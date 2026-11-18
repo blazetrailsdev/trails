@@ -11,6 +11,10 @@ const ANY = "@typescript-eslint/no-explicit-any";
 const STRIPPED = "packages/activerecord/lib/associations.ts";
 const MOVED = "packages/activerecord/lib/aggregations.ts";
 const MOVED_TO = "packages/activerecord/lib/aggregations-moved.ts";
+const CAST = "blazetrails/no-double-cast";
+const GROWN = "packages/actionview/lib/layouts.ts";
+const SHRUNK = "packages/actionview/lib/lookup-context.ts";
+const ADDED = "packages/actionview/lib/helpers/sanitize-helper.ts";
 
 describe("exceedances", () => {
   it("flags a file above its base count and a file new at a non-zero count", () => {
@@ -39,6 +43,13 @@ describe("main", () => {
       (await fs.readFile(stripped, "utf-8")).replace(/: any\b/g, ": unknown"),
     );
     await git(dir, "mv", MOVED, MOVED_TO);
+    const grown = path.join(dir, GROWN);
+    await fs.writeFile(
+      grown,
+      (await fs.readFile(grown, "utf-8")).replace(/ as unknown as /g, " as "),
+    );
+    await fs.appendFile(path.join(dir, SHRUNK), "\nexport const _x = (1 as unknown as string);\n");
+    await git(dir, "rm", "-q", ADDED);
     await git(dir, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qam", "base");
     base = (await git(dir, "rev-parse", "HEAD")).stdout.trim();
   }, 60_000);
@@ -67,6 +78,18 @@ describe("main", () => {
     );
     expect(error?.message).toContain(`${MOVED}::${ANY}: 0 → ${current[`${MOVED}::${ANY}`]}`);
   }, 120_000);
+
+  it("counts a double cast that grows, shrinks and is new against the base", async () => {
+    const atBase = await measureAt(base, [GROWN, SHRUNK, ADDED]);
+    const current = await measure([GROWN, SHRUNK, ADDED]);
+    expect(atBase[`${GROWN}::${CAST}`]).toBeUndefined();
+    expect(current[`${SHRUNK}::${CAST}`]).toBeLessThan(atBase[`${SHRUNK}::${CAST}`]);
+    expect(atBase[`${ADDED}::${CAST}`]).toBeUndefined();
+    expect(exceedances(atBase, current)).toEqual([
+      { key: `${ADDED}::${CAST}`, base: 0, current: current[`${ADDED}::${CAST}`] },
+      { key: `${GROWN}::${CAST}`, base: 0, current: current[`${GROWN}::${CAST}`] },
+    ]);
+  }, 60_000);
 
   it("passes when the base is HEAD itself", async () => {
     const { stdout } = await run("git", ["status", "--porcelain", "packages"], { cwd: ROOT_DIR });

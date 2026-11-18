@@ -60,6 +60,7 @@ import noLoadSchemaWithStubbedDdl from "./eslint/no-load-schema-with-stubbed-ddl
 import thorImportBoundary from "./eslint/thor-import-boundary.mjs";
 import thorCommandRegistration from "./eslint/thor-command-registration.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
+import noDoubleCast from "./eslint/no-double-cast.mjs";
 import noRawControlBytes from "./eslint/no-raw-control-bytes.mjs";
 import noJsRenderingInRailsMessages from "./eslint/no-js-rendering-in-rails-messages.mjs";
 import noFreeformComments from "./eslint/no-freeform-comments.mjs";
@@ -349,6 +350,7 @@ export default defineConfig(
           "thor-import-boundary": thorImportBoundary,
           "thor-command-registration": thorCommandRegistration,
           "no-explicit-any-disable": noExplicitAnyDisable,
+          "no-double-cast": noDoubleCast,
           "no-raw-control-bytes": noRawControlBytes,
           "no-js-rendering-in-rails-messages": noJsRenderingInRailsMessages,
           "no-freeform-comments": noFreeformComments,
@@ -1182,6 +1184,25 @@ export default defineConfig(
       "@typescript-eslint/no-explicit-any": "off",
       "unused-imports/no-unused-vars": "off",
       "no-undef": "off",
+    },
+  },
+
+  // ── type polish (RFC 0242): `no-explicit-any` and `no-double-cast` are held
+  //    at `warn` in these packages' lib and counted per file against
+  //    origin/main by `pnpm parity:lint:counts`; disabling `no-explicit-any`
+  //    inline is an error. After the package blocks above that turn it off. ──
+  {
+    files: [
+      "packages/activerecord/lib/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "blazetrails/no-double-cast": "warn",
+      "blazetrails/no-explicit-any-disable": "error",
     },
   },
 

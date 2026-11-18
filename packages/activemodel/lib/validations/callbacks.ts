@@ -37,8 +37,7 @@ export const ClassMethods = {
 /** @internal */
 export interface ValidationCallbacksHost {
   prototype: object;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors ASCallbacks.ClassMethods#setCallback's filter splat.
-  setCallback(name: string, ...filterList: any[]): void;
+  setCallback(name: string, ...filterList: unknown[]): void;
 }
 
 export type ValidationCallbackFilter<T extends ValidationCallbacksHost> =
@@ -51,8 +50,7 @@ export interface CallbacksInstanceMethods {
   runValidationsBang(): Promise<boolean>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
-type AnyClass = (new (...args: any[]) => any) & { prototype: object };
+type AnyClass = (new (...args: never[]) => unknown) & { prototype: object };
 
 export const Callbacks = {
   ClassMethods,

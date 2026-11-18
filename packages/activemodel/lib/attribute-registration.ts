@@ -248,8 +248,7 @@ export const ClassMethods = {
 
 export const AttributeRegistration = {
   ClassMethods,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `extend()`'s own AnyClass shape.
-  [included](base: new (...args: any[]) => any): void {
+  [included](base: new (...args: never[]) => unknown): void {
     extend(base, ClassMethods);
   },
 };

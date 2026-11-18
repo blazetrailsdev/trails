@@ -31,6 +31,7 @@ export const RULES = [
   "@typescript-eslint/no-explicit-any",
   "blazetrails/rails-error-parity",
   "blazetrails/no-standalone-associations",
+  "blazetrails/no-double-cast",
 ];
 
 /**
