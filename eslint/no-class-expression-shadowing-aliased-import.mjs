@@ -9,8 +9,9 @@
  *
  * esbuild renames a bundled aliased import back to its original name, which
  * then collides with the class expression's inner binding, and the module
- * throws a TDZ `ReferenceError` at load. Drop the inner name: a static field's
- * NamedEvaluation still sets `.name`.
+ * throws a TDZ `ReferenceError` at load. Keep the class name, which `parity:api`
+ * credits members through, and read the superclass through a namespace import
+ * instead of an alias: `class BacktraceCleaner extends ActiveSupport.BacktraceCleaner`.
  */
 
 export default {
@@ -22,7 +23,7 @@ export default {
     schema: [],
     messages: {
       shadowsAliasedImport:
-        "Class expression `{{name}}` shares the original name of the aliased import `{{name}} as {{local}}`; esbuild renames the import back and the module throws a TDZ ReferenceError at load. Drop the class expression's name.",
+        "Class expression `{{name}}` shares the original name of the aliased import `{{name}} as {{local}}`; esbuild renames the import back and the module throws a TDZ ReferenceError at load. Keep the name and read the superclass through a namespace import instead of the alias.",
     },
   },
   create(context) {
