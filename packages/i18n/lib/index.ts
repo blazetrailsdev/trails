@@ -1,11 +1,13 @@
 import { TopLevel } from "@blazetrails/ruby-compat";
 export { Config } from "./config.js";
+export { VERSION } from "./version.js";
 export type { ExceptionHandlerLike, MissingInterpolationArgumentHandler } from "./config.js";
 export {
   ArgumentError,
   Disabled,
   ExceptionHandler,
   InvalidLocale,
+  InvalidFilenames,
   InvalidLocaleData,
   InvalidPluralizationData,
   MissingInterpolationArgument,
@@ -76,6 +78,7 @@ export { FLATTEN_SEPARATOR, Flatten, SEPARATOR_ESCAPE_CHAR } from "./backend/fla
 export { KeyValue, SubtreeProxy } from "./backend/key-value.js";
 export type { Store } from "./backend/key-value.js";
 export { Simple } from "./backend/simple.js";
+export { LazyLoadable, LocaleExtractor } from "./backend/lazy-loadable.js";
 export * as Backend from "./backend.js";
 export { Fallbacks, fallbacks, setFallbacks } from "./backend/fallbacks.js";
 export type { FallbacksLike, FallbacksMethods } from "./backend/fallbacks.js";

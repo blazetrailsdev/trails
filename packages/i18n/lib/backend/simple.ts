@@ -20,8 +20,8 @@ export interface Simple extends Base {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Simple {
-  private initializedFlag = false;
-  private translationsStore: TranslationData | undefined;
+  protected initializedFlag = false;
+  protected translationsStore: TranslationData | undefined;
 
   initialized(): boolean {
     return this.initializedFlag;

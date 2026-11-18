@@ -38,12 +38,6 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
       "procs via `eval`/`instance_eval`, which has no trails counterpart.",
   },
   {
-    pattern: "backend/lazy_loadable.rb",
-    testFile: "backend/lazy_loadable_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend mixin — defers translation-file loading until first lookup.",
-  },
-  {
     pattern: "backend/memoize.rb",
     testFile: "backend/memoize_test.rb",
     package: "i18n",
@@ -90,11 +84,6 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
     testFile: "api/cascade_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
-  },
-  {
-    testFile: "api/lazy_loadable_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend mixin — defers translation-file loading until first lookup.",
   },
   {
     testFile: "api/memoize_test.rb",
