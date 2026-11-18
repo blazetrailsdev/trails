@@ -3,7 +3,7 @@ import { extend, constSet } from "@blazetrails/ruby-compat/include";
 import { ActiveSupport } from "../namespaces.js";
 import type { Serializer } from "./serializer.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
-import { Temporal, Time } from "@blazetrails/date";
+import { DateTime, Temporal, Time } from "@blazetrails/date";
 import {
   BigDecimal,
   Complex,
@@ -37,30 +37,12 @@ const JD_UNIX_EPOCH = 2440588;
 
 const UNIX_EPOCH_DATE = Temporal.PlainDate.from("1970-01-01");
 
-const NANOS_PER_SECOND = 1_000_000_000;
-
 function julianDay(date: Temporal.PlainDate): number {
   return JD_UNIX_EPOCH + date.since(UNIX_EPOCH_DATE, { largestUnit: "day" }).days;
 }
 
 function dateFromJulianDay(jd: number): Temporal.PlainDate {
   return UNIX_EPOCH_DATE.add({ days: jd - JD_UNIX_EPOCH });
-}
-
-function nanosecondOfSecond(time: {
-  millisecond: number;
-  microsecond: number;
-  nanosecond: number;
-}): number {
-  return time.millisecond * 1_000_000 + time.microsecond * 1_000 + time.nanosecond;
-}
-
-function secFraction(datetime: Temporal.PlainDateTime): Rational {
-  return rational(nanosecondOfSecond(datetime), NANOS_PER_SECOND);
-}
-
-function offset(_datetime: Temporal.PlainDateTime): Rational {
-  return rational(0, 1);
 }
 
 export class UnserializableObjectError extends Error {}
@@ -234,31 +216,28 @@ export const Extensions = {
     return complex(unpacker.read(), unpacker.read());
   },
 
-  writeDatetime(datetime: Temporal.PlainDateTime, packer: Packer): void {
-    packer.write(julianDay(datetime.toPlainDate()));
+  /** @inventedArm if — CONVERGEABLE date-parse-returns-temporal-not-the-owned-date-class */
+  writeDatetime(
+    datetime: DateTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
+    packer: Packer,
+  ): void {
+    if (!(datetime instanceof DateTime)) datetime = new DateTime(datetime);
+    packer.write(datetime.jd);
     packer.write(datetime.hour);
-    packer.write(datetime.minute);
-    packer.write(datetime.second);
-    Extensions.writeRational(secFraction(datetime), packer);
-    Extensions.writeRational(offset(datetime), packer);
+    packer.write(datetime.min);
+    packer.write(datetime.sec);
+    Extensions.writeRational(datetime.secFraction, packer);
+    Extensions.writeRational(datetime.offset, packer);
   },
 
-  readDatetime(unpacker: Unpacker): Temporal.PlainDateTime {
-    const jd = unpacker.read() as number;
-    const hour = unpacker.read() as number;
-    const minute = unpacker.read() as number;
-    const second = unpacker.read() as number;
-    const secFraction = Extensions.readRational(unpacker);
-    Extensions.readRational(unpacker);
-    const nanos = Math.round(secFraction.toF() * NANOS_PER_SECOND);
-    return dateFromJulianDay(jd).toPlainDateTime({
-      hour,
-      minute,
-      second,
-      millisecond: Math.floor(nanos / 1_000_000),
-      microsecond: Math.floor(nanos / 1_000) % 1_000,
-      nanosecond: nanos % 1_000,
-    });
+  readDatetime(unpacker: Unpacker): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return DateTime.jd(
+      unpacker.read() as number,
+      unpacker.read() as number,
+      unpacker.read() as number,
+      rational(unpacker.read() as number, 1).add(Extensions.readRational(unpacker)),
+      Extensions.readRational(unpacker),
+    );
   },
 
   writeDate(date: Temporal.PlainDate, packer: Packer): void {
