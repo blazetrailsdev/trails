@@ -125,9 +125,7 @@ export class Base {
 
   /** @internal */
   static get abstract(): boolean {
-    return Object.hasOwn(this, "_abstract")
-      ? (this as unknown as { _abstract: boolean })._abstract
-      : false;
+    return Object.hasOwn(this, "_abstract") ? this._abstract : false;
   }
 
   /** @internal */
@@ -137,7 +135,7 @@ export class Base {
 
   /** @internal */
   static abstractBang(): void {
-    (this as unknown as { _abstract: boolean })._abstract = true;
+    this._abstract = true;
   }
 
   static {
@@ -149,14 +147,13 @@ export class Base {
 
   static controllerPath(): string {
     if (Object.hasOwn(this, "_controllerPath")) {
-      return (this as unknown as { _controllerPath: string })._controllerPath;
+      return this._controllerPath!;
     }
     const name = rbModName(this);
-    if (!name) return ((this as unknown as { _controllerPath: string })._controllerPath = "");
+    if (!name) return (this._controllerPath = "");
     const SUFFIX = "Controller";
     const stripped = name.endsWith(SUFFIX) ? name.slice(0, -SUFFIX.length) : name;
-    return ((this as unknown as { _controllerPath: string })._controllerPath =
-      underscore(stripped));
+    return (this._controllerPath = underscore(stripped));
   }
 
   /** @internal */
@@ -179,7 +176,7 @@ export class Base {
 
   /** @internal */
   static clearActionMethodsBang(): void {
-    (this as unknown as { _actionMethodCache?: Set<string> })._actionMethodCache = undefined;
+    this._actionMethodCache = undefined;
   }
 
   /** @internal */

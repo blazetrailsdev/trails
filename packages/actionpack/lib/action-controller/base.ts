@@ -350,6 +350,8 @@ export class Base extends Metal {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static raiseOnMissingCallbackActions: boolean;
+  declare static enableFragmentCacheLogging: boolean;
+  declare dbRuntime?: number | null;
   declare static beforeAction: OmitThisParameter<typeof beforeAction>;
   declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
   declare static skipBeforeAction: OmitThisParameter<typeof skipBeforeAction>;
@@ -495,7 +497,7 @@ export class Base extends Metal {
     this._markedForSameOriginVerification = null;
     this.viewRuntime = null;
     if (isModuleIncluded(new.target, TopLevel.ActiveRecord?.Railties.ControllerRuntime as never)) {
-      (this as unknown as { dbRuntime: number | null }).dbRuntime = null;
+      this.dbRuntime = null;
     }
   }
 
