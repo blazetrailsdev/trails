@@ -435,9 +435,6 @@ export default defineConfig(
     },
   },
 
-  // ── no-class-expression-shadowing-aliased-import ──
-  // esbuild renames an aliased import back to its original name, so a class
-  // expression carrying that name throws a TDZ ReferenceError at load.
   {
     files: ["packages/**/*.ts"],
     rules: {
