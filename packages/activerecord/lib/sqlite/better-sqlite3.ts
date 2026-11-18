@@ -50,6 +50,7 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
   constructor(private readonly stmt: Database.Statement) {}
 
   private bind<T>(binds: SqliteBinds | undefined, call: (args: unknown[]) => T): T {
+    this._columns = null;
     const args = bindArgs(binds);
     try {
       if (binds !== undefined && !Array.isArray(binds)) return call(args);

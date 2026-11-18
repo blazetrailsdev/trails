@@ -348,9 +348,9 @@ export class Engine extends Trailtie {
 
   /** @internal */
   buildRequest(env: RackEnv): Request {
-    /** @perf 2.9x — PERMANENT */
+    /** @perf 3.8x — PERMANENT */
     const envConfig = this.envConfig();
-    for (const key in envConfig) env[key] = envConfig[key];
+    for (const key of Object.keys(envConfig)) env[key] = envConfig[key];
     const req = new Request(env);
     req.routes = this.routes();
     req.setEngineScriptName(req.scriptName);

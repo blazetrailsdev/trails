@@ -26,6 +26,21 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     await driver.close();
   });
 
+  it("reads a statement's columns again after a schema change re-prepares it", async () => {
+    const own = await betterSqlite3Driver.open({ database: ":memory:" });
+    try {
+      await (await own.prepare("CREATE TABLE gadgets (id INTEGER PRIMARY KEY)")).run();
+      const select = await own.prepare("SELECT * FROM gadgets");
+      select.all();
+      expect(select.columns().map((c) => c.name)).toEqual(["id"]);
+      await own.exec("ALTER TABLE gadgets ADD COLUMN label TEXT");
+      select.all();
+      expect(select.columns().map((c) => c.name)).toEqual(["id", "label"]);
+    } finally {
+      await own.close();
+    }
+  });
+
   it("retrieves a row by name", async () => {
     const select = await driver.prepare("SELECT id, name, qty FROM widgets WHERE name = ?");
     const row = (await select.get(["sprocket"])) as Record<string, unknown>;
