@@ -32,6 +32,8 @@ import {
   withLocale,
 } from "../lib/i18n.js";
 import { Config } from "../lib/config.js";
+import { VERSION } from "../lib/version.js";
+import { Fiber, Thread } from "@blazetrails/ruby-compat";
 import { Simple } from "../lib/backend/simple.js";
 import type { TranslationKey } from "../lib/i18n.js";
 
@@ -403,8 +405,19 @@ describe("I18nTest", () => {
     }
   });
 
+  it("exposes its VERSION constant", () => {
+    expect(VERSION).toBeTruthy();
+  });
+
   it("uses the default locale as a locale by default", () => {
     expect(locale()).toBe(defaultLocale());
+  });
+
+  it("sets the current locale to Thread.current", () => {
+    expect(() => setLocale("de")).not.toThrow();
+    expect(locale()).toBe("de");
+    expect((Thread.current().threadVariableGet(":i18n_config") as Config).locale).toBe("de");
+    setLocale("en");
   });
 
   it("locale= doesn't ignore junk", () => {
@@ -618,5 +631,18 @@ describe("I18nTest", () => {
     } finally {
       RESERVED_KEYS.splice(0, RESERVED_KEYS.length, ...originalKeys);
     }
+  });
+
+  it("I18n.locale is preserved in Fiber context", () => {
+    setAvailableLocales(["en", "ja"]);
+    setDefaultLocale("ja");
+    setLocale("en");
+
+    let fiberLocale: Locale | false | null = null;
+    new Fiber(() => {
+      fiberLocale = locale();
+    }).resume();
+
+    expect(fiberLocale).toBe("en");
   });
 });

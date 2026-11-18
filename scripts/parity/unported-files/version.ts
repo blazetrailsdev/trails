@@ -17,11 +17,4 @@ export const VERSION_UNPORTED_FILES: UnportedFile[] = [
       "(leading `/`) so it cannot also exclude `gem_version.rb`, which owns " +
       "real surface (`ActionPack.gem_version`).",
   })),
-  {
-    pattern: "/version.rb",
-    package: "i18n",
-    reason:
-      "`i18n/version.rb` defines only the `I18n::VERSION` constant. trails " +
-      "carries the version in package.json, so there is no method to port.",
-  },
 ];

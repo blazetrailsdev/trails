@@ -515,24 +515,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   // (adapter-prevent-writes.test.ts:60); only the PG `assert_raises` variant is
   // skipped, and that is an adapter behavior, not a JS-runtime impossibility.
   {
-    testFile: "i18n_test.rb",
-    tests: ["exposes its VERSION constant"],
-    reason:
-      "Asserts `I18n::VERSION`, which lives in the `version.rb` excluded above " +
-      "— trails carries the version in package.json, so there is no constant.",
-  },
-  {
-    testFile: "i18n_test.rb",
-    tests: [
-      "sets the current locale to Thread.current",
-      "I18n.locale is preserved in Fiber context",
-    ],
-    reason:
-      "Both read the config back off `Thread.current.thread_variable_get(:i18n_config)` / a " +
-      "`Fiber`. trails keeps one process-wide config and Node has neither thread-local " +
-      "storage of this shape nor Fibers, so there is nothing to assert.",
-  },
-  {
     testFile: "backend/transliterator_test.rb",
     tests: ["default transliterator raises errors for invalid UTF-8"],
     reason:
