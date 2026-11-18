@@ -79,12 +79,12 @@ export const Concern = {
     }
   },
 
-  included(this: ConcernHost, base: unknown = null, block?: (this: any) => void): void {
+  included(this: object, base: unknown = null, block?: (this: any) => void): void {
     if (base == null) {
       if (Object.hasOwn(this, "_includedBlock")) {
         if (
-          sourceLocation(this._includedBlock!) !== sourceLocation(block!) ||
-          this._includedBlock!.toString() !== block!.toString()
+          sourceLocation((this as ConcernHost)._includedBlock!) !== sourceLocation(block!) ||
+          (this as ConcernHost)._includedBlock!.toString() !== block!.toString()
         ) {
           throw new MultipleIncludedBlocks();
         }

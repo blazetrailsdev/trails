@@ -527,9 +527,7 @@ Object.assign(Behavior, {
   buildResponse,
 });
 
-(
-  Behavior as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
-).included(null, function (this: typeof TestCase) {
+Concern.included.call(Behavior, null, function (this: typeof TestCase) {
   include(this, TemplateAssertions);
   include(this, Assertions);
   classAttribute.call(this, "_controllerClass");

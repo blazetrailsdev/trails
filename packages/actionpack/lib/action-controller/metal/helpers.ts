@@ -86,12 +86,9 @@ export function helpers(this: {
 export const Helpers = { ClassMethods, helpers };
 extend(Helpers, Concern);
 include(Helpers, AbstractHelpers);
-(Helpers as unknown as { included(base: null, block: (this: object) => void): void }).included(
-  null,
-  function (this: object) {
-    classAttribute.call(this, "helpersPath", { default: [] });
-    classAttribute.call(this, "includeAllHelpers", { default: true });
-  },
-);
+Concern.included.call(Helpers, null, function (this: object) {
+  classAttribute.call(this, "helpersPath", { default: [] });
+  classAttribute.call(this, "includeAllHelpers", { default: true });
+});
 
 ActionController.Helpers = Helpers;

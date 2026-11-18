@@ -80,9 +80,7 @@ export const ClassMethods = { addFlashTypes, actionMethods };
 /** @missingRailsCall delegate — CONVERGEABLE flash-reader-is-a-hand-written-getter-not-a-delegate-call */
 export const Flash = { ClassMethods, redirectTo };
 extend(Flash, Concern);
-(
-  Flash as unknown as { included(base: null, block: (this: FlashClassHost) => void): void }
-).included(null, function (this: FlashClassHost) {
+Concern.included.call(Flash, null, function (this: FlashClassHost) {
   classAttribute.call(this, "_flashTypes", { instanceAccessor: false, default: [] });
 
   Object.defineProperty(this.prototype, "flash", { get: flash, configurable: true });

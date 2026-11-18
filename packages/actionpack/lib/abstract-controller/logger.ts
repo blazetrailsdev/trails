@@ -14,9 +14,7 @@ type LoggerIncludingClass = (new (...args: never[]) => unknown) & {
 
 export const Logger = {};
 extend(Logger, Concern);
-(
-  Logger as unknown as { included(base: null, block: (this: LoggerIncludingClass) => void): void }
-).included(null, function (this: LoggerIncludingClass) {
+Concern.included.call(Logger, null, function (this: LoggerIncludingClass) {
   this.configAccessor("logger");
   include(this, Benchmarkable);
 });

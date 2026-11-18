@@ -240,11 +240,8 @@ export const Redirecting = {
 extend(Redirecting, Concern);
 include(Redirecting, Logger);
 include(Redirecting, UrlFor);
-(Redirecting as unknown as { included(base: null, block: (this: object) => void): void }).included(
-  null,
-  function (this: object) {
-    mattrAccessor.call(this, "raiseOnOpenRedirects", { default: false });
-  },
-);
+Concern.included.call(Redirecting, null, function (this: object) {
+  mattrAccessor.call(this, "raiseOnOpenRedirects", { default: false });
+});
 
 ActionController.Redirecting = Redirecting;

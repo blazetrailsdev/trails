@@ -7,9 +7,7 @@ import { ConditionalGet, type Etagger } from "./conditional-get.js";
 export const EtagWithFlash = {};
 extend(EtagWithFlash, Concern);
 include(EtagWithFlash, ConditionalGet);
-(
-  EtagWithFlash as unknown as { included(base: null, block: (this: object) => void): void }
-).included(null, function (this: object) {
+Concern.included.call(EtagWithFlash, null, function (this: object) {
   (this as typeof ConditionalGet.ClassMethods & { etaggers: Etagger[] }).etag(function (
     this: unknown,
   ) {
