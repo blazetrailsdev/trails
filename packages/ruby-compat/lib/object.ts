@@ -768,6 +768,52 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  */
 export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   if (mid === "toYaml") return true;
+  const bound = _methodBound(obj, mid);
+  if (bound !== null) return bound;
+  const respondToMissing = chainEntry(obj, "respondToMissing");
+  if (typeof respondToMissing !== "function") return false;
+  const ret = (respondToMissing as (mid: string) => unknown).call(obj, mid);
+  return ret != null && ret !== false;
+}
+
+/**
+ * The method-entry half of `basic_obj_respond_to` (`method_boundp`,
+ * `vendor/ruby/v3.3.11/vm_method.c:1788`), memoized per prototype and name
+ * until {@link methodCacheSerial} moves, as MRI's call cache is. A receiver
+ * holding its own entry for the name is looked up afresh. `null` is no entry
+ * either way, where `respond_to_missing?` decides.
+ *
+ * @perf 3.5% — PERMANENT
+ */
+function _methodBound(obj: unknown, mid: string): boolean | null {
+  if (typeof obj !== "object" || obj === null) return _methodBoundUncached(obj, mid);
+  const proto = Object.getPrototypeOf(obj) as object | null;
+  const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
+  const writer = writerSpelling(attr);
+  if (
+    proto === null ||
+    Object.hasOwn(obj, mid) ||
+    Object.hasOwn(obj, Symbol.toStringTag) ||
+    Object.hasOwn(obj, Symbol.iterator) ||
+    (attr !== undefined && Object.hasOwn(obj, attr)) ||
+    (writer !== undefined && Object.hasOwn(obj, writer))
+  ) {
+    return _methodBoundUncached(obj, mid);
+  }
+  let entries = _boundEntries.get(proto);
+  if (entries === undefined || entries.serial !== methodCacheSerial) {
+    entries = { serial: methodCacheSerial, bound: new Map() };
+    _boundEntries.set(proto, entries);
+  }
+  let bound = entries.bound.get(mid);
+  if (bound === undefined) entries.bound.set(mid, (bound = _methodBoundUncached(obj, mid)));
+  return bound;
+}
+
+/** @perf 3.5% — PERMANENT */
+const _boundEntries = new WeakMap<object, { serial: number; bound: Map<string, boolean | null> }>();
+
+function _methodBoundUncached(obj: unknown, mid: string): boolean | null {
   const core =
     obj === null || obj === undefined
       ? false
@@ -875,11 +921,7 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   ) {
     if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
   }
-  if (reopenedSeatMethod(obj, mid) !== undefined) return true;
-  const respondToMissing = chainEntry(obj, "respondToMissing");
-  if (typeof respondToMissing !== "function") return false;
-  const ret = (respondToMissing as (mid: string) => unknown).call(obj, mid);
-  return ret != null && ret !== false;
+  return reopenedSeatMethod(obj, mid) !== undefined ? true : null;
 }
 
 function chainEntry(obj: unknown, name: string): unknown {

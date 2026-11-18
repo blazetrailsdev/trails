@@ -1872,3 +1872,26 @@ describe("basicObjRespondTo on a String instance", () => {
     expect(toS(new String("x"))).toBe("x");
   });
 });
+
+describe("rbObjRespondTo method cache", () => {
+  it("answers a method defined after the first query", () => {
+    class Widget {}
+    const widget = new Widget();
+    expect(rbObjRespondTo(widget, "spin")).toBe(false);
+    rbModDefineMethod(Widget, "spin", () => "spun");
+    expect(rbObjRespondTo(widget, "spin")).toBe(true);
+  });
+
+  it("consults respondToMissing on every call", () => {
+    let answer = false;
+    class Ghost {
+      respondToMissing(): boolean {
+        return answer;
+      }
+    }
+    const ghost = new Ghost();
+    expect(rbObjRespondTo(ghost, "boo")).toBe(false);
+    answer = true;
+    expect(rbObjRespondTo(ghost, "boo")).toBe(true);
+  });
+});
