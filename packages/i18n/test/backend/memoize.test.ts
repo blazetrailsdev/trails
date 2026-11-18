@@ -82,7 +82,7 @@ describe("I18nBackendMemoizeTest", () => {
     spy().spyCalls = 0;
     backend().storeTranslations("copa", { ca: ":bana" } as unknown as TranslationData);
     expect(availableLocales()).toEqual(availableLocales());
-    expect(availableLocales().includes("copa")).toBe(true);
+    expect(availableLocales().includes("copa")).toBeTruthy();
     expect(spy().spyCalls).toBe(1);
   });
 

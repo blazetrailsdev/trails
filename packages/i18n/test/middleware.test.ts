@@ -1,9 +1,9 @@
 import { Thread } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { locale, setDefaultLocale, setLocale } from "../../lib/i18n.js";
-import { Middleware } from "../../lib/middleware.js";
-import * as TestCase from "../support/test-case.js";
+import { locale, setDefaultLocale, setLocale } from "../lib/i18n.js";
+import { Middleware } from "../lib/middleware.js";
+import * as TestCase from "./support/test-case.js";
 
 class DummyRackApp {
   call(_env: unknown): unknown {
