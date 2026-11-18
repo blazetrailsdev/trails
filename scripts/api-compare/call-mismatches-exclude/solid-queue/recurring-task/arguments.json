@@ -1,0 +1,9 @@
+[
+  {
+    "package": "solid-queue",
+    "tsFile": "recurring-task/arguments.ts",
+    "rubyName": "load",
+    "call": "deserialize",
+    "reason": "ActiveJob::Arguments.deserialize is async and a serialize coder's load is sync; RecurringTask#argumentsWithKwargs awaits it instead (CONVERGEABLE recurring-task-arguments-load-deserializes)."
+  }
+]
