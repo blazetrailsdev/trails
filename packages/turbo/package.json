@@ -41,7 +41,8 @@
   "devDependencies": {
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
-    "@blazetrails/trails-tsc": "workspace:*"
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@types/node": "25.3.5"
   },
   "mirrors": [
     {
