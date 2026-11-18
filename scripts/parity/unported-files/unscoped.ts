@@ -517,11 +517,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "backend/transliterator_test.rb",
     tests: ["default transliterator raises errors for invalid UTF-8"],
-    reason:
-      'Feeds `"a\\x92b"`, whose bytes are not valid UTF-8, and relies on Ruby\'s regexp ' +
-      "engine raising `ArgumentError: invalid byte sequence` (transliterator.rb:96). A JS " +
-      "string is UTF-16 code units with no invalid-byte state to reach, so no input makes " +
-      "the ported `transliterate` raise.",
+    reason: 'PERMANENT: CLAUDE.md \u00a7 "A String has no encoding tag either".',
   },
   {
     testFile: "test_date_new.rb",

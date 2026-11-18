@@ -7,3 +7,5 @@ export { Pluralization } from "./backend/pluralization.js";
 export { Simple } from "./backend/simple.js";
 export { LazyLoadable, LocaleExtractor } from "./backend/lazy-loadable.js";
 export { Transliterator } from "./backend/transliterator.js";
+export { Cascade } from "./backend/cascade.js";
+export { Memoize } from "./backend/memoize.js";
