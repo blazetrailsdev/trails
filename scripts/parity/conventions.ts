@@ -1782,6 +1782,7 @@ export function rubyMethodToTs(
  * {@link PROTOCOL_CALL_ENROLLED_PACKAGES}, and skipped elsewhere as before.
  */
 export function rubyCallToTs(name: string, pkg: string | undefined): string[] | null {
+  if (name === "new") return ["constructor"];
   if (
     pkg !== undefined &&
     PROTOCOL_CALL_ENROLLED_PACKAGES.has(pkg) &&
@@ -1873,7 +1874,8 @@ function rubyMethodToTsWithoutUnderscore(
   // at `:111`) WRAPS the constructor; it is a second Ruby member, not a second
   // spelling of the same one.
   if (name === "new" && siblingRubyNames?.has("initialize") === true) return null;
-  if (name === "initialize" || name === "new") return ["constructor"];
+  if (name === "initialize") return ["constructor"];
+  if (name === "new") return ["constructor", "new"];
   if (name === "to_s" || name === "to_str") return ["toString"];
   if (name === "to_json") return ["toJSON"];
   if (name === "to_sql") return ["toSql"];

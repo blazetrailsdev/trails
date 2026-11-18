@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  augmentsForeignClass,
   ownerRecordsNothing,
   skeletonIsAnotherOwners,
   skeletonsOfOwner,
@@ -5081,5 +5082,25 @@ describe("unreachableSingletonCallsDropped", () => {
         "split",
       ),
     ).toBe(true);
+  });
+});
+
+describe("augmentsForeignClass", () => {
+  const src = [
+    'declare module "@blazetrails/mail/elements/address" {',
+    "  interface Address {",
+    "    equals(other: unknown): boolean;",
+    "  }",
+    "}",
+    "export class Local {}",
+  ].join("\n");
+
+  it("answers a class the declare module block reopens", () => {
+    expect(augmentsForeignClass(src, "Address")).toBe(true);
+  });
+
+  it("does not answer a class outside the block", () => {
+    expect(augmentsForeignClass(src, "Local")).toBe(false);
+    expect(augmentsForeignClass(src, "Message")).toBe(false);
   });
 });

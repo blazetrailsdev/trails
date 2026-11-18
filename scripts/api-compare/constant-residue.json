@@ -37,7 +37,7 @@
     }
   },
   "actionmailbox": {
-    "rows": 29,
+    "rows": 31,
     "excluded": ["base-controller.ts::BaseController"],
     "unwalked": [
       "gem-version.ts::VERSION",
@@ -52,6 +52,7 @@
       "action-mailbox/incinerates-controller.ts::IncineratesController": "Trails::Conductor::ActionMailbox::IncineratesController",
       "action-mailbox/reroutes-controller.ts::ReroutesController": "Trails::Conductor::ActionMailbox::ReroutesController",
       "callbacks.ts::ClassMethods": "ActionMailbox::Callbacks::ClassMethods",
+      "inbound-email/message-id.ts::ClassMethods": "ActionMailbox::InboundEmail::MessageId::ClassMethods",
       "routing.ts::ClassMethods": "ActionMailbox::Routing::ClassMethods"
     }
   },
