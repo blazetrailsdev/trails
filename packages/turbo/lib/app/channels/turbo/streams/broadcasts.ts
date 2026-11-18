@@ -135,22 +135,18 @@ export const Broadcasts = {
   async broadcastActionLaterTo(this: BroadcastsHost, ...streamables: unknown[]): Promise<unknown> {
     const {
       action,
+      target = null,
+      targets = null,
       attributes = {},
-      target: t = null,
-      targets: ts = null,
       ...rendering
     } = extractOptionsBang(streamables);
-    let target = t;
-    let targets = ts;
     streamables = compactBlank(streamables.flat(Infinity));
 
     if (isPresent(streamables)) {
-      target = this.convertToTurboStreamDomId(target);
-      targets = this.convertToTurboStreamDomId(targets, { includeSelector: true });
       return await ActionBroadcastJob.performLater(this.streamNameFrom(streamables), {
         action,
-        target,
-        targets,
+        target: this.convertToTurboStreamDomId(target),
+        targets: this.convertToTurboStreamDomId(targets, { includeSelector: true }),
         attributes,
         ...rendering,
       });
