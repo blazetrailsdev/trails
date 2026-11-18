@@ -2,10 +2,21 @@ import { Executor, OrderedOptions } from "@blazetrails/activesupport";
 
 class AppExecutor extends Executor {}
 
+const activeJob = new OrderedOptions();
+activeJob.queueAdapter = "solid_queue";
+
 export const app: {
   executor: typeof Executor;
-  config: { x: OrderedOptions & { solidQueueRecordHookRan?: boolean }; timeZone: string };
+  reloader: typeof Executor;
+  deprecators: Map<string, unknown>;
+  config: {
+    x: OrderedOptions & { solidQueueRecordHookRan?: boolean };
+    timeZone: string;
+    activeJob: OrderedOptions;
+  };
 } = {
   executor: AppExecutor,
-  config: { x: new OrderedOptions(), timeZone: "UTC" },
+  reloader: AppExecutor,
+  deprecators: new Map(),
+  config: { x: new OrderedOptions(), timeZone: "UTC", activeJob },
 };

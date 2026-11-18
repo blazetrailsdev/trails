@@ -78,6 +78,7 @@ export interface SerializerLike {
 export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
   Railtie?: unknown;
   Base: typeof Base;
+  BatchId?: object;
   Arguments: typeof ArgumentsModule.Arguments;
   DeserializationError: typeof ArgumentsModule.DeserializationError;
   SerializationError: typeof ArgumentsModule.SerializationError;

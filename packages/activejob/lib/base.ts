@@ -10,11 +10,13 @@ import {
   extend,
   Hash,
   include,
+  isModuleIncluded,
   NoMethodError,
   rbHashSRuby2KeywordsHash,
   rbObjClass,
   rbObjIsKindOf,
   SecureRandom,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Callbacks, ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 import { ClassMethods, Core } from "./core.js";
@@ -99,6 +101,7 @@ export class Base {
    * @inventedArm getPrototypeOf — PERMANENT
    * @inventedArm throw — PERMANENT
    * @inlinedFrom ActiveJob::Core#initialize rails/v8.0.2/activejob/lib/active_job/core.rb:93-102
+   * @inlinedFrom ActiveJob::BatchId#initialize solid_queue/v1.7.2/lib/active_job/batch_id.rb:19-22
    */
   constructor(...arguments_: unknown[]) {
     const last = arguments_[arguments_.length - 1];
@@ -121,6 +124,15 @@ export class Base {
     const timeZone = zone();
     if (timeZone === false) throw new NoMethodError("undefined method `name' for false", "name");
     this.timezone = timeZone?.name ?? null;
+    /** @inventedArm if — PERMANENT */
+    if (ActiveJob.BatchId !== undefined && isModuleIncluded(new.target, ActiveJob.BatchId)) {
+      const host = this as this & { batchId?: unknown; isSolidQueueJob(): boolean };
+      if (host.isSolidQueueJob()) {
+        host.batchId = (
+          TopLevel as { SolidQueue?: { Batch: { currentBatchId(): unknown } } }
+        ).SolidQueue!.Batch.currentBatchId();
+      }
+    }
   }
 }
 include(Base, Core);

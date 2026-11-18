@@ -1,6 +1,7 @@
 import { include, inquiry, type StringInquirer } from "@blazetrails/activesupport";
-import { NotImplementedError, Thread, classModule } from "@blazetrails/ruby-compat";
+import { Errno, IO, NotImplementedError, Thread, classModule } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
+import { Timer } from "../timer.js";
 import { Supervised } from "./supervised.js";
 
 const DEFAULT_MODE = "async";
@@ -10,9 +11,11 @@ type Mode = StringInquirer & Record<string, () => boolean>;
 interface RunnableHost {
   _mode?: string | null;
   _thread?: Thread;
+  _bootGuard: NullGuard | ForkGuard;
   name: string;
   mode: Mode;
   boot(): Promise<void>;
+  runInMode(block: () => Promise<void>): Promise<unknown>;
   run(): Promise<void>;
   runCallbacks(kind: string, block: () => unknown): Promise<unknown>;
   registerSignalHandlers(): void;
@@ -37,18 +40,43 @@ export class Runnable {
   }
 
   async start(this: RunnableHost): Promise<void> {
-    await this.boot();
-
-    if (this.isRunningAsync()) {
-      this._thread = this.createThread(() => this.run());
-    } else {
+    await this.runInMode(async () => {
+      await this.boot();
       await this.run();
-    }
+    });
+  }
+
+  isBootTimedOut(this: RunnableHost): boolean {
+    return this._bootGuard.isTimedOut();
+  }
+
+  markAsReaped(this: RunnableHost): void {
+    this._bootGuard.close();
   }
 
   /** @internal */
   get mode(): Mode {
     return inquiry.call(String((this as unknown as RunnableHost)._mode ?? DEFAULT_MODE));
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall create_fork — CONVERGEABLE solid-queue-fork-mode-unported-register
+   */
+  async runInMode(this: RunnableHost, block: () => Promise<void>): Promise<unknown> {
+    if (this.isRunningAsFork()) {
+      this._bootGuard = new ForkGuard();
+      await block();
+      this._bootGuard.start();
+      return;
+    } else if (this.isRunningAsync()) {
+      this._bootGuard = new NullGuard();
+      this._thread = this.createThread(block);
+      return this._thread;
+    } else {
+      this._bootGuard = new NullGuard();
+      return await block();
+    }
   }
 
   /** @internal */
@@ -61,6 +89,8 @@ export class Runnable {
         }
       });
     });
+
+    this._bootGuard.complete();
   }
 
   /** @internal */
@@ -123,3 +153,87 @@ export class Runnable {
   }
 }
 include(Runnable, Supervised);
+
+export class NullGuard {
+  private _completed?: boolean;
+
+  complete(): void {
+    this._completed = true;
+  }
+
+  start(): void {}
+
+  isCompleted(): boolean | undefined {
+    return this._completed;
+  }
+
+  isTimedOut(): boolean {
+    return false;
+  }
+
+  close(): void {}
+}
+
+export class ForkGuard {
+  private _reader: IO;
+  private _writer: IO;
+  private _createdAt: number;
+  private _completed?: boolean;
+
+  constructor() {
+    [this._reader, this._writer] = IO.pipe();
+    this._createdAt = Timer.monotonicTimeNow();
+  }
+
+  complete(): void {
+    try {
+      this.reader.close();
+      this.writer.write(".");
+    } catch (error) {
+      if (!(error instanceof Errno.EPIPE)) throw error;
+    } finally {
+      this.writer.close();
+    }
+  }
+
+  start(): void {
+    this.writer.close();
+  }
+
+  isCompleted(): boolean {
+    return (this._completed ||= (() => {
+      const completed = this.reader.readNonblock(1, null, { exception: false }) !== "wait_readable";
+      if (completed) this.reader.close();
+      return completed;
+    })());
+  }
+
+  isTimedOut(): boolean {
+    return (
+      !this.isCompleted() &&
+      Timer.monotonicTimeNow() - this.createdAt >= SolidQueue.forkBootTimeout.toF()
+    );
+  }
+
+  close(): void {
+    if (!this.reader.isClosed()) this.reader.close();
+    if (!this.writer.isClosed()) this.writer.close();
+  }
+
+  /** @internal */
+  private get reader(): IO {
+    return this._reader;
+  }
+
+  /** @internal */
+  private get writer(): IO {
+    return this._writer;
+  }
+
+  /** @internal */
+  private get createdAt(): number {
+    return this._createdAt;
+  }
+}
+
+export const BootGuards = { NullGuard, ForkGuard };

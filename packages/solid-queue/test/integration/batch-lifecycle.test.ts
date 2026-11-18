@@ -5,8 +5,7 @@ import {
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
 import { Base as ActiveJobBase, performAllLater } from "@blazetrails/activejob";
-import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-after-transaction-commit";
-import { days, include, seconds } from "@blazetrails/activesupport";
+import { days, seconds } from "@blazetrails/activesupport";
 import {
   assertDifference,
   assertNoDifference,
@@ -34,8 +33,6 @@ import {
   waitForBatchesToFinishFor,
   waitForJobsToFinishFor,
 } from "../support/jobs-test-helper.js";
-
-include(ActiveJobBase, EnqueueAfterTransactionCommit);
 
 class FailingJobError extends RuntimeError {}
 
@@ -281,7 +278,7 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
     ApplicationJob.enqueueAfterTransactionCommit = true;
 
     const job = new AddToBufferJob("prebuilt");
-    expect(job.batchId).toBeUndefined();
+    expect(job.batchId).toBeNull();
 
     let batch: Batch | null = null;
     await JobResult.transaction(async () => {
