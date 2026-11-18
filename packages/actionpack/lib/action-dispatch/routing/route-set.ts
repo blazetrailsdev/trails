@@ -100,12 +100,15 @@ function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): b
 export class CustomUrlHelper implements PolymorphicMappingEntry {
   readonly name: string;
   readonly defaults: Record<string, unknown>;
-  readonly block: (this: PolymorphicHost, ...args: unknown[]) => object | string;
+  readonly block: (
+    this: PolymorphicHost & Record<string, unknown>,
+    ...args: unknown[]
+  ) => object | string;
 
   constructor(
     name: string,
     defaults: Record<string, unknown>,
-    block: (this: PolymorphicHost, ...args: unknown[]) => object | string,
+    block: (this: PolymorphicHost & Record<string, unknown>, ...args: unknown[]) => object | string,
   ) {
     this.name = name;
     this.defaults = defaults;
@@ -114,7 +117,7 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
 
   call(t: PolymorphicHost, args: unknown[], onlyPath = false): string {
     const options = extractOptionsBang(args);
-    const url = (t as unknown as { fullUrlFor(options: unknown): string }).fullUrlFor(
+    const url = (t as PolymorphicHost & { fullUrlFor(options: unknown): string }).fullUrlFor(
       this.evalBlock(t, args, options),
     );
 
@@ -131,7 +134,10 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
     args: unknown[],
     options: Record<string, unknown>,
   ): object | string {
-    return this.block.apply(t, [...args, this.mergeDefaults(options)]);
+    return this.block.apply(t as PolymorphicHost & Record<string, unknown>, [
+      ...args,
+      this.mergeDefaults(options),
+    ]);
   }
 
   /** @internal */
@@ -269,12 +275,12 @@ export class Dispatcher extends Endpoint {
     try {
       const params = req.pathParameters;
       const controller = this._controller(req);
-      const res = await controller.makeResponseBang(req as unknown as AdRequest);
+      const res = await controller.makeResponseBang(req as AdRequest);
       return await this._dispatch(controller, params["action"] as string, req, res);
     } catch (error) {
       if (error instanceof RoutingError) {
         if (this._raiseOnNameError) throw error;
-        return [404, { [X_CASCADE]: "pass" }, []] as unknown as RackishResponse;
+        return [404, { [X_CASCADE]: "pass" }, []] as RackishResponse;
       }
       throw error;
     }
@@ -283,7 +289,7 @@ export class Dispatcher extends Endpoint {
   /** @internal */
   protected _controller(req: RouterRequest): DispatchableControllerClass {
     try {
-      return (req as unknown as AdRequest).controllerClass() as DispatchableControllerClass;
+      return (req as AdRequest).controllerClass() as DispatchableControllerClass;
     } catch (e) {
       if (e instanceof NameError) throw new RoutingError(e.message);
       throw e;
@@ -297,11 +303,7 @@ export class Dispatcher extends Endpoint {
     req: RouterRequest,
     res: AdResponse,
   ): Promise<RackishResponse> {
-    return (await controller.dispatch(
-      action,
-      req as unknown as AdRequest,
-      res,
-    )) as unknown as RackishResponse;
+    return (await controller.dispatch(action, req as AdRequest, res)) as RackishResponse;
   }
 }
 
@@ -650,7 +652,7 @@ export class NamedRouteCollection {
   addUrlHelper(
     name: string,
     defaults: Record<string, unknown>,
-    block: (this: PolymorphicHost, ...args: unknown[]) => object | string,
+    block: (this: PolymorphicHost & Record<string, unknown>, ...args: unknown[]) => object | string,
   ): this {
     const helper = new CustomUrlHelper(name, defaults, block);
     const pathName = camelize(`${name}_path`, "lower");
@@ -660,7 +662,7 @@ export class NamedRouteCollection {
       this: UrlHelperContext,
       ...args: unknown[]
     ) {
-      return helper.call(this as unknown as PolymorphicHost, args, true);
+      return helper.call(this, args, true);
     };
     rbClearMethodCache();
     this._appendToIncluders(pathName, this.pathHelpersModule.prototype[pathName], true);
@@ -669,7 +671,7 @@ export class NamedRouteCollection {
       this: UrlHelperContext,
       ...args: unknown[]
     ) {
-      return helper.call(this as unknown as PolymorphicHost, args, false);
+      return helper.call(this, args, false);
     };
     rbClearMethodCache();
     this._appendToIncluders(urlName, this.urlHelpersModule.prototype[urlName], false);
@@ -1234,7 +1236,7 @@ export class RouteSet {
   addPolymorphicMapping(
     klass: string,
     options: Record<string, unknown>,
-    block: (this: PolymorphicHost, ...args: unknown[]) => object | string,
+    block: (this: PolymorphicHost & Record<string, unknown>, ...args: unknown[]) => object | string,
   ): void {
     this.polymorphicMappings.set(klass, new CustomUrlHelper(klass, options, block));
   }
@@ -1242,7 +1244,7 @@ export class RouteSet {
   addUrlHelper(
     name: string,
     options: Record<string, unknown>,
-    block: (this: PolymorphicHost, ...args: unknown[]) => object | string,
+    block: (this: PolymorphicHost & Record<string, unknown>, ...args: unknown[]) => object | string,
   ): NamedRouteCollection {
     return this.namedRoutes.addUrlHelper(name, options, block);
   }
@@ -1358,19 +1360,19 @@ export class RouteSet {
   }
 
   urlOptions(): Record<string, unknown> {
-    return urlOptionsFn.call(this as unknown as UrlForHost);
+    return urlOptionsFn.call(this);
   }
 
   fullUrlFor(options?: UrlForOptions): string {
-    return fullUrlForFn.call(this as unknown as UrlForHost, options);
+    return fullUrlForFn.call(this, options);
   }
 
   routeFor(name: string, ...args: unknown[]): string {
-    return routeForFn.call(this as unknown as UrlForHost, name, ...args);
+    return routeForFn.call(this, name, ...args);
   }
 
   polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options: PolymorphicOptions = {}): string {
-    return polymorphicUrlFn.call(this as unknown as PolymorphicHost, recordOrHashOrArray, options);
+    return polymorphicUrlFn.call(this, recordOrHashOrArray, options);
   }
 
   /** @internal */
@@ -1378,15 +1380,12 @@ export class RouteSet {
     routes: UrlForRoutes,
     block: () => Exclude<T, Promise<unknown>>,
   ): Exclude<T, Promise<unknown>> {
-    return withRoutesFn.call(this as unknown as UrlForHost, routes, block) as Exclude<
-      T,
-      Promise<unknown>
-    >;
+    return withRoutesFn.call(this, routes, block) as Exclude<T, Promise<unknown>>;
   }
 
   /** @internal */
   _routesContext(): RouteSet {
-    return routesContextFn.call(this as unknown as UrlForHost) as RouteSet;
+    return routesContextFn.call(this) as RouteSet;
   }
 
   recognizePathWithRequest(
@@ -1396,7 +1395,7 @@ export class RouteSet {
     { raiseOnMissing = true }: { raiseOnMissing?: boolean } = {},
   ): Record<string, unknown> | undefined {
     let pathParameters: Record<string, unknown> | undefined;
-    this.router.recognize(req as unknown as RouterRequest, (route, params) => {
+    this.router.recognize(req, (route, params) => {
       Object.assign(params, extras);
       for (const [key, value] of Object.entries(params)) {
         if (typeof value === "string") {
@@ -1479,7 +1478,7 @@ export class RouteSet {
   async call(env: RackEnv): Promise<RackResponse> {
     const req = this.makeRequest(env);
     req.pathInfo = Utils.normalizePath(req.pathInfo);
-    return (await this.router.serve(req as unknown as RouterRequest)) as unknown as RackResponse;
+    return (await this.router.serve(req)) as RackResponse;
   }
 }
 
