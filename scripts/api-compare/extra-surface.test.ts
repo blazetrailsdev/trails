@@ -5282,8 +5282,6 @@ describe("buildReport — a RUBY_FILE_TS_OVERRIDES row onto a path-mirrored file
     const pkg = report.packages[0];
     expect(pkg.totalMoved).toBe(0);
     expect(pkg.extraFiles).toEqual([]);
-    // `renderDependencies` is private in the mirrored erb_tracker.rb, so only
-    // `explicitDependencies` (private in ruby_tracker.rb) is counted.
     expect(pkg.totalInternal).toBe(1);
   });
 });
