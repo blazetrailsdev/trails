@@ -97,18 +97,17 @@ function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): b
 }
 
 /** @internal */
+type CustomUrlHelperHost = PolymorphicHost & Record<string, unknown>;
+
 export class CustomUrlHelper implements PolymorphicMappingEntry {
   readonly name: string;
   readonly defaults: Record<string, unknown>;
-  readonly block: (
-    this: PolymorphicHost & Record<string, unknown>,
-    ...args: unknown[]
-  ) => object | string;
+  readonly block: (this: CustomUrlHelperHost, ...args: unknown[]) => object | string;
 
   constructor(
     name: string,
     defaults: Record<string, unknown>,
-    block: (this: PolymorphicHost & Record<string, unknown>, ...args: unknown[]) => object | string,
+    block: (this: CustomUrlHelperHost, ...args: unknown[]) => object | string,
   ) {
     this.name = name;
     this.defaults = defaults;
@@ -117,9 +116,7 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
 
   call(t: PolymorphicHost, args: unknown[], onlyPath = false): string {
     const options = extractOptionsBang(args);
-    const url = (t as PolymorphicHost & { fullUrlFor(options: unknown): string }).fullUrlFor(
-      this.evalBlock(t, args, options),
-    );
+    const url = t.fullUrlFor!(this.evalBlock(t, args, options));
 
     if (onlyPath) {
       return "/" + (url.match(/(?<!\/)\/(?!\/)(.*)$/s)?.[1] ?? "");
@@ -134,10 +131,7 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
     args: unknown[],
     options: Record<string, unknown>,
   ): object | string {
-    return this.block.apply(t as PolymorphicHost & Record<string, unknown>, [
-      ...args,
-      this.mergeDefaults(options),
-    ]);
+    return this.block.apply(t as CustomUrlHelperHost, [...args, this.mergeDefaults(options)]);
   }
 
   /** @internal */
@@ -652,7 +646,7 @@ export class NamedRouteCollection {
   addUrlHelper(
     name: string,
     defaults: Record<string, unknown>,
-    block: (this: PolymorphicHost & Record<string, unknown>, ...args: unknown[]) => object | string,
+    block: (this: CustomUrlHelperHost, ...args: unknown[]) => object | string,
   ): this {
     const helper = new CustomUrlHelper(name, defaults, block);
     const pathName = camelize(`${name}_path`, "lower");
@@ -1236,7 +1230,7 @@ export class RouteSet {
   addPolymorphicMapping(
     klass: string,
     options: Record<string, unknown>,
-    block: (this: PolymorphicHost & Record<string, unknown>, ...args: unknown[]) => object | string,
+    block: (this: CustomUrlHelperHost, ...args: unknown[]) => object | string,
   ): void {
     this.polymorphicMappings.set(klass, new CustomUrlHelper(klass, options, block));
   }
@@ -1244,7 +1238,7 @@ export class RouteSet {
   addUrlHelper(
     name: string,
     options: Record<string, unknown>,
-    block: (this: PolymorphicHost & Record<string, unknown>, ...args: unknown[]) => object | string,
+    block: (this: CustomUrlHelperHost, ...args: unknown[]) => object | string,
   ): NamedRouteCollection {
     return this.namedRoutes.addUrlHelper(name, options, block);
   }

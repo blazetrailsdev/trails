@@ -39,6 +39,7 @@ export interface PolymorphicRoutesAccessor {
 
 export interface PolymorphicHost {
   _routes: PolymorphicRoutesAccessor | null;
+  fullUrlFor?(options: unknown): string;
 }
 
 export type PolymorphicArg =
