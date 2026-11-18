@@ -522,7 +522,8 @@ neither is an error.
 8. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
 9. **`pnpm parity:changed`** is the one-command local check: it runs CI's
    comparison gate stack scoped to each changed package (~20–30s each). When
-   `ruby-compat` or `activesupport` changed, run `pnpm parity:changed --full`.
+   `ruby-compat` or `activesupport` changed, `--full` adds the unscoped
+   `pnpm parity:api` compare; the gate stack still runs scoped.
 
 ## Module mixins (Ruby `include` → TypeScript)
 

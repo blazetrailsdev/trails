@@ -29,6 +29,7 @@
  * entry guard is the sole exception), async fs only, no third-party runtime deps.
  */
 
+import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { ROOT_DIR } from "./config.js";
@@ -43,6 +44,35 @@ import {
   missingScope,
 } from "./body-pins.js";
 import { loadLedgered, partitionLedgered } from "./bump-ledger.js";
+
+/**
+ * The `@inlinedFrom <Mod>#<method> <citation>` tags in every package other
+ * than `scope`: a pin those credit is seen only by an unscoped compare.
+ */
+export async function inlinedFromOutside(
+  scope: string,
+): Promise<{ method: string; file: string }[]> {
+  const tags: { method: string; file: string }[] = [];
+  const pkgsDir = path.join(ROOT_DIR, "packages");
+  for (const pkg of await fs.readdir(pkgsDir)) {
+    if (pkg === scope) continue;
+    const lib = path.join(pkgsDir, pkg, "lib");
+    let files: string[];
+    try {
+      files = await fs.readdir(lib, { recursive: true });
+    } catch {
+      continue;
+    }
+    for (const f of files) {
+      if (!f.endsWith(".ts")) continue;
+      const text = await fs.readFile(path.join(lib, f), "utf8");
+      for (const m of text.matchAll(/@inlinedFrom\s+\S+#(\S+)\s+(\S+?):\d/g)) {
+        tags.push({ method: m[1], file: m[2] });
+      }
+    }
+  }
+  return tags;
+}
 
 async function main(scope: string | null): Promise<number> {
   const artifact = await loadArtifact();
@@ -90,18 +120,25 @@ async function main(scope: string | null): Promise<number> {
     }
   }
 
-  if (scope !== null && !process.env.CI && stale.length > 0 && drift.length === 0) {
-    console.log(
-      `body-pins gate: OK (${pins.length} pinned); ${stale.length} pin(s) not seen in ` +
-        `scope ${scope}, left to the unscoped run:`,
+  let red = stale;
+  if (scope !== null && !process.env.CI && stale.length > 0) {
+    const tags = await inlinedFromOutside(scope);
+    const outside = stale.filter((s) =>
+      tags.some((t) => t.method === s.rubyName && t.file.endsWith(`/${s.rubyFile}`)),
     );
-    for (const s of stale.sort((a, b) => keyOf(a).localeCompare(keyOf(b)))) {
-      console.log(`  ? ${s.package}  ${s.rubyFile}:${s.rubyName}`);
+    red = stale.filter((s) => !outside.includes(s));
+    if (outside.length > 0) {
+      console.log(
+        `body-pins gate: ${outside.length} pin(s) credited through an @inlinedFrom tag outside ` +
+          `scope ${scope}, left to the unscoped run:`,
+      );
+      for (const s of outside.sort((a, b) => keyOf(a).localeCompare(keyOf(b)))) {
+        console.log(`  outside  ${s.package}  ${s.rubyFile}:${s.rubyName}`);
+      }
     }
-    return 0;
   }
 
-  if (drift.length === 0 && stale.length === 0) {
+  if (drift.length === 0 && red.length === 0) {
     console.log(`body-pins gate: OK (${pins.length} pinned)`);
     return 0;
   }
@@ -122,15 +159,15 @@ async function main(scope: string | null): Promise<number> {
     }
   }
 
-  if (stale.length > 0) {
+  if (red.length > 0) {
     console.error(
-      `\nbody-pins gate: ${stale.length} STALE pin(s) — the pinned pair no longer matches.`,
+      `\nbody-pins gate: ${red.length} STALE pin(s) — the pinned pair no longer matches.`,
     );
     console.error(
       `The method was removed/renamed or the pair stopped matching. Remove the ` +
         `entr(ies) from ${path.relative(ROOT_DIR, MANIFEST_PATH)}:\n`,
     );
-    for (const s of stale.sort((a, b) => keyOf(a).localeCompare(keyOf(b)))) {
+    for (const s of red.sort((a, b) => keyOf(a).localeCompare(keyOf(b)))) {
       console.error(`  - ${s.package}  ${s.rubyFile}:${s.rubyName}`);
     }
   }

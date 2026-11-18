@@ -4,9 +4,10 @@
  *
  * Each enrolled package (one with a vendored lib path) runs
  * `scripts/ci/scoped-comparison.sh <pkg>` in turn; the others are skipped
- * with a note. `--full` runs the unscoped `pnpm parity:api` instead, which is
- * what to reach for when a shared package changed, since a scoped run cannot
- * see the callers in other packages. CI's full job stays the backstop.
+ * with a note. `--full` also runs the unscoped `pnpm parity:api` compare, so a
+ * change to a shared package is compared against its callers in every
+ * package; the scoped gate stack still runs only for the changed packages.
+ * CI's full job stays the backstop.
  */
 import { execFileSync, spawnSync } from "child_process";
 import * as path from "path";
@@ -65,25 +66,22 @@ function sh(cmd: string, args: string[]): number {
 }
 
 export function main(argv: string[]): number {
-  if (argv.includes("--full")) {
-    console.log("parity:changed --full: running the unscoped pnpm parity:api");
-    return sh("pnpm", ["parity:api"]);
-  }
-
+  const full = argv.includes("--full");
   const p = plan(changedFiles(), enrolledPackages());
-  if (p.run.length === 0 && p.skipped.length === 0) {
+  if (p.run.length === 0 && p.skipped.length === 0 && !full) {
     console.log("parity:changed: no packages/* changed against origin/main; nothing to compare");
     return 0;
   }
   for (const pkg of p.skipped) {
     console.log(`parity:changed: skip ${pkg} (no vendored lib path, not enrolled)`);
   }
-  if (p.shared.length > 0) {
-    console.log(
+  if (p.shared.length > 0 && !full) {
+    console.error(
       `parity:changed: ${p.shared.join(", ")} changed. Other packages call into it, and a ` +
-        "scoped run cannot see them, so the full CI job may still differ. " +
-        "Run `pnpm parity:changed --full` for the unscoped comparison.",
+        "scoped run cannot see them. Run `pnpm parity:changed --full` to add the unscoped " +
+        "pnpm parity:api compare.",
     );
+    if (p.run.length === 0) return 1;
   }
 
   const failed: string[] = [];
@@ -92,12 +90,17 @@ export function main(argv: string[]): number {
     if (sh("bash", ["scripts/ci/scoped-comparison.sh", pkg]) !== 0) failed.push(pkg);
   }
 
+  if (full) {
+    console.log("\nparity:changed --full: unscoped pnpm parity:api");
+    if (sh("pnpm", ["parity:api"]) !== 0) failed.push("parity:api (unscoped)");
+  }
+
   console.log("");
   if (failed.length > 0) {
     console.error(`parity:changed: FAILED for ${failed.join(", ")}`);
     return 1;
   }
-  console.log(`parity:changed: OK (${p.run.join(", ") || "nothing enrolled"})`);
+  console.log(`parity:changed: OK (${[...p.run, ...(full ? ["parity:api"] : [])].join(", ")})`);
   return 0;
 }
 
