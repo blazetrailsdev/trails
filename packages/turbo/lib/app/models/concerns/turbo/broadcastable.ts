@@ -341,7 +341,7 @@ export const Broadcastable = {
   /** @internal */
   broadcastRenderingWithDefaults(this: BroadcastableHost, options: Options): Options {
     const o = options;
-    o.locals = reverseMerge((o.locals as Options | null | undefined) ?? {}, {
+    o.locals = reverseMerge(o.locals != null && o.locals !== false ? (o.locals as Options) : {}, {
       [this.modelName.element]: this,
     });
 

@@ -1,8 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeAll, beforeEach, describe, it } from "vitest";
 import { TestCase } from "@blazetrails/actioncable/channel/test-case.js";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
+import type { Included } from "@blazetrails/activesupport";
 import { domId } from "@blazetrails/actionview/record-identifier.js";
 import { Thread, constSet, include } from "@blazetrails/ruby-compat";
 import { withProductionDebouncer } from "../test-helper.js";
@@ -11,6 +11,7 @@ import { ActionHelper } from "../../lib/app/helpers/turbo/streams/action-helper.
 import { Turbo } from "../../lib/turbo-trails.js";
 import { ApplicationController } from "../dummy/app/controllers/application-controller.js";
 import { Message } from "../dummy/app/models/message.js";
+import type { Broadcastable } from "../../lib/app/models/concerns/turbo/broadcastable.js";
 import { Profile } from "../dummy/app/models/users/profile.js";
 
 class BroadcastableTest extends TestCase {}
@@ -24,12 +25,16 @@ class MessageThatRendersError extends Message {
   }
 }
 
-type Ctx = { testCase: any };
+type Ctx = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  testCase: any;
+};
+type Broadcasting = Included<typeof Broadcastable> & { toGidParam(): string };
 
 const render = ApplicationController.render.bind(ApplicationController);
 
 describe("Turbo::BroadcastableTest", () => {
-  let message: any;
+  let message: Message & Broadcasting;
 
   beforeAll(async () => {
     await Message.loadSchema();
@@ -40,7 +45,7 @@ describe("Turbo::BroadcastableTest", () => {
     for (const key of Thread.current().keys()) {
       if (key.startsWith("turbo-")) Thread.current().set(key, null);
     }
-    message = new Message({ id: 1, content: "Hello!" });
+    message = new Message({ id: 1, content: "Hello!" }) as Message & Broadcasting;
   });
 
   afterEach(async () => {
@@ -82,7 +87,8 @@ describe("Turbo::BroadcastableTest", () => {
   });
 
   it("broadcasting remove does not render contents", async ({ testCase: t }: Ctx) => {
-    const message = new MessageThatRendersError({ id: 1 }) as any;
+    const message = new MessageThatRendersError({ id: 1 }) as MessageThatRendersError &
+      Broadcasting;
 
     await t.assertBroadcastOn(
       message.toGidParam(),
@@ -217,7 +223,8 @@ describe("Turbo::BroadcastableTest", () => {
   });
 
   it("broadcasting refresh does not render contents", async ({ testCase: t }: Ctx) => {
-    const message = new MessageThatRendersError({ id: 1 }) as any;
+    const message = new MessageThatRendersError({ id: 1 }) as MessageThatRendersError &
+      Broadcasting;
 
     await t.assertBroadcastOn(message.toGidParam(), t.turboStreamActionTag("refresh"), () =>
       message.broadcastRefresh(),
@@ -381,7 +388,7 @@ describe("Turbo::BroadcastableTest", () => {
   });
 
   it("render correct local name in partial for namespaced models", async ({ testCase: t }: Ctx) => {
-    const profile = new Profile({ id: 1, name: "Ryan" }) as any;
+    const profile = new Profile({ id: 1, name: "Ryan" }) as Profile & Broadcasting;
     await t.assertBroadcastOn(
       profile.toParam(),
       t.turboStreamActionTag("replace", { target: "users_profile_1", template: "<p>Ryan</p>\n" }),
@@ -392,7 +399,7 @@ describe("Turbo::BroadcastableTest", () => {
   it("local variables don't get overwritten if they collide with the template name", async ({
     testCase: t,
   }: Ctx) => {
-    const profile = new Profile({ id: 1, name: "Ryan" }) as any;
+    const profile = new Profile({ id: 1, name: "Ryan" }) as Profile & Broadcasting;
     await t.assertBroadcastOn(
       profile.toParam(),
       t.turboStreamActionTag("replace", {
@@ -412,7 +419,7 @@ describe("Turbo::BroadcastableTest", () => {
   });
 
   it("broadcast render to stream now", async ({ testCase: t }: Ctx) => {
-    const profile = new Profile({ id: 1, name: "Ryan" }) as any;
+    const profile = new Profile({ id: 1, name: "Ryan" }) as Profile & Broadcasting;
     await t.assertBroadcastOn(
       profile.toParam(),
       t.turboStreamActionTag("replace", { target: "message_1", template: "Goodbye!" }),
