@@ -6830,6 +6830,19 @@ export function main() {
             inheritance.checked--; // don't score; file-missing is tracked elsewhere
             continue;
           }
+          // A superclass-less reopen of another gem's class (`class Mail::Address`
+          // in `action_mailbox/mail_ext/address_equality.rb`) ports as a
+          // `declare module` augmentation of the package that defines it, so the
+          // TS file has no class to compare and Ruby states no superclass.
+          if (
+            rubySuper === null &&
+            /^declare module "@blazetrails\//m.test(
+              fs.readFileSync(path.join(pkgSrcDir, expectedTs), "utf8"),
+            )
+          ) {
+            inheritance.checked--;
+            continue;
+          }
           inheritance.mismatches.push({
             rubyFqn: fqn,
             rubyFile: info.file,

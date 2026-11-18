@@ -7,7 +7,7 @@ import { TestCase } from "../../lib/test-case.js";
 class TestHelperTest extends TestCase {}
 TestHelperTest.fileFixturePath = File.expandPath("../fixtures/files", import.meta.dirname);
 
-describe("ActionMailbox::TestHelperTest", () => {
+describe("TestHelperTest", () => {
   it("multi-part mail can be built in tests using a block", async () => {
     const test = new TestHelperTest("multi-part mail can be built in tests using a block");
     const inboundEmail = await test.createInboundEmailFromMail(function () {
