@@ -59,14 +59,14 @@ function allApplicationHelpers(this: HelpersClassHost): string[] {
 export const ClassMethods = {
   helperAttr,
 
-  helpers(this: HelpersClass): ActionViewBase {
+  helpers(this: HelpersClass & ConfigReceiver): ActionViewBase {
     return ((rbObjIvarGet(this, "@helper_proxy") as ActionViewBase | null) ||
       rbObjIvarSet(
         this,
         "@helper_proxy",
         (() => {
           const proxy = ActionViewBase.empty();
-          proxy.config = (this as unknown as ConfigReceiver).config().inheritableCopy();
+          proxy.config = this.config().inheritableCopy();
           return extend(proxy, this._helpers);
         })(),
       )) as ActionViewBase;
