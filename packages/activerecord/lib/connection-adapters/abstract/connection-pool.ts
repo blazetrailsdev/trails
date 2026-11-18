@@ -214,10 +214,6 @@ export class LeaseRegistry {
 }
 
 export class ExecutorHooks {
-  /**
-   * @inventedArm if — PERMANENT
-   * @inventedArm for — PERMANENT
-   */
   static run(): Promise<void> | undefined {
     const pools = ActiveRecord.Base.connectionHandler
       .connectionPoolList("all")
