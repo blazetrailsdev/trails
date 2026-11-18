@@ -4815,7 +4815,11 @@ export function main() {
       tsParamsByName.set(m.name, sigs);
       if (scope === "package") recordTsPortedWithArgs(portedWithArgsMaps, m, file, owner);
       if (scope === "dep" && !isTestHelperFile(file)) {
-        tsParamsByNameInDeps.set(m.name, [...(tsParamsByNameInDeps.get(m.name) ?? []), m.params]);
+        tsParamsByNameInDeps.set(m.name, [
+          ...(tsParamsByNameInDeps.get(m.name) ?? []),
+          m.params,
+          ...(m.aliasParams ? [m.aliasParams] : []),
+        ]);
       }
       if (scope === "package") {
         const byName = tsBlockSigsByFileName.get(file) ?? new Map<string, ParamInfo[][]>();
