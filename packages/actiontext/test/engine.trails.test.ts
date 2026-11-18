@@ -36,7 +36,7 @@ describe("ActionText::Engine", () => {
 
   it("registers lib/tasks", async () => {
     const [tasks] = await Engine.instance().paths().get("lib/tasks")!.existent();
-    expect(tasks).toMatch(/\/tasks\/actiontext\.(ts|js)$/);
+    expect(tasks).toMatch(/\/tasks\/actiontext\.rake\.(ts|js)$/);
   });
 
   it("runs its ported initializers in Rails' order, system_test_helper excepted", () => {

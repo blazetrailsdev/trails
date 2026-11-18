@@ -544,7 +544,7 @@ describe("Base.help", () => {
     ["scaffold_controller", "`bin/trails generate scaffold_controller CreditCard`"],
     ["scaffold", "'bin/trails destroy scaffold ModelName'"],
     ["script", "script/cleanup/my-script.ts"],
-    ["task", "lib/tasks/feeds.ts"],
+    ["task", "lib/tasks/feeds.rake.ts"],
   ])("%s --help prints the generator's USAGE file", async (name, line) => {
     const help = await capture("stdout", () =>
       Generators.invoke(name, ["--help"], { destinationRoot: "/tmp" }),

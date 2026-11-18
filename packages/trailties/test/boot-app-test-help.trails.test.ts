@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { RouteSet } from "@blazetrails/actionpack";
+import { ExceptionWrapper, RouteSet } from "@blazetrails/actionpack";
 import { TestCase as ControllerTestCase, IntegrationTest } from "@blazetrails/actionpack/testing";
 import { ActiveJob } from "@blazetrails/activejob";
 import { ActionCable } from "@blazetrails/actioncable";
@@ -170,6 +170,48 @@ describe("test_help wires a booted app into the test case classes", () => {
     await controllerTest.get("show");
     expect(controllerTest.response.status).toBe(200);
     expect(controllerTest.response.body).toContain("<p>Hello from TSE</p>");
+  });
+
+  it("renders a view calling a named route helper through ActionController::TestCase", async ({
+    task,
+  }) => {
+    const { PostsController } =
+      await import("./fixtures/boot-app/app/controllers/posts-controller.js");
+    const controllerTest = new ControllerTestCase(task.name);
+    controllerTest.controller = new PostsController();
+    await controllerTest.beforeSetup();
+    await controllerTest.get("nav");
+    expect(controllerTest.response.status).toBe(200);
+    expect(controllerTest.response.body).toContain('<a href="/posts">Posts</a>');
+    expect(controllerTest.response.body).toContain('action="/posts"');
+  });
+
+  it("registers the trailties' rescue_responses on ExceptionWrapper", () => {
+    expect(ExceptionWrapper.statusCodeForException("ActiveRecord::RecordNotFound")).toBe(404);
+  });
+
+  it("refuses a tokenless POST with 422 once forgery protection is allowed", async ({ task }) => {
+    const { ApplicationController } =
+      await import("./fixtures/boot-app/app/controllers/application-controller.js");
+    const { Post } = await import("./fixtures/boot-app/app/models/post.js");
+    const previous = ApplicationController.allowForgeryProtection;
+    ApplicationController.allowForgeryProtection = true;
+    try {
+      const session = new IntegrationTest(task.name) as unknown as BootAppIntegrationTest;
+      await session.beforeSetup();
+      await session.post("/posts", { params: { post: { title: "Forged" } } });
+      expect(session.response.status).toBe(422);
+      expect(await Post.where({ title: "Forged" }).count()).toBe(0);
+
+      await session.get("/posts/nav");
+      const token = /name="authenticity_token" value="([^"]+)"/.exec(session.response.body)![1];
+      await session.post("/posts", {
+        params: { post: { title: "Tokened" }, authenticity_token: token },
+      });
+      expect(session.response.status).toBe(201);
+    } finally {
+      ApplicationController.allowForgeryProtection = previous;
+    }
   });
 
   it("rolls a model test's writes back after the test", async () => {

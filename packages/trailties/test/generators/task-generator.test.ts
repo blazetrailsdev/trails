@@ -20,7 +20,7 @@ beforeEach((context) => {
 describe("TaskGeneratorTest", () => {
   it("task is created", async () => {
     await t.runGenerator();
-    await t.assertFile("lib/tasks/feeds.ts", (content) => {
+    await t.assertFile("lib/tasks/feeds.rake.ts", (content) => {
       expect(content).toMatch(/namespace: feeds/);
       expect(content).toMatch(/export async function foo\(\)/);
       expect(content).toMatch(/export async function bar\(\)/);
@@ -28,7 +28,7 @@ describe("TaskGeneratorTest", () => {
   });
 
   it("task on revoke", async () => {
-    const taskPath = "lib/tasks/feeds.ts";
+    const taskPath = "lib/tasks/feeds.rake.ts";
     await t.runGenerator();
     await t.assertFile(taskPath);
     await t.runGenerator(["feeds"], { behavior: "revoke" });

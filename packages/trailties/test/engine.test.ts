@@ -15,6 +15,7 @@ import { loaded } from "./fixtures/loaded.js";
 import { EngineConfiguration } from "../lib/engine/configuration.js";
 import { MiddlewareStackProxy } from "../lib/configuration.js";
 import { Trailties } from "../lib/engine/trailties.js";
+import { Configuration as TrailtieConfiguration } from "../lib/trailtie/configuration.js";
 
 const posixPath: PathAdapter = {
   join: (...p) => p.join("/").replace(/\/+/g, "/"),
@@ -82,6 +83,13 @@ describe("Engine", () => {
     Engine.register(BlogEngine, "/");
     expect(BlogEngine.engineName()).toBe("blog_engine");
     expect(BlogEngine.engineName()).toBe(BlogEngine.railtieName());
+  });
+
+  it("registering an engine pushes it onto the eager_load_namespaces", () => {
+    class EagerEngine extends Engine {}
+    Engine.register(EagerEngine, "/");
+    expect(TrailtieConfiguration.eagerLoadNamespaces).toContain(EagerEngine);
+    expect(new TrailtieConfiguration().eagerLoadNamespaces).toContain(EagerEngine);
   });
 
   it("isolated? defaults to false", () => {

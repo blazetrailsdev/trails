@@ -51,6 +51,10 @@ export class Configuration {
     });
   }
 
+  static get eagerLoadNamespaces(): unknown[] {
+    return Configuration._eagerLoadNamespaces;
+  }
+
   get eagerLoadNamespaces(): unknown[] {
     return Configuration._eagerLoadNamespaces;
   }

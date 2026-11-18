@@ -10,7 +10,7 @@ describe("ActionMailbox ingress tasks", () => {
   let output: string;
 
   beforeAll(async () => {
-    await import("../../lib/tasks/ingress.js");
+    await import("../../lib/tasks/ingress.rake.js");
   });
 
   beforeEach(async () => {

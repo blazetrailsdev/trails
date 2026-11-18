@@ -6,6 +6,7 @@ Trails.application!.routes().draw(function () {
   this.get("/admin/sessions", { to: "admin/sessions#index" });
   this.get("/admin/users", { to: "admin/users#index" });
   this.get("/posts/show", { to: "posts#show" });
+  this.get("/posts/nav", { to: "posts#nav" });
   this.get("/posts/link", { to: "posts#link" });
   this.get("/posts/url", { to: "posts#url" });
   this.get("/posts/canonical", { to: "posts#canonical" });

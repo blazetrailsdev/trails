@@ -20,7 +20,7 @@ describe("vite.rake", () => {
   });
 
   it("enhances vite:verify_install with environment", async () => {
-    await Dir.chdir(rootDir.toString(), () => import("../lib/tasks/vite.js"));
+    await Dir.chdir(rootDir.toString(), () => import("../lib/tasks/vite.rake.js"));
     expect((await Task.get("vite:verify_install")).prerequisites).toContain("environment");
   });
 });
