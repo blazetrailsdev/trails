@@ -78,6 +78,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     loofah: ["html-sanitizer", "loofah/**/*.test.ts"],
     crass: ["html-sanitizer", "crass/**/*.test.ts"],
     "turbo-rails": ["turbo", "**/*.test.ts"],
+    "stimulus-rails": ["stimulus", "**/*.test.ts"],
   };
   const result: Record<string, string[]> = {};
 

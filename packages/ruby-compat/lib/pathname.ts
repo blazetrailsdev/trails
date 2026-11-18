@@ -128,6 +128,47 @@ export class Pathname {
     return File.isFileAsync(this._path);
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:161` `path_cmp` */
+  compareTo(other: unknown): number | null {
+    if (!(other instanceof Pathname)) return null;
+    const s1 = this._path;
+    const s2 = other._path;
+    let p1 = 0;
+    let p2 = 0;
+    while (p1 < s1.length && p2 < s2.length) {
+      let c1 = s1.charCodeAt(p1++);
+      let c2 = s2.charCodeAt(p2++);
+      if (c1 === 0x2f) c1 = 0;
+      if (c2 === 0x2f) c2 = 0;
+      if (c1 !== c2) {
+        if (c1 < c2) return -1;
+        else return 1;
+      }
+    }
+    if (p1 < s1.length) return 1;
+    if (p2 < s2.length) return -1;
+    return 0;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:891` `path_directory_p` */
+  async isDirectory(): Promise<boolean> {
+    return File.isDirectoryAsync(this._path);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:449` `children` */
+  async children(withDirectory = true): Promise<Pathname[]> {
+    if (this._path === ".") withDirectory = false;
+    const result: Pathname[] = [];
+    for (const e of await Dir.childrenAsync(this._path)) {
+      if (withDirectory) {
+        result.push(new (this.constructor as typeof Pathname)(File.join(this._path, e)));
+      } else {
+        result.push(new (this.constructor as typeof Pathname)(e));
+      }
+    }
+    return result;
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:981` `path_size` */
   size(): number {
     return File.size(this._path);

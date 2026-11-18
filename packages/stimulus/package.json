@@ -1,0 +1,45 @@
+{
+  "name": "@blazetrails/stimulus",
+  "version": "0.1.0",
+  "description": "Stimulus for Trails, mirroring the stimulus-rails gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*.js": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./*": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && pnpm build:templates",
+    "build:templates": "rm -rf dist/install/app && mkdir -p dist/install && cp -R lib/install/app dist/install/"
+  },
+  "dependencies": {
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trailties": "workspace:*"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "mirrors": [
+    {
+      "source": "stimulus-rails",
+      "ref": "v1.3.4",
+      "sha": "8e34f2e4dd7716224317b635db1e5d9ed58324b1"
+    }
+  ]
+}

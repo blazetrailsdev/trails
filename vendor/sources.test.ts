@@ -234,6 +234,7 @@ describe("vendor/sources.ts", () => {
       "mini-mime",
       "net-smtp",
       "turbo-rails",
+      "stimulus-rails",
       "vite-assets",
       "vite-trails",
     ]);
@@ -450,6 +451,7 @@ describe("vendor/sources.ts", () => {
         "solid-cable",
         "solid-cache",
         "solid-queue",
+        "stimulus-rails",
         "thor",
         "trailties",
         "turbo-rails",
@@ -527,6 +529,7 @@ describe("vendor/sources.ts", () => {
         "solid-cable",
         "solid-cache",
         "solid-queue",
+        "stimulus-rails",
         "thor",
         "trailties",
         "turbo-rails",

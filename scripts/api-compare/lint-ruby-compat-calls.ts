@@ -134,6 +134,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "solid-cache",
   "solid-queue",
   "sqlite3",
+  "stimulus-rails",
   "thor",
   "trailties",
   "turbo-rails",

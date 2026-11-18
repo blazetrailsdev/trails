@@ -53,6 +53,7 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   crass: "html-sanitizer",
   erubi: "tse-compiler",
   "turbo-rails": "turbo",
+  "stimulus-rails": "stimulus",
 };
 
 /**

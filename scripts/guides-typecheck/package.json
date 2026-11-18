@@ -38,6 +38,7 @@
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/thor": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
+    "@blazetrails/stimulus": "workspace:*",
     "@blazetrails/turbo": "workspace:*",
     "@blazetrails/tzinfo": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",

@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "declarationDir": "dist/types",
+    "rootDir": "lib"
+  },
+  "include": ["lib"],
+  "exclude": ["lib/install/app"],
+  "references": [
+    { "path": "../activesupport" },
+    { "path": "../rake" },
+    { "path": "../ruby-compat" },
+    { "path": "../trailties" }
+  ]
+}

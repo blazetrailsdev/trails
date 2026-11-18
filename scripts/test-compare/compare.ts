@@ -1879,6 +1879,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   loofah: "packages/html-sanitizer/test/loofah/",
   crass: "packages/html-sanitizer/test/crass/",
   "turbo-rails": "packages/turbo/test/",
+  "stimulus-rails": "packages/stimulus/test/",
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {
