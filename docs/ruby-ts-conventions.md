@@ -217,6 +217,14 @@ parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
+- not called by activerecord
+  - `version_string`, `make_shareable`, `warn`, `require_bigdecimal_without_warning` (only in: `../pg.rb`, `pg.rb`)
+- not called by activerecord
+  - `quote_connstr`, `connect_hash_to_string`, `parse_connect_args`, `copy_data`, `transaction`, `conndefaults`, `conninfo_hash`, `ssl_attributes`, `check_socket`, `get_result`, `get_copy_data`, `setnonblocking`, `isnonblocking`, `put_copy_data`, `put_copy_end`, `encrypt_password`, `new`, `ping`, `async_send_api=`, `async_api=`, `async_get_result`, `async_get_copy_data`, `async_setnonblocking`, `async_isnonblocking`, `nonblocking?`, `async_put_copy_data`, `async_put_copy_end`, `async_encrypt_password`, `async_reset`, `async_cancel`, `isthreadsafe`, `async_connect`, `connect`, `open`, `setdb`, `setdblogin`, `async_ping` (only in: `connection.rb`)
+- not called by activerecord
+  - `field_names_as` (only in: `result.rb`)
+- not called by activerecord
+  - `==`, `marshal_dump`, `marshal_load`, `inspect_short` (only in: `coder.rb`)
 - `ViteRuby::Commands#legacy_yarn_version?` (vite_ruby/lib/vite_ruby/commands.rb:44-46) and its `YARN_PRODUCTION` arm (lib/tasks/vite.rake:92-94) are not ported: trails apps use pnpm, never yarn (CLAUDE.md, "importmap-rails and propshaft are out of scope"). PERMANENT.
   - `legacy_yarn_version?` (only in: `commands.rb`)
 - Zeitwerk's `Module#autoload` and `Kernel#require` decorations are not ported: JS has no hook on an unresolved identifier and no synchronous `import()` (CLAUDE.md, "`Module#autoload` is a build step"). PERMANENT.
