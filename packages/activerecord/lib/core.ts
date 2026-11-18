@@ -55,7 +55,7 @@ import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import type { AttributeSet, YAMLEncoder } from "@blazetrails/activemodel";
 import { LegacyYamlAdapter } from "./legacy-yaml-adapter.js";
 import { classAttribute, included } from "@blazetrails/activesupport";
-import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
+import { ConnectionHandler } from "./connection-adapters.js";
 
 type FindByStatementCache = Map<boolean, InstanceType<typeof Concurrent.Map<unknown, any>>>;
 

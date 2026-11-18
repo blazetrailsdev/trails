@@ -1,6 +1,7 @@
 node_modules/
 .trails/
 dist/
+dist-vite/
 build/
 db/*.sqlite3*
 log/
