@@ -66,10 +66,7 @@ export class Runnable {
     return inquiry.call(String((this as unknown as RunnableHost)._mode ?? DEFAULT_MODE));
   }
 
-  /**
-   * @internal
-   * @missingRailsCall create_fork — CONVERGEABLE solid-queue-fork-mode-unported-register
-   */
+  /** @internal */
   async runInMode(this: RunnableHost, block: () => Promise<void>): Promise<unknown> {
     if (this.isRunningAsFork()) {
       this._bootGuard = new ForkGuard();
