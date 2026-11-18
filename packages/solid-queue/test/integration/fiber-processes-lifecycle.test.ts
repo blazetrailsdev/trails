@@ -58,7 +58,11 @@ async function assertJobStatus(activeJob: ActiveJobBase, status: "finished" | "r
   });
 }
 
-async function assertRegisteredWorkersFor(queues: string[], supervisorPid: number | null = null) {
+async function assertRegisteredWorkersFor(
+  ...args: [...queues: string[], options: { supervisorPid?: number | null }]
+) {
+  const { supervisorPid = null } = args.at(-1) as { supervisorPid?: number | null };
+  const queues = args.slice(0, -1) as string[];
   const workers = await findProcessesRegisteredAs("Worker").toArray();
   const registeredQueues = workers
     .map((process) => process.metadata.get("queues") as string | null)
@@ -106,7 +110,7 @@ describe("FiberProcessesLifecycleTest", () => {
     );
 
     await waitForRegisteredProcesses(2, { timeout: 3 });
-    await assertRegisteredWorkersFor(["background"], RbProcess.pid);
+    await assertRegisteredWorkersFor("background", { supervisorPid: RbProcess.pid });
   });
 
   afterEach(async () => {
@@ -134,8 +138,7 @@ describe("FiberProcessesLifecycleTest", () => {
     expect(await Record.uncached(() => JobResult.count())).toBe(6);
     for (let i = 0; i < 6; i++) await assertCompletedJobResults(`job_${i}`, "background");
 
-    await signalProcess(run, "TERM");
-    await waitForProcessTerminationWithTimeout(run);
+    await run.terminate();
     await assertCleanTermination();
   });
 
