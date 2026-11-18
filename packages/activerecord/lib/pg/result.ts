@@ -3,7 +3,6 @@ import type pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
 import { Result as ActiveRecordResult } from "../result.js";
 import { Constants as PGConstants } from "@blazetrails/pg";
-import * as Constants from "./exceptions.js";
 
 type DatabaseErrorFields = Partial<Record<keyof pg.DatabaseError, unknown>>;
 
@@ -12,20 +11,20 @@ const _ERROR_FIELDS: Record<number, keyof pg.DatabaseError> = {
   [PGConstants.PG_DIAG_SEVERITY]: "severity",
   [PGConstants.PG_DIAG_SQLSTATE]: "code",
   [PGConstants.PG_DIAG_MESSAGE_PRIMARY]: "message",
-  [Constants.PG_DIAG_MESSAGE_DETAIL]: "detail",
-  [Constants.PG_DIAG_MESSAGE_HINT]: "hint",
-  [Constants.PG_DIAG_STATEMENT_POSITION]: "position",
-  [Constants.PG_DIAG_INTERNAL_POSITION]: "internalPosition",
-  [Constants.PG_DIAG_INTERNAL_QUERY]: "internalQuery",
-  [Constants.PG_DIAG_CONTEXT]: "where",
-  [Constants.PG_DIAG_SOURCE_FILE]: "file",
-  [Constants.PG_DIAG_SOURCE_LINE]: "line",
+  [PGConstants.PG_DIAG_MESSAGE_DETAIL]: "detail",
+  [PGConstants.PG_DIAG_MESSAGE_HINT]: "hint",
+  [PGConstants.PG_DIAG_STATEMENT_POSITION]: "position",
+  [PGConstants.PG_DIAG_INTERNAL_POSITION]: "internalPosition",
+  [PGConstants.PG_DIAG_INTERNAL_QUERY]: "internalQuery",
+  [PGConstants.PG_DIAG_CONTEXT]: "where",
+  [PGConstants.PG_DIAG_SOURCE_FILE]: "file",
+  [PGConstants.PG_DIAG_SOURCE_LINE]: "line",
   [PGConstants.PG_DIAG_SOURCE_FUNCTION]: "routine",
-  [Constants.PG_DIAG_SCHEMA_NAME]: "schema",
-  [Constants.PG_DIAG_TABLE_NAME]: "table",
-  [Constants.PG_DIAG_COLUMN_NAME]: "column",
-  [Constants.PG_DIAG_DATATYPE_NAME]: "dataType",
-  [Constants.PG_DIAG_CONSTRAINT_NAME]: "constraint",
+  [PGConstants.PG_DIAG_SCHEMA_NAME]: "schema",
+  [PGConstants.PG_DIAG_TABLE_NAME]: "table",
+  [PGConstants.PG_DIAG_COLUMN_NAME]: "column",
+  [PGConstants.PG_DIAG_DATATYPE_NAME]: "dataType",
+  [PGConstants.PG_DIAG_CONSTRAINT_NAME]: "constraint",
 };
 
 export class Result extends Array<Record<string, unknown>> {

@@ -11,14 +11,6 @@ type Query = (config: QueryConfig) => Promise<pg.QueryResult | pg.QueryResult[]>
 const OID_BYTEA = 17;
 const OID_BYTEA_ARRAY = 1001;
 
-const PQTRANS_IDLE = 0;
-const PQTRANS_ACTIVE = 1;
-const PQTRANS_INTRANS = 2;
-const PQTRANS_INERROR = 3;
-
-const CONNECTION_OK = 0;
-const CONNECTION_BAD = 1;
-
 type Protocol = pg.Connection & {
   connect(portOrPath: string | number, host?: string): void;
   cancel(processID: number, secretKey: number): void;
@@ -104,8 +96,8 @@ export class Connection {
   status(): number {
     const { _ending, _ended, _queryable } = this.client;
     return this.bad || _ending === true || _ended === true || _queryable === false
-      ? CONNECTION_BAD
-      : CONNECTION_OK;
+      ? PG.CONNECTION_BAD
+      : PG.CONNECTION_OK;
   }
 
   async reset(): Promise<void> {
@@ -136,14 +128,14 @@ export class Connection {
   }
 
   transactionStatus(): number {
-    if (this.client._activeQuery != null) return PQTRANS_ACTIVE;
+    if (this.client._activeQuery != null) return PG.PQTRANS_ACTIVE;
     switch (this.readyForQuery) {
       case "T":
-        return PQTRANS_INTRANS;
+        return PG.PQTRANS_INTRANS;
       case "E":
-        return PQTRANS_INERROR;
+        return PG.PQTRANS_INERROR;
       default:
-        return PQTRANS_IDLE;
+        return PG.PQTRANS_IDLE;
     }
   }
 
