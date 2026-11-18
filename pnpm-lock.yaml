@@ -1372,6 +1372,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -1459,6 +1462,9 @@ importers:
       '@blazetrails/stimulus':
         specifier: workspace:*
         version: link:../stimulus
+      '@blazetrails/turbo':
+        specifier: workspace:*
+        version: link:../turbo
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers

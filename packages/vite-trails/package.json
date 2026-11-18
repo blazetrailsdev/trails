@@ -34,6 +34,7 @@
   "devDependencies": {
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/stimulus": "workspace:*",
+    "@blazetrails/turbo": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
     "vite": "^7.3.1",
     "vite-plugin-ruby": "^5.2.6"
