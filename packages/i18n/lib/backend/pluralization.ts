@@ -19,25 +19,24 @@ export function Pluralization<T extends BackendConstructor>(Superclass: T): T {
 
     protected override pluralize(locale: Locale, entry: unknown, count: unknown): unknown {
       if (!(entry instanceof Hash && truthy(count))) return entry;
-      const hash = entry;
 
       const pluralizer = this.pluralizer(locale);
       if (typeof pluralizer === "function") {
-        if (count === 0 && hasKey(hash, ":zero")) return hashAref(hash, ":zero");
+        if (count === 0 && hasKey(entry, ":zero")) return hashAref(entry, ":zero");
 
         if (count === 0 || count === 1) {
-          const value = hashAref(hash, this.symbolicCount(count));
+          const value = hashAref(entry, this.symbolicCount(count));
           if (truthy(value)) return value;
         }
 
         const pluralRuleCategory = (pluralizer as (count: unknown) => string)(count);
 
         let value: unknown;
-        if (hasKey(hash, pluralRuleCategory) || hasKey(hash, ":other")) {
-          const categoryValue = hashAref(hash, pluralRuleCategory);
-          value = truthy(categoryValue) ? categoryValue : hashAref(hash, ":other");
+        if (hasKey(entry, pluralRuleCategory) || hasKey(entry, ":other")) {
+          const categoryValue = hashAref(entry, pluralRuleCategory);
+          value = truthy(categoryValue) ? categoryValue : hashAref(entry, ":other");
         } else {
-          throw new InvalidPluralizationData(hash, count, pluralRuleCategory);
+          throw new InvalidPluralizationData(entry, count, pluralRuleCategory);
         }
         return value;
       } else {
@@ -53,11 +52,10 @@ export function Pluralization<T extends BackendConstructor>(Superclass: T): T {
     /** @internal */
     protected pluralizer(locale: Locale): unknown {
       const pluralizers = this.pluralizers();
-      const key = String(locale);
-      if (!truthy(pluralizers[key])) {
-        pluralizers[key] = t("i18n.plural.rule", { locale, resolve: false });
+      if (!truthy(pluralizers[locale])) {
+        pluralizers[locale] = t(":i18n.plural.rule", { locale, resolve: false });
       }
-      return pluralizers[key];
+      return pluralizers[locale];
     }
 
     /** @internal */
