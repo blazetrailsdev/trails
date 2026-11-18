@@ -387,7 +387,7 @@ const alias = {
   "@blazetrails/actiontext/": path.resolve(__dirname, "packages/actiontext/lib") + "/",
   "@blazetrails/actiontext": path.resolve(__dirname, "packages/actiontext/lib/index.ts"),
   "@blazetrails/stimulus/": path.resolve(__dirname, "packages/stimulus/lib") + "/",
-  "@blazetrails/stimulus": path.resolve(__dirname, "packages/stimulus/lib/stimulus-trails.ts"),
+  "@blazetrails/stimulus": path.resolve(__dirname, "packages/stimulus/lib/index.ts"),
   "@blazetrails/turbo/": path.resolve(__dirname, "packages/turbo/lib") + "/",
   "@blazetrails/turbo": path.resolve(__dirname, "packages/turbo/lib/turbo-trails.ts"),
   "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/lib") + "/",

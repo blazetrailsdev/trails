@@ -20,5 +20,3 @@ declare module "@blazetrails/ruby-compat" {
     Stimulus?: typeof Stimulus;
   }
 }
-
-await import("./engine.js");

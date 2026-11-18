@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "description": "Stimulus for Trails, mirroring the stimulus-rails gem",
   "type": "module",
-  "main": "dist/stimulus-trails.js",
-  "types": "dist/types/stimulus-trails.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/types/stimulus-trails.d.ts",
-      "default": "./dist/stimulus-trails.js"
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./*.js": {
       "types": "./dist/types/*.d.ts",

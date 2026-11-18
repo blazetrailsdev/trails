@@ -233,8 +233,8 @@ describe("vendor/sources.ts", () => {
       "mail",
       "mini-mime",
       "net-smtp",
-      "stimulus-rails",
       "turbo-rails",
+      "stimulus-rails",
       "vite-assets",
       "vite-trails",
     ]);
