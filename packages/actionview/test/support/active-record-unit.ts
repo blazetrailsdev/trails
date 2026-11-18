@@ -124,9 +124,9 @@ export class ActiveRecordTestCase extends TestCase {
     }
   }
 
-  override async run(): Promise<this> {
+  override async run() {
     if (ActiveRecordTestConnector.connected) return super.run();
-    return undefined as unknown as this;
+    return undefined as never;
   }
 
   async captureSql(block: () => unknown): Promise<string[]> {

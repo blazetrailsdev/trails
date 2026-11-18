@@ -673,11 +673,10 @@ describe("ActiveSupport::Notifications", () => {
 
   describe("publish", () => {
     it("fires a fire-and-forget event", () => {
-      const events: Event[] = [];
-      Notifications.subscribe("cache.miss", (e) => events.push(e));
+      const calls: unknown[][] = [];
+      Notifications.subscribe("cache.miss", (...args: unknown[]) => calls.push(args));
       Notifications.publish("cache.miss", { key: "users/1" });
-      expect(events).toHaveLength(1);
-      expect(events[0].payload).toEqual({ key: "users/1" });
+      expect(calls).toEqual([["cache.miss", { key: "users/1" }]]);
     });
   });
 

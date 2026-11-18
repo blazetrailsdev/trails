@@ -161,13 +161,8 @@ export class Notifications {
     return this.instrumenter.instrument(name, payload, block) as any;
   }
 
-  static publish(name: string, ...args: [EventPayload?]): void {
-    const resolved = args[0] ?? {};
-    const event = this.instrumenter.newEvent(name, resolved);
-    event.startBang();
-    event.payload = resolved;
-    event.finishBang();
-    this.notifier.publishEvent(event);
+  static publish(name: string, ...args: unknown[]): void {
+    this.notifier.publish(name, ...args);
   }
 
   static publishEvent(event: Event): void {

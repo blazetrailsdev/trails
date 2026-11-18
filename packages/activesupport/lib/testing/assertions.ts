@@ -139,7 +139,7 @@ export class Test {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  async run(): Promise<this> {
+  async run(): Promise<Result> {
     await this.timeIt(async () => {
       await this.captureExceptions(async () => {
         for (const hook of Test.SETUP_METHODS) {
@@ -156,7 +156,7 @@ export class Test {
       }
     });
 
-    return this;
+    return Result.from(this);
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -226,6 +226,70 @@ export class Test {
 }
 
 rbDeclareIvar(Test, "@NAME", "name");
+
+/** @noRailsEquivalent PERMANENT */
+export class Result {
+  /** @noRailsEquivalent PERMANENT */
+  name: string;
+  /** @noRailsEquivalent PERMANENT */
+  klass: string | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  assertions = 0;
+  /** @noRailsEquivalent PERMANENT */
+  failures: Assertion[] = [];
+  /** @noRailsEquivalent PERMANENT */
+  time: number | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  metadata?: Record<string, unknown>;
+  /** @noRailsEquivalent PERMANENT */
+  sourceLocation: [string, number] | null = null;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static from(runnable: Test): Result {
+    const o = runnable;
+
+    const r = new this(o.name);
+    r.klass = o.constructor.name;
+    r.assertions = o.assertions;
+    r.failures = [...o.failures];
+    r.time = o.time;
+    if (o.isMetadata()) r.metadata = o.metadata;
+
+    r.sourceLocation = ["unknown", -1];
+
+    return r;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  className(): string | null {
+    return this.klass;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get failure(): Assertion | undefined {
+    return this.failures[0];
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isPassed(): boolean {
+    return !this.failure;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isSkipped(): boolean {
+    return this.failure != null && this.failure instanceof Skip;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isError(): boolean {
+    return this.failures.some((failure) => failure instanceof UnexpectedError);
+  }
+}
 
 function classNameOf(e: Error): string {
   if (e.name && e.name !== "Error") return e.name;
