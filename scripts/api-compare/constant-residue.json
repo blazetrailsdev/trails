@@ -921,7 +921,7 @@
     }
   },
   "i18n": {
-    "rows": 30,
+    "rows": 33,
     "excluded": [],
     "unwalked": ["backend/transliterator.ts::Transliterator", "utils.ts::Utils"],
     "residue": {
