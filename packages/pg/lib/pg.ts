@@ -1,3 +1,6 @@
+import { PG } from "./namespaces.js";
+
+/** @noRailsEquivalent PERMANENT */
 export const Constants = {
   CONNECTION_OK: 0,
   CONNECTION_BAD: 1,
@@ -10,3 +13,6 @@ export const Constants = {
   PG_DIAG_MESSAGE_PRIMARY: 77,
   PG_DIAG_SOURCE_FUNCTION: 82,
 };
+
+PG.Constants = Constants;
+Object.assign(PG, Constants);

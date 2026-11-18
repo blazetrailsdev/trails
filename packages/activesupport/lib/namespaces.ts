@@ -177,7 +177,6 @@ declare module "@blazetrails/ruby-compat" {
       Base?: { logger: unknown };
       afterAllTransactionsCommit(block: () => unknown): unknown;
     };
-    PG?: { Connection: abstract new (...args: never[]) => object };
     ActionCable?: { name?: string; Engine?: unknown; server?(): unknown };
     BCrypt?: {
       Engine: { readonly MIN_COST: number; readonly cost: number };

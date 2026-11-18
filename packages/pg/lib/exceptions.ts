@@ -1,4 +1,5 @@
 import { StandardError } from "@blazetrails/ruby-compat";
+import { PG } from "./namespaces.js";
 
 export interface Result {
   errorField(fieldcode: number): string | null;
@@ -26,10 +27,20 @@ export class Error extends StandardError {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class ServerError extends Error {}
 
+/** @noRailsEquivalent PERMANENT */
 export class UnableToSend extends Error {}
 
+/** @noRailsEquivalent PERMANENT */
 export class ConnectionBad extends Error {}
 
+/** @noRailsEquivalent PERMANENT */
 export class FeatureNotSupported extends ServerError {}
+
+PG.Error = Error;
+PG.ServerError = ServerError;
+PG.UnableToSend = UnableToSend;
+PG.ConnectionBad = ConnectionBad;
+PG.FeatureNotSupported = FeatureNotSupported;

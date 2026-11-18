@@ -55,7 +55,7 @@ beforeEach(() => {
     rawConnection: async () => raw,
     disconnectBang: async () => log.push("disconnect!"),
   };
-  TopLevel.PG = { Connection };
+  TopLevel.PG = { ...TopLevel.PG!, Connection: Connection as never };
   TopLevel.ActiveRecord = {
     Base: {
       logger: null,

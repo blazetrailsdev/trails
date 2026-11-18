@@ -212,6 +212,9 @@ importers:
       '@blazetrails/activerecord':
         specifier: workspace:*
         version: link:../activerecord
+      '@blazetrails/pg':
+        specifier: workspace:*
+        version: link:../pg
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers

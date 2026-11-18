@@ -23,6 +23,9 @@
       "path": "../rack"
     },
     {
+      "path": "../pg"
+    },
+    {
       "path": "../rackup"
     },
     {

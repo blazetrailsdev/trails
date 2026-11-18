@@ -68,7 +68,9 @@ export class Connection {
     try {
       return Promise.resolve(
         (this.client.query as unknown as (...args: unknown[]) => unknown)(...args),
-      ).catch((error: unknown) => raise(this, error)) as Promise<pg.QueryResult>;
+      ).catch((error: unknown) => {
+        throw pgError(this, error);
+      }) as Promise<pg.QueryResult>;
     } catch (error) {
       return Promise.reject(pgError(this, error));
     }
@@ -78,7 +80,7 @@ export class Connection {
     try {
       await this.client.end();
     } catch (error) {
-      raise(this, error);
+      throw pgError(this, error);
     }
   }
 
@@ -94,7 +96,9 @@ export class Connection {
   }
 
   connect(): Promise<unknown> {
-    return this.client.connect().catch((error: unknown) => raise(this, error, ConnectionBad));
+    return this.client.connect().catch((error: unknown) => {
+      throw pgError(this, error, ConnectionBad);
+    });
   }
 
   status(): number {
@@ -125,7 +129,9 @@ export class Connection {
     await client
       .end()
       .then(() => conn.connect())
-      .catch((error: unknown) => raise(this, error, ConnectionBad));
+      .catch((error: unknown) => {
+        throw pgError(this, error, ConnectionBad);
+      });
     this.client = conn;
   }
 
@@ -170,7 +176,9 @@ export class Connection {
         values: params.map(param),
         rowMode: "array",
         types: types(this),
-      }).catch((error: unknown) => raise(this, error)),
+      }).catch((error: unknown) => {
+        throw pgError(this, error);
+      }),
     );
   }
 
@@ -178,7 +186,9 @@ export class Connection {
     return result(
       await (this.query as unknown as Query)(
         sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
-      ).catch((error: unknown) => raise(this, error)),
+      ).catch((error: unknown) => {
+        throw pgError(this, error);
+      }),
     );
   }
 
@@ -264,7 +274,9 @@ export class Connection {
         values: params.map(param),
         rowMode: "array",
         types: types(this),
-      }).catch((error: unknown) => raise(this, error)),
+      }).catch((error: unknown) => {
+        throw pgError(this, error);
+      }),
     );
   }
 
@@ -409,10 +421,6 @@ function pgError(conn: Connection, error: unknown, klass?: typeof PGError): unkn
     conn.bad = true;
   }
   return wrapped;
-}
-
-function raise(conn: Connection, error: unknown, klass?: typeof PGError): never {
-  throw pgError(conn, error, klass);
 }
 
 function result(raw: pg.QueryResult | pg.QueryResult[]): PG.Result {
