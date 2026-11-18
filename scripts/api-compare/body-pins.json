@@ -63208,6 +63208,20 @@
   },
   {
     "package": "activesupport",
+    "rubyFile": "logger_silence.rb",
+    "rubyName": "log_at",
+    "digest": "092843fa01477c17",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activesupport",
+    "rubyFile": "logger_silence.rb",
+    "rubyName": "silence",
+    "digest": "73c0d5249989a190",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activesupport",
     "rubyFile": "logger_thread_safe_level.rb",
     "rubyName": "level",
     "digest": "17c099156dfffe45",
