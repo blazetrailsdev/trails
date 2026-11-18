@@ -1187,10 +1187,6 @@ export default defineConfig(
     },
   },
 
-  // ── type polish (RFC 0242): `no-explicit-any` and `no-double-cast` are held
-  //    at `warn` in these packages' lib and counted per file against
-  //    origin/main by `pnpm parity:lint:counts`; disabling `no-explicit-any`
-  //    inline is an error. After the package blocks above that turn it off. ──
   {
     files: [
       "packages/activerecord/lib/**/*.ts",
