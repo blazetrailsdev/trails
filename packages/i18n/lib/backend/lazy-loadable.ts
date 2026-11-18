@@ -33,12 +33,12 @@ class FilenameIncorrect extends StandardError {
 export class LazyLoadable extends Simple {
   static readonly FilenameIncorrect = FilenameIncorrect;
 
-  private _lazyLoad: boolean;
+  private lazyLoad: boolean;
   declare private _initializedLocales: Hash<Locale, boolean> | null | undefined;
 
   constructor({ lazyLoad = false }: { lazyLoad?: boolean } = {}) {
     super();
-    this._lazyLoad = lazyLoad;
+    this.lazyLoad = lazyLoad;
   }
 
   override initialized(): boolean {
@@ -111,7 +111,7 @@ export class LazyLoadable extends Simple {
   }
 
   private isLazyLoad(): boolean {
-    return this._lazyLoad;
+    return this.lazyLoad;
   }
 
   private loadTranslationsAndCollectFileErrors(files: unknown[]): Error[] {
