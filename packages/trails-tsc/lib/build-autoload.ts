@@ -99,6 +99,7 @@ const BOOT_PATHS = [
   "config/initializers",
   "db/seeds.ts",
   "app/helpers",
+  "app/views",
   "config",
 ];
 
@@ -132,6 +133,32 @@ async function helperFiles(dir: string, out: Set<string>): Promise<void> {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
+async function viewEntries(
+  trailsDir: string,
+  root: string,
+  dir: string,
+  out: [string, string][],
+): Promise<void> {
+  const path = getPath();
+  const at = `${dir}/`.lastIndexOf("/app/views/");
+  if (at === -1) return;
+  const outViews = File.join(dir.slice(0, at), ".trails/views");
+  for (const rel of (await Dir.globAsync("**/*", 0, { base: dir })).sort()) {
+    const file = File.join(dir, rel);
+    const compiled = File.join(outViews, `${rel}.js`);
+    if ((await File.isDirectoryAsync(file)) || !(await File.isExistAsync(compiled))) continue;
+    let source = "";
+    for (const byte of await File.binreadAsync(file)) source += String.fromCharCode(byte);
+    const specifier = path.relative!(trailsDir, compiled);
+    const key = path.relative!(root, file);
+    out.push([
+      key,
+      `  ${JSON.stringify(key)}: async () => ({ ...(await import(${JSON.stringify(specifier.startsWith(".") ? specifier : `./${specifier}`)})), source: ${JSON.stringify(source)} }),`,
+    ]);
+  }
+}
+
 async function writeBoot(
   trailsDir: string,
   root: string,
@@ -142,6 +169,7 @@ async function writeBoot(
     (engine): engine is BootEngine => typeof (engine as BootEngine).paths === "function",
   );
   const files = new Set<string>();
+  const views: [string, string][] = [];
   for (const engine of engines) {
     const engineRoot = engine.config.root ?? root;
     for (const key of BOOT_PATHS) {
@@ -150,6 +178,12 @@ async function writeBoot(
       if (key === "config") {
         for (const dir of await node.existent()) {
           if (await File.isDirectoryAsync(dir)) await configFiles(dir, files);
+        }
+        continue;
+      }
+      if (key === "app/views") {
+        for (const dir of await node.existent()) {
+          if (await File.isDirectoryAsync(dir)) await viewEntries(trailsDir, root, dir, views);
         }
         continue;
       }
@@ -182,12 +216,23 @@ async function writeBoot(
     return `  ${JSON.stringify(path.relative!(root, file))}: () => import(${JSON.stringify(specifier.startsWith(".") ? specifier : `./${specifier}`)}),`;
   });
   const boot = [
-    'import { getPath, registerCompiledFiles } from "@blazetrails/ruby-compat";',
+    `import { getPath, ${views.length === 0 ? "" : "loadIseqEval, "}registerCompiledFiles } from "@blazetrails/ruby-compat";`,
     "",
     'registerCompiledFiles(getPath().fileURLToPath(new URL("..", import.meta.url)), {',
     ...entries,
+    ...views.map(([, entry]) => entry),
     "});",
     "",
+    ...(views.length === 0
+      ? []
+      : [
+          "await Promise.all(",
+          `  ${JSON.stringify(views.map(([rel]) => rel))}.map((view) =>`,
+          "    loadIseqEval(getPath().fileURLToPath(new URL(`../${view}`, import.meta.url))),",
+          "  ),",
+          ");",
+          "",
+        ]),
   ].join("\n");
   await getFs().mkdir!(trailsDir, { recursive: true });
   await getFs().writeFile!(File.join(trailsDir, "boot.generated.js"), boot);

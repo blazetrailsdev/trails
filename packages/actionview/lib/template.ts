@@ -9,10 +9,12 @@ import {
   ArgumentError,
   Encoding,
   forceEncoding,
+  isCompiledFile,
   isValidEncoding,
   Exception,
   extend,
   LoadError,
+  loadedFileExports,
   NotImplementedError,
   rbInspect,
   rbModName,
@@ -74,6 +76,7 @@ let templateCompiler: TemplateCompiler = async (template, methodName, _source, f
     );
   }
   const { identifier } = template;
+  if (isCompiledFile(identifier)) return loadedFileExports(identifier) as { default: StandIn };
   const at = identifier.lastIndexOf("/app/views/");
   const compiled =
     at === -1
