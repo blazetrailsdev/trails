@@ -5282,7 +5282,7 @@ describe("buildReport — a RUBY_FILE_TS_OVERRIDES row onto a path-mirrored file
     const pkg = report.packages[0];
     expect(pkg.totalMoved).toBe(0);
     expect(pkg.extraFiles).toEqual([]);
-    expect(pkg.totalInternal).toBe(2);
+    expect(pkg.totalInternal).toBe(1);
   });
 });
 
@@ -5325,5 +5325,87 @@ describe("thor scoring across lanes", () => {
       ]),
     );
     expect(extras(manifest({ thor: thorRuby, arel }))).toEqual(alone);
+  });
+});
+
+describe("countTsInternalNames — Rails-backed privates", () => {
+  const memoize = (): ClassInfo =>
+    ({
+      name: "Memoize",
+      file: "backend/memoize.ts",
+      instanceMethods: [
+        { name: "lookup", visibility: "protected", internal: true, params: [] },
+        { name: "invented", visibility: "public", internal: true, params: [] },
+      ],
+      classMethods: [],
+    }) as unknown as ClassInfo;
+
+  it("does not count an @internal member the mirrored .rb declares private", () => {
+    expect(
+      countTsInternalNames(
+        "backend/memoize.ts",
+        [memoize()],
+        [],
+        undefined,
+        [],
+        new Set(["lookup"]),
+      ),
+    ).toBe(1);
+  });
+
+  it("counts an @internal member with no Rails-private counterpart", () => {
+    expect(countTsInternalNames("backend/memoize.ts", [memoize()], [], undefined, [])).toBe(2);
+  });
+});
+
+describe("buildReport — internal count reads the private walk in TS spelling", () => {
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      i18n: {
+        classes: {},
+        modules: {
+          "I18n::Backend::Memoize": rubyClass({
+            name: "Memoize",
+            file: "backend/memoize.rb",
+            instance: [method("available_locales"), method("reset_memoizations!", true)],
+          }),
+        },
+      },
+    },
+  };
+  const ts: ApiManifest = {
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      i18n: {
+        classes: {},
+        modules: {
+          "backend/memoize.ts:Memoize": {
+            name: "Memoize",
+            file: "backend/memoize.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: [
+              method("availableLocales"),
+              method("resetMemoizationsBang", true),
+              method("invented", true),
+            ],
+            classMethods: [],
+          },
+        },
+      },
+    },
+  };
+
+  it("skips a snake_case bang private and counts the unbacked one", () => {
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].totalInternal).toBe(1);
   });
 });

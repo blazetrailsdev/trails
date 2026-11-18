@@ -124,6 +124,12 @@ export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
  * {@link MARK_PATH} because a rowless package carries no row there, while this
  * number is never pinned at 0 — most `@internal` uses are correct, and the
  * gate exists so a spike is visible, not so the count reaches zero.
+ *
+ * A member whose name is private / protected in the mirrored `.rb` is not
+ * counted (`countTsInternalNames`'s `railsPrivate`): it is a faithful port, not
+ * debt. A TS `private` field porting a Ruby ivar (i18n `Middleware`'s `app` for
+ * `@app`) IS counted: an ivar is no Ruby method, so nothing in the Rails
+ * private set backs it, and the mark carries it as measured hidden state.
  */
 export const INTERNAL_MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-internal-mark.json");
 

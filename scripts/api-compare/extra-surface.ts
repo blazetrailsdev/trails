@@ -1226,6 +1226,13 @@ function walkTsFileSurface(
  * silent hiding place (RFC 0120). A constructor is not one: it ports Ruby's
  * `initialize`, which is always private, and declares no name (RFC 0234
  * § Design 2(a), ruled by the operator on 2026-11-16).
+ *
+ * `railsPrivate` is the mirrored `.rb`'s private / protected method names
+ * (`collectAllowedNames` with `visibility: "private"`, the walk
+ * `eslint/rails-private-methods.json` and the privates lane's `credited`
+ * column come from). A member named there is a faithful port whose `@internal`
+ * `rails-private-jsdoc` requires, so it is not counted: the mark measures the
+ * unbacked internals RFC 0121 receipts, not ported Rails privates.
  */
 export function countTsInternalNames(
   file: string,
@@ -1233,18 +1240,20 @@ export function countTsInternalNames(
   modules: ClassInfo[],
   fileFunctions: MethodInfo[] | undefined,
   internalConstants: string[],
+  railsPrivate: ReadonlySet<string> = new Set(),
 ): number {
   const isInternal = (m: MethodInfo): boolean =>
     m.internal === true &&
     m.declaredIn === undefined &&
     !m.name.startsWith("_") &&
-    m.name !== "constructor";
+    m.name !== "constructor" &&
+    !railsPrivate.has(m.name);
   const functionNames = new Set((fileFunctions ?? []).map((fn) => fn.name));
   const fileFunctionKey = (m: MethodInfo): string => `${m.name}:${m.line}:${m.isStatic === true}`;
   const fileFunctionEntries = new Set((fileFunctions ?? []).map(fileFunctionKey));
   const isOwnMember = (m: MethodInfo): boolean =>
     isInternal(m) && !(m.bodyless === true && functionNames.has(m.name));
-  let count = internalConstants.filter((n) => !n.startsWith("_")).length;
+  let count = internalConstants.filter((n) => !n.startsWith("_") && !railsPrivate.has(n)).length;
   for (const c of [...classes, ...modules]) {
     if (c.file !== file) continue;
     count += [...c.instanceMethods, ...c.classMethods].filter(
@@ -2691,9 +2700,32 @@ function buildPackageReport(
       (n) => !internalConsts.has(n),
     );
     if (!(rubyFile !== null && foldsOntoPathMirror(rubyFile, expectedTs))) {
-      result.totalInternal += countTsInternalNames(expectedTs, classes, modules, fileFns, [
-        ...internalConsts,
-      ]);
+      const railsPrivate =
+        rubyFile === null
+          ? new Set<string>()
+          : collectAllowedNames(
+              rubyFiles.get(rubyFile) ?? [],
+              pkg,
+              rubyPkg.modules,
+              moduleFqnByShort,
+              crossPackageModules,
+              crossPackagePkgByFqn,
+              crossPackageClasses,
+              constantAliases,
+              [],
+              rubyFile,
+              [],
+              undefined,
+              "private",
+            );
+      result.totalInternal += countTsInternalNames(
+        expectedTs,
+        classes,
+        modules,
+        fileFns,
+        [...internalConsts],
+        railsPrivate,
+      );
     }
     if (classes.length === 0 && modules.length === 0 && !fileFns && fileConsts.length === 0)
       continue;
