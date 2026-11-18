@@ -251,3 +251,9 @@ export class Cors {
 }
 
 Rack.Cors = Cors;
+
+declare module "@blazetrails/rack" {
+  interface RackNamespace {
+    Cors?: typeof Cors;
+  }
+}

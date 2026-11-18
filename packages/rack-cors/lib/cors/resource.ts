@@ -1,7 +1,6 @@
 import { Rack, type RackEnv } from "@blazetrails/rack";
 import { constDefined, constGet, regexpEscape, TypeError } from "@blazetrails/ruby-compat";
 
-import type { Cors } from "../cors.js";
 import { CorsMisconfigurationError } from "./resources/cors-misconfiguration-error.js";
 import { Result } from "./result.js";
 
@@ -92,7 +91,7 @@ export class Resource {
   processPreflight(env: RackEnv, result: Result): Headers {
     const headers: Headers = {};
 
-    const requestMethod = env[(Rack.Cors as typeof Cors).HTTP_ACCESS_CONTROL_REQUEST_METHOD] as
+    const requestMethod = env[Rack.Cors!.HTTP_ACCESS_CONTROL_REQUEST_METHOD] as
       | string
       | null
       | undefined;
@@ -103,7 +102,7 @@ export class Resource {
     )
       return headers;
 
-    const requestHeaders = env[(Rack.Cors as typeof Cors).HTTP_ACCESS_CONTROL_REQUEST_HEADERS] as
+    const requestHeaders = env[Rack.Cors!.HTTP_ACCESS_CONTROL_REQUEST_HEADERS] as
       | string
       | null
       | undefined;
@@ -121,7 +120,7 @@ export class Resource {
   toHeaders(env: RackEnv): Headers {
     const h: Headers = {
       "access-control-allow-origin": this.originForResponseHeader(
-        env[(Rack.Cors as typeof Cors).HTTP_ORIGIN] as string,
+        env[Rack.Cors!.HTTP_ORIGIN] as string,
       ),
       "access-control-allow-methods": this.methods.map((m) => String(m).toUpperCase()).join(", "),
       "access-control-expose-headers": this.expose == null ? "" : this.expose.join(", "),
@@ -146,10 +145,10 @@ export class Resource {
   /** @internal */
   protected toPreflightHeaders(env: RackEnv): Headers {
     const h = this.toHeaders(env);
-    if (env[(Rack.Cors as typeof Cors).HTTP_ACCESS_CONTROL_REQUEST_HEADERS] != null)
+    if (env[Rack.Cors!.HTTP_ACCESS_CONTROL_REQUEST_HEADERS] != null)
       Object.assign(h, {
         "access-control-allow-headers": env[
-          (Rack.Cors as typeof Cors).HTTP_ACCESS_CONTROL_REQUEST_HEADERS
+          Rack.Cors!.HTTP_ACCESS_CONTROL_REQUEST_HEADERS
         ] as string,
       });
     return h;
