@@ -166,11 +166,10 @@ export function parseHttpDate(s: string | undefined): Date | undefined {
 
 type R = ResponseCacheHost;
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface Response extends ResponseCacheHost {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Response {
+  declare protected getHeader: ResponseCacheHost["getHeader"];
+  declare protected setHeader: ResponseCacheHost["setHeader"];
+  declare protected hasHeader: ResponseCacheHost["hasHeader"];
   /** @internal */
   declare _cacheControlHash: CacheControlHash;
 
@@ -205,7 +204,7 @@ export class Response {
   }
 
   set etag(v: unknown) {
-    weakEtag.call(this, v);
+    weakEtag.call(this as unknown as R, v);
   }
 }
 

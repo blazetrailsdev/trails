@@ -51,11 +51,11 @@ export interface ParametersHost {
   logger?: { debug(message: string): void } | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface Parameters extends ParametersHost {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Parameters {
+  declare controllerClassFor: ParametersHost["controllerClassFor"];
+  declare protected setHeader: ParametersHost["setHeader"];
+  declare protected deleteHeader: ParametersHost["deleteHeader"];
+
   /** @internal */
   private static _parameterParsers: ParameterParsers = DEFAULT_PARSERS;
 
@@ -84,11 +84,11 @@ export class Parameters {
   }
 
   get params(): Record<string, unknown> {
-    return parameters.call(this);
+    return parameters.call(this as unknown as ParametersHost);
   }
 
   get pathParameters(): Record<string, unknown> {
-    return pathParameters.call(this);
+    return pathParameters.call(this as unknown as ParametersHost);
   }
 
   set pathParameters(parameters: Record<string, unknown>) {
