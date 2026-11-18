@@ -1,5 +1,5 @@
-import { BooleanType, Model } from "@blazetrails/activemodel";
-import { gemVersion } from "@blazetrails/activerecord";
+import { BooleanType, Errors, Model, ValidationsCallbacks } from "@blazetrails/activemodel";
+import { ActiveRecordError, gemVersion } from "@blazetrails/activerecord";
 import {
   IsolatedExecutionState,
   TopLevel,
@@ -25,7 +25,10 @@ import {
   Struct,
   constSet,
   env,
+  puts,
   rbInspect,
+  stderr as $stderr,
+  stdout as $stdout,
 } from "@blazetrails/ruby-compat";
 import { RecurringTask } from "./recurring-task.js";
 import { Record } from "./record.js";
@@ -52,16 +55,23 @@ export interface Configuration extends Model {}
 export class Configuration {
   declare static Process: typeof Process;
   declare static validate: typeof Model.validate;
+  declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
 
   static {
     constSet(SolidQueue, "Configuration", this);
     include(this, Model);
+    include(this, ValidationsCallbacks);
 
     this.validate(":ensureConfiguredProcesses");
     this.validate(":ensureValidRecurringTasks");
     this.validate(":ensureValidWorkerExecutionOptions");
     this.validate(":ensureFiberWorkersUseSupportedIsolationLevel");
-    this.validate(":ensureCorrectlySizedThreadPool");
+    this.validate(":warnAboutIncorrectlySizedDatabasePool");
+    this.validate(":warnAboutMissingConfigFiles");
+
+    (this as unknown as typeof Model & typeof Configuration).beforeValidation((configuration) => {
+      (configuration as Configuration).warnings.clear();
+    });
 
     constSet(this, "Process", Process);
   }
@@ -78,6 +88,7 @@ export class Configuration {
     pollingInterval: 1,
     concurrencyMaintenance: true,
     concurrencyMaintenanceInterval: 600,
+    batchMaintenance: true,
   };
 
   static readonly SCHEDULER_DEFAULTS = {
@@ -90,6 +101,7 @@ export class Configuration {
   static readonly FIBER_QUERY_SCOPED_CONNECTIONS_VERSION = new Gem.Version("7.2.0");
 
   private options: Options;
+  private _warnings?: Errors<Configuration>;
   private _workersOptions?: Options[];
   private _schedulerOptions?: Options;
   private _dispatchersOptions?: Options[];
@@ -123,18 +135,24 @@ export class Configuration {
     }
   }
 
-  async errorMessages(): Promise<string> {
-    if ((await this.configuredProcesses()).length === 0) {
-      return "No workers or processed configured. Exiting...";
-    } else {
-      const errorMessages = (await this.invalidTasks())
-        .map((task) => {
-          const allMessages = task.errors.fullMessages.map((msg) => `\t${msg}`).join("\n");
-          return `${task.key}:\n${allMessages}`;
-        })
-        .join("\n");
+  get warnings(): Errors<Configuration> {
+    return (this._warnings ??= new Errors(this));
+  }
 
-      return `Invalid processes configured:\n${errorMessages}`;
+  async check(): Promise<boolean> {
+    if (await this.isValid()) {
+      for (const warning of this.warnings.fullMessages) puts.call($stderr, warning);
+      puts.call($stdout, "Solid Queue configuration is valid.");
+
+      return true;
+    } else {
+      puts.call($stderr, "Solid Queue configuration is invalid:");
+      for (const message of [...this.warnings.fullMessages, ...this.errors.fullMessages]) {
+        for (const line of message!.split(/(?<=\n)/))
+          puts.call($stderr, `  ${line.replace(/\r?\n$/, "")}`);
+      }
+
+      return false;
     }
   }
 
@@ -180,14 +198,34 @@ export class Configuration {
   }
 
   /** @internal */
-  private async ensureCorrectlySizedThreadPool(): Promise<void> {
-    const dbPoolSize = Record.connectionPool()?.size;
-    if (dbPoolSize != null && dbPoolSize < (await this.estimatedNumberOfThreads())) {
-      this.errors.add(
-        "base",
-        `Solid Queue is configured to use ${await this.estimatedNumberOfThreads()} threads but the ` +
-          `database connection pool is ${dbPoolSize}. Increase it in \`config/database.yml\``,
-      );
+  private async warnAboutIncorrectlySizedDatabasePool(): Promise<void> {
+    try {
+      const dbPoolSize = Record.connectionPool()?.size;
+
+      if (dbPoolSize != null && dbPoolSize < (await this.estimatedDatabasePoolSize())) {
+        this.warnings.add(
+          "base",
+          `Warning: Solid Queue needs at least ${await this.estimatedDatabasePoolSize()} database connections ` +
+            `for the configured workers but the database connection pool is ${dbPoolSize}. Increase it in \`config/database.yml\``,
+        );
+      }
+    } catch (error) {
+      if (!(error instanceof ActiveRecordError)) throw error;
+    }
+  }
+
+  /** @internal */
+  private async warnAboutMissingConfigFiles(): Promise<void> {
+    const files = [this.options.configFile];
+    if (!this.isSkipRecurringTasks()) files.push(this.options.recurringScheduleFile);
+
+    for (const file of files.filter((file) => file != null)) {
+      if (!(await File.isExistAsync(String(new Pathname(String(file)))))) {
+        this.warnings.add(
+          "base",
+          `Warning: provided configuration file '${String(file)}' does not exist. Falling back to default configuration.`,
+        );
+      }
     }
   }
 
@@ -399,12 +437,17 @@ export class Configuration {
   }
 
   /** @internal */
-  private async estimatedNumberOfThreads(): Promise<number> {
-    const threadCounts = (await this.workersOptions()).map((options) =>
-      this.estimatedExecutionConnectionsForWorker(options),
+  private async estimatedDatabasePoolSize(): Promise<number> {
+    const sizes = (await this.workersOptions()).map((options) =>
+      this.estimatedDatabasePoolSizeForWorker(options),
     );
-    const threadCount = threadCounts.length > 0 ? Math.max(...threadCounts) : null;
-    return (threadCount ?? 1) + 2;
+    const workerPoolSize = sizes.length > 0 ? Math.max(...sizes) : null;
+    return workerPoolSize ?? 1;
+  }
+
+  /** @internal */
+  private estimatedDatabasePoolSizeForWorker(options: Options): number {
+    return this.estimatedExecutionConnectionsForWorker(options) + 2;
   }
 
   /** @internal */

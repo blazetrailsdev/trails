@@ -1,4 +1,5 @@
 import {
+  Deprecation,
   Logger,
   Notifications,
   runLoadHooks,
@@ -12,7 +13,10 @@ import {
 } from "@blazetrails/activesupport";
 import { STDOUT, TopLevel, constSet } from "@blazetrails/ruby-compat";
 
+import { nextMajorVersion } from "./version.js";
+
 let _timeZone: string | null = null;
+let _deprecator: Deprecation | undefined;
 
 export const SolidQueue = {
   name: "SolidQueue",
@@ -96,6 +100,10 @@ export const SolidQueue = {
     return SolidQueue.preserveFinishedJobs;
   },
 
+  deprecator(): Deprecation {
+    return (_deprecator ??= new Deprecation(String(nextMajorVersion()), "SolidQueue"));
+  },
+
   instrument<T>(
     channel: string,
     options: Record<string, unknown> = {},
@@ -161,6 +169,7 @@ export const SolidQueue = {
   isSupervisor(): boolean;
   isSilencePolling(): boolean;
   isPreserveFinishedJobs(): boolean;
+  deprecator(): Deprecation;
   instrument<T>(
     channel: string,
     options?: Record<string, unknown>,

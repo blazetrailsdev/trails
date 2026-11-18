@@ -1,0 +1,159 @@
+import type {} from "@blazetrails/vitest-matchers";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import "./support/dummy-application.js";
+import { TopLevel, camelize } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
+import { SystemExit, env, setEnv } from "@blazetrails/ruby-compat";
+import { Configuration, RecurringTask } from "../lib/index.js";
+import { Cli } from "../lib/cli.js";
+import { loadAppSchema } from "./support/queue-schema.js";
+import "./support/job-result.js";
+
+const dummyRoot = `${import.meta.dirname}/support/dummy`;
+
+function configFilePath(name: string): string {
+  return `${dummyRoot}/config/${name}.yml`;
+}
+
+async function withEnv(vars: { [key: string]: string | undefined }, block: () => Promise<void>) {
+  const previous = Object.fromEntries(Object.keys(vars).map((key) => [key, env[key]]));
+  for (const [key, value] of Object.entries(vars)) setEnv(key, value);
+  try {
+    await block();
+  } finally {
+    for (const [key, value] of Object.entries(previous)) setEnv(key, value);
+  }
+}
+
+async function captureIo(block: () => Promise<void>): Promise<[string, string]> {
+  let err = "";
+  const out = await capture("stdout", async () => {
+    err = await capture("stderr", block);
+  });
+  return [out, err];
+}
+
+function configurationFromCli(cliOptions: { [key: string]: unknown } = {}): Configuration {
+  const cli = new (Cli as unknown as new (
+    args: string[],
+    options: { [key: string]: unknown },
+  ) => { options: { toA(): [string, unknown][] } })([], cliOptions);
+  const options = Object.fromEntries(
+    cli.options
+      .toA()
+      .filter(([, value]) => value != null)
+      .map(([key, value]) => [camelize(key, false), value]),
+  );
+
+  return new Configuration(options);
+}
+
+async function captureCheckRun(...args: string[]): Promise<[string, string, number | null]> {
+  let status: number | null = null;
+  const [out, err] = await captureIo(async () => {
+    try {
+      await (Cli as unknown as { start(args: string[]): Promise<unknown> }).start([
+        "check",
+        ...args,
+      ]);
+    } catch (e) {
+      if (!(e instanceof SystemExit)) throw e;
+      status = e.status;
+    }
+  });
+  return [out, err, status];
+}
+
+describe("CliTest", () => {
+  beforeAll(async () => {
+    await loadAppSchema();
+    const pool = RecurringTask.connectionPool();
+    await pool.schemaReflection.loadAllBang(pool);
+  });
+
+  beforeEach(() => {
+    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "The application loader is Zeitwerk" — framework packages are ES modules, so no Zeitwerk eager load decides whether `cli.ts` loads.
+  it.skip("eager loading leaves the CLI to bin/jobs", () => {});
+
+  it("mode defaults to fork when no env var or option", async () => {
+    await withEnv({ SOLID_QUEUE_SUPERVISOR_MODE: undefined }, async () => {
+      const config = configurationFromCli();
+
+      expect(config.mode().isFork()).toBeTruthy();
+    });
+  });
+
+  it("mode respects SOLID_QUEUE_SUPERVISOR_MODE env var", async () => {
+    await withEnv({ SOLID_QUEUE_SUPERVISOR_MODE: "async" }, async () => {
+      const config = configurationFromCli();
+
+      expect(config.mode().isAsync()).toBeTruthy();
+    });
+  });
+
+  it("mode option overrides env var", async () => {
+    await withEnv({ SOLID_QUEUE_SUPERVISOR_MODE: "async" }, async () => {
+      const config = configurationFromCli({ mode: "fork" });
+
+      expect(config.mode().isFork()).toBeTruthy();
+    });
+  });
+
+  it("mode option works without env var", async () => {
+    await withEnv({ SOLID_QUEUE_SUPERVISOR_MODE: undefined }, async () => {
+      const config = configurationFromCli({ mode: "async" });
+
+      expect(config.mode().isAsync()).toBeTruthy();
+    });
+  });
+
+  it("only_recurring option runs just the scheduler", async () => {
+    const config = configurationFromCli({ only_recurring: true });
+
+    expect((await config.configuredProcesses()).length).toBe(1);
+    expect((await config.configuredProcesses())[0].kind).toBe("scheduler");
+  });
+
+  it("only_recurring respects SOLID_QUEUE_ONLY_RECURRING env var", async () => {
+    await withEnv({ SOLID_QUEUE_ONLY_RECURRING: "true" }, async () => {
+      const config = configurationFromCli();
+
+      expect((await config.configuredProcesses()).length).toBe(1);
+      expect((await config.configuredProcesses())[0].kind).toBe("scheduler");
+    });
+  });
+
+  it("check exits 0 and prints OK message for a valid configuration", async () => {
+    const [out, err] = await captureIo(async () => {
+      await expect(
+        (Cli as unknown as { start(args: string[]): Promise<unknown> }).start([
+          "check",
+          "--skip-recurring",
+        ]),
+      ).resolves.not.toThrow();
+    });
+
+    expect(out).toMatch("Solid Queue configuration is valid.");
+    expect(err).toBeEmpty();
+  });
+
+  it("check exits 1 and prints invalid recurring task errors", async () => {
+    const [out, err, exitStatus] = await captureCheckRun(
+      "--recurring_schedule_file",
+      configFilePath("recurring_with_invalid"),
+    );
+
+    expect(exitStatus).toBe(1);
+    expect(err).toMatch("Solid Queue configuration is invalid");
+    expect(err).toMatch("periodic_invalid_class");
+    expect(err).toMatch("periodic_incorrect_schedule");
+    expect(out).toBeEmpty();
+  });
+});

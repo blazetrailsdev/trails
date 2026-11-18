@@ -1,6 +1,10 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import { IsolatedExecutionState, TopLevel } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
+import { gemVersion } from "@blazetrails/activerecord";
+import { Pathname, env, setEnv } from "@blazetrails/ruby-compat";
 import { Configuration, RecurringTask, type Scheduler } from "../lib/index.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import "./support/job-result.js";
@@ -37,6 +41,28 @@ async function withExecutionIsolation(level: "thread" | "fiber", block: () => Pr
   } finally {
     if (previousLevel != null) IsolatedExecutionState.isolationLevel = previousLevel;
   }
+}
+
+async function withEnv(vars: { [key: string]: string | undefined }, block: () => Promise<void>) {
+  const previous = Object.fromEntries(Object.keys(vars).map((key) => [key, env[key]]));
+  for (const [key, value] of Object.entries(vars)) setEnv(key, value);
+  try {
+    await block();
+  } finally {
+    for (const [key, value] of Object.entries(previous)) setEnv(key, value);
+  }
+}
+
+async function captureIo(block: () => Promise<void>): Promise<[string, string]> {
+  let err = "";
+  const out = await capture("stdout", async () => {
+    err = await capture("stderr", block);
+  });
+  return [out, err];
+}
+
+function isFiberWorkersReleaseConnectionsBetweenQueries(): boolean {
+  return gemVersion().compare(Configuration.FIBER_QUERY_SCOPED_CONNECTIONS_VERSION)! >= 0;
 }
 
 async function assertHasRecurringTask(
@@ -101,6 +127,15 @@ describe("ConfigurationTest", () => {
     await assertProcesses(configuration, "dispatcher", 1, {
       batchSize: Configuration.DISPATCHER_DEFAULTS.batchSize,
     });
+  });
+
+  it("warns if provided configuration file does not exist", async () => {
+    const configuration = new Configuration({ configFile: new Pathname("/path/to/nowhere.yml") });
+
+    expect(await configuration.isValid()).toBeTruthy();
+    expect(configuration.warnings.fullMessages).toContain(
+      "Warning: provided configuration file '/path/to/nowhere.yml' does not exist. Falling back to default configuration.",
+    );
   });
 
   it("read configuration from default file", async () => {
@@ -183,6 +218,40 @@ describe("ConfigurationTest", () => {
     });
   });
 
+  it.skipIf(isFiberWorkersReleaseConnectionsBetweenQueries())(
+    "fiber worker size inflates required database pool size on Rails 7.1",
+    async () => {
+      await withExecutionIsolation("fiber", async () => {
+        const configuration = new Configuration({
+          workers: [{ queues: "llm*", fibers: 1000 }],
+          dispatchers: [],
+          skipRecurring: true,
+        });
+
+        expect(await configuration.isValid()).toBeTruthy();
+        expect(configuration.warnings.fullMessages[0]).toMatch(
+          /needs at least 1002 database connections/,
+        );
+      });
+    },
+  );
+
+  it.skipIf(!isFiberWorkersReleaseConnectionsBetweenQueries())(
+    "fiber worker size does not inflate required database pool size on Rails 7.2+",
+    async () => {
+      await withExecutionIsolation("fiber", async () => {
+        const configuration = new Configuration({
+          workers: [{ queues: "llm*", fibers: 1000 }],
+          dispatchers: [],
+          skipRecurring: true,
+        });
+
+        expect(await configuration.isValid()).toBeTruthy();
+        expect(configuration.warnings).toBeEmpty();
+      });
+    },
+  );
+
   it("mulitple workers with the same configuration", async () => {
     const backgroundWorker = { queues: "background", polling_interval: 10, processes: 3 };
     const configuration = new Configuration({ workers: [backgroundWorker] });
@@ -220,6 +289,24 @@ describe("ConfigurationTest", () => {
     });
   });
 
+  it("scheduler starts with dynamic_tasks_enabled even without static tasks", async () => {
+    const configuration = new Configuration({
+      recurringScheduleFile: configFilePath("empty_configuration"),
+      scheduler: { dynamic_tasks_enabled: true },
+    });
+
+    await assertProcesses(configuration, "scheduler", 1, { dynamicTasksEnabled: true });
+  });
+
+  it("no scheduler without static tasks or dynamic_tasks_enabled", async () => {
+    const configuration = new Configuration({
+      recurringScheduleFile: configFilePath("empty_configuration"),
+      scheduler: { dynamic_tasks_enabled: false },
+    });
+
+    await assertProcesses(configuration, "scheduler", 0);
+  });
+
   it("no recurring tasks configuration when explicitly excluded", async () => {
     const configuration = new Configuration({
       dispatchers: [{ polling_interval: 0.1 }],
@@ -228,6 +315,73 @@ describe("ConfigurationTest", () => {
     await assertProcesses(configuration, "dispatcher", 1, {
       pollingInterval: 0.1,
       recurringTasks: null,
+    });
+  });
+
+  it("only_recurring runs just the scheduler process", async () => {
+    const configuration = new Configuration({ onlyRecurring: true });
+
+    expect((await configuration.configuredProcesses()).length).toBe(1);
+    await assertProcesses(configuration, "scheduler", 1);
+    await assertProcesses(configuration, "worker", 0);
+    await assertProcesses(configuration, "dispatcher", 0);
+    expect(await configuration.isValid()).toBeTruthy();
+  });
+
+  it("only_recurring ignores workers and dispatchers from the config file", async () => {
+    const configuration = new Configuration({ onlyRecurring: true });
+
+    await assertProcesses(configuration, "worker", 0);
+    await assertProcesses(configuration, "dispatcher", 0);
+    await assertProcesses(configuration, "scheduler", 1);
+
+    const scheduler = (await configuration.configuredProcesses())[0].instantiate() as Scheduler;
+    await assertHasRecurringTask(scheduler, {
+      key: "periodic_store_result",
+      class_name: "StoreResultJob",
+      schedule: "every second",
+    });
+  });
+
+  it("only_recurring when SOLID_QUEUE_ONLY_RECURRING environment variable is set", async () => {
+    await withEnv({ SOLID_QUEUE_ONLY_RECURRING: "true" }, async () => {
+      const configuration = new Configuration();
+
+      expect((await configuration.configuredProcesses()).length).toBe(1);
+      await assertProcesses(configuration, "scheduler", 1);
+      await assertProcesses(configuration, "worker", 0);
+      await assertProcesses(configuration, "dispatcher", 0);
+    });
+  });
+
+  it("only_recurring with skip_recurring is invalid", async () => {
+    const configuration = new Configuration({ onlyRecurring: true, skipRecurring: true });
+
+    expect(await configuration.isValid()).toBeFalsy();
+    expect(configuration.errors.fullMessages).toEqual(["No processes configured"]);
+  });
+
+  it("skip recurring tasks when SOLID_QUEUE_SKIP_RECURRING environment variable is set", async () => {
+    await withEnv({ SOLID_QUEUE_SKIP_RECURRING: "true" }, async () => {
+      const configuration = new Configuration({ dispatchers: [{ polling_interval: 0.1 }] });
+      await assertProcesses(configuration, "dispatcher", 1, { pollingInterval: 0.1 });
+      await assertProcesses(configuration, "scheduler", 0);
+    });
+  });
+
+  it("include recurring tasks when SOLID_QUEUE_SKIP_RECURRING environment variable is false", async () => {
+    await withEnv({ SOLID_QUEUE_SKIP_RECURRING: "false" }, async () => {
+      const configuration = new Configuration({ dispatchers: [{ polling_interval: 0.1 }] });
+      await assertProcesses(configuration, "dispatcher", 1, { pollingInterval: 0.1 });
+      await assertProcesses(configuration, "scheduler", 1);
+    });
+  });
+
+  it("include recurring tasks when SOLID_QUEUE_SKIP_RECURRING environment variable is not set", async () => {
+    await withEnv({ SOLID_QUEUE_SKIP_RECURRING: undefined }, async () => {
+      const configuration = new Configuration({ dispatchers: [{ polling_interval: 0.1 }] });
+      await assertProcesses(configuration, "dispatcher", 1, { pollingInterval: 0.1 });
+      await assertProcesses(configuration, "scheduler", 1);
     });
   });
 
@@ -247,11 +401,12 @@ describe("ConfigurationTest", () => {
       error.includes("periodic_incorrect_schedule: Schedule is not a supported recurring schedule"),
     ).toBeTruthy();
 
-    expect(
-      await new Configuration({
-        recurringScheduleFile: configFilePath("empty_recurring"),
-      }).isValid(),
-    ).toBeTruthy();
+    configuration = new Configuration({ recurringScheduleFile: configFilePath("empty_recurring") });
+    expect(await configuration.isValid()).toBeTruthy();
+    expect(configuration.warnings.fullMessages.join("")).toMatch(
+      /provided configuration file '[^']+' does not exist\./,
+    );
+
     expect(await new Configuration({ skipRecurring: true }).isValid()).toBeTruthy();
 
     configuration = new Configuration({
@@ -265,17 +420,99 @@ describe("ConfigurationTest", () => {
     });
     expect(await configuration.isValid()).toBeTruthy();
     await assertProcesses(configuration, "scheduler", 0);
+    expect(configuration.warnings.fullMessages.join("")).toMatch(
+      /provided configuration file '[^']+' does not exist\./,
+    );
 
     configuration = new Configuration({ skipRecurring: true, dispatchers: [], workers: [] });
     expect(await configuration.isValid()).toBeFalsy();
     expect(configuration.errors.fullMessages).toEqual(["No processes configured"]);
 
     configuration = new Configuration({
-      workers: [{ queues: "background", threads: 50, polling_interval: 10 }],
+      skipRecurring: true,
+      dispatchers: [],
+      workers: [{ fibers: 3 }],
     });
     expect(await configuration.isValid()).toBeFalsy();
     expect(configuration.errors.fullMessages[0]).toMatch(
-      /Solid Queue is configured to use \d+ threads but the database connection pool is \d+. Increase it in `config\/database.yml`/,
+      /require fiber-scoped isolated execution state/,
     );
+
+    configuration = new Configuration({
+      workers: [{ queues: "background", threads: 50, polling_interval: 10 }],
+    });
+    expect(await configuration.isValid()).toBeTruthy();
+  });
+
+  it("reports an undersized database pool as a warning rather than an error", async () => {
+    const configuration = new Configuration({
+      workers: [{ queues: "background", threads: 50, polling_interval: 10 }],
+      skipRecurring: true,
+    });
+
+    expect(await configuration.isValid()).toBeTruthy();
+    expect(configuration.warnings.size).toBe(1);
+    expect(configuration.warnings.fullMessages[0]).toMatch(
+      /Solid Queue needs at least \d+ database connections for the configured workers but the database connection pool is \d+\. Increase it in `config\/database.yml`/,
+    );
+  });
+
+  it("has no warnings when the database connection pool is large enough", async () => {
+    const configuration = new Configuration({
+      workers: [{ queues: "background", threads: 1, polling_interval: 10 }],
+      skipRecurring: true,
+    });
+
+    expect(await configuration.isValid()).toBeTruthy();
+    expect(configuration.warnings).toBeEmpty();
+  });
+
+  it("does not duplicate warnings when validated more than once", async () => {
+    const configuration = new Configuration({
+      workers: [{ queues: "background", threads: 50, polling_interval: 10 }],
+      skipRecurring: true,
+    });
+
+    for (let i = 0; i < 3; i++) await configuration.isValid();
+
+    expect(configuration.warnings.size).toBe(1);
+  });
+
+  it("check prints a success message and returns true for a valid configuration", async () => {
+    const [out, err] = await captureIo(async () => {
+      expect(await new Configuration({ skipRecurring: true }).check()).toBeTruthy();
+    });
+
+    expect(out).toMatch("Solid Queue configuration is valid.");
+    expect(err).toBeEmpty();
+  });
+
+  it("check prints warnings to stderr on the valid path", async () => {
+    const [out, err] = await captureIo(async () => {
+      expect(
+        await new Configuration({
+          workers: [{ queues: "background", threads: 50, polling_interval: 10 }],
+          skipRecurring: true,
+        }).check(),
+      ).toBeTruthy();
+    });
+
+    expect(out).toMatch("Solid Queue configuration is valid.");
+    expect(err).toMatch(
+      /Solid Queue needs at least \d+ database connections for the configured workers but the database connection pool is \d+/,
+    );
+  });
+
+  it("check prints errors to stderr and returns false for an invalid configuration", async () => {
+    const [, err] = await captureIo(async () => {
+      expect(
+        await new Configuration({
+          recurringScheduleFile: configFilePath("recurring_with_invalid"),
+        }).check(),
+      ).toBeFalsy();
+    });
+
+    expect(err).toMatch("Solid Queue configuration is invalid:");
+    expect(err).toMatch("periodic_invalid_class");
   });
 });
