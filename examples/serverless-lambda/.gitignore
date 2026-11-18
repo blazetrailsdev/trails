@@ -1,0 +1,6 @@
+node_modules/
+.trails/
+dist/
+build/
+db/*.sqlite3*
+log/

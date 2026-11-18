@@ -115,14 +115,18 @@ export async function rackResponseToFetchResponse(rackResponse: RackResponse): P
   try {
     const responseBody = NULL_BODY_STATUSES.has(status) ? null : await collectBody(body);
 
-    return new Response(responseBody, {
-      status,
-      headers: new Headers(headers),
-    });
-  } finally {
-    if (body && typeof (body as any).close === "function") {
-      (body as any).close();
+    // Rack 3 carries a repeated header (set-cookie) as an Array; new Headers(record)
+    // would comma-join it into one value.
+    const fetchHeaders = new Headers();
+    for (const [name, value] of Object.entries(headers)) {
+      for (const v of Array.isArray(value) ? value : [value]) {
+        if (typeof v === "string") fetchHeaders.append(name, v);
+      }
     }
+    return new Response(responseBody as BodyInit | null, { status, headers: fetchHeaders });
+  } finally {
+    const closable = body as { close?: () => void } | null;
+    if (closable && typeof closable.close === "function") closable.close();
   }
 }
 

@@ -279,4 +279,16 @@ describe("rackResponseToFetchResponse", () => {
     expect(resp.headers.get("location")).toBe("/new-path");
     expect(resp.headers.get("x-custom")).toBe("value");
   });
+
+  it("keeps each value of an array-valued header such as set-cookie", async () => {
+    async function* body() {
+      yield "";
+    }
+    const resp = await rackResponseToFetchResponse([
+      200,
+      { "set-cookie": ["a=1; path=/", "b=2; path=/"] },
+      body(),
+    ]);
+    expect(resp.headers.getSetCookie()).toEqual(["a=1; path=/", "b=2; path=/"]);
+  });
 });

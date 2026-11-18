@@ -1,0 +1,29 @@
+{
+  "name": "@blazetrails/example-serverless-lambda",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A minimal trails app bundled into one esbuild file and run on AWS Lambda",
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "package": "bash scripts/package.sh",
+    "deploy": "bash scripts/deploy.sh",
+    "invoke:local": "bash scripts/invoke-local.sh",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trailties": "workspace:*",
+    "libxml2-wasm": "0.7.1"
+  },
+  "devDependencies": {
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@types/node": "^25.3.5",
+    "esbuild": "0.27.3"
+  }
+}
