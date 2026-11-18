@@ -920,7 +920,7 @@
     }
   },
   "i18n": {
-    "rows": 37,
+    "rows": 39,
     "excluded": [],
     "unwalked": [
       "backend/pluralization.ts::Pluralization",

@@ -12,13 +12,15 @@ import * as m8 from "./backend/simple.js";
 import * as m9 from "./backend/transliterator.js";
 import * as m10 from "./config.js";
 import * as m11 from "./exceptions.js";
-import * as m12 from "./locale.js";
-import * as m13 from "./locale/fallbacks.js";
-import * as m14 from "./locale/tag/parents.js";
-import * as m15 from "./locale/tag/rfc4646.js";
-import * as m16 from "./locale/tag/simple.js";
-import * as m17 from "./middleware.js";
-import * as m18 from "./utils.js";
+import * as m12 from "./gettext.js";
+import * as m13 from "./gettext/helpers.js";
+import * as m14 from "./locale.js";
+import * as m15 from "./locale/fallbacks.js";
+import * as m16 from "./locale/tag/parents.js";
+import * as m17 from "./locale/tag/rfc4646.js";
+import * as m18 from "./locale/tag/simple.js";
+import * as m19 from "./middleware.js";
+import * as m20 from "./utils.js";
 
 defineConstants([
   [() => m11.ArgumentError, "I18n::ArgumentError"],
@@ -39,17 +41,19 @@ defineConstants([
   [() => m10.Config, "I18n::Config"],
   [() => m11.Disabled, "I18n::Disabled"],
   [() => m11.ExceptionHandler, "I18n::ExceptionHandler"],
+  [() => m12.Gettext, "I18n::Gettext"],
+  [() => m13.Helpers, "I18n::Gettext::Helpers"],
   [() => m11.InvalidFilenames, "I18n::InvalidFilenames"],
   [() => m11.InvalidLocale, "I18n::InvalidLocale"],
   [() => m11.InvalidLocaleData, "I18n::InvalidLocaleData"],
   [() => m11.InvalidPluralizationData, "I18n::InvalidPluralizationData"],
-  [() => m12.Locale, "I18n::Locale"],
-  [() => m13.Fallbacks, "I18n::Locale::Fallbacks"],
-  [() => m14.Parents, "I18n::Locale::Tag::Parents"],
-  [() => m15.Rfc4646, "I18n::Locale::Tag::Rfc4646"],
-  [() => m15.Parser, "I18n::Locale::Tag::Rfc4646::Parser"],
-  [() => m16.Simple, "I18n::Locale::Tag::Simple"],
-  [() => m17.Middleware, "I18n::Middleware"],
+  [() => m14.Locale, "I18n::Locale"],
+  [() => m15.Fallbacks, "I18n::Locale::Fallbacks"],
+  [() => m16.Parents, "I18n::Locale::Tag::Parents"],
+  [() => m17.Rfc4646, "I18n::Locale::Tag::Rfc4646"],
+  [() => m17.Parser, "I18n::Locale::Tag::Rfc4646::Parser"],
+  [() => m18.Simple, "I18n::Locale::Tag::Simple"],
+  [() => m19.Middleware, "I18n::Middleware"],
   [() => m11.MissingInterpolationArgument, "I18n::MissingInterpolationArgument"],
   [() => m11.MissingTranslation, "I18n::MissingTranslation"],
   [() => m11.Base, "I18n::MissingTranslation::Base"],
@@ -57,5 +61,5 @@ defineConstants([
   [() => m11.ReservedInterpolationKey, "I18n::ReservedInterpolationKey"],
   [() => m11.UnknownFileType, "I18n::UnknownFileType"],
   [() => m11.UnsupportedMethod, "I18n::UnsupportedMethod"],
-  [() => m18, "I18n::Utils"],
+  [() => m20, "I18n::Utils"],
 ]);

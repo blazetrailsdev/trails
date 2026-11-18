@@ -75,6 +75,8 @@ export {
 export type { FileReader, TranslateOptions } from "./backend/base.js";
 export { Chain } from "./backend/chain.js";
 export { FLATTEN_SEPARATOR, Flatten, SEPARATOR_ESCAPE_CHAR } from "./backend/flatten.js";
+export { Gettext } from "./gettext.js";
+import "./gettext/helpers.js";
 export { KeyValue, SubtreeProxy } from "./backend/key-value.js";
 export type { Store } from "./backend/key-value.js";
 export { Simple } from "./backend/simple.js";
