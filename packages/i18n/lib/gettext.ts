@@ -1,18 +1,23 @@
-import { Helpers } from "./gettext/helpers.js";
+import type { Helpers } from "./gettext/helpers.js";
 
 const _pluralKeys: Record<string, string[]> = { en: ["one", "other"] };
 
-export const Gettext = {
+interface Gettext {
+  PLURAL_SEPARATOR: string;
+  CONTEXT_SEPARATOR: string;
+  Helpers?: typeof Helpers;
+  pluralKeys: { (): Record<string, string[]>; (...args: string[]): string[] };
+  extractScope(msgid: unknown, separator: string): [string[], string];
+}
+
+export const Gettext: Gettext = {
   PLURAL_SEPARATOR: "\u0001",
   CONTEXT_SEPARATOR: "\u0004",
 
-  Helpers,
-
   pluralKeys: ((...args: string[]) =>
-    args.length === 0 ? _pluralKeys : (_pluralKeys[args[0]] ?? _pluralKeys.en)) as {
-    (): Record<string, string[]>;
-    (...args: string[]): string[];
-  },
+    args.length === 0
+      ? _pluralKeys
+      : (_pluralKeys[args[0]] ?? _pluralKeys.en)) as Gettext["pluralKeys"],
 
   extractScope(msgid: unknown, separator: string): [string[], string] {
     const scope = String(msgid ?? "").split(separator);
