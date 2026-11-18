@@ -2,7 +2,8 @@ import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import { TopLevel, camelize } from "@blazetrails/activesupport";
-import { SystemExit } from "@blazetrails/ruby-compat";
+import { SystemExit, type Hash } from "@blazetrails/ruby-compat";
+import type { ThorClass } from "@blazetrails/thor";
 import { Configuration, RecurringTask } from "../lib/index.js";
 import { Cli } from "../lib/cli.js";
 import { loadAppSchema } from "./support/queue-schema.js";
@@ -12,10 +13,7 @@ import { captureIo, configFilePath, withEnv } from "./support/configuration-test
 const dummyRoot = `${import.meta.dirname}/support/dummy`;
 
 function configurationFromCli(cliOptions: { [key: string]: unknown } = {}): Configuration {
-  const cli = new (Cli as unknown as new (
-    args: string[],
-    options: { [key: string]: unknown },
-  ) => { options: { toA(): [string, unknown][] } })([], cliOptions);
+  const cli = new Cli([], cliOptions) as unknown as { options: Hash<string, unknown> };
   const options = Object.fromEntries(
     cli.options
       .toA()
@@ -26,14 +24,13 @@ function configurationFromCli(cliOptions: { [key: string]: unknown } = {}): Conf
   return new Configuration(options);
 }
 
+const start = (args: string[]) => (Cli as unknown as ThorClass).start(args);
+
 async function captureCheckRun(...args: string[]): Promise<[string, string, number | null]> {
   let status: number | null = null;
   const [out, err] = await captureIo(async () => {
     try {
-      await (Cli as unknown as { start(args: string[]): Promise<unknown> }).start([
-        "check",
-        ...args,
-      ]);
+      await start(["check", ...args]);
     } catch (e) {
       if (!(e instanceof SystemExit)) throw e;
       status = e.status;
@@ -110,12 +107,7 @@ describe("CliTest", () => {
 
   it("check exits 0 and prints OK message for a valid configuration", async () => {
     const [out, err] = await captureIo(async () => {
-      await expect(
-        (Cli as unknown as { start(args: string[]): Promise<unknown> }).start([
-          "check",
-          "--skip-recurring",
-        ]),
-      ).resolves.not.toThrow();
+      await expect(start(["check", "--skip-recurring"])).resolves.not.toThrow();
     });
 
     expect(out).toMatch("Solid Queue configuration is valid.");
