@@ -1,5 +1,6 @@
 import { include, isPresent, truncateBytes } from "@blazetrails/activesupport";
 import { constSet, excBacktrace, rbModName } from "@blazetrails/ruby-compat";
+import { takeWhile } from "@blazetrails/ruby-compat/enumerable";
 import { Execution } from "./execution.js";
 import {
   Dispatching,
@@ -134,12 +135,10 @@ export class FailedExecution extends Execution {
   private truncateBacktrace(error: ErrorDetails, limit: number): string[] {
     let available = limit - this.serializedErrorSize({ ...error, backtrace: [] }) + 1;
 
-    const lines: string[] = [];
-    for (const line of error.backtrace!) {
-      if ((available -= this.serializedErrorSize(line) + 1) < 0) break;
-      lines.push(line);
-    }
-    return lines;
+    return takeWhile(
+      error.backtrace!,
+      (line) => (available -= this.serializedErrorSize(line) + 1) >= 0,
+    );
   }
 
   /** @internal */
