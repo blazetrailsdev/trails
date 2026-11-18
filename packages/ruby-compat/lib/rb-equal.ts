@@ -169,7 +169,10 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
      and `HashWithIndifferentAccess` under it) — and both stand for the same
      Ruby value, so the arm reads whichever the operand is. */
   if (isHash(a)) {
-    if (!isHash(b)) return false;
+    if (!isHash(b)) {
+      if (!rbObjRespondTo(b, "toHash")) return false;
+      return equalOrEql(b, a, eql);
+    }
     const entriesA = hashEntries(a)!;
     const entriesB = hashEntries(b)!;
     if (entriesA.length !== entriesB.length) return false;
@@ -199,8 +202,9 @@ export function hashEntries(value: unknown): [unknown, unknown][] | null {
 }
 
 /* `RB_TYPE_P(hash2, T_HASH)` (`vendor/ruby/v3.3.11/hash.c:3751`), which
-   `hash_equal` asks of the other operand before it reads either table. Its
-   `to_hash` arm for a non-Hash operand (`hash.c:3752-3764`) is not ported.
+   `hash_equal` asks of the other operand before it reads either table; a
+   non-Hash operand answering `to_hash` is asked `hash2 == hash1` in turn
+   (`hash.c:3752-3764`).
    A plain object {@link isModuleObject} recognises is a Module, whose `==` is
    `rb_obj_equal` (`vendor/ruby/v3.3.11/object.c:4374`), not a Hash. */
 function isHash(value: unknown): boolean {

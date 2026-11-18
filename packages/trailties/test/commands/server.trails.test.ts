@@ -68,7 +68,7 @@ describe("trails server environment (trails)", () => {
     devServerStarts.length = 0;
     runOptions = [];
     runApps = [];
-    Trails.logger = new BroadcastLogger(new Logger(null));
+    Trails.logger = new BroadcastLogger(new Logger(null)) as unknown as Logger;
     vi.spyOn(Trails, "initialize").mockResolvedValue({
       app: () => () => [200, {}, []],
       loadServer: async () => {},
@@ -143,11 +143,11 @@ describe("trails server environment (trails)", () => {
     await reseatLoadedVite();
     await run();
     delete Handler._handlers["vite"];
-    expect((Trails.logger as BroadcastLogger).broadcasts).toHaveLength(2);
+    expect((Trails.logger as unknown as BroadcastLogger).broadcasts).toHaveLength(2);
 
-    Trails.logger = new BroadcastLogger(new Logger(null));
+    Trails.logger = new BroadcastLogger(new Logger(null)) as unknown as Logger;
     await run("-e", "production");
-    expect((Trails.logger as BroadcastLogger).broadcasts).toHaveLength(1);
+    expect((Trails.logger as unknown as BroadcastLogger).broadcasts).toHaveLength(1);
   });
 
   it("does not override an already-set TRAILS_ENV", async () => {

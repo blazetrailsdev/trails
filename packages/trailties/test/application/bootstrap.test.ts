@@ -54,7 +54,7 @@ describe("Bootstrap", () => {
       app.config = { ...baseConfig(), logger: custom };
       await app.runInitializers("all");
       expect(Trails.logger).toBeInstanceOf(BroadcastLogger);
-      expect((Trails.logger as BroadcastLogger).broadcasts).toEqual([custom]);
+      expect((Trails.logger as unknown as BroadcastLogger).broadcasts).toEqual([custom]);
     });
 
     it("logs to config.defaultLogFile when config.logger is unset", async () => {
@@ -79,7 +79,7 @@ describe("Bootstrap", () => {
     it("preserves a pre-existing logger", async () => {
       const app = new TestApp();
       const preset = new BroadcastLogger(new Logger(null));
-      Trails.logger = preset;
+      Trails.logger = preset as unknown as Logger;
       await app.runInitializers("all");
       expect(Trails.logger).toBe(preset);
     });

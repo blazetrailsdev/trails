@@ -159,7 +159,7 @@ export class Server extends RackupServer<ServerOptions> {
     console.level = Trails.logger!.level;
 
     if (!Logger.isLoggerOutputsTo(Trails.logger!, STDERR, STDOUT)) {
-      (Trails.logger as BroadcastLogger).broadcastTo(console);
+      (Trails.logger as unknown as BroadcastLogger).broadcastTo(console);
     }
   }
 

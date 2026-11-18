@@ -3,10 +3,9 @@ import { currentErrorReporter } from "./error-reporter.js";
 import { deprecateMethods } from "./deprecation/method-wrappers.js";
 import { ArgumentError } from "./hash-utils.js";
 import { underscore } from "./inflector.js";
-import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { rbObjRespondTo, stderr } from "@blazetrails/ruby-compat";
-import { TopLevel } from "./namespaces.js";
+import { ActiveSupport, TopLevel } from "./namespaces.js";
 import { ThreadLocalVar } from "./thread-local-var.js";
 
 export type DeprecationBehavior = "raise" | "stderr" | "log" | "silence" | "notify" | "report";
@@ -38,7 +37,7 @@ export const DEFAULT_BEHAVIORS: Readonly<Record<DeprecationBehavior, Deprecation
     },
 
     log: (message, callstack, deprecator) => {
-      const logger = TopLevel.Trails?.logger ?? new Logger(stderr);
+      const logger = TopLevel.Trails?.logger ?? new ActiveSupport.Logger(stderr);
       logger.warn(message);
       if (deprecator.debug) logger.debug(callstack.join("\n  "));
     },
