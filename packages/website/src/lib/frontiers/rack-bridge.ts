@@ -133,7 +133,9 @@ async function collectBody(body: RackBody): Promise<string | Uint8Array> {
   const binaryChunks: Uint8Array[] = [];
   let hasBinary = false;
 
-  for await (const chunk of body) {
+  for await (const raw of body as AsyncIterable<unknown>) {
+    // A rendered view yields ActiveSupport::SafeBuffer chunks, not primitives.
+    const chunk = raw instanceof Uint8Array ? raw : String(raw);
     if (typeof chunk === "string") {
       if (hasBinary) {
         binaryChunks.push(encoder.encode(chunk));

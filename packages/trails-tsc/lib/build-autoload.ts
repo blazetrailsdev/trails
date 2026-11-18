@@ -177,14 +177,23 @@ async function writeBoot(
   for (const dir of application.config.helpersPaths ?? []) {
     if (await File.isDirectoryAsync(dir)) await helperFiles(dir, files);
   }
+  for (const engine of engines) {
+    const views = File.join(engine.config.root ?? root, ".trails/views");
+    if (!(await File.isDirectoryAsync(views))) continue;
+    for (const file of (await Dir.globAsync("**/*.js", 0, { base: views })).sort()) {
+      files.add(File.join(views, file));
+    }
+  }
   const entries = [...files].map((file) => {
     const specifier = path.relative!(trailsDir, file);
     return `  ${JSON.stringify(path.relative!(root, file))}: () => import(${JSON.stringify(specifier.startsWith(".") ? specifier : `./${specifier}`)}),`;
   });
   const boot = [
-    'import { getPath, registerCompiledFiles } from "@blazetrails/ruby-compat";',
+    'import { registerCompiledFiles } from "@blazetrails/ruby-compat";',
+    'import { Application } from "@blazetrails/trailties";',
     "",
-    'registerCompiledFiles(getPath().fileURLToPath(new URL("..", import.meta.url)), {',
+    "// Rooted as Application.findRoot roots the app, so a bundle that inlines this file still matches.",
+    "registerCompiledFiles(Application.findRoot(import.meta.dirname), {",
     ...entries,
     "});",
     "",
@@ -204,11 +213,11 @@ async function writeEntry(
     return relative.startsWith(".") ? relative : `./${relative}`;
   };
   const autoloadDir = File.join(trailsDir, "autoload");
-  const imports = tagged.map(
-    ([, dir], i) =>
-      `import { imports as imports${i} } from ${JSON.stringify(specifier(autoloadDir, File.join(dir, "imports.generated.js")))};`,
-  );
-  const byTag = tagged.map(([tag], i) => `  ${JSON.stringify(tag)}: imports${i},`);
+  const imports = tagged.flatMap(([, dir], i) => [
+    `import { imports as imports${i} } from ${JSON.stringify(specifier(autoloadDir, File.join(dir, "imports.generated.js")))};`,
+    `import manifest${i} from ${JSON.stringify(specifier(autoloadDir, File.join(dir, "manifest.json")))} with { type: "json" };`,
+  ]);
+  const byTag = tagged.map(([tag], i) => `  ${JSON.stringify(tag)}: [imports${i}, manifest${i}],`);
   const install = [
     'import "../boot.generated.js";',
     'import "@blazetrails/ruby-compat/psych-yaml";',
@@ -219,7 +228,7 @@ async function writeEntry(
     `const byTag = {\n${byTag.join("\n")}\n};`,
     "",
     "Trails.autoloaders.each((loader) => {",
-    "  if (Object.hasOwn(byTag, loader.tag)) loader.imports = byTag[loader.tag];",
+    "  if (Object.hasOwn(byTag, loader.tag)) [loader.imports, loader.manifest] = byTag[loader.tag];",
     "});",
     "",
   ].join("\n");

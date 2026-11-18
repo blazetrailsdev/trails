@@ -179,6 +179,21 @@ describe("rackResponseToFetchResponse", () => {
     expect(await resp.text()).toBe("<html><body>Hi</body></html>");
   });
 
+  it("stringifies non-primitive string chunks such as SafeBuffer", async () => {
+    class SafeBufferLike {
+      constructor(private s: string) {}
+      toString() {
+        return this.s;
+      }
+    }
+    async function* body() {
+      yield new SafeBufferLike("<h1>Posts</h1>");
+      yield "<p>ok</p>";
+    }
+    const resp = await rackResponseToFetchResponse([200, {}, body() as AsyncIterable<any>]);
+    expect(await resp.text()).toBe("<h1>Posts</h1><p>ok</p>");
+  });
+
   it("preserves status codes", async () => {
     async function* body() {
       yield "Not Found";

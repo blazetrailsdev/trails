@@ -120,12 +120,16 @@ describe("buildAutoload", () => {
       expect(install).toContain(
         'import { imports as imports0 } from "./trails.main/imports.generated.js";',
       );
-      expect(install).toContain('"trails.main": imports0,');
-      expect(install).toContain("loader.imports = byTag[loader.tag]");
+      expect(install).toContain(
+        'import manifest0 from "./trails.main/manifest.json" with { type: "json" };',
+      );
+      expect(install).toContain('"trails.main": [imports0, manifest0],');
+      expect(install).toContain("[loader.imports, loader.manifest] = byTag[loader.tag]");
 
       let sawApplication: unknown;
       vi.doMock("@blazetrails/ruby-compat/psych-yaml", () => ({}));
       vi.doMock("@blazetrails/trailties", () => ({
+        Application: { findRoot: () => tmp },
         Trails: {
           autoloaders: {
             each: (block: (loader: Loader) => void) => {
@@ -142,6 +146,9 @@ describe("buildAutoload", () => {
         await import(File.expandPath(".trails/autoload/install.generated.js"));
         expect(sawApplication).toBe(true);
         expect(Object.keys(main.imports!)).toEqual(["Widget"]);
+        expect(main.manifest).toEqual(
+          JSON.parse(File.read(".trails/autoload/trails.main/manifest.json")),
+        );
       } finally {
         vi.doUnmock("@blazetrails/trailties");
         vi.doUnmock("@blazetrails/ruby-compat/psych-yaml");
@@ -223,6 +230,7 @@ describe("buildAutoload", () => {
         "app/helpers/admin",
         "config/storage",
         "lib/helpers",
+        ".trails/views/posts",
       ]) {
         FileUtils.mkdirP(dir);
       }
@@ -249,6 +257,8 @@ describe("buildAutoload", () => {
       File.write("app/helpers/format.ts", "export {};\n");
       File.write("app/helpers/posts-helper.test.ts", "export {};\n");
       File.write("lib/helpers/extra-helper.ts", "export {};\n");
+      File.write(".trails/views/posts/index.html.tse.js", "export default () => {};\n");
+      File.write(".trails/views/posts/index.html.tse.js.map", "{}\n");
       const root = Dir.pwd();
       const globs: Record<string, string> = {
         "config/routes": "**/*.{ts,js}",
@@ -304,6 +314,10 @@ describe("buildAutoload", () => {
       ]) {
         expect(boot).toContain(`${JSON.stringify(rel)}: () => import("../${rel}"),`);
       }
+      expect(boot).toContain(
+        '".trails/views/posts/index.html.tse.js": () => import("./views/posts/index.html.tse.js"),',
+      );
+      expect(boot).not.toContain(".js.map");
       expect(boot).not.toContain("production.d.ts");
       expect(boot).not.toContain("app/helpers/format.ts");
       expect(boot).not.toContain("posts-helper.test.ts");
@@ -314,6 +328,15 @@ describe("buildAutoload", () => {
       );
 
       const registered: [string, Record<string, () => Promise<unknown>>][] = [];
+      const rootedFrom: (string | undefined)[] = [];
+      vi.doMock("@blazetrails/trailties", () => ({
+        Application: {
+          findRoot: (from: string | undefined) => {
+            rootedFrom.push(from);
+            return root;
+          },
+        },
+      }));
       vi.doMock("@blazetrails/ruby-compat", async (original) => ({
         ...(await original<object>()),
         registerCompiledFiles: (r: string, files: Record<string, () => Promise<unknown>>) => {
@@ -326,7 +349,11 @@ describe("buildAutoload", () => {
         await import(File.expandPath(".trails/boot.generated.js"));
       } finally {
         vi.doUnmock("@blazetrails/ruby-compat");
+        vi.doUnmock("@blazetrails/trailties");
       }
+      expect(rootedFrom.map((from) => File.realpath(from!))).toEqual([
+        File.realpath(File.expandPath(".trails")),
+      ]);
       expect(registered.map(([r]) => File.expandPath(r))).toEqual([root]);
       const drawn = await import(File.expandPath("config/routes.ts"));
       await rbFLoad(File.expandPath("config/routes.ts"));

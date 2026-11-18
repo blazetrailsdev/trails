@@ -9,10 +9,12 @@ import {
   ArgumentError,
   Encoding,
   forceEncoding,
+  isCompiledFile,
   isValidEncoding,
   Exception,
   extend,
   LoadError,
+  loadIseqEval,
   NotImplementedError,
   rbInspect,
   rbModName,
@@ -79,6 +81,7 @@ let templateCompiler: TemplateCompiler = async (template, methodName, _source, f
     at === -1
       ? `${identifier}.js`
       : `${identifier.slice(0, at)}/.trails/views/${identifier.slice(at + "/app/views/".length)}.js`;
+  if (isCompiledFile(compiled)) return (await loadIseqEval(compiled)) as { default: StandIn };
   const url = new URL(compiled, "file:///");
   url.search = `?${methodName}-${(loads += 1)}`;
   try {
