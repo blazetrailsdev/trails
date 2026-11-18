@@ -71,8 +71,7 @@ export interface ValidationsInternalsHost<TBase extends object = object> {
   _contextForValidation?: ValidationContext;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
-type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
+type IncludingClass = (new (...args: never[]) => unknown) & { prototype: object };
 
 export class Validations {
   declare static AbsenceValidator: typeof AbsenceValidator;

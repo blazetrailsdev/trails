@@ -14,8 +14,7 @@ import { Conversion } from "./conversion.js";
 import { Naming } from "./naming.js";
 import { Translation } from "./translation.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
-type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
+type IncludingClass = (new (...args: never[]) => unknown) & { prototype: object };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
 export class API {
