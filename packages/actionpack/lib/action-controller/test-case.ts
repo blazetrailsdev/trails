@@ -400,7 +400,7 @@ function setupRequest(
   this.request.fetchHeader("SCRIPT_NAME", (k) => {
     this.request.setHeader(
       k,
-      (this.controller as unknown as { config(): { relativeUrlRoot?: string } }).config()
+      (this.controller as Metal & { config(): { relativeUrlRoot?: string } }).config()
         .relativeUrlRoot,
     );
   });

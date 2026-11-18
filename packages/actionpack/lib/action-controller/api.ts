@@ -114,7 +114,6 @@ export class API extends Metal {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static raiseOnMissingCallbackActions: boolean;
-  declare dbRuntime?: number | null;
   declare static beforeAction: OmitThisParameter<typeof beforeAction>;
   declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
   declare static skipBeforeAction: OmitThisParameter<typeof skipBeforeAction>;
@@ -160,7 +159,7 @@ export class API extends Metal {
     this._urlOptions = null;
     this.viewRuntime = null;
     if (isModuleIncluded(new.target, TopLevel.ActiveRecord?.Railties.ControllerRuntime as never)) {
-      this.dbRuntime = null;
+      (this as this & { dbRuntime: number | null }).dbRuntime = null;
     }
   }
 }
