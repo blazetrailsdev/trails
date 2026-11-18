@@ -813,6 +813,7 @@ function _methodBound(obj: unknown, mid: string): boolean | null {
 /** @perf 3.5% — PERMANENT */
 const _boundEntries = new WeakMap<object, { serial: number; bound: Map<string, boolean | null> }>();
 
+/** @perf 3.5% — PERMANENT */
 function _methodBoundUncached(obj: unknown, mid: string): boolean | null {
   const core =
     obj === null || obj === undefined
