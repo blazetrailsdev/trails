@@ -19,6 +19,7 @@ import {
   rbStrMatch,
   rbStrSend,
   classModule,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError, TypeError } from "./attribute-assignment.js";
 
@@ -44,6 +45,7 @@ export class Naming {
       },
       configurable: true,
     });
+    rbClearMethodCache();
   }
 
   get modelName(): ModelName {

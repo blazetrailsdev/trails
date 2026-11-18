@@ -1,5 +1,10 @@
 import { Date as RubyDate, DateTime as RubyDateTime, Temporal, Time } from "@blazetrails/date";
-import { Rational, rational, TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import {
+  Rational,
+  rational,
+  TEMPORAL_METHOD_TABLE,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import { instantFrom } from "../../temporal.js";
 import { currentTime } from "../../time-travel.js";
@@ -297,3 +302,4 @@ Object.defineProperty(RubyDateTime.prototype, "change", {
   writable: true,
   configurable: true,
 });
+rbClearMethodCache();

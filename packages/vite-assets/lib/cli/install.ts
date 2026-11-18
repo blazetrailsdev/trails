@@ -8,6 +8,7 @@ import {
   stderr,
   StringIO,
   STDOUT as $stdout,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { Config } from "../config.js";
 import { IO } from "../io.js";
@@ -115,6 +116,7 @@ export class Install extends Command {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
     }
   }
 

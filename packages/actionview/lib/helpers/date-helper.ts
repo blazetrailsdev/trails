@@ -28,6 +28,7 @@ import {
   numStep,
   sprintf,
   defineModule,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 import "../action-view.js";
@@ -843,6 +844,7 @@ for (const method of ["sec", "min", "hour", "day", "month", "year"]) {
     writable: true,
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 declare module "./form-helper.js" {

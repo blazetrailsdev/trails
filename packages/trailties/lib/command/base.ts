@@ -9,6 +9,7 @@ import {
   rbObjMethod,
   TSE,
   type Included,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import type { Basic } from "@blazetrails/thor/shell/basic";
@@ -208,6 +209,7 @@ export class Base extends Thor {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       klass.methodAdded(this.commandName());
       return true;
     } else {

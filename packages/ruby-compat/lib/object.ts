@@ -768,6 +768,51 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  */
 export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   if (mid === "toYaml") return true;
+  const bound = _methodBound(obj, mid);
+  if (bound !== null) return bound;
+  const respondToMissing = _chainEntry(obj, "respondToMissing");
+  if (typeof respondToMissing !== "function") return false;
+  const ret = (respondToMissing as (mid: string) => unknown).call(obj, mid);
+  return ret != null && ret !== false;
+}
+
+/** @perf 3.7x — PERMANENT */
+function _methodBound(obj: unknown, mid: string): boolean | null {
+  if (typeof obj !== "object" || obj === null) return methodBoundp(obj, mid);
+  const proto = Object.getPrototypeOf(obj) as object | null;
+  const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
+  const writer = writerSpelling(attr);
+  if (
+    proto === null ||
+    Object.hasOwn(obj, mid) ||
+    Object.hasOwn(obj, Symbol.toStringTag) ||
+    Object.hasOwn(obj, Symbol.iterator) ||
+    (attr !== undefined && Object.hasOwn(obj, attr)) ||
+    (writer !== undefined && Object.hasOwn(obj, writer))
+  ) {
+    return methodBoundp(obj, mid);
+  }
+  let entries = _boundEntries.get(proto);
+  if (entries === undefined || entries.serial !== methodCacheSerial) {
+    entries = { serial: methodCacheSerial, bound: new Map() };
+    _boundEntries.set(proto, entries);
+  }
+  let bound = entries.bound.get(mid);
+  if (bound === undefined) entries.bound.set(mid, (bound = methodBoundp(obj, mid)));
+  return bound;
+}
+
+/** @perf 3.7x — PERMANENT */
+const _boundEntries = new WeakMap<object, { serial: number; bound: Map<string, boolean | null> }>();
+
+/**
+ * `method_boundp` (`vendor/ruby/v3.3.11/vm_method.c:1788-1818`): whether the
+ * receiver's method entry for `mid` is bound, unbound (`false`, an undef
+ * entry) or absent (`null`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `method_boundp`.
+ */
+function methodBoundp(obj: unknown, mid: string): boolean | null {
   const core =
     obj === null || obj === undefined
       ? false
@@ -875,19 +920,34 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   ) {
     if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
   }
-  if (reopenedSeatMethod(obj, mid) !== undefined) return true;
-  const respondToMissing = chainEntry(obj, "respondToMissing");
-  if (typeof respondToMissing !== "function") return false;
-  const ret = (respondToMissing as (mid: string) => unknown).call(obj, mid);
-  return ret != null && ret !== false;
+  return reopenedSeatMethod(obj, mid) !== undefined ? true : null;
 }
 
-function chainEntry(obj: unknown, name: string): unknown {
-  for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
-    if (Object.hasOwn(o, name)) return Object.getOwnPropertyDescriptor(o, name)?.value;
+/** @perf 3.7x — PERMANENT */
+function _chainEntry(obj: unknown, name: string): unknown {
+  const proto =
+    typeof obj === "object" && obj !== null && !Object.hasOwn(obj, name)
+      ? (Object.getPrototypeOf(obj) as object | null)
+      : null;
+  let entries = proto === null ? undefined : _chainEntries.get(proto);
+  if (proto !== null && (entries === undefined || entries.serial !== methodCacheSerial)) {
+    entries = { serial: methodCacheSerial, values: new Map() };
+    _chainEntries.set(proto, entries);
   }
-  return undefined;
+  if (entries?.values.has(name)) return entries.values.get(name);
+  let value: unknown;
+  for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
+    if (Object.hasOwn(o, name)) {
+      value = Object.getOwnPropertyDescriptor(o, name)?.value;
+      break;
+    }
+  }
+  entries?.values.set(name, value);
+  return value;
 }
+
+/** @perf 3.7x — PERMANENT */
+const _chainEntries = new WeakMap<object, { serial: number; values: Map<string, unknown> }>();
 
 /**
  * `Object#respond_to_missing?` (`obj_respond_to_missing`,
@@ -1662,7 +1722,7 @@ export function rbCheckFuncall(recv: unknown, mid: string, ...args: unknown[]): 
  * (`vendor/ruby/v3.3.11/vm_method.c:2934`).
  */
 export function rbObjRespondTo(obj: unknown, mid: string): boolean {
-  const isRespondTo = chainEntry(obj, "isRespondTo");
+  const isRespondTo = _chainEntry(obj, "isRespondTo");
   if (typeof isRespondTo === "function") {
     const result = (isRespondTo as (mid: string) => unknown).call(obj, mid);
     return result != null && result !== false;

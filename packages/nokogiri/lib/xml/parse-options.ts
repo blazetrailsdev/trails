@@ -1,4 +1,4 @@
-import { rbObjInspect } from "@blazetrails/ruby-compat";
+import { rbObjInspect, rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
@@ -149,6 +149,7 @@ for (const constant of Object.keys(ParseOptions).filter((k) => /^[A-Z]/.test(k))
       configurable: true,
     },
   });
+  rbClearMethodCache();
 }
 
 XML.ParseOptions = ParseOptions;

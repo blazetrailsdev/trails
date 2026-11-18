@@ -33,6 +33,7 @@ import {
   TypeError,
   warn,
   rbGvGet,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { Command } from "./command.js";
 import { Invocation } from "./invocation.js";
@@ -473,6 +474,7 @@ export const ClassMethods = {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       this.methodAdded(name);
     });
   },

@@ -12,6 +12,7 @@ import {
   isModuleIncluded,
   rbFSend,
   TopLevel,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
@@ -67,6 +68,7 @@ function children(klass: SpecClass): SpecClass[] {
 function nukeTestMethodsBang(klass: SpecClass): void {
   for (const name of publicInstanceMethods(klass).filter((n) => /^test_/.test(n))) {
     Object.defineProperty(klass.prototype, name, { value: undefined, configurable: true });
+    rbClearMethodCache();
   }
 }
 

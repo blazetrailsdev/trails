@@ -9,6 +9,7 @@ import {
   rbModName,
   shadowsIncluded,
   toS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { NotImplementedError } from "./errors.js";
@@ -2485,6 +2486,7 @@ for (const [name, fn] of [
     writable: true,
     enumerable: false,
   });
+  rbClearMethodCache();
 }
 
 {
@@ -2498,6 +2500,7 @@ for (const [name, fn] of [
     configurable: true,
     enumerable: false,
   });
+  rbClearMethodCache();
 }
 
 import "@blazetrails/globalid/wire";

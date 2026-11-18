@@ -1,3 +1,4 @@
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { Address } from "@blazetrails/mail";
 
 declare module "@blazetrails/mail/elements/address" {
@@ -11,3 +12,4 @@ export function equals(this: Address, otherAddress: unknown): boolean {
 }
 
 Address.prototype.equals = equals;
+rbClearMethodCache();

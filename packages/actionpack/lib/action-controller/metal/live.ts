@@ -23,6 +23,7 @@ import {
   stringDelete,
   toEnum,
   toS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Concern, IsolatedExecutionState, Notifications, extend } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
@@ -37,6 +38,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
 
   static {
     Object.defineProperty(this.prototype, "toAry", { value: undefined, configurable: true });
+    rbClearMethodCache();
   }
 
   ignoreDisconnect: boolean;

@@ -1,7 +1,7 @@
 import { Concern, extend, isPresent } from "@blazetrails/activesupport";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Time } from "@blazetrails/date";
-import { classModule } from "@blazetrails/ruby-compat";
+import { classModule, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import type { Batch } from "../batch.js";
 import { SolidQueue } from "../solid-queue.js";
 
@@ -77,5 +77,6 @@ extend(Callbacks, Concern);
       },
       configurable: true,
     });
+    rbClearMethodCache();
   }
 });

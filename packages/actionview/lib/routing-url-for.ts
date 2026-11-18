@@ -17,6 +17,7 @@ import {
   rbCallSuper,
   rtest,
   symbolToS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 import type { UrlHelperHost } from "./helpers/url-helper.js";
@@ -86,8 +87,10 @@ export class RoutingUrlFor {
         for (const [name, desc] of copied) {
           rbSeatSuper(proto, name, desc.value, seats);
           Object.defineProperty(proto, name, { ...desc, enumerable: false });
+          rbClearMethodCache();
         }
         Object.defineProperties(proto, seats);
+        rbClearMethodCache();
       }
     }
   }

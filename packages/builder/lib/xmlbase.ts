@@ -12,6 +12,7 @@ import {
   rbObjSingletonClass,
   stringToSym,
   symbolToS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { XChar } from "./xchar.js";
 
@@ -199,6 +200,7 @@ export abstract class XmlBase {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
     }
   }
 }

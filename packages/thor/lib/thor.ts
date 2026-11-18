@@ -30,6 +30,7 @@ import {
   hashDelete,
   isModuleIncluded,
   TopLevel,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, type Relations } from "./base.js";
 import type { Invocation } from "./invocation.js";
@@ -146,6 +147,7 @@ export class Thor {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       this.methodAdded(subcommandName);
     } else {
       this.desc(usage, description, options);
@@ -352,6 +354,7 @@ export class Thor {
       writable: true,
       configurable: true,
     });
+    rbClearMethodCache();
     this.methodAdded(subcommand);
     for (const [, command] of Object.entries(subcommandClass.commands())) {
       command.ancestorName = subcommand;
@@ -692,6 +695,7 @@ export class Thor {
       writable: true,
       configurable: true,
     });
+    rbClearMethodCache();
     this.methodAdded("help");
   }
   /** @internal */

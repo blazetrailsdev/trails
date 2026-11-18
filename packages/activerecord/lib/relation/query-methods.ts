@@ -26,6 +26,7 @@ import {
   filterMap,
   rbObjIsKindOf,
   toA,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import {
@@ -1706,6 +1707,7 @@ Object.defineProperty(QueryMethods, included, {
           this._values[name] = value;
         },
       });
+      rbClearMethodCache();
     }
 
     Object.defineProperty(ActiveRecord.Relation.prototype, "extensions", {
@@ -1714,6 +1716,7 @@ Object.defineProperty(QueryMethods, included, {
         return this.extendingValues;
       },
     });
+    rbClearMethodCache();
   },
 });
 

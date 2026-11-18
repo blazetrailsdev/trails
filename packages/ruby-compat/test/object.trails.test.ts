@@ -440,9 +440,7 @@ describe("Object#respond_to?", () => {
   it("answers a respond_to_missing? defined on the prototype after the first query", () => {
     class Late {}
     expect(basicObjRespondTo(new Late(), "dynamic")).toBe(false);
-    Object.defineProperty(Late.prototype, "respondToMissing", {
-      value: (mid: string) => mid === "dynamic",
-    });
+    rbModDefineMethod(Late, "respondToMissing", (mid: string) => mid === "dynamic");
     expect(basicObjRespondTo(new Late(), "dynamic")).toBe(true);
   });
 
@@ -1870,5 +1868,68 @@ describe("basicObjRespondTo on a String instance", () => {
   it("answers no STRING_METHOD_TABLE name it cannot dispatch", () => {
     expect(rbObjRespondTo(new String("x"), "toS")).toBe(false);
     expect(toS(new String("x"))).toBe("x");
+  });
+});
+
+describe("rbObjRespondTo method cache", () => {
+  it("answers a method defined after the first query", () => {
+    class Widget {}
+    const widget = new Widget();
+    expect(rbObjRespondTo(widget, "spin")).toBe(false);
+    rbModDefineMethod(Widget, "spin", () => "spun");
+    expect(rbObjRespondTo(widget, "spin")).toBe(true);
+  });
+
+  it("keeps an undefined method unbound until it is defined again", () => {
+    class Widget {
+      spin(): string {
+        return "spun";
+      }
+    }
+    class Gadget extends Widget {}
+    rbModDefineMethod(Gadget, "spin", { value: undefined });
+    const gadget = new Gadget();
+    expect(rbObjRespondTo(gadget, "spin")).toBe(false);
+    expect(rbObjRespondTo(gadget, "spin")).toBe(false);
+    rbModDefineMethod(Gadget, "spin", () => "spun again");
+    expect(rbObjRespondTo(gadget, "spin")).toBe(true);
+  });
+
+  it("answers an own method after a negative answer for its prototype", () => {
+    class Widget {}
+    expect(rbObjRespondTo(new Widget(), "spin")).toBe(false);
+    const widget = Object.assign(new Widget(), { spin: () => "spun" });
+    expect(rbObjRespondTo(widget, "spin")).toBe(true);
+    expect(rbObjRespondTo(new Widget(), "spin")).toBe(false);
+  });
+
+  it("answers per object for an own Symbol.toStringTag on a shared prototype", () => {
+    class Seat {}
+    expect(rbObjRespondTo(new Seat(), "toDate")).toBe(false);
+    const date = Object.assign(new Seat(), { [Symbol.toStringTag]: "Temporal.PlainDate" });
+    expect(rbObjRespondTo(date, "toDate")).toBe(true);
+    expect(rbObjRespondTo(new Seat(), "toDate")).toBe(false);
+  });
+
+  it("answers a method a raw prototype write defines after rbClearMethodCache", () => {
+    class Widget {}
+    const widget = new Widget();
+    expect(rbObjRespondTo(widget, "spin")).toBe(false);
+    Object.defineProperty(Widget.prototype, "spin", { value: () => "spun", configurable: true });
+    rbClearMethodCache();
+    expect(rbObjRespondTo(widget, "spin")).toBe(true);
+  });
+
+  it("consults respondToMissing on every call", () => {
+    let answer = false;
+    class Ghost {
+      respondToMissing(): boolean {
+        return answer;
+      }
+    }
+    const ghost = new Ghost();
+    expect(rbObjRespondTo(ghost, "boo")).toBe(false);
+    answer = true;
+    expect(rbObjRespondTo(ghost, "boo")).toBe(true);
   });
 });

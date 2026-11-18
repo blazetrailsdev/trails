@@ -19,6 +19,7 @@ import {
   Encoding,
   toEnum,
   rbProcCall,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { URI_PARSER } from "./utils.js";
@@ -170,6 +171,7 @@ for (const methodName of StreamWrapper.REQUIRED_METHODS) {
     writable: true,
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 export class Wrapper {

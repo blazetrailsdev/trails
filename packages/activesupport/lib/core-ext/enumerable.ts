@@ -8,6 +8,7 @@ import {
   rbIntegerTypeP,
   rbPlus,
   TopLevel,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { exclude, indexBy, indexWith, sum as enumerableSum } from "../enumerable-utils.js";
@@ -64,6 +65,7 @@ declare module "@blazetrails/ruby-compat/range" {
 }
 
 Object.assign(Range.prototype, { sum });
+rbClearMethodCache();
 
 TopLevel.Enumerable = Enumerable;
 

@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
@@ -57,6 +57,7 @@ export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
       },
       configurable: true,
     });
+    rbClearMethodCache();
     this.methodAdded(type);
     if (typeof this.helperMethod === "function") this.helperMethod(type);
 
@@ -85,6 +86,7 @@ extend(Flash, Concern);
   classAttribute.call(this, "_flashTypes", { instanceAccessor: false, default: [] });
 
   Object.defineProperty(this.prototype, "flash", { get: flash, configurable: true });
+  rbClearMethodCache();
   this.addFlashTypes("alert", "notice");
 });
 

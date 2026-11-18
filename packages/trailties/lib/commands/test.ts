@@ -1,5 +1,5 @@
 import "../constants.test.generated.js";
-import { LOAD_PATH, LoadError, rbFSystem } from "@blazetrails/ruby-compat";
+import { LOAD_PATH, LoadError, rbFSystem, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { UnrecognizedCommandError, root } from "../command.js";
@@ -24,6 +24,7 @@ export class TestCommand extends Base {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       klass.methodAdded(name);
     }
 

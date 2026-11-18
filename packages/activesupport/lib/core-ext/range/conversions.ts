@@ -1,5 +1,5 @@
 import { Range } from "@blazetrails/ruby-compat/range";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import "../time/conversions.js";
 import "../date/conversions.js";
 
@@ -45,3 +45,4 @@ export function toFs<T>(this: Range<T>, format: string = "default"): string | un
 export const toFormattedS = toFs;
 
 Object.assign(Range.prototype, { toFs, toFormattedS });
+rbClearMethodCache();

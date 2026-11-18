@@ -1,3 +1,4 @@
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 /** @noRailsEquivalent PERMANENT */
 export function applyThenable(prototype: object): void {
   const def = { writable: true, configurable: true, enumerable: false };
@@ -26,4 +27,5 @@ export function applyThenable(prototype: object): void {
       },
     },
   });
+  rbClearMethodCache();
 }

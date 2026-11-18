@@ -9,6 +9,7 @@ import {
   RuntimeError,
   Thread,
   Struct,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
@@ -1208,6 +1209,7 @@ export const ClassMethods = {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
 
       Object.defineProperty(this, `_${camelize(name, false)}Callbacks`, {
         get(this: CallbacksClass) {
@@ -1225,6 +1227,7 @@ export const ClassMethods = {
         },
         configurable: true,
       });
+      rbClearMethodCache();
     });
   },
 

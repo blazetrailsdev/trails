@@ -17,6 +17,7 @@ import {
   hashDelete,
   isModuleIncluded,
   rbFSend,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, type Relations } from "./base.js";
 import { Actions, type ActionsHost } from "./actions.js";
@@ -118,6 +119,7 @@ export class Group {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       this.methodAdded(meth);
     });
   }
@@ -162,6 +164,7 @@ export class Group {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       this.methodAdded(meth);
     });
   }

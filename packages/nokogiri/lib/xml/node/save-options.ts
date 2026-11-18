@@ -1,3 +1,4 @@
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 export class SaveOptions {
   static readonly FORMAT = 1;
   static readonly NO_DECLARATION = 2;
@@ -78,9 +79,11 @@ for (const constant of CONSTANTS) {
       return this;
     },
   });
+  rbClearMethodCache();
   Object.defineProperty(SaveOptions.prototype, `is${name}`, {
     value(this: SaveOptions) {
       return (this.options & value) === value;
     },
   });
+  rbClearMethodCache();
 }

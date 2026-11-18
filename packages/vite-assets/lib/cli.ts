@@ -1,5 +1,5 @@
 import { camelize } from "@blazetrails/activesupport";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import type { GroupClass } from "@blazetrails/thor/group.js";
 import { ViteAssets } from "./vite-assets.js";
@@ -63,6 +63,7 @@ export class CLI extends Thor {
       writable: true,
       configurable: true,
     });
+    rbClearMethodCache();
     this.methodAdded(name);
     if (aliases.length > 0) this.map(Object.fromEntries(aliases.map((alias) => [alias, name])));
   }

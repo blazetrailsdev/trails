@@ -6,6 +6,7 @@ import {
   rbObjDup,
   type AsyncContext,
   type AsyncContextAdapter,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
@@ -43,6 +44,7 @@ Thread.prototype.activeSupportExecutionState = activeSupportExecutionState;
 Thread.prototype.setActiveSupportExecutionState = setActiveSupportExecutionState;
 Fiber.prototype.activeSupportExecutionState = activeSupportExecutionState;
 Fiber.prototype.setActiveSupportExecutionState = setActiveSupportExecutionState;
+rbClearMethodCache();
 
 let _isolationLevel: IsolationLevel | null = null;
 let _scope: typeof Thread | typeof Fiber;

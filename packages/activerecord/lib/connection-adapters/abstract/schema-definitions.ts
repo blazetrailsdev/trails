@@ -8,6 +8,7 @@ import {
   rbRegMatchP,
   slice,
   symbolToS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
@@ -556,7 +557,9 @@ ColumnMethods[included] = function (base: ColumnMethodsBase): void {
   );
 
   base.prototype.blob = base.prototype.binary;
+  rbClearMethodCache();
   base.prototype.numeric = base.prototype.decimal;
+  rbClearMethodCache();
 };
 
 /** @internal */

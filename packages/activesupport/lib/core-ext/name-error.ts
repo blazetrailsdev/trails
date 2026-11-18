@@ -1,4 +1,9 @@
-import { ArgumentError, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  rbModName,
+  rbObjRespondTo,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
 
 declare module "@blazetrails/ruby-compat/name-error" {
@@ -50,5 +55,6 @@ function realModName(mod: unknown): string | null {
 
 NameError.prototype.missingName = missingName;
 NameError.prototype.isMissingName = isMissingName;
+rbClearMethodCache();
 
 export { NameError };

@@ -1,4 +1,10 @@
-import { ArgumentError, NameError, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  NameError,
+  rbEqual,
+  rbInspect,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { assert } from "./assertions.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -237,9 +243,11 @@ export function assertCalledOnInstanceOf<T>(
       ? { configurable: true, get: stubbed, set: inherited.set }
       : { configurable: true, writable: true, value: stubbed },
   );
+  rbClearMethodCache();
   const ensure = () => {
     if (original) Object.defineProperty(proto, methodName, original);
     else delete (proto as Record<string, unknown>)[methodName];
+    rbClearMethodCache();
   };
 
   const check = () => {

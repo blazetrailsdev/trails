@@ -18,6 +18,7 @@ import {
   constGet,
   constDefined,
   rbModName,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
@@ -171,6 +172,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
           return this._shebang;
         },
       });
+      rbClearMethodCache();
     });
   }
 

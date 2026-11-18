@@ -12,7 +12,15 @@ import { Placeholderable } from "@blazetrails/actionview/helpers/tags/placeholde
 import { Translator } from "@blazetrails/actionview/helpers/tags/translator.js";
 import { Tags } from "@blazetrails/actionview/namespaces.js";
 import { ActionText as ActionTextNamespace } from "../../../action-text.js";
-import { block, classModule, except, fetch, hashDelete, include } from "@blazetrails/ruby-compat";
+import {
+  block,
+  classModule,
+  except,
+  fetch,
+  hashDelete,
+  include,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 
 type Options = Record<string, unknown>;
 
@@ -182,6 +190,7 @@ for (const ref of FormHelper._includers) {
   }
 }
 Object.assign(FormHelper.prototype, formHelperMembers);
+rbClearMethodCache();
 
 const FormBuilderRichTextarea = {
   richTextarea(this: FormBuilderHost, method: unknown, options: Options = {}): Promise<unknown> {
@@ -191,3 +200,4 @@ const FormBuilderRichTextarea = {
 Object.assign(FormBuilder.prototype, FormBuilderRichTextarea, {
   richTextArea: FormBuilderRichTextarea.richTextarea,
 });
+rbClearMethodCache();

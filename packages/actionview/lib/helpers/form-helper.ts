@@ -33,6 +33,7 @@ import {
   classModule,
   included,
   include,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 import { ModelNaming, convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
@@ -798,6 +799,7 @@ export class FormBuilder {
       }
     });
     this.prototype.textArea = this.prototype.textarea;
+    rbClearMethodCache();
   }
 
   fieldsFor(
@@ -906,6 +908,7 @@ export class FormBuilder {
   declare checkBox: FormBuilder["checkbox"];
   static {
     this.prototype.checkBox = this.prototype.checkbox;
+    rbClearMethodCache();
   }
 
   radioButton(method: unknown, tagValue: unknown, options: Record<string, unknown> = {}): unknown {

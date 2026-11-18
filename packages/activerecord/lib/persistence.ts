@@ -11,6 +11,7 @@ import {
   rtest,
   eachWithObject,
   eachWithIndex,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
@@ -644,6 +645,7 @@ export async function reload<T extends ReloadRecord>(
     AttributeMethods.ClassMethods.undefineAttributeMethods.call(rbObjSingletonClass(this) as never);
     if (_virtualAttributePrototypes.has(freshPrototype)) {
       Object.defineProperties(prototype, Object.getOwnPropertyDescriptors(freshPrototype));
+      rbClearMethodCache();
     }
   }
   this._newRecord = false;
@@ -1009,6 +1011,7 @@ function _virtualAttributePrototype(klass: typeof Base, names: string[]): object
   proto = Object.create(klass.prototype) as object;
   for (const name of names) {
     Object.defineProperties(proto, _virtualAttributeMethods(klass, cache.methods, name));
+    rbClearMethodCache();
   }
   if (cache.prototypes.size < 64) cache.prototypes.set(key, proto);
   _virtualAttributePrototypes.add(proto);

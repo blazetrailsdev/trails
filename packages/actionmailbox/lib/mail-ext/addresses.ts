@@ -1,5 +1,10 @@
 import { Address, Message, type AddressList } from "@blazetrails/mail";
-import { rbFArray, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  rbFArray,
+  rbObjAsString,
+  rbObjRespondTo,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/mail/message" {
   interface Message {
@@ -70,3 +75,4 @@ Message.prototype.bccAddresses = bccAddresses;
 Message.prototype.xOriginalToAddresses = xOriginalToAddresses;
 Message.prototype.xForwardedToAddresses = xForwardedToAddresses;
 Message.prototype.addressList = addressList;
+rbClearMethodCache();

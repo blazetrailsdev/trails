@@ -1,3 +1,4 @@
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { formattedOffset as dateTimeFormattedOffset } from "../date-time/conversions.js";
 import { ordinalize } from "../../inflector.js";
@@ -89,3 +90,4 @@ RubyTime.prototype.toFs = function (this: RubyTime, format?: string): string {
 };
 RubyTime.prototype.toFormattedS = RubyTime.prototype.toFs;
 RubyTime.prototype.rfc3339 = RubyTime.prototype.xmlschema;
+rbClearMethodCache();

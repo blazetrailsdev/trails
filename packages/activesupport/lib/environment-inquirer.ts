@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { StringInquirer } from "./string-inquirer.js";
 import { isIn } from "./core-ext/object/inclusion.js";
 
@@ -42,4 +42,5 @@ for (const env of DEFAULT_ENVIRONMENTS) {
       return this[env];
     },
   });
+  rbClearMethodCache();
 }

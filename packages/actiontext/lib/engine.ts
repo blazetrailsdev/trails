@@ -4,7 +4,7 @@ import "@blazetrails/trailties/trailties/action-controller";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import "@blazetrails/activestorage/engine";
-import { File, include, prepend, rbFRequire } from "@blazetrails/ruby-compat";
+import { File, include, prepend, rbFRequire, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
 import { Attachable } from "./attachable.js";
 import { Attachment } from "./attachment.js";
@@ -106,6 +106,7 @@ export class Engine extends TrailsEngine {
           writable: true,
           configurable: true,
         });
+        rbClearMethodCache();
 
         Object.defineProperty(this.prototype, "attachablePlainTextRepresentation", {
           value: function (this: BlobHost, caption: unknown = null): string {
@@ -114,6 +115,7 @@ export class Engine extends TrailsEngine {
           writable: true,
           configurable: true,
         });
+        rbClearMethodCache();
 
         Object.defineProperty(this.prototype, "toTrixContentAttachmentPartialPath", {
           value: function (): null {
@@ -122,6 +124,7 @@ export class Engine extends TrailsEngine {
           writable: true,
           configurable: true,
         });
+        rbClearMethodCache();
       });
     });
 

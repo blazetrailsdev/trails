@@ -15,6 +15,7 @@ import {
   rbObjClassname,
   rbObjIsKindOf,
   type Bytes,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
@@ -142,6 +143,7 @@ for (const [name, key] of Object.entries(Properties.DEFAULT_PROPERTIES)) {
       this.set(key, value);
     },
   });
+  rbClearMethodCache();
 }
 
 /** @internal */

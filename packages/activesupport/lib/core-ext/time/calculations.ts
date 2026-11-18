@@ -1,5 +1,12 @@
 import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
-import { fetch, Rational, rbObjClassname, rbObjRespondTo, rbPlus } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  Rational,
+  rbObjClassname,
+  rbObjRespondTo,
+  rbPlus,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { deprecator } from "../../deprecator.js";
 import { Duration } from "../../duration.js";
 import { ArgumentError } from "../../hash-utils.js";
@@ -474,6 +481,7 @@ Object.assign(RubyTime.prototype, {
   eqlWithCoercion,
   eql: eqlWithCoercion,
 });
+rbClearMethodCache();
 
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
 

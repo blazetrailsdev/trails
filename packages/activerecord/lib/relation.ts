@@ -20,7 +20,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
-import { ARRAY_METHOD_TABLE, fetch } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, fetch, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import type { Psych } from "@blazetrails/ruby-compat/psych";
 import * as Arel from "@blazetrails/arel";
@@ -2221,6 +2221,7 @@ for (const name of ["updateAll", "deleteAll"] as const) {
     writable: true,
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 applyThenable(Relation.prototype);

@@ -9,6 +9,7 @@ import {
   rbFLoad,
   TopLevel,
   stderr as $stderr,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 export interface ConfigOptions {
@@ -298,4 +299,5 @@ for (const option of [...Config.CONFIGURABLE_WITH_ENV, ...Config.NOT_CONFIGURABL
     },
     configurable: true,
   });
+  rbClearMethodCache();
 }

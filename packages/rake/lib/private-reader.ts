@@ -1,4 +1,4 @@
-import { extend, included } from "@blazetrails/ruby-compat";
+import { extend, included, rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 const ClassMethods = {
   privateReader(this: { prototype: object }, ...names: string[]): void {
@@ -9,6 +9,7 @@ const ClassMethods = {
         },
         configurable: true,
       });
+      rbClearMethodCache();
     }
   },
 };

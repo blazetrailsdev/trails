@@ -61,6 +61,7 @@ export class MethodSet {
       if (owner instanceof Module) {
         owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
       } else Object.defineProperty(owner.prototype, as, instanceMethod);
+      rbClearMethodCache();
     }
     rbClearMethodCache();
   }

@@ -1,6 +1,6 @@
 import type { PermittedAttributes } from "@blazetrails/activemodel";
 import type { PluckColumn, PluckedRow } from "../relation/calculations.js";
-import { NoMethodError, extend } from "@blazetrails/ruby-compat";
+import { NoMethodError, extend, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
@@ -503,6 +503,7 @@ for (const name of valueAccessorNames) {
     },
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 for (const name of delegateMethods) {
@@ -514,6 +515,7 @@ for (const name of delegateMethods) {
     writable: true,
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 Associations.CollectionProxy = CollectionProxy;

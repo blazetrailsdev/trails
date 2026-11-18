@@ -6,6 +6,7 @@ import {
   includedModules,
   isModuleIncluded,
   constSet,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 import { AbstractController } from "../../namespaces.js";
@@ -102,6 +103,7 @@ Object.defineProperty(RoutesHelpers, "with", {
         }
         const wrapped = inherited(key, descriptor);
         Object.defineProperty(proto, key, wrapped);
+        rbClearMethodCache();
         installed.set(key, wrapped);
       }
       const moduleRoutes = (mod as { _routes?: Partial<RouteSet> })._routes;
