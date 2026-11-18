@@ -3,6 +3,7 @@ import "./support/dummy-application.js";
 import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { Process, Record, RecurringTask, Scheduler } from "../lib/index.js";
 import "./support/add-to-buffer-job.js";
+import { waitForRegisteredProcesses } from "./support/processes-test-helper.js";
 
 describe.runIf(Record.connectionDbConfig().adapter === "sqlite3")(
   "Scheduler on a file SQLite queue database",
@@ -26,6 +27,7 @@ describe.runIf(Record.connectionDbConfig().adapter === "sqlite3")(
       });
       try {
         await scheduler.start();
+        await waitForRegisteredProcesses(1, { timeout: 2 });
         expect(await Process.where({ kind: "Scheduler" }).count()).toBe(1);
       } finally {
         await scheduler.stop();
