@@ -327,13 +327,14 @@ describe("Rack::Cors", () => {
     it("should use Logger if none is set", async () => {
       const app = mockApp();
 
+      const level = vi.spyOn(Logger.prototype, "level", "set");
       const debug = vi.spyOn(Logger.prototype, "debug").mockReturnValue(true);
 
       const cors = new Cors(app, { debug: true }, () => {});
       await cors.call({ HTTP_ORIGIN: "test.com" });
-      expect(cors["logger"]).toBeInstanceOf(Logger);
-      expect((cors["logger"] as Logger).level).toEqual(Logger.Severity.DEBUG);
+      expect(level).toHaveBeenCalledWith(Logger.Severity.DEBUG);
       expect(debug).toHaveBeenCalledTimes(1);
+      level.mockRestore();
       debug.mockRestore();
     });
   });
