@@ -9,9 +9,6 @@ import {
 import { TopLevel, constGet, include } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../../turbo-trails.js";
 import { ActionHelper } from "../../../helpers/turbo/streams/action-helper.js";
-import { ActionBroadcastJob } from "../../../jobs/turbo/streams/action-broadcast-job.js";
-import { BroadcastJob } from "../../../jobs/turbo/streams/broadcast-job.js";
-import { BroadcastStreamJob } from "../../../jobs/turbo/streams/broadcast-stream-job.js";
 import { ThreadDebouncer } from "../../../models/turbo/thread-debouncer.js";
 
 type Options = Record<string, unknown>;
@@ -126,7 +123,7 @@ export const Broadcasts = {
     const streamName = this.streamNameFrom(streamables);
 
     return this.refreshDebouncerFor(...streamables, { requestId }).debounce(() =>
-      BroadcastStreamJob.performLater(streamName, {
+      Turbo.Streams.BroadcastStreamJob!.performLater(streamName, {
         content: this.turboStreamRefreshTag({ requestId, ...opts }).toStr(),
       }),
     );
@@ -143,13 +140,16 @@ export const Broadcasts = {
     streamables = compactBlank(streamables.flat(Infinity));
 
     if (isPresent(streamables)) {
-      return await ActionBroadcastJob.performLater(this.streamNameFrom(streamables), {
-        action,
-        target: this.convertToTurboStreamDomId(target),
-        targets: this.convertToTurboStreamDomId(targets, { includeSelector: true }),
-        attributes,
-        ...rendering,
-      });
+      return await Turbo.Streams.ActionBroadcastJob!.performLater(
+        this.streamNameFrom(streamables),
+        {
+          action,
+          target: this.convertToTurboStreamDomId(target),
+          targets: this.convertToTurboStreamDomId(targets, { includeSelector: true }),
+          attributes,
+          ...rendering,
+        },
+      );
     }
     return null;
   },
@@ -163,7 +163,7 @@ export const Broadcasts = {
 
   broadcastRenderLaterTo(this: BroadcastsHost, ...streamables: unknown[]): Promise<unknown> {
     const rendering = extractOptionsBang(streamables);
-    return BroadcastJob.performLater(this.streamNameFrom(streamables), rendering);
+    return Turbo.Streams.BroadcastJob!.performLater(this.streamNameFrom(streamables), rendering);
   },
 
   async broadcastStreamTo(this: BroadcastsHost, ...streamables: unknown[]): Promise<unknown> {
