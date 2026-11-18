@@ -16,6 +16,7 @@ type LayoutMethod = (
 type LayoutOption = string | ((...args: never[]) => unknown) | boolean | null | undefined;
 
 export type Layouts = {
+  constructor: LayoutsClass;
   actionName: string;
   _actionHasLayout?: boolean;
   _layoutConditions: Record<string, string[]>;
@@ -30,7 +31,8 @@ export type Layouts = {
   ): unknown;
 };
 
-type LayoutsClass = {
+/** @internal */
+export type LayoutsClass = {
   name: string;
   prototype: object;
   _layout?: LayoutOption;
@@ -212,7 +214,7 @@ export function _defaultLayout(
 ): LayoutValue {
   const klasses: LayoutsClass[] = [];
   for (
-    let klass = this.constructor as unknown as LayoutsClass;
+    let klass = this.constructor;
     !Object.hasOwn(klass.prototype, "_layout");
     klass = Object.getPrototypeOf(klass) as LayoutsClass
   ) {
@@ -231,7 +233,7 @@ export function _defaultLayout(
 
   if (requireLayout && this.isActionHasLayout() && !value) {
     throw new ArgumentError(
-      `There was no default layout for ${this.constructor.name} in ${rbInspect((this.constructor as unknown as LayoutsClass).viewPaths())}`,
+      `There was no default layout for ${this.constructor.name} in ${rbInspect(this.constructor.viewPaths())}`,
     );
   }
 
@@ -251,19 +253,16 @@ export const Layouts = new Module((mod) => {
   extend(mod, Concern);
   mod.include(Rendering);
 
-  (mod as unknown as { included(base: null, block: (this: LayoutsClass) => void): void }).included(
-    null,
-    function () {
-      classAttribute.call(this, "_layout", { instanceAccessor: false });
-      classAttribute.call(this, "_layoutConditions", {
-        instanceAccessor: false,
-        instanceReader: true,
-        default: {},
-      });
+  Concern.included.call(mod, null, function (this: LayoutsClass) {
+    classAttribute.call(this, "_layout", { instanceAccessor: false });
+    classAttribute.call(this, "_layoutConditions", {
+      instanceAccessor: false,
+      instanceReader: true,
+      default: {},
+    });
 
-      this._writeLayoutMethod();
-    },
-  );
+    this._writeLayoutMethod();
+  });
 
   mod.defineMethod("_processRenderTemplateOptions", _processRenderTemplateOptions);
   mod.defineMethod("setActionHasLayout", setActionHasLayout);

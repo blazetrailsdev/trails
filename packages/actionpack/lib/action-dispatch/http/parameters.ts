@@ -51,11 +51,11 @@ export interface ParametersHost {
   logger?: { debug(message: string): void } | null;
 }
 
-export class Parameters {
-  declare controllerClassFor: ParametersHost["controllerClassFor"];
-  declare protected setHeader: ParametersHost["setHeader"];
-  declare protected deleteHeader: ParametersHost["deleteHeader"];
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `Http::Parameters` is included into `ActionDispatch::Request` (`action_dispatch/http/parameters.rb`); the merge names the host members it reads. */
+export interface Parameters extends ParametersHost {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class Parameters {
   /** @internal */
   private static _parameterParsers: ParameterParsers = DEFAULT_PARSERS;
 
@@ -84,11 +84,11 @@ export class Parameters {
   }
 
   get params(): Record<string, unknown> {
-    return parameters.call(this as unknown as ParametersHost);
+    return parameters.call(this);
   }
 
   get pathParameters(): Record<string, unknown> {
-    return pathParameters.call(this as unknown as ParametersHost);
+    return pathParameters.call(this);
   }
 
   set pathParameters(parameters: Record<string, unknown>) {

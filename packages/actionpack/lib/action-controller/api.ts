@@ -114,18 +114,18 @@ export class API extends Metal {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static raiseOnMissingCallbackActions: boolean;
-  declare static beforeAction: OmitThisParameter<typeof beforeAction>;
-  declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
-  declare static skipBeforeAction: OmitThisParameter<typeof skipBeforeAction>;
-  declare static appendBeforeAction: OmitThisParameter<typeof appendBeforeAction>;
-  declare static afterAction: OmitThisParameter<typeof afterAction>;
-  declare static prependAfterAction: OmitThisParameter<typeof prependAfterAction>;
-  declare static skipAfterAction: OmitThisParameter<typeof skipAfterAction>;
-  declare static appendAfterAction: OmitThisParameter<typeof appendAfterAction>;
-  declare static aroundAction: OmitThisParameter<typeof aroundAction>;
-  declare static prependAroundAction: OmitThisParameter<typeof prependAroundAction>;
-  declare static skipAroundAction: OmitThisParameter<typeof skipAroundAction>;
-  declare static appendAroundAction: OmitThisParameter<typeof appendAroundAction>;
+  declare static beforeAction: typeof beforeAction;
+  declare static prependBeforeAction: typeof prependBeforeAction;
+  declare static skipBeforeAction: typeof skipBeforeAction;
+  declare static appendBeforeAction: typeof appendBeforeAction;
+  declare static afterAction: typeof afterAction;
+  declare static prependAfterAction: typeof prependAfterAction;
+  declare static skipAfterAction: typeof skipAfterAction;
+  declare static appendAfterAction: typeof appendAfterAction;
+  declare static aroundAction: typeof aroundAction;
+  declare static prependAroundAction: typeof prependAroundAction;
+  declare static skipAroundAction: typeof skipAroundAction;
+  declare static appendAroundAction: typeof appendAroundAction;
 
   declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
 

@@ -4572,8 +4572,8 @@ function sameFileLiteralAlias(
 function moduleLiteralCast(init: ts.Expression): boolean {
   const literal = unwrapAssertions(init);
   return (
-    ts.isAsExpression(init) &&
-    !ts.isConstTypeReference(init.type) &&
+    ((ts.isAsExpression(init) && !ts.isConstTypeReference(init.type)) ||
+      ts.isSatisfiesExpression(init)) &&
     ts.isObjectLiteralExpression(literal) &&
     literal.properties.some(
       (p) =>

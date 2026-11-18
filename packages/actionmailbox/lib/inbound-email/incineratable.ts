@@ -17,7 +17,7 @@ export const Incineratable = {
   },
 };
 extend(Incineratable, Concern);
-Concern.included.call(Incineratable as never, null, function (this: typeof InboundEmail) {
+Concern.included.call(Incineratable, null, function (this: typeof InboundEmail) {
   this.afterUpdateCommit(":incinerateLater", {
     if: (inboundEmail: InboundEmail) =>
       ActionMailbox.incinerate != null &&

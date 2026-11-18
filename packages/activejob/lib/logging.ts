@@ -57,7 +57,7 @@ function isLoggerTaggedByActiveJob(this: LoggingJob): boolean {
 export const Logging = defineModule({ performNow }, {}, { tagLogger, isLoggerTaggedByActiveJob });
 extend(Logging, Concern);
 
-Concern.included.call(Logging as never, null, function (this: LoggingClass) {
+Concern.included.call(Logging, null, function (this: LoggingClass) {
   cattrAccessor.call(this, "logger", {
     default: TaggedLogging.new(new Logger(STDOUT as never)),
   });

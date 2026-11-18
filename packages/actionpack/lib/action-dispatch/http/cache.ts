@@ -166,10 +166,11 @@ export function parseHttpDate(s: string | undefined): Date | undefined {
 
 type R = ResponseCacheHost;
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `Http::Cache::Response` is included into `ActionDispatch::Response` (`action_dispatch/http/cache.rb`); the merge names the host members it reads. */
+export interface Response extends ResponseCacheHost {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Response {
-  declare protected getHeader: ResponseCacheHost["getHeader"];
-  declare protected setHeader: ResponseCacheHost["setHeader"];
-  declare protected hasHeader: ResponseCacheHost["hasHeader"];
   /** @internal */
   declare _cacheControlHash: CacheControlHash;
 
@@ -204,7 +205,7 @@ export class Response {
   }
 
   set etag(v: unknown) {
-    weakEtag.call(this as unknown as R, v);
+    weakEtag.call(this, v);
   }
 }
 

@@ -70,6 +70,6 @@ export const ClassMethods = {
 
 export const ActiveRecordExtensions = { ClassMethods };
 extend(ActiveRecordExtensions, Concern);
-Concern.included.call(ActiveRecordExtensions as never, null, function (this: typeof Base) {
+Concern.included.call(ActiveRecordExtensions, null, function (this: typeof Base) {
   classAttribute.call(this, "attachmentReflections", { instanceWriter: false, default: {} });
 });

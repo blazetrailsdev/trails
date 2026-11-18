@@ -31,24 +31,27 @@ export interface FlashRequestHost {
   };
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `Flash::RequestMethods` is included into `ActionDispatch::Request` (`action_dispatch/middleware/flash.rb`); the merge names the host members it reads. */
+export interface RequestMethods extends Pick<
+  FlashRequestHost,
+  "session" | "setHeader" | "getHeader"
+> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class RequestMethods {
   get flash(): FlashHash | null {
     const flash = this.flashHash();
     if (flash) return flash;
-    return (this.flash = FlashHash.fromSessionValue(
-      (this as unknown as FlashRequestHost).session.get("flash"),
-    ));
+    return (this.flash = FlashHash.fromSessionValue(this.session.get("flash")));
   }
 
   set flash(flash: FlashHash | null) {
-    (this as unknown as FlashRequestHost).setHeader(KEY, flash);
+    this.setHeader(KEY, flash);
   }
 
   /** @internal */
   flashHash(): FlashHash | null {
-    return (
-      ((this as unknown as FlashRequestHost).getHeader(KEY) as FlashHash | null | undefined) ?? null
-    );
+    return (this.getHeader(KEY) as FlashHash | null | undefined) ?? null;
   }
 }
 

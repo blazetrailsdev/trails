@@ -85,7 +85,7 @@ export function wrapDeliveryBehaviorBang(
 
 export const DeliveryMethods = { ClassMethods, wrapDeliveryBehaviorBang };
 extend(DeliveryMethods, Concern);
-Concern.included.call(DeliveryMethods as never, null, function (this: DeliveryMethodsClass) {
+Concern.included.call(DeliveryMethods, null, function (this: DeliveryMethodsClass) {
   cattrAccessor.call(this, "raiseDeliveryErrors", { default: true });
   cattrAccessor.call(this, "performDeliveries", { default: true });
 

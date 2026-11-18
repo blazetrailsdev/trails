@@ -5,7 +5,7 @@ import { ActionMailer } from "./namespaces.js";
 
 export const QueuedDelivery = {};
 extend(QueuedDelivery, Concern);
-Concern.included.call(QueuedDelivery as never, null, function (this: object) {
+Concern.included.call(QueuedDelivery, null, function (this: object) {
   classAttribute.call(this, "deliveryJob", { default: MailDeliveryJob });
   const deliveryJob = Object.getOwnPropertyDescriptor(this, "deliveryJob")!;
   const host = this as Parameters<typeof DescendantsTracker.registerSubclass>[1];

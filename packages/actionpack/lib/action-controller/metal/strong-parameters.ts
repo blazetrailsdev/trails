@@ -1011,7 +1011,8 @@ Parameters.prototype.withDefaultsBang = Parameters.prototype.reverseMergeBang;
 include(Parameters, DeepMergeable);
 include(Parameters, ToJsonWithActiveSupportEncoder);
 
-interface StrongParametersHost {
+/** @internal */
+export interface StrongParametersHost {
   _params: Parameters | Record<string, unknown> | null;
   actionName: string;
   request: {
@@ -1020,21 +1021,22 @@ interface StrongParametersHost {
   };
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `StrongParameters` is included into a controller (`action_controller/metal/strong_parameters.rb`); the merge names the host members `params` reads. */
+export interface StrongParameters extends StrongParametersHost {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class StrongParameters {
   get params(): Parameters {
-    const self = this as unknown as StrongParametersHost;
-    return (self._params ??= new Parameters(self.request.parameters, {
+    return (this._params ??= new Parameters(this.request.parameters, {
       controller: this.constructor.name,
-      action: self.actionName,
-      request: self.request,
-      params: self.request.filteredParameters(),
+      action: this.actionName,
+      request: this.request,
+      params: this.request.filteredParameters(),
     })) as Parameters;
   }
 
   set params(value: Parameters | Record<string, unknown>) {
-    (this as unknown as StrongParametersHost)._params = isPlainObject(value)
-      ? new Parameters(value)
-      : value;
+    this._params = isPlainObject(value) ? new Parameters(value) : value;
   }
 }
 

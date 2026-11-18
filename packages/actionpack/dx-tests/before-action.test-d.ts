@@ -1,12 +1,10 @@
 import { describe, it, expectTypeOf } from "vitest";
-import { AbstractController, ActionController } from "@blazetrails/actionpack";
+import { ActionController } from "@blazetrails/actionpack";
 
 class PostsController extends ActionController.Base {
   static {
     this.beforeAction(":_setPost", { only: ["show", "edit"] });
     this.beforeAction((controller) => {
-      expectTypeOf(controller).toEqualTypeOf<AbstractController.Base>();
-      // @ts-expect-error — red once the block receives PostsController
       expectTypeOf(controller).toEqualTypeOf<PostsController>();
     });
     this.afterAction(":_log", { except: "index" });
