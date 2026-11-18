@@ -38,7 +38,7 @@ import {
   type ChangeOptions as TimeChangeOptions,
 } from "./core-ext/time/calculations.js";
 import { advance as timeAdvance } from "./time-ext.js";
-import { since as datetimeSince } from "./core-ext/date-time/calculations.js";
+import { since as datetimeSince, subsec } from "./core-ext/date-time/calculations.js";
 import { deprecator } from "./deprecator.js";
 import { inTimeZone, type DateOrTime } from "./core-ext/date-and-time/zones.js";
 import {
@@ -113,6 +113,7 @@ type TimeLike =
 export class TimeWithZone {
   private _utc!: Time | null;
   private _time!: TimeLike | null;
+  private _toDatetime: DateTime | null = null;
   private _timeZone!: TimeZone | Timezone;
   private _period?: TimezonePeriod;
   private _toTimeWithTimezone?: Time;
@@ -208,7 +209,7 @@ export class TimeWithZone {
         time.day,
         time.hour,
         time.min,
-        time.secFraction.add(time.sec),
+        subsec(time).add(time.sec),
       );
     }
     const values =
@@ -597,11 +598,8 @@ export class TimeWithZone {
       | Temporal.PlainDateTime
       | Temporal.ZonedDateTime,
   ): TimeWithZone | number {
-    if (arg instanceof Time) {
+    if (arg instanceof Time || arg instanceof DateTime) {
       return this.getutc().minus(arg.getutc()) as number;
-    }
-    if (arg instanceof DateTime) {
-      return this.getutc().minus(arg.toTime().getutc()) as number;
     }
     if (arg instanceof Temporal.PlainDateTime || arg instanceof Temporal.ZonedDateTime) {
       const otherNs =
@@ -897,7 +895,9 @@ export class TimeWithZone {
   }
 
   toDatetime(): DateTime {
-    return this.utc().toDatetime().newOffset(rational(this.utcOffset, 86_400));
+    return (this._toDatetime ??= this.utc()
+      .toDatetime()
+      .newOffset(rational(this.utcOffset, 86_400)));
   }
 
   private durationOfVariableLength(obj: unknown): boolean {

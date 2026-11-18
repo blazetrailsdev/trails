@@ -1,4 +1,4 @@
-import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache, TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { DateTime as RubyDateTime, Temporal, Time, cCivilToJd } from "@blazetrails/date";
 import { DATE_FORMATS } from "../time/conversions.js";
 import { TimeZone } from "../../values/time-zone.js";
@@ -36,15 +36,18 @@ declare module "@blazetrails/date" {
   }
 }
 
-for (const [name, fn] of Object.entries({ toFs, toFormattedS, usec })) {
-  Object.defineProperty(RubyDateTime.prototype, name, {
-    value: function (this: RubyDateTime, ...args: unknown[]): unknown {
-      return (fn as (datetime: RubyDateTime, ...rest: unknown[]) => unknown)(this, ...args);
-    },
-    writable: true,
-    configurable: true,
-  });
-}
+Object.assign(RubyDateTime.prototype, {
+  toFs(this: RubyDateTime, format?: string): string {
+    return toFs(this, format);
+  },
+  toFormattedS(this: RubyDateTime, format?: string): string {
+    return toFormattedS(this, format);
+  },
+  usec(this: RubyDateTime): number {
+    return usec(this);
+  },
+});
+rbClearMethodCache();
 
 export function formattedOffset(
   datetime: DateTime,

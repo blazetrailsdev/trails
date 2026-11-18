@@ -41,8 +41,8 @@ export function secondsUntilEndOfDay(datetime: DateTime): number {
   return toI(endOfDay(datetime)) - toI(datetime);
 }
 
-export function subsec(datetime: DateTime): number {
-  return datetime.secFraction.toF();
+export function subsec(datetime: DateTime): Rational {
+  return datetime.secFraction;
 }
 
 interface ChangeOptions {
@@ -309,13 +309,21 @@ declare module "@blazetrails/date" {
   }
 }
 
-for (const [name, fn] of Object.entries({ isUtc, getutc, getlocal, nsec, change })) {
-  Object.defineProperty(RubyDateTime.prototype, name, {
-    value: function (this: RubyDateTime, ...args: unknown[]): unknown {
-      return (fn as (datetime: RubyDateTime, ...rest: unknown[]) => unknown)(this, ...args);
-    },
-    writable: true,
-    configurable: true,
-  });
-}
+Object.assign(RubyDateTime.prototype, {
+  change(this: RubyDateTime, options: ChangeOptions): DateTime {
+    return change(this, options);
+  },
+  isUtc(this: RubyDateTime): boolean {
+    return isUtc(this);
+  },
+  getutc(this: RubyDateTime): Time {
+    return getutc(this);
+  },
+  getlocal(this: RubyDateTime, utcOffset?: number | string | null): Time {
+    return getlocal(this, utcOffset);
+  },
+  nsec(this: RubyDateTime): number {
+    return nsec(this);
+  },
+});
 rbClearMethodCache();

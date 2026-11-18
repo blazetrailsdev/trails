@@ -711,8 +711,8 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("subsec", () => {
-    expect(subsec(dt(2000))).toBe(0);
-    expect(subsec(dt(2000, 1, 1, 0, 0, new Rational(1, 2)))).toBe(0.5);
+    expect(subsec(dt(2000))).toEqual(new Rational(0, 1));
+    expect(subsec(dt(2000, 1, 1, 0, 0, new Rational(1, 2)))).toEqual(new Rational(1, 2));
   });
 
   it("seconds since midnight", () => {
