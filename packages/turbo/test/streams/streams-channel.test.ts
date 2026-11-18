@@ -4,12 +4,10 @@ import type { Extended } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/actioncable/channel/test-case.js";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { Thread, constSet, include } from "@blazetrails/ruby-compat";
-import "../test-helper.js";
+import { withProductionDebouncer } from "../test-helper.js";
 import type { Broadcasts } from "../../lib/app/channels/turbo/streams/broadcasts.js";
 import { StreamsChannel } from "../../lib/app/channels/turbo/streams-channel.js";
 import { ActionHelper } from "../../lib/app/helpers/turbo/streams/action-helper.js";
-import { Debouncer } from "../../lib/app/models/turbo/debouncer.js";
-import { ThreadDebouncer } from "../../lib/app/models/turbo/thread-debouncer.js";
 import { Turbo } from "../../lib/turbo-trails.js";
 import { ApplicationController } from "../dummy/app/controllers/application-controller.js";
 import { Message } from "../dummy/app/models/message.js";
@@ -21,24 +19,7 @@ constSet(Turbo, "StreamsChannelTest", StreamsChannelTest);
 
 type Ctx = { testCase: any };
 
-const render = (options: object): Promise<unknown> =>
-  ApplicationController.render(options) as Promise<unknown>;
-
-async function withProductionDebouncer(t: any, block: () => Promise<unknown>): Promise<void> {
-  const old = ThreadDebouncer.debouncerClass;
-  ThreadDebouncer.debouncerClass = Debouncer;
-  try {
-    await block();
-  } finally {
-    ThreadDebouncer.debouncerClass = old;
-    await new Promise((resolve) => setTimeout(resolve, (Debouncer.DEFAULT_DELAY + 0.2) * 1000));
-
-    const turboKeys = Thread.current()
-      .keys()
-      .filter((k) => k.startsWith("turbo-"));
-    expect(turboKeys, "Thread-locals were not cleaned up").toEqual([]);
-  }
-}
+const render = (options: object): Promise<unknown> => ApplicationController.render(options);
 
 const channel = StreamsChannel as typeof StreamsChannel & Extended<typeof Broadcasts>;
 
@@ -323,7 +304,7 @@ describe("Turbo::StreamsChannelTest", () => {
   });
 
   it("broadcasting refresh later is debounced", async ({ testCase: t }: Ctx) => {
-    await withProductionDebouncer(t, () =>
+    await withProductionDebouncer(() =>
       t.assertBroadcastOn("stream", t.turboStreamRefreshTag(), () =>
         t.assertBroadcasts("stream", 1, () =>
           t.performEnqueuedJobs({}, async () => {
@@ -339,7 +320,7 @@ describe("Turbo::StreamsChannelTest", () => {
   it("broadcasting refresh later is debounced considering the current request id", async ({
     testCase: t,
   }: Ctx) => {
-    await withProductionDebouncer(t, () =>
+    await withProductionDebouncer(() =>
       t.assertBroadcasts("stream", 2, () =>
         t.performEnqueuedJobs({}, () =>
           t.assertBroadcastOn("stream", t.turboStreamRefreshTag({ "request-id": "123" }), () =>

@@ -191,7 +191,7 @@ export const Broadcasts = {
     return (constGet(TopLevel, "ApplicationController") as typeof ActionController.Base).render({
       formats: [format],
       ...rendering,
-    }) as Promise<unknown>;
+    });
   },
 
   /** @internal */
