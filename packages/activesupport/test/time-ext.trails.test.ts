@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import { toTime } from "../lib/core-ext/date-time/compatibility.js";
 import { advance, change } from "../lib/time-ext.js";
 import { offsetInSeconds, secondsSinceUnixEpoch } from "../lib/core-ext/date-time/conversions.js";
@@ -29,7 +29,7 @@ describe("to_time over a receiver that carries an offset", () => {
 
   it("DateTime#to_time returns getlocal(utc_offset) when preserve_timezone is set", () => {
     setPreserveTimezone(true);
-    const datetime = Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:00");
+    const datetime = DateTime.civil(2005, 2, 21, 10, 11, 12, "+05:00");
     const result = toTime(datetime);
     expect(result.utcOffset).toBe(18000);
     expect(result.hour).toBe(10);
@@ -37,15 +37,15 @@ describe("to_time over a receiver that carries an offset", () => {
 
   it("DateTime#to_time returns getlocal when preserve_timezone is false", () => {
     setPreserveTimezone(false);
-    const datetime = Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:00");
+    const datetime = DateTime.civil(2005, 2, 21, 10, 11, 12, "+05:00");
     const result = toTime(datetime);
     expect(result.zone).toBe(RubyTime.now().zone);
-    expect(result.toZonedDateTime().epochNanoseconds).toBe(datetime.epochNanoseconds);
+    expect(result.toF()).toBe(RubyTime.utc(2005, 2, 21, 5, 11, 12).toF());
   });
 
   it("DateTime#to_time reads a PlainDateTime as +00:00", () => {
     setPreserveTimezone(true);
-    const result = toTime(Temporal.PlainDateTime.from("2005-02-21T10:11:12"));
+    const result = toTime(DateTime.civil(2005, 2, 21, 10, 11, 12));
     expect(result.utcOffset).toBe(0);
     expect(result.hour).toBe(10);
   });
@@ -53,22 +53,18 @@ describe("to_time over a receiver that carries an offset", () => {
 
 describe("DateTime's private conversion helpers", () => {
   it("offset_in_seconds reads the receiver's offset as whole seconds", () => {
-    expect(offsetInSeconds(Temporal.PlainDateTime.from("2005-02-21T10:11:12"))).toBe(0);
-    expect(
-      offsetInSeconds(Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:30")),
-    ).toBe(19800);
+    expect(offsetInSeconds(DateTime.civil(2005, 2, 21, 10, 11, 12))).toBe(0);
+    expect(offsetInSeconds(DateTime.civil(2005, 2, 21, 10, 11, 12, "+05:30"))).toBe(19800);
   });
 
   it("seconds_since_unix_epoch subtracts the offset from the local wall clock", () => {
-    expect(secondsSinceUnixEpoch(Temporal.PlainDateTime.from("1970-01-01T00:00:00"))).toBe(0);
-    expect(secondsSinceUnixEpoch(Temporal.PlainDateTime.from("2005-02-21T10:11:12"))).toBe(
+    expect(secondsSinceUnixEpoch(DateTime.civil(1970, 1, 1))).toBe(0);
+    expect(secondsSinceUnixEpoch(DateTime.civil(2005, 2, 21, 10, 11, 12))).toBe(
       Date.UTC(2005, 1, 21, 10, 11, 12) / 1000,
     );
-    expect(
-      secondsSinceUnixEpoch(
-        Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:00"),
-      ),
-    ).toBe(Date.UTC(2005, 1, 21, 5, 11, 12) / 1000);
+    expect(secondsSinceUnixEpoch(DateTime.civil(2005, 2, 21, 10, 11, 12, "+05:00"))).toBe(
+      Date.UTC(2005, 1, 21, 5, 11, 12) / 1000,
+    );
   });
 });
 

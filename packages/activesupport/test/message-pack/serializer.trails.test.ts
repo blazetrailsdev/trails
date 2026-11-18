@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BigDecimal, FrozenError, IPAddr, Pathname, Range, URI } from "@blazetrails/ruby-compat";
 
-import { Temporal, Time } from "@blazetrails/date";
+import { DateTime, Temporal, Time } from "@blazetrails/date";
 
 import {
   Duration,
@@ -145,7 +145,9 @@ describe("MessagePackSerializerTrailsTest", () => {
       204, 128, 199, 19, 5, 206, 0, 37, 104, 88, 12, 34, 56, 206, 7, 91, 205, 21, 206, 59, 154, 202,
       0, 0,
     ]);
-    expect(serializer.load(serializer.dump(datetime))).toEqual(datetime);
+    expect(
+      (serializer.load(serializer.dump(datetime)) as DateTime).cmp(new DateTime(datetime)),
+    ).toBe(0);
 
     expect([...serializer.dump(Temporal.PlainDate.from("1999-12-31"))]).toEqual([
       204, 128, 199, 5, 6, 206, 0, 37, 104, 88,

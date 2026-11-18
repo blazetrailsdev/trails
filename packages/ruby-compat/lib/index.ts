@@ -43,7 +43,6 @@ export {
   max,
   min,
   rbCmpint,
-  rubyClass,
 } from "./comparable.js";
 export type { Comparable } from "./comparable.js";
 export {

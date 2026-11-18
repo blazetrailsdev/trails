@@ -2,7 +2,7 @@ import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ActionView } from "@blazetrails/actionpack";
-import { DateTime, Time, strftime } from "@blazetrails/date";
+import { DateTime, Time } from "@blazetrails/date";
 import { ExecutionContext, I18n, Notifications, days } from "@blazetrails/activesupport";
 import {
   assertCalled,
@@ -141,7 +141,7 @@ describe("BaseTest", () => {
   });
 
   it("mail() with bcc, cc, content_type, charset, mime_version, reply_to and date", async () => {
-    const time = DateTime.parse(strftime(DateTime.now(), "%Y-%m-%d 00:00:00 %z"));
+    const time = DateTime.parse(DateTime.now().strftime("%Y-%m-%d 00:00:00 %z"));
     const email = await BaseMailer.welcome({
       bcc: "bcc@test.lindsaar.net",
       cc: "cc@test.lindsaar.net",

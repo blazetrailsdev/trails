@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone, useZone } from "@blazetrails/activesupport";
 import {
@@ -15,7 +15,7 @@ import { Timezone } from "../../../lib/type/helpers/timezone.js";
 const timezone = new Timezone();
 
 describe("applySecondsPrecision", () => {
-  const dt = Temporal.PlainDateTime.from("2024-01-02T03:04:05.123456789");
+  const dt = DateTime.civil(2024, 1, 2, 3, 4, new Rational(5123456789, 1000000000));
 
   it("returns value unchanged when precision is undefined", () => {
     expect(applySecondsPrecision.call({}, dt)).toBe(dt);
@@ -30,48 +30,40 @@ describe("applySecondsPrecision", () => {
   });
 
   it("a negative precision rounds every sub-second digit off", () => {
-    const r = applySecondsPrecision.call({ precision: -1 }, dt) as Temporal.PlainDateTime;
-    expect(r.toString()).toBe("2024-01-02T03:04:05");
+    const r = applySecondsPrecision.call({ precision: -1 }, dt) as DateTime;
+    expect(r.strftime("%FT%T.%N")).toBe("2024-01-02T03:04:05.000000000");
   });
 
   it("a non-Integer precision does Float arithmetic", () => {
     const time = RubyTime.utc(2024, 1, 2, 3, 4, 5, new Rational(123456789, 1000));
     expect((applySecondsPrecision.call({ precision: 3.5 }, time) as RubyTime).nsec).toBe(123328828);
-    const r = applySecondsPrecision.call({ precision: 3.5 }, dt) as Temporal.PlainDateTime;
-    expect(r.toString()).toBe("2024-01-02T03:04:05.123328828");
+    const r = applySecondsPrecision.call({ precision: 3.5 }, dt) as DateTime;
+    expect(r.strftime("%FT%T.%N")).toBe("2024-01-02T03:04:05.123328828");
   });
 
   it("precision 0 truncates to whole seconds", () => {
-    const r = applySecondsPrecision.call({ precision: 0 }, dt) as Temporal.PlainDateTime;
-    expect(r.millisecond).toBe(0);
-    expect(r.microsecond).toBe(0);
-    expect(r.nanosecond).toBe(0);
+    const r = applySecondsPrecision.call({ precision: 0 }, dt) as DateTime;
+    expect(r.strftime("%N")).toBe("000000000");
   });
 
   it("precision 3 keeps milliseconds, drops micros + nanos", () => {
-    const r = applySecondsPrecision.call({ precision: 3 }, dt) as Temporal.PlainDateTime;
-    expect(r.millisecond).toBe(123);
-    expect(r.microsecond).toBe(0);
-    expect(r.nanosecond).toBe(0);
+    const r = applySecondsPrecision.call({ precision: 3 }, dt) as DateTime;
+    expect(r.strftime("%N")).toBe("123000000");
   });
 
   it("precision 6 keeps micros, drops nanos", () => {
-    const r = applySecondsPrecision.call({ precision: 6 }, dt) as Temporal.PlainDateTime;
-    expect(r.millisecond).toBe(123);
-    expect(r.microsecond).toBe(456);
-    expect(r.nanosecond).toBe(0);
+    const r = applySecondsPrecision.call({ precision: 6 }, dt) as DateTime;
+    expect(r.strftime("%N")).toBe("123456000");
   });
 
   it("precision 8 keeps two of three nano digits", () => {
-    const r = applySecondsPrecision.call({ precision: 8 }, dt) as Temporal.PlainDateTime;
-    expect(r.millisecond).toBe(123);
-    expect(r.microsecond).toBe(456);
-    expect(r.nanosecond).toBe(780);
+    const r = applySecondsPrecision.call({ precision: 8 }, dt) as DateTime;
+    expect(r.strftime("%N")).toBe("123456780");
   });
 
   it("truncates rather than rounds (789 → 780 at precision 8, not 790)", () => {
-    const r = applySecondsPrecision.call({ precision: 8 }, dt) as Temporal.PlainDateTime;
-    expect(r.nanosecond).toBe(780);
+    const r = applySecondsPrecision.call({ precision: 8 }, dt) as DateTime;
+    expect(r.strftime("%N")).toBe("123456780");
   });
 
   it("passes PlainDate (no .round) through unchanged", () => {

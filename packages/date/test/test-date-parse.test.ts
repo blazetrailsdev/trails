@@ -1657,7 +1657,7 @@ describe("TestDateParse", () => {
   });
 
   it("parse  comp", () => {
-    const n = new DateTime(DateTime.now());
+    const n = DateTime.now();
 
     let d = dtParse("073");
     expect([d.year, d.yday, d.hour, d.min, d.sec]).toEqual([n.year, 73, 0, 0, 0]);
@@ -2027,7 +2027,7 @@ describe("TestDateParse", () => {
 
   it("iso8601", () => {
     expect(Date.iso8601()).toBeInstanceOf(Temporal.PlainDate);
-    expect(DateTime.iso8601()).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(DateTime.iso8601()).toBeInstanceOf(DateTime);
 
     const d = Date.iso8601("2001-02-03", Date.ITALY + 10);
     expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
@@ -2040,7 +2040,7 @@ describe("TestDateParse", () => {
 
   it("rfc3339", () => {
     expect(Date.rfc3339()).toBeInstanceOf(Temporal.PlainDate);
-    expect(DateTime.rfc3339()).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(DateTime.rfc3339()).toBeInstanceOf(DateTime);
 
     const d = Date.rfc3339("2001-02-03T04:05:06+07:00", Date.ITALY + 10);
     expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
@@ -2053,7 +2053,7 @@ describe("TestDateParse", () => {
 
   it("xmlschema", () => {
     expect(Date.xmlschema()).toBeInstanceOf(Temporal.PlainDate);
-    expect(DateTime.xmlschema()).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(DateTime.xmlschema()).toBeInstanceOf(DateTime);
 
     const d = Date.xmlschema("2001-02-03", Date.ITALY + 10);
     expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
@@ -2066,9 +2066,9 @@ describe("TestDateParse", () => {
 
   it("rfc2822", () => {
     expect(Date.rfc2822()).toBeInstanceOf(Temporal.PlainDate);
-    expect(DateTime.rfc2822()).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(DateTime.rfc2822()).toBeInstanceOf(DateTime);
     expect(Date.rfc822()).toBeInstanceOf(Temporal.PlainDate);
-    expect(DateTime.rfc822()).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(DateTime.rfc822()).toBeInstanceOf(DateTime);
 
     let d = Date.rfc2822("Sat, 3 Feb 2001 04:05:06 +0700", Date.ITALY + 10);
     expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
@@ -2087,7 +2087,7 @@ describe("TestDateParse", () => {
 
   it("httpdate", () => {
     expect(Date.httpdate()).toBeInstanceOf(Temporal.PlainDate);
-    expect(DateTime.httpdate()).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(DateTime.httpdate()).toBeInstanceOf(DateTime);
 
     const d = Date.httpdate("Sat, 03 Feb 2001 04:05:06 GMT", Date.ITALY + 10);
     expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
@@ -2100,7 +2100,7 @@ describe("TestDateParse", () => {
 
   it("jisx0301", () => {
     expect(Date.jisx0301()).toBeInstanceOf(Temporal.PlainDate);
-    expect(DateTime.jisx0301()).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(DateTime.jisx0301()).toBeInstanceOf(DateTime);
 
     let d = Date.jisx0301("H13.02.03", Date.ITALY + 10);
     expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);

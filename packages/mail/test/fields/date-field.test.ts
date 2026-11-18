@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DateTime, strftime, Temporal } from "@blazetrails/date";
+import { DateTime } from "@blazetrails/date";
 import { DateField } from "../../lib/fields/date-field.js";
 
 describe("Mail::DateField", () => {
@@ -8,9 +8,7 @@ describe("Mail::DateField", () => {
       expect(() => new DateField("12 Aug 2009 00:00:02 GMT")).not.toThrow();
     });
     it("should be able to tell the time", () => {
-      expect(new DateField("12 Aug 2009 00:00:02 GMT").dateTime()?.constructor).toEqual(
-        Temporal.PlainDateTime,
-      );
+      expect(new DateField("12 Aug 2009 00:00:02 GMT").dateTime()?.constructor).toEqual(DateTime);
     });
     it("should accept a string without the field name", () => {
       const t = new DateField("12 Aug 2009 00:00:02 GMT");
@@ -38,7 +36,7 @@ describe("Mail::DateField", () => {
       const now = DateTime.now();
       const spy = vi.spyOn(DateTime, "now").mockReturnValue(now);
       expect(String(new DateField().dateTime())).toEqual(
-        String(DateTime.parse(strftime(now, "%FT%T%:z"))),
+        String(DateTime.parse(now.strftime("%FT%T%:z"))),
       );
       expect(spy).toHaveBeenCalled();
     });

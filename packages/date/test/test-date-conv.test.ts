@@ -9,9 +9,9 @@ describe("TestDateConv", () => {
       new (...args: never[]) => object,
       new (...args: never[]) => object,
     ][] = [
-      [new Time(2004, 9, 19, 1, 2, 3, "+03:00"), Time, Temporal.ZonedDateTime],
-      [new Date(2004, 9, 19), Time, Temporal.PlainDateTime],
-      [new DateTime(2004, 9, 19, 1, 2, 3, new Rational(8, 24)), Time, Temporal.ZonedDateTime],
+      [new Time(2004, 9, 19, 1, 2, 3, "+03:00"), Time, DateTime],
+      [new Date(2004, 9, 19), Time, DateTime],
+      [new DateTime(2004, 9, 19, 1, 2, 3, new Rational(8, 24)), Time, DateTime],
     ];
     for (const [o, timeClass, datetimeClass] of subjects) {
       expect(o.toTime()).toBeInstanceOf(timeClass);
@@ -169,7 +169,7 @@ describe("TestDateConv", () => {
 
     t = Time.now();
     d = t.toDatetime();
-    expect(t.iso8601(9)).toEqual(iso8601(d, 9));
+    expect(t.iso8601(9)).toEqual(d.iso8601(9));
   });
 
   it("to datetime  from date", () => {
@@ -218,21 +218,12 @@ describe("TestDateConv", () => {
   });
 });
 
-function usec(t: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
-  return t.millisecond * 1000 + t.microsecond;
+function usec(t: DateTime): number {
+  return t.secFraction.mul(1_000_000).toI();
 }
 
-function iso8601(
-  d: Temporal.ZonedDateTime | Temporal.PlainDateTime,
-  fractionDigits: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9,
-): string {
-  return d instanceof Temporal.ZonedDateTime
-    ? d.toString({ fractionalSecondDigits: fractionDigits, timeZoneName: "never" })
-    : `${d.toString({ fractionalSecondDigits: fractionDigits })}+00:00`;
-}
-
-function offsetSeconds(d: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
-  return d instanceof Temporal.ZonedDateTime ? d.offsetNanoseconds / 1_000_000_000 : 0;
+function offsetSeconds(d: DateTime): number {
+  return d.offset.mul(86400).toI();
 }
 
 function timeToDate(t: Time): Date {

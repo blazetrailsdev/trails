@@ -30,15 +30,6 @@ import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 import { rbStrCmp } from "./string/support.js";
 
 /**
- * Marks a `Temporal.ZonedDateTime` that `DateTime#to_datetime` answers, so
- * `rbObjClass` reports `DateTime` for it where a Temporal value has no class
- * of its own. A JS `Symbol` because it is a brand, not a Ruby Symbol value.
- * @noRailsEquivalent PERMANENT — the brand standing in for `rb_obj_class`
- * (`vendor/ruby/v3.3.11/compar.c:28`); Ruby core, not Rails.
- */
-export const rubyClass = Symbol.for("@blazetrails/ruby-compat:rubyClass");
-
-/**
  * The receiver of the mixin: a class that defines `<=>`, spelled `compareTo`
  * here since `Comparable#==` already claims `equals`.
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` (`vendor/ruby/v3.3.11/compar.c:315`).

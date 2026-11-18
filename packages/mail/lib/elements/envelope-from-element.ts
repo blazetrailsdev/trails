@@ -1,4 +1,4 @@
-import { DateTime, strftime } from "@blazetrails/date";
+import { DateTime } from "@blazetrails/date";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { EnvelopeFromParser } from "../parsers/envelope-from-parser.js";
 
@@ -17,7 +17,7 @@ export class EnvelopeFromElement {
       if (rbObjRespondTo(this.dateTime, "ctime")) {
         return (this.dateTime as unknown as { ctime(): string }).ctime();
       } else {
-        return strftime(this.dateTime, "%a %b %e %T %Y");
+        return this.dateTime.strftime("%a %b %e %T %Y");
       }
     }
     return null;

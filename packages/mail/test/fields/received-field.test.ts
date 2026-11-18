@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DateTime, Temporal } from "@blazetrails/date";
+import { DateTime } from "@blazetrails/date";
 import { ReceivedField } from "../../lib/fields/received-field.js";
 
 describe("Mail::ReceivedField", () => {
@@ -16,7 +16,7 @@ describe("Mail::ReceivedField", () => {
       new ReceivedField(
         "from localhost (localhost [127.0.0.1]) by xxx.xxxxx.com (Postfix) with ESMTP id 50FD3A96F for <xxxx@xxxx.com>; Tue, 10 May 2005 17:26:50 +0000 (GMT)",
       ).dateTime()?.constructor,
-    ).toEqual(Temporal.PlainDateTime);
+    ).toEqual(DateTime);
   });
   it("should accept a string without the field name", () => {
     const t = new ReceivedField(

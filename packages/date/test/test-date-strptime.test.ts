@@ -2,7 +2,7 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect } from "vitest";
-import { Date, DateTime, strftime } from "../lib/date.js";
+import { Date, DateTime } from "../lib/date.js";
 import type { DateParts } from "../lib/date.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
@@ -75,16 +75,16 @@ function valuesAt(h: DateParts | null, ...keys: (keyof DateParts)[]): unknown[] 
   return keys.map((key) => (h?.[key] === undefined ? null : h[key]));
 }
 
-function ymdhms(d: Temporal.PlainDateTime | Temporal.ZonedDateTime): number[] {
-  return [d.year, d.month, d.day, d.hour, d.minute, d.second];
+function ymdhms(d: DateTime): number[] {
+  return [Number(d.year), d.month, d.day, d.hour, d.minute, d.second];
 }
 
-function cwymdhms(d: Temporal.PlainDateTime | Temporal.ZonedDateTime): (number | undefined)[] {
-  return [d.yearOfWeek, d.weekOfYear, d.dayOfWeek, d.hour, d.minute, d.second];
+function cwymdhms(d: DateTime): (number | undefined)[] {
+  return [Number(d.cwyear), d.cweek, d.cwday, d.hour, d.minute, d.second];
 }
 
-function wnumWdayHms(d: Temporal.PlainDateTime | Temporal.ZonedDateTime, fmt: string): number[] {
-  return [d.year, Number(strftime(d, fmt)), d.dayOfWeek % 7, d.hour, d.minute, d.second];
+function wnumWdayHms(d: DateTime, fmt: string): number[] {
+  return [Number(d.year), Number(d.strftime(fmt)), d.wday, d.hour, d.minute, d.second];
 }
 
 describe("TestDateStrptime", () => {
@@ -659,7 +659,7 @@ describe("TestDateStrptime", () => {
       ]) {
         const s = d.strftime(fmt);
         const d2 = DateTime.strptime(s, fmt);
-        expect([fmt, d.toS(), d2.toString()]).toEqual([fmt, d.toS(), `${d.toS()}T00:00:00`]);
+        expect([fmt, d.toS(), d2.toS()]).toEqual([fmt, d.toS(), `${d.toS()}T00:00:00+00:00`]);
       }
     }
   });
@@ -671,58 +671,64 @@ describe("TestDateStrptime", () => {
     expect(ymdhms(d)).toEqual([1969, 12, 31, 0, 0, 0]);
 
     d = DateTime.strptime("-999", "%Q");
-    expect([...ymdhms(d), d.millisecond]).toEqual([1969, 12, 31, 23, 59, 59, 1]);
+    expect([...ymdhms(d), d.secFraction.mul(1000).toI()]).toEqual([1969, 12, 31, 23, 59, 59, 1]);
     d = DateTime.strptime("-1000", "%Q");
-    expect([...ymdhms(d), d.millisecond]).toEqual([1969, 12, 31, 23, 59, 59, 0]);
+    expect([...ymdhms(d), d.secFraction.mul(1000).toI()]).toEqual([1969, 12, 31, 23, 59, 59, 0]);
   });
 
   it("strptime  comp", () => {
     const n = DateTime.strptime(Temporal.Now.plainDateISO().toString(), "%F");
 
     let d = DateTime.strptime("073", "%j");
-    expect([d.year, d.dayOfYear, d.hour, d.minute, d.second]).toEqual([n.year, 73, 0, 0, 0]);
+    expect([Number(d.year), d.yday, d.hour, d.minute, d.second]).toEqual([
+      Number(n.year),
+      73,
+      0,
+      0,
+      0,
+    ]);
     d = DateTime.strptime("13", "%d");
-    expect(ymdhms(d)).toEqual([n.year, n.month, 13, 0, 0, 0]);
+    expect(ymdhms(d)).toEqual([Number(n.year), n.month, 13, 0, 0, 0]);
 
     d = DateTime.strptime("Mar", "%b");
-    expect(ymdhms(d)).toEqual([n.year, 3, 1, 0, 0, 0]);
+    expect(ymdhms(d)).toEqual([Number(n.year), 3, 1, 0, 0, 0]);
     d = DateTime.strptime("2004", "%Y");
     expect(ymdhms(d)).toEqual([2004, 1, 1, 0, 0, 0]);
 
     d = DateTime.strptime("Mar 13", "%b %d");
-    expect(ymdhms(d)).toEqual([n.year, 3, 13, 0, 0, 0]);
+    expect(ymdhms(d)).toEqual([Number(n.year), 3, 13, 0, 0, 0]);
     d = DateTime.strptime("Mar 2004", "%b %Y");
     expect(ymdhms(d)).toEqual([2004, 3, 1, 0, 0, 0]);
     d = DateTime.strptime("23:55", "%H:%M");
-    expect(ymdhms(d)).toEqual([n.year, n.month, n.day, 23, 55, 0]);
+    expect(ymdhms(d)).toEqual([Number(n.year), n.month, n.day, 23, 55, 0]);
     d = DateTime.strptime("23:55:30", "%H:%M:%S");
-    expect(ymdhms(d)).toEqual([n.year, n.month, n.day, 23, 55, 30]);
+    expect(ymdhms(d)).toEqual([Number(n.year), n.month, n.day, 23, 55, 30]);
 
     d = DateTime.strptime("Sun 23:55", "%a %H:%M");
-    const d2 = d.subtract({ days: d.dayOfWeek % 7 });
-    expect(ymdhms(d)).toEqual([d2.year, d2.month, d2.day, 23, 55, 0]);
+    const d2 = d.minus(d.wday) as DateTime;
+    expect(ymdhms(d)).toEqual([Number(d2.year), d2.month, d2.day, 23, 55, 0]);
     d = DateTime.strptime("Aug 23:55", "%b %H:%M");
-    expect(ymdhms(d)).toEqual([n.year, 8, 1, 23, 55, 0]);
+    expect(ymdhms(d)).toEqual([Number(n.year), 8, 1, 23, 55, 0]);
 
     d = DateTime.strptime("2004", "%G");
     expect(cwymdhms(d)).toEqual([2004, 1, 1, 0, 0, 0]);
     d = DateTime.strptime("11", "%V");
-    expect(cwymdhms(d)).toEqual([n.yearOfWeek, 11, 1, 0, 0, 0]);
+    expect(cwymdhms(d)).toEqual([Number(n.cwyear), 11, 1, 0, 0, 0]);
     d = DateTime.strptime("6", "%u");
-    expect(cwymdhms(d)).toEqual([n.yearOfWeek, n.weekOfYear, 6, 0, 0, 0]);
+    expect(cwymdhms(d)).toEqual([Number(n.cwyear), n.cweek, 6, 0, 0, 0]);
 
     d = DateTime.strptime("11-6", "%V-%u");
-    expect(cwymdhms(d)).toEqual([n.yearOfWeek, 11, 6, 0, 0, 0]);
+    expect(cwymdhms(d)).toEqual([Number(n.cwyear), 11, 6, 0, 0, 0]);
     d = DateTime.strptime("2004-11", "%G-%V");
     expect(cwymdhms(d)).toEqual([2004, 11, 1, 0, 0, 0]);
 
     d = DateTime.strptime("11-6", "%U-%w");
-    expect(wnumWdayHms(d, "%U")).toEqual([n.year, 11, 6, 0, 0, 0]);
+    expect(wnumWdayHms(d, "%U")).toEqual([Number(n.year), 11, 6, 0, 0, 0]);
     d = DateTime.strptime("2004-11", "%Y-%U");
     expect(wnumWdayHms(d, "%U")).toEqual([2004, 11, 0, 0, 0, 0]);
 
     d = DateTime.strptime("11-6", "%W-%w");
-    expect(wnumWdayHms(d, "%W")).toEqual([n.year, 11, 6, 0, 0, 0]);
+    expect(wnumWdayHms(d, "%W")).toEqual([Number(n.year), 11, 6, 0, 0, 0]);
     d = DateTime.strptime("2004-11", "%Y-%W");
     expect(wnumWdayHms(d, "%W")).toEqual([2004, 11, 1, 0, 0, 0]);
   });
@@ -759,17 +765,17 @@ describe("TestDateStrptime", () => {
   it("sz", () => {
     let d = DateTime.strptime("0 -0200", "%s %z");
     expect(ymdhms(d)).toEqual([1969, 12, 31, 22, 0, 0]);
-    expect((d as Temporal.ZonedDateTime).offset).toBe("-02:00");
+    expect(d.zone).toBe("-02:00");
     d = DateTime.strptime("9 +0200", "%s %z");
     expect(ymdhms(d)).toEqual([1970, 1, 1, 2, 0, 9]);
-    expect((d as Temporal.ZonedDateTime).offset).toBe("+02:00");
+    expect(d.zone).toBe("+02:00");
 
     d = DateTime.strptime("0 -0200", "%Q %z");
     expect(ymdhms(d)).toEqual([1969, 12, 31, 22, 0, 0]);
-    expect((d as Temporal.ZonedDateTime).offset).toBe("-02:00");
+    expect(d.zone).toBe("-02:00");
     d = DateTime.strptime("9000 +0200", "%Q %z");
     expect(ymdhms(d)).toEqual([1970, 1, 1, 2, 0, 9]);
-    expect((d as Temporal.ZonedDateTime).offset).toBe("+02:00");
+    expect(d.zone).toBe("+02:00");
   });
 });
 

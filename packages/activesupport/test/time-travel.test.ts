@@ -107,7 +107,7 @@ describe("TimeTravelTest", () => {
       expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
       expect(instantOf(Time.new({ precision: 3 }))).not.toEqual(instantOf(expectedTime));
       expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+      expect(DateTime.now().toS()).toEqual(expectedTime.toDatetime().toS());
     } finally {
       travelBack();
       now.mockRestore();
@@ -125,7 +125,7 @@ describe("TimeTravelTest", () => {
         expect(instantOf(Time.new({ precision: 3 }))).not.toEqual(instantOf(expectedTime));
         expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
         expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-        expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+        expect(DateTime.now().toS()).toEqual(expectedTime.toDatetime().toS());
       });
 
       expect(Time.now().toS()).not.toEqual(expectedTime.toS());
@@ -133,7 +133,7 @@ describe("TimeTravelTest", () => {
       expect(RubyDate.today().toString()).not.toEqual(
         new RubyDate(2004, 11, 24).toDate().toString(),
       );
-      expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
+      expect(DateTime.now().toS()).not.toEqual(expectedTime.toDatetime().toS());
     } finally {
       now.mockRestore();
     }
@@ -171,7 +171,7 @@ describe("TimeTravelTest", () => {
       expect(Time.now().toS()).toEqual(expectedTime.toS());
       expect(Time.new().toS()).toEqual(expectedTime.toS());
       expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+      expect(DateTime.now().toS()).toEqual(expectedTime.toDatetime().toS());
       travelBack();
 
       expect(Time.now().toS()).not.toEqual(expectedTime.toS());
@@ -179,7 +179,7 @@ describe("TimeTravelTest", () => {
       expect(RubyDate.today().toString()).not.toEqual(
         new RubyDate(2004, 11, 24).toDate().toString(),
       );
-      expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
+      expect(DateTime.now().toS()).not.toEqual(expectedTime.toDatetime().toS());
     } finally {
       travelBack();
       now.mockRestore();
@@ -195,7 +195,7 @@ describe("TimeTravelTest", () => {
       expect(Time.now().toS()).toEqual(expectedTime.toS());
       expect(Time.new().toS()).toEqual(expectedTime.toS());
       expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+      expect(DateTime.now().toS()).toEqual(expectedTime.toDatetime().toS());
 
       travelBack(() => {
         expect(Time.now().toS()).not.toEqual(expectedTime.toS());
@@ -203,13 +203,13 @@ describe("TimeTravelTest", () => {
         expect(RubyDate.today().toString()).not.toEqual(
           new RubyDate(2004, 11, 24).toDate().toString(),
         );
-        expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
+        expect(DateTime.now().toS()).not.toEqual(expectedTime.toDatetime().toS());
       });
 
       expect(Time.now().toS()).toEqual(expectedTime.toS());
       expect(Time.new().toS()).toEqual(expectedTime.toS());
       expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+      expect(DateTime.now().toS()).toEqual(expectedTime.toDatetime().toS());
     } finally {
       travelBack();
       now.mockRestore();

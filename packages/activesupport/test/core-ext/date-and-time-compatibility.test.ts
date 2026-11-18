@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../../lib/time-with-zone.js";
 import { TimeZone } from "../../lib/values/time-zone.js";
 import { toTime } from "../../lib/core-ext/date-time/compatibility.js";
@@ -164,7 +165,7 @@ describe("DateAndTimeCompatibilityTest", () => {
           .utcToLocal(new RubyTime(2016, 4, 23, 15, 11, 12, "-0700"))
           .toZonedDateTime();
         const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
-          toTime(foreignTime),
+          toTime(new RubyDateTime(foreignTime)),
         );
 
         expect(convertedTime.toZonedDateTime().epochNanoseconds).toEqual(
@@ -181,7 +182,7 @@ describe("DateAndTimeCompatibilityTest", () => {
           .utcToLocal(new RubyTime(2016, 11, 23, 15, 11, 12, "-0700"))
           .toZonedDateTime();
         const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
-          toTime(foreignTime),
+          toTime(new RubyDateTime(foreignTime)),
         );
 
         expect(convertedTime.toZonedDateTime().epochNanoseconds).toEqual(
@@ -230,7 +231,7 @@ describe("DateAndTimeCompatibilityTest", () => {
   it("datetime to time preserves timezone", async () => {
     await withPreserveTimezone(true, () =>
       withEnvTz("US/Eastern", () => {
-        const source = Temporal.PlainDateTime.from("2016-04-23T15:11:12").toZonedDateTime("+01:00");
+        const source = new RubyDateTime(2016, 4, 23, 15, 11, 12, new Rational(1, 24));
         const time = toTime(source);
 
         expect(time).toBeInstanceOf(RubyTime);
@@ -245,7 +246,7 @@ describe("DateAndTimeCompatibilityTest", () => {
   it("datetime to time does not preserve time zone", async () => {
     await withPreserveTimezone(false, () =>
       withEnvTz("US/Eastern", () => {
-        const source = Temporal.PlainDateTime.from("2016-04-23T15:11:12").toZonedDateTime("+01:00");
+        const source = new RubyDateTime(2016, 4, 23, 15, 11, 12, new Rational(1, 24));
         const time = toTime(source);
 
         expect(time).toBeInstanceOf(RubyTime);
@@ -261,8 +262,8 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(true, () =>
       withEnvTz("US/Eastern", () => {
         const source = Object.freeze(
-          Temporal.PlainDateTime.from("2016-04-23T15:11:12").toZonedDateTime("+01:00"),
-        );
+          new RubyDateTime(2016, 4, 23, 15, 11, 12, new Rational(1, 24)),
+        ) as RubyDateTime;
         const time = toTime(source);
 
         expect(time).toBeInstanceOf(RubyTime);
@@ -279,8 +280,8 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(false, () =>
       withEnvTz("US/Eastern", () => {
         const source = Object.freeze(
-          Temporal.PlainDateTime.from("2016-04-23T15:11:12").toZonedDateTime("+01:00"),
-        );
+          new RubyDateTime(2016, 4, 23, 15, 11, 12, new Rational(1, 24)),
+        ) as RubyDateTime;
         const time = toTime(source);
 
         expect(time).toBeInstanceOf(RubyTime);

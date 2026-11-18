@@ -230,7 +230,7 @@ export const Extensions = {
     Extensions.writeRational(datetime.offset, packer);
   },
 
-  readDatetime(unpacker: Unpacker): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  readDatetime(unpacker: Unpacker): DateTime {
     return DateTime.jd(
       unpacker.read() as number,
       unpacker.read() as number,

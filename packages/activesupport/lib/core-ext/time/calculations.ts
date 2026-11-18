@@ -1,4 +1,4 @@
-import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Date as RubyDate, DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
 import {
   fetch,
   Rational,
@@ -54,10 +54,7 @@ export function atWithCoercion(timeOrNumber: unknown, ...args: unknown[]): RubyT
   if (args.length === 0) {
     if (timeOrNumber instanceof TimeWithZone) {
       return atWithoutCoercion(timeOrNumber.toR()).getlocal();
-    } else if (
-      timeOrNumber instanceof Temporal.PlainDateTime ||
-      timeOrNumber instanceof Temporal.ZonedDateTime
-    ) {
+    } else if (timeOrNumber instanceof RubyDateTime) {
       return atWithoutCoercion(toF(timeOrNumber)).getlocal();
     } else {
       return atWithoutCoercion(timeOrNumber);
@@ -307,7 +304,7 @@ export function minusWithCoercion(this: RubyTime, other: unknown): RubyTime | nu
   if (typeof (other as { comparableTime?: unknown })?.comparableTime === "function") {
     other = (other as TimeWithZone).comparableTime();
   }
-  return other instanceof Temporal.PlainDateTime || other instanceof Temporal.ZonedDateTime
+  return other instanceof RubyDateTime
     ? this.toF() - toF(other)
     : minusWithoutCoercion.call(this, other);
 }

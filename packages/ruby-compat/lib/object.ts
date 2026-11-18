@@ -9,7 +9,7 @@ import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.j
 import { rbPlus } from "./numeric.js";
 import { BINARY_METHOD_TABLE, STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
-import { cmp, rbCmpint, rubyClass } from "./comparable.js";
+import { cmp, rbCmpint } from "./comparable.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
@@ -115,9 +115,7 @@ export function rbObjClass(obj: unknown): Klass {
     temporalTag(obj) !== null &&
     typeof (obj as { epochNanoseconds?: unknown }).epochNanoseconds === "bigint"
   ) {
-    return reopened(
-      (obj as { [rubyClass]?: string })[rubyClass] === "DateTime" ? rbCDateTime : rbCTime,
-    ) as Klass;
+    return reopened(rbCTime) as Klass;
   }
   const tag = temporalTag(obj);
   if (tag === "Temporal.PlainDate") return reopened(rbCDate) as Klass;

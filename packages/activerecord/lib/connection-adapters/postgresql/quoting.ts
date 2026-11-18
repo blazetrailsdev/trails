@@ -285,7 +285,7 @@ function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | numb
 }
 
 function year(value: TemporalDateLike): number {
-  if ("year" in value) return value.year;
+  if ("year" in value) return Number(value.year);
   // boundary: a JS `Date` a caller still holds is a local Ruby `Time`.
   if (value instanceof Date) return value.getFullYear();
   return value.toZonedDateTimeISO("UTC").year;

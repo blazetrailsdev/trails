@@ -1,4 +1,4 @@
-import { ArgumentError, DateTime, strftime } from "@blazetrails/date";
+import { ArgumentError, DateTime } from "@blazetrails/date";
 import { binaryString, rbObjAsString, type Encoding } from "@blazetrails/ruby-compat";
 import { DateTimeElement } from "../elements/date-time-element.js";
 import { Utilities } from "../utilities.js";
@@ -28,7 +28,7 @@ export class CommonDateField extends NamedStructuredField {
     }
 
     if (datetime != null) {
-      return strftime(datetime, "%a, %d %b %Y %H:%M:%S %z");
+      return datetime.strftime("%a, %d %b %Y %H:%M:%S %z");
     } else {
       return string;
     }

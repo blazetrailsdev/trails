@@ -173,16 +173,16 @@ describe("TestSH", () => {
     d = RubyDate.jd(2451944);
     expect([d.year, d.month, d.day]).toEqual([2001, 2, 3]);
 
-    expect(RubyDateTime.jd().toString()).toBe("-004712-01-01T00:00:00");
-    expect(RubyDateTime.jd(0).toString()).toBe("-004712-01-01T00:00:00");
-    expect(RubyDateTime.jd(2451944).toString()).toBe("2001-02-03T00:00:00");
-    expect(RubyDateTime.jd(2451944, 4, 5, 6).toString()).toBe("2001-02-03T04:05:06");
-    expect(RubyDateTime.jd(2451944, 4, 5, 6, 0).toString()).toBe("2001-02-03T04:05:06");
-    expect(RubyDateTime.jd(2451944, 4, 5, 6, "+9:00").toString()).toBe(
-      "2001-02-03T04:05:06+09:00[+09:00]",
+    expect(RubyDateTime.jd().strftime("%FT%T")).toBe("-4712-01-01T00:00:00");
+    expect(RubyDateTime.jd(0).strftime("%FT%T")).toBe("-4712-01-01T00:00:00");
+    expect(RubyDateTime.jd(2451944).strftime("%FT%T")).toBe("2001-02-03T00:00:00");
+    expect(RubyDateTime.jd(2451944, 4, 5, 6).strftime("%FT%T")).toBe("2001-02-03T04:05:06");
+    expect(RubyDateTime.jd(2451944, 4, 5, 6, 0).strftime("%FT%T")).toBe("2001-02-03T04:05:06");
+    expect(RubyDateTime.jd(2451944, 4, 5, 6, "+9:00").strftime("%FT%T%:z")).toBe(
+      "2001-02-03T04:05:06+09:00",
     );
-    expect(RubyDateTime.jd(2451944, -4, -5, -6, "-9:00").toString()).toBe(
-      "2001-02-03T20:55:54-09:00[-09:00]",
+    expect(RubyDateTime.jd(2451944, -4, -5, -6, "-9:00").strftime("%FT%T%:z")).toBe(
+      "2001-02-03T20:55:54-09:00",
     );
   });
 
@@ -204,16 +204,18 @@ describe("TestSH", () => {
     d = RubyDate.ordinal(2001, -2, RubyDate.GREGORIAN);
     expect([d.year, d.dayOfYear]).toEqual([2001, 364]);
 
-    expect(RubyDateTime.ordinal().toString()).toBe("-004712-01-01T00:00:00");
-    expect(RubyDateTime.ordinal(-4712, 1).toString()).toBe("-004712-01-01T00:00:00");
-    expect(RubyDateTime.ordinal(2001, 34).toString()).toBe("2001-02-03T00:00:00");
-    expect(RubyDateTime.ordinal(2001, 34, 4, 5, 6).toString()).toBe("2001-02-03T04:05:06");
-    expect(RubyDateTime.ordinal(2001, 34, 4, 5, 6, 0).toString()).toBe("2001-02-03T04:05:06");
-    expect(RubyDateTime.ordinal(2001, 34, 4, 5, 6, "+9:00").toString()).toBe(
-      "2001-02-03T04:05:06+09:00[+09:00]",
+    expect(RubyDateTime.ordinal().strftime("%FT%T")).toBe("-4712-01-01T00:00:00");
+    expect(RubyDateTime.ordinal(-4712, 1).strftime("%FT%T")).toBe("-4712-01-01T00:00:00");
+    expect(RubyDateTime.ordinal(2001, 34).strftime("%FT%T")).toBe("2001-02-03T00:00:00");
+    expect(RubyDateTime.ordinal(2001, 34, 4, 5, 6).strftime("%FT%T")).toBe("2001-02-03T04:05:06");
+    expect(RubyDateTime.ordinal(2001, 34, 4, 5, 6, 0).strftime("%FT%T")).toBe(
+      "2001-02-03T04:05:06",
     );
-    expect(RubyDateTime.ordinal(2001, 34, -4, -5, -6, "-9:00").toString()).toBe(
-      "2001-02-03T20:55:54-09:00[-09:00]",
+    expect(RubyDateTime.ordinal(2001, 34, 4, 5, 6, "+9:00").strftime("%FT%T%:z")).toBe(
+      "2001-02-03T04:05:06+09:00",
+    );
+    expect(RubyDateTime.ordinal(2001, 34, -4, -5, -6, "-9:00").strftime("%FT%T%:z")).toBe(
+      "2001-02-03T20:55:54-09:00",
     );
   });
 
@@ -229,16 +231,20 @@ describe("TestSH", () => {
     expect(RubyDate.commercial(2001, -2, -3, RubyDate.JULIAN).toString()).toBe("2001-12-22");
     expect(RubyDate.commercial(2001, -2, -3, RubyDate.GREGORIAN).toString()).toBe("2001-12-21");
 
-    expect(RubyDateTime.commercial().toString()).toBe("-004712-01-01T00:00:00");
-    expect(RubyDateTime.commercial(-4712, 1, 1).toString()).toBe("-004712-01-01T00:00:00");
-    expect(RubyDateTime.commercial(2001, 5, 6).toString()).toBe("2001-02-03T00:00:00");
-    expect(RubyDateTime.commercial(2001, 5, 6, 4, 5, 6).toString()).toBe("2001-02-03T04:05:06");
-    expect(RubyDateTime.commercial(2001, 5, 6, 4, 5, 6, 0).toString()).toBe("2001-02-03T04:05:06");
-    expect(RubyDateTime.commercial(2001, 5, 6, 4, 5, 6, "+9:00").toString()).toBe(
-      "2001-02-03T04:05:06+09:00[+09:00]",
+    expect(RubyDateTime.commercial().strftime("%FT%T")).toBe("-4712-01-01T00:00:00");
+    expect(RubyDateTime.commercial(-4712, 1, 1).strftime("%FT%T")).toBe("-4712-01-01T00:00:00");
+    expect(RubyDateTime.commercial(2001, 5, 6).strftime("%FT%T")).toBe("2001-02-03T00:00:00");
+    expect(RubyDateTime.commercial(2001, 5, 6, 4, 5, 6).strftime("%FT%T")).toBe(
+      "2001-02-03T04:05:06",
     );
-    expect(RubyDateTime.commercial(2001, 5, 6, -4, -5, -6, "-9:00").toString()).toBe(
-      "2001-02-03T20:55:54-09:00[-09:00]",
+    expect(RubyDateTime.commercial(2001, 5, 6, 4, 5, 6, 0).strftime("%FT%T")).toBe(
+      "2001-02-03T04:05:06",
+    );
+    expect(RubyDateTime.commercial(2001, 5, 6, 4, 5, 6, "+9:00").strftime("%FT%T%:z")).toBe(
+      "2001-02-03T04:05:06+09:00",
+    );
+    expect(RubyDateTime.commercial(2001, 5, 6, -4, -5, -6, "-9:00").strftime("%FT%T%:z")).toBe(
+      "2001-02-03T20:55:54-09:00",
     );
   });
 
@@ -265,38 +271,44 @@ describe("TestSH", () => {
     expect(RubyDate.commercial(2001, 2, 3.0).toString()).toBe("2001-01-10");
     expect(RubyDate.commercial(2001, 2, new Rational(3, 1)).toString()).toBe("2001-01-10");
 
-    expect(RubyDateTime.jd(2451944.0).toString()).toBe("2001-02-03T00:00:00");
-    expect(RubyDateTime.jd(new Rational(2451944, 1)).toString()).toBe("2001-02-03T00:00:00");
-    expect(RubyDateTime.jd(2451944.5).toString()).toBe("2001-02-03T12:00:00");
-    expect(RubyDateTime.jd(new Rational(4903889, 2)).toString()).toBe("2001-02-03T12:00:00");
+    expect(RubyDateTime.jd(2451944.0).strftime("%FT%T")).toBe("2001-02-03T00:00:00");
+    expect(RubyDateTime.jd(new Rational(2451944, 1)).strftime("%FT%T")).toBe("2001-02-03T00:00:00");
+    expect(RubyDateTime.jd(2451944.5).strftime("%FT%T")).toBe("2001-02-03T12:00:00");
+    expect(RubyDateTime.jd(new Rational(4903889, 2)).strftime("%FT%T")).toBe("2001-02-03T12:00:00");
 
-    expect(RubyDateTime.civil(2001, 2, 3.0).toString()).toBe("2001-02-03T00:00:00");
-    expect(RubyDateTime.civil(2001, 2, new Rational(3, 1)).toString()).toBe("2001-02-03T00:00:00");
-    expect(RubyDateTime.civil(2001, 2, 3.5).toString()).toBe("2001-02-03T12:00:00");
-    expect(RubyDateTime.civil(2001, 2, new Rational(7, 2)).toString()).toBe("2001-02-03T12:00:00");
-    expect(RubyDateTime.civil(2001, 2, 3, 4.5).toString()).toBe("2001-02-03T04:30:00");
-    expect(RubyDateTime.civil(2001, 2, 3, new Rational(9, 2)).toString()).toBe(
+    expect(RubyDateTime.civil(2001, 2, 3.0).strftime("%FT%T")).toBe("2001-02-03T00:00:00");
+    expect(RubyDateTime.civil(2001, 2, new Rational(3, 1)).strftime("%FT%T")).toBe(
+      "2001-02-03T00:00:00",
+    );
+    expect(RubyDateTime.civil(2001, 2, 3.5).strftime("%FT%T")).toBe("2001-02-03T12:00:00");
+    expect(RubyDateTime.civil(2001, 2, new Rational(7, 2)).strftime("%FT%T")).toBe(
+      "2001-02-03T12:00:00",
+    );
+    expect(RubyDateTime.civil(2001, 2, 3, 4.5).strftime("%FT%T")).toBe("2001-02-03T04:30:00");
+    expect(RubyDateTime.civil(2001, 2, 3, new Rational(9, 2)).strftime("%FT%T")).toBe(
       "2001-02-03T04:30:00",
     );
-    expect(RubyDateTime.civil(2001, 2, 3, 4, 5.5).toString()).toBe("2001-02-03T04:05:30");
-    expect(RubyDateTime.civil(2001, 2, 3, 4, new Rational(11, 2)).toString()).toBe(
+    expect(RubyDateTime.civil(2001, 2, 3, 4, 5.5).strftime("%FT%T")).toBe("2001-02-03T04:05:30");
+    expect(RubyDateTime.civil(2001, 2, 3, 4, new Rational(11, 2)).strftime("%FT%T")).toBe(
       "2001-02-03T04:05:30",
     );
 
-    expect(RubyDateTime.ordinal(2001, 2.0).toString()).toBe("2001-01-02T00:00:00");
-    expect(RubyDateTime.ordinal(2001, new Rational(2, 1)).toString()).toBe("2001-01-02T00:00:00");
+    expect(RubyDateTime.ordinal(2001, 2.0).strftime("%FT%T")).toBe("2001-01-02T00:00:00");
+    expect(RubyDateTime.ordinal(2001, new Rational(2, 1)).strftime("%FT%T")).toBe(
+      "2001-01-02T00:00:00",
+    );
 
-    expect(RubyDateTime.commercial(2001, 2, 3.0).toString()).toBe("2001-01-10T00:00:00");
-    expect(RubyDateTime.commercial(2001, 2, new Rational(3, 1)).toString()).toBe(
+    expect(RubyDateTime.commercial(2001, 2, 3.0).strftime("%FT%T")).toBe("2001-01-10T00:00:00");
+    expect(RubyDateTime.commercial(2001, 2, new Rational(3, 1)).strftime("%FT%T")).toBe(
       "2001-01-10T00:00:00",
     );
   });
 
   it("canon24oc", () => {
     let d = RubyDateTime.jd(2451943, 24);
-    expect(d.toString()).toBe("2001-02-03T00:00:00");
+    expect(d.toS()).toBe("2001-02-03T00:00:00+00:00");
     d = RubyDateTime.ordinal(2001, 33, 24);
-    expect(d.toString()).toBe("2001-02-03T00:00:00");
+    expect(d.toS()).toBe("2001-02-03T00:00:00+00:00");
     const dt = new RubyDateTime(2001, 2, 2, 24);
     expect([dt.year, dt.mon, dt.mday, dt.hour, dt.min, dt.sec, dt.offset]).toEqual([
       2001,
@@ -308,7 +320,7 @@ describe("TestSH", () => {
       new Rational(0, 1),
     ]);
     d = RubyDateTime.commercial(2001, 5, 5, 24);
-    expect(d.toString()).toBe("2001-02-03T00:00:00");
+    expect(d.toS()).toBe("2001-02-03T00:00:00+00:00");
   });
 
   it("strftime", () => {

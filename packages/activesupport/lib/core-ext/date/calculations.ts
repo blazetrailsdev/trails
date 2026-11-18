@@ -215,13 +215,7 @@ export function compareWithCoercion(
         : other instanceof TimeWithZone
           ? other.utc().toZonedDateTime().toInstant()
           : Temporal.Instant.fromEpochMilliseconds(other.getTime());
-    return Temporal.Instant.compare(
-      (toDatetime instanceof Temporal.ZonedDateTime
-        ? toDatetime
-        : toDatetime.toZonedDateTime("UTC")
-      ).toInstant(),
-      instant,
-    );
+    return Temporal.Instant.compare(toDatetime.toTime().toZonedDateTime().toInstant(), instant);
   } else {
     return compareWithoutCoercion(date, other);
   }
