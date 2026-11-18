@@ -9,7 +9,7 @@ export const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve,
 
 const dummyRoot = `${import.meta.dirname}/dummy`;
 
-export function runSupervisor(options: { [key: string]: unknown } = {}) {
+export function runSupervisor(options: { [key: string]: unknown } = {}, block?: () => void) {
   vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
   const supervisors: Supervisor[] = [];
   const started = vi.spyOn(Supervisor.prototype, "start").mockImplementationOnce(function (
@@ -20,6 +20,7 @@ export function runSupervisor(options: { [key: string]: unknown } = {}) {
     return this.start();
   });
   let exited = false;
+  block?.();
   const running = Supervisor.start({ skipRecurring: true, ...options });
   running.then(
     () => (exited = true),
