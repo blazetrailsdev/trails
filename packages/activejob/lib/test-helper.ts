@@ -587,8 +587,8 @@ export interface TestHelper {
   set enqueuedJobs(enqueuedJobs: Payload[]);
   get performedJobs(): Payload[];
   set performedJobs(performedJobs: Payload[]);
-  beforeSetup: typeof beforeSetup;
-  afterTeardown: typeof afterTeardown;
+  beforeSetup(): unknown;
+  afterTeardown(): unknown;
   queueAdapterForTest: typeof queueAdapterForTest;
   assertEnqueuedJobs: typeof assertEnqueuedJobs;
   assertNoEnqueuedJobs: typeof assertNoEnqueuedJobs;

@@ -1,5 +1,5 @@
 import { afterAll } from "vitest";
-import { Logger, TopLevel, setTrailsRoot } from "@blazetrails/activesupport";
+import { Logger, TopLevel, objectWith, setTrailsRoot } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, Migrator } from "@blazetrails/activerecord";
 import { Trails } from "@blazetrails/trailties";
 import { ActionController } from "@blazetrails/actionpack";
@@ -35,12 +35,9 @@ afterAll(async () => {
 });
 
 export async function withProductionDebouncer(block: () => Promise<unknown>): Promise<void> {
-  const old = ThreadDebouncer.debouncerClass;
-  ThreadDebouncer.debouncerClass = Debouncer;
   try {
-    await block();
+    await objectWith(ThreadDebouncer, { debouncerClass: Debouncer }, block);
   } finally {
-    ThreadDebouncer.debouncerClass = old;
     await new Promise((resolve) => setTimeout(resolve, (Debouncer.DEFAULT_DELAY + 0.2) * 1000));
 
     const turboKeys = Thread.current()

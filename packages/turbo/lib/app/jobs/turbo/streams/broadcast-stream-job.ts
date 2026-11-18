@@ -1,5 +1,5 @@
+import "../../../../constants.broadcast-stream-job.generated.js";
 import { Base, DeserializationError } from "@blazetrails/activejob";
-import { constSet } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../../turbo-trails.js";
 import { StreamsChannel } from "../../../channels/turbo/streams-channel.js";
 
@@ -12,4 +12,4 @@ export class BroadcastStreamJob extends Base {
     await StreamsChannel.broadcastStreamTo(stream, { content });
   }
 }
-constSet(Turbo.Streams, "BroadcastStreamJob", BroadcastStreamJob);
+Turbo.Streams.BroadcastStreamJob = BroadcastStreamJob;

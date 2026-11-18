@@ -7,18 +7,38 @@ export function objectWith<T extends object, R>(
 ): R {
   const target = obj as Record<string, unknown>;
   const oldValues: Record<string, unknown> = {};
+  let deferred = false;
   try {
     for (const [key, value] of Object.entries(attributes)) {
       if (!(key in target)) throw new NoMethodError(`undefined method '${key}'`);
       oldValues[key] = target[key];
       publicSendWriter(target, key, value);
     }
-    return fn(obj);
+    const result = fn(obj);
+    if (_isThenable(result)) {
+      deferred = true;
+      return Promise.resolve(result).finally(() => {
+        for (const [key, oldValue] of Object.entries(oldValues)) {
+          publicSendWriter(target, key, oldValue);
+        }
+      }) as R;
+    }
+    return result;
   } finally {
-    for (const [key, oldValue] of Object.entries(oldValues)) {
-      publicSendWriter(target, key, oldValue);
+    if (!deferred) {
+      for (const [key, oldValue] of Object.entries(oldValues)) {
+        publicSendWriter(target, key, oldValue);
+      }
     }
   }
+}
+
+function _isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as { then?: unknown }).then === "function"
+  );
 }
 
 function publicSendWriter(target: Record<string, unknown>, key: string, value: unknown): void {
