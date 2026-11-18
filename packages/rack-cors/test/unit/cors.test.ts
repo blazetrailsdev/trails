@@ -331,6 +331,8 @@ describe("Rack::Cors", () => {
 
       const cors = new Cors(app, { debug: true }, () => {});
       await cors.call({ HTTP_ORIGIN: "test.com" });
+      expect(cors["logger"]).toBeInstanceOf(Logger);
+      expect((cors["logger"] as Logger).level).toEqual(Logger.Severity.DEBUG);
       expect(debug).toHaveBeenCalledTimes(1);
       debug.mockRestore();
     });
