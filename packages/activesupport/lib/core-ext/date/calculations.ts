@@ -6,6 +6,7 @@ import { ArgumentError, zone as timeZone } from "../../time-zone-config.js";
 import { Rational, TEMPORAL_METHOD_TABLE, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { DAYS_INTO_WEEK } from "../date-and-time/calculations.js";
 import { inTimeZone } from "../date-and-time/zones.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 const BEGINNING_OF_WEEK = "beginning_of_week";
 
@@ -253,3 +254,4 @@ Object.defineProperty(RubyDate.prototype, "change", {
   writable: true,
   configurable: true,
 });
+rbClearMethodCache();

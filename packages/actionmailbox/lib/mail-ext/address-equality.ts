@@ -1,4 +1,5 @@
 import { Address } from "@blazetrails/mail";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/mail/elements/address" {
   interface Address {
@@ -11,3 +12,4 @@ export function equals(this: Address, otherAddress: unknown): boolean {
 }
 
 Address.prototype.equals = equals;
+rbClearMethodCache();

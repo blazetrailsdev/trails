@@ -9,6 +9,7 @@ import { zone as timeZone } from "../../time-zone-config.js";
 import { advance as dateAdvance } from "../date/calculations.js";
 import { compare as dateTimeCompare, since as dateTimeSince } from "../date-time/calculations.js";
 import { toF } from "../date-time/conversions.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export const COMMON_YEAR_DAYS_IN_MONTH = [null, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -474,6 +475,7 @@ Object.assign(RubyTime.prototype, {
   eqlWithCoercion,
   eql: eqlWithCoercion,
 });
+rbClearMethodCache();
 
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
 

@@ -9,6 +9,7 @@ import { secFraction } from "../../time-ext.js";
 import * as date from "../date/calculations.js";
 import { toDatetime as stringToDatetime } from "../string/conversions.js";
 import { nsec, toI } from "./conversions.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type DateTime = Temporal.PlainDateTime | Temporal.ZonedDateTime;
 
@@ -297,3 +298,4 @@ Object.defineProperty(RubyDateTime.prototype, "change", {
   writable: true,
   configurable: true,
 });
+rbClearMethodCache();

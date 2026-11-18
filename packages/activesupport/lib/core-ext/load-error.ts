@@ -1,4 +1,5 @@
 import { LoadError } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat" {
   interface LoadError {
@@ -15,5 +16,6 @@ function deleteSuffix(str: string, suffix: string): string {
 }
 
 LoadError.prototype.isMissing = isMissing;
+rbClearMethodCache();
 
 export { LoadError };

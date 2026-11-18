@@ -3,6 +3,7 @@ import { formattedOffset as dateTimeFormattedOffset } from "../date-time/convers
 import { ordinalize } from "../../inflector.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type DateFormatsReceiver =
   | RubyTime
@@ -89,3 +90,4 @@ RubyTime.prototype.toFs = function (this: RubyTime, format?: string): string {
 };
 RubyTime.prototype.toFormattedS = RubyTime.prototype.toFs;
 RubyTime.prototype.rfc3339 = RubyTime.prototype.xmlschema;
+rbClearMethodCache();

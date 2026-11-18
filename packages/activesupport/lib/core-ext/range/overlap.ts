@@ -1,5 +1,6 @@
 import { TypeError } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 /**
  * `Range#overlap?` / `#overlaps?` (core_ext/range/overlap.rb:8,39), which Ruby
@@ -59,3 +60,4 @@ declare module "@blazetrails/ruby-compat/range" {
 }
 
 Object.assign(Range.prototype, { overlap, overlaps });
+rbClearMethodCache();

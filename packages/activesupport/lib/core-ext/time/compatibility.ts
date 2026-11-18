@@ -1,11 +1,13 @@
 import { nowTimeZoneId, Time as RubyTime } from "@blazetrails/date";
 import { preserveTimezone as compatibilityPreserveTimezone } from "../date-and-time/compatibility.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 Object.assign(RubyTime.prototype, {
   toTime(this: RubyTime): RubyTime {
     return preserveTimezone(this) ? this : this.getlocal();
   },
 });
+rbClearMethodCache();
 
 export function preserveTimezone(time: RubyTime): boolean | string {
   return isSystemLocalTime(time) || compatibilityPreserveTimezone();
