@@ -59,7 +59,7 @@ describe("stimulus:install", () => {
     const entrypoint = await File.readAsync(
       rootDir.join("app/javascript/entrypoints/application.js").toString(),
     );
-    expect(entrypoint).toContain(`import "./controllers"\n`);
+    expect(entrypoint).toContain(`import "~/controllers"\n`);
     expect(
       await File.isExistAsync(rootDir.join("app/javascript/controllers/index.js").toString()),
     ).toBe(true);
