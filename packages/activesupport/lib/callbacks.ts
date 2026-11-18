@@ -80,7 +80,10 @@ export class Value {
   }
 
   static check(callback: Callback, target: object, value?: unknown): boolean {
-    return callback.conditionsLambdas().every((cond) => cond(target, value));
+    return callback.conditionsLambdas().every((cond) => {
+      const r: unknown = cond(target, value);
+      return r != null && r !== false;
+    });
   }
 }
 
@@ -788,10 +791,34 @@ export class CallbackSequence {
     return sequence;
   }
 
-  isSkip(arg: Environment): boolean {
+  isSkip(arg: Environment): boolean | Promise<boolean> {
     if (arg.halted) return true;
     if (!this.userConditions) return false;
-    return !this.userConditions.every((c) => c(arg.target, arg.value));
+    const conditions = this.userConditions;
+    for (let i = 0; i < conditions.length; i++) {
+      const r: unknown = conditions[i](arg.target, arg.value);
+      if (!isThenable(r)) {
+        if (r == null || r === false) return true;
+        continue;
+      }
+      /** @inventedArm throw — PERMANENT */
+      if (arg.syncChain !== undefined) {
+        new Thread(() => r);
+        throw new RuntimeError(
+          `Async callback on sync chain "${arg.syncChain}" — around condition returned a Promise`,
+        );
+      }
+      return (async () => {
+        const first = await r;
+        if (first == null || first === false) return true;
+        for (const c of conditions.slice(i + 1)) {
+          const rest: unknown = await c(arg.target, arg.value);
+          if (rest == null || rest === false) return true;
+        }
+        return false;
+      })();
+    }
+    return false;
   }
 
   isFinal(): boolean {
@@ -1037,6 +1064,7 @@ interface InvokeSequenceState {
   current: CallbackSequence;
   skipped: CallbackSequence[] | null;
   step: "before" | "yield" | "after" | "skipped";
+  skip?: boolean;
 }
 
 interface ProceedTracker {
@@ -1307,6 +1335,7 @@ function runCallbacks(
     let current = resume?.current ?? nextSequence;
     let skipped = resume?.skipped ?? null;
     let step = resume?.step ?? "before";
+    let resolvedSkip: boolean | Promise<boolean> | undefined = resume?.skip;
     resume = null;
     const suspend = (r: PromiseLike<unknown>, at: InvokeSequenceState["step"]) =>
       Promise.resolve(r).then(() => {
@@ -1333,7 +1362,19 @@ function runCallbacks(
             result = suspend(yielded, "after");
             break sequence;
           }
-        } else if (current.isSkip(env)) {
+        } else if (
+          (resolvedSkip ?? (resolvedSkip = current.isSkip(env))) === true ||
+          isThenable(resolvedSkip)
+        ) {
+          if (isThenable(resolvedSkip)) {
+            const pendingSkip = resolvedSkip;
+            result = Promise.resolve(pendingSkip).then((skip) => {
+              resume = { current, skipped, step: "yield", skip };
+              return invokeSequence();
+            });
+            break sequence;
+          }
+          resolvedSkip = undefined;
           (skipped ??= []).push(current);
           nextSequence = nextSequence.nested!;
           step = "before";

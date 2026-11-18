@@ -1406,3 +1406,31 @@ describe("thenable callback conditions short-circuit (trails)", () => {
     expect(host.log).toEqual(["save", "zero"]);
   });
 });
+
+describe("thenable around callback conditions (trails)", () => {
+  it("awaits an async if: on an around callback and skips it when false", async () => {
+    class Host extends Model {}
+    Host.defineCallbacks("save");
+    Host.setCallback(
+      "save",
+      "around",
+      (r: Host, next: () => unknown) => {
+        r.log.push("around-no");
+        return next();
+      },
+      { if: async () => false },
+    );
+    Host.setCallback(
+      "save",
+      "around",
+      (r: Host, next: () => unknown) => {
+        r.log.push("around-zero");
+        return next();
+      },
+      { if: [async () => 0, () => ""] },
+    );
+    const host = new Host();
+    await host.runCallbacks("save", () => host.log.push("save"));
+    expect(host.log).toEqual(["around-zero", "save"]);
+  });
+});
