@@ -5357,3 +5357,55 @@ describe("countTsInternalNames — Rails-backed privates", () => {
     expect(countTsInternalNames("backend/memoize.ts", [memoize()], [], undefined, [])).toBe(2);
   });
 });
+
+describe("buildReport — internal count reads the private walk in TS spelling", () => {
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      i18n: {
+        classes: {},
+        modules: {
+          "I18n::Backend::Memoize": rubyClass({
+            name: "Memoize",
+            file: "backend/memoize.rb",
+            instance: [method("available_locales"), method("reset_memoizations!", true)],
+          }),
+        },
+      },
+    },
+  };
+  const ts: ApiManifest = {
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      i18n: {
+        classes: {},
+        modules: {
+          "backend/memoize.ts:Memoize": {
+            name: "Memoize",
+            file: "backend/memoize.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: [
+              method("availableLocales"),
+              method("resetMemoizationsBang", true),
+              method("invented", true),
+            ],
+            classMethods: [],
+          },
+        },
+      },
+    },
+  };
+
+  it("skips a snake_case bang private and counts the unbacked one", () => {
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].totalInternal).toBe(1);
+  });
+});
