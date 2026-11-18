@@ -82,10 +82,11 @@ export class Resource {
   }
 
   isMatch(path: string | null, env: RackEnv): boolean {
-    if (!this.isMatchesPath(path)) return false;
-    if (this.ifProc == null) return true;
-    const result = this.ifProc(env);
-    return result != null && result !== false;
+    let result: unknown;
+    return (
+      this.isMatchesPath(path) &&
+      (this.ifProc == null || ((result = this.ifProc(env)) != null && result !== false))
+    );
   }
 
   processPreflight(env: RackEnv, result: Result): Headers {
