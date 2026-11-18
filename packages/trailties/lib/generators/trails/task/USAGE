@@ -6,4 +6,4 @@ Description:
 Example:
     `bin/trails generate task feeds fetch erase add`
 
-        Task:      lib/tasks/feeds.ts
+        Task:      lib/tasks/feeds.rake.ts
