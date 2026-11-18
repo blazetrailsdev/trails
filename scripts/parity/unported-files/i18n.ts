@@ -51,27 +51,6 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
       "Pre-1.0: optional backend mixin — attaches lookup metadata onto the " +
       "translated String's singleton class. JS strings take no per-instance state.",
   },
-  {
-    pattern: "backend/pluralization.rb",
-    testFile: "backend/pluralization_test.rb",
-    package: "i18n",
-    reason:
-      "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data.",
-  },
-  {
-    testFile: "backend/pluralization_fallback_test.rb",
-    package: "i18n",
-    reason:
-      "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data. " +
-      "Suite for the deferred `backend/pluralization.rb` composed with Fallbacks.",
-  },
-  {
-    testFile: "backend/pluralization_scope_test.rb",
-    package: "i18n",
-    reason:
-      "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data. " +
-      "Suite for the deferred `backend/pluralization.rb` looked up under a scope.",
-  },
   // --- i18n: api/ suites that install a deferred backend ---
   {
     testFile: "api/all_features_test.rb",

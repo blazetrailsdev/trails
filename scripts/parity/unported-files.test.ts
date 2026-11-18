@@ -63,6 +63,8 @@ describe("isSourceUnported package scoping", () => {
       "backend/fallbacks.rb",
       "backend/flatten.rb",
       "backend/key_value.rb",
+      "backend/lazy_loadable.rb",
+      "backend/pluralization.rb",
       "backend/simple.rb",
       "backend/transliterator.rb",
       "config.rb",
@@ -75,6 +77,7 @@ describe("isSourceUnported package scoping", () => {
       "locale/tag/rfc4646.rb",
       "locale/tag/simple.rb",
       "utils.rb",
+      "version.rb",
     ]);
     const unaccounted = ["../i18n.rb", ...files].filter(
       (f) => !inScope.has(f) && !isSourceUnported(f, "i18n"),
