@@ -55,7 +55,6 @@ export class BroadcastLogger {
     });
   }
 
-  /** @noRailsEquivalent PERMANENT */
   get localLevel(): number | null {
     return Object.getOwnPropertyDescriptor(
       LoggerThreadSafeLevel.prototype,

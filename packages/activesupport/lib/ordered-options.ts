@@ -133,7 +133,6 @@ export class OrderedOptions {
     return this;
   }
 
-  /** @noRailsEquivalent PERMANENT */
   equals(other: unknown): boolean {
     return rbEqual(this.toH(), other);
   }
