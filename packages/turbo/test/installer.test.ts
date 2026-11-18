@@ -62,6 +62,15 @@ describe("InstallerTest", () => {
         const { AppGenerator } = await import("@blazetrails/trailties/generators");
         await AppGenerator.applyTrailsTemplate(location, rootDir.toString());
       }
+      const [, manager, pkg] = /^(pnpm|bun) add (\S+)$/.exec(String(args[0])) ?? [];
+      if (pkg) {
+        const packageJson = JSON.parse(await read("package.json"));
+        packageJson.dependencies = { ...packageJson.dependencies, [pkg]: "*" };
+        await File.writeAsync(rootDir.join("package.json").toString(), JSON.stringify(packageJson));
+        if (manager === "pnpm") {
+          await File.writeAsync(rootDir.join("pnpm-lock.yaml").toString(), `  ${pkg}:\n`);
+        }
+      }
       return true;
     });
   });
@@ -81,7 +90,8 @@ describe("InstallerTest", () => {
       expect(await read("app/javascript/entrypoints/application.js")).toMatch(
         `import "@hotwired/turbo-rails"\n`,
       );
-      expect(system).toHaveBeenCalledWith("pnpm add @hotwired/turbo-rails");
+      expect(await read("package.json")).toMatch("@hotwired/turbo-rails");
+      expect(await read("pnpm-lock.yaml")).toMatch("@hotwired/turbo-rails");
     });
   });
 
@@ -117,7 +127,7 @@ describe("InstallerTest", () => {
       expect(await read("app/javascript/entrypoints/application.js")).toMatch(
         `import "@hotwired/turbo-rails"\n`,
       );
-      expect(system).toHaveBeenCalledWith("bun add @hotwired/turbo-rails");
+      expect(await read("package.json")).toMatch("@hotwired/turbo-rails");
     });
   });
 });
