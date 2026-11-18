@@ -26,7 +26,7 @@ export class Resources {
       .flat()
       .filter((s) => s !== "")
       .map((n): Origin => {
-        if (typeof n === "function" || n instanceof RegExp || /^[a-z][a-z0-9.+-]*:\/\//.test(n)) {
+        if (typeof n === "function" || n instanceof RegExp || /^[a-z][a-z0-9.+-]*:\/\//m.test(n)) {
           return n;
         } else if (n === "*") {
           this.publicResources = true;
@@ -57,7 +57,7 @@ export class Resources {
           const r = origin(source, env);
           return r != null && r !== false;
         } else if (origin instanceof RegExp) {
-          return source != null && origin.test(source);
+          return source != null && source.search(origin) !== -1;
         } else {
           return source === origin;
         }

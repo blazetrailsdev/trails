@@ -1,4 +1,4 @@
-import { Utils, type RackApp, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { Rack, Utils, type RackApp, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { Logger, rbObjRespondTo, rbProcCall, STDOUT, TopLevel } from "@blazetrails/ruby-compat";
 
 import { Resource } from "./cors/resource.js";
@@ -249,3 +249,5 @@ export class Cors {
     return [null, originMatched ? Result.MISS_NO_PATH : Result.MISS_NO_ORIGIN];
   }
 }
+
+Rack.Cors = Cors;

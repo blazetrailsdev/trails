@@ -1,7 +1,7 @@
 import { Rack, type RackEnv } from "@blazetrails/rack";
 import { constDefined, constGet, regexpEscape, TypeError } from "@blazetrails/ruby-compat";
 
-import { Cors } from "../cors.js";
+import type { Cors } from "../cors.js";
 import { CorsMisconfigurationError } from "./resources/cors-misconfiguration-error.js";
 import { Result } from "./result.js";
 
@@ -12,8 +12,8 @@ export interface ResourceOptions {
   maxAge?: number | null;
   if?: ((env: RackEnv) => unknown) | null;
   vary?: string | string[] | null;
-  headers?: "any" | string | string[] | null;
-  methods?: "any" | string | string[] | null;
+  headers?: ":any" | string | string[] | null;
+  methods?: ":any" | string | string[] | null;
   expose?: string | string[] | null;
 }
 
@@ -29,7 +29,7 @@ export class Resource {
 
   path: string | RegExp;
   methods: string[];
-  headers: "any" | string[] | null;
+  headers: ":any" | string[] | null;
   expose: string[] | null;
   maxAge: number;
   credentials: boolean;
@@ -53,8 +53,8 @@ export class Resource {
     this.publicResource = publicResource;
 
     switch (opts.headers) {
-      case "any":
-        this.headers = "any";
+      case ":any":
+        this.headers = ":any";
         break;
       case null:
       case undefined:
@@ -66,7 +66,7 @@ export class Resource {
 
     let methods: string[];
     switch (opts.methods) {
-      case "any":
+      case ":any":
         methods = ["get", "head", "post", "put", "patch", "delete", "options"];
         break;
       default:
@@ -78,7 +78,7 @@ export class Resource {
   }
 
   isMatchesPath(path: string | null): boolean {
-    return path != null && this.pattern.test(path);
+    return path != null && path.search(this.pattern) !== -1;
   }
 
   isMatch(path: string | null, env: RackEnv): boolean {
@@ -92,7 +92,10 @@ export class Resource {
   processPreflight(env: RackEnv, result: Result): Headers {
     const headers: Headers = {};
 
-    const requestMethod = env[Cors.HTTP_ACCESS_CONTROL_REQUEST_METHOD] as string | null | undefined;
+    const requestMethod = env[(Rack.Cors as typeof Cors).HTTP_ACCESS_CONTROL_REQUEST_METHOD] as
+      | string
+      | null
+      | undefined;
     if (requestMethod == null && result.miss(Result.MISS_NO_METHOD)) return headers;
     if (
       !this.methods.includes(requestMethod!.toLowerCase()) &&
@@ -100,7 +103,7 @@ export class Resource {
     )
       return headers;
 
-    const requestHeaders = env[Cors.HTTP_ACCESS_CONTROL_REQUEST_HEADERS] as
+    const requestHeaders = env[(Rack.Cors as typeof Cors).HTTP_ACCESS_CONTROL_REQUEST_HEADERS] as
       | string
       | null
       | undefined;
@@ -117,7 +120,9 @@ export class Resource {
 
   toHeaders(env: RackEnv): Headers {
     const h: Headers = {
-      "access-control-allow-origin": this.originForResponseHeader(env[Cors.HTTP_ORIGIN] as string),
+      "access-control-allow-origin": this.originForResponseHeader(
+        env[(Rack.Cors as typeof Cors).HTTP_ORIGIN] as string,
+      ),
       "access-control-allow-methods": this.methods.map((m) => String(m).toUpperCase()).join(", "),
       "access-control-expose-headers": this.expose == null ? "" : this.expose.join(", "),
       "access-control-max-age": String(this.maxAge),
@@ -141,9 +146,11 @@ export class Resource {
   /** @internal */
   protected toPreflightHeaders(env: RackEnv): Headers {
     const h = this.toHeaders(env);
-    if (env[Cors.HTTP_ACCESS_CONTROL_REQUEST_HEADERS] != null)
+    if (env[(Rack.Cors as typeof Cors).HTTP_ACCESS_CONTROL_REQUEST_HEADERS] != null)
       Object.assign(h, {
-        "access-control-allow-headers": env[Cors.HTTP_ACCESS_CONTROL_REQUEST_HEADERS] as string,
+        "access-control-allow-headers": env[
+          (Rack.Cors as typeof Cors).HTTP_ACCESS_CONTROL_REQUEST_HEADERS
+        ] as string,
       });
     return h;
   }
@@ -151,7 +158,7 @@ export class Resource {
   /** @internal */
   protected isAllowHeaders(requestHeaders: string | string[]): boolean {
     const headers = this.headers || [];
-    if (headers === "any") return true;
+    if (headers === ":any") return true;
 
     if (typeof requestHeaders === "string") requestHeaders = requestHeaders.split(/,\s*/);
     return requestHeaders.every((header) => {

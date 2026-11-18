@@ -1,6 +1,6 @@
-import type { RackEnv } from "@blazetrails/rack";
+import { Rack, type RackEnv } from "@blazetrails/rack";
 
-import { Cors } from "../cors.js";
+import type { Cors } from "../cors.js";
 
 export class Result {
   static readonly HEADER_KEY = "x-rack-cors";
@@ -33,7 +33,7 @@ export class Result {
     const r = new Result();
     r.preflight = false;
     r.hit = true;
-    return (env[Cors.ENV_KEY] = r);
+    return (env[(Rack.Cors as typeof Cors).ENV_KEY] = r);
   }
 
   static miss(env: RackEnv, reason: string | null): Result {
@@ -41,13 +41,13 @@ export class Result {
     r.preflight = false;
     r.hit = false;
     r.missReason = reason;
-    return (env[Cors.ENV_KEY] = r);
+    return (env[(Rack.Cors as typeof Cors).ENV_KEY] = r);
   }
 
   static preflight(env: RackEnv): Result {
     const r = new Result();
     r.preflight = true;
-    return (env[Cors.ENV_KEY] = r);
+    return (env[(Rack.Cors as typeof Cors).ENV_KEY] = r);
   }
 
   appendHeader(headers: Record<string, unknown>): string {

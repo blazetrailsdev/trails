@@ -19,7 +19,7 @@ describe("DSL", () => {
           ),
         );
         allow.resource("/get-only", { methods: "get" });
-        allow.resource("/", { headers: "any" });
+        allow.resource("/", { headers: ":any" });
       });
     });
     const resources = cors["allResources"]();
@@ -49,7 +49,7 @@ describe("DSL", () => {
           ),
         );
         this.resource("/get-only", { methods: "get" });
-        this.resource("/", { headers: "any" });
+        this.resource("/", { headers: ":any" });
       });
     });
     const resources = cors["allResources"]();
@@ -71,7 +71,7 @@ describe("DSL", () => {
     const cors = new Cors(app, {}, function () {
       this.allow(function () {
         this.origins("file://");
-        this.resource("/", { headers: "any" });
+        this.resource("/", { headers: ":any" });
       });
     });
     const resources = cors["allResources"]();
@@ -83,7 +83,7 @@ describe("DSL", () => {
     const cors = new Cors(app, {}, function () {
       this.allow(function () {
         this.origins("example.net");
-        this.resource("/", { headers: "any" });
+        this.resource("/", { headers: ":any" });
       });
     });
     const resources = cors["allResources"]();
