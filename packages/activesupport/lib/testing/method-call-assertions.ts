@@ -9,6 +9,7 @@ export class MockExpectationError extends Error {
 interface MockCall {
   retval: unknown;
   args: unknown[];
+  kwargs: Record<string, unknown>;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -17,17 +18,27 @@ export class Mock {
   #actualCalls = new Map<string, MockCall[]>();
 
   /** @noRailsEquivalent PERMANENT */
-  expect(name: string, retval: unknown, args: unknown[] = []): this {
+  expect(
+    name: string,
+    retval: unknown,
+    args: unknown[] = [],
+    kwargs: Record<string, unknown> = {},
+  ): this {
     if (!Array.isArray(args)) throw new ArgumentError("args must be an array");
     const expected = this.#expectedCalls.get(name) ?? [];
-    expected.push({ retval, args });
+    expected.push({ retval, args, kwargs });
     this.#expectedCalls.set(name, expected);
     return this;
   }
 
   __call(name: string, data: MockCall | MockCall[]): string {
     if (Array.isArray(data)) return data.map((d) => this.__call(name, d)).join(", ");
-    const args = rbInspect(data.args).slice(1, -1);
+    let args = rbInspect(data.args).slice(1, -1);
+    const kwargs = data.kwargs;
+    if (kwargs && Object.keys(kwargs).length > 0) {
+      if (args.length > 0) args += ", ";
+      args += rbInspect(kwargs).slice(1, -1);
+    }
     return `${name}(${args}) => ${rbInspect(data.retval)}`;
   }
 
@@ -48,21 +59,39 @@ export class Mock {
   /** @noRailsEquivalent PERMANENT */
   call(...args: unknown[]): unknown {
     const sym = ":call";
+    let kwargs: Record<string, unknown> = {};
     const actualCalls = this.#actualCalls.get("call") ?? [];
     const index = actualCalls.length;
     const expectedCall = this.#expectedCalls.get("call")?.[index];
 
     if (!expectedCall) {
       throw new MockExpectationError(
-        `No more expects available for ${rbInspect(sym)}: ${rbInspect(args)} ${rbInspect({})}`,
+        `No more expects available for ${rbInspect(sym)}: ${rbInspect(args)} ${rbInspect(kwargs)}`,
       );
     }
 
-    const { args: expectedArgs, retval } = expectedCall;
+    const { args: expectedArgs, kwargs: expectedKwargs, retval } = expectedCall;
+    const last = args.at(-1);
+    if (
+      Object.keys(expectedKwargs).length > 0 &&
+      args.length > expectedArgs.length &&
+      last !== null &&
+      typeof last === "object" &&
+      Object.getPrototypeOf(last) === Object.prototype
+    ) {
+      args = args.slice(0, -1);
+      kwargs = last as Record<string, unknown>;
+    }
 
     if (expectedArgs.length !== args.length) {
       throw new ArgumentError(
         `mocked method ${rbInspect(sym)} expects ${expectedArgs.length} arguments, got ${rbInspect(args)}`,
+      );
+    }
+
+    if (Object.keys(expectedKwargs).length !== Object.keys(kwargs).length) {
+      throw new ArgumentError(
+        `mocked method ${rbInspect(sym)} expects ${Object.keys(expectedKwargs).length} keyword arguments, got ${rbInspect(kwargs)}`,
       );
     }
 
@@ -76,9 +105,28 @@ export class Mock {
       );
     }
 
+    if (Object.keys(expectedKwargs).sort().join("\0") !== Object.keys(kwargs).sort().join("\0")) {
+      throw new MockExpectationError(
+        `mocked method ${rbInspect(sym)} called with unexpected keywords ${rbInspect(Object.keys(expectedKwargs))} vs ${rbInspect(Object.keys(kwargs))}`,
+      );
+    }
+
+    const zippedKwargs = Object.entries(expectedKwargs).map(
+      ([ek, ev]) => [ek, ev, kwargs[ek]] as const,
+    );
+
+    const kwargsMatched = zippedKwargs.every(([, ev, av]) => caseEqual(ev, av) || rbEqual(ev, av));
+
+    if (!kwargsMatched) {
+      throw new MockExpectationError(
+        `mocked method ${rbInspect(sym)} called with unexpected keyword arguments ${rbInspect(expectedKwargs)} vs ${rbInspect(kwargs)}`,
+      );
+    }
+
     actualCalls.push({
       retval,
       args: expectedArgs.map((e, i) => (caseEqual(e, args[i]) ? e : args[i])),
+      kwargs: Object.fromEntries(zippedKwargs.map(([k, e, a]) => [k, caseEqual(e, a) ? e : a])),
     });
     this.#actualCalls.set("call", actualCalls);
 
@@ -121,11 +169,11 @@ export function assertCalledWith<T extends object>(
   object: T,
   methodName: keyof T & string,
   args: unknown[],
-  { returns = false }: { returns?: unknown } = {},
+  { returns = false, ...kwargs }: { returns?: unknown; [kwarg: string]: unknown } = {},
   block?: () => void | Promise<void>,
 ): void | Promise<void> {
   const mock = new Mock();
-  expectCalledWith(mock, args, { returns });
+  expectCalledWith(mock, args, { returns, ...kwargs });
 
   const result = stub(
     object,
@@ -153,9 +201,9 @@ export function assertNotCalled<T extends object>(
 export function expectCalledWith(
   mock: Mock,
   args: unknown[],
-  { returns = false }: { returns?: unknown } = {},
+  { returns = false, ...kwargs }: { returns?: unknown; [kwarg: string]: unknown } = {},
 ): void {
-  mock.expect("call", returns, args);
+  mock.expect("call", returns, args, kwargs);
 }
 
 /** @internal */

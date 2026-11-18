@@ -1,9 +1,7 @@
 import type { DurationParts } from "../duration.js";
-import { rbInspect as inspect, StringScanner } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect as inspect, StringScanner } from "@blazetrails/ruby-compat";
 
-export class ParsingError extends Error {
-  override name = "ParsingError";
-}
+export class ParsingError extends ArgumentError {}
 
 const PERIOD_OR_COMMA = /\.|,/;
 const PERIOD = ".";

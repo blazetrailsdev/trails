@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { StringInquirer, inquiry } from "../lib/string-inquirer.js";
+import { StringInquirer } from "../lib/string-inquirer.js";
+import { inquiry } from "../lib/core-ext/string/inquiry.js";
 import { EnvironmentInquirer } from "../lib/environment-inquirer.js";
 import {
   assertNotPredicate,

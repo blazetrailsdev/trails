@@ -167,7 +167,7 @@ describe("TimeZoneTest", () => {
     withEnvTz("US/Eastern", () => {
       const zone = TimeZone.create("Eastern Time (US & Canada)");
       Object.assign(zone, {
-        timeNow: () => new Date(Time.local(2000).toZonedDateTime().epochMilliseconds),
+        timeNow: () => Time.local(2000),
       });
       expect(zone.now()).toBeInstanceOf(TimeWithZone);
       expect(zone.now().utc()).toEqual(Time.utc(2000, 1, 1, 5));
@@ -180,7 +180,7 @@ describe("TimeZoneTest", () => {
     withEnvTz("US/Eastern", () => {
       const zone = TimeZone.create("Eastern Time (US & Canada)");
       Object.assign(zone, {
-        timeNow: () => new Date(Time.local(2006, 4, 2, 2).toZonedDateTime().epochMilliseconds),
+        timeNow: () => Time.local(2006, 4, 2, 2),
       });
 
       expect(zone.now().time).toEqual(Time.utc(2006, 4, 2, 3));
@@ -192,7 +192,7 @@ describe("TimeZoneTest", () => {
     withEnvTz("US/Eastern", () => {
       const zone = TimeZone.create("Eastern Time (US & Canada)");
       Object.assign(zone, {
-        timeNow: () => new Date(Time.at(1162098000).toZonedDateTime().epochMilliseconds),
+        timeNow: () => Time.at(1162098000),
       });
       expect(zone.now().time).toEqual(Time.utc(2006, 10, 29, 1));
       expect(zone.now().dst()).toEqual(true);

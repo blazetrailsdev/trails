@@ -410,8 +410,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // it generates with live in one file here, so the reopening follows
   // redefine_method.rb's entry above rather than claiming its own path.
   "activesupport:core_ext/class/attribute.rb": "class-attribute.ts",
-  "activesupport:core_ext/array/inquiry.rb": "array-inquirer.ts",
-  "activesupport:core_ext/string/inquiry.rb": "string-inquirer.ts",
   "activesupport:inflector/transliterate.rb": "transliterate.ts",
   // ARTest's `expand_config` is typed on `NamedConnection` and
   // `ARUNIT_ENTRY_NAMES`, both declared in connection.ts, which already imports
