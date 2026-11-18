@@ -1,4 +1,4 @@
-import { Dir, File, extend, include, type Extended, type Included } from "@blazetrails/ruby-compat";
+import { Dir, File, extend, include, type Included } from "@blazetrails/ruby-compat";
 import {
   ActiveRecordMigration,
   Base,
@@ -26,13 +26,6 @@ export class UpdateGenerator extends Base {
 
     this.methodAdded("copyNewMigrations");
   }
-
-  declare static migrationLookupAt: Extended<typeof ClassMethods>["migrationLookupAt"];
-  declare static isMigrationExists: Extended<typeof ClassMethods>["isMigrationExists"];
-  declare static currentMigrationNumber: Extended<typeof ClassMethods>["currentMigrationNumber"];
-  declare static nextMigrationNumber: Extended<
-    typeof ActiveRecordMigration.ClassMethods
-  >["nextMigrationNumber"];
 
   async copyNewMigrations(): Promise<void> {
     const sourceRoot = (await (this.constructor as typeof UpdateGenerator).sourceRoot())!;
