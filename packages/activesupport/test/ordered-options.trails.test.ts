@@ -5,6 +5,7 @@
  * reaches only through nested Hashes.
  */
 import { describe, it, expect } from "vitest";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { OrderedOptions } from "../lib/ordered-options.js";
 import { HashWithIndifferentAccess } from "../lib/hash-with-indifferent-access.js";
 
@@ -56,5 +57,19 @@ describe("OrderedOptions method_missing in the prototype chain", () => {
     expect(Object.keys(options)).not.toContain("foo");
     expect(options instanceof Sub).toBe(true);
     expect(Object.getPrototypeOf(options)).toBe(Sub.prototype);
+  });
+});
+
+describe("OrderedOptions Hash#==", () => {
+  it("compares equal to a Hash of the same contents in both orders", () => {
+    const options = new OrderedOptions();
+    options.set("a", 1);
+    const nested = new OrderedOptions();
+    nested.set("b", 2);
+    options.set("nested", nested);
+    expect(rbEqual({ a: 1, nested: { b: 2 } }, options)).toBe(true);
+    expect(rbEqual(options, { a: 1, nested: { b: 2 } })).toBe(true);
+    expect(rbEqual({ a: 1, nested: { b: 3 } }, options)).toBe(false);
+    expect(rbEqual(options, { a: 1, nested: { b: 3 } })).toBe(false);
   });
 });

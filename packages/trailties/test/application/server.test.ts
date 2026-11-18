@@ -50,7 +50,7 @@ describe("ServerTest", () => {
     app.server(() => {
       output.push("Hello world");
     });
-    Trails.logger = new BroadcastLogger(new Logger(null));
+    Trails.logger = new BroadcastLogger(new Logger(null)) as unknown as Logger;
     vi.spyOn(Trails, "initialize").mockResolvedValue(app);
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(Handler.Node, "run").mockImplementation((async () => {

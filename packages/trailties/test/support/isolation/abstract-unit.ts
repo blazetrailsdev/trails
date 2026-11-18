@@ -16,6 +16,7 @@ import {
   setEnv,
 } from "@blazetrails/ruby-compat";
 import { Dependencies } from "@blazetrails/activesupport";
+import { MethodCallAssertions } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Stream } from "@blazetrails/activesupport/testing/stream";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { MockRequest } from "@blazetrails/rack";
@@ -550,6 +551,7 @@ include(TestCase, Rack);
 include(TestCase, Generation);
 include(TestCase, Reload);
 include(TestCase, Stream);
+include(TestCase, MethodCallAssertions);
 
 async function withEnv<T>(
   this: TestCase,

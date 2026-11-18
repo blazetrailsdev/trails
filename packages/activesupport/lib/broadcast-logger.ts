@@ -1,32 +1,35 @@
 import { NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { Logger, type LogLevel } from "./logger.js";
+import { LoggerSilence } from "./logger-silence.js";
+import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";
 import { ActiveSupport } from "./namespaces.js";
 
-export class BroadcastLogger extends Logger {
-  public broadcasts: Logger[] = [];
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerSilence` (`broadcast_logger.rb:75`); the class/interface merge is how `include()` surfaces on the type side.
+export class BroadcastLogger {
+  declare static silencer: boolean;
+  declare static setSilencer: (silencer: boolean) => void;
 
-  static silencer: boolean = true;
+  public broadcasts: (Logger | BroadcastLogger)[];
 
-  static setSilencer(silencer: boolean): void {
-    this.silencer = silencer;
-  }
+  protected _formatter: Logger["formatter"] = null;
 
-  constructor(...loggers: Logger[]) {
-    super(null);
-    this._formatter = null;
+  progname: unknown;
+
+  constructor(...loggers: (Logger | BroadcastLogger)[]) {
     this.broadcasts = [];
     this.progname = "Broadcast";
 
     this.broadcastTo(...loggers);
   }
 
-  broadcastTo(...loggers: Logger[]): this {
+  broadcastTo(...loggers: (Logger | BroadcastLogger)[]): this {
     this.broadcasts.push(...loggers);
     return this;
   }
 
   /** @missingRailsCall delete — PERMANENT */
-  stopBroadcastingTo(logger: Logger): this {
+  stopBroadcastingTo(logger: Logger | BroadcastLogger): this {
     this.broadcasts = this.broadcasts.filter((l) => l !== logger);
     return this;
   }
@@ -54,7 +57,10 @@ export class BroadcastLogger extends Logger {
   }
 
   get localLevel(): number | null {
-    return super.localLevel;
+    return Object.getOwnPropertyDescriptor(
+      LoggerThreadSafeLevel.prototype,
+      "localLevel",
+    )!.get!.call(this) as number | null;
   }
 
   set formatter(value: Logger["formatter"]) {
@@ -163,7 +169,7 @@ export class BroadcastLogger extends Logger {
     return copy;
   }
 
-  private dispatch(block: (logger: Logger) => void): boolean {
+  private dispatch(block: (logger: Logger | BroadcastLogger) => void): boolean {
     this.broadcasts?.forEach((logger) => block(logger));
     return true;
   }
@@ -188,6 +194,15 @@ export class BroadcastLogger extends Logger {
     return this.broadcasts.some((logger) => rbObjRespondTo(logger, method));
   }
 }
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the class/interface merge is how `include()` surfaces on the type side. */
+export interface BroadcastLogger {
+  get silencer(): boolean;
+  setSilencer(silencer: boolean): void;
+  logAt<T>(level: number | LogLevel, fn: () => T): T;
+  silence<T>(severity?: number | LogLevel, fn?: (logger: this) => T): T | undefined;
+}
+include(BroadcastLogger, LoggerSilence);
 
 BroadcastLogger.prototype.log = BroadcastLogger.prototype.add;
 

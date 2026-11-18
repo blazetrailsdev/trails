@@ -55,8 +55,7 @@ describe("EncryptedConfigurationTest", () => {
     assertEqual("bar", creds.something.nested.foo);
     assertEqual(["something"], creds.keys());
     assertEqual(["good", "bad", "nested"], creds.something.keys());
-    const something = { ...creds.something.toH(), nested: creds.something.nested.toH() };
-    assertEqual({ good: true, bad: false, nested: { foo: "bar" } }, something);
+    assertEqual({ good: true, bad: false, nested: { foo: "bar" } }, creds.something);
   });
   it("reading comment-only configuration", async () => {
     await credentials.write("# comment");

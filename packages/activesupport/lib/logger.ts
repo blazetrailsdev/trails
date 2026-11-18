@@ -8,7 +8,9 @@ import {
 import { File } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import { include } from "@blazetrails/ruby-compat/include";
-import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";
+import { LoggerSilence } from "./logger-silence.js";
+
+import type { BroadcastLogger } from "./broadcast-logger.js";
 
 export type { LoggerFormatter } from "@blazetrails/ruby-compat";
 
@@ -34,27 +36,16 @@ const defaultOutput: LoggerOutput = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerThreadSafeLevel` (`logger_silence.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerSilence` (`logger.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
 export class Logger extends RubyLogger {
-  static silencer: boolean = true;
+  declare static silencer: boolean;
+  declare static setSilencer: (silencer: boolean) => void;
 
-  static setSilencer(silencer: boolean): void {
-    this.silencer = silencer;
-  }
-
-  get silencer(): boolean {
-    return (this.constructor as typeof Logger).silencer;
-  }
-
-  setSilencer(silencer: boolean): void {
-    (this.constructor as typeof Logger).setSilencer(silencer);
-  }
-
-  static isLoggerOutputsTo(logger: Logger, ...sources: unknown[]): boolean {
-    const loggers: Logger[] =
+  static isLoggerOutputsTo(logger: Logger | BroadcastLogger, ...sources: unknown[]): boolean {
+    const loggers: (Logger | BroadcastLogger)[] =
       logger instanceof ActiveSupport.BroadcastLogger ? logger.broadcasts : [logger];
 
-    const logdevs = loggers.map((logger) => logger.logdev);
+    const logdevs = loggers.map((logger) => (logger as { logdev?: Logger["logdev"] }).logdev);
     const loggerSources = logdevs
       .map((logdev) => logdev?.filename ?? logdev?.dev)
       .filter((source) => source != null);
@@ -82,10 +73,6 @@ export class Logger extends RubyLogger {
     super.level = severity;
   }
 
-  silence<T>(severity: number | LogLevel = Logger.ERROR, fn?: (logger: this) => T): T | undefined {
-    return this.silencer ? this.logAt(severity, () => fn?.(this)) : fn?.(this);
-  }
-
   private static normalizeSources(sources: unknown[]): unknown[] {
     return sources.map((source) => {
       if (typeof (source as { path?: unknown })?.path === "string") {
@@ -102,8 +89,11 @@ export interface Logger {
   get localLevel(): number | null;
   set localLevel(level: number | LogLevel | null);
   logAt<T>(level: number | LogLevel, fn: () => T): T;
+  get silencer(): boolean;
+  setSilencer(silencer: boolean): void;
+  silence<T>(severity?: number | LogLevel, fn?: (logger: this) => T): T | undefined;
 }
-include(Logger, LoggerThreadSafeLevel);
+include(Logger, LoggerSilence);
 
 export class SimpleFormatter extends RubyLogger.Formatter {
   override call(severity: string, timestamp: unknown, progname: unknown, msg: unknown): string {
