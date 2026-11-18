@@ -93,6 +93,8 @@ export interface Logger {
 }
 include(Logger, LoggerSilence);
 
+ActiveSupport.Logger = Logger;
+
 export class SimpleFormatter extends RubyLogger.Formatter {
   override call(severity: string, timestamp: unknown, progname: unknown, msg: unknown): string {
     return `${typeof msg === "string" ? msg : rbInspect(msg)}\n`;
