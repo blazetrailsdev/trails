@@ -148,14 +148,10 @@ export interface TestHelper {
   _oldPubsubAdapter: unknown;
   beforeSetup(): unknown;
   afterTeardown(): unknown;
-  assertBroadcasts(
-    ...args: Parameters<typeof assertBroadcasts>
-  ): ReturnType<typeof assertBroadcasts>;
+  assertBroadcasts(stream: string, number: number, block?: Block): Promise<void>;
   assertNoBroadcasts: typeof assertNoBroadcasts;
   captureBroadcasts: typeof captureBroadcasts;
-  assertBroadcastOn(
-    ...args: Parameters<typeof assertBroadcastOn>
-  ): ReturnType<typeof assertBroadcastOn>;
+  assertBroadcastOn(stream: string, data: unknown, block?: Block): Promise<void>;
   pubsubAdapter: typeof pubsubAdapter;
   broadcasts(stream: string): unknown[];
   clearMessages(stream: string): unknown[];
