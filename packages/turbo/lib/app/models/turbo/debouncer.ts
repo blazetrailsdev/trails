@@ -5,16 +5,21 @@ export class Debouncer {
   static readonly DEFAULT_DELAY = 0.5;
 
   readonly delay: number;
-  scheduledTask: ScheduledTask | null;
+  /** @internal */
+  private _scheduledTask: ScheduledTask | null;
+
+  get scheduledTask(): ScheduledTask | null {
+    return this._scheduledTask;
+  }
 
   constructor({ delay = Debouncer.DEFAULT_DELAY }: { delay?: number } = {}) {
     this.delay = delay;
-    this.scheduledTask = null;
+    this._scheduledTask = null;
   }
 
   debounce(block: () => unknown): ScheduledTask {
     if (!this.scheduledTask?.isComplete()) this.scheduledTask?.cancel();
-    return (this.scheduledTask = ScheduledTask.execute(this.delay, {}, block));
+    return (this._scheduledTask = ScheduledTask.execute(this.delay, {}, block));
   }
 
   wait(): Promise<unknown> | undefined {

@@ -142,6 +142,7 @@ export class Engine extends TrailsEngine {
       });
     });
 
+    /** @missingRailsCall include — CONVERGEABLE turbo-test-helpers */
     this.initializer("turbo.test_assertions", () => {
       onLoad("active_support_test_case", () => {
         ThreadDebouncer.debouncerClass = ImmediateDebouncer;

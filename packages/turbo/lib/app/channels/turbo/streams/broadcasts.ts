@@ -202,7 +202,9 @@ export const Broadcasts = {
     if (render === false) {
       return null;
     } else {
-      return content || html || (isPresent(rest) ? await this.renderFormat(":html", rest) : null);
+      if (content != null && content !== false) return content;
+      if (html != null && html !== false) return html;
+      return isPresent(rest) ? await this.renderFormat(":html", rest) : null;
     }
   },
 };
