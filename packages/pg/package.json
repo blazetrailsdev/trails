@@ -1,0 +1,42 @@
+{
+  "name": "@blazetrails/pg",
+  "version": "0.1.0",
+  "description": "The PostgreSQL client, mirroring Ruby's pg gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "peerDependencies": {
+    "pg": "^8.19.0"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "mirrors": [
+    {
+      "source": "pg",
+      "ref": "v1.5.9",
+      "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
+    }
+  ]
+}

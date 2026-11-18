@@ -45,7 +45,6 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   "activerecord-test-support": "activerecord",
   "rails-dom-testing": "actionview",
   mysql2: "activerecord",
-  pg: "activerecord",
   sqlite3: "activerecord",
   racc: "nokogiri",
   "rails-html-sanitizer": "html-sanitizer",
@@ -117,7 +116,6 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   actionpackversion: "action-pack",
   "rails-dom-testing": "rails-dom-testing",
   mysql2: "mysql2",
-  pg: "pg",
   sqlite3: "sqlite",
   racc: "racc",
   loofah: "loofah",
@@ -135,10 +133,22 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
  */
 export function overlappingSubDirs(pkg: string): string[] {
   const own = packageSrcDir(pkg);
-  return PACKAGES.filter((other) => other !== pkg)
-    .map(packageSrcDir)
-    .filter((dir) => dir.startsWith(own + path.sep));
+  return [
+    ...PACKAGES.filter((other) => other !== pkg)
+      .map(packageSrcDir)
+      .filter((dir) => dir.startsWith(own + path.sep)),
+    ...(UNSCORED_SUBDIRS[pkg] ?? []).map((sub) => path.join(own, sub)),
+  ];
 }
+
+/**
+ * Dirs inside a package's src that no package scores: a gem port's files
+ * still awaiting their move into the gem's own package (RFC 0186's
+ * `pg-*-moves-to-the-package` stories empty `activerecord/lib/pg`).
+ */
+export const UNSCORED_SUBDIRS: Record<string, string[]> = {
+  activerecord: ["pg"],
+};
 
 /** A package's extraction roots, as the freshness guards need them. */
 export interface PackageRoots {

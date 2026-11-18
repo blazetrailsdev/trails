@@ -1,6 +1,6 @@
 import pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
-import { ConnectionBad, Error as PGError, ServerError, UnableToSend } from "./exceptions.js";
+import { ConnectionBad, Error as PGError, ServerError, UnableToSend } from "@blazetrails/pg";
 import { PG } from "./pg.js";
 
 export type PGConnection = Connection;
@@ -10,14 +10,6 @@ type Query = (config: QueryConfig) => Promise<pg.QueryResult | pg.QueryResult[]>
 
 const OID_BYTEA = 17;
 const OID_BYTEA_ARRAY = 1001;
-
-const PQTRANS_IDLE = 0;
-const PQTRANS_ACTIVE = 1;
-const PQTRANS_INTRANS = 2;
-const PQTRANS_INERROR = 3;
-
-const CONNECTION_OK = 0;
-const CONNECTION_BAD = 1;
 
 type Protocol = pg.Connection & {
   connect(portOrPath: string | number, host?: string): void;
@@ -68,7 +60,9 @@ export class Connection {
     try {
       return Promise.resolve(
         (this.client.query as unknown as (...args: unknown[]) => unknown)(...args),
-      ).catch((error: unknown) => raise(this, error)) as Promise<pg.QueryResult>;
+      ).catch((error: unknown) => {
+        throw pgError(this, error);
+      }) as Promise<pg.QueryResult>;
     } catch (error) {
       return Promise.reject(pgError(this, error));
     }
@@ -78,7 +72,7 @@ export class Connection {
     try {
       await this.client.end();
     } catch (error) {
-      raise(this, error);
+      throw pgError(this, error);
     }
   }
 
@@ -94,14 +88,16 @@ export class Connection {
   }
 
   connect(): Promise<unknown> {
-    return this.client.connect().catch((error: unknown) => raise(this, error, ConnectionBad));
+    return this.client.connect().catch((error: unknown) => {
+      throw pgError(this, error, ConnectionBad);
+    });
   }
 
   status(): number {
     const { _ending, _ended, _queryable } = this.client;
     return this.bad || _ending === true || _ended === true || _queryable === false
-      ? CONNECTION_BAD
-      : CONNECTION_OK;
+      ? PG.CONNECTION_BAD
+      : PG.CONNECTION_OK;
   }
 
   async reset(): Promise<void> {
@@ -125,19 +121,21 @@ export class Connection {
     await client
       .end()
       .then(() => conn.connect())
-      .catch((error: unknown) => raise(this, error, ConnectionBad));
+      .catch((error: unknown) => {
+        throw pgError(this, error, ConnectionBad);
+      });
     this.client = conn;
   }
 
   transactionStatus(): number {
-    if (this.client._activeQuery != null) return PQTRANS_ACTIVE;
+    if (this.client._activeQuery != null) return PG.PQTRANS_ACTIVE;
     switch (this.readyForQuery) {
       case "T":
-        return PQTRANS_INTRANS;
+        return PG.PQTRANS_INTRANS;
       case "E":
-        return PQTRANS_INERROR;
+        return PG.PQTRANS_INERROR;
       default:
-        return PQTRANS_IDLE;
+        return PG.PQTRANS_IDLE;
     }
   }
 
@@ -170,7 +168,9 @@ export class Connection {
         values: params.map(param),
         rowMode: "array",
         types: types(this),
-      }).catch((error: unknown) => raise(this, error)),
+      }).catch((error: unknown) => {
+        throw pgError(this, error);
+      }),
     );
   }
 
@@ -178,7 +178,9 @@ export class Connection {
     return result(
       await (this.query as unknown as Query)(
         sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
-      ).catch((error: unknown) => raise(this, error)),
+      ).catch((error: unknown) => {
+        throw pgError(this, error);
+      }),
     );
   }
 
@@ -264,7 +266,9 @@ export class Connection {
         values: params.map(param),
         rowMode: "array",
         types: types(this),
-      }).catch((error: unknown) => raise(this, error)),
+      }).catch((error: unknown) => {
+        throw pgError(this, error);
+      }),
     );
   }
 
@@ -409,10 +413,6 @@ function pgError(conn: Connection, error: unknown, klass?: typeof PGError): unkn
     conn.bad = true;
   }
   return wrapped;
-}
-
-function raise(conn: Connection, error: unknown, klass?: typeof PGError): never {
-  throw pgError(conn, error, klass);
 }
 
 function result(raw: pg.QueryResult | pg.QueryResult[]): PG.Result {

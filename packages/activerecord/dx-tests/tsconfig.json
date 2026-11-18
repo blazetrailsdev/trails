@@ -61,6 +61,7 @@
       "@blazetrails/ruby-compat": ["../../ruby-compat/lib/index.ts"],
       "@blazetrails/html-sanitizer": ["../../html-sanitizer/lib/index.ts"],
       "@blazetrails/msgpack": ["../../msgpack/lib/index.ts"],
+      "@blazetrails/pg": ["../../pg/lib/index.ts"],
       "@blazetrails/nokogiri": ["../../nokogiri/lib/index.ts"],
       "@blazetrails/builder": ["../../builder/lib/builder.ts"],
       "@blazetrails/bcrypt": ["../../bcrypt/lib/index.ts"],

@@ -39,9 +39,13 @@
     "node": ">=26"
   },
   "peerDependencies": {
+    "@blazetrails/pg": "workspace:*",
     "pg": ">=8.19.0"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/pg": {
+      "optional": true
+    },
     "pg": {
       "optional": true
     },
@@ -51,6 +55,7 @@
   },
   "devDependencies": {
     "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/pg": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
     "@rails/actioncable": "8.0.200",
     "ioredis": "^6.0.0"

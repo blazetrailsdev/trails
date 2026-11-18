@@ -1,4 +1,5 @@
 import { TopLevel } from "@blazetrails/activesupport";
+import "@blazetrails/pg";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import {
   OpenSSL,

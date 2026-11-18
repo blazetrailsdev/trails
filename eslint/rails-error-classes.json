@@ -1395,6 +1395,7 @@
     "rack-proxy": {},
     "rack-session": {},
     "rack-test": {},
+    "pg": {},
     "thor": {
       "base.ts": {
         "*": {
@@ -1434,6 +1435,7 @@
     "rack-proxy": [],
     "rack-session": [],
     "rack-test": [],
+    "pg": [],
     "thor": []
   }
 }
