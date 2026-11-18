@@ -5282,7 +5282,9 @@ describe("buildReport — a RUBY_FILE_TS_OVERRIDES row onto a path-mirrored file
     const pkg = report.packages[0];
     expect(pkg.totalMoved).toBe(0);
     expect(pkg.extraFiles).toEqual([]);
-    expect(pkg.totalInternal).toBe(2);
+    // `renderDependencies` is private in the mirrored erb_tracker.rb, so only
+    // `explicitDependencies` (private in ruby_tracker.rb) is counted.
+    expect(pkg.totalInternal).toBe(1);
   });
 });
 
@@ -5325,5 +5327,35 @@ describe("thor scoring across lanes", () => {
       ]),
     );
     expect(extras(manifest({ thor: thorRuby, arel }))).toEqual(alone);
+  });
+});
+
+describe("countTsInternalNames — Rails-backed privates", () => {
+  const memoize = (): ClassInfo =>
+    ({
+      name: "Memoize",
+      file: "backend/memoize.ts",
+      instanceMethods: [
+        { name: "lookup", visibility: "protected", internal: true, params: [] },
+        { name: "invented", visibility: "public", internal: true, params: [] },
+      ],
+      classMethods: [],
+    }) as unknown as ClassInfo;
+
+  it("does not count an @internal member the mirrored .rb declares private", () => {
+    expect(
+      countTsInternalNames(
+        "backend/memoize.ts",
+        [memoize()],
+        [],
+        undefined,
+        [],
+        new Set(["lookup"]),
+      ),
+    ).toBe(1);
+  });
+
+  it("counts an @internal member with no Rails-private counterpart", () => {
+    expect(countTsInternalNames("backend/memoize.ts", [memoize()], [], undefined, [])).toBe(2);
   });
 });
