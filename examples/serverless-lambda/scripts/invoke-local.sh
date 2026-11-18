@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Run build/pkg under AWS's Lambda nodejs:26 image (Runtime Interface Emulator) and invoke it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 docker rm -f trails-lambda-rie >/dev/null 2>&1 || true

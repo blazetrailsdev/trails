@@ -1,6 +1,3 @@
-// esbuild bundle for a serverless target. Drivers for adapters the app does not use are
-// replaced by a stub: esbuild hoists an external import to the top of an ESM bundle even when
-// only a lazily-imported adapter file reaches it, so "external" would make them load-time deps.
 import { build } from "esbuild";
 
 const UNUSED_DRIVERS = (

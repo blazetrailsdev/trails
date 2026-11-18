@@ -1,12 +1,14 @@
-import { requestToRackEnvWithBody, rackResponseToFetchResponse } from "./rack-bridge.ts";
+import {
+  requestToRackEnvWithBody,
+  rackResponseToFetchResponse,
+} from "../../../packages/website/src/lib/frontiers/rack-bridge.ts";
 import { Trails } from "@blazetrails/trailties";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
-import { copyFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-// Lambda's /var/task is read-only; SQLite wants a writable file beside its journal.
 if (process.env.SPIKE_DB_SEED && process.env.SQLITE_PATH && !existsSync(process.env.SQLITE_PATH)) {
-  copyFileSync(process.env.SPIKE_DB_SEED, process.env.SQLITE_PATH);
+  writeFileSync(process.env.SQLITE_PATH, readFileSync(process.env.SPIKE_DB_SEED));
 }
 
 export const bootTiming: Record<string, number> = { moduleEval: performance.now() };
@@ -14,13 +16,10 @@ let booted: Promise<typeof Trails.application> | undefined;
 function boot() {
   return (booted ??= (async () => {
     bootTiming.bootStart = performance.now();
-    // `trails build` (scripts/build.sh) writes it, so it is absent until the first build.
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     await import("../.trails/entry.generated.js");
     bootTiming.initDone = performance.now();
-    // Boot flushes idle connections, and a model's first synchronous attribute read then leases an
-    // unconnected one whose type map is unloaded; verify one here so that lease finds it warm.
     const { Base } = await import("@blazetrails/activerecord");
     await Base.connectionPool().withConnection((conn) => conn.verifyBang());
     bootTiming.connected = performance.now();
@@ -107,6 +106,4 @@ export async function handler(
   };
 }
 
-// Boot during Lambda's INIT phase (CPU-boosted, and unbilled for on-demand functions)
-// rather than inside the first invocation.
 if (process.env.AWS_LAMBDA_FUNCTION_NAME) await boot();

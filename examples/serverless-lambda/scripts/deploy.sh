@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-# Create or update the Lambda function and its public Function URL.
-#   LAMBDA_ROLE_ARN=arn:aws:iam::<acct>:role/<role> scripts/deploy.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 FN=${FUNCTION_NAME:-trails-serverless-lambda}
 ENV='Variables={TRAILS_ENV=production,SQLITE_PATH=/tmp/spike.sqlite3,SPIKE_DB_SEED=db/spike.sqlite3}'
-# Postgres (RDS in a VPC): PGHOST, PGUSER, PGPASSWORD, VPC_SUBNETS (csv), VPC_SECURITY_GROUP.
 if [ -n "${PGHOST:-}" ]; then
   ENV="Variables={TRAILS_ENV=production,PGHOST=$PGHOST,PGUSER=$PGUSER,PGPASSWORD=$PGPASSWORD,PGDATABASE=${PGDATABASE:-trails}}"
 fi

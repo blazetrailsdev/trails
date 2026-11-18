@@ -1,4 +1,3 @@
-// Writes db/spike.sqlite3, the read-only seed the Lambda copies to /tmp at cold start.
 import { DatabaseSync } from "node:sqlite";
 import { rmSync } from "node:fs";
 

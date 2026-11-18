@@ -192,7 +192,6 @@ async function writeBoot(
     'import { registerCompiledFiles } from "@blazetrails/ruby-compat";',
     'import { Application } from "@blazetrails/trailties";',
     "",
-    "// Rooted as Application.findRoot roots the app, so a bundle that inlines this file still matches.",
     "registerCompiledFiles(Application.findRoot(import.meta.dirname), {",
     ...entries,
     "});",

@@ -8,7 +8,10 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "@blazetrails/rack": ["./node_modules/@blazetrails/rack/dist/index.d.ts"]
+    }
   },
   "include": ["app", "config", "serverless"]
 }

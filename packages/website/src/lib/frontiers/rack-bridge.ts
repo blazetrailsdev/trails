@@ -115,8 +115,6 @@ export async function rackResponseToFetchResponse(rackResponse: RackResponse): P
   try {
     const responseBody = NULL_BODY_STATUSES.has(status) ? null : await collectBody(body);
 
-    // Rack 3 carries a repeated header (set-cookie) as an Array; new Headers(record)
-    // would comma-join it into one value.
     const fetchHeaders = new Headers();
     for (const [name, value] of Object.entries(headers)) {
       for (const v of Array.isArray(value) ? value : [value]) {
@@ -138,7 +136,6 @@ async function collectBody(body: RackBody): Promise<string | Uint8Array> {
   let hasBinary = false;
 
   for await (const raw of body as AsyncIterable<unknown>) {
-    // A rendered view yields ActiveSupport::SafeBuffer chunks, not primitives.
     const chunk = raw instanceof Uint8Array ? raw : String(raw);
     if (typeof chunk === "string") {
       if (hasBinary) {
