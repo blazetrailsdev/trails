@@ -23,13 +23,13 @@ describe("BootGuardsTest", () => {
   it("a fork guard times out when boot doesn't complete within the configured timeout", async () => {
     guard = new ForkGuard();
 
-    expect(guard.isCompleted()).toBe(false);
-    expect(guard.isTimedOut()).toBe(false);
+    expect(guard.isCompleted()).toBeFalsy();
+    expect(guard.isTimedOut()).toBeFalsy();
 
     await sleep(SolidQueue.forkBootTimeout.toF());
 
-    expect(guard.isCompleted()).toBe(false);
-    expect(guard.isTimedOut()).toBe(true);
+    expect(guard.isCompleted()).toBeFalsy();
+    expect(guard.isTimedOut()).toBeTruthy();
   });
 
   it.skip("a fork guard completed from the forked process doesn't time out", () => {});
@@ -40,11 +40,11 @@ describe("BootGuardsTest", () => {
     guard = new NullGuard();
 
     expect(guard.isCompleted()).toBeFalsy();
-    expect(guard.isTimedOut()).toBe(false);
+    expect(guard.isTimedOut()).toBeFalsy();
 
     guard.complete();
 
-    expect(guard.isCompleted()).toBe(true);
-    expect(guard.isTimedOut()).toBe(false);
+    expect(guard.isCompleted()).toBeTruthy();
+    expect(guard.isTimedOut()).toBeFalsy();
   });
 });

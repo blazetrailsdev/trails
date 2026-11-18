@@ -244,3 +244,4 @@ export class ForkGuard {
 }
 
 export const BootGuards = { NullGuard, ForkGuard };
+SolidQueue.Processes.BootGuards = BootGuards;

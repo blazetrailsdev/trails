@@ -1,3 +1,4 @@
+import { ActiveJob } from "@blazetrails/activejob";
 import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
 import {
   Concern,
@@ -138,3 +139,4 @@ Object.defineProperty(ConcurrencyControls, "CONCURRENCY_ON_CONFLICT_BEHAVIOUR", 
   });
   classAttribute.call(this, "concurrencyOnConflict", { default: "block" });
 });
+ActiveJob.ConcurrencyControls = ConcurrencyControls;

@@ -113,7 +113,7 @@ export const SolidQueue = {
   },
 } as {
   name: string;
-  Processes: { name: string };
+  Processes: { name: string; BootGuards?: typeof import("./processes/runnable.js").BootGuards };
   DEFAULT_LOGGER: Logger;
   logger: Logger;
   appExecutor: { wrap<T>(block: () => T, options?: { source?: string }): T } | null;

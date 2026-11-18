@@ -795,30 +795,34 @@ export class CallbackSequence {
     if (arg.halted) return true;
     if (!this.userConditions) return false;
     const conditions = this.userConditions;
-    for (let i = 0; i < conditions.length; i++) {
-      const r: unknown = conditions[i](arg.target, arg.value);
-      if (!isThenable(r)) {
-        if (r == null || r === false) return true;
-        continue;
-      }
-      /** @inventedArm throw — PERMANENT */
-      if (arg.syncChain !== undefined) {
-        new Thread(() => r);
-        throw new RuntimeError(
-          `Async callback on sync chain "${arg.syncChain}" — around condition returned a Promise`,
-        );
-      }
-      return (async () => {
-        const first = await r;
-        if (first == null || first === false) return true;
-        for (const c of conditions.slice(i + 1)) {
-          const rest: unknown = await c(arg.target, arg.value);
-          if (rest == null || rest === false) return true;
-        }
-        return false;
-      })();
+    let pending: PromiseLike<unknown> | null = null;
+    let rest = 0;
+    const all = conditions.every((c, i) => {
+      const r: unknown = c(arg.target, arg.value);
+      if (!isThenable(r)) return r != null && r !== false;
+      pending = r;
+      rest = i + 1;
+      return false;
+    });
+    if (pending === null) return !all;
+    /** @inventedArm throw — PERMANENT */
+    if (arg.syncChain !== undefined) {
+      const thenable: PromiseLike<unknown> = pending;
+      new Thread(() => thenable);
+      throw new RuntimeError(
+        `Async callback on sync chain "${arg.syncChain}" — around condition returned a Promise`,
+      );
     }
-    return false;
+    const awaited: PromiseLike<unknown> = pending;
+    return (async () => {
+      const first = await awaited;
+      if (first == null || first === false) return true;
+      for (const c of conditions.slice(rest)) {
+        const r: unknown = await c(arg.target, arg.value);
+        if (r == null || r === false) return true;
+      }
+      return false;
+    })();
   }
 
   isFinal(): boolean {
