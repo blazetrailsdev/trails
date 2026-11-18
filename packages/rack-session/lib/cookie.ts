@@ -221,7 +221,7 @@ export class Cookie extends PersistedSecure {
     return data;
   }
 
-  static SessionId = class SessionId extends DelegateClass(SessionSessionId) {
+  static SessionId = class extends DelegateClass(SessionSessionId) {
     /** @internal */
     _cookieValue: string;
 

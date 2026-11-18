@@ -304,7 +304,7 @@ export class V6_1 extends V7_0 {
 }
 
 export class V6_0 extends V6_1 {
-  static ReferenceDefinition: typeof ConnectionAdaptersReferenceDefinition = class ReferenceDefinition extends ConnectionAdaptersReferenceDefinition {
+  static ReferenceDefinition: typeof ConnectionAdaptersReferenceDefinition = class extends ConnectionAdaptersReferenceDefinition {
     override indexOptions(_tableName: string): AddIndexOptions {
       return this.asOptions(this.index);
     }

@@ -76,7 +76,6 @@ import {
 import { Post as HmPost } from "../../models/post.js";
 import { Tag as HmTag } from "../../models/tag.js";
 import { Tyre } from "../../models/tyre.js";
-import { Car as HmCar } from "../../models/car.js";
 import { Bulb as HmBulb, FailedBulb } from "../../models/bulb.js";
 import { Tagging as HmTagging } from "../../models/tagging.js";
 import {
@@ -332,7 +331,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("has many build with options", async () => {
-    const car = await HmCar.create({});
+    const car = await Car.create({});
     await HmBulb.create({ name: "defaulty", car_id: car.id });
     const carBulbs = await (car as any).bulbs;
     const scopedBulbs = await HmBulb.where({ name: "defaulty", car_id: car.id });
@@ -450,7 +449,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("create from association with nil values should work", async () => {
-    const car = await HmCar.create({});
+    const car = await Car.create({});
     const bulb1 = (car as any).bulbs.new({});
     expect(bulb1.name).toBe("defaulty");
     const bulb2 = (car as any).bulbs.build({});
@@ -466,7 +465,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("do not call callbacks for delete all", async () => {
-    const car = (await HmCar.create({ name: "honda" })) as any;
+    const car = (await Car.create({ name: "honda" })) as any;
     await car.funkyBulbs.create({});
     expect(await car.funkyBulbs.count()).toBe(1);
     const reloaded = await car.reload();
@@ -2011,7 +2010,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("clearing updates counter cache when inverse counter cache is a symbol with dependent destroy", async () => {
-    const car = (await HmCar.first()) as any;
+    const car = (await Car.first()) as any;
     await car.engines.createBang();
 
     await assertDifference(
@@ -2616,7 +2615,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("counter cache on unloaded association", async () => {
-    const car = (await HmCar.create({ name: "My AppliCar" })) as any;
+    const car = (await Car.create({ name: "My AppliCar" })) as any;
     expect(await car.engines.size()).toBe(0);
   });
 
@@ -3120,7 +3119,7 @@ describe("HasManyAssociationsTest", () => {
     const bulb = new HmBulb({ color: "red" }) as any;
     expect(bulb.color).toBe("RED!");
 
-    const car = (await HmCar.createBang()) as any;
+    const car = (await Car.createBang()) as any;
     await car.bulbs.push(bulb);
 
     expect((await car.bulbs.toArray())[0].color).toBe("RED!");
@@ -3178,16 +3177,16 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("association attributes are available to after initialize", async () => {
-    const car = (await HmCar.create({ name: "honda" })) as any;
+    const car = (await Car.create({ name: "honda" })) as any;
     const bulb = car.bulbs.build();
 
     expect(bulb.attributesAfterInitialize["car_id"]).toBe(car.id);
   });
 
   it("attributes are set when initialized from has many null relationship", async () => {
-    constSet(TopLevel, "Car", HmCar);
+    constSet(TopLevel, "Car", Car);
     constSet(TopLevel, "Bulb", HmBulb);
-    const car = new HmCar({ name: "honda" }) as any;
+    const car = new Car({ name: "honda" }) as any;
     const bulb = await car.bulbs.where({ name: "headlight" }).firstOrInitialize();
     expect(bulb.name).toBe("headlight");
   });
@@ -3203,7 +3202,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("replace", async () => {
-    const car = (await HmCar.create({ name: "honda" })) as any;
+    const car = (await Car.create({ name: "honda" })) as any;
     const bulb1 = await car.bulbs.create({});
     const bulb2 = await HmBulb.create({});
 
@@ -3215,7 +3214,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("replace returns target", async () => {
-    const car = (await HmCar.create({ name: "honda" })) as any;
+    const car = (await Car.create({ name: "honda" })) as any;
     const bulb1 = await car.bulbs.create({});
     const bulb2 = await car.bulbs.create({});
     const bulb3 = await HmBulb.create({});
@@ -3362,7 +3361,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("can unscope the default scope of the associated model", async () => {
-    const car = await HmCar.create({});
+    const car = await Car.create({});
     const bulb1 = await HmBulb.create({ name: "defaulty", car_id: car.id });
     const bulb2 = await HmBulb.create({ name: "other", car_id: car.id });
 
@@ -3372,13 +3371,13 @@ describe("HasManyAssociationsTest", () => {
     const allBulbs = await (car as any).allBulbs.sortBy((b: any) => b.id);
     expect(allBulbs.map((b: any) => b.id)).toEqual([bulb1.id, bulb2.id]);
 
-    const includesCar = (await HmCar.includes(":allBulbs").find(car.id)) as any;
+    const includesCar = (await Car.includes(":allBulbs").find(car.id)) as any;
     expect((await includesCar.allBulbs.sortBy((b: any) => b.id)).map((b: any) => b.id)).toEqual([
       bulb1.id,
       bulb2.id,
     ]);
 
-    const eagerCar = (await HmCar.eagerLoad(":allBulbs").find(car.id)) as any;
+    const eagerCar = (await Car.eagerLoad(":allBulbs").find(car.id)) as any;
     expect((await eagerCar.allBulbs.sortBy((b: any) => b.id)).map((b: any) => b.id)).toEqual([
       bulb1.id,
       bulb2.id,
@@ -3386,7 +3385,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("can unscope and where the default scope of the associated model", async () => {
-    const car = await HmCar.create({});
+    const car = await Car.create({});
     await HmBulb.create({ name: "defaulty", car_id: car.id });
     await HmBulb.create({ name: "other", car_id: car.id });
 
@@ -3398,7 +3397,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("can rewhere the default scope of the associated model", async () => {
-    const car = await HmCar.create({});
+    const car = await Car.create({});
     await HmBulb.create({ name: "defaulty", car_id: car.id });
     await HmBulb.create({ name: "old", car_id: car.id });
 
@@ -3410,20 +3409,20 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("unscopes the default scope of associated model when used with include", async () => {
-    const car = (await HmCar.createBang()) as any;
+    const car = (await Car.createBang()) as any;
     const bulb1 = await HmBulb.createBang({ name: "defaulty", car });
     const bulb2 = await HmBulb.createBang({ name: "other", car });
 
     expect(
       (
-        await ((await HmCar.includes("allBulbs2").find(car.id)) as any).allBulbs2.sortBy(
+        await ((await Car.includes("allBulbs2").find(car.id)) as any).allBulbs2.sortBy(
           (b: any) => b.id,
         )
       ).map(recordId),
     ).toEqual([bulb1, bulb2].map(recordId));
     expect(
       (
-        await ((await HmCar.eagerLoad("allBulbs2").find(car.id)) as any).allBulbs2.sortBy(
+        await ((await Car.eagerLoad("allBulbs2").find(car.id)) as any).allBulbs2.sortBy(
           (b: any) => b.id,
         )
       ).map(recordId),
@@ -3431,7 +3430,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("raises RecordNotDestroyed when replaced child can't be destroyed", async () => {
-    const car = (await HmCar.createBang()) as any;
+    const car = (await Car.createBang()) as any;
     const originalChild = (await FailedBulb.createBang({ car })) as any;
 
     const error = (await assertRaise([RecordNotDestroyed], {}, async () => {
@@ -3505,7 +3504,7 @@ describe("HasManyAssociationsTest", () => {
     const bulb = await HmBulb.createBang();
     const tyre = await Tyre.createBang();
 
-    const car = (await HmCar.createBang({ name: "honda" }, (c: any) => {
+    const car = (await Car.createBang({ name: "honda" }, (c: any) => {
       c.bulbs.push(bulb);
       c.tyres.push(tyre);
     })) as any;
@@ -3518,7 +3517,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("associations replace in memory when records have the same id", async () => {
     const bulb = (await HmBulb.createBang()) as any;
-    const car = (await HmCar.createBang({ name: "honda", bulbs: [bulb] })) as any;
+    const car = (await Car.createBang({ name: "honda", bulbs: [bulb] })) as any;
 
     expect(car.savedChangeToName).toEqual([null, "honda"]);
 
@@ -3531,7 +3530,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("in memory replacement executes no queries", async () => {
     const bulb = await HmBulb.createBang();
-    const car = (await HmCar.createBang({ name: "honda", bulbs: [bulb] })) as any;
+    const car = (await Car.createBang({ name: "honda", bulbs: [bulb] })) as any;
 
     expect(car.savedChangeToName).toEqual([null, "honda"]);
 
@@ -3567,7 +3566,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("in memory replacements sets inverse instance", async () => {
     const bulb = await HmBulb.createBang();
-    const car = (await HmCar.createBang({ name: "honda", bulbs: [bulb] })) as any;
+    const car = (await Car.createBang({ name: "honda", bulbs: [bulb] })) as any;
 
     expect(car.savedChangeToName).toEqual([null, "honda"]);
 
@@ -3578,9 +3577,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("reattach to new objects replaces inverse association and foreign key", async () => {
-    const bulb = (await HmBulb.createBang({ car: await HmCar.createBang() })) as any;
+    const bulb = (await HmBulb.createBang({ car: await Car.createBang() })) as any;
     expect(bulb.car_id).toBeTruthy();
-    const car = new HmCar() as any;
+    const car = new Car() as any;
     await car.bulbs.push(bulb);
     expect(await bulb.car).toBe(car);
     expect(bulb.car_id).toBeNull();
@@ -3589,7 +3588,7 @@ describe("HasManyAssociationsTest", () => {
   it("in memory replacement maintains order", async () => {
     const firstBulb = await HmBulb.createBang();
     const secondBulb = await HmBulb.createBang();
-    const car = (await HmCar.createBang({ name: "honda", bulbs: [firstBulb, secondBulb] })) as any;
+    const car = (await Car.createBang({ name: "honda", bulbs: [firstBulb, secondBulb] })) as any;
 
     expect(car.savedChangeToName).toEqual([null, "honda"]);
 
@@ -3626,7 +3625,7 @@ describe("HasManyAssociationsTest", () => {
         if (await (await record.car).save()) count += 1;
       });
 
-      const car = (await HmCar.createBang()) as any;
+      const car = (await Car.createBang()) as any;
       await car.bulbs.createBang();
 
       expect(count).toBe(1);
@@ -3731,7 +3730,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("ids reader memoization", async () => {
-    const car = (await HmCar.createBang({ name: "Tofaş" })) as any;
+    const car = (await Car.createBang({ name: "Tofaş" })) as any;
     const bulb = (await HmBulb.createBang({ car })) as any;
 
     expect(await car.bulbIds).toEqual([bulb.id]);
@@ -3753,7 +3752,7 @@ describe("HasManyAssociationsTest", () => {
         await (await record.car).bulbs.load();
       });
 
-      const car = (await HmCar.createBang({ name: "Car" })) as any;
+      const car = (await Car.createBang({ name: "Car" })) as any;
       const bulb = await car.bulbs.createBang();
 
       expect((await car.bulbs.toArray()).map(recordId)).toEqual([bulb].map(recordId));
