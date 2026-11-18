@@ -1,5 +1,5 @@
 import * as TestCase from "../support/test-case.js";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, regexpEscape } from "@blazetrails/ruby-compat";
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { LazyLoadable } from "../../lib/backend/lazy-loadable.js";
@@ -108,13 +108,13 @@ describe("I18nBackendLazyLoadableTest", () => {
       await backend.reloadBang();
 
       withLocale("en", () => {
-        expect(backend.initialized()).toBe(false);
+        expect(backend.initialized()).toBeFalsy();
         t("foo.bar");
-        expect(backend.initialized()).toBe(true);
+        expect(backend.initialized()).toBeTruthy();
       });
 
       withLocale("fr", () => {
-        expect(backend.initialized()).toBe(false);
+        expect(backend.initialized()).toBeFalsy();
       });
     });
   });
@@ -127,19 +127,20 @@ describe("I18nBackendLazyLoadableTest", () => {
       await backend.reloadBang();
 
       withLocale("en", () => {
-        expect(backend.initialized()).toBe(false);
+        expect(backend.initialized()).toBeFalsy();
       });
 
       withLocale("fr", () => {
-        expect(backend.initialized()).toBe(false);
+        expect(backend.initialized()).toBeFalsy();
       });
     });
   });
 
   it("lazy mode: eager_load! raises UnsupportedMethod exception", async () => {
     await withLazyMode(async () => {
-      const exception = await backend.eagerLoadBang().catch((e: unknown) => e);
-      expect(exception).toBeInstanceOf(UnsupportedMethod);
+      const promise = backend.eagerLoadBang();
+      await expect(promise).rejects.toThrow(UnsupportedMethod);
+      const exception = await promise.catch((e: unknown) => e);
       const expectedMsg =
         "LazyLoadable does not support the #eager_load! method. Cannot eager load translations because backend was configured with lazy_load: true.";
       expect((exception as Error).message).toBe(expectedMsg);
@@ -203,16 +204,19 @@ describe("I18nBackendLazyLoadableTest", () => {
     await withLazyMode(async () => {
       await withTranslationFileInLoadPath(filename, null, fileContents, (filePath) => {
         let exception: unknown;
-        try {
-          t("foo.bar");
-        } catch (e) {
-          exception = e;
-        }
-        expect(exception).toBeInstanceOf(InvalidFilenames);
+        expect(() => {
+          try {
+            t("foo.bar");
+          } catch (e) {
+            exception = e;
+            throw e;
+          }
+        }).toThrow(InvalidFilenames);
 
-        expect((exception as Error).message).toContain(
-          `${filePath} can only load translations for "en". Found translations for: [:fr]`,
+        const expectedMessage = new RegExp(
+          `${regexpEscape(filePath)} can only load translations for "en"\\. Found translations for: \\[:fr\\]`,
         );
+        expect((exception as Error).message).toMatch(expectedMessage);
       });
     });
   });
@@ -224,16 +228,19 @@ describe("I18nBackendLazyLoadableTest", () => {
     await withLazyMode(async () => {
       await withTranslationFileInLoadPath(filename, null, fileContents, (filePath) => {
         let exception: unknown;
-        try {
-          t("foo.bar");
-        } catch (e) {
-          exception = e;
-        }
-        expect(exception).toBeInstanceOf(InvalidFilenames);
+        expect(() => {
+          try {
+            t("foo.bar");
+          } catch (e) {
+            exception = e;
+            throw e;
+          }
+        }).toThrow(InvalidFilenames);
 
-        expect((exception as Error).message).toContain(
-          `${filePath} can only load translations for "en". Found translations for: [:fr, :de]`,
+        const expectedMessage = new RegExp(
+          `${regexpEscape(filePath)} can only load translations for "en"\\. Found translations for: \\[:fr, :de\\]`,
         );
+        expect((exception as Error).message).toMatch(expectedMessage);
       });
     });
   });
@@ -281,16 +288,19 @@ describe("I18nBackendLazyLoadableTest", () => {
         contents,
         (filePath) => {
           let exception: unknown;
-          try {
-            t("foo.bar");
-          } catch (e) {
-            exception = e;
-          }
-          expect(exception).toBeInstanceOf(InvalidFilenames);
+          expect(() => {
+            try {
+              t("foo.bar");
+            } catch (e) {
+              exception = e;
+              throw e;
+            }
+          }).toThrow(InvalidFilenames);
 
-          expect((exception as Error).message).toContain(
-            `${filePath} can only load translations for "fr". Found translations for: [:de]`,
+          const expectedMessage = new RegExp(
+            `${regexpEscape(filePath)} can only load translations for "fr"\\. Found translations for: \\[:de\\]`,
           );
+          expect((exception as Error).message).toMatch(expectedMessage);
         },
       );
     });
