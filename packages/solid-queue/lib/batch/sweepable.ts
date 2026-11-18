@@ -15,16 +15,23 @@ export class ClassMethods {
       "sweep_stalled_batches",
       { stalled_for: stalledFor, stale_executions: 0, finished_batches: 0, started_batches: 0 },
       async (payload) => {
-        payload.stale_executions = await this.sweepStaleExecutions({ batchSize });
-        payload.finished_batches = await this.finishStalledBatches({ batchSize });
-        payload.started_batches = await this.startStalledBatches({ stalledFor, batchSize });
+        payload.stale_executions = await ClassMethods.sweepStaleExecutions.call(this, {
+          batchSize,
+        });
+        payload.finished_batches = await ClassMethods.finishStalledBatches.call(this, {
+          batchSize,
+        });
+        payload.started_batches = await ClassMethods.startStalledBatches.call(this, {
+          stalledFor,
+          batchSize,
+        });
         return payload.started_batches;
       },
     );
   }
 
   /** @internal */
-  static async sweepStaleExecutions(
+  private static async sweepStaleExecutions(
     this: typeof Batch,
     { batchSize }: { batchSize: number },
   ): Promise<number> {
@@ -34,7 +41,7 @@ export class ClassMethods {
       SolidQueue.BatchExecution!.withFinishedJobs(),
       SolidQueue.BatchExecution!.withFailedJobs(),
     ]) {
-      await stale.findEach({ batchSize: batchSize }, async (batchExecution) => {
+      await stale.findEach({ batchSize }, async (batchExecution) => {
         swept += 1;
         await batchExecution.destroy();
       });
@@ -44,7 +51,7 @@ export class ClassMethods {
   }
 
   /** @internal */
-  static async finishStalledBatches(
+  private static async finishStalledBatches(
     this: typeof Batch,
     { batchSize }: { batchSize: number },
   ): Promise<number> {
@@ -53,7 +60,7 @@ export class ClassMethods {
     await this.unfinished()
       .enqueued()
       .withoutExecutions()
-      .findEach({ batchSize: batchSize }, async (batch) => {
+      .findEach({ batchSize }, async (batch) => {
         finished += 1;
         await batch.finish();
       });
@@ -62,7 +69,7 @@ export class ClassMethods {
   }
 
   /** @internal */
-  static async startStalledBatches(
+  private static async startStalledBatches(
     this: typeof Batch,
     { stalledFor, batchSize }: { stalledFor: Duration; batchSize: number },
   ): Promise<number> {
@@ -71,7 +78,7 @@ export class ClassMethods {
     await this.unfinished()
       .where({ enqueued_at: null })
       .where({ created_at: new Range(null, stalledFor.ago(), true) })
-      .findEach({ batchSize: batchSize }, async (batch) => {
+      .findEach({ batchSize }, async (batch) => {
         started += 1;
         await batch.start();
       });

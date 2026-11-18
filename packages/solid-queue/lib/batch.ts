@@ -48,6 +48,8 @@ export class Batch extends Record {
   declare active_job_batch_id: string | null;
   declare description: string | null;
   declare total_jobs: number;
+  declare completed_jobs: number;
+  declare failed_jobs: number;
   declare enqueued_at: Time | null;
   declare finished_at: Time | null;
   declare failed_at: Time | null;
@@ -76,9 +78,6 @@ export class Batch extends Record {
   declare static clearable: (options?: { finishedBefore?: unknown }) => Relation<Batch>;
   declare static clearFinishedInBatches: typeof ClearableClassMethods.clearFinishedInBatches;
   declare static sweepStalled: typeof SweepableClassMethods.sweepStalled;
-  declare static sweepStaleExecutions: typeof SweepableClassMethods.sweepStaleExecutions;
-  declare static finishStalledBatches: typeof SweepableClassMethods.finishStalledBatches;
-  declare static startStalledBatches: typeof SweepableClassMethods.startStalledBatches;
   /** @internal */
   static _migrated: boolean | null = null;
 

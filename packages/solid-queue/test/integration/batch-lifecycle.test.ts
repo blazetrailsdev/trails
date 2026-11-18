@@ -28,6 +28,7 @@ import { AddToBufferJob, JobBuffer } from "../support/add-to-buffer-job.js";
 import { JobResult } from "../support/job-result.js";
 import { RaisingJob } from "../support/raising-job.js";
 import { loadAppSchema } from "../support/queue-schema.js";
+import type {} from "../../lib/active-job/batch-id.js";
 import {
   silentOnThreadErrorFor,
   waitForBatchesToFinishFor,
@@ -166,8 +167,8 @@ function assertFinishedInOrder(...finishables: { finished_at: unknown }[]) {
   }
 }
 
-async function jobBang(activeJob: { jobId?: string | null }): Promise<Job> {
-  return await Job.findByBang({ active_job_id: activeJob.jobId });
+async function jobBang(activeJob: unknown): Promise<Job> {
+  return await Job.findByBang({ active_job_id: (activeJob as ActiveJobBase).jobId });
 }
 
 function batchJobs(...batches: Batch[]) {
@@ -247,7 +248,7 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
 
   it("all jobs are run, including jobs enqueued inside of other jobs", async () => {
     let batch2: Batch | null = null;
-    let job1, job2, job3;
+    let job1!: unknown, job2!: unknown, job3!: unknown;
     const batch1 = await Batch.enqueue({}, async () => {
       job1 = await AddToBufferJob.performLater("hey");
       batch2 = await Batch.enqueue({}, async () => {
@@ -305,7 +306,7 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
     let batch1: Batch | null = null;
     let batch2: Batch | null = null;
     let batch3: Batch | null = null;
-    let job1, job2, job3;
+    let job1!: unknown, job2!: unknown, job3!: unknown;
     await JobResult.transaction(async () => {
       await JobResult.createBang({ queue_name: "default", status: "" });
 
@@ -538,7 +539,7 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
       () => Batch.clearFinishedInBatches(),
     );
 
-    travelTo(days(3).fromNow());
+    travelTo(days(3).fromNow() as Time);
 
     await assertDifference(
       () => Batch.count(),
