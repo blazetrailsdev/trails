@@ -20,6 +20,9 @@ import type { Broadcasts } from "./app/channels/turbo/streams/broadcasts.js";
 import type { ActionBroadcastJob } from "./app/jobs/turbo/streams/action-broadcast-job.js";
 import type { BroadcastJob } from "./app/jobs/turbo/streams/broadcast-job.js";
 import type { BroadcastStreamJob } from "./app/jobs/turbo/streams/broadcast-stream-job.js";
+import type { Debouncer } from "./app/models/turbo/debouncer.js";
+import type { ImmediateDebouncer } from "./app/models/turbo/immediate-debouncer.js";
+import type { ThreadDebouncer } from "./app/models/turbo/thread-debouncer.js";
 import type { StreamsChannel } from "./app/channels/turbo/streams-channel.js";
 import type { FrameRequest } from "./app/controllers/turbo/frames/frame-request.js";
 import type { Navigation } from "./app/controllers/turbo/native/navigation.js";
@@ -85,6 +88,9 @@ export const Turbo = {
   IncludesHelper?: typeof IncludesHelper;
   StreamsHelper?: typeof StreamsHelper;
   StreamsChannel?: typeof StreamsChannel;
+  Debouncer?: typeof Debouncer;
+  ImmediateDebouncer?: typeof ImmediateDebouncer;
+  ThreadDebouncer?: typeof ThreadDebouncer;
   RequestIdTracking?: typeof RequestIdTracking;
   Frames: {
     FrameRequest?: typeof FrameRequest;

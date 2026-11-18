@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { Extended } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/actioncable/channel/test-case.js";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { Thread, constSet, include } from "@blazetrails/ruby-compat";
 import "../test-helper.js";
+import type { Broadcasts } from "../../lib/app/channels/turbo/streams/broadcasts.js";
 import { StreamsChannel } from "../../lib/app/channels/turbo/streams-channel.js";
 import { ActionHelper } from "../../lib/app/helpers/turbo/streams/action-helper.js";
 import { Debouncer } from "../../lib/app/models/turbo/debouncer.js";
@@ -38,7 +40,7 @@ async function withProductionDebouncer(t: any, block: () => Promise<unknown>): P
   }
 }
 
-const channel: any = StreamsChannel;
+const channel = StreamsChannel as typeof StreamsChannel & Extended<typeof Broadcasts>;
 
 describe("Turbo::StreamsChannelTest", () => {
   beforeAll(async () => {

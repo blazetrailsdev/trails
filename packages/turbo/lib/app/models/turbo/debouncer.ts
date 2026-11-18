@@ -1,4 +1,4 @@
-import { ScheduledTask, constSet } from "@blazetrails/ruby-compat";
+import { ScheduledTask } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../turbo-trails.js";
 
 export class Debouncer {
@@ -31,4 +31,4 @@ export class Debouncer {
     return this.delay + 1;
   }
 }
-constSet(Turbo, "Debouncer", Debouncer);
+Turbo.Debouncer = Debouncer;
