@@ -28,6 +28,7 @@ import { solidCache } from "./assertion-receipts/solid-cache.js";
 import { solidQueue } from "./assertion-receipts/solid-queue.js";
 import { trailties } from "./assertion-receipts/trailties.js";
 import { tzinfo } from "./assertion-receipts/tzinfo.js";
+import { turboRails } from "./assertion-receipts/turbo-rails.js";
 import { viteTrails } from "./assertion-receipts/vite-trails.js";
 
 /** One Rails assertion the port cannot make. */
@@ -73,6 +74,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   "solid-queue": solidQueue,
   trailties,
   tzinfo,
+  "turbo-rails": turboRails,
   "vite-trails": viteTrails,
 };
 

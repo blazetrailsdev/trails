@@ -86,7 +86,10 @@ describe("Turbo::FrameRequestViewTest", () => {
     (tc as unknown as { setup(): void }).setup();
     tc.rendered = String(await ApplicationController.render({ template: "trays/show" }));
 
+    tc.assertDom("html");
+    tc.assertDom("html head");
     tc.assertDom("html head title", { text: "Dummy" });
+    tc.assertDom("html body:not(.turbo-native)");
     tc.assertDom("html body:not(.turbo-native) turbo-frame#tray");
   });
 });
