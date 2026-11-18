@@ -919,9 +919,13 @@
     }
   },
   "i18n": {
-    "rows": 33,
+    "rows": 34,
     "excluded": [],
-    "unwalked": ["backend/transliterator.ts::Transliterator", "utils.ts::Utils"],
+    "unwalked": [
+      "backend/pluralization.ts::Pluralization",
+      "backend/transliterator.ts::Transliterator",
+      "utils.ts::Utils"
+    ],
     "residue": {
       "backend/key-value.ts::SubtreeProxy": "I18n::Backend::KeyValue::SubtreeProxy",
       "backend/transliterator.ts::HashTransliterator": "I18n::Backend::Transliterator::HashTransliterator",
