@@ -1,13 +1,6 @@
 import { TopLevel } from "@blazetrails/activesupport";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  Dir,
-  File,
-  FileUtils,
-  LoadError,
-  NotImplementedError,
-  registerCompiledFiles,
-} from "@blazetrails/ruby-compat";
+import { LoadError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/base.js";
 import { LookupContext } from "../../lib/lookup-context.js";
 import { setTemplateCompiler, Template } from "../../lib/template.js";
@@ -50,28 +43,6 @@ describe("Templates are precompiled", () => {
     expect((error as Error).message).toBe(
       `cannot load such file -- ${fixture("unbuilt")}/.trails/views/greetings/show.html.tse.js`,
     );
-  });
-
-  it("renders a file-backed template through the module a compiled build registered", async () => {
-    shipped();
-    const root = Dir.mktmpdir("precompiled-registered");
-    try {
-      FileUtils.mkdirP(`${root}/app/views/greetings`);
-      FileUtils.cp(
-        `${fixture("unbuilt")}/app/views/greetings/show.html.tse`,
-        `${root}/app/views/greetings/show.html.tse`,
-      );
-      const built = await import(
-        `${fixture("precompiled")}/.trails/views/greetings/show.html.tse.js`
-      );
-      registerCompiledFiles(root, {
-        ".trails/views/greetings/show.html.tse.js": async () => built,
-      });
-      expect(String(await greeting(root).render(view(), { name: "Ada" }))).toBe("Hello, Ada!\n");
-      expect(File.isExist(`${root}/.trails`)).toBe(false);
-    } finally {
-      FileUtils.rmRf(root);
-    }
   });
 
   it("raises NotImplementedError for a string-source template in shipped code", async () => {

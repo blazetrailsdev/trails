@@ -18,7 +18,6 @@ import {
   type UrlForHost,
   type UrlForRoutes,
 } from "./url-for.js";
-import type { PolymorphicHost } from "./polymorphic-routes.js";
 import { extractOptionsBang, include } from "@blazetrails/activesupport";
 import {
   NoMethodError,
@@ -69,8 +68,7 @@ export class RoutesProxy implements UrlForHost {
   /** @internal */
   polymorphicPathForAction = polymorphicPathForAction;
   /** @internal */
-  polymorphicMapping = (record: unknown) =>
-    polymorphicMapping(this as unknown as PolymorphicHost, record);
+  polymorphicMapping = (record: unknown) => polymorphicMapping(this, record);
 
   constructor(
     routes: UrlForRoutes,

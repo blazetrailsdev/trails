@@ -28,7 +28,9 @@ import type { FrameRequest } from "./app/controllers/turbo/frames/frame-request.
 import type { Navigation } from "./app/controllers/turbo/native/navigation.js";
 import type { NavigationController } from "./app/controllers/turbo/native/navigation-controller.js";
 import type { RequestIdTracking } from "./app/controllers/concerns/turbo/request-id-tracking.js";
+import type { Broadcastable } from "./app/models/concerns/turbo/broadcastable.js";
 import type { TagBuilder } from "./app/models/turbo/streams/tag-builder.js";
+import type { Tasks } from "./tasks/turbo-tasks.js";
 import type { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
@@ -92,6 +94,8 @@ export const Turbo = {
   ImmediateDebouncer?: typeof ImmediateDebouncer;
   ThreadDebouncer?: typeof ThreadDebouncer;
   RequestIdTracking?: typeof RequestIdTracking;
+  Broadcastable?: typeof Broadcastable;
+  Tasks?: typeof Tasks;
   Frames: {
     FrameRequest?: typeof FrameRequest;
   };

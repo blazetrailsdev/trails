@@ -1,0 +1,71 @@
+import { rbCallSuper, toSym } from "@blazetrails/ruby-compat";
+
+import { EMPTY_HASH, newDoubleNestedCache, type TranslationKey } from "../i18n.js";
+import type { Locale } from "../locale.js";
+import type { TranslationData } from "../utils.js";
+import type { TranslateOptions } from "./base.js";
+import { Flatten } from "./flatten.js";
+
+interface MemoizeHost {
+  memoizedLocales?: Locale[] | null;
+  memoizedLookupStore?: Map<string, Map<string, unknown>>;
+  availableLocales(): Locale[];
+  memoizedLookup(): Map<string, Map<string, unknown>>;
+  resetMemoizationsBang(locale?: Locale | null): void;
+}
+
+export const Memoize = {
+  availableLocales(this: MemoizeHost): Locale[] {
+    return (this.memoizedLocales ||= rbCallSuper(this, Memoize.availableLocales) as Locale[]);
+  },
+  storeTranslations(
+    this: MemoizeHost,
+    locale: Locale,
+    data: TranslationData | Record<string, unknown>,
+    options: TranslateOptions = EMPTY_HASH,
+  ): unknown {
+    this.resetMemoizationsBang(locale);
+    return rbCallSuper(this, Memoize.storeTranslations, locale, data, options);
+  },
+  async reloadBang(this: MemoizeHost): Promise<void> {
+    this.resetMemoizationsBang();
+    await rbCallSuper(this, Memoize.reloadBang);
+  },
+  async eagerLoadBang(this: MemoizeHost): Promise<void> {
+    this.memoizedLookup();
+    this.availableLocales();
+    await rbCallSuper(this, Memoize.eagerLoadBang);
+  },
+  /** @internal */
+  lookup(
+    this: MemoizeHost,
+    locale: Locale,
+    key: TranslationKey,
+    scope: unknown = null,
+    options: TranslateOptions = EMPTY_HASH,
+  ): unknown {
+    const flatKey = toSym(
+      Flatten.normalizeFlatKeys(locale, key, scope, options.separator as string | undefined),
+    );
+    const memoizedLookup = this.memoizedLookup();
+    let flatHash = memoizedLookup.get(toSym(locale));
+    if (flatHash === undefined) {
+      flatHash = new Map();
+      memoizedLookup.set(toSym(locale), flatHash);
+    }
+    if (flatHash.has(flatKey)) return flatHash.get(flatKey);
+    const result = rbCallSuper(this, Memoize.lookup, locale, key, scope, options);
+    flatHash.set(flatKey, result);
+    return result;
+  },
+  /** @internal */
+  memoizedLookup(this: MemoizeHost): Map<string, Map<string, unknown>> {
+    return (this.memoizedLookupStore ||= newDoubleNestedCache<string, unknown>());
+  },
+  /** @internal */
+  resetMemoizationsBang(this: MemoizeHost, locale: Locale | null = null): void {
+    this.memoizedLocales = null;
+    if (locale != null) this.memoizedLookup().get(toSym(locale))?.clear();
+    else this.memoizedLookup().clear();
+  },
+};

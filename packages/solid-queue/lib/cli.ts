@@ -1,4 +1,4 @@
-import { type Hash, constSet } from "@blazetrails/ruby-compat";
+import { type Hash, SystemExit, constSet } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "./solid-queue.js";
 import { camelize } from "@blazetrails/activesupport";
 import { Thor, type ThorClass } from "@blazetrails/thor";
@@ -15,6 +15,13 @@ export class Cli extends Thor {
       banner: "SOLID_QUEUE_CONFIG",
     });
 
+    klass.classOption("mode", {
+      type: "string",
+      enum: ["fork", "async"],
+      desc: "Whether to fork processes for workers and dispatchers (fork) or to run these in the same process as the supervisor (async) (default: fork).",
+      banner: "SOLID_QUEUE_SUPERVISOR_MODE",
+    });
+
     klass.classOption("recurring_schedule_file", {
       type: "string",
       desc: `Path to recurring schedule definition (default: ${Configuration.DEFAULT_RECURRING_SCHEDULE_FILE_PATH}).`,
@@ -23,8 +30,14 @@ export class Cli extends Thor {
 
     klass.classOption("skip_recurring", {
       type: "boolean",
-      default: false,
       desc: "Whether to skip recurring tasks scheduling",
+      banner: "SOLID_QUEUE_SKIP_RECURRING",
+    });
+
+    klass.classOption("only_recurring", {
+      type: "boolean",
+      desc: "Whether to run only the scheduler process for recurring tasks",
+      banner: "SOLID_QUEUE_ONLY_RECURRING",
     });
 
     klass.desc(
@@ -33,6 +46,12 @@ export class Cli extends Thor {
     );
     klass.defaultCommand("start");
     klass.methodAdded("start");
+
+    klass.desc(
+      "check",
+      "Validates the Solid Queue configuration for the current Rails env without starting anything. Exits non-zero on errors.",
+    );
+    klass.methodAdded("check");
   }
 
   static isExitOnFailure(): boolean {
@@ -44,6 +63,14 @@ export class Cli extends Thor {
     await Supervisor.start(
       Object.fromEntries(options.toA().map(([key, value]) => [camelize(key, false), value])),
     );
+  }
+
+  async check(): Promise<void> {
+    const options = (this as unknown as { options: Hash<string, unknown> }).options;
+    const configuration = new Configuration(
+      Object.fromEntries(options.toA().map(([key, value]) => [camelize(key, false), value])),
+    );
+    if (!(await configuration.check())) throw new SystemExit(1);
   }
 }
 

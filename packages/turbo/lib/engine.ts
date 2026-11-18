@@ -12,6 +12,7 @@ import "./app/jobs/turbo/streams/broadcast-stream-job.js";
 import "./app/helpers/turbo/drive-helper.js";
 import "./app/helpers/turbo/frames-helper.js";
 import "./app/helpers/turbo/includes-helper.js";
+import { Broadcastable } from "./app/models/concerns/turbo/broadcastable.js";
 import "./app/helpers/turbo/streams-helper.js";
 import "./app/helpers/turbo/streams/action-helper.js";
 import { RequestIdTracking } from "./app/controllers/concerns/turbo/request-id-tracking.js";
@@ -117,6 +118,14 @@ export class Engine extends TrailsEngine {
     this.initializer("turbo.request_id_tracking", () => {
       onLoad("action_controller", function (this: object) {
         include(this, RequestIdTracking);
+      });
+    });
+
+    this.initializer("turbo.broadcastable", () => {
+      onLoad("active_record", function (this: object) {
+        if ("ActiveJob" in TopLevel) {
+          include(this, Broadcastable);
+        }
       });
     });
 

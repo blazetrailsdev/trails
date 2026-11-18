@@ -8,7 +8,9 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Loader, Registry } from "@blazetrails/zeitwerk";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Template } from "@blazetrails/actionview";
 import { buildAutoload } from "../lib/build-autoload.js";
+import { buildViews } from "../lib/build-views.js";
 
 describe("buildAutoload", () => {
   const seats = TopLevel as Record<string, unknown>;
@@ -230,7 +232,6 @@ describe("buildAutoload", () => {
         "app/helpers/admin",
         "config/storage",
         "lib/helpers",
-        ".trails/views/posts",
       ]) {
         FileUtils.mkdirP(dir);
       }
@@ -257,8 +258,6 @@ describe("buildAutoload", () => {
       File.write("app/helpers/format.ts", "export {};\n");
       File.write("app/helpers/posts-helper.test.ts", "export {};\n");
       File.write("lib/helpers/extra-helper.ts", "export {};\n");
-      File.write(".trails/views/posts/index.html.tse.js", "export default () => {};\n");
-      File.write(".trails/views/posts/index.html.tse.js.map", "{}\n");
       const root = Dir.pwd();
       const globs: Record<string, string> = {
         "config/routes": "**/*.{ts,js}",
@@ -314,10 +313,6 @@ describe("buildAutoload", () => {
       ]) {
         expect(boot).toContain(`${JSON.stringify(rel)}: () => import("../${rel}"),`);
       }
-      expect(boot).toContain(
-        '".trails/views/posts/index.html.tse.js": () => import("./views/posts/index.html.tse.js"),',
-      );
-      expect(boot).not.toContain(".js.map");
       expect(boot).not.toContain("production.d.ts");
       expect(boot).not.toContain("app/helpers/format.ts");
       expect(boot).not.toContain("posts-helper.test.ts");
@@ -362,6 +357,59 @@ describe("buildAutoload", () => {
     } finally {
       delete seats.Drawn;
       delete (globalThis as Record<string, unknown>).__routesEvaluated;
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("renders a view from the boot map with app/views absent", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    Dir.chdir(tmp);
+    try {
+      FileUtils.mkdirP("app/views/posts");
+      FileUtils.mkdirP("config");
+      File.write("config/application.ts", "export {};\n");
+      File.write("config/environment.ts", "export default null;\n");
+      File.write("app/views/posts/index.html.tse", "<%# locals: (title:) %><h1><%= title %></h1>");
+      const root = Dir.pwd();
+      await buildViews({ cwd: root });
+      seats.Trails = {
+        application: {
+          config: { root },
+          paths: () => ({
+            get: (key: string) => ({
+              toAry: () => [key],
+              extensions: () => undefined,
+              existent: async () => {
+                const full = File.expandPath(key, root);
+                return File.isExist(full) ? [full] : [];
+              },
+            }),
+          }),
+          initializers: { tsort: () => [] },
+        },
+      };
+
+      await buildAutoload();
+
+      expect(File.read(".trails/boot.generated.js")).toContain(
+        '"app/views/posts/index.html.tse": async () => ({ ...(await import("./views/posts/index.html.tse.js")), source: ',
+      );
+      FileUtils.rmRf("app/views");
+      vi.doMock("@blazetrails/trailties", () => ({ Application: { findRoot: () => root } }));
+      await import(File.expandPath(".trails/boot.generated.js"));
+      vi.doUnmock("@blazetrails/trailties");
+      const { Base, FileSystemResolver, LookupContext } = await import("@blazetrails/actionview");
+
+      const ctx = new LookupContext(null, {}, []);
+      ctx.appendViewPaths([new FileSystemResolver(File.expandPath("app/views"))]);
+      const template = ctx.findTemplate("index", ["posts"], false, ["title"]) as Template;
+      const html = await template.render(new (Base.withEmptyTemplateCache())(null, {}, null), {
+        title: "Posts",
+      });
+
+      expect(String(html)).toBe("<h1>Posts</h1>");
+    } finally {
       Dir.chdir(pwd);
       FileUtils.rmRf(tmp);
     }

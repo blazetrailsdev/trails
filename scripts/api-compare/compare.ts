@@ -3216,6 +3216,19 @@ const RUBY_ERROR_BUILTINS = new Set([
   "LoadError",
 ]);
 
+/**
+ * Does `source` reopen `short` inside a `declare module "@blazetrails/…"`
+ * block, the TS port of a superclass-less Ruby reopen of another gem's class
+ * (`class Mail::Address` in `actionmailbox/lib/action_mailbox/mail_ext/address_equality.rb`)?
+ */
+export function augmentsForeignClass(source: string, short: string): boolean {
+  const member = new RegExp(`^\\s*(?:export\\s+)?(?:interface|class)\\s+${short}\\b`, "m");
+  for (const block of source.matchAll(/^declare module "@blazetrails\/[^"]*" \{\n([^]*?)^\}/gm)) {
+    if (member.test(block[1])) return true;
+  }
+  return false;
+}
+
 function shortName(fqn: string | undefined | null): string | null {
   if (!fqn) return null;
   // Ruby uses `::` as the namespace separator; TS extractor stores the
@@ -4815,7 +4828,11 @@ export function main() {
       tsParamsByName.set(m.name, sigs);
       if (scope === "package") recordTsPortedWithArgs(portedWithArgsMaps, m, file, owner);
       if (scope === "dep" && !isTestHelperFile(file)) {
-        tsParamsByNameInDeps.set(m.name, [...(tsParamsByNameInDeps.get(m.name) ?? []), m.params]);
+        tsParamsByNameInDeps.set(m.name, [
+          ...(tsParamsByNameInDeps.get(m.name) ?? []),
+          m.params,
+          ...(m.aliasParams ? [m.aliasParams] : []),
+        ]);
       }
       if (scope === "package") {
         const byName = tsBlockSigsByFileName.get(file) ?? new Map<string, ParamInfo[][]>();
@@ -6828,6 +6845,13 @@ export function main() {
           const fileExists = fs.existsSync(path.join(pkgSrcDir, expectedTs));
           if (!fileExists) {
             inheritance.checked--; // don't score; file-missing is tracked elsewhere
+            continue;
+          }
+          if (
+            rubySuper === null &&
+            augmentsForeignClass(fs.readFileSync(path.join(pkgSrcDir, expectedTs), "utf8"), short)
+          ) {
+            inheritance.checked--;
             continue;
           }
           inheritance.mismatches.push({

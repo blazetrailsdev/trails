@@ -1,0 +1,103 @@
+# Daily request-path benchmark of examples/twelve-dollar-server (RFC 0241).
+# Runs the slim harness's plain pass from bench/run.sh against main HEAD and
+# appends one JSON record to perf/history.jsonl on the perf-data branch.
+name: Perf
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      vus:
+        description: k6 virtual users (keep the runner below saturation)
+        default: "200"
+      challenge_ref:
+        description: twelve-dollar-server-challenge commit to bench against
+        default: 917f5a82799521b18e6b17c26c746c2b2a8136ef
+
+concurrency:
+  group: perf
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CHALLENGE_DIR: ${{ github.workspace }}/challenge
+      OUT: ${{ github.workspace }}/perf-out
+      VUS: ${{ inputs.vus || '200' }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: arjaythedev/twelve-dollar-server-challenge
+          path: challenge
+          ref: ${{ inputs.challenge_ref || '917f5a82799521b18e6b17c26c746c2b2a8136ef' }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26.13.0
+          package-manager-cache: false
+      - run: sudo apt-get update && sudo apt-get install -y sqlite3 jq
+      - uses: grafana/setup-k6-action@c47136d33d365efbeb9ae7266908b5dcf98cdece # v1
+      - name: Build trails
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm exec tsc --build packages/trailties packages/rackup packages/activerecord packages/actionpack
+      - id: challenge
+        run: echo "sha=$(git -C challenge rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: seed
+        with:
+          path: |
+            challenge/seed/feed.db
+            challenge/seed/tokens.json
+          key: tdsc-seed-${{ steps.challenge.outputs.sha }}
+      - if: steps.seed.outputs.cache-hit != 'true'
+        run: bash challenge/seed/make-seed.sh
+      - name: Bench
+        run: bash examples/twelve-dollar-server/bench/run.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-${{ github.run_id }}
+          path: perf-out
+
+  record:
+    needs: bench
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: perf-${{ github.run_id }}
+          path: perf-out
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          path: repo
+      - name: Append to perf-data
+        working-directory: repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch origin perf-data; then
+            git checkout -B perf-data FETCH_HEAD
+          else
+            git checkout --orphan perf-data
+            git rm -rfq .
+          fi
+          mkdir -p perf
+          cat "$GITHUB_WORKSPACE/perf-out/record.json" >> perf/history.jsonl
+          git add perf/history.jsonl
+          git commit -m "perf: record run ${{ github.run_id }}"
+          git push origin perf-data

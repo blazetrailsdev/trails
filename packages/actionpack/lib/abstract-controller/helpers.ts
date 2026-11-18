@@ -242,33 +242,30 @@ export const ClassMethods = new Module((mod) => {
 export const Helpers = new Module((mod) => {
   extend(mod, Concern);
 
-  (mod as unknown as { included(base: null, block: (this: HelpersClass) => void): void }).included(
-    null,
-    function (this: HelpersClass) {
-      classAttribute.call(this, "_helperMethods", { default: [] });
+  Concern.included.call(mod, null, function (this: HelpersClass) {
+    classAttribute.call(this, "_helperMethods", { default: [] });
 
-      rbDeclareIvar({ prototype: this }, "@_helpers", "__helpers");
-      Object.defineProperty(this, "_helpers", {
-        configurable: true,
-        get(this: HelpersClass) {
-          if (!rbObjIvarDefined(this, "@_helpers") && !rbModSingletonP(this as never)) {
-            inherited.call(rbClassSuperclass(this)!, this);
-          }
-          if (rbObjIvarGet(this, "@_helpers") != null) {
-            return rbObjIvarGet(this, "@_helpers");
-          } else {
-            return rbClassSuperclass(this)!._helpers;
-          }
-        },
-        set: ClassMethods.instanceMethod("_helpers")!.set,
-      });
+    rbDeclareIvar({ prototype: this }, "@_helpers", "__helpers");
+    Object.defineProperty(this, "_helpers", {
+      configurable: true,
+      get(this: HelpersClass) {
+        if (!rbObjIvarDefined(this, "@_helpers") && !rbModSingletonP(this as never)) {
+          inherited.call(rbClassSuperclass(this)!, this);
+        }
+        if (rbObjIvarGet(this, "@_helpers") != null) {
+          return rbObjIvarGet(this, "@_helpers");
+        } else {
+          return rbClassSuperclass(this)!._helpers;
+        }
+      },
+      set: ClassMethods.instanceMethod("_helpers")!.set,
+    });
 
-      this._helpers = this.defineHelpersModule(this);
-    },
-  );
+    this._helpers = this.defineHelpersModule(this);
+  });
 }).include({
   get _helpers(): HelperMethodsModule {
-    return (this as unknown as HelpersHost).constructor._helpers;
+    return (this as HelpersHost).constructor._helpers;
   },
 }) as Module<{ readonly _helpers: HelperMethodsModule }> & {
   ClassMethods: typeof ClassMethods;

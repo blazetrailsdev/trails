@@ -93,7 +93,7 @@ type IncludedBlock = { included(base: null, block: (this: any) => void): void };
 export const Renderers = new Module((mod) => {
   extend(mod, Concern);
 
-  (mod as unknown as IncludedBlock).included(null, function () {
+  Concern.included.call(mod, null, function () {
     classAttribute.call(this, "_renderers", { default: Object.freeze(new Set<string>()) });
   });
 
@@ -118,7 +118,7 @@ export const All = new Module((mod) => {
   extend(mod, Concern);
   mod.include(Renderers);
 
-  (mod as unknown as IncludedBlock).included(null, function () {
+  Concern.included.call(mod, null, function () {
     this._renderers = RENDERERS;
   });
 });

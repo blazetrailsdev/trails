@@ -113,6 +113,15 @@ describe("ApiAppGeneratorTest", () => {
     });
   });
 
+  it("cors initializer imports rack-cors", async () => {
+    await t.runGenerator();
+
+    await t.assertFile(
+      "config/initializers/cors.ts",
+      /\/\/ import \* as Rack from "@blazetrails\/rack-cors";/,
+    );
+  });
+
   it("dockerfile", async () => {
     await t.runGenerator();
 

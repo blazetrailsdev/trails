@@ -277,6 +277,6 @@ export class Flash {
   static readonly FlashHash = FlashHash;
 
   constructor(app: RackApp | { call: RackApp }) {
-    return app as unknown as Flash;
+    return app as Flash;
   }
 }

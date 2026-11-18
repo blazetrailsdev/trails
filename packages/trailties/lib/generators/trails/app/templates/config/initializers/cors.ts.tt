@@ -5,13 +5,23 @@
 
 // Read more: https://github.com/cyu/rack-cors
 
-// Trails.application.config.middleware.insertBefore(0, Rack.Cors, function () {
-//   this.allow(function () {
-//     this.origins("example.com");
+// Run `pnpm add @blazetrails/rack-cors`, then uncomment the block below.
+
+// import * as Rack from "@blazetrails/rack-cors";
+// import { block } from "@blazetrails/ruby-compat";
+// import { Trails } from "@blazetrails/trailties";
 //
-//     this.resource("*", {
-//       headers: "any",
-//       methods: ["get", "post", "put", "patch", "delete", "options", "head"],
+// Trails.application!.config.middleware.insertBefore(
+//   0,
+//   Rack.Cors,
+//   block(function (this: Rack.Cors) {
+//     this.allow(function (this: Rack.Resources) {
+//       this.origins("example.com");
+//
+//       this.resource("*", {
+//         headers: "any",
+//         methods: ["get", "post", "put", "patch", "delete", "options", "head"],
+//       });
 //     });
-//   });
-// });
+//   }),
+// );

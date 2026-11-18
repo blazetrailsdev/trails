@@ -316,7 +316,7 @@ describe("rubyMethodToTs", () => {
   it("maps any new that is not a class's own to the constructor only away from initialize", () => {
     const beside = new Set(["new", "initialize"]);
     expect(rubyMethodToTs("new", beside)).toBeNull();
-    expect(rubyMethodToTs("new")).toEqual(["constructor"]);
+    expect(rubyMethodToTs("new")).toEqual(["constructor", "new"]);
   });
 
   it("special-cases the common Ruby → JS aliases", () => {

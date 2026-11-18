@@ -3,6 +3,6 @@ import { VERSION } from "../lib/index.js";
 
 describe("SolidQueue::VERSION", () => {
   it("matches the vendored gem", () => {
-    expect(VERSION).toBe("1.1.3");
+    expect(VERSION).toBe("1.7.2");
   });
 });

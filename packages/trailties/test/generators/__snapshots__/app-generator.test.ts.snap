@@ -147,10 +147,11 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config/storage.ts
 `;
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > environments/development.ts 1`] = `
-"import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { days } from "@blazetrails/activesupport";
+"import { days } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
+
+const cachingDev = await getFs().exists(getPath().join(Trails.root()!, "tmp/caching-dev.txt"));
 
 Trails.application.configure(function () {
   // Settings specified here will take precedence over those in config/application.ts.
@@ -169,7 +170,7 @@ Trails.application.configure(function () {
 
   // Enable/disable Action Controller caching. By default Action Controller caching is disabled.
   // Run trails dev:cache to toggle Action Controller caching.
-  if (existsSync(join(this.config.root!, "tmp/caching-dev.txt"))) {
+  if (cachingDev) {
     this.config.actionController.performCaching = true;
     this.config.actionController.enableFragmentCacheLogging = true;
     this.config.publicFileServer.headers = { "cache-control": \`public, max-age=\${days(2).toI()}\` };
@@ -227,6 +228,7 @@ Trails.application.configure(function () {
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > environments/production.ts 1`] = `
 "import { TaggedLogging } from "@blazetrails/activesupport";
+import { env, STDOUT } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 
 Trails.application.configure(function () {
@@ -264,10 +266,10 @@ Trails.application.configure(function () {
 
   // Log to STDOUT with the current request id as a default log tag.
   this.config.logTags = [":request_id"];
-  this.config.logger = TaggedLogging.logger(process.stdout);
+  this.config.logger = TaggedLogging.logger(STDOUT);
 
   // Change to "debug" to log everything (including potentially personally-identifiable information!)
-  this.config.logLevel = process.env.TRAILS_LOG_LEVEL ?? "info";
+  this.config.logLevel = env.TRAILS_LOG_LEVEL ?? "info";
 
   // Prevent health checks from clogging up the logs.
   this.config.silenceHealthcheckPath = "/up";
@@ -326,6 +328,7 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > environments/test
 // and recreated between test runs. Don't rely on the data there!
 
 import { isPresent } from "@blazetrails/activesupport";
+import { env } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 
 Trails.application.configure(function () {
@@ -338,7 +341,7 @@ Trails.application.configure(function () {
   // this is usually not necessary, and can slow down your test suite. However, it's
   // recommended that you enable it in continuous integration systems to ensure eager
   // loading is working properly before deploying your code.
-  this.config.eagerLoad = isPresent(process.env.CI);
+  this.config.eagerLoad = isPresent(env.CI);
 
   // Configure public file server for tests with cache-control for performance.
   this.config.publicFileServer.headers = { "cache-control": "public, max-age=3600" };

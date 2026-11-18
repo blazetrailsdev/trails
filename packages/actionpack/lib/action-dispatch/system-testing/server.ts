@@ -56,10 +56,7 @@ export class Server {
               return () => {
                 server.middlewares.use(async (req, res, next) => {
                   try {
-                    await new node(vite.app!).service(
-                      req as unknown as HttpRequest,
-                      res as unknown as HttpResponse,
-                    );
+                    await new node(vite.app!).service(req as HttpRequest, res as HttpResponse);
                   } catch (err: unknown) {
                     next(err);
                   }

@@ -27,6 +27,7 @@
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "parity:api": "bash scripts/api-compare/run.sh",
+    "parity:changed": "tsx scripts/parity/changed.ts",
     "parity:api:drift": "pnpm tsx scripts/api-compare/drift.ts",
     "parity:api:extra": "pnpm tsx scripts/api-compare/extra-surface.ts",
     "parity:api:privates": "pnpm tsx scripts/api-compare/privates-surface.ts",

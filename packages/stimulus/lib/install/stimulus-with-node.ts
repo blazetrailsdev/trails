@@ -32,11 +32,11 @@ export default async function (this: AppGenerator): Promise<void> {
     this.say("Import Stimulus controllers");
     await this.appendToFile(
       "app/javascript/entrypoints/application.js",
-      `import "./controllers"\n`,
+      `import "~/controllers"\n`,
     );
   } else {
     this.say(
-      `Couldn't find "app/javascript/entrypoints/application.js".\nYou must import "./controllers" in your JavaScript entrypoint file`,
+      `Couldn't find "app/javascript/entrypoints/application.js".\nYou must import "~/controllers" in your JavaScript entrypoint file`,
       "red",
     );
   }

@@ -203,7 +203,7 @@ export class Route {
   /** @missingRailsName upcase — PERMANENT */
   static verbMatcher(verb: string): VerbMatcher {
     return fetch<VerbMatcher>(
-      VerbMatchers.VERB_TO_CLASS as unknown as Record<string, unknown>,
+      VerbMatchers.VERB_TO_CLASS as Record<string, unknown>,
       verb,
       block<VerbMatcher>(
         () =>

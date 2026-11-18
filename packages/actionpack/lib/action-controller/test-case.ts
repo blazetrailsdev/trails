@@ -35,13 +35,7 @@ import {
   verbose,
   warn,
 } from "@blazetrails/ruby-compat";
-import {
-  DEFAULT_OPTIONS,
-  Persisted,
-  SecureSessionHash,
-  SessionId,
-  type PersistedRequest,
-} from "@blazetrails/rack-session";
+import { DEFAULT_OPTIONS, SecureSessionHash, SessionId } from "@blazetrails/rack-session";
 import {
   MULTIPART_BOUNDARY,
   UploadedFile as RackTestUploadedFile,
@@ -406,7 +400,7 @@ function setupRequest(
   this.request.fetchHeader("SCRIPT_NAME", (k) => {
     this.request.setHeader(
       k,
-      (this.controller as unknown as { config(): { relativeUrlRoot?: string } }).config()
+      (this.controller as Metal & { config(): { relativeUrlRoot?: string } }).config()
         .relativeUrlRoot,
     );
   });
@@ -444,7 +438,7 @@ async function processControllerResponse(
 
     if (this.request.isHaveCookieJar()) {
       if (!this.request.cookieJar().isCommitted()) {
-        this.request.cookieJar().write(this.response as unknown as CookieResponse);
+        this.request.cookieJar().write(this.response as CookieResponse);
         cookies.update(this.request.cookieJar().toHash());
         cookies.update(this.response.cookies as Record<string, string>);
       }
@@ -527,9 +521,7 @@ Object.assign(Behavior, {
   buildResponse,
 });
 
-(
-  Behavior as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
-).included(null, function (this: typeof TestCase) {
+Concern.included.call(Behavior, null, function (this: typeof TestCase) {
   include(this, TemplateAssertions);
   include(this, Assertions);
   classAttribute.call(this, "_controllerClass");
@@ -778,7 +770,7 @@ export class TestSession extends SecureSessionHash {
     session: Record<string, unknown> = {},
     id: SessionId = new SessionId(SecureRandom.hex(16)),
   ) {
-    super(null as unknown as Persisted, null as unknown as PersistedRequest);
+    super(null, null);
     this.setId(id);
     this.data = this.stringifyKeys(session);
     this.loaded = true;

@@ -24,12 +24,6 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
     reason: "Pre-1.0: optional backend mixin — caches parsed translation files on disk.",
   },
   {
-    pattern: "backend/cascade.rb",
-    testFile: "backend/cascade_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
-  },
-  {
     pattern: "backend/interpolation_compiler.rb",
     testFile: "backend/interpolation_compiler_test.rb",
     package: "i18n",
@@ -38,26 +32,18 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
       "procs via `eval`/`instance_eval`, which has no trails counterpart.",
   },
   {
-    pattern: "backend/memoize.rb",
-    testFile: "backend/memoize_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend mixin — memoizes lookups per locale.",
-  },
-  {
     pattern: "backend/metadata.rb",
     testFile: "backend/metadata_test.rb",
     package: "i18n",
     reason:
-      "Pre-1.0: optional backend mixin — attaches lookup metadata onto the " +
-      "translated String's singleton class. JS strings take no per-instance state.",
+      'PERMANENT: attaches lookup metadata onto the translated String\'s singleton class — CLAUDE.md \u00a7 "Ruby Strings are JS string primitives (no mutable String carrier)" and \u00a7 "Core extensions are not installed on native prototypes".',
   },
   // --- i18n: api/ suites that install a deferred backend ---
   {
     testFile: "api/all_features_test.rb",
     package: "i18n",
     reason:
-      "Pre-1.0: optional backend mixins — a Chain of every deferred mixin " +
-      "(Cascade, Memoize, Metadata, Pluralization, Fallbacks) at once.",
+      'PERMANENT: includes I18n::Backend::Cache and Metadata — packages/i18n/CLAUDE.md \u00a7 "A translation lookup is synchronous; the load is an awaited step" and CLAUDE.md \u00a7 "Ruby Strings are JS string primitives (no mutable String carrier)".',
   },
   {
     testFile: "api/cascade_test.rb",
@@ -77,31 +63,15 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
   },
   // --- i18n: gem surface trails has no counterpart for ---
   {
-    // Deliberately broad: covers `gettext.rb`, `gettext/*` and the
-    // `backend/gettext.rb` mixin in one entry.
-    pattern: "gettext",
-    testFile: "gettext/",
+    pattern: "gettext/po_parser.rb",
     package: "i18n",
-    reason:
-      "Pre-1.0: gettext .po support — the catalogue parser, the `_`/`n_`/`s_` " +
-      "helpers, and the backend mixin that loads .po files. A Ruby toolchain " +
-      "concern with no trails consumer; Rails' own I18n usage never touches it.",
+    reason: "Pre-1.0: gettext .po support — the .po catalogue parser.",
   },
   {
-    testFile: "gettext_plural_keys_test.rb",
+    pattern: "backend/gettext.rb",
+    testFile: "gettext/backend_test.rb",
     package: "i18n",
-    reason:
-      "Pre-1.0: gettext .po support — exercises `I18n::Gettext.plural_keys`. " +
-      "Sits at test/i18n/, outside the `gettext/` prefix above.",
-  },
-  {
-    pattern: "middleware.rb",
-    testFile: "i18n/middleware_test.rb",
-    package: "i18n",
-    reason:
-      "Rack middleware that resets `I18n.locale` after each request. trails " +
-      "has no Rack request lifecycle wiring for i18n yet; resetting is done " +
-      "explicitly by callers.",
+    reason: "Pre-1.0: gettext .po support — the backend mixin that loads .po files.",
   },
   {
     pattern: "tests/",

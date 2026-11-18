@@ -6,7 +6,7 @@ export CI_BG_DIR="${CI_BG_DIR:-$(mktemp -d)}"
 
 pkg="${1:?usage: scoped-comparison.sh <package>}"
 
-src="packages/$pkg/src"
+src="packages/$pkg/lib"
 
 only="with_entries(select(.key == \"$pkg\"))"
 ALL_LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths)

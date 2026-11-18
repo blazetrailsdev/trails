@@ -180,4 +180,18 @@ describe("Relation#clone copying fields", () => {
       Reflect.deleteProperty(proto, "annotation");
     }
   });
+
+  it("seats a class field after its first clone, so later clones copy it by assignment", () => {
+    expect(Post.where({ id: 1 }).limit(1)).toBeInstanceOf(Relation);
+    const placeholders = Object.getPrototypeOf(Relation.prototype) as object;
+    expect(Object.hasOwn(placeholders, "_values")).toBe(true);
+    const descriptorSpy = vi.spyOn(Object, "getOwnPropertyDescriptor");
+    try {
+      expect(Post.where({ id: 1 }).limit(1)).toBeInstanceOf(Relation);
+      const keys = descriptorSpy.mock.calls.map(([, key]) => key);
+      expect(keys).not.toContain("_values");
+    } finally {
+      descriptorSpy.mockRestore();
+    }
+  });
 });

@@ -1732,7 +1732,22 @@ export class Relation<T extends Base, G extends boolean = false> {
       ) {
         copy[key] = Reflect.get(this, key);
       } else {
-        Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(this, key)!);
+        const descriptor = Object.getOwnPropertyDescriptor(this, key)!;
+        Object.defineProperty(copy, key, descriptor);
+        if (
+          key.startsWith("_") &&
+          descriptor.writable === true &&
+          descriptor.enumerable === true &&
+          descriptor.configurable === true &&
+          !Object.hasOwn(_placeholderFields, key) &&
+          _isPlaceholderField(proto, key)
+        ) {
+          Object.defineProperty(_placeholderFields, key, {
+            value: undefined,
+            writable: true,
+            configurable: true,
+          });
+        }
       }
     }
     const initializeClone = "initializeClone" in copy ? copy.initializeClone : copy.initializeCopy;

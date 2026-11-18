@@ -22,6 +22,9 @@
       "path": "../activesupport"
     },
     {
+      "path": "../rake"
+    },
+    {
       "path": "../ruby-compat"
     },
     {

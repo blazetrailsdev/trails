@@ -12,10 +12,13 @@ import {
   isEmpty,
   getChildProcess,
   hashAref,
+  include,
+  type Included,
   keys,
   isAbsentHalf,
   rbAnyToS,
   rbEqual,
+  rbModName,
   rbModToS,
   rbFArray,
   rbObjClass,
@@ -70,7 +73,27 @@ export class Skip extends Assertion {
 }
 
 /** @noRailsEquivalent PERMANENT */
+export const Reportable = {
+  /** @noRailsEquivalent PERMANENT */
+  isPassed(this: Test | Result): boolean {
+    return !this.failure;
+  },
+
+  /** @noRailsEquivalent PERMANENT */
+  isSkipped(this: Test | Result): boolean {
+    return this.failure != null && this.failure instanceof Skip;
+  },
+
+  /** @noRailsEquivalent PERMANENT */
+  isError(this: Test | Result): boolean {
+    return this.failures.some((failure) => failure instanceof UnexpectedError);
+  },
+};
+
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
+/** @noRailsEquivalent PERMANENT */
 export class Test {
+  /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
   /** @noRailsEquivalent PERMANENT */
   static PASSTHROUGH_EXCEPTIONS = [SignalException, SystemExit];
   /** @noRailsEquivalent PERMANENT */
@@ -134,12 +157,7 @@ export class Test {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  isPassed(): boolean {
-    return !this.failure;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  async run(): Promise<this> {
+  async run(): Promise<Result> {
     await this.timeIt(async () => {
       await this.captureExceptions(async () => {
         for (const hook of Test.SETUP_METHODS) {
@@ -156,7 +174,7 @@ export class Test {
       }
     });
 
-    return this;
+    return Result.from(this);
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -184,16 +202,6 @@ export class Test {
         this.failures.push(new UnexpectedError(e as Error));
       }
     }
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  isSkipped(): boolean {
-    return this.failure != null && this.failure instanceof Skip;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  isError(): boolean {
-    return this.failures.some((failure) => failure instanceof UnexpectedError);
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -226,6 +234,65 @@ export class Test {
 }
 
 rbDeclareIvar(Test, "@NAME", "name");
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Minitest::Reportable` (`test.rb:13`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Test extends Included<typeof Reportable> {}
+include(Test, Reportable);
+
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
+/** @noRailsEquivalent PERMANENT */
+export class Result {
+  /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+  /** @noRailsEquivalent PERMANENT */
+  name: string;
+  /** @noRailsEquivalent PERMANENT */
+  klass: string | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  assertions = 0;
+  /** @noRailsEquivalent PERMANENT */
+  failures: Assertion[] = [];
+  /** @noRailsEquivalent PERMANENT */
+  time: number | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  metadata?: Record<string, unknown>;
+  /** @noRailsEquivalent PERMANENT */
+  sourceLocation: [string, number] | null = null;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static from(runnable: Test): Result {
+    const o = runnable;
+
+    const r = new this(o.name);
+    r.klass = rbModName(o.constructor);
+    r.assertions = o.assertions;
+    r.failures = [...o.failures];
+    r.time = o.time;
+    if (o.isMetadata()) r.metadata = o.metadata;
+
+    r.sourceLocation = ["unknown", -1];
+
+    return r;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  className(): string | null {
+    return this.klass;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get failure(): Assertion | undefined {
+    return this.failures[0];
+  }
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Minitest::Reportable` (`minitest.rb:652`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Result extends Included<typeof Reportable> {}
+include(Result, Reportable);
 
 function classNameOf(e: Error): string {
   if (e.name && e.name !== "Error") return e.name;

@@ -63,6 +63,18 @@ export default defineConfig({
           },
         },
       },
+      {
+        extends: true,
+        test: {
+          name: "actionpack",
+          typecheck: {
+            enabled: true,
+            only: true,
+            include: ["packages/actionpack/dx-tests/**/*.test-d.ts"],
+            tsconfig: "./packages/actionpack/dx-tests/tsconfig.json",
+          },
+        },
+      },
     ],
   },
 });

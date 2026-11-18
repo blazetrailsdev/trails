@@ -336,9 +336,7 @@ export const ParamsWrapper = {
   _performParameterWrapping,
 };
 extend(ParamsWrapper, Concern);
-(
-  ParamsWrapper as unknown as { included(base: null, block: (this: object) => void): void }
-).included(null, function (this: object) {
+Concern.included.call(ParamsWrapper, null, function (this: object) {
   classAttribute.call(this, "_wrapperOptions", { default: Options.fromHash({ format: [] }) });
   deferInherited.call(this as WrapperHostClass);
 });

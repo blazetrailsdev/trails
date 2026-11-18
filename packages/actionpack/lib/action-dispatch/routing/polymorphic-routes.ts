@@ -38,8 +38,8 @@ export interface PolymorphicRoutesAccessor {
 }
 
 export interface PolymorphicHost {
-  _routes: PolymorphicRoutesAccessor;
-  [helper: string]: unknown;
+  _routes: PolymorphicRoutesAccessor | null;
+  fullUrlFor?(options: unknown): string;
 }
 
 export type PolymorphicArg =
@@ -176,7 +176,7 @@ export function polymorphicMapping(
   target: PolymorphicHost,
   record: unknown,
 ): PolymorphicMappingEntry | undefined {
-  const mappings = target._routes.polymorphicMappings;
+  const mappings = target._routes!.polymorphicMappings;
   if (!mappings) return undefined;
   if (isToModel(record)) {
     return mappings.get(record.toModel().modelName.name);

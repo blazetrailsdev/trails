@@ -891,9 +891,6 @@ importers:
 
   packages/mail:
     dependencies:
-      '@blazetrails/activesupport':
-        specifier: workspace:*
-        version: link:../activesupport
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
@@ -1020,6 +1017,9 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
     devDependencies:
+      '@blazetrails/rack-test':
+        specifier: workspace:*
+        version: link:../rack-test
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
@@ -1373,6 +1373,9 @@ importers:
       '@blazetrails/mail':
         specifier: workspace:*
         version: link:../mail
+      '@blazetrails/rack-cors':
+        specifier: workspace:*
+        version: link:../rack-cors
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../rack-test
@@ -1406,6 +1409,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -1493,6 +1499,9 @@ importers:
       '@blazetrails/stimulus':
         specifier: workspace:*
         version: link:../stimulus
+      '@blazetrails/turbo':
+        specifier: workspace:*
+        version: link:../turbo
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers

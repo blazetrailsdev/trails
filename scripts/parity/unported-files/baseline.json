@@ -225,33 +225,21 @@
     "reason": "Pre-1.0: optional backend mixin — caches parsed translation files on disk."
   },
   {
-    "pattern": "backend/cascade.rb",
-    "testFile": "backend/cascade_test.rb",
-    "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`)."
-  },
-  {
     "pattern": "backend/interpolation_compiler.rb",
     "testFile": "backend/interpolation_compiler_test.rb",
     "package": "i18n",
     "reason": "Pre-1.0: optional backend mixin — compiles interpolations into Ruby procs via `eval`/`instance_eval`, which has no trails counterpart."
   },
   {
-    "pattern": "backend/memoize.rb",
-    "testFile": "backend/memoize_test.rb",
-    "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin — memoizes lookups per locale."
-  },
-  {
     "pattern": "backend/metadata.rb",
     "testFile": "backend/metadata_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin — attaches lookup metadata onto the translated String's singleton class. JS strings take no per-instance state."
+    "reason": "PERMANENT: attaches lookup metadata onto the translated String's singleton class — CLAUDE.md \u00a7 \"Ruby Strings are JS string primitives (no mutable String carrier)\" and \u00a7 \"Core extensions are not installed on native prototypes\"."
   },
   {
     "testFile": "api/all_features_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixins — a Chain of every deferred mixin (Cascade, Memoize, Metadata, Pluralization, Fallbacks) at once."
+    "reason": "PERMANENT: includes I18n::Backend::Cache and Metadata — packages/i18n/CLAUDE.md \u00a7 \"A translation lookup is synchronous; the load is an awaited step\" and CLAUDE.md \u00a7 \"Ruby Strings are JS string primitives (no mutable String carrier)\"."
   },
   {
     "testFile": "api/cascade_test.rb",
@@ -269,26 +257,9 @@
     "reason": "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data."
   },
   {
-    "pattern": "gettext",
-    "testFile": "gettext/",
-    "package": "i18n",
-    "reason": "Pre-1.0: gettext .po support — the catalogue parser, the `_`/`n_`/`s_` helpers, and the backend mixin that loads .po files. A Ruby toolchain concern with no trails consumer; Rails' own I18n usage never touches it."
-  },
-  {
-    "testFile": "gettext_plural_keys_test.rb",
-    "package": "i18n",
-    "reason": "Pre-1.0: gettext .po support — exercises `I18n::Gettext.plural_keys`. Sits at test/i18n/, outside the `gettext/` prefix above."
-  },
-  {
-    "pattern": "middleware.rb",
-    "testFile": "i18n/middleware_test.rb",
-    "package": "i18n",
-    "reason": "Rack middleware that resets `I18n.locale` after each request. trails has no Rack request lifecycle wiring for i18n yet; resetting is done explicitly by callers."
-  },
-  {
     "testFile": "backend/transliterator_test.rb",
     "tests": ["default transliterator raises errors for invalid UTF-8"],
-    "reason": "Feeds `\"a\\x92b\"`, whose bytes are not valid UTF-8, and relies on Ruby's regexp engine raising `ArgumentError: invalid byte sequence` (transliterator.rb:96). A JS string is UTF-16 code units with no invalid-byte state to reach, so no input makes the ported `transliterate` raise."
+    "reason": "PERMANENT: CLAUDE.md \u00a7 \"A String has no encoding tag either\"."
   },
   {
     "pattern": "tests/",

@@ -50,6 +50,7 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
   constructor(private readonly stmt: Database.Statement) {}
 
   private bind<T>(binds: SqliteBinds | undefined, call: (args: unknown[]) => T): T {
+    this._columns = null;
     const args = bindArgs(binds);
     try {
       if (binds !== undefined && !Array.isArray(binds)) return call(args);
@@ -116,14 +117,17 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
     return this.stmt.reader;
   }
 
+  /** @perf 1.7% — PERMANENT */
+  private _columns: ColumnInfo[] | null = null;
+
   columns(): ColumnInfo[] {
-    return this.stmt.columns().map((c) => ({
+    return (this._columns ??= this.stmt.columns().map((c) => ({
       name: c.name,
       column: c.column,
       table: c.table,
       database: c.database,
       type: c.type,
-    }));
+    })));
   }
 
   setReadBigInts(on: boolean): void {

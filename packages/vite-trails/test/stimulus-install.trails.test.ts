@@ -59,7 +59,7 @@ describe("stimulus:install", () => {
     const entrypoint = await File.readAsync(
       rootDir.join("app/javascript/entrypoints/application.js").toString(),
     );
-    expect(entrypoint).toContain(`import "./controllers"\n`);
+    expect(entrypoint).toContain(`import "~/controllers"\n`);
     expect(
       await File.isExistAsync(rootDir.join("app/javascript/controllers/index.js").toString()),
     ).toBe(true);
@@ -69,5 +69,21 @@ describe("stimulus:install", () => {
       ),
     ).toBe(true);
     expect(system).toHaveBeenCalledWith("pnpm add @hotwired/stimulus");
+  });
+
+  it("installs the bun arm into a vite:install app", { timeout: 60_000 }, async () => {
+    await File.writeAsync(rootDir.join("bun.config.js").toString(), "");
+    await Dir.chdir(rootDir.toString(), async () => {
+      ViteAssets.reloadWith({ root: rootDir.toString(), mode: "development" });
+      await new CLI.Install().call();
+      const { Tasks } = await import("@blazetrails/stimulus/tasks/stimulus-tasks.js");
+      await Tasks.runStimulusInstallTemplate("stimulus-with-bun");
+    });
+
+    const entrypoint = await File.readAsync(
+      rootDir.join("app/javascript/entrypoints/application.js").toString(),
+    );
+    expect(entrypoint).toContain(`import "~/controllers"\n`);
+    expect(system).toHaveBeenCalledWith("bun add @hotwired/stimulus");
   });
 });
