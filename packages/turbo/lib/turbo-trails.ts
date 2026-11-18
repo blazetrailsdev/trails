@@ -30,6 +30,7 @@ import type { NavigationController } from "./app/controllers/turbo/native/naviga
 import type { RequestIdTracking } from "./app/controllers/concerns/turbo/request-id-tracking.js";
 import type { Broadcastable } from "./app/models/concerns/turbo/broadcastable.js";
 import type { TagBuilder } from "./app/models/turbo/streams/tag-builder.js";
+import type { Tasks } from "./tasks/turbo-tasks.js";
 import type { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
@@ -94,6 +95,7 @@ export const Turbo = {
   ThreadDebouncer?: typeof ThreadDebouncer;
   RequestIdTracking?: typeof RequestIdTracking;
   Broadcastable?: typeof Broadcastable;
+  Tasks?: typeof Tasks;
   Frames: {
     FrameRequest?: typeof FrameRequest;
   };
