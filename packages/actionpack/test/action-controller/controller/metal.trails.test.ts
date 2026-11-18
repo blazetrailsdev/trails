@@ -11,8 +11,8 @@ function makeRequest(): Request {
   return new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" });
 }
 
-function makeResponse(): Response {
-  return new Response();
+async function makeResponse(): Promise<Response> {
+  return await Response.new();
 }
 
 describe("Metal#params", () => {
@@ -39,58 +39,58 @@ describe("Metal#params", () => {
     const c = new TestController();
     const assigned = new Parameters({ id: "7" });
     c.params = assigned;
-    await c.dispatch("index", req, makeResponse());
+    await c.dispatch("index", req, await makeResponse());
     expect(c.receivedParams).toBe(assigned);
   });
 });
 
 describe("Metal#response_body=", () => {
-  it("takes the String arm for an html-safe SafeBuffer, as Ruby's is_a?(String) does", () => {
+  it("takes the String arm for an html-safe SafeBuffer, as Ruby's is_a?(String) does", async () => {
     const c = new (class extends Metal {})();
-    c.setResponseBang(makeResponse());
-    c.responseBody = htmlSafe("<p>hi</p>");
+    c.setResponseBang(await makeResponse());
+    await c.setResponseBody(htmlSafe("<p>hi</p>"));
     expect(c.response.body).toBe("<p>hi</p>");
   });
 });
 
 describe("Metal#response_body= / #status=", () => {
-  it("joins an Array body", () => {
+  it("joins an Array body", async () => {
     const c = new (class extends Metal {})();
-    c.setResponseBang(makeResponse());
-    c.responseBody = ["a", "b"];
+    c.setResponseBang(await makeResponse());
+    await c.setResponseBody(["a", "b"]);
     expect(c.response.body).toBe("ab");
   });
 
-  it("a nil body resets the response's", () => {
+  it("a nil body resets the response's", async () => {
     const c = new (class extends Metal {})();
-    c.setResponseBang(makeResponse());
-    c.responseBody = "hi";
-    c.responseBody = null;
+    c.setResponseBang(await makeResponse());
+    await c.setResponseBody("hi");
+    await c.setResponseBody(null);
     expect(c.response.body).toBe("");
   });
 
-  it("status= and head raise on an unknown status symbol", () => {
+  it("status= and head raise on an unknown status symbol", async () => {
     const klass = class extends Metal {};
     include(klass, Head);
     const c = new klass() as Metal & Included<typeof Head>;
-    c.setResponseBang(makeResponse());
+    c.setResponseBang(await makeResponse());
     expect(() => {
       c.status = ":bogus";
     }).toThrow("Unrecognized status code :bogus");
-    expect(() => c.head(":bogus")).toThrow("Unrecognized status code :bogus");
+    await expect(c.head(":bogus")).rejects.toThrow("Unrecognized status code :bogus");
   });
 });
 
 describe("Metal#dispatch", () => {
   it("seats the controller on the request's action_controller.instance", async () => {
     class TestController extends Metal {
-      index(): void {
-        this.responseBody = "ok";
+      async index(): Promise<void> {
+        await this.setResponseBody("ok");
       }
     }
     const c = new TestController();
     const req = makeRequest();
-    await c.dispatch("index", req, makeResponse());
+    await c.dispatch("index", req, await makeResponse());
     expect(req.controllerInstance).toBe(c);
     expect(req.env["action_controller.instance"]).toBe(c);
   });
@@ -114,21 +114,21 @@ describe("Metal.middlewareStack", () => {
 });
 
 describe("Metal#response_code / #to_a", () => {
-  it("response_code is an alias of status", () => {
+  it("response_code is an alias of status", async () => {
     const c = new (class extends Metal {})();
-    c.setResponseBang(makeResponse());
+    c.setResponseBang(await makeResponse());
     c.status = 404;
     expect(c.responseCode).toBe(404);
   });
 
   it("to_a is the response's Rack triple", async () => {
     class TestController extends Metal {
-      index(): void {
-        this.responseBody = "hi";
+      async index(): Promise<void> {
+        await this.setResponseBody("hi");
       }
     }
     const c = new TestController();
-    const triple = await c.dispatch("index", makeRequest(), makeResponse());
+    const triple = await c.dispatch("index", makeRequest(), await makeResponse());
     expect(triple[0]).toBe(200);
     expect(c.toA()[0]).toBe(200);
   });

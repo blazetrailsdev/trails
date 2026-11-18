@@ -56,8 +56,8 @@ const Encryptor = new MessageEncryptor(Generator.generateKey(SessionSalt, 32) as
 });
 
 class TestController extends Base {
-  noSessionAccess(): void {
-    this.head(":ok");
+  async noSessionAccess(): Promise<void> {
+    await this.head(":ok");
   }
 
   async persistentSessionId(): Promise<void> {
@@ -84,19 +84,19 @@ class TestController extends Base {
     await this.render({ plain: `class: ${rbModToS(rbObjClass(this.session))}` });
   }
 
-  callSessionClear(): void {
+  async callSessionClear(): Promise<void> {
     this.session.clear();
-    this.head(":ok");
+    await this.head(":ok");
   }
 
   async callResetSession(): Promise<void> {
     await this.resetSession();
-    this.head(":ok");
+    await this.head(":ok");
   }
 
-  raiseDataOverflow(): void {
+  async raiseDataOverflow(): Promise<void> {
     this.session.set("foo", "bye!".repeat(1024));
-    this.head(":ok");
+    await this.head(":ok");
   }
 
   async changeSessionId(): Promise<void> {
@@ -104,12 +104,12 @@ class TestController extends Base {
     await this.getSessionId();
   }
 
-  renewSessionId(): void {
+  async renewSessionId(): Promise<void> {
     (this.request.sessionOptions as unknown as InstanceType<typeof Session.Options>).set(
       "renew",
       true,
     );
-    this.head(":ok");
+    await this.head(":ok");
   }
 }
 

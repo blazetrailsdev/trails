@@ -51,13 +51,13 @@ class ViewLoadPathsTest extends TestCase {
     });
   }
 
-  override setup(): void {
+  override async setup(): Promise<void> {
     DetailsKey.clear();
 
     this.controller = new TestController();
     Object.assign(this, {
       request: ControllerTestRequest.create(this.controller.constructor),
-      response: new ActionDispatch.TestResponse(),
+      response: await ActionDispatch.TestResponse.new(),
     });
     this.paths = TestController.viewPaths();
     super.setup();
@@ -97,7 +97,7 @@ describe("ViewLoadPathsTest", () => {
   beforeEach(async ({ task }) => {
     tc = new ViewLoadPathsTest(task.name);
     await tc.beforeSetup();
-    tc.setup();
+    await tc.setup();
     controller = tc.controller as TestController;
   });
 

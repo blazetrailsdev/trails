@@ -382,7 +382,7 @@ describe("Engine", () => {
 
     const controller = new PostsController();
     controller.setRequestBang(new Request(MockRequest.envFor("/posts")));
-    controller.setResponseBang(new Response());
+    controller.setResponseBang(await Response.new());
     await controller.render({ action: "index" });
     expect(controller.response.body).toBe("posts#index\n");
     resetLoadHooks();

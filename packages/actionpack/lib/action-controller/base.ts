@@ -326,7 +326,7 @@ export interface Base
   redirectTo<FlashType extends string = never>(
     options?: RedirectToOptions,
     responseOptionsAndFlash?: RedirectToResponseOptionsAndFlash<FlashType>,
-  ): number;
+  ): Promise<number>;
   redirectBack: OmitThisParameter<typeof redirectBack>;
   redirectBackOrTo: OmitThisParameter<typeof redirectBackOrTo>;
   urlFrom: OmitThisParameter<typeof urlFrom>;

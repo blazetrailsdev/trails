@@ -79,9 +79,10 @@ describe("RenderersTest", () => {
 
   it("using custom render option", async () => {
     try {
-      addRenderer("simon", function (this: TestController, says) {
+      addRenderer("simon", async function (this: TestController, says) {
         this.contentType = Mime.get("text");
-        return (this.responseBody = `Simon says: ${says}`);
+        await this.setResponseBody(`Simon says: ${says}`);
+        return `Simon says: ${says}`;
       });
 
       await tc.get("renderSimonSays");

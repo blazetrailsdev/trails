@@ -31,7 +31,8 @@ export interface RenderOptions {
 }
 
 export interface RenderingHost {
-  responseBody: unknown;
+  readonly responseBody: unknown;
+  setResponseBody(responseBody: unknown): void | Promise<void>;
   renderToBody(options: RenderOptions): unknown;
   /** @internal */
   _setHtmlContentType(): void;
@@ -53,14 +54,15 @@ export interface RenderingHost {
 export function render<T extends RenderingHost>(this: T, ...args: unknown[]): unknown {
   const options = this._normalizeRender(...args);
   const renderedBody = this.renderToBody(options);
-  const set = (renderedBody: unknown): unknown => {
+  const set = async (renderedBody: unknown): Promise<unknown> => {
     if (options.html != null && options.html !== false) {
       this._setHtmlContentType();
     } else {
       this._setRenderedContentType(this.renderedFormat());
     }
     this._setVaryHeader();
-    return (this.responseBody = renderedBody);
+    await this.setResponseBody(renderedBody);
+    return renderedBody;
   };
   if (typeof (renderedBody as PromiseLike<unknown> | null)?.then === "function") {
     return Promise.resolve(renderedBody).then(set);

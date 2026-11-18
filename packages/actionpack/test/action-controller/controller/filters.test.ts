@@ -70,7 +70,7 @@ function rq(): Request {
   return new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "test.host" });
 }
 async function run(ctrl: Base, action = "show"): Promise<Base & Ivars> {
-  await ctrl.dispatch(action, rq(), new Response());
+  await ctrl.dispatch(action, rq(), await Response.new());
   return ctrl;
 }
 function push(name: string, prop = "ranFilter") {
@@ -112,10 +112,10 @@ for (const i of [1, 2, 3]) {
     async [`fail${i}`](this: Base) {
       await this.render({ plain: String(i) });
     },
-    [`try${i}`](this: Base) {
+    async [`try${i}`](this: Base) {
       ivars(this).try = i;
       if (this.actionName === `fail${i}`) {
-        this.head(404);
+        await this.head(404);
       }
     },
   });
@@ -157,9 +157,9 @@ class FT_BeforeActionRedirectionController extends Base {
     await this.render({ inline: "ran target_of_redirection action" });
   }
 
-  private beforeActionRedirects() {
+  private async beforeActionRedirects() {
     push("before_action_redirects")(this);
-    this.redirectTo({ action: "target_of_redirection" });
+    await this.redirectTo({ action: "target_of_redirection" });
   }
 
   private unreachedAfterAction() {

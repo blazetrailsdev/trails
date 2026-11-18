@@ -145,8 +145,7 @@ export interface Attributes extends Pick<
 }
 
 type AttributeMethodSuffixHost = AttributeMethodHost &
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
-  (new (...args: any[]) => any) & { prototype: object } & {
+  (new (...args: never[]) => unknown) & { prototype: object } & {
     attributeMethodSuffix(
       ...suffixes: Array<string | { parameters?: string | null | false }>
     ): void;

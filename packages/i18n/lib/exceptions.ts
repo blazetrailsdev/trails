@@ -253,6 +253,34 @@ export class UnsupportedMethod extends ArgumentError {
   }
 }
 
+export class InvalidFilenames extends ArgumentError {
+  static readonly NUMBER_OF_ERRORS_SHOWN = 20;
+
+  constructor(fileErrors: Error[]) {
+    super(`Found ${fileErrors.length} error(s).
+The first ${Math.min(fileErrors.length, InvalidFilenames.NUMBER_OF_ERRORS_SHOWN)} error(s):
+${fileErrors
+  .map((e) => e.message)
+  .slice(0, InvalidFilenames.NUMBER_OF_ERRORS_SHOWN)
+  .join("\n")}
+
+To use the LazyLoadable backend:
+1. Filenames must start with the locale.
+2. An underscore must separate the locale with any optional text that follows.
+3. The file must only contain translation data for the single locale.
+
+Example:
+"/config/locales/fr.yml" which contains:
+\`\`\`yml
+  fr:
+    dog:
+      chien
+\`\`\`
+`);
+    this.name = "InvalidFilenames";
+  }
+}
+
 export class ExceptionHandler {
   call(exception: Error, _locale: Locale, _key: TranslationKey, _options: unknown): string {
     if (exception instanceof MissingTranslation) {

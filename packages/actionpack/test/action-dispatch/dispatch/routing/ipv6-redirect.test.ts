@@ -17,8 +17,8 @@ class BadRouteRequestController extends Base {
     await this.render({ plain: (this as unknown as { fooPath(): string }).fooPath() });
   }
 
-  foo(): void {
-    this.redirectTo({ action: "index" });
+  async foo(): Promise<void> {
+    await this.redirectTo({ action: "index" });
   }
 }
 constSet(TopLevel, "BadRouteRequestController", BadRouteRequestController);

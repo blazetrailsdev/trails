@@ -58,8 +58,8 @@ CustomActionableError.action("Action 1", () => null);
 CustomActionableError.action("Action 2", () => null);
 
 class SimpleController extends ControllerBase {
-  hello(): void {
-    this.responseBody = "hello";
+  async hello(): Promise<void> {
+    await this.setResponseBody("hello");
   }
 }
 

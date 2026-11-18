@@ -29,6 +29,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "activerecord",
     "activesupport",
     "rack",
+    "rack-cors",
     "rack-proxy",
     "rack-session",
     "rack-test",

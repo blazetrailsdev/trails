@@ -8,5 +8,5 @@ import type { Response } from "../http/response.js";
 export interface DispatchableControllerClass {
   new (): unknown;
   dispatch(action: string, req: Request, res: Response): Promise<RackResponse>;
-  makeResponseBang(request: Request): Response;
+  makeResponseBang(request: Request): Promise<Response>;
 }

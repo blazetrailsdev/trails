@@ -125,10 +125,10 @@ describe("RailtieTest (trails-only)", () => {
 
     class WidgetsController extends LogRuntimeController {
       static actions = ["index"];
-      index(): void {
+      async index(): Promise<void> {
         RuntimeRegistry.setSqlRuntime(RuntimeRegistry.sqlRuntime() + 12.0);
         RuntimeRegistry.setQueriesCount(RuntimeRegistry.queriesCount() + 1);
-        this.head(204);
+        await this.head(204);
       }
     }
 
@@ -136,7 +136,7 @@ describe("RailtieTest (trails-only)", () => {
       await new WidgetsController().dispatch(
         "index",
         new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/widgets", HTTP_HOST: "localhost" }),
-        new Response(),
+        await Response.new(),
       );
     } finally {
       Notifications.unsubscribe(subscriber);

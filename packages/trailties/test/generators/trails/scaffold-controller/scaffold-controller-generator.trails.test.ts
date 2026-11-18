@@ -39,7 +39,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
       declare postsPath: (...args: unknown[]) => string;
 
       async destroy(): Promise<void> {
-        this.redirectTo(this.postsPath(), {
+        await this.redirectTo(this.postsPath(), {
           notice: "Post was successfully destroyed.",
           status: ":see_other",
         });

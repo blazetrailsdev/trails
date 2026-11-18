@@ -247,12 +247,15 @@ describe("Metal wiring", () => {
     expect(() => host.render()).toThrow(DoubleRenderError);
   });
 
-  test("render delegates to abstract render when not yet performed", () => {
+  test("render delegates to abstract render when not yet performed", async () => {
     const host = including({
       request: { shouldApplyVaryHeader: () => false },
       response: { headers: new Map<string, string>() },
       performed: false,
       responseBody: null as unknown,
+      setResponseBody(this: { responseBody: unknown }, responseBody: unknown) {
+        this.responseBody = responseBody;
+      },
       renderToBody: (opts: Record<string, unknown>) => `body:${String(opts.plain ?? "")}`,
       _setHtmlContentType: () => {},
       _setRenderedContentType: () => {},
@@ -260,7 +263,7 @@ describe("Metal wiring", () => {
       renderedFormat: () => null,
       ...normalizeRender,
     });
-    host.render({ plain: "hi" });
+    await host.render({ plain: "hi" });
     expect(host.responseBody).toBe("body:hi");
   });
 

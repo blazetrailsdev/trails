@@ -174,8 +174,8 @@ export class Metal extends AbstractControllerBase {
       : underscore(demodulize(this.name).replace(/Controller$/, "")));
   }
 
-  static makeResponseBang(request: Request): Response {
-    const res = new Response();
+  static async makeResponseBang(request: Request): Promise<Response> {
+    const res = await Response.new();
     res.request = request;
     return res;
   }
@@ -195,7 +195,7 @@ export class Metal extends AbstractControllerBase {
   static action(this: typeof Metal, name: string): RackApp | RackAppObject {
     const app: RackApp = async (env: RackEnv) => {
       const req = new Request(env);
-      const res = this.makeResponseBang(req);
+      const res = await this.makeResponseBang(req);
       const controller = new this();
       await controller.dispatch(name, req, res);
       return controller.toA();
@@ -302,13 +302,13 @@ export class Metal extends AbstractControllerBase {
     return this.response.mediaType;
   }
 
-  override set responseBody(body: unknown) {
+  override async setResponseBody(body: unknown): Promise<void> {
     if (body != null && body !== false) {
       if (typeof body === "string" || body instanceof SafeBuffer) body = [body];
-      this.response.body = body;
-      super.responseBody = body;
+      await this.response.setBody(body);
+      super.setResponseBody(body);
     } else {
-      this.response.resetBodyBang();
+      await this.response.resetBodyBang();
     }
   }
 

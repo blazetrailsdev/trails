@@ -6,11 +6,11 @@ import { XML, type Html5Document } from "@blazetrails/nokogiri";
 import { TestResponse } from "../../../lib/action-dispatch/testing/test-response.js";
 
 describe("TestResponseTest", () => {
-  function assertResponseCodeRange(
+  async function assertResponseCodeRange(
     range: Range<number> | number[],
     predicate: "isSuccessful" | "isNotFound" | "isRedirection" | "isServerError" | "isClientError",
-  ): void {
-    const response = new TestResponse();
+  ): Promise<void> {
+    const response = await TestResponse.new();
     for (let status = 0; status <= 599; status++) {
       response.status = status;
       expect(response[predicate], `ActionDispatch::TestResponse.new(${status}).${predicate}`).toBe(
@@ -19,19 +19,19 @@ describe("TestResponseTest", () => {
     }
   }
 
-  it("helpers", () => {
-    assertResponseCodeRange(new Range(200, 299), "isSuccessful");
-    assertResponseCodeRange([404], "isNotFound");
-    assertResponseCodeRange(new Range(300, 399), "isRedirection");
-    assertResponseCodeRange(new Range(500, 599), "isServerError");
-    assertResponseCodeRange(new Range(400, 499), "isClientError");
+  it("helpers", async () => {
+    await assertResponseCodeRange(new Range(200, 299), "isSuccessful");
+    await assertResponseCodeRange([404], "isNotFound");
+    await assertResponseCodeRange(new Range(300, 399), "isRedirection");
+    await assertResponseCodeRange(new Range(500, 599), "isServerError");
+    await assertResponseCodeRange(new Range(400, 499), "isClientError");
   });
 
-  it("response parsing", () => {
-    let response = TestResponse.create(200, {}, "");
+  it("response parsing", async () => {
+    let response = await TestResponse.create(200, {}, "");
     assertEqual(response.body, response.parsedBody);
 
-    response = TestResponse.create(
+    response = await TestResponse.create(
       200,
       { "Content-Type": "application/json" },
       '{ "foo": "fighters" }',
@@ -39,7 +39,7 @@ describe("TestResponseTest", () => {
     assertKindOf(HashWithIndifferentAccess, response.parsedBody);
     assertEqual({ foo: "fighters" }, response.parsedBody);
 
-    response = TestResponse.create(
+    response = await TestResponse.create(
       200,
       { "Content-Type": "text/html" },
       `<html>
@@ -54,8 +54,8 @@ describe("TestResponseTest", () => {
     assertEqual("Content", (response.parsedBody as Html5Document).atXpath("/html/body/div")!.text);
   });
 
-  it("JSON response Hash pattern matching", () => {
-    const response = TestResponse.create(
+  it("JSON response Hash pattern matching", async () => {
+    const response = await TestResponse.create(
       200,
       { "Content-Type": "application/json" },
       '{ "foo": "fighters" }',
@@ -66,8 +66,8 @@ describe("TestResponseTest", () => {
     });
   });
 
-  it("JSON response Array pattern matching", () => {
-    const response = TestResponse.create(
+  it("JSON response Array pattern matching", async () => {
+    const response = await TestResponse.create(
       200,
       { "Content-Type": "application/json" },
       '[{ "foo": "fighters" }, { "nir": "vana" }]',

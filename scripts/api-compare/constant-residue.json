@@ -703,7 +703,7 @@
     }
   },
   "activesupport": {
-    "rows": 190,
+    "rows": 191,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -818,8 +818,6 @@
       "duration/iso8601-serializer.ts::ISO8601Serializer": "ActiveSupport::Duration::ISO8601Serializer",
       "json/encoding.ts::Encoding": "ActiveSupport::JSON::Encoding",
       "json/encoding.ts::JSONGemEncoder": "ActiveSupport::JSON::Encoding::JSONGemEncoder",
-      "logger.ts::Logger": "ActiveSupport::Logger",
-      "logger.ts::SimpleFormatter": "ActiveSupport::Logger::SimpleFormatter",
       "notifications/fanout.ts::AllMessages": "ActiveSupport::Notifications::Fanout::Subscribers::Matcher::AllMessages",
       "notifications/fanout.ts::EventObject": "ActiveSupport::Notifications::Fanout::Subscribers::EventObject",
       "notifications/fanout.ts::Evented": "ActiveSupport::Notifications::Fanout::Subscribers::Evented",
@@ -921,7 +919,7 @@
     }
   },
   "i18n": {
-    "rows": 30,
+    "rows": 33,
     "excluded": [],
     "unwalked": ["backend/transliterator.ts::Transliterator", "utils.ts::Utils"],
     "residue": {
@@ -1083,6 +1081,14 @@
       "multipart/parser.ts::MultipartTotalPartLimitError": "Rack::Multipart::MultipartTotalPartLimitError",
       "multipart/parser.ts::TempfilePart": "Rack::Multipart::Parser::Collector::TempfilePart",
       "urlmap.ts::URLMap": "Rack::URLMap"
+    }
+  },
+  "rack-cors": {
+    "rows": 5,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "cors/resources/cors-misconfiguration-error.ts::CorsMisconfigurationError": "Rack::Cors::Resource::CorsMisconfigurationError"
     }
   },
   "rack-proxy": {

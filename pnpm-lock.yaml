@@ -974,6 +974,22 @@ importers:
         specifier: 25.3.5
         version: 25.3.5
 
+  packages/rack-cors:
+    dependencies:
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
+
   packages/rack-proxy:
     dependencies:
       '@blazetrails/rack':
@@ -1605,6 +1621,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack
+      '@blazetrails/rack-cors':
+        specifier: workspace:*
+        version: link:../../packages/rack-cors
       '@blazetrails/rack-proxy':
         specifier: workspace:*
         version: link:../../packages/rack-proxy

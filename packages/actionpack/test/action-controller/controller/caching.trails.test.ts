@@ -12,8 +12,8 @@ function makeRequest(opts: Record<string, string> = {}): Request {
     ...opts,
   });
 }
-function makeResponse(): Response {
-  return new Response();
+async function makeResponse(): Promise<Response> {
+  return await Response.new();
 }
 
 describe("conditional GET", () => {
@@ -25,7 +25,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("show", makeRequest(), makeResponse());
+    await c.dispatch("show", makeRequest(), await makeResponse());
     expect(c.headers.get("etag")).toMatch(/^W\/"[a-f0-9]{32}"$/);
   });
 
@@ -38,7 +38,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("show", makeRequest(), makeResponse());
+    await c.dispatch("show", makeRequest(), await makeResponse());
     expect(c.headers.get("last-modified")).toBe("Sat, 15 Jun 2024 12:00:00 GMT");
   });
 
@@ -51,7 +51,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("show", makeRequest(), makeResponse());
+    await c.dispatch("show", makeRequest(), await makeResponse());
     expect(c.headers.get("last-modified")).toBe("Sat, 15 Jun 2024 12:00:00 GMT");
   });
 
@@ -63,7 +63,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("show", makeRequest(), makeResponse());
+    await c.dispatch("show", makeRequest(), await makeResponse());
     expect(c.headers.get("cache-control")).toBe("public");
   });
 
@@ -75,7 +75,7 @@ describe("conditional GET", () => {
       }
     }
     const c1 = new C();
-    await c1.dispatch("show", makeRequest(), makeResponse());
+    await c1.dispatch("show", makeRequest(), await makeResponse());
     const etag = c1.headers.get("etag")!;
     expect(c1.status).toBe(200);
 
@@ -88,7 +88,7 @@ describe("conditional GET", () => {
         HTTP_HOST: "localhost",
         HTTP_IF_NONE_MATCH: etag,
       }),
-      makeResponse(),
+      await makeResponse(),
     );
     expect(c2.status).toBe(304);
   });
@@ -110,7 +110,7 @@ describe("conditional GET", () => {
         HTTP_HOST: "localhost",
         HTTP_IF_MODIFIED_SINCE: date.toUTCString(),
       }),
-      makeResponse(),
+      await makeResponse(),
     );
     expect(c.status).toBe(304);
   });
@@ -131,7 +131,7 @@ describe("conditional GET", () => {
         HTTP_HOST: "localhost",
         HTTP_IF_NONE_MATCH: 'W/"old-etag"',
       }),
-      makeResponse(),
+      await makeResponse(),
     );
     expect(c.status).toBe(200);
   });
@@ -145,7 +145,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("show", makeRequest(), makeResponse());
+    await c.dispatch("show", makeRequest(), await makeResponse());
     expect(result).toBe(true);
     expect(c.response.body).toBe("content");
   });
@@ -158,7 +158,7 @@ describe("conditional GET", () => {
       }
     }
     const c1 = new C();
-    await c1.dispatch("show", makeRequest(), makeResponse());
+    await c1.dispatch("show", makeRequest(), await makeResponse());
     const etag = c1.headers.get("etag")!;
 
     let result: boolean | undefined;
@@ -177,7 +177,7 @@ describe("conditional GET", () => {
         HTTP_HOST: "localhost",
         HTTP_IF_NONE_MATCH: etag,
       }),
-      makeResponse(),
+      await makeResponse(),
     );
     expect(result).toBe(false);
   });
@@ -190,7 +190,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.headers.get("cache-control")).toBe("max-age=3600, private");
   });
 
@@ -202,7 +202,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.headers.get("cache-control")).toBe("max-age=600, public");
   });
 
@@ -214,7 +214,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.headers.get("cache-control")).toBe("max-age=300, private, must-revalidate");
   });
 
@@ -226,7 +226,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.headers.get("cache-control")).toBe("max-age=60, public, must-revalidate");
   });
 
@@ -238,7 +238,7 @@ describe("conditional GET", () => {
       }
     }
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.headers.get("cache-control")).toBe("no-cache");
   });
 });

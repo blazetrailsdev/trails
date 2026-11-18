@@ -194,7 +194,7 @@ export class Trailtie extends BaseTrailtie {
       if (!Logger.isLoggerOutputsTo(Trails.logger!, STDERR, STDOUT)) {
         const console = new Logger(STDERR);
         console.level = Trails.logger!.level;
-        (Trails.logger as BroadcastLogger).broadcastTo(console);
+        (Trails.logger as unknown as BroadcastLogger).broadcastTo(console);
       }
       ActiveRecord.setVerboseQueryLogs(false);
       ActiveRecord.Base.attributesForInspect = ":all";

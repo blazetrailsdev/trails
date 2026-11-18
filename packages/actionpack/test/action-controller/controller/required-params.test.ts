@@ -18,9 +18,9 @@ import {
 } from "../../../lib/action-controller/metal/strong-parameters.js";
 
 class BooksController extends Base {
-  create() {
+  async create() {
     (this.params.require("book") as Parameters).require("name");
-    this.head(":ok");
+    await this.head(":ok");
   }
 }
 

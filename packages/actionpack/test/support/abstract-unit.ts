@@ -471,8 +471,8 @@ export const RoutingTestHelpers = {
 };
 
 export class ResourcesController extends Base {
-  index(): void {
-    this.head(":ok");
+  async index(): Promise<void> {
+    await this.head(":ok");
   }
   declare show: ResourcesController["index"];
   static {

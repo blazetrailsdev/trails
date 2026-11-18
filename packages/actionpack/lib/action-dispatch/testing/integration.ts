@@ -386,7 +386,7 @@ export class Session {
     const stream = (this.request.controllerInstance as Metal | undefined)?.response?.stream;
     if (stream instanceof Buffer && !(stream instanceof LiveBuffer)) await stream.awaitBody();
     const response = this._mockSession.lastResponse();
-    this.response = TestResponse.fromResponse(response);
+    this.response = await TestResponse.fromResponse(response);
     this.response.request = this.request;
     this._htmlDocument = null;
     this._urlOptions = undefined;

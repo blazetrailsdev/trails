@@ -61,6 +61,7 @@ export const ActiveSupport = {
   XmlMini: typeof import("./xml-mini.js");
   LazyLoadHooks: typeof import("./lazy-load-hooks.js");
   BroadcastLogger: typeof BroadcastLogger;
+  Logger: typeof Logger;
   Duration: typeof Duration;
   TestCase?: typeof import("./test-case.js").TestCase;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;

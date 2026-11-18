@@ -5,15 +5,15 @@ type Host = InstanceType<typeof ActionController.Base>;
 
 export const FileServer = {
   /** @internal */
-  serveFile(
+  async serveFile(
     this: Host,
     path: string,
     { contentType, disposition }: { contentType: string | null; disposition: string | null },
-  ): ReturnType<Files["serving"]> {
+  ): Promise<ReturnType<Files["serving"]>> {
     const result = new Files(null).serving(this.request, path);
     const [status, headers, body] = result;
     this.status = status;
-    this.responseBody = body;
+    await this.setResponseBody(body);
 
     for (const [name, value] of Object.entries(headers)) {
       this.response.headers.set(name, value);

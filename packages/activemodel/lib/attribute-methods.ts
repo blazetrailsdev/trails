@@ -498,8 +498,7 @@ export const ClassMethods = {
 
 export const AttributeMethods = {
   ClassMethods,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
-  [included](base: (new (...args: any[]) => any) & { prototype: object }): void {
+  [included](base: (new (...args: never[]) => unknown) & { prototype: object }): void {
     extend(base, ClassMethods);
 
     classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });

@@ -39,7 +39,7 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
     this.<%= singular %> = <%= this.ormClass().build(modelClassName, params) %>;
 
     if (await this.<%= this.ormInstance().save() %>) {
-      this.redirectTo(<%= this.redirectResourceName() %>, { notice: "<%= this.humanName() %> was successfully created." });
+      await this.redirectTo(<%= this.redirectResourceName() %>, { notice: "<%= this.humanName() %> was successfully created." });
     } else {
       await this.render("new", { status: ":unprocessable_entity" });
     }
@@ -48,7 +48,7 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
   // PATCH/PUT <%= this.routeUrl() %>/1
   async update()<%= sig %> {
     if (await this.<%= this.ormInstance().update(params) %>) {
-      this.redirectTo(<%= this.redirectResourceName() %>, { notice: "<%= this.humanName() %> was successfully updated.", status: ":see_other" });
+      await this.redirectTo(<%= this.redirectResourceName() %>, { notice: "<%= this.humanName() %> was successfully updated.", status: ":see_other" });
     } else {
       await this.render("edit", { status: ":unprocessable_entity" });
     }
@@ -57,7 +57,7 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
   // DELETE <%= this.routeUrl() %>/1
   async destroy()<%= sig %> {
     await this.<%= this.ormInstance().destroy() %>;
-    this.redirectTo(this.<%= this.indexHelper() %>Path(), { notice: "<%= this.humanName() %> was successfully destroyed.", status: ":see_other" });
+    await this.redirectTo(this.<%= this.indexHelper() %>Path(), { notice: "<%= this.humanName() %> was successfully destroyed.", status: ":see_other" });
   }
 
   // Use callbacks to share common setup or constraints between actions.

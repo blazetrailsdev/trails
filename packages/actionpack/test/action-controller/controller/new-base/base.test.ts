@@ -19,13 +19,14 @@ class SimpleController extends Base {
     await this.render({ body: "success" });
   }
 
-  modifyResponseBody(): void {
-    this.responseBody = "success";
+  async modifyResponseBody(): Promise<void> {
+    await this.setResponseBody("success");
   }
 
-  modifyResponseBodyTwice(): void {
-    const ret = (this.responseBody = "success");
-    this.responseBody = `${ret}!`;
+  async modifyResponseBodyTwice(): Promise<void> {
+    const ret = "success";
+    await this.setResponseBody(ret);
+    await this.setResponseBody(`${ret}!`);
   }
 
   modifyResponseHeaders(): void {}

@@ -30,20 +30,20 @@ export class DiskController extends BaseController {
     this.skipForgeryProtection();
   }
 
-  show(): void {
+  async show(): Promise<void> {
     try {
       const key = this.decodeVerifiedKey();
       if (key != null) {
-        this.serveFile(this.namedDiskService(key.service_name).pathFor(key.key), {
+        await this.serveFile(this.namedDiskService(key.service_name).pathFor(key.key), {
           contentType: key.content_type,
           disposition: key.disposition,
         });
       } else {
-        this.head(":not_found");
+        await this.head(":not_found");
       }
     } catch (error) {
       if (!(error instanceof Errno.ENOENT)) throw error;
-      this.head(":not_found");
+      await this.head(":not_found");
     }
   }
 
@@ -55,16 +55,16 @@ export class DiskController extends BaseController {
           await this.namedDiskService(token.service_name).upload(token.key, this.request.body, {
             checksum: token.checksum,
           });
-          this.head(":no_content");
+          await this.head(":no_content");
         } else {
-          this.head(":unprocessable_entity");
+          await this.head(":unprocessable_entity");
         }
       } else {
-        this.head(":not_found");
+        await this.head(":not_found");
       }
     } catch (error) {
       if (!(error instanceof IntegrityError)) throw error;
-      this.head(":unprocessable_entity");
+      await this.head(":unprocessable_entity");
     }
   }
 

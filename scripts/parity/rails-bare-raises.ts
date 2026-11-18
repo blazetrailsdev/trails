@@ -46,7 +46,9 @@ function foldMethods(rows: RaiseRow[]): BareRaises {
     if (names.length === 0) continue;
     for (const tsName of rubyMethodToTsIgnoringSkip(rubyName) ?? []) {
       if (tsName.startsWith("_") && !rubyName.startsWith("_")) continue;
-      methods[tsName] = [...new Set([...(methods[tsName] ?? []), ...names])].sort();
+      methods[tsName] = [
+        ...new Set([...(Object.hasOwn(methods, tsName) ? methods[tsName] : []), ...names]),
+      ].sort();
     }
   }
   return methods;

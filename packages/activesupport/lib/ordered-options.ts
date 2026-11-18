@@ -1,5 +1,5 @@
 import { presence } from "./core-ext/object/blank.js";
-import { KeyError, rbObjClassname } from "@blazetrails/ruby-compat";
+import { KeyError, rbEqual, rbObjClassname } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
   static name = "ActiveSupport::OrderedOptions";
@@ -126,6 +126,15 @@ export class OrderedOptions {
 
   toH(): Record<string, unknown> {
     return Object.fromEntries(this.data);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  toHash(): this {
+    return this;
+  }
+
+  equals(other: unknown): boolean {
+    return rbEqual(this.toH(), other);
   }
 
   each(fn: (key: string, value: unknown) => void): this {

@@ -101,10 +101,10 @@ async function sendBlobStream(
       } catch (error) {
         if (error instanceof FileNotFoundError) {
           this.expiresNow();
-          this.head(":not_found");
+          await this.head(":not_found");
         } else {
           this.expiresNow();
-          this.head(":internal_server_error");
+          await this.head(":internal_server_error");
           throw error;
         }
       }

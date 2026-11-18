@@ -14,8 +14,8 @@ class ApiRateLimitedController extends API {
     this.rateLimit({ to: 2, within: Duration.seconds(2), only: "limitedToTwo" });
   }
 
-  limitedToTwo() {
-    this.head(":ok");
+  async limitedToTwo() {
+    await this.head(":ok");
   }
 }
 

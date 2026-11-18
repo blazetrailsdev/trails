@@ -77,9 +77,9 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
       }
     })());
 
-  if (TopLevel.Trails!.logger instanceof BroadcastLogger) {
+  if ((TopLevel.Trails!.logger as Logger | BroadcastLogger) instanceof BroadcastLogger) {
     if (this.config.broadcastLogLevel != null) {
-      TopLevel.Trails!.logger.level = constGet(
+      (TopLevel.Trails!.logger as unknown as BroadcastLogger).level = constGet(
         Logger,
         String(this.config.broadcastLogLevel).replace(/^:/, "").toUpperCase(),
       ) as number;
@@ -91,7 +91,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
     ) as number;
     const broadcastLogger = new BroadcastLogger(TopLevel.Trails!.logger);
     broadcastLogger.formatter = TopLevel.Trails!.logger.formatter;
-    TopLevel.Trails!.logger = broadcastLogger;
+    TopLevel.Trails!.logger = broadcastLogger as unknown as Logger;
   }
 });
 

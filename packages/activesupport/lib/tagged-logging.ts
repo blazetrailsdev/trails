@@ -1,4 +1,5 @@
 import { Logger, SimpleFormatter, type LoggerFormatter } from "./logger.js";
+import type { BroadcastLogger } from "./broadcast-logger.js";
 import type { Temporal } from "@blazetrails/date";
 import {
   ArgumentError,
@@ -164,7 +165,7 @@ export const TaggedLogging = {
     return TaggedLogging.new(new Logger(...args));
   },
 
-  new<L extends Logger>(logger: L): L & TaggedLogger {
+  new<L extends Logger | BroadcastLogger>(logger: L): L & TaggedLogger {
     logger = (logger as { dup?: () => L }).dup?.() ?? rbObjClone(logger);
 
     if (logger.formatter) {

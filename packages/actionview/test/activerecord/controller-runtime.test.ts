@@ -29,12 +29,12 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
     async create() {
       RuntimeRegistry.setSqlRuntime(RuntimeRegistry.sqlRuntime() + 100.0);
       await Project.last();
-      this.redirectTo("/");
+      await this.redirectTo("/");
     }
 
-    redirect() {
+    async redirect() {
       Project.all();
-      this.redirectTo({ action: "show" });
+      await this.redirectTo({ action: "show" });
     }
 
     async dbAfterRender() {

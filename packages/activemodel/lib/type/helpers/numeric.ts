@@ -41,8 +41,7 @@ export function isNonNumericString(value: string): boolean {
   return !NUMERIC_REGEX.test(value);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AbstractValueTypeCtor<T = unknown> = abstract new (...args: any[]) => ValueType<T>;
+type AbstractValueTypeCtor<T = unknown> = abstract new (...args: never[]) => ValueType<T>;
 
 export interface NumericMixinMethods {
   cast(value: unknown): unknown;

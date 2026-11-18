@@ -9,7 +9,7 @@ export class SourcesController extends Trails.Conductor.BaseController {
     const inboundEmail = await ActionMailbox.InboundEmail.createAndExtractMessageIdBang(
       this.params.get("source") as string,
     );
-    this.redirectTo(this.mainApp.trailsConductorInboundEmailUrl(inboundEmail));
+    await this.redirectTo(this.mainApp.trailsConductorInboundEmailUrl(inboundEmail));
   }
 }
 

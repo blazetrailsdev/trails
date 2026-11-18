@@ -5,7 +5,7 @@ import type { Metal } from "../metal.js";
 
 type HeadHost = Pick<
   Metal,
-  "headers" | "urlFor" | "responseCode" | "mediaType" | "response" | "responseBody"
+  "headers" | "urlFor" | "responseCode" | "mediaType" | "response" | "setResponseBody"
 > & {
   set status(value: number | string);
   set location(value: string);
@@ -14,11 +14,11 @@ type HeadHost = Pick<
   includeContent: typeof includeContent;
 };
 
-export function head(
+export async function head(
   this: HeadHost,
   status: number | string | null | false,
   options: Record<string, unknown> | null = null,
-): true {
+): Promise<true> {
   if (isPlainObject(status) || (status as unknown) instanceof Map) {
     throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
   }
@@ -57,7 +57,7 @@ export function head(
     this.response.charset = false;
   }
 
-  this.responseBody = "";
+  await this.setResponseBody("");
 
   return true;
 }

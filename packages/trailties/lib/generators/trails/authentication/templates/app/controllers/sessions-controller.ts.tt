@@ -7,8 +7,8 @@ export class SessionsController extends ApplicationController {
     this.allowUnauthenticatedAccess({ only: ["new", "create"] });
     this.rateLimit({
       to: 10, within: minutes(3), only: "create",
-      with: function (this: SessionsController) {
-        this.redirectTo(this.newSessionUrl(), { alert: "Try again later." });
+      with: async function (this: SessionsController) {
+        await this.redirectTo(this.newSessionUrl(), { alert: "Try again later." });
       },
     });
   }
@@ -19,14 +19,14 @@ export class SessionsController extends ApplicationController {
     const user = await User.authenticateBy(this.params.permit("email_address", "password"));
     if (user) {
       await this.startNewSessionFor(user);
-      this.redirectTo(this.afterAuthenticationUrl());
+      await this.redirectTo(this.afterAuthenticationUrl());
     } else {
-      this.redirectTo(this.newSessionPath(), { alert: "Try another email address or password." });
+      await this.redirectTo(this.newSessionPath(), { alert: "Try another email address or password." });
     }
   }
 
   async destroy(): Promise<void> {
     await this.terminateSession();
-    this.redirectTo(this.newSessionPath());
+    await this.redirectTo(this.newSessionPath());
   }
 }

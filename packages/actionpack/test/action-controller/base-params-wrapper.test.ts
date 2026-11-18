@@ -94,9 +94,9 @@ describe("Base ParamsWrapper wiring", () => {
     let seen: HashWithIndifferentAccess | null = null;
     class WidgetsController extends Base {
       static actions = ["create"];
-      create(): void {
+      async create(): Promise<void> {
         seen = this.params.toUnsafeHash();
-        this.head(204);
+        await this.head(204);
       }
     }
     WidgetsController.wrapParameters({ format: [":json"], name: "widget" });
@@ -108,7 +108,7 @@ describe("Base ParamsWrapper wiring", () => {
       "action_dispatch.request.request_parameters": { name: "alpha", color: "blue" },
     });
     const controller = new WidgetsController();
-    await controller.dispatch("create", request, new Response());
+    await controller.dispatch("create", request, await Response.new());
     expect(seen).not.toBeNull();
     assertEqual({ name: "alpha", color: "blue" }, seen!.get("widget"));
     expect(seen!.get("name")).toBe("alpha");
@@ -118,9 +118,9 @@ describe("Base ParamsWrapper wiring", () => {
     let seen: HashWithIndifferentAccess | null = null;
     class ThingsController extends Base {
       static actions = ["create"];
-      create(): void {
+      async create(): Promise<void> {
         seen = this.params.toUnsafeHash();
-        this.head(204);
+        await this.head(204);
       }
     }
     ThingsController.wrapParameters({ format: [":xml"], name: "thing" });
@@ -132,7 +132,7 @@ describe("Base ParamsWrapper wiring", () => {
       "action_dispatch.request.request_parameters": { name: "beta" },
     });
     const controller = new ThingsController();
-    await controller.dispatch("create", request, new Response());
+    await controller.dispatch("create", request, await Response.new());
     expect(seen).not.toBeNull();
     expect(seen!.get("thing")).toBeUndefined();
     expect(seen!.get("name")).toBe("beta");

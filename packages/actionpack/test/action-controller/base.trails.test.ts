@@ -59,19 +59,19 @@ beforeAll(() => {
 describe("ActionController::Base render partial:", () => {
   it("resolves a qualified partial name from a controller whose path is unrelated", async () => {
     const c = new BadgeController();
-    await c.dispatch("show", makeRequest(), new Response());
+    await c.dispatch("show", makeRequest(), await Response.new());
     expect(c.response.body).toBe("badge");
   });
 
   it("resolves an unqualified partial against the controller's prefix", async () => {
     const c = new BadgeController();
-    await c.dispatch("row", makeRequest(), new Response());
+    await c.dispatch("row", makeRequest(), await Response.new());
     expect(c.response.body).toBe("row");
   });
 
   it("reaches a partial in app/views/application from a subclass", async () => {
     const c = new BadgeController();
-    await c.dispatch("footer", makeRequest(), new Response());
+    await c.dispatch("footer", makeRequest(), await Response.new());
     expect(c.response.body).toBe("footer");
   });
 });
@@ -80,7 +80,7 @@ describe("ActionController::Cookies#cookies", () => {
   class CookiesController extends ApplicationController {
     async authenticate(): Promise<void> {
       this.cookies().set("user_name", "david");
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 
@@ -92,7 +92,7 @@ describe("ActionController::Cookies#cookies", () => {
       HTTP_COOKIE: "flavor=oatmeal",
     });
     const controller = new CookiesController();
-    await controller.dispatch("authenticate", request, new Response());
+    await controller.dispatch("authenticate", request, await Response.new());
     expect(controller.cookies()).toBe(request.cookieJar());
     expect(controller.cookies().get("flavor")).toBe("oatmeal");
     expect(request.cookieJar().get("user_name")).toBe("david");
@@ -139,13 +139,13 @@ describe("ActionController::Base#respond_to?", () => {
     back = "";
     async show(): Promise<void> {
       this.back = this.viewContext().urlFor(":back");
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 
   it("answers respond_to? without negotiating MimeResponds#respond_to", async () => {
     const controller = new BackController();
-    await controller.dispatch("show", makeRequest(), new Response());
+    await controller.dispatch("show", makeRequest(), await Response.new());
     expect(rbObjRespondTo(controller, "request")).toBe(true);
   });
 
@@ -157,7 +157,7 @@ describe("ActionController::Base#respond_to?", () => {
       HTTP_REFERER: "http://localhost/previous",
     });
     const controller = new BackController();
-    await controller.dispatch("show", request, new Response());
+    await controller.dispatch("show", request, await Response.new());
     expect(controller.back).toBe("http://localhost/previous");
   });
 });
@@ -175,7 +175,7 @@ describe("ActionController::Streaming#_render_template", () => {
   it("renders a stream: true template through view_renderer.render_body with no-cache", async () => {
     const controller = new StreamController();
     const renderBody = vi.spyOn(controller.viewRenderer(), "renderBody");
-    await controller.dispatch("show", makeRequest(), new Response());
+    await controller.dispatch("show", makeRequest(), await Response.new());
     expect(renderBody).toHaveBeenCalledOnce();
     expect(controller.response.body).toBe("streamed row");
     expect(controller.response.getHeader("cache-control")).toBe("no-cache");
@@ -198,7 +198,7 @@ describe("ActionController::Streaming layout content_for fallback", () => {
 
   it("falls back to the app name when no view provides a title on a streamed render", async () => {
     const controller = new StreamLayoutController();
-    await controller.dispatch("show", makeRequest(), new Response());
+    await controller.dispatch("show", makeRequest(), await Response.new());
     expect(await (controller.response.stream as Buffer).awaitBody()).toBe(
       "<title>Blog</title>body",
     );
@@ -227,7 +227,7 @@ describe("ActionController::Streaming chunked response body", () => {
 
   it("hands the layout head to the rack body before the template finishes", async () => {
     const controller = new StreamGateController();
-    await controller.dispatch("show", makeRequest(), new Response());
+    await controller.dispatch("show", makeRequest(), await Response.new());
     const chunks = (controller.response.toA()[2] as AsyncIterable<unknown>)[Symbol.asyncIterator]();
 
     expect((await chunks.next()).value).toBe("<head></head>");
@@ -242,7 +242,7 @@ describe("ActionController::Streaming chunked response body", () => {
 
   it("raises on a sync body read while the streamed Body is pending", async () => {
     const controller = new StreamGateController();
-    await controller.dispatch("show", makeRequest(), new Response());
+    await controller.dispatch("show", makeRequest(), await Response.new());
 
     expect(() => controller.response.body).toThrow(/await awaitBody before body/);
     expect(() => controller.response.body).toThrow(/await awaitBody before body/);
@@ -252,7 +252,7 @@ describe("ActionController::Streaming chunked response body", () => {
 
   it("rescues a template that rejects after a sync body read", async () => {
     const controller = new StreamGateController();
-    await controller.dispatch("show", makeRequest(), new Response());
+    await controller.dispatch("show", makeRequest(), await Response.new());
 
     expect(() => controller.response.body).toThrow(/await awaitBody before body/);
     fail(new Error("boom"));
@@ -269,7 +269,7 @@ describe("ActionController::Base bare render", () => {
 
   it("raises MissingTemplate for a bare render with no view paths", async () => {
     await expect(
-      new BareController().dispatch("index", makeRequest(), new Response()),
+      new BareController().dispatch("index", makeRequest(), await Response.new()),
     ).rejects.toBeInstanceOf(MissingTemplate);
   });
 });
@@ -295,7 +295,7 @@ describe("ActionView::ViewPaths.local_prefixes (view_paths.rb:73-77)", () => {
 
   it("renders from the prefix an overriding controller names", async () => {
     const c = new RfcPagesController();
-    await c.dispatch("show", makeRequest(), new Response());
+    await c.dispatch("show", makeRequest(), await Response.new());
     expect(c.response.body).toBe("from rfc-pages");
   });
 
@@ -325,13 +325,13 @@ describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
       this.viewContext().formWith({ model: new Post(), url: "/posts" }, (f) => {
         this.builder = f;
       });
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 
   it("calls the controller's default_form_builder reader for formWith({ model })", async () => {
     const controller = new PostsController();
-    await controller.dispatch("new", makeRequest(), new Response());
+    await controller.dispatch("new", makeRequest(), await Response.new());
     expect((controller.builder as object).constructor).toBe(
       (ViewBase as unknown as { defaultFormBuilder: unknown }).defaultFormBuilder,
     );
@@ -348,7 +348,7 @@ describe("ActionController::ConditionalGet (conditional_get.rb:137-155,290-303)"
       }
     }
     const c = new ExpiresController();
-    await c.dispatch("index", makeRequest(), new Response());
+    await c.dispatch("index", makeRequest(), await Response.new());
     expect(c.headers.get("cache-control")).toBe(
       "max-age=3600, private, stale-while-revalidate=60, immutable, s-maxage=10",
     );
@@ -363,7 +363,7 @@ describe("ActionController::ConditionalGet (conditional_get.rb:137-155,290-303)"
       }
     }
     const c = new CcController();
-    await c.dispatch("index", makeRequest(), new Response());
+    await c.dispatch("index", makeRequest(), await Response.new());
     expect(c.headers.get("cache-control")).toBe("public, no-cache");
   });
 
@@ -379,7 +379,7 @@ describe("ActionController::ConditionalGet (conditional_get.rb:137-155,290-303)"
       }
     }
     const c = new RelationController();
-    await c.dispatch("index", makeRequest(), new Response());
+    await c.dispatch("index", makeRequest(), await Response.new());
     expect(c.headers.get("last-modified")).toBe(updatedAt.toUTCString());
   });
 });
@@ -395,7 +395,7 @@ describe("ActionController::ConditionalGet#http_cache_forever (conditional_get.r
 
   it("renders a hundred-year public immutable max-age and yields when stale", async () => {
     const c = new ForeverController();
-    await c.dispatch("index", makeRequest(), new Response());
+    await c.dispatch("index", makeRequest(), await Response.new());
     expect(c.yielded).toBe(true);
     expect(c.headers.get("cache-control")).toBe("max-age=3155695200, public, immutable");
     expect(c.headers.get("etag")).toMatch(/^W\//);
@@ -403,7 +403,7 @@ describe("ActionController::ConditionalGet#http_cache_forever (conditional_get.r
 
   it("answers 304 without yielding when the request is fresh", async () => {
     const first = new ForeverController();
-    await first.dispatch("index", makeRequest(), new Response());
+    await first.dispatch("index", makeRequest(), await Response.new());
     const request = new Request({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/",
@@ -412,7 +412,7 @@ describe("ActionController::ConditionalGet#http_cache_forever (conditional_get.r
       HTTP_IF_MODIFIED_SINCE: first.headers.get("last-modified")!,
     });
     const c = new ForeverController();
-    await c.dispatch("index", request, new Response());
+    await c.dispatch("index", request, await Response.new());
     expect(c.yielded).toBe(false);
     expect(c.status).toBe(304);
   });
@@ -428,7 +428,7 @@ describe("ActionController::Rescue#process_action (rescue.rb:26-31)", () => {
     BoomController.rescueFrom(RangeError, { with: () => {} });
     const c = new BoomController();
     const request = makeRequest();
-    await c.dispatch("index", request, new Response());
+    await c.dispatch("index", request, await Response.new());
     expect(request.env["action_dispatch.show_detailed_exceptions"]).toBe(false);
   });
 });

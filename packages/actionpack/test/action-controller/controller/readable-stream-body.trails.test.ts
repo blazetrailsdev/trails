@@ -10,15 +10,17 @@ import { Response } from "../../../lib/action-dispatch/http/response.js";
 await Handler.get("node");
 
 class RelayController extends Base {
-  relay() {
+  async relay() {
     this.response.contentType = "application/octet-stream";
-    this.responseBody = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new Uint8Array([0x68, 0x69]));
-        controller.enqueue(new TextEncoder().encode(" caf\u00e9"));
-        controller.close();
-      },
-    });
+    await this.setResponseBody(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([0x68, 0x69]));
+          controller.enqueue(new TextEncoder().encode(" caf\u00e9"));
+          controller.close();
+        },
+      }),
+    );
   }
 }
 
@@ -45,15 +47,17 @@ describe("a ReadableStream response body", () => {
 
   it("is cancelled by the rack body's close while a read is parked", async () => {
     let cancelled = false;
-    const res = new Response();
-    res.body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new Uint8Array([1]));
-      },
-      cancel() {
-        cancelled = true;
-      },
-    });
+    const res = await Response.new();
+    await res.setBody(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([1]));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      }),
+    );
     const [, , body] = res.toA() as [
       number,
       unknown,
@@ -73,15 +77,17 @@ describe("a ReadableStream response body served by Rackup::Handler::Node", () =>
   it("cancels a source stalled after its first chunk when the client disconnects", async () => {
     let cancelled = false;
     const app = async () => {
-      const res = new Response();
-      res.body = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(new Uint8Array([1]));
-        },
-        cancel() {
-          cancelled = true;
-        },
-      });
+      const res = await Response.new();
+      await res.setBody(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array([1]));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        }),
+      );
       return res.toA();
     };
     const listeners: Record<string, (() => void)[]> = {};

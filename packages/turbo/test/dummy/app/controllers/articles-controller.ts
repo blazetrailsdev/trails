@@ -26,7 +26,7 @@ export class ArticlesController extends ApplicationController {
 
     await this.article.updateBang(this.articleParams());
 
-    this.redirectTo((this as unknown as UrlHelpers).articlesUrl());
+    await this.redirectTo((this as unknown as UrlHelpers).articlesUrl());
   }
 
   async create(): Promise<void> {
@@ -34,7 +34,7 @@ export class ArticlesController extends ApplicationController {
 
     await this.article.updateBang(this.articleParams());
 
-    this.redirectTo((this as unknown as UrlHelpers).articlesUrl());
+    await this.redirectTo((this as unknown as UrlHelpers).articlesUrl());
   }
 
   async destroy(): Promise<void> {
@@ -42,12 +42,12 @@ export class ArticlesController extends ApplicationController {
 
     await this.article.destroyBang();
 
-    this.redirectTo((this as unknown as UrlHelpers).articlesUrl());
+    await this.redirectTo((this as unknown as UrlHelpers).articlesUrl());
   }
 
   async destroyAll(): Promise<void> {
     await Article.destroyAll();
-    this.redirectTo((this as unknown as UrlHelpers).articlesUrl(), { status: ":see_other" });
+    await this.redirectTo((this as unknown as UrlHelpers).articlesUrl(), { status: ":see_other" });
   }
 
   /** @internal */

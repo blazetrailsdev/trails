@@ -14,7 +14,7 @@ export interface RendererController {
     renderToString(...args: unknown[]): unknown;
   };
   _routes?: { defaultEnv(): Env; defaultUrlOptions: Record<string, unknown> } | null;
-  makeResponseBang(request: Request): Response;
+  makeResponseBang(request: Request): Promise<Response>;
 }
 
 export class Renderer {
@@ -96,13 +96,13 @@ export class Renderer {
     return this._defaults;
   }
 
-  render(...args: unknown[]): unknown {
+  async render(...args: unknown[]): Promise<unknown> {
     const request = new Request(this.envForRequest() as RackEnv);
     request.routes = this.controller._routes;
 
     const instance = new this.controller();
     instance.setRequestBang(request);
-    instance.setResponseBang(this.controller.makeResponseBang(request));
+    instance.setResponseBang(await this.controller.makeResponseBang(request));
     return instance.renderToString(...args);
   }
 

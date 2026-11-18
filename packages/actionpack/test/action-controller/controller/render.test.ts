@@ -344,72 +344,72 @@ class TestController extends Base {
     });
   }
 
-  headCreated(): void {
-    this.head(":created");
+  async headCreated(): Promise<void> {
+    await this.head(":created");
   }
 
-  headCreatedWithApplicationJsonContentType(): void {
-    this.head(":created", { contentType: "application/json" });
+  async headCreatedWithApplicationJsonContentType(): Promise<void> {
+    await this.head(":created", { contentType: "application/json" });
   }
 
-  headOkWithImagePngContentType(): void {
-    this.head(":ok", { contentType: "image/png" });
+  async headOkWithImagePngContentType(): Promise<void> {
+    await this.head(":ok", { contentType: "image/png" });
   }
 
-  headOkWithStringKeyContentType(): void {
-    this.head(":ok", { "Content-Type": "application/pdf" });
+  async headOkWithStringKeyContentType(): Promise<void> {
+    await this.head(":ok", { "Content-Type": "application/pdf" });
   }
 
-  headWithLocationHeader(): void {
-    this.head(":ok", { location: "/foo" });
+  async headWithLocationHeader(): Promise<void> {
+    await this.head(":ok", { location: "/foo" });
   }
 
-  headWithLocationObject(): void {
-    this.head(":ok", { location: new Customer("david", 1) });
+  async headWithLocationObject(): Promise<void> {
+    await this.head(":ok", { location: new Customer("david", 1) });
   }
 
-  headWithSymbolicStatus(): void {
-    this.head(stringToSym(this.params.get("status") as string));
+  async headWithSymbolicStatus(): Promise<void> {
+    await this.head(stringToSym(this.params.get("status") as string));
   }
 
-  headWithIntegerStatus(): void {
-    this.head(toI(this.params.get("status") as string) as number);
+  async headWithIntegerStatus(): Promise<void> {
+    await this.head(toI(this.params.get("status") as string) as number);
   }
 
-  headWithStringStatus(): void {
-    this.head(this.params.get("status") as string);
+  async headWithStringStatus(): Promise<void> {
+    await this.head(this.params.get("status") as string);
   }
 
-  headWithCustomHeader(): void {
-    this.head(":ok", { x_custom_header: "something" });
+  async headWithCustomHeader(): Promise<void> {
+    await this.head(":ok", { x_custom_header: "something" });
   }
 
-  headWithWwwAuthenticateHeader(): void {
-    this.head(":ok", { "WWW-Authenticate": "something" });
+  async headWithWwwAuthenticateHeader(): Promise<void> {
+    await this.head(":ok", { "WWW-Authenticate": "something" });
   }
 
-  headWithStatusCodeFirst(): void {
-    this.head(":forbidden", { x_custom_header: "something" });
+  async headWithStatusCodeFirst(): Promise<void> {
+    await this.head(":forbidden", { x_custom_header: "something" });
   }
 
-  headAndReturn(): void {
-    if (this.head(":ok")) return;
+  async headAndReturn(): Promise<void> {
+    if (await this.head(":ok")) return;
     throw new RuntimeError("should not reach this line");
   }
 
-  headWithNoContent(): void {
+  async headWithNoContent(): Promise<void> {
     this.response.headers.set("Content-Type", "dummy");
     this.response.headers.set("Content-Length", 42 as never);
 
-    this.head(204);
+    await this.head(204);
   }
 
   async headDefaultContentType(): Promise<void> {
     this.request.formats = [];
 
     await this.respondTo((format) => {
-      format.any(() => {
-        this.head(200);
+      format.any(async () => {
+        await this.head(200);
       });
     });
   }
@@ -1182,8 +1182,8 @@ class LiveTestController extends Base {
     include(this, Live);
   }
 
-  testAction(): void {
-    this.head(":ok");
+  async testAction(): Promise<void> {
+    await this.head(":ok");
   }
 }
 
@@ -1228,7 +1228,7 @@ describe("LiveHeadRenderTest", () => {
 describe("HttpCacheForeverTest", () => {
   class HttpCacheForeverController extends Base {
     async cacheMeForever(): Promise<void> {
-      let rendered: void | Promise<void> = undefined;
+      let rendered: unknown = undefined;
       await this.httpCacheForever({ public: this.params.get("public") as boolean }, () => {
         rendered = this.render({ plain: "hello" });
       });

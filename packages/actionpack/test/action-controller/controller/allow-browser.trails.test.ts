@@ -13,7 +13,7 @@ describe("AllowBrowser default block", () => {
   it("renders public/406-unsupported-browser.html with 406 Not Acceptable", async () => {
     class ModernController extends Base {
       async hello(): Promise<void> {
-        this.head(200);
+        await this.head(200);
       }
     }
     ModernController.allowBrowser({ versions: "modern" });
@@ -29,7 +29,7 @@ describe("AllowBrowser default block", () => {
         HTTP_HOST: "localhost",
         HTTP_USER_AGENT: CHROME_118,
       });
-      await c.dispatch("hello", request, new Response());
+      await c.dispatch("hello", request, await Response.new());
       expect(c.status).toBe(406);
       expect(String(c.response.body)).toContain("Your browser is not supported.");
     } finally {

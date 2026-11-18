@@ -52,13 +52,13 @@ describe("ParamsWrapperTest", () => {
   class UsersController extends Base {
     static lastParameters: Record<string, unknown> | null = null;
 
-    parse() {
+    async parse() {
       (this.constructor as typeof UsersController).lastParameters = except(
         this.request.params,
         "controller",
         "action",
       );
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
   Object.defineProperty(UsersController, "name", { value: "ParamsWrapperTest::UsersController" });
@@ -390,13 +390,13 @@ describe("NamespacedParamsWrapperTest", () => {
   class UsersController extends Base {
     static lastParameters: Record<string, unknown> | null = null;
 
-    parse() {
+    async parse() {
       (this.constructor as typeof UsersController).lastParameters = except(
         this.request.params,
         "controller",
         "action",
       );
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
   Object.defineProperty(UsersController, "name", {
@@ -508,13 +508,13 @@ describe("AnonymousControllerParamsWrapperTest", () => {
         class extends Base {
           static lastParameters: Record<string, unknown> | null = null;
 
-          parse() {
+          async parse() {
             (this.constructor as unknown as { lastParameters: unknown }).lastParameters = except(
               this.request.params,
               "controller",
               "action",
             );
-            this.head(":ok");
+            await this.head(":ok");
           }
         },
       );
@@ -565,13 +565,13 @@ describe("IrregularInflectionParamsWrapperTest", () => {
   class ParamswrappernewsController extends Base {
     static lastParameters: Record<string, unknown> | null = null;
 
-    parse() {
+    async parse() {
       (this.constructor as typeof ParamswrappernewsController).lastParameters = except(
         this.request.params,
         "controller",
         "action",
       );
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
   Object.defineProperty(ParamswrappernewsController, "name", {

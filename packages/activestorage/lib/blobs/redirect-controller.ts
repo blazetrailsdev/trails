@@ -13,7 +13,7 @@ export class RedirectController extends BaseController {
 
   async show(): Promise<void> {
     this.expiresIn(ActiveStorage.serviceUrlsExpireIn);
-    this.redirectTo(
+    await this.redirectTo(
       await this.blob.url({ disposition: this.params.get("disposition") as string | undefined }),
       { allowOtherHost: true },
     );

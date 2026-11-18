@@ -26,18 +26,18 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
     class LimitedController extends Base {
       async show() {
         actionRan += 1;
-        this.head(200);
+        await this.head(200);
       }
     }
     LimitedController.rateLimit({ to: 1, within: 60, store });
 
     const r1 = new LimitedController();
-    await r1.dispatch("show", makeRequest(), new Response());
+    await r1.dispatch("show", makeRequest(), await Response.new());
     expect(r1.status).toBe(200);
     expect(actionRan).toBe(1);
 
     const r2 = new LimitedController();
-    await r2.dispatch("show", makeRequest(), new Response());
+    await r2.dispatch("show", makeRequest(), await Response.new());
     expect(r2.status).toBe(429);
     expect(actionRan).toBe(1);
     expect(await store.read("rate-limit:limited:1.2.3.4")).toBe(2);
@@ -51,13 +51,13 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
 
     class InstrumentedController extends Base {
       async show() {
-        this.head(200);
+        await this.head(200);
       }
     }
     InstrumentedController.rateLimit({ to: 0, within: 60, store: new MemoryStore() });
 
     const c = new InstrumentedController();
-    await c.dispatch("show", makeRequest(), new Response());
+    await c.dispatch("show", makeRequest(), await Response.new());
     expect(events).toHaveLength(1);
     expect(events[0].request).toBe(c.request);
   });
@@ -65,13 +65,13 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
   it("is also wired onto ActionController::API (Rails api.rb:125 includes RateLimiting)", async () => {
     class PingApi extends API {
       async show() {
-        this.head(200);
+        await this.head(200);
       }
     }
     PingApi.rateLimit({ to: 0, within: 60, store: new MemoryStore() });
 
     const c = new PingApi();
-    await c.dispatch("show", makeRequest(), new Response());
+    await c.dispatch("show", makeRequest(), await Response.new());
     expect(c.status).toBe(429);
   });
 
@@ -80,7 +80,7 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
 
     class MethodOverrideController extends Base {
       async show() {
-        this.head(200);
+        await this.head(200);
       }
       async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
         overrideCalls.push("method-override");
@@ -90,7 +90,7 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
     MethodOverrideController.rateLimit({ to: 1, within: 60, store: new MemoryStore() });
 
     const c = new MethodOverrideController();
-    await c.dispatch("show", makeRequest(), new Response());
+    await c.dispatch("show", makeRequest(), await Response.new());
     expect(overrideCalls).toEqual(["method-override"]);
   });
 
@@ -99,20 +99,20 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
 
     class DefaultStoreController extends Base {
       async show() {
-        this.head(200);
+        await this.head(200);
       }
     }
     (DefaultStoreController as unknown as { cacheStore: MemoryStore }).cacheStore = cacheStore;
     DefaultStoreController.rateLimit({ to: 5, within: 60, store: undefined, name: undefined });
 
-    await new DefaultStoreController().dispatch("show", makeRequest(), new Response());
+    await new DefaultStoreController().dispatch("show", makeRequest(), await Response.new());
     expect(await cacheStore.read("rate-limit:default_store:1.2.3.4")).toBe(1);
 
     class NullStoreController extends DefaultStoreController {}
     NullStoreController.rateLimit({ to: 5, within: 60, store: null as never });
 
     await expect(
-      new NullStoreController().dispatch("show", makeRequest(), new Response()),
+      new NullStoreController().dispatch("show", makeRequest(), await Response.new()),
     ).rejects.toThrow(TypeError);
   });
 });

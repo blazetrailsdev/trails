@@ -18,8 +18,8 @@ export async function sendAction(
   return ret;
 }
 
-export function defaultRender(this: BasicImplicitRenderHost): void {
-  this.head(":no_content");
+export async function defaultRender(this: BasicImplicitRenderHost): Promise<void> {
+  await this.head(":no_content");
 }
 
 export const BasicImplicitRender = { sendAction, defaultRender };

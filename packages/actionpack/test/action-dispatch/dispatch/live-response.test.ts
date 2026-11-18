@@ -19,8 +19,8 @@ describe("ActionController", () => {
     describe("ResponseTest", () => {
       let response: LiveResponse;
 
-      beforeEach(() => {
-        response = new LiveResponse();
+      beforeEach(async () => {
+        response = await LiveResponse.new();
         response.request = Request.empty();
       });
 
@@ -30,14 +30,14 @@ describe("ActionController", () => {
         assertNotEqual(headers, response.headers);
       });
 
-      it("initialize with default headers", () => {
+      it("initialize with default headers", async () => {
         const r = class extends LiveResponse {
           static override get defaultHeaders(): Record<string, string> {
             return { omg: "g" };
           }
         };
 
-        const headers = r.create().headers;
+        const headers = (await r.create()).headers;
         assertKindOf(LiveResponse.Headers, headers);
         assertEqual("g", headers.get("omg"));
       });
@@ -60,8 +60,8 @@ describe("ActionController", () => {
         assert(await t.join());
       });
 
-      it("setting body populates buffer", () => {
-        response.body = "omg";
+      it("setting body populates buffer", async () => {
+        await response.setBody("omg");
         response.close();
         assertEqual(["omg"], response.bodyParts());
       });
