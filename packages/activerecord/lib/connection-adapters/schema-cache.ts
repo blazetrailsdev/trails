@@ -35,7 +35,8 @@ export class SchemaReflection {
   static useSchemaCacheDump = true;
   static checkSchemaCacheDumpVersion = true;
 
-  private _cache: SchemaCache | null;
+  /** @internal */
+  _cache: SchemaCache | null;
   private _cachePath: string | null;
 
   constructor(cachePath?: string | null, cache?: SchemaCache) {

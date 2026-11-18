@@ -221,7 +221,7 @@ export class ExecutorHooks {
   static run(): Promise<void> | undefined {
     const pools = ActiveRecord.Base.connectionHandler
       .connectionPoolList("all")
-      .filter((pool) => pool.schemaReflection["_cache"] != null && !pool.isConnected());
+      .filter((pool) => pool.schemaReflection._cache != null && !pool.isConnected());
     if (pools.length === 0) return undefined;
     return (async () => {
       for (const pool of pools) {
