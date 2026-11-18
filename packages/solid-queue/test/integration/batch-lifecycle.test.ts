@@ -364,13 +364,17 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
     expect(await Batch.count()).toBe(2);
     expect(await Batch.finished().count()).toBe(2);
 
-    for (const jobBatch of [jobBatch1, jobBatch2]) {
-      expect(jobBatch.total_jobs).toBe(1);
-      expect(jobBatch.failed_jobs).toBe(1);
-      expect(jobBatch.completed_jobs).toBe(0);
-      expect(await jobBatch.pendingJobs()).toBe(0);
-      expect(await jobBatch.jobs.count()).toBe(3);
-    }
+    expect(jobBatch1.total_jobs).toBe(1);
+    expect(jobBatch1.failed_jobs).toBe(1);
+    expect(jobBatch1.completed_jobs).toBe(0);
+    expect(await jobBatch1.pendingJobs()).toBe(0);
+    expect(await jobBatch1.jobs.count()).toBe(3);
+
+    expect(jobBatch2.total_jobs).toBe(1);
+    expect(jobBatch2.failed_jobs).toBe(1);
+    expect(jobBatch2.completed_jobs).toBe(0);
+    expect(await jobBatch2.pendingJobs()).toBe(0);
+    expect(await jobBatch2.jobs.count()).toBe(3);
 
     expect((await Batch.all().toArray()).map((batch) => batch.isFailed()).sort()).toEqual([
       true,
@@ -446,12 +450,15 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
     expect(await Batch.count()).toBe(2);
     expect(await Batch.finished().count()).toBe(2);
 
-    for (const jobBatch of [jobBatch1, jobBatch2]) {
-      expect(jobBatch.total_jobs).toBe(1);
-      expect(jobBatch.failed_jobs).toBe(0);
-      expect(jobBatch.completed_jobs).toBe(1);
-      expect(await jobBatch.pendingJobs()).toBe(0);
-    }
+    expect(jobBatch1.total_jobs).toBe(1);
+    expect(jobBatch1.failed_jobs).toBe(0);
+    expect(jobBatch1.completed_jobs).toBe(1);
+    expect(await jobBatch1.pendingJobs()).toBe(0);
+
+    expect(jobBatch2.total_jobs).toBe(1);
+    expect(jobBatch2.failed_jobs).toBe(0);
+    expect(jobBatch2.completed_jobs).toBe(1);
+    expect(await jobBatch2.pendingJobs()).toBe(0);
 
     expect((await Batch.all().toArray()).map((batch) => batch.isSucceeded()).sort()).toEqual([
       true,
