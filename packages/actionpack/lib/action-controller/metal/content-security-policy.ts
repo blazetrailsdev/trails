@@ -88,11 +88,7 @@ export const ContentSecurityPolicy = {
 extend(ContentSecurityPolicy, Concern);
 include(ContentSecurityPolicy, Helpers);
 include(ContentSecurityPolicy, Callbacks);
-(
-  ContentSecurityPolicy as unknown as {
-    included(base: null, block: (this: HelpersClass) => void): void;
-  }
-).included(null, function () {
+Concern.included.call(ContentSecurityPolicy, null, function (this: HelpersClass) {
   this.helperMethod("isContentSecurityPolicy");
   this.helperMethod("contentSecurityPolicyNonce");
 });

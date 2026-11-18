@@ -159,7 +159,7 @@ export class API extends Metal {
     this._urlOptions = null;
     this.viewRuntime = null;
     if (isModuleIncluded(new.target, TopLevel.ActiveRecord?.Railties.ControllerRuntime as never)) {
-      (this as unknown as { dbRuntime: number | null }).dbRuntime = null;
+      (this as this & { dbRuntime: number | null }).dbRuntime = null;
     }
   }
 }

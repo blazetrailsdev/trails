@@ -276,7 +276,7 @@ export class CookieJar implements Iterable<[string, string | null]> {
       options.sameSite = this.request.cookiesSameSiteProtection?.() as SetCookieOptions["sameSite"];
     }
 
-    const request = this.request as unknown as { host?: string };
+    const request = this.request;
     if (options.domain === ":all" || options.domain === "all") {
       let cookieDomain = "";
       const host = request.host ?? "";
@@ -368,7 +368,7 @@ export class CookieJar implements Iterable<[string, string | null]> {
 
   /** @internal */
   private isWriteCookie(cookie: SetCookieOptions): boolean {
-    const request = this.request as unknown as { ssl?: boolean; host?: string };
+    const request = this.request;
     return (
       request.ssl === true ||
       !cookie.secure ||
@@ -661,6 +661,8 @@ export interface RequestCookieMethodsHost {
   setHeader(name: string, value: unknown): unknown;
   cookies: Record<string, string>;
   cookiesSameSiteProtection?(): unknown;
+  host?: string | null;
+  ssl?: boolean;
 }
 
 export function cookieJar(this: RequestCookieMethodsHost): CookieJar {

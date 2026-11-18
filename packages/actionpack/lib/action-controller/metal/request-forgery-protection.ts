@@ -26,7 +26,7 @@ import {
   type RequestCookieMethodsHost,
 } from "../../action-dispatch/middleware/cookies.js";
 import { SessionHash } from "@blazetrails/rack-session";
-import type { Persisted, PersistedRequest } from "@blazetrails/rack-session";
+import type { PersistedRequest } from "@blazetrails/rack-session";
 import type { Request as Req } from "../../action-dispatch/http/request.js";
 import { ActionControllerError } from "./exceptions.js";
 import type {
@@ -64,7 +64,7 @@ export type NullSessionRequest = Omit<Req, "session" | "flash" | "sessionOptions
 
 export class NullSessionHash extends SessionHash {
   constructor(req: PersistedRequest) {
-    super(null as unknown as Persisted, req);
+    super(null, req);
     this.data = {};
     this.loaded = true;
   }

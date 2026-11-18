@@ -21,12 +21,9 @@ export function instrumentName(this: unknown): string {
 
 export const Caching = { instrumentPayload, instrumentName };
 extend(Caching, Concern);
-(Caching as unknown as { included(base: null, block: (this: any) => void): void }).included(
-  null,
-  function () {
-    include(this, AbstractControllerCaching);
-  },
-);
+Concern.included.call(Caching, null, function (this: any) {
+  include(this, AbstractControllerCaching);
+});
 
 function serializeValue(value: unknown): string {
   if (value === null || value === undefined) return "";

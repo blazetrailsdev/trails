@@ -255,7 +255,7 @@ export class Session {
       if (rbObjRespondTo(this.controller, "urlOptions")) {
         reverseMergeBang(
           urlOptions,
-          (this.controller as unknown as { urlOptions(): Record<string, unknown> }).urlOptions(),
+          (this.controller as Metal & { urlOptions(): Record<string, unknown> }).urlOptions(),
         );
       }
 

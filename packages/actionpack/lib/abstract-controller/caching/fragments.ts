@@ -49,26 +49,23 @@ export const Fragments = {
   instrumentFragmentCache,
 };
 extend(Fragments, Concern);
-(
-  Fragments as unknown as {
-    included(
-      base: null,
-      block: (this: FragmentsClassMethods & { helperMethod(...methods: string[]): void }) => void,
-    ): void;
-  }
-).included(null, function () {
-  if (rbObjRespondTo(this, "classAttribute")) {
-    classAttribute.call(this, "fragmentCacheKeys");
-  } else {
-    mattrWriter.call(this, "fragmentCacheKeys");
-  }
+Concern.included.call(
+  Fragments,
+  null,
+  function (this: FragmentsClassMethods & { helperMethod(...methods: string[]): void }) {
+    if (rbObjRespondTo(this, "classAttribute")) {
+      classAttribute.call(this, "fragmentCacheKeys");
+    } else {
+      mattrWriter.call(this, "fragmentCacheKeys");
+    }
 
-  this.fragmentCacheKeys = [];
+    this.fragmentCacheKeys = [];
 
-  if (typeof this.helperMethod === "function") {
-    this.helperMethod("combinedFragmentCacheKey");
-  }
-});
+    if (typeof this.helperMethod === "function") {
+      this.helperMethod("combinedFragmentCacheKey");
+    }
+  },
+);
 
 export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unknown[] {
   const heads = this.constructor.fragmentCacheKeys!.map((k) => k.call(this));

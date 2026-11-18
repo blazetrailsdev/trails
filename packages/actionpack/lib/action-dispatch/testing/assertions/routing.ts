@@ -454,9 +454,8 @@ export const RoutingAssertions = new Module((mod) => {
     });
   });
 
-  (
-    mod as unknown as { included(base: null, block: (this: { prototype: object }) => void): void }
-  ).included(
+  Concern.included.call(
+    mod,
     null,
     /** @inventedArm if — PERMANENT */
     function (this: { prototype: object }) {

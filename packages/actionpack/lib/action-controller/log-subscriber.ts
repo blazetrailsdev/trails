@@ -6,7 +6,6 @@ import {
 import { expandCacheKey } from "@blazetrails/activesupport/cache";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { Base } from "./base.js";
-import type { CachingClassMethods } from "../abstract-controller/caching.js";
 import { ExceptionWrapper } from "../action-dispatch/middleware/exception-wrapper.js";
 import { isSymbol, rbInspect, rbObjAsString, round, symbolToS } from "@blazetrails/ruby-compat";
 
@@ -105,28 +104,28 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   writeFragment(event: Event): void {
-    if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
+    if (!Base.enableFragmentCacheLogging) return;
     const key = expandCacheKey(event.payload.key ?? event.payload.path);
     const humanName = "Write fragment";
     this.info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
   }
 
   readFragment(event: Event): void {
-    if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
+    if (!Base.enableFragmentCacheLogging) return;
     const key = expandCacheKey(event.payload.key ?? event.payload.path);
     const humanName = "Read fragment";
     this.info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
   }
 
   isExistFragment(event: Event): void {
-    if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
+    if (!Base.enableFragmentCacheLogging) return;
     const key = expandCacheKey(event.payload.key ?? event.payload.path);
     const humanName = "Exist fragment?";
     this.info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
   }
 
   expireFragment(event: Event): void {
-    if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
+    if (!Base.enableFragmentCacheLogging) return;
     const key = expandCacheKey(event.payload.key ?? event.payload.path);
     const humanName = "Expire fragment";
     this.info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);

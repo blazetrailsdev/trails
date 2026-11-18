@@ -1,0 +1,45 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "paths": {
+      "@blazetrails/actionpack": ["../lib/index.ts"],
+      "@blazetrails/actionview/rails-dom-testing/*": [
+        "../../actionview/lib/rails-dom-testing/*.ts"
+      ],
+      "@blazetrails/actionview": ["../../actionview/lib/index.ts"],
+      "@blazetrails/rack-session": ["../../rack-session/lib/index.ts"],
+      "@blazetrails/activesupport": ["../../activesupport/lib/index.ts"],
+      "@blazetrails/i18n": ["../../i18n/lib/index.ts"],
+      "@blazetrails/activesupport/*": ["../../activesupport/lib/*.ts"],
+      "@blazetrails/actionpack/testing": ["../lib/testing.ts"],
+      "@blazetrails/activemodel": ["../../activemodel/lib/index.ts"],
+      "@blazetrails/rack-test": ["../../rack-test/lib/index.ts"],
+      "@blazetrails/rackup": ["../../rackup/lib/index.ts"],
+      "@blazetrails/ruby-compat/include": ["../../ruby-compat/lib/include.ts"],
+      "@blazetrails/ruby-compat/method-missing-proxy": [
+        "../../ruby-compat/lib/method-missing-proxy.ts"
+      ],
+      "@blazetrails/ruby-compat/name-error": ["../../ruby-compat/lib/name-error.ts"],
+      "@blazetrails/ruby-compat/psych": ["../../ruby-compat/lib/psych.ts"],
+      "@blazetrails/ruby-compat/psych-adapter": ["../../ruby-compat/lib/psych-adapter.ts"],
+      "@blazetrails/ruby-compat/yaml": ["../../ruby-compat/lib/yaml.ts"],
+      "@blazetrails/ruby-compat/enumerable": ["../../ruby-compat/lib/enumerable.ts"],
+      "@blazetrails/ruby-compat/range": ["../../ruby-compat/lib/range.ts"],
+      "@blazetrails/ruby-compat": ["../../ruby-compat/lib/index.ts"],
+      "@blazetrails/bcrypt": ["../../bcrypt/lib/index.ts"],
+      "@blazetrails/date": ["../../date/lib/index.ts"],
+      "@blazetrails/tzinfo": ["../../tzinfo/lib/index.ts"],
+      "@blazetrails/did-you-mean": ["../../did-you-mean/lib/index.ts"],
+      "@blazetrails/tse-compiler": ["../../tse-compiler/lib/index.ts"],
+      "@blazetrails/builder": ["../../builder/lib/builder.ts"],
+      "@blazetrails/html-sanitizer": ["../../html-sanitizer/lib/index.ts"],
+      "@blazetrails/msgpack": ["../../msgpack/lib/index.ts"],
+      "@blazetrails/rack": ["../../rack/lib/index.ts"],
+      "@blazetrails/nokogiri": ["../../nokogiri/lib/index.ts"],
+      "@blazetrails/actionview/tse-modules": ["../../actionview/types/tse-modules.d.ts"]
+    }
+  },
+  "include": ["./**/*.test-d.ts"]
+}

@@ -203,7 +203,7 @@ export class Response extends DispatchResponse {
   protected override beforeCommitted(): void {
     super.beforeCommitted();
     const jar = this.request!.cookieJar();
-    if (!this.committed) jar.write(this as unknown as CookieResponse);
+    if (!this.committed) jar.write(this as CookieResponse);
   }
 
   /** @internal */

@@ -206,9 +206,7 @@ export const UrlFor = {
 extend(UrlFor, Concern);
 include(UrlFor, PolymorphicRoutes);
 
-(
-  UrlFor as unknown as { included(base: null, block: (this: UrlForIncluder) => void): void }
-).included(null, function (this: UrlForIncluder) {
+Concern.included.call(UrlFor, null, function (this: UrlForIncluder) {
   if (!rbModMethodDefined(this, "defaultUrlOptions")) {
     if (typeof this === "function" && !Object.hasOwn(this, classModule)) {
       classAttribute.call(this, "defaultUrlOptions");

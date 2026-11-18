@@ -60,11 +60,7 @@ export function lookupAndDigestTemplate(
 export const EtagWithTemplateDigest = {};
 extend(EtagWithTemplateDigest, Concern);
 include(EtagWithTemplateDigest, ConditionalGet);
-(
-  EtagWithTemplateDigest as unknown as {
-    included(base: null, block: (this: object) => void): void;
-  }
-).included(null, function (this: object) {
+Concern.included.call(EtagWithTemplateDigest, null, function (this: object) {
   classAttribute.call(this, "etagWithTemplateDigest", { default: true });
 
   (this as typeof ConditionalGet.ClassMethods & { etaggers: Etagger[] }).etag(function (

@@ -70,7 +70,7 @@ export abstract class Node {
   }
 }
 
-include(Node as unknown as new (...args: never[]) => unknown, Enumerable);
+include(Node as new (...args: never[]) => unknown, Enumerable);
 
 export abstract class Terminal extends Node {
   get symbol(): Node | string {

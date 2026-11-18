@@ -60,33 +60,30 @@ export const Caching = { ClassMethods, viewCacheDependencies, cache };
 extend(Caching, Concern);
 include(Caching, ConfigMethods);
 include(Caching, Fragments);
-(
-  Caching as unknown as {
-    included(
-      base: null,
-      block: (
-        this: CachingClassMethods & {
-          configAccessor(...names: string[]): void;
-          helperMethod(...methods: string[]): void;
-        },
-      ) => void,
-    ): void;
-  }
-).included(null, function () {
-  extend(this, ConfigMethods);
+Concern.included.call(
+  Caching,
+  null,
+  function (
+    this: CachingClassMethods & {
+      configAccessor(...names: string[]): void;
+      helperMethod(...methods: string[]): void;
+    },
+  ) {
+    extend(this, ConfigMethods);
 
-  this.configAccessor("defaultStaticExtension");
-  this.defaultStaticExtension ||= ".html";
+    this.configAccessor("defaultStaticExtension");
+    this.defaultStaticExtension ||= ".html";
 
-  this.configAccessor("performCaching");
-  if (this.performCaching == null) this.performCaching = true;
+    this.configAccessor("performCaching");
+    if (this.performCaching == null) this.performCaching = true;
 
-  this.configAccessor("enableFragmentCacheLogging");
-  this.enableFragmentCacheLogging = false;
+    this.configAccessor("enableFragmentCacheLogging");
+    this.enableFragmentCacheLogging = false;
 
-  classAttribute.call(this, "_viewCacheDependencies", { default: [] });
-  if (typeof this.helperMethod === "function") this.helperMethod("viewCacheDependencies");
-});
+    classAttribute.call(this, "_viewCacheDependencies", { default: [] });
+    if (typeof this.helperMethod === "function") this.helperMethod("viewCacheDependencies");
+  },
+);
 
 export function viewCacheDependencies(this: CachingHost): unknown[] {
   const out: unknown[] = [];
