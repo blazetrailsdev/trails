@@ -44,6 +44,8 @@ export interface FormTagHelperHost extends UrlHelperHost, TagHelperHost {
   submitTag(value?: unknown, options?: Record<string, unknown> | Hash<string, unknown>): SafeBuffer;
   pathToImage(source: unknown, options?: Record<string, unknown>): string;
   safeJoin(array: unknown[], sep?: string | SafeBuffer | null): SafeBuffer;
+  trailsDirectUploadsUrl?(): unknown;
+  mainApp?(): { trailsDirectUploadsUrl(): unknown };
 }
 
 export let embedAuthenticityTokenInRemoteForms: boolean | null = null;
@@ -648,18 +650,12 @@ export function convertDirectUploadOptionToUrl(
   if (directUpload == null || directUpload === false) return options;
 
   if (rbObjRespondTo(this, "trailsDirectUploadsUrl")) {
-    options["data-direct-upload-url"] = (
-      this as unknown as { trailsDirectUploadsUrl(): unknown }
-    ).trailsDirectUploadsUrl();
+    options["data-direct-upload-url"] = this.trailsDirectUploadsUrl!();
   } else if (
     rbObjRespondTo(this, "mainApp") &&
-    rbObjRespondTo((this as unknown as { mainApp(): unknown }).mainApp(), "trailsDirectUploadsUrl")
+    rbObjRespondTo(this.mainApp!(), "trailsDirectUploadsUrl")
   ) {
-    options["data-direct-upload-url"] = (
-      this as unknown as { mainApp(): { trailsDirectUploadsUrl(): unknown } }
-    )
-      .mainApp()
-      .trailsDirectUploadsUrl();
+    options["data-direct-upload-url"] = this.mainApp!().trailsDirectUploadsUrl();
   }
   return options;
 }

@@ -420,7 +420,7 @@ export const Locals = {
 /** @internal */
 function view(this: Behavior): LocalsView {
   return (this.__view ??= (() => {
-    const view = this.controller.viewContext() as unknown as LocalsView;
+    const view = this.controller.viewContext() as LocalsView;
     include(rbObjSingletonClass(view), this._helpers);
     extend(view, Locals);
     view.renderedViews = this.renderedViews();
@@ -487,7 +487,7 @@ function methodMissing(this: Behavior, selector: string, ...args: unknown[]): un
   try {
     routes =
       rbObjRespondTo(this.controller, "_routes") &&
-      (this.controller as unknown as { _routes: RoutesHost })._routes;
+      (this.controller as { _routes: RoutesHost })._routes;
   } catch (e) {
     if (!(e instanceof StandardError)) throw e;
   }
@@ -519,7 +519,7 @@ function respondToMissing(this: Behavior, name: string, _includePrivate = false)
   try {
     routes =
       rbObjRespondTo(this.controller, "_routes") &&
-      (this.controller as unknown as { _routes: RoutesHost })._routes;
+      (this.controller as { _routes: RoutesHost })._routes;
   } catch (e) {
     if (!(e instanceof StandardError)) throw e;
   }

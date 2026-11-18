@@ -295,7 +295,7 @@ type View = Base &
   Record<string, (...args: unknown[]) => unknown> & {
     post: Post;
     car: Car;
-    post_delegator: PostDelegator;
+    postDelegator: PostDelegator;
   };
 
 describe("FormHelperTest", () => {
@@ -458,7 +458,7 @@ describe("FormHelperTest", () => {
     view.car = new Car("#000FFF");
     const postDelegator = new PostDelegator();
     postDelegator.title = "Hello World";
-    view.post_delegator = postDelegator;
+    view.postDelegator = postDelegator;
   });
 
   afterEach(async () => {

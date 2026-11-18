@@ -577,7 +577,7 @@ export function defaultFormBuilderClass(this: FormHelperHost): typeof FormBuilde
   const builder =
     this.defaultFormBuilder != null && this.defaultFormBuilder !== false
       ? this.defaultFormBuilder
-      : (ActionView.Base as unknown as { defaultFormBuilder: unknown }).defaultFormBuilder;
+      : ActionView.Base.defaultFormBuilder;
   return (typeof builder === "string" ? constantize(builder) : builder) as typeof FormBuilder;
 }
 

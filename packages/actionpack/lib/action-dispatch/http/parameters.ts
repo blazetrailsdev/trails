@@ -51,10 +51,10 @@ export interface ParametersHost {
   logger?: { debug(message: string): void } | null;
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `Http::Parameters` is included into `ActionDispatch::Request` (`action_dispatch/http/parameters.rb`); the merge names the host members it reads. */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface Parameters extends ParametersHost {}
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Parameters {
   /** @internal */
   private static _parameterParsers: ParameterParsers = DEFAULT_PARSERS;

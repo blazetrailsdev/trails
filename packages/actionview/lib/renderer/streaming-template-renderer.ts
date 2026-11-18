@@ -52,7 +52,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
 > {
   /** @internal */
   protected override async renderTemplate(
-    view: ViewContext,
+    view: ViewContext & ConstructorParameters<typeof StreamingFlow>[0],
     template: RenderableTemplate,
     layoutName: RenderOptions["layout"] = null,
     locals: Record<string, unknown> = {},
@@ -73,7 +73,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
     buffer: Buffer,
     template: RenderableTemplate,
     layout: RenderableTemplate | null,
-    view: ViewContext,
+    view: ViewContext & ConstructorParameters<typeof StreamingFlow>[0],
     locals: Record<string, unknown>,
   ): Promise<void> {
     const output = new StreamingBuffer(buffer);
@@ -97,10 +97,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
           }
         });
 
-        view.viewFlow = new StreamingFlow(
-          view as unknown as ConstructorParameters<typeof StreamingFlow>[0],
-          fiber,
-        );
+        view.viewFlow = new StreamingFlow(view, fiber);
 
         await fiber.resume();
 

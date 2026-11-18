@@ -170,11 +170,7 @@ export interface ViewContextHost {
 }
 
 export function viewContext(this: ViewContextHost): Base {
-  return new (this.viewContextClass())(
-    this.lookupContext,
-    this.viewAssigns(),
-    this as unknown as null,
-  );
+  return new (this.viewContextClass())(this.lookupContext, this.viewAssigns(), this);
 }
 
 /** @internal */

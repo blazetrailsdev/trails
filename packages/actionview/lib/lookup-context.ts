@@ -11,6 +11,7 @@ import {
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import type { NestedDependencies } from "./digestor.js";
+import type { I18nProxy } from "./rendering.js";
 import { Base, type ViewContextClass } from "./base.js";
 import { Handlers } from "./template/handlers.js";
 import { Template } from "./template.js";
@@ -213,8 +214,7 @@ export class LookupContext {
   set locale(value: string | null) {
     if (value != null) {
       const config = rbObjRespondTo(I18n.config(), "originalConfig")
-        ? (I18n.config() as unknown as { originalConfig: ReturnType<typeof I18n.config> })
-            .originalConfig
+        ? (I18n.config() as I18nProxy).originalConfig
         : I18n.config();
       config.locale = isSymbol(value) ? symbolToS(value) : value;
     }

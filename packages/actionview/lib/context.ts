@@ -6,6 +6,7 @@ import { OutputFlow } from "./flows.js";
 export interface Context {
   outputBuffer: OutputBuffer | null;
   viewFlow: OutputFlow;
+  virtualPath?: string | null;
   _prepareContext(): void;
   _layoutFor(name?: string | null): SafeBuffer | Promise<SafeBuffer>;
 }
@@ -13,7 +14,7 @@ export interface Context {
 function _prepareContext(this: Context): void {
   this.viewFlow = new OutputFlow();
   this.outputBuffer = new OutputBuffer();
-  (this as unknown as { virtualPath: string | null }).virtualPath = null;
+  this.virtualPath = null;
 }
 
 function _layoutFor(this: Context, name: string | null = null): SafeBuffer | Promise<SafeBuffer> {

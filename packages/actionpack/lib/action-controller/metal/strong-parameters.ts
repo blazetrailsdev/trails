@@ -1021,10 +1021,10 @@ export interface StrongParametersHost {
   };
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `StrongParameters` is included into a controller (`action_controller/metal/strong_parameters.rb`); the merge names the host members `params` reads. */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface StrongParameters extends StrongParametersHost {}
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class StrongParameters {
   get params(): Parameters {
     return (this._params ??= new Parameters(this.request.parameters, {
