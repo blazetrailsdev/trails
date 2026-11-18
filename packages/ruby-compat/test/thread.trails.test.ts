@@ -14,6 +14,17 @@ describe("Thread (trails)", () => {
     expect(read()).toContain(`thread.trails.test.ts:${line} `);
   });
 
+  it("to_s names the line that created a subclass thread, not the subclass constructor", () => {
+    class Worker extends Thread {
+      constructor() {
+        super(() => null);
+      }
+    }
+    const line = Number(new Error().stack!.split("\n")[1].match(/:(\d+):\d+\)?$/)![1]) + 1;
+    const thread = new Worker();
+    expect(String(thread)).toContain(`thread.trails.test.ts:${line} `);
+  });
+
   it("to_s keeps the creation site when the stack limit changes after creation", () => {
     const thread = spawn();
     const limit = Error.stackTraceLimit;

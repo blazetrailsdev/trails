@@ -1,0 +1,1 @@
+SELECT posts.id, posts.body, posts.created_at, users.username AS author, (SELECT count(*) FROM likes WHERE likes.post_id = posts.id) AS like_count FROM "posts" INNER JOIN "users" ON "users"."id" = "posts"."user_id" WHERE ("posts"."created_at" < ? OR ("posts"."created_at" = ? AND "posts"."id" < ?)) ORDER BY "posts"."created_at" DESC, "posts"."id" DESC LIMIT ?
