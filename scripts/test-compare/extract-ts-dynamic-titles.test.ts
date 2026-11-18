@@ -306,3 +306,23 @@ describe("dynamically-named describe titles", () => {
     ).toEqual(["Migration > <expr> > adds a foreign key"]);
   });
 });
+
+describe("empty-string describe titles", () => {
+  it("keeps a nested describe('') as an empty ancestor segment", () => {
+    const info = extractTestsFromSource(
+      `
+        describe("Rack::Cors", () => {
+          describe("preflight requests", () => {
+            describe("", () => {
+              it("should not send failed preflight requests thru the app", () => {});
+            });
+          });
+        });
+      `,
+      "packages/rack-cors/test/unit/cors.test.ts",
+    );
+    expect(info.testCases.map((tc) => tc.ancestors)).toEqual([
+      ["Rack::Cors", "preflight requests", ""],
+    ]);
+  });
+});
