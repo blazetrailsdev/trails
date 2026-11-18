@@ -27,10 +27,6 @@ export const Navigation = {
     return /(Turbo|Hotwire) Native/.test(this.request.userAgent ?? "");
   },
 
-  isTurboNativeApp(this: NavigationHost): boolean {
-    return this.isHotwireNativeApp();
-  },
-
   recedeOrRedirectTo(this: NavigationHost, url: string, options: Options = {}): unknown {
     return this.turboNativeActionOrRedirect(url, "recede", "to", options);
   },
@@ -80,6 +76,7 @@ export const Navigation = {
     }
   },
 };
+Object.assign(Navigation, { isTurboNativeApp: Navigation.isHotwireNativeApp });
 extend(Navigation, Concern);
 (
   Navigation as unknown as {

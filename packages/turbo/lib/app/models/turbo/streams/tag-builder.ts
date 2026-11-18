@@ -5,7 +5,6 @@ import { ActionHelper } from "../../../helpers/turbo/streams/action-helper.js";
 
 type Options = Record<string, unknown>;
 type Block = (...args: unknown[]) => unknown;
-type Opts = Options | Block;
 
 interface ViewContext {
   formats: unknown;
@@ -34,98 +33,94 @@ export class TagBuilder {
     return this.actionAll("remove", targets, null, { allowInferredRendering: false });
   }
 
-  replace(target: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
-      [content, rendering] = [null, content as Options];
-    return this.action("replace", target, content, rendering, block);
+  replace(
+    target: unknown,
+    content: unknown = null,
+    { method = null, ...rendering }: Options = {},
+    block?: Block,
+  ) {
+    if ((content as object | null)?.constructor === Object)
+      [content, { method = null, ...rendering }] = [null, content as Options];
+    return this.action("replace", target, content, { method, ...rendering }, block);
   }
 
-  replaceAll(targets: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
-      [content, rendering] = [null, content as Options];
-    return this.actionAll("replace", targets, content, rendering, block);
+  replaceAll(
+    targets: unknown,
+    content: unknown = null,
+    { method = null, ...rendering }: Options = {},
+    block?: Block,
+  ) {
+    if ((content as object | null)?.constructor === Object)
+      [content, { method = null, ...rendering }] = [null, content as Options];
+    return this.actionAll("replace", targets, content, { method, ...rendering }, block);
   }
 
-  before(target: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
+  before(target: unknown, content: unknown = null, rendering: Options = {}, block?: Block) {
+    if ((content as object | null)?.constructor === Object)
       [content, rendering] = [null, content as Options];
     return this.action("before", target, content, rendering, block);
   }
 
-  beforeAll(targets: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
+  beforeAll(targets: unknown, content: unknown = null, rendering: Options = {}, block?: Block) {
+    if ((content as object | null)?.constructor === Object)
       [content, rendering] = [null, content as Options];
     return this.actionAll("before", targets, content, rendering, block);
   }
 
-  after(target: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
+  after(target: unknown, content: unknown = null, rendering: Options = {}, block?: Block) {
+    if ((content as object | null)?.constructor === Object)
       [content, rendering] = [null, content as Options];
     return this.action("after", target, content, rendering, block);
   }
 
-  afterAll(targets: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
+  afterAll(targets: unknown, content: unknown = null, rendering: Options = {}, block?: Block) {
+    if ((content as object | null)?.constructor === Object)
       [content, rendering] = [null, content as Options];
     return this.actionAll("after", targets, content, rendering, block);
   }
 
-  update(target: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
-      [content, rendering] = [null, content as Options];
-    return this.action("update", target, content, rendering, block);
+  update(
+    target: unknown,
+    content: unknown = null,
+    { method = null, ...rendering }: Options = {},
+    block?: Block,
+  ) {
+    if ((content as object | null)?.constructor === Object)
+      [content, { method = null, ...rendering }] = [null, content as Options];
+    return this.action("update", target, content, { method, ...rendering }, block);
   }
 
-  updateAll(targets: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
-      [content, rendering] = [null, content as Options];
-    return this.actionAll("update", targets, content, rendering, block);
+  updateAll(
+    targets: unknown,
+    content: unknown = null,
+    { method = null, ...rendering }: Options = {},
+    block?: Block,
+  ) {
+    if ((content as object | null)?.constructor === Object)
+      [content, { method = null, ...rendering }] = [null, content as Options];
+    return this.actionAll("update", targets, content, { method, ...rendering }, block);
   }
 
-  append(target: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
+  append(target: unknown, content: unknown = null, rendering: Options = {}, block?: Block) {
+    if ((content as object | null)?.constructor === Object)
       [content, rendering] = [null, content as Options];
     return this.action("append", target, content, rendering, block);
   }
 
-  appendAll(targets: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
+  appendAll(targets: unknown, content: unknown = null, rendering: Options = {}, block?: Block) {
+    if ((content as object | null)?.constructor === Object)
       [content, rendering] = [null, content as Options];
     return this.actionAll("append", targets, content, rendering, block);
   }
 
-  prepend(target: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
+  prepend(target: unknown, content: unknown = null, rendering: Options = {}, block?: Block) {
+    if ((content as object | null)?.constructor === Object)
       [content, rendering] = [null, content as Options];
     return this.action("prepend", target, content, rendering, block);
   }
 
-  prependAll(targets: unknown, content: unknown = null, rendering: Opts = {}, block?: Block) {
-    if (typeof rendering === "function") [rendering, block] = [{}, rendering];
-    if (typeof content === "function") [content, block] = [null, content as Block];
-    else if ((content as object | null)?.constructor === Object)
+  prependAll(targets: unknown, content: unknown = null, rendering: Options = {}, block?: Block) {
+    if ((content as object | null)?.constructor === Object)
       [content, rendering] = [null, content as Options];
     return this.actionAll("prepend", targets, content, rendering, block);
   }

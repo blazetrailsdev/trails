@@ -52,7 +52,9 @@ describe("Turbo::StreamsHelperTest", () => {
   });
 
   it("turbo_stream builder captures block when called without :partial keyword", async () => {
-    const rendered = await tc.turboStream.update("target_id", () => tc.tag().span("Hello, world"));
+    const rendered = await tc.turboStream.update("target_id", null, {}, () =>
+      tc.tag().span("Hello, world"),
+    );
 
     tc.assertDomEqual(
       `<turbo-stream action="update" target="target_id">
@@ -67,6 +69,7 @@ describe("Turbo::StreamsHelperTest", () => {
   it("turbo_stream builder forwards block to partial when called with :partial keyword", async () => {
     const rendered = await tc.turboStream.update(
       "target_id",
+      null,
       { partial: "application/partial_with_block" },
       () => "Hello, from application/partial_with_block partial",
     );
@@ -84,6 +87,7 @@ describe("Turbo::StreamsHelperTest", () => {
   it("turbo_stream builder forwards block to partial when called with :layout keyword", async () => {
     const rendered = await tc.turboStream.update(
       "target_id",
+      null,
       { layout: "application/partial_with_block" },
       () => "Hello, from application/partial_with_block partial",
     );

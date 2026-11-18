@@ -78,8 +78,8 @@ describe("Turbo::FrameRequestControllerTest", () => {
 
 describe("Turbo::FrameRequestViewTest", () => {
   it("supports rendering context without request object", async () => {
-    const tc = new TestCase(expect.getState().currentTestName!) as TestCase & {
-      rendered: string;
+    const tc = new TestCase(expect.getState().currentTestName!) as unknown as {
+      rendered: unknown;
       assertDom(selector: string, options?: object): void;
     };
     await (tc as unknown as { beforeSetup(): Promise<void> }).beforeSetup();
