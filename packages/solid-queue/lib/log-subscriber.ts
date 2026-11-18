@@ -110,6 +110,34 @@ export class LogSubscriber extends BaseLogSubscriber {
     );
   }
 
+  finishBatch(event: Event): void {
+    this.info(
+      this.formattedEvent(event, {
+        action: "Finish batch",
+        ...slice(event.payload, "batch_id", "total_jobs", "completed_jobs", "failed_jobs"),
+      }),
+    );
+  }
+
+  sweepStalledBatches(event: Event): void {
+    this.debug(
+      this.formattedEvent(event, {
+        action: "Sweep stalled batches",
+        ...slice(event.payload, "stale_executions", "finished_batches", "started_batches"),
+      }),
+    );
+  }
+
+  batchProgressError(event: Event): void {
+    this.error(
+      this.formattedEvent(event, {
+        action: "Error updating batch progress",
+        ...slice(event.payload, "batch_id", "job_id"),
+        error: this.formattedError(event.payload.error as Error),
+      }),
+    );
+  }
+
   releaseManyBlocked(event: Event): void {
     this.debug(
       this.formattedEvent(event, {

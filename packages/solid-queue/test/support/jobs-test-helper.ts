@@ -3,6 +3,7 @@ import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { waitWhileWithTimeout } from "./processes-test-helper.js";
 import { Job } from "../../lib/job.js";
 import { Record } from "../../lib/record.js";
+import { Batch } from "../../lib/batch.js";
 
 export async function waitForJobsToFinishFor(
   timeout = 1,
@@ -42,4 +43,11 @@ export function silentOnThreadErrorFor(
       onThreadError?.(exception);
     }
   };
+}
+
+export async function waitForBatchesToFinishFor(timeout = 1) {
+  await waitWhileWithTimeout(
+    timeout,
+    async () => await Record.uncached(() => Batch.where({ finished_at: null }).isAny()),
+  );
 }
