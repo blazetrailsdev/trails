@@ -1782,8 +1782,6 @@ export function rubyMethodToTs(
  * {@link PROTOCOL_CALL_ENROLLED_PACKAGES}, and skipped elsewhere as before.
  */
 export function rubyCallToTs(name: string, pkg: string | undefined): string[] | null {
-  // A `new` call answers `constructor` alone; compare.ts's
-  // `rubyCallToTsForReceivers` adds `new` where the receiver may be an instance.
   if (name === "new") return ["constructor"];
   if (
     pkg !== undefined &&
@@ -1877,9 +1875,6 @@ function rubyMethodToTsWithoutUnderscore(
   // spelling of the same one.
   if (name === "new" && siblingRubyNames?.has("initialize") === true) return null;
   if (name === "initialize") return ["constructor"];
-  // An instance-level `new` with no `initialize` beside it is a controller
-  // action (`Rails::Conductor::ActionMailbox::InboundEmailsController#new`),
-  // a plain method JS spells `new()`; a class-level one is the constructor.
   if (name === "new") return ["constructor", "new"];
   if (name === "to_s" || name === "to_str") return ["toString"];
   if (name === "to_json") return ["toJSON"];
