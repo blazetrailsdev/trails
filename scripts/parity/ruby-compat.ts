@@ -164,6 +164,7 @@ export const ENUMERABLE_FREE_FUNCTIONS = new Map<string, string>([
   ["Enumerable#map", "map"],
   ["Enumerable#partition", "partition"],
   ["Enumerable#take", "take"],
+  ["Enumerable#take_while", "takeWhile"],
   ["Enumerable#uniq", "uniq"],
   ["Enumerable#zip", "zip"],
 ]);

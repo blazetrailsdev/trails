@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
@@ -99,9 +100,7 @@ describe("UpdateGeneratorTest", () => {
 
       await testCase.runGenerator();
 
-      expect(await Dir.globAsync(File.join(testCase.destinationRoot, "db/**/*.ts"))).toHaveLength(
-        0,
-      );
+      expect(await Dir.globAsync(File.join(testCase.destinationRoot, "db/**/*.ts"))).toBeEmpty();
     } finally {
       await FileUtils.rmRfAsync(emptySourceRoot);
     }
