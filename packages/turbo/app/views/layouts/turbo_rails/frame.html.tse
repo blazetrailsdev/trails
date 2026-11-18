@@ -1,0 +1,9 @@
+<html>
+  <head>
+    <%= csrfMetaTags() %>
+    <%= yield("head") %>
+  </head>
+  <body>
+    <%= yield %>
+  </body>
+</html>

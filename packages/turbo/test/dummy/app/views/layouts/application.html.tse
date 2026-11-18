@@ -8,7 +8,7 @@
     <%= yield("head") %>
   </head>
 
-  <body class="<%= turboNativeApp() ? "turbo-native" : "" %>">
+  <body class="<%= isTurboNativeApp() ? "turbo-native" : "" %>">
     <%= yield %>
   </body>
 </html>

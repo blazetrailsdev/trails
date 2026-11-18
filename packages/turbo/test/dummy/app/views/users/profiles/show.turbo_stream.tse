@@ -1,2 +1,2 @@
-<%= turboStream.replace(this.profile) %>
-<%= turboStream.update(this.profile) %>
+<%= await turboStream.replace(this.profile) %>
+<%= await turboStream.update(this.profile) %>

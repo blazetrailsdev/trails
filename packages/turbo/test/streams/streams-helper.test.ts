@@ -7,11 +7,37 @@ import "../test-helper.js";
 import { StreamsChannel } from "../../lib/app/channels/turbo/streams-channel.js";
 import { StreamsHelper } from "../../lib/app/helpers/turbo/streams-helper.js";
 import { Channel } from "../dummy/app/channels/application-cable/channel.js";
+import { Message } from "../dummy/app/models/message.js";
+import { ModelName } from "@blazetrails/activemodel";
+import { Turbo } from "../../lib/turbo-trails.js";
 
 class TestChannel extends Channel {}
 constSet(TopLevel, "TestChannel", TestChannel);
 
 type Tc = Record<string, any>;
+
+class Component {
+  id: number;
+  content: string;
+  static readonly modelName = new ModelName(this, Turbo, "Turbo::StreamsHelperTest::Component");
+
+  constructor({ id, content }: { id: number; content: string }) {
+    this.id = id;
+    this.content = content;
+  }
+
+  get modelName(): ModelName {
+    return Component.modelName;
+  }
+
+  renderIn(_viewContext: unknown): string {
+    return this.content;
+  }
+
+  toKey(): unknown[] {
+    return [this.id];
+  }
+}
 
 class StreamsHelperTest extends TestCase {}
 (StreamsHelperTest as any).tests(StreamsHelper);
@@ -23,6 +49,71 @@ describe("Turbo::StreamsHelperTest", () => {
     tc = new (StreamsHelperTest as any)(task.name) as unknown as Tc;
     await tc.beforeSetup();
     tc.setup();
+  });
+
+  it("turbo_stream builder captures block when called without :partial keyword", async () => {
+    const rendered = await tc.turboStream.update("target_id", () => tc.tag().span("Hello, world"));
+
+    tc.assertDomEqual(
+      `<turbo-stream action="update" target="target_id">
+        <template>
+          <span>Hello, world</span>
+        </template>
+      </turbo-stream>`,
+      String(rendered),
+    );
+  });
+
+  it("turbo_stream builder forwards block to partial when called with :partial keyword", async () => {
+    const rendered = await tc.turboStream.update(
+      "target_id",
+      { partial: "application/partial_with_block" },
+      () => "Hello, from application/partial_with_block partial",
+    );
+
+    tc.assertDomEqual(
+      `<turbo-stream action="update" target="target_id">
+        <template>
+          <p>Hello, from application/partial_with_block partial</p>
+        </template>
+      </turbo-stream>`,
+      String(rendered),
+    );
+  });
+
+  it("turbo_stream builder forwards block to partial when called with :layout keyword", async () => {
+    const rendered = await tc.turboStream.update(
+      "target_id",
+      { layout: "application/partial_with_block" },
+      () => "Hello, from application/partial_with_block partial",
+    );
+
+    tc.assertDomEqual(
+      `<turbo-stream action="update" target="target_id">
+        <template>
+          <p>Hello, from application/partial_with_block partial</p>
+        </template>
+      </turbo-stream>`,
+      String(rendered),
+    );
+  });
+
+  it("supports valid :renderable option object with nil content", async () => {
+    const component = new Component({ id: 1, content: "Hello, world" });
+
+    tc.assertDomEqual(
+      `<turbo-stream action="update" target="streams_helper_test_component_1"><template>Hello, world</template></turbo-stream>`,
+      String(await tc.turboStream.update(component)),
+    );
+  });
+
+  it("supports valid :renderable option object with content", async () => {
+    const component = new Component({ id: 1, content: "Hello, world" });
+
+    tc.assertDomEqual(
+      `<turbo-stream action="update" target="streams_helper_test_component_1"><template>Raw content</template></turbo-stream>`,
+      String(await tc.turboStream.update(component, "Raw content")),
+    );
   });
 
   it("with streamable", () => {
@@ -76,6 +167,41 @@ describe("Turbo::StreamsHelperTest", () => {
       String(
         tc.turboStreamFrom("messages", { channel: "NonExistentChannel", data: { payload: 1 } }),
       ),
+    );
+  });
+  it("turbo_stream.refresh", () => {
+    tc.assertDomEqual(
+      `<turbo-stream action="refresh"></turbo-stream>`,
+      String(tc.turboStream.refresh()),
+    );
+    tc.assertDomEqual(
+      `<turbo-stream request-id="abc123" action="refresh"></turbo-stream>`,
+      String(Turbo.withRequestId("abc123", () => tc.turboStream.refresh())),
+    );
+    tc.assertDomEqual(
+      `<turbo-stream request-id="def456" action="refresh"></turbo-stream>`,
+      String(tc.turboStream.refresh({ requestId: "def456" })),
+    );
+  });
+
+  it("custom turbo_stream builder actions", async () => {
+    tc.assertDomEqual(
+      `<turbo-stream action="highlight" target="an-id"><template></template></turbo-stream>`,
+      String(await tc.turboStream.highlight("an-id")),
+    );
+    tc.assertDomEqual(
+      `<turbo-stream action="highlight" targets=".a-selector"><template></template></turbo-stream>`,
+      String(await tc.turboStream.highlightAll(".a-selector")),
+    );
+  });
+
+  it("supports valid :partial option objects", async () => {
+    await Message.loadSchema();
+    const message = new Message({ id: 1, content: "Hello, world" });
+
+    tc.assertDomEqual(
+      `<turbo-stream action="update" target="message_1"><template><p>Hello, world</p></template></turbo-stream>`,
+      String(await tc.turboStream.update(message)),
     );
   });
 });

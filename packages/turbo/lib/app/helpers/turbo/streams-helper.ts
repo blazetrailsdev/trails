@@ -7,6 +7,7 @@ import {
 import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../turbo-trails.js";
 import { StreamsChannel } from "../../channels/turbo/streams-channel.js";
+import { TagBuilder } from "../../models/turbo/streams/tag-builder.js";
 
 type Options = Record<string, unknown>;
 
@@ -15,6 +16,10 @@ interface StreamsHelperHost {
 }
 
 export const StreamsHelper = {
+  get turboStream(): TagBuilder {
+    return new TagBuilder(this);
+  },
+
   turboStreamFrom(this: StreamsHelperHost, ...streamables: unknown[]): SafeBuffer {
     const attributes = extractOptionsBang(streamables) as Options;
     if (!streamables.some((streamable) => isPresent(streamable)))
