@@ -1621,6 +1621,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack
+      '@blazetrails/rack-cors':
+        specifier: workspace:*
+        version: link:../../packages/rack-cors
       '@blazetrails/rack-proxy':
         specifier: workspace:*
         version: link:../../packages/rack-proxy
