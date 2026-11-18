@@ -15,12 +15,8 @@ import {
   constSet,
 } from "@blazetrails/ruby-compat";
 
-import {
-  isTruthy,
-  PersistedSecure,
-  type PersistedRequest,
-  SessionId as SessionSessionId,
-} from "./abstract/id.js";
+import { isTruthy, PersistedSecure, type PersistedRequest } from "./abstract/id.js";
+import * as Session from "./abstract/id.js";
 import { RACK_SESSION_UNPACKED_COOKIE_DATA } from "./constants.js";
 import { Encryptor, type EncryptorOptions } from "./encryptor.js";
 
@@ -172,9 +168,9 @@ export class Cookie extends PersistedSecure {
   }
 
   /** @internal */
-  override extractSessionId(request: PersistedRequest): SessionSessionId | null | false {
+  override extractSessionId(request: PersistedRequest): Session.SessionId | null | false {
     const data = this.unpackedCookieData(request);
-    return (data == null ? null : hashAref(data, "session_id")) as SessionSessionId | null;
+    return (data == null ? null : hashAref(data, "session_id")) as Session.SessionId | null;
   }
 
   /** @internal */
@@ -221,7 +217,7 @@ export class Cookie extends PersistedSecure {
     return data;
   }
 
-  static SessionId = class SessionId extends DelegateClass(SessionSessionId) {
+  static SessionId = class SessionId extends DelegateClass(Session.SessionId) {
     /** @internal */
     _cookieValue: string;
 

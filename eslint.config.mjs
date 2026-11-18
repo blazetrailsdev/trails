@@ -28,6 +28,7 @@ import noConditionalInTest from "./eslint/no-conditional-in-test.mjs";
 import noGetterCalledAsMethod from "./eslint/no-getter-called-as-method.mjs";
 import asyncQueryingEmpty from "./eslint/async-querying-empty.mjs";
 import noQSuffixPredicate from "./eslint/no-q-suffix-predicate.mjs";
+import noClassExpressionShadowingAliasedImport from "./eslint/no-class-expression-shadowing-aliased-import.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
 import railsFileStructureMethodOrder, {
@@ -335,6 +336,7 @@ export default defineConfig(
           "no-getter-called-as-method": noGetterCalledAsMethod,
           "async-querying-empty": asyncQueryingEmpty,
           "no-q-suffix-predicate": noQSuffixPredicate,
+          "no-class-expression-shadowing-aliased-import": noClassExpressionShadowingAliasedImport,
           "sqlite-driver-await": sqliteDriverAwait,
           "prefer-await-relation": preferAwaitRelation,
           "nie-requires-annotation": nieRequiresAnnotation,
@@ -430,6 +432,13 @@ export default defineConfig(
     files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/no-getter-called-as-method": "error",
+    },
+  },
+
+  {
+    files: ["packages/**/*.ts"],
+    rules: {
+      "blazetrails/no-class-expression-shadowing-aliased-import": "error",
     },
   },
 

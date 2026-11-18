@@ -3,21 +3,21 @@ import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call
 import { Range } from "@blazetrails/ruby-compat";
 import { Error as ModelError } from "../../lib/error.js";
 import { I18n } from "../../lib/i18n.js";
-import { Person as BasePerson } from "../models/person.js";
+import * as PersonModel from "../models/person.js";
 
 describe("I18nValidationTest", () => {
-  let personStub: typeof BasePerson | undefined;
-  let person: BasePerson & Record<string, any>;
+  let personStub: typeof PersonModel.Person | undefined;
+  let person: PersonModel.Person & Record<string, any>;
   let oldLoadPath: (string | string[])[];
   let oldBackend: ReturnType<typeof I18n.backend>;
   let originalI18nCustomizeFullMessage: boolean;
 
-  function personClass(): typeof BasePerson {
-    return (personStub ??= class Person extends BasePerson {});
+  function personClass(): typeof PersonModel.Person {
+    return (personStub ??= class Person extends PersonModel.Person {});
   }
 
   function setup(): void {
-    BasePerson.clearValidatorsBang();
+    PersonModel.Person.clearValidatorsBang();
     personStub = undefined;
     person = new (personClass())();
 
@@ -449,13 +449,19 @@ describe("I18nValidationTest", () => {
   const VALIDATION_EXPECTATIONS: [
     string,
     string,
-    (person: BasePerson & Record<string, any>, optionsToMerge: Record<string, unknown>) => void,
+    (
+      person: PersonModel.Person & Record<string, any>,
+      optionsToMerge: Record<string, unknown>,
+    ) => void,
   ][] = [
     [
       "validates_confirmation_of",
       "confirmation",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesConfirmationOf("title", optionsToMerge);
+        (person.constructor as typeof PersonModel.Person).validatesConfirmationOf(
+          "title",
+          optionsToMerge,
+        );
         person.titleConfirmation = "foo";
       },
     ],
@@ -463,7 +469,7 @@ describe("I18nValidationTest", () => {
       "validates_acceptance_of",
       "accepted",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesAcceptanceOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesAcceptanceOf("title", {
           ...optionsToMerge,
           allowNil: false,
         });
@@ -473,14 +479,17 @@ describe("I18nValidationTest", () => {
       "validates_presence_of",
       "blank",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesPresenceOf("title", optionsToMerge);
+        (person.constructor as typeof PersonModel.Person).validatesPresenceOf(
+          "title",
+          optionsToMerge,
+        );
       },
     ],
     [
       "validates_length_of",
       "too_short",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesLengthOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesLengthOf("title", {
           ...optionsToMerge,
           within: new Range(3, 5),
         });
@@ -490,7 +499,7 @@ describe("I18nValidationTest", () => {
       "validates_length_of",
       "too_long",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesLengthOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesLengthOf("title", {
           ...optionsToMerge,
           within: new Range(3, 5),
         });
@@ -501,7 +510,7 @@ describe("I18nValidationTest", () => {
       "validates_length_of",
       "wrong_length",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesLengthOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesLengthOf("title", {
           ...optionsToMerge,
           is: 5,
         });
@@ -511,7 +520,7 @@ describe("I18nValidationTest", () => {
       "validates_format_of",
       "invalid",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesFormatOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesFormatOf("title", {
           ...optionsToMerge,
           with: /^[1-9][0-9]*$/,
         });
@@ -521,7 +530,7 @@ describe("I18nValidationTest", () => {
       "validates_inclusion_of",
       "inclusion",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesInclusionOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesInclusionOf("title", {
           ...optionsToMerge,
           in: ["a", "b", "c"],
         });
@@ -531,7 +540,7 @@ describe("I18nValidationTest", () => {
       "validates_exclusion_of",
       "exclusion",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesExclusionOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesExclusionOf("title", {
           ...optionsToMerge,
           in: ["a", "b", "c"],
         });
@@ -542,7 +551,10 @@ describe("I18nValidationTest", () => {
       "validates_numericality_of",
       "not_a_number",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesNumericalityOf("title", optionsToMerge);
+        (person.constructor as typeof PersonModel.Person).validatesNumericalityOf(
+          "title",
+          optionsToMerge,
+        );
         person.title = "a";
       },
     ],
@@ -550,7 +562,7 @@ describe("I18nValidationTest", () => {
       "validates_numericality_of",
       "not_an_integer",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesNumericalityOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesNumericalityOf("title", {
           ...optionsToMerge,
           onlyInteger: true,
         });
@@ -561,7 +573,7 @@ describe("I18nValidationTest", () => {
       "validates_numericality_of",
       "odd",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesNumericalityOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesNumericalityOf("title", {
           ...optionsToMerge,
           onlyInteger: true,
           odd: true,
@@ -573,7 +585,7 @@ describe("I18nValidationTest", () => {
       "validates_numericality_of",
       "less_than",
       (person, optionsToMerge) => {
-        (person.constructor as typeof BasePerson).validatesNumericalityOf("title", {
+        (person.constructor as typeof PersonModel.Person).validatesNumericalityOf("title", {
           ...optionsToMerge,
           onlyInteger: true,
           lessThan: 0,
@@ -588,7 +600,7 @@ describe("I18nValidationTest", () => {
       attribute: string,
       errorType: string,
       blockThatSetsValidation: (
-        person: BasePerson & Record<string, any>,
+        person: PersonModel.Person & Record<string, any>,
         optionsToMerge: Record<string, unknown>,
       ) => void,
     ) => Promise<void>,

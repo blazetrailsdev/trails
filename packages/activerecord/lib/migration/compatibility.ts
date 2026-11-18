@@ -12,7 +12,7 @@ import { prepend } from "@blazetrails/ruby-compat/include";
 import { Current, Migration } from "../migration.js";
 import * as Compatibility from "./compatibility.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { ReferenceDefinition as ConnectionAdaptersReferenceDefinition } from "../connection-adapters/abstract/schema-definitions.js";
+import * as ConnectionAdapters from "../connection-adapters/abstract/schema-definitions.js";
 import type { CommentStatements } from "../connection-adapters/abstract/schema-statements.js";
 import type { CommandRecorder as MigrationCommandRecorder } from "./command-recorder.js";
 import type {
@@ -304,7 +304,9 @@ export class V6_1 extends V7_0 {
 }
 
 export class V6_0 extends V6_1 {
-  static ReferenceDefinition: typeof ConnectionAdaptersReferenceDefinition = class ReferenceDefinition extends ConnectionAdaptersReferenceDefinition {
+  static ReferenceDefinition: typeof ConnectionAdapters.ReferenceDefinition = class ReferenceDefinition
+    extends ConnectionAdapters.ReferenceDefinition
+  {
     override indexOptions(_tableName: string): AddIndexOptions {
       return this.asOptions(this.index);
     }

@@ -8,9 +8,9 @@ import { Parser } from "../journey/parser.js";
 import { Ast, type Node } from "../journey/nodes/node.js";
 import { Pattern } from "../journey/path/pattern.js";
 import { Route as JourneyRoute, type VerbMatcher } from "../journey/route.js";
+import * as ActiveSupport from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
-  BacktraceCleaner as ActiveSupportBacktraceCleaner,
   camelize,
   callerLocations,
   cattrAccessor,
@@ -1044,7 +1044,9 @@ export class Scope {
 include(Scope, Enumerable);
 
 export class Mapper {
-  static BacktraceCleaner: typeof ActiveSupportBacktraceCleaner = class BacktraceCleaner extends ActiveSupportBacktraceCleaner {
+  static BacktraceCleaner: typeof ActiveSupport.BacktraceCleaner = class BacktraceCleaner
+    extends ActiveSupport.BacktraceCleaner
+  {
     constructor() {
       super();
       this.removeSilencers();
@@ -1062,7 +1064,7 @@ export class Mapper {
   ];
 
   declare static routeSourceLocations: boolean;
-  declare static backtraceCleaner: ActiveSupportBacktraceCleaner;
+  declare static backtraceCleaner: ActiveSupport.BacktraceCleaner;
 
   static {
     cattrAccessor.call(this, "routeSourceLocations", { instanceAccessor: false, default: false });
