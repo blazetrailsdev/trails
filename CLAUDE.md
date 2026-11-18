@@ -1755,6 +1755,10 @@ dependencies, not ports.
   it. stimulus-rails' node branch is ported verbatim, `Stimulus::Manifest`
   included, so `controllers/index.js` is a static manifest and not an
   `import.meta.glob`.
+- `stimulus:install` appends `import "~/controllers"` to the entrypoint
+  where `stimulus_with_node.rb:10-12` appends `import "./controllers"`: from
+  `entrypoints/`, `./controllers` does not resolve, and vite-plugin-ruby's
+  `~` alias names `sourceCodeDir`. Ruled by the operator on 2026-11-18.
 - `trails server` boots the Rack app, `DevServerProxy` forwards Vite
   requests, and `bin/vite dev` runs Vite in its own process, as in
   vite_rails. `trailsPlugin` (Rack-inside-Vite) remains only as test
