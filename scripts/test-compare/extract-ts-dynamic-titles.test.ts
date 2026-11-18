@@ -308,8 +308,6 @@ describe("dynamically-named describe titles", () => {
 });
 
 describe("empty-string describe titles", () => {
-  // Ruby's extractor keeps `describe ''` as a segment ("" is truthy in Ruby),
-  // so the TS side keeps `describe("", ...)` too (rack-cors cors_test.rb:393).
   it("keeps a nested describe('') as an empty ancestor segment", () => {
     const info = extractTestsFromSource(
       `
