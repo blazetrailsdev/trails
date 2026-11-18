@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
+import { TestCase } from "@blazetrails/actionview/test-case.js";
 import { File } from "@blazetrails/ruby-compat";
 import { app } from "../test-helper.js";
 import { ApplicationController } from "../dummy/app/controllers/application-controller.js";
@@ -72,5 +73,20 @@ describe("Turbo::FrameRequestControllerTest", () => {
 
     await t.get(trayPath({ id: 1 }), { headers: { "Turbo-Frame": turboFrameRequestId } });
     expect(String(t.response.body)).toMatch(new RegExp(turboFrameRequestId));
+  });
+});
+
+describe("Turbo::FrameRequestViewTest", () => {
+  it("supports rendering context without request object", async () => {
+    const tc = new TestCase(expect.getState().currentTestName!) as TestCase & {
+      rendered: string;
+      assertDom(selector: string, options?: object): void;
+    };
+    await (tc as unknown as { beforeSetup(): Promise<void> }).beforeSetup();
+    (tc as unknown as { setup(): void }).setup();
+    tc.rendered = String(await ApplicationController.render({ template: "trays/show" }));
+
+    tc.assertDom("html head title", { text: "Dummy" });
+    tc.assertDom("html body:not(.turbo-native) turbo-frame#tray");
   });
 });
