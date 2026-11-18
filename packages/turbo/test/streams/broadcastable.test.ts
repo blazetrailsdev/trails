@@ -26,8 +26,7 @@ class MessageThatRendersError extends Message {
 }
 
 type Ctx = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  testCase: any;
+  testCase: BroadcastableTest & ActiveJobTestHelper & Included<typeof ActionHelper>;
 };
 type Broadcasting = Included<typeof Broadcastable> & { toGidParam(): string };
 
@@ -557,6 +556,59 @@ describe("Turbo::BroadcastableTest", () => {
         t.performEnqueuedJobs({}, () =>
           message.broadcastUpdateLaterTo(message, { targets: ".message_1" }),
         ),
+    );
+  });
+
+  it("broadcasting replace morph to stream now", async ({ testCase: t }: Ctx) => {
+    await t.assertBroadcastOn(
+      "stream",
+      t.turboStreamActionTag("replace", {
+        target: "message_1",
+        method: "morph",
+        template: await render(message),
+      }),
+      () =>
+        message.broadcastReplaceTo("stream", {
+          target: "message_1",
+          attributes: { method: "morph" },
+        }),
+    );
+  });
+  it("broadcasting update morph to stream now targeting", async ({ testCase: t }: Ctx) => {
+    await t.assertBroadcastOn(
+      "stream",
+      t.turboStreamActionTag("update", {
+        target: "message_1",
+        method: "morph",
+        template: await render(message),
+      }),
+      () =>
+        message.broadcastUpdateTo("stream", {
+          target: "message_1",
+          attributes: { method: "morph" },
+        }),
+    );
+  });
+  it("broadcasting replace morph now", async ({ testCase: t }: Ctx) => {
+    await t.assertBroadcastOn(
+      message.toGidParam(),
+      t.turboStreamActionTag("replace", {
+        target: "message_1",
+        method: "morph",
+        template: await render(message),
+      }),
+      () => message.broadcastReplace({ target: "message_1", attributes: { method: "morph" } }),
+    );
+  });
+  it("broadcasting update morph now", async ({ testCase: t }: Ctx) => {
+    await t.assertBroadcastOn(
+      message.toGidParam(),
+      t.turboStreamActionTag("update", {
+        target: "message_1",
+        method: "morph",
+        template: await render(message),
+      }),
+      () => message.broadcastUpdate({ target: "message_1", attributes: { method: "morph" } }),
     );
   });
 });

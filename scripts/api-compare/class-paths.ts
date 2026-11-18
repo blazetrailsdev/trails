@@ -60,6 +60,7 @@ const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = {};
 
 /** A directory or file whose files load one at a time, so each carries its own table and loads no sibling. */
 const LAZY_DIRS: Record<string, string[]> = {
+  turbo: ["app/jobs/turbo/streams/"],
   activerecord: [
     "connection-adapters/",
     "destroy-association-async-job.ts",
@@ -553,9 +554,15 @@ async function checkSeatedPaths(dir: string, paths: readonly string[]): Promise<
   );
   const entry = await entryFile(cwd);
   const table = `${path.dirname(entry)}/constants.generated.js`;
-  await run("node", ["--input-type=module", "-e", `await import(${JSON.stringify(table)});`], {
-    cwd,
-  });
+  const hasTable = await fs.access(path.join(cwd, table)).then(
+    () => true,
+    () => false,
+  );
+  if (hasTable) {
+    await run("node", ["--input-type=module", "-e", `await import(${JSON.stringify(table)});`], {
+      cwd,
+    });
+  }
   for (const [seated, generated] of JSON.parse(stdout) as [string, string][]) {
     console.error(`${dir}: seated ${seated}, generated ${generated}`);
     process.exitCode = 1;

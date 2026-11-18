@@ -146,12 +146,16 @@ export class TestHelper {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface TestHelper {
   _oldPubsubAdapter: unknown;
-  beforeSetup: typeof beforeSetup;
-  afterTeardown: typeof afterTeardown;
-  assertBroadcasts: typeof assertBroadcasts;
+  beforeSetup(): unknown;
+  afterTeardown(): unknown;
+  assertBroadcasts(
+    ...args: Parameters<typeof assertBroadcasts>
+  ): ReturnType<typeof assertBroadcasts>;
   assertNoBroadcasts: typeof assertNoBroadcasts;
   captureBroadcasts: typeof captureBroadcasts;
-  assertBroadcastOn: typeof assertBroadcastOn;
+  assertBroadcastOn(
+    ...args: Parameters<typeof assertBroadcastOn>
+  ): ReturnType<typeof assertBroadcastOn>;
   pubsubAdapter: typeof pubsubAdapter;
   broadcasts(stream: string): unknown[];
   clearMessages(stream: string): unknown[];

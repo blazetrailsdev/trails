@@ -1372,6 +1372,16 @@
       "zeitwerk-checker.ts::ZeitwerkChecker": "Trails::ZeitwerkChecker"
     }
   },
+  "turbo": {
+    "rows": 3,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "app/jobs/turbo/streams/action-broadcast-job.ts::ActionBroadcastJob": "Turbo::Streams::ActionBroadcastJob",
+      "app/jobs/turbo/streams/broadcast-job.ts::BroadcastJob": "Turbo::Streams::BroadcastJob",
+      "app/jobs/turbo/streams/broadcast-stream-job.ts::BroadcastStreamJob": "Turbo::Streams::BroadcastStreamJob"
+    }
+  },
   "tzinfo": {
     "rows": 41,
     "excluded": [],

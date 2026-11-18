@@ -8,7 +8,7 @@ import {
   type Extended,
 } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
 import type { Engine } from "./engine.js";
 import type { DriveHelper } from "./app/helpers/turbo/drive-helper.js";
 import type { FramesHelper } from "./app/helpers/turbo/frames-helper.js";
@@ -119,5 +119,11 @@ mattrAccessor.call(Turbo, "drawRoutes", { default: true });
 threadMattrAccessor.call(Turbo, "currentRequestId");
 Turbo.Frames = {};
 Turbo.Native = {};
-constSet(Turbo, "Streams", {});
-constSet(TopLevel, "Turbo", Turbo);
+Turbo.Streams = {};
+TopLevel.Turbo = Turbo;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Turbo?: typeof Turbo;
+  }
+}

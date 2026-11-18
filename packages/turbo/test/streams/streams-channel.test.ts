@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { Extended } from "@blazetrails/activesupport";
+import type { Extended, Included } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/actioncable/channel/test-case.js";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { Thread, constSet, include } from "@blazetrails/ruby-compat";
@@ -17,7 +16,9 @@ include(StreamsChannelTest, ActiveJobTestHelper);
 include(StreamsChannelTest, ActionHelper);
 constSet(Turbo, "StreamsChannelTest", StreamsChannelTest);
 
-type Ctx = { testCase: any };
+type Ctx = {
+  testCase: StreamsChannelTest & ActiveJobTestHelper & Included<typeof ActionHelper>;
+};
 
 const render = (options: object): Promise<unknown> => ApplicationController.render(options);
 

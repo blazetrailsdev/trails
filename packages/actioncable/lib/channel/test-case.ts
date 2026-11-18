@@ -188,10 +188,7 @@ export const ClassMethods: Omit<
   },
 };
 
-export interface Behavior extends Omit<
-  TestHelper,
-  "beforeSetup" | "afterTeardown" | "assertBroadcasts" | "assertBroadcastOn"
-> {
+export interface Behavior extends Omit<TestHelper, "assertBroadcasts" | "assertBroadcastOn"> {
   readonly connection: ConnectionStub | null;
   readonly subscription: StubbedSubscription | null;
   /** @internal */
