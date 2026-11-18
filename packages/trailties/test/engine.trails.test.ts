@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MockRequest } from "@blazetrails/rack";
 import { Engine } from "../lib/engine.js";
 import { Application } from "../lib/application.js";
+import { Configuration as TrailtieConfiguration } from "../lib/trailtie/configuration.js";
 
 describe("Engine#buildRequest", () => {
   it("merges env_config and sets routes and engine_script_name on the request", () => {
@@ -100,6 +101,17 @@ describe("Engine#config paths", () => {
     expect(await paths.loadPaths()).toEqual([out]);
     expect(await paths.get("lib/tasks")!.expanded()).toEqual([`${root}/lib/tasks`]);
     expect(await paths.get("lib/assets")!.expanded()).toEqual([`${root}/lib/assets`]);
+  });
+});
+
+describe("Engine.register eager_load_namespaces", () => {
+  it("lists an engine registered twice only once", () => {
+    class TwiceEngine extends Engine {}
+    Engine.register(TwiceEngine, "/");
+    Engine.register(TwiceEngine, "/");
+    expect(TrailtieConfiguration.eagerLoadNamespaces.filter((e) => e === TwiceEngine)).toHaveLength(
+      1,
+    );
   });
 });
 

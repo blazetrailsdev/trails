@@ -93,7 +93,9 @@ export class Engine extends Trailtie {
 
   static override register(base: typeof Trailtie, calledFrom?: string): void {
     if (!base.isAbstractRailtie()) {
-      TrailtieConfiguration.eagerLoadNamespaces.push(base);
+      const eagerLoadNamespaces = TrailtieConfiguration.eagerLoadNamespaces;
+      /** @inventedArm if — PERMANENT */
+      if (!eagerLoadNamespaces.includes(base)) eagerLoadNamespaces.push(base);
 
       if (calledFrom !== undefined) (base as typeof Engine).calledFrom(calledFrom);
     }
