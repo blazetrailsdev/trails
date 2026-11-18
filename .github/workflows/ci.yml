@@ -1159,6 +1159,7 @@ jobs:
       needs.changes.outputs.actioncable_affected == 'true' ||
       needs.changes.outputs.actionview_affected == 'true' ||
       needs.changes.outputs.tse_compiler_affected == 'true' ||
+      needs.changes.outputs.actionpack_affected == 'true' ||
       (needs.changes.outputs.activerecord_affected == 'true' && needs.changes.outputs.ar_scope == '') ||
       (needs.changes.outputs.trailties_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true' &&
@@ -1188,12 +1189,12 @@ jobs:
       - name: TSE Compiler tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.tse_compiler_affected == 'true' }}
         run: pnpm vitest run packages/tse-compiler
-      # vitest.dx-tests.config.ts only declares activerecord and trailties
-      # projects, so this runs when either is affected.
+      # Runs when a package with a dx-tests project is affected.
       - name: DX type tests
         if: >-
           ${{ !cancelled() && steps.install.outcome == 'success' &&
-          ((needs.changes.outputs.activerecord_affected == 'true' && needs.changes.outputs.ar_scope == '') ||
+          (needs.changes.outputs.actionpack_affected == 'true' ||
+          (needs.changes.outputs.activerecord_affected == 'true' && needs.changes.outputs.ar_scope == '') ||
           (needs.changes.outputs.trailties_affected == 'true' &&
           needs.changes.outputs.thor_only != 'true' &&
           needs.changes.outputs.actioncable_only != 'true')) }}
