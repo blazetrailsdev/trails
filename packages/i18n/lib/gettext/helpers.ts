@@ -57,11 +57,7 @@ const _Helpers = {
     const separator = Gettext.CONTEXT_SEPARATOR;
 
     if (Array.isArray(msgid)) {
-      [msgidPlural, msgid, n] = [
-        msgid[1],
-        [msgctxt, msgid[0]].join(separator),
-        msgidPlural as number,
-      ];
+      [msgidPlural, msgid, n] = [msgid[1], [msgctxt, msgid[0]].join(separator), msgidPlural];
     } else {
       msgid = [msgctxt, msgid].join(separator);
     }
