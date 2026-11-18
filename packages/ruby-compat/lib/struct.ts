@@ -18,6 +18,7 @@ export interface StructInstance {
   equals(other: unknown): boolean;
   eql(other: unknown): boolean;
   hash(): number;
+  toA(): unknown[];
   toH(block?: (k: string, v: unknown) => [unknown, unknown]): Record<string, unknown>;
 }
 
@@ -196,6 +197,15 @@ export const Struct = {
        */
       hash(): number {
         return rbHash([this.constructor, ...structValues(this)]);
+      }
+
+      /**
+       * `rb_struct_to_a` (`vendor/ruby/v3.3.11/struct.c:1028`).
+       *
+       * @noRailsEquivalent PERMANENT
+       */
+      toA(): unknown[] {
+        return [...this[RSTRUCT]];
       }
 
       /**

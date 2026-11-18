@@ -66,6 +66,7 @@ describe("Struct", () => {
   it("answers its members' values as a hash, through a block when given", () => {
     const joe = new Customer("Joe", 1);
     expect(joe.toH()).toEqual({ name: "Joe", zip: 1 });
+    expect(joe.toA()).toEqual(["Joe", 1]);
     expect(joe.toH((k, v) => [k.toUpperCase(), String(v)])).toEqual({ NAME: "Joe", ZIP: "1" });
   });
 

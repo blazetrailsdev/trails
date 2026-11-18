@@ -566,7 +566,7 @@ describe("MessagePack::Factory", () => {
         factory.registerType(0x00, rbCSymbol);
         factory.registerType(0x01, Point, {
           packer: (point: Point, packer: Packer) => {
-            packer.write(Object.values(point.toH()));
+            packer.write(point.toA());
             return null;
           },
           unpacker: (unpacker: Unpacker) => {
