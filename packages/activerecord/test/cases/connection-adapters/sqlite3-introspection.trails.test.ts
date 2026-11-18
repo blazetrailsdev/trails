@@ -1,7 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../../lib/connection-adapters/abstract/connection-pool.js";
@@ -9,12 +6,9 @@ import type { ConnectionPool } from "../../../lib/connection-adapters/abstract/c
 describe("SQLite3Adapter schema introspection", () => {
   let adapter: SQLite3Adapter;
   let pool: ConnectionPool;
-  let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-introspect-"));
-    const file = path.join(tmpDir, "db.sqlite3");
-    pool = newSqlitePool(file);
+    pool = newSqlitePool(":memory:");
     adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
   });
 
@@ -23,7 +17,6 @@ describe("SQLite3Adapter schema introspection", () => {
     await adapter.execute(`DROP TABLE IF EXISTS gadgets`).catch(() => undefined);
     await adapter.execute(`DROP TABLE IF EXISTS temp_widgets`).catch(() => undefined);
     await pool.disconnect();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("shares one frozen Column instance between structurally identical columns", async () => {
