@@ -16,8 +16,6 @@ let booted: Promise<typeof Trails.application> | undefined;
 function boot() {
   return (booted ??= (async () => {
     bootTiming.bootStart = performance.now();
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     await import("../.trails/entry.generated.js");
     bootTiming.initDone = performance.now();
     const { Base } = await import("@blazetrails/activerecord");
