@@ -1,3 +1,4 @@
+import { stringSplit, toS } from "@blazetrails/ruby-compat";
 import type { Helpers } from "./gettext/helpers.js";
 
 const _pluralKeys: Record<string, string[]> = { en: ["one", "other"] };
@@ -7,7 +8,7 @@ interface Gettext {
   CONTEXT_SEPARATOR: string;
   Helpers?: typeof Helpers;
   pluralKeys: { (): Record<string, string[]>; (...args: string[]): string[] };
-  extractScope(msgid: unknown, separator: string): [string[], string];
+  extractScope(msgid: unknown, separator: string): [string[], string | undefined];
 }
 
 export const Gettext: Gettext = {
@@ -19,9 +20,9 @@ export const Gettext: Gettext = {
       ? _pluralKeys
       : (_pluralKeys[args[0]] ?? _pluralKeys.en)) as Gettext["pluralKeys"],
 
-  extractScope(msgid: unknown, separator: string): [string[], string] {
-    const scope = String(msgid ?? "").split(separator);
+  extractScope(msgid: unknown, separator: string): [string[], string | undefined] {
+    const scope = stringSplit(toS(msgid), separator);
     msgid = scope.pop();
-    return [scope, msgid as string];
+    return [scope, msgid as string | undefined];
   },
 };

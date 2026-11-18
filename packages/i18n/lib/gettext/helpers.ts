@@ -12,7 +12,7 @@ const _Helpers = {
     return t(msgid, { ...{ default: msgid, separator: "|" }, ...options });
   },
 
-  sgettext(msgid: string, separator = "|"): unknown {
+  sgettext(msgid: string | undefined, separator = "|"): unknown {
     let scope: string[];
     [scope, msgid] = Gettext.extractScope(msgid, separator);
     return t(msgid, { scope, default: msgid, separator });
@@ -20,7 +20,7 @@ const _Helpers = {
 
   pgettext(msgctxt: string, msgid: string): unknown {
     const separator = Gettext.CONTEXT_SEPARATOR;
-    return Helpers.sgettext([msgctxt, msgid].join(separator), separator);
+    return this.sgettext([msgctxt, msgid].join(separator), separator);
   },
 
   ngettext(
@@ -28,11 +28,11 @@ const _Helpers = {
     msgidPlural: string | number,
     n: number | string = 1,
   ): unknown {
-    return Helpers.nsgettext(msgid, msgidPlural, n);
+    return this.nsgettext(msgid, msgidPlural, n);
   },
 
   nsgettext(
-    msgid: string | string[],
+    msgid: string | string[] | undefined,
     msgidPlural: string | number,
     n: number | string = 1,
     separator: unknown = "|",
@@ -52,7 +52,7 @@ const _Helpers = {
     msgctxt: string,
     msgid: string | string[],
     msgidPlural: string | number,
-    n: number = 1,
+    n: number | string = 1,
   ): unknown {
     const separator = Gettext.CONTEXT_SEPARATOR;
 
@@ -66,7 +66,7 @@ const _Helpers = {
       msgid = [msgctxt, msgid].join(separator);
     }
 
-    return Helpers.nsgettext(msgid, msgidPlural, n, separator);
+    return this.nsgettext(msgid, msgidPlural, n, separator);
   },
 };
 
