@@ -5495,8 +5495,6 @@ def run
 
     PACKAGE_EXTRA_DIRS.fetch(pkg_name, []).each do |extra_dir|
       abort "Extra lib directory for #{pkg_name} not found at #{extra_dir}." unless File.directory?(extra_dir)
-      # A `/./` segment marks the root paths are recorded against, as rsync -R
-      # reads it: `lib/./active_job` records `active_job/batch_id.rb`.
       extra_root = extra_dir.include?("/./") ? extra_dir.split("/./").first : extra_dir
       Dir.glob(File.join(extra_dir, "**", "*.rb")).sort.each do |filepath|
         extractor.process_file(filepath.sub("/./", "/"), extra_root)
