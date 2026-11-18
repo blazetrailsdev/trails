@@ -1044,7 +1044,7 @@ export class Scope {
 include(Scope, Enumerable);
 
 export class Mapper {
-  static BacktraceCleaner: typeof ActiveSupport.BacktraceCleaner = class BacktraceCleaner
+  static BacktraceCleaner: typeof ActiveSupport.BacktraceCleaner = class
     extends ActiveSupport.BacktraceCleaner
   {
     constructor() {

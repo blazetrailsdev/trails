@@ -179,6 +179,21 @@ describe("rackResponseToFetchResponse", () => {
     expect(await resp.text()).toBe("<html><body>Hi</body></html>");
   });
 
+  it("stringifies non-primitive string chunks such as SafeBuffer", async () => {
+    class SafeBufferLike {
+      constructor(private s: string) {}
+      toString() {
+        return this.s;
+      }
+    }
+    async function* body() {
+      yield new SafeBufferLike("<h1>Posts</h1>");
+      yield "<p>ok</p>";
+    }
+    const resp = await rackResponseToFetchResponse([200, {}, body() as AsyncIterable<any>]);
+    expect(await resp.text()).toBe("<h1>Posts</h1><p>ok</p>");
+  });
+
   it("preserves status codes", async () => {
     async function* body() {
       yield "Not Found";
@@ -263,5 +278,44 @@ describe("rackResponseToFetchResponse", () => {
     const resp = await rackResponseToFetchResponse(rackResp);
     expect(resp.headers.get("location")).toBe("/new-path");
     expect(resp.headers.get("x-custom")).toBe("value");
+  });
+
+  it("keeps each value of an array-valued header such as set-cookie", async () => {
+    async function* body() {
+      yield "";
+    }
+    const resp = await rackResponseToFetchResponse([
+      200,
+      { "set-cookie": ["a=1; path=/", "b=2; path=/"] },
+      body(),
+    ]);
+    expect(resp.headers.getSetCookie()).toEqual(["a=1; path=/", "b=2; path=/"]);
+  });
+
+  it("stringifies a non-string header value such as a numeric content-length", async () => {
+    async function* body() {
+      yield "hi";
+    }
+    const resp = await rackResponseToFetchResponse([
+      200,
+      { "content-length": 2 } as unknown as Record<string, string>,
+      body(),
+    ]);
+    expect(resp.headers.get("content-length")).toBe("2");
+  });
+
+  it("awaits an async body close before resolving", async () => {
+    let closed = false;
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        yield "";
+      },
+      async close() {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        closed = true;
+      },
+    };
+    await rackResponseToFetchResponse([200, {}, body]);
+    expect(closed).toBe(true);
   });
 });

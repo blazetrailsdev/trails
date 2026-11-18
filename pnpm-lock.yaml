@@ -120,6 +120,43 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/serverless-lambda:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../../packages/actionpack
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../../packages/actionview
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../../packages/activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../../packages/activesupport
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../../packages/rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../../packages/ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../../packages/trailties
+      libxml2-wasm:
+        specifier: 0.7.1
+        version: 0.7.1
+    devDependencies:
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../../packages/trails-tsc
+      '@types/node':
+        specifier: ^25.3.5
+        version: 25.3.5
+      esbuild:
+        specifier: 0.27.3
+        version: 0.27.3
+
   examples/twelve-dollar-server:
     dependencies:
       '@blazetrails/actionpack':

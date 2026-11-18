@@ -304,7 +304,7 @@ export class V6_1 extends V7_0 {
 }
 
 export class V6_0 extends V6_1 {
-  static ReferenceDefinition: typeof ConnectionAdapters.ReferenceDefinition = class ReferenceDefinition
+  static ReferenceDefinition: typeof ConnectionAdapters.ReferenceDefinition = class
     extends ConnectionAdapters.ReferenceDefinition
   {
     override indexOptions(_tableName: string): AddIndexOptions {

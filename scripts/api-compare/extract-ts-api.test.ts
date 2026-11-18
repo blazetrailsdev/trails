@@ -8896,6 +8896,22 @@ describe("staticClassExpressions", () => {
       "pread",
     ]);
   });
+
+  it("names an anonymous static class expression after its field, as NamedEvaluation does", () => {
+    const [cls] = ts
+      .createSourceFile(
+        "virtual.ts",
+        "class V6_0 { static ReferenceDefinition = class extends Base { indexOptions() {} }; }",
+        ts.ScriptTarget.Latest,
+        true,
+      )
+      .statements.filter(ts.isClassDeclaration);
+    const [nested, ...rest] = staticClassExpressions(cls, "V6_0");
+    expect(rest).toEqual([]);
+    expect(nested.seat).toBe("V6_0.ReferenceDefinition");
+    expect(nested.name).toBe("ReferenceDefinition");
+    expect(nested.cls.members.map((member) => member.name?.getText())).toEqual(["indexOptions"]);
+  });
 });
 
 describe("extractClass — @inlinedFrom on a constructor", () => {

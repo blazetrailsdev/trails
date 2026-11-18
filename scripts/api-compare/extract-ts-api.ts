@@ -5310,7 +5310,8 @@ export function staticModuleInstances(
  * lets `Journey::Scanner::Scanner` share its outer class's name). Keyed by the
  * dotted seat so it never overwrites the outer class; recurses for deeper
  * nesting. A `static CONST = new (class { ... })()` member is hosted the same
- * way, on a class named after the constant.
+ * way, on a class named after the constant. An anonymous class expression
+ * takes its field's name, as NamedEvaluation gives it at run time.
  */
 export function staticClassExpressions(
   node: ts.ClassDeclaration | ts.ClassExpression,
@@ -5328,10 +5329,11 @@ export function staticClassExpressions(
       continue;
     }
     const cls = init && conditionalClassExpression(init);
-    if (!cls || !cls.name) continue;
+    if (!cls) continue;
     const conditional = cls !== unwrapParens(init) ? { conditional: true as const } : {};
+    const named = cls.name ? {} : { name: member.name.text };
     found.push(
-      { seat: nestedSeat, cls, ...conditional },
+      { seat: nestedSeat, cls, ...named, ...conditional },
       ...staticClassExpressions(cls, nestedSeat),
     );
   }

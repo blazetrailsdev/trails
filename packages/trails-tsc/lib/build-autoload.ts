@@ -216,9 +216,11 @@ async function writeBoot(
     return `  ${JSON.stringify(path.relative!(root, file))}: () => import(${JSON.stringify(specifier.startsWith(".") ? specifier : `./${specifier}`)}),`;
   });
   const boot = [
-    `import { getPath, ${views.length === 0 ? "" : "loadIseqEval, "}registerCompiledFiles } from "@blazetrails/ruby-compat";`,
+    `import { ${views.length === 0 ? "" : "loadIseqEval, "}registerCompiledFiles } from "@blazetrails/ruby-compat";`,
+    'import { Application } from "@blazetrails/trailties";',
     "",
-    'registerCompiledFiles(getPath().fileURLToPath(new URL("..", import.meta.url)), {',
+    "const root = Application.findRoot(import.meta.dirname);",
+    "registerCompiledFiles(root, {",
     ...entries,
     ...views.map(([, entry]) => entry),
     "});",
@@ -228,7 +230,7 @@ async function writeBoot(
       : [
           "await Promise.all(",
           `  ${JSON.stringify(views.map(([rel]) => rel))}.map((view) =>`,
-          "    loadIseqEval(getPath().fileURLToPath(new URL(`../${view}`, import.meta.url))),",
+          "    loadIseqEval(`${root}/${view}`),",
           "  ),",
           ");",
           "",
@@ -249,11 +251,11 @@ async function writeEntry(
     return relative.startsWith(".") ? relative : `./${relative}`;
   };
   const autoloadDir = File.join(trailsDir, "autoload");
-  const imports = tagged.map(
-    ([, dir], i) =>
-      `import { imports as imports${i} } from ${JSON.stringify(specifier(autoloadDir, File.join(dir, "imports.generated.js")))};`,
-  );
-  const byTag = tagged.map(([tag], i) => `  ${JSON.stringify(tag)}: imports${i},`);
+  const imports = tagged.flatMap(([, dir], i) => [
+    `import { imports as imports${i} } from ${JSON.stringify(specifier(autoloadDir, File.join(dir, "imports.generated.js")))};`,
+    `import manifest${i} from ${JSON.stringify(specifier(autoloadDir, File.join(dir, "manifest.json")))} with { type: "json" };`,
+  ]);
+  const byTag = tagged.map(([tag], i) => `  ${JSON.stringify(tag)}: [imports${i}, manifest${i}],`);
   const install = [
     'import "../boot.generated.js";',
     'import "@blazetrails/ruby-compat/psych-yaml";',
@@ -264,7 +266,7 @@ async function writeEntry(
     `const byTag = {\n${byTag.join("\n")}\n};`,
     "",
     "Trails.autoloaders.each((loader) => {",
-    "  if (Object.hasOwn(byTag, loader.tag)) loader.imports = byTag[loader.tag];",
+    "  if (Object.hasOwn(byTag, loader.tag)) [loader.imports, loader.manifest] = byTag[loader.tag];",
     "});",
     "",
   ].join("\n");
