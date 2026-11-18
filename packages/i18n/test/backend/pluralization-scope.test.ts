@@ -1,11 +1,14 @@
 import * as TestCase from "../support/test-case.js";
+import { include } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Fallbacks } from "../../lib/backend/fallbacks.js";
 import { Pluralization } from "../../lib/backend/pluralization.js";
 import { Simple } from "../../lib/backend/simple.js";
 import { config, setDefaultLocale, translate } from "../../lib/i18n.js";
 
-class Backend extends Fallbacks(Pluralization(Simple)) {}
+class PluralizationSimple extends Simple {}
+include(PluralizationSimple, Pluralization);
+class Backend extends Fallbacks(PluralizationSimple) {}
 
 afterEach(TestCase.teardown);
 

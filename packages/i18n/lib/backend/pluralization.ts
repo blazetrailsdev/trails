@@ -1,70 +1,83 @@
-import { Hash, hasKey, hashAref } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  defineModule,
+  hasKey,
+  hashAref,
+  rbCallSuper,
+  rbEqual,
+  rbObjRespondTo,
+  rbProcCall,
+} from "@blazetrails/ruby-compat";
 
 import { InvalidPluralizationData } from "../exceptions.js";
 import { t, type Locale } from "../i18n.js";
-import type { Base } from "./base.js";
 
-function truthy(value: unknown): boolean {
-  return value !== undefined && value !== null && value !== false;
+interface PluralizationHost {
+  _pluralizers?: Record<string, unknown>;
+  pluralizers(): Record<string, unknown>;
+  pluralizer(locale: Locale): unknown;
+  symbolicCount(count: unknown): string;
 }
 
-type BackendConstructor = abstract new (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ...args: any[]
-) => Base;
+function pluralize(
+  this: PluralizationHost,
+  locale: Locale,
+  entry: unknown,
+  count: unknown,
+): unknown {
+  if (!(entry instanceof Hash && count != null && count !== false)) return entry;
 
-export function Pluralization<T extends BackendConstructor>(Superclass: T): T {
-  abstract class Pluralization extends Superclass {
-    declare private _pluralizers: Record<string, unknown> | undefined;
+  const pluralizer = this.pluralizer(locale);
+  if (rbObjRespondTo(pluralizer, "call")) {
+    if (rbEqual(count, 0) && hasKey(entry, ":zero")) return hashAref(entry, ":zero");
 
-    protected override pluralize(locale: Locale, entry: unknown, count: unknown): unknown {
-      if (!(entry instanceof Hash && truthy(count))) return entry;
-
-      const pluralizer = this.pluralizer(locale);
-      if (typeof pluralizer === "function") {
-        if (count === 0 && hasKey(entry, ":zero")) return hashAref(entry, ":zero");
-
-        if (count === 0 || count === 1) {
-          const value = hashAref(entry, this.symbolicCount(count));
-          if (truthy(value)) return value;
-        }
-
-        const pluralRuleCategory = (pluralizer as (count: unknown) => string)(count);
-
-        let value: unknown;
-        if (hasKey(entry, pluralRuleCategory) || hasKey(entry, ":other")) {
-          const categoryValue = hashAref(entry, pluralRuleCategory);
-          value = truthy(categoryValue) ? categoryValue : hashAref(entry, ":other");
-        } else {
-          throw new InvalidPluralizationData(entry, count, pluralRuleCategory);
-        }
-        return value;
-      } else {
-        return super.pluralize(locale, entry, count);
-      }
+    if (rbEqual(count, 0) || rbEqual(count, 1)) {
+      const value = hashAref(entry, this.symbolicCount(count));
+      if (value != null && value !== false) return value;
     }
 
-    /** @internal */
-    protected pluralizers(): Record<string, unknown> {
-      return (this._pluralizers ??= {});
-    }
+    const pluralRuleCategory = rbProcCall(pluralizer, count);
 
-    /** @internal */
-    protected pluralizer(locale: Locale): unknown {
-      const pluralizers = this.pluralizers();
-      if (!truthy(pluralizers[locale])) {
-        pluralizers[locale] = t(":i18n.plural.rule", { locale, resolve: false });
-      }
-      return pluralizers[locale];
+    let value: unknown;
+    if (hasKey(entry, pluralRuleCategory as string) || hasKey(entry, ":other")) {
+      const categoryValue = hashAref(entry, pluralRuleCategory);
+      value =
+        categoryValue != null && categoryValue !== false
+          ? categoryValue
+          : hashAref(entry, ":other");
+    } else {
+      throw new InvalidPluralizationData(entry, count, pluralRuleCategory as string);
     }
-
-    /** @internal */
-    private symbolicCount(count: number): string {
-      if (count === 0) count = 0;
-      if (count === 1) count = 1;
-      return `:${String(count)}`;
-    }
+    return value;
+  } else {
+    return rbCallSuper(this, pluralize, locale, entry, count);
   }
-
-  return Pluralization;
 }
+
+/** @internal */
+function pluralizers(this: PluralizationHost): Record<string, unknown> {
+  return (this._pluralizers ??= {});
+}
+
+/** @internal */
+function pluralizer(this: PluralizationHost, locale: Locale): unknown {
+  const pluralizers = this.pluralizers();
+  const current = pluralizers[locale];
+  if (current == null || current === false) {
+    pluralizers[locale] = t(":i18n.plural.rule", { locale, resolve: false });
+  }
+  return pluralizers[locale];
+}
+
+/** @internal */
+function symbolicCount(this: PluralizationHost, count: unknown): string {
+  if (rbEqual(count, 0)) count = 0;
+  if (rbEqual(count, 1)) count = 1;
+  return `:${String(count)}`;
+}
+
+export const Pluralization = defineModule(
+  { pluralize },
+  { pluralizers, pluralizer },
+  { symbolicCount },
+);

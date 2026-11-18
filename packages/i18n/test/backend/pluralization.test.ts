@@ -1,12 +1,14 @@
 import * as TestCase from "../support/test-case.js";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, include } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Fallbacks } from "../../lib/backend/fallbacks.js";
 import { Pluralization } from "../../lib/backend/pluralization.js";
 import { Simple } from "../../lib/backend/simple.js";
 import { config, t, type Locale } from "../../lib/i18n.js";
 
-class Backend extends Fallbacks(Pluralization(Simple)) {}
+class PluralizationSimple extends Simple {}
+include(PluralizationSimple, Pluralization);
+class Backend extends Fallbacks(PluralizationSimple) {}
 
 function pluralizer(backend: Backend, locale: Locale): unknown {
   return (backend as unknown as { pluralizer(locale: Locale): unknown }).pluralizer(locale);
