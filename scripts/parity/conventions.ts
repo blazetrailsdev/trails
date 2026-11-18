@@ -265,6 +265,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // without this the default rule would expect `../i18n.ts`, outside src.
   "i18n:../i18n.rb": "i18n.ts",
   "msgpack:../msgpack.rb": "msgpack.ts",
+  "pg:../pg.rb": "pg.ts",
   "chronic:../chronic.rb": "chronic.ts",
   "et-orbi:../et-orbi.rb": "et-orbi.ts",
   // `interpolate/ruby.rb` reopens `module I18n`, which `backend/cache.rb`
@@ -770,6 +771,68 @@ export interface ScopedSkipGroup {
 }
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
+  {
+    reason: "not called by activerecord",
+    names: ["version_string", "make_shareable", "warn", "require_bigdecimal_without_warning"],
+    rubyFiles: ["../pg.rb", "pg.rb"],
+    packages: ["pg"],
+  },
+  {
+    reason: "not called by activerecord",
+    names: [
+      "quote_connstr",
+      "connect_hash_to_string",
+      "parse_connect_args",
+      "copy_data",
+      "transaction",
+      "conndefaults",
+      "conninfo_hash",
+      "ssl_attributes",
+      "check_socket",
+      "get_result",
+      "get_copy_data",
+      "setnonblocking",
+      "isnonblocking",
+      "put_copy_data",
+      "put_copy_end",
+      "encrypt_password",
+      "new",
+      "ping",
+      "async_send_api=",
+      "async_api=",
+      "async_get_result",
+      "async_get_copy_data",
+      "async_setnonblocking",
+      "async_isnonblocking",
+      "nonblocking?",
+      "async_put_copy_data",
+      "async_put_copy_end",
+      "async_encrypt_password",
+      "async_reset",
+      "async_cancel",
+      "isthreadsafe",
+      "async_connect",
+      "connect",
+      "open",
+      "setdb",
+      "setdblogin",
+      "async_ping",
+    ],
+    rubyFiles: ["connection.rb"],
+    packages: ["pg"],
+  },
+  {
+    reason: "not called by activerecord",
+    names: ["field_names_as"],
+    rubyFiles: ["result.rb"],
+    packages: ["pg"],
+  },
+  {
+    reason: "not called by activerecord",
+    names: ["==", "marshal_dump", "marshal_load", "inspect_short"],
+    rubyFiles: ["coder.rb"],
+    packages: ["pg"],
+  },
   {
     reason:
       "`ViteRuby::Commands#legacy_yarn_version?` (vite_ruby/lib/vite_ruby/commands.rb:44-46) and its " +

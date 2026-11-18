@@ -30,6 +30,8 @@
     { "path": "packages/vitest-matchers/tsconfig.test.json" },
     { "path": "packages/msgpack" },
     { "path": "packages/msgpack/tsconfig.test.json" },
+    { "path": "packages/pg" },
+    { "path": "packages/pg/tsconfig.test.json" },
     { "path": "packages/mail" },
     { "path": "packages/mail/tsconfig.test.json" },
     { "path": "packages/tse-compiler" },

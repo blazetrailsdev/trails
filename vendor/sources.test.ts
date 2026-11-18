@@ -514,6 +514,7 @@ describe("vendor/sources.ts", () => {
         "msgpack",
         "net-smtp",
         "nokogiri",
+        "pg",
         "raabro",
         "racc",
         "rack",

@@ -79,6 +79,7 @@
   "peerDependencies": {
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
+    "@blazetrails/pg": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "expo-sqlite": "^15.0.0",
     "libsql": "^0.5.29",
@@ -90,6 +91,9 @@
       "optional": true
     },
     "@blazetrails/msgpack": {
+      "optional": true
+    },
+    "@blazetrails/pg": {
       "optional": true
     },
     "better-sqlite3": {
@@ -118,6 +122,7 @@
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
+    "@blazetrails/pg": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
@@ -130,11 +135,6 @@
       "source": "mysql2",
       "ref": "0.5.6",
       "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
-    },
-    {
-      "source": "pg",
-      "ref": "v1.5.9",
-      "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
     },
     {
       "source": "rails",

@@ -251,11 +251,7 @@ export async function setConstraints(
   await this.execute(`SET CONSTRAINTS ${list} ${deferred.toUpperCase()}`);
 }
 
-const PQTRANS_IDLE = 0;
-const PQTRANS_INTRANS = 2;
-const PQTRANS_INERROR = 3;
-
-const IDLE_TRANSACTION_STATUSES = [PQTRANS_IDLE, PQTRANS_INTRANS, PQTRANS_INERROR];
+const IDLE_TRANSACTION_STATUSES = [PG.PQTRANS_IDLE, PG.PQTRANS_INTRANS, PG.PQTRANS_INERROR];
 
 /** @internal */
 export async function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): Promise<void> {

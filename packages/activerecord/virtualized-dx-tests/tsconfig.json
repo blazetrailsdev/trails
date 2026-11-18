@@ -24,6 +24,7 @@
       "@blazetrails/builder": ["../../builder/lib/builder.ts"],
       "@blazetrails/html-sanitizer": ["../../html-sanitizer/lib/index.ts"],
       "@blazetrails/msgpack": ["../../msgpack/lib/index.ts"],
+      "@blazetrails/pg": ["../../pg/lib/index.ts"],
       "@blazetrails/nokogiri": ["../../nokogiri/lib/index.ts"],
       "@blazetrails/bcrypt": ["../../bcrypt/lib/index.ts"],
       "@blazetrails/date": ["../../date/lib/index.ts"],

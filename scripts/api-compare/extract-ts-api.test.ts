@@ -6336,7 +6336,6 @@ describe("sub-package de-overlap", () => {
   it("maps activerecord's src/support to the activerecord-test-support package", () => {
     expect(overlappingSubDirs("activerecord")).toEqual([
       packageSrcDir("mysql2"),
-      packageSrcDir("pg"),
       packageSrcDir("sqlite3"),
     ]);
     expect(packageSrcDir("activerecord-test-support")).toBe(

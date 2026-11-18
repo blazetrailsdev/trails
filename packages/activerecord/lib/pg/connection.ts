@@ -1,6 +1,6 @@
 import pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
-import { ConnectionBad, Error as PGError, ServerError, UnableToSend } from "./exceptions.js";
+import { ConnectionBad, Error as PGError, ServerError, UnableToSend } from "@blazetrails/pg";
 import { PG } from "./pg.js";
 
 export type PGConnection = Connection;

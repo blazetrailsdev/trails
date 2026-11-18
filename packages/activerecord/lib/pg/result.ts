@@ -2,15 +2,16 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import type pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
 import { Result as ActiveRecordResult } from "../result.js";
+import { Constants as PGConstants } from "@blazetrails/pg";
 import * as Constants from "./exceptions.js";
 
 type DatabaseErrorFields = Partial<Record<keyof pg.DatabaseError, unknown>>;
 
 /** @noRailsEquivalent PERMANENT */
 const _ERROR_FIELDS: Record<number, keyof pg.DatabaseError> = {
-  [Constants.PG_DIAG_SEVERITY]: "severity",
-  [Constants.PG_DIAG_SQLSTATE]: "code",
-  [Constants.PG_DIAG_MESSAGE_PRIMARY]: "message",
+  [PGConstants.PG_DIAG_SEVERITY]: "severity",
+  [PGConstants.PG_DIAG_SQLSTATE]: "code",
+  [PGConstants.PG_DIAG_MESSAGE_PRIMARY]: "message",
   [Constants.PG_DIAG_MESSAGE_DETAIL]: "detail",
   [Constants.PG_DIAG_MESSAGE_HINT]: "hint",
   [Constants.PG_DIAG_STATEMENT_POSITION]: "position",
@@ -19,7 +20,7 @@ const _ERROR_FIELDS: Record<number, keyof pg.DatabaseError> = {
   [Constants.PG_DIAG_CONTEXT]: "where",
   [Constants.PG_DIAG_SOURCE_FILE]: "file",
   [Constants.PG_DIAG_SOURCE_LINE]: "line",
-  [Constants.PG_DIAG_SOURCE_FUNCTION]: "routine",
+  [PGConstants.PG_DIAG_SOURCE_FUNCTION]: "routine",
   [Constants.PG_DIAG_SCHEMA_NAME]: "schema",
   [Constants.PG_DIAG_TABLE_NAME]: "table",
   [Constants.PG_DIAG_COLUMN_NAME]: "column",
@@ -127,4 +128,9 @@ export class Result extends Array<Record<string, unknown>> {
     const decoder = this.#typemap.coders.get(oid) ?? this.#typemap.defaultTypeMap?.coders.get(oid);
     return typeof value !== "string" || !decoder ? value : decoder.decode(value);
   }
+}
+
+declare module "@blazetrails/pg" {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface Result extends InstanceType<typeof import("./result.js").Result> {}
 }

@@ -23,7 +23,7 @@ describe("package.json mirrors fields", () => {
   it("lists every source of a package built from several", async () => {
     const expected = await expectedMirrors();
     expect(expected.get("activerecord")?.map((m) => m.source)).toEqual(
-      expect.arrayContaining(["rails", "pg", "mysql2", "sqlite3"]),
+      expect.arrayContaining(["rails", "mysql2", "sqlite3"]),
     );
     for (const mirrors of expected.values())
       for (const m of mirrors ?? []) expect(m.sha).toMatch(/^[0-9a-f]{40}$/);

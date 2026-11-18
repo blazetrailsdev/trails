@@ -36,6 +36,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "rackup",
     "bcrypt",
     "msgpack",
+    "pg",
     "marcel",
     "chronic",
     "builder",

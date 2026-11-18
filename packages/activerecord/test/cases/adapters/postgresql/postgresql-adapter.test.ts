@@ -21,7 +21,7 @@ import { Value, Integer } from "../../../../lib/type.js";
 import * as DdlHelper from "../../../support/ddl-helper.js";
 import { withSecondAdapter } from "../../../support/second-connection.js";
 import { Name } from "../../../../lib/connection-adapters/postgresql/utils.js";
-import { ConnectionBad } from "../../../../lib/pg/exceptions.js";
+import { ConnectionBad } from "@blazetrails/pg";
 import type { PGConnection } from "../../../../lib/pg/connection.js";
 
 let adapter: PostgreSQLAdapter;

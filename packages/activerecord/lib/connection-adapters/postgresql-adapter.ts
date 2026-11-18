@@ -143,12 +143,6 @@ const DUPLICATE_DATABASE = "42P04";
 const LOCK_NOT_AVAILABLE = "55P03";
 const QUERY_CANCELED = "57014";
 
-const PQTRANS_IDLE = 0;
-const PQTRANS_INTRANS = 2;
-const PQTRANS_INERROR = 3;
-
-const CONNECTION_OK = 0;
-
 const FEATURE_NOT_SUPPORTED = "0A000";
 import {
   buildTruncateStatements as pgBuildTruncateStatements,
@@ -570,7 +564,7 @@ export class PostgreSQLAdapter
         return;
       }
 
-      if (live.transactionStatus() !== PQTRANS_IDLE) {
+      if (live.transactionStatus() !== PG.PQTRANS_IDLE) {
         await live.query("ROLLBACK");
       }
       await live.query("DISCARD ALL");
@@ -1079,7 +1073,7 @@ export class PostgreSQLAdapter
   /** @internal */
   isRetryableQueryError(exception: unknown): boolean {
     return (
-      this._rawConnection?.transactionStatus() !== PQTRANS_INERROR &&
+      this._rawConnection?.transactionStatus() !== PG.PQTRANS_INERROR &&
       super.isRetryableQueryError(exception)
     );
   }
@@ -2036,7 +2030,7 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     try {
       const conn = this._connection._rawConnection;
       if (conn) {
-        if (conn.status() === CONNECTION_OK) {
+        if (conn.status() === PG.CONNECTION_OK) {
           await conn.query(`DEALLOCATE ${pgQuoteColumnName(key.name)}`);
         }
       }

@@ -2,11 +2,13 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { Connection } from "./connection.js";
 import {
   ConnectionBad,
+  Constants,
   Error as PGError,
-  PG_DIAG_MESSAGE_PRIMARY,
-  PG_DIAG_SEVERITY,
-  PG_DIAG_SOURCE_FUNCTION,
-  PG_DIAG_SQLSTATE,
+  FeatureNotSupported,
+  ServerError,
+  UnableToSend,
+} from "@blazetrails/pg";
+import {
   PG_DIAG_SEVERITY_NONLOCALIZED,
   PG_DIAG_MESSAGE_DETAIL,
   PG_DIAG_MESSAGE_HINT,
@@ -21,8 +23,6 @@ import {
   PG_DIAG_COLUMN_NAME,
   PG_DIAG_DATATYPE_NAME,
   PG_DIAG_CONSTRAINT_NAME,
-  ServerError,
-  UnableToSend,
 } from "./exceptions.js";
 import { Result as PGResult } from "./result.js";
 import { Array as TextDecoderArray } from "./text-decoder/array.js";
@@ -42,10 +42,9 @@ export const PG = {
   ConnectionBad,
   ServerError,
   UnableToSend,
-  PG_DIAG_SQLSTATE,
-  PG_DIAG_SOURCE_FUNCTION,
-  PG_DIAG_MESSAGE_PRIMARY,
-  PG_DIAG_SEVERITY,
+  FeatureNotSupported,
+  Constants,
+  ...Constants,
   PG_DIAG_SEVERITY_NONLOCALIZED,
   PG_DIAG_MESSAGE_DETAIL,
   PG_DIAG_MESSAGE_HINT,

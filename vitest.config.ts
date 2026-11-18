@@ -432,6 +432,7 @@ const alias = {
   "@blazetrails/vitest-matchers": path.resolve(__dirname, "packages/vitest-matchers/lib/index.ts"),
   "@blazetrails/date": path.resolve(__dirname, "packages/date/lib/index.ts"),
   "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/lib/index.ts"),
+  "@blazetrails/pg": path.resolve(__dirname, "packages/pg/lib/index.ts"),
   "@blazetrails/mail/": path.resolve(__dirname, "packages/mail/lib") + "/",
   "@blazetrails/mail": path.resolve(__dirname, "packages/mail/lib/index.ts"),
   "@blazetrails/thor/": path.resolve(__dirname, "packages/thor/lib") + "/",

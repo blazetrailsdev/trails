@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-test",
+    "rootDir": ".",
+    "lib": ["ES2022", "DOM", "ESNext.Iterator"]
+  },
+  "include": ["test"],
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    }
+  ]
+}
