@@ -1,7 +1,7 @@
 import { Builder, Lint, type RackApp, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import type { MockResponse } from "@blazetrails/rack";
 import { Session } from "@blazetrails/rack-test";
-import { block, Logger, StringIO, TopLevel } from "@blazetrails/ruby-compat";
+import { block, Logger, rbProcCall, StringIO, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Cors } from "../../lib/index.js";
@@ -36,7 +36,7 @@ class CaptureResult {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const response = await (this.app as { call(env: RackEnv): Promise<RackResponse> }).call(env);
+    const response = (await rbProcCall(this.app, env)) as RackResponse;
     this.resultHolder.corsResult = env[Cors.RACK_CORS] as Result;
     return response;
   }
@@ -50,9 +50,7 @@ class FakeProxy {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const [status, headers, body] = await (
-      this.app as { call(env: RackEnv): Promise<RackResponse> }
-    ).call(env);
+    const [status, headers, body] = (await rbProcCall(this.app, env)) as RackResponse;
     (headers as Record<string, unknown>)["vary"] = ["Origin", "User-Agent"];
     return [status, headers, body];
   }
