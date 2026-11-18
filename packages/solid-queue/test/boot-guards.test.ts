@@ -32,9 +32,32 @@ describe("BootGuardsTest", () => {
     expect(guard.isTimedOut()).toBeTruthy();
   });
 
-  it.skip("a fork guard completed from the forked process doesn't time out", () => {});
+  // BLOCKED: solid-queue-fork-mode-unported-register
+  it.skip("a fork guard completed from the forked process doesn't time out", async () => {
+    const forkGuard = new ForkGuard();
+    guard = forkGuard;
 
-  it.skip("a fork guard reads as completed when the forked process exits before finishing its boot", () => {});
+    forkGuard.complete();
+    forkGuard.start();
+
+    expect(forkGuard.isCompleted()).toBeTruthy();
+
+    await sleep(SolidQueue.forkBootTimeout.toF());
+
+    expect(forkGuard.isCompleted()).toBeTruthy();
+    expect(forkGuard.isTimedOut()).toBeFalsy();
+  });
+
+  // BLOCKED: solid-queue-fork-mode-unported-register
+  it.skip("a fork guard reads as completed when the forked process exits before finishing its boot", () => {
+    const forkGuard = new ForkGuard();
+    guard = forkGuard;
+
+    forkGuard.start();
+
+    expect(forkGuard.isCompleted()).toBeTruthy();
+    expect(forkGuard.isTimedOut()).toBeFalsy();
+  });
 
   it("a null guard completes on boot and never times out", () => {
     guard = new NullGuard();

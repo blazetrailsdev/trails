@@ -109,6 +109,7 @@ describe("SupervisorTest", () => {
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
   });
 
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
   it.skip("start", async () => {
     const run = runSupervisor();
     const pid = RubyProcess.pid;
@@ -123,6 +124,7 @@ describe("SupervisorTest", () => {
     await assertNoRegisteredProcesses();
   });
 
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
   it.skip("start with provided configuration", async () => {
     const run = runSupervisor({ dispatchers: [{ batch_size: 100 }] });
     await waitForRegisteredProcesses(2, { timeout: 2 });
@@ -138,6 +140,7 @@ describe("SupervisorTest", () => {
     await assertNoRegisteredProcesses();
   });
 
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
   it.skip("start with empty configuration", async () => {
     const error = captureStderr();
     const run = runSupervisor({ workers: [], dispatchers: [] });
@@ -149,6 +152,7 @@ describe("SupervisorTest", () => {
     expect(error.join("")).toMatch(/No processes configured/);
   });
 
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
   it.skip("start with invalid recurring tasks", async () => {
     const error = captureStderr();
     const run = runSupervisor({
@@ -164,6 +168,7 @@ describe("SupervisorTest", () => {
     expect(error.join("")).toMatch(/Invalid recurring tasks/);
   });
 
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
   it.skip("create and delete pidfile", async () => {
     expect(await File.isExistAsync(pidfile)).toBeFalsy();
 
@@ -179,6 +184,7 @@ describe("SupervisorTest", () => {
     expect(await File.isExistAsync(pidfile)).toBeFalsy();
   });
 
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
   it.skip("abort if there's already a pidfile for a supervisor", async () => {
     await FileUtils.mkdirPAsync(File.dirname(pidfile));
     await File.writeAsync(pidfile, RubyProcess.pid.toString());
@@ -193,6 +199,7 @@ describe("SupervisorTest", () => {
     await waitForProcessTerminationWithTimeout(run, { exitstatus: 1 });
   });
 
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
   it.skip("delete previous pidfile if the owner is dead", async () => {
     const deadPid = 4194304 + 1;
     await FileUtils.mkdirPAsync(File.dirname(pidfile));
@@ -208,6 +215,7 @@ describe("SupervisorTest", () => {
     await run.terminate();
   });
 
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
   it.skip("fail orphaned executions", async () => {
     for (let i = 0; i < 3; i++) {
       await (
