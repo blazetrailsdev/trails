@@ -3,13 +3,17 @@ import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 import { constSet, rbCallSuper } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Scoping } from "./namespaces.js";
 import { isSchemaLoaded } from "./model-schema.js";
+import type { Base } from "./base.js";
+import type { Relation } from "./relation.js";
+
+type Scope = Relation<any, boolean>;
 
 const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
 export class ScopeRegistry {
-  private readonly _currentScope: WeakMap<object, any>;
-  private readonly _ignoreDefaultScope: WeakMap<object, any>;
-  private readonly _globalCurrentScope: WeakMap<object, any>;
+  private readonly _currentScope: WeakMap<object, Scope>;
+  private readonly _ignoreDefaultScope: WeakMap<object, boolean>;
+  private readonly _globalCurrentScope: WeakMap<object, Scope>;
 
   constructor() {
     this._currentScope = new WeakMap();
@@ -24,56 +28,56 @@ export class ScopeRegistry {
     );
   }
 
-  currentScope(model: object, skipInheritedScope = false): any | null {
+  currentScope(model: object, skipInheritedScope = false): Scope | null {
     return valueFor(this._currentScope, model, skipInheritedScope);
   }
 
-  setCurrentScope(model: object, value: any): void {
+  setCurrentScope(model: object, value: Scope | null): void {
     setValueFor(this._currentScope, model, value);
   }
 
-  ignoreDefaultScope(model: object, skipInheritedScope = false): any | null {
+  ignoreDefaultScope(model: object, skipInheritedScope = false): boolean | null {
     return valueFor(this._ignoreDefaultScope, model, skipInheritedScope);
   }
 
-  setIgnoreDefaultScope(model: object, value: any): void {
+  setIgnoreDefaultScope(model: object, value: boolean | null): void {
     setValueFor(this._ignoreDefaultScope, model, value);
   }
 
-  globalCurrentScope(model: object, skipInheritedScope = false): any | null {
+  globalCurrentScope(model: object, skipInheritedScope = false): Scope | null {
     return valueFor(this._globalCurrentScope, model, skipInheritedScope);
   }
 
-  setGlobalCurrentScope(model: object, value: any): void {
+  setGlobalCurrentScope(model: object, value: Scope | null): void {
     setValueFor(this._globalCurrentScope, model, value);
   }
 
-  static currentScope(model: object, skipInheritedScope = false): any | null {
+  static currentScope(model: object, skipInheritedScope = false): Scope | null {
     return this.instance().currentScope(model, skipInheritedScope);
   }
-  static setCurrentScope(model: object, value: any): void {
+  static setCurrentScope(model: object, value: Scope | null): void {
     this.instance().setCurrentScope(model, value);
   }
-  static ignoreDefaultScope(model: object, skipInheritedScope = false): any | null {
+  static ignoreDefaultScope(model: object, skipInheritedScope = false): boolean | null {
     return this.instance().ignoreDefaultScope(model, skipInheritedScope);
   }
-  static setIgnoreDefaultScope(model: object, value: any): void {
+  static setIgnoreDefaultScope(model: object, value: boolean | null): void {
     this.instance().setIgnoreDefaultScope(model, value);
   }
-  static globalCurrentScope(model: object, skipInheritedScope = false): any | null {
+  static globalCurrentScope(model: object, skipInheritedScope = false): Scope | null {
     return this.instance().globalCurrentScope(model, skipInheritedScope);
   }
-  static setGlobalCurrentScope(model: object, value: any): void {
+  static setGlobalCurrentScope(model: object, value: Scope | null): void {
     this.instance().setGlobalCurrentScope(model, value);
   }
 }
 
 /** @internal */
-function valueFor(
-  scopeType: WeakMap<object, any>,
+function valueFor<T>(
+  scopeType: WeakMap<object, T>,
   model: object,
   skipInheritedScope: boolean,
-): any | null {
+): T | null {
   const value = scopeType.get(model);
   if (value !== undefined) return value;
   if (skipInheritedScope) return null;
@@ -85,7 +89,7 @@ function valueFor(
 }
 
 /** @internal */
-function setValueFor(scopeType: WeakMap<object, any>, model: object, value: any): void {
+function setValueFor<T>(scopeType: WeakMap<object, T>, model: object, value: T | null): void {
   if (value === null) {
     scopeType.delete(model);
   } else {
@@ -94,14 +98,14 @@ function setValueFor(scopeType: WeakMap<object, any>, model: object, value: any)
 }
 
 interface ScopingHost {
-  constructor: { isScopeAttributes(): boolean };
+  constructor: typeof Base;
   /** @internal */
   _assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
 }
 
 /** @inventedArm if — PERMANENT */
 export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
-  const klass = this.constructor as any;
+  const klass = this.constructor;
   if (!klass.isScopeAttributes()) return;
 
   let attributes = scopeAttributes.call(klass);
@@ -128,8 +132,8 @@ Object.assign(Scoping, {
 });
 
 interface ScopingClassHost {
-  currentScope?(skipInheritedScope?: boolean): any;
-  all?(): any;
+  currentScope?(skipInheritedScope?: boolean): unknown;
+  all?(): Scope;
 }
 
 export function scopeAttributes(this: ScopingClassHost): Record<string, unknown> {
@@ -141,16 +145,19 @@ export function isScopeAttributes(this: ScopingClassHost): boolean {
   return !!this.currentScope?.();
 }
 
-export function setCurrentScope(this: ScopingClassHost, scope: any): void {
-  ScopeRegistry.setCurrentScope(this as unknown as object, scope);
+export function setCurrentScope(this: ScopingClassHost, scope: Scope | null): void {
+  ScopeRegistry.setCurrentScope(this, scope);
 }
 
-export function globalCurrentScope(this: ScopingClassHost, skipInheritedScope = false): any | null {
-  return ScopeRegistry.globalCurrentScope(this as unknown as object, skipInheritedScope);
+export function globalCurrentScope(
+  this: ScopingClassHost,
+  skipInheritedScope = false,
+): Scope | null {
+  return ScopeRegistry.globalCurrentScope(this, skipInheritedScope);
 }
 
-export function setGlobalCurrentScope(this: ScopingClassHost, scope: any): void {
-  ScopeRegistry.setGlobalCurrentScope(this as unknown as object, scope);
+export function setGlobalCurrentScope(this: ScopingClassHost, scope: Scope | null): void {
+  ScopeRegistry.setGlobalCurrentScope(this, scope);
 }
 
 export function scopeRegistry(): ScopeRegistry {

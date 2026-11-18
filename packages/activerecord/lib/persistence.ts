@@ -13,6 +13,7 @@ import {
   eachWithIndex,
   rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
+import type { AttributeSet, ValueType } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import type { IndexedRow } from "./result.js";
@@ -38,7 +39,7 @@ import { RecordInvalid } from "./validations.js";
 import { ActiveRecord } from "./namespaces.js";
 
 interface PersistenceHost {
-  new (attrs?: Record<string, unknown> | PermittedAttributes, block?: (record: any) => void): any;
+  new (attrs?: Record<string, unknown> | PermittedAttributes, block?: (record: Base) => void): Base;
   /** @internal */
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;
@@ -49,21 +50,21 @@ interface PersistenceHost {
   /** @internal */
   discriminateClassForRecord(record: Record<string, unknown> | IndexedRow): typeof Base;
   /** @internal */
-  instantiateInstanceOf(
-    klass: typeof Base,
+  instantiateInstanceOf<K extends typeof Base>(
+    klass: K,
     attributes: Record<string, unknown> | IndexedRow,
     columnTypes?: Record<string, unknown>,
-    block?: (r: any) => void,
-  ): any;
+    block?: (r: InstanceType<K>) => void,
+  ): InstanceType<K>;
 }
 
-export async function create(
-  this: typeof Base,
+export async function create<T extends typeof Base>(
+  this: T,
   attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
-  block?: (record: any) => void | Promise<void>,
-): Promise<any> {
+  block?: (record: InstanceType<T>) => void | Promise<void>,
+): Promise<InstanceType<T> | InstanceType<T>[]> {
   if (Array.isArray(attributes)) {
-    const records: any[] = [];
+    const records: InstanceType<T>[] = [];
     for (const attr of attributes) records.push(await this.create(attr, block));
     return records;
   }
@@ -71,19 +72,20 @@ export async function create(
   const record = await awaitingAssignment(
     attributes,
     block,
-    (block) => new this(attributes, block),
+    (block) =>
+      new this(attributes, block as ((record: Base) => void) | undefined) as InstanceType<T>,
   );
   await record.save();
   return record;
 }
 
-export async function createBang(
-  this: typeof Base,
+export async function createBang<T extends typeof Base>(
+  this: T,
   attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
-  block?: (record: any) => void | Promise<void>,
-): Promise<any> {
+  block?: (record: InstanceType<T>) => void | Promise<void>,
+): Promise<InstanceType<T> | InstanceType<T>[]> {
   if (Array.isArray(attributes)) {
-    const records: any[] = [];
+    const records: InstanceType<T>[] = [];
     for (const attr of attributes) records.push(await this.createBang(attr, block));
     return records;
   }
@@ -91,7 +93,8 @@ export async function createBang(
   const record = await awaitingAssignment(
     attributes,
     block,
-    (block) => new this(attributes, block),
+    (block) =>
+      new this(attributes, block as ((record: Base) => void) | undefined) as InstanceType<T>,
   );
   await record.saveBang();
   return record;
@@ -100,23 +103,23 @@ export async function createBang(
 export function build(
   this: PersistenceHost,
   attributes?: Record<string, unknown> | Record<string, unknown>[],
-  block?: (record: any) => void,
-): any {
+  block?: (record: Base) => void,
+): Base | Base[] {
   if (Array.isArray(attributes)) {
-    return attributes.map((attr) => build.call(this, attr, block));
+    return attributes.map((attr) => build.call(this, attr, block) as Base);
   } else {
     return new this(attributes, block);
   }
 }
 
-export function instantiate(
-  this: PersistenceHost,
+export function instantiate<T extends typeof Base>(
+  this: PersistenceHost & T,
   attributes: Record<string, unknown> | IndexedRow,
   columnTypes: Record<string, unknown> = {},
-  block?: (record: any) => void,
-): any {
+  block?: (record: InstanceType<T>) => void,
+): InstanceType<T> {
   const klass = this.discriminateClassForRecord(attributes);
-  return this.instantiateInstanceOf(klass, attributes, columnTypes, block);
+  return this.instantiateInstanceOf(klass as T, attributes, columnTypes, block);
 }
 
 export class ClassMethods {
@@ -492,7 +495,7 @@ export { deleteRow as delete };
 export async function save(
   this: Base,
   options?: { validate?: boolean; touch?: boolean },
-  block?: (record: any) => void,
+  block?: (record: Base) => void,
 ): Promise<boolean> {
   try {
     return await this.createOrUpdate(options?.touch ?? true, block);
@@ -505,7 +508,7 @@ export async function save(
 export async function saveBang(
   this: Base,
   options?: { validate?: boolean; touch?: boolean },
-  block?: (record: any) => void,
+  block?: (record: Base) => void,
 ): Promise<true> {
   if (!(await this.createOrUpdate(options?.touch ?? true, block))) {
     throw new RecordNotSaved("Failed to save the record", this);
@@ -827,7 +830,7 @@ export function _updateRow(
 }
 
 /** @internal */
-export async function createOrUpdate(this: Base, block?: (record: any) => void): Promise<boolean> {
+export async function createOrUpdate(this: Base, block?: (record: Base) => void): Promise<boolean> {
   if (this.isReadonly()) this._raiseReadonlyRecordError();
   if (this.isDestroyed()) return false;
   const result = this.isNewRecord()
@@ -850,7 +853,7 @@ export const Persistence = {
   _updateRecord: async function _updateRecord(
     this: Base,
     attributeNames?: string[],
-    block?: (record: any) => void,
+    block?: (record: Base) => void,
   ): Promise<number> {
     attributeNames = this.attributesForUpdate(attributeNames ?? this.attributeNames());
 
@@ -876,11 +879,11 @@ export const Persistence = {
 export async function _createRecord(
   this: Base,
   attributeNames: string[] = this.attributeNames(),
-  block?: (record: any) => void,
+  block?: (record: Base) => void,
 ): Promise<unknown> {
   attributeNames = this.attributesForCreate(attributeNames);
 
-  await this.constructor.withConnection(async (connection: any) => {
+  await this.constructor.withConnection(async (connection) => {
     const returningColumns = await this.constructor._returningColumnsForInsert(connection);
 
     const returningValues = (await _insertRecord.call(
@@ -954,16 +957,21 @@ export function _raiseRecordNotTouchedError(): never {
  * @inventedArm if — PERMANENT
  * @inventedArm keys — PERMANENT
  */
-export function instantiateInstanceOf(
+export function instantiateInstanceOf<K extends typeof Base>(
   this: PersistenceHost,
-  klass: typeof Base,
-  attributes: Record<string, unknown> | IndexedRow,
+  klass: K,
+  attributes: Record<string, unknown> | IndexedRow | AttributeSet,
   columnTypes: Record<string, unknown> = {},
-  block?: (r: any) => void,
-): any {
+  block?: (r: InstanceType<K>) => void,
+): InstanceType<K> {
   // eslint-disable-next-line blazetrails/ruby-compat-native-required -- attributes may be a Hash
   const names = keys(attributes as Record<string, unknown>);
-  attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
+  attributes = klass
+    .attributesBuilder()
+    .buildFromDatabase(
+      attributes as Record<string, unknown>,
+      columnTypes as Record<string, ValueType>,
+    );
   const record = klass.allocate();
   const virtual = _virtualAttributeNames(record, names);
   if (virtual.length > 0) Object.setPrototypeOf(record, _virtualAttributePrototype(klass, virtual));

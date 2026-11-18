@@ -7,7 +7,7 @@ import { ConnectionPool } from "../../lib/connection-adapters/abstract/connectio
 import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";
-import { ConnectionAdapters } from "../../lib/namespaces.js";
+import { ConnectionAdapters } from "../../lib/connection-adapters.js";
 import { loadSchema } from "./load-schema-helper.js";
 import { stampCanonicalSchema } from "./canonical-schema-stamp.js";
 import {

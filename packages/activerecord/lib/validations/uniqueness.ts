@@ -10,6 +10,11 @@ import {
 } from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
 import { stripThenable } from "@blazetrails/activesupport";
+import type { Base } from "../base.js";
+import type { Relation } from "../relation.js";
+import type { SingularAssociation } from "../associations/singular-association.js";
+
+type Scope = Omit<Relation<Base>, "then">;
 
 export function validatesUniquenessOf(
   this: {
@@ -22,7 +27,7 @@ export function validatesUniquenessOf(
 }
 
 export class UniquenessValidator extends EachValidator {
-  private _klass: any;
+  private _klass: typeof Base;
 
   /** @internal */
   _covered: string[] | null = null;
@@ -44,11 +49,11 @@ export class UniquenessValidator extends EachValidator {
       );
     }
     super(options);
-    this._klass = options.class;
-    if (rbModSingletonP(this._klass)) this._klass = rbClassSuperclass(this._klass);
+    this._klass = options.class as typeof Base;
+    if (rbModSingletonP(this._klass)) this._klass = rbClassSuperclass(this._klass) as typeof Base;
   }
 
-  async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
+  async validateEach(record: Base, attribute: string, value: unknown): Promise<void> {
     const finderClass = this.findFinderClassFor(record);
     value = mapEnumAttribute(finderClass, attribute, value);
 
@@ -70,7 +75,7 @@ export class UniquenessValidator extends EachValidator {
     relation = await this.scopeRelation(record, relation);
 
     if (rtest(this.options.conditions)) {
-      const conditions = this.options.conditions as (this: any, record?: any) => any;
+      const conditions = this.options.conditions as (this: Scope, record?: Base) => Scope;
       relation =
         conditions.length === 0 ? conditions.call(relation) : conditions.call(relation, record);
     }
@@ -84,23 +89,27 @@ export class UniquenessValidator extends EachValidator {
   }
 
   /** @internal */
-  private findFinderClassFor(record: any): any {
+  private findFinderClassFor(record: Base): typeof Base {
     let currentClass = record.constructor;
-    let foundClass = null;
+    let foundClass = currentClass;
     for (;;) {
       if (!currentClass.isAbstractClass()) foundClass = currentClass;
       if (currentClass === this._klass) break;
-      currentClass = rbClassSuperclass(currentClass);
+      currentClass = rbClassSuperclass(currentClass) as typeof Base;
     }
     return foundClass;
   }
 
   /** @internal */
-  protected async buildRelation(klass: any, attribute: string, value: unknown): Promise<any> {
+  protected async buildRelation(
+    klass: typeof Base,
+    attribute: string,
+    value: unknown,
+  ): Promise<Scope> {
     const relation = klass.unscoped();
-    let none = null;
-    const comparison = await klass.withConnection((connection: any) =>
-      relation.bindAttribute(attribute, value, (attr: any, bind: any) => {
+    let none: Scope | null = null;
+    const comparison = await klass.withConnection((connection) =>
+      relation.bindAttribute(attribute, value, (attr, bind) => {
         if (bind.isUnboundable()) {
           none = relation.noneBang();
           return null;
@@ -116,14 +125,14 @@ export class UniquenessValidator extends EachValidator {
       }),
     );
 
-    return stripThenable(none ?? relation.whereBang(comparison));
+    return stripThenable(none ?? (relation.whereBang(comparison) as Relation<Base>));
   }
 
   /** @internal */
-  private async scopeRelation(record: any, relation: any): Promise<any> {
+  private async scopeRelation(record: Base, relation: Scope): Promise<Scope> {
     for (const scopeItem of kernelArray(this.options.scope as string | string[])) {
       const scopeValue = record.constructor._reflectOnAssociation(scopeItem)
-        ? await record.association(scopeItem).reader
+        ? await (record.association(scopeItem) as SingularAssociation).reader
         : record.readAttribute(scopeItem);
       relation = relation.where({ [scopeItem]: scopeValue });
     }
@@ -135,8 +144,8 @@ export class UniquenessValidator extends EachValidator {
 /** @internal */
 async function isValidationNeeded(
   validator: UniquenessValidator,
-  klass: any,
-  record: any,
+  klass: typeof Base,
+  record: Base,
   attribute: string,
 ): Promise<boolean> {
   const options = validator.options;
@@ -159,8 +168,8 @@ async function isValidationNeeded(
 /** @internal */
 async function isCoveredByUniqueIndex(
   this: UniquenessValidator,
-  klass: any,
-  record: any,
+  klass: typeof Base,
+  record: Base,
   attribute: string,
   scope: string[],
 ): Promise<boolean> {
@@ -184,7 +193,7 @@ async function isCoveredByUniqueIndex(
 
 /** @internal */
 async function tableIndexes(
-  klass: any,
+  klass: typeof Base,
 ): Promise<{ unique?: boolean; where?: string | null; columns?: unknown }[]> {
   const tableName = klass?.tableName;
   if (!klass || !tableName) return [];
@@ -197,7 +206,7 @@ async function tableIndexes(
 }
 
 /** @internal */
-function resolveAttributes(record: any, attributes: string[]): string[] {
+function resolveAttributes(record: Base, attributes: string[]): string[] {
   const out: string[] = [];
   for (const attr of attributes) {
     const ctor = record.constructor;
@@ -209,17 +218,15 @@ function resolveAttributes(record: any, attributes: string[]): string[] {
     const fk = refl.foreignKey();
     if (Array.isArray(fk)) out.push(...fk);
     else if (fk != null) out.push(fk);
-    const isPoly =
-      typeof refl.isPolymorphic === "function" ? refl.isPolymorphic() : refl.polymorphic;
-    if (isPoly && refl.foreignType) out.push(refl.foreignType);
+    if (refl.isPolymorphic() && refl.foreignType) out.push(refl.foreignType);
   }
   return out.filter((x) => x != null);
 }
 
 /** @internal */
-function mapEnumAttribute(klass: any, attribute: string, value: unknown): unknown {
+function mapEnumAttribute(klass: typeof Base, attribute: string, value: unknown): unknown {
   const mapping = klass.definedEnums[toS(attribute)];
-  if (value != null && value !== false && mapping != null) value = mapping.get(value);
+  if (value != null && value !== false && mapping != null) value = mapping.get(value as string);
   return value;
 }
 

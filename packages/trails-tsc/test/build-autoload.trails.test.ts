@@ -112,7 +112,7 @@ describe("buildAutoload", () => {
       expect(File.read(".trails/entry.generated.js")).toEqual(
         [
           'import "./autoload/install.generated.js";',
-          'export { default } from "../config/environment.ts";',
+          'export default (await import("../config/environment.ts")).default;',
           "",
         ].join("\n"),
       );

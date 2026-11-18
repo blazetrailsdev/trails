@@ -41,10 +41,11 @@ function's environment, so keep the state private.
 - `serverless/lambda.ts` exposes an API Gateway v2 / Function URL `handler`, a fetch-style `fetch` and a
   raw `rack` entry. It boots during Lambda's INIT phase through `.trails/entry.generated.js`, which
   `trails build` writes. It reuses the website's `packages/website/src/lib/frontiers/rack-bridge.ts`.
-- `bundle.mjs` replaces the drivers of adapters the app does not use with a stub that raises when it is
-  loaded. esbuild hoists an external `import` to the top of an ESM bundle even when only a lazily
-  imported adapter file reaches it, so marking a driver external would make it a load-time
-  dependency.
+- `config/database.ts` imports the adapter modules the app is configured with. The built-in
+  adapters' `ConnectionAdapters.loadPath` specifiers are computed, so a bundler only pulls in the
+  driver of an adapter the app imports. `bundle.mjs` needs no driver stub.
+- `pnpm check:vite` (`bundle-vite.mjs`) builds the app as a Vite (Rollup) SSR bundle and serves
+  `GET /posts` from it, after `pnpm build`.
 - `libxml2-wasm` stays external. Its top-level await, which nokogiri → html-sanitizer → ActionView
   `Base` reach, breaks esbuild's lazy module initialisation.
 - `/var/task` is read-only, so the seed DB is copied to `/tmp` at cold start, and the production logger

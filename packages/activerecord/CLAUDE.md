@@ -647,6 +647,16 @@ runs before `resolve`.** As a consequence:
   step every `establish_connection` already awaits, so `DatabaseConfig#validate!`
   stays Rails' body. Code that builds a `PoolConfig` without a handler
   (`support/template-global-setup.ts`) calls `load` itself.
+- A built-in's `loadPath` thunk imports a computed specifier,
+  `new URL("./connection-adapters/<file>.js", import.meta.url)`, so a bundler
+  does not follow it into every optional driver. A bundled app imports the
+  adapter module it is configured with, as a Gemfile names the driver gem; the
+  module seats its class, and `load` then finds it defined.
+- `connection-handler.ts` does not import `connection-adapters.ts`, which
+  re-exports it, as `connection_handler.rb` is only reached through
+  `connection_adapters.rb`'s autoload. That edge put the two in a cycle in which
+  a Rollup bundle reads `ConnectionHandler` in TDZ. A module that calls `load`
+  imports `connection-adapters.ts`.
 - An adapter registered by a third party is loaded the same way. Outside the
   handler, the template setup and the per-worker test database setup
   (`test-setup-worker-db.ts`), the only callers are tests that build a

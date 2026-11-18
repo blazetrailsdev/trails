@@ -1096,7 +1096,7 @@ export class Base extends Model {
     attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    return _Persistence.create.call(this, attrs, block);
+    return (_Persistence.create<T>).call(this, attrs, block);
   }
 
   static async createBang<T extends typeof Base>(
@@ -1114,7 +1114,7 @@ export class Base extends Model {
     attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    return _Persistence.createBang.call(this, attrs, block);
+    return (_Persistence.createBang<T>).call(this, attrs, block);
   }
 
   static instantiate<T extends typeof Base>(
@@ -1123,7 +1123,7 @@ export class Base extends Model {
     columnTypes?: Record<string, unknown>,
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T> {
-    return _Persistence.instantiate.call(this, attributes, columnTypes, block);
+    return (_Persistence.instantiate<T>).call(this, attributes, columnTypes, block);
   }
 
   /** @internal */

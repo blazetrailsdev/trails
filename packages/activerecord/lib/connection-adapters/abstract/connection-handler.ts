@@ -16,7 +16,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js"
 import { AdapterNotSpecified, ConnectionNotDefined } from "../../errors.js";
 import type { QueryCachePool } from "./query-cache.js";
 import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
-import "../../connection-adapters.js";
 import { isPreventingWrites } from "../../core.js";
 
 export interface ConnectionOwner {

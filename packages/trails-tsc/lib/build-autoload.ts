@@ -272,7 +272,7 @@ async function writeEntry(
   ].join("\n");
   const entry = [
     'import "./autoload/install.generated.js";',
-    `export { default } from ${JSON.stringify(specifier(trailsDir, environmentFile))};`,
+    `export default (await import(${JSON.stringify(specifier(trailsDir, environmentFile))})).default;`,
     "",
   ].join("\n");
   const fs = getFs();
