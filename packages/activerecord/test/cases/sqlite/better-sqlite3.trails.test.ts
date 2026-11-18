@@ -31,10 +31,10 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     try {
       await (await own.prepare("CREATE TABLE gadgets (id INTEGER PRIMARY KEY)")).run();
       const select = await own.prepare("SELECT * FROM gadgets");
-      select.all();
+      await select.all();
       expect(select.columns().map((c) => c.name)).toEqual(["id"]);
       await own.exec("ALTER TABLE gadgets ADD COLUMN label TEXT");
-      select.all();
+      await select.all();
       expect(select.columns().map((c) => c.name)).toEqual(["id", "label"]);
     } finally {
       await own.close();
