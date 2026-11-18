@@ -129,8 +129,3 @@ export class Result extends Array<Record<string, unknown>> {
     return typeof value !== "string" || !decoder ? value : decoder.decode(value);
   }
 }
-
-declare module "@blazetrails/pg" {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  interface Result extends InstanceType<typeof import("./result.js").Result> {}
-}

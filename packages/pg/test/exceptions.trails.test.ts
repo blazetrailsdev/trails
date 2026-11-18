@@ -5,7 +5,7 @@ import { ConnectionBad, Constants, Error, FeatureNotSupported, ServerError } fro
 describe("PG::Error", () => {
   it("carries connection and result and aliases error to message", () => {
     const connection = {};
-    const result = {};
+    const result = { errorField: () => null, resultErrorField: () => null };
     const err = new ConnectionBad("gone", { connection, result });
     expect(err).toBeInstanceOf(Error);
     expect(err).toBeInstanceOf(StandardError);

@@ -1,7 +1,9 @@
 import { StandardError } from "@blazetrails/ruby-compat";
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Result {}
+export interface Result {
+  errorField(fieldcode: number): string | null;
+  resultErrorField(fieldcode: number): string | null;
+}
 
 export class Error extends StandardError {
   readonly connection: object | null;
