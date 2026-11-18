@@ -312,7 +312,7 @@ describe("RailtieTest", () => {
       "Can't perform asynchronous queries without a query session",
     );
 
-    Executor.wrap(() => {
+    await Executor.wrap(() => {
       expect(Base.asynchronousQueriesTracker().currentSession.isActive()).toBe(true);
     });
 

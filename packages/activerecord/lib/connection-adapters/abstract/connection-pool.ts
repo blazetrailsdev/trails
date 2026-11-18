@@ -33,6 +33,7 @@ import type { HashConfig } from "../../database-configurations/hash-config.js";
 import type { PoolConfig } from "../pool-config.js";
 import type { ConnectionDescriptor } from "./connection-handler.js";
 import {
+  ActiveRecordError,
   ConnectionNotEstablished,
   ConnectionTimeoutError,
   ExclusiveConnectionTimeoutError,
@@ -214,7 +215,22 @@ export class LeaseRegistry {
 }
 
 export class ExecutorHooks {
-  static run(): void {}
+  /** @inventedArm if — PERMANENT */
+  static run(): Promise<void> | undefined {
+    const pools = ActiveRecord.Base.connectionHandler
+      .connectionPoolList("all")
+      .filter((pool) => !pool.isConnected());
+    if (pools.length === 0) return undefined;
+    return (async () => {
+      for (const pool of pools) {
+        try {
+          await pool.withConnection((connection) => connection.verifyBang());
+        } catch (error) {
+          if (!(error instanceof ActiveRecordError)) throw error;
+        }
+      }
+    })();
+  }
 
   static complete(): void {
     ActiveRecord.Base.connectionHandler.eachConnectionPool((pool) => {

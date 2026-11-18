@@ -484,17 +484,17 @@ and the synchronous body peeks at the warmed value.**
   connect is not also an unhandled rejection. A caller that can reach it on a
   connection nothing has verified warms first, awaiting `verifyBang` when the
   type map is unset, and that await is where the connection error surfaces.
-  There are three warm steps. `buildFixtureSql` is one. The third is
-  trailties' `active_record.set_executor_hooks` `to_run` block: after
-  `active_record.clear_active_connections` flushes the boot connection, a
-  model read peeks the warm schema cache through a fresh lease, so each
-  request's executor run verifies a connection on every pool that holds none
-  (outside the test env), and a failed connect is left for the read itself
-  to raise. `loadSchemaFromAdapter`
-  is the second: a schema cache loaded from a dump answers its columns with no
+  There are three warm steps. `buildFixtureSql` is the first.
+  `loadSchemaFromAdapter` is the second: a schema cache loaded from a dump answers its columns with no
   query, so nothing has verified the connection when `loadSchemaBang` reaches
   `typeForColumn`. A failed verify is raised from that step, including where
-  the step drops a failed reflection.
+  the step drops a failed reflection. `ConnectionPool::ExecutorHooks.run`,
+  a no-op in Rails (`connection_pool.rb:194-196`), is the third:
+  `active_record.clear_active_connections` (`railtie.rb:299-311`) flushes the
+  boot connection, and a model read then peeks the warm schema cache through
+  a fresh lease with no async step before it. So each executor run verifies
+  a connection on every pool that holds none. A failed connect is dropped
+  there, and the request sees the `TypeError` above, as it did before.
 - `mismatchedForeignKey` has no fact to warm, because the table and column are
   only known once the failed statement is in hand. It is the one member here
   that answers a value or a promise of it: the `sql` arm returns a promise of
