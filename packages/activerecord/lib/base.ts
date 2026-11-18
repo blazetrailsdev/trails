@@ -104,7 +104,7 @@ import {
 import * as Timestamp from "./timestamp.js";
 import * as _TouchLater from "./touch-later.js";
 import { Association as AssociationInstance } from "./associations/association.js";
-import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
+import { ConnectionHandler } from "./connection-adapters.js";
 
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
