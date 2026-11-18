@@ -375,8 +375,8 @@ describe("buildAutoload", () => {
       expect(File.read(".trails/boot.generated.js")).toContain(
         '"app/views/posts/index.html.tse": async () => ({ ...(await import("./views/posts/index.html.tse.js")), source: ',
       );
-      await import(File.expandPath(".trails/boot.generated.js"));
       FileUtils.rmRf("app/views");
+      await import(File.expandPath(".trails/boot.generated.js"));
       const { Base, FileSystemResolver, LookupContext } = await import("@blazetrails/actionview");
 
       const ctx = new LookupContext(null, {}, []);

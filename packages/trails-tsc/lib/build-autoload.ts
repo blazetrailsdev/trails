@@ -147,7 +147,7 @@ async function viewEntries(
   for (const rel of (await Dir.globAsync("**/*", 0, { base: dir })).sort()) {
     const file = File.join(dir, rel);
     const compiled = File.join(outViews, `${rel}.js`);
-    if (!(await File.isExistAsync(compiled)) || (await File.isDirectoryAsync(file))) continue;
+    if ((await File.isDirectoryAsync(file)) || !(await File.isExistAsync(compiled))) continue;
     let source = "";
     for (const byte of await File.binreadAsync(file)) source += String.fromCharCode(byte);
     const specifier = path.relative!(trailsDir, compiled);
@@ -226,9 +226,11 @@ async function writeBoot(
     ...(views.length === 0
       ? []
       : [
-          `for (const view of ${JSON.stringify(views.map(([rel]) => rel))}) {`,
-          "  await loadIseqEval(getPath().fileURLToPath(new URL(`../${view}`, import.meta.url)));",
-          "}",
+          "await Promise.all(",
+          `  ${JSON.stringify(views.map(([rel]) => rel))}.map((view) =>`,
+          "    loadIseqEval(getPath().fileURLToPath(new URL(`../${view}`, import.meta.url))),",
+          "  ),",
+          ");",
           "",
         ]),
   ].join("\n");
