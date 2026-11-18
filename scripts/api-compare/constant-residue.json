@@ -1171,6 +1171,12 @@
     "unwalked": [],
     "residue": {}
   },
+  "stimulus": {
+    "rows": 1,
+    "excluded": [],
+    "unwalked": [],
+    "residue": { "engine.ts::Engine": "Stimulus::Engine" }
+  },
   "thor": {
     "rows": 42,
     "excluded": ["thor.ts::Thor"],
