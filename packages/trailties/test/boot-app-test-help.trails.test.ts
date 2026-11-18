@@ -183,6 +183,7 @@ describe("test_help wires a booted app into the test case classes", () => {
     await controllerTest.get("nav");
     expect(controllerTest.response.status).toBe(200);
     expect(controllerTest.response.body).toContain('<a href="/posts">Posts</a>');
+    expect(controllerTest.response.body).toContain('action="/posts"');
   });
 
   it("registers the trailties' rescue_responses on ExceptionWrapper", () => {
@@ -201,6 +202,13 @@ describe("test_help wires a booted app into the test case classes", () => {
       await session.post("/posts", { params: { post: { title: "Forged" } } });
       expect(session.response.status).toBe(422);
       expect(await Post.where({ title: "Forged" }).count()).toBe(0);
+
+      await session.get("/posts/nav");
+      const token = /name="authenticity_token" value="([^"]+)"/.exec(session.response.body)![1];
+      await session.post("/posts", {
+        params: { post: { title: "Tokened" }, authenticity_token: token },
+      });
+      expect(session.response.status).toBe(201);
     } finally {
       ApplicationController.allowForgeryProtection = previous;
     }

@@ -1,1 +1,2 @@
 <a href="<%= postsPath() %>">Posts</a>
+<%= buttonTo("Create", postsPath(), { params: { "post[title]": "Tokened" } }) %>
