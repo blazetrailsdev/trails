@@ -63,22 +63,15 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
   },
   // --- i18n: gem surface trails has no counterpart for ---
   {
-    // Deliberately broad: covers `gettext.rb`, `gettext/*` and the
-    // `backend/gettext.rb` mixin in one entry.
-    pattern: "gettext",
-    testFile: "gettext/",
+    pattern: "gettext/po_parser.rb",
     package: "i18n",
-    reason:
-      "Pre-1.0: gettext .po support — the catalogue parser, the `_`/`n_`/`s_` " +
-      "helpers, and the backend mixin that loads .po files. A Ruby toolchain " +
-      "concern with no trails consumer; Rails' own I18n usage never touches it.",
+    reason: "Pre-1.0: gettext .po support — the .po catalogue parser.",
   },
   {
-    testFile: "gettext_plural_keys_test.rb",
+    pattern: "backend/gettext.rb",
+    testFile: "gettext/backend_test.rb",
     package: "i18n",
-    reason:
-      "Pre-1.0: gettext .po support — exercises `I18n::Gettext.plural_keys`. " +
-      "Sits at test/i18n/, outside the `gettext/` prefix above.",
+    reason: "Pre-1.0: gettext .po support — the backend mixin that loads .po files.",
   },
   {
     pattern: "tests/",
