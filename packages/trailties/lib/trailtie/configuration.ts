@@ -51,10 +51,6 @@ export class Configuration {
     });
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
   static get eagerLoadNamespaces(): unknown[] {
     return Configuration._eagerLoadNamespaces;
   }
