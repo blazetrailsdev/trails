@@ -10,6 +10,10 @@ export class PostsController extends ApplicationController {
     await this.render({ template: "posts/show", locals: { title: "Hello from TSE" } });
   }
 
+  async nav(): Promise<void> {
+    await this.render({ template: "posts/nav" });
+  }
+
   async link(): Promise<void> {
     await this.render({ json: { href: (this as unknown as { postsPath(): string }).postsPath() } });
   }

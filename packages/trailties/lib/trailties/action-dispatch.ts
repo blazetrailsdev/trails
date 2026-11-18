@@ -20,6 +20,7 @@ import { Trails } from "../trails.js";
 
 export interface ActionDispatchConfig {
   xSendfileHeader: string | null;
+  sslDefaultRedirectStatus?: number | null;
   ipSpoofingCheck: boolean;
   trustedProxies?: CustomProxies | null;
   showExceptions: "all" | "rescuable" | "none";
