@@ -129,7 +129,7 @@ export class ViteAssets {
   }
 
   static installTasks(): Promise<true> {
-    return rbFLoad(decodeURIComponent(new URL("./tasks/vite.js", import.meta.url).pathname));
+    return rbFLoad(decodeURIComponent(new URL("./tasks/vite.rake.js", import.meta.url).pathname));
   }
 
   static reloadWith(configOptions: ConfigAttrs = {}): ViteAssets {

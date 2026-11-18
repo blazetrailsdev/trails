@@ -890,6 +890,17 @@ describe("Application::DefaultMiddlewareStack", () => {
     expect(build((c) => (c.forceSsl = true))).toContain(SSL);
   });
 
+  it("passes SSL the ssl_options and ssl_default_redirect_status", () => {
+    const app = buildApp();
+    app.config.forceSsl = true;
+    app.config.sslOptions = { hsts: { subdomains: true } };
+    app.config.actionDispatch.sslDefaultRedirectStatus = 308;
+    const mw = new DefaultMiddlewareStack(app, app.config, paths)
+      .buildStack()
+      .middlewares.find((m) => m.klass === SSL)!;
+    expect(mw.args).toEqual([{ hsts: { subdomains: true }, sslDefaultRedirectStatus: 308 }]);
+  });
+
   it("excludes Static when public_file_server.enabled is false", () => {
     expect(build((c) => (c.publicFileServer.enabled = false))).not.toContain(Static);
   });

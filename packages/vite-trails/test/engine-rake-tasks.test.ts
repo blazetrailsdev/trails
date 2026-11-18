@@ -112,7 +112,9 @@ describe("EngineRakeTasksTest", () => {
   async function installTasks(): Promise<void> {
     await DSL.namespace("app", async () => {
       DSL.task("environment");
-      await rbFLoad(decodeURIComponent(new URL("../lib/tasks/vite.js", import.meta.url).pathname));
+      await rbFLoad(
+        decodeURIComponent(new URL("../lib/tasks/vite.rake.js", import.meta.url).pathname),
+      );
     });
   }
 

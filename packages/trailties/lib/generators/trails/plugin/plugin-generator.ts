@@ -137,7 +137,7 @@ export class PluginBuilder {
   /** @missingRailsArgs template — PERMANENT */
   async lib(this: PluginBuilderHost): Promise<void> {
     await this.template("lib/%namespaced_name%.ts");
-    await this.template("lib/tasks/%namespaced_name%_tasks.ts");
+    await this.template("lib/tasks/%namespaced_name%_tasks.rake.ts");
     await this.template("lib/%namespaced_name%/version.ts");
 
     if (this.isEngine()) {

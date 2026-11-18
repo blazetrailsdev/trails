@@ -103,6 +103,18 @@ describe("Engine#config paths", () => {
   });
 });
 
+describe("Engine lib/tasks", () => {
+  it("loads only *.rake task files from an engine's lib/tasks", async () => {
+    class TasksEngine extends Engine {}
+    const root = new URL("./fixtures/tasks-engine", import.meta.url).pathname;
+    Engine.register(TasksEngine, root);
+
+    expect(await TasksEngine.instance().paths().get("lib/tasks")!.existent()).toEqual([
+      `${root}/lib/tasks/sample.rake.ts`,
+    ]);
+  });
+});
+
 describe("Engine#loadServer awaits server blocks", () => {
   const fixtureRoot = new URL("./fixtures/initializer-engine", import.meta.url).pathname;
 

@@ -66,7 +66,10 @@ export class DefaultMiddlewareStack {
     }
 
     if (config.forceSsl) {
-      stack.use(SSL, config.sslOptions);
+      stack.use(SSL, {
+        ...config.sslOptions,
+        sslDefaultRedirectStatus: config.actionDispatch.sslDefaultRedirectStatus,
+      });
     }
 
     stack.use(Sendfile, config.actionDispatch.xSendfileHeader);

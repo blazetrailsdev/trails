@@ -37,6 +37,7 @@ import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
 import { generateRailtieName, Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
+import { Configuration as TrailtieConfiguration } from "./trailtie/configuration.js";
 import { EngineConfiguration } from "./engine/configuration.js";
 import type { MiddlewareStackProxy } from "./configuration.js";
 import { LazyRouteSet } from "./engine/lazy-route-set.js";
@@ -91,8 +92,12 @@ export class Engine extends Trailtie {
   }
 
   static override register(base: typeof Trailtie, calledFrom?: string): void {
-    if (!base.isAbstractRailtie() && calledFrom !== undefined) {
-      (base as typeof Engine).calledFrom(calledFrom);
+    if (!base.isAbstractRailtie()) {
+      const eagerLoadNamespaces = TrailtieConfiguration.eagerLoadNamespaces;
+      /** @inventedArm if — PERMANENT */
+      if (!eagerLoadNamespaces.includes(base)) eagerLoadNamespaces.push(base);
+
+      if (calledFrom !== undefined) (base as typeof Engine).calledFrom(calledFrom);
     }
     super.register(base);
   }

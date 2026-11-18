@@ -11,6 +11,6 @@ export class TaskGenerator extends NamedBase {
   declare actions: string[];
 
   async createTaskFiles(): Promise<void> {
-    await this.template("task.ts", File.join("lib/tasks", `${this.fileName}${this.ext()}`));
+    await this.template("task.ts", File.join("lib/tasks", `${this.fileName}.rake${this.ext()}`));
   }
 }
