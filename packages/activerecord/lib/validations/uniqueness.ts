@@ -54,7 +54,7 @@ export class UniquenessValidator extends EachValidator {
   }
 
   async validateEach(record: Base, attribute: string, value: unknown): Promise<void> {
-    const finderClass = this.findFinderClassFor(record);
+    const finderClass = this.findFinderClassFor(record)!;
     value = mapEnumAttribute(finderClass, attribute, value);
 
     if (record.isPersisted() && !(await isValidationNeeded(this, finderClass, record, attribute))) {
@@ -89,9 +89,9 @@ export class UniquenessValidator extends EachValidator {
   }
 
   /** @internal */
-  private findFinderClassFor(record: Base): typeof Base {
+  private findFinderClassFor(record: Base): typeof Base | null {
     let currentClass = record.constructor;
-    let foundClass = currentClass;
+    let foundClass: typeof Base | null = null;
     for (;;) {
       if (!currentClass.isAbstractClass()) foundClass = currentClass;
       if (currentClass === this._klass) break;
