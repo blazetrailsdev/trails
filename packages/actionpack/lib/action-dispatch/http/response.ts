@@ -361,6 +361,7 @@ export class Response {
     status: number | string = 200,
     headers: Record<string, string> = {},
     body: unknown = [],
+    block?: (response: Response) => void,
   ) {
     this._headers = new Headers();
     for (const [key, value] of Object.entries(headers)) {
@@ -375,7 +376,7 @@ export class Response {
     body: unknown = [],
     block?: (response: T) => void,
   ): Promise<T> {
-    const response = rbClassNewInstance(this, status, headers, body);
+    const response = rbClassNewInstance(this, status, headers, body, block);
     await response.setBody(body);
     response.status = status;
     response.prepareCacheControlBang();
