@@ -48,7 +48,7 @@ describe("Redirecting#redirect_to types", () => {
       expectTypeOf(controller.redirectTo).returns.toEqualTypeOf<Promise<number>>();
       const flash = controller as unknown as { redirectTo: typeof flashRedirectTo; flash: never };
       // @ts-expect-error a misspelled response option on Flash#redirect_to itself
-      flash.redirectTo("/posts", { statsu: "see_other" });
+      await flash.redirectTo("/posts", { statsu: "see_other" });
       const host = controller as unknown as RedirectingHost;
       host.redirectTo("/posts", { notice: "Forwarded by redirect_back_or_to", status: 303 });
     };

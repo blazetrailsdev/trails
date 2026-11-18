@@ -628,7 +628,6 @@ export class Response {
   }
 
   async awaitCommit(): Promise<void> {
-    if (this._committed) return;
     while (!this._committed) await new Promise<void>((broadcast) => this.cv.push(broadcast));
     /** @inventedArm setTimeout — PERMANENT */
     await new Promise<void>((resume) => setTimeout(resume, 0));

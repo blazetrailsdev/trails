@@ -315,7 +315,6 @@ Behavior.ClassMethods = ClassMethods;
   });
 });
 
-/** @missingRailsArgs new — PERMANENT */
 async function setupWithController(this: Behavior): Promise<void> {
   const controllerClass = (() => class extends TestController {})();
   this.controller = await controllerClass.new();
