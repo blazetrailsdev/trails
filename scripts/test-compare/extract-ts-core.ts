@@ -801,14 +801,14 @@ export function extractTestsFromSource(
 
         if (ADAPTER_SUITE_WRAPPERS.has(funcName)) {
           const title = getSuiteTitle(node, 0, bindings);
-          if (title) {
+          if (title !== null) {
             enterSuite(node, title, gateFromWrapper(funcName));
             return;
           }
         } else if (funcName === "describeIfSupports") {
           // describeIfSupports("feature", "title", fn)
           const title = getSuiteTitle(node, 1, bindings);
-          if (title) {
+          if (title !== null) {
             enterSuite(node, title, gateFromWrapper(funcName, getArgString(node, 0)));
             return;
           }
@@ -852,7 +852,7 @@ export function extractTestsFromSource(
             // describeIfPg.skipIf(…) — compose the wrapper's adapter gate with
             // the inline guard.
             const title = getSuiteTitle(node, 0, bindings);
-            if (title) {
+            if (title !== null) {
               const wrapperGate = gateFromWrapper(base.text);
               enterSuite(
                 node,
@@ -866,7 +866,7 @@ export function extractTestsFromSource(
             // arg 1. Handle explicitly so we don't fall through and re-register
             // the nested tests with no suite title/gate.
             const title = getSuiteTitle(node, 1, bindings);
-            if (title) {
+            if (title !== null) {
               const wrapperGate = gateFromWrapper(base.text, getArgString(node, 0));
               enterSuite(
                 node,
@@ -898,7 +898,7 @@ export function extractTestsFromSource(
         const base = expression.expression;
         if (ts.isIdentifier(base) && base.text === "describe") {
           const title = getSuiteTitle(node, 0, bindings);
-          if (title) {
+          if (title !== null) {
             enterSuite(node, title, null);
             return;
           }
