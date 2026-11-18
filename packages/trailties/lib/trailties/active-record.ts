@@ -356,7 +356,27 @@ export class Trailtie extends BaseTrailtie {
       ConnectionPool.installExecutorHooks();
       /** @noRailsEquivalent PERMANENT */
       this.config.afterInitialize((app) => {
-        app.executor.toRun(() => (coldPools.size === 0 ? undefined : warmSchemaCache(coldPools)));
+        app.executor.toRun(() => {
+          const unconnected =
+            activeRecord === undefined || Trails.env["test?"]()
+              ? []
+              : activeRecord.connectionHandler
+                  .connectionPoolList("all")
+                  .filter((pool) => !pool.isConnected());
+          if (coldPools.size === 0 && unconnected.length === 0) return undefined;
+          return (async () => {
+            if (coldPools.size !== 0) await warmSchemaCache(coldPools);
+            for (const pool of unconnected) {
+              try {
+                await pool.withConnection(async (connection) => {
+                  await connection.verifyBang();
+                });
+              } catch (error) {
+                if (!(error instanceof ActiveRecordError)) throw error;
+              }
+            }
+          })();
+        });
       });
     });
 

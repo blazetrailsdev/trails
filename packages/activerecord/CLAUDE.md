@@ -484,8 +484,14 @@ and the synchronous body peeks at the warmed value.**
   connect is not also an unhandled rejection. A caller that can reach it on a
   connection nothing has verified warms first, awaiting `verifyBang` when the
   type map is unset, and that await is where the connection error surfaces.
-  There are two warm steps. `buildFixtureSql` is one. `loadSchemaFromAdapter`
-  is the other: a schema cache loaded from a dump answers its columns with no
+  There are three warm steps. `buildFixtureSql` is one. The third is
+  trailties' `active_record.set_executor_hooks` `to_run` block: after
+  `active_record.clear_active_connections` flushes the boot connection, a
+  model read peeks the warm schema cache through a fresh lease, so each
+  request's executor run verifies a connection on every pool that holds none
+  (outside the test env), and a failed connect is left for the read itself
+  to raise. `loadSchemaFromAdapter`
+  is the second: a schema cache loaded from a dump answers its columns with no
   query, so nothing has verified the connection when `loadSchemaBang` reaches
   `typeForColumn`. A failed verify is raised from that step, including where
   the step drops a failed reflection.
