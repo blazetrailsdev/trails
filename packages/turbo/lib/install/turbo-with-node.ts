@@ -7,13 +7,10 @@ import type { AppGenerator } from "@blazetrails/trailties/generators";
  * @missingRailsArgs run — PERMANENT
  */
 export default async function (this: AppGenerator): Promise<void> {
-  if (
-    await File.isExistAsync(
-      new Pathname(TopLevel.Trails!.root()!)
-        .join("app/javascript/entrypoints/application.js")
-        .toString(),
-    )
-  ) {
+  const jsEntrypointPath = new Pathname(TopLevel.Trails!.root()!).join(
+    "app/javascript/entrypoints/application.js",
+  );
+  if (await File.isExistAsync(jsEntrypointPath.toString())) {
     this.say("Import Turbo");
     await this.appendToFile(
       "app/javascript/entrypoints/application.js",

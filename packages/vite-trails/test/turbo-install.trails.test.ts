@@ -4,7 +4,7 @@ import { Trails } from "@blazetrails/trailties";
 import { ViteAssets } from "@blazetrails/vite-assets";
 import { CLI } from "@blazetrails/vite-assets/cli.js";
 import "../lib/cli.js";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const system = vi.hoisted(() => vi.fn());
 vi.mock("@blazetrails/ruby-compat", async (importOriginal) => {
@@ -17,6 +17,15 @@ vi.mock("@blazetrails/ruby-compat", async (importOriginal) => {
 
 describe("turbo:install", () => {
   let rootDir: Pathname;
+
+  beforeAll(async () => {
+    Rake.application = new Application();
+    await import("@blazetrails/turbo/tasks/turbo-tasks.js");
+  });
+
+  afterAll(() => {
+    Rake.application = undefined;
+  });
 
   beforeEach(async () => {
     rootDir = new Pathname(new URL("../tmp/", import.meta.url).pathname).join(crypto.randomUUID());
@@ -39,13 +48,10 @@ describe("turbo:install", () => {
       }
       return true;
     });
-    Rake.application = new Application();
-    await import("@blazetrails/turbo/tasks/turbo-tasks.js");
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    Rake.application = undefined;
     await FileUtils.rmRfAsync(rootDir.toString());
   });
 
