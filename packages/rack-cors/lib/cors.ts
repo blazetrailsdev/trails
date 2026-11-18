@@ -1,5 +1,12 @@
 import { Rack, Utils, type RackApp, type RackEnv, type RackResponse } from "@blazetrails/rack";
-import { Logger, rbObjRespondTo, rbProcCall, STDOUT, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  Logger,
+  rbBlockGivenP,
+  rbObjRespondTo,
+  rbProcCall,
+  STDOUT,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 
 import { Resource } from "./cors/resource.js";
 import { Resources } from "./cors/resources.js";
@@ -8,6 +15,7 @@ import { Result } from "./cors/result.js";
 type DebugLogger = { debug(message: unknown, block?: () => unknown): unknown };
 type CorsOptions = { debug?: unknown; logger?: DebugLogger | (() => DebugLogger) | null };
 type Headers = Record<string, unknown>;
+type CorsBlock = (this: Cors, cors: Cors) => void;
 
 export class Cors {
   static readonly HTTP_ORIGIN = "HTTP_ORIGIN";
@@ -42,15 +50,19 @@ export class Cors {
   /** @internal */
   protected _allResources?: Resources[];
 
-  constructor(app: RackApp, opts: CorsOptions = {}, block?: (this: Cors, cors: Cors) => void) {
+  constructor(app: RackApp, opts: CorsOptions | CorsBlock = {}, block?: CorsBlock) {
+    if (rbBlockGivenP(opts)) {
+      block = opts as CorsBlock;
+      opts = {};
+    }
     this.app = app;
-    this.debugMode = opts.debug != null && opts.debug !== false;
+    this.debugMode = (opts as CorsOptions).debug != null && (opts as CorsOptions).debug !== false;
     this.logger = this.loggerProc = null;
 
-    const logger = opts.logger;
+    const logger = (opts as CorsOptions).logger;
     if (logger != null) {
       if (rbObjRespondTo(logger, "call")) {
-        this.loggerProc = opts.logger as () => DebugLogger;
+        this.loggerProc = (opts as CorsOptions).logger as () => DebugLogger;
       } else {
         this.logger = logger as DebugLogger;
       }
