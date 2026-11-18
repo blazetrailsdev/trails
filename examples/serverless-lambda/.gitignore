@@ -4,3 +4,6 @@ dist/
 build/
 db/*.sqlite3*
 log/
+infra/.terraform/
+infra/*.tfstate*
+infra/*.tfvars

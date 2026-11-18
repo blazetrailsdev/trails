@@ -118,13 +118,13 @@ export async function rackResponseToFetchResponse(rackResponse: RackResponse): P
     const fetchHeaders = new Headers();
     for (const [name, value] of Object.entries(headers)) {
       for (const v of Array.isArray(value) ? value : [value]) {
-        if (typeof v === "string") fetchHeaders.append(name, v);
+        if (v != null) fetchHeaders.append(name, String(v));
       }
     }
     return new Response(responseBody as BodyInit | null, { status, headers: fetchHeaders });
   } finally {
-    const closable = body as { close?: () => void } | null;
-    if (closable && typeof closable.close === "function") closable.close();
+    const closable = body as { close?: () => unknown } | null;
+    if (closable && typeof closable.close === "function") await closable.close();
   }
 }
 

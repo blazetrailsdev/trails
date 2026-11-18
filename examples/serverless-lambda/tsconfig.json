@@ -13,5 +13,5 @@
       "@blazetrails/rack": ["./node_modules/@blazetrails/rack/dist/index.d.ts"]
     }
   },
-  "include": ["app", "config", "serverless"]
+  "include": ["app", "config", "serverless", "config.ts"]
 }

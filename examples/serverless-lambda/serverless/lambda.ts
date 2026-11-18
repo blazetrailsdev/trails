@@ -62,9 +62,10 @@ const SEED_SQL = [
 async function seed(): Promise<{ posts: unknown }> {
   await boot();
   const { Base } = await import("@blazetrails/activerecord");
-  const conn = await Base.leaseConnection();
-  for (const sql of SEED_SQL) await conn.execute(sql);
-  return { posts: await conn.selectValue("SELECT count(*) FROM posts") };
+  return Base.connectionPool().withConnection(async (conn) => {
+    for (const sql of SEED_SQL) await conn.execute(sql);
+    return { posts: await conn.selectValue("SELECT count(*) FROM posts") };
+  });
 }
 
 export async function handler(

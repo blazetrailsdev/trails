@@ -7,7 +7,7 @@
   "scripts": {
     "build": "bash scripts/build.sh",
     "package": "bash scripts/package.sh",
-    "deploy": "bash scripts/deploy.sh",
+    "deploy": "terraform -chdir=infra init -input=false && terraform -chdir=infra apply",
     "invoke:local": "bash scripts/invoke-local.sh",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
