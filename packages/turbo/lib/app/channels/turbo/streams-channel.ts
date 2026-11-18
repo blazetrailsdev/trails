@@ -4,15 +4,13 @@ import { Turbo } from "../../../turbo-trails.js";
 import { Broadcasts } from "./streams/broadcasts.js";
 import { StreamName } from "./streams/stream-name.js";
 
-type BroadcastsMethods = typeof Broadcasts;
-
 export class StreamsChannel extends Base {
   declare static verifiedStreamName: typeof StreamName.verifiedStreamName;
   declare static signedStreamName: typeof StreamName.signedStreamName;
   declare static streamNameFrom: typeof StreamName.streamNameFrom;
-  declare static broadcastActionTo: OmitThisParameter<BroadcastsMethods["broadcastActionTo"]>;
-  declare static broadcastRenderTo: OmitThisParameter<BroadcastsMethods["broadcastRenderTo"]>;
-  declare static broadcastStreamTo: OmitThisParameter<BroadcastsMethods["broadcastStreamTo"]>;
+  declare static broadcastActionTo: OmitThisParameter<(typeof Broadcasts)["broadcastActionTo"]>;
+  declare static broadcastRenderTo: OmitThisParameter<(typeof Broadcasts)["broadcastRenderTo"]>;
+  declare static broadcastStreamTo: OmitThisParameter<(typeof Broadcasts)["broadcastStreamTo"]>;
   declare verifiedStreamNameFromParams: () => unknown;
 
   static {

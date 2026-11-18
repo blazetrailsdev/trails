@@ -1,12 +1,9 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread, constSet } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../turbo-trails.js";
 import { Debouncer } from "./debouncer.js";
 
-interface DebouncerLike {
-  debounce(block: () => unknown): unknown;
-  wait(): unknown;
-}
+type DebouncerLike = { debounce(block: () => unknown): unknown; wait(): unknown };
 
 export class ThreadDebouncer {
   declare static debouncerClass: new (options: { delay: number }) => DebouncerLike;
@@ -48,4 +45,4 @@ export class ThreadDebouncer {
     });
   }
 }
-Turbo.ThreadDebouncer = ThreadDebouncer;
+constSet(Turbo, "ThreadDebouncer", ThreadDebouncer);

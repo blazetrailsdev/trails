@@ -1,3 +1,4 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../turbo-trails.js";
 import { Debouncer } from "./debouncer.js";
 
@@ -14,4 +15,4 @@ export class ImmediateDebouncer {
     return true;
   }
 }
-Turbo.ImmediateDebouncer = ImmediateDebouncer;
+constSet(Turbo, "ImmediateDebouncer", ImmediateDebouncer);
