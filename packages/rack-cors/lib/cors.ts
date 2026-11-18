@@ -55,15 +55,14 @@ export class Cors {
       block = opts as CorsBlock;
       opts = {};
     }
-    opts = opts as CorsOptions;
     this.app = app;
-    this.debugMode = opts.debug != null && opts.debug !== false;
+    this.debugMode = (opts as CorsOptions).debug != null && (opts as CorsOptions).debug !== false;
     this.logger = this.loggerProc = null;
 
-    const logger = opts.logger;
+    const logger = (opts as CorsOptions).logger;
     if (logger != null) {
       if (rbObjRespondTo(logger, "call")) {
-        this.loggerProc = opts.logger as () => DebugLogger;
+        this.loggerProc = (opts as CorsOptions).logger as () => DebugLogger;
       } else {
         this.logger = logger as DebugLogger;
       }
