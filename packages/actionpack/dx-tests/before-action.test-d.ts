@@ -6,7 +6,8 @@ class PostsController extends ActionController.Base {
     this.beforeAction(":_setPost", { only: ["show", "edit"] });
     this.beforeAction((controller) => {
       expectTypeOf(controller).toEqualTypeOf<AbstractController.Base>();
-      expectTypeOf(controller).not.toEqualTypeOf<PostsController>();
+      // @ts-expect-error — red once the block receives PostsController
+      expectTypeOf(controller).toEqualTypeOf<PostsController>();
     });
     this.afterAction(":_log", { except: "index" });
     this.aroundAction(":_wrap");
