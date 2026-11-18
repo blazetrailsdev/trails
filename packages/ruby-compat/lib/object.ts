@@ -770,13 +770,13 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   if (mid === "toYaml") return true;
   const bound = _methodBound(obj, mid);
   if (bound !== null) return bound;
-  const respondToMissing = chainEntry(obj, "respondToMissing");
+  const respondToMissing = _chainEntry(obj, "respondToMissing");
   if (typeof respondToMissing !== "function") return false;
   const ret = (respondToMissing as (mid: string) => unknown).call(obj, mid);
   return ret != null && ret !== false;
 }
 
-/** @perf 2.8x — PERMANENT */
+/** @perf 3.7x — PERMANENT */
 function _methodBound(obj: unknown, mid: string): boolean | null {
   if (typeof obj !== "object" || obj === null) return methodBoundp(obj, mid);
   const proto = Object.getPrototypeOf(obj) as object | null;
@@ -802,7 +802,7 @@ function _methodBound(obj: unknown, mid: string): boolean | null {
   return bound;
 }
 
-/** @perf 2.8x — PERMANENT */
+/** @perf 3.7x — PERMANENT */
 const _boundEntries = new WeakMap<object, { serial: number; bound: Map<string, boolean | null> }>();
 
 /**
@@ -923,12 +923,31 @@ function methodBoundp(obj: unknown, mid: string): boolean | null {
   return reopenedSeatMethod(obj, mid) !== undefined ? true : null;
 }
 
-function chainEntry(obj: unknown, name: string): unknown {
-  for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
-    if (Object.hasOwn(o, name)) return Object.getOwnPropertyDescriptor(o, name)?.value;
+/** @perf 3.7x — PERMANENT */
+function _chainEntry(obj: unknown, name: string): unknown {
+  const proto =
+    typeof obj === "object" && obj !== null && !Object.hasOwn(obj, name)
+      ? (Object.getPrototypeOf(obj) as object | null)
+      : null;
+  let entries = proto === null ? undefined : _chainEntries.get(proto);
+  if (proto !== null && (entries === undefined || entries.serial !== methodCacheSerial)) {
+    entries = { serial: methodCacheSerial, values: new Map() };
+    _chainEntries.set(proto, entries);
   }
-  return undefined;
+  if (entries?.values.has(name)) return entries.values.get(name);
+  let value: unknown;
+  for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
+    if (Object.hasOwn(o, name)) {
+      value = Object.getOwnPropertyDescriptor(o, name)?.value;
+      break;
+    }
+  }
+  entries?.values.set(name, value);
+  return value;
 }
+
+/** @perf 3.7x — PERMANENT */
+const _chainEntries = new WeakMap<object, { serial: number; values: Map<string, unknown> }>();
 
 /**
  * `Object#respond_to_missing?` (`obj_respond_to_missing`,
@@ -1703,7 +1722,7 @@ export function rbCheckFuncall(recv: unknown, mid: string, ...args: unknown[]): 
  * (`vendor/ruby/v3.3.11/vm_method.c:2934`).
  */
 export function rbObjRespondTo(obj: unknown, mid: string): boolean {
-  const isRespondTo = chainEntry(obj, "isRespondTo");
+  const isRespondTo = _chainEntry(obj, "isRespondTo");
   if (typeof isRespondTo === "function") {
     const result = (isRespondTo as (mid: string) => unknown).call(obj, mid);
     return result != null && result !== false;

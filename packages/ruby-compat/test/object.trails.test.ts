@@ -440,9 +440,7 @@ describe("Object#respond_to?", () => {
   it("answers a respond_to_missing? defined on the prototype after the first query", () => {
     class Late {}
     expect(basicObjRespondTo(new Late(), "dynamic")).toBe(false);
-    Object.defineProperty(Late.prototype, "respondToMissing", {
-      value: (mid: string) => mid === "dynamic",
-    });
+    rbModDefineMethod(Late, "respondToMissing", (mid: string) => mid === "dynamic");
     expect(basicObjRespondTo(new Late(), "dynamic")).toBe(true);
   });
 

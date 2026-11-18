@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include, rbModDefineMethod, rbModUndefMethod } from "@blazetrails/ruby-compat";
 import { CsrfHelper, type csrfMetaTags } from "../../lib/helpers/csrf-helper.js";
 import { TagHelper } from "../../lib/helpers/tag-helper.js";
 import { assertDomEqual } from "../../lib/rails-dom-testing/assertions/dom-assertions.js";
@@ -45,12 +45,15 @@ describe("CsrfHelperTest", () => {
 
   it("csrf meta tags without protect against forgery method", () => {
     const test = new CsrfHelperTest();
-    const { isProtectAgainstForgery } = CsrfHelperTest.prototype;
-    delete (CsrfHelperTest.prototype as Partial<CsrfHelperTest>).isProtectAgainstForgery;
+    rbModUndefMethod(CsrfHelperTest, "isProtectAgainstForgery");
     try {
       assertDomEqual("", test.csrfMetaTags());
     } finally {
-      CsrfHelperTest.prototype.isProtectAgainstForgery = isProtectAgainstForgery;
+      rbModDefineMethod(
+        CsrfHelperTest,
+        "isProtectAgainstForgery",
+        () => CsrfHelperTest.requestForgery,
+      );
     }
   });
 });
