@@ -20,12 +20,40 @@ export const Bundler = {
     if (groups.length === 0) groups = ["default"];
     if (!groups.includes("default")) return;
     const gemfile = await Bundler.defaultGemfile();
-    const root = File.dirname(gemfile);
+    const gemRoot = File.dirname(gemfile);
     const dependencies = (JSON.parse(await File.readAsync(gemfile)) as { dependencies?: object })
       .dependencies;
     for (const name of Object.keys(dependencies ?? {})) {
       if (!name.startsWith("@blazetrails/")) continue;
-      await requireGem(root, name);
+      let root = gemRoot;
+      let dir = File.join(root, "node_modules", name);
+      while (!(await File.isExistAsync(File.join(dir, "package.json")))) {
+        const parent = File.dirname(root);
+        if (parent === root) {
+          const error = new LoadError(`cannot load such file -- ${name}`);
+          error.path = name;
+          throw error;
+        }
+        root = parent;
+        dir = File.join(root, "node_modules", name);
+      }
+      const manifest = File.join(dir, "package.json");
+      const json = JSON.parse(await File.readAsync(manifest)) as {
+        exports?: unknown;
+        main?: string;
+      };
+      const dot =
+        json.exports != null && typeof json.exports === "object" && "." in json.exports
+          ? (json.exports as Record<string, unknown>)["."]
+          : json.exports;
+      const entry =
+        typeof dot === "string"
+          ? dot
+          : dot != null && typeof dot === "object"
+            ? ((dot as Record<string, unknown>).import ?? (dot as Record<string, unknown>).default)
+            : (json.main ?? "index.js");
+      if (typeof entry !== "string") continue;
+      await import(new URL(`file://${File.expandPath(entry, dir)}`).href);
     }
   },
 
@@ -47,33 +75,3 @@ export const Bundler = {
     }
   },
 };
-
-type Manifest = { exports?: unknown; main?: string };
-
-async function requireGem(root: string, name: string): Promise<void> {
-  let dir = File.join(root, "node_modules", name);
-  while (!(await File.isExistAsync(File.join(dir, "package.json")))) {
-    const parent = File.dirname(root);
-    if (parent === root) {
-      const error = new LoadError(`cannot load such file -- ${name}`);
-      error.path = name;
-      throw error;
-    }
-    root = parent;
-    dir = File.join(root, "node_modules", name);
-  }
-  const manifest = File.join(dir, "package.json");
-  const json = JSON.parse(await File.readAsync(manifest)) as Manifest;
-  const dot =
-    json.exports != null && typeof json.exports === "object" && "." in json.exports
-      ? (json.exports as Record<string, unknown>)["."]
-      : json.exports;
-  const entry =
-    typeof dot === "string"
-      ? dot
-      : dot != null && typeof dot === "object"
-        ? ((dot as Record<string, unknown>).import ?? (dot as Record<string, unknown>).default)
-        : (json.main ?? "index.js");
-  if (typeof entry !== "string") return;
-  await import(new URL(`file://${File.expandPath(entry, dir)}`).href);
-}

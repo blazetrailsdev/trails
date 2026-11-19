@@ -32,6 +32,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/date": "workspace:*",
+    "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/thor": "workspace:*",
     "@blazetrails/trailties": "workspace:*"

@@ -1175,6 +1175,9 @@ importers:
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
+      '@blazetrails/msgpack':
+        specifier: workspace:*
+        version: link:../msgpack
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
