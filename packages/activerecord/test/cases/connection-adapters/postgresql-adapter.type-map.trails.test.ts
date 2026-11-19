@@ -1,5 +1,5 @@
 import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";
-import { PG } from "../../../lib/pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import { Array as OidArray } from "../../../lib/connection-adapters/postgresql/oid/array.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

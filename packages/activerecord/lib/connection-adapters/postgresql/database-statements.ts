@@ -1,4 +1,4 @@
-import { PG } from "../../pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import type { Connection as PGConnection } from "@blazetrails/pg";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
@@ -13,6 +13,7 @@ import {
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
 import { aryJoin, b, count, eachWithIndex, fetch, rbRegMatchP } from "@blazetrails/ruby-compat";
+import type { ConnectionPool, NullPool } from "../abstract/connection-pool.js";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -283,6 +284,8 @@ export interface PerformQueryHost extends HandleWarningsHost {
   isInTransaction(): boolean;
   sqlKey(sql: string | null): string;
   _statements: StatementPool;
+  lock: { synchronize<T>(block: () => Promise<T>): Promise<T> };
+  pool: ConnectionPool | NullPool;
   verifiedBang(): void;
   /** @internal */
   handleWarnings(sql: unknown): void;
@@ -315,14 +318,14 @@ export async function performQuery(
         result = await rawConnection.execPrepared(stmtKey, typeCastedBinds);
         break;
       } catch (error) {
-        if (this.isCachedPlanFailure(error as Parameters<typeof this.isCachedPlanFailure>[0])) {
+        if (!(error instanceof PG.FeatureNotSupported)) throw error;
+        if (this.isCachedPlanFailure(error)) {
           if (this.isInTransaction()) {
-            throw new PreparedStatementCacheExpired(
-              (error as { message?: string })?.message ?? "cached plan expired",
-              { sql: sql as string, binds, cause: error },
-            );
+            throw new PreparedStatementCacheExpired(error.message, { connectionPool: this.pool });
           } else {
-            await this._statements.delete(this.sqlKey(sql));
+            await this.lock.synchronize(async () => {
+              await this._statements.delete(this.sqlKey(sql));
+            });
             continue;
           }
         }

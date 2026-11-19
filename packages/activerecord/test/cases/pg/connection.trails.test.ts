@@ -3,7 +3,7 @@ import { it, expect, describe, vi } from "vitest";
 import { fakePgConnection } from "../../support/fake-pg-connection.js";
 import { IO, rbClassNewInstance } from "@blazetrails/ruby-compat";
 import { Connection } from "@blazetrails/pg";
-import { PG } from "../../../lib/pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import { cancelAnyRunningQuery } from "../../../lib/connection-adapters/postgresql/database-statements.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 import { ConnectionNotEstablished } from "../../../lib/errors.js";

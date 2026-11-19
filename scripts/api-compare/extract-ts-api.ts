@@ -7889,10 +7889,18 @@ function recordCallSite(
     const activeSupport = ts.isIdentifier(callee)
       ? activeSupportBindingsFor(call.getSourceFile()).get(callee.text)
       : undefined;
+    const newOf = !ts.isNewExpression(call)
+      ? undefined
+      : ts.isIdentifier(callee)
+        ? callee.text
+        : ts.isPropertyAccessExpression(callee)
+          ? callee.name.text
+          : undefined;
     sites.push({
       name,
       args,
       flags: [...new Set(flags)],
+      ...(newOf !== undefined ? { newOf } : {}),
       ...(recv !== undefined && recv !== "?" && recv !== "id:this" && !recv.startsWith("const:")
         ? { recv }
         : {}),

@@ -1,5 +1,11 @@
 import pg from "pg";
-import { ConnectionBad, Error as PGError, ServerError, UnableToSend } from "../exceptions.js";
+import {
+  ConnectionBad,
+  ERROR_CLASSES,
+  Error as PGError,
+  ServerError,
+  UnableToSend,
+} from "../exceptions.js";
 import { Result } from "../result.js";
 import type { Connection } from "../connection.js";
 
@@ -131,7 +137,7 @@ export function pgError(conn: Connection, error: unknown, klass?: typeof PGError
   if (klass != null) {
     wrapped = new klass(`${error.message}\n`, { connection: conn });
   } else if (error instanceof pg.DatabaseError) {
-    wrapped = new ServerError(error.message, {
+    wrapped = new (lookupErrorClass(error.code ?? null))(error.message, {
       connection: conn,
       result: emptyResult(error),
     });
@@ -149,6 +155,24 @@ export function pgError(conn: Connection, error: unknown, klass?: typeof PGError
     conn.bad = true;
   }
   return wrapped;
+}
+
+function lookupErrorClass(sqlstate: string | null): typeof PGError {
+  let klass: typeof PGError | undefined;
+  if (sqlstate != null) {
+    klass = Object.hasOwn(ERROR_CLASSES, sqlstate) ? ERROR_CLASSES[sqlstate] : undefined;
+    if (klass == null) {
+      klass = Object.hasOwn(ERROR_CLASSES, sqlstate.slice(0, 2))
+        ? ERROR_CLASSES[sqlstate.slice(0, 2)]
+        : undefined;
+      if (klass == null) {
+        klass = ServerError;
+      }
+    }
+  } else {
+    klass = UnableToSend;
+  }
+  return klass;
 }
 
 function result(raw: pg.QueryResult | pg.QueryResult[]): Result {

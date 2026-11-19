@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { CallSite, ParamInfo } from "@blazetrails/parity/types";
+import type { CallSite, ClassInfo, MethodInfo, ParamInfo } from "@blazetrails/parity/types";
+import { constructorSigsThroughSuperclass } from "./compare.js";
 import {
   comparableRubySites,
   foldReaderProcCalls,
@@ -1813,5 +1814,49 @@ describe("compareCallArgs Enumerable free functions", () => {
       verdict: "mismatch",
       class: "shape",
     });
+  });
+});
+
+describe("inherited-constructor padding", () => {
+  const p = (name: string, kind: ParamInfo["kind"]): ParamInfo => ({ name, kind }) as ParamInfo;
+  const cls = (name: string, file: string, superclass?: string, ctor?: ParamInfo[]): ClassInfo =>
+    ({
+      name,
+      file,
+      ...(superclass ? { superclass } : {}),
+      includes: [],
+      extends: [],
+      instanceMethods: ctor ? [{ name: "constructor", params: ctor } as MethodInfo] : [],
+      classMethods: [],
+    }) as unknown as ClassInfo;
+  const entities = new Map<string, ClassInfo[]>([
+    ["MoneyDecoder", [cls("MoneyDecoder", "oid/money.ts", "SimpleDecoder")]],
+    ["SimpleDecoder", [cls("SimpleDecoder", "simple-decoder.ts", "Coder")]],
+    [
+      "Coder",
+      [cls("Coder", "coder.ts", undefined, [p("hash", "optional"), p("kwargs", "optional")])],
+    ],
+  ]);
+  const ruby = site("new", ["kwargs{name=str:money,oid=num:790}"]);
+  const tsCall = site("constructor", ["nil", "kwargs{name=str:money,oid=num:790}"]);
+
+  it("drops the hash padding before kwargs through the class's inherited constructor", () => {
+    const sigs = constructorSigsThroughSuperclass(entities, "MoneyDecoder", "adapter.ts");
+    expect(sigs).toEqual([[p("hash", "optional"), p("kwargs", "optional")]]);
+    expect(compareCallArgs(ruby, tsCall, undefined, sigs).verdict).toBe("match");
+  });
+
+  it("does not resolve an unknown class or a call-expression superclass", () => {
+    expect(constructorSigsThroughSuperclass(entities, "Unknown", "adapter.ts")).toBeUndefined();
+    const delegated = new Map(entities);
+    delegated.set("Wrapper", [cls("Wrapper", "wrapper.ts", "DelegateClass(Coder)")]);
+    expect(constructorSigsThroughSuperclass(delegated, "Wrapper", "adapter.ts")).toBeUndefined();
+  });
+
+  it("reads a root class with no constructor as JS's implicit zero-parameter one", () => {
+    const rooted = new Map([["Plain", [cls("Plain", "plain.ts")]]]);
+    const sigs = constructorSigsThroughSuperclass(rooted, "Plain", "adapter.ts");
+    expect(sigs).toEqual([[]]);
+    expect(compareCallArgs(ruby, tsCall, undefined, sigs).verdict).toBe("mismatch");
   });
 });

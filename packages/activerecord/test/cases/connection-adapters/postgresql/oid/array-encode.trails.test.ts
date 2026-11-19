@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { FrozenError } from "@blazetrails/ruby-compat";
 import { Coder } from "@blazetrails/pg";
 import { PGTextDecoder } from "../../../../../lib/connection-adapters/postgresql/pg-text-decoder.js";
-import { PG } from "../../../../../lib/pg/pg.js";
+import { PG } from "@blazetrails/pg";
 
 describe("PostgreSQL array literal encoding", () => {
   const encoder = new PG.TextEncoder.Array(null, { name: "text[]", delimiter: "," });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
-import { PG } from "../../../../../lib/pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import {
   Array as OidArray,
   Data,

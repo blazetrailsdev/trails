@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import pg from "pg";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { PGTextDecoder } from "../../../../lib/connection-adapters/postgresql/pg-text-decoder.js";
-import { PG } from "../../../../lib/pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import { fakePgConnection } from "../../../support/fake-pg-connection.js";
 import { Rational } from "@blazetrails/ruby-compat";
 

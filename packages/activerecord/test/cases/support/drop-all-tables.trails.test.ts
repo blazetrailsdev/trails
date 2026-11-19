@@ -11,7 +11,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../../../lib/connection
 import { typeRegistryKeyFor } from "../../support/type-registry-key.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import { ConnectionFailed, ConnectionNotEstablished } from "../../../lib/errors.js";
-import { PG } from "../../../lib/pg/pg.js";
+import { PG } from "@blazetrails/pg";
 
 let adapter: DatabaseAdapter;
 
