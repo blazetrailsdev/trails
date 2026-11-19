@@ -7,8 +7,12 @@ describe("PG::Type derivations", () => {
       const textencStringArray = new PG.TextEncoder.Array();
       const textdecStringArray = new PG.TextDecoder.Array();
       const textencIntArray = new PG.TextEncoder.Array();
-      const textencStringArrayWithDelimiter = new PG.TextEncoder.Array({ delimiter: ";" });
-      const textdecStringArrayWithDelimiter = new PG.TextDecoder.Array({ delimiter: ";" });
+      const textencStringArrayWithDelimiter = new PG.TextEncoder.Array(undefined, {
+        delimiter: ";",
+      });
+      const textdecStringArrayWithDelimiter = new PG.TextDecoder.Array(undefined, {
+        delimiter: ";",
+      });
 
       describe("#decode", () => {
         describe("one dimensional arrays", () => {
