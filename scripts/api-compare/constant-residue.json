@@ -918,7 +918,7 @@
     }
   },
   "i18n": {
-    "rows": 39,
+    "rows": 40,
     "excluded": [],
     "unwalked": [
       "backend/pluralization.ts::Pluralization",
