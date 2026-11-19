@@ -12,8 +12,6 @@ import {
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import type { PredicateBuilder } from "./relation/predicate-builder.js";
-
-type ScopeBlock = (...args: any[]) => any;
 import { ConfigurationError, NameError, UnknownPrimaryKey } from "./errors.js";
 import { cachedFindByStatement } from "./core.js";
 import { TableMetadata } from "./table-metadata.js";
@@ -71,6 +69,8 @@ import {
 } from "./associations/errors.js";
 import { polymorphicName, typeCondition } from "./inheritance.js";
 import { Relation } from "./relation.js";
+
+type ScopeBlock = (...args: any[]) => any;
 
 export type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 

@@ -1886,7 +1886,7 @@ export interface Base
   isSavedChanges(): boolean;
   isSavedChangeToAttribute(attr: string | string[], options?: DirtyOptions): boolean;
   attributeBeforeLastSave(attr: string): unknown;
-  isWillSaveChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
+  isWillSaveChangeToAttribute(attr: string | string[], options?: DirtyOptions): boolean;
   attributeChangeToBeSaved(attr: string): [unknown, unknown] | null;
   attributeInDatabase(attr: string): unknown;
   readAttributeForValidation(attribute: string): unknown;

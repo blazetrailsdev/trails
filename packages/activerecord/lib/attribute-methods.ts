@@ -731,7 +731,7 @@ export function isSavedChanges(this: Parameters<typeof _isSavedChanges>[0]): boo
 }
 export function isWillSaveChangeToAttribute(
   this: Parameters<typeof _isWillSaveChangeToAttribute>[0],
-  attrName: string,
+  attrName: string | string[],
   options?: DirtyOptions,
 ): boolean | undefined {
   return _isWillSaveChangeToAttribute(this, attrName, options);

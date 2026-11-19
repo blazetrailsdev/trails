@@ -485,7 +485,7 @@ export function _isRecordChanged(
     record.isNewRecord() ||
     isAssociationForeignKeyChanged(reflection, record, key) ||
     isInversePolymorphicAssociationChanged(reflection, record) ||
-    record.isWillSaveChangeToAttribute(reflection.foreignKey() as string)
+    record.isWillSaveChangeToAttribute(reflection.foreignKey())
   );
 }
 
