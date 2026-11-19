@@ -9,14 +9,14 @@ import { testsLookup } from "../support/tests/lookup.js";
 import { testsPluralization } from "../support/tests/pluralization.js";
 import { testsProcs } from "../support/tests/procs.js";
 import { testsLocalizationDate } from "../support/tests/localization/date.js";
-import { setupTimeTranslations } from "../support/tests/localization/time.js";
+import { testsLocalizationDateTime } from "../support/tests/localization/date-time.js";
+import { testsLocalizationTime } from "../support/tests/localization/time.js";
 import { config } from "../../lib/i18n.js";
 
 describe("I18nApiChainTest", () => {
   beforeEach(async () => {
     await TestCase.setup();
     config().backend = new Chain(new Simple(), config().backend);
-    setupTimeTranslations();
   });
   afterEach(TestCase.teardown);
 
@@ -26,6 +26,8 @@ describe("I18nApiChainTest", () => {
   testsPluralization();
   testsProcs();
   testsLocalizationDate();
+  testsLocalizationDateTime();
+  testsLocalizationTime();
 
   it("make sure we use the Chain backend", () => {
     expect(config().backend.constructor).toBe(Chain);
