@@ -1,4 +1,4 @@
-import { ARRAY_METHOD_TABLE, block, Enumerator, toEnum } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, block, Enumerator, rtest, toEnum } from "@blazetrails/ruby-compat";
 
 export function extractBang<T>(array: T[], predicate: (item: T) => boolean): T[];
 export function extractBang<T>(array: T[]): Enumerator<T>;
@@ -16,7 +16,7 @@ export function extractBang<T>(array: T[], predicate?: (item: T) => boolean): T[
     0,
     array.length,
     ...array.filter((element) => {
-      if (predicate(element)) {
+      if (rtest(predicate(element))) {
         extractedElements.push(element);
         return false;
       }
