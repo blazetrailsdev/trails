@@ -1,6 +1,6 @@
 import { ActiveSupport } from "./namespaces.js";
 import * as LazyLoadHooks from "./lazy-load-hooks.js";
-type Hook = (this: any, base: any) => void;
+type Hook = (this: any, base: any) => unknown;
 
 interface HookOptions {
   yield?: boolean;
@@ -36,11 +36,10 @@ export function onLoad(name: string, options: HookOptions | Hook, callback?: Hoo
   bucket(loadHooks, name).push([block, options]);
 }
 
-export function runLoadHooks(name: string, base: any): void {
+/** @inventedArm map — PERMANENT */
+export function runLoadHooks(name: string, base: any): unknown[] {
   bucket(loaded, name).push(base);
-  for (const [hook, options] of bucket(loadHooks, name)) {
-    executeHook(name, base, options, hook);
-  }
+  return bucket(loadHooks, name).map(([hook, options]) => executeHook(name, base, options, hook));
 }
 
 /** @internal */
@@ -48,22 +47,23 @@ function withExecutionControl(
   name: string,
   block: Hook,
   once: boolean | undefined,
-  fn: () => void,
-): void {
+  fn: () => unknown,
+): unknown {
   if (!bucket(runOnce, name).includes(block)) {
     if (once === true) bucket(runOnce, name).push(block);
 
-    fn();
+    return fn();
   }
+  return undefined;
 }
 
 /** @internal */
-function executeHook(name: string, base: any, options: HookOptions, block: Hook): void {
-  withExecutionControl(name, block, options.runOnce, () => {
+function executeHook(name: string, base: any, options: HookOptions, block: Hook): unknown {
+  return withExecutionControl(name, block, options.runOnce, () => {
     if (options.yield) {
-      block(base);
+      return block(base);
     } else {
-      block.call(base, base);
+      return block.call(base, base);
     }
   });
 }

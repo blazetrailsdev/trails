@@ -93,11 +93,7 @@ export class ModelGenerator extends Base {
       File.join("app/models", ...this.classPath(), `${dasherize(this.fileName)}${ext}`),
       `${importPath}
 
-export class ${className} extends ${parentClass} {
-  static toString(): string {
-    return ${JSON.stringify(this.className())};
-  }
-${staticBlock}}
+export class ${className} extends ${parentClass} {${staticBlock}}
 `,
     );
   }

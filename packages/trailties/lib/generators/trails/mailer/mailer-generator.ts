@@ -42,7 +42,9 @@ export class MailerGenerator extends NamedBase {
 
   /** @internal */
   private applicationMailerFileName(): string {
-    return (this._applicationMailerFileName ??= `app/mailers/application-mailer${this.ext()}`);
+    return (this._applicationMailerFileName ??= this.isMountableEngine()
+      ? `app/mailers/${this.namespacedPath()}/application-mailer${this.ext()}`
+      : `app/mailers/application-mailer${this.ext()}`);
   }
 }
 

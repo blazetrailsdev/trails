@@ -651,10 +651,6 @@ describe("ModelGeneratorTest", () => {
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class Account extends ApplicationRecord {
-  static toString(): string {
-    return "Account";
-  }
-
   static {
     this.belongsTo("supplier", { polymorphic: true });
   }
@@ -732,10 +728,6 @@ export class Account extends ApplicationRecord {
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class User extends ApplicationRecord {
-  static toString(): string {
-    return "User";
-  }
-
   static {
     this.hasSecureToken();
     this.hasSecureToken("auth_token");
@@ -751,10 +743,6 @@ export class User extends ApplicationRecord {
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class Message extends ApplicationRecord {
-  static toString(): string {
-    return "Message";
-  }
-
   static {
     this.hasRichText("content");
   }
@@ -769,10 +757,6 @@ export class Message extends ApplicationRecord {
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class Message extends ApplicationRecord {
-  static toString(): string {
-    return "Message";
-  }
-
   static {
     this.hasOneAttached("video");
   }
@@ -787,10 +771,6 @@ export class Message extends ApplicationRecord {
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
 export class Message extends ApplicationRecord {
-  static toString(): string {
-    return "Message";
-  }
-
   static {
     this.hasManyAttached("photos");
   }
