@@ -325,15 +325,11 @@ export class Connection {
   }
 }
 
-/** @internal */
-function stdStrings(self: Connection | typeof Connection): boolean {
-  return self instanceof Connection
-    ? self.parameterStatuses["standard_conforming_strings"] !== "off"
-    : false;
-}
-
 function escapeString(this: Connection | typeof Connection, string: string): string {
-  const std = stdStrings(this);
+  const std =
+    this instanceof Connection
+      ? this.parameterStatuses["standard_conforming_strings"] !== "off"
+      : false;
   let result = "";
   for (const c of stringValue(string)) {
     if (c === "'" || (c === "\\" && !std)) result += c;
@@ -344,7 +340,10 @@ function escapeString(this: Connection | typeof Connection, string: string): str
 
 function escapeBytea(this: Connection | typeof Connection, str: Uint8Array | string): string {
   const from = typeof str === "string" ? Buffer.from(str, "binary") : Buffer.from(str);
-  const std = stdStrings(this);
+  const std =
+    this instanceof Connection
+      ? this.parameterStatuses["standard_conforming_strings"] !== "off"
+      : false;
   if (this instanceof Connection) {
     return `${std ? "" : "\\"}\\x${from.toString("hex")}`;
   }
