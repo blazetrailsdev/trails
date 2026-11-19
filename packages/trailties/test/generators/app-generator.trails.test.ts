@@ -181,6 +181,15 @@ describe("AppGenerator (trails-only)", () => {
         { destinationRoot: root },
       ).invokeAll();
       const app = path.join(root, "my-app");
+      fs.mkdirSync(path.join(app, "node_modules/@blazetrails"), { recursive: true });
+      const { dependencies } = JSON.parse(fs.readFileSync(path.join(app, "package.json"), "utf8"));
+      for (const name of Object.keys(dependencies)) {
+        if (!name.startsWith("@blazetrails/")) continue;
+        fs.symlinkSync(
+          path.resolve(packageDir, "..", name.slice("@blazetrails/".length)),
+          path.join(app, "node_modules", name),
+        );
+      }
       const node = (args: string[], cwd = app) =>
         spawnSync(getProcessAdapter().execPath!(), args, {
           cwd,

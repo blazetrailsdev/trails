@@ -453,6 +453,10 @@ export async function assertDifference<T>(
   block: () => T | Promise<T>,
 ): Promise<T | undefined>;
 export async function assertDifference<T>(
+  expression: Expression<number> | string | (Expression<number> | string)[],
+  block: () => T | Promise<T>,
+): Promise<T | undefined>;
+export async function assertDifference<T>(
   expression:
     | Expression<number>
     | string
