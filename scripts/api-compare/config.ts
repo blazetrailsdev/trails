@@ -72,7 +72,9 @@ export const DIR_TO_PACKAGES: Record<string, string[]> = Object.entries(
   // (`activerecord` + `activerecord-test-support`); seed the self-mapping so
   // resolving the npm dep `@blazetrails/activerecord` doesn't lose `activerecord`.
   Object.fromEntries(
-    PACKAGES.filter((pkg) => !PACKAGE_DIR_OVERRIDES[pkg]).map((pkg) => [pkg, [pkg]]),
+    [...PACKAGES, ...TS_ONLY_PACKAGES]
+      .filter((pkg) => !PACKAGE_DIR_OVERRIDES[pkg])
+      .map((pkg) => [pkg, [pkg]]),
   ),
 );
 
