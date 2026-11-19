@@ -34,9 +34,10 @@ class SupervisorBootSignalTest extends TestCase {
 }
 constSet(TopLevel, "SupervisorBootSignalTest", SupervisorBootSignalTest);
 
-type Hooked = typeof Supervisor | typeof Worker;
-
-async function resetHooks(process: Hooked, block: () => Promise<void>): Promise<void> {
+async function resetHooks(
+  process: typeof Supervisor | typeof Worker,
+  block: () => Promise<void>,
+): Promise<void> {
   const exitHooks = process.lifecycleHooks.exit;
   const startHooks = process.lifecycleHooks.start;
   const stopHooks = process.lifecycleHooks.stop;
@@ -87,13 +88,13 @@ describe("SupervisorBootSignalTest", () => {
         await waitWhileWithTimeout(5, async () => !release);
       });
 
-      SolidQueue.onWorkerStart(async () => {
-        await JobResult.createBang({
+      SolidQueue.onWorkerStart(() =>
+        JobResult.createBang({
           queue_name: "background",
           status: "hook_called",
           value: "worker_started",
-        });
-      });
+        }),
+      );
 
       for (let i = 0; i < 3; i++) {
         await (
