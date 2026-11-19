@@ -988,14 +988,16 @@ export function normalizeCallbackParams(
     type = rest.shift() as CallbackKind;
   }
   let options: Record<string, unknown> = {};
-  if (rest.length > 0 && isCallbackOptions(rest[rest.length - 1])) {
-    options = rest.pop() as Record<string, unknown>;
+  const last = rest[rest.length - 1];
+  if (rest.length > 0 && isCallbackOptions(last)) {
+    rest.pop();
+    options = last;
   }
   if (block) rest.unshift(block);
   return [type, rest as Array<AnyCallback | string | symbol>, { ...options }];
 }
 
-function isCallbackOptions(value: unknown): boolean {
+function isCallbackOptions(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null) return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;

@@ -167,7 +167,8 @@ export class LogSubscriber extends Subscriber {
     try {
       super.call(event);
     } catch (e) {
-      this._logException(event.name, e as Error);
+      if (!(e instanceof Error)) throw e;
+      this._logException(event.name, e);
     }
   }
 
@@ -177,7 +178,8 @@ export class LogSubscriber extends Subscriber {
     try {
       super.publishEvent(event);
     } catch (e) {
-      this._logException(event.name, e as Error);
+      if (!(e instanceof Error)) throw e;
+      this._logException(event.name, e);
     }
   }
 
