@@ -14,7 +14,7 @@ import { Concern } from "./concern.js";
 import { extractOptionsBang } from "./hash-utils.js";
 import { safeConstantize } from "./inflector.js";
 
-type ErrorHandler = ((this: any, error: any) => unknown) | string;
+type ErrorHandler = ((this: never, error: never) => unknown) | string;
 
 type ExceptionClass = (abstract new (...args: never) => unknown) | Module;
 
@@ -31,7 +31,7 @@ export const ClassMethods = {
   rescueFrom(
     this: Pick<RescuableClass, "rescueHandlers">,
     ...klasses: Array<
-      ExceptionClass | string | { with?: ErrorHandler } | ((this: any, error: any) => unknown)
+      ExceptionClass | string | { with?: ErrorHandler } | Exclude<ErrorHandler, string>
     >
   ): void {
     const block = rbBlockGivenP(klasses[klasses.length - 1])
@@ -114,7 +114,7 @@ export const ClassMethods = {
       if (rescuer.length === 0) {
         return (_e) => (rescuer as (this: object) => unknown).call(object);
       } else {
-        return (e) => rescuer.call(object, e);
+        return (e) => (rescuer as (this: object, e: unknown) => unknown).call(object, e);
       }
     }
     return null;
@@ -155,13 +155,9 @@ export const ClassMethods = {
 };
 
 export const Rescuable = { rescueWithHandler, handlerForRescue, ClassMethods };
-extend(Rescuable, Concern);
-(Rescuable as unknown as { included(base: null, block: (this: object) => void): void }).included(
-  null,
-  function (this: object) {
-    classAttribute.call(this, "rescueHandlers", { default: [] });
-  },
-);
+extend(Rescuable, Concern).included(null, function (this: object) {
+  classAttribute.call(this, "rescueHandlers", { default: [] });
+});
 export type Rescuable = Included<typeof Rescuable>;
 
 export function rescueWithHandler(

@@ -15,7 +15,7 @@ import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
 /** @internal */
-export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends AbstractRenderer {
+export class TemplateRenderer extends AbstractRenderer {
   /** @internal */
   protected details: Record<string, readonly (string | symbol)[]> = {};
 
@@ -23,7 +23,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
     super(lookupContext);
   }
 
-  render(context: ViewContext, options: RenderOptions): Rendered {
+  render(context: ViewContext, options: RenderOptions): Promise<RenderedTemplate> {
     this.details = this.extractDetails(options as Record<string, unknown>);
     const template = this.determineTemplate(options);
     this.prependFormats(template.format);
@@ -103,7 +103,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
     template: RenderableTemplate,
     layoutName: RenderOptions["layout"],
     locals: Record<string, unknown>,
-  ): Rendered {
+  ): Promise<RenderedTemplate> {
     return this.renderWithLayout(view, template, layoutName, locals, (layout) =>
       Notifications.instrument<Promise<string | SafeBuffer | Uint8Array>>(
         "render_template.action_view",
@@ -117,7 +117,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
             view._layoutFor!(...name),
           ) as Promise<string | SafeBuffer | Uint8Array>,
       ),
-    ) as Rendered;
+    );
   }
 
   /** @internal */

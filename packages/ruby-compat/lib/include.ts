@@ -2121,10 +2121,10 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
  *   extend(Base, ConnectionHandlingMethods);
  *   // Now Base.connectedTo(...) works
  */
-export function extend<T extends AnyClass | object>(
-  klass: T,
-  ...argv: Array<ModuleObject | AnyClass | Module>
-): T {
+export function extend<
+  T extends AnyClass | object,
+  M extends ModuleObject | AnyClass | Module = ModuleObject | AnyClass | Module,
+>(klass: T, ...argv: M[]): T & Extended<M> {
   let argc = argv.length;
   if (argc < 1) {
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1+)`);
@@ -2133,7 +2133,7 @@ export function extend<T extends AnyClass | object>(
   while (argc--) {
     extendObject(klass, argv[argc]);
   }
-  return klass;
+  return klass as T & Extended<M>;
 }
 
 function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {

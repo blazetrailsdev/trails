@@ -6,17 +6,13 @@ import { Model } from "../../lib/index.js";
 import { Attributes, type AttributesClassHalf } from "../../lib/attributes.js";
 import { Dirty } from "../../lib/dirty.js";
 import { defineModelCallbacks } from "../../lib/callbacks.js";
-import { hasSecurePassword } from "../../lib/secure-password.js";
+import { hasSecurePassword, type SecurePassword } from "../../lib/secure-password.js";
 import type { Password } from "@blazetrails/bcrypt";
 
-const SecurePasswordModel = Model as unknown as {
-  new (attributes?: Record<string, unknown>): Model & {
-    get password(): unknown;
-    set password(value: unknown);
-  };
-};
-
-export class User extends SecurePasswordModel {
+export class User extends (Model as Pick<typeof Model, keyof typeof Model> &
+  (new (
+    attributes?: Record<string, unknown>,
+  ) => Model & SecurePassword.InstanceMethodsOnActivation)) {
   declare static attribute: AttributesClassHalf["attribute"];
 
   static {
@@ -48,9 +44,6 @@ export interface User extends Attributes, Dirty {
   password_digest: string | Password | null;
   recovery_password_digest: string | Password | null;
   recovery_password: unknown;
-  passwordConfirmation: unknown;
-  passwordChallenge: unknown;
-  readonly passwordSalt: string | null;
   authenticate(unencryptedPassword: unknown): User | false;
   authenticatePassword(unencryptedPassword: unknown): User | false;
   authenticateRecoveryPassword(unencryptedPassword: unknown): User | false;
