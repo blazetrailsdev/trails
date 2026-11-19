@@ -14,6 +14,16 @@ export function setTestOrder(value: string | null): void {
   _testOrder = value;
 }
 
+let _testParallelizationThreshold = 50;
+
+export function testParallelizationThreshold(): number {
+  return _testParallelizationThreshold;
+}
+
+export function setTestParallelizationThreshold(value: number): void {
+  _testParallelizationThreshold = value;
+}
+
 export function cacheFormatVersion(): number {
   return formatVersion();
 }
@@ -44,6 +54,12 @@ export function setToTimePreservesTimezone(value: boolean | string | null): void
 
 Object.defineProperties(ActiveSupport, {
   testOrder: { get: testOrder, set: setTestOrder, configurable: true, enumerable: true },
+  testParallelizationThreshold: {
+    get: testParallelizationThreshold,
+    set: setTestParallelizationThreshold,
+    configurable: true,
+    enumerable: true,
+  },
   errorReporter: {
     get: (): ErrorReporter => currentErrorReporter,
     set: (reporter: ErrorReporter) => _setErrorReporter(reporter),

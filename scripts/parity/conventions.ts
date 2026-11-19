@@ -406,7 +406,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/string/exclude.rb": "string-utils.ts",
   "activesupport:core_ext/object/with.rb": "core-ext/object/with.ts",
   "activesupport:core_ext/class/subclasses.rb": "module-ext.ts",
-  "activesupport:core_ext/kernel/reporting.rb": "module-ext.ts",
   "activesupport:core_ext/module/redefine_method.rb": "class-attribute.ts",
   // `class_attribute` and the `redefine_method` / `redefine_singleton_method`
   // it generates with live in one file here, so the reopening follows

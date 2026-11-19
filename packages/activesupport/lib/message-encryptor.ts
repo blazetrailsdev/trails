@@ -1,4 +1,14 @@
-import { Cipher, b, prepend, rbEqual, byteslice, type Bytes } from "@blazetrails/ruby-compat";
+import {
+  Cipher,
+  b,
+  prepend,
+  rbEqual,
+  byteslice,
+  type Bytes,
+  rbModName,
+  sprintf,
+  rbObjId,
+} from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "./message-verifier.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
@@ -242,6 +252,10 @@ export class MessageEncryptor extends Codec {
 
   private newCipher(): Cipher {
     return new Cipher(this.cipher);
+  }
+
+  inspect(): string {
+    return `#<${rbModName(this.constructor)}:${sprintf("%#016x", rbObjId(this) << 1)}>`;
   }
 }
 

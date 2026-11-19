@@ -71,7 +71,7 @@ describe("BacktraceCleanerFilterTest", () => {
   });
 
   it("backtrace cleaner should allow removing filters", () => {
-    bc.removeFilters();
+    bc.removeFiltersBang();
     expect(bc.clean(["/my/prefix/my/class.rb"])[0]).toEqual("/my/prefix/my/class.rb");
   });
 
@@ -103,7 +103,7 @@ describe("BacktraceCleanerSilencerTest", () => {
   });
 
   it("backtrace cleaner should allow removing silencer", () => {
-    bc.removeSilencers();
+    bc.removeSilencersBang();
     expect(bc.clean(["/mongrel/stuff.rb"])).toEqual(["/mongrel/stuff.rb"]);
   });
 

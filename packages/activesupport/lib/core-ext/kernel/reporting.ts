@@ -15,3 +15,15 @@ export function withWarnings<T>(flag: unknown, block: () => T): T {
     setVerbose(oldVerbose);
   });
 }
+
+export function suppress<T>(
+  fn: () => T,
+  ...errorClasses: Array<new (...args: never[]) => Error>
+): T | null {
+  try {
+    return fn();
+  } catch (e) {
+    if (errorClasses.some((cls) => e instanceof cls)) return null;
+    throw e;
+  }
+}

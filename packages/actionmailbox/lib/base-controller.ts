@@ -91,6 +91,6 @@ Trails.Conductor.BaseController = class BaseController extends ActionController.
 
   /** @internal */
   private async ensureDevelopmentEnv(): Promise<void> {
-    if (!Trails.env["development?"]()) await this.head(":forbidden");
+    if (!Trails.env.isDevelopment()) await this.head(":forbidden");
   }
 };

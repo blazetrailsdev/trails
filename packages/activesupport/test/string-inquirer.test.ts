@@ -17,11 +17,11 @@ describe("StringInquirerTest", () => {
   });
 
   it("match", () => {
-    assertPredicate(stringInquirer, (s) => (s as any)["production?"]());
+    assertPredicate(stringInquirer, (s) => (s as any).isProduction());
   });
 
   it("miss", () => {
-    assertNotPredicate(stringInquirer, (s) => (s as any)["development?"]());
+    assertNotPredicate(stringInquirer, (s) => (s as any).isDevelopment());
   });
 
   it("missing question mark", () => {
@@ -50,8 +50,8 @@ describe("StringInquirer", () => {
   it("inquiry factory wraps the receiver", () => {
     const env = inquiry.call("test");
     expect(env).toBeInstanceOf(StringInquirer);
-    expect((env as any)["test?"]()).toBe(true);
-    expect((env as any)["production?"]()).toBe(false);
+    expect((env as any).isTest()).toBe(true);
+    expect((env as any).isProduction()).toBe(false);
   });
 
   it("toString returns original string", () => {
@@ -71,8 +71,8 @@ describe("StringInquirer", () => {
     const env = new EnvironmentInquirer("development");
     expect(env).toBeInstanceOf(String);
     expect(env).toBeInstanceOf(StringInquirer);
-    expect(env["local?"]()).toBe(true);
-    expect((env as any)["development?"]()).toBe(true);
+    expect(env.isLocal()).toBe(true);
+    expect((env as any).isDevelopment()).toBe(true);
   });
 
   it("answers the is-spelled predicate", () => {

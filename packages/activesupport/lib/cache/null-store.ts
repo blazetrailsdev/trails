@@ -1,7 +1,8 @@
+import { rbModName } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "../namespaces.js";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
-import { Store } from "./store.js";
+import { Store, inspectOptions } from "./store.js";
 
 export class NullStore extends Store implements CacheStore {
   static supportsCacheVersioning(): boolean {
@@ -21,6 +22,10 @@ export class NullStore extends Store implements CacheStore {
   }
 
   override async deleteMatched(_matcher: string | RegExp, _options?: CacheOptions): Promise<void> {}
+
+  inspect(): string {
+    return `#<${rbModName(this.constructor)} options=${inspectOptions(this.options as Record<string, unknown>)}>`;
+  }
 
   protected async readEntry(key: string, _options: Record<string, unknown>): Promise<Entry | null> {
     return this.deserializeEntry(await this.readSerializedEntry(key));

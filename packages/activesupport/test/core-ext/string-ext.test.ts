@@ -829,8 +829,8 @@ describe("StringInflectionsTest", () => {
   });
 
   it("string inquiry", () => {
-    assertPredicate(inquiry.call("production"), (s) => s["production?"]());
-    assertNotPredicate(inquiry.call("production"), (s) => s["development?"]());
+    assertPredicate(inquiry.call("production"), (s) => s.isProduction());
+    assertNotPredicate(inquiry.call("production"), (s) => s.isDevelopment());
   });
 
   it("truncate", () => {

@@ -13,7 +13,7 @@ const BACKTRACE =
 
 function makeCleaner(): BacktraceCleaner {
   const cleaner = new BacktraceCleaner();
-  cleaner.removeFilters();
+  cleaner.removeFiltersBang();
   cleaner.addSilencer((line) => !line.includes("lib/"));
   return cleaner;
 }

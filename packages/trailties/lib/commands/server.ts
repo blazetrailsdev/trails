@@ -58,7 +58,7 @@ export interface ServerOptions extends RackupServerOptions {
 }
 
 Handler.loadPath["rackup/handler/vite"] = async () => {
-  if (!Trails.env["development?"]() || !(await hasViteConfig(Dir.pwd()))) {
+  if (!Trails.env.isDevelopment() || !(await hasViteConfig(Dir.pwd()))) {
     throw new LoadError("cannot load such file -- rackup/handler/vite");
   }
   return import("../server/dev-server.js");

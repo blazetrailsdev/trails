@@ -5,9 +5,9 @@ import { assertNot, assertPredicate } from "../lib/testing/assertions.js";
 
 describe("EnvironmentInquirerTest", () => {
   it("local predicate", () => {
-    assertPredicate(new EnvironmentInquirer("development"), (env) => env["local?"]());
-    assertPredicate(new EnvironmentInquirer("test"), (env) => env["local?"]());
-    assertNot(new EnvironmentInquirer("production")["local?"]());
+    assertPredicate(new EnvironmentInquirer("development"), (env) => env.isLocal());
+    assertPredicate(new EnvironmentInquirer("test"), (env) => env.isLocal());
+    assertNot(new EnvironmentInquirer("production").isLocal());
   });
 
   it("prevent local from being used as an actual environment name", () => {

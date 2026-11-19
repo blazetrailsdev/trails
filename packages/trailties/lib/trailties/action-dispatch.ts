@@ -124,11 +124,11 @@ export class Trailtie extends BaseTrailtie {
       Object.assign(ExceptionWrapper.rescueTemplates, this.config.actionDispatch.rescueTemplates);
 
       if (this.config.actionDispatch.alwaysWriteCookie == null) {
-        this.config.actionDispatch.alwaysWriteCookie = Trails.env["development?"]();
+        this.config.actionDispatch.alwaysWriteCookie = Trails.env.isDevelopment();
       }
       CookieJar.alwaysWriteCookie = this.config.actionDispatch.alwaysWriteCookie;
 
-      Mapper.routeSourceLocations = Trails.env["development?"]();
+      Mapper.routeSourceLocations = Trails.env.isDevelopment();
 
       CacheRequest.strictFreshness = app.config.actionDispatch.strictFreshness;
       ActionDispatch.testApp = app;

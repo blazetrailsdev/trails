@@ -194,7 +194,7 @@ export class PendingMigrationError extends MigrationError {
   detailedMigrationMessage(pendingMigrations: Array<{ filename?: string }>): string {
     let message =
       "Migrations are pending. To resolve this issue, run:\n\n        bin/trails db:migrate";
-    if (TopLevel.Trails?.env !== undefined && !TopLevel.Trails.env["local?"]()) {
+    if (TopLevel.Trails?.env !== undefined && !TopLevel.Trails.env.isLocal()) {
       message += ` TRAILS_ENV=${TopLevel.Trails.env}`;
     }
     message += "\n\n";

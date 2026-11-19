@@ -770,6 +770,26 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     });
   });
 
+  it("fetch race condition protection", async () => {
+    const time = Time.now();
+    const key = crypto.randomUUID();
+    const value = crypto.randomUUID();
+    const expiresIn = 60;
+
+    await cache.write(key, value, { expiresIn });
+    await stub(Time, "now", plusWithDuration.call(time, expiresIn + 1), [], async () => {
+      const fetchedValue = await cache.fetch(key, { expiresIn, raceConditionTtl: 10 }, async () =>
+        crypto.randomUUID(),
+      );
+      expect(fetchedValue).not.toEqual(value);
+      expect(fetchedValue).not.toBeNull();
+    });
+
+    await stub(Time, "now", plusWithDuration.call(time, 2 * expiresIn), [], async () => {
+      expect(await cache.read(key)).not.toBeNull();
+    });
+  });
+
   it("fetch multi race condition protection", async () => {
     const time = Time.now();
     const key = crypto.randomUUID();

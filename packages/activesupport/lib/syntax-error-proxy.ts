@@ -40,7 +40,7 @@ export class SyntaxErrorProxy extends DelegateClass(SyntaxError) {
   }
 }
 
-class BacktraceLocation {
+export class BacktraceLocation {
   #toS: string;
 
   constructor(
@@ -55,12 +55,16 @@ class BacktraceLocation {
     return this.#toS;
   }
 
+  setToS(value: string): void {
+    this.#toS = value;
+  }
+
   spot(_: unknown): void {}
 
   label(): void {}
 }
 
-class BacktraceLocationProxy extends DelegateClass(Location) {
+export class BacktraceLocationProxy extends DelegateClass(Location) {
   declare ex: SyntaxErrorProxy;
 
   constructor(loc: Location, ex: SyntaxErrorProxy) {

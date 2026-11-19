@@ -5,7 +5,11 @@ import type {
 } from "../error-reporter.js";
 
 export class ErrorSubscriber implements ErrorSubscriberInterface {
-  events: Array<[unknown, boolean, ErrorSeverity, string, ErrorContext]> = [];
+  events: Array<[unknown, boolean, ErrorSeverity, string, ErrorContext]>;
+
+  constructor() {
+    this.events = [];
+  }
 
   report(
     error: unknown,
