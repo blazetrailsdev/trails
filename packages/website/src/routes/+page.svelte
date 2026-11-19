@@ -17,8 +17,12 @@
   let copied = $state(false);
 
   async function copy() {
-    await navigator.clipboard.writeText(installs[pm]);
-    copied = true;
+    try {
+      await navigator.clipboard.writeText(installs[pm]);
+      copied = true;
+    } catch {
+      copied = false;
+    }
   }
 
   const repo = "https://github.com/blazetrailsdev/trails";
@@ -71,9 +75,9 @@
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
     <span class="pill">trails &mdash; pre-release &middot; measured at {data.measuredAt}</span>
     <div class="stage">
-      <div class="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === "same"} onclick={() => (tab = "same")}>Same method</button>
-        <button role="tab" aria-selected={tab === "caught"} onclick={() => (tab = "caught")}>Caught by the compiler</button>
+      <div class="tabs">
+        <button aria-pressed={tab === "same"} onclick={() => (tab = "same")}>Same method</button>
+        <button aria-pressed={tab === "caught"} onclick={() => (tab = "caught")}>Caught by the compiler</button>
       </div>
       {#if tab === "same"}
         <div class="split">
@@ -134,9 +138,9 @@
       {/each}
     </div>
     <div class="install">
-      <div class="pms" role="tablist">
+      <div class="pms">
         {#each Object.keys(installs) as k}
-          <button role="tab" aria-selected={pm === k} onclick={() => ((pm = k), (copied = false))}>{k}</button>
+          <button aria-pressed={pm === k} onclick={() => ((pm = k), (copied = false))}>{k}</button>
         {/each}
       </div>
       <div class="cmd">
@@ -201,7 +205,7 @@
   .stage { max-width: 1170px; margin: 0 auto; background: #211710; border-radius: 10px; overflow: hidden; text-align: left; box-shadow: 0 30px 60px rgb(0 0 0 / 0.2); }
   .tabs { display: flex; gap: 4px; padding: 10px 10px 0; background: #2a1e16; }
   .tabs button { font: 600 15px var(--sans); color: #d9c6b0; background: none; border: 0; padding: 10px 18px; border-radius: 6px 6px 0 0; cursor: pointer; }
-  .tabs button[aria-selected="true"] { background: #3a2a1f; color: #fff; }
+  .tabs button[aria-pressed="true"] { background: #3a2a1f; color: #fff; }
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2a1e16; }
   .pane { background: #3a2a1f; min-height: 380px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
@@ -235,7 +239,7 @@
   .install { max-width: 760px; margin: 56px auto 0; text-align: left; }
   .pms { display: flex; gap: 4px; }
   .pms button { font: 600 14px var(--mono); color: var(--ink); background: none; border: 0; padding: 8px 14px; border-radius: 6px 6px 0 0; cursor: pointer; }
-  .pms button[aria-selected="true"] { background: var(--ink); color: #fff; }
+  .pms button[aria-pressed="true"] { background: var(--ink); color: #fff; }
   .cmd { display: flex; align-items: center; gap: 16px; background: var(--ink); color: #fbf1e4; border-radius: 0 8px 8px 8px; padding: 18px 20px; }
   .cmd code { flex: 1; font: 16px var(--mono); overflow-x: auto; white-space: nowrap; }
   .prompt { color: var(--mango); margin-right: 6px; }
