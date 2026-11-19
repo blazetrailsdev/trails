@@ -2335,7 +2335,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await assertNoDifference(
       () => callbacksForModel(model).length,
       null,
-      () => addAutosaveAssociationCallbacks.call(model, reflection),
+      () => addAutosaveAssociationCallbacks.call(model, reflection!),
     );
   }
 

@@ -44,10 +44,10 @@ export function isSavedChanges(record: DirtyRecord): boolean {
 
 export function isWillSaveChangeToAttribute(
   record: DirtyRecord,
-  attrName: string,
+  attrName: string | string[],
   options?: DirtyOptions,
 ): boolean | undefined {
-  return record.mutationsFromDatabase.isChanged(attrName, options);
+  return record.mutationsFromDatabase.isChanged(String(attrName), options);
 }
 
 export function attributeChangeToBeSaved(

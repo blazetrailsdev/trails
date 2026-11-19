@@ -13,7 +13,7 @@ describe("I18nValidationTest", () => {
   let originalI18nCustomizeFullMessage: boolean;
 
   function personClass(): typeof PersonModel.Person {
-    return (personStub ??= class Person extends PersonModel.Person {});
+    return (personStub ??= { Person: class extends PersonModel.Person {} }.Person);
   }
 
   function setup(): void {

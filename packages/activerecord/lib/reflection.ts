@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
+import type { PredicateBuilder } from "./relation/predicate-builder.js";
 import { ConfigurationError, NameError, UnknownPrimaryKey } from "./errors.js";
 import { cachedFindByStatement } from "./core.js";
 import { TableMetadata } from "./table-metadata.js";
@@ -69,6 +70,8 @@ import {
 import { polymorphicName, typeCondition } from "./inheritance.js";
 import { Relation } from "./relation.js";
 
+type ScopeBlock = (...args: any[]) => any;
+
 export type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 
 export interface ConcreteReflection {
@@ -81,7 +84,7 @@ export interface ConcreteReflection {
   readonly klass: typeof Base;
   readonly type?: string;
   foreignKey?(kwargs?: { inferFromInverseOf?: boolean }): string | string[];
-  readonly scope?: ((...args: any[]) => any) | null;
+  readonly scope?: ScopeBlock | null;
   joinPrimaryKey?(klass?: typeof Base): string | string[];
   readonly joinForeignKey?: string | string[];
   readonly parentReflection?: AssociationReflection | ThroughReflection | null;
@@ -140,11 +143,11 @@ export abstract class AbstractReflection {
 
   abstract get klass(): typeof Base;
 
-  get scopes(): Array<(...args: any[]) => any> {
+  get scopes(): Array<ScopeBlock> {
     return this.scope ? [this.scope] : [];
   }
 
-  get scope(): ((...args: any[]) => any) | null {
+  get scope(): ScopeBlock | null {
     return null;
   }
 
@@ -184,7 +187,11 @@ export abstract class AbstractReflection {
     return [this];
   }
 
-  buildScope(table?: Table | Nodes.TableAlias, predicateBuilder?: any, klass?: typeof Base): any {
+  buildScope(
+    table?: Table | Nodes.TableAlias,
+    predicateBuilder?: PredicateBuilder,
+    klass?: typeof Base,
+  ): any {
     return Relation.create(klass ?? this.klass, { table, predicateBuilder });
   }
 
@@ -227,9 +234,9 @@ export abstract class AbstractReflection {
 
   joinScopes(
     table: Table | Nodes.TableAlias,
-    predicateBuilder?: any,
+    predicateBuilder?: PredicateBuilder,
     klass?: typeof Base,
-    record?: any,
+    record?: Base,
   ): any[] {
     if (this.scope) {
       return [this._concrete().scopeFor(this.buildScope(table, predicateBuilder, klass), record)];
@@ -237,12 +244,12 @@ export abstract class AbstractReflection {
     return [];
   }
 
-  klassJoinScope(table?: Table | Nodes.TableAlias, predicateBuilder?: any): any {
+  klassJoinScope(table?: Table | Nodes.TableAlias, predicateBuilder?: PredicateBuilder): any {
     const relation = this.buildScope(table, predicateBuilder);
     return this.klass.scopeForAssociation(relation);
   }
 
-  constraints(): Array<(...args: any[]) => any> {
+  constraints(): Array<ScopeBlock> {
     return this.chain.flatMap((r) => r.scopes);
   }
 
@@ -380,12 +387,12 @@ export class MacroReflection extends AbstractReflection {
   readonly options: Record<string, unknown>;
   readonly activeRecord: typeof Base;
   readonly pluralName: string;
-  private _scope: ((...args: any[]) => any) | null;
+  private _scope: ScopeBlock | null;
   private _klassCache: typeof Base | null = null;
 
   constructor(
     name: string | null,
-    scope: ((...args: any[]) => any) | null,
+    scope: ScopeBlock | null,
     options: Record<string, unknown>,
     activeRecord: typeof Base,
   ) {
@@ -423,7 +430,7 @@ export class MacroReflection extends AbstractReflection {
     }
   }
 
-  get scope(): ((...args: any[]) => any) | null {
+  get scope(): ScopeBlock | null {
     return this._scope;
   }
 
@@ -510,7 +517,7 @@ export class AssociationReflection extends MacroReflection {
 
   constructor(
     name: string | null,
-    scope: ((...args: any[]) => any) | null,
+    scope: ScopeBlock | null,
     options: Record<string, unknown>,
     activeRecord: typeof Base,
   ) {
@@ -780,10 +787,10 @@ export class AssociationReflection extends MacroReflection {
     return this._activeRecordPrimaryKeyCache;
   }
 
-  associationScopeCache(klass: typeof Base, owner: any, block: (params: any) => any): any {
+  associationScopeCache(klass: typeof Base, owner: Base, block: (params: any) => any): any {
     let key: unknown = this;
     if (this.isPolymorphic()) {
-      key = [key, owner._readAttribute(this.foreignType)];
+      key = [key, owner._readAttribute(this.foreignType!)];
     }
     return klass.withConnection((connection) =>
       cachedFindByStatement.call(klass, connection, key, block),
@@ -820,13 +827,9 @@ export class AssociationReflection extends MacroReflection {
     }
   }
 
-  joinIdFor(owner: any): any[] {
+  joinIdFor(owner: Base): any[] {
     const keys = Array.isArray(this.joinForeignKey) ? this.joinForeignKey : [this.joinForeignKey];
-    return keys.map((key) => {
-      if (typeof owner._readAttribute === "function") return owner._readAttribute(key);
-      if (typeof owner.readAttribute === "function") return owner.readAttribute(key);
-      return owner[key];
-    });
+    return keys.map((key) => owner._readAttribute(key));
   }
 
   get throughReflection(): null {
@@ -1085,7 +1088,7 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.macro;
   }
 
-  associationScopeCache(klass: typeof Base, owner: any, block: (params: any) => any): any {
+  associationScopeCache(klass: typeof Base, owner: Base, block: (params: any) => any): any {
     return this.delegateReflection.associationScopeCache(klass, owner, block);
   }
 
@@ -1129,7 +1132,7 @@ export class ThroughReflection extends AbstractReflection {
     return _.foreignType;
   }
 
-  joinIdFor(owner: any): any[] {
+  joinIdFor(owner: Base): any[] {
     const _ = this.sourceReflection;
     if (_ == null) throw DelegationError.nilTarget("join_id_for", "source_reflection");
     return _.joinIdFor(owner);
@@ -1141,7 +1144,7 @@ export class ThroughReflection extends AbstractReflection {
     return _.type;
   }
 
-  get scope(): ((...args: any[]) => any) | null {
+  get scope(): ScopeBlock | null {
     return this.delegateReflection.scope;
   }
 
@@ -1222,9 +1225,9 @@ export class ThroughReflection extends AbstractReflection {
 
   joinScopes(
     table: Table | Nodes.TableAlias,
-    predicateBuilder?: any,
+    predicateBuilder?: PredicateBuilder,
     klass?: typeof Base,
-    record?: any,
+    record?: Base,
   ): any[] {
     const sourceScopes =
       this.sourceReflection?.joinScopes(table, predicateBuilder, klass, record) ?? [];
@@ -1241,7 +1244,7 @@ export class ThroughReflection extends AbstractReflection {
     this.throughReflection?.clearAssociationScopeCache();
   }
 
-  get scopes(): Array<(...args: any[]) => any> {
+  get scopes(): Array<ScopeBlock> {
     const sourceScopes = this.sourceReflection?.scopes ?? [];
     return [...sourceScopes, ...super.scopes];
   }
@@ -1396,7 +1399,7 @@ export class ThroughReflection extends AbstractReflection {
     this.checkValidityOfInverseBang();
   }
 
-  constraints(): Array<(...args: any[]) => any> {
+  constraints(): Array<ScopeBlock> {
     const scopeChain = this.sourceReflection!.constraints();
     if (this.scope) scopeChain.push(this.scope);
     return scopeChain;
@@ -1455,7 +1458,7 @@ export class PolymorphicReflection extends AbstractReflection {
     return this._reflection.klass;
   }
 
-  get scope(): ((...args: any[]) => any) | null {
+  get scope(): ScopeBlock | null {
     return this._reflection.scope;
   }
 
@@ -1485,9 +1488,9 @@ export class PolymorphicReflection extends AbstractReflection {
 
   joinScopes(
     table: Table | Nodes.TableAlias,
-    predicateBuilder?: any,
+    predicateBuilder?: PredicateBuilder,
     klass?: typeof Base,
-    record?: any,
+    record?: Base,
   ): any[] {
     const scopes = super.joinScopes(table, predicateBuilder, klass, record);
     if (!this._previousReflection.isThroughReflection()) {
@@ -1505,12 +1508,12 @@ export class PolymorphicReflection extends AbstractReflection {
     return scopes;
   }
 
-  constraints(): Array<(...args: any[]) => any> {
+  constraints(): Array<ScopeBlock> {
     return [...this._reflection.constraints(), this.sourceTypeScope()];
   }
 
   /** @internal */
-  private sourceTypeScope(): (...args: any[]) => any {
+  private sourceTypeScope(): ScopeBlock {
     const type = this._previousReflection.foreignType;
     const sourceType = this._previousReflection.options.sourceType;
     return function (this: any, object: any) {
@@ -1529,7 +1532,7 @@ export class RuntimeReflection extends AbstractReflection {
     this._association = association;
   }
 
-  get scope(): ((...args: any[]) => any) | null {
+  get scope(): ScopeBlock | null {
     return this._reflection.scope;
   }
 
@@ -1537,7 +1540,7 @@ export class RuntimeReflection extends AbstractReflection {
     return this._reflection.type;
   }
 
-  constraints(): Array<(...args: any[]) => any> {
+  constraints(): Array<ScopeBlock> {
     return this._reflection.constraints();
   }
 
@@ -1574,7 +1577,7 @@ function reflectionClassFor(
   macro: string,
 ): new (
   name: string | null,
-  scope: ((...args: any[]) => any) | null,
+  scope: ScopeBlock | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
 ) => MacroReflection {
@@ -1595,14 +1598,14 @@ function reflectionClassFor(
 export function create(
   macro: Exclude<MacroType, "composedOf">,
   name: string | null,
-  scope: ((...args: any[]) => any) | null,
+  scope: ScopeBlock | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
 ): AssociationReflection | ThroughReflection;
 export function create(
   macro: "composedOf",
   name: string | null,
-  scope: ((...args: any[]) => any) | null,
+  scope: ScopeBlock | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
 ): AggregateReflection;
@@ -1616,7 +1619,7 @@ export function create(
 export function create(
   macro: string,
   name: string | null,
-  scope: ((...args: any[]) => any) | null,
+  scope: ScopeBlock | null,
   options: Record<string, unknown>,
   ar: typeof Base,
 ): MacroReflection | ThroughReflection {
