@@ -16,7 +16,7 @@ let t: Host;
 const render = (record: Message): Promise<unknown> => ApplicationController.render(record);
 
 const urlHelpers = () =>
-  app.routes().urlHelpers() as unknown as Record<string, (o?: object) => string>;
+  app.routes().urlHelpers() as unknown as Record<string, (...args: unknown[]) => string>;
 
 describe("Turbo::StreamsControllerTest", () => {
   beforeAll(async () => {
@@ -51,9 +51,14 @@ describe("Turbo::StreamsControllerTest", () => {
       { id: 5, content: "OLLA!" },
     ])) as unknown as [Message, Message];
 
-    await t.get(urlHelpers().messagePath(message1, { other_message: message5 }), {
-      as: ":turbo_stream",
-    });
+    await t.get(
+      urlHelpers().messagePath(message1, {
+        other_message: message5,
+      }),
+      {
+        as: ":turbo_stream",
+      },
+    );
 
     t.assertDomEqual(
       `<turbo-stream action="remove" target="message_1"></turbo-stream>
