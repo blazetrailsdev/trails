@@ -81,6 +81,7 @@ function readArrayWithoutDim(
   return array;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class Array extends CompositeDecoder {
   decode(string: string | null, tuple: number | null = null, field: number | null = null) {
     if (string == null) return null;

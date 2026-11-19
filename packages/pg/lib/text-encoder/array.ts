@@ -21,6 +21,7 @@ function writeArray(self: Array, value: readonly unknown[], quote: boolean): str
   return `{${out.join(self.delimiter)}}`;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class Array extends CompositeEncoder {
   encode(value: readonly unknown[], encoding?: unknown): string;
   encode(value: unknown, encoding?: unknown): string | null;

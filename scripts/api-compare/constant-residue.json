@@ -1068,16 +1068,25 @@
     }
   },
   "pg": {
-    "rows": 1,
+    "rows": 4,
     "excluded": [
+      "composite-decoder.ts::CompositeDecoder",
+      "composite-encoder.ts::CompositeEncoder",
       "exceptions.ts::ConnectionBad",
       "exceptions.ts::FeatureNotSupported",
       "exceptions.ts::ServerError",
       "exceptions.ts::UnableToSend",
-      "pg.ts::Constants"
+      "pg.ts::Constants",
+      "text-decoder/array.ts::Array",
+      "text-encoder/array.ts::Array"
     ],
     "unwalked": [],
-    "residue": { "exceptions.ts::Error": "PG::Error" }
+    "residue": {
+      "coder.ts::Coder": "PG::Coder",
+      "coder.ts::CompositeCoder": "PG::CompositeCoder",
+      "exceptions.ts::Error": "PG::Error",
+      "result.ts::Result": "PG::Result"
+    }
   },
   "raabro": { "rows": 3, "excluded": [], "unwalked": [], "residue": {} },
   "rack": {
