@@ -164,7 +164,7 @@ describe("AsyncProcessesLifecycleTest", () => {
     await assertCleanTermination();
   });
 
-  // PERMANENT-SKIP: CLAUDE.md § "Runtime facts Node does not expose", `fork`
+  // BLOCKED: solid-queue-fork-mode-unported-register
   it.skip("kill supervisor while there are jobs in-flight", async () => {
     const noPause = await enqueueStoreResultJob("no pause");
     const pause = await enqueueStoreResultJob("pause", "background", { pause: 3 });
@@ -196,7 +196,7 @@ describe("AsyncProcessesLifecycleTest", () => {
     await assertCleanTermination();
   });
 
-  // PERMANENT-SKIP: CLAUDE.md § "Runtime facts Node does not expose", `fork`
+  // BLOCKED: solid-queue-fork-mode-unported-register
   it.skip("quit supervisor while there are jobs in-flight", async () => {
     const noPause = await enqueueStoreResultJob("no pause");
     const pause = await enqueueStoreResultJob("pause", "background", { pause: 60 });
