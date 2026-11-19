@@ -200,6 +200,13 @@ export class File extends IO {
   static readonly SEPARATOR = "/";
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:7848` — `File::NULL`, the null device.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::NULL`.
+   */
+  static readonly NULL = "/dev/null";
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:7433` — `File::ALT_SEPARATOR`, the `'\\'` of
    * `FILE_ALT_SEPARATOR` (`file.c:3303`) where the build is DOSISH, and `nil`
    * everywhere else (`file.c:7435`). The platform answer comes from the

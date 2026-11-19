@@ -5,7 +5,7 @@ import {
   RoutesHelpers,
   type RoutesHelpersControllerClass,
 } from "../../../lib/abstract-controller/trailties/routes-helpers.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { constSet, rbFSend, TopLevel } from "@blazetrails/ruby-compat";
 
 describe("RoutesHelpers.with (trails)", () => {
   it("accepts a real RouteSet with no cast", () => {
@@ -132,7 +132,9 @@ describe("RoutesHelpers.with (trails)", () => {
   it("copies a namespaced module's helpers, which no route set records", () => {
     const cls = class {};
     const wired = cls as unknown as RoutesHelpersControllerClass;
-    wired.trailtieRoutesUrlHelpers = () => ({ enginePath: () => "/engine" });
+    const Blog = { trailtieRoutesUrlHelpers: () => ({ enginePath: () => "/engine" }) };
+    constSet(TopLevel, "Blog", Blog);
+    constSet(Blog, "PostsController", cls);
     RoutesHelpers.with(new RouteSet())(wired);
     expect((new (class extends cls {})() as unknown as { enginePath(): string }).enginePath()).toBe(
       "/engine",

@@ -726,7 +726,7 @@ ${requireStatements.join("\n")}`;
   ): Promise<void> {
     const fullCommand = `"${installCommand}" ${command}`;
     if (this.options.quiet) {
-      await rbFSystem(env, fullCommand, { out: "/dev/null" });
+      await rbFSystem(env, fullCommand, { out: File.NULL });
     } else {
       await rbFSystem(env, fullCommand);
     }

@@ -7,7 +7,9 @@ import {
   isModuleIncluded,
   constSet,
   rbClearMethodCache,
+  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
+import { moduleParents } from "@blazetrails/activesupport";
 
 import { AbstractController } from "../../namespaces.js";
 
@@ -82,12 +84,13 @@ Object.defineProperty(RoutesHelpers, "with", {
           },
         };
       };
-      const namespaceBuilder = findTrailtieUrlHelpers(cls);
-      const urlHelpersModule = (): HelperMethodsModule | ClassModule =>
-        namespaceBuilder
-          ? namespaceBuilder(includePathHelpers)
+      const namespace = moduleParents(cls).find((m) =>
+        rbObjRespondTo(m, "trailtieRoutesUrlHelpers"),
+      ) as RoutesHelpersClassMethods | undefined;
+      const mod =
+        namespace !== undefined
+          ? namespace.trailtieRoutesUrlHelpers!(includePathHelpers)
           : routes.urlHelpers(includePathHelpers);
-      const mod = urlHelpersModule();
       const proto = cls.prototype;
       let earlier = installedMembers.get(proto);
       if (!earlier) installedMembers.set(proto, (earlier = []));
@@ -190,20 +193,6 @@ function includedDescriptors(
     }
   }
   return descriptors;
-}
-
-function findTrailtieUrlHelpers(
-  cls: RoutesHelpersClassMethods,
-): RoutesHelpersClassMethods["trailtieRoutesUrlHelpers"] {
-  let current: object | null = cls;
-  while (current && current !== Function.prototype && current !== Object.prototype) {
-    const own = Object.getOwnPropertyDescriptor(current, "trailtieRoutesUrlHelpers")?.value as
-      | RoutesHelpersClassMethods["trailtieRoutesUrlHelpers"]
-      | undefined;
-    if (typeof own === "function") return own;
-    current = Object.getPrototypeOf(current);
-  }
-  return undefined;
 }
 
 export const Trailties = { RoutesHelpers };
