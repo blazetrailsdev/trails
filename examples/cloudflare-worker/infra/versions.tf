@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.9"
   required_providers {
     cloudflare = { source = "cloudflare/cloudflare", version = "~> 5.0" }
     neon       = { source = "kislerdm/neon", version = "~> 0.18" }
@@ -8,5 +8,5 @@ terraform {
 
 provider "cloudflare" {}
 
-# Reads NEON_API_KEY. Unused when `database_url` is set.
+# Reads NEON_API_KEY. Unused when `database` is set.
 provider "neon" {}

@@ -9,16 +9,27 @@ variable "name" {
 }
 
 variable "postgres" {
-  description = "Create a Neon Postgres project. Ignored when `database_url` is set."
+  description = "Create a Neon Postgres project. Ignored when `database` is set."
   type        = bool
   default     = true
 }
 
-variable "database_url" {
-  description = "An existing Postgres URL (postgres://user:password@host:5432/db) instead of a new Neon project."
-  type        = string
-  default     = null
-  sensitive   = true
+variable "database" {
+  description = "An existing Postgres database instead of a new Neon project."
+  type = object({
+    host     = string
+    port     = optional(number, 5432)
+    database = string
+    user     = string
+    password = string
+  })
+  default   = null
+  sensitive = true
+
+  validation {
+    condition     = var.database != null || var.postgres
+    error_message = "Set database, or postgres = true to create a Neon project."
+  }
 }
 
 variable "neon_region" {

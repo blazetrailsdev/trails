@@ -2,7 +2,10 @@ import { Base } from "@blazetrails/activerecord";
 import "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
-import { requestToRackEnvWithBody, rackResponseToFetchResponse } from "./rack-bridge.ts";
+import {
+  requestToRackEnvWithBody,
+  rackResponseToFetchResponse,
+} from "../../serverless-lambda/serverless/rack-bridge.ts";
 
 interface Env {
   HYPERDRIVE: { connectionString: string };
@@ -10,11 +13,15 @@ interface Env {
 
 let booted: Promise<typeof Trails.application> | undefined;
 function boot(env: Env) {
-  return (booted ??= (async () => {
+  booted ??= (async () => {
     setEnv("DATABASE_URL", env.HYPERDRIVE.connectionString);
     await import("../.trails/entry.generated.js");
     return Trails.application;
-  })());
+  })().catch((e: unknown) => {
+    booted = undefined;
+    throw e;
+  });
+  return booted;
 }
 
 export default {

@@ -17,20 +17,20 @@ pnpm run deploy   # posts table (db/setup.ts), views + `trails build` + esbuild 
 
 ## Infrastructure (`infra/`)
 
-Terraform creates the Hyperdrive config and, unless `database_url` is set, a Neon Postgres project.
+Terraform creates the Hyperdrive config and, unless `database` is set, a Neon Postgres project.
 `pnpm run deploy` (`scripts/deploy.sh`) reads its outputs, creates the `posts` table (`db/setup.ts`, through the trails PostgreSQL adapter), writes
 `wrangler.deploy.jsonc` with the Hyperdrive id, and uploads the script with `wrangler deploy`, which also
 enables its `workers.dev` subdomain. The script is the build's output, so wrangler and not Terraform
 uploads it.
 
-| Variable       | Default                    |                                                       |
-| -------------- | -------------------------- | ----------------------------------------------------- |
-| `account_id`   | (required)                 | the Cloudflare account                                |
-| `name`         | `trails-cloudflare-worker` | Hyperdrive config and Neon project name               |
-| `postgres`     | `true`                     | create a Neon project                                 |
-| `database_url` | `null`                     | an existing Postgres URL instead of a Neon project    |
-| `neon_region`  | `aws-us-east-2`            |                                                       |
-| `neon_org_id`  | `null`                     | the Neon organization; a new Neon account requires it |
+| Variable      | Default                    |                                                                                                 |
+| ------------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
+| `account_id`  | (required)                 | the Cloudflare account                                                                          |
+| `name`        | `trails-cloudflare-worker` | Hyperdrive config and Neon project name                                                         |
+| `postgres`    | `true`                     | create a Neon project                                                                           |
+| `database`    | `null`                     | an existing database (`host`, `port`, `database`, `user`, `password`) instead of a Neon project |
+| `neon_region` | `aws-us-east-2`            |                                                                                                 |
+| `neon_org_id` | `null`                     | the Neon organization; a new Neon account requires it                                           |
 
 A new Cloudflare account registers its `workers.dev` subdomain once (Workers & Pages → Subdomain) before the
 first `wrangler deploy`. Hyperdrive's query cache is disabled (`caching.disabled`): it serves a cached
