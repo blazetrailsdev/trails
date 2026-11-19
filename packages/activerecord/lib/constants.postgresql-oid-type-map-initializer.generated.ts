@@ -3,7 +3,8 @@ import * as m0 from "./connection-adapters/postgresql/oid/type-map-initializer.j
 
 defineConstants([
   [
-    () => m0.TypeMapInitializer,
+    m0,
+    "TypeMapInitializer",
     "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::TypeMapInitializer",
   ],
 ]);

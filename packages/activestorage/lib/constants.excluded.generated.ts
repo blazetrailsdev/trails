@@ -3,14 +3,16 @@ import * as m0 from "./transformers/image-processing-transformer.js";
 import * as m1 from "./transformers/transformer.js";
 
 defineConstants([
-  [() => m0.ImageProcessingTransformer, "ActiveStorage::Transformers::ImageProcessingTransformer"],
+  [m0, "ImageProcessingTransformer", "ActiveStorage::Transformers::ImageProcessingTransformer"],
   [
-    () => m0.UnsupportedImageProcessingArgument,
+    m0,
+    "UnsupportedImageProcessingArgument",
     "ActiveStorage::Transformers::ImageProcessingTransformer::UnsupportedImageProcessingArgument",
   ],
   [
-    () => m0.UnsupportedImageProcessingMethod,
+    m0,
+    "UnsupportedImageProcessingMethod",
     "ActiveStorage::Transformers::ImageProcessingTransformer::UnsupportedImageProcessingMethod",
   ],
-  [() => m1.Transformer, "ActiveStorage::Transformers::Transformer"],
+  [m1, "Transformer", "ActiveStorage::Transformers::Transformer"],
 ]);

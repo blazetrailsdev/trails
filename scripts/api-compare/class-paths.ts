@@ -510,7 +510,7 @@ export function renderClassPaths(entries: readonly ClassPathEntry[], entry?: str
     "defineConstants([",
     ...sorted.map(
       (e) =>
-        `  [() => ${alias.get(e.file)}${e.namespace ? "" : `.${e.tsName}`}, ${JSON.stringify(e.fqn)}],`,
+        `  [${alias.get(e.file)}, ${e.namespace ? "null" : JSON.stringify(e.tsName)}, ${JSON.stringify(e.fqn)}],`,
     ),
     "]);",
     "",

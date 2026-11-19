@@ -13,16 +13,16 @@ import * as m10 from "./missing-executable-error.js";
 import * as m11 from "./runner.js";
 
 defineConstants([
-  [() => m0.Build, "ViteAssets::Build"],
-  [() => m1.Builder, "ViteAssets::Builder"],
-  [() => m2.Commands, "ViteAssets::Commands"],
-  [() => m3.CompatibilityCheck, "ViteAssets::CompatibilityCheck"],
-  [() => m4.Config, "ViteAssets::Config"],
-  [() => m5.DevServerProxy, "ViteAssets::DevServerProxy"],
-  [() => m6.Error, "ViteAssets::Error"],
-  [() => m7.IO, "ViteAssets::IO"],
-  [() => m8.Manifest, "ViteAssets::Manifest"],
-  [() => m9.MissingEntrypointError, "ViteAssets::MissingEntrypointError"],
-  [() => m10.MissingExecutableError, "ViteAssets::MissingExecutableError"],
-  [() => m11.Runner, "ViteAssets::Runner"],
+  [m0, "Build", "ViteAssets::Build"],
+  [m1, "Builder", "ViteAssets::Builder"],
+  [m2, "Commands", "ViteAssets::Commands"],
+  [m3, "CompatibilityCheck", "ViteAssets::CompatibilityCheck"],
+  [m4, "Config", "ViteAssets::Config"],
+  [m5, "DevServerProxy", "ViteAssets::DevServerProxy"],
+  [m6, "Error", "ViteAssets::Error"],
+  [m7, "IO", "ViteAssets::IO"],
+  [m8, "Manifest", "ViteAssets::Manifest"],
+  [m9, "MissingEntrypointError", "ViteAssets::MissingEntrypointError"],
+  [m10, "MissingExecutableError", "ViteAssets::MissingExecutableError"],
+  [m11, "Runner", "ViteAssets::Runner"],
 ]);
