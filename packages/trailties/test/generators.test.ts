@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import { File, LOAD_PATH } from "@blazetrails/ruby-compat";
@@ -15,12 +15,23 @@ const FIXTURES = decodeURIComponent(new URL("./fixtures", import.meta.url).pathn
 
 class GeneratorsTestApp extends Application {}
 
+const originalApplication = Trails.application;
+const originalTemplatesPath = [...Generators.templatesPath()];
+let fixturesLib: string;
+
 beforeAll(async () => {
   Trails.application = GeneratorsTestApp.instance();
   Trails.application.config.setRoot(FIXTURES);
   Generators.templatesPath().push(File.join(FIXTURES, "lib", "templates"));
-  LOAD_PATH.unshift(File.join(Trails.root()!, "lib"));
+  fixturesLib = File.join(Trails.root()!, "lib");
+  LOAD_PATH.unshift(fixturesLib);
   await Generators.lookupBang();
+});
+
+afterAll(() => {
+  LOAD_PATH.splice(LOAD_PATH.indexOf(fixturesLib), 1);
+  Generators.templatesPath().splice(0, Infinity, ...originalTemplatesPath);
+  Trails.application = originalApplication;
 });
 
 async function help(): Promise<string> {

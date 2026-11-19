@@ -15,10 +15,22 @@ export class TestCommand extends Base {
     klass.desc("test [PATHS...]", "Run tests except system tests");
     klass.methodAdded("perform");
 
-    for (const name of Runner.TEST_FOLDERS) {
-      klass.desc(name, `Run tests in test/${name}`);
-      klass.methodAdded(name);
-    }
+    klass.desc("models", "Run tests in test/models");
+    klass.methodAdded("models");
+    klass.desc("helpers", "Run tests in test/helpers");
+    klass.methodAdded("helpers");
+    klass.desc("channels", "Run tests in test/channels");
+    klass.methodAdded("channels");
+    klass.desc("controllers", "Run tests in test/controllers");
+    klass.methodAdded("controllers");
+    klass.desc("mailers", "Run tests in test/mailers");
+    klass.methodAdded("mailers");
+    klass.desc("integration", "Run tests in test/integration");
+    klass.methodAdded("integration");
+    klass.desc("jobs", "Run tests in test/jobs");
+    klass.methodAdded("jobs");
+    klass.desc("mailboxes", "Run tests in test/mailboxes");
+    klass.methodAdded("mailboxes");
 
     klass.desc("all", "Run all tests, including system tests");
     klass.methodAdded("all");
@@ -30,14 +42,6 @@ export class TestCommand extends Base {
     klass.methodAdded("system");
     klass.desc("generators", "Run tests in test/lib/generators");
     klass.methodAdded("generators");
-    this.methodAdded("models");
-    this.methodAdded("helpers");
-    this.methodAdded("channels");
-    this.methodAdded("controllers");
-    this.methodAdded("mailers");
-    this.methodAdded("integration");
-    this.methodAdded("jobs");
-    this.methodAdded("mailboxes");
   }
 
   static executable(...args: [string?]): string {
