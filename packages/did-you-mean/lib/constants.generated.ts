@@ -7,11 +7,11 @@ import * as m4 from "./spell-checker.js";
 import * as m5 from "./spell-checkers/null-checker.js";
 
 defineConstants([
-  [() => m0.DeprecatedMapping, "DidYouMean::DeprecatedMapping"],
-  [() => m1.Formatter, "DidYouMean::Formatter"],
-  [() => m2.Jaro, "DidYouMean::Jaro"],
-  [() => m2.JaroWinkler, "DidYouMean::JaroWinkler"],
-  [() => m3.Levenshtein, "DidYouMean::Levenshtein"],
-  [() => m5.NullChecker, "DidYouMean::NullChecker"],
-  [() => m4.SpellChecker, "DidYouMean::SpellChecker"],
+  [m0, "DeprecatedMapping", "DidYouMean::DeprecatedMapping"],
+  [m1, "Formatter", "DidYouMean::Formatter"],
+  [m2, "Jaro", "DidYouMean::Jaro"],
+  [m2, "JaroWinkler", "DidYouMean::JaroWinkler"],
+  [m3, "Levenshtein", "DidYouMean::Levenshtein"],
+  [m5, "NullChecker", "DidYouMean::NullChecker"],
+  [m4, "SpellChecker", "DidYouMean::SpellChecker"],
 ]);

@@ -15,6 +15,17 @@ describe("rbModName over the generated class-path table", () => {
     expect(rbPathToClass("Outer::Inner::Generated")).toBe(Generated);
   });
 
+  it("answers a generated namespace-member row, and the namespace itself", () => {
+    class Member {}
+    const namespace = { Member };
+    defineConstants([
+      [namespace, "Member", "RowNamespace::Member"],
+      [namespace, null, "RowNamespace"],
+    ]);
+    expect(rbModName(Member)).toBe("RowNamespace::Member");
+    expect(rbPathToClass("RowNamespace")).toBe(namespace);
+  });
+
   it("constGet resolves a generated row, and a row in TDZ misses", () => {
     class Outer {}
     class Resolved {}

@@ -3,6 +3,6 @@ import * as m0 from "./magic.js";
 import * as m1 from "./mime-type.js";
 
 defineConstants([
-  [() => m0.Magic, "Marcel::Magic"],
-  [() => m1.MimeType, "Marcel::MimeType"],
+  [m0, "Magic", "Marcel::Magic"],
+  [m1, "MimeType", "Marcel::MimeType"],
 ]);

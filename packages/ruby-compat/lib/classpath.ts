@@ -32,12 +32,21 @@ const tableClasses = new Map<string, () => unknown>();
  *
  * @noRailsEquivalent PERMANENT
  */
-export function defineConstants(entries: readonly [() => unknown, string][]): void {
-  for (const [klass, path] of entries) {
+export function defineConstants(
+  entries: readonly ([() => unknown, string] | [object, string | null, string])[],
+): void {
+  for (const row of entries) {
+    const path = row.length === 2 ? row[1] : row[2];
+    const klass = row.length === 2 ? row[0] : _readConstantsRow(row[0], row[1]);
     pendingClassPaths.push([klass, path]);
     classPathsRegistered = true;
     tableClasses.set(path, klass);
   }
+}
+
+/** @perf 10ms — PERMANENT */
+function _readConstantsRow(namespace: object, name: string | null): () => unknown {
+  return name === null ? () => namespace : () => (namespace as Record<string, unknown>)[name];
 }
 
 /**
