@@ -7,6 +7,8 @@ import { File, constDefined } from "@blazetrails/ruby-compat";
 import { Turbo } from "./turbo-trails.js";
 import type { TestAssertions } from "./test-assertions.js";
 import type { IntegrationTestAssertions } from "./test-assertions/integration-test-assertions.js";
+import type { IdentityEncoder } from "@blazetrails/actionpack/testing";
+import type { SystemTestHelper } from "./system-test-helper.js";
 import type { TestHelper as BroadcastableTestHelper } from "./broadcastable/test-helper.js";
 import "./app/channels/turbo/streams-channel.js";
 import "./app/jobs/turbo/streams/action-broadcast-job.js";
@@ -25,6 +27,13 @@ import "./app/controllers/turbo/native/navigation-controller.js";
 import { ImmediateDebouncer } from "./app/models/turbo/immediate-debouncer.js";
 import { ThreadDebouncer } from "./app/models/turbo/thread-debouncer.js";
 import { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
+
+declare module "@blazetrails/actionpack/testing" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace RequestEncoder {
+    let TurboStreamEncoder: typeof IdentityEncoder | undefined;
+  }
+}
 
 export interface TurboConfig extends OrderedOptions {
   testConnectAfterActions?: string[];
@@ -202,6 +211,50 @@ export class Engine extends TrailsEngine {
           : null;
       onLoad("action_dispatch_integration_test", function (this: object) {
         if (integrationTestAssertions !== null) include(this, integrationTestAssertions);
+      });
+    });
+
+    this.initializer("turbo.integration_test_request_encoding", () => {
+      onLoad("action_dispatch_integration_test", () => {
+        const RequestEncoder = ActionDispatch.RequestEncoder!;
+        const header = [Mime.get("turbo_stream"), Mime.get("html")].join(",");
+        class TurboStreamEncoder extends RequestEncoder.IdentityEncoder {
+          override get acceptHeader(): string {
+            return header;
+          }
+        }
+        RequestEncoder.TurboStreamEncoder = TurboStreamEncoder;
+
+        RequestEncoder.encoders.set(":turbo_stream", new TurboStreamEncoder());
+      });
+    });
+
+    /** @inventedArm await — PERMANENT */
+    this.initializer("turbo.system_test_helper", async () => {
+      const { SystemTestHelper: systemTestHelper } = (await Turbo.loadPath[
+        "turbo/system_test_helper"
+      ]()) as { SystemTestHelper: typeof SystemTestHelper };
+      onLoad("action_dispatch_system_test_case", function (this: object) {
+        include(this, systemTestHelper);
+      });
+    });
+
+    this.config.afterInitialize((app) => {
+      onLoad("action_dispatch_system_test_case", function (this: { prototype: object }) {
+        for (const method of app.config.turbo.testConnectAfterActions as string[]) {
+          const prototype = this.prototype as Record<string, unknown>;
+          const superMethod = prototype[method] as
+            | ((this: unknown, ...args: unknown[]) => unknown)
+            | undefined;
+          prototype[method] = async function (
+            this: { connectTurboCableStreamSources(): Promise<void> },
+            ...args: unknown[]
+          ) {
+            const result = await superMethod!.apply(this, args);
+            await this.connectTurboCableStreamSources();
+            return result;
+          };
+        }
       });
     });
   }

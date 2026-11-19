@@ -30,6 +30,7 @@ import type { NavigationController } from "./app/controllers/turbo/native/naviga
 import type { RequestIdTracking } from "./app/controllers/concerns/turbo/request-id-tracking.js";
 import type { Broadcastable } from "./app/models/concerns/turbo/broadcastable.js";
 import type { TagBuilder } from "./app/models/turbo/streams/tag-builder.js";
+import type { SystemTestHelper } from "./system-test-helper.js";
 import type { Tasks } from "./tasks/turbo-tasks.js";
 import type { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
 
@@ -41,6 +42,7 @@ export const Turbo = {
   loadPath: {
     "turbo/test_assertions": () => import("@blazetrails/turbo/test-assertions"),
     "turbo/broadcastable/test_helper": () => import("@blazetrails/turbo/broadcastable/test-helper"),
+    "turbo/system_test_helper": () => import("@blazetrails/turbo/system-test-helper"),
     "turbo/test_assertions/integration_test_assertions": () =>
       import("@blazetrails/turbo/test-assertions/integration-test-assertions"),
   } as Record<string, () => Promise<unknown>>,
@@ -92,6 +94,7 @@ export const Turbo = {
   /** @internal */
   _signedStreamVerifierKey?: string | Uint8Array | null;
   Engine?: typeof Engine;
+  SystemTestHelper?: typeof SystemTestHelper;
   DriveHelper?: typeof DriveHelper;
   FramesHelper?: typeof FramesHelper;
   IncludesHelper?: typeof IncludesHelper;

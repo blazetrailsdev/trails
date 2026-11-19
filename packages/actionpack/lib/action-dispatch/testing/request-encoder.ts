@@ -6,6 +6,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Testing } from "@blazetrails/actionview/rails-dom-testing/testing";
 import { Mime, MimeType } from "../http/mime-type.js";
+import { ActionDispatch } from "../../namespaces.js";
 
 export type ResponseParser = (body: string) => unknown;
 export type ParamEncoder = (params: unknown) => unknown;
@@ -27,7 +28,9 @@ export class IdentityEncoder {
 }
 
 export class RequestEncoder {
-  private static encoders: Map<string, RequestEncoder | IdentityEncoder> = new Map([
+  static IdentityEncoder = IdentityEncoder;
+  /** @internal */
+  static encoders: Map<string, RequestEncoder | IdentityEncoder> = new Map([
     [":identity", new IdentityEncoder()],
   ]);
 
@@ -101,3 +104,5 @@ RequestEncoder.registerEncoder(":html", {
 RequestEncoder.registerEncoder(":json", {
   responseParser: (body) => JSON.parse(body, { objectClass: HashWithIndifferentAccess }),
 });
+
+ActionDispatch.RequestEncoder = RequestEncoder;
