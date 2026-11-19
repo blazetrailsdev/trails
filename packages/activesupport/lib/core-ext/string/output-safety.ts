@@ -432,11 +432,10 @@ for (const unsafeMethod of SafeBuffer.UNSAFE_STRING_METHODS) {
         configurable: true,
       },
       [`${name}Bang`]: {
-        value(this: SafeBuffer, ...args: unknown[]): SafeBuffer | null {
-          const self = this as unknown as { _htmlSafe: boolean; _value: string };
-          self._htmlSafe = false;
-          const [result, string] = rbStrSend(self._value, `${name}Bang`, ...args);
-          self._value = string;
+        value(this: { _htmlSafe: boolean; _value: string }, ...args: unknown[]): unknown {
+          this._htmlSafe = false;
+          const [result, string] = rbStrSend(this._value, `${name}Bang`, ...args);
+          this._value = string;
           return result == null ? null : this;
         },
         writable: true,
