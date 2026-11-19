@@ -14,7 +14,7 @@
  * while the importing module body runs: an `extends` clause, a static field
  * initializer or static block, a decorator, a computed member name, or any
  * top-level expression. Assigning a namespace object (`Seat.X = XModule`),
- * or placing it in an array literal (a generated `defineConstants` row),
+ * or placing it in a generated `defineConstants` row,
  * reads no binding, since ESM creates it before any module body runs, and is
  * not counted; nor is a read of a module's own namespace placed after its last
  * runtime declaration, when every member it declares is initialized; such a
@@ -439,12 +439,18 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
       )
       .map((s) => s.end),
   );
+  const isDefineConstantsRow = (row: ts.Node) =>
+    ts.isArrayLiteralExpression(row) &&
+    ts.isArrayLiteralExpression(row.parent) &&
+    ts.isCallExpression(row.parent.parent) &&
+    ts.isIdentifier(row.parent.parent.expression) &&
+    row.parent.parent.expression.text === "defineConstants";
   const isNamespaceAssignment = (name: string, node: ts.Node) =>
     namespaces.has(name) &&
     ((ts.isBinaryExpression(node.parent) &&
       node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
       node.parent.right === node) ||
-      ts.isArrayLiteralExpression(node.parent));
+      isDefineConstantsRow(node.parent));
   const isTrailingOwnNamespace = (name: string, node: ts.Node) =>
     locals.get(name) === file &&
     namespaces.has(name) &&
