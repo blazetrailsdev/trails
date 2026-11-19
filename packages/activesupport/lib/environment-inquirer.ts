@@ -7,9 +7,7 @@ export const DEFAULT_ENVIRONMENTS = ["development", "test", "production"];
 export const LOCAL_ENVIRONMENTS = ["development", "test"];
 
 export class EnvironmentInquirer extends StringInquirer {
-  #development: boolean;
-  #test: boolean;
-  #production: boolean;
+  #defaults: Record<string, boolean> = {};
   #local: boolean;
 
   constructor(env: string) {
@@ -17,23 +15,23 @@ export class EnvironmentInquirer extends StringInquirer {
 
     super(env);
 
-    this.#development = env === "development";
-    this.#test = env === "test";
-    this.#production = env === "production";
+    for (const defaultEnv of DEFAULT_ENVIRONMENTS) {
+      this.#defaults[defaultEnv] = env === defaultEnv;
+    }
 
     this.#local = isIn(env, LOCAL_ENVIRONMENTS);
   }
 
   isDevelopment(): boolean {
-    return this.#development;
+    return this.#defaults["development"];
   }
 
   isTest(): boolean {
-    return this.#test;
+    return this.#defaults["test"];
   }
 
   isProduction(): boolean {
-    return this.#production;
+    return this.#defaults["production"];
   }
 
   isLocal(): boolean {

@@ -23,6 +23,10 @@ export class NullStore extends Store implements CacheStore {
 
   override async deleteMatched(_matcher: string | RegExp, _options?: CacheOptions): Promise<void> {}
 
+  inspect(): string {
+    return `#<${rbModName(this.constructor)} options=${inspectOptions(this.options as Record<string, unknown>)}>`;
+  }
+
   protected async readEntry(key: string, _options: Record<string, unknown>): Promise<Entry | null> {
     return this.deserializeEntry(await this.readSerializedEntry(key));
   }
@@ -45,10 +49,6 @@ export class NullStore extends Store implements CacheStore {
 
   protected async deleteEntry(_key: string, _options: Record<string, unknown>): Promise<boolean> {
     return false;
-  }
-
-  inspect(): string {
-    return `#<${rbModName(this.constructor)} options=${inspectOptions(this.options as Record<string, unknown>)}>`;
   }
 }
 
