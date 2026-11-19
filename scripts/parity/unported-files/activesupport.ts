@@ -245,7 +245,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "The first declares `class_attribute` inside a class's own singleton " +
       "class (`class << self`), whose lookup chain is what core_ext/class/attribute.rb:86-120 " +
-      "walks; the third asserts `singleton_class.prepend` wraps the generated reader and " +
+      "walks; the second asserts `singleton_class.prepend` wraps the generated reader and " +
       "writer. A JS class has no metaclass apart from its own statics and no " +
       "`Module#prepend`, so there is no receiver for either shape.",
   },

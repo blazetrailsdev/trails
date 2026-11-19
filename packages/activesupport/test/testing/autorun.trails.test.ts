@@ -195,9 +195,10 @@ describe("autorun locates the test method (tests_without_assertions.rb:13)", () 
 
   it("makes no assertions", () => {});
 
-  it("prints the test's own line in the missing-assertions warning", () => {
+  it("prints the test's own line in the missing-assertions warning", (context) => {
+    const subject = context.task.suite!.tasks.find((t) => t.name === "makes no assertions")!;
     const err = warn.mock.calls.map((c) => String(c[0])).join("\n");
     const line = err.match(/`test_makes_no_assertions` .+autorun\.trails\.test\.ts:(\d+)/)?.[1];
-    expect(Number(line)).toBeGreaterThan(0);
+    expect(Number(line)).toBe(subject.location!.line);
   });
 });
