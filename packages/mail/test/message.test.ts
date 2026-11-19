@@ -288,6 +288,9 @@ describe("Mail::Message", () => {
       };
 
       beforeEach(() => {
+        const time = DateTime.now();
+        vi.spyOn(DateTime, "now").mockReturnValue(time);
+
         yamlMail = new Message({
           to: "someone@somewhere.com",
           cc: "someoneelse@somewhere.com",
@@ -296,6 +299,10 @@ describe("Mail::Message", () => {
           subject: "subject",
         });
         yamlMail.deliveryMethod("smtp", smtpSettings);
+      });
+
+      afterEach(() => {
+        vi.restoreAllMocks();
       });
 
       it("should serialize the basic information to YAML", () => {
