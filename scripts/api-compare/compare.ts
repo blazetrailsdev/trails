@@ -1312,9 +1312,6 @@ export function reorderedCalls(
   };
   const flagged = reordered((name) => tsCalls.indexOf(name));
   if (flagged === undefined) return [];
-  // A plain-object `merge` ports as `{ ...h, ...other }` (CLAUDE.md's native
-  // Hash table), so a body may hold Ruby's `merge` at the spread's position
-  // while a later `.merge(...)` call carries the name.
   if (rubyCalls.includes("merge") && tsCalls.includes(NATIVE_SPREAD)) {
     const spreadAt = tsCalls.indexOf(NATIVE_SPREAD);
     if (reordered((name) => (name === "merge" ? spreadAt : tsCalls.indexOf(name))) === undefined)
