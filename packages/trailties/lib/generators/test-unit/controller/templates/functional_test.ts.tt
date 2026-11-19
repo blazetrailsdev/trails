@@ -21,7 +21,7 @@ describe("<%= this.className() %>ControllerTest", () => {
   // });
 <% } else { -%>
 <% for (const action of this.actions) { -%>
-  it("should get <%= action %>", async ({ testCase: t }) => {
+  it<{ testCase: <%= this.className().split("::").pop() %>ControllerTest }>("should get <%= action %>", async ({ testCase: t }) => {
     await t.get(t.<%= ActiveSupport.Inflector.camelize(`${this.urlHelperPrefix()}_${action}_url`, "lower") %>());
     t.assertResponse(":success");
   });

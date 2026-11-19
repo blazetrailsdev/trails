@@ -170,7 +170,7 @@ export class Generators {
     };
     for (const dir of LOAD_PATH) {
       for (const base of Generators.lookupPaths()) {
-        const root = File.join(dir, base, "trails");
+        const root = File.join(dir, base);
         if (File.isDirectory(root)) await walk(dir, base, root);
       }
     }

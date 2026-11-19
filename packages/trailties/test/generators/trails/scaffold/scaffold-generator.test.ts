@@ -203,7 +203,7 @@ describe("ScaffoldGeneratorTest", () => {
 
     await t.assertFile("test/controllers/product-lines-controller.test.ts", (content) => {
       expect(content).toMatch(/class ProductLinesControllerTest extends IntegrationTest/);
-      expect(content).toMatch(/it\("should get index"/);
+      expect(content).toMatch(/it(?:<[^>]*>)?\("should get index"/);
       expect(content).toMatch(
         /t\.post\(t\.productLinesUrl\(\), \{ params: \{ product_line: \{\} \}/,
       );

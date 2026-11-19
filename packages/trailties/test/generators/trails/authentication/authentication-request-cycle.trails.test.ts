@@ -65,11 +65,24 @@ describe("AuthenticationGenerator in a generated app", () => {
       ).invokeAll();
       const app = path.join(root, "my-app");
       fs.mkdirSync(path.join(app, "node_modules/@blazetrails"), { recursive: true });
-      fs.symlinkSync(
-        path.resolve(PACKAGE_DIR, "../bcrypt"),
-        path.join(app, "node_modules/@blazetrails/bcrypt"),
-      );
-      await new AuthenticationGenerator([], {}, { destinationRoot: app }).invokeAll();
+      const { dependencies } = JSON.parse(fs.readFileSync(path.join(app, "package.json"), "utf8"));
+      for (const name of [...Object.keys(dependencies), "@blazetrails/bcrypt"]) {
+        if (!name.startsWith("@blazetrails/")) continue;
+        fs.symlinkSync(
+          path.resolve(PACKAGE_DIR, "..", name.slice("@blazetrails/".length)),
+          path.join(app, "node_modules", name),
+        );
+      }
+      const generator = new AuthenticationGenerator([], {}, { destinationRoot: app });
+      const executeCommand = generator.executeCommand.bind(generator);
+      generator.executeCommand = async (executor, command, ...rest) => {
+        if (command !== "add @blazetrails/bcrypt")
+          return executeCommand(executor, command, ...rest);
+        const manifest = JSON.parse(fs.readFileSync(path.join(app, "package.json"), "utf8"));
+        manifest.dependencies["@blazetrails/bcrypt"] = "*";
+        fs.writeFileSync(path.join(app, "package.json"), JSON.stringify(manifest, null, 2));
+      };
+      await generator.invokeAll();
       fs.writeFileSync(path.join(app, "request-cycle.ts"), REQUEST_CYCLE);
 
       const node = (args: string[]) =>

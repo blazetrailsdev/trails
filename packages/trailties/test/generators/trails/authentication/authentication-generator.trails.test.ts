@@ -85,10 +85,14 @@ describe("AuthenticationGenerator", () => {
 
 describe("AuthenticationGenerator enable_bcrypt", () => {
   it("adds the bcrypt gem port and requires it from config/application.ts", async () => {
+    const commands: string[] = [];
     registerChildProcessAdapter("trailties-auth-bcrypt-test", {
       spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
       system: async () => ({ pid: 1, status: 0, signal: null }),
-      capture2e: async () => ["", { pid: 1, status: 0, signal: null }],
+      capture2e: async (...args: unknown[]) => {
+        commands.push(args.flat().join(" "));
+        return ["", { pid: 1, status: 0, signal: null }];
+      },
     });
     childProcessAdapterConfig.adapter = "trailties-auth-bcrypt-test";
     const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-bcrypt-"));
@@ -105,8 +109,9 @@ describe("AuthenticationGenerator enable_bcrypt", () => {
       await new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
 
       expect(fs.readFileSync(path.join(appDir, "config/application.ts"), "utf-8")).toBe(
-        `import { Application } from "@blazetrails/trailties";\n\nimport "@blazetrails/trailties/all";\nimport "@blazetrails/bcrypt";\n`,
+        files["config/application.ts"],
       );
+      expect(commands.some((c) => c.includes("add @blazetrails/bcrypt"))).toBe(true);
     } finally {
       fs.rmSync(appDir, { recursive: true, force: true });
     }

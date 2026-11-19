@@ -22,7 +22,7 @@ beforeAll(async () => {
 async function generatorDirectories(): Promise<string[]> {
   const fs = getFs();
   const path = getPath();
-  const root = decodeURIComponent(new URL("../lib/generators/trails/", import.meta.url).pathname);
+  const root = decodeURIComponent(new URL("../lib/generators/", import.meta.url).pathname);
   const out: string[] = [];
   const walk = async (dir: string, namespace: string[]): Promise<void> => {
     const entries = (await fs.readdir!(dir)).sort();
@@ -44,7 +44,7 @@ Trails.application = GeneratorsCommandTestApp.instance();
 describe("GeneratorsTest", () => {
   it("lookup finds a generator for every generator directory", async () => {
     const namespaces = (await Generators.publicNamespaces()).sort();
-    const expected = (await generatorDirectories()).map((d) => `trails:${d}`).sort();
+    const expected = (await generatorDirectories()).sort();
     expect(namespaces).toEqual(expected);
   });
 
@@ -66,9 +66,7 @@ describe("GeneratorsTest", () => {
 
   it("every generator directory is reachable as a trails generate subcommand", async () => {
     for (const dir of await generatorDirectories()) {
-      expect((await Generators.findByNamespace(`trails:${dir}`))?.namespace()).toEqual(
-        `trails:${dir}`,
-      );
+      expect((await Generators.findByNamespace(dir))?.namespace()).toEqual(dir);
     }
   });
 

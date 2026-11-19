@@ -854,7 +854,7 @@ describe("AppGenerator", () => {
     await t.runGenerator([File.join(t.destinationRoot, "my-app")]);
 
     await t.assertFile("my-app/config/application.ts", (appConfig: string) => {
-      expect(appConfig).toContain(`import { Application } from "@blazetrails/trailties";`);
+      expect(appConfig).toContain(`import { Application, Trails } from "@blazetrails/trailties";`);
       expect(appConfig).toContain("export class MyApp extends Application {");
       expect(appConfig).toContain("Application.register(this, import.meta.dirname);");
     });

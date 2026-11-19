@@ -139,15 +139,15 @@ describe("ScaffoldGenerator (type-check)", () => {
       fs.writeFileSync(
         path.join(appDir, "db/schema.ts"),
         [
-          'import type { DatabaseAdapter } from "@blazetrails/activerecord";',
-          "export default async function defineSchema(ctx: DatabaseAdapter) {",
+          'import { Schema } from "@blazetrails/activerecord";',
+          "await Schema.get(8).define(async (ctx) => {",
           '  await ctx.createTable("posts", { force: "cascade" }, (t) => {',
           '    t.string("title");',
           '    t.text("body");',
           '    t.datetime("created_at", { null: false });',
           '    t.datetime("updated_at", { null: false });',
           "  });",
-          "}",
+          "});",
         ].join("\n"),
       );
       fs.writeFileSync(
@@ -184,7 +184,7 @@ describe("ScaffoldGenerator (type-check)", () => {
       fs.writeFileSync(
         path.join(appDir, "config/integration-test-helpers.ts"),
         [
-          'import type { IntegrationTest } from "@blazetrails/actionpack";',
+          'import type { IntegrationTest } from "@blazetrails/actionpack/testing";',
           "export function urls(t: IntegrationTest): string[] {",
           "  return [t.postsUrl(), t.newPostUrl(), t.rootUrl(), t.adminPostPath(1)];",
           "}",

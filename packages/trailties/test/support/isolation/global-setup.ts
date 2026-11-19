@@ -37,4 +37,16 @@ export default async function setup(): Promise<void> {
     File.join(TRAILS_FRAMEWORK_ROOT, "packages/trailties/node_modules"),
     File.join(TRAILS_FRAMEWORK_ROOT, "tmp/node_modules"),
   );
+
+  const manifest = JSON.parse(await File.readAsync(File.join(appTemplatePath, "package.json"))) as {
+    dependencies?: object;
+  };
+  await FileUtils.mkdirPAsync(File.join(appTemplatePath, "node_modules/@blazetrails"));
+  for (const name of Object.keys(manifest.dependencies ?? {})) {
+    if (!name.startsWith("@blazetrails/")) continue;
+    await FileUtils.lnSfAsync(
+      File.join(TRAILS_FRAMEWORK_ROOT, "packages", name.slice("@blazetrails/".length)),
+      File.join(appTemplatePath, "node_modules", name),
+    );
+  }
 }
