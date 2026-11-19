@@ -1,4 +1,7 @@
 <script>
+  import "@fontsource-variable/bricolage-grotesque";
+  import "@fontsource-variable/instrument-sans";
+  import "@fontsource-variable/jetbrains-mono";
   import { base } from "$app/paths";
 
   let { data } = $props();
@@ -43,17 +46,7 @@
   <nav class="nav">
     <ul class="left">{#each navLeft as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
     <a href="{base}/" class="mark" aria-label="trails home">
-      <svg viewBox="0 0 220 56" aria-hidden="true">
-        <defs>
-          <linearGradient id="blaze" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0" stop-color="#c2410c" />
-            <stop offset="1" stop-color="#f59e0b" />
-          </linearGradient>
-        </defs>
-        <text x="110" y="42" text-anchor="middle" font-size="44" font-weight="900" letter-spacing="-1.5">
-          <tspan fill="url(#blaze)">Blaze</tspan><tspan fill="#2f5d1e">Trails</tspan>
-        </text>
-      </svg>
+      <span class="wm">tra<span class="i">ı</span>ls</span>
     </a>
     <ul class="right">{#each navRight as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
   </nav>
@@ -66,9 +59,9 @@
   </header>
 
   <section class="company">
-    <h2>You’re in good company.</h2>
+    <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
-    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span>{#if data.coverage[t]}<small>{data.coverage[t]} of the Rails API</small>{/if}</a></li>{/each}</ul>
+    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the Rails API</small>{/if}</a></li>{/each}</ul>
     <p class="small"><strong>These are just a few of the packages.</strong> The gems Rails depends on are ported alongside them.</p>
   </section>
 
@@ -130,15 +123,17 @@
     --red: #d30001;
     --ink: #261b23;
     --tint: #f0e7e9;
-    --sans: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
-    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --display: "Bricolage Grotesque Variable", "Helvetica Neue", Arial, sans-serif;
+    --sans: "Instrument Sans Variable", "Helvetica Neue", Arial, system-ui, sans-serif;
+    --mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     background: #fff;
     color: var(--ink);
     font: 21px/1.45 var(--sans);
     text-align: center;
   }
   a { color: inherit; }
-  h1, h2 { color: var(--red); font-weight: 700; letter-spacing: -0.02em; margin: 0 auto 1.5rem; }
+  h1, h2, h3 { font-family: var(--display); }
+  h1, h2 { color: var(--red); font-weight: 800; letter-spacing: -0.035em; margin: 0 auto 1.5rem; }
   h1 { font-size: 78px; line-height: 72px; max-width: 1200px; }
   h2 { font-size: 56px; line-height: 1; }
   h3 { color: var(--red); font-size: 28px; margin: 1.5rem 0 0.5rem; }
@@ -153,7 +148,10 @@
   .nav ul { display: flex; gap: 36px; list-style: none; margin: 0; padding: 0; font-size: 16px; font-weight: 600; }
   .nav a { text-decoration: none; }
   .left { justify-content: flex-end; }
-  .mark svg { display: block; width: 180px; }
+  .mark { text-decoration: none; }
+  .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--ink); }
+  .i { position: relative; }
+  .i::before { content: ""; position: absolute; left: 50%; transform: translateX(-50%); top: 0.02em; width: 0.26em; height: 0.17em; background: var(--red); border-radius: 0.035em; }
 
   .hero { padding: 40px 24px 80px; }
   .lede { font-size: 30px; line-height: 1.3; max-width: 700px; margin: 0 auto 1.5rem; }
