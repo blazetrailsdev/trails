@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { RakeCommand } from "../../lib/commands/rake.js";
+import { UnrecognizedCommandError } from "../../lib/command.js";
 
 describe("Trails::Command::RakeTest", () => {
   const originalCwd = Dir.pwd();
@@ -31,6 +32,23 @@ DSL.task("connects", block(async () => {
     );
 
     await RakeCommand.perform("connects", [], {});
+
+    expect(
+      Base.connectionHandler.connectionPoolList("all").filter((pool) => pool.isConnected()),
+    ).toEqual([]);
+  }, 30_000);
+
+  it("leaves no connection open when the Rakefile connects and the task is unrecognized", async () => {
+    File.write(
+      "Rakefile.ts",
+      `import { Base } from "@blazetrails/activerecord";
+await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
+await (await Base.leaseConnection()).execute("SELECT 1");`,
+    );
+
+    await expect(RakeCommand.perform("nope", [], {})).rejects.toBeInstanceOf(
+      UnrecognizedCommandError,
+    );
 
     expect(
       Base.connectionHandler.connectionPoolList("all").filter((pool) => pool.isConnected()),
