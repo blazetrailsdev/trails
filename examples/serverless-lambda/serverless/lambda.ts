@@ -1,7 +1,4 @@
-import {
-  requestToRackEnvWithBody,
-  rackResponseToFetchResponse,
-} from "../../../packages/website/src/lib/frontiers/rack-bridge.ts";
+import { requestToRackEnvWithBody, rackResponseToFetchResponse } from "./rack-bridge.ts";
 import { Trails } from "@blazetrails/trailties";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 

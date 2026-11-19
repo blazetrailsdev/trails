@@ -1298,6 +1298,10 @@ jobs:
       - uses: ./.github/actions/cache-build
       - run: pnpm build
       - run: scripts/generated-app-smoke.sh "$RUNNER_TEMP/generated-app"
+      # The serverless spike as a Vite (Rollup) SSR bundle, serving GET /posts: guards
+      # module-eval cycles and `trails build`'s entry order on a Vite host.
+      - run: pnpm --filter @blazetrails/example-serverless-lambda build
+      - run: pnpm --filter @blazetrails/example-serverless-lambda check:vite
 
   # The root README's Quickstart, run as written against this checkout, with
   # its printed and generated blocks compared to what the run produces.

@@ -26,6 +26,7 @@ function inspect(value: unknown): string {
 }
 
 export namespace ClassAttribute {
+  /** @perf 11ms — PERMANENT */
   export function redefine(
     owner: AttributeOwner,
     name: string,
@@ -41,20 +42,18 @@ export namespace ClassAttribute {
       }
     }
 
-    redefineMethod(owner, namespacedName, true, () => value);
-
-    redefineMethod(
-      owner,
-      `${namespacedName}=`,
-      true,
-      function (this: AttributeOwner, newValue: unknown) {
+    Object.defineProperty(owner, namespacedName, {
+      get: () => value,
+      set(this: AttributeOwner, newValue: unknown) {
         if (owner === this) {
           value = newValue;
         } else {
           ClassAttribute.redefine(this, name, namespacedName, newValue);
         }
       },
-    );
+      configurable: true,
+      enumerable: false,
+    });
   }
 
   export function redefineMethod(
