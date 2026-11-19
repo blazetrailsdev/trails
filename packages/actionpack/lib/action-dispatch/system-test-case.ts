@@ -138,6 +138,11 @@ export class SystemTestCase extends TestCase {
     return (this._page = await this._context.newPage());
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  async goto(url: string): Promise<Awaited<ReturnType<Page["goto"]>>> {
+    return (await this.page()).goto(new URL(url, vite.url).href);
+  }
+
   /** @internal */
   private urlHelpers(): object | null {
     if (this._urlHelpers) return this._urlHelpers;
