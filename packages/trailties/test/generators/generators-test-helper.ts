@@ -119,10 +119,18 @@ export async function runAppUpdate(
   await Dir.chdir(appRoot, async () => {
     const frameworkRoot = File.expandPath("../..", import.meta.dirname);
     await FileUtils.mkdirPAsync("node_modules/@blazetrails");
+    const ports = Object.keys(JSON.parse(await File.readAsync("package.json")).dependencies ?? {})
+      .filter((name) => name.startsWith("@blazetrails/") && name !== "@blazetrails/trailties")
+      .map((name) => File.join(frameworkRoot, "..", name.slice("@blazetrails/".length)));
     await FileUtils.lnSfAsync(
       [
         frameworkRoot,
-        ...(await Dir.globAsync(File.join(frameworkRoot, "node_modules/@blazetrails/*"))),
+        ...new Set([
+          ...(await Dir.globAsync(File.join(frameworkRoot, "node_modules/@blazetrails/*"))).filter(
+            (dir) => !ports.some((port) => File.basename(port) === File.basename(dir)),
+          ),
+          ...ports,
+        ]),
       ],
       "node_modules/@blazetrails",
     );

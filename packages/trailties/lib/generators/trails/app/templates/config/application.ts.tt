@@ -1,8 +1,13 @@
 import "./boot.ts";
 
-import { Application } from "@blazetrails/trailties";
+import { Bundler } from "@blazetrails/ruby-compat";
+import { Application, Trails } from "@blazetrails/trailties";
 
 <%= this.trailsRequireStatement() %>
+
+// Require the gem ports listed in package.json, including any ports
+// you've limited to :test, :development, or :production.
+await Bundler.require(...Trails.groups());
 
 export class <%= this.appConstBase() %> extends Application {
   static {
