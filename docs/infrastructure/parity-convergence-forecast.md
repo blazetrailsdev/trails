@@ -36,7 +36,7 @@ const percent = totalRuby > 0 ? Math.round((implemented / totalRuby) * 1000) / 1
 ```
 
 `pending` (`it.skip`/`todo`) stubs increment `matchedSkipped`
-(`compare.ts:694-695`) and are subtracted — the launch-roadmap claim "stubs
+(`compare.ts:694-695`) and are subtracted — the claim "stubs
 don't count" is still true in code. The packages at 100% carry `skipped = 0`
 in their latest snapshots, so no unskipped-stub inflation there.
 

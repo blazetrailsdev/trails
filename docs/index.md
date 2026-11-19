@@ -23,7 +23,6 @@ Work-size legend (rough order-of-magnitude):
 
 | Doc                                                                           | Priority | Work | Notes                                                                                             |
 | ----------------------------------------------------------------------------- | -------- | ---- | ------------------------------------------------------------------------------------------------- |
-| [`launch-roadmap.md`](launch-roadmap.md)                                      | P0       | —    | The "what blocks public launch" doc. Everything else feeds into this.                             |
 | [`virtual-source-files-plan.md`](infrastructure/virtual-source-files-plan.md) | P0       | M    | Phase 1 done; **Phase 2 (tsserver plugin)** is the open work. 6 sub-PRs (2.1–2.6) + Phase 3 docs. |
 
 ## Per-package "Road to 100%" trackers
