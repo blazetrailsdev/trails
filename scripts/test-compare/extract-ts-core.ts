@@ -150,6 +150,8 @@ export const REQUIRED_TEST_MODULES: Record<string, string> = {
   testsDefaults: "packages/i18n/test/support/tests/defaults.ts",
   testsLookup: "packages/i18n/test/support/tests/lookup.ts",
   testsPluralization: "packages/i18n/test/support/tests/pluralization.ts",
+  testsProcs: "packages/i18n/test/support/tests/procs.ts",
+  testsLocalizationDate: "packages/i18n/test/support/tests/localization/date.ts",
 };
 
 /** The top-level function `name` declared in a required test-module file. */
