@@ -38,6 +38,13 @@ type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 export const Turbo = {
   name: "Turbo",
 
+  loadPath: {
+    "turbo/test_assertions": () => import("@blazetrails/turbo/test-assertions"),
+    "turbo/broadcastable/test_helper": () => import("@blazetrails/turbo/broadcastable/test-helper"),
+    "turbo/test_assertions/integration_test_assertions": () =>
+      import("@blazetrails/turbo/test-assertions/integration-test-assertions"),
+  } as Record<string, () => Promise<unknown>>,
+
   setSignedStreamVerifierKey(signedStreamVerifierKey: string | Uint8Array | null): void {
     this._signedStreamVerifierKey = signedStreamVerifierKey;
   },
