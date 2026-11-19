@@ -13,7 +13,7 @@ let booted: Promise<typeof Trails.application> | undefined;
 function boot() {
   return (booted ??= (async () => {
     bootTiming.bootStart = performance.now();
-    await import("../.trails/entry.generated.js");
+    await (await import("../.trails/entry.generated.js")).default();
     bootTiming.initDone = performance.now();
     const { Base } = await import("@blazetrails/activerecord");
     await Base.connectionPool().withConnection((conn) => conn.verifyBang());

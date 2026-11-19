@@ -111,8 +111,15 @@ describe("buildAutoload", () => {
 
       expect(File.read(".trails/entry.generated.js")).toEqual(
         [
+          'import { loadedFileExports, rbFRequireFile } from "@blazetrails/ruby-compat";',
+          'import { Application } from "@blazetrails/trailties";',
           'import "./autoload/install.generated.js";',
-          'export default (await import("../config/environment.ts")).default;',
+          "",
+          "export default async () => {",
+          "  const environment = `${Application.findRoot(import.meta.dirname)}/config/environment.ts`;",
+          "  await rbFRequireFile(environment);",
+          "  return loadedFileExports(environment).default;",
+          "};",
           "",
         ].join("\n"),
       );
@@ -300,6 +307,16 @@ describe("buildAutoload", () => {
         "config/environments/test.ts",
         "config/initializers/deep/inflections.ts",
         "db/seeds.ts",
+        "config/environment.ts",
+        "vendor/blog/config/routes.ts",
+        "vendor/blog/config/initializers/blog.ts",
+      ]) {
+        expect(boot).toContain(
+          `${JSON.stringify(rel)}: async () => (await import("./compiled/${rel}")).default(),`,
+        );
+        expect(File.isExist(`.trails/compiled/${rel}`)).toBe(true);
+      }
+      for (const rel of [
         "app/helpers/application-helper.ts",
         "app/helpers/admin/users_helper.ts",
         "config/database.ts",
@@ -308,8 +325,6 @@ describe("buildAutoload", () => {
         "config/storage/production.ts",
         "config/my.settings.ts",
         "lib/helpers/extra-helper.ts",
-        "vendor/blog/config/routes.ts",
-        "vendor/blog/config/initializers/blog.ts",
       ]) {
         expect(boot).toContain(`${JSON.stringify(rel)}: () => import("../${rel}"),`);
       }
@@ -350,13 +365,96 @@ describe("buildAutoload", () => {
         File.realpath(File.expandPath(".trails")),
       ]);
       expect(registered.map(([r]) => File.expandPath(r))).toEqual([root]);
-      const drawn = await import(File.expandPath("config/routes.ts"));
+      expect((globalThis as Record<string, unknown>).__routesEvaluated).toBeUndefined();
       await rbFLoad(File.expandPath("config/routes.ts"));
       expect((globalThis as Record<string, unknown>).__routesEvaluated).toBe(1);
-      expect(seats.Drawn).toBe(drawn.Drawn);
+      expect(seats.Drawn).toEqual({});
     } finally {
       delete seats.Drawn;
       delete (globalThis as Record<string, unknown>).__routesEvaluated;
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("compiles a loaded file's exports, re-exports and relative imports into its function", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    Dir.chdir(tmp);
+    try {
+      FileUtils.mkdirP("config/initializers");
+      File.write("config/application.ts", "export {};\n");
+      File.write("config/environment.ts", "export default null;\n");
+      File.write(
+        "config/initializers/shared.ts",
+        "export const a = 1;\nexport const b = 2;\nexport default 3;\n",
+      );
+      File.write(
+        "config/initializers/exports.ts",
+        [
+          "export * from './shared.ts';",
+          "export * as all from './shared.ts';",
+          "export { b as c } from './shared.ts';",
+          "export type T = number;",
+          "export const d = (await import('./shared.ts')).a;",
+          "export default class {}",
+          "",
+        ].join("\n"),
+      );
+      File.write("config/initializers/meta.ts", "export const here = import.meta.dirname;\n");
+      const root = Dir.pwd();
+      seats.Trails = {
+        application: {
+          config: { root },
+          paths: () => ({
+            get: (key: string) =>
+              key === "config/initializers"
+                ? {
+                    toAry: () => [key],
+                    extensions: () => undefined,
+                    existent: async () => [File.expandPath("config/initializers/exports.ts")],
+                  }
+                : undefined,
+          }),
+          initializers: { tsort: () => [] },
+        },
+      };
+
+      await buildAutoload();
+
+      const compiled = await import(
+        File.expandPath(".trails/compiled/config/initializers/exports.ts")
+      );
+      const exports = await compiled.default();
+      expect(exports.a).toBe(1);
+      expect(exports.b).toBe(2);
+      expect(exports.all.default).toBe(3);
+      expect(exports.c).toBe(2);
+      expect(exports.d).toBe(1);
+      expect(typeof exports.default).toBe("function");
+      expect(Object.hasOwn(exports, "T")).toBe(false);
+
+      seats.Trails = {
+        application: {
+          config: { root },
+          paths: () => ({
+            get: (key: string) =>
+              key === "config/initializers"
+                ? {
+                    toAry: () => [key],
+                    extensions: () => undefined,
+                    existent: async () => [File.expandPath("config/initializers/meta.ts")],
+                  }
+                : undefined,
+          }),
+          initializers: { tsort: () => [] },
+        },
+      };
+      await buildAutoload();
+      const meta = await import(File.expandPath(".trails/compiled/config/initializers/meta.ts"));
+      expect(File.realpath((await meta.default()).here)).toBe(
+        File.realpath(File.expandPath("config/initializers")),
+      );
+    } finally {
       Dir.chdir(pwd);
       FileUtils.rmRf(tmp);
     }
