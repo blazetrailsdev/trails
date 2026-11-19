@@ -19,7 +19,7 @@ describe("Database", () => {
 
   it("each adapter exposes packages, service, feature, volume", () => {
     const pg = new PostgreSQL();
-    expect(pg.pkgDependency).toEqual({ name: "pg", version: "^8.19.0" });
+    expect(pg.gem()).toEqual(["pg", "^8.19.0"]);
     expect(pg.basePackage).toBe("postgresql-client");
     expect(pg.port).toBe(5432);
     expect(pg.service?.image).toBe("postgres:16.1");
@@ -30,12 +30,12 @@ describe("Database", () => {
     expect(sl.service).toBeUndefined();
     expect(sl.buildPackage).toBeUndefined();
     expect(sl.volume).toBeUndefined();
-    expect(sl.pkgDependency.name).toBe("better-sqlite3");
+    expect(sl.gem()[0]).toBe("better-sqlite3");
   });
 
   it("mariadb variant overrides name and service", () => {
     expect(new MariaDBMySQL2().name).toBe("mariadb");
     expect(new MariaDBMySQL2().service?.image).toBe("mariadb:10.5");
-    expect(new MariaDBMySQL2().pkgDependency.name).toBe("mysql2");
+    expect(new MariaDBMySQL2().gem()[0]).toBe("mysql2");
   });
 });

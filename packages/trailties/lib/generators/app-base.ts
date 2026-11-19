@@ -84,6 +84,7 @@ export abstract class AppBase extends Base {
     this.noCommands(() => this.methodAdded("isDevcontainer"));
     this.noCommands(() => this.methodAdded("skipDevcontainer"));
     this.noCommands(() => this.methodAdded("dependsOnSystemTest"));
+    this.noCommands(() => this.methodAdded("gemfileEntries"));
     this.noCommands(() => this.methodAdded("trailsGemfileEntry"));
     this.noCommands(() => this.methodAdded("trailsDevPackages"));
     this.noCommands(() => this.methodAdded("applyTrailsTemplate"));
@@ -509,20 +510,75 @@ ${requireStatements.join("\n")}`;
     return !!(this.options.dev || this.options.edge || this.options.main);
   }
 
+  gemfileEntries(): GemfileEntry[] {
+    return [
+      this.trailsGemfileEntry(),
+      this.databaseGemfileEntry(),
+      this.javascriptGemfileEntry(),
+      this.hotwireGemfileEntry(),
+      this.cssGemfileEntry(),
+      this.cableGemfileEntry(),
+    ]
+      .flat()
+      .filter((entry) => entry != null)
+      .filter(this._gemFilter);
+  }
+
   /** @internal */
-  trailsGemfileEntry(name: string, packageManager: string): string {
-    const subdirectory =
-      packageManager === "pnpm" ? `&path:/packages/${name.replace("@blazetrails/", "")}` : "";
-    if (this.options.dev) {
-      const path = this.trailsDevPackages()[name];
-      return `${packageManager === "pnpm" ? "link" : "file"}:${path}`;
-    } else if (this.options.edge) {
-      return `github:blazetrailsdev/trails#${this.edgeBranch()}${subdirectory}`;
-    } else if (this.options.main) {
-      return `github:blazetrailsdev/trails#main${subdirectory}`;
-    } else {
-      return [this.trailsVersionSpecifier()].flat().join(" ");
-    }
+  protected databaseGemfileEntry(): GemfileEntry | undefined {
+    if (this.options.skipActiveRecord) return;
+
+    const [gemName, gemVersion] = this.database.gem();
+    return GemfileEntry.version(
+      gemName,
+      gemVersion,
+      `Use ${this.options.database} as the database for Active Record`,
+    );
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs github — PERMANENT
+   * @missingRailsArgs version — PERMANENT
+   */
+  trailsGemfileEntry(): GemfileEntry[] {
+    const packageManager = (this as unknown as { packageManager?: string }).packageManager;
+    return TRAILS_PACKAGES.filter(([, skip]) => !skip?.(this)).map(([name, , group]) => {
+      let entry: GemfileEntry;
+      if (this.options.dev) {
+        entry = GemfileEntry.path(
+          name,
+          this.trailsDevPackages()[name],
+          "Use local checkout of Trails",
+        );
+      } else if (this.options.edge) {
+        entry = GemfileEntry.github(
+          name,
+          "blazetrailsdev/trails",
+          this.edgeBranch(),
+          "Use specific branch of Trails",
+        );
+      } else if (this.options.main) {
+        entry = GemfileEntry.github(
+          name,
+          "blazetrailsdev/trails",
+          "main",
+          "Use main development branch of Trails",
+        );
+      } else {
+        entry = GemfileEntry.version(
+          name,
+          this.trailsVersionSpecifier(),
+          'Bundle edge Trails instead: "@blazetrails/trailties": "github:blazetrailsdev/trails#main"',
+        );
+      }
+      if (packageManager === "pnpm" && entry.options.github != null) {
+        entry.options.glob = `/packages/${name.replace("@blazetrails/", "")}`;
+      }
+      if (packageManager === "pnpm" && entry.options.path != null) entry.options.link = "true";
+      if (group != null) entry.options.group = group;
+      return entry;
+    });
   }
 
   /**
@@ -536,6 +592,41 @@ ${requireStatements.join("\n")}`;
       const patch = gemVersion.segments().slice(0, 3).join(".");
       return [`~${patch}`, `>=${gemVersion}`];
     }
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs floats — PERMANENT
+   */
+  protected javascriptGemfileEntry(): GemfileEntry | undefined {
+    if (this.options.skipJavascript) return;
+
+    if (this.options.javascript === "vite") {
+      return GemfileEntry.floats(
+        "@blazetrails/vite-trails",
+        "Use JavaScript with Vite [https://vite-ruby.netlify.app]",
+      );
+    }
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs floats — PERMANENT
+   */
+  protected hotwireGemfileEntry(): GemfileEntry[] | undefined {
+    if (this.options.skipHotwire) return;
+
+    const turboRailsEntry = GemfileEntry.floats(
+      "@blazetrails/turbo",
+      "Hotwire's SPA-like page accelerator [https://turbo.hotwired.dev]",
+    );
+
+    const stimulusRailsEntry = GemfileEntry.floats(
+      "@blazetrails/stimulus",
+      "Hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]",
+    );
+
+    return [turboRailsEntry, stimulusRailsEntry];
   }
 
   /** @internal */
@@ -656,6 +747,27 @@ ${requireStatements.join("\n")}`;
       return [...this.dockerfileBuildPackages(), "google-chrome-stable"];
     } else {
       return this.dockerfileBuildPackages();
+    }
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs floats — PERMANENT
+   */
+  protected cssGemfileEntry(): GemfileEntry | undefined {
+    if (this.options.api) return;
+    if (!this.options.css) return;
+
+    if (!this.usingJsRuntime() && this.options.css === "tailwind") {
+      return GemfileEntry.floats("@tailwindcss/vite", "Use Tailwind CSS [https://tailwindcss.com]");
+    }
+  }
+
+  /** @internal */
+  protected cableGemfileEntry(): GemfileEntry | undefined {
+    if (!this.options.skipActionCable && this.options.skipSolid) {
+      const comment = "Use Redis adapter to run Action Cable in production";
+      return new GemfileEntry("redis", ">= 4.0.1", comment, {}, true);
     }
   }
 
@@ -870,5 +982,97 @@ ${requireStatements.join("\n")}`;
   get database(): Database {
     if (!this._database) this._database = Database.build(this.options.database ?? "sqlite3");
     return this._database;
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+type TrailsPackage = [name: string, skip?: (generator: AppBase) => unknown, group?: string];
+
+/** @noRailsEquivalent PERMANENT */
+const TRAILS_PACKAGES: TrailsPackage[] = [
+  ["@blazetrails/activerecord"],
+  ["@blazetrails/activemodel"],
+  ["@blazetrails/date"],
+  ["@blazetrails/activesupport"],
+  ["@blazetrails/rack"],
+  ["@blazetrails/rackup"],
+  ["@blazetrails/ruby-compat"],
+  ["@blazetrails/actionpack"],
+  ["@blazetrails/actionview"],
+  ["@blazetrails/trailties"],
+  ["@blazetrails/activejob", (g) => g.options.skipActiveJob],
+  ["@blazetrails/actionmailer", (g) => g.options.skipActionMailer],
+  ["@blazetrails/solid-cache", (g) => g.options.skipSolid],
+  ["@blazetrails/solid-queue", (g) => g.options.skipSolid],
+  ["@blazetrails/solid-cable", (g) => g.options.skipSolid || g.options.skipActionCable],
+  ["@blazetrails/actioncable", (g) => g.options.skipActionCable],
+  ["@blazetrails/activerecord-cli", undefined, "development"],
+  ["@blazetrails/trails-tsc", undefined, "development"],
+];
+
+export class GemfileEntry {
+  name: string;
+  version: string | string[] | null;
+  comment: string | null;
+  options: Record<string, string>;
+  commentedOut: boolean;
+
+  constructor(
+    name: string,
+    version: string | string[] | null,
+    comment: string | null,
+    options: Record<string, string> = {},
+    commentedOut = false,
+  ) {
+    this.name = name;
+    this.version = version;
+    this.comment = comment;
+    this.options = options;
+    this.commentedOut = commentedOut;
+  }
+
+  static github(
+    name: string,
+    github: string,
+    branch: string | null = null,
+    comment: string | null = null,
+  ): GemfileEntry {
+    if (branch) {
+      return new this(name, null, comment, { github, branch });
+    } else {
+      return new this(name, null, comment, { github });
+    }
+  }
+
+  static version(
+    name: string,
+    version: string | string[],
+    comment: string | null = null,
+  ): GemfileEntry {
+    return new this(name, version, comment);
+  }
+
+  static floats(name: string, comment: string | null = null): GemfileEntry {
+    return new this(name, null, comment);
+  }
+
+  static path(name: string, path: string, comment: string | null = null): GemfileEntry {
+    return new this(name, null, comment, { path });
+  }
+
+  /** @missingRailsArgs join — PERMANENT */
+  toString(): string {
+    const { github, branch, glob, path, link } = this.options;
+    let specifier: string;
+    if (github != null) {
+      specifier = `github:${github}${branch ? `#${branch}` : ""}${glob ? `&path:${glob}` : ""}`;
+    } else if (path != null) {
+      specifier = `${link ? "link" : "file"}:${path}`;
+    } else if (this.version != null) {
+      specifier = [this.version].flat().join(" ");
+    } else {
+      specifier = "*";
+    }
+    return `${JSON.stringify(this.name)}: ${JSON.stringify(specifier)}`;
   }
 }

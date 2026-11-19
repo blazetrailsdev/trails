@@ -12,7 +12,7 @@ import { RouteSet } from "@blazetrails/actionpack";
 import { MockRequest } from "@blazetrails/rack";
 import { Engine } from "../lib/engine.js";
 import { loaded } from "./fixtures/loaded.js";
-import { EngineConfiguration } from "../lib/engine/configuration.js";
+import { Configuration as EngineConfiguration } from "../lib/engine/configuration.js";
 import { MiddlewareStackProxy } from "../lib/configuration.js";
 import { Trailties } from "../lib/engine/trailties.js";
 import { Configuration as TrailtieConfiguration } from "../lib/trailtie/configuration.js";

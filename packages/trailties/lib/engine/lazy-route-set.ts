@@ -1,4 +1,4 @@
-import { RouteSet, type DrawCallback, type Request } from "@blazetrails/actionpack";
+import { RouteSet, type DrawCallback } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { TopLevel } from "@blazetrails/activesupport";
 import {
@@ -131,13 +131,10 @@ export class LazyRouteSet extends RouteSet {
   }
 
   override recognizePathWithRequest(
-    req: Request,
-    path: string,
-    extras: Record<string, unknown>,
-    options: { raiseOnMissing?: boolean } = {},
-  ): Record<string, unknown> | undefined {
+    ...args: Parameters<RouteSet["recognizePathWithRequest"]>
+  ): ReturnType<RouteSet["recognizePathWithRequest"]> {
     TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return super.recognizePathWithRequest(req, path, extras, options);
+    return super.recognizePathWithRequest(...args);
   }
 
   override routes(): ReturnType<RouteSet["routes"]> {

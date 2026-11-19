@@ -29,7 +29,7 @@ import {
 import { FileUtils, isPlainHash, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
 import { LogSubscriber, reverseMergeBang, wrap } from "@blazetrails/activesupport";
 import type { DatabaseConfigModule } from "../database.js";
-import { EngineConfiguration } from "../engine/configuration.js";
+import { Configuration as EngineConfiguration } from "../engine/configuration.js";
 import { SourceAnnotationExtractor, type Annotation } from "../source-annotation-extractor.js";
 import { Trails } from "../trails.js";
 import type { Root } from "../paths.js";

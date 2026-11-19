@@ -1,6 +1,6 @@
 overrides:
-<% for (const name of Object.keys(this.trailsDevPackages())) { -%>
-  <%= JSON.stringify(name) %>: <%= JSON.stringify(this.trailsGemfileEntry(name, this.packageManager)) %>
+<% for (const [name, path] of Object.entries(this.trailsDevPackages())) { -%>
+  <%= JSON.stringify(name) %>: <%= JSON.stringify(`link:${path}`) %>
 <% } -%>
 allowBuilds:
   better-sqlite3: true

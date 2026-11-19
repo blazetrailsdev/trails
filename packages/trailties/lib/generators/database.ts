@@ -2,11 +2,6 @@ import "../constants.database.generated.js";
 export const DATABASES = ["mysql", "postgresql", "sqlite3", "mariadb-mysql"] as const;
 export type DatabaseName = (typeof DATABASES)[number];
 
-export interface PkgDependency {
-  name: string;
-  version: string;
-}
-
 export interface DockerService {
   image: string;
   restart: string;
@@ -18,7 +13,7 @@ export interface DockerService {
 export abstract class Database {
   abstract readonly name: string;
   abstract readonly template: string;
-  abstract readonly pkgDependency: PkgDependency;
+  abstract gem(): [string, string];
   readonly basePackage?: string;
   readonly buildPackage?: string;
   readonly featureName?: string;
@@ -73,7 +68,9 @@ const mariaDBService: DockerService = {
 export class MySQL2 extends Database {
   readonly name: string = "mysql";
   readonly template: string = "config/databases/mysql.yml";
-  readonly pkgDependency: PkgDependency = { name: "mysql2", version: "^3.18.2" };
+  gem(): [string, string] {
+    return ["mysql2", "^3.18.2"];
+  }
   override readonly basePackage: string | undefined = "default-mysql-client";
   override readonly buildPackage: string | undefined = "default-libmysqlclient-dev";
   override readonly featureName: string | undefined =
@@ -86,7 +83,9 @@ export class MySQL2 extends Database {
 export class PostgreSQL extends Database {
   readonly name = "postgres";
   readonly template = "config/databases/postgresql.yml";
-  readonly pkgDependency: PkgDependency = { name: "pg", version: "^8.19.0" };
+  gem(): [string, string] {
+    return ["pg", "^8.19.0"];
+  }
   override readonly basePackage = "postgresql-client";
   override readonly buildPackage = "libpq-dev";
   override readonly featureName = "ghcr.io/rails/devcontainer/features/postgres-client";
@@ -103,7 +102,9 @@ export class PostgreSQL extends Database {
 export class SQLite3 extends Database {
   readonly name = "sqlite3";
   readonly template = "config/databases/sqlite3.yml";
-  readonly pkgDependency: PkgDependency = { name: "better-sqlite3", version: "^13.0.3" };
+  gem(): [string, string] {
+    return ["better-sqlite3", "^13.0.3"];
+  }
   override readonly basePackage = "sqlite3";
   override readonly featureName = "ghcr.io/rails/devcontainer/features/sqlite3";
 }

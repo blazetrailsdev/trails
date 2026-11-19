@@ -177,7 +177,7 @@ describe("AppGenerator (trails-only)", () => {
     try {
       await new AppGenerator(
         ["my-app"],
-        { skipInstall: true, database: "sqlite" },
+        { skipInstall: true, skipJavascript: true, database: "sqlite" },
         { destinationRoot: root },
       ).invokeAll();
       const app = path.join(root, "my-app");
@@ -246,9 +246,13 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("--main without pnpm writes the bare branch specifier", () => {
-    const generator = new AppGenerator(["my-app"], { main: true }, { destinationRoot: tmpDir });
-    expect(generator.trailsGemfileEntry("@blazetrails/trailties", "npm")).toBe(
-      "github:blazetrailsdev/trails#main",
+    const generator = new AppGenerator(
+      ["my-app"],
+      { main: true, packageManager: "npm" },
+      { destinationRoot: tmpDir },
+    );
+    expect(String(generator.trailsGemfileEntry()[0])).toBe(
+      '"@blazetrails/activerecord": "github:blazetrailsdev/trails#main"',
     );
   });
 

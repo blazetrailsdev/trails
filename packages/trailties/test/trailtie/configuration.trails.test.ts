@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { NoMethodError } from "@blazetrails/ruby-compat";
 import { Configuration } from "../../lib/trailtie/configuration.js";
-import { EngineConfiguration } from "../../lib/engine/configuration.js";
+import { Configuration as EngineConfiguration } from "../../lib/engine/configuration.js";
 
 describe("Railtie::Configuration (trails)", () => {
   it("respondTo answers true for a real method as well as a stored option", () => {

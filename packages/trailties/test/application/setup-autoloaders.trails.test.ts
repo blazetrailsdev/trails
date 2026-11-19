@@ -3,7 +3,7 @@ import { Dependencies } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { buildManifest, Cref, Registry } from "@blazetrails/zeitwerk";
 import { Autoloaders } from "../../lib/autoloaders.js";
-import { EngineConfiguration } from "../../lib/engine/configuration.js";
+import { Configuration as EngineConfiguration } from "../../lib/engine/configuration.js";
 import { Root } from "../../lib/paths.js";
 import { Bootstrap } from "../../lib/application/bootstrap.js";
 import { Finisher } from "../../lib/application/finisher.js";

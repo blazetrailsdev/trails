@@ -48,7 +48,7 @@ defineConstants([
   [m10, "Generators", "Trails::Configuration::Generators"],
   [m10, "MiddlewareStackProxy", "Trails::Configuration::MiddlewareStackProxy"],
   [m11, "Engine", "Trails::Engine"],
-  [m12, "EngineConfiguration", "Trails::Engine::Configuration"],
+  [m12, "Configuration", "Trails::Engine::Configuration"],
   [m13, "LazyRouteSet", "Trails::Engine::LazyRouteSet"],
   [m13, "NamedRouteCollection", "Trails::Engine::LazyRouteSet::NamedRouteCollection"],
   [m13, "LazyRouteSet.ProxyUrlHelpers", "Trails::Engine::LazyRouteSet::ProxyUrlHelpers"],

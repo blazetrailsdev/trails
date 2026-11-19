@@ -167,7 +167,10 @@ Object.setPrototypeOf(
 
 Trails.ActionMethods = ActionMethods;
 
-export class AppBuilder extends ActionMethods {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface AppBuilder extends ActionMethods {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class AppBuilder {
   declare readonly options: AppBaseOptions & AppGeneratorOptions;
   /** @internal */
   declare private readonly database: AppGenerator["database"];

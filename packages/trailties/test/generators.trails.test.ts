@@ -71,9 +71,7 @@ describe("GeneratorsTest", () => {
   });
 
   it("a namespace Rails hides is registered but not advertised", async () => {
-    const lines: string[] = [];
-    await Generators.help("generate", (line) => lines.push(line));
-    const help = lines.join("\n");
+    const help = await capture("stdout", () => Generators.help("generate"));
     for (const name of ["devcontainer", "resource_route", "master_key"]) {
       expect(await Generators.findByNamespace(name)).not.toBeNull();
       expect(help).not.toMatch(new RegExp(`^\\s+${name}\\b`, "m"));
