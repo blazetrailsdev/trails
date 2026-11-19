@@ -1,6 +1,8 @@
 <script>
   import { base } from "$app/paths";
 
+  let { data } = $props();
+
   const repo = "https://github.com/blazetrailsdev/trails";
   const guides = `${base}/docs/guides/`;
 
@@ -23,99 +25,6 @@
     "i18n", "thor",
   ];
 
-  const blocks = [
-    {
-      file: "app/models/article.ts",
-      title: "Active Records make modeling easy.",
-      body: "Databases come to life with business logic encapsulated in rich objects. Modeling associations between tables, providing callbacks when saved, encrypting sensitive data seamlessly, and expressing SQL queries beautifully.",
-      code: `import { ApplicationRecord } from "./application-record.js";
-import { Current } from "./current.js";
-
-export class Article extends ApplicationRecord {
-  static {
-    this.belongsTo("author", { default: () => Current.user });
-    this.hasMany("comments");
-
-    this.hasOneAttached("coverImage");
-    this.hasRichText("content", { encrypted: true });
-    this.enum("status", ["drafted", "published"]);
-
-    this.scope("recent", function () {
-      return this.order({ created_at: "desc" }).limit(25);
-    });
-
-    this.afterSaveCommit("deliverLater", { if: "isPublished" });
-  }
-
-  async byline(): Promise<string> {
-    const author = await this.author;
-    return \`Written by \${author.name} on \${this.createdAt.toFs("short")}\`;
-  }
-
-  async deliverLater(): Promise<void> {
-    await Article.DeliveryJob.performLater(this);
-  }
-}`,
-    },
-    {
-      file: "app/controllers/articles-controller.ts",
-      title: "Action Controllers handle all requests.",
-      body: "Controllers expose the domain model to the web, process incoming parameters, set caching headers, and render templates, responding with either HTML or JSON.",
-      code: `import { Article } from "../models/article.js";
-import { ApplicationController } from "./application-controller.js";
-
-export class ArticlesController extends ApplicationController {
-  declare articles: Article[];
-  declare article: Article;
-
-  async index(): Promise<void> {
-    this.articles = await Article.recent();
-  }
-
-  async show(): Promise<void> {
-    this.article = await Article.find(this.params.expect("id"));
-    await this.freshWhen({ etag: this.article });
-  }
-
-  async create(): Promise<void> {
-    const article = await Article.createBang(this._articleParams());
-    await this.redirectTo(article);
-  }
-
-  private _articleParams() {
-    return this.params.expect({ article: ["title", "content"] });
-  }
-}`,
-    },
-    {
-      file: "app/views/articles/show.html.tse",
-      title: "Action Views mix TypeScript and HTML.",
-      body: "Templates can use the full versatility of TypeScript, excessive code is extracted into helpers, and the domain model is used directly and interwoven with the HTML.",
-      code: `<h1><%= this.article.title %></h1>
-
-<%= imageTag(this.article.coverImage.url()) %>
-
-<p><%= this.article.content %></p>
-
-<% if (Current.user.isAdmin()) { %>
-  <%= linkTo("Edit", editArticlePath(this.article)) %>
-<% } %>`,
-    },
-    {
-      file: "config/routes.ts",
-      title: "Action Dispatch routes URLs.",
-      body: "Configure how URLs connect to the controllers using the routing domain language. Routes expose the bundle of actions that go together as a resource: index, show, new, create, edit, update, destroy.",
-      code: `import { Trails } from "@blazetrails/trailties";
-
-Trails.application.routes().draw(function () {
-  this.resources("articles", function () { // /articles, /articles/1
-    this.resources("comments");             // /articles/1/comments, /comments/1
-  });
-
-  this.root("articles#index");              // /
-});`,
-    },
-  ];
 
   const cards = [
     { tag: "Learning", title: "Read the guides", body: "Learn what the frameworks can do and how they fit together.", href: guides },
@@ -172,11 +81,11 @@ Trails.application.routes().draw(function () {
   </section>
 
   <section class="band blocks">
-    {#each blocks as b}
+    {#each data.blocks as b}
       <div class="block">
         <div class="code">
           <div class="file">{b.file} &middot; placeholder</div>
-          <pre><code>{b.code}</code></pre>
+          {@html b.html}
         </div>
         <h3>{b.title}</h3>
         <p>{b.body}</p>
@@ -261,10 +170,12 @@ Trails.application.routes().draw(function () {
   .card { background: #fff; max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px rgb(0 0 0 / 0.08); }
   .band > .card:first-child { margin-top: 0; }
 
-  .blocks { padding-top: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 560px)); justify-content: center; gap: 60px 50px; }
+  .blocks { padding-top: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 560px)); justify-content: center; column-gap: 50px; }
+  .block { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; padding-bottom: 60px; }
+  .code { display: flex; flex-direction: column; }
   .code { background: #3a3038; border-radius: 6px; overflow: hidden; text-align: left; }
   .file { background: #2c242a; color: #cfc5cb; font: 13px var(--mono); text-align: center; padding: 8px; }
-  .code pre { margin: 0; padding: 20px; min-height: 340px; font: 13px/1.6 var(--mono); color: #e8dfe4; overflow-x: auto; }
+  .code :global(pre) { flex: 1; margin: 0; padding: 20px; font: 13px/1.6 var(--mono); overflow-x: auto; background: #3a3038 !important; }
   .block p { font-size: 17px; margin: 0 auto; max-width: 500px; }
 
   .start { padding: 90px 24px; }

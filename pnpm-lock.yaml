@@ -1565,6 +1565,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.0.0
         version: 4.2.2(vite@6.4.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3))
+      shiki:
+        specifier: 2.5.0
+        version: 2.5.0
       svelte:
         specifier: ^5.0.0
         version: 5.55.1
