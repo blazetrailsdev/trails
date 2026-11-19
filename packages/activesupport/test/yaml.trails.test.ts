@@ -154,6 +154,24 @@ describe("Psych object protocol", () => {
     );
   });
 
+  it("revives a !ruby/hash-with-ivars Hash subclass with its ivars", () => {
+    class Carrier extends HashWithIndifferentAccess {
+      foo = "bar";
+    }
+    constSet(TopLevel, "Carrier", Carrier);
+    try {
+      const h = new Carrier();
+      h.set("x", 42);
+      h.foo = "baz";
+      const loaded = Psych.unsafeLoad(Psych.dump(h)) as Carrier;
+      expect(loaded).toBeInstanceOf(Carrier);
+      expect(loaded.foo).toBe("baz");
+      expect([...loaded]).toEqual([["x", 42]]);
+    } finally {
+      if (constDefined(Object, "Carrier", false)) rbModRemoveConst(Object, "Carrier");
+    }
+  });
+
   it("revives a !ruby/hash class as that Hash, merge keys included", () => {
     const h = Psych.unsafeLoad(
       "--- !ruby/hash:ActiveSupport::HashWithIndifferentAccess\n<<: { y: 1 }\nx: 42\n",

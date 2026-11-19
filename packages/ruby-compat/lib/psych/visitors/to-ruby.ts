@@ -310,6 +310,25 @@ export class ToRuby extends Visitor {
       }
       return this.initWith(e, h, o);
     }
+    if ((match = /^!ruby\/hash-with-ivars(?::(.*))?$/.exec(o.tag))) {
+      const hash = match[1]
+        ? (allocate(this.resolveClass(match[1])) as Map<unknown, unknown>)
+        : new Hash<unknown, unknown>();
+      this.register(o, hash);
+      eachSlice<Node, Node[]>(o.children, 2, ([key, value]) => {
+        switch ((key as Scalar).value) {
+          case "elements":
+            this.reviveHash(hash, value as Mapping);
+            break;
+          case "ivars":
+            eachSlice<Node, Node[]>((value as Mapping).children, 2, ([k, v]) => {
+              rbObjIvarSet(hash, this.accept(k) as string, this.accept(v));
+            });
+            break;
+        }
+      });
+      return hash;
+    }
     if ((match = /^!map:(.*)$/.exec(o.tag) ?? /^!ruby\/hash:(.*)$/.exec(o.tag))) {
       return this.reviveHash(
         this.register(o, allocate(this.resolveClass(match[1])) as Record<string, unknown>),

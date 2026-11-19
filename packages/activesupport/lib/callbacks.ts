@@ -1,4 +1,5 @@
 import {
+  aryDeleteIf,
   extend,
   kernelCatch,
   kernelCatchSync,
@@ -919,17 +920,16 @@ export class CallbackChain {
     this.chain.unshift(callback);
   }
 
-  /** @missingRailsCall delete_if — PERMANENT */
   private removeDuplicates(callback: Callback): void {
     this._allCallbacks = undefined;
     this._singleCallbacks.clear();
-    this.chain = this.chain.filter((c) => !callback.isDuplicates(c));
+    aryDeleteIf(this.chain, (c) => callback.isDuplicates(c));
   }
 
   remove(kind: CallbackKind, filter?: AnyCallback | string | symbol | CallbackObject): void {
     this._allCallbacks = undefined;
     this._singleCallbacks.clear();
-    this.chain = this.chain.filter((cb) => !cb.matches(kind, filter));
+    aryDeleteIf(this.chain, (cb) => cb.matches(kind, filter));
   }
 
   clear(): this {

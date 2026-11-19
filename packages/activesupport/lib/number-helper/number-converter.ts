@@ -11,62 +11,68 @@ export const BIGDECIMAL_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*
 
 export type NumberFormatOptions = object;
 
-const DEFAULTS: Record<string, Record<string, unknown>> = {
-  format: {
+const DEFAULTS = new Hash<string, unknown>()
+  .set(":format", {
     separator: ".",
     delimiter: ",",
     precision: 3,
     significant: false,
     stripInsignificantZeros: false,
-  },
-  currency: {
-    format: "%u%n",
-    negativeFormat: "-%u%n",
-    unit: "$",
-    separator: ".",
-    delimiter: ",",
-    precision: 2,
-    significant: false,
-    stripInsignificantZeros: false,
-  },
-  percentage: {
-    delimiter: "",
-    format: "%n%",
-  },
-  precision: {
-    delimiter: "",
-  },
-  human: {
-    delimiter: "",
-    precision: 3,
-    significant: true,
-    stripInsignificantZeros: true,
-    storage_units: {
-      format: "%n %u",
-      units: {
-        byte: new Hash<unknown, unknown>().set(":one", "Byte").set(":other", "Bytes"),
-        kb: "KB",
-        mb: "MB",
-        gb: "GB",
-        tb: "TB",
-        pb: "PB",
-        eb: "EB",
-        zb: "ZB",
-      },
-    },
-    decimal_units: {
-      format: "%n %u",
-      units: {
-        unit: "",
-        thousand: "Thousand",
-        million: "Million",
-        billion: "Billion",
-        trillion: "Trillion",
-        quadrillion: "Quadrillion",
-      },
-    },
-  },
-};
+  })
+  .set(
+    ":currency",
+    new Hash<string, unknown>().set(":format", {
+      format: "%u%n",
+      negativeFormat: "-%u%n",
+      unit: "$",
+      separator: ".",
+      delimiter: ",",
+      precision: 2,
+      significant: false,
+      stripInsignificantZeros: false,
+    }),
+  )
+  .set(":percentage", new Hash<string, unknown>().set(":format", { delimiter: "", format: "%n%" }))
+  .set(":precision", new Hash<string, unknown>().set(":format", { delimiter: "" }))
+  .set(
+    ":human",
+    new Hash<string, unknown>()
+      .set(":format", {
+        delimiter: "",
+        precision: 3,
+        significant: true,
+        stripInsignificantZeros: true,
+      })
+      .set(
+        ":storage_units",
+        new Hash<string, unknown>()
+          .set(":format", "%n %u")
+          .set(
+            ":units",
+            new Hash<string, unknown>()
+              .set(":byte", "Bytes")
+              .set(":kb", "KB")
+              .set(":mb", "MB")
+              .set(":gb", "GB")
+              .set(":tb", "TB"),
+          ),
+      )
+      .set(
+        ":decimal_units",
+        new Hash<string, unknown>()
+          .set(":format", "%n %u")
+          .set(
+            ":units",
+            new Hash<string, unknown>()
+              .set(":unit", "")
+              .set(":thousand", "Thousand")
+              .set(":million", "Million")
+              .set(":billion", "Billion")
+              .set(":trillion", "Trillion")
+              .set(":quadrillion", "Quadrillion"),
+          ),
+      ),
+  );
 
 export abstract class NumberConverter<TOptions extends NumberFormatOptions = NumberFormatOptions> {
   protected number: unknown;
@@ -135,17 +141,11 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   }
 
   protected defaultFormatOptions(): Record<string, unknown> {
+    const options = rbObjDup(DEFAULTS.get(":format") as Record<string, unknown>);
     const ns = (this.constructor as typeof NumberConverter).namespace;
-    const base = rbObjDup(DEFAULTS.format);
-    if (ns && DEFAULTS[ns]) {
-      const nsDefaults = DEFAULTS[ns];
-      for (const [k, v] of Object.entries(nsDefaults)) {
-        if (typeof v !== "object" || v === null) {
-          base[k] = v;
-        }
-      }
-    }
-    return base;
+    if (ns)
+      Object.assign(options, (DEFAULTS.get(`:${ns}`) as Hash<string, unknown>).get(":format"));
+    return options;
   }
 
   protected i18nFormatOptions(): Record<string, unknown> {
@@ -189,13 +189,8 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   }
 
   private defaultValue(key: string): unknown {
-    const parts = key.split(".");
-    let current: unknown = DEFAULTS;
-    for (const part of parts) {
-      if (current === null || current === undefined || typeof current !== "object")
-        return undefined;
-      current = (current as Record<string, unknown>)[part];
-    }
-    return current;
+    return key
+      .split(".")
+      .reduce<unknown>((defaults, k) => (defaults as Hash<string, unknown>).get(`:${k}`), DEFAULTS);
   }
 }
