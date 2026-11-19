@@ -526,7 +526,7 @@ ${requireStatements.join("\n")}`;
 
   /**
    * @internal
-   * @inventedArm replace — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json
+   * @inventedArm replace — PERMANENT
    */
   protected trailsVersionSpecifier(gemVersion = Trails.gemVersion()): string | string[] {
     if (gemVersion.segments().length === 3 || gemVersion.release().segments().length === 3) {

@@ -232,16 +232,6 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
 const RUBY_FILE_EXTENSIONS: Record<string, string> = { ".rb": ".ts", ".erb": ".tse" };
 const RUBY_FILE_EXTENSION = /\.e?rb(?![A-Za-z0-9_])/g;
 
-/** A gem's manifests and the port's npm manifests are one file to the comparer:
- *  a Rails `Gemfile` or gemspec is the port's `package.json` or
- *  `pnpm-workspace.yaml`, on either side. Ruled by the operator on 2026-11-18. */
-const MANIFEST_FILES = new Set([
-  "Gemfile",
-  "%name%.gemspec",
-  "package.json",
-  "pnpm-workspace.yaml",
-]);
-
 /**
  * A literal's key, through literals.ts#normalizeLiteral so escapes, numeric
  * underscores and symbol-vs-string spellings are absorbed exactly once.
@@ -260,7 +250,6 @@ function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string 
   if (key === "num:NaN" || key === null) return UNPARSEABLE_LITERAL;
   if (!key.startsWith("str:")) return key;
   const text = key.slice("str:".length);
-  if (MANIFEST_FILES.has(text)) return "str:package.json";
   const bare = text.startsWith(":") ? text.slice(1) : text;
   if (IDENTIFIER_STRING.test(bare)) return `str:${snakeToCamel(bare)}`;
   return `str:${text.replace(RUBY_FILE_EXTENSION, (ext) => RUBY_FILE_EXTENSIONS[ext])}`;
@@ -878,7 +867,19 @@ function padsDefaultedParams(
 
 /** Two argument keys naming the same value. Only `ref:` keys have more than one
  *  spelling; a literal key is already canonical. */
+/** A gem manifest Rails names, against the npm manifests the port writes in its
+ *  place: an app's or plugin's `Gemfile` is its `package.json` or
+ *  `pnpm-workspace.yaml`, and a gemspec is its `package.json`. Ruled by the
+ *  operator on 2026-11-18. */
+const RUBY_MANIFEST_FILES: Record<string, readonly string[]> = {
+  "str:Gemfile": ["str:package.json", "str:pnpm-workspace.yaml"],
+  "str:%name%.gemspec": ["str:package.json"],
+};
+
 function argKeysEqual(rubyKey: string, tsKey: string): boolean {
+  if (Object.hasOwn(RUBY_MANIFEST_FILES, rubyKey) && RUBY_MANIFEST_FILES[rubyKey].includes(tsKey)) {
+    return true;
+  }
   if (rubyKey.startsWith(CALLEE_PREFIX)) {
     return calleeKeys(rubyKey.slice(CALLEE_PREFIX.length)).includes(tsKey);
   }

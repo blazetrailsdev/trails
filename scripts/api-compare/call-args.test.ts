@@ -16,12 +16,6 @@ function site(name: string, args: string[], flags: string[] = []): CallSite {
 }
 
 describe("normalizeArg", () => {
-  it("reads a gem manifest as the npm manifest", () => {
-    expect(normalizeArg("str:Gemfile")).toBe(normalizeArg("str:package.json"));
-    expect(normalizeArg("str:%name%.gemspec")).toBe(normalizeArg("str:pnpm-workspace.yaml"));
-    expect(normalizeArg("str:Rakefile")).not.toBe(normalizeArg("str:package.json"));
-  });
-
   it("camelizes identifiers", () => {
     expect(normalizeArg("id:join_str")).toBe("ref:joinStr");
   });
@@ -159,6 +153,39 @@ describe("compareCallArgs colon-kept Symbol spelling", () => {
     expect(compareCallArgs(site("add", ["str::a.b"]), site("add", ["str:a.b"])).verdict).toBe(
       "mismatch",
     );
+  });
+});
+
+describe("compareCallArgs gem manifest", () => {
+  // plugin_generator.rb:53-63 `template "Gemfile"` / `template "%name%.gemspec"`.
+  it("reads a Gemfile as the npm manifest the port writes", () => {
+    for (const ts of ["str:package.json", "str:pnpm-workspace.yaml"]) {
+      expect(
+        compareCallArgs(site("template", ["str:Gemfile"]), site("template", [ts])).verdict,
+      ).toBe("match");
+    }
+  });
+
+  it("reads a gemspec as package.json only", () => {
+    expect(
+      compareCallArgs(
+        site("template", ["str:%name%.gemspec"]),
+        site("template", ["str:package.json"]),
+      ).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(
+        site("template", ["str:%name%.gemspec"]),
+        site("template", ["str:pnpm-workspace.yaml"]),
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("does not read the npm manifest as a gem manifest", () => {
+    expect(
+      compareCallArgs(site("template", ["str:package.json"]), site("template", ["str:Gemfile"]))
+        .verdict,
+    ).toBe("mismatch");
   });
 });
 
