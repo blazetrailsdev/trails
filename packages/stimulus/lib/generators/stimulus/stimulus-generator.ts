@@ -20,11 +20,6 @@ export class StimulusGenerator extends NamedBase {
   /** @internal */
   attribute?: string;
 
-  /**
-   * @missingRailsCall root — PERMANENT
-   * @missingRailsCall join — PERMANENT
-   * @missingRailsCall exist — PERMANENT
-   */
   async copyViewFiles(): Promise<void> {
     this.attribute = this.stimulusAttributeValue(this.controllerName());
     await this.template(
