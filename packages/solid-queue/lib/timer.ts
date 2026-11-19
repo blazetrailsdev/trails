@@ -3,18 +3,18 @@ import { Process } from "@blazetrails/ruby-compat";
 const sleep = (seconds: number) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
 export const Timer = {
-  async waitUntil(timeout: number, condition: () => boolean, block: () => unknown): Promise<void> {
+  async waitUntil(timeout: number, condition: () => boolean, block?: () => unknown): Promise<void> {
     if (timeout > 0) {
       const deadline = Timer.monotonicTimeNow() + timeout;
 
       while (Timer.monotonicTimeNow() < deadline && !condition()) {
         await sleep(0.1);
-        await block();
+        if (block) await block();
       }
     } else {
       while (!condition()) {
         await sleep(0.5);
-        await block();
+        if (block) await block();
       }
     }
   },

@@ -1,5 +1,5 @@
 import { Concern, extend } from "@blazetrails/activesupport";
-import { TimerTask, classModule } from "@blazetrails/ruby-compat";
+import { StandardError, TimerTask, classModule } from "@blazetrails/ruby-compat";
 import { ClaimedExecution } from "../claimed-execution.js";
 import { Process } from "../process.js";
 import { ProcessMissingError } from "../processes/process-missing-error.js";
@@ -12,6 +12,10 @@ interface MaintenanceHost {
   wrapInAppExecutor<T>(block: () => T): T;
   handleThreadError(error: unknown): void;
   pruneDeadProcesses(): Promise<void>;
+  releaseClaimedJobsBy(
+    terminatedProcess: { name: string },
+    options: { withError: Error },
+  ): Promise<void>;
 }
 
 export class Maintenance {
@@ -48,6 +52,34 @@ export class Maintenance {
         new ProcessMissingError(),
       ),
     );
+  }
+
+  /** @internal */
+  async releaseClaimedJobsBy(
+    this: MaintenanceHost,
+    terminatedProcess: { name: string },
+    { withError }: { withError: Error },
+  ): Promise<void> {
+    await this.wrapInAppExecutor(async () => {
+      const registeredProcess = await Process.findBy({ name: terminatedProcess.name });
+      if (registeredProcess) {
+        await registeredProcess.failAllClaimedExecutionsWith(withError);
+      }
+    });
+  }
+
+  /** @internal */
+  async attemptToReleaseClaimedJobsBy(
+    this: MaintenanceHost,
+    terminatedProcess: { name: string },
+    { withError }: { withError: Error },
+  ): Promise<void> {
+    try {
+      await this.releaseClaimedJobsBy(terminatedProcess, { withError: withError });
+    } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
+      this.handleThreadError(error);
+    }
   }
 }
 extend(Maintenance, Concern);

@@ -3,7 +3,7 @@ import { Thread, classModule, onSignal } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import type { ClassMethods as CallbacksClassMethods } from "../processes/callbacks.js";
 
-type Signal = "QUIT" | "INT" | "TERM";
+type Signal = "QUIT" | "INT" | "TERM" | "KILL";
 
 interface Supervisee {
   stop(): Promise<void>;
@@ -13,7 +13,8 @@ interface Supervisee {
 interface SignalsHost {
   _signalQueue?: Signal[];
   _signalHandlers?: (() => void)[];
-  forks: { [pid: string]: Supervisee };
+  processInstances: { [pid: string]: Supervisee };
+  isStandalone(): unknown;
   signalQueue(): Signal[];
   interrupt(): Promise<void>;
   stop(): Promise<void>;
@@ -46,6 +47,8 @@ export class Signals {
 
   /** @internal */
   async processSignalQueue(this: SignalsHost): Promise<void> {
+    if (!this.isStandalone()) return;
+
     let signal: Signal | undefined;
     while ((signal = this.signalQueue().shift())) {
       await this.handleSignal(signal);
@@ -79,12 +82,13 @@ export class Signals {
   /**
    * @internal
    * @missingRailsArgs kill — PERMANENT
+   * @inventedArm if — CONVERGEABLE solid-queue-fork-mode-unported-register
    */
   signalProcess(this: SignalsHost, pid: string, signal: Signal): void {
-    const supervisee = this.forks[pid];
+    const supervisee = this.processInstances[pid];
     if (supervisee == null) return;
 
-    if (signal === "QUIT") supervisee._thread?.kill();
+    if (signal === "QUIT" || signal === "KILL") supervisee._thread?.kill();
     else supervisee.stop().catch((error: unknown) => this.handleThreadError(error));
   }
 
@@ -99,6 +103,6 @@ extend(Signals, Concern);
     included(base: null, block: (this: CallbacksClassMethods) => void): void;
   }
 ).included(null, function () {
-  this.beforeBoot(":registerSignalHandlers");
-  this.afterShutdown(":restoreDefaultSignalHandlers");
+  this.beforeBoot(":registerSignalHandlers", { if: ":isStandalone" });
+  this.afterShutdown(":restoreDefaultSignalHandlers", { if: ":isStandalone" });
 });

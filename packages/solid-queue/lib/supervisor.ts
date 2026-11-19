@@ -1,37 +1,37 @@
 import { include, seconds } from "@blazetrails/activesupport";
-import { Process, STDERR, STDOUT, abort } from "@blazetrails/ruby-compat";
+import {
+  NotImplementedError,
+  Process,
+  STDERR,
+  STDOUT,
+  Thread,
+  abort,
+} from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
 import {
   LifecycleHooks,
   type ClassMethods as LifecycleHooksClassMethods,
 } from "./lifecycle-hooks.js";
 import { Base } from "./processes/base.js";
-import { ProcessExitError } from "./processes/process-exit-error.js";
 import { SolidQueue } from "./solid-queue.js";
 import { Maintenance } from "./supervisor/maintenance.js";
 import { Pidfiled } from "./supervisor/pidfiled.js";
 import { Signals } from "./supervisor/signals.js";
-import { Timer } from "./timer.js";
 
 interface Supervisee {
   name: string;
   mode: unknown;
-  _thread: { kill(): unknown; toKill: boolean };
+  _thread?: { kill(): unknown; toKill: boolean };
   isAlive(): boolean | null;
+  isBootTimedOut(): boolean;
+  markAsReaped(): void;
   supervisedBy(process: unknown): void;
-  start(): Promise<void>;
+  start(): Promise<unknown>;
   stop(): Promise<void>;
   isStopped(): boolean;
 }
 
-interface Status {
-  pid: string;
-  exitstatus: number | null;
-  isExited(): boolean;
-  isSignaled(): boolean;
-  stopsig: null;
-  termsig: null;
-}
+type ConfiguredProcess = InstanceType<typeof Configuration.Process>;
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below. */
 export class Supervisor extends Base {
@@ -58,7 +58,12 @@ export class Supervisor extends Base {
     const configuration = new Configuration(options);
 
     if (await configuration.isValid()) {
-      const supervisor = new this(configuration);
+      for (const warning of configuration.warnings.fullMessages) SolidQueue.logger?.warn(warning);
+
+      const klass = configuration.mode().isFork()
+        ? SolidQueue.ForkSupervisor!
+        : SolidQueue.AsyncSupervisor!;
+      const supervisor = new klass(configuration);
       await supervisor.start();
       return supervisor;
     } else {
@@ -67,17 +72,28 @@ export class Supervisor extends Base {
   }
 
   /** @internal */
-  private configuration: Configuration;
+  protected configuration: Configuration;
   /** @internal */
-  forks: { [pid: string]: Supervisee };
+  protected configuredProcesses: { [processId: string]: ConfiguredProcess };
   /** @internal */
-  private configuredProcesses: { [pid: string]: InstanceType<typeof Configuration.Process> };
+  protected processInstances: { [processId: string]: Supervisee };
 
   constructor(configuration: Configuration) {
     super(configuration);
     this.configuration = configuration;
-    this.forks = {};
+
     this.configuredProcesses = {};
+    this.processInstances = {};
+
+    (this as { name: string }).name = this.generateName();
+  }
+
+  mode(): ReturnType<Configuration["mode"]> {
+    return this.configuration.mode();
+  }
+
+  isStandalone(): unknown {
+    return this.configuration.isStandalone();
   }
 
   async start(): Promise<void> {
@@ -85,9 +101,13 @@ export class Supervisor extends Base {
     await this.runStartHooks();
 
     await this.startProcesses();
-    this.launchMaintenanceTask();
 
-    await this.supervise();
+    if (this.isStopped()) {
+      await this.shutdown();
+    } else {
+      this.launchMaintenanceTask();
+      await this.supervise();
+    }
   }
 
   override async stop(): Promise<void> {
@@ -95,8 +115,12 @@ export class Supervisor extends Base {
     await this.runStopHooks();
   }
 
+  override get kind(): string {
+    return `Supervisor(${this.configuration?.mode()})`;
+  }
+
   /** @internal */
-  private async boot(): Promise<void> {
+  protected async boot(): Promise<void> {
     await SolidQueue.instrument("start_process", { process: this }, async () => {
       await this.runCallbacks("boot", () => {
         this.syncStdStreams();
@@ -105,25 +129,21 @@ export class Supervisor extends Base {
   }
 
   /** @internal */
-  private async startProcesses(): Promise<void> {
+  protected async startProcesses(): Promise<void> {
     for (const configuredProcess of await this.configuration.configuredProcesses()) {
+      if (await this.isTimeToStop()) break;
+
       await this.startProcess(configuredProcess);
     }
   }
 
   /** @internal */
-  private async supervise(): Promise<void> {
+  protected async supervise(): Promise<void> {
     try {
-      while (true) {
-        if (this.isStopped()) break;
-
+      while (!(await this.isTimeToStop())) {
         this.setProcline();
-        await this.processSignalQueue();
-
-        if (!this.isStopped()) {
-          await this.reapAndReplaceTerminatedForks();
-          await this.interruptibleSleep(seconds(1));
-        }
+        await this.checkAndReplaceTerminatedProcesses();
+        await this.interruptibleSleep(seconds(1));
       }
     } finally {
       await this.shutdown();
@@ -131,44 +151,40 @@ export class Supervisor extends Base {
   }
 
   /** @internal */
-  private async startProcess(
-    configuredProcess: InstanceType<typeof Configuration.Process>,
-  ): Promise<void> {
+  protected async isTimeToStop(): Promise<boolean> {
+    await this.processSignalQueue();
+    return this.isStopped();
+  }
+
+  /** @internal */
+  protected async startProcess(configuredProcess: ConfiguredProcess): Promise<void> {
     const processInstance = configuredProcess.instantiate() as Supervisee;
     processInstance.supervisedBy(this.process);
-    processInstance.mode = "async";
+    /** @inventedArm isFork — CONVERGEABLE solid-queue-fork-mode-unported-register */
+    processInstance.mode = this.mode().isFork() ? "async" : this.mode();
 
-    await processInstance.start();
-    const pid = processInstance.name;
+    const processId = String(await processInstance.start());
 
-    this.configuredProcesses[pid] = configuredProcess;
-    this.forks[pid] = processInstance;
+    this.configuredProcesses[processId] = configuredProcess;
+    this.processInstances[processId] = processInstance;
   }
 
   /** @internal */
-  private setProcline(): void {
-    this.procline(`supervising ${this.supervisedProcesses().join(", ")}`);
-  }
+  protected async checkAndReplaceTerminatedProcesses(): Promise<void> {}
 
   /** @internal */
-  private async terminateGracefully(): Promise<void> {
+  protected async terminateGracefully(): Promise<void> {
     await SolidQueue.instrument(
       "graceful_termination",
       {
         process_id: this.processId,
         supervisor_pid: Process.pid,
-        supervised_processes: this.supervisedProcesses(),
+        supervised_processes: Object.keys(this.configuredProcesses),
       },
       async (payload) => {
-        this.termForks();
+        await this.performGracefulTermination();
 
-        await Timer.waitUntil(
-          SolidQueue.shutdownTimeout.toF(),
-          () => this.isAllForksTerminated(),
-          () => this.reapTerminatedForks(),
-        );
-
-        if (!this.isAllForksTerminated()) {
+        if (!this.isAllProcessesTerminated()) {
           payload.shutdown_timeout_exceeded = true;
           await this.terminateImmediately();
         }
@@ -177,22 +193,37 @@ export class Supervisor extends Base {
   }
 
   /** @internal */
-  private async terminateImmediately(): Promise<void> {
+  protected async terminateImmediately(): Promise<void> {
     await SolidQueue.instrument(
       "immediate_termination",
       {
         process_id: this.processId,
         supervisor_pid: Process.pid,
-        supervised_processes: this.supervisedProcesses(),
+        supervised_processes: Object.keys(this.configuredProcesses),
       },
-      () => {
-        this.quitForks();
+      async () => {
+        await this.performImmediateTermination();
       },
     );
   }
 
   /** @internal */
-  private async shutdown(): Promise<void> {
+  protected async performGracefulTermination(): Promise<void> {
+    throw new NotImplementedError();
+  }
+
+  /** @internal */
+  protected async performImmediateTermination(): Promise<void> {
+    throw new NotImplementedError();
+  }
+
+  /** @internal */
+  protected isAllProcessesTerminated(): boolean {
+    throw new NotImplementedError();
+  }
+
+  /** @internal */
+  protected async shutdown(): Promise<void> {
     await SolidQueue.instrument("shutdown_process", { process: this }, async () => {
       await this.runCallbacks("shutdown", () => {
         this.stopMaintenanceTask();
@@ -201,113 +232,15 @@ export class Supervisor extends Base {
   }
 
   /** @internal */
-  private syncStdStreams(): void {
+  protected setProcline(): void {
+    if (this.isStandalone()) {
+      this.procline(`supervising ${Object.keys(this.configuredProcesses).join(", ")}`);
+    }
+  }
+
+  /** @internal */
+  protected syncStdStreams(): void {
     STDOUT.sync = STDERR.sync = true;
-  }
-
-  /** @internal */
-  private supervisedProcesses(): string[] {
-    return Object.keys(this.forks);
-  }
-
-  /** @internal */
-  private termForks(): void {
-    this.signalProcesses(Object.keys(this.forks), "TERM");
-  }
-
-  /** @internal */
-  private quitForks(): void {
-    this.signalProcesses(Object.keys(this.forks), "QUIT");
-  }
-
-  /**
-   * @internal
-   * @missingRailsArgs waitpid2 — PERMANENT
-   */
-  private async reapAndReplaceTerminatedForks(): Promise<void> {
-    while (true) {
-      const [pid, status] = this.waitpid2() ?? [];
-      if (pid == null) break;
-
-      await this.replaceFork(pid, status!);
-    }
-  }
-
-  /**
-   * @internal
-   * @missingRailsArgs waitpid2 — PERMANENT
-   */
-  private async reapTerminatedForks(): Promise<void> {
-    while (true) {
-      const [pid, status] = this.waitpid2() ?? [];
-      if (pid == null) break;
-
-      const terminatedFork = this.forks[pid];
-      delete this.forks[pid];
-      if (terminatedFork && (!status!.isExited() || status!.exitstatus! > 0)) {
-        await this.handleClaimedJobsBy(terminatedFork, status!);
-      }
-
-      delete this.configuredProcesses[pid];
-    }
-  }
-
-  /** @internal */
-  private async replaceFork(pid: string, status: Status): Promise<void> {
-    await SolidQueue.instrument(
-      "replace_fork",
-      { supervisor_pid: Process.pid, pid: pid, status: status },
-      async (payload) => {
-        const terminatedFork = this.forks[pid];
-        if (terminatedFork) {
-          delete this.forks[pid];
-          payload.fork = terminatedFork;
-          await this.handleClaimedJobsBy(terminatedFork, status);
-
-          const configuredProcess = this.configuredProcesses[pid];
-          delete this.configuredProcesses[pid];
-          await this.startProcess(configuredProcess);
-        }
-      },
-    );
-  }
-
-  /** @internal */
-  private async handleClaimedJobsBy(terminatedFork: Supervisee, status: Status): Promise<void> {
-    const registeredProcess = await this.process!.supervisees.findBy({
-      name: terminatedFork.name,
-    });
-    if (registeredProcess) {
-      const error = new ProcessExitError(status);
-      await registeredProcess.failAllClaimedExecutionsWith(error);
-    }
-  }
-
-  /** @internal */
-  private isAllForksTerminated(): boolean {
-    return Object.keys(this.forks).length === 0;
-  }
-
-  /** @internal */
-  private waitpid2(): [string, Status] | null {
-    for (const [pid, instance] of Object.entries(this.forks)) {
-      if (instance.isAlive()) continue;
-
-      const exitBang = instance._thread.toKill;
-      const exited = exitBang || instance.isStopped();
-      return [
-        pid,
-        {
-          pid: pid,
-          exitstatus: exitBang ? 1 : exited ? 0 : null,
-          isExited: () => exited,
-          isSignaled: () => false,
-          stopsig: null,
-          termsig: null,
-        },
-      ];
-    }
-    return null;
   }
 }
 
@@ -317,11 +250,16 @@ export interface Supervisor {
   runStopHooks(): Promise<void>;
   launchMaintenanceTask(): void;
   stopMaintenanceTask(): void;
+  attemptToReleaseClaimedJobsBy(
+    terminatedProcess: { name: string },
+    options: { withError: Error },
+  ): Promise<void>;
   processSignalQueue(): Promise<void>;
-  signalProcesses(pids: string[], signal: "QUIT" | "INT" | "TERM"): void;
-  signalProcess(pid: string, signal: "QUIT" | "INT" | "TERM"): void;
+  signalProcesses(pids: string[], signal: "QUIT" | "INT" | "TERM" | "KILL"): void;
+  signalProcess(pid: string, signal: "QUIT" | "INT" | "TERM" | "KILL"): void;
   signalQueue(): string[];
   interrupt(): Promise<void>;
+  createThread<R>(block: () => R): Thread<Promise<R>>;
 }
 
 SolidQueue.Supervisor = Supervisor;

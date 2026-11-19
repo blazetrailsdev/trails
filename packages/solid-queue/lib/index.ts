@@ -27,6 +27,8 @@ export { Worker } from "./worker.js";
 export { Dispatcher } from "./dispatcher.js";
 export { Scheduler } from "./scheduler.js";
 export { Supervisor } from "./supervisor.js";
+export { AsyncSupervisor } from "./async-supervisor.js";
+export { ForkSupervisor } from "./fork-supervisor.js";
 export { Configuration } from "./configuration.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { Engine } from "./engine.js";

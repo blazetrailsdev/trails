@@ -151,6 +151,8 @@ export const SolidQueue = {
   };
   onSchedulerExit(block: () => unknown): void;
   Supervisor?: typeof import("./supervisor.js").Supervisor;
+  AsyncSupervisor?: typeof import("./async-supervisor.js").AsyncSupervisor;
+  ForkSupervisor?: typeof import("./fork-supervisor.js").ForkSupervisor;
   onStart(block: () => unknown): void;
   onStop(block: () => unknown): void;
   onExit(block: () => unknown): void;
