@@ -606,9 +606,9 @@ describe("FilterTest", () => {
       }
     }
     C.aroundAction(async (c, next) => {
-      (c as C).values.push("before");
+      c.values.push("before");
       await next();
-      (c as C).values.push("after");
+      c.values.push("after");
     });
     const ctrl = new C();
     await assertNothingRaised(() => run(ctrl, "index"));

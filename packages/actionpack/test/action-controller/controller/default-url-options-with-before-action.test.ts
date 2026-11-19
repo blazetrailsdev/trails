@@ -8,9 +8,7 @@ import { TestCase } from "../../../lib/action-controller/test-case.js";
 class ControllerWithBeforeActionAndDefaultUrlOptions extends Base {
   static {
     this.beforeAction((c) => {
-      I18n.setLocale(
-        (c as ControllerWithBeforeActionAndDefaultUrlOptions).params.get("locale") as string,
-      );
+      I18n.setLocale(c.params.get("locale") as string);
     });
     this.afterAction(() => {
       I18n.setLocale("en");
