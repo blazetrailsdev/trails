@@ -99,7 +99,10 @@ describe("DestroyCommand", () => {
     await commandInvoke("destroy", ["scaffold-controller", "Post"]);
     expect(invoke.mock.calls.map((c) => c[0])).toEqual([
       "scaffold_controller",
-      "scaffold_controller",
+      "scaffold-controller",
     ]);
+    expect(await Generators.findByNamespace("scaffold_controller")).toBe(
+      await Generators.findByNamespace("scaffold-controller"),
+    );
   });
 });

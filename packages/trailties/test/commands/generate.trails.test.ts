@@ -40,7 +40,7 @@ describe("GenerateCommand", () => {
     await commandInvoke("generate", ["scaffold-controller", "Post"]);
     expect(invoke.mock.calls.map((c) => c[0])).toEqual([
       "scaffold_controller",
-      "scaffold_controller",
+      "scaffold-controller",
     ]);
   });
 
@@ -58,7 +58,7 @@ describe("GenerateCommand", () => {
 
   it("lists generator names in kebab-case", async () => {
     const help = await capture(":stdout", () => commandInvoke("generate", ["--help"]));
-    expect(help).toMatch(/^\s+scaffold_controller$/m);
-    expect(help).not.toContain("scaffold-controller");
+    expect(help).toMatch(/^\s+scaffold-controller$/m);
+    expect(help).not.toContain("scaffold_controller");
   });
 });

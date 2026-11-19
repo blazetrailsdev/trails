@@ -1,5 +1,4 @@
 import "../constants.generate.generated.js";
-import { underscore } from "@blazetrails/activesupport";
 import { rbAryReplace, rbArgv } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
@@ -29,8 +28,7 @@ export class GenerateCommand extends Base {
 
     rbAryReplace(rbArgv(), this.args as string[]);
 
-    /** @inventedArm underscore — PERMANENT */
-    await Generators.invoke(underscore(generator), this.args as string[], {
+    await Generators.invoke(generator, this.args as string[], {
       behavior: "invoke",
       destinationRoot: root()?.toString(),
     });

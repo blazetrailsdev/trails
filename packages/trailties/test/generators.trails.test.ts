@@ -1,5 +1,4 @@
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { underscore } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
@@ -45,7 +44,7 @@ Trails.application = GeneratorsCommandTestApp.instance();
 describe("GeneratorsTest", () => {
   it("lookup finds a generator for every generator directory", async () => {
     const namespaces = (await Generators.publicNamespaces()).sort();
-    const expected = (await generatorDirectories()).map((d) => `trails:${underscore(d)}`).sort();
+    const expected = (await generatorDirectories()).map((d) => `trails:${d}`).sort();
     expect(namespaces).toEqual(expected);
   });
 
@@ -66,7 +65,7 @@ describe("GeneratorsTest", () => {
   });
 
   it("every generator directory is reachable as a trails generate subcommand", async () => {
-    for (const dir of (await generatorDirectories()).map((d) => underscore(d))) {
+    for (const dir of await generatorDirectories()) {
       expect((await Generators.findByNamespace(`trails:${dir}`))?.namespace()).toEqual(
         `trails:${dir}`,
       );
@@ -162,8 +161,8 @@ describe("Generators.findByNamespace fallbacks and context", () => {
   });
 
   it("resolves a generator from either spelling of its namespace", async () => {
-    const klass = await Generators.findByNamespace("scaffold_controller");
-    expect(klass?.namespace()).toBe("trails:scaffold_controller");
-    expect(await Generators.findByNamespace(underscore("scaffold-controller"))).toBe(klass);
+    const dashed = await Generators.findByNamespace("scaffold-controller");
+    expect(dashed?.namespace()).toBe("trails:scaffold-controller");
+    expect(await Generators.findByNamespace("scaffold_controller")).toBe(dashed);
   });
 });

@@ -529,7 +529,7 @@ describe("Base.help", () => {
     const help = await capture("stdout", () =>
       Generators.invoke("resource_route", ["--help"], { destinationRoot: "/tmp" }),
     );
-    expect(help).toContain("bin/trails generate resource_route NAME");
+    expect(help).toContain("bin/trails generate resource-route NAME");
     expect(help).toContain("Description:\n    Create ");
   });
 
