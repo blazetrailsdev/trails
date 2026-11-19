@@ -4513,8 +4513,11 @@ export function buildEntitiesByName(
 /**
  * The constructor signature a `new className(…)` reaches: the class's own
  * `constructor`, else the nearest one up its `superclass` chain, across
- * packages (`MoneyDecoder` → `PG.SimpleDecoder` → `PG.Coder`). Undefined when
- * the class or a link of the chain does not resolve to one entity.
+ * packages (`MoneyDecoder` → `PG.SimpleDecoder` → `PG.Coder`). A root class
+ * with no `constructor` has JS's implicit zero-parameter one. Undefined when
+ * the class or a link of the chain does not resolve to one entity, or a link is
+ * a call expression (`DelegateClass(ValueType)`, `Struct.new(…)`); the
+ * extractor records an `extends` expression without its type arguments.
  */
 export function constructorSigsThroughSuperclass(
   entitiesByName: Map<string, ClassInfo[]>,
@@ -4536,7 +4539,8 @@ export function constructorSigsThroughSuperclass(
     seen.add(entity);
     const ctors = entity.instanceMethods.filter((m) => m.name === "constructor");
     if (ctors.length > 0) return ctors.map(arityParams);
-    if (entity.superclass === undefined) return undefined;
+    if (entity.superclass === undefined) return [[]];
+    if (!/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(entity.superclass)) return undefined;
     entity = resolveEntityByDeclaringFile(
       entitiesByName.get(entity.superclass.split(".").at(-1)!) ?? [],
       entity.file ?? childFile,

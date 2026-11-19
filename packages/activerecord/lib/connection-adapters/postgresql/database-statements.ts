@@ -13,6 +13,7 @@ import {
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
 import { aryJoin, b, count, eachWithIndex, fetch, rbRegMatchP } from "@blazetrails/ruby-compat";
+import type { ConnectionPool, NullPool } from "../abstract/connection-pool.js";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -284,7 +285,7 @@ export interface PerformQueryHost extends HandleWarningsHost {
   sqlKey(sql: string | null): string;
   _statements: StatementPool;
   lock: { synchronize<T>(block: () => Promise<T>): Promise<T> };
-  pool: unknown;
+  pool: ConnectionPool | NullPool;
   verifiedBang(): void;
   /** @internal */
   handleWarnings(sql: unknown): void;

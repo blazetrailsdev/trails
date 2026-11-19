@@ -1846,7 +1846,17 @@ describe("inherited-constructor padding", () => {
     expect(compareCallArgs(ruby, tsCall, undefined, sigs).verdict).toBe("match");
   });
 
-  it("does not resolve a class with no constructor anywhere up its chain", () => {
+  it("does not resolve an unknown class or a call-expression superclass", () => {
     expect(constructorSigsThroughSuperclass(entities, "Unknown", "adapter.ts")).toBeUndefined();
+    const delegated = new Map(entities);
+    delegated.set("Wrapper", [cls("Wrapper", "wrapper.ts", "DelegateClass(Coder)")]);
+    expect(constructorSigsThroughSuperclass(delegated, "Wrapper", "adapter.ts")).toBeUndefined();
+  });
+
+  it("reads a root class with no constructor as JS's implicit zero-parameter one", () => {
+    const rooted = new Map([["Plain", [cls("Plain", "plain.ts")]]]);
+    const sigs = constructorSigsThroughSuperclass(rooted, "Plain", "adapter.ts");
+    expect(sigs).toEqual([[]]);
+    expect(compareCallArgs(ruby, tsCall, undefined, sigs).verdict).toBe("mismatch");
   });
 });
