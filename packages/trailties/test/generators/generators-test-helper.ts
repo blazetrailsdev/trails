@@ -119,7 +119,8 @@ export async function runAppUpdate(
   await Dir.chdir(appRoot, async () => {
     const frameworkRoot = File.expandPath("../..", import.meta.dirname);
     await FileUtils.mkdirPAsync("node_modules/@blazetrails");
-    const ports = Object.keys(JSON.parse(await File.readAsync("package.json")).dependencies ?? {})
+    const manifest = JSON.parse(await File.readAsync("package.json")) as { dependencies?: object };
+    const ports = Object.keys(manifest.dependencies ?? {})
       .filter((name) => name.startsWith("@blazetrails/") && name !== "@blazetrails/trailties")
       .map((name) => File.join(frameworkRoot, "..", name.slice("@blazetrails/".length)));
     await FileUtils.lnSfAsync(
