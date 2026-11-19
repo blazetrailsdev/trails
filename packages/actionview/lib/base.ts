@@ -81,6 +81,7 @@ export class Base {
   declare static prefixPartialPathWithControllerNamespace: boolean;
   declare static isPrefixPartialPathWithControllerNamespace: boolean;
   declare prefixPartialPathWithControllerNamespace: boolean;
+  declare static defaultFormBuilder: unknown;
   declare static defaultFormats: readonly string[] | null | undefined;
   declare defaultFormats: readonly string[] | null | undefined;
   declare static automaticallyDisableSubmitTag: boolean;

@@ -20,6 +20,6 @@ export const Routable = {
   },
 };
 extend(Routable, Concern);
-Concern.included.call(Routable as never, null, function (this: typeof InboundEmail) {
+Concern.included.call(Routable, null, function (this: typeof InboundEmail) {
   this.afterCreateCommit(":routeLater", { if: ":isPending" });
 });

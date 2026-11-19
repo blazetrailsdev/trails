@@ -247,7 +247,7 @@ export abstract class AbstractRenderer {
   ): Record<string, readonly (string | symbol)[]> {
     const details: Record<string, readonly (string | symbol)[]> = {};
     for (const key of this.lookupContext.constructor
-      ? ((this.lookupContext.constructor as unknown as { registeredDetails?: readonly string[] })
+      ? ((this.lookupContext.constructor as { registeredDetails?: readonly string[] })
           .registeredDetails ?? [])
       : []) {
       const value = options[key];

@@ -66,7 +66,7 @@ export const ClassMethods = {
 /** @internal */
 export const Previews = { ClassMethods };
 extend(Previews, Concern);
-Concern.included.call(Previews as never, null, function (this: PreviewsClass) {
+Concern.included.call(Previews, null, function (this: PreviewsClass) {
   mattrAccessor.call(this, "previewPaths", { instanceWriter: false, default: [] });
   mattrAccessor.call(this, "showPreviews", { instanceWriter: false });
   mattrAccessor.call(this, "previewInterceptors", {

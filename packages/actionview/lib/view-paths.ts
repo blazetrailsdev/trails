@@ -183,8 +183,6 @@ Object.assign(ViewPaths.prototype, {
   prependViewPath,
 });
 extend(ViewPaths, Concern);
-(
-  ViewPaths as unknown as { included(base: null, block: (this: ViewPathsClass) => void): void }
-).included(null, function (this: ViewPathsClass) {
+Concern.included.call(ViewPaths, null, function (this: ViewPathsClass) {
   PathRegistry.setViewPaths(this, new PathSet());
 });

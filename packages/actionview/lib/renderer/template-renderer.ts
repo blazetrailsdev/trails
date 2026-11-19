@@ -117,7 +117,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
             view._layoutFor!(...name),
           ) as Promise<string | SafeBuffer | Uint8Array>,
       ),
-    ) as unknown as Rendered;
+    ) as Rendered;
   }
 
   /** @internal */

@@ -42,6 +42,7 @@ import {
   rbObjSingletonClass,
   TopLevel,
   constSet,
+  rbObjIvarSet,
 } from "@blazetrails/ruby-compat";
 
 import { Base } from "../../lib/base.js";
@@ -295,7 +296,6 @@ type View = Base &
   Record<string, (...args: unknown[]) => unknown> & {
     post: Post;
     car: Car;
-    post_delegator: PostDelegator;
   };
 
 describe("FormHelperTest", () => {
@@ -458,7 +458,7 @@ describe("FormHelperTest", () => {
     view.car = new Car("#000FFF");
     const postDelegator = new PostDelegator();
     postDelegator.title = "Hello World";
-    view.post_delegator = postDelegator;
+    rbObjIvarSet(view, "@post_delegator", postDelegator);
   });
 
   afterEach(async () => {

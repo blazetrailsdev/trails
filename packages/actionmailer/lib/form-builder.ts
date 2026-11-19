@@ -19,7 +19,7 @@ export const FormBuilder = {
   },
 };
 extend(FormBuilder, Concern);
-Concern.included.call(FormBuilder as never, null, function (this: object) {
+Concern.included.call(FormBuilder, null, function (this: object) {
   classAttribute.call(this, "_defaultFormBuilder", { instanceAccessor: false });
 });
 

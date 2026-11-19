@@ -181,7 +181,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
 
     const collectionIterator = rbObjRespondTo(collection, "preloadAssociations")
       ? new PreloadCollectionIterator(
-          collection as unknown as Collection,
+          collection as Collection,
           partial,
           iterVars,
           collection as Relation,

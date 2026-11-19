@@ -11,9 +11,12 @@ import {
 } from "@blazetrails/activesupport";
 import { ActionNotFound, type Base } from "./base.js";
 
-export type ActionCallback = (controller: Base) => void | boolean | Promise<void | boolean>;
+export type ActionCallback<C = Base> = (controller: C) => void | boolean | Promise<void | boolean>;
 
-export type AroundCallback = (controller: Base, next: () => Promise<void>) => void | Promise<void>;
+export type AroundCallback<C = Base> = (
+  controller: C,
+  next: () => Promise<void>,
+) => void | Promise<void>;
 
 export interface CallbackPredicateLike {
   isMatch(controller: Base): boolean;
@@ -42,21 +45,24 @@ type CallbackObject = {
 };
 
 /** @internal */
-type CallbackFilter = ActionCallback | AroundCallback | string | CallbackObject;
+type CallbackFilter<C = Base> = ActionCallback<C> | AroundCallback<C> | string | CallbackObject;
+
+/** @internal */
+type AnyCallbackFilter = CallbackFilter<never>;
 
 /** @internal */
 type CallbackOptionsWithFilters = CallbackOptions & {
-  filters?: CallbackFilter[];
+  filters?: AnyCallbackFilter[];
 };
 
 /** @internal */
 export class ActionFilter implements CallbackPredicateLike {
-  private readonly _filters: ReadonlyArray<CallbackFilter>;
+  private readonly _filters: ReadonlyArray<AnyCallbackFilter>;
   private readonly _conditionalKey: "only" | "except";
   private readonly _actions: ReadonlySet<string>;
 
   constructor(
-    filters: ReadonlyArray<CallbackFilter>,
+    filters: ReadonlyArray<AnyCallbackFilter>,
     conditionalKey: "only" | "except",
     actions: string | string[],
   ) {
@@ -129,13 +135,13 @@ export function _normalizeCallbackOption(
 }
 
 /** @internal */
-export function _insertCallbacks(
-  callbacks: Array<CallbackFilter | CallbackOptions>,
-  block: ActionCallback | AroundCallback | null = null,
-  yieldFn: (callback: CallbackFilter, options: CallbackOptions) => void,
+export function _insertCallbacks<C = Base>(
+  callbacks: Array<CallbackFilter<C> | CallbackOptions>,
+  block: ActionCallback<C> | AroundCallback<C> | null = null,
+  yieldFn: (callback: CallbackFilter<C>, options: CallbackOptions) => void,
 ): void {
   const options = extractOptionsBang(callbacks) as CallbackOptionsWithFilters;
-  const filters = callbacks as CallbackFilter[];
+  const filters = callbacks as CallbackFilter<C>[];
   if (block) filters.push(block);
   options.filters = filters;
   _normalizeCallbackOptions(options);
@@ -146,7 +152,7 @@ export function _insertCallbacks(
 }
 
 /** @internal */
-function _inspectFilter(filter: CallbackFilter): string {
+function _inspectFilter(filter: AnyCallbackFilter): string {
   if (typeof filter === "string") return `:${filter}`;
   const fn = filter as { name?: string };
   return fn.name && fn.name.length > 0 ? `:${fn.name}` : "#<Proc:anonymous>";
@@ -154,20 +160,21 @@ function _inspectFilter(filter: CallbackFilter): string {
 
 type ActionCallbackArgs<T> = Array<T | string | CallbackObject | CallbackOptions>;
 
-export function beforeAction(
-  this: Extended<typeof ASCallbacks.ClassMethods>,
-  ...names: ActionCallbackArgs<ActionCallback>
-): void {
+/** @internal */
+type ControllerOf<H> = H extends abstract new (...args: never) => infer C ? C : Base;
+
+export function beforeAction<
+  H extends Pick<Extended<typeof ASCallbacks.ClassMethods>, "setCallback" | "skipCallback">,
+>(this: H, ...names: ActionCallbackArgs<ActionCallback<ControllerOf<H>>>): void {
   const callback = "before";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback("process_action", callback, name, options);
   });
 }
 
-export function prependBeforeAction(
-  this: Extended<typeof ASCallbacks.ClassMethods>,
-  ...names: ActionCallbackArgs<ActionCallback>
-): void {
+export function prependBeforeAction<
+  H extends Pick<Extended<typeof ASCallbacks.ClassMethods>, "setCallback" | "skipCallback">,
+>(this: H, ...names: ActionCallbackArgs<ActionCallback<ControllerOf<H>>>): void {
   const callback = "before";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback("process_action", callback, name, {
@@ -177,30 +184,27 @@ export function prependBeforeAction(
   });
 }
 
-export function skipBeforeAction(
-  this: Extended<typeof ASCallbacks.ClassMethods>,
-  ...names: ActionCallbackArgs<ActionCallback>
-): void {
+export function skipBeforeAction<
+  H extends Pick<Extended<typeof ASCallbacks.ClassMethods>, "setCallback" | "skipCallback">,
+>(this: H, ...names: ActionCallbackArgs<ActionCallback<ControllerOf<H>>>): void {
   const callback = "before";
   _insertCallbacks(names, null, (name, options) => {
     this.skipCallback("process_action", callback, name, options);
   });
 }
 
-export function afterAction(
-  this: Extended<typeof ASCallbacks.ClassMethods>,
-  ...names: ActionCallbackArgs<ActionCallback>
-): void {
+export function afterAction<
+  H extends Pick<Extended<typeof ASCallbacks.ClassMethods>, "setCallback" | "skipCallback">,
+>(this: H, ...names: ActionCallbackArgs<ActionCallback<ControllerOf<H>>>): void {
   const callback = "after";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback("process_action", callback, name, options);
   });
 }
 
-export function prependAfterAction(
-  this: Extended<typeof ASCallbacks.ClassMethods>,
-  ...names: ActionCallbackArgs<ActionCallback>
-): void {
+export function prependAfterAction<
+  H extends Pick<Extended<typeof ASCallbacks.ClassMethods>, "setCallback" | "skipCallback">,
+>(this: H, ...names: ActionCallbackArgs<ActionCallback<ControllerOf<H>>>): void {
   const callback = "after";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback("process_action", callback, name, {
@@ -210,30 +214,27 @@ export function prependAfterAction(
   });
 }
 
-export function skipAfterAction(
-  this: Extended<typeof ASCallbacks.ClassMethods>,
-  ...names: ActionCallbackArgs<ActionCallback>
-): void {
+export function skipAfterAction<
+  H extends Pick<Extended<typeof ASCallbacks.ClassMethods>, "setCallback" | "skipCallback">,
+>(this: H, ...names: ActionCallbackArgs<ActionCallback<ControllerOf<H>>>): void {
   const callback = "after";
   _insertCallbacks(names, null, (name, options) => {
     this.skipCallback("process_action", callback, name, options);
   });
 }
 
-export function aroundAction(
-  this: Extended<typeof ASCallbacks.ClassMethods>,
-  ...names: ActionCallbackArgs<AroundCallback>
-): void {
+export function aroundAction<
+  H extends Pick<Extended<typeof ASCallbacks.ClassMethods>, "setCallback" | "skipCallback">,
+>(this: H, ...names: ActionCallbackArgs<AroundCallback<ControllerOf<H>>>): void {
   const callback = "around";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback("process_action", callback, name, options);
   });
 }
 
-export function prependAroundAction(
-  this: Extended<typeof ASCallbacks.ClassMethods>,
-  ...names: ActionCallbackArgs<AroundCallback>
-): void {
+export function prependAroundAction<
+  H extends Pick<Extended<typeof ASCallbacks.ClassMethods>, "setCallback" | "skipCallback">,
+>(this: H, ...names: ActionCallbackArgs<AroundCallback<ControllerOf<H>>>): void {
   const callback = "around";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback("process_action", callback, name, {
@@ -243,10 +244,9 @@ export function prependAroundAction(
   });
 }
 
-export function skipAroundAction(
-  this: Extended<typeof ASCallbacks.ClassMethods>,
-  ...names: ActionCallbackArgs<AroundCallback>
-): void {
+export function skipAroundAction<
+  H extends Pick<Extended<typeof ASCallbacks.ClassMethods>, "setCallback" | "skipCallback">,
+>(this: H, ...names: ActionCallbackArgs<AroundCallback<ControllerOf<H>>>): void {
   const callback = "around";
   _insertCallbacks(names, null, (name, options) => {
     this.skipCallback("process_action", callback, name, options);

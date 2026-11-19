@@ -37,7 +37,7 @@ export const ClassMethods = { beforeDeliver, afterDeliver, aroundDeliver };
 
 export const Callbacks = { ClassMethods };
 extend(Callbacks, Concern);
-Concern.included.call(Callbacks as never, null, function (this: CallbacksClass) {
+Concern.included.call(Callbacks, null, function (this: CallbacksClass) {
   include(this, ASCallbacks);
   this.defineCallbacks("deliver", { skipAfterCallbacksIfTerminated: true });
 });

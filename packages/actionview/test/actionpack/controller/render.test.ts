@@ -109,7 +109,7 @@ class TestController extends ActionController.Base {
     this.layout(":determineLayout");
     this.beforeAction(
       (c) => {
-        (c as TestController).request.format = "xml";
+        c.request.format = "xml";
       },
       { only: "renderWithFilters" },
     );

@@ -113,6 +113,7 @@ export class TestController extends ActionController.Base {
 include(TestController, ActionDispatch.TestProcess);
 
 export interface Behavior {
+  constructor: BehaviorClass;
   controller: TestController;
   request: TestController["request"];
   outputBuffer: OutputBuffer;
@@ -130,7 +131,8 @@ export interface Behavior {
   renderedViews(): RenderedViewsCollection;
 }
 
-interface BehaviorClass {
+/** @internal */
+export interface BehaviorClass {
   name: string;
   contentClass: typeof RenderedViewContent;
   _helperClass?: HelperModule | null;
@@ -146,7 +148,7 @@ interface BehaviorClass {
 
 export const Behavior = {
   get lookupContext(): unknown {
-    return (this as unknown as Behavior).controller.lookupContext;
+    return this.controller.lookupContext;
   },
   controller: undefined as TestController | undefined,
   request: undefined as TestController["request"] | undefined,
@@ -157,9 +159,9 @@ export const Behavior = {
   render,
   renderedViews,
   get _routes(): unknown {
-    const controller = (this as unknown as Behavior).controller;
+    const controller = this.controller;
     if (rbObjRespondTo(controller, "_routes")) {
-      return (controller as unknown as { _routes: unknown })._routes;
+      return controller._routes;
     }
     return null;
   },
@@ -175,7 +177,7 @@ export const Behavior = {
   RenderedViewsCollection: undefined as typeof RenderedViewsCollection | undefined,
   Locals: undefined as typeof Locals | undefined,
   INTERNAL_IVARS: undefined as typeof INTERNAL_IVARS | undefined,
-};
+} satisfies ThisType<Behavior>;
 extend(Behavior, Concern);
 
 include(Behavior, ActionDispatch.TestProcess);
@@ -252,14 +254,13 @@ export const ClassMethods = {
   },
 
   set helperClass(helperClass: HelperModule | null) {
-    (this as unknown as BehaviorClass)._helperClass = helperClass;
+    this._helperClass = helperClass;
   },
 
   get helperClass(): HelperModule | null {
-    const klass = this as unknown as BehaviorClass;
     return (
-      (Object.hasOwn(klass, "_helperClass") ? klass._helperClass : null) ||
-      (klass._helperClass = klass.determineDefaultHelperClass(klass.name))
+      (Object.hasOwn(this, "_helperClass") ? this._helperClass : null) ||
+      (this._helperClass = this.determineDefaultHelperClass(this.name))
     );
   },
 
@@ -268,13 +269,11 @@ export const ClassMethods = {
     if (this.helperClass) this.helper(this.helperClass);
     include(this as never, this._helpers);
   },
-};
+} satisfies ThisType<BehaviorClass>;
 
 Behavior.ClassMethods = ClassMethods;
 
-(
-  Behavior as unknown as { included(base: null, block: (this: BehaviorClass) => void): void }
-).included(null, function (this: BehaviorClass) {
+Concern.included.call(Behavior, null, function (this: BehaviorClass) {
   classAttribute.call(this, "contentClass", {
     instanceAccessor: false,
     default: RenderedViewContent,
@@ -284,10 +283,7 @@ Behavior.ClassMethods = ClassMethods;
     ...contentClassReader,
     get(this: BehaviorClass) {
       if (!Object.hasOwn(this, "__class_attr_contentClass")) {
-        ClassMethods.inherited.call(
-          rbClassSuperclass(this as never) as unknown as BehaviorClass,
-          this,
-        );
+        ClassMethods.inherited.call(rbClassSuperclass(this)!, this);
       }
       return contentClassReader.get!.call(this);
     },
@@ -321,14 +317,14 @@ async function setupWithController(this: Behavior): Promise<void> {
   this.request = this.controller.request;
   this.viewFlow = new OutputFlow();
   this.outputBuffer = new OutputBuffer();
-  this.rendered = new (this.constructor as unknown as BehaviorClass).contentClass("");
+  this.rendered = new this.constructor.contentClass("");
 
   rbModDefineMethod(controllerClass, "_testCase", () => this);
 }
 
 function config(this: Behavior): unknown {
   if (rbObjRespondTo(this.controller, "config")) {
-    return (this.controller as unknown as { config: unknown }).config;
+    return this.controller.config;
   }
   return null;
 }
@@ -339,7 +335,7 @@ function render(
   localAssigns: Record<string, unknown> = {},
   block?: () => unknown,
 ): ReturnType<Base["render"]> {
-  const contentClass = (this.constructor as unknown as BehaviorClass).contentClass;
+  const contentClass = this.constructor.contentClass;
   this.view().assign(this.viewAssigns());
   const output = this.view().render(options, localAssigns, block);
   if (output instanceof Promise) {
@@ -424,7 +420,7 @@ export const Locals = {
 /** @internal */
 function view(this: Behavior): LocalsView {
   return (this.__view ??= (() => {
-    const view = this.controller.viewContext() as unknown as LocalsView;
+    const view = this.controller.viewContext() as LocalsView;
     include(rbObjSingletonClass(view), this._helpers);
     extend(view, Locals);
     view.renderedViews = this.renderedViews();
@@ -491,7 +487,7 @@ function methodMissing(this: Behavior, selector: string, ...args: unknown[]): un
   try {
     routes =
       rbObjRespondTo(this.controller, "_routes") &&
-      (this.controller as unknown as { _routes: RoutesHost })._routes;
+      (this.controller as { _routes: RoutesHost })._routes;
   } catch (e) {
     if (!(e instanceof StandardError)) throw e;
   }
@@ -523,7 +519,7 @@ function respondToMissing(this: Behavior, name: string, _includePrivate = false)
   try {
     routes =
       rbObjRespondTo(this.controller, "_routes") &&
-      (this.controller as unknown as { _routes: RoutesHost })._routes;
+      (this.controller as { _routes: RoutesHost })._routes;
   } catch (e) {
     if (!(e instanceof StandardError)) throw e;
   }

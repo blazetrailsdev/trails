@@ -23,7 +23,7 @@ export const ClassMethods = {
 
 export const Routing = { ClassMethods };
 extend(Routing, Concern);
-Concern.included.call(Routing as never, null, function (this: object) {
+Concern.included.call(Routing, null, function (this: object) {
   cattrAccessor.call(this, "router", { default: new Router() });
 });
 

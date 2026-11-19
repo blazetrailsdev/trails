@@ -198,7 +198,9 @@ function seatedNames(statement: ts.Statement): string[] {
   return statement.declarationList.declarations.flatMap((decl) => {
     if (!ts.isIdentifier(decl.name) || !/^[A-Z][a-z]/.test(decl.name.text)) return [];
     const init = decl.initializer;
-    const isModule = init !== undefined && ts.isObjectLiteralExpression(init);
+    const isModule =
+      init !== undefined &&
+      ts.isObjectLiteralExpression(ts.isSatisfiesExpression(init) ? init.expression : init);
     const isStruct =
       init !== undefined &&
       ts.isCallExpression(init) &&

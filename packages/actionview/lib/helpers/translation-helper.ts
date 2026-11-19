@@ -172,8 +172,6 @@ export const TranslationHelper = defineModule({ translate, t, localize, l }) as 
 extend(TranslationHelper, Concern);
 include(TranslationHelper, TagHelper);
 extend(TranslationHelper, { raiseOnMissingTranslations, setRaiseOnMissingTranslations });
-(
-  TranslationHelper as unknown as { included(base: null, block: (this: object) => void): void }
-).included(null, function () {
+Concern.included.call(TranslationHelper, null, function () {
   mattrAccessor.call(this, "debugMissingTranslation", { default: true });
 });

@@ -14,7 +14,7 @@ const MOVED_TO = "packages/activerecord/lib/aggregations-moved.ts";
 const CAST = "blazetrails/no-double-cast";
 const GROWN = "packages/actionview/lib/layouts.ts";
 const SHRUNK = "packages/actionview/lib/lookup-context.ts";
-const ADDED = "packages/actionview/lib/helpers/sanitize-helper.ts";
+const ADDED = "packages/actionview/lib/helpers/form-helper.ts";
 
 describe("exceedances", () => {
   it("flags a file above its base count and a file new at a non-zero count", () => {

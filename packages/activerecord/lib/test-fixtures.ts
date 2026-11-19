@@ -475,7 +475,7 @@ export const TestFixtures = {
 Object.defineProperty(TestFixtures, "ClassMethods", { value: ClassMethods });
 extend(TestFixtures, Concern);
 
-Concern.included.call(TestFixtures as never, null, function (this: TestCaseClass) {
+Concern.included.call(TestFixtures, null, function (this: TestCaseClass) {
   classAttribute.call(this, "fixturePaths", { instanceWriter: false, default: [] });
   classAttribute.call(this, "fixtureTableNames", { default: [] });
   classAttribute.call(this, "fixtureClassNames", { default: {} });

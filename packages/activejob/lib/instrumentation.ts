@@ -74,7 +74,7 @@ export const Instrumentation = defineModule(
 );
 extend(Instrumentation, Concern);
 
-Concern.included.call(Instrumentation as never, null, function (this: InstrumentationClass) {
+Concern.included.call(Instrumentation, null, function (this: InstrumentationClass) {
   this.aroundEnqueue(
     block(function (this: InstrumentationJob, _: unknown, block: () => unknown) {
       return this.scheduledAt != null && this.scheduledAt !== false

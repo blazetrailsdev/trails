@@ -67,15 +67,15 @@ export function stripLinks(
 
 export const ClassMethods = {
   set fullSanitizer(value: Sanitizer) {
-    (this as unknown as SanitizeHelperClass)._fullSanitizer = value;
+    this._fullSanitizer = value;
   },
 
   set linkSanitizer(value: Sanitizer) {
-    (this as unknown as SanitizeHelperClass)._linkSanitizer = value;
+    this._linkSanitizer = value;
   },
 
   set safeListSanitizer(value: SafeListSanitizer) {
-    (this as unknown as SanitizeHelperClass)._safeListSanitizer = value;
+    this._safeListSanitizer = value;
   },
 
   get sanitizerVendor(): SanitizerVendor {
@@ -91,29 +91,26 @@ export const ClassMethods = {
   },
 
   get fullSanitizer(): Sanitizer {
-    const self = this as unknown as SanitizeHelperClass;
-    if (!Object.hasOwn(self, "_fullSanitizer") || self._fullSanitizer == null) {
-      self._fullSanitizer = new self.sanitizerVendor.fullSanitizer();
+    if (!Object.hasOwn(this, "_fullSanitizer") || this._fullSanitizer == null) {
+      this._fullSanitizer = new this.sanitizerVendor.fullSanitizer();
     }
-    return self._fullSanitizer;
+    return this._fullSanitizer;
   },
 
   get linkSanitizer(): Sanitizer {
-    const self = this as unknown as SanitizeHelperClass;
-    if (!Object.hasOwn(self, "_linkSanitizer") || self._linkSanitizer == null) {
-      self._linkSanitizer = new self.sanitizerVendor.linkSanitizer();
+    if (!Object.hasOwn(this, "_linkSanitizer") || this._linkSanitizer == null) {
+      this._linkSanitizer = new this.sanitizerVendor.linkSanitizer();
     }
-    return self._linkSanitizer;
+    return this._linkSanitizer;
   },
 
   get safeListSanitizer(): SafeListSanitizer {
-    const self = this as unknown as SanitizeHelperClass;
-    if (!Object.hasOwn(self, "_safeListSanitizer") || self._safeListSanitizer == null) {
-      self._safeListSanitizer = new self.sanitizerVendor.safeListSanitizer();
+    if (!Object.hasOwn(this, "_safeListSanitizer") || this._safeListSanitizer == null) {
+      this._safeListSanitizer = new this.sanitizerVendor.safeListSanitizer();
     }
-    return self._safeListSanitizer;
+    return this._safeListSanitizer;
   },
-};
+} satisfies ThisType<SanitizeHelperClass>;
 
 Object.defineProperties(
   ClassMethods,

@@ -48,7 +48,7 @@ function clearTestDeliveries(): void {
 
 export const ClearTestDeliveries = { clearTestDeliveries };
 extend(ClearTestDeliveries, Concern);
-Concern.included.call(ClearTestDeliveries as never, null, function (this: BehaviorClass) {
+Concern.included.call(ClearTestDeliveries, null, function (this: BehaviorClass) {
   this.setup(":clearTestDeliveries");
   this.teardown(":clearTestDeliveries");
 });
@@ -160,7 +160,7 @@ include(Behavior, ConstantLookup);
 include(Behavior, TestHelper);
 include(Behavior, SelectorAssertions);
 include(Behavior, DomAssertions);
-Concern.included.call(Behavior as never, null, function (this: BehaviorClass) {
+Concern.included.call(Behavior, null, function (this: BehaviorClass) {
   classAttribute.call(this, "_mailerClass", { default: null });
   this.setup(":initializeTestDeliveries");
   this.setup(":setExpectedMail");

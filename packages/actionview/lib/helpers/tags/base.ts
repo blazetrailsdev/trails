@@ -8,7 +8,10 @@ import {
   include,
   type Included,
   rbFSend,
+  NameError,
   rbInspect,
+  rbObjIvarDefined,
+  rbObjIvarGet,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 
@@ -105,21 +108,24 @@ export class Base {
   }
 
   protected retrieveObject(object: unknown): unknown {
-    if (object != null && object !== false) {
-      return object;
-    } else if (Object.hasOwn(this._templateObject, this._objectName)) {
-      return (this._templateObject as unknown as Record<string, unknown>)[this._objectName];
+    try {
+      if (object != null && object !== false) {
+        return object;
+      } else if (rbObjIvarDefined(this._templateObject, `@${this._objectName}`)) {
+        return rbObjIvarGet(this._templateObject, `@${this._objectName}`);
+      }
+      return null;
+    } catch (e) {
+      if (!(e instanceof NameError)) throw e;
+      return null;
     }
-    return null;
   }
 
   protected retrieveAutoindex(preMatch: string): unknown {
     const object =
       this.object != null && this.object !== false
         ? this.object
-        : Object.hasOwn(this._templateObject, preMatch)
-          ? (this._templateObject as unknown as Record<string, unknown>)[preMatch]
-          : null;
+        : rbObjIvarGet(this._templateObject, `@${preMatch}`);
     if (object != null && object !== false) {
       return toParam(object);
     } else {
