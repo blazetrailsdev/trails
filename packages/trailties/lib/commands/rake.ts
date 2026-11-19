@@ -1,4 +1,5 @@
 import "../constants.rake.generated.js";
+import { disconnectAllBang } from "@blazetrails/activerecord";
 import { Rake, TaskManager, type Application as RakeApplication } from "@blazetrails/rake";
 import { extend, regexpEscape } from "@blazetrails/ruby-compat";
 import { Actions } from "../command/actions.js";
@@ -22,6 +23,10 @@ export class RakeCommand extends Base {
       .map((task) => [task.nameWithArgs(), task.comment]);
   }
 
+  /**
+   * @inventedArm try — CONVERGEABLE rake-command-exits-when-the-task-returns
+   * @inventedArm disconnectAllBang — CONVERGEABLE rake-command-exits-when-the-task-returns
+   */
   static override async perform(
     task: string,
     args: string[],
@@ -43,7 +48,11 @@ export class RakeCommand extends Base {
       }
 
       rake.options.suppressBacktracePattern = this.nonAppFilePattern();
-      await rake.standardExceptionHandling(() => rake.topLevel());
+      try {
+        await rake.standardExceptionHandling(() => rake.topLevel());
+      } finally {
+        await disconnectAllBang();
+      }
     });
   }
 

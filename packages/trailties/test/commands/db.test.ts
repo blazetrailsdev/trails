@@ -51,7 +51,6 @@ import { Actions } from "../../lib/command/actions.js";
 import { block, getPath } from "@blazetrails/ruby-compat";
 
 let seedLoads = 0;
-const seedEnhancers: Array<() => void> = [];
 
 async function runTaskLogging(task: string, logs: string[]): Promise<void> {
   const previous = getProcessAdapter();
@@ -109,7 +108,6 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
       await rbFLoad(
         path.resolve(import.meta.dirname, "../../../activerecord/lib/trailties/databases.ts"),
       );
-      for (const enhance of seedEnhancers) enhance();
       await rake.invokeTask(task);
     });
   } finally {
@@ -2264,30 +2262,16 @@ await AnimalsRecord.establishConnection({ adapter: "sqlite3", database: ${JSON.s
     );
     setEnginePath(path.join(tmpDir, "boot.ts"));
     await runTask("db:migrate");
-    let connectedAfterSeed: unknown[] | undefined;
-    seedEnhancers.push(() =>
-      DSL.task(
-        "db:seed",
-        block(() => {
-          connectedAfterSeed = Base.connectionHandler
-            .connectionPoolList("all")
-            .filter((pool) => pool.isConnected());
-        }),
-      ),
-    );
 
-    try {
-      await runTask("db:seed");
-    } finally {
-      seedEnhancers.pop();
-    }
+    await runTask("db:seed");
 
     const Dog = (globalThis as { __dbSeedDog?: unknown }).__dbSeedDog;
     delete (globalThis as { __dbSeedDog?: unknown }).__dbSeedDog;
     expect(Dog).toBeDefined();
     expect(await rowCountIn(animalsDb(), "dogs")).toBe(1);
     expect(await tableIn(primaryDb(), "dogs")).toBe(false);
-    expect(connectedAfterSeed).toEqual([]);
+    const { Base } = await import("@blazetrails/activerecord");
+    expect(Base.connectionHandler.connectionPools.filter((pool) => pool.isConnected())).toEqual([]);
   });
 
   it("db migrate names each migration it runs and does not claim to be up to date", async () => {
