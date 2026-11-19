@@ -10,7 +10,7 @@ await build({
   configFile: false,
   logLevel: "error",
   esbuild: { tsconfigRaw: "{}" },
-  ssr: { noExternal: true, external: ["libxml2-wasm"] },
+  ssr: { noExternal: true },
   build: {
     ssr: "serverless/lambda.ts",
     outDir: "dist-vite",

@@ -143,9 +143,6 @@ importers:
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../../packages/trailties
-      libxml2-wasm:
-        specifier: 0.7.1
-        version: 0.7.1
     devDependencies:
       '@blazetrails/trails-tsc':
         specifier: workspace:*

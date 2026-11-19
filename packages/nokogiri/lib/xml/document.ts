@@ -1,7 +1,7 @@
-import { XmlDocument as LibXmlDocument, XmlParseError } from "libxml2-wasm";
+import type { XmlDocument as LibXmlDocument } from "libxml2-wasm";
 import { include } from "@blazetrails/ruby-compat";
 
-import { HTML5, XML } from "../namespaces.js";
+import { HTML5, XML, Nokogiri } from "../namespaces.js";
 
 import type { NodeSet } from "./node-set.js";
 import * as Searchable from "./searchable.js";
@@ -96,10 +96,10 @@ export class XmlDocument {
   ): XmlDocument {
     const document = new XmlDocument();
     try {
-      document._doc = LibXmlDocument.fromString(string);
+      document._doc = Nokogiri.LibXml2!.XmlDocument.fromString(string);
       document._root = new XmlNode(document._doc.root, document);
     } catch (e) {
-      if (!(e instanceof XmlParseError)) throw e;
+      if (!(e instanceof Nokogiri.LibXml2!.XmlParseError)) throw e;
       for (const detail of e.details) {
         document.errors.push(new SyntaxError(detail.message, 3, detail.line, detail.col));
       }
@@ -126,7 +126,7 @@ export class XmlDocument {
     try {
       this._doc?.processXInclude();
     } catch (e) {
-      if (!(e instanceof XmlParseError)) throw e;
+      if (!(e instanceof Nokogiri.LibXml2!.XmlParseError)) throw e;
       throw new SyntaxError(e.message);
     }
   }

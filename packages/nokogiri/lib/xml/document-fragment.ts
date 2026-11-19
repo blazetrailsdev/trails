@@ -1,7 +1,6 @@
-import { XmlDocument as LibXmlDocument } from "libxml2-wasm";
 import { defaultTreeAdapter } from "parse5";
 
-import { XML } from "../namespaces.js";
+import { XML, Nokogiri } from "../namespaces.js";
 
 import { XmlDocument } from "./document.js";
 import { XmlNode } from "./node.js";
@@ -34,7 +33,7 @@ export class DocumentFragment extends XmlNode {
   ) {
     super(
       !(document instanceof XmlNode)
-        ? LibXmlDocument.create().createRoot("root")
+        ? Nokogiri.LibXml2!.XmlDocument.create().createRoot("root")
         : defaultTreeAdapter.createDocumentFragment(),
       document,
     );

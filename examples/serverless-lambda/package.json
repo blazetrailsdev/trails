@@ -19,8 +19,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
-    "@blazetrails/trailties": "workspace:*",
-    "libxml2-wasm": "0.7.1"
+    "@blazetrails/trailties": "workspace:*"
   },
   "devDependencies": {
     "@blazetrails/trails-tsc": "workspace:*",

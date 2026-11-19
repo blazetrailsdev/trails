@@ -51,3 +51,4 @@ export const CSS = {
   XPathVisitor,
   xpathFor,
 };
+export { Nokogiri } from "./namespaces.js";

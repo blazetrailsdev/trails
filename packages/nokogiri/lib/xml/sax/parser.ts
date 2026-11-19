@@ -1,13 +1,6 @@
-import {
-  XmlDocument as LibXmlDocument,
-  XmlElement,
-  XmlText,
-  XmlCData,
-  XmlTreeNode,
-  XmlParseError,
-} from "libxml2-wasm";
+import type { XmlDocument as LibXmlDocument, XmlTreeNode } from "libxml2-wasm";
 import { SaxDocument } from "./document.js";
-import { SAX } from "../../namespaces.js";
+import { SAX, Nokogiri } from "../../namespaces.js";
 import { type Readable, readSource } from "../../readable.js";
 
 export class SaxParser {
@@ -16,9 +9,9 @@ export class SaxParser {
   parse(data: string | Readable): void {
     let doc: LibXmlDocument;
     try {
-      doc = LibXmlDocument.fromString(readSource(data));
+      doc = Nokogiri.LibXml2!.XmlDocument.fromString(readSource(data));
     } catch (e) {
-      if (e instanceof XmlParseError) {
+      if (e instanceof Nokogiri.LibXml2!.XmlParseError) {
         for (const detail of e.details) {
           this.handler.error(detail.message);
         }
@@ -36,7 +29,7 @@ export class SaxParser {
   }
 
   private _walk(node: XmlTreeNode): void {
-    if (node instanceof XmlElement) {
+    if (node instanceof Nokogiri.LibXml2!.XmlElement) {
       const attrs: [string, string][] = node.attrs.map(
         (a) => [a.name, a.value] as [string, string],
       );
@@ -47,9 +40,9 @@ export class SaxParser {
         child = child.next;
       }
       this.handler.endElement(node.name);
-    } else if (node instanceof XmlCData) {
+    } else if (node instanceof Nokogiri.LibXml2!.XmlCData) {
       this.handler.cdataBlock(node.content ?? "");
-    } else if (node instanceof XmlText) {
+    } else if (node instanceof Nokogiri.LibXml2!.XmlText) {
       this.handler.characters(node.content ?? "");
     }
   }
