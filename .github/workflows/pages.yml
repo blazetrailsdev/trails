@@ -34,10 +34,6 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Download parity summary
-        # The newest package-summary.json from a successful main CI run's
-        # parity-outputs-<sha> artifact (ci.yml "Upload parity outputs"). No
-        # parity run here; a miss leaves the file absent and the site renders
-        # "—" for every figure.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -153,10 +153,6 @@ export function sectionsFor(summary: Summary, pkg: string): ClaudeSection[] {
   );
 }
 
-/**
- * A lede as VitePress markdown: relative links point at GitHub, and `<` outside
- * a code span is escaped so Vue does not read prose like `<pkg>` as a tag.
- */
 function renderLede(s: ClaudeSection, ref: string): string {
   const linked = s.lede.replace(/\]\((?!https?:|#)([^)]+)\)/g, (_m, link: string) => {
     const target = path.posix.join(path.posix.dirname(s.file), link);
