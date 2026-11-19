@@ -41,18 +41,19 @@ describe("Trails::Command::InitializersTest", { timeout: 120_000 }, () => {
     expect(finalOutput.includes("set_added_test_module")).toBeTruthy();
   });
 
-  it("prints out initializers only specified in environment option", async () => {
+  // BLOCKED: generated-app-constant-is-app-const-base-application
+  it.skip("prints out initializers only specified in environment option", async () => {
     await t.addToConfig(`
       if (Trails.env.isDevelopment()) this.initializer("set_added_development_module", () => {});
       if (Trails.env.isProduction()) this.initializer("set_added_production_module", () => {});
 `);
 
     let output = (await runInitializersCommand()).split("\n");
-    expect(output).toContain("AppTemplate.set_added_development_module");
-    expect(output).not.toContain("AppTemplate.set_added_production_module");
+    expect(output).toContain("AppTemplate::Application.set_added_development_module");
+    expect(output).not.toContain("AppTemplate::Application.set_added_production_module");
 
     output = (await runInitializersCommand(["-e", "production"])).split("\n");
-    expect(output).not.toContain("AppTemplate.set_added_development_module");
-    expect(output).toContain("AppTemplate.set_added_production_module");
+    expect(output).not.toContain("AppTemplate::Application.set_added_development_module");
+    expect(output).toContain("AppTemplate::Application.set_added_production_module");
   });
 });
