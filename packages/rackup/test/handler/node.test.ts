@@ -6,14 +6,7 @@ import * as path from "node:path";
 import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/ruby-compat";
 import { b, stderr, TCPSocket, Thread } from "@blazetrails/ruby-compat";
 import type { RackApp, RackBody, RackEnv, RackMiddleware } from "@blazetrails/rack";
-import {
-  Files,
-  Lint,
-  RACK_ERRORS,
-  RACK_HIJACK,
-  RACK_INPUT,
-  RACK_IS_HIJACK,
-} from "@blazetrails/rack";
+import { Files, Lint, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "@blazetrails/rack";
 import { Node } from "../../lib/handler/node.js";
 
 async function serving(
@@ -549,7 +542,7 @@ describe("Rack::Handler::Node", () => {
       await serving(
         async (e) => {
           try {
-            return await linted.call({ ...e, [RACK_ERRORS]: lintableErrors });
+            return await linted.call(e);
           } catch (error) {
             lintError = error;
             return [500, {}, [""]];
@@ -560,6 +553,28 @@ describe("Rack::Handler::Node", () => {
 
       expect(lintError).toBeNull();
       expect(io).toBeInstanceOf(TCPSocket);
+    });
+
+    it("passes Rack::Lint with the handler's own rack.errors", async () => {
+      let lintError: unknown = null;
+      let text = "";
+      const linted = new Lint(async () => [200, { "content-type": "text/plain" }, ["ok"]]);
+      await serving(
+        async (e) => {
+          try {
+            return await linted.call(e);
+          } catch (error) {
+            lintError = error;
+            return [500, {}, [""]];
+          }
+        },
+        async (url) => {
+          text = (await rawGet(url, "/linted")).text;
+        },
+      );
+
+      expect(lintError).toBeNull();
+      expect(text).toContain("200");
     });
 
     it("lets the app full-hijack a GET and write a raw HTTP/1 response itself", async () => {
@@ -720,7 +735,7 @@ describe("Rack::Handler::Node", () => {
       await serving(
         async (e) => {
           try {
-            return await linted.call({ ...e, [RACK_ERRORS]: lintableErrors });
+            return await linted.call(e);
           } catch (error) {
             lintError = error;
             return [500, {}, [""]];
@@ -750,7 +765,7 @@ describe("Rack::Handler::Node", () => {
       await serving(
         async (e) => {
           try {
-            return await linted.call({ ...e, [RACK_ERRORS]: lintableErrors });
+            return await linted.call(e);
           } catch (error) {
             lintError = error;
             return [500, {}, [""]];
@@ -1133,8 +1148,6 @@ describe("Rack::Handler::Node", () => {
     });
   });
 });
-
-const lintableErrors = { puts() {}, write() {}, flush() {} };
 
 function openUpgrade(
   port: number,

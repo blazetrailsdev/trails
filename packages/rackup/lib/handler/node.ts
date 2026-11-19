@@ -2,6 +2,7 @@ import {
   EOFError,
   getHttpAsync,
   stderr,
+  STDERR,
   StringIO,
   TCPSocket,
   Thread,
@@ -298,7 +299,7 @@ export class Node {
     }
 
     env[RACK_INPUT] = input;
-    env[RACK_ERRORS] = stderr;
+    env[RACK_ERRORS] = STDERR;
     env[RACK_URL_SCHEME] = ["yes", "on", "1"].includes(env[HTTPS] as string) ? "https" : "http";
 
     env[QUERY_STRING] ??= "";
