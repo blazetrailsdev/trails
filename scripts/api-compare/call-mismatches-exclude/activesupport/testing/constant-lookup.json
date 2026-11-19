@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "testing/constant-lookup.ts",
+    "rubyName": "determine_constant_from_test_name",
+    "call": "sub!",
+    "reason": "the JS string is a primitive: String#sub! on a native string is written as String.prototype.replace / replaceAll with a JS RegExp (CLAUDE.md \"Ruby Strings are JS string primitives\"); surfaced when SafeBuffer#sub! was ported. Convergence: activesupport-native-string-gsub-call-gate-credit"
+  }
+]

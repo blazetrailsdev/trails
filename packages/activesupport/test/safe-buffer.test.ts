@@ -102,7 +102,7 @@ describe("SafeBufferTest", () => {
 
   it("Should escape dirty buffers on add", () => {
     const clean = htmlSafe("hello");
-    buffer = new SafeBuffer("<>", false);
+    buffer.gsubBang("", "<>");
     expect(clean.plus(buffer).toString()).toEqual("hello&lt;&gt;");
   });
 
@@ -155,7 +155,7 @@ describe("SafeBufferTest", () => {
   });
 
   it("Should continue unsafe on slice", () => {
-    const safeString = new SafeBuffer('<script>alert("lolpwnd");</script>oo', false);
+    const safeString = htmlSafe("foo").gsubBang("f", '<script>alert("lolpwnd");</script>')!;
 
     assertNot(isHtmlSafe(safeString), "should not be safe");
 

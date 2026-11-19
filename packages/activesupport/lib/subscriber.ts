@@ -1,9 +1,8 @@
 import { Notifications } from "./notifications.js";
+import { rbModMethodDefined } from "@blazetrails/ruby-compat";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 import type { NotificationSubscriber } from "./notifications.js";
 import type { Event } from "./notifications/instrumenter.js";
-import type { AnyClass } from "./descendants-tracker.js";
-import type { Logger } from "./logger.js";
 
 function snakeCase(str: string): string {
   return str.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
@@ -30,86 +29,146 @@ function eventMethodCandidates(snakeMethod: string): string[] {
   return [...named, camel, snakeMethod];
 }
 
-interface ClassState {
-  namespace?: string;
-  subscriber?: Subscriber;
-  notifier?: typeof Notifications;
-  _logLevels?: Map<string, (logger: Logger) => boolean>;
-}
-
-const _classState = new WeakMap<AnyClass, ClassState>();
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function getClassState(cls: AnyClass): ClassState {
-  return getState(cls);
-}
-
-function getState(cls: AnyClass): ClassState {
-  let state = _classState.get(cls);
-  if (!state) {
-    state = {};
-    _classState.set(cls, state);
-  }
-  return state;
-}
-
 export class Subscriber {
-  patterns: Map<string, NotificationSubscriber> = new Map();
+  patterns: Map<string, NotificationSubscriber>;
 
   private static _subscribers: Subscriber[] = [];
-
-  static get subscribers(): Subscriber[] {
-    return this._subscribers;
-  }
+  declare private static _namespace?: string;
+  declare private static _subscriber?: Subscriber;
+  declare private static _notifier?: typeof Notifications;
+  declare private static _inheritAll?: boolean;
 
   static attachTo(
     namespace: string,
-    subscriber?: Subscriber,
+    subscriber: Subscriber = new this(),
     notifier: typeof Notifications = Notifications,
-    options?: { inheritAll?: boolean },
-  ): Subscriber {
-    const sub = subscriber ?? new this();
-    const state = getState(this);
-    state.namespace = namespace;
-    state.subscriber = sub;
-    state.notifier = notifier;
+    { inheritAll = false }: { inheritAll?: boolean } = {},
+  ): string[] {
+    this._namespace = namespace;
+    this._subscriber = subscriber;
+    this._notifier = notifier;
+    this._inheritAll = inheritAll;
 
-    this._subscribers.push(sub);
+    this.subscribers.push(subscriber);
 
-    const methods = this._fetchPublicMethods(sub, options?.inheritAll ?? false);
-    for (const event of methods) {
-      this._addEventSubscriber(event, state);
+    const events = this.fetchPublicMethods(subscriber, inheritAll);
+    for (const event of events) {
+      this.addEventSubscriber(event);
     }
-
-    return sub;
-  }
-
-  static methodAdded(event: string): void {
-    const state = getState(this);
-    if (!state.notifier) return;
-    const snaked = event.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
-    this._addEventSubscriber(snaked, state);
+    return events;
   }
 
   static detachFrom(namespace: string, notifier: typeof Notifications = Notifications): void {
-    const state = getState(this);
-    state.namespace = namespace;
-    state.notifier = notifier;
-    const sub = this._subscribers.find((s) => s instanceof this);
-    if (!sub) return;
+    this._namespace = namespace;
+    this._subscriber = this.findAttachedSubscriber();
+    this._notifier = notifier;
 
-    state.subscriber = sub;
-    const idx = this._subscribers.indexOf(sub);
-    if (idx !== -1) this._subscribers.splice(idx, 1);
+    const subscriber = this.subscriber;
+    if (!subscriber) return;
 
-    const methods = this._fetchPublicMethods(sub, true);
-    for (const event of methods) {
-      this._removeEventSubscriber(event, state);
+    const idx = this.subscribers.indexOf(subscriber);
+    if (idx !== -1) this.subscribers.splice(idx, 1);
+
+    for (const event of this.fetchPublicMethods(subscriber, true)) {
+      this.removeEventSubscriber(event);
     }
-    state.notifier = undefined;
+
+    this._notifier = undefined;
+  }
+
+  /** @inventedArm replace — PERMANENT */
+  static methodAdded(event: string): void {
+    if (rbModMethodDefined(this, event) && this.notifier) {
+      event = event.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+      this.addEventSubscriber(event);
+    }
+  }
+
+  static get subscribers(): Subscriber[] {
+    return Subscriber._subscribers;
+  }
+
+  /** @internal */
+  protected static get subscriber(): Subscriber | undefined {
+    return Object.hasOwn(this, "_subscriber") ? this._subscriber : undefined;
+  }
+
+  /** @internal */
+  protected static get notifier(): typeof Notifications | undefined {
+    return Object.hasOwn(this, "_notifier") ? this._notifier : undefined;
+  }
+
+  /** @internal */
+  protected static get namespace(): string | undefined {
+    return Object.hasOwn(this, "_namespace") ? this._namespace : undefined;
+  }
+
+  private static addEventSubscriber(event: string): void {
+    if (this.isInvalidEvent(event)) return;
+
+    const pattern = this.preparePattern(event);
+
+    if (this.isPatternSubscribed(pattern)) return;
+
+    this.subscriber!.patterns.set(pattern, this.notifier!.subscribe(pattern, this.subscriber!));
+  }
+
+  private static removeEventSubscriber(event: string): void {
+    if (this.isInvalidEvent(event)) return;
+
+    const pattern = this.preparePattern(event);
+
+    if (!this.isPatternSubscribed(pattern)) return;
+
+    this.notifier!.unsubscribe(this.subscriber!.patterns.get(pattern)!);
+    this.subscriber!.patterns.delete(pattern);
+  }
+
+  /** @internal */
+  private static findAttachedSubscriber(): Subscriber | undefined {
+    return this.subscribers.find((attachedSubscriber) => attachedSubscriber.constructor === this);
+  }
+
+  private static isInvalidEvent(event: string): boolean {
+    return event === "start" || event === "finish";
+  }
+
+  /** @internal */
+  private static preparePattern(event: string): string {
+    return `${event}.${this.namespace}`;
+  }
+
+  /** @internal */
+  private static isPatternSubscribed(pattern: string): boolean {
+    return this.subscriber!.patterns.has(pattern);
+  }
+
+  /** @missingRailsArgs public_instance_methods — PERMANENT */
+  protected static fetchPublicMethods(subscriber: Subscriber, inheritAll: boolean): string[] {
+    const baseKeys = new Set(publicInstanceMethods(Subscriber, true));
+    const keys = new Set<string>();
+    let proto = Object.getPrototypeOf(subscriber);
+
+    while (proto && proto !== Subscriber.prototype && proto !== Object.prototype) {
+      for (const key of Object.getOwnPropertyNames(proto)) {
+        if (
+          key !== "constructor" &&
+          !key.startsWith("_") &&
+          !baseKeys.has(key) &&
+          typeof Reflect.get(subscriber, key) === "function"
+        ) {
+          keys.add(key);
+        }
+      }
+      if (!inheritAll) break;
+      proto = Object.getPrototypeOf(proto);
+    }
+
+    return Array.from(keys).map((k) => snakeCase(k));
+  }
+
+  constructor() {
+    this.patterns = new Map();
   }
 
   call(event: Event): void {
@@ -132,57 +191,5 @@ export class Subscriber {
         (candidate) => typeof Reflect.get(this, candidate) === "function",
       ) ?? null;
     if (method) (Reflect.get(this, method) as (event: Event) => void).call(this, event);
-  }
-
-  private static _invalidEvent(event: string): boolean {
-    return event === "start" || event === "finish";
-  }
-
-  private static _addEventSubscriber(event: string, state: ClassState): void {
-    if (this._invalidEvent(event)) return;
-    const subscriber = state.subscriber!;
-    const notifier = state.notifier!;
-    const pattern = `${event}.${state.namespace}`;
-
-    if (subscriber.patterns.has(pattern)) return;
-
-    subscriber.patterns.set(pattern, notifier.subscribe(pattern, subscriber));
-  }
-
-  private static _removeEventSubscriber(event: string, state: ClassState): void {
-    if (this._invalidEvent(event)) return;
-    const sub = state.subscriber!;
-    const notifier = state.notifier!;
-    const pattern = `${event}.${state.namespace}`;
-
-    const handle = sub.patterns.get(pattern);
-    if (!handle) return;
-
-    notifier.unsubscribe(handle);
-    sub.patterns.delete(pattern);
-  }
-
-  /** @missingRailsArgs public_instance_methods — PERMANENT */
-  protected static _fetchPublicMethods(subscriber: Subscriber, inheritAll: boolean): string[] {
-    const baseKeys = new Set(publicInstanceMethods(Subscriber, true));
-    const keys = new Set<string>();
-    let proto = Object.getPrototypeOf(subscriber);
-
-    while (proto && proto !== Subscriber.prototype && proto !== Object.prototype) {
-      for (const key of Object.getOwnPropertyNames(proto)) {
-        if (
-          key !== "constructor" &&
-          !key.startsWith("_") &&
-          !baseKeys.has(key) &&
-          typeof Reflect.get(subscriber, key) === "function"
-        ) {
-          keys.add(key);
-        }
-      }
-      if (!inheritAll) break;
-      proto = Object.getPrototypeOf(proto);
-    }
-
-    return Array.from(keys).map((k) => snakeCase(k));
   }
 }

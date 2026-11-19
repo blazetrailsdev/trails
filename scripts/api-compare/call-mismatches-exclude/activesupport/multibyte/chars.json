@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "multibyte/chars.ts",
+    "rubyName": "titleize",
+    "call": "gsub",
+    "reason": "the JS string is a primitive: String#gsub on a native string is written as String.prototype.replace / replaceAll with a JS RegExp (CLAUDE.md \"Ruby Strings are JS string primitives\"); surfaced when SafeBuffer#gsub was ported. Convergence: activesupport-native-string-gsub-call-gate-credit"
+  }
+]

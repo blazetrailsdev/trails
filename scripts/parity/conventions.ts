@@ -1526,6 +1526,46 @@ export const INHERITANCE_SKIP_CLASSES: RubyOnlyClass[] = [
       "`ruby_tracker.rb` maps onto `dependency-tracker/tse-tracker.ts`, whose " +
       "`TSETracker` carries its methods.",
   },
+  {
+    fqn: "Hash",
+    reason:
+      'PERMANENT: an activesupport core-class reopen with no trails class — CLAUDE.md, "Core extensions are not installed on native prototypes".',
+  },
+  {
+    fqn: "Class",
+    reason:
+      'PERMANENT: an activesupport core-class reopen with no trails class — CLAUDE.md, "Core extensions are not installed on native prototypes".',
+  },
+  {
+    fqn: "DateTime",
+    reason:
+      'PERMANENT: an activesupport core-class reopen with no trails class — CLAUDE.md, "Core extensions are not installed on native prototypes".',
+  },
+  {
+    fqn: "ERB",
+    reason:
+      'PERMANENT: an activesupport core-class reopen with no trails class — CLAUDE.md, "Core extensions are not installed on native prototypes".',
+  },
+  {
+    fqn: "File",
+    reason:
+      'PERMANENT: an activesupport core-class reopen with no trails class — CLAUDE.md, "Core extensions are not installed on native prototypes".',
+  },
+  {
+    fqn: "Integer",
+    reason:
+      'PERMANENT: an activesupport core-class reopen with no trails class — CLAUDE.md, "Core extensions are not installed on native prototypes".',
+  },
+  {
+    fqn: "Object",
+    reason:
+      'PERMANENT: an activesupport core-class reopen with no trails class — CLAUDE.md, "Core extensions are not installed on native prototypes".',
+  },
+  {
+    fqn: "Data",
+    reason:
+      'PERMANENT: an activesupport core-class reopen with no trails class — CLAUDE.md, "Core extensions are not installed on native prototypes".',
+  },
 ];
 
 const INHERITANCE_SKIP_CLASS_FQNS = new Set(INHERITANCE_SKIP_CLASSES.map((c) => c.fqn));

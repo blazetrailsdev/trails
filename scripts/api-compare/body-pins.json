@@ -21143,13 +21143,6 @@
   {
     "package": "actionview",
     "rubyFile": "template/error.rb",
-    "rubyName": "message",
-    "digest": "601dd91126dd45c4",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "template/error.rb",
     "rubyName": "should_record?",
     "digest": "7557682936ba3cb0",
     "ref": "v8.0.2"

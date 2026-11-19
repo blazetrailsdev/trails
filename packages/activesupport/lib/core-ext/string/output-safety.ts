@@ -2,7 +2,11 @@ import {
   IndexError,
   NoMethodError,
   Range,
+  rbBlockGivenP,
   rbObjClassname,
+  rbStrSub,
+  rbStrSubBang,
+  strGsub,
   stringSuperclass,
 } from "@blazetrails/ruby-compat";
 
@@ -111,6 +115,8 @@ function strRange(str: string, args: ArefArgs): [number, number] {
   return [start, second === undefined ? 1 : second];
 }
 
+type BlockFn = (...params: unknown[]) => unknown;
+
 export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJson") {
   static readonly UNSAFE_STRING_METHODS = [
     "capitalize",
@@ -178,10 +184,15 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     return this.stringIntoSafeBuffer(first, true);
   }
 
-  safeConcat(value: unknown): this {
-    if (!this._htmlSafe) throw new SafeConcatError();
+  /** @internal */
+  private originalConcat(value: unknown): this {
     this._value += concatArgument(value);
     return this;
+  }
+
+  safeConcat(value: unknown): this {
+    if (!this._htmlSafe) throw new SafeConcatError();
+    return this.originalConcat(value);
   }
 
   dup(): SafeBuffer {
@@ -303,6 +314,80 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     return this._value;
   }
 
+  encodeWith(coder: { representObject(tag: string | null, obj: unknown): void }): void {
+    coder.representObject(null, this.toStr());
+  }
+
+  /** @missingRailsArgs set_block_back_references — PERMANENT */
+  gsub(...args: [...unknown[], BlockFn] | unknown[]): string | Generator<string> {
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as BlockFn) : null;
+    if (block) {
+      return strGsub(
+        { string: this.toStr() },
+        [
+          ...args,
+          (...params: unknown[]) => {
+            this.setBlockBackReferences(block, null);
+            return block(...params);
+          },
+        ],
+        false,
+      )!;
+    } else {
+      return strGsub({ string: this.toStr() }, args, false)!;
+    }
+  }
+
+  /** @missingRailsArgs set_block_back_references — PERMANENT */
+  gsubBang(...args: [...unknown[], BlockFn] | unknown[]): this | null {
+    this._htmlSafe = false;
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as BlockFn) : null;
+    const self = { string: this._value };
+    const result = block
+      ? strGsub(
+          self,
+          [
+            ...args,
+            (...params: unknown[]) => {
+              this.setBlockBackReferences(block, null);
+              return block(...params);
+            },
+          ],
+          true,
+        )
+      : strGsub(self, args, true);
+    this._value = self.string;
+    return result == null ? null : this;
+  }
+
+  /** @missingRailsArgs set_block_back_references — PERMANENT */
+  sub(...args: [...unknown[], BlockFn] | unknown[]): string {
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as BlockFn) : null;
+    if (block) {
+      return rbStrSub({ string: this.toStr() }, ...args, (...params: unknown[]) => {
+        this.setBlockBackReferences(block, null);
+        return block(...params);
+      });
+    } else {
+      return rbStrSub({ string: this.toStr() }, ...args);
+    }
+  }
+
+  /** @missingRailsArgs set_block_back_references — PERMANENT */
+  subBang(...args: [...unknown[], BlockFn] | unknown[]): this | null {
+    this._htmlSafe = false;
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as BlockFn) : null;
+    const self = { string: this._value };
+    const result = block
+      ? rbStrSubBang(self, ...args, (...params: unknown[]) => {
+          this.setBlockBackReferences(block, null);
+          return block(...params);
+        })
+      : rbStrSubBang(self, ...args);
+    this._value = self.string;
+    return result == null ? null : this;
+  }
+
   htmlSafeBuffer(): SafeBuffer {
     return new SafeBuffer(this._value, true);
   }
@@ -320,6 +405,12 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
       return escapeHTML(toStr(arg));
     }
   }
+
+  /**
+   * @internal
+   * @missingRailsCall eval — PERMANENT
+   */
+  private setBlockBackReferences(_block: BlockFn, _matchData: unknown): void {}
 
   private stringIntoSafeBuffer(newString: string, isHtmlSafe: boolean): SafeBuffer {
     return new SafeBuffer(newString, isHtmlSafe);

@@ -1,4 +1,4 @@
-import { Subscriber, getClassState } from "./subscriber.js";
+import { Subscriber } from "./subscriber.js";
 import type { Event } from "./notifications/instrumenter.js";
 import type { Logger } from "./logger.js";
 import type { Notifications } from "./notifications.js";
@@ -27,20 +27,21 @@ export class LogSubscriber extends Subscriber {
   static colorizeLogging = true;
 
   static get logLevels(): Map<string, (logger: Logger) => boolean> {
-    const state = getClassState(this);
-    if (!state._logLevels) {
+    if (!Object.hasOwn(this, "_logLevels")) {
       const parent = Object.getPrototypeOf(this) as typeof LogSubscriber | undefined;
-      state._logLevels =
+      this._logLevels =
         parent && typeof parent === "function" && "logLevels" in parent
           ? new Map(parent.logLevels)
           : new Map();
     }
-    return state._logLevels;
+    return this._logLevels!;
   }
 
   static set logLevels(value: Map<string, (logger: Logger) => boolean>) {
-    getClassState(this)._logLevels = value;
+    this._logLevels = value;
   }
+
+  declare private static _logLevels?: Map<string, (logger: Logger) => boolean>;
 
   static readonly LEVEL_CHECKS: Record<string, (logger: Logger) => boolean> = {
     debug: (logger) => !logger["debug?"],
@@ -77,7 +78,7 @@ export class LogSubscriber extends Subscriber {
     subscriber?: Subscriber,
     notifier?: typeof Notifications,
     options?: { inheritAll?: boolean },
-  ): Subscriber {
+  ): string[] {
     const result = super.attachTo(namespace, subscriber, notifier, options);
     this._setEventLevels();
     return result;
@@ -95,7 +96,7 @@ export class LogSubscriber extends Subscriber {
   }
 
   /** @missingRailsArgs public_instance_methods — PERMANENT */
-  protected static override _fetchPublicMethods(
+  protected static override fetchPublicMethods(
     subscriber: Subscriber,
     inheritAll: boolean,
   ): string[] {
@@ -127,10 +128,9 @@ export class LogSubscriber extends Subscriber {
   }
 
   private static _setEventLevels(): void {
-    const state = getClassState(this);
-    const sub = state.subscriber as LogSubscriber | undefined;
+    const sub = this.subscriber as LogSubscriber | undefined;
     if (!sub) return;
-    sub.eventLevels = transformKeys(this.logLevels, (k) => `${k}.${state.namespace}`);
+    sub.eventLevels = transformKeys(this.logLevels, (k) => `${k}.${this.namespace}`);
   }
 
   eventLevels: Map<string, (logger: Logger) => boolean>;

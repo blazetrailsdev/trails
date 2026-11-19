@@ -698,7 +698,7 @@ describe("RUBY_ONLY_CLASSES", () => {
 describe("INHERITANCE_SKIP_CLASSES", () => {
   it("requires a fully-qualified name and a non-empty reason per entry", () => {
     for (const c of INHERITANCE_SKIP_CLASSES) {
-      expect(c.fqn).toContain("::");
+      expect(c.fqn).toMatch(/^[A-Z]\w*(::[A-Z]\w*)*$/);
       expect(c.reason.trim().length).toBeGreaterThan(0);
     }
   });
