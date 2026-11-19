@@ -5626,8 +5626,6 @@ export function main() {
         return { tsClass, ambiguous };
       };
 
-      // A constructor whose every tag is guarded, paired with no Rails
-      // `initialize` of its host: compared against the tagged bodies alone.
       const guardedOnly = new Map<string, { owner: string; tags: InlinedFrom[] }>();
       const inlinedSegmentsFor = (
         rubyName: string,
