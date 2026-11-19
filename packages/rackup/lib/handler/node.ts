@@ -40,6 +40,8 @@ export interface Options {
   Port?: number;
   /** @noRailsEquivalent PERMANENT */
   Host?: string;
+  /** @noRailsEquivalent PERMANENT */
+  persistentTimeout?: number;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -76,6 +78,10 @@ export class Node {
         res.end();
       });
     });
+    if (options.persistentTimeout != null) {
+      server.keepAliveTimeout = options.persistentTimeout * 1000;
+      server.headersTimeout = server.keepAliveTimeout + 1000;
+    }
     server.on("upgrade", (req, socket, head) => {
       handler.upgrade(req, socket, head).catch((error: unknown) => {
         stderr.write(

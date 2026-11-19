@@ -8297,7 +8297,10 @@ function collectCalls(
     }
   };
   const visit = (n: ts.Node): void => {
-    for (const [form, receiver] of nativeHashForms(n)) addHashForm(form, receiver);
+    for (const [form, receiver] of nativeHashForms(n)) {
+      if (skipHoistedClosures && form === "spread") names.add(`${NATIVE_FORM_PREFIX}spread`);
+      addHashForm(form, receiver);
+    }
     if (
       !skipHoistedClosures &&
       ts.isConditionalExpression(n) &&

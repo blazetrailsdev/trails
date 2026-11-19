@@ -283,6 +283,35 @@ describe("Rack::Handler::Node", () => {
     return { lines, restore: () => spy.mockRestore() };
   }
 
+  it("keeps an idle connection open past 5 s when persistentTimeout is set", async () => {
+    const server = await Node.run(async () => [200, { "content-length": "2" }, ["ok"]], {
+      Port: 0,
+      Host: "127.0.0.1",
+      persistentTimeout: 75,
+    });
+    const address = server.address();
+    const port = address && typeof address === "object" ? address.port : 0;
+    const socket = connect(port, "127.0.0.1");
+    try {
+      let received = "";
+      let closed = false;
+      socket.on("data", (chunk) => (received += String(chunk)));
+      socket.on("close", () => (closed = true));
+      const request = "GET / HTTP/1.1\r\nhost: localhost\r\n\r\n";
+      socket.write(request);
+      await vi.waitFor(() => expect(received).toContain("\r\n\r\nok"));
+      await new Promise((resolve) => setTimeout(resolve, 5500));
+
+      expect(closed).toBe(false);
+      received = "";
+      socket.write(request);
+      await vi.waitFor(() => expect(received).toContain("200 OK"));
+    } finally {
+      socket.destroy();
+      await Node.shutdown();
+    }
+  }, 15000);
+
   it("answers 500 when the app raises on an ordinary request", async () => {
     const log = captureStderr();
     try {

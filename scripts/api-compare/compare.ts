@@ -169,6 +169,7 @@ import {
   jsEnumerableAliases,
   EVAL_CALLBACK_PREFIX,
   LENGTH_READ_UNCREDITED_RECEIVER_KINDS,
+  NATIVE_FORM_PREFIX,
   NATIVE_FORM_ANALOGUES,
   TYPED_NATIVE_FORM,
   NEGATED_ALIASES,
@@ -1261,6 +1262,8 @@ export const ORDER_PREFIX = "order:";
  * then have no Ruby position and are dropped; otherwise they are positioned
  * where they were made, as the block form is.
  */
+const NATIVE_SPREAD = `${NATIVE_FORM_PREFIX}spread`;
+
 export function reorderedCalls(
   rubyName: string,
   rubyCalls: readonly string[],
@@ -1299,14 +1302,25 @@ export function reorderedCalls(
     rubySeq.push(hit);
   }
   if (rubySeq.length < 2) return [];
-  for (const [i, name] of rubySeq.entries()) {
-    for (const later of rubySeq.slice(i + 1)) {
-      if (tsCalls.indexOf(later) < tsCalls.indexOf(name)) {
-        return [`${ORDER_PREFIX}${later},${name} → ${name},${later}`];
+  const reordered = (at: (name: string) => number): string | undefined => {
+    for (const [i, name] of rubySeq.entries()) {
+      for (const later of rubySeq.slice(i + 1)) {
+        if (at(later) < at(name)) return `${ORDER_PREFIX}${later},${name} → ${name},${later}`;
       }
     }
+    return undefined;
+  };
+  const flagged = reordered((name) => tsCalls.indexOf(name));
+  if (flagged === undefined) return [];
+  // A plain-object `merge` ports as `{ ...h, ...other }` (CLAUDE.md's native
+  // Hash table), so a body may hold Ruby's `merge` at the spread's position
+  // while a later `.merge(...)` call carries the name.
+  if (rubyCalls.includes("merge") && tsCalls.includes(NATIVE_SPREAD)) {
+    const spreadAt = tsCalls.indexOf(NATIVE_SPREAD);
+    if (reordered((name) => (name === "merge" ? spreadAt : tsCalls.indexOf(name))) === undefined)
+      return [];
   }
-  return [];
+  return [flagged];
 }
 
 function resolveEvalCallbackCalls(tsCalls: readonly string[], drop: boolean): string[] {
@@ -5954,7 +5968,9 @@ export function main() {
             ...reorderedCalls(
               rubyName,
               rubyCalls,
-              [...partitionNegatedCalls(seqSets[0]).calls],
+              seqSets[0].filter(
+                (c) => c === NATIVE_SPREAD || partitionNegatedCalls([c]).calls.size > 0,
+              ),
               (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
               (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
               callsSignificant,

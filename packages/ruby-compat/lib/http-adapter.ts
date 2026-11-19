@@ -50,6 +50,8 @@ export interface HttpServer {
   listen(port: number, host: string, listener?: () => void): unknown;
   close(callback?: (error?: Error) => void): unknown;
   address(): string | { port: number } | null;
+  keepAliveTimeout: number;
+  headersTimeout: number;
   on(event: "upgrade", listener: HttpUpgradeListener): unknown;
   on(event: "close", listener: () => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;

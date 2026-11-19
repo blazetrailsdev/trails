@@ -4147,6 +4147,20 @@ describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
   const wide = { has: (k: string) => k !== "super" };
   const ported = () => true;
 
+  it("credits a native spread with the position of Ruby's first merge", () => {
+    const rubyCalls = ["merge", "stop_on_unknown_option?", "merge"];
+    expect(
+      reorderedCalls(
+        "initialize",
+        rubyCalls,
+        ["@spread", "isStopOnUnknownOption", "merge"],
+        ported,
+        map,
+        wide,
+      ),
+    ).toEqual([]);
+  });
+
   it("flags a body that makes Rails' calls in a different order", () => {
     expect(
       reorderedCalls("create", ["build", "save"], ["save", "build"], ported, map, wide),
