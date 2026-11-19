@@ -1036,7 +1036,7 @@
     }
   },
   "nokogiri": {
-    "rows": 27,
+    "rows": 25,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1052,7 +1052,6 @@
       "html5/document-fragment.ts::DocumentFragment": "Nokogiri::HTML5::DocumentFragment",
       "html5/document.ts::Document": "Nokogiri::HTML5::Document",
       "html5/node.ts::Node": "Nokogiri::HTML5::Node",
-      "racc/parser.ts::ParseError": "Racc::ParseError",
       "xml/attr.ts::Attr": "Nokogiri::XML::Attr",
       "xml/document-fragment.ts::DocumentFragment": "Nokogiri::XML::DocumentFragment",
       "xml/document.ts::XmlDocument": "Nokogiri::XML::Document",

@@ -1,6 +1,13 @@
-import { Racc } from "../namespaces.js";
-import { kernelCatch, kernelThrow, NotImplementedError, rbInspect } from "@blazetrails/ruby-compat";
+import { constSet } from "../include.js";
+import { kernelCatch, kernelThrow } from "../kernel-catch.js";
+import { NotImplementedError } from "../not-implemented-error.js";
+import { TopLevel, rbInspect } from "../object.js";
 
+/**
+ * @noRailsEquivalent PERMANENT — racc gem `Racc::ParseError`
+ * (`vendor/racc/v1.8.0/lib/racc/parser.rb:16`), bundled with Ruby
+ * (`vendor/ruby/v3.3.11/gems/bundled_gems:23`).
+ */
 export class ParseError extends Error {
   override name = "Racc::ParseError";
 }
@@ -22,6 +29,11 @@ type RaccArg = [
   boolean,
 ];
 
+/**
+ * @noRailsEquivalent PERMANENT — racc gem `Racc::Parser`
+ * (`vendor/racc/v1.8.0/lib/racc/parser.rb:184`), bundled with Ruby
+ * (`vendor/ruby/v3.3.11/gems/bundled_gems:23`).
+ */
 export abstract class Parser {
   declare ["constructor"]: typeof Parser & {
     Racc_arg: RaccArg;
@@ -248,5 +260,10 @@ export abstract class Parser {
   }
 }
 
-Racc.ParseError = ParseError;
-Racc.Parser = Parser;
+/**
+ * @noRailsEquivalent PERMANENT — racc gem `Racc`
+ * (`vendor/racc/v1.8.0/lib/racc/parser.rb:15`), bundled with Ruby
+ * (`vendor/ruby/v3.3.11/gems/bundled_gems:23`).
+ */
+export const Racc = { name: "Racc", ParseError, Parser };
+constSet(TopLevel, "Racc", Racc);

@@ -63,17 +63,6 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
   },
   // --- i18n: gem surface trails has no counterpart for ---
   {
-    pattern: "gettext/po_parser.rb",
-    package: "i18n",
-    reason: "Pre-1.0: gettext .po support — the .po catalogue parser.",
-  },
-  {
-    pattern: "backend/gettext.rb",
-    testFile: "gettext/backend_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: gettext .po support — the backend mixin that loads .po files.",
-  },
-  {
     pattern: "tests/",
     package: "i18n",
     reason:

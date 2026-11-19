@@ -64,6 +64,11 @@
       "source": "ruby",
       "ref": "v3_3_11",
       "sha": "1f2d15125a2dc701e1822ed2900eb17899500ec7"
+    },
+    {
+      "source": "racc",
+      "ref": "v1.8.0",
+      "sha": "8eeca623c95c77724d3b0856806d2f9fc82684b1"
     }
   ]
 }
