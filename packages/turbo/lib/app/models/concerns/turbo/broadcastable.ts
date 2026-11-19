@@ -7,7 +7,7 @@ import {
   reverseMerge,
   threadMattrAccessor,
 } from "@blazetrails/activesupport";
-import { rbFSend, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo, rbProcCall, rtest } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../../turbo-trails.js";
 
 type Options = Record<string, unknown>;
@@ -44,25 +44,24 @@ export const ClassMethods = {
     { insertsBy = "append", target = this.broadcastTargetDefault(), ...rendering }: Options = {},
   ): void {
     this.afterCreateCommit(function (this: Host) {
-      return this.broadcastActionLaterTo(
-        (rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null) ?? rbFSend(this, stream),
-        {
-          action: insertsBy,
-          target: (rbObjRespondTo(target, "call") ? rbProcCall(target, this) : null) ?? target,
-          ...rendering,
-        },
-      );
+      const called = rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null;
+      const streamables = rtest(called) ? called : rbFSend(this, stream);
+      const calledTarget = rbObjRespondTo(target, "call") ? rbProcCall(target, this) : null;
+      return this.broadcastActionLaterTo(streamables, {
+        action: insertsBy,
+        target: rtest(calledTarget) ? calledTarget : target,
+        ...rendering,
+      });
     });
     this.afterUpdateCommit(function (this: Host) {
-      return this.broadcastReplaceLaterTo(
-        (rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null) ?? rbFSend(this, stream),
-        { ...rendering },
-      );
+      const called = rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null;
+      return this.broadcastReplaceLaterTo(rtest(called) ? called : rbFSend(this, stream), {
+        ...rendering,
+      });
     });
     this.afterDestroyCommit(function (this: Host) {
-      return this.broadcastRemoveTo(
-        (rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null) ?? rbFSend(this, stream),
-      );
+      const called = rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null;
+      return this.broadcastRemoveTo(rtest(called) ? called : rbFSend(this, stream));
     });
   },
 
@@ -72,9 +71,10 @@ export const ClassMethods = {
     { insertsBy = "append", target = this.broadcastTargetDefault(), ...rendering }: Options = {},
   ): void {
     this.afterCreateCommit(function (this: Host) {
+      const calledTarget = rbObjRespondTo(target, "call") ? rbProcCall(target, this) : null;
       return this.broadcastActionLaterTo(stream, {
         action: insertsBy,
-        target: (rbObjRespondTo(target, "call") ? rbProcCall(target, this) : null) ?? target,
+        target: rtest(calledTarget) ? calledTarget : target,
         ...rendering,
       });
     });
@@ -88,9 +88,8 @@ export const ClassMethods = {
 
   broadcastsRefreshesTo(this: BroadcastableClassHost, stream: unknown): void {
     this.afterCommit(function (this: Host) {
-      return this.broadcastRefreshLaterTo(
-        (rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null) ?? rbFSend(this, stream),
-      );
+      const called = rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null;
+      return this.broadcastRefreshLaterTo(rtest(called) ? called : rbFSend(this, stream));
     });
   },
 
