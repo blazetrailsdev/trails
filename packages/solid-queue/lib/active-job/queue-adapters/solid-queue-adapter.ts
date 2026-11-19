@@ -18,6 +18,17 @@ declare module "@blazetrails/activejob/namespaces" {
 export class SolidQueueAdapter {
   declare static stopping: boolean;
 
+  static {
+    classAttribute.call(this, "stopping", {
+      default: false,
+      instanceWriter: false,
+      instancePredicate: false,
+    });
+    SolidQueue.onWorkerStop(() => {
+      this.stopping = true;
+    });
+  }
+
   isStopping(_job: unknown = null): boolean {
     return (this.constructor as typeof SolidQueueAdapter).stopping;
   }
@@ -38,14 +49,5 @@ export class SolidQueueAdapter {
     return await Job.enqueueAll(activeJobs);
   }
 }
-
-classAttribute.call(SolidQueueAdapter, "stopping", {
-  default: false,
-  instanceWriter: false,
-  instancePredicate: false,
-});
-SolidQueue.onWorkerStop(() => {
-  SolidQueueAdapter.stopping = true;
-});
 
 constSet(QueueAdapters, "SolidQueueAdapter", SolidQueueAdapter);
