@@ -74,7 +74,7 @@ export class QueueSelector {
     else {
       return (await this.relation
         .where(
-          Array(this.prefixes().length).fill("queue_name LIKE ?").join(" OR "),
+          Array(this.prefixes().length).fill("queue_name LIKE ? ESCAPE '!'").join(" OR "),
           ...this.prefixes(),
         )
         .distinctValuesOf("queue_name")) as string[];
@@ -85,7 +85,7 @@ export class QueueSelector {
   private prefixes(): string[] {
     return (this._prefixes ??= this.rawQueues
       .filter((queue) => this.isPrefixedName(queue))
-      .map((queue) => queue.replaceAll("*", "%")));
+      .map((queue) => this.relation.sanitizeSqlLike(queue, "!").replaceAll("*", "%")));
   }
 
   /** @internal */
