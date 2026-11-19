@@ -48,7 +48,7 @@ export interface FallbacksHost {
     options: TranslateOptions,
   ): unknown;
 }
-function translate(
+export function translate(
   this: FallbacksHost,
   locale: Locale | null | undefined,
   key: TranslationKey | null | undefined,
@@ -94,7 +94,7 @@ function translate(
   );
 }
 
-function resolveEntry(
+export function resolveEntry(
   this: FallbacksHost,
   locale: Locale,
   object: TranslationKey | null | undefined,
@@ -127,7 +127,10 @@ function resolveEntry(
   return result instanceof MissingTranslation ? null : result;
 }
 
-function extractNonSymbolDefaultBang(this: FallbacksHost, options: TranslateOptions): unknown {
+export function extractNonSymbolDefaultBang(
+  this: FallbacksHost,
+  options: TranslateOptions,
+): unknown {
   const defaults = [options.default].flat(Infinity as 1);
   const firstNonSymbolDefault = defaults.find((default_) => !isSymbol(default_));
   if (truthy(firstNonSymbolDefault)) {
@@ -136,7 +139,7 @@ function extractNonSymbolDefaultBang(this: FallbacksHost, options: TranslateOpti
   return firstNonSymbolDefault;
 }
 
-function exists(
+export function exists(
   this: FallbacksHost,
   locale: Locale,
   key: TranslationKey,
