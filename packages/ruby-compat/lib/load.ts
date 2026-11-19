@@ -114,7 +114,6 @@ export async function rbFLoad(fname: string): Promise<true> {
  */
 export async function loadIseqEval(fname: string, fresh = false): Promise<Record<string, unknown>> {
   const full = File.expandPath(fname);
-  if (!fresh && loadedFiles.has(full)) return loadedFiles.get(full)!;
   const compiled =
     fresh && loadedFiles.has(full) && (await File.isExistAsync(full))
       ? undefined

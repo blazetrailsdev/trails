@@ -199,13 +199,61 @@ async function writeLoadFunction(trailsDir: string, root: string, file: string):
   const isExported = (node: ts.Node) =>
     ts.canHaveModifiers(node) &&
     (ts.getModifiers(node) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+  const bodyText = (node: ts.Node) => {
+    const edits: [number, number, string][] = [];
+    const visit = (child: ts.Node): void => {
+      if (ts.isMetaProperty(child) && child.keywordToken === ts.SyntaxKind.ImportKeyword) {
+        throw new Error(
+          `${file}: import.meta cannot be read in a file trails build compiles to a function`,
+        );
+      }
+      if (
+        ts.isCallExpression(child) &&
+        child.expression.kind === ts.SyntaxKind.ImportKeyword &&
+        child.arguments[0] !== undefined &&
+        ts.isStringLiteralLike(child.arguments[0])
+      ) {
+        const spec = child.arguments[0];
+        edits.push([spec.getStart(sf), spec.getEnd(), rewrite(spec)]);
+      }
+      ts.forEachChild(child, visit);
+    };
+    visit(node);
+    let out = text.slice(node.getStart(sf), node.getEnd());
+    for (const [start, end, value] of edits.reverse()) {
+      out = out.slice(0, start - node.getStart(sf)) + value + out.slice(end - node.getStart(sf));
+    }
+    return out;
+  };
   const strip = (node: ts.Node) =>
-    node
-      .getText(sf)
+    bodyText(node)
       .replace(/^export\s+default\s+/, "")
       .replace(/^export\s+/, "");
+  let reexports = 0;
   for (const statement of sf.statements) {
     if (
+      ts.isExportDeclaration(statement) &&
+      statement.moduleSpecifier !== undefined &&
+      !statement.isTypeOnly
+    ) {
+      const ns = `__reexport${(reexports += 1)}`;
+      top.push(`import * as ${ns} from ${rewrite(statement.moduleSpecifier)};`);
+      const clause = statement.exportClause;
+      if (clause === undefined) {
+        body.push(
+          `for (const [name, value] of Object.entries(${ns})) if (name !== "default") __exports[name] = value;`,
+        );
+      } else if (ts.isNamespaceExport(clause)) {
+        body.push(`__exports[${JSON.stringify(clause.name.text)}] = ${ns};`);
+      } else {
+        for (const spec of clause.elements) {
+          if (spec.isTypeOnly) continue;
+          body.push(
+            `__exports[${JSON.stringify(spec.name.text)}] = ${ns}[${JSON.stringify((spec.propertyName ?? spec.name).text)}];`,
+          );
+        }
+      }
+    } else if (
       (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
       statement.moduleSpecifier !== undefined
     ) {
@@ -222,7 +270,7 @@ async function writeLoadFunction(trailsDir: string, root: string, file: string):
     ) {
       top.push(statement.getText(sf));
     } else if (ts.isExportAssignment(statement)) {
-      body.push(`__exports.default = ${statement.expression.getText(sf)};`);
+      body.push(`__exports.default = ${bodyText(statement.expression)};`);
     } else if (ts.isExportDeclaration(statement)) {
       const clause = statement.exportClause;
       if (clause !== undefined && ts.isNamedExports(clause) && !statement.isTypeOnly) {
@@ -234,10 +282,17 @@ async function writeLoadFunction(trailsDir: string, root: string, file: string):
         }
       }
     } else if (isExported(statement)) {
-      body.push(strip(statement));
       const isDefault = (ts.getModifiers(statement as ts.HasModifiers) ?? []).some(
         (m) => m.kind === ts.SyntaxKind.DefaultKeyword,
       );
+      if (
+        isDefault &&
+        (statement as ts.FunctionDeclaration | ts.ClassDeclaration).name === undefined
+      ) {
+        body.push(`__exports.default = ${strip(statement)};`);
+        continue;
+      }
+      body.push(strip(statement));
       const declared = ts.isVariableStatement(statement)
         ? statement.declarationList.declarations.map((d) => d.name)
         : [(statement as ts.FunctionDeclaration | ts.ClassDeclaration).name];
@@ -248,7 +303,7 @@ async function writeLoadFunction(trailsDir: string, root: string, file: string):
         );
       }
     } else {
-      body.push(statement.getText(sf));
+      body.push(bodyText(statement));
     }
   }
   const source = [

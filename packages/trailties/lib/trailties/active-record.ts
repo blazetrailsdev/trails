@@ -16,6 +16,7 @@ import {
   block,
   rbFLoad,
   rbFRequireFile,
+  getPath,
   rbObjRespondTo,
   STDERR,
   STDOUT,
@@ -191,8 +192,9 @@ export class Trailtie extends BaseTrailtie {
     this.console(async (app) => {
       if ((app as Application).isSandbox()) {
         await rbFRequireFile(
-          new URL(import.meta.resolve("@blazetrails/activerecord/trailties/console-sandbox"))
-            .pathname,
+          getPath().fileURLToPath!(
+            import.meta.resolve("@blazetrails/activerecord/trailties/console-sandbox"),
+          ),
         );
       }
       if (!Logger.isLoggerOutputsTo(Trails.logger!, STDERR, STDOUT)) {

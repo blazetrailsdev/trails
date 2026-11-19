@@ -373,6 +373,85 @@ describe("buildAutoload", () => {
     }
   });
 
+  it("compiles a loaded file's exports, re-exports and relative imports into its function", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    Dir.chdir(tmp);
+    try {
+      FileUtils.mkdirP("config/initializers");
+      File.write("config/application.ts", "export {};\n");
+      File.write("config/environment.ts", "export default null;\n");
+      File.write(
+        "config/initializers/shared.ts",
+        "export const a = 1;\nexport const b = 2;\nexport default 3;\n",
+      );
+      File.write(
+        "config/initializers/exports.ts",
+        [
+          "export * from './shared.ts';",
+          "export * as all from './shared.ts';",
+          "export { b as c } from './shared.ts';",
+          "export type T = number;",
+          "export const d = (await import('./shared.ts')).a;",
+          "export default class {}",
+          "",
+        ].join("\n"),
+      );
+      File.write("config/initializers/meta.ts", "export const here = import.meta.dirname;\n");
+      const root = Dir.pwd();
+      seats.Trails = {
+        application: {
+          config: { root },
+          paths: () => ({
+            get: (key: string) =>
+              key === "config/initializers"
+                ? {
+                    toAry: () => [key],
+                    extensions: () => undefined,
+                    existent: async () => [File.expandPath("config/initializers/exports.ts")],
+                  }
+                : undefined,
+          }),
+          initializers: { tsort: () => [] },
+        },
+      };
+
+      await buildAutoload();
+
+      const compiled = await import(
+        File.expandPath(".trails/compiled/config/initializers/exports.ts")
+      );
+      const exports = await compiled.default();
+      expect(exports.a).toBe(1);
+      expect(exports.b).toBe(2);
+      expect(exports.all.default).toBe(3);
+      expect(exports.c).toBe(2);
+      expect(exports.d).toBe(1);
+      expect(typeof exports.default).toBe("function");
+      expect(Object.hasOwn(exports, "T")).toBe(false);
+
+      seats.Trails = {
+        application: {
+          config: { root },
+          paths: () => ({
+            get: (key: string) =>
+              key === "config/initializers"
+                ? {
+                    toAry: () => [key],
+                    extensions: () => undefined,
+                    existent: async () => [File.expandPath("config/initializers/meta.ts")],
+                  }
+                : undefined,
+          }),
+          initializers: { tsort: () => [] },
+        },
+      };
+      await expect(buildAutoload()).rejects.toThrow(/import\.meta cannot be read/);
+    } finally {
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
   it("renders a view from the boot map with app/views absent", async () => {
     const tmp = Dir.mktmpdir("build-autoload");
     Dir.chdir(tmp);
