@@ -55,6 +55,7 @@
       "@blazetrails/ruby-compat/name-error": ["../../ruby-compat/lib/name-error.ts"],
       "@blazetrails/ruby-compat/psych": ["../../ruby-compat/lib/psych.ts"],
       "@blazetrails/ruby-compat/psych-adapter": ["../../ruby-compat/lib/psych-adapter.ts"],
+      "@blazetrails/ruby-compat/racc/parser": ["../../ruby-compat/lib/racc/parser.ts"],
       "@blazetrails/ruby-compat/yaml": ["../../ruby-compat/lib/yaml.ts"],
       "@blazetrails/ruby-compat/enumerable": ["../../ruby-compat/lib/enumerable.ts"],
       "@blazetrails/ruby-compat/range": ["../../ruby-compat/lib/range.ts"],

@@ -596,6 +596,8 @@ export const CORE_CLASSES: readonly [string, string | null, string, string][] = 
   ["NoMethodError", "no-method-error.ts", "NoMethodError", "error.c:3360"],
   ["NotImplementedError", "not-implemented-error.ts", "NotImplementedError", "error.c:3346"],
   ["Object", null, "Object", "class.c:894"],
+  ["Racc::ParseError", "racc/parser.ts", "ParseError", "racc/v1.8.0/lib/racc/parser.rb:16"],
+  ["Racc::Parser", "racc/parser.ts", "Parser", "racc/v1.8.0/lib/racc/parser.rb:184"],
   ["Range", "range.ts", "Range", "range.c:2636"],
   ["RangeError", "range-error.ts", "RangeError", "error.c:3329"],
   ["Rational", "rational.ts", "Rational", "rational.c:2759"],
@@ -693,12 +695,15 @@ async function checkCoreSites(): Promise<string[]> {
   ];
   for (const [fqn, site] of rows) {
     const [file, line] = site.split(":");
-    const source = await fs.readFile(path.join(ruby, file), "utf8").catch(() => null);
+    const gem = file.endsWith(".rb");
+    const root = gem ? path.join(ROOT_DIR, "vendor") : ruby;
+    const source = await fs.readFile(path.join(root, file), "utf8").catch(() => null);
     if (source === null) {
       bad.push(`${fqn} ${site} (unreadable)`);
       continue;
     }
-    if (!source.split("\n")[Number(line) - 1]?.includes(`"${fqn}"`)) bad.push(`${fqn} ${site}`);
+    const needle = gem ? `class ${fqn.split("::").at(-1)}` : `"${fqn}"`;
+    if (!source.split("\n")[Number(line) - 1]?.includes(needle)) bad.push(`${fqn} ${site}`);
   }
   return bad;
 }
@@ -1017,19 +1022,21 @@ async function main(): Promise<void> {
   if (check) await checkConstantResidue(tables, process.argv.includes("--record"), stale, only);
   const targets = (
     await Promise.all(
-      [...tables].map(async ([dir, entries]) => [
-        [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
-        [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded && !e.table)] as const,
-        ...[
-          ...new Set([
-            ...(SEPARATE_SUBPATH_ENTRIES[dir]
-              ? [separateTable(SEPARATE_SUBPATH_ENTRIES[dir])]
-              : []),
-            ...entries.flatMap((e) => (e.table ? [e.table] : [])),
-            ...(LAZY_DIRS[dir] ? await lazyTablesOnDisk(dir) : []),
-          ]),
-        ].map((table) => [dir, table, entries.filter((e) => e.table === table)] as const),
-      ]),
+      [...tables]
+        .filter(([dir]) => dir !== "ruby-compat")
+        .map(async ([dir, entries]) => [
+          [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
+          [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded && !e.table)] as const,
+          ...[
+            ...new Set([
+              ...(SEPARATE_SUBPATH_ENTRIES[dir]
+                ? [separateTable(SEPARATE_SUBPATH_ENTRIES[dir])]
+                : []),
+              ...entries.flatMap((e) => (e.table ? [e.table] : [])),
+              ...(LAZY_DIRS[dir] ? await lazyTablesOnDisk(dir) : []),
+            ]),
+          ].map((table) => [dir, table, entries.filter((e) => e.table === table)] as const),
+        ]),
     )
   ).flat();
   if (only === undefined || only === "ruby-compat") {

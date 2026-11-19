@@ -46,7 +46,7 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   "rails-dom-testing": "actionview",
   mysql2: "activerecord",
   sqlite3: "activerecord",
-  racc: "nokogiri",
+  racc: "ruby-compat",
   "rails-html-sanitizer": "html-sanitizer",
   loofah: "html-sanitizer",
   crass: "html-sanitizer",
@@ -72,7 +72,7 @@ export const DIR_TO_PACKAGES: Record<string, string[]> = Object.entries(
   // (`activerecord` + `activerecord-test-support`); seed the self-mapping so
   // resolving the npm dep `@blazetrails/activerecord` doesn't lose `activerecord`.
   Object.fromEntries(
-    PACKAGES.filter((pkg) => !PACKAGE_DIR_OVERRIDES[pkg]).map((pkg) => [pkg, [pkg]]),
+    TS_EXTRACT_PACKAGES.filter((pkg) => !PACKAGE_DIR_OVERRIDES[pkg]).map((pkg) => [pkg, [pkg]]),
   ),
 );
 

@@ -1875,7 +1875,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "solid-cache": "packages/solid-cache/test/",
   erubi: "packages/tse-compiler/test/",
   nokogiri: "packages/nokogiri/test/",
-  racc: "packages/nokogiri/test/racc/",
+  racc: "packages/ruby-compat/test/racc/",
   "rails-html-sanitizer": "packages/html-sanitizer/test/",
   loofah: "packages/html-sanitizer/test/loofah/",
   crass: "packages/html-sanitizer/test/crass/",

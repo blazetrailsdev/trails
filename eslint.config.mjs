@@ -827,7 +827,9 @@ export default defineConfig(
   //    classes register against, so `registerCryptoAdapter`, `registerFsAdapter`
   //    and friends have
   //    no `vendor/ruby/` line to cite. They still carry their receipts; only
-  //    the citation half is out of scope for them. This ignores list must stay
+  //    the citation half is out of scope for them. `lib/racc/` is exempt
+  //    whole: it is the racc gem port, which `parity:api` scores against
+  //    `vendor/racc/`, so its exports need neither. This ignores list must stay
   //    in sync with the same block in eslint/rails-private-jsdoc.config.mjs,
   //    which is the enforcing run (it is the CI job that fetches vendor/ruby).
   {
@@ -841,6 +843,7 @@ export default defineConfig(
       "packages/ruby-compat/lib/http-adapter.ts",
       "packages/ruby-compat/lib/os-adapter.ts",
       "packages/ruby-compat/lib/process-adapter.ts",
+      "packages/ruby-compat/lib/racc/**",
       "packages/ruby-compat/lib/repl-adapter.ts",
       "packages/ruby-compat/lib/zlib-adapter.ts",
     ],

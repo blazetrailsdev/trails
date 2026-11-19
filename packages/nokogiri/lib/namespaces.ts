@@ -20,7 +20,6 @@ import type { SelectorCache } from "./css/selector-cache.js";
 import type { SyntaxError as CssSyntaxError } from "./css/syntax-error.js";
 import type { XPathVisitor } from "./css/xpath-visitor.js";
 import type { Tokenizer } from "./css/tokenizer.js";
-import type { ParseError, Parser as RaccParser } from "./racc/parser.js";
 
 export const XML = { name: "Nokogiri::XML" } as {
   name: string;
@@ -64,10 +63,3 @@ export const CSS = { name: "Nokogiri::CSS" } as {
 
 export const Nokogiri = { name: "Nokogiri", XML, HTML5, CSS };
 constSet(TopLevel, "Nokogiri", Nokogiri);
-
-export const Racc = { name: "Racc" } as {
-  name: string;
-  ParseError: typeof ParseError;
-  Parser: typeof RaccParser;
-};
-constSet(TopLevel, "Racc", Racc);

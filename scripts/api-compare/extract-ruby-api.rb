@@ -1143,6 +1143,8 @@ class ApiExtractor
 
     return if node[0] == :command_call && record_boot_mixin(node[1], cmd_name, args)
 
+    return if node[0] == :command && walk_literal_string_eval(cmd_name, args)
+
     # Zeitwerk's `internal def foo` (zeitwerk/internal.rb:6-11) is `private`
     # plus a public `__foo` alias.
     if cmd_name == "internal" && args.is_a?(Array) && args.flatten.include?(:def)
@@ -3456,6 +3458,24 @@ class ApiExtractor
   # in it have no position in this body's stream. Recorded as `stringEvalCalls`
   # for compare.ts#reorderedCalls; the block form is parsed like any block.
   STRING_EVAL_CALLS = %w[module_eval class_eval].freeze
+
+  # A bare `module_eval <<'X' … X` whose String has no interpolation (racc's
+  # generated parsers, i18n/gettext/po_parser.rb:23-110) defines its `def`s on
+  # the enclosing class exactly as written, so the String is re-parsed and
+  # walked in place, padded so each `def` keeps its line in the file.
+  def walk_literal_string_eval(cmd_name, args)
+    return false unless STRING_EVAL_CALLS.include?(cmd_name)
+    list = args.is_a?(Array) && args[0] == :args_add_block ? args[1] : args
+    lit = list.is_a?(Array) && list[0]
+    return false unless lit.is_a?(Array) && lit[0] == :string_literal
+    parts = lit[1].is_a?(Array) && lit[1][0] == :string_content ? lit[1][1..] : nil
+    return false unless parts && !parts.empty? && parts.all? { |p| p.is_a?(Array) && p[0] == :@tstring_content }
+    source = parts.map { |p| p[1] }.join
+    sexp = Ripper.sexp(("\n" * (parts[0][2][0] - 1)) + source)
+    return false unless sexp
+    walk(sexp[1])
+    true
+  end
 
   def string_literal_arg?(args)
     return false unless args.is_a?(Array)

@@ -96,7 +96,7 @@ function readLocaleModule(filename: string): unknown {
   return localeModules.get(filename);
 }
 
-function readFile(filename: string): string {
+export function _readFile(filename: string): string {
   const contents = fileContents.get(filename);
   if (contents === undefined) {
     throw new Error(
@@ -533,7 +533,7 @@ export abstract class Base {
   protected loadYml(filename: string): [unknown, boolean] {
     try {
       return [
-        YAML.unsafeLoad(readFile(filename), { filename, symbolizeNames: true, freeze: true }),
+        YAML.unsafeLoad(_readFile(filename), { filename, symbolizeNames: true, freeze: true }),
         true,
       ];
     } catch (e) {
@@ -551,7 +551,7 @@ export abstract class Base {
    */
   protected loadJson(filename: string): [unknown, boolean] {
     try {
-      return [JSON.parse(readFile(filename), { symbolizeNames: true, freeze: true }), true];
+      return [JSON.parse(_readFile(filename), { symbolizeNames: true, freeze: true }), true];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }

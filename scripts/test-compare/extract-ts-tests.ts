@@ -73,8 +73,8 @@ export function getPackageTestFiles(): Record<string, string[]> {
   ];
   const packageAliases: Record<string, [dir: string, pattern: string, ignore?: string]> = {
     erubi: ["tse-compiler", "**/*.test.ts"],
-    nokogiri: ["nokogiri", "**/*.test.ts", "racc/"],
-    racc: ["nokogiri", "racc/**/*.test.ts"],
+    nokogiri: ["nokogiri", "**/*.test.ts"],
+    racc: ["ruby-compat", "racc/**/*.test.ts"],
     "rails-html-sanitizer": ["html-sanitizer", "*.test.ts"],
     loofah: ["html-sanitizer", "loofah/**/*.test.ts"],
     crass: ["html-sanitizer", "crass/**/*.test.ts"],
