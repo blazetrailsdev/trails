@@ -11,6 +11,7 @@ import { testsProcs } from "../support/tests/procs.js";
 import { testsLocalizationDate } from "../support/tests/localization/date.js";
 import { testsLocalizationDateTime } from "../support/tests/localization/date-time.js";
 import { testsLocalizationTime } from "../support/tests/localization/time.js";
+import { testsLocalizationProcs } from "../support/tests/localization/procs.js";
 import { config } from "../../lib/i18n.js";
 
 describe("I18nApiChainTest", () => {
@@ -28,6 +29,7 @@ describe("I18nApiChainTest", () => {
   testsLocalizationDate();
   testsLocalizationDateTime();
   testsLocalizationTime();
+  testsLocalizationProcs();
 
   it("make sure we use the Chain backend", () => {
     expect(config().backend.constructor).toBe(Chain);

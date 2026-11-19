@@ -11,6 +11,7 @@ import { testsProcs } from "../support/tests/procs.js";
 import { testsLocalizationDate } from "../support/tests/localization/date.js";
 import { testsLocalizationDateTime } from "../support/tests/localization/date-time.js";
 import { testsLocalizationTime } from "../support/tests/localization/time.js";
+import { testsLocalizationProcs } from "../support/tests/localization/procs.js";
 import { config } from "../../lib/i18n.js";
 
 class Backend extends Fallbacks(Simple) {}
@@ -30,6 +31,7 @@ describe("I18nFallbacksApiTest", () => {
   testsLocalizationDate();
   testsLocalizationDateTime();
   testsLocalizationTime();
+  testsLocalizationProcs();
 
   it("make sure we use a backend with Fallbacks included", () => {
     expect(config().backend.constructor).toBe(Backend);
