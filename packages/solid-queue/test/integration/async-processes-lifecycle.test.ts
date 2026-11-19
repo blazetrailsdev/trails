@@ -138,12 +138,11 @@ describe("AsyncProcessesLifecycleTest", () => {
   });
 
   afterEach(async () => {
-    if (pid.isExists) await pid.terminate().catch(() => null);
+    if (pid.isExists) await pid.terminate();
     vi.restoreAllMocks();
     await Job.destroyAll();
     await JobResult.deleteAll();
-    await ClaimedExecution.deleteAll();
-    await Process.deleteAll();
+    await Process.destroyAll();
   });
 
   afterAll(() => {
