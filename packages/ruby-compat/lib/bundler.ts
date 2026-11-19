@@ -60,7 +60,11 @@ export const Bundler = {
           : dot != null && typeof dot === "object"
             ? ((dot as Record<string, unknown>).import ?? (dot as Record<string, unknown>).default)
             : (json.main ?? "index.js");
-      if (typeof entry !== "string") continue;
+      if (typeof entry !== "string") {
+        const error = new LoadError(`cannot load such file -- ${name}`);
+        error.path = name;
+        throw error;
+      }
       await import(new URL(`file://${File.expandPath(entry, dir)}`).href);
     }
   },
