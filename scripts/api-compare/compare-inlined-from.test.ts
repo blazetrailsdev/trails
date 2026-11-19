@@ -13,6 +13,8 @@ vi.mock("./config.js", async (importOriginal) => ({
 }));
 
 import { main } from "./compare.js";
+import { inlinedFromTags } from "./extract-ts-api.js";
+import * as ts from "typescript-5";
 
 const PKG = "activemodel";
 const API_RB = "rails/v8.0.2/activemodel/lib/active_model/api.rb";
@@ -292,6 +294,67 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     expect(() => compare(fixture)).toThrow(
       new RegExp(`^@inlinedFrom ${message}: activemodel/thing\\.ts Thing#constructor`),
     );
+  });
+
+  const unpaired = { rubyInitialize: false, rubyClass: false };
+  it("pairs a guarded tag with the module's initialize where no Rails include records it", () => {
+    const guarded = { ...unpaired, inlinedFrom: [tag({ guarded: true })] };
+    expect(compare(guarded)).toEqual({ calls: [], args: [] });
+    const { calls } = compare({ ...guarded, tsCalls: ["buildReflection", "super"] });
+    expect(calls.join("\n")).toContain("assign_attributes → assignAttributes");
+  });
+
+  it("scores a guarded tag's module initialize as matched in the module's file", () => {
+    expect(moduleRow({ ...unpaired, inlinedFrom: [tag({ guarded: true })] })).toMatchObject({
+      matched: 1,
+      missing: 0,
+      moves: [],
+    });
+  });
+
+  it("still throws on an unpaired constructor whose tags are not all guarded", () => {
+    const naming = tag({
+      module: "ActiveModel::Naming",
+      file: NAMING_FILE,
+      firstLine: 5,
+      lastLine: 7,
+    });
+    expect(() =>
+      compare({
+        ...unpaired,
+        classMethodsNew: true,
+        namingInitialize: true,
+        inlinedFrom: [tag({ guarded: true }), naming],
+      }),
+    ).toThrow(/^@inlinedFrom was never compared, no Rails `initialize` paired/);
+  });
+});
+
+describe("inlinedFromTags on a constructor", () => {
+  const ctorOf = (body: string) => {
+    const file = ts.createSourceFile(
+      "t.ts",
+      `class T {\n  /** @inlinedFrom ActiveModel::Attributes#initialize rails/v8.0.2/activemodel/lib/active_model/attributes.rb:106-109 */\n  constructor() {\n${body}\n  }\n}`,
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    return (file.statements[0] as ts.ClassDeclaration).members[0];
+  };
+
+  it("marks the tag guarded when an isModuleIncluded(new.target, Mod) guard tests its module", () => {
+    expect(
+      inlinedFromTags(ctorOf("if (isModuleIncluded(new.target, Attributes)) {}"))?.[0].guarded,
+    ).toBe(true);
+  });
+
+  it("leaves an unguarded segment, or one guarded on another module, unmarked", () => {
+    expect(inlinedFromTags(ctorOf(""))?.[0].guarded).toBeUndefined();
+    expect(
+      inlinedFromTags(ctorOf("if (isModuleIncluded(new.target, API)) {}"))?.[0].guarded,
+    ).toBeUndefined();
+    expect(
+      inlinedFromTags(ctorOf("if (isModuleIncluded(this, Attributes)) {}"))?.[0].guarded,
+    ).toBeUndefined();
   });
 });
 

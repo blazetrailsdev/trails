@@ -757,8 +757,13 @@ Thor class), the body is still inlined at Ruby's `super` position in the
 nearest constructor, wrapped in `if (isModuleIncluded(new.target, Mod))`, the
 `include?` question Ruby's ancestor chain answers. The guard carries
 `@inventedArm if — PERMANENT` where the arm gate compares the declaration, and
-the segment is tagged only where the Rails manifest records the include
+the segment is tagged where the Rails manifest records the include
 (`inlined-from-manifest-follows-included-hook-includes`). Ruled by the operator on 2026-10-19.
+A segment behind such a guard is also tagged where no framework class includes
+the module, as with an open-set module only application code includes
+(`ActiveModel::Attributes#initialize` in `Model`'s constructor): the guard
+names the module, and the gate pairs the tag with that module's `initialize`
+directly. Ruled by the operator on 2026-11-18.
 
 `parity:api` credits a tagged module hook to the constructor, both call gates
 compare the constructor against the tagged bodies in chain order, and

@@ -3119,7 +3119,33 @@ export function inventedArmTags(node: ts.Node): string[] | undefined {
  */
 export function inlinedFromTags(node: ts.Node): InlinedFrom[] | undefined {
   const tags = taggedCommentOf(node, INLINED_FROM_TAG, fileHasInlinedFromTag, inlinedFromIn);
-  return tags !== undefined && tags.length > 0 ? tags : undefined;
+  if (tags === undefined || tags.length === 0) return undefined;
+  if (!ts.isConstructorDeclaration(node)) return tags;
+  const guards = includedGuardsOf(node);
+  return tags.map((tag) =>
+    guards.has(tag.module.split("::").pop()!) ? { ...tag, guarded: true as const } : tag,
+  );
+}
+
+/**
+ * The modules a constructor's top-level `if (isModuleIncluded(new.target, Mod))`
+ * statements test, by the guard argument's last name segment (CLAUDE.md, "A
+ * module installed at run time is inlined behind a guard").
+ */
+function includedGuardsOf(ctor: ts.ConstructorDeclaration): Set<string> {
+  const guards = new Set<string>();
+  for (const stmt of ctor.body?.statements ?? []) {
+    if (!ts.isIfStatement(stmt) || !ts.isCallExpression(stmt.expression)) continue;
+    const { expression: callee, arguments: args } = stmt.expression;
+    if (!ts.isIdentifier(callee) || callee.text !== "isModuleIncluded" || args.length !== 2) {
+      continue;
+    }
+    const [target, mod] = args;
+    if (!ts.isMetaProperty(target) || target.name.text !== "target") continue;
+    if (ts.isIdentifier(mod)) guards.add(mod.text);
+    else if (ts.isPropertyAccessExpression(mod)) guards.add(mod.name.text);
+  }
+  return guards;
 }
 
 /**

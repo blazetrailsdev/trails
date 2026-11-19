@@ -430,6 +430,12 @@ describe("inlinedFromFindings", () => {
     ]);
   });
 
+  it("admits a guarded tag on a module the class's Rails ancestry does not include", () => {
+    expect(
+      messages([{ ...CORE, guarded: true }], { owner: "ProxyRecord", file: "proxy.ts" }),
+    ).toEqual([]);
+  });
+
   it("ends the chain at an initialize that calls no super", () => {
     const enrolled = ["activerecord"];
     expect(messages([], { owner: "Proxy", file: "proxy.ts", enrolled })).toEqual([]);

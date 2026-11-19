@@ -361,7 +361,7 @@ export function inlinedFromFindings(
           report(hook, "sits on a constructor whose file and name mirror no Rails class or module");
         } else if (reached.sameFile.includes(hook)) {
           report(hook, "is redundant: a body from the mirrored Ruby file is inlined untagged");
-        } else if (!reached.tagged.includes(hook)) {
+        } else if (!reached.tagged.includes(hook) && tag.guarded !== true) {
           report(
             hook,
             `names a module ${counterpart!.fqn} does not ${tag.hook === "new" ? "extend" : "include or prepend"}`,
