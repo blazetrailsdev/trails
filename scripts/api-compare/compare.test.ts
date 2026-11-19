@@ -4632,9 +4632,9 @@ describe("declarationOnlyInFile", () => {
   it("credits a define_model_callbacks entry, defined at run time on both sides", () => {
     expect(
       declarationOnlyInFile(
-        "crud.ts",
-        "compileInsert",
-        bodyless,
+        "callbacks.ts",
+        "beforeSave",
+        new Map([["callbacks.ts", new Map([["beforeSave", new Set(["ClassMethods"])]])]]),
         new Map(),
         "define_model_callbacks",
       ),
