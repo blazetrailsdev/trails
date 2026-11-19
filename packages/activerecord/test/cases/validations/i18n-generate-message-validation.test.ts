@@ -1,3 +1,4 @@
+import { include } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../../../lib/validations.js";
@@ -11,7 +12,8 @@ fixtures([]);
 describe("I18nGenerateMessageValidationTest", () => {
   let topic: Topic;
 
-  class Backend extends I18n.Fallbacks(I18n.Simple) {}
+  class Backend extends I18n.Simple {}
+  include(Backend, I18n.Fallbacks);
 
   function resetI18nLoadPath(fn: () => void): void {
     const oldLoadPath = [...I18n.loadPath()];

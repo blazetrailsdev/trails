@@ -1,3 +1,4 @@
+import { include } from "@blazetrails/ruby-compat";
 import * as TestCase from "../support/test-case.js";
 import { kernelCatch } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
@@ -6,7 +7,8 @@ import { Simple } from "../../lib/backend/simple.js";
 import { config, t, withLocale } from "../../lib/i18n.js";
 import { MissingTranslation } from "../../lib/exceptions.js";
 
-class Backend extends Fallbacks(Simple) {}
+class Backend extends Simple {}
+include(Backend, Fallbacks);
 
 describe("Backend::Fallbacks over the ActiveRecord error-message scopes", () => {
   beforeEach(TestCase.setup);

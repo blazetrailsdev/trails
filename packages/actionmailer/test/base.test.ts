@@ -1,3 +1,4 @@
+import { include } from "@blazetrails/ruby-compat";
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -581,7 +582,8 @@ describe("BaseTest", () => {
   });
 
   it("implicit multipart with fallback locale", async () => {
-    const fallbackBackend = class extends I18n.Fallbacks(I18n.Simple) {};
+    const fallbackBackend = class extends I18n.Simple {};
+    include(fallbackBackend, I18n.Fallbacks);
 
     const backend = I18n.backend();
     try {

@@ -1,3 +1,4 @@
+import { include } from "@blazetrails/ruby-compat";
 import * as TestCase from "../support/test-case.js";
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
 
@@ -14,7 +15,8 @@ import { testsLocalizationTime } from "../support/tests/localization/time.js";
 import { testsLocalizationProcs } from "../support/tests/localization/procs.js";
 import { config } from "../../lib/i18n.js";
 
-class Backend extends Fallbacks(Simple) {}
+class Backend extends Simple {}
+include(Backend, Fallbacks);
 
 describe("I18nFallbacksApiTest", () => {
   beforeEach(async () => {

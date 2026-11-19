@@ -8,7 +8,8 @@ import { config, t, type Locale } from "../../lib/i18n.js";
 
 class PluralizationSimple extends Simple {}
 include(PluralizationSimple, Pluralization);
-class Backend extends Fallbacks(PluralizationSimple) {}
+class Backend extends PluralizationSimple {}
+include(Backend, Fallbacks);
 
 function pluralizer(backend: Backend, locale: Locale): unknown {
   return (backend as unknown as { pluralizer(locale: Locale): unknown }).pluralizer(locale);

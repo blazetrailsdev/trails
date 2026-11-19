@@ -5,7 +5,7 @@ import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { FileUtils, Pathname, include, includedModules } from "@blazetrails/ruby-compat";
 import { Rack, type Generation } from "../../support/isolation/abstract-unit.js";
-import { Trailtie as I18nRailtie } from "../../../lib/trailties/i18n.js";
+import { Trailtie as I18nRailtie, type I18nFallbacksConfig } from "../../../lib/trailties/i18n.js";
 import { Trails } from "../../../lib/trails.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -235,7 +235,7 @@ Trails.application.routes.draw(function () {
   });
 
   it.skip("config.i18n.fallbacks = true initializes I18n.fallbacks with default settings", async () => {
-    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = true;
+    I18nRailtie.config.i18n.fallbacks = true;
     await t.loadApp();
     expect(includedModules(I18n.backend().constructor as { prototype: object })).toContain(
       I18n.Fallbacks,
@@ -244,9 +244,8 @@ Trails.application.routes.draw(function () {
   });
 
   it.skip("config.i18n.fallbacks = true initializes I18n.fallbacks with default settings even when backend changes", async () => {
-    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = true;
-    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).backend = new (class
-      extends I18n.Simple {})();
+    I18nRailtie.config.i18n.fallbacks = true;
+    I18nRailtie.config.i18n.backend = new (class extends I18n.Simple {})();
     await t.loadApp();
     expect(includedModules(I18n.backend().constructor as { prototype: object })).toContain(
       I18n.Fallbacks,
@@ -255,50 +254,37 @@ Trails.application.routes.draw(function () {
   });
 
   it.skip("config.i18n.fallbacks.defaults = [:'en-US'] initializes fallbacks with en-US as a fallback default", async () => {
-    (
-      (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks as Record<
-        string,
-        unknown
-      >
-    ).defaults = ["en-US"];
+    (I18nRailtie.config.i18n.fallbacks as I18nFallbacksConfig).defaults = ["en-US"];
     await t.loadApp();
     t.assertFallbacks({ de: ["de", "en-US", "en"] });
   });
 
   it.skip("config.i18n.fallbacks.map = { :ca => :'es-ES' } initializes fallbacks with a mapping ca => es-ES", async () => {
-    (
-      (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks as Record<
-        string,
-        unknown
-      >
-    ).map = { ca: "es-ES" };
+    (I18nRailtie.config.i18n.fallbacks as I18nFallbacksConfig).map = { ca: "es-ES" };
     await t.loadApp();
     t.assertFallbacks({ ca: ["ca", "es-ES", "es"] });
   });
 
   it.skip("[shortcut] config.i18n.fallbacks = [:'en-US'] initializes fallbacks with en-US as a fallback default", async () => {
-    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = ["en-US"];
+    I18nRailtie.config.i18n.fallbacks = ["en-US"];
     await t.loadApp();
     t.assertFallbacks({ de: ["de", "en-US", "en"] });
   });
 
   it.skip("[shortcut] config.i18n.fallbacks = [{ :ca => :'es-ES' }] initializes fallbacks with a mapping ca => es-ES", async () => {
-    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = [{ ca: "es-ES" }];
+    I18nRailtie.config.i18n.fallbacks = [{ ca: "es-ES" }];
     await t.loadApp();
     t.assertFallbacks({ ca: ["ca", "es-ES", "es"] });
   });
 
   it.skip("[shortcut] config.i18n.fallbacks = [:'en-US', { :ca => :'es-ES' }] initializes fallbacks with the given arguments", async () => {
-    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = [
-      "en-US",
-      { ca: "es-ES" },
-    ];
+    I18nRailtie.config.i18n.fallbacks = ["en-US", { ca: "es-ES" }];
     await t.loadApp();
     t.assertFallbacks({ ca: ["ca", "es-ES", "es", "en-US", "en"] });
   });
 
   it.skip("[shortcut] config.i18n.fallbacks = { ca: :en } initializes fallbacks with a mapping ca => :en", async () => {
-    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = { ca: "en" };
+    I18nRailtie.config.i18n.fallbacks = { ca: "en" };
     await t.loadApp();
     t.assertFallbacks({ ca: ["ca", "en"] });
   });
