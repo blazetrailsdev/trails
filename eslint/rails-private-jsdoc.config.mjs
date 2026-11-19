@@ -123,6 +123,7 @@ export default [
       "packages/ruby-compat/lib/http-adapter.ts",
       "packages/ruby-compat/lib/os-adapter.ts",
       "packages/ruby-compat/lib/process-adapter.ts",
+      "packages/ruby-compat/lib/racc/**",
       "packages/ruby-compat/lib/repl-adapter.ts",
       "packages/ruby-compat/lib/zlib-adapter.ts",
     ],
