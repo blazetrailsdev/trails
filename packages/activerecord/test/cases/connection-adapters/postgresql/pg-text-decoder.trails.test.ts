@@ -131,7 +131,7 @@ describe("PGConnection#typeMapForResults", () => {
       getTypeParser: () => () => "from the client",
       query: async (config: never) => (queries.push(config), { rows: [], fields: [] }),
     });
-    expect(client.typeMapForResults.coders().length).toBe(0);
+    expect(client.typeMapForResults._lookupOid(0, OID_INT8)).toBeNull();
     client.typeMapForResults = map;
     await client.asyncExec("SELECT 1");
     const { getTypeParser } = queries[0].types;

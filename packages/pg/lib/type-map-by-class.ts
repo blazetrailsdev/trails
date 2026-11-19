@@ -16,14 +16,6 @@ export class TypeMapByClass {
     return coder;
   }
 
-  get(klass: object): Encoder | null {
-    return this.#klassToCoder.get(klass) ?? null;
-  }
-
-  coders(): Map<object, Encoder> {
-    return new Map(this.#klassToCoder);
-  }
-
   /**
    * @internal
    * @noRailsEquivalent PERMANENT

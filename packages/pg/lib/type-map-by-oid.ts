@@ -22,16 +22,6 @@ export class TypeMapByOid {
     return this;
   }
 
-  rmCoder(format: number, oid: number): Decoder | null {
-    const coder = this.#format[format]?.get(oid) ?? null;
-    this.#format[format]?.delete(oid);
-    return coder;
-  }
-
-  coders(): Decoder[] {
-    return [...this.#format[0].values(), ...this.#format[1].values()];
-  }
-
   /**
    * @internal
    * @noRailsEquivalent PERMANENT

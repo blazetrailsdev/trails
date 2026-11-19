@@ -16,7 +16,6 @@ describe("PG::TypeMapByClass", () => {
     expect(map.set(rbCInteger, int)).toBe(int);
     map.set(rbCTrueClass, bool);
     map.set(rbCFalseClass, bool);
-    expect(map.get(rbCInteger)).toBe(int);
     expect(map._lookupKlass(3)).toBe(int);
     expect(map._lookupKlass(true)).toBe(bool);
     expect(map._lookupKlass("x")).toBeNull();
@@ -46,14 +45,11 @@ describe("PG::TypeMapByOid", () => {
     const inner = new PG.TypeMapByOid();
     const coder = new Upcase(null, { oid: 25, name: "text" });
     expect(inner.addCoder(coder)).toBe(inner);
-    expect(inner.coders()).toEqual([coder]);
     expect(coder.toH()).toEqual({ oid: 25, format: 0, flags: 0, name: "text" });
     const outer = new PG.TypeMapByOid();
     outer.defaultTypeMap = inner;
     expect(outer._lookupOid(0, 25)).toBe(coder);
     expect(outer._lookupOid(1, 25)).toBeNull();
-    expect(inner.rmCoder(0, 25)).toBe(coder);
-    expect(inner.coders()).toEqual([]);
     expect(() => inner.addCoder(new Upcase(null, { oid: 1, format: 2 }))).toThrow(ArgumentError);
   });
 });
