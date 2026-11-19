@@ -26,7 +26,10 @@ function inspect(value: unknown): string {
 }
 
 export namespace ClassAttribute {
-  /** @perf 11ms — PERMANENT */
+  /**
+   * @perf 11ms — PERMANENT
+   * @missingRailsCall redefine_method — PERMANENT
+   */
   export function redefine(
     owner: AttributeOwner,
     name: string,
@@ -60,14 +63,10 @@ export namespace ClassAttribute {
     owner: object,
     name: string,
     isPrivate: boolean,
-    fn: (() => unknown) | ((value: unknown) => void),
+    fn: () => unknown,
   ): void {
-    const isWriter = name.endsWith("=");
-    const key = isWriter ? name.slice(0, -1) : name;
-    const existing = isWriter ? Object.getOwnPropertyDescriptor(owner, key) : undefined;
-    Object.defineProperty(owner, key, {
-      get: isWriter ? existing?.get : (fn as () => unknown),
-      set: isWriter ? (fn as (value: unknown) => void) : undefined,
+    Object.defineProperty(owner, name, {
+      get: fn,
       configurable: true,
       enumerable: !isPrivate,
     });
