@@ -161,8 +161,9 @@ describe("Generators.findByNamespace fallbacks and context", () => {
     expect(await Generators.findByNamespace("nope", null, "model")).toBeNull();
   });
 
-  it("answers Rails' snake_case namespace for a dashed generator directory", async () => {
+  it("resolves a generator from either spelling of its namespace", async () => {
     const klass = await Generators.findByNamespace("scaffold_controller");
     expect(klass?.namespace()).toBe("trails:scaffold_controller");
+    expect(await Generators.findByNamespace(underscore("scaffold-controller"))).toBe(klass);
   });
 });

@@ -56,7 +56,7 @@ describe("GenerateCommand", () => {
     expect(help).toHaveBeenCalledWith("generate");
   });
 
-  it("lists generator names in Rails' snake_case", async () => {
+  it("lists generator names in kebab-case", async () => {
     const help = await capture(":stdout", () => commandInvoke("generate", ["--help"]));
     expect(help).toMatch(/^\s+scaffold_controller$/m);
     expect(help).not.toContain("scaffold-controller");
