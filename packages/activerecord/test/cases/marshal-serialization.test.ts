@@ -32,8 +32,8 @@ describe("MarshalSerializationTest", () => {
     );
   }
 
+  // PERMANENT-SKIP: Ruby-written Marshal blobs are not loaded (CLAUDE.md, "Runtime facts Node does not expose").
   it.skip("deserializing rails 6 1 marshal basic", async () => {
-    // BLOCKED: activerecord-load-rails-written-marshal-fixtures
     const topic = Marshal.load(await marshalFixture("rails_6_1_topic")) as Topic;
 
     expect(topic.isNewRecord()).toBeFalsy();
@@ -42,8 +42,8 @@ describe("MarshalSerializationTest", () => {
     expect(topic.content).toBe("Have a nice day");
   });
 
+  // PERMANENT-SKIP: Ruby-written Marshal blobs are not loaded (CLAUDE.md, "Runtime facts Node does not expose").
   it.skip("deserializing rails 6 1 marshal with loaded association cache", async () => {
-    // BLOCKED: activerecord-load-rails-written-marshal-fixtures
     const topic = Marshal.load(await marshalFixture("rails_6_1_topic_associations")) as Topic;
 
     expect(topic.isNewRecord()).toBeFalsy();
@@ -54,8 +54,8 @@ describe("MarshalSerializationTest", () => {
     expect((await topic.replies.first())!.association("topic").isLoaded()).toBeTruthy();
   });
 
+  // PERMANENT-SKIP: Ruby-written Marshal blobs are not loaded (CLAUDE.md, "Runtime facts Node does not expose").
   it.skip("deserializing rails 7 1 marshal basic", async () => {
-    // BLOCKED: activerecord-load-rails-written-marshal-fixtures
     const topic = Marshal.load(await marshalFixture("rails_7_1_topic")) as Topic;
 
     expect(topic.isNewRecord()).toBeFalsy();
@@ -64,8 +64,8 @@ describe("MarshalSerializationTest", () => {
     expect(topic.content).toBe("Have a nice day");
   });
 
+  // PERMANENT-SKIP: Ruby-written Marshal blobs are not loaded (CLAUDE.md, "Runtime facts Node does not expose").
   it.skip("deserializing rails 7 1 marshal with loaded association cache", async () => {
-    // BLOCKED: activerecord-load-rails-written-marshal-fixtures
     const topic = Marshal.load(await marshalFixture("rails_7_1_topic_associations")) as Topic;
 
     expect(topic.isNewRecord()).toBeFalsy();
