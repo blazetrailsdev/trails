@@ -1,4 +1,4 @@
-import { ActionController, Mime, MimeType } from "@blazetrails/actionpack";
+import { ActionController, ActionDispatch, Mime, MimeType } from "@blazetrails/actionpack";
 import { OrderedOptions, TopLevel, include, onLoad } from "@blazetrails/activesupport";
 import "@blazetrails/trailties/trailties/action-controller";
 import { Trails, type Application } from "@blazetrails/trailties";
@@ -162,39 +162,46 @@ export class Engine extends TrailsEngine {
      * @inventedArm if — PERMANENT
      */
     this.initializer("turbo.test_assertions", async () => {
-      const { TestAssertions: testAssertions } = (await Turbo.loadPath[
-        "turbo/test_assertions"
-      ]()) as {
-        TestAssertions: typeof TestAssertions;
-      };
+      const testAssertions =
+        TopLevel.ActiveSupport?.TestCase !== undefined
+          ? (
+              (await Turbo.loadPath["turbo/test_assertions"]()) as {
+                TestAssertions: typeof TestAssertions;
+              }
+            ).TestAssertions
+          : null;
+      onLoad("active_support_test_case", function (this: object) {
+        if (testAssertions !== null) include(this, testAssertions);
+
+        ThreadDebouncer.debouncerClass = ImmediateDebouncer;
+      });
+
       const testHelper =
-        constDefined(TopLevel, "ActionCable") && constDefined(TopLevel, "ActiveJob")
+        TopLevel.ActiveSupport?.TestCase !== undefined && constDefined(TopLevel, "ActiveJob")
           ? (
               (await Turbo.loadPath["turbo/broadcastable/test_helper"]()) as {
                 TestHelper: typeof BroadcastableTestHelper;
               }
             ).TestHelper
           : null;
-      const { IntegrationTestAssertions: integrationTestAssertions } = (await Turbo.loadPath[
-        "turbo/test_assertions/integration_test_assertions"
-      ]()) as { IntegrationTestAssertions: typeof IntegrationTestAssertions };
-
-      onLoad("active_support_test_case", function (this: object) {
-        include(this, testAssertions);
-
-        ThreadDebouncer.debouncerClass = ImmediateDebouncer;
-      });
-
       onLoad("action_cable", () => {
         onLoad("active_support_test_case", function (this: object) {
-          if ("ActiveJob" in TopLevel) {
-            include(this, testHelper!);
+          if (testHelper !== null) {
+            include(this, testHelper);
           }
         });
       });
 
+      const integrationTestAssertions =
+        ActionDispatch.IntegrationTest !== undefined
+          ? (
+              (await Turbo.loadPath["turbo/test_assertions/integration_test_assertions"]()) as {
+                IntegrationTestAssertions: typeof IntegrationTestAssertions;
+              }
+            ).IntegrationTestAssertions
+          : null;
       onLoad("action_dispatch_integration_test", function (this: object) {
-        include(this, integrationTestAssertions);
+        if (integrationTestAssertions !== null) include(this, integrationTestAssertions);
       });
     });
   }
