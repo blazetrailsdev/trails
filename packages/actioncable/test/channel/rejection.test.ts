@@ -1,3 +1,4 @@
+import { withIndifferentAccess } from "@blazetrails/activesupport";
 import { Mock, stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -9,7 +10,7 @@ import { Base } from "../../lib/channel/base.js";
 
 class SecretChannel extends Base {
   override subscribed(): unknown {
-    if ((this.params["id"] as number) > 0) return this.reject();
+    if ((this.params.get("id") as number) > 0) return this.reject();
     return null;
   }
 
@@ -40,7 +41,7 @@ describe("ActionCable::Channel::RejectionTest", () => {
     const [subscriptions, mock] = mockSubscriptions();
 
     await stub(connection, "subscriptions", subscriptions, [], async () => {
-      channel = new SecretChannel(connection as never, "{id: 1}", { id: 1 });
+      channel = new SecretChannel(connection as never, "{id: 1}", withIndifferentAccess({ id: 1 }));
       await channel.subscribeToChannel();
 
       const expected = { identifier: "{id: 1}", type: "reject_subscription" };
@@ -54,7 +55,7 @@ describe("ActionCable::Channel::RejectionTest", () => {
     const [subscriptions, mock] = mockSubscriptions();
 
     await stub(connection, "subscriptions", subscriptions, [], async () => {
-      channel = new SecretChannel(connection as never, "{id: 1}", { id: 1 });
+      channel = new SecretChannel(connection as never, "{id: 1}", withIndifferentAccess({ id: 1 }));
       await channel.subscribeToChannel();
 
       const expected = { identifier: "{id: 1}", type: "reject_subscription" };

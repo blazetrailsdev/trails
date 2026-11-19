@@ -1,4 +1,4 @@
-import { ActiveSupportJSON } from "@blazetrails/activesupport";
+import { ActiveSupportJSON, withIndifferentAccess } from "@blazetrails/activesupport";
 import { Mock, stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MockRequest } from "@blazetrails/rack";
 import { Thread, hashAref, constSet, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
@@ -115,7 +115,11 @@ describe("StreamTest", () => {
       unsubscribe.expect("call", null, ["test_room_1", Function]);
 
       await stub(connection, "pubsub", pubsub, [], async () => {
-        const channel = new ChatChannel(connection as never, "{id: 1}", { id: 1 });
+        const channel = new ChatChannel(
+          connection as never,
+          "{id: 1}",
+          withIndifferentAccess({ id: 1 }),
+        );
         await channel.subscribeToChannel();
 
         await tc.waitForAsync();
@@ -184,7 +188,11 @@ describe("StreamTest", () => {
   it("reject subscription when nil is passed to stream_or_reject_for", async () => {
     await tc.runInEventmachine(async () => {
       const connection = new TestConnection();
-      const channel = new ChatChannel(connection as never, "{id: 1}", { id: 1 });
+      const channel = new ChatChannel(
+        connection as never,
+        "{id: 1}",
+        withIndifferentAccess({ id: 1 }),
+      );
       await channel.subscribeToChannel();
       channel.streamOrRejectFor(null);
       expect(connection.lastTransmission).toBeNull();
@@ -201,7 +209,11 @@ describe("StreamTest", () => {
     await tc.runInEventmachine(async () => {
       const connection = new TestConnection();
 
-      const channel = new ChatChannel(connection as never, "{id: 1}", { id: 1 });
+      const channel = new ChatChannel(
+        connection as never,
+        "{id: 1}",
+        withIndifferentAccess({ id: 1 }),
+      );
       await channel.subscribeToChannel();
 
       expect(connection.lastTransmission).toBeNull();

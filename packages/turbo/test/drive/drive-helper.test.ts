@@ -2,10 +2,42 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/actionview/test-case.js";
-import "../test-helper.js";
+import { IntegrationTest } from "@blazetrails/actionpack/testing";
+import { app } from "../test-helper.js";
+import "../dummy/app/controllers/trays-controller.js";
 import { DriveHelper } from "../../lib/app/helpers/turbo/drive-helper.js";
 
 type Tc = Record<string, any>;
+
+const traysPath = () => (app.routes().urlHelpers() as any).traysPath() as string;
+
+describe("Turbo::DriveHelperTest", () => {
+  let t: IntegrationTest;
+
+  beforeEach(() => {
+    t = new IntegrationTest(expect.getState().currentTestName!);
+    t.app = app;
+    app.reloadRoutesUnlessLoaded();
+  });
+
+  it("opting out of the default cache", async () => {
+    await t.get(traysPath());
+    expect(String(t.response.body)).toMatch(/<meta name="turbo-cache-control" content="no-cache">/);
+  });
+
+  it("requiring reload", async () => {
+    await t.get(traysPath());
+    expect(String(t.response.body)).toMatch(/<meta name="turbo-visit-control" content="reload">/);
+  });
+
+  it("configuring refresh strategy", async () => {
+    await t.get(traysPath());
+    expect(String(t.response.body)).toMatch(/<meta name="turbo-refresh-method" content="morph">/);
+    expect(String(t.response.body)).toMatch(
+      /<meta name="turbo-refresh-scroll" content="preserve">/,
+    );
+  });
+});
 
 class DriverHelperUnitTest extends TestCase {}
 (DriverHelperUnitTest as any).tests(DriveHelper);
