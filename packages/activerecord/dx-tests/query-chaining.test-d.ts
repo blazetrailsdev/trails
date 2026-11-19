@@ -37,6 +37,22 @@ describe("query chaining DX", () => {
     expectTypeOf(await rel.findBy({ published: true })).toEqualTypeOf<Post | null>();
   });
 
+  it("findEach / findInBatches / inBatches yield typed records and relations", async () => {
+    const rel = {} as Relation<Post>;
+    await rel.findEach({}, (record) => {
+      expectTypeOf(record).toEqualTypeOf<Post>();
+    });
+    for await (const record of rel.findEach()) {
+      expectTypeOf(record).toEqualTypeOf<Post>();
+    }
+    await rel.findInBatches({}, (batch) => {
+      expectTypeOf(batch).toEqualTypeOf<Post[]>();
+    });
+    await rel.inBatches({}, async (batch) => {
+      expectTypeOf(await batch.first()).toEqualTypeOf<Post | null>();
+    });
+  });
+
   it("Relation ordinal finders (second..fortyTwo) return T | null", async () => {
     const rel = {} as Relation<Post>;
     expectTypeOf(await rel.second()).toEqualTypeOf<Post | null>();

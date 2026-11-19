@@ -13,11 +13,26 @@ import { ApplicationController } from "../dummy/app/controllers/application-cont
 import { Message } from "../dummy/app/models/message.js";
 import type { Broadcastable } from "../../lib/app/models/concerns/turbo/broadcastable.js";
 import { Profile } from "../dummy/app/models/users/profile.js";
+import { Article } from "../dummy/app/models/article.js";
+import { Board } from "../dummy/app/models/board.js";
+import { Comment } from "../dummy/app/models/comment.js";
 
 class BroadcastableTest extends TestCase {}
 include(BroadcastableTest, ActiveJobTestHelper);
 include(BroadcastableTest, ActionHelper);
 constSet(Turbo, "BroadcastableTest", BroadcastableTest);
+
+for (const name of [
+  "BroadcastableArticleTest",
+  "BroadcastableCommentTest",
+  "BroadcastableBoardTest",
+  "SuppressingBroadcastsTest",
+]) {
+  const klass = class extends TestCase {};
+  include(klass, ActiveJobTestHelper);
+  include(klass, ActionHelper);
+  constSet(Turbo, name, klass);
+}
 
 class MessageThatRendersError extends Message {
   toPartialPath(): string {
@@ -609,6 +624,376 @@ describe("Turbo::BroadcastableTest", () => {
         template: await render(message),
       }),
       () => message.broadcastUpdate({ target: "message_1", attributes: { method: "morph" } }),
+    );
+  });
+});
+
+describe("Turbo::BroadcastableArticleTest", () => {
+  beforeAll(async () => {
+    await Article.loadSchema();
+  });
+
+  afterEach(async () => {
+    await Article.deleteAll();
+  });
+
+  it("creating an article broadcasts to the overriden target with a string", async ({
+    testCase: t,
+  }: Ctx) => {
+    await t.assertBroadcastOn(
+      "overriden-stream",
+      t.turboStreamActionTag("append", { target: "overriden-target", template: "<p>Body</p>\n" }),
+      () => t.performEnqueuedJobs({}, () => Article.createBang({ body: "Body" })),
+    );
+  });
+
+  it("updating an article broadcasts", async ({ testCase: t }: Ctx) => {
+    const article = await Article.createBang({ body: "Hey" });
+
+    await t.assertBroadcastOn(
+      "ho",
+      t.turboStreamActionTag("replace", {
+        target: `article_${article.id}`,
+        template: "<p>Ho</p>\n",
+      }),
+      () => t.performEnqueuedJobs({}, () => article.updateBang({ body: "Ho" })),
+    );
+  });
+
+  it("destroying an article broadcasts", async ({ testCase: t }: Ctx) => {
+    const article = await Article.createBang({ body: "Hey" });
+
+    await t.assertBroadcastOn(
+      "hey",
+      t.turboStreamActionTag("remove", { target: `article_${article.id}` }),
+      () => article.destroyBang(),
+    );
+  });
+});
+
+describe("Turbo::BroadcastableCommentTest", () => {
+  let article: Article;
+
+  beforeAll(async () => {
+    await Article.loadSchema();
+    await Comment.loadSchema();
+  });
+
+  beforeEach(async () => {
+    article = await Article.createBang({ body: "Body" });
+  });
+
+  afterEach(async () => {
+    await Comment.deleteAll();
+    await Article.deleteAll();
+  });
+
+  it("creating a comment broadcasts to the overriden target with a lambda", async ({
+    testCase: t,
+  }: Ctx) => {
+    const stream = `${article.toGidParam()}:comments`;
+    const target = `article_${article.id}_comments`;
+
+    await t.assertBroadcastOn(
+      stream,
+      t.turboStreamActionTag("append", {
+        target: target,
+        template: `<p class="different">comment</p>\n`,
+      }),
+      () => t.performEnqueuedJobs({}, () => article.comments.createBang({ body: "comment" })),
+    );
+  });
+
+  it("creating a second comment while using locals broadcasts the second comment", async ({
+    testCase: t,
+  }: Ctx) => {
+    const stream = `${article.toGidParam()}:comments`;
+    const target = `article_${article.id}_comments`;
+
+    await t.assertBroadcastOn(
+      stream,
+      t.turboStreamActionTag("append", {
+        target: target,
+        template: `<p class="different">comment</p>\n`,
+      }),
+      () => t.performEnqueuedJobs({}, () => article.comments.createBang({ body: "comment" })),
+    );
+
+    await t.assertBroadcastOn(
+      stream,
+      t.turboStreamActionTag("append", {
+        target: target,
+        template: `<p class="different">another comment</p>\n`,
+      }),
+      () =>
+        t.performEnqueuedJobs({}, () => article.comments.createBang({ body: "another comment" })),
+    );
+  });
+
+  it("updating a comment broadcasts", async ({ testCase: t }: Ctx) => {
+    const comment = await article.comments.createBang({ body: "random" });
+    const stream = `${article.toGidParam()}:comments`;
+    const target = `comment_${comment.id}`;
+
+    await t.assertBroadcastOn(
+      stream,
+      t.turboStreamActionTag("replace", {
+        target: target,
+        template: `<p class="different">precise</p>\n`,
+      }),
+      () => t.performEnqueuedJobs({}, () => comment.updateBang({ body: "precise" })),
+    );
+  });
+
+  it("destroying a comment broadcasts", async ({ testCase: t }: Ctx) => {
+    const comment = await article.comments.createBang({ body: "comment" });
+    const stream = `${article.toGidParam()}:comments`;
+    const target = `comment_${comment.id}`;
+
+    await t.assertBroadcastOn(stream, t.turboStreamActionTag("remove", { target: target }), () =>
+      comment.destroyBang(),
+    );
+  });
+});
+
+describe("Turbo::BroadcastableBoardTest", () => {
+  beforeAll(async () => {
+    await Board.loadSchema();
+  });
+
+  afterEach(async () => {
+    await Board.deleteAll();
+  });
+
+  it("creating a board broadcasts refreshes to a channel using models plural name when creating", async ({
+    testCase: t,
+  }: Ctx) => {
+    await t.assertBroadcastOn("boards", t.turboStreamActionTag("refresh"), () =>
+      t.performEnqueuedJobs({}, async () => {
+        await Board.createBang({ name: "Board" });
+        await StreamsChannel.refreshDebouncerFor(["boards"]).wait();
+      }),
+    );
+  });
+
+  it("updating a board broadcasts to the models channel", async ({ testCase: t }: Ctx) => {
+    const board = (await Board.suppressingTurboBroadcasts(() =>
+      Board.createBang({ name: "Hey" }),
+    )) as Board & Broadcasting;
+
+    await t.assertBroadcastOn(board.toGidParam(), t.turboStreamActionTag("refresh"), () =>
+      t.performEnqueuedJobs({}, async () => {
+        await board.updateBang({ name: "Ho" });
+        await StreamsChannel.refreshDebouncerFor(board).wait();
+      }),
+    );
+  });
+
+  it("destroying a board broadcasts refreshes to the model channel", async ({
+    testCase: t,
+  }: Ctx) => {
+    const board = (await Board.suppressingTurboBroadcasts(() =>
+      Board.createBang({ name: "Hey" }),
+    )) as Board & Broadcasting;
+
+    await t.assertBroadcastOn(board.toGidParam(), t.turboStreamActionTag("refresh"), () =>
+      board.destroyBang(),
+    );
+  });
+});
+
+describe("Turbo::SuppressingBroadcastsTest", () => {
+  let message: Message & Broadcasting;
+
+  beforeEach(() => {
+    message = new Message({ id: 1, content: "Hello!" }) as Message & Broadcasting;
+  });
+
+  async function assertNoBroadcastsWhenSuppressing(
+    t: Ctx["testCase"],
+    stream: string,
+    block: () => unknown,
+  ): Promise<void> {
+    await t.assertNoBroadcasts(stream, () => Message.suppressingTurboBroadcasts(block));
+  }
+
+  async function assertNoBroadcastsLaterWhenSuppressing(
+    t: Ctx["testCase"],
+    stream: string,
+    block: () => unknown,
+  ): Promise<void> {
+    await assertNoBroadcastsWhenSuppressing(t, stream, () => t.assertNoEnqueuedJobs({}, block));
+  }
+
+  it("suppressing broadcasting remove to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () => message.broadcastRemoveTo("stream"));
+  });
+
+  it("suppressing broadcasting remove now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastRemove(),
+    );
+  });
+
+  it("suppressing broadcasting replace to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () =>
+      message.broadcastReplaceTo("stream"),
+    );
+  });
+
+  it("suppressing broadcasting replace to stream later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, "stream", () =>
+      message.broadcastReplaceLaterTo("stream"),
+    );
+  });
+
+  it("suppressing broadcasting replace now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastReplace(),
+    );
+  });
+
+  it("suppressing broadcasting replace later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastReplaceLater(),
+    );
+  });
+
+  it("suppressing broadcasting update to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () => message.broadcastUpdateTo("stream"));
+  });
+
+  it("suppressing broadcasting update to stream later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, "stream", () =>
+      message.broadcastUpdateLaterTo("stream"),
+    );
+  });
+
+  it("suppressing broadcasting update now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastUpdate(),
+    );
+  });
+
+  it("suppressing broadcasting update later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastUpdateLater(),
+    );
+  });
+
+  it("suppressing broadcasting before to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () =>
+      message.broadcastBeforeTo("stream", { target: "message_1" }),
+    );
+  });
+
+  it("suppressing broadcasting after to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () =>
+      message.broadcastAfterTo("stream", { target: "message_1" }),
+    );
+  });
+
+  it("suppressing broadcasting append to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () => message.broadcastAppendTo("stream"));
+  });
+
+  it("suppressing broadcasting append to stream later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, "stream", () =>
+      message.broadcastAppendLaterTo("stream"),
+    );
+  });
+
+  it("suppressing broadcasting append now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastAppend(),
+    );
+  });
+
+  it("suppressing broadcasting append later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastAppendLater(),
+    );
+  });
+
+  it("suppressing broadcasting prepend to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () =>
+      message.broadcastPrependTo("stream"),
+    );
+  });
+
+  it("suppressing broadcasting prepend to stream later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, "stream", () =>
+      message.broadcastPrependLaterTo("stream"),
+    );
+  });
+
+  it("suppressing broadcasting refresh to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () =>
+      message.broadcastRefreshTo("stream"),
+    );
+  });
+
+  it("suppressing broadcasting refresh to stream later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, "stream", () =>
+      message.broadcastRefreshLaterTo("stream"),
+    );
+  });
+
+  it("suppressing broadcasting prepend now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastPrepend(),
+    );
+  });
+
+  it("suppressing broadcasting prepend later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastPrependLater(),
+    );
+  });
+
+  it("suppressing broadcasting action to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () =>
+      message.broadcastActionTo("stream", { action: "prepend" }),
+    );
+  });
+
+  it("suppressing broadcasting action to stream later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, "stream", () =>
+      message.broadcastActionLaterTo("stream", { action: "prepend" }),
+    );
+  });
+
+  it("suppressing broadcasting action now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastAction("prepend"),
+    );
+  });
+
+  it("suppressing broadcasting action later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastActionLater({ action: "prepend" }),
+    );
+  });
+
+  it("suppressing broadcast render now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastRender(),
+    );
+  });
+
+  it("suppressing broadcast render later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, message.toGidParam(), () =>
+      message.broadcastRenderLater(),
+    );
+  });
+
+  it("suppressing broadcast render to stream now", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsWhenSuppressing(t, "stream", () => message.broadcastRenderTo("stream"));
+  });
+
+  it("suppressing broadcast render to stream later", async ({ testCase: t }: Ctx) => {
+    await assertNoBroadcastsLaterWhenSuppressing(t, "stream", () =>
+      message.broadcastRenderLaterTo("stream"),
     );
   });
 });

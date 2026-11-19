@@ -3,5 +3,9 @@ import { ApplicationRecord } from "./application-record.js";
 
 export class Board extends ApplicationRecord {
   declare name: string | null;
+
+  static {
+    this.broadcastsRefreshes();
+  }
 }
 constSet(TopLevel, "Board", Board);

@@ -137,13 +137,16 @@ function valuesEqual(a: unknown, b: unknown): boolean {
     );
   }
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
-  if (typeof (a as any).equals === "function") return Boolean((a as any).equals(b));
-  if (typeof (a as any).eql === "function") return Boolean((a as any).eql(b));
+  const x = a as { equals?: (o: unknown) => unknown; eql?: (o: unknown) => unknown };
+  if (typeof x.equals === "function") return Boolean(x.equals(b));
+  if (typeof x.eql === "function") return Boolean(x.eql(b));
   if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
   const keys = Object.keys(a);
   if (keys.length !== Object.keys(b).length) return false;
   return keys.every(
-    (key) => Object.hasOwn(b, key) && valuesEqual((a as any)[key], (b as any)[key]),
+    (key) =>
+      Object.hasOwn(b, key) &&
+      valuesEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
   );
 }
 
@@ -162,7 +165,7 @@ export type ValuesHash = {
   joins?: (AssociationSpec | string | Nodes.Join)[];
   leftOuterJoins?: AssociationSpec[];
   references?: string[];
-  extending?: Array<Record<string, (...args: any[]) => any>>;
+  extending?: Array<Record<string, (...args: never[]) => unknown>>;
   unscope?: UnscopeArg[];
   optimizerHints?: string[];
   annotate?: string[];
@@ -273,6 +276,13 @@ function _isPlaceholderField(proto: object, key: string): boolean {
   return true;
 }
 
+type ScopeRegistryLike = {
+  currentScope(model: unknown, skipInheritedScope?: boolean): unknown;
+  setCurrentScope(model: unknown, scope: unknown): void;
+  globalCurrentScope(model: unknown, skipInheritedScope?: boolean): unknown;
+  setGlobalCurrentScope(model: unknown, scope: unknown): void;
+};
+
 /** @perf 8x — PERMANENT */
 const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<object> = {
   get(target: object, prop: string | symbol, receiver: any) {
@@ -289,19 +299,19 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<object> = {
     if (/^(0|[1-9]\d*)$/.test(prop)) {
       return receiver._isRecordsSynchronous
         ? (receiver.target ?? receiver._records)[Number(prop)]
-        : receiver.records().then((records: any[]) => records[Number(prop)]);
+        : receiver.records().then((records: unknown[]) => records[Number(prop)]);
     }
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
-      return (...args: any[]) => {
+      return (...args: unknown[]) => {
         const records = receiver.each(() => {});
         return records instanceof Promise
-          ? records.then((records: any[]) => enumerable([...records], args))
+          ? records.then((records: unknown[]) => enumerable([...records], args))
           : enumerable([...records], args);
       };
     }
     if (receiver.respondToMissing(prop, false)) {
-      return (...args: any[]) => receiver.methodMissing(prop, ...args);
+      return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
     }
     return value;
   },
@@ -1772,11 +1782,11 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   /** @internal */
-  isAlreadyInScope(registry: any): boolean {
+  isAlreadyInScope(registry: ScopeRegistryLike | null | undefined): boolean {
     return this._delegateToModel && !!registry?.currentScope?.(this.model, true);
   }
 
-  private isGlobalScope(registry: any): boolean {
+  private isGlobalScope(registry: ScopeRegistryLike | null | undefined): boolean {
     return !!registry?.globalCurrentScope?.(this.model, true);
   }
 
@@ -1811,13 +1821,13 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   private _scoping<R>(
-    scope: any,
-    registry: any,
+    scope: unknown,
+    registry: ScopeRegistryLike,
     allQueries: boolean | null = false,
     block: () => R,
   ): R {
-    let previous: any;
-    let previousGlobal: any;
+    let previous: unknown;
+    let previousGlobal: unknown;
     return rbEnsure(
       () => {
         previous = registry.currentScope(this.model, true);
@@ -1883,11 +1893,11 @@ export interface Relation<T extends Base, G extends boolean = false> extends Rel
   isNullRelation(): boolean;
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2>;
   /** @noRailsEquivalent PERMANENT */
   catch<TResult = never>(
-    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
+    onrejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null,
   ): Promise<T[] | TResult>;
   /** @noRailsEquivalent PERMANENT */
   finally(onfinally?: (() => void) | null): Promise<T[]>;
@@ -1995,8 +2005,8 @@ export interface Relation<T extends Base, G extends boolean = false>
   strictLoading(value?: boolean): Relation<T, G>;
   createWith(value: Record<string, unknown> | Map<string, unknown> | null): Relation<T, G>;
   from(value: string | Relation<any, boolean> | ArelNode, subqueryName?: string): Relation<T, G>;
-  extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T, G> & M;
-  extending<M extends Record<string, (...args: any[]) => any>>(
+  extending<M extends Record<string, (...args: never[]) => unknown>>(mod: M): Relation<T, G> & M;
+  extending<M extends Record<string, (...args: never[]) => unknown>>(
     mod: M | undefined,
   ): Relation<T, G> & Partial<M>;
   extending(...modules: object[]): Relation<T, G>;
@@ -2179,7 +2189,7 @@ export interface Relation<T extends Base, G extends boolean = false> {
     options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },
   ): Promise<R>;
   transaction<R>(
-    fn: (tx: any) => Promise<R>,
+    fn: (tx: unknown) => Promise<R>,
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
   ): Promise<R | undefined>;
   sanitizeSqlLike(value: string, escapeChar?: string): string;
@@ -2187,11 +2197,14 @@ export interface Relation<T extends Base, G extends boolean = false> {
 }
 
 const arrayMethod = (name: string) => {
-  const method = fetch<(records: any[], ...args: any[]) => unknown>(ARRAY_METHOD_TABLE, name);
-  return (records: any[], args: any[]) => method(records, ...args);
+  const method = fetch<(records: unknown[], ...args: unknown[]) => unknown>(
+    ARRAY_METHOD_TABLE,
+    name,
+  );
+  return (records: unknown[], args: unknown[]) => method(records, ...args);
 };
 
-const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknown> = {
+const ENUMERABLE_METHODS: Record<string, (records: unknown[], args: unknown[]) => unknown> = {
   partition: arrayMethod("partition"),
   isAll: arrayMethod("isAll"),
   eachCons: arrayMethod("eachCons"),
@@ -2212,7 +2225,8 @@ for (const name of [
   "sort",
   "flatMap",
 ]) {
-  ENUMERABLE_METHODS[name] = (records, args) => (records as any)[name](...args);
+  ENUMERABLE_METHODS[name] = (records, args) =>
+    (records as unknown[] & Record<string, (...a: unknown[]) => unknown>)[name](...args);
 }
 
 include(Relation, Enumerable);
@@ -2227,9 +2241,12 @@ include(Relation, SignedIdRelationMethods);
 include(Relation, TokenForRelationMethods);
 
 for (const name of ["updateAll", "deleteAll"] as const) {
-  const body = Relation.prototype[name] as (this: Relation<any>, ...args: any[]) => Promise<number>;
+  const body = Relation.prototype[name] as (
+    this: Relation<Base>,
+    ...args: unknown[]
+  ) => Promise<number>;
   Object.defineProperty(Relation.prototype, name, {
-    value: async function (this: Relation<any>, ...args: any[]): Promise<number> {
+    value: async function (this: Relation<Base>, ...args: unknown[]): Promise<number> {
       await this._materializeDeferredDistinctPkPredicates();
       return body.apply(this, args);
     },

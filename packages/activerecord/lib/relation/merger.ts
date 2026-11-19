@@ -1,3 +1,5 @@
+import type { Base } from "../base.js";
+import type { Relation } from "../relation.js";
 import { Nodes } from "@blazetrails/arel";
 import { any, assertValidKeys, isBlank, isPlainObject } from "@blazetrails/activesupport";
 
@@ -7,12 +9,14 @@ import type { AssociationSpec } from "./query-methods.js";
 import { isEmpty, partition, union } from "@blazetrails/ruby-compat";
 import { arelColumns, constructJoinDependency, QueryMethods } from "./query-methods.js";
 
-export class Merger {
-  readonly relation: any;
-  readonly values: Record<string, unknown>;
-  readonly other: any;
+type BangMethod = (...args: unknown[]) => unknown;
 
-  constructor(relation: any, other: any) {
+export class Merger {
+  readonly relation: Relation<Base>;
+  readonly values: Record<string, unknown>;
+  readonly other: Relation<Base>;
+
+  constructor(relation: Relation<Base>, other: Relation<Base>) {
     this.relation = relation;
     this.other = other;
     this.values = typeof other.values === "function" ? other.values() : {};
@@ -37,14 +41,14 @@ export class Merger {
     );
   }
 
-  merge(): any {
+  merge(): Relation<Base> {
     const rel = this.relation;
     for (const name of Merger.NORMAL_VALUES) {
       const value = this.values[name];
       if (value == null || (isBlank(value) && value !== false)) continue;
-      const bang = `${name}Bang`;
-      if (Array.isArray(value)) rel[bang](...value);
-      else rel[bang](value);
+      const bang = `${name}Bang` as keyof Relation<Base>;
+      if (Array.isArray(value)) (rel[bang] as BangMethod)(...value);
+      else (rel[bang] as BangMethod)(value);
     }
 
     if (this.other.isNullRelation()) rel.noneBang();
@@ -59,7 +63,7 @@ export class Merger {
     return rel;
   }
 
-  private mergeSelectValues(rel: any): void {
+  private mergeSelectValues(rel: Relation<Base>): void {
     if (isEmpty(this.other.selectValues)) return;
 
     if (this.other.model === rel.model) {
@@ -69,7 +73,7 @@ export class Merger {
     }
   }
 
-  private mergePreloads(rel: any): void {
+  private mergePreloads(rel: Relation<Base>): void {
     if (isEmpty(this.other.preloadValues) && isEmpty(this.other.includesValues)) return;
 
     if (this.other.model === rel.model) {
@@ -95,7 +99,7 @@ export class Merger {
     }
   }
 
-  private mergeJoins(rel: any): void {
+  private mergeJoins(rel: Relation<Base>): void {
     const other = this.other;
     if (isEmpty(other.joinsValues)) return;
 
@@ -121,7 +125,7 @@ export class Merger {
     }
   }
 
-  private mergeOuterJoins(rel: any): void {
+  private mergeOuterJoins(rel: Relation<Base>): void {
     const other = this.other;
     if (isEmpty(other.leftOuterJoinsValues)) return;
 
@@ -147,20 +151,18 @@ export class Merger {
     }
   }
 
-  private mergeMultiValues(rel: any): void {
+  private mergeMultiValues(rel: Relation<Base>): void {
     if (this.other.reorderingValue) {
       rel.reorderBang(...this.other.orderValues);
     } else if (any(this.other.orderValues)) {
       rel.orderBang(...this.other.orderValues);
     }
 
-    const extensions = this.other.extensions.filter(
-      (mod: unknown) => !rel.extensions.includes(mod),
-    );
+    const extensions = this.other.extensions.filter((mod) => !rel.extensions.includes(mod));
     if (any(extensions)) rel.extendingBang(...extensions);
   }
 
-  private mergeSingleValues(rel: any): void {
+  private mergeSingleValues(rel: Relation<Base>): void {
     if (this.other.lockValue) rel.lockValue ||= this.other.lockValue;
 
     if (!isBlank(this.other.createWithValue)) {
@@ -168,7 +170,7 @@ export class Merger {
     }
   }
 
-  private mergeClauses(rel: any): void {
+  private mergeClauses(rel: Relation<Base>): void {
     if (this.isReplaceFromClause() && this.other.fromClause) {
       rel.fromClause = this.other.fromClause;
     }
@@ -193,30 +195,30 @@ export class Merger {
 }
 
 export class HashMerger {
-  readonly relation: any;
+  readonly relation: Relation<Base>;
   readonly hash: Record<string, unknown>;
 
-  constructor(relation: any, hash: Record<string, unknown>) {
+  constructor(relation: Relation<Base>, hash: Record<string, unknown>) {
     assertValidKeys(hash, ActiveRecord.Relation.VALUE_METHODS as string[]);
     this.relation = relation;
     this.hash = hash;
   }
 
-  merge(): any {
+  merge(): Relation<Base> {
     return new Merger(this.relation, this.other()).merge();
   }
 
-  private other(): any {
-    const other: any = ActiveRecord.Relation.create(this.relation.model, {
+  private other(): Relation<Base> {
+    const other: Relation<Base> = ActiveRecord.Relation.create(this.relation.model, {
       table: this.relation.table,
       predicateBuilder: this.relation.predicateBuilder,
     });
     for (const [key, value] of Object.entries(this.hash)) {
-      const method = key === "select" ? "_selectBang" : `${key}Bang`;
+      const method = (key === "select" ? "_selectBang" : `${key}Bang`) as keyof Relation<Base>;
       if (Array.isArray(value)) {
-        other[method](...value);
+        (other[method] as BangMethod)(...value);
       } else {
-        other[method](value);
+        (other[method] as BangMethod)(value);
       }
     }
     return other;

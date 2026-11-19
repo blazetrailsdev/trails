@@ -7,6 +7,7 @@ import {
   reverseMerge,
   threadMattrAccessor,
 } from "@blazetrails/activesupport";
+import { rbFSend, rbObjRespondTo, rbProcCall, rtest } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../../turbo-trails.js";
 
 type Options = Record<string, unknown>;
@@ -15,6 +16,11 @@ type Options = Record<string, unknown>;
 export interface BroadcastableClassHost {
   suppressedTurboBroadcasts: boolean | null;
   modelName: { plural: string };
+  broadcastTargetDefault(): string;
+  afterCommit(callback: (this: Host) => unknown): void;
+  afterCreateCommit(callback: (this: Host) => unknown): void;
+  afterUpdateCommit(callback: (this: Host) => unknown): void;
+  afterDestroyCommit(callback: (this: Host) => unknown): void;
 }
 
 /** @internal */
@@ -32,8 +38,88 @@ export interface BroadcastableHost {
 type Host = BroadcastableHost & Record<string, (...args: unknown[]) => Promise<unknown>>;
 
 export const ClassMethods = {
+  broadcastsTo(
+    this: BroadcastableClassHost,
+    stream: unknown,
+    { insertsBy = "append", target = this.broadcastTargetDefault(), ...rendering }: Options = {},
+  ): void {
+    this.afterCreateCommit(function (this: Host) {
+      const called = rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null;
+      const streamables = rtest(called) ? called : rbFSend(this, stream);
+      const calledTarget = rbObjRespondTo(target, "call") ? rbProcCall(target, this) : null;
+      return this.broadcastActionLaterTo(streamables, {
+        action: insertsBy,
+        target: rtest(calledTarget) ? calledTarget : target,
+        ...rendering,
+      });
+    });
+    this.afterUpdateCommit(function (this: Host) {
+      const called = rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null;
+      return this.broadcastReplaceLaterTo(rtest(called) ? called : rbFSend(this, stream), {
+        ...rendering,
+      });
+    });
+    this.afterDestroyCommit(function (this: Host) {
+      const called = rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null;
+      return this.broadcastRemoveTo(rtest(called) ? called : rbFSend(this, stream));
+    });
+  },
+
+  broadcasts(
+    this: BroadcastableClassHost,
+    stream: unknown = this.modelName.plural,
+    { insertsBy = "append", target = this.broadcastTargetDefault(), ...rendering }: Options = {},
+  ): void {
+    this.afterCreateCommit(function (this: Host) {
+      const calledTarget = rbObjRespondTo(target, "call") ? rbProcCall(target, this) : null;
+      return this.broadcastActionLaterTo(stream, {
+        action: insertsBy,
+        target: rtest(calledTarget) ? calledTarget : target,
+        ...rendering,
+      });
+    });
+    this.afterUpdateCommit(function (this: Host) {
+      return this.broadcastReplaceLater({ ...rendering });
+    });
+    this.afterDestroyCommit(function (this: Host) {
+      return this.broadcastRemove();
+    });
+  },
+
+  broadcastsRefreshesTo(this: BroadcastableClassHost, stream: unknown): void {
+    this.afterCommit(function (this: Host) {
+      const called = rbObjRespondTo(stream, "call") ? rbProcCall(stream, this) : null;
+      return this.broadcastRefreshLaterTo(rtest(called) ? called : rbFSend(this, stream));
+    });
+  },
+
+  broadcastsRefreshes(this: BroadcastableClassHost, stream: unknown = this.modelName.plural): void {
+    this.afterCreateCommit(function (this: Host) {
+      return this.broadcastRefreshLaterTo(stream);
+    });
+    this.afterUpdateCommit(function (this: Host) {
+      return this.broadcastRefreshLater();
+    });
+    this.afterDestroyCommit(function (this: Host) {
+      return this.broadcastRefresh();
+    });
+  },
+
   broadcastTargetDefault(this: BroadcastableClassHost): string {
     return this.modelName.plural;
+  },
+
+  async suppressingTurboBroadcasts<T>(
+    this: BroadcastableClassHost,
+    block: () => T | Promise<T>,
+  ): Promise<T> {
+    const original = this.suppressedTurboBroadcasts;
+    this.suppressedTurboBroadcasts = true;
+    try {
+      return await block();
+    } finally {
+      this.suppressedTurboBroadcasts = original;
+    }
   },
 
   isSuppressedTurboBroadcasts(this: BroadcastableClassHost): boolean | null {
