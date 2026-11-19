@@ -43,7 +43,13 @@ export function defineConstants(entries: readonly [object, string | null, string
 
 /** @perf 10ms — PERMANENT */
 function _readConstantsRow(namespace: object, name: string | null): () => unknown {
-  return name === null ? () => namespace : () => (namespace as Record<string, unknown>)[name];
+  if (name === null) return () => namespace;
+  const segments = name.split(".");
+  return () =>
+    segments.reduce<unknown>(
+      (owner, segment) => (owner as Record<string, unknown>)[segment],
+      namespace,
+    );
 }
 
 /**

@@ -26,6 +26,13 @@ describe("rbModName over the generated class-path table", () => {
     expect(rbPathToClass("RowNamespace")).toBe(namespace);
   });
 
+  it("answers a generated row naming a nested member", () => {
+    class Nested {}
+    const namespace = { Owner: { Nested } };
+    defineConstants([[namespace, "Owner.Nested", "RowNested::Owner::Nested"]]);
+    expect(rbModName(Nested)).toBe("RowNested::Owner::Nested");
+  });
+
   it("constGet resolves a generated row, and a row in TDZ misses", () => {
     class Outer {}
     class Resolved {}
