@@ -34,8 +34,6 @@ for (const name of [
   constSet(Turbo, name, klass);
 }
 
-type Suppressing = { suppressingTurboBroadcasts<T>(block: () => T | Promise<T>): Promise<T> };
-
 class MessageThatRendersError extends Message {
   toPartialPath(): string {
     return "messages/raises_error";
@@ -759,8 +757,6 @@ describe("Turbo::BroadcastableCommentTest", () => {
 });
 
 describe("Turbo::BroadcastableBoardTest", () => {
-  const BoardClass = Board as typeof Board & Suppressing;
-
   beforeAll(async () => {
     await Board.loadSchema();
   });
@@ -781,7 +777,7 @@ describe("Turbo::BroadcastableBoardTest", () => {
   });
 
   it("updating a board broadcasts to the models channel", async ({ testCase: t }: Ctx) => {
-    const board = (await BoardClass.suppressingTurboBroadcasts(() =>
+    const board = (await Board.suppressingTurboBroadcasts(() =>
       Board.createBang({ name: "Hey" }),
     )) as Board & Broadcasting;
 
@@ -796,7 +792,7 @@ describe("Turbo::BroadcastableBoardTest", () => {
   it("destroying a board broadcasts refreshes to the model channel", async ({
     testCase: t,
   }: Ctx) => {
-    const board = (await BoardClass.suppressingTurboBroadcasts(() =>
+    const board = (await Board.suppressingTurboBroadcasts(() =>
       Board.createBang({ name: "Hey" }),
     )) as Board & Broadcasting;
 
@@ -818,9 +814,7 @@ describe("Turbo::SuppressingBroadcastsTest", () => {
     stream: string,
     block: () => unknown,
   ): Promise<void> {
-    await t.assertNoBroadcasts(stream, () =>
-      (Message as typeof Message & Suppressing).suppressingTurboBroadcasts(block),
-    );
+    await t.assertNoBroadcasts(stream, () => Message.suppressingTurboBroadcasts(block));
   }
 
   async function assertNoBroadcastsLaterWhenSuppressing(

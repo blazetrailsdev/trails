@@ -2,7 +2,6 @@ import type { AssociationProxy } from "@blazetrails/activerecord";
 import type { Comment } from "./comment.js";
 import { parameterize } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
-import type { ClassMethods as Broadcasts } from "../../../../lib/app/models/concerns/turbo/broadcastable.js";
 import { ApplicationRecord } from "./application-record.js";
 
 export class Article extends ApplicationRecord {
@@ -14,7 +13,7 @@ export class Article extends ApplicationRecord {
 
     this.validates("body", { presence: true });
 
-    (this as unknown as typeof Broadcasts).broadcasts.call(this as never, "overriden-stream", {
+    this.broadcasts("overriden-stream", {
       target: "overriden-target",
     });
 
