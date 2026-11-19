@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { vite } from "../../../actionpack/lib/action-dispatch/system-testing/server.js";
 import { ApplicationSystemTestCase } from "../application-system-test-case.js";
 import { app } from "../test-helper.js";
 import { Message } from "../dummy/app/models/message.js";
 import { StreamsChannel } from "../../lib/app/channels/turbo/streams-channel.js";
 import type { SystemTestHelper } from "../../lib/system-test-helper.js";
 
+type Page = Awaited<ReturnType<ApplicationSystemTestCase["page"]>>;
 type Helper = ApplicationSystemTestCase & {
   [K in keyof typeof SystemTestHelper]: (typeof SystemTestHelper)[K] extends (
     ...args: infer A
@@ -15,15 +17,18 @@ type Helper = ApplicationSystemTestCase & {
 
 describe("AssertionsTest", () => {
   let t: Helper;
+  let page: Page;
 
   const urlHelpers = () =>
     app.routes().urlHelpers() as unknown as Record<string, (...args: unknown[]) => string>;
   const visit = async (path: string) => {
-    await t.goto(path);
+    await page.goto(new URL(path, vite.url).href);
+    await t.connectTurboCableStreamSources();
   };
 
   beforeEach(async () => {
     t = new ApplicationSystemTestCase(expect.getState().currentTestName!) as Helper;
+    page = await t.page();
     app.reloadRoutesUnlessLoaded();
   });
 

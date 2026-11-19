@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { domId } from "@blazetrails/actionview";
 import { extend, include, TopLevel } from "@blazetrails/ruby-compat";
+import { vite } from "../../../actionpack/lib/action-dispatch/system-testing/server.js";
 import { ApplicationSystemTestCase } from "../application-system-test-case.js";
 import { app } from "../test-helper.js";
 import { Message } from "../dummy/app/models/message.js";
@@ -49,7 +50,8 @@ describe("BroadcastsTest", () => {
     app.reloadRoutesUnlessLoaded();
   };
   const visit = async (path: string) => {
-    await t.goto(path);
+    await page.goto(new URL(path, vite.url).href);
+    await t.connectTurboCableStreamSources();
   };
   const text = async () => (await page.locator("body").textContent()) ?? "";
   const within = (id: string) => page.locator(`[id="${id}"]`);
