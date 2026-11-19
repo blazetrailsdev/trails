@@ -723,7 +723,10 @@ export class TagBuilder {
     return `${key}="${String(value)}"`;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm underscore — PERMANENT
+   */
   private prefixTagOption(prefix: string, key: string, value: unknown, escape: boolean): string {
     key = `${prefix}-${dasherize(underscore(String(key)))}`;
     if (
