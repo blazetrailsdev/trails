@@ -2,6 +2,9 @@ resource "neon_project" "db" {
   count     = var.postgres && var.database_url == null ? 1 : 0
   name      = var.name
   region_id = var.neon_region
+  org_id    = var.neon_org_id
+
+  history_retention_seconds = 21600
 }
 
 locals {

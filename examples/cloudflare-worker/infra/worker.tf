@@ -9,4 +9,7 @@ resource "cloudflare_hyperdrive_config" "db" {
     user     = local.origin.user
     password = local.origin.password
   }
+  caching = {
+    disabled = true
+  }
 }

@@ -11,3 +11,4 @@ infra/*.tfvars
 .wrangler/
 wrangler.deploy.jsonc
 .env
+infra/tfplan

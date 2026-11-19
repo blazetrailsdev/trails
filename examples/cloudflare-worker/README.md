@@ -23,13 +23,20 @@ Terraform creates the Hyperdrive config and, unless `database_url` is set, a Neo
 enables its `workers.dev` subdomain. The script is the build's output, so wrangler and not Terraform
 uploads it.
 
-| Variable       | Default                    |                                                    |
-| -------------- | -------------------------- | -------------------------------------------------- |
-| `account_id`   | (required)                 | the Cloudflare account                             |
-| `name`         | `trails-cloudflare-worker` | Hyperdrive config and Neon project name            |
-| `postgres`     | `true`                     | create a Neon project                              |
-| `database_url` | `null`                     | an existing Postgres URL instead of a Neon project |
-| `neon_region`  | `aws-us-east-2`            |                                                    |
+| Variable       | Default                    |                                                       |
+| -------------- | -------------------------- | ----------------------------------------------------- |
+| `account_id`   | (required)                 | the Cloudflare account                                |
+| `name`         | `trails-cloudflare-worker` | Hyperdrive config and Neon project name               |
+| `postgres`     | `true`                     | create a Neon project                                 |
+| `database_url` | `null`                     | an existing Postgres URL instead of a Neon project    |
+| `neon_region`  | `aws-us-east-2`            |                                                       |
+| `neon_org_id`  | `null`                     | the Neon organization; a new Neon account requires it |
+
+A new Cloudflare account registers its `workers.dev` subdomain once (Workers & Pages → Subdomain) before the
+first `wrangler deploy`. Hyperdrive's query cache is disabled (`caching.disabled`): it serves a cached
+`SELECT` for up to a minute, so a redirect after a write would render the list from before it.
+
+Credentials can live in a gitignored `.env` (see `.env.example`); `pnpm run deploy` loads it.
 
 The applying identity needs `CLOUDFLARE_API_TOKEN` with Hyperdrive and Workers Scripts edit permissions
 (wrangler reads the same token) and, for Neon, `NEON_API_KEY`. The database password is kept in the

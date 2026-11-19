@@ -25,3 +25,9 @@ variable "neon_region" {
   type    = string
   default = "aws-us-east-2"
 }
+
+variable "neon_org_id" {
+  description = "The Neon organization for the new project (Neon console: Organization settings)."
+  type        = string
+  default     = null
+}
