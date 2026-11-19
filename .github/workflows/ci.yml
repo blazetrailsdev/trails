@@ -78,6 +78,7 @@ jobs:
       sqlite_only: ${{ steps.filter.outputs.sqlite_only }}
       unit_packages: ${{ steps.filter.outputs.unit_packages }}
       actioncable_only: ${{ steps.filter.outputs.actioncable_only }}
+      website_only: ${{ steps.filter.outputs.website_only }}
       website_label: ${{ steps.filter.outputs.website_label }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite == 'true' || steps.pr_lanes.outputs.parity_inputs == 'true' }}
       sqlite_mem_affected: ${{ steps.pr_lanes.outputs.sqlite_mem == 'true' }}
@@ -429,7 +430,7 @@ jobs:
   build-and-typecheck:
     name: Build & Type Check
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.website_only != 'true'
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
@@ -496,7 +497,7 @@ jobs:
   promise-counts:
     name: Promise finding counts (${{ matrix.shard }})
     needs: changes
-    if: github.event_name == 'pull_request' && needs.changes.outputs.docs_only != 'true'
+    if: github.event_name == 'pull_request' && needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.website_only != 'true'
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 30
     strategy:
@@ -1007,12 +1008,12 @@ jobs:
       # scripts/parity/pipeline/query/node spawns the dump runners as real subprocesses;
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && needs.changes.outputs.website_only != 'true'
         run: pnpm build
       # scripts/schema-compare is the one suite that belongs elsewhere: it
       # parses the REAL vendored test/schema/schema.rb, so it runs as a step of
       # rails-comparison, the job that fetches vendor/.
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && needs.changes.outputs.website_only != 'true'
         run: >
           pnpm vitest run
           scripts/guides-typecheck
@@ -1052,7 +1053,7 @@ jobs:
           scripts/vendor-recite.test.ts
           vendor/sources.test.ts
           vendor/fetch.test.ts
-      - if: needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true'
+      - if: needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true' || needs.changes.outputs.website_only == 'true'
         run: >
           pnpm vitest run
           scripts/stale-story-references.test.ts
@@ -2919,6 +2920,7 @@ jobs:
           COMPARISON_AFFECTED: ${{ needs.changes.outputs.comparison_affected }}
           THOR_ONLY: ${{ needs.changes.outputs.thor_only }}
           ACTIONCABLE_ONLY: ${{ needs.changes.outputs.actioncable_only }}
+          WEBSITE_ONLY: ${{ needs.changes.outputs.website_only }}
           ACTIONCABLE_AFFECTED: ${{ needs.changes.outputs.actioncable_affected }}
           WEBSITE_LABEL: ${{ needs.changes.outputs.website_label }}
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
@@ -2931,7 +2933,7 @@ jobs:
           MYSQL_PREPARED_NOT_REQUIRED: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && !(github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')) }}
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
           QUICKSTART_NOT_REQUIRED: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
-          PROMISE_COUNTS_NOT_REQUIRED: ${{ github.event_name != 'pull_request' || needs.changes.outputs.docs_only == 'true' }}
+          PROMISE_COUNTS_NOT_REQUIRED: ${{ github.event_name != 'pull_request' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.website_only == 'true' }}
           GUIDES_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-guides') }}
         run: |
           set -euo pipefail
@@ -2966,6 +2968,11 @@ jobs:
                   # happens if `changes` itself failed — already caught above —
                   # so treat any skip here as legitimate.
                   continue
+                  ;;
+                build-and-typecheck)
+                  if [ "$WEBSITE_ONLY" = "true" ]; then
+                    continue
+                  fi
                   ;;
                 mysql-tests)
                   # Temporarily disabled (if: false) — its skip is always
