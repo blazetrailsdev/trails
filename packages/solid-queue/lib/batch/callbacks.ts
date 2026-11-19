@@ -19,6 +19,19 @@ export class Callbacks {
   declare on_finish: { [key: string]: unknown } | null;
   declare on_success: { [key: string]: unknown } | null;
   declare on_failure: { [key: string]: unknown } | null;
+  declare writeAttribute: (name: string, value: unknown) => void;
+
+  setOnFinish(callback: unknown): void {
+    this.writeAttribute("on_finish", this.serializeCallback(callback));
+  }
+
+  setOnSuccess(callback: unknown): void {
+    this.writeAttribute("on_success", this.serializeCallback(callback));
+  }
+
+  setOnFailure(callback: unknown): void {
+    this.writeAttribute("on_failure", this.serializeCallback(callback));
+  }
 
   /** @internal */
   serializeCallback(value: unknown): unknown {
@@ -73,7 +86,9 @@ extend(Callbacks, Concern);
         return this.readAttribute(`on_${callbackType}`);
       },
       set(this: Batch, callback: unknown) {
-        this.writeAttribute(`on_${callbackType}`, this.serializeCallback(callback));
+        if (callbackType === "finish") this.setOnFinish(callback);
+        else if (callbackType === "success") this.setOnSuccess(callback);
+        else if (callbackType === "failure") this.setOnFailure(callback);
       },
       configurable: true,
     });

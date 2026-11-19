@@ -33,7 +33,7 @@ export class Semaphore extends Record {
 
   static async createUniqueBy(attributes: { [key: string]: unknown }): Promise<unknown> {
     try {
-      if (await (await this.connection)!.supportsInsertConflictTarget()) {
+      if (await this.isSupportsInsertConflictTarget()) {
         return !(await this.insert({ ...attributes }, { uniqueBy: "key" })).isEmpty();
       } else {
         return await this.createBang({ ...attributes });

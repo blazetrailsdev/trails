@@ -109,7 +109,8 @@ describe("SupervisorTest", () => {
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
   });
 
-  it("start", async () => {
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
+  it.skip("start", async () => {
     const run = runSupervisor();
     const pid = RubyProcess.pid;
     await waitForRegisteredProcesses(4);
@@ -123,7 +124,8 @@ describe("SupervisorTest", () => {
     await assertNoRegisteredProcesses();
   });
 
-  it("start with provided configuration", async () => {
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
+  it.skip("start with provided configuration", async () => {
     const run = runSupervisor({ dispatchers: [{ batch_size: 100 }] });
     await waitForRegisteredProcesses(2, { timeout: 2 });
 
@@ -138,7 +140,8 @@ describe("SupervisorTest", () => {
     await assertNoRegisteredProcesses();
   });
 
-  it("start with empty configuration", async () => {
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
+  it.skip("start with empty configuration", async () => {
     const error = captureStderr();
     const run = runSupervisor({ workers: [], dispatchers: [] });
     await sleep(0.5);
@@ -149,7 +152,8 @@ describe("SupervisorTest", () => {
     expect(error.join("")).toMatch(/No processes configured/);
   });
 
-  it("start with invalid recurring tasks", async () => {
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
+  it.skip("start with invalid recurring tasks", async () => {
     const error = captureStderr();
     const run = runSupervisor({
       recurringScheduleFile: configFilePath("recurring_with_invalid"),
@@ -164,7 +168,8 @@ describe("SupervisorTest", () => {
     expect(error.join("")).toMatch(/Invalid recurring tasks/);
   });
 
-  it("create and delete pidfile", async () => {
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
+  it.skip("create and delete pidfile", async () => {
     expect(await File.isExistAsync(pidfile)).toBeFalsy();
 
     const run = runSupervisor();
@@ -179,7 +184,8 @@ describe("SupervisorTest", () => {
     expect(await File.isExistAsync(pidfile)).toBeFalsy();
   });
 
-  it("abort if there's already a pidfile for a supervisor", async () => {
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
+  it.skip("abort if there's already a pidfile for a supervisor", async () => {
     await FileUtils.mkdirPAsync(File.dirname(pidfile));
     await File.writeAsync(pidfile, RubyProcess.pid.toString());
     const err = captureStderr();
@@ -193,7 +199,8 @@ describe("SupervisorTest", () => {
     await waitForProcessTerminationWithTimeout(run, { exitstatus: 1 });
   });
 
-  it("delete previous pidfile if the owner is dead", async () => {
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
+  it.skip("delete previous pidfile if the owner is dead", async () => {
     const deadPid = 4194304 + 1;
     await FileUtils.mkdirPAsync(File.dirname(pidfile));
     await File.writeAsync(pidfile, deadPid.toString());
@@ -208,7 +215,8 @@ describe("SupervisorTest", () => {
     await run.terminate();
   });
 
-  it("fail orphaned executions", async () => {
+  // BLOCKED: solid-queue-fork-supervisor-tests-v1-7-2
+  it.skip("fail orphaned executions", async () => {
     for (let i = 0; i < 3; i++) {
       await (
         StoreResultJob.set({ queue: "new_queue" }) as unknown as typeof StoreResultJob

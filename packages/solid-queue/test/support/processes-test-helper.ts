@@ -1,6 +1,6 @@
 import { expect, vi } from "vitest";
 import { isPresent, TopLevel } from "@blazetrails/activesupport";
-import { Errno, SystemExit, Timeout } from "@blazetrails/ruby-compat";
+import { SystemExit, Timeout } from "@blazetrails/ruby-compat";
 import { Process } from "../../lib/process.js";
 import { Record as SolidQueueRecord } from "../../lib/record.js";
 import { Supervisor } from "../../lib/supervisor.js";
@@ -44,22 +44,15 @@ export function runSupervisor(options: { [key: string]: unknown } = {}, block?: 
 }
 
 export function signalProcess(
-  pid: ReturnType<typeof runSupervisor> | { supervisor: Supervisor; name: string },
+  pid: ReturnType<typeof runSupervisor>,
   signal: "TERM" | "INT" | "QUIT" | "KILL",
   { wait = null }: { wait?: number | null } = {},
 ) {
   return (async () => {
     if (wait != null) await sleep(wait);
     const supervisor = pid.supervisor;
-    if (!("name" in pid)) {
-      supervisor.signalQueue().push(signal);
-      await supervisor.interrupt();
-      return;
-    }
-    const supervisee = supervisor.forks[pid.name];
-    if (supervisee == null) throw new Errno.ESRCH();
-    if (signal === "KILL") supervisee._thread.kill();
-    else supervisor.signalProcess(pid.name, signal);
+    supervisor.signalQueue().push(signal);
+    await supervisor.interrupt();
   })();
 }
 

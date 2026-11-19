@@ -17,6 +17,12 @@ export class Record extends Base {
       return this.lock();
     }
   }
+
+  static async isSupportsInsertConflictTarget(): Promise<boolean> {
+    return await this.connectionPool().withConnection(
+      async (connection) => await connection.supportsInsertConflictTarget(),
+    );
+  }
 }
 
 constSet(SolidQueue, "Record", Record);

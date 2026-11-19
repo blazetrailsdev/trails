@@ -80,7 +80,10 @@ export class Value {
   }
 
   static check(callback: Callback, target: object, value?: unknown): boolean {
-    return callback.conditionsLambdas().every((cond) => cond(target, value));
+    return callback.conditionsLambdas().every((cond) => {
+      const r: unknown = cond(target, value);
+      return r != null && r !== false;
+    });
   }
 }
 
@@ -788,10 +791,38 @@ export class CallbackSequence {
     return sequence;
   }
 
-  isSkip(arg: Environment): boolean {
+  isSkip(arg: Environment): boolean | Promise<boolean> {
     if (arg.halted) return true;
     if (!this.userConditions) return false;
-    return !this.userConditions.every((c) => c(arg.target, arg.value));
+    const conditions = this.userConditions;
+    let pending: PromiseLike<unknown> | null = null;
+    let rest = 0;
+    const all = conditions.every((c, i) => {
+      const r: unknown = c(arg.target, arg.value);
+      if (!isThenable(r)) return r != null && r !== false;
+      pending = r;
+      rest = i + 1;
+      return false;
+    });
+    if (pending === null) return !all;
+    /** @inventedArm throw — PERMANENT */
+    if (arg.syncChain !== undefined) {
+      const thenable: PromiseLike<unknown> = pending;
+      new Thread(() => thenable);
+      throw new RuntimeError(
+        `Async callback on sync chain "${arg.syncChain}" — around condition returned a Promise`,
+      );
+    }
+    const awaited: PromiseLike<unknown> = pending;
+    return (async () => {
+      const first = await awaited;
+      if (first == null || first === false) return true;
+      for (const c of conditions.slice(rest)) {
+        const r: unknown = await c(arg.target, arg.value);
+        if (r == null || r === false) return true;
+      }
+      return false;
+    })();
   }
 
   isFinal(): boolean {
@@ -1037,6 +1068,7 @@ interface InvokeSequenceState {
   current: CallbackSequence;
   skipped: CallbackSequence[] | null;
   step: "before" | "yield" | "after" | "skipped";
+  skip?: boolean;
 }
 
 interface ProceedTracker {
@@ -1307,6 +1339,7 @@ function runCallbacks(
     let current = resume?.current ?? nextSequence;
     let skipped = resume?.skipped ?? null;
     let step = resume?.step ?? "before";
+    let resolvedSkip: boolean | Promise<boolean> | undefined = resume?.skip;
     resume = null;
     const suspend = (r: PromiseLike<unknown>, at: InvokeSequenceState["step"]) =>
       Promise.resolve(r).then(() => {
@@ -1333,7 +1366,19 @@ function runCallbacks(
             result = suspend(yielded, "after");
             break sequence;
           }
-        } else if (current.isSkip(env)) {
+        } else if (
+          (resolvedSkip ?? (resolvedSkip = current.isSkip(env))) === true ||
+          isThenable(resolvedSkip)
+        ) {
+          if (isThenable(resolvedSkip)) {
+            const pendingSkip = resolvedSkip;
+            result = Promise.resolve(pendingSkip).then((skip) => {
+              resume = { current, skipped, step: "yield", skip };
+              return invokeSequence();
+            });
+            break sequence;
+          }
+          resolvedSkip = undefined;
           (skipped ??= []).push(current);
           nextSequence = nextSequence.nested!;
           step = "before";

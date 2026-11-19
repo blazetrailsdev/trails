@@ -69,6 +69,9 @@ export class Batch extends Record {
   declare progressPercentage: typeof Status.prototype.progressPercentage;
   declare serializeCallback: typeof Callbacks.prototype.serializeCallback;
   declare enqueueCallbackJobs: typeof Callbacks.prototype.enqueueCallbackJobs;
+  declare setOnFinish: typeof Callbacks.prototype.setOnFinish;
+  declare setOnSuccess: typeof Callbacks.prototype.setOnSuccess;
+  declare setOnFailure: typeof Callbacks.prototype.setOnFailure;
   declare static finished: () => Relation<Batch>;
   declare static succeeded: () => Relation<Batch>;
   declare static unfinished: () => Relation<Batch>;

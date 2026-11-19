@@ -101,7 +101,7 @@ export class RecurringTask extends Record {
   }
 
   static async createOrUpdateAll(tasks: RecurringTask[]): Promise<unknown> {
-    if (await (await this.connection)!.supportsInsertConflictTarget()) {
+    if (await this.isSupportsInsertConflictTarget()) {
       return await this.upsertAll(
         tasks.map((task) => task.attributesForUpsert()),
         { uniqueBy: "key" },

@@ -10,11 +10,13 @@ import {
   extend,
   Hash,
   include,
+  isModuleIncluded,
   NoMethodError,
   rbHashSRuby2KeywordsHash,
   rbObjClass,
   rbObjIsKindOf,
   SecureRandom,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Callbacks, ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 import { ClassMethods, Core } from "./core.js";
@@ -121,6 +123,15 @@ export class Base {
     const timeZone = zone();
     if (timeZone === false) throw new NoMethodError("undefined method `name' for false", "name");
     this.timezone = timeZone?.name ?? null;
+    /** @inventedArm if — PERMANENT */
+    if (isModuleIncluded(new.target, ActiveJob.BatchId as never)) {
+      const host = this as this & { batchId?: unknown; isSolidQueueJob(): boolean };
+      if (host.isSolidQueueJob()) {
+        host.batchId = (
+          TopLevel as { SolidQueue?: { Batch: { currentBatchId(): unknown } } }
+        ).SolidQueue!.Batch.currentBatchId();
+      }
+    }
   }
 }
 include(Base, Core);

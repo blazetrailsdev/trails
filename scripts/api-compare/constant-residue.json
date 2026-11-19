@@ -1179,15 +1179,18 @@
     }
   },
   "solid-queue": {
-    "rows": 87,
-    "excluded": [
-      "active-job/batch-id.ts::BatchId",
-      "active-job/concurrency-controls.ts::ClassMethods",
-      "active-job/concurrency-controls.ts::ConcurrencyControls",
-      "active-job/queue-adapters/solid-queue-adapter.ts::SolidQueueAdapter"
-    ],
+    "rows": 94,
+    "excluded": [],
     "unwalked": [],
-    "residue": {}
+    "residue": {
+      "active-job/batch-id.ts::BatchId": "ActiveJob::BatchId",
+      "active-job/concurrency-controls.ts::ClassMethods": "ActiveJob::ConcurrencyControls::ClassMethods",
+      "active-job/concurrency-controls.ts::ConcurrencyControls": "ActiveJob::ConcurrencyControls",
+      "active-job/queue-adapters/solid-queue-adapter.ts::SolidQueueAdapter": "ActiveJob::QueueAdapters::SolidQueueAdapter",
+      "processes/runnable.ts::BootGuards": "SolidQueue::Processes::BootGuards",
+      "processes/runnable.ts::ForkGuard": "SolidQueue::Processes::BootGuards::ForkGuard",
+      "processes/runnable.ts::NullGuard": "SolidQueue::Processes::BootGuards::NullGuard"
+    }
   },
   "stimulus": {
     "rows": 1,

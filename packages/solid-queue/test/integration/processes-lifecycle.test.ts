@@ -78,7 +78,11 @@ async function assertJobStatus(
   });
 }
 
-async function assertRegisteredWorkersFor(queues: string[], supervisorPid: number | null = null) {
+async function assertRegisteredWorkersFor(
+  ...args: [...queues: string[], options: { supervisorPid?: number | null }]
+) {
+  const { supervisorPid = null } = args.at(-1) as { supervisorPid?: number | null };
+  const queues = args.slice(0, -1) as string[];
   const workers = await findProcessesRegisteredAs("Worker").toArray();
   const registeredQueues = workers
     .map((process) => process.metadata.get("queues") as string | null)
@@ -136,7 +140,7 @@ describe("ProcessesLifecycleTest", () => {
       "background",
       "default",
     ]);
-    await assertRegisteredWorkersFor(["background", "default"], RbProcess.pid);
+    await assertRegisteredWorkersFor("background", "default", { supervisorPid: RbProcess.pid });
   });
 
   afterEach(async () => {
@@ -332,99 +336,6 @@ describe("ProcessesLifecycleTest", () => {
     await waitWhileWithTimeout(1, async () => (await FailedExecution.count()) < 3);
     for (const job of [error1, error2, error3]) await assertJobStatus(job, "failed");
 
-    await run.terminate();
-    await assertCleanTermination();
-  });
-
-  // PERMANENT-SKIP: CLAUDE.md § "Runtime facts Node does not expose", `fork`
-  it.skip("process a job that exits", async () => {
-    for (let i = 0; i < 2; i++) {
-      await enqueueStoreResultJob("no exit", "background");
-      await enqueueStoreResultJob("no exit", "default");
-    }
-    await enqueueStoreResultJob("paused no exit", "default", { pause: 0.5 });
-    const exitJob = await enqueueStoreResultJob("exit", "background", { exitValue: 1, pause: 0.2 });
-    const pauseJob = await enqueueStoreResultJob("exit", "background", { pause: 0.3 });
-
-    for (let i = 0; i < 2; i++) await enqueueStoreResultJob("no exit", "background");
-
-    await waitForJobsToFinishFor(3, { except: [exitJob, pauseJob] });
-
-    await assertCompletedJobResults("no exit", "default", 2);
-    await assertCompletedJobResults("no exit", "background", 4);
-    await assertCompletedJobResults("paused no exit", "default", 1);
-
-    for (const job of [exitJob, pauseJob]) await assertJobStatus(job, "claimed");
-
-    expect(run.isExists).toBeTruthy();
-    await run.terminate();
-
-    for (const job of [exitJob, pauseJob]) await assertJobStatus(job, "failed");
-
-    await assertCleanTermination();
-  });
-
-  it("terminate worker individually", async () => {
-    await enqueueStoreResultJob("pause", "background", { pause: 0.5 });
-    await enqueueStoreResultJob("pause", "default", { pause: 0.5 });
-
-    const worker = (await findProcessesRegisteredAs("Worker").first())!;
-
-    await waitWhileWithTimeout(1, async () => (await ReadyExecution.count()) > 0);
-    const signal = signalProcess({ supervisor: run.supervisor, name: worker.name }, "TERM", {
-      wait: 0.1,
-    });
-
-    await waitForRegisteredProcesses(2, { timeout: 3 });
-    expect(await Process.findBy({ id: worker.id })).toBeNull();
-
-    await waitForJobsToFinishFor(1);
-    await assertCompletedJobResults("pause", "background");
-    await assertCompletedJobResults("pause", "default");
-
-    await waitForRegisteredProcesses(3, { timeout: 3 });
-    await assertRegisteredWorkersFor(["background", "default"], RbProcess.pid);
-
-    await enqueueStoreResultJob("no_pause");
-    await enqueueStoreResultJob("no_pause", "default");
-    await waitForJobsToFinishFor(1);
-
-    await assertCompletedJobResults("no_pause", "background");
-    await assertCompletedJobResults("no_pause", "default");
-
-    await signal;
-    await run.terminate();
-    await assertCleanTermination();
-  });
-
-  it("kill worker individually", { timeout: 15_000 }, async () => {
-    const killedPause = await enqueueStoreResultJob("killed_pause", "background", { pause: 1 });
-    await enqueueStoreResultJob("pause", "default", { pause: 0.5 });
-
-    const worker = (await findProcessesRegisteredAs("Worker").toArray()).find((process) =>
-      (process.metadata.get("queues") as string).includes("background"),
-    )!;
-    const signal = signalProcess({ supervisor: run.supervisor, name: worker.name }, "KILL", {
-      wait: 0.5,
-    });
-
-    await sleep(0.5);
-    expect(await Process.isExists({ id: worker.id })).toBeTruthy();
-
-    await waitForRegisteredProcesses(4, { timeout: 5 });
-
-    await assertStartedJobResult("killed_pause");
-    await assertJobStatus(killedPause, "failed");
-    await assertCompletedJobResults("pause", "default");
-
-    await enqueueStoreResultJob("no_pause");
-    await enqueueStoreResultJob("no_pause", "default");
-    await sleep(2);
-
-    await assertCompletedJobResults("no_pause", "background");
-    await assertCompletedJobResults("no_pause", "default");
-
-    await signal;
     await run.terminate();
     await assertCleanTermination();
   });

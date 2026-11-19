@@ -104,7 +104,7 @@ function libExtraPathsFor(cloneRoot: string, source: UpstreamSource): Record<str
   const out: Record<string, string[]> = {};
   for (const pkg of source.packages) {
     if (pkg.compareApi === false || !pkg.extraLibPaths) continue;
-    out[pkg.name] = pkg.extraLibPaths.map((p) => join(cloneRoot, p));
+    out[pkg.name] = pkg.extraLibPaths.map((p) => `${cloneRoot}/${p}`);
   }
   return out;
 }

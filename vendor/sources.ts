@@ -41,6 +41,9 @@ export interface PackageEntry {
    * `.rb` files map onto the same TS `src/` as `libPath`'s. An engine gem keeps
    * its models under `app/models/<gem>/` beside `lib/<gem>/`, and
    * `app/models/solid_queue/job.rb` ports to `packages/solid-queue/lib/job.ts`.
+   * A `/./` segment keeps the directories after it in the recorded path, as
+   * rsync -R reads it: `lib/./active_job` records `active_job/batch_id.rb`,
+   * which ports to `packages/solid-queue/lib/active-job/batch-id.ts`.
    */
   extraLibPaths?: string[];
   /** Path relative to the source's vendored root; omitted = test-compare ignores. */
@@ -959,7 +962,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "solid-queue",
         libPath: "lib/solid_queue",
         libEntryFile: "lib/solid_queue.rb",
-        extraLibPaths: ["app/models/solid_queue", "app/jobs/solid_queue"],
+        extraLibPaths: ["app/models/solid_queue", "app/jobs/solid_queue", "lib/./active_job"],
         testPath: "test",
         compareApi: true,
         compareTests: true,
@@ -1420,7 +1423,12 @@ export function libExtraPathsManifest(): Record<string, string[]> {
     for (const pkg of source.packages) {
       if (pkg.compareApi === false) continue;
       if (!pkg.extraLibPaths) continue;
-      out[pkg.name] = pkg.extraLibPaths.map((p) => resolve(sourceRoot(source), p));
+      out[pkg.name] = pkg.extraLibPaths.map((p) => {
+        const [root, kept] = p.split("/./");
+        return kept === undefined
+          ? resolve(sourceRoot(source), p)
+          : `${resolve(sourceRoot(source), root)}/./${kept}`;
+      });
     }
   }
   return out;
