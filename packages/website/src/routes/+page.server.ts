@@ -1,5 +1,7 @@
 import { codeToHtml } from "shiki";
 
+import { loadParity, percent, shortSha } from "$lib/parity";
+
 const blocks = [
   {
     file: "app/models/article.ts",
@@ -99,7 +101,10 @@ Trails.application.routes().draw(function () {
 ];
 
 export async function load() {
+  const parity = await loadParity();
   return {
+    measuredAt: shortSha(parity.measuredAt),
+    coverage: Object.fromEntries(parity.packages.map((p) => [p.name, percent(p.api)])),
     blocks: await Promise.all(
       blocks.map(async ({ code, lang, ...rest }) => ({
         ...rest,

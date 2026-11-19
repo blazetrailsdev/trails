@@ -1,8 +1,6 @@
-import type { DatabaseAdapter } from "@blazetrails/activerecord";
+import { Schema } from "@blazetrails/activerecord";
 
-export const defineParams = { version: 2026_09_25_000001 };
-
-export default async function defineSchema(ctx: DatabaseAdapter) {
+await Schema.get(8).define({ version: 2026_09_25_000001 }, async (ctx) => {
   await ctx.createTable("authors", { force: "cascade" }, (t) => {
     t.string("name", { null: false });
   });
@@ -12,4 +10,4 @@ export default async function defineSchema(ctx: DatabaseAdapter) {
     t.integer("status", { default: 0, null: false });
     t.integer("author_id");
   });
-}
+});

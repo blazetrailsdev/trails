@@ -189,7 +189,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
 
     await t.assertFile(FUNCTIONAL, (content) => {
       assertMatch(/^export class UsersControllerTest extends IntegrationTest/m, content);
-      assertMatch(/it\("should get index"/, content);
+      assertMatch(/it(?:<[^>]*>)?\("should get index"/, content);
       assertMatch(
         new RegExp(
           `t\\.post\\(t\\.usersUrl\\(\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\} \\}\\)`,
@@ -210,7 +210,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
 
     await t.assertFile(FUNCTIONAL, (content) => {
       assertMatch(/^export class UsersControllerTest extends IntegrationTest/m, content);
-      assertMatch(/it\("should get index"/, content);
+      assertMatch(/it(?:<[^>]*>)?\("should get index"/, content);
       assertMatch(/t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{\} \} \}\)/, content);
       assertMatch(
         /t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{\} \} \}\)/,
@@ -382,7 +382,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
 
     await t.assertFile(FUNCTIONAL, (content) => {
       assertMatch(/^export class UsersControllerTest extends IntegrationTest/m, content);
-      assertMatch(/it\("should get index"/, content);
+      assertMatch(/it(?:<[^>]*>)?\("should get index"/, content);
       assertMatch(
         new RegExp(
           `t\\.post\\(t\\.usersUrl\\(\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\}, as: ":json" \\}\\)`,

@@ -59,9 +59,14 @@ await Trails.application.loadServer();
 exports[`AppGenerator > snapshots emitted TypeScript sources > config/application.ts 1`] = `
 "import "./boot.ts";
 
-import { Application } from "@blazetrails/trailties";
+import { Bundler } from "@blazetrails/ruby-compat";
+import { Application, Trails } from "@blazetrails/trailties";
 
 import "@blazetrails/trailties/all";
+
+// Require the gem ports listed in package.json, including any ports
+// you've limited to :test, :development, or :production.
+await Bundler.require(...Trails.groups());
 
 export class MyApp extends Application {
   static {

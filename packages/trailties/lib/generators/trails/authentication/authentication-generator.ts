@@ -96,19 +96,6 @@ export class AuthenticationGenerator extends Base {
     } else {
       await this.executeCommand(executor, "add @blazetrails/bcrypt", { capture: true });
     }
-
-    const application = "config/application.ts";
-    if (!File.isExist(File.join(this.destinationRoot, application))) return;
-    const appFull = File.join(this.destinationRoot, application);
-    const src = File.read(appFull);
-    if (src.includes(BCRYPT_IMPORT)) return;
-    const frameworks = 'import "@blazetrails/trailties/all";\n';
-    File.write(
-      appFull,
-      src.includes(frameworks)
-        ? src.replace(frameworks, frameworks + BCRYPT_IMPORT)
-        : BCRYPT_IMPORT + src,
-    );
   }
 
   async addMigrations(): Promise<void> {
@@ -121,7 +108,6 @@ export class AuthenticationGenerator extends Base {
   }
 }
 
-const BCRYPT_IMPORT = `import "@blazetrails/bcrypt";\n`;
 const INCLUDE_IMPORT = `import { include, type Extended, type Included } from "@blazetrails/activesupport";\n`;
 const AUTH_IMPORT = `import { Authentication, type ClassMethods } from "./concerns/authentication.ts";\n`;
 const INCLUDED_SURFACE = `export interface ApplicationController extends Included<typeof Authentication> {}\n\n`;

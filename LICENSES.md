@@ -47,5 +47,6 @@ keeping the attribution guarantee.
 - **Copying from Rails Guides into ours:** don't. Rails Guides are
   CC BY-SA 4.0, which would force the entire Trails docs set onto
   that license. We use Rails Guides as a structural reference only
-  (topic list, section order) and write prose from scratch. See
-  `docs/rails-guides-migration-plan.md` for the operating rule.
+  (topic list, section order) and write prose from scratch. The guides
+  index (`packages/website/docs/guides/index.md`) follows the Rails
+  Guides table of contents under that rule.

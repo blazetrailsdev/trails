@@ -1,5 +1,5 @@
 import * as TestCase from "../support/test-case.js";
-import { Hash, Thread } from "@blazetrails/ruby-compat";
+import { Hash, include, Thread } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { Fallbacks, fallbacks, setFallbacks } from "../../lib/backend/fallbacks.js";
 import { Chain } from "../../lib/backend/chain.js";
@@ -10,7 +10,8 @@ import { Fallbacks as LocaleFallbacks } from "../../lib/locale/fallbacks.js";
 import { Date } from "@blazetrails/date";
 import { Time } from "@blazetrails/date";
 
-class Backend extends Fallbacks(Simple) {}
+class Backend extends Simple {}
+include(Backend, Fallbacks);
 
 afterEach(TestCase.teardown);
 
@@ -355,7 +356,8 @@ describe("I18nBackendFallbacksLocalizeTest", () => {
 });
 
 describe("I18nBackendFallbacksWithChainTest", () => {
-  class ChainBackend extends Fallbacks(Chain) {}
+  class ChainBackend extends Chain {}
+  include(ChainBackend, Fallbacks);
 
   beforeEach(async () => {
     const backend = await setup();
@@ -440,7 +442,7 @@ describe("I18nBackendFallbacksExistsTest", () => {
 });
 
 describe("I18nBackendOnFallbackHookTest", () => {
-  class Backend extends Fallbacks(Simple) {
+  class Backend extends Simple {
     fallbackCollector?: unknown[][];
 
     protected onFallback(...args: unknown[]): unknown {
@@ -449,6 +451,7 @@ describe("I18nBackendOnFallbackHookTest", () => {
       return null;
     }
   }
+  include(Backend, Fallbacks);
 
   let backend: Backend;
 

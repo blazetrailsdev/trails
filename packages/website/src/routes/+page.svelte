@@ -61,14 +61,14 @@
   <header class="hero">
     <h1>Convention over configuration.<br />Now with types.</h1>
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
-    <span class="pill">trails &mdash; pre-release</span>
+    <span class="pill">trails &mdash; pre-release &middot; measured at {data.measuredAt}</span>
     <div class="video">Editor video placeholder</div>
   </header>
 
   <section class="company">
     <h2>You’re in good company.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
-    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}">{t}</a></li>{/each}</ul>
+    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span><small>{data.coverage[t] ?? "—"} of the Rails API</small></a></li>{/each}</ul>
     <p class="small"><strong>These are just a few of the packages.</strong> The gems Rails depends on are ported alongside them.</p>
   </section>
 
@@ -163,8 +163,9 @@
 
   .company { padding: 40px 24px 100px; }
   .tiles { display: grid; grid-template-columns: repeat(4, 220px); justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 48px 0; }
-  .tiles a { display: grid; place-items: center; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; text-decoration: none; }
+  .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; text-decoration: none; }
   .tiles li:nth-last-child(2) { grid-column: 2; }
+  .tiles small { font-size: 13px; font-weight: 500; color: #6b5d66; }
 
   .band { background: var(--tint); padding: 90px 24px; }
   .card { background: #fff; max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px rgb(0 0 0 / 0.08); }

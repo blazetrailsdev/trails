@@ -336,6 +336,7 @@ export { RangeError } from "./range-error.js";
 export { KeyError } from "./key-error.js";
 export { LocalJumpError } from "./local-jump-error.js";
 export { LoadError } from "./load-error.js";
+export { Bundler } from "./bundler.js";
 export { TSE, type TSECompiler } from "./tse.js";
 export { OpenURI } from "./open-uri.js";
 export {
