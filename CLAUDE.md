@@ -28,6 +28,15 @@ Mirror, method by method and line by line:
   disagrees. It also covers file paths (`PATH_SEGMENT_ALIASES`,
   `RUBY_FILE_TS_OVERRIDES`). If your name isn't the one that table produces
   from the Ruby name, you have a bug, not a preference.
+- **Casing is translated, never mirrored.** trails uses Node casing
+  everywhere: camelCase for code identifiers and option keys, kebab-case for
+  names a user or file sees (generator namespaces, file and directory names,
+  CLI tokens, locale and lookup keys). A Ruby value spelled snake_case
+  (`scaffold_controller`, `test_unit:model`) is `scaffold-controller`,
+  `test-unit:model`. A difference that is only snake_case against kebab-case or
+  camelCase is not a deviation: it is not receipted, not baselined and never
+  filed as a story, and a story proposing snake_case "like Rails" closes
+  `FALSIFIED:`. Ruled by the operator on 2026-11-18.
 - **Locals and parameters.** A local or parameter keeps the Rails identifier,
   camelCased — Ruby `stmt` is `stmt`, not `statement`; `klass` is `klass`, not
   `modelClass`. Same for parameter _order_ and defaults.
