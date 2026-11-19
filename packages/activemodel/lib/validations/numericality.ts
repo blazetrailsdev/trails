@@ -239,7 +239,7 @@ export function prepareValueForValidation(
 ): unknown {
   if (this.isRecordAttributeChangedInPlace(record, attrName)) return value;
 
-  const r = record as unknown as RecordWithRawAttribute;
+  const r: RecordWithRawAttribute = record;
   let rawValue: unknown;
   const cameFromUser = `${attrName}CameFromUser`;
 
@@ -258,10 +258,9 @@ export function prepareValueForValidation(
   return rawValue !== undefined && rawValue !== null && rawValue !== false ? rawValue : value;
 }
 
-interface RecordWithRawAttribute {
+interface RecordWithRawAttribute extends ValidatableRecord {
   attributeChangedInPlace?: (name: string) => boolean;
   readAttribute?: (name: string) => unknown;
-  [key: string]: unknown;
 }
 
 /** @internal */
@@ -269,7 +268,7 @@ export function isRecordAttributeChangedInPlace(
   record: ValidatableRecord,
   attrName: string,
 ): boolean {
-  const r = record as unknown as RecordWithRawAttribute;
+  const r: RecordWithRawAttribute = record;
   return typeof r.attributeChangedInPlace === "function" && r.attributeChangedInPlace(attrName);
 }
 
@@ -279,12 +278,12 @@ function parseFloat(num: number, precision: number, scale?: number | null): numb
   return Number(new BigDecimal(round(num, scale), precision).toString("F"));
 }
 
-function respondTo(obj: RecordWithRawAttribute, method: string): boolean {
+function respondTo(obj: object, method: string): boolean {
   return method in obj;
 }
 
-function publicSend(obj: RecordWithRawAttribute, method: string): unknown {
-  const value = obj[method];
+function publicSend(obj: object, method: string): unknown {
+  const value: unknown = Reflect.get(obj, method);
   return typeof value === "function" ? (value as () => unknown).call(obj) : value;
 }
 

@@ -315,7 +315,7 @@ function sendAssociation(record: SerializationRecord, name: string): unknown {
       `undefined method '${name}' for an instance of ${record.constructor.name}`,
     );
   }
-  const reader = (record as unknown as Record<string, unknown>)[name];
+  const reader: unknown = Reflect.get(record, name);
   return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
 }
 

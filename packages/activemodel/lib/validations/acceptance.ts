@@ -29,7 +29,7 @@ export class AcceptanceValidator extends EachValidator {
   setupBang(klass: AttributeMethodQueryable): void {
     const defineAttributes = new LazilyDefineAttributes(this.attributes);
     if (!aryIncludes(includedModules(klass), defineAttributes)) {
-      include(klass as unknown as Parameters<typeof include>[0], defineAttributes);
+      include(klass, defineAttributes);
     }
   }
 }

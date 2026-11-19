@@ -282,10 +282,8 @@ export const ClassMethods = {
         ...options,
         exceptOn,
         unless: [
-          (record: object) => {
-            const current = kernelArray(
-              (record as unknown as ValidationsContextHost).validationContext,
-            );
+          (record: ValidationsContextHost) => {
+            const current = kernelArray(record.validationContext);
             return exceptOn.some((c) => current.includes(c));
           },
           ...kernelArray(options.unless as CallbackConditions["unless"]),

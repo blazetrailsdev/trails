@@ -359,7 +359,7 @@ export const ClassMethods = {
   generatedAttributeMethods(this: ClassMethodsHost): Module {
     if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
       const mod = new Module();
-      include(this as unknown as new (...args: unknown[]) => unknown, mod);
+      include(this, mod);
       this._generatedAttributeMethods = mod;
     }
     return this._generatedAttributeMethods!;
