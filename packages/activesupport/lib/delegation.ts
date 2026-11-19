@@ -78,6 +78,7 @@ export namespace Delegation {
   /**
    * @inventedArm if — PERMANENT
    * @inventedArm throw — PERMANENT
+   * @inventedArm or — PERMANENT
    */
   export function generate<T extends object>(
     owner: T,
