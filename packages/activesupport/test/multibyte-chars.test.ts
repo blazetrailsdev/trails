@@ -73,6 +73,97 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(proxy.toS()).not.toEqual(original);
   });
 
+  it("capitalize bang should return self when modifying wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    expect(proxy.capitalizeBang()).toBe(proxy);
+  });
+
+  it("capitalize bang should change wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    proxy.capitalizeBang();
+    expect(proxy.toS()).not.toEqual(original);
+  });
+
+  it("downcase bang should return self when modifying wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    expect(proxy.downcaseBang()).toBe(proxy);
+  });
+
+  it("downcase bang should change wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    proxy.downcaseBang();
+    expect(proxy.toS()).not.toEqual(original);
+  });
+
+  it("lstrip bang should return self when modifying wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    expect(proxy.lstripBang()).toBe(proxy);
+  });
+
+  it("lstrip bang should change wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    proxy.lstripBang();
+    expect(proxy.toS()).not.toEqual(original);
+  });
+
+  it("reverse bang should return self when modifying wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    expect(proxy.reverseBang()).toBe(proxy);
+  });
+
+  it("reverse bang should change wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    proxy.reverseBang();
+    expect(proxy.toS()).not.toEqual(original);
+  });
+
+  it("rstrip bang should return self when modifying wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    expect(proxy.rstripBang()).toBe(proxy);
+  });
+
+  it("rstrip bang should change wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    proxy.rstripBang();
+    expect(proxy.toS()).not.toEqual(original);
+  });
+
+  it("swapcase bang should return self when modifying wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    expect(proxy.swapcaseBang()).toBe(proxy);
+  });
+
+  it("swapcase bang should change wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    proxy.swapcaseBang();
+    expect(proxy.toS()).not.toEqual(original);
+  });
+
+  it("upcase bang should return self when modifying wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    expect(proxy.upcaseBang()).toBe(proxy);
+  });
+
+  it("upcase bang should change wrapped string", () => {
+    const original = " él piDió Un bUen café ";
+    const proxy = chars(original) as Chars & Record<string, any>;
+    proxy.upcaseBang();
+    expect(proxy.toS()).not.toEqual(original);
+  });
+
   it("unicode string should have utf8 encoding", () => {
     expect(typeof UNICODE_STRING).toBe("string");
   });

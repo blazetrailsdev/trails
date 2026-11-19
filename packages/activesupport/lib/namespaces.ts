@@ -68,6 +68,7 @@ export const ActiveSupport = {
   Inflector: typeof Inflector;
   MessagePack?: typeof MessagePack;
   testOrder: string | null;
+  testParallelizationThreshold: number;
   errorReporter: ErrorReporter;
   cacheFormatVersion(): number;
   setCacheFormatVersion(value: number): void;
