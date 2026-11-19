@@ -1,7 +1,21 @@
 import { defineConfig } from "vitepress";
+import { publishedPackages } from "../../src/lib/parity.js";
 
 const siteBase = process.env.SITE_BASE ?? "";
 const siteRoot = process.env.SITE_ROOT || `${siteBase}/`;
+const packages = await publishedPackages();
+
+const railsGuideSections = [
+  "Start Here",
+  "Models",
+  "Views",
+  "Controllers",
+  "Other Components",
+  "Digging Deeper",
+  "Going to Production",
+  "Advanced Active Record",
+  "Extending Rails",
+];
 
 export default defineConfig({
   title: "BlazeTrails",
@@ -15,6 +29,7 @@ export default defineConfig({
     nav: [
       { text: "Docs", link: "/" },
       { text: "Guides", link: "/guides/" },
+      { text: "Packages", link: "/packages/" },
       { text: "Website", link: siteRoot },
       { text: "API Reference", link: "/api/@blazetrails/arel/README" },
     ],
@@ -29,11 +44,20 @@ export default defineConfig({
           ],
         },
         {
-          text: "Trails Deviations",
+          text: "Rails Guides",
+          items: railsGuideSections.map((text) => ({
+            text,
+            link: `/guides/#${text.toLowerCase().replace(/ /g, "-")}`,
+          })),
+        },
+        { text: "Contributing", link: "/guides/#contributing" },
+      ],
+      "/packages/": [
+        {
+          text: "Packages",
           items: [
-            { text: "Arel", link: "/guides/arel-rails-deviations" },
-            { text: "ActiveModel", link: "/guides/activemodel-rails-deviations" },
-            { text: "ActiveRecord", link: "/guides/activerecord-rails-deviations" },
+            { text: "All packages", link: "/packages/" },
+            ...packages.map(({ dir }) => ({ text: dir, link: `/packages/${dir}` })),
           ],
         },
       ],

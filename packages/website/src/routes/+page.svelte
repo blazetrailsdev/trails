@@ -1,12 +1,13 @@
 <script>
   import { base } from "$app/paths";
+  let { data } = $props();
   const packages = [
-    { name: "ActiveRecord", path: "activerecord", desc: "ORM with migrations, associations, and query building", coverage: "71%" },
-    { name: "ActiveModel", path: "activemodel", desc: "Validations, callbacks, dirty tracking, serialization", coverage: "95%" },
-    { name: "ActiveSupport", path: "activesupport", desc: "Inflection, caching, notifications, encryption", coverage: "38%" },
-    { name: "Arel", path: "arel", desc: "SQL AST builder and query generation", coverage: "100%" },
-    { name: "Rack", path: "rack", desc: "Web server interface, middleware, request/response", coverage: "100%" },
-    { name: "ActionPack", path: "actionpack", desc: "Controllers (74% API), routing, sessions, CSRF", coverage: "27%" },
+    { name: "ActiveRecord", path: "activerecord", desc: "ORM with migrations, associations, and query building" },
+    { name: "ActiveModel", path: "activemodel", desc: "Validations, callbacks, dirty tracking, serialization" },
+    { name: "ActiveSupport", path: "activesupport", desc: "Inflection, caching, notifications, encryption" },
+    { name: "Arel", path: "arel", desc: "SQL AST builder and query generation" },
+    { name: "Rack", path: "rack", desc: "Web server interface, middleware, request/response" },
+    { name: "ActionPack", path: "actionpack", desc: "Controllers, routing, sessions, CSRF" },
   ];
 
   const codeExample = `import { Base, Schema } from "@blazetrails/activerecord";
@@ -436,13 +437,14 @@ const users = await User.where({ name: "Alice" })
           <div class="rounded-lg border border-border bg-surface p-5">
             <div class="mb-2 flex items-center justify-between">
               <h3 class="font-mono text-sm font-semibold text-text">{pkg.name}</h3>
-              <span class="rounded bg-surface-overlay px-2 py-0.5 font-mono text-[10px] text-text-muted">{pkg.coverage}</span>
+              <span class="rounded bg-surface-overlay px-2 py-0.5 font-mono text-[10px] text-text-muted">{data.coverage[pkg.path] ?? "—"}</span>
             </div>
             <p class="mb-3 text-xs leading-relaxed text-text-muted">{pkg.desc}</p>
             <code class="text-[10px] text-accent">@blazetrails/{pkg.path}</code>
           </div>
         {/each}
       </div>
+      <p class="mt-6 text-center font-mono text-[10px] text-text-muted">Share of Rails API methods matched, measured at {data.measuredAt}</p>
     </div>
   </section>
 
