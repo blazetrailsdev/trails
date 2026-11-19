@@ -14,7 +14,8 @@ export class SectionChannel extends ApplicationCable.Channel {
   declare verifiedStreamNameFromParams: () => unknown;
 
   static {
-    extend(this, Broadcasts, StreamName);
+    extend(this, Broadcasts);
+    extend(this, StreamName);
     include(this, StreamName.ClassMethods);
   }
 

@@ -22,7 +22,6 @@ type Broadcasting = {
 class BroadcastsTest extends ApplicationSystemTestCase {
   declare static signedStreamName: (streamables: unknown) => string;
   declare connectTurboCableStreamSources: (typeof SystemTestHelper)["connectTurboCableStreamSources"];
-  declare performEnqueuedJobs: ActiveJobTestHelper["performEnqueuedJobs"];
 
   static {
     include(this, ActiveJobTestHelper);
@@ -37,15 +36,15 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
-type Ctx = { testCase: BroadcastsTest };
+type Ctx = { testCase: BroadcastsTest & ActiveJobTestHelper };
 
 describe("BroadcastsTest", () => {
-  let t: BroadcastsTest;
+  let t: BroadcastsTest & ActiveJobTestHelper;
   let page: Page;
 
   const urlHelpers = () =>
     app.routes().urlHelpers() as unknown as Record<string, (...args: unknown[]) => string>;
-  const setup = async (testCase: BroadcastsTest) => {
+  const setup = async (testCase: BroadcastsTest & ActiveJobTestHelper) => {
     t = testCase;
     page = await t.page();
     app.reloadRoutesUnlessLoaded();
@@ -60,7 +59,7 @@ describe("BroadcastsTest", () => {
     expect.poll(() => locator.textContent()).toContain(content);
   const assertNoText = (locator: ReturnType<typeof within>, content: string) =>
     expect.poll(() => locator.textContent()).not.toContain(content);
-  const create = async (attributes: object) =>
+  const create = async (attributes: Record<string, unknown>) =>
     (await Message.create(attributes)) as unknown as Message & Broadcasting;
 
   const reconnectCableStreamSource = async ({ from, to }: { from: unknown; to: unknown }) => {
