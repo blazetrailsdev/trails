@@ -48,6 +48,20 @@ function chars(str: string): AnyChars {
   return new Chars(str) as AnyChars;
 }
 
+function inspectCodepoints(str: string | { toS(): string }): string {
+  return Array.from(typeof str === "string" ? str : str.toS(), (c) =>
+    c.codePointAt(0)!.toString(16),
+  ).join(" ");
+}
+
+function assertEqualCodepoints(
+  expected: string | { toS(): string },
+  actual: string | { toS(): string },
+  message?: string,
+): void {
+  expect(inspectCodepoints(actual), message).toEqual(inspectCodepoints(expected));
+}
+
 describe("MultibyteCharsUTF8BehaviorTest", () => {
   let chars_: AnyChars;
   const whitespace = "\n\t ";
@@ -793,10 +807,10 @@ describe("MultibyteCharsExtrasTest", () => {
 
     const byteString = "\udcb8\udc9e\x08\udc88\udca5";
     const tidyString = String.fromCodePoint(0xb8, 0x17e, 0x8, 0x2c6, 0xa5);
-    expect(chars(byteString).tidyBytes().toS()).toEqual(tidyString);
+    assertEqualCodepoints(tidyString, chars(byteString).tidyBytes());
     await assertNothingRaised(() => Array.from(chars(byteString).tidyBytes().toS()));
 
-    expect(chars("\udcf0\udca5\udca4\x21").tidyBytes().toS()).toEqual("\u00f0\u00a5\u00a4\x21");
+    assertEqualCodepoints("\u00f0\u00a5\u00a4\x21", chars("\udcf0\udca5\udca4\x21").tidyBytes());
   });
 
   it("tidy bytes should forcibly tidy bytes if specified", () => {

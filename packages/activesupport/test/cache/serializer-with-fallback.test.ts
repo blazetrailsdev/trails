@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import "../../lib/message-pack.js";
 import { SerializerWithFallback } from "../../lib/cache/serializer-with-fallback.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, StringIO } from "@blazetrails/ruby-compat";
+import { Logger } from "../../lib/logger.js";
 import { Entry } from "../../lib/cache/entry.js";
 import { Store } from "../../lib/cache/index.js";
 import { assertNotNil, assertNil } from "../../lib/testing/assertions.js";
@@ -23,6 +24,12 @@ function makeEntry() {
     expiresIn: 100,
     version: "v42",
   });
+}
+
+function assertLogs(pattern: RegExp, block: () => unknown) {
+  const io = new StringIO();
+  Store.with({ logger: new Logger(io) }, block);
+  expect(io.string()).toMatch(pattern);
 }
 
 function assertEntry(expected: Entry, actual: unknown) {
@@ -59,15 +66,8 @@ describe("CacheSerializerWithFallbackTest", () => {
     });
 
     it(`${inspect(format)} serializer logs unrecognized payloads`, () => {
-      const messages: string[] = [];
-      const logger = { warn: (msg: string) => messages.push(msg) };
-
-      Store.with({ logger }, () => serializer(format).load({}));
-      expect(messages.some((m) => /unrecognized/i.test(m))).toBe(true);
-
-      messages.length = 0;
-      Store.with({ logger }, () => serializer(format).load(""));
-      expect(messages.some((m) => /unrecognized/i.test(m))).toBe(true);
+      assertLogs(/unrecognized/i, () => serializer(format).load({}));
+      assertLogs(/unrecognized/i, () => serializer(format).load(""));
     });
   }
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, camelized } from "@blazetrails/ruby-compat";
 import { titleize, underscore } from "../lib/inflector.js";
 import { SafeBuffer, htmlSafe, isHtmlSafe } from "../lib/core-ext/string/output-safety.js";
 import { htmlEscape } from "../lib/core-ext/tse/util.js";
@@ -12,6 +12,8 @@ import {
   assertNotNil,
   assertNil,
 } from "../lib/testing/assertions.js";
+
+type Methods = Record<string, (...args: unknown[]) => unknown>;
 
 describe("SafeBufferTest", () => {
   let buffer: SafeBuffer;
@@ -67,6 +69,44 @@ describe("SafeBufferTest", () => {
     const str = underscore(htmlSafe("MyTest").toStr());
     expect(str).toEqual("my_test");
   });
+
+  for (const [unsafeMethod, dummyArgs] of Object.entries({
+    capitalize: null,
+    chomp: null,
+    chop: null,
+    delete: "foo",
+    delete_prefix: "foo",
+    delete_suffix: "foo",
+    downcase: null,
+    gsub: ["foo", "bar"],
+    lstrip: null,
+    next: null,
+    reverse: null,
+    rstrip: null,
+    scrub: null,
+    squeeze: null,
+    strip: null,
+    sub: ["foo", "bar"],
+    succ: null,
+    swapcase: null,
+    tr: ["foo", "bar"],
+    tr_s: ["foo", "bar"],
+    unicode_normalize: null,
+    upcase: null,
+  })) {
+    const name = camelized(unsafeMethod);
+    const args = dummyArgs === null ? [] : [dummyArgs].flat();
+
+    it(`Should not return safe buffer from ${unsafeMethod}`, () => {
+      const alteredBuffer = (buffer as unknown as Methods)[name].apply(buffer, args);
+      assertNotPredicate(alteredBuffer, isHtmlSafe);
+    });
+
+    it(`Should not return safe buffer from ${unsafeMethod}!`, () => {
+      (buffer as unknown as Methods)[`${name}Bang`].apply(buffer, args);
+      assertNotPredicate(buffer, isHtmlSafe);
+    });
+  }
 
   it("can assign value into zero-index", () => {
     const buffer = new SafeBuffer("012345");

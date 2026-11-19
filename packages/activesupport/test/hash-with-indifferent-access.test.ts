@@ -364,6 +364,24 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(dup.get("a")).toBe(1);
   });
 
+  it("symbolize keys for hash with indifferent access", () => {
+    assertInstanceOf(Hash, wia(symbols()).symbolizeKeys());
+    expect(wia(symbols()).symbolizeKeys()).toEqual(symbols());
+    expect(wia(strings()).symbolizeKeys()).toEqual(symbols());
+    expect(wia(mixed()).symbolizeKeys()).toEqual(symbols());
+  });
+
+  it("lookup returns the same object that is stored in hash indifferent access", () => {
+    const hash = new HashWithIndifferentAccess<number[]>((h, k) => {
+      const value: number[] = [];
+      h.set(k, value);
+      return value;
+    });
+    hash.get(":a")!.push(1);
+
+    expect(hash.get(":a")).toEqual([1]);
+  });
+
   it("to options for hash with indifferent access", () => {
     assertInstanceOf(Hash, wia(symbols()).toOptions());
     expect(wia(symbols()).toOptions()).toEqual(symbols());

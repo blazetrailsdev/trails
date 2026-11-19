@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Time } from "@blazetrails/date";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, RuntimeError } from "@blazetrails/ruby-compat";
 import { Notifications } from "../lib/notifications.js";
 import { Fanout, type Evented } from "../lib/notifications/fanout.js";
 import { travelTo, travelBack } from "../lib/testing/time-helpers.js";
@@ -504,6 +504,54 @@ describe("InstrumentationTest", () => {
     expect(evs.length).toBe(1);
     expect(evs[0].name).toBe("awesome");
     expect(evs[0].payload).toEqual({ result: 2 });
+  });
+
+  it("instrumenter exposes its id", () => {
+    expect(Notifications.instrumenter.id.length).toBe(20);
+  });
+
+  it("nested events can be instrumented", () => {
+    const event = (args: unknown[]) => new Event(...(args as ConstructorParameters<typeof Event>));
+    Notifications.instrument("awesome", { payload: "notifications" }, () => {
+      Notifications.instrument("wot", { payload: "child" }, () => 1 + 1);
+
+      expect(events.length).toBe(1);
+      expect(event(events[0]).name).toBe("wot");
+      expect(event(events[0]).payload).toEqual({ payload: "child" });
+    });
+
+    expect(events.length).toBe(2);
+    expect(event(events.at(-1)!).name).toBe("awesome");
+    expect(event(events.at(-1)!).payload).toEqual({ payload: "notifications" });
+  });
+
+  it("instrument publishes when exception is raised", () => {
+    const event = (args: unknown[]) => new Event(...(args as ConstructorParameters<typeof Event>));
+    let e: unknown;
+    try {
+      Notifications.instrument("awesome", { payload: "notifications" }, () => {
+        throw new RuntimeError("FAIL");
+      });
+    } catch (error) {
+      e = error;
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect((e as Error).message).toBe("FAIL");
+    }
+
+    expect(events.length).toBe(1);
+    expect(event(events.at(-1)!).payload).toEqual({
+      payload: "notifications",
+      exception: ["RuntimeError", "FAIL"],
+      exception_object: e,
+    });
+  });
+
+  it("event is pushed even without block", () => {
+    const event = (args: unknown[]) => new Event(...(args as ConstructorParameters<typeof Event>));
+    Notifications.instrument("awesome", { payload: "notifications" });
+    expect(events.length).toBe(1);
+    expect(event(events.at(-1)!).name).toBe("awesome");
+    expect(event(events.at(-1)!).payload).toEqual({ payload: "notifications" });
   });
 });
 

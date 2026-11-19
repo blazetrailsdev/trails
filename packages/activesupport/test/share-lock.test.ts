@@ -504,46 +504,46 @@ describe("ShareLockTest", () => {
       });
     }
   });
-});
 
-describe("CustomAssertionsTest", () => {
-  let latch: InstanceType<typeof Concurrent.CountDownLatch>;
-  let thread: Thread;
+  describe("CustomAssertionsTest", () => {
+    let latch: InstanceType<typeof Concurrent.CountDownLatch>;
+    let thread: Thread;
 
-  beforeEach(() => {
-    latch = new Concurrent.CountDownLatch();
-    thread = new Thread(() => latch.wait());
-  });
+    beforeEach(() => {
+      latch = new Concurrent.CountDownLatch();
+      thread = new Thread(() => latch.wait());
+    });
 
-  afterEach(async () => {
-    latch.countDown();
-    await thread.join();
-  });
+    afterEach(async () => {
+      latch.countDown();
+      await thread.join();
+    });
 
-  it("happy path", async () => {
-    await assertThreadsStuckButReleasableByLatch(thread, latch);
-  });
+    it("happy path", async () => {
+      await assertThreadsStuckButReleasableByLatch(thread, latch);
+    });
 
-  it("detects stuck thread", async () => {
-    await assertRaises([Assertion], {}, () => assertThreadsNotStuck(thread));
-  });
+    it("detects stuck thread", async () => {
+      await assertRaises([Assertion], {}, () => assertThreadsNotStuck(thread));
+    });
 
-  it("detects free thread", async () => {
-    latch.countDown();
-    await assertRaises([Assertion], {}, () => assertThreadsStuck(thread));
-  });
+    it("detects free thread", async () => {
+      latch.countDown();
+      await assertRaises([Assertion], {}, () => assertThreadsStuck(thread));
+    });
 
-  it("detects already released", async () => {
-    latch.countDown();
-    await assertRaises([Assertion], {}, () =>
-      assertThreadsStuckButReleasableByLatch(thread, latch),
-    );
-  });
+    it("detects already released", async () => {
+      latch.countDown();
+      await assertRaises([Assertion], {}, () =>
+        assertThreadsStuckButReleasableByLatch(thread, latch),
+      );
+    });
 
-  it("detects remains latched", async () => {
-    const anotherLatch = new Concurrent.CountDownLatch();
-    await assertRaises([Assertion], {}, () =>
-      assertThreadsStuckButReleasableByLatch(thread, anotherLatch),
-    );
+    it("detects remains latched", async () => {
+      const anotherLatch = new Concurrent.CountDownLatch();
+      await assertRaises([Assertion], {}, () =>
+        assertThreadsStuckButReleasableByLatch(thread, anotherLatch),
+      );
+    });
   });
 });

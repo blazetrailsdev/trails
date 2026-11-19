@@ -39,6 +39,17 @@ import {
   runSafeConstantizeTestsOn,
 } from "../lib/constantize-test-cases.js";
 
+const Irregularities: Record<string, string> = {
+  person: "people",
+  man: "men",
+  child: "children",
+  sex: "sexes",
+  move: "moves",
+  cow: "kine",
+  zombie: "zombies",
+  genus: "genera",
+};
+
 const SingularToPlural: Record<string, string> = {
   search: "searches",
   switch: "switches",
@@ -904,6 +915,46 @@ describe("InflectorTest", () => {
     });
   }
 
+  for (const inflectionType of ["plurals", "singulars", "uncountables", "humans"] as const) {
+    it(`clear ${inflectionType}`, () => {
+      withInflections((inflect) => {
+        inflect.clear(inflectionType);
+        assert(
+          [...inflect[inflectionType]].length === 0,
+          `${inflectionType} inflections should be empty after clear :${inflectionType}`,
+        );
+      });
+    });
+  }
+
+  for (const [singular, plural] of Object.entries(Irregularities)) {
+    it(`irregularity between ${singular} and ${plural}`, () => {
+      withInflections((inflect) => {
+        inflect.irregular(singular, plural);
+        expect(singularize(plural)).toBe(singular);
+        expect(pluralize(singular)).toBe(plural);
+      });
+    });
+  }
+
+  for (const [singular, plural] of Object.entries(Irregularities)) {
+    it(`pluralize of irregularity ${plural} should be the same`, () => {
+      withInflections((inflect) => {
+        inflect.irregular(singular, plural);
+        expect(pluralize(plural)).toBe(plural);
+      });
+    });
+  }
+
+  for (const [singular, plural] of Object.entries(Irregularities)) {
+    it(`singularize of irregularity ${singular} should be the same`, () => {
+      withInflections((inflect) => {
+        inflect.irregular(singular, plural);
+        expect(singularize(singular)).toBe(singular);
+      });
+    });
+  }
+
   it("clear inflections with acronyms", () => {
     withInflections((inflect) => {
       inflect.clear("acronyms");
@@ -920,26 +971,26 @@ describe("InflectorTest", () => {
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
   for (const [singular, plural] of Object.entries(SingularToPlural)) {
-    it(`pluralize singular ${singular}`, () => {
+    it(`pluralize singular ${singular.replaceAll("_", " ")}`, () => {
       expect(pluralize(singular)).toBe(plural);
       expect(pluralize(capitalize(singular))).toBe(capitalize(plural));
     });
   }
 
   for (const [singular, plural] of Object.entries(SingularToPlural)) {
-    it(`singularize plural ${plural}`, () => {
+    it(`singularize plural ${plural.replaceAll("_", " ")}`, () => {
       expect(singularize(plural)).toBe(singular);
       expect(singularize(capitalize(plural))).toBe(capitalize(singular));
     });
   }
 
   for (const [singular, plural] of Object.entries(SingularToPlural)) {
-    it(`pluralize plural ${plural}`, () => {
+    it(`pluralize plural ${plural.replaceAll("_", " ")}`, () => {
       expect(pluralize(plural)).toBe(plural);
       expect(pluralize(capitalize(plural))).toBe(capitalize(plural));
     });
 
-    it(`singularize singular ${singular}`, () => {
+    it(`singularize singular ${singular.replaceAll("_", " ")}`, () => {
       expect(singularize(singular)).toBe(singular);
       expect(singularize(capitalize(singular))).toBe(capitalize(singular));
     });

@@ -1,9 +1,12 @@
 import {
+  camelized,
   IndexError,
   NoMethodError,
   Range,
   rbBlockGivenP,
   rbObjClassname,
+  rbStrRespondTo,
+  rbStrSend,
   rbStrSub,
   rbStrSubBang,
   strGsub,
@@ -414,6 +417,31 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
 
   private stringIntoSafeBuffer(newString: string, isHtmlSafe: boolean): SafeBuffer {
     return new SafeBuffer(newString, isHtmlSafe);
+  }
+}
+
+for (const unsafeMethod of SafeBuffer.UNSAFE_STRING_METHODS) {
+  const name = camelized(unsafeMethod);
+  if (rbStrRespondTo(unsafeMethod, name)) {
+    globalThis.Object.defineProperties(SafeBuffer.prototype, {
+      [name]: {
+        value(this: SafeBuffer, ...args: unknown[]): unknown {
+          return rbStrSend(this.toStr(), name, ...args)[0];
+        },
+        writable: true,
+        configurable: true,
+      },
+      [`${name}Bang`]: {
+        value(this: { _htmlSafe: boolean; _value: string }, ...args: unknown[]): unknown {
+          this._htmlSafe = false;
+          const [result, string] = rbStrSend(this._value, `${name}Bang`, ...args);
+          this._value = string;
+          return result == null ? null : this;
+        },
+        writable: true,
+        configurable: true,
+      },
+    });
   }
 }
 

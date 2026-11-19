@@ -90,8 +90,18 @@ class ExpandedPayment {
 }
 
 describe("EnumerableTests", () => {
+  it("minimum", () => {
+    const payments = new GenericEnumerable([new Payment(5), new Payment(15), new Payment(10)]);
+    expect(minimum(payments, (p) => p.price)).toBe(5);
+  });
+
   it("minimum with empty enumerable", () => {
     expect(minimum([], () => 0)).toBeNull();
+  });
+
+  it("maximum", () => {
+    const payments = new GenericEnumerable([new Payment(5), new Payment(15), new Payment(10)]);
+    expect(maximum(payments, (p) => p.price)).toBe(15);
   });
 
   it("maximum with empty enumerable", () => {
@@ -373,7 +383,7 @@ describe("EnumerableTests", () => {
   });
 
   it("pick", () => {
-    const payments = [new Payment(5), new Payment(15), new Payment(10)];
+    const payments = new GenericEnumerable([new Payment(5), new Payment(15), new Payment(10)]);
     expect(pick(payments, "price")).toBe(5);
 
     const expanded = [
@@ -412,6 +422,14 @@ describe("EnumerableTests", () => {
     const items = [{ id: 3 }, { id: 1 }, { id: 2 }];
     const result = inOrderOf(items, (x) => x.id, [1, 2, 3]);
     expect(result.map((x) => x.id)).toEqual([1, 2, 3]);
+  });
+
+  it("in order of ignores missing series", () => {
+    const values = [new Payment(5), new Payment(1), new Payment(3)];
+    assertEqual(
+      [new Payment(1), new Payment(5), new Payment(3)],
+      inOrderOf(values, (p) => p.price, [1, 2, 4, 5, 3]),
+    );
   });
 
   it("in order of drops elements not named in series", () => {
