@@ -1934,6 +1934,15 @@ describe("TimeExtCalculationsTest", () => {
     expect(new TimeWithZone(RubyTime.utc(2000), utcZone) instanceof Sub).toEqual(false);
   });
 
+  it("all day", () => {
+    expect(RubyTime.local(2011, 6, 7, 10, 10, 10).allDay()).toEqual(
+      new Range(
+        RubyTime.local(2011, 6, 7, 0, 0, 0),
+        RubyTime.local(2011, 6, 7, 23, 59, 59, new Rational(999999999, 1000)),
+      ),
+    );
+  });
+
   it("all day with timezone", () => {
     const beginningOfDay = new TimeWithZone(
       null,
@@ -1961,6 +1970,48 @@ describe("TimeExtCalculationsTest", () => {
         ) as TimeWithZone & { allDay(): Range<TimeWithZone> }
       ).allDay().end,
     ).toEqual(endOfDay);
+  });
+
+  it("all week", () => {
+    expect(RubyTime.local(2011, 6, 7, 10, 10, 10).allWeek()).toEqual(
+      new Range(
+        RubyTime.local(2011, 6, 6, 0, 0, 0),
+        RubyTime.local(2011, 6, 12, 23, 59, 59, new Rational(999999999, 1000)),
+      ),
+    );
+    expect(RubyTime.local(2011, 6, 7, 10, 10, 10).allWeek(":sunday")).toEqual(
+      new Range(
+        RubyTime.local(2011, 6, 5, 0, 0, 0),
+        RubyTime.local(2011, 6, 11, 23, 59, 59, new Rational(999999999, 1000)),
+      ),
+    );
+  });
+
+  it("all month", () => {
+    expect(RubyTime.local(2011, 6, 7, 10, 10, 10).allMonth()).toEqual(
+      new Range(
+        RubyTime.local(2011, 6, 1, 0, 0, 0),
+        RubyTime.local(2011, 6, 30, 23, 59, 59, new Rational(999999999, 1000)),
+      ),
+    );
+  });
+
+  it("all quarter", () => {
+    expect(RubyTime.local(2011, 6, 7, 10, 10, 10).allQuarter()).toEqual(
+      new Range(
+        RubyTime.local(2011, 4, 1, 0, 0, 0),
+        RubyTime.local(2011, 6, 30, 23, 59, 59, new Rational(999999999, 1000)),
+      ),
+    );
+  });
+
+  it("all year", () => {
+    expect(RubyTime.local(2011, 6, 7, 10, 10, 10).allYear()).toEqual(
+      new Range(
+        RubyTime.local(2011, 1, 1, 0, 0, 0),
+        RubyTime.local(2011, 12, 31, 23, 59, 59, new Rational(999999999, 1000)),
+      ),
+    );
   });
 
   it("rfc3339 parse", async () => {

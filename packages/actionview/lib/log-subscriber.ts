@@ -4,7 +4,7 @@ import {
   NotificationEvent as Event,
   trailsRoot as appTrailsRoot,
 } from "@blazetrails/activesupport";
-import type { Logger, Subscriber } from "@blazetrails/activesupport";
+import type { Logger } from "@blazetrails/activesupport";
 import { round } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
@@ -159,7 +159,7 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     this.subscribeLogLevel("render_collection", "debug");
   }
 
-  static override attachTo(...args: Parameters<typeof BaseLogSubscriber.attachTo>): Subscriber {
+  static override attachTo(...args: Parameters<typeof BaseLogSubscriber.attachTo>): string[] {
     Notifications.subscribe("render_template.action_view", new Start());
     Notifications.subscribe("render_layout.action_view", new Start());
 

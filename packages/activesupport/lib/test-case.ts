@@ -24,6 +24,18 @@ import {
   assertNoDifference,
   assertChanges,
   assertNoChanges,
+  assertNotEmpty,
+  assertNotEqual,
+  assertNotInDelta,
+  assertNotInEpsilon,
+  assertNotInstanceOf,
+  assertNotKindOf,
+  assertNoMatch,
+  assertNotNil,
+  assertNotOperator,
+  assertNotPredicate,
+  assertNotRespondTo,
+  assertNotSame,
 } from "./testing/assertions.js";
 import { ErrorReporterAssertions } from "./testing/error-reporter-assertions.js";
 import { stubConst } from "./testing/constant-stubbing.js";
@@ -45,7 +57,13 @@ import "./executor/test-helper.js";
 import "./current-attributes/test-helper.js";
 import "./execution-context/test-helper.js";
 import { include, type Extended } from "@blazetrails/ruby-compat/include";
-import { prepend } from "@blazetrails/ruby-compat";
+import {
+  prepend,
+  rbAnyToS,
+  rbModMethodDefined,
+  rbModToS,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 
 export class TestCase extends Minitest.Test {
   declare static fileFixturePath: string | Pathname | null;
@@ -71,6 +89,23 @@ export class TestCase extends Minitest.Test {
     return activeSupportTestOrder()!;
   }
 
+  static test(name: string, block?: (this: TestCase) => unknown): void {
+    const testName = `test_${name.replace(/\s+/g, "_")}`;
+    const defined = rbModMethodDefined(this, testName);
+    if (defined) throw new RuntimeError(`${testName} is already defined in ${rbModToS(this)}`);
+    if (block) {
+      Reflect.set(this.prototype, testName, block);
+    } else {
+      Reflect.set(this.prototype, testName, function (this: TestCase) {
+        this.assert(false, `No implementation provided for ${name}`);
+      });
+    }
+  }
+
+  inspect(): string {
+    return rbAnyToS(this);
+  }
+
   static setTaggedLogger = setTaggedLogger;
   /** @internal */
   static taggedLogger = taggedLogger;
@@ -84,6 +119,19 @@ export class TestCase extends Minitest.Test {
   static assertNoDifference = assertNoDifference;
   static assertChanges = assertChanges;
   static assertNoChanges = assertNoChanges;
+
+  static assertNotEmpty = assertNotEmpty;
+  static assertNotEqual = assertNotEqual;
+  static assertNotInDelta = assertNotInDelta;
+  static assertNotInEpsilon = assertNotInEpsilon;
+  static assertNotInstanceOf = assertNotInstanceOf;
+  static assertNotKindOf = assertNotKindOf;
+  static assertNoMatch = assertNoMatch;
+  static assertNotNil = assertNotNil;
+  static assertNotOperator = assertNotOperator;
+  static assertNotPredicate = assertNotPredicate;
+  static assertNotRespondTo = assertNotRespondTo;
+  static assertNotSame = assertNotSame;
 
   static assertDeprecated = assertDeprecated;
   static assertNotDeprecated = assertNotDeprecated;

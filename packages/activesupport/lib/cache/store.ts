@@ -447,7 +447,7 @@ export abstract class Store {
     options?: StoreOptions,
     block?: (payload: EventPayload) => T,
   ): T {
-    return this._instrument(operation, false, options, { key }, block);
+    return this._instrument(operation, { options, key }, block);
   }
 
   protected instrumentMulti<T>(
@@ -456,14 +456,16 @@ export abstract class Store {
     options?: StoreOptions,
     block?: (payload: EventPayload) => T,
   ): T {
-    return this._instrument(operation, true, options, { key: keys }, block);
+    return this._instrument(operation, { multi: true, options, key: keys }, block);
   }
 
   private _instrument<T>(
     operation: string,
-    multi: boolean,
-    options: StoreOptions | undefined,
-    payload: EventPayload,
+    {
+      multi = false,
+      options = null,
+      ...payload
+    }: { multi?: boolean; options?: StoreOptions | null } & EventPayload = {},
     block?: (payload: EventPayload) => T,
   ): T {
     if (this.logger && this.logger["debug?"] && !this.silence) {

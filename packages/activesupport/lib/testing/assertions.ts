@@ -1114,6 +1114,61 @@ export function assertNoMatch(
   return refuteMatch(matcher, obj, msg);
 }
 
+function refuteInDelta(
+  exp: number,
+  act: number,
+  delta: number = 0.001,
+  msg: string | (() => string) | null = null,
+): true {
+  const n = Math.abs(exp - act);
+  msg = message(msg, null, () => `Expected |${exp} - ${act}| (${n}) to not be <= ${delta}`);
+  return refute(delta >= n, msg);
+}
+
+export const assertNotInDelta = refuteInDelta;
+
+function refuteInEpsilon(
+  exp: number,
+  act: number,
+  epsilon: number = 0.001,
+  msg: string | (() => string) | null = null,
+): true {
+  return refuteInDelta(exp, act, Math.min(Math.abs(exp), Math.abs(act)) * epsilon, msg);
+}
+
+export const assertNotInEpsilon = refuteInEpsilon;
+
+function refuteInstanceOf(
+  cls: abstract new (...args: never) => unknown,
+  obj: unknown,
+  msg: string | (() => string) | null = null,
+): true {
+  msg = message(
+    msg,
+    null,
+    () => `Expected ${inspect(obj)} to not be an instance of ${rbModToS(cls)}`,
+  );
+  return refute(rbObjClass(obj) === cls, msg);
+}
+
+export const assertNotInstanceOf = refuteInstanceOf;
+
+function refuteOperator(
+  o1: unknown,
+  op: string,
+  o2?: unknown,
+  msg: string | (() => string) | null = null,
+): true {
+  if (o2 === undefined) {
+    msg = message(msg, null, () => `Expected ${inspect(o1)} to not be ${op}`);
+    return refute(rbFSend(o1, op), msg);
+  }
+  msg = message(msg, null, () => `Expected ${inspect(o1)} to not be ${op} ${inspect(o2)}`);
+  return refute(rbFSend(o1, op, o2), msg);
+}
+
+export const assertNotOperator = refuteOperator;
+
 function caseEqual(expected: unknown, actual: unknown): boolean {
   if (expected instanceof RegExp) return typeof actual === "string" && expected.test(actual);
   if (typeof expected === "function") return actual instanceof (expected as new () => unknown);

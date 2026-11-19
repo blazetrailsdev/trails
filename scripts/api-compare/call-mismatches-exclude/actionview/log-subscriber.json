@@ -1,0 +1,47 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "log-subscriber.ts",
+    "rubyName": "render_collection",
+    "call": "debug",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Rails' `info do ... end` / `debug do ... end` passes no progname; the port passes `undefined` for the skipped positional before its block. Convergence: activesupport-log-subscriber-level-helpers-block-in-progname-slot"
+  },
+  {
+    "package": "actionview",
+    "tsFile": "log-subscriber.ts",
+    "rubyName": "render_layout",
+    "call": "info",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Rails' `info do ... end` / `debug do ... end` passes no progname; the port passes `undefined` for the skipped positional before its block. Convergence: activesupport-log-subscriber-level-helpers-block-in-progname-slot"
+  },
+  {
+    "package": "actionview",
+    "tsFile": "log-subscriber.ts",
+    "rubyName": "render_partial",
+    "call": "debug",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Rails' `info do ... end` / `debug do ... end` passes no progname; the port passes `undefined` for the skipped positional before its block. Convergence: activesupport-log-subscriber-level-helpers-block-in-progname-slot"
+  },
+  {
+    "package": "actionview",
+    "tsFile": "log-subscriber.ts",
+    "rubyName": "render_template",
+    "call": "info",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Rails' `info do ... end` / `debug do ... end` passes no progname; the port passes `undefined` for the skipped positional before its block. Convergence: activesupport-log-subscriber-level-helpers-block-in-progname-slot"
+  },
+  {
+    "package": "actionview",
+    "tsFile": "log-subscriber.ts",
+    "rubyName": "start",
+    "call": "debug",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Rails' `info do ... end` / `debug do ... end` passes no progname; the port passes `undefined` for the skipped positional before its block. Convergence: activesupport-log-subscriber-level-helpers-block-in-progname-slot"
+  }
+]

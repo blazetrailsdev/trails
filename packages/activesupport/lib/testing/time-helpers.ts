@@ -8,15 +8,10 @@ import { midnight } from "../core-ext/date/calculations.js";
 import { change } from "../time-ext.js";
 import { plusWithDuration } from "../core-ext/time/calculations.js";
 import { toTime } from "../core-ext/date-time/compatibility.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty, Struct } from "@blazetrails/ruby-compat";
 
-class Stub {
-  constructor(
-    readonly object: object,
-    readonly methodName: string,
-    readonly originalMethod: unknown,
-  ) {}
-}
+const Stub = Struct.new("object", "methodName", "originalMethod");
+type Stub = InstanceType<typeof Stub>;
 
 export class SimpleStubs {
   private stubs: Map<object, Map<string, Stub>>;
@@ -63,7 +58,7 @@ export class SimpleStubs {
   }
 
   private unstubObject(stub: Stub): void {
-    (stub.object as Record<string, unknown>)[stub.methodName] = stub.originalMethod;
+    (stub.object as Record<string, unknown>)[stub.methodName as string] = stub.originalMethod;
   }
 }
 
