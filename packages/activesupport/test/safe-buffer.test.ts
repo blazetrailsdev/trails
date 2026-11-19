@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, camelized } from "@blazetrails/ruby-compat";
 import { titleize, underscore } from "../lib/inflector.js";
 import { SafeBuffer, htmlSafe, isHtmlSafe } from "../lib/core-ext/string/output-safety.js";
 import { htmlEscape } from "../lib/core-ext/tse/util.js";
@@ -94,7 +94,7 @@ describe("SafeBufferTest", () => {
     unicode_normalize: null,
     upcase: null,
   })) {
-    const name = unsafeMethod.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
+    const name = camelized(unsafeMethod);
     const args = dummyArgs === null ? [] : [dummyArgs].flat();
 
     it(`Should not return safe buffer from ${unsafeMethod}`, () => {

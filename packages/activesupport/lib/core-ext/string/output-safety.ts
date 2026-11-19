@@ -1,4 +1,5 @@
 import {
+  camelized,
   IndexError,
   NoMethodError,
   Range,
@@ -420,7 +421,7 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
 }
 
 for (const unsafeMethod of SafeBuffer.UNSAFE_STRING_METHODS) {
-  const name = unsafeMethod.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
+  const name = camelized(unsafeMethod);
   if (rbStrRespondTo(unsafeMethod, name)) {
     globalThis.Object.defineProperties(SafeBuffer.prototype, {
       [name]: {
