@@ -105,8 +105,7 @@ export class LazyRouteSet extends RouteSet {
             return Reflect.get(target, name, receiver);
           }
           if (!receiver.respondToMissing(name)) return undefined;
-          if (name in receiver) return (receiver as Record<string, unknown>)[name];
-          return (...args: unknown[]) => receiver.methodMissing(name, ...args);
+          return (receiver as Record<string, unknown>)[name];
         },
       }),
     );

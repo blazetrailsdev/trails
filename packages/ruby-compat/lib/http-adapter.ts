@@ -53,6 +53,8 @@ export interface HttpServer {
   on(event: "upgrade", listener: HttpUpgradeListener): unknown;
   on(event: "close", listener: () => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
+  once(event: "error", listener: (error: Error) => void): unknown;
+  off(event: "error", listener: (error: Error) => void): unknown;
 }
 
 /**

@@ -1214,6 +1214,9 @@ describe("Node.run listening", () => {
       const address = server.address();
       const port = address && typeof address === "object" ? address.port : 0;
       expect(write).toHaveBeenCalledWith(`* Listening on http://127.0.0.1:${port}\n`);
+      expect(
+        (server as unknown as { listenerCount(e: string): number }).listenerCount("error"),
+      ).toBe(0);
       write.mockClear();
       try {
         await expect(Node.run(app, { Port: port, Host: "127.0.0.1" })).rejects.toMatchObject({
