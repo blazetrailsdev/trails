@@ -1,5 +1,11 @@
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    NotificationComponent?: typeof NotificationComponent;
+  }
+}
 
 export class NotificationComponent {
   renderIn(
@@ -9,4 +15,4 @@ export class NotificationComponent {
     return htmlSafe(`<div class='notification'>${viewContext.capture(block)}</div>`);
   }
 }
-constSet(TopLevel, "NotificationComponent", NotificationComponent);
+TopLevel.NotificationComponent = NotificationComponent;

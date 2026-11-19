@@ -1,5 +1,11 @@
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    MessageComponent?: typeof MessageComponent;
+  }
+}
 
 export class MessageComponent {
   private text: unknown;
@@ -16,4 +22,4 @@ export class MessageComponent {
     return "html";
   }
 }
-constSet(TopLevel, "MessageComponent", MessageComponent);
+TopLevel.MessageComponent = MessageComponent;

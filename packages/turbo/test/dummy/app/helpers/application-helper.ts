@@ -1,4 +1,10 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    ApplicationHelper?: typeof ApplicationHelper;
+  }
+}
 
 export const ApplicationHelper = {};
-constSet(TopLevel, "ApplicationHelper", ApplicationHelper);
+TopLevel.ApplicationHelper = ApplicationHelper;

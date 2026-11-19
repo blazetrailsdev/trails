@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { TestCase } from "@blazetrails/actionview/test-case.js";
 import "../test-helper.js";
 import { StreamsChannel } from "../../lib/app/channels/turbo/streams-channel.js";
@@ -11,8 +11,14 @@ import { Message } from "../dummy/app/models/message.js";
 import { ModelName } from "@blazetrails/activemodel";
 import { Turbo } from "../../lib/turbo-trails.js";
 
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    TestChannel?: typeof TestChannel;
+  }
+}
+
 class TestChannel extends Channel {}
-constSet(TopLevel, "TestChannel", TestChannel);
+TopLevel.TestChannel = TestChannel;
 
 type Tc = Record<string, any>;
 

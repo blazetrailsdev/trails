@@ -1,5 +1,11 @@
 import { Model } from "@blazetrails/activemodel";
-import { constSet, rbModAttrReader, rbModAttrWriter, TopLevel } from "@blazetrails/ruby-compat";
+import { rbModAttrReader, rbModAttrWriter, TopLevel } from "@blazetrails/ruby-compat";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Company?: typeof Company;
+  }
+}
 
 export class Company extends Model {
   declare id: unknown;
@@ -14,4 +20,4 @@ export class Company extends Model {
     return "companies/company";
   }
 }
-constSet(TopLevel, "Company", Company);
+TopLevel.Company = Company;

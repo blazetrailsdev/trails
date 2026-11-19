@@ -1,6 +1,12 @@
 import { delegate } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationRecord } from "./application-record.js";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Message?: typeof Message;
+  }
+}
 
 export class Message extends ApplicationRecord {
   declare content: string | null;
@@ -9,4 +15,4 @@ export class Message extends ApplicationRecord {
     delegate.call(this.prototype, "toString", { to: "content", allowNil: true });
   }
 }
-constSet(TopLevel, "Message", Message);
+TopLevel.Message = Message;

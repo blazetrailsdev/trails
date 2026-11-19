@@ -1,15 +1,15 @@
 import { Model } from "@blazetrails/activemodel";
-import {
-  constSet,
-  include,
-  rbModAttrReader,
-  rbModAttrWriter,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { include, rbModAttrReader, rbModAttrWriter, TopLevel } from "@blazetrails/ruby-compat";
 import { Broadcastable } from "../../../../../lib/app/models/concerns/turbo/broadcastable.js";
 
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Users?: typeof Users;
+  }
+}
+
 export const Users: Record<string, unknown> = {};
-constSet(TopLevel, "Users", Users);
+TopLevel.Users = Users;
 
 export class Profile extends Model {
   declare id: unknown;
@@ -30,4 +30,4 @@ export class Profile extends Model {
     return "users/profiles/profile";
   }
 }
-constSet(Users, "Profile", Profile);
+Users.Profile = Profile;

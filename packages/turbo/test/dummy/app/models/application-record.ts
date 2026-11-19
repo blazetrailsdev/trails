@@ -1,5 +1,11 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "@blazetrails/activerecord";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    ApplicationRecord?: typeof ApplicationRecord;
+  }
+}
 
 export class ApplicationRecord extends Base {
   declare static broadcastsTo: (stream: unknown, options?: Record<string, unknown>) => void;
@@ -11,4 +17,4 @@ export class ApplicationRecord extends Base {
     this.primaryAbstractClass();
   }
 }
-constSet(TopLevel, "ApplicationRecord", ApplicationRecord);
+TopLevel.ApplicationRecord = ApplicationRecord;
