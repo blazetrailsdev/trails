@@ -23,7 +23,14 @@ import { toTime as dateToTime } from "../../lib/core-ext/date/conversions.js";
 import { current } from "../../lib/time-ext.js";
 import "../../lib/core-ext/time/calculations.js";
 import { setPreserveTimezone } from "../../lib/core-ext/date-and-time/compatibility.js";
-import { Rational, rational, rbEqual, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  Rational,
+  rational,
+  rbEqual,
+  rbHash,
+  rbInspect,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { YAML, toYaml } from "@blazetrails/ruby-compat/yaml";
 import { assertDeprecated, assertNotDeprecated } from "../../lib/testing/deprecation.js";
 import { assertNotCalled } from "../../lib/testing/method-call-assertions.js";
@@ -1358,6 +1365,84 @@ twz: !ruby/object:ActiveSupport::TimeWithZone
     expect(twz.beginningOfMonth().inspect()).toEqual("1999-12-01 00:00:00.000000000 EST -05:00");
   });
 
+  it("end of year", () => {
+    expect(twz.inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.endOfYear().inspect()).toEqual("1999-12-31 23:59:59.999999999 EST -05:00");
+  });
+
+  it("end of month", () => {
+    expect(twz.inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.endOfMonth().inspect()).toEqual("1999-12-31 23:59:59.999999999 EST -05:00");
+  });
+
+  it("beginning of day", () => {
+    expect(twz.inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.beginningOfDay().inspect()).toEqual("1999-12-31 00:00:00.000000000 EST -05:00");
+  });
+
+  it("end of day", () => {
+    expect(twz.inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+    expect(twz.endOfDay().inspect()).toEqual("1999-12-31 23:59:59.999999999 EST -05:00");
+  });
+
+  it("beginning of hour", () => {
+    const utc = RubyTime.utc(2000, 1, 1, 0, 30);
+    const twz = new TimeWithZone(utc, timeZone);
+    expect(twz.inspect()).toEqual("1999-12-31 19:30:00.000000000 EST -05:00");
+    expect(twz.beginningOfHour().inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+  });
+
+  it("end of hour", () => {
+    const utc = RubyTime.utc(2000, 1, 1, 0, 30);
+    const twz = new TimeWithZone(utc, timeZone);
+    expect(twz.inspect()).toEqual("1999-12-31 19:30:00.000000000 EST -05:00");
+    expect(twz.endOfHour().inspect()).toEqual("1999-12-31 19:59:59.999999999 EST -05:00");
+  });
+
+  it("beginning of minute", () => {
+    const utc = RubyTime.utc(2000, 1, 1, 0, 30, 10);
+    const twz = new TimeWithZone(utc, timeZone);
+    expect(twz.inspect()).toEqual("1999-12-31 19:30:10.000000000 EST -05:00");
+    expect(twz.beginningOfHour().inspect()).toEqual("1999-12-31 19:00:00.000000000 EST -05:00");
+  });
+
+  it("end of minute", () => {
+    const utc = RubyTime.utc(2000, 1, 1, 0, 30, 10);
+    const twz = new TimeWithZone(utc, timeZone);
+    expect(twz.inspect()).toEqual("1999-12-31 19:30:10.000000000 EST -05:00");
+    expect(twz.endOfMinute().inspect()).toEqual("1999-12-31 19:30:59.999999999 EST -05:00");
+  });
+
+  it("seconds since midnight", () => {
+    expect(twz.secondsSinceMidnight()).toEqual(19 * 60 * 60);
+  });
+
+  it("minus with datetime", () => {
+    expect(
+      new TimeWithZone(RubyTime.utc(2000, 1, 2), TimeZone.find("UTC")!).minus(
+        DateTime.civil(2000, 1, 1),
+      ),
+    ).toEqual(86_400.0);
+  });
+
+  it("to datetime", () => {
+    expect(twz.toDatetime()).toEqual(
+      DateTime.civil(1999, 12, 31, 19, 0, 0, new Rational(-18_000, 86_400)),
+    );
+  });
+
+  it("acts like date", () => {
+    expect(actsLike.call(twz, "date")).toBe(false);
+    expect(actsLike.call(new TimeWithZone(DateTime.civil(2000), timeZone), "date")).toBe(false);
+  });
+
+  it("hash", () => {
+    expect(twz.hash()).toEqual(rbHash(RubyTime.utc(2000)));
+    expect(new TimeWithZone(RubyTime.utc(2000), TimeZone.find("Hawaii")!).hash()).toEqual(
+      rbHash(RubyTime.utc(2000)),
+    );
+  });
+
   it("in", () => {
     const twz = maketwz();
     expect(twz.in(1).inspect()).toBe("1999-12-31 19:00:01.000000000 EST -05:00");
@@ -1585,6 +1670,13 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   const t = RubyTime.utc(2000);
   const dt = DateTime.civil(2000);
+
+  it("localtime", () => {
+    setZone(TimeZone.find("Eastern Time (US & Canada)"));
+    expect((inTimeZone.call(dt) as TimeWithZone).localtime()).toEqual(
+      (inTimeZone.call(dt) as TimeWithZone).utc().toTime().getlocal(),
+    );
+  });
 
   it("in time zone", () => {
     useZone("Alaska", () => {

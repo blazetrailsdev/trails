@@ -1,8 +1,10 @@
 import { describe, it } from "vitest";
 import { localCacheBehavior } from "../behaviors/local-cache-behavior.js";
+import { connectionPoolBehavior } from "../behaviors/connection-pool-behavior.js";
 
 describe("MemCacheStoreTest", () => {
   localCacheBehavior();
+  connectionPoolBehavior();
 
   it.skip("validate pool arguments");
   it.skip("instantiating the store doesn't connect to Memcache");

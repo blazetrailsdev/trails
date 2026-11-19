@@ -569,7 +569,7 @@ class TestExtractor
   # owns the cases and its TS twin ports them. Enrolled by module name, as
   # `LIB_TEST_MODULES` is. activesupport's `ConnectionPoolBehavior` has no TS
   # twin yet and stays unenrolled.
-  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest MessagePackSharedSerializerTests FileUpdateCheckerSharedTests CacheStoreBehavior CacheStoreVersionBehavior CacheStoreCoderBehavior CacheStoreCompressionBehavior CacheStoreFormatVersionBehavior CacheStoreSerializerBehavior CacheDeleteMatchedBehavior CacheIncrementDecrementBehavior CacheInstrumentationBehavior CacheLoggingBehavior EncodedKeyCacheBehavior FailureSafetyBehavior FailureRaisingBehavior LocalCacheBehavior].freeze
+  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest MessagePackSharedSerializerTests FileUpdateCheckerSharedTests CacheStoreBehavior CacheStoreVersionBehavior CacheStoreCoderBehavior CacheStoreCompressionBehavior CacheStoreFormatVersionBehavior CacheStoreSerializerBehavior CacheDeleteMatchedBehavior CacheIncrementDecrementBehavior CacheInstrumentationBehavior CacheLoggingBehavior ConnectionPoolBehavior EncodedKeyCacheBehavior FailureSafetyBehavior FailureRaisingBehavior LocalCacheBehavior].freeze
 
   def collect_required_modules(sexp, filepath)
     missing = @module_includes.keys.select do |name|

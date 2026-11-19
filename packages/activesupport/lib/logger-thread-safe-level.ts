@@ -1,4 +1,4 @@
-import { ArgumentError, Logger } from "@blazetrails/ruby-compat";
+import { ArgumentError, Logger, rbEnsure } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { NameError } from "./core-ext/name-error.js";
 import type { LogLevel } from "./logger.js";
@@ -50,19 +50,19 @@ export class LoggerThreadSafeLevel {
     }
   }
 
+  /** @inventedArm fork — PERMANENT */
   logAt<T>(level: number | LogLevel, fn: () => T): T {
-    const oldLocalLevel = this.localLevel;
-    this.localLevel = level;
-    let async = false;
-    try {
-      const result = fn();
-      if (typeof (result as PromiseLike<unknown> | null)?.then === "function") {
-        async = true;
-        return Promise.resolve(result).finally(() => (this.localLevel = oldLocalLevel)) as T;
-      }
-      return result;
-    } finally {
-      if (!async) this.localLevel = oldLocalLevel;
-    }
+    return IsolatedExecutionState.fork(this.localLevelKey, () => {
+      const oldLocalLevel = this.localLevel;
+      return rbEnsure(
+        () => {
+          this.localLevel = level;
+          return fn();
+        },
+        () => {
+          this.localLevel = oldLocalLevel;
+        },
+      );
+    });
   }
 }

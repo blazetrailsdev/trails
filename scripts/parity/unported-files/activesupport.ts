@@ -6,65 +6,29 @@
 import type { UnportedFile } from "./types.js";
 
 const SOLID_STACK_ONLY =
-  "trails targets the Solid stack (Solid Cache/Queue/Cable); memcached and Redis backends are deferred by owner ruling (2026-10-17).";
+  "PERMANENT: trails targets the Solid stack (Solid Cache/Queue/Cable); memcached and Redis backends are deferred by owner ruling (2026-10-17).";
 
 export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   {
     pattern: "i18n_railtie.rb",
     package: "activesupport",
-    reason:
-      "Rails boot lifecycle hook that wires I18n into the Railtie/Application init sequence. " +
-      "No JS equivalent — I18n is configured directly in user code.",
+    reason: "CONVERGEABLE activesupport-port-i18n-railtie",
   },
   // The activesupport `core_ext/*` tail with no trails counterpart (RFC 0072).
   {
-    pattern: "core_ext/module/attribute_accessors_per_thread.rb",
-    package: "activesupport",
-    reason: "Stores the value per `Thread.current`; JS has no thread-local storage.",
-  },
-  {
-    pattern: "core_ext/module/remove_method.rb",
-    package: "activesupport",
-    reason: "Method-table surgery to silence redefinition warnings; JS reassignment is silent.",
-  },
-  {
     pattern: "core_ext/kernel/singleton_class.rb",
     package: "activesupport",
-    reason:
-      "Ruby metaprogramming with no JS equivalent; trails assigns to the class object directly.",
+    reason: "CONVERGEABLE activesupport-port-kernel-singleton-class",
   },
   {
     pattern: "core_ext/pathname/existence.rb",
     package: "activesupport",
-    reason:
-      "Ruby's Pathname is not ported (trails paths are strings) and the check is async in JS.",
+    reason: "CONVERGEABLE activesupport-port-pathname-existence",
   },
   {
     pattern: "core_ext/regexp.rb",
     package: "activesupport",
-    reason: "Reads the `//m` bit out of Ruby's options bitmask; JS `RegExp` exposes `.multiline`.",
-  },
-  {
-    pattern: "core_ext/integer/multiple.rb",
-    package: "activesupport",
-    reason: "Pre-1.0: `Integer#multiple_of?` is unported and has no trails caller.",
-  },
-  {
-    pattern: "core_ext/module/deprecation.rb",
-    package: "activesupport",
-    reason:
-      "Pre-1.0: class-body sugar over `Deprecation#deprecate_methods`; trails calls the " +
-      "deprecator directly (`deprecation.ts#deprecateMethod`).",
-  },
-  {
-    pattern: "core_ext/object/with_options.rb",
-    package: "activesupport",
-    reason: "Pre-1.0: needs ActiveSupport::OptionMerger, not ported yet (RFC 0093).",
-  },
-  {
-    pattern: "core_ext/string/behavior.rb",
-    package: "activesupport",
-    reason: "Pre-1.0: one arm of `acts_like?`; trails ports the Time/Date arms only.",
+    reason: "CONVERGEABLE activesupport-port-core-ext-regexp",
   },
   // Out-of-closure activesupport families (RFC 0072). trails' scope for the
   // support gems is the `require "active_support/…"` closure of
@@ -91,39 +55,28 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason: SOLID_STACK_ONLY,
   },
   {
-    pattern: "cache/strategy/local_cache_middleware.rb",
-    testFile: "local_cache_middleware_test.rb",
-    package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
-  },
-  {
     pattern: "evented_file_update_checker.rb",
     testFile: "evented_file_update_checker_test.rb",
     package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+    reason: "CONVERGEABLE activesupport-port-evented-file-update-checker",
   },
   {
     pattern: "xml_mini/jdom.rb",
     testFile: "jdom_engine_test.rb",
     package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+    reason: "PERMANENT: JRuby-only; it drives Java's javax.xml DOM, which has no Node runtime.",
   },
   {
     pattern: "xml_mini/libxml.rb",
     testFile: "libxml_engine_test.rb",
     package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+    reason: "CONVERGEABLE activesupport-port-xml-mini-libxml-engines",
   },
   {
     pattern: "xml_mini/libxmlsax.rb",
     testFile: "libxmlsax_engine_test.rb",
     package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+    reason: "CONVERGEABLE activesupport-port-xml-mini-libxml-engines",
   },
   {
     pattern: "testing/parallelization.rb",
@@ -153,14 +106,12 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     pattern: "fork_tracker.rb",
     testFile: "fork_tracker_test.rb",
     package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+    reason: "CONVERGEABLE activesupport-port-fork-tracker",
   },
   {
     pattern: "/railtie.rb",
     package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+    reason: "CONVERGEABLE activesupport-port-railtie",
   },
 
   // ---------------------------------------------------------------------------

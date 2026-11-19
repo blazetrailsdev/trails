@@ -1,4 +1,5 @@
 import { describe, it } from "vitest";
+import { connectionPoolBehavior } from "../behaviors/connection-pool-behavior.js";
 
 describe("RedisCacheStoreCommonBehaviorTest", () => {
   it.skip("fetch multi uses redis mget");
@@ -46,6 +47,7 @@ describe("ClearTest", () => {
 });
 
 describe("ConnectionPoolBehaviorTest", () => {
+  connectionPoolBehavior();
   it.skip("pool options work");
   it.skip("connection pooling by default");
 });

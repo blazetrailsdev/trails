@@ -2,7 +2,7 @@
   {
     "pattern": "i18n_railtie.rb",
     "package": "activesupport",
-    "reason": "Rails boot lifecycle hook that wires I18n into the Railtie/Application init sequence. No JS equivalent — I18n is configured directly in user code."
+    "reason": "CONVERGEABLE activesupport-port-i18n-railtie"
   },
   {
     "pattern": "adapters/trilogy",
@@ -21,7 +21,7 @@
       "swapping shards and roles in a multi threaded environment",
       "swapping granular shards and roles in a multi threaded environment"
     ],
-    "reason": "GVL / Ruby Thread semantics — concurrent shard-swapping tests cannot translate to single-threaded Node.js."
+    "reason": "GVL / Ruby Thread semantics \u2014 concurrent shard-swapping tests cannot translate to single-threaded Node.js."
   },
   {
     "testFile": "query_cache_test.rb",
@@ -33,7 +33,7 @@
       "query cache is cleared for all thread when a connection is shared",
       "threads use the same connection"
     ],
-    "reason": "GVL / Ruby Thread + fork() semantics — per-thread / cross-process query-cache visibility cannot translate to single-threaded Node.js."
+    "reason": "GVL / Ruby Thread + fork() semantics \u2014 per-thread / cross-process query-cache visibility cannot translate to single-threaded Node.js."
   },
   {
     "testFile": "scoping/default_scoping_test.rb",
@@ -48,17 +48,17 @@
   {
     "testFile": "has_and_belongs_to_many_associations_test.rb",
     "tests": ["marshal dump"],
-    "reason": "Ruby Marshal binary serialization — no Node.js equivalent."
+    "reason": "Ruby Marshal binary serialization \u2014 no Node.js equivalent."
   },
   {
     "testFile": "belongs_to_associations_test.rb",
     "tests": ["belongs to proxy should not respond to private methods"],
-    "reason": "Probes Ruby method visibility: `private_method` must raise NoMethodError on a direct call but succeed via `send` (the via-send sibling IS ported). JS has no runtime-enforced private dispatch — a method is either callable or absent."
+    "reason": "Probes Ruby method visibility: `private_method` must raise NoMethodError on a direct call but succeed via `send` (the via-send sibling IS ported). JS has no runtime-enforced private dispatch \u2014 a method is either callable or absent."
   },
   {
     "testFile": "reaper_test.rb",
     "tests": ["connection pool starts reaper in fork"],
-    "reason": "GVL / Ruby fork() semantics — process forking has no Node.js equivalent."
+    "reason": "GVL / Ruby fork() semantics \u2014 process forking has no Node.js equivalent."
   },
   {
     "testFile": "connection_adapters/connection_handler_test.rb",
@@ -69,7 +69,7 @@
       "retrieve connection pool copies schema cache from ancestor pool",
       "pool from any process for uses most recent spec"
     ],
-    "reason": "Ruby fork() + Marshal — process forking and binary serialization have no Node.js equivalent."
+    "reason": "Ruby fork() + Marshal \u2014 process forking and binary serialization have no Node.js equivalent."
   },
   {
     "testFile": "cases/binary_test.rb",
@@ -131,7 +131,7 @@
     "package": "did-you-mean",
     "pattern": "spell_checkers/name_error_checkers/class_name_checker.rb",
     "testFile": "spell_checking/test_class_name_check.rb",
-    "reason": "Suggests constant/class names by walking Module#constants + ancestor scopes. Ruby-only — JS has no equivalent constant introspection."
+    "reason": "Suggests constant/class names by walking Module#constants + ancestor scopes. Ruby-only \u2014 JS has no equivalent constant introspection."
   },
   {
     "package": "did-you-mean",
@@ -159,15 +159,15 @@
   },
   {
     "testFile": "tree_spell/test_change_word.rb",
-    "reason": "tree_spell helper test — excluded transitively with tree_spell_checker.rb."
+    "reason": "tree_spell helper test \u2014 excluded transitively with tree_spell_checker.rb."
   },
   {
     "testFile": "tree_spell/test_explore.rb",
-    "reason": "tree_spell helper test — excluded transitively with tree_spell_checker.rb."
+    "reason": "tree_spell helper test \u2014 excluded transitively with tree_spell_checker.rb."
   },
   {
     "testFile": "tree_spell/test_human_typo.rb",
-    "reason": "tree_spell helper test — excluded transitively with tree_spell_checker.rb."
+    "reason": "tree_spell helper test \u2014 excluded transitively with tree_spell_checker.rb."
   },
   {
     "testFile": "test_ractor_compatibility.rb",
@@ -176,7 +176,7 @@
   {
     "testFile": "message_encryptor_test.rb",
     "tests": ["backwards compatibility decrypt previously encrypted messages without metadata"],
-    "reason": "Decrypts a ciphertext minted before message metadata existed (message_encryptor_test.rb:147-154). The plaintext is the Ruby Marshal payload `\\x04\\x08I\"\\x12Ruby on Rails\\x06:\\x06ET` — an ivar-wrapped Ruby String — so passing it requires a real Ruby Marshal wire reader. trails has no Ruby Marshal runtime: the `:marshal` serializer in messages/serializer-with-fallback.ts is a trails-native codec behind Rails' `\\x04\\x08` signature, matching the project-wide Marshal exclusion above (marshalling.rb / marshal_serialization_test.rb). Ruby-only wire format."
+    "reason": "Decrypts a ciphertext minted before message metadata existed (message_encryptor_test.rb:147-154). The plaintext is the Ruby Marshal payload `\\x04\\x08I\"\\x12Ruby on Rails\\x06:\\x06ET` \u2014 an ivar-wrapped Ruby String \u2014 so passing it requires a real Ruby Marshal wire reader. trails has no Ruby Marshal runtime: the `:marshal` serializer in messages/serializer-with-fallback.ts is a trails-native codec behind Rails' `\\x04\\x08` signature, matching the project-wide Marshal exclusion above (marshalling.rb / marshal_serialization_test.rb). Ruby-only wire format."
   },
   {
     "testFile": "transactions_test.rb",
@@ -210,51 +210,51 @@
   {
     "pattern": "tools.rb",
     "package": "activerecord-test-support",
-    "reason": "Rails' rake/minitest test-runner plumbing: prepends adapter globbing onto Rails::TestUnit::Runner and invokes it with ARGV. vitest fills that role in trails — no port intended."
+    "reason": "Rails' rake/minitest test-runner plumbing: prepends adapter globbing onto Rails::TestUnit::Runner and invokes it with ARGV. vitest fills that role in trails \u2014 no port intended."
   },
   {
     "pattern": "backend/cache.rb",
     "testFile": "backend/cache_test.rb",
     "package": "i18n",
-    "reason": "PERMANENT: its `_fetch` reads a cache store inside the lookup, and every ActiveSupport::Cache store read is async — CLAUDE.md § \"A translation lookup is synchronous; the load is an awaited step\". Opt-in mixin; no default configuration includes it."
+    "reason": "PERMANENT: its `_fetch` reads a cache store inside the lookup, and every ActiveSupport::Cache store read is async \u2014 CLAUDE.md \u00a7 \"A translation lookup is synchronous; the load is an awaited step\". Opt-in mixin; no default configuration includes it."
   },
   {
     "pattern": "backend/cache_file.rb",
     "testFile": "backend/cache_file_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin — caches parsed translation files on disk."
+    "reason": "Pre-1.0: optional backend mixin \u2014 caches parsed translation files on disk."
   },
   {
     "pattern": "backend/interpolation_compiler.rb",
     "testFile": "backend/interpolation_compiler_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin — compiles interpolations into Ruby procs via `eval`/`instance_eval`, which has no trails counterpart."
+    "reason": "Pre-1.0: optional backend mixin \u2014 compiles interpolations into Ruby procs via `eval`/`instance_eval`, which has no trails counterpart."
   },
   {
     "pattern": "backend/metadata.rb",
     "testFile": "backend/metadata_test.rb",
     "package": "i18n",
-    "reason": "PERMANENT: attaches lookup metadata onto the translated String's singleton class — CLAUDE.md \u00a7 \"Ruby Strings are JS string primitives (no mutable String carrier)\" and \u00a7 \"Core extensions are not installed on native prototypes\"."
+    "reason": "PERMANENT: attaches lookup metadata onto the translated String's singleton class \u2014 CLAUDE.md \u00a7 \"Ruby Strings are JS string primitives (no mutable String carrier)\" and \u00a7 \"Core extensions are not installed on native prototypes\"."
   },
   {
     "testFile": "api/all_features_test.rb",
     "package": "i18n",
-    "reason": "PERMANENT: includes I18n::Backend::Cache and Metadata — packages/i18n/CLAUDE.md \u00a7 \"A translation lookup is synchronous; the load is an awaited step\" and CLAUDE.md \u00a7 \"Ruby Strings are JS string primitives (no mutable String carrier)\"."
+    "reason": "PERMANENT: includes I18n::Backend::Cache and Metadata \u2014 packages/i18n/CLAUDE.md \u00a7 \"A translation lookup is synchronous; the load is an awaited step\" and CLAUDE.md \u00a7 \"Ruby Strings are JS string primitives (no mutable String carrier)\"."
   },
   {
     "testFile": "api/cascade_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`)."
+    "reason": "Pre-1.0: optional backend mixin \u2014 cascading key lookup (`foo.bar.baz` \u2192 `foo.baz`)."
   },
   {
     "testFile": "api/memoize_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin — memoizes lookups per locale."
+    "reason": "Pre-1.0: optional backend mixin \u2014 memoizes lookups per locale."
   },
   {
     "testFile": "api/pluralization_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data."
+    "reason": "Pre-1.0: optional backend mixin \u2014 pluralization via per-locale rule procs in the data."
   },
   {
     "testFile": "backend/transliterator_test.rb",
@@ -264,22 +264,22 @@
   {
     "pattern": "tests/",
     "package": "i18n",
-    "reason": "`lib/i18n/tests/*` are minitest mixins the gem ships so third-party backends can run its conformance suite. Test-support scaffolding, not library surface — trails' backend tests are vitest files instead."
+    "reason": "`lib/i18n/tests/*` are minitest mixins the gem ships so third-party backends can run its conformance suite. Test-support scaffolding, not library surface \u2014 trails' backend tests are vitest files instead."
   },
   {
     "pattern": "tests.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: the `I18n::Tests` namespace's autoload shim for the `tests/` conformance mixins excluded above — a file that sits beside the directory the pattern above reaches."
+    "reason": "Pre-1.0: the `I18n::Tests` namespace's autoload shim for the `tests/` conformance mixins excluded above \u2014 a file that sits beside the directory the pattern above reaches."
   },
   {
     "testFile": "test_date_ractor.rb",
     "package": "date",
-    "reason": "Ractor is Ruby's actor-based parallelism primitive — the file exercises `Ractor.make_shareable`/`Ractor.new` round-tripping of a Date across isolated interpreter states. JS is single-threaded and has no analogue, same reason `promise.rb` is excluded above."
+    "reason": "Ractor is Ruby's actor-based parallelism primitive \u2014 the file exercises `Ractor.make_shareable`/`Ractor.new` round-tripping of a Date across isolated interpreter states. JS is single-threaded and has no analogue, same reason `promise.rb` is excluded above."
   },
   {
     "testFile": "test_date_marshal.rb",
     "package": "date",
-    "reason": "Ruby's Marshal binary object format — `Marshal.dump`/`Marshal.load` of a Date, including the frozen-string and instance-variable round trip. Not applicable: JS has no Marshal, and the wire format is Ruby-only."
+    "reason": "Ruby's Marshal binary object format \u2014 `Marshal.dump`/`Marshal.load` of a Date, including the frozen-string and instance-variable round trip. Not applicable: JS has no Marshal, and the wire format is Ruby-only."
   },
   {
     "testFile": "test_date_new.rb",
@@ -294,55 +294,25 @@
     "reason": "The four Marshal cases inside TestSH load Marshal payloads emitted by Ruby 1.4/1.6/1.8/1.9.2 to check the dumped Date representation stays loadable. Ruby-only wire format, same as test_date_marshal.rb above; the rest of the file stays counted."
   },
   {
-    "pattern": "core_ext/module/attribute_accessors_per_thread.rb",
-    "package": "activesupport",
-    "reason": "Stores the value per `Thread.current`; JS has no thread-local storage."
-  },
-  {
-    "pattern": "core_ext/module/remove_method.rb",
-    "package": "activesupport",
-    "reason": "Method-table surgery to silence redefinition warnings; JS reassignment is silent."
-  },
-  {
     "pattern": "core_ext/kernel/singleton_class.rb",
     "package": "activesupport",
-    "reason": "Ruby metaprogramming with no JS equivalent; trails assigns to the class object directly."
+    "reason": "CONVERGEABLE activesupport-port-kernel-singleton-class"
   },
   {
     "pattern": "core_ext/pathname/existence.rb",
     "package": "activesupport",
-    "reason": "Ruby's Pathname is not ported (trails paths are strings) and the check is async in JS."
+    "reason": "CONVERGEABLE activesupport-port-pathname-existence"
   },
   {
     "pattern": "core_ext/regexp.rb",
     "package": "activesupport",
-    "reason": "Reads the `//m` bit out of Ruby's options bitmask; JS `RegExp` exposes `.multiline`."
-  },
-  {
-    "pattern": "core_ext/integer/multiple.rb",
-    "package": "activesupport",
-    "reason": "Pre-1.0: `Integer#multiple_of?` is unported and has no trails caller."
-  },
-  {
-    "pattern": "core_ext/module/deprecation.rb",
-    "package": "activesupport",
-    "reason": "Pre-1.0: class-body sugar over `Deprecation#deprecate_methods`; trails calls the deprecator directly (`deprecation.ts#deprecateMethod`)."
-  },
-  {
-    "pattern": "core_ext/object/with_options.rb",
-    "package": "activesupport",
-    "reason": "Pre-1.0: needs ActiveSupport::OptionMerger, not ported yet (RFC 0093)."
-  },
-  {
-    "pattern": "core_ext/string/behavior.rb",
-    "package": "activesupport",
-    "reason": "Pre-1.0: one arm of `acts_like?`; trails ports the Time/Date arms only."
+    "reason": "CONVERGEABLE activesupport-port-core-ext-regexp"
   },
   {
     "testFile": "verifier_test.rb",
     "className": "VerifierTest",
     "tests": ["generates URL-safe messages"],
     "liveTsCounterpart": "verifier.test.ts asserts the char-class guarantee (no `+` or `/` in the token) rather than the exact bytes, which is the whole of what the Rails test can portably mean here.",
-    "reason": "Asserts byte-for-byte equality against a known token produced by Ruby's Marshal serializer wrapped in MessageVerifier — the Rails source notes the bytes even differ across Ruby versions. Our globalid Verifier uses JSON serialization (the default for our MessageVerifier), so the encoded payload differs structurally and that byte string is unreproducible in principle, not merely unported."
+    "reason": "Asserts byte-for-byte equality against a known token produced by Ruby's Marshal serializer wrapped in MessageVerifier \u2014 the Rails source notes the bytes even differ across Ruby versions. Our globalid Verifier uses JSON serialization (the default for our MessageVerifier), so the encoded payload differs structurally and that byte string is unreproducible in principle, not merely unported."
   }
 ]

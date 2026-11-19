@@ -4,22 +4,24 @@ export function withOptions<T extends object>(object: T, options: Record<string,
 export function withOptions<T extends object, R>(
   object: T,
   options: Record<string, unknown>,
-  block: (optionMerger: T) => R,
+  block: ((optionMerger: T) => R) | ((this: T) => R),
 ): R;
 export function withOptions<T extends object, R>(
   object: T,
   options: Record<string, unknown>,
-  block: ((optionMerger: T) => R) | undefined,
+  block: ((optionMerger: T) => R) | ((this: T) => R) | undefined,
 ): R | T;
 export function withOptions<T extends object, R>(
   object: T,
   options: Record<string, unknown>,
-  block?: (optionMerger: T) => R,
+  block?: ((optionMerger: T) => R) | ((this: T) => R),
 ): R | T {
   const optionMerger = new OptionMerger(object, options) as unknown as T;
 
   if (block) {
-    return block(optionMerger);
+    return block.length === 0
+      ? (block as (this: T) => R).call(optionMerger)
+      : (block as (optionMerger: T) => R)(optionMerger);
   } else {
     return optionMerger;
   }

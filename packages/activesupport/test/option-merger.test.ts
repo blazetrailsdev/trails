@@ -139,6 +139,20 @@ describe("OptionMergerTest", () => {
     expect(Object.getPrototypeOf(new OptionMerger({}, {}))).toBe(OptionMerger.prototype);
   });
 
+  it("option merger implicit receiver", () => {
+    Object.defineProperty(options, "mergeBang", {
+      value(this: Record<string, unknown>, other: Record<string, unknown>) {
+        return Object.assign(this, other);
+      },
+    });
+    withOptions(options, { foo: "bar" }, function (this: typeof options) {
+      (this.mergeBang as (other: Record<string, unknown>) => unknown)({ fizz: "buzz" });
+    });
+
+    const expected = { hello: "world", foo: "bar", fizz: "buzz" };
+    expect(options).toEqual(expected);
+  });
+
   it("with options hash like", () => {
     class HashLike {
       constructor(hash: Record<string, unknown>) {
