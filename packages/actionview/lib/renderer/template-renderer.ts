@@ -12,11 +12,10 @@ import { Renderable } from "../template/renderable.js";
 import { type TemplateHandler } from "../template/handlers.js";
 import { Template } from "../template.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
-import type { Body, StreamingTemplateRenderer } from "./streaming-template-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
 /** @internal */
-export class TemplateRenderer extends AbstractRenderer {
+export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends AbstractRenderer {
   /** @internal */
   protected details: Record<string, readonly (string | symbol)[]> = {};
 
@@ -24,16 +23,7 @@ export class TemplateRenderer extends AbstractRenderer {
     super(lookupContext);
   }
 
-  render(
-    this: StreamingTemplateRenderer,
-    context: ViewContext,
-    options: RenderOptions,
-  ): Promise<Body | (string | SafeBuffer | Uint8Array | null)[]>;
-  render(context: ViewContext, options: RenderOptions): Promise<RenderedTemplate>;
-  render(
-    context: ViewContext,
-    options: RenderOptions,
-  ): Promise<RenderedTemplate | Body | (string | SafeBuffer | Uint8Array | null)[]> {
+  render(context: ViewContext, options: RenderOptions): Rendered {
     this.details = this.extractDetails(options as Record<string, unknown>);
     const template = this.determineTemplate(options);
     this.prependFormats(template.format);
@@ -113,7 +103,7 @@ export class TemplateRenderer extends AbstractRenderer {
     template: RenderableTemplate,
     layoutName: RenderOptions["layout"],
     locals: Record<string, unknown>,
-  ): Promise<RenderedTemplate> {
+  ): Rendered {
     return this.renderWithLayout(view, template, layoutName, locals, (layout) =>
       Notifications.instrument<Promise<string | SafeBuffer | Uint8Array>>(
         "render_template.action_view",
@@ -127,7 +117,7 @@ export class TemplateRenderer extends AbstractRenderer {
             view._layoutFor!(...name),
           ) as Promise<string | SafeBuffer | Uint8Array>,
       ),
-    );
+    ) as Rendered;
   }
 
   /** @internal */

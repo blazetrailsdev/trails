@@ -4,7 +4,12 @@ import { StreamingBuffer } from "../buffers.js";
 import { StreamingFlow } from "../flows.js";
 import { Base } from "../base.js";
 import { TemplateRenderer } from "./template-renderer.js";
-import type { RenderableTemplate, RenderOptions, ViewContext } from "./abstract-renderer.js";
+import type {
+  RenderableTemplate,
+  RenderedTemplate,
+  RenderOptions,
+  ViewContext,
+} from "./abstract-renderer.js";
 
 type Buffer = (chunk: string) => void;
 
@@ -42,8 +47,10 @@ export class Body {
 }
 
 /** @internal */
-export class StreamingTemplateRenderer extends TemplateRenderer {
-  // @ts-expect-error TS2416: CLAUDE.md, "Override signature on the static side".
+export class StreamingTemplateRenderer extends TemplateRenderer<
+  Promise<Body | (string | SafeBuffer | Uint8Array | null)[]>
+> {
+  /** @internal */
   protected override async renderTemplate(
     view: ViewContext & ConstructorParameters<typeof StreamingFlow>[0],
     template: RenderableTemplate,
@@ -51,7 +58,8 @@ export class StreamingTemplateRenderer extends TemplateRenderer {
     locals: Record<string, unknown> = {},
   ): Promise<Body | (string | SafeBuffer | Uint8Array | null)[]> {
     if (!(layoutName != null && layoutName !== false && template.supportsStreaming?.())) {
-      return [(await super.renderTemplate(view, template, layoutName, locals)).body];
+      const rendered = await super.renderTemplate(view, template, layoutName, locals);
+      return [(rendered as unknown as RenderedTemplate).body];
     }
 
     locals ??= {};
