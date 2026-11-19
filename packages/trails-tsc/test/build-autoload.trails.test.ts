@@ -111,11 +111,15 @@ describe("buildAutoload", () => {
 
       expect(File.read(".trails/entry.generated.js")).toEqual(
         [
-          'import { loadIseqEval } from "@blazetrails/ruby-compat";',
+          'import { loadedFileExports, rbFRequireFile } from "@blazetrails/ruby-compat";',
           'import { Application } from "@blazetrails/trailties";',
           'import "./autoload/install.generated.js";',
           "",
-          "export default async () => (await loadIseqEval(`${Application.findRoot(import.meta.dirname)}/config/environment.ts`)).default;",
+          "export default async () => {",
+          "  const environment = `${Application.findRoot(import.meta.dirname)}/config/environment.ts`;",
+          "  await rbFRequireFile(environment);",
+          "  return loadedFileExports(environment).default;",
+          "};",
           "",
         ].join("\n"),
       );

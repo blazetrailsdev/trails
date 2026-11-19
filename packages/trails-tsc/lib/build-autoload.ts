@@ -454,11 +454,15 @@ async function writeEntry(
     "",
   ].join("\n");
   const entry = [
-    'import { loadIseqEval } from "@blazetrails/ruby-compat";',
+    'import { loadedFileExports, rbFRequireFile } from "@blazetrails/ruby-compat";',
     'import { Application } from "@blazetrails/trailties";',
     'import "./autoload/install.generated.js";',
     "",
-    `export default async () => (await loadIseqEval(\`\${Application.findRoot(import.meta.dirname)}/${getPath().relative!(root, environmentFile)}\`)).default;`,
+    "export default async () => {",
+    `  const environment = \`\${Application.findRoot(import.meta.dirname)}/${getPath().relative!(root, environmentFile)}\`;`,
+    "  await rbFRequireFile(environment);",
+    "  return loadedFileExports(environment).default;",
+    "};",
     "",
   ].join("\n");
   const fs = getFs();
