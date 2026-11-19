@@ -78,10 +78,6 @@ jobs:
       sqlite_only: ${{ steps.filter.outputs.sqlite_only }}
       unit_packages: ${{ steps.filter.outputs.unit_packages }}
       actioncable_only: ${{ steps.filter.outputs.actioncable_only }}
-      # Every changed path is under packages/website/. The Website job's
-      # typedoc step runs `tsc --build` itself, and no package imports the
-      # site, so Build & Type Check, Promise counts and the full Repo Checks
-      # suite cannot be moved by such a PR.
       website_only: ${{ steps.filter.outputs.website_only }}
       website_label: ${{ steps.filter.outputs.website_label }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite == 'true' || steps.pr_lanes.outputs.parity_inputs == 'true' }}
