@@ -289,6 +289,8 @@ export interface TaggedConstructor {
   package: string;
   tsFile: string;
   tsName: string;
+  /** The tag sits on a guarded segment ({@link InlinedFrom.guarded}). */
+  guarded?: true;
 }
 
 /**
@@ -312,7 +314,12 @@ export function inlinedHookTags(
           inlinedHookBody(ruby, tag, `${name}/${tsFile} ${owner}#${member.name}`);
           byHook.set(key, [
             ...(byHook.get(key) ?? []),
-            { package: name, tsFile, tsName: member.name },
+            {
+              package: name,
+              tsFile,
+              tsName: member.name,
+              ...(tag.guarded ? { guarded: true } : {}),
+            },
           ]);
         }
       }
@@ -330,6 +337,8 @@ export function inlinedHookTags(
  * those mirrors within the module's own package. The include graph is built
  * per package, so a constructor in another package is credited on its tag,
  * which {@link inlinedHookTags} has already resolved to the module's `def`.
+ * A guarded tag on a module no Rails class of its package mixes in is
+ * credited wherever it sits: its guard is the include test.
  */
 export function inlinedHookCreditedBy(
   module: string,
@@ -340,7 +349,12 @@ export function inlinedHookCreditedBy(
 ): TaggedConstructor | undefined {
   return tags
     .get(`${module}#${hook}`)
-    ?.find((tagged) => tagged.package !== pkg || includerFiles.has(tagged.tsFile));
+    ?.find(
+      (tagged) =>
+        (tagged.guarded === true && includerFiles.size === 0) ||
+        tagged.package !== pkg ||
+        includerFiles.has(tagged.tsFile),
+    );
 }
 
 /**

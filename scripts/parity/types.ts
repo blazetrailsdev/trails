@@ -19,6 +19,12 @@ export interface InlinedFrom {
   file: string;
   firstLine: number;
   lastLine: number;
+  /**
+   * Set on a constructor's tag whose segment sits in an
+   * `if (isModuleIncluded(new.target, Mod))` guard naming the tagged module:
+   * a module installed at run time, paired with its `initialize` directly.
+   */
+  guarded?: true;
 }
 
 /** A recorded literal value — a parameter default or constant RHS. `expr` marks

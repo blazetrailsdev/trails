@@ -236,6 +236,17 @@ export function inlinedFromFindings(
   const modules = new Map(entities(ruby, "modules").map((mod) => [mod.fqn, mod]));
   const rubyClasses = new Map(entities(ruby, "classes").map((klass) => [klass.fqn, klass]));
   const rubyEntities = [...rubyClasses.values(), ...modules.values()];
+  const byShort = new Map<string, string[]>();
+  for (const fqn of modules.keys()) {
+    byShort.set(shortName(fqn), [...(byShort.get(shortName(fqn)) ?? []), fqn]);
+  }
+  const mixedIn = new Set(
+    rubyEntities.flatMap((entity) =>
+      [...entity.info.includes, ...(entity.info.prepends ?? [])].map((incName) =>
+        resolveModuleName(incName, entity.fqn, byShort),
+      ),
+    ),
+  );
   const findings: InlinedFromFinding[] = [];
   const visited = new Set<string>();
   for (const [name, pkg] of Object.entries(ts.packages)) {
@@ -361,7 +372,10 @@ export function inlinedFromFindings(
           report(hook, "sits on a constructor whose file and name mirror no Rails class or module");
         } else if (reached.sameFile.includes(hook)) {
           report(hook, "is redundant: a body from the mirrored Ruby file is inlined untagged");
-        } else if (!reached.tagged.includes(hook)) {
+        } else if (
+          !reached.tagged.includes(hook) &&
+          !(tag.guarded === true && !mixedIn.has(tag.module))
+        ) {
           report(
             hook,
             `names a module ${counterpart!.fqn} does not ${tag.hook === "new" ? "extend" : "include or prepend"}`,

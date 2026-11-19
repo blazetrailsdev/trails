@@ -143,6 +143,10 @@ export class Model {
   /** @internal */
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inlinedFrom ActiveModel::Attributes#initialize rails/v8.0.2/activemodel/lib/active_model/attributes.rb:106-109
+   */
   constructor(attributes: Record<string, unknown> | Map<string, unknown> | null = {}) {
     const klass = new.target;
     if (_includesAttributes(klass)) {

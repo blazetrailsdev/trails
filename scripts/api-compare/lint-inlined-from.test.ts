@@ -94,6 +94,7 @@ const ruby = {
           def("new", `${AR}/first.rb`, 2, 4),
         ]),
         "ActiveRecord::Last::ClassMethods": entity("last.rb", [def("new", `${AR}/last.rb`, 2, 4)]),
+        "ActiveRecord::Open": entity("open.rb", [def("initialize", `${AR}/open.rb`, 2, 4)]),
         "ActiveRecord::Plain": entity("plain.rb", [def("save", `${AR}/plain.rb`, 8, 10)]),
         "ActiveRecord::Plain::ClassMethods": entity("plain.rb", [
           def("new", `${AR}/plain.rb`, 2, 4),
@@ -426,6 +427,19 @@ describe("inlinedFromFindings", () => {
     const enrolled = ["activerecord"];
     expect(messages([LAST, NEW, FIRST, CORE, API], { owner: "BaseRecord", enrolled })).toEqual([]);
     expect(messages([CORE], { owner: "ProxyRecord", file: "proxy.ts" })).toEqual([
+      "ActiveRecord::Core#initialize names a module ActiveRecord::Proxy does not include or prepend",
+    ]);
+  });
+
+  it("admits a guarded tag on a module the class's Rails ancestry does not include", () => {
+    const open = { ...tag("ActiveRecord::Open#initialize", `${AR}/open.rb:2-4`), guarded: true };
+    expect(messages([open as InlinedFrom], { owner: "ProxyRecord", file: "proxy.ts" })).toEqual([]);
+  });
+
+  it("still flags a guarded tag on a module a Rails class includes", () => {
+    expect(
+      messages([{ ...CORE, guarded: true }], { owner: "ProxyRecord", file: "proxy.ts" }),
+    ).toEqual([
       "ActiveRecord::Core#initialize names a module ActiveRecord::Proxy does not include or prepend",
     ]);
   });

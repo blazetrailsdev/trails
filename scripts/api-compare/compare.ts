@@ -5626,6 +5626,7 @@ export function main() {
         return { tsClass, ambiguous };
       };
 
+      const guardedOnly = new Map<string, { owner: string; tags: InlinedFrom[] }>();
       const inlinedSegmentsFor = (
         rubyName: string,
         tsName: string,
@@ -5657,6 +5658,16 @@ export function main() {
           );
         }
         if (rubyName !== "initialize") return [];
+        const guardedTags = guardedOnly.get(`${tsFile} ${rubyModule}`);
+        if (guardedTags !== undefined) {
+          inlinedTagsCompared.add(`${tsFile} ${guardedTags.owner}`);
+          return taggedBodies(
+            ruby,
+            guardedTags.tags,
+            [],
+            `${pkg}/${tsFile} ${guardedTags.owner}#constructor`,
+          ).map((m) => m.body);
+        }
         const klass = rubyPkg.classes[rubyModule] as unknown as ClassInfo | undefined;
         if (!klass) return [];
         const initializeOf = (fqn: string) =>
@@ -6708,6 +6719,19 @@ export function main() {
         ) {
           continue;
         }
+        checkCalls("initialize", "constructor", expectedTs, fqn, "instance");
+        checkCallArgs("initialize", "constructor", expectedTs, fqn, "instance");
+      }
+      for (const [owner, tags] of tsInlinedFromByFileOwner.get(expectedTs) ?? []) {
+        if (inlinedTagsCompared.has(`${expectedTs} ${owner}`)) continue;
+        if (!tags.every((tag) => tag.guarded === true)) continue;
+        const fqn = items.find(
+          (item) =>
+            resolveOwner("initialize", "constructor", expectedTs, item.fqn, "instance").tsClass ===
+            owner,
+        )?.fqn;
+        if (fqn === undefined) continue;
+        guardedOnly.set(`${expectedTs} ${fqn}`, { owner, tags });
         checkCalls("initialize", "constructor", expectedTs, fqn, "instance");
         checkCallArgs("initialize", "constructor", expectedTs, fqn, "instance");
       }
