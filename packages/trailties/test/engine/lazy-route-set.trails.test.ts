@@ -6,7 +6,7 @@ describe("LazyRouteSet method_missing_module", () => {
   let reload: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    reload = vi.fn(() => true);
+    reload = vi.fn((): boolean => false).mockReturnValueOnce(true);
     Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
   });
 
@@ -27,7 +27,7 @@ describe("LazyRouteSet method_missing_module", () => {
     const appUrlHelpers = new LazyRouteSet().urlHelpers() as unknown as Record<string, unknown>;
 
     expect(appUrlHelpers.rootPath).toBeUndefined();
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -35,7 +35,7 @@ describe("LazyRouteSet url helper modules", () => {
   let reload: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    reload = vi.fn(() => true);
+    reload = vi.fn((): boolean => false).mockReturnValueOnce(true);
     Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
   });
 
@@ -47,7 +47,7 @@ describe("LazyRouteSet url helper modules", () => {
     const mod = new LazyRouteSet().generateUrlHelpers(false) as unknown as Record<string, unknown>;
 
     expect(mod.rootUrl).toBeUndefined();
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(2);
   });
 
   it("prepends respond_to_missing? onto the named route helper modules", () => {
@@ -91,7 +91,7 @@ describe("LazyRouteSet url helper modules", () => {
     };
 
     expect(() => mod.routeFor("root")).toThrow();
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -99,7 +99,7 @@ describe("LazyRouteSet#routes", () => {
   let reload: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    reload = vi.fn(() => true);
+    reload = vi.fn((): boolean => false).mockReturnValueOnce(true);
     Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
   });
 
