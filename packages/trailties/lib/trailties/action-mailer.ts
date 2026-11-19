@@ -58,7 +58,7 @@ export class Trailtie extends BaseTrailtie {
       options.javascriptsDir ??= await paths.get("public/javascripts")!.first();
       options.stylesheetsDir ??= await paths.get("public/stylesheets")!.first();
       if (options.showPreviews == null) {
-        options.showPreviews = TopLevel.Trails!.env["development?"]();
+        options.showPreviews = TopLevel.Trails!.env.isDevelopment();
       }
       options.cacheStore ??= TopLevel.Trails!.cache;
       options.previewPaths = [

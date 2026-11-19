@@ -345,7 +345,7 @@ export class Trailtie extends BaseTrailtie {
     };
     /** @noRailsEquivalent PERMANENT */
     this.config.toPrepare(async () => {
-      if (Trails.env["test?"]()) return;
+      if (Trails.env.isTest()) return;
       if (activeRecord === undefined) return;
       await warmSchemaCache(activeRecord.connectionHandler.connectionPoolList("all"));
     });

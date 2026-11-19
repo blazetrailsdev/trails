@@ -252,18 +252,6 @@ export function moduleParents(klass: object): unknown[] {
   return parents;
 }
 
-export function suppress<T>(
-  fn: () => T,
-  ...errorClasses: Array<new (...args: any[]) => Error>
-): T | undefined {
-  try {
-    return fn();
-  } catch (e) {
-    if (errorClasses.some((cls) => e instanceof cls)) return undefined;
-    throw e;
-  }
-}
-
 export function registerSubclass(parent: AnyClass, child: AnyClass): void {
   DescendantsTracker.registerSubclass(parent, child);
 }

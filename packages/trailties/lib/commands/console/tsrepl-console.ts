@@ -79,7 +79,7 @@ export class TSREPLConsole {
   async start(): Promise<void> {
     TSREPL.setup(null);
 
-    if (!Trails.env["local?"]() && !Object.hasOwn(ENV, "TSREPL_USE_AUTOCOMPLETE")) {
+    if (!Trails.env.isLocal() && !Object.hasOwn(ENV, "TSREPL_USE_AUTOCOMPLETE")) {
       TSREPL.conf.USE_AUTOCOMPLETE = false;
     }
 

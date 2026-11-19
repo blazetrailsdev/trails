@@ -15,9 +15,13 @@ export const ReloadedClassesFiltering = {
 };
 
 export class WeakSet<T extends object> {
-  private _map = new globalThis.WeakMap<T, boolean>();
+  private _map: globalThis.WeakMap<T, boolean>;
   private _refs: WeakRef<T>[] = [];
   private _addsSinceCompact = 0;
+
+  constructor() {
+    this._map = new globalThis.WeakMap<T, boolean>();
+  }
 
   add(object: T): void {
     if (!this._map.has(object)) {

@@ -26,14 +26,12 @@ export class BacktraceCleaner {
     return this;
   }
 
-  removeFilters(): this {
-    this._filters = [];
-    return this;
+  removeSilencersBang(): LineSilencer[] {
+    return (this._silencers = []);
   }
 
-  removeSilencers(): this {
-    this._silencers = [];
-    return this;
+  removeFiltersBang(): LineFilter[] {
+    return (this._filters = []);
   }
 
   clean<T>(backtrace: T[], kind: CleanKind = "silent"): Array<T | string> {

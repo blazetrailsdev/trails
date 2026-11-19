@@ -10,8 +10,8 @@ describe("StringInquirer method_missing in the prototype chain", () => {
   });
 
   it("lets a subclass store its own state on the instance", () => {
-    expect(new EnvironmentInquirer("production")["local?"]()).toBe(false);
-    expect(new EnvironmentInquirer("test")["local?"]()).toBe(true);
+    expect(new EnvironmentInquirer("production").isLocal()).toBe(false);
+    expect(new EnvironmentInquirer("test").isLocal()).toBe(true);
   });
 
   it("reads undefined for JS protocol probes Ruby never answers", async () => {

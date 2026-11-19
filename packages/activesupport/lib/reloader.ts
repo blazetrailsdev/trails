@@ -24,7 +24,12 @@ export class Reloader extends ExecutionWrapper {
     this.defineCallbacks("class_unload");
   }
 
-  #locked = false;
+  #locked: boolean;
+
+  constructor() {
+    super();
+    this.#locked = false;
+  }
 
   static toPrepare(...args: FilterListEntry[]): void {
     this.setCallback("prepare", ...args);

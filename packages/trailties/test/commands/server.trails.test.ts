@@ -84,7 +84,7 @@ describe("trails server environment (trails)", () => {
     vi.spyOn(Trails, "root").mockReturnValue(tmpDir);
     const aref = Handler.aref.bind(Handler);
     vi.spyOn(Handler, "aref").mockImplementation((name: string) =>
-      name === "vite" && !Trails.env["development?"]() ? null : aref(name),
+      name === "vite" && !Trails.env.isDevelopment() ? null : aref(name),
     );
     vi.spyOn(Builder, "parseFile").mockImplementation((async () => {
       const app = await Trails.initialize();

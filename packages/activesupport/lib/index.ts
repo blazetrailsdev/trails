@@ -280,7 +280,6 @@ export {
   moduleParent,
   moduleParentName,
   moduleParents,
-  suppress,
   registerSubclass,
   subclasses,
   descendants,
@@ -288,6 +287,7 @@ export {
 } from "./module-ext.js";
 export { Rescuable } from "./rescuable.js";
 export type { MattrOptions } from "./module-ext.js";
+export { suppress } from "./core-ext/kernel/reporting.js";
 
 export type {
   CallbackKind,

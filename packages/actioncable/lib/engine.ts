@@ -64,7 +64,7 @@ export class Engine extends BaseEngine {
 
     this.initializer("action_cable.set_configs", async (app) => {
       const options = app.config.get("actionCable") as Options;
-      if (TopLevel.Trails!.env["development?"]()) {
+      if (TopLevel.Trails!.env.isDevelopment()) {
         options.allowedRequestOrigins ??= /https?:\/\/localhost:\d+/;
       }
 

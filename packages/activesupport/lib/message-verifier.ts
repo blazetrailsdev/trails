@@ -1,4 +1,12 @@
-import { DigestInstance, OpenSSL, prepend, type Bytes } from "@blazetrails/ruby-compat";
+import {
+  DigestInstance,
+  OpenSSL,
+  prepend,
+  type Bytes,
+  rbModName,
+  sprintf,
+  rbObjId,
+} from "@blazetrails/ruby-compat";
 import { isPresent } from "./core-ext/object/blank.js";
 import { SecurityUtils } from "./security-utils.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
@@ -174,6 +182,10 @@ export class MessageVerifier extends Codec {
       }
       throw error;
     }
+  }
+
+  inspect(): string {
+    return `#<${rbModName(this.constructor)}:${sprintf("%#016x", rbObjId(this) << 1)}>`;
   }
 }
 

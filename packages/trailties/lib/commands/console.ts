@@ -74,7 +74,7 @@ export class Console {
   isSandbox(): boolean | undefined {
     if (this.options.sandbox != null) return this.options.sandbox;
 
-    if (Trails.env["local?"]()) return false;
+    if (Trails.env.isLocal()) return false;
 
     return this.app.config.sandboxByDefault;
   }

@@ -170,7 +170,7 @@ export class Store extends CacheStore {
 
     const clearWith = Object.hasOwn(options, "clearWith")
       ? options.clearWith
-      : TopLevel.Trails!.env["test?"]()
+      : TopLevel.Trails!.env.isTest()
         ? "delete"
         : "truncate";
     this.clearWith = clearWith == null ? null : String(clearWith);

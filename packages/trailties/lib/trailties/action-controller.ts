@@ -85,7 +85,7 @@ export class Trailtie extends BaseTrailtie {
         let actionOnUnpermittedParameters = options.actionOnUnpermittedParameters;
 
         if (actionOnUnpermittedParameters == null) {
-          actionOnUnpermittedParameters = TopLevel.Trails!.env["local?"]() ? "log" : false;
+          actionOnUnpermittedParameters = TopLevel.Trails!.env.isLocal() ? "log" : false;
         }
 
         ActionController.Parameters.actionOnUnpermittedParameters = actionOnUnpermittedParameters;

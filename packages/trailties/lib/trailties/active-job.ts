@@ -103,7 +103,7 @@ export class Trailtie extends BaseTrailtie {
         unknown
       >;
       if (options.queueAdapter == null || options.queueAdapter === false) {
-        options.queueAdapter = Trails.env["test?"]() ? "test" : "async";
+        options.queueAdapter = Trails.env.isTest() ? "test" : "async";
       }
 
       this.config.afterInitialize(() => {

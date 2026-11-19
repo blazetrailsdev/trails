@@ -1,0 +1,48 @@
+$ bash scripts/api-compare/run.sh --package activesupport --missing
+(node:34723) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Error: parity:api would measure 28 package(s) against a stale build:
+  packages/actioncable — OutOfDate
+  packages/actionmailbox — OutOfDate
+  packages/actionmailer — OutOfDate
+  packages/actionpack — OutOfDate
+  packages/actiontext — OutOfDate
+  packages/actionview — OutOfDate
+  packages/activejob — OutOfDate
+  packages/activemodel — OutOfDate
+  packages/activerecord — OutOfDate
+  packages/activerecord-cli — OutOfDate
+  packages/activestorage — OutOfDate
+  packages/arel — OutOfDate
+  packages/bcrypt — OutOfDate
+  packages/builder — OutOfDate
+  packages/globalid — OutOfDate
+  packages/html-sanitizer — OutOfDate
+  packages/image-processing — OutOfDate
+  packages/rack-test — OutOfDate
+  packages/solid-cable — OutOfDate
+  packages/solid-cache — OutOfDate
+  packages/solid-queue — OutOfDate
+  packages/stimulus — OutOfDate
+  packages/thor — OutOfDate
+  packages/trails-tsc — OutOfDate
+  packages/trailties — OutOfDate
+  packages/turbo — OutOfDate
+  packages/vite-assets — OutOfDate
+  packages/vite-trails — OutOfDate
+
+Cross-package imports resolve through packages/<pkg>/dist/*.d.ts, so what
+the extractor sees depends on those declarations. Run `pnpm build` and
+re-run.
+
+git does not update dist on checkout, so a stale one makes these totals
+mix one commit's sources with another commit's build output.
+
+API_COMPARE_FORCE=1 does NOT fix this — it clears the extractor caches
+(local mtime-keyed and shared content-keyed) and nothing else; build state
+is not a cache. Set API_COMPARE_ALLOW_STALE_BUILD=1 to measure anyway
+(totals are not a trustworthy baseline).
+    at main (/mnt/theta/trails/worktrees/active-support-test-parallelization-threshold-unseated-e228/scripts/api-compare/extract-ts-api.ts:475:33)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Promise.all (index 1)
+    at async main (/mnt/theta/trails/worktrees/active-support-test-parallelization-threshold-unseated-e228/scripts/api-compare/orchestrate.ts:165:3)

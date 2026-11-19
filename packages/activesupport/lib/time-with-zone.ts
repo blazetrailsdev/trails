@@ -341,6 +341,10 @@ export class TimeWithZone {
     return this._local().day;
   }
 
+  get mday(): number {
+    return this._local().day;
+  }
+
   get hour(): number {
     return this._local().hour;
   }

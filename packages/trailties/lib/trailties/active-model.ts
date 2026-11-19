@@ -25,7 +25,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_model.secure_password", () => {
-      ActiveModel.SecurePassword.minCost = TopLevel.Trails!.env["test?"]();
+      ActiveModel.SecurePassword.minCost = TopLevel.Trails!.env.isTest();
     });
 
     this.initializer("active_model.i18n_customize_full_message", () => {

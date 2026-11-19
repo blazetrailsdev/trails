@@ -335,7 +335,7 @@ export class Configuration extends EngineConfiguration {
         this.precompileFilterParameters = true;
         this.domTestingDefaultHtmlVersion = "HTML5" in Nokogiri ? ":html5" : ":html4";
 
-        if (Trails.env["local?"]()) {
+        if (Trails.env.isLocal()) {
           this.logFileSize = 100 * 1024 * 1024;
         }
 
@@ -481,12 +481,12 @@ export class Configuration extends EngineConfiguration {
           ? this.generateLocalSecret()
           : (getEnv("SECRET_KEY_BASE") ??
             (Trails.application!._credentials?.dig("secret_key_base") as string | undefined) ??
-            (Trails.env["local?"]() && this.generateLocalSecret()))) as string)
+            (Trails.env.isLocal() && this.generateLocalSecret()))) as string)
     );
   }
 
   set secretKeyBase(newSecretKeyBase: unknown) {
-    if (newSecretKeyBase == null && Trails.env["local?"]()) {
+    if (newSecretKeyBase == null && Trails.env.isLocal()) {
       this._secretKeyBase = this.generateLocalSecret();
     } else if (typeof newSecretKeyBase === "string" && isPresent(newSecretKeyBase)) {
       this._secretKeyBase = newSecretKeyBase;

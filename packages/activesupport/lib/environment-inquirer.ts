@@ -1,4 +1,4 @@
-import { ArgumentError, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { StringInquirer } from "./string-inquirer.js";
 import { isIn } from "./core-ext/object/inclusion.js";
 
@@ -6,15 +6,10 @@ export const DEFAULT_ENVIRONMENTS = ["development", "test", "production"];
 
 export const LOCAL_ENVIRONMENTS = ["development", "test"];
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- environment_inquirer.rb:28-32 class_evals these; the merge is how the runtime-defined methods surface on the type side.
-export interface EnvironmentInquirer {
-  "development?"(): boolean;
-  "test?"(): boolean;
-  "production?"(): boolean;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class EnvironmentInquirer extends StringInquirer {
+  #development: boolean;
+  #test: boolean;
+  #production: boolean;
   #local: boolean;
 
   constructor(env: string) {
@@ -22,25 +17,26 @@ export class EnvironmentInquirer extends StringInquirer {
 
     super(env);
 
-    for (const defaultEnv of DEFAULT_ENVIRONMENTS) {
-      (this as unknown as Record<string, boolean>)[defaultEnv] = env === defaultEnv;
-    }
+    this.#development = env === "development";
+    this.#test = env === "test";
+    this.#production = env === "production";
 
     this.#local = isIn(env, LOCAL_ENVIRONMENTS);
   }
 
-  "local?"(): boolean {
+  isDevelopment(): boolean {
+    return this.#development;
+  }
+
+  isTest(): boolean {
+    return this.#test;
+  }
+
+  isProduction(): boolean {
+    return this.#production;
+  }
+
+  isLocal(): boolean {
     return this.#local;
   }
-}
-
-for (const env of DEFAULT_ENVIRONMENTS) {
-  Object.defineProperty(EnvironmentInquirer.prototype, `${env}?`, {
-    configurable: true,
-    writable: true,
-    value: function (this: Record<string, boolean>): boolean {
-      return this[env];
-    },
-  });
-  rbClearMethodCache();
 }

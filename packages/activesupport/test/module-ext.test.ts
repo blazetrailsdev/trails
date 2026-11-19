@@ -1,3 +1,4 @@
+import { suppress } from "../lib/core-ext/kernel/reporting.js";
 import { describe, it, expect } from "vitest";
 import { block, isAbsentHalf, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
@@ -7,7 +8,6 @@ import {
   attrInternal,
   isAnonymous,
   moduleParentName,
-  suppress,
 } from "../lib/module-ext.js";
 
 describe("ModuleTest", () => {

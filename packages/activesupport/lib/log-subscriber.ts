@@ -132,7 +132,12 @@ export class LogSubscriber extends Subscriber {
     sub.eventLevels = transformKeys(this.logLevels, (k) => `${k}.${state.namespace}`);
   }
 
-  eventLevels: Map<string, (logger: Logger) => boolean> = new Map();
+  eventLevels: Map<string, (logger: Logger) => boolean>;
+
+  constructor() {
+    super();
+    this.eventLevels = new Map();
+  }
 
   get logger(): Logger | null {
     return LogSubscriber.logger;

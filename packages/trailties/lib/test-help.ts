@@ -25,7 +25,7 @@ interface FixtureHost {
   fileFixturePath?: string;
 }
 
-if (Trails.env["production?"]()) {
+if (Trails.env.isProduction()) {
   abort("Abort testing: Your Trails environment is running in production mode!");
 }
 

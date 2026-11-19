@@ -10,8 +10,9 @@ describe("EnvironmentInquirer", () => {
   });
 
   it("answers each DEFAULT_ENVIRONMENTS predicate without the method_missing proxy", () => {
-    const env = new EnvironmentInquirer("production") as unknown as Record<string, () => boolean>;
-    expect(DEFAULT_ENVIRONMENTS.map((name) => env[`${name}?`]())).toEqual([false, false, true]);
-    expect(Object.hasOwn(EnvironmentInquirer.prototype, "production?")).toBe(true);
+    const env = new EnvironmentInquirer("production");
+    expect([env.isDevelopment(), env.isTest(), env.isProduction()]).toEqual([false, false, true]);
+    expect(DEFAULT_ENVIRONMENTS.length).toBe(3);
+    expect(Object.hasOwn(EnvironmentInquirer.prototype, "isProduction")).toBe(true);
   });
 });

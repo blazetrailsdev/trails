@@ -203,7 +203,7 @@ Finisher.initializer("configure_executor_for_concurrency", function (this: Finis
 });
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
-  if (!Trails.env["development?"]()) return;
+  if (!Trails.env.isDevelopment()) return;
   this.routes().prepend(function () {
     this.get("/trails/info/properties", { to: "trails/info#properties", internal: true });
     this.get("/trails/info/routes", { to: "trails/info#routes", internal: true });

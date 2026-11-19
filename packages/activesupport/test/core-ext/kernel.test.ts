@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { enableWarnings, silenceWarnings } from "../../lib/core-ext/kernel/reporting.js";
-import { suppress } from "../../lib/module-ext.js";
+import { suppress } from "../../lib/core-ext/kernel/reporting.js";
 import { ArgumentError, LoadError, verbose } from "@blazetrails/ruby-compat";
 import { assertNil } from "../../lib/testing/assertions.js";
 

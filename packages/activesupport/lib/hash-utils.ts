@@ -395,32 +395,48 @@ export function assertValidKeys(
   }
 }
 
-export function deepTransformValues(obj: unknown, fn: (value: unknown) => unknown): unknown {
-  if (Array.isArray(obj)) {
-    return obj.map((item) => deepTransformValues(item, fn));
-  }
-  if (obj !== null && typeof obj === "object" && isPlainObject(obj)) {
-    const result: AnyObject = {};
-    for (const key of Object.keys(obj)) {
-      result[key] = deepTransformValues(obj[key], fn);
-    }
-    return result;
-  }
-  return fn(obj);
+export function deepTransformValues(obj: unknown, block: (value: unknown) => unknown): unknown {
+  return _deepTransformValuesInObject(obj, block);
 }
 
-export function deepTransformValuesBang(obj: unknown, fn: (value: unknown) => unknown): unknown {
-  if (Array.isArray(obj)) {
-    obj.forEach((item, i) => (obj[i] = deepTransformValuesBang(item, fn)));
-    return obj;
-  }
-  if (obj !== null && typeof obj === "object" && isPlainObject(obj)) {
-    for (const key of Object.keys(obj)) {
-      obj[key] = deepTransformValuesBang(obj[key], fn);
+export function deepTransformValuesBang(obj: unknown, block: (value: unknown) => unknown): unknown {
+  return _deepTransformValuesInObjectBang(obj, block);
+}
+
+/** @internal */
+export function _deepTransformValuesInObject(
+  object: unknown,
+  block: (value: unknown) => unknown,
+): unknown {
+  if (isPlainObject(object)) {
+    const result: AnyObject = {};
+    for (const key of Object.keys(object)) {
+      result[key] = _deepTransformValuesInObject(object[key], block);
     }
-    return obj;
+    return result;
+  } else if (Array.isArray(object)) {
+    return object.map((e) => _deepTransformValuesInObject(e, block));
+  } else {
+    return block(object);
   }
-  return fn(obj);
+}
+
+/** @internal */
+export function _deepTransformValuesInObjectBang(
+  object: unknown,
+  block: (value: unknown) => unknown,
+): unknown {
+  if (isPlainObject(object)) {
+    for (const key of Object.keys(object)) {
+      object[key] = _deepTransformValuesInObjectBang(object[key], block);
+    }
+    return object;
+  } else if (Array.isArray(object)) {
+    object.forEach((e, i) => (object[i] = _deepTransformValuesInObjectBang(e, block)));
+    return object;
+  } else {
+    return block(object);
+  }
 }
 
 export function isPlainObject(value: unknown): value is AnyObject {

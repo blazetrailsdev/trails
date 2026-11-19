@@ -1049,7 +1049,7 @@ export class Mapper {
   {
     constructor() {
       super();
-      this.removeSilencers();
+      this.removeSilencersBang();
       this.addCoreSilencer();
       this.addStdlibSilencer();
     }
