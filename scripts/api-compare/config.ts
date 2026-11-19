@@ -46,7 +46,7 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   "rails-dom-testing": "actionview",
   mysql2: "activerecord",
   sqlite3: "activerecord",
-  racc: "nokogiri",
+  racc: "ruby-compat",
   "rails-html-sanitizer": "html-sanitizer",
   loofah: "html-sanitizer",
   crass: "html-sanitizer",
