@@ -1239,7 +1239,7 @@
     }
   },
   "trailties": {
-    "rows": 168,
+    "rows": 169,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "commands/build.ts::BuildCommand",
@@ -1311,7 +1311,7 @@
       "configuration.ts::Generators": "Trails::Configuration::Generators",
       "configuration.ts::MiddlewareStackProxy": "Trails::Configuration::MiddlewareStackProxy",
       "engine.ts::Engine": "Trails::Engine",
-      "engine/configuration.ts::EngineConfiguration": "Trails::Engine::Configuration",
+      "engine/configuration.ts::Configuration": "Trails::Engine::Configuration",
       "engine/lazy-route-set.ts::LazyRouteSet": "Trails::Engine::LazyRouteSet",
       "engine/lazy-route-set.ts::LazyRouteSet.ProxyUrlHelpers": "Trails::Engine::LazyRouteSet::ProxyUrlHelpers",
       "engine/lazy-route-set.ts::NamedRouteCollection": "Trails::Engine::LazyRouteSet::NamedRouteCollection",
@@ -1327,6 +1327,7 @@
       "generators/active-record/model/model-generator.ts::ModelGenerator": "ActiveRecord::Generators::ModelGenerator",
       "generators/active-record/multi-db/multi-db-generator.ts::MultiDbGenerator": "ActiveRecord::Generators::MultiDbGenerator",
       "generators/app-base.ts::AppBase": "Trails::Generators::AppBase",
+      "generators/app-base.ts::GemfileEntry": "Trails::Generators::AppBase::GemfileEntry",
       "generators/app-name.ts::AppName": "Trails::Generators::AppName",
       "generators/base.ts::Base": "Trails::Generators::Base",
       "generators/base.ts::Error": "Trails::Generators::Error",

@@ -177,7 +177,7 @@ describe("AppGenerator (trails-only)", () => {
     try {
       await new AppGenerator(
         ["my-app"],
-        { skipInstall: true, skipJavascript: true, database: "sqlite" },
+        { skipInstall: true, database: "sqlite" },
         { destinationRoot: root },
       ).invokeAll();
       const app = path.join(root, "my-app");

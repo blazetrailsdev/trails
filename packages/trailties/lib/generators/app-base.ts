@@ -514,7 +514,6 @@ ${requireStatements.join("\n")}`;
     return [
       this.trailsGemfileEntry(),
       this.databaseGemfileEntry(),
-      this.javascriptGemfileEntry(),
       this.hotwireGemfileEntry(),
       this.cssGemfileEntry(),
       this.cableGemfileEntry(),
@@ -591,21 +590,6 @@ ${requireStatements.join("\n")}`;
     } else {
       const patch = gemVersion.segments().slice(0, 3).join(".");
       return [`~${patch}`, `>=${gemVersion}`];
-    }
-  }
-
-  /**
-   * @internal
-   * @missingRailsArgs floats — PERMANENT
-   */
-  protected javascriptGemfileEntry(): GemfileEntry | undefined {
-    if (this.options.skipJavascript) return;
-
-    if (this.options.javascript === "vite") {
-      return GemfileEntry.floats(
-        "@blazetrails/vite-trails",
-        "Use JavaScript with Vite [https://vite-ruby.netlify.app]",
-      );
     }
   }
 
