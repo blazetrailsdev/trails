@@ -3,13 +3,10 @@ import { OrderedOptions, TopLevel, include, onLoad } from "@blazetrails/activesu
 import "@blazetrails/trailties/trailties/action-controller";
 import { Trails, type Application } from "@blazetrails/trailties";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
-import { File, LoadError, constDefined } from "@blazetrails/ruby-compat";
+import { File, constDefined } from "@blazetrails/ruby-compat";
 import { Turbo } from "./turbo-trails.js";
-import type { TestAssertions } from "./test-assertions.js";
-import type { IntegrationTestAssertions } from "./test-assertions/integration-test-assertions.js";
 import type { IdentityEncoder } from "@blazetrails/actionpack/testing";
 import type { SystemTestHelper } from "./system-test-helper.js";
-import type { TestHelper as BroadcastableTestHelper } from "./broadcastable/test-helper.js";
 import "./app/channels/turbo/streams-channel.js";
 import "./app/jobs/turbo/streams/action-broadcast-job.js";
 import "./app/jobs/turbo/streams/broadcast-job.js";
@@ -172,62 +169,34 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    /**
-     * @inventedArm await — PERMANENT
-     * @inventedArm if — PERMANENT
-     */
+    /** @inventedArm await — PERMANENT */
     this.initializer("turbo.test_assertions", async () => {
-      const testAssertions =
-        TopLevel.ActiveSupport?.TestCase !== undefined
-          ? (
-              (await Turbo.loadPath["turbo/test_assertions"]()) as {
-                TestAssertions: typeof TestAssertions;
-              }
-            ).TestAssertions
-          : null;
+      const { TestAssertions } = (await Turbo.loadPath[
+        "turbo/test_assertions"
+      ]()) as typeof import("./test-assertions.js");
+      const { TestHelper } = (await Turbo.loadPath[
+        "turbo/broadcastable/test_helper"
+      ]()) as typeof import("./broadcastable/test-helper.js");
+      const { IntegrationTestAssertions } = (await Turbo.loadPath[
+        "turbo/test_assertions/integration_test_assertions"
+      ]()) as typeof import("./test-assertions/integration-test-assertions.js");
+
       onLoad("active_support_test_case", function (this: object) {
-        if (testAssertions === null) {
-          throw new LoadError("cannot load such file -- turbo/test_assertions");
-        }
-        include(this, testAssertions);
+        include(this, TestAssertions);
 
         ThreadDebouncer.debouncerClass = ImmediateDebouncer;
       });
 
-      const testHelper =
-        TopLevel.ActiveSupport?.TestCase !== undefined && constDefined(TopLevel, "ActiveJob")
-          ? (
-              (await Turbo.loadPath["turbo/broadcastable/test_helper"]()) as {
-                TestHelper: typeof BroadcastableTestHelper;
-              }
-            ).TestHelper
-          : null;
       onLoad("action_cable", () => {
         onLoad("active_support_test_case", function (this: object) {
           if (constDefined(TopLevel, "ActiveJob")) {
-            if (testHelper === null) {
-              throw new LoadError("cannot load such file -- turbo/broadcastable/test_helper");
-            }
-            include(this, testHelper);
+            include(this, TestHelper);
           }
         });
       });
 
-      const integrationTestAssertions =
-        ActionDispatch.IntegrationTest !== undefined
-          ? (
-              (await Turbo.loadPath["turbo/test_assertions/integration_test_assertions"]()) as {
-                IntegrationTestAssertions: typeof IntegrationTestAssertions;
-              }
-            ).IntegrationTestAssertions
-          : null;
       onLoad("action_dispatch_integration_test", function (this: object) {
-        if (integrationTestAssertions === null) {
-          throw new LoadError(
-            "cannot load such file -- turbo/test_assertions/integration_test_assertions",
-          );
-        }
-        include(this, integrationTestAssertions);
+        include(this, IntegrationTestAssertions);
       });
     });
 

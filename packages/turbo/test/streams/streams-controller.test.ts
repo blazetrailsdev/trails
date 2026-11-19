@@ -123,6 +123,7 @@ describe("Turbo::StreamsControllerTest", () => {
     );
   });
 
+  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("render correct partial and I18n with a custom view path in the controller", async () => {
     await t.get(urlHelpers().adminCompanyPath({ id: 1 }), { as: ":turbo_stream" });
     t.assertDomEqual(

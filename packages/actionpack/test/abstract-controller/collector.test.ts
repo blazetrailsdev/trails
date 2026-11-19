@@ -227,22 +227,18 @@ describe("generateMethodForMime", () => {
     expect(Collector.isMethodDefined("json")).toBe(true);
   });
 
-  it("defines a multi-word MIME symbol under its Ruby name", () => {
-    expect(Collector.isMethodDefined("url_encoded_form")).toBe(true);
-  });
-
   it("round-trips a multi-word MIME symbol registered later, and through method_missing", () => {
     MimeType.register("application/tablet-phone", ":tablet_phone");
     try {
       const c = new TestCollector() as TestCollector & { tabletPhone(): unknown };
-      expect(Collector.isMethodDefined("tablet_phone")).toBe(true);
+      expect(Collector.isMethodDefined("tabletPhone")).toBe(true);
       expect(c.tabletPhone()).toBe("dispatched:tablet_phone");
-      Collector.removeMethod("tablet_phone");
+      Collector.removeMethod("tabletPhone");
       expect(c.tabletPhone()).toBe("dispatched:tablet_phone");
-      expect(Collector.isMethodDefined("tablet_phone")).toBe(true);
+      expect(Collector.isMethodDefined("tabletPhone")).toBe(true);
     } finally {
       MimeType.unregister(":tablet_phone");
-      Collector.removeMethod("tablet_phone");
+      Collector.removeMethod("tabletPhone");
     }
   });
 });

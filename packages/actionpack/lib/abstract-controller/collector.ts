@@ -85,7 +85,7 @@ export function methodMissing(this: object, symbol: string, ...args: unknown[]):
 
   if (MimeType.SET.isInclude(mimeConstant)) {
     Collector.generateMethodForMime(mimeConstant);
-    return rbFSend(this, symbol, ...args);
+    return rbFSend(this, camelize(symbol, "lower"), ...args);
   } else {
     const super_ = Collector.superMethod(this, "methodMissing");
     if (super_ !== undefined) return super_(symbol, ...args);

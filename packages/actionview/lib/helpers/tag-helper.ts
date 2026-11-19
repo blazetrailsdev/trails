@@ -10,7 +10,6 @@ import {
   isBlank,
   isPlainObject,
   isPresent,
-  underscore,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
 import {
@@ -723,12 +722,11 @@ export class TagBuilder {
     return `${key}="${String(value)}"`;
   }
 
-  /**
-   * @internal
-   * @inventedArm underscore — PERMANENT
-   */
+  /** @internal */
   private prefixTagOption(prefix: string, key: string, value: unknown, escape: boolean): string {
-    key = `${prefix}-${dasherize(underscore(String(key)))}`;
+    key = String(key);
+    if (/^[a-z]/.test(key)) key = key.replace(/[A-Z]/g, (hump) => `_${hump.toLowerCase()}`);
+    key = `${prefix}-${dasherize(key)}`;
     if (
       !(typeof value === "string" || value instanceof SafeBuffer || value instanceof BigDecimal)
     ) {
