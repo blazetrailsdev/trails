@@ -2226,7 +2226,7 @@ for (const name of [
   "flatMap",
 ]) {
   ENUMERABLE_METHODS[name] = (records, args) =>
-    (records as unknown as Record<string, (...a: unknown[]) => unknown>)[name](...args);
+    (records as unknown[] & Record<string, (...a: unknown[]) => unknown>)[name](...args);
 }
 
 include(Relation, Enumerable);
