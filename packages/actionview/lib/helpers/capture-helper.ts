@@ -92,6 +92,18 @@ export function contentFor(
   }
 }
 
+export function provide(
+  this: CaptureHelperHost,
+  name: string,
+  content: unknown,
+  block: () => PromiseLike<unknown>,
+): Promise<SafeBuffer | null>;
+export function provide(
+  this: CaptureHelperHost,
+  name: string,
+  content?: unknown,
+  block?: () => unknown,
+): SafeBuffer | null;
 /** @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge */
 export function provide(
   this: CaptureHelperHost,
