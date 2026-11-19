@@ -22,9 +22,6 @@ function localesDir(): string {
   return new URL("../test-data/locales", import.meta.url).pathname;
 }
 
-const { gettext, sgettext, pgettext, ngettext, nsgettext, npgettext } = Helpers;
-const n_ = Helpers.n_.bind(Helpers);
-
 describe("I18nGettextBackendTest", () => {
   beforeEach(async () => {
     await TestCase.setup();
@@ -45,69 +42,69 @@ describe("I18nGettextBackendTest", () => {
 
   it("looks up a translation", () => {
     setLocale("de");
-    expect(gettext.call(Helpers, "car")).toBe("Auto");
+    expect(Helpers.gettext("car")).toBe("Auto");
   });
 
   it("uses default translation", () => {
-    expect(gettext.call(Helpers, "car")).toBe("car");
+    expect(Helpers.gettext("car")).toBe("car");
   });
 
   it("looks up a namespaced translation", () => {
     setLocale("de");
-    expect(sgettext.call(Helpers, "Car|Wheels count")).toBe("Räderzahl");
-    expect(pgettext.call(Helpers, "Car", "Wheels count")).toBe("Räderzahl");
-    expect(pgettext.call(Helpers, "New car", "Wheels count")).toBe("Räderzahl!");
+    expect(Helpers.sgettext("Car|Wheels count")).toBe("Räderzahl");
+    expect(Helpers.pgettext("Car", "Wheels count")).toBe("Räderzahl");
+    expect(Helpers.pgettext("New car", "Wheels count")).toBe("Räderzahl!");
   });
 
   it("uses namespaced default translation", () => {
-    expect(sgettext.call(Helpers, "Car|Wheels count")).toBe("Wheels count");
-    expect(pgettext.call(Helpers, "Car", "Wheels count")).toBe("Wheels count");
-    expect(pgettext.call(Helpers, "New car", "Wheels count")).toBe("Wheels count");
+    expect(Helpers.sgettext("Car|Wheels count")).toBe("Wheels count");
+    expect(Helpers.pgettext("Car", "Wheels count")).toBe("Wheels count");
+    expect(Helpers.pgettext("New car", "Wheels count")).toBe("Wheels count");
   });
 
   it("pluralizes entry", () => {
     setLocale("de");
-    expect(ngettext.call(Helpers, "Axis", "Axis", 1)).toBe("Achse");
-    expect(ngettext.call(Helpers, "Axis", "Axis", 2)).toBe("Achsen");
+    expect(Helpers.ngettext("Axis", "Axis", 1)).toBe("Achse");
+    expect(Helpers.ngettext("Axis", "Axis", 2)).toBe("Achsen");
   });
 
   it("pluralizes default entry", () => {
-    expect(ngettext.call(Helpers, "Axis", "Axis", 1)).toBe("Axis");
-    expect(ngettext.call(Helpers, "Axis", "Axis", 2)).toBe("Axis");
+    expect(Helpers.ngettext("Axis", "Axis", 1)).toBe("Axis");
+    expect(Helpers.ngettext("Axis", "Axis", 2)).toBe("Axis");
   });
 
   it("pluralizes namespaced entry", () => {
     setLocale("de");
-    expect(nsgettext.call(Helpers, "Car|wheel", "wheels", 1)).toBe("Rad");
-    expect(nsgettext.call(Helpers, "Car|wheel", "wheels", 2)).toBe("Räder");
-    expect(npgettext.call(Helpers, "Car", "wheel", "wheels", 1)).toBe("Rad");
-    expect(npgettext.call(Helpers, "Car", "wheel", "wheels", 2)).toBe("Räder");
-    expect(npgettext.call(Helpers, "New car", "wheel", "wheels", 1)).toBe("Rad!");
-    expect(npgettext.call(Helpers, "New car", "wheel", "wheels", 2)).toBe("Räder!");
+    expect(Helpers.nsgettext("Car|wheel", "wheels", 1)).toBe("Rad");
+    expect(Helpers.nsgettext("Car|wheel", "wheels", 2)).toBe("Räder");
+    expect(Helpers.npgettext("Car", "wheel", "wheels", 1)).toBe("Rad");
+    expect(Helpers.npgettext("Car", "wheel", "wheels", 2)).toBe("Räder");
+    expect(Helpers.npgettext("New car", "wheel", "wheels", 1)).toBe("Rad!");
+    expect(Helpers.npgettext("New car", "wheel", "wheels", 2)).toBe("Räder!");
   });
 
   it("pluralizes namespaced default entry", () => {
-    expect(nsgettext.call(Helpers, "Car|wheel", "wheels", 1)).toBe("wheel");
-    expect(nsgettext.call(Helpers, "Car|wheel", "wheels", 2)).toBe("wheels");
-    expect(npgettext.call(Helpers, "Car", "wheel", "wheels", 1)).toBe("wheel");
-    expect(npgettext.call(Helpers, "Car", "wheel", "wheels", 2)).toBe("wheels");
-    expect(npgettext.call(Helpers, "New car", "wheel", "wheels", 1)).toBe("wheel");
-    expect(npgettext.call(Helpers, "New car", "wheel", "wheels", 2)).toBe("wheels");
+    expect(Helpers.nsgettext("Car|wheel", "wheels", 1)).toBe("wheel");
+    expect(Helpers.nsgettext("Car|wheel", "wheels", 2)).toBe("wheels");
+    expect(Helpers.npgettext("Car", "wheel", "wheels", 1)).toBe("wheel");
+    expect(Helpers.npgettext("Car", "wheel", "wheels", 2)).toBe("wheels");
+    expect(Helpers.npgettext("New car", "wheel", "wheels", 1)).toBe("wheel");
+    expect(Helpers.npgettext("New car", "wheel", "wheels", 2)).toBe("wheels");
   });
 
   it("pluralizes namespaced entry with alternative syntax", () => {
     setLocale("de");
-    expect(nsgettext.call(Helpers, ["Car|wheel", "wheels"], 1)).toBe("Rad");
-    expect(nsgettext.call(Helpers, ["Car|wheel", "wheels"], 2)).toBe("Räder");
-    expect(npgettext.call(Helpers, "Car", ["wheel", "wheels"], 1)).toBe("Rad");
-    expect(npgettext.call(Helpers, "Car", ["wheel", "wheels"], 2)).toBe("Räder");
-    expect(npgettext.call(Helpers, "New car", ["wheel", "wheels"], 1)).toBe("Rad!");
-    expect(npgettext.call(Helpers, "New car", ["wheel", "wheels"], 2)).toBe("Räder!");
+    expect(Helpers.nsgettext(["Car|wheel", "wheels"], 1)).toBe("Rad");
+    expect(Helpers.nsgettext(["Car|wheel", "wheels"], 2)).toBe("Räder");
+    expect(Helpers.npgettext("Car", ["wheel", "wheels"], 1)).toBe("Rad");
+    expect(Helpers.npgettext("Car", ["wheel", "wheels"], 2)).toBe("Räder");
+    expect(Helpers.npgettext("New car", ["wheel", "wheels"], 1)).toBe("Rad!");
+    expect(Helpers.npgettext("New car", ["wheel", "wheels"], 2)).toBe("Räder!");
   });
 
   it("ngettextpluralizes entry with dots", () => {
     setLocale("de");
-    expect(n_("On %{count} wheel.", "On %{count} wheels.", 1)).toBe("Auf 1 Achse.");
-    expect(n_("On %{count} wheel.", "On %{count} wheels.", 2)).toBe("Auf 2 Achsen.");
+    expect(Helpers.n_("On %{count} wheel.", "On %{count} wheels.", 1)).toBe("Auf 1 Achse.");
+    expect(Helpers.n_("On %{count} wheel.", "On %{count} wheels.", 2)).toBe("Auf 2 Achsen.");
   });
 });
