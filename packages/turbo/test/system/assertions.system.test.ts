@@ -24,7 +24,6 @@ describe("AssertionsTest", () => {
 
   beforeEach(async () => {
     t = new ApplicationSystemTestCase(expect.getState().currentTestName!) as Helper;
-    await t.page();
     app.reloadRoutesUnlessLoaded();
   });
 
