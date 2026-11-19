@@ -25,7 +25,7 @@ describe("LazyRouteSet", () => {
 
   beforeEach(() => {
     routes = new LazyRouteSet();
-    reload = vi.fn(async () => true);
+    reload = vi.fn((): boolean | null => true);
     Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
     constSet(TopLevel, "PostsController", StubController);
   });
@@ -92,37 +92,31 @@ describe("LazyRouteSet", () => {
     expect(() => routes.draw(function () {})).not.toThrow();
   });
 
-  function loadRoutesLazily(): () => Promise<boolean | null> | undefined {
-    let loading: Promise<boolean | null> | undefined;
+  function loadRoutesLazily(): void {
+    let loaded = false;
     reload.mockImplementation(() => {
-      if (loading) return Promise.resolve(null);
-      return (loading = Promise.resolve().then(() => {
-        routes.draw(function () {
-          this.root({ to: "posts#index" });
-        });
-        return true;
-      }));
+      if (loaded) return null;
+      loaded = true;
+      routes.draw(function () {
+        this.root({ to: "posts#index" });
+      });
+      return true;
     });
-    return () => loading;
   }
 
-  it("app lazily loads routes when invoking url helpers", async () => {
-    const loading = loadRoutesLazily();
+  it("app lazily loads routes when invoking url helpers", () => {
+    loadRoutesLazily();
     const appUrlHelpers = routes.urlHelpers() as unknown as { rootPath(): string };
 
     assertNotOperator("rootPath", "in", appUrlHelpers);
-    void appUrlHelpers.rootPath;
-    await loading();
     expect(appUrlHelpers.rootPath()).toBe("/");
   });
 
-  it("app lazily loads routes when checking respond_to?", async () => {
-    const loading = loadRoutesLazily();
+  it("app lazily loads routes when checking respond_to?", () => {
+    loadRoutesLazily();
     const appUrlHelpers = routes.urlHelpers();
 
     assertNotOperator("rootPath", "in", appUrlHelpers);
-    rbObjRespondTo(appUrlHelpers, "rootPath");
-    await loading();
     assertOperator(appUrlHelpers, "respond_to?", "rootPath");
   });
 

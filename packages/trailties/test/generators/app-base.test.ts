@@ -197,26 +197,41 @@ describe("AppBase run tasks", () => {
 
   it("runInstall installs through the package manager unless isInstall is false", async () => {
     const previous = childProcessAdapterConfig.adapter;
-    const spawnSync = vi.fn(() => ({ status: 0, signal: null, stdout: "", stderr: "" }));
-    registerChildProcessAdapter("run-install-test", { spawnSync });
+    const system = vi.fn(async () => ({ pid: 1, status: 1, signal: null }));
+    registerChildProcessAdapter("run-install-test", {
+      spawnSync: vi.fn(),
+      system,
+    } as unknown as ChildProcessAdapter);
     childProcessAdapterConfig.adapter = "run-install-test";
     try {
       const generator = (options: Record<string, unknown>) =>
-        new T(["app"], { quiet: true, ...options }, { destinationRoot: "/tmp" }) as unknown as {
+        new T(["app"], options, { destinationRoot: "/tmp" }) as unknown as {
           runInstall(): Promise<void>;
+          sayStatus: unknown;
         };
-      await generator({ skipInstall: true }).runInstall();
-      await generator({ pretend: true }).runInstall();
-      expect(spawnSync).not.toHaveBeenCalled();
-      const installing = generator({}) as unknown as {
-        runInstall(): Promise<void>;
-        sayStatus: unknown;
-      };
+      await generator({ quiet: true, skipInstall: true }).runInstall();
+      await generator({ quiet: true, pretend: true }).runInstall();
+      expect(system).not.toHaveBeenCalled();
+
+      const quiet = generator({ quiet: true });
       const sayStatus = vi.fn();
-      installing.sayStatus = sayStatus;
-      await installing.runInstall();
-      expect(spawnSync).toHaveBeenCalledOnce();
+      quiet.sayStatus = sayStatus;
+      await quiet.runInstall();
       expect(sayStatus).toHaveBeenCalledWith("run", expect.stringMatching(/ install$/));
+      expect(system).toHaveBeenCalledOnce();
+      expect(system.mock.calls[0]).toEqual([
+        expect.stringMatching(/^"\w+" install$/),
+        expect.anything(),
+        null,
+        expect.objectContaining({ out: "/dev/null" }),
+      ]);
+
+      const loud = generator({});
+      loud.sayStatus = vi.fn();
+      await loud.runInstall();
+      expect(system).toHaveBeenCalledTimes(2);
+      expect((system.mock.calls[1] as unknown[])[3]).not.toHaveProperty("out");
+      expect((system.mock.calls[1] as unknown[])[3]).not.toHaveProperty("err");
     } finally {
       childProcessAdapterConfig.adapter = previous;
     }

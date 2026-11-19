@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/ruby-compat";
-import { b, stderr, TCPSocket, Thread } from "@blazetrails/ruby-compat";
+import { b, stderr, stdout, TCPSocket, Thread } from "@blazetrails/ruby-compat";
 import type { RackApp, RackBody, RackEnv, RackMiddleware } from "@blazetrails/rack";
 import { Files, Lint, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "@blazetrails/rack";
 import { Node } from "../../lib/handler/node.js";
@@ -1204,3 +1204,31 @@ async function rawGet(url: string, path: string): Promise<{ text: string }> {
     socket.on("close", () => resolve({ text }));
   });
 }
+
+describe("Node.run listening", () => {
+  it("reports the bound address once listening, and never on a failed bind", async () => {
+    const write = vi.spyOn(stdout, "write").mockImplementation(() => 0 as never);
+    try {
+      const app: RackApp = async () => [200, {}, [""]];
+      const server = await Node.run(app, { Port: 0, Host: "127.0.0.1" });
+      const address = server.address();
+      const port = address && typeof address === "object" ? address.port : 0;
+      expect(write).toHaveBeenCalledWith(`* Listening on http://127.0.0.1:${port}\n`);
+      expect(
+        (server as unknown as { listenerCount(e: string): number }).listenerCount("error"),
+      ).toBe(0);
+      write.mockClear();
+      try {
+        await expect(Node.run(app, { Port: port, Host: "127.0.0.1" })).rejects.toMatchObject({
+          code: "EADDRINUSE",
+        });
+        expect(write).not.toHaveBeenCalled();
+      } finally {
+        Node.server = server;
+        await Node.shutdown();
+      }
+    } finally {
+      write.mockRestore();
+    }
+  });
+});

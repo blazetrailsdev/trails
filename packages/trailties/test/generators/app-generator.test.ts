@@ -64,11 +64,11 @@ async function runGeneratorInstance(
   const railsCommands: string[] = [];
   const proto = AppGenerator.prototype as unknown as {
     isInstall(): boolean;
-    installCommand(command: string): void;
+    installCommand(command: string): Promise<void>;
   };
   const stubs = [
     vi.spyOn(proto, "isInstall").mockReturnValue(true),
-    vi.spyOn(proto, "installCommand").mockImplementation((command: string) => {
+    vi.spyOn(proto, "installCommand").mockImplementation(async (command: string) => {
       bundleCommands.push(command);
     }),
     vi.spyOn(Actions, "trailsCommand").mockImplementation(async (command: string) => {

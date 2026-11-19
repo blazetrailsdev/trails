@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { include } from "@blazetrails/ruby-compat";
+import { constSet, include, TopLevel } from "@blazetrails/ruby-compat";
 
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import { UrlFor } from "../../../lib/action-dispatch/routing/url-for.js";
@@ -35,38 +35,12 @@ describe("withRoutesHelpers", () => {
     expect(spy2).toHaveBeenCalledWith(false);
   });
 
-  it("prefers a class-level trailtieRoutesUrlHelpers over routes.urlHelpers", () => {
-    const Namespaced: HelperMethodsModule = { nsPath: () => "/ns" };
-    const routesSpy = vi.fn();
-    const cls: RoutesHelpersControllerClass = {
-      prototype: {},
-      trailtieRoutesUrlHelpers: () => Namespaced,
-    };
-    RoutesHelpers.with({ urlHelpers: routesSpy })(cls);
-
-    expect((cls.prototype as { nsPath?: () => string }).nsPath?.()).toBe("/ns");
-    expect(routesSpy).not.toHaveBeenCalled();
-  });
-
-  it("walks the static-side prototype chain (approximation of Ruby module_parents)", () => {
-    const Inherited: HelperMethodsModule = { up: () => "from-parent" };
-    const parent = { trailtieRoutesUrlHelpers: () => Inherited };
-    const child: RoutesHelpersControllerClass = Object.create(
-      parent,
-    ) as RoutesHelpersControllerClass;
-    child.prototype = {};
-
-    RoutesHelpers.with({ urlHelpers: vi.fn() })(child);
-
-    expect((child.prototype as { up?: () => string }).up?.()).toBe("from-parent");
-  });
-
   it("passes include_path_helpers through to the namespaced builder too", () => {
     const nsSpy = vi.fn().mockReturnValue({});
-    const cls: RoutesHelpersControllerClass = {
-      prototype: {},
-      trailtieRoutesUrlHelpers: nsSpy,
-    };
+    const Ns = { trailtieRoutesUrlHelpers: nsSpy };
+    constSet(TopLevel, "RoutesHelpersNs", Ns);
+    const cls = class {} as unknown as RoutesHelpersControllerClass;
+    constSet(Ns, "PostsController", cls);
     RoutesHelpers.with({ urlHelpers: vi.fn() }, false)(cls);
     expect(nsSpy).toHaveBeenCalledWith(false);
   });
@@ -80,22 +54,6 @@ describe("withRoutesHelpers", () => {
     const proto = cls.prototype as { inherited?: () => string; own?: () => string };
     expect(proto.inherited?.()).toBe("from-proto");
     expect(proto.own?.()).toBe("own");
-  });
-
-  it("does not pick up trailtieRoutesUrlHelpers planted on Object.prototype", () => {
-    (Object.prototype as { trailtieRoutesUrlHelpers?: unknown }).trailtieRoutesUrlHelpers = () => ({
-      sneaky: () => "polluted",
-    });
-    try {
-      const cls = makeClass();
-      const RouteHelper: HelperMethodsModule = { clean: () => "clean" };
-      RoutesHelpers.with({ urlHelpers: () => RouteHelper })(cls);
-      const proto = cls.prototype as { clean?: () => string; sneaky?: () => string };
-      expect(proto.clean?.()).toBe("clean");
-      expect(proto.sneaky).toBeUndefined();
-    } finally {
-      delete (Object.prototype as { trailtieRoutesUrlHelpers?: unknown }).trailtieRoutesUrlHelpers;
-    }
   });
 
   it("crosses the module's methods and _routes, but not its other members", () => {

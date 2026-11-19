@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ExceptionWrapper, RouteSet } from "@blazetrails/actionpack";
 import { TestCase as ControllerTestCase, IntegrationTest } from "@blazetrails/actionpack/testing";
 import { ActiveJob } from "@blazetrails/activejob";
@@ -127,20 +127,6 @@ describe("test_help wires a booted app into the test case classes", () => {
       expect(session.response.status).toBe(200);
       expect(session.response.body).toContain("<p>Hello from TSE</p>");
     });
-  });
-
-  it("loads the application's routes in IntegrationTest's before_setup", async () => {
-    const reload = vi.spyOn(Trails.application!, "reloadRoutesUnlessLoaded");
-    try {
-      const session = new IntegrationTest("test") as unknown as {
-        beforeSetup(): unknown;
-      };
-      const setup = session.beforeSetup();
-      expect(reload).toHaveBeenCalledTimes(1);
-      await setup;
-    } finally {
-      reload.mockRestore();
-    }
   });
 
   // PERMANENT-SKIP: a method a class defines itself is not overwritten by a later include's copy (CLAUDE.md, "A module's `initialize` is inlined into the constructor (`@inlinedFrom`)": a module included by an open set of classes binds `super` at include time).

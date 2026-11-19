@@ -158,4 +158,26 @@ export class FooCommand extends Base {
     expect(foo.name).toBe("FooCommand");
     expect(foo.namespace()).toBe("foo");
   }, 30_000);
+
+  it("re-raises a module-not-found raised while loading the command", async () => {
+    const { Dir, File, FileUtils, LOAD_PATH, LoadError, registerCompiledFiles } =
+      await import("@blazetrails/ruby-compat");
+    const lib = File.join(Dir.mktmpdir("lookup"), "lib");
+    await FileUtils.mkdirPAsync(File.join(lib, "commands"));
+    const file = File.join(lib, "commands", "bar.ts");
+    await File.writeAsync(file, "");
+    registerCompiledFiles(lib, {
+      "commands/bar.ts": () =>
+        Promise.reject(
+          Object.assign(
+            new Error(`Cannot find module '/missing/dependency.js' imported from ${file}`),
+            { code: "ERR_MODULE_NOT_FOUND" },
+          ),
+        ),
+    });
+    LOAD_PATH.unshift(lib);
+    onTestFinished(() => void LOAD_PATH.splice(LOAD_PATH.indexOf(lib), 1));
+
+    await expect(findByNamespace("bar")).rejects.toThrow(LoadError);
+  }, 30_000);
 });

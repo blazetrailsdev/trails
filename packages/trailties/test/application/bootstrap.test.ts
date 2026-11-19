@@ -6,7 +6,8 @@ import {
   onLoad,
   resetLoadHooks,
 } from "@blazetrails/activesupport";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Errno, STDERR } from "@blazetrails/ruby-compat";
 import { Initializable } from "../../lib/initializable.js";
 import {
   Bootstrap,
@@ -82,6 +83,42 @@ describe("Bootstrap", () => {
       Trails.logger = preset as unknown as Logger;
       await app.runInitializers("all");
       expect(Trails.logger).toBe(preset);
+    });
+
+    it("applies config.broadcastLogLevel to a preset BroadcastLogger", async () => {
+      const app = new TestApp();
+      const preset = new BroadcastLogger(new Logger(null));
+      Trails.logger = preset as unknown as Logger;
+      app.config = { ...baseConfig(), broadcastLogLevel: "error" };
+      await app.runInitializers("all");
+      expect(Trails.logger).toBe(preset);
+      expect(preset.level).toBe(Logger.ERROR);
+    });
+
+    it("falls back to a WARN STDERR logger when the log file cannot be opened", async () => {
+      const app = new TestApp();
+      app.config = {
+        ...baseConfig(),
+        logLevel: "warn",
+        defaultLogFile: async () => {
+          throw new Errno.EACCES("log/test.log");
+        },
+      };
+      const written: string[] = [];
+      const write = vi.spyOn(STDERR, "write").mockImplementation((...s: unknown[]) => {
+        written.push(s.map(String).join(""));
+        return 0 as never;
+      });
+      try {
+        await app.runInitializers("all");
+      } finally {
+        write.mockRestore();
+      }
+      expect(Trails.logger).toBeInstanceOf(BroadcastLogger);
+      expect(Trails.logger?.level).toBe(Logger.WARN);
+      expect(written.join("")).toContain(
+        "Unable to access log file. Please ensure that log/test.log",
+      );
     });
   });
 
