@@ -147,7 +147,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     pattern: "testing/parallelize_executor.rb",
     package: "activesupport",
     reason:
-      'PERMANENT: forks worker processes and talks to them over DRb; vitest owns worker scheduling — CLAUDE.md \u00a7 "Runtime facts Node does not expose", the `fork` bullet (RFC 0246 Open question 2, ruled by the operator on 2026-11-19).',
+      'PERMANENT: exists only to drive the `Parallelization` worker pool or a thread pool for Minitest; vitest owns worker scheduling — CLAUDE.md \u00a7 "Runtime facts Node does not expose", the `fork` bullet (RFC 0246 Open question 2, ruled by the operator on 2026-11-19).',
   },
   {
     pattern: "fork_tracker.rb",

@@ -96,7 +96,7 @@ export class LogSubscriber extends Subscriber {
   }
 
   /** @missingRailsArgs public_instance_methods — PERMANENT */
-  protected static override _fetchPublicMethods(
+  protected static override fetchPublicMethods(
     subscriber: Subscriber,
     inheritAll: boolean,
   ): string[] {

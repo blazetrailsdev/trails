@@ -97,7 +97,7 @@ export class TestCase extends Minitest.Test {
       Reflect.set(this.prototype, testName, block);
     } else {
       Reflect.set(this.prototype, testName, function (this: TestCase) {
-        this.assert(false, `No implementation provided for ${name}`);
+        this.flunk(`No implementation provided for ${name}`);
       });
     }
   }

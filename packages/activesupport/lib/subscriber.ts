@@ -1,4 +1,5 @@
 import { Notifications } from "./notifications.js";
+import { rbModMethodDefined } from "@blazetrails/ruby-compat";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 import type { NotificationSubscriber } from "./notifications.js";
 import type { Event } from "./notifications/instrumenter.js";
@@ -35,6 +36,7 @@ export class Subscriber {
   declare private static _namespace?: string;
   declare private static _subscriber?: Subscriber;
   declare private static _notifier?: typeof Notifications;
+  declare private static _inheritAll?: boolean;
 
   static attachTo(
     namespace: string,
@@ -45,12 +47,13 @@ export class Subscriber {
     this._namespace = namespace;
     this._subscriber = subscriber;
     this._notifier = notifier;
+    this._inheritAll = inheritAll;
 
     this.subscribers.push(subscriber);
 
-    const events = this._fetchPublicMethods(subscriber, inheritAll);
+    const events = this.fetchPublicMethods(subscriber, inheritAll);
     for (const event of events) {
-      this._addEventSubscriber(event);
+      this.addEventSubscriber(event);
     }
     return events;
   }
@@ -66,16 +69,18 @@ export class Subscriber {
     const idx = this.subscribers.indexOf(subscriber);
     if (idx !== -1) this.subscribers.splice(idx, 1);
 
-    for (const event of this._fetchPublicMethods(subscriber, true)) {
-      this._removeEventSubscriber(event);
+    for (const event of this.fetchPublicMethods(subscriber, true)) {
+      this.removeEventSubscriber(event);
     }
 
     this._notifier = undefined;
   }
 
+  /** @inventedArm replace — PERMANENT */
   static methodAdded(event: string): void {
-    if (this.notifier) {
-      this._addEventSubscriber(event.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase());
+    if (rbModMethodDefined(this, event) && this.notifier) {
+      event = event.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+      this.addEventSubscriber(event);
     }
   }
 
@@ -98,8 +103,8 @@ export class Subscriber {
     return Object.hasOwn(this, "_namespace") ? this._namespace : undefined;
   }
 
-  private static _addEventSubscriber(event: string): void {
-    if (this._invalidEvent(event)) return;
+  private static addEventSubscriber(event: string): void {
+    if (this.isInvalidEvent(event)) return;
 
     const pattern = this.preparePattern(event);
 
@@ -108,8 +113,8 @@ export class Subscriber {
     this.subscriber!.patterns.set(pattern, this.notifier!.subscribe(pattern, this.subscriber!));
   }
 
-  private static _removeEventSubscriber(event: string): void {
-    if (this._invalidEvent(event)) return;
+  private static removeEventSubscriber(event: string): void {
+    if (this.isInvalidEvent(event)) return;
 
     const pattern = this.preparePattern(event);
 
@@ -124,7 +129,7 @@ export class Subscriber {
     return this.subscribers.find((attachedSubscriber) => attachedSubscriber.constructor === this);
   }
 
-  private static _invalidEvent(event: string): boolean {
+  private static isInvalidEvent(event: string): boolean {
     return event === "start" || event === "finish";
   }
 
@@ -139,7 +144,7 @@ export class Subscriber {
   }
 
   /** @missingRailsArgs public_instance_methods — PERMANENT */
-  protected static _fetchPublicMethods(subscriber: Subscriber, inheritAll: boolean): string[] {
+  protected static fetchPublicMethods(subscriber: Subscriber, inheritAll: boolean): string[] {
     const baseKeys = new Set(publicInstanceMethods(Subscriber, true));
     const keys = new Set<string>();
     let proto = Object.getPrototypeOf(subscriber);

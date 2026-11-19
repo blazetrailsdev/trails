@@ -318,6 +318,7 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     coder.representObject(null, this.toStr());
   }
 
+  /** @missingRailsArgs set_block_back_references — PERMANENT */
   gsub(...args: [...unknown[], BlockFn] | unknown[]): string | Generator<string> {
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as BlockFn) : null;
     if (block) {
@@ -326,7 +327,7 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
         [
           ...args,
           (...params: unknown[]) => {
-            this.setBlockBackReferences(block, params[0]);
+            this.setBlockBackReferences(block, null);
             return block(...params);
           },
         ],
@@ -337,6 +338,7 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     }
   }
 
+  /** @missingRailsArgs set_block_back_references — PERMANENT */
   gsubBang(...args: [...unknown[], BlockFn] | unknown[]): this | null {
     this._htmlSafe = false;
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as BlockFn) : null;
@@ -347,7 +349,7 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
           [
             ...args,
             (...params: unknown[]) => {
-              this.setBlockBackReferences(block, params[0]);
+              this.setBlockBackReferences(block, null);
               return block(...params);
             },
           ],
@@ -358,11 +360,12 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     return result == null ? null : this;
   }
 
+  /** @missingRailsArgs set_block_back_references — PERMANENT */
   sub(...args: [...unknown[], BlockFn] | unknown[]): string {
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as BlockFn) : null;
     if (block) {
       return rbStrSub({ string: this.toStr() }, ...args, (...params: unknown[]) => {
-        this.setBlockBackReferences(block, params[0]);
+        this.setBlockBackReferences(block, null);
         return block(...params);
       });
     } else {
@@ -370,13 +373,14 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     }
   }
 
+  /** @missingRailsArgs set_block_back_references — PERMANENT */
   subBang(...args: [...unknown[], BlockFn] | unknown[]): this | null {
     this._htmlSafe = false;
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as BlockFn) : null;
     const self = { string: this._value };
     const result = block
       ? rbStrSubBang(self, ...args, (...params: unknown[]) => {
-          this.setBlockBackReferences(block, params[0]);
+          this.setBlockBackReferences(block, null);
           return block(...params);
         })
       : rbStrSubBang(self, ...args);

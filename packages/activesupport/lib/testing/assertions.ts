@@ -127,6 +127,12 @@ export class Test {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  flunk(msg: string | (() => string) | null = null): true {
+    msg ??= "Epic Fail!";
+    return this.assert(false, msg);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   assert(test: unknown, msg: string | (() => string) | null = null): true {
     this.assertions += 1;
     if (test == null || test === false) {
