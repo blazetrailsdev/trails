@@ -104,10 +104,10 @@ export class Job extends Record {
   static {
     constSet(SolidQueue, "Job", this);
 
+    include(this, Batchable);
     include(this, Recurrable);
     include(this, Clearable);
     include(this, Executable);
-    include(this, Batchable);
 
     this.serialize("arguments", { coder: JSON });
   }
