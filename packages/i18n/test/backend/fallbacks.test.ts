@@ -1,6 +1,5 @@
-import { include } from "@blazetrails/ruby-compat";
 import * as TestCase from "../support/test-case.js";
-import { Hash, Thread } from "@blazetrails/ruby-compat";
+import { Hash, include, Thread } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { Fallbacks, fallbacks, setFallbacks } from "../../lib/backend/fallbacks.js";
 import { Chain } from "../../lib/backend/chain.js";

@@ -2,7 +2,7 @@ import { isSymbol, kernelCatch, kernelThrow, rbCallSuper, Thread } from "@blazet
 
 import { MissingTranslation, InvalidLocale } from "../exceptions.js";
 import * as I18n from "../i18n.js";
-import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
+import type { Locale, TranslationKey } from "../i18n.js";
 import { Fallbacks as LocaleFallbacks } from "../locale/fallbacks.js";
 import type { TranslateOptions } from "./base.js";
 
@@ -52,7 +52,7 @@ export function translate(
   this: FallbacksHost,
   locale: Locale | null | undefined,
   key: TranslationKey | null | undefined,
-  options: TranslateOptions = EMPTY_HASH,
+  options: TranslateOptions = I18n.EMPTY_HASH,
 ): unknown {
   if (!truthy("fallback" in options ? options.fallback : true)) {
     return rbCallSuper(this, translate, locale, key, options);
@@ -99,7 +99,7 @@ export function resolveEntry(
   locale: Locale,
   object: TranslationKey | null | undefined,
   subject: unknown,
-  options: TranslateOptions = EMPTY_HASH,
+  options: TranslateOptions = I18n.EMPTY_HASH,
 ): unknown {
   if (options.resolve === false) return subject;
   const result = kernelCatch(":exception", () => {
@@ -143,7 +143,7 @@ export function exists(
   this: FallbacksHost,
   locale: Locale,
   key: TranslationKey,
-  options: TranslateOptions = EMPTY_HASH,
+  options: TranslateOptions = I18n.EMPTY_HASH,
 ): boolean {
   if (!truthy("fallback" in options ? options.fallback : true)) {
     return rbCallSuper(this, exists, locale, key, options) as boolean;
