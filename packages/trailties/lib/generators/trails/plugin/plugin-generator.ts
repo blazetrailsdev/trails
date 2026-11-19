@@ -32,7 +32,7 @@ interface PluginBuilderHost {
   chmod(path: string, mode: number, config: object): Promise<unknown>;
   run(command: string, config: object): Promise<unknown>;
   inside(dir: string, config: { verbose?: unknown }, block: () => Promise<void>): Promise<unknown>;
-  gem(name: string, options: { path: string }): Promise<void>;
+  gem(name: string, version: string): Promise<void>;
   invoke(klass: unknown, args: unknown[], opts: object): Promise<unknown>;
   gitInitCommand(): Promise<string>;
   shebang(): string;
@@ -274,7 +274,7 @@ this.config.actionController.includeAllHelpers = false;
     const gemfileInAppPath = File.join(this.trailsAppPath()!, "package.json");
     if (await File.isExistAsync(gemfileInAppPath)) {
       await this.inside(File.expandPath(this.trailsAppPath()!), { verbose: false }, () =>
-        this.gem(this.name(), { path: this.relativePath()! }),
+        this.gem(this.name(), `file:${this.relativePath()}`),
       );
     }
   }
