@@ -15,7 +15,7 @@ declare module "@blazetrails/activejob/namespaces" {
   }
 }
 
-export class SolidQueueAdapter {
+export class SolidQueueAdapter extends QueueAdapters.AbstractAdapter {
   declare static stopping: boolean;
 
   static {
@@ -37,11 +37,11 @@ export class SolidQueueAdapter {
     return true;
   }
 
-  async enqueue(activeJob: ActiveJob): Promise<unknown> {
+  override async enqueue(activeJob: ActiveJob): Promise<unknown> {
     return await Job.enqueue(activeJob);
   }
 
-  async enqueueAt(activeJob: ActiveJob, timestamp: number): Promise<unknown> {
+  override async enqueueAt(activeJob: ActiveJob, timestamp: number): Promise<unknown> {
     return await Job.enqueue(activeJob, { scheduledAt: Time.at(timestamp) });
   }
 

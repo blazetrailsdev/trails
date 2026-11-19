@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
-import { Batch, Job, SolidQueueAdapter } from "../lib/index.js";
+import { Batch, BatchExecution, Job, SolidQueueAdapter } from "../lib/index.js";
 import type {} from "../lib/active-job/batch-id.js";
 import { ApplicationJob } from "./support/application-job.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
@@ -23,5 +23,28 @@ describe("ActiveJob::BatchId#initialize (trails)", () => {
     });
     expect(job.batchId).toBe(batch.id);
     expect(new AddToBufferJob("built outside").batchId).toBeNull();
+  });
+});
+
+describe("SolidQueue::BatchExecution.with_finished_jobs (trails)", () => {
+  beforeAll(() => {
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
+  });
+
+  afterEach(async () => {
+    await Job.destroyAll();
+    await Batch.destroyAll();
+  });
+
+  it("sweeps the batch execution of a finished job", async () => {
+    await Batch.enqueue({}, async () => {
+      await AddToBufferJob.performLater("finished");
+    });
+    expect(await BatchExecution.count()).toBe(1);
+    await Job.updateAll({ finished_at: new Date() });
+
+    await Batch.sweepStalled();
+
+    expect(await BatchExecution.count()).toBe(0);
   });
 });

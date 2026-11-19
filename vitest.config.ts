@@ -251,6 +251,10 @@ const alias = {
     __dirname,
     "packages/activerecord/lib/fixtures.ts",
   ),
+  "@blazetrails/activerecord/connection-adapters/abstract-mysql-adapter.js": path.resolve(
+    __dirname,
+    "packages/activerecord/lib/connection-adapters/abstract-mysql-adapter.ts",
+  ),
   "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js": path.resolve(
     __dirname,
     "packages/activerecord/lib/connection-adapters/sqlite3-adapter.ts",

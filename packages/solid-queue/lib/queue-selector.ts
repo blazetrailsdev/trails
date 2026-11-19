@@ -60,7 +60,7 @@ export class QueueSelector {
 
   /** @internal */
   private async allQueues(): Promise<string[]> {
-    return await this.relation.distinct().pluck("queue_name");
+    return (await this.relation.distinctValuesOf("queue_name")) as string[];
   }
 
   /** @internal */
@@ -72,13 +72,12 @@ export class QueueSelector {
   private async prefixedNames(): Promise<string[]> {
     if (this.prefixes().length === 0) return [];
     else {
-      return await this.relation
+      return (await this.relation
         .where(
-          Array(this.prefixes().length).fill("queue_name LIKE ?").join(" OR "),
+          Array(this.prefixes().length).fill("queue_name LIKE ? ESCAPE '!'").join(" OR "),
           ...this.prefixes(),
         )
-        .distinct()
-        .pluck("queue_name");
+        .distinctValuesOf("queue_name")) as string[];
     }
   }
 
@@ -86,7 +85,7 @@ export class QueueSelector {
   private prefixes(): string[] {
     return (this._prefixes ??= this.rawQueues
       .filter((queue) => this.isPrefixedName(queue))
-      .map((queue) => queue.replaceAll("*", "%")));
+      .map((queue) => this.relation.sanitizeSqlLike(queue, "!").replaceAll("*", "%")));
   }
 
   /** @internal */

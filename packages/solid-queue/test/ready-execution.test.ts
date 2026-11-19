@@ -126,6 +126,36 @@ describe("SolidQueue::ReadyExecutionTest", () => {
     ).toBeTruthy();
   });
 
+  it("prefixes escape LIKE wildcards so only literal queue names match", async () => {
+    await AddToBufferJob.set({ queue: "mailbox" }).performLater(1);
+    await AddToBufferJob.set({ queue: "mail-ops" }).performLater(1);
+
+    await assertClaimedJobs(0, async () =>
+      ReadyExecution.claim("mail_*", (await Job.count()) + 1, 42),
+    );
+
+    await AddToBufferJob.set({ queue: "mail_ops" }).performLater(1);
+    await AddToBufferJob.set({ queue: "100x_done" }).performLater(1);
+
+    await assertClaimedJobs(1, async () =>
+      ReadyExecution.claim("mail_*", (await Job.count()) + 1, 42),
+    );
+    expect((await ((await ClaimedExecution.last()) as ClaimedExecution).job).queue_name).toEqual(
+      "mail_ops",
+    );
+
+    await assertClaimedJobs(0, async () =>
+      ReadyExecution.claim("100%_*", (await Job.count()) + 1, 42),
+    );
+
+    await AddToBufferJob.set({ queue: "100%_done" }).performLater(1);
+
+    await assertClaimedJobs(1, async () => ReadyExecution.claim("100%_*", 1, 42));
+    expect((await ((await ClaimedExecution.last()) as ClaimedExecution).job).queue_name).toEqual(
+      "100%_done",
+    );
+  });
+
   it("claim jobs using a wildcard and having paused queues", async () => {
     await AddToBufferJob.performLater("hey");
 
