@@ -12,52 +12,37 @@ export const BIGDECIMAL_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*
 export type NumberFormatOptions = object;
 
 const DEFAULTS = new Hash<string, unknown>()
-  .set(
-    ":format",
-    new Hash<string, unknown>()
-      .set(":separator", ".")
-      .set(":delimiter", ",")
-      .set(":precision", 3)
-      .set(":significant", false)
-      .set(":stripInsignificantZeros", false),
-  )
+  .set(":format", {
+    separator: ".",
+    delimiter: ",",
+    precision: 3,
+    significant: false,
+    stripInsignificantZeros: false,
+  })
   .set(
     ":currency",
-    new Hash<string, unknown>().set(
-      ":format",
-      new Hash<string, unknown>()
-        .set(":format", "%u%n")
-        .set(":negativeFormat", "-%u%n")
-        .set(":unit", "$")
-        .set(":separator", ".")
-        .set(":delimiter", ",")
-        .set(":precision", 2)
-        .set(":significant", false)
-        .set(":stripInsignificantZeros", false),
-    ),
+    new Hash<string, unknown>().set(":format", {
+      format: "%u%n",
+      negativeFormat: "-%u%n",
+      unit: "$",
+      separator: ".",
+      delimiter: ",",
+      precision: 2,
+      significant: false,
+      stripInsignificantZeros: false,
+    }),
   )
-  .set(
-    ":percentage",
-    new Hash<string, unknown>().set(
-      ":format",
-      new Hash<string, unknown>().set(":delimiter", "").set(":format", "%n%"),
-    ),
-  )
-  .set(
-    ":precision",
-    new Hash<string, unknown>().set(":format", new Hash<string, unknown>().set(":delimiter", "")),
-  )
+  .set(":percentage", new Hash<string, unknown>().set(":format", { delimiter: "", format: "%n%" }))
+  .set(":precision", new Hash<string, unknown>().set(":format", { delimiter: "" }))
   .set(
     ":human",
     new Hash<string, unknown>()
-      .set(
-        ":format",
-        new Hash<string, unknown>()
-          .set(":delimiter", "")
-          .set(":precision", 3)
-          .set(":significant", true)
-          .set(":stripInsignificantZeros", true),
-      )
+      .set(":format", {
+        delimiter: "",
+        precision: 3,
+        significant: true,
+        stripInsignificantZeros: true,
+      })
       .set(
         ":storage_units",
         new Hash<string, unknown>()
@@ -156,16 +141,11 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   }
 
   protected defaultFormatOptions(): Record<string, unknown> {
-    const options = rbObjDup(DEFAULTS.get(":format") as Hash<string, unknown>);
+    const options = rbObjDup(DEFAULTS.get(":format") as Record<string, unknown>);
     const ns = (this.constructor as typeof NumberConverter).namespace;
-    if (ns) {
-      for (const [k, v] of (DEFAULTS.get(`:${ns}`) as Hash<string, unknown>).get(":format") as Hash<
-        string,
-        unknown
-      >)
-        options.set(k, v);
-    }
-    return Object.fromEntries([...options].map(([k, v]) => [symbolToS(k), v]));
+    if (ns)
+      Object.assign(options, (DEFAULTS.get(`:${ns}`) as Hash<string, unknown>).get(":format"));
+    return options;
   }
 
   protected i18nFormatOptions(): Record<string, unknown> {

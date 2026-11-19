@@ -2243,6 +2243,7 @@ function fieldIvar(obj: object, field: string): string {
 }
 
 function idForVar(obj: object, iv: string): string {
+  if (isSymbol(iv)) iv = symbolToS(iv);
   if (_validIvarNames.has(iv)) return iv;
   if (!/^@[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_\u0080-\u{10FFFF}]*$/u.test(iv)) {
     throw new NameError(`\`${iv}' is not allowed as an instance variable name`, iv, {
@@ -2299,7 +2300,8 @@ export function rbObjIvarDefined(obj: object, iv: string): boolean {
  * `Kernel#instance_variable_set` (`rb_obj_ivar_set_m`, `vendor/ruby/v3.3.11/object.c:2914`):
  * sets ivar `iv` as an own field of `obj`, never through a setter, as
  * `rb_ivar_set` (`vendor/ruby/v3.3.11/variable.c:1923`) writes the ivar table
- * directly after `rb_check_frozen`.
+ * directly after `rb_check_frozen`. `iv` is a Symbol (`":@foo"`) or a String,
+ * as `id_for_var`'s `rb_check_id` (`vendor/ruby/v3.3.11/object.c:2225`) takes either.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#instance_variable_set`
  * (`vendor/ruby/v3.3.11/object.c:2914`).
