@@ -524,10 +524,13 @@ ${requireStatements.join("\n")}`;
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm replace — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json
+   */
   protected trailsVersionSpecifier(gemVersion = Trails.gemVersion()): string | string[] {
     if (gemVersion.segments().length === 3 || gemVersion.release().segments().length === 3) {
-      return `~${gemVersion}`;
+      return `~${`${gemVersion}`.replace(/^(\d+\.\d+\.\d+)\.(?=[A-Za-z])/, "$1-")}`;
     } else {
       const patch = gemVersion.segments().slice(0, 3).join(".");
       return [`~${patch}`, `>=${gemVersion}`];

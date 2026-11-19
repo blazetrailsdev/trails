@@ -1,3 +1,4 @@
+import { Gem } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
@@ -222,6 +223,17 @@ describe("AppGenerator (trails-only)", () => {
     expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts");
     expect(pkg.devDependencies["@blazetrails/activerecord-cli"]).toBeDefined();
     expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(false);
+  });
+
+  it("writes a release or prerelease Trails version as an npm tilde range", () => {
+    const generator = new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir });
+    const specifier = (v: string) =>
+      (
+        generator as unknown as { trailsVersionSpecifier(v: unknown): unknown }
+      ).trailsVersionSpecifier(new Gem.Version(v));
+    expect(specifier("1.2.3")).toBe("~1.2.3");
+    expect(specifier("1.2.3.pre4")).toBe("~1.2.3-pre4");
+    expect(specifier("1.2.3.4")).toEqual(["~1.2.3", ">=1.2.3.4"]);
   });
 
   it("--main without pnpm writes the bare branch specifier", () => {

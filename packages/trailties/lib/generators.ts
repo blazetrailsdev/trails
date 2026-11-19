@@ -387,7 +387,7 @@ async function requireGenerator(dir: string, base: string, path: string): Promis
   for (const value of Object.values(mod)) {
     if (typeof value === "function" && value.prototype instanceof Base) {
       const klass = value as unknown as GeneratorClass;
-      klass.namespace(namespace.map((segment) => underscore(segment)).join(":"));
+      klass.namespace(namespace.map(underscore).join(":"));
       _subclasses ??= [];
       if (!_subclasses.includes(klass)) _subclasses.push(klass);
       return;
