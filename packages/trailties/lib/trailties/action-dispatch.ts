@@ -104,15 +104,16 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("action_dispatch.configure", (app) => {
-      this.config.afterInitialize(async () => {
+      this.config.afterInitialize(() => {
         const cookiesSerializer = this.config.actionDispatch.cookiesSerializer;
         if (
           typeof cookiesSerializer === "string" &&
           cookiesSerializer.includes("message_pack") &&
           TopLevel.ActiveSupport!.MessagePack === undefined
         ) {
-          await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
+          return TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
         }
+        return undefined;
       });
 
       HttpURL.secureProtocol = app.config.forceSsl;
