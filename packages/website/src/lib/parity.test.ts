@@ -45,13 +45,17 @@ describe("loadParity", () => {
       file,
       heading,
       anchor,
-      lede: `Rule for <${anchor}>, see [doc](docs/x.md) and \`<code>\`.`,
+      lede: `Rule for <${anchor}>, see [doc](docs/x.md), [here](#own) and \`<code>\`.`,
     });
     await write(
       "scripts/parity/output/package-summary.json",
       JSON.stringify({
         packages: [
-          { name: "arel", railsCounterpart: "arel", permanentSkips: { "CLAUDE.md#cited": [] } },
+          {
+            name: "arel",
+            railsCounterpart: "arel",
+            permanentSkips: { "CLAUDE.md#cited": [], "CLAUDE.md#stub": [] },
+          },
         ],
         tagSites: [],
         files: [
@@ -62,6 +66,13 @@ describe("loadParity", () => {
           section("CLAUDE.md", "Cited rule", "cited"),
           section("CLAUDE.md", "Uncited rule", "uncited"),
           section("packages/arel/CLAUDE.md", "Own rule", "own"),
+          section("packages/activerecord/CLAUDE.md", "Moved rule", "moved"),
+          {
+            file: "CLAUDE.md",
+            heading: "Moved rule",
+            anchor: "stub",
+            lede: "Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#moved); unchanged.",
+          },
         ],
       }),
     );
@@ -71,12 +82,19 @@ describe("loadParity", () => {
     const arel = data.packages[0];
     expect(percent(arel.api)).toBe("75%");
     expect(percent(arel.tests)).toBe("50%");
-    expect(arel.railsVersion).toBe("v8.0.2");
+    expect(arel.railsVersion).toBeNull();
+    await fs.mkdir(path.join(root, "vendor/rails/v8.0.2/arel"), { recursive: true });
+    expect((await loadParity(root)).packages[0].railsVersion).toBe("v8.0.2");
     const page = packagePage(data, "arel");
     expect(page).toContain("| Measured at | abcdef0123 |");
     expect(page).toContain("### Cited rule");
     expect(page).toContain("### Own rule");
     expect(page).not.toContain("Uncited rule");
+    expect(page).not.toContain("Moved to");
+    expect(page).toContain("blob/fedcba/packages/activerecord/CLAUDE.md#moved");
+    expect(page).toContain(
+      "[here](https://github.com/blazetrailsdev/trails/blob/fedcba/CLAUDE.md#own)",
+    );
     expect(page).toContain("Rule for &lt;cited>");
     expect(page).toContain("`<code>`");
     expect(page).toContain("](https://github.com/blazetrailsdev/trails/blob/fedcba/docs/x.md)");

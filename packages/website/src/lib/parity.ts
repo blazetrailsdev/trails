@@ -98,13 +98,22 @@ export async function loadParity(root = REPO_ROOT): Promise<ParityData> {
     "vendor/sources.lock.json",
     root,
   );
-  const packages = (await publishedPackages(root)).map(({ dir, description }) => {
+  const isRailsGem = (gem: string) =>
+    fs.stat(path.join(root, "vendor/rails", lock?.sources.rails?.ref ?? "", gem)).then(
+      () => true,
+      () => false,
+    );
+  const packages: PackageFigures[] = [];
+  for (const { dir, description } of await publishedPackages(root)) {
     const entry: PackageSummary | undefined = valid?.packages.find((p) => p.name === dir);
     const files = valid?.files.filter((f) => f.package === dir) ?? [];
     const counterpart = entry?.railsCounterpart ?? null;
     const source =
-      counterpart === null ? null : (lock?.sources[counterpart] ?? lock?.sources.rails);
-    return {
+      counterpart === null
+        ? null
+        : (lock?.sources[counterpart] ??
+          ((await isRailsGem(counterpart)) ? lock?.sources.rails : null));
+    packages.push({
       name: dir,
       description,
       railsCounterpart: counterpart,
@@ -119,8 +128,8 @@ export async function loadParity(root = REPO_ROOT): Promise<ParityData> {
         (f) => f.testsMatched,
         (f) => f.testsTotal,
       ),
-    };
-  });
+    });
+  }
   return { measuredAt: valid ? measuredAt || "local" : null, buildRef, summary: valid, packages };
 }
 
@@ -136,8 +145,8 @@ export function shortSha(sha: string | null): string {
  * The `CLAUDE.md` sections a package page lists: every section of the
  * package's own `CLAUDE.md`, then each other section its receipts or
  * `PERMANENT-SKIP` lines cite, in the order the summary lists them. A root
- * heading kept only as a "Moved to" pointer at the package's own file is the
- * same rule, listed once under the package.
+ * heading kept only as a "Moved to" pointer is replaced by the section it
+ * points at, and each section is listed once.
  */
 export function sectionsFor(summary: Summary, pkg: string): ClaudeSection[] {
   const own = `packages/${pkg}/CLAUDE.md`;
@@ -146,16 +155,22 @@ export function sectionsFor(summary: Summary, pkg: string): ClaudeSection[] {
     if (t.package === pkg && t.citedSection) cited.add(t.citedSection);
   const entry = summary.packages.find((p) => p.name === pkg);
   for (const key of Object.keys(entry?.permanentSkips ?? {})) if (key !== "") cited.add(key);
-  return summary.claudeSections.filter(
-    (s) =>
-      s.file === own ||
-      (cited.has(`${s.file}#${s.anchor}`) && !s.lede.startsWith(`Moved to [${own}]`)),
-  );
+  const byKey = new Map(summary.claudeSections.map((s) => [`${s.file}#${s.anchor}`, s]));
+  const out = summary.claudeSections.filter((s) => s.file === own);
+  for (const key of cited) {
+    let s = byKey.get(key);
+    const moved = s && /^Moved to \[[^\]]*\]\(([^)#]+)#([^)]+)\)/.exec(s.lede);
+    if (moved) s = byKey.get(`${moved[1]}#${moved[2]}`);
+    if (s && !out.includes(s)) out.push(s);
+  }
+  return out;
 }
 
 function renderLede(s: ClaudeSection, ref: string): string {
-  const linked = s.lede.replace(/\]\((?!https?:|#)([^)]+)\)/g, (_m, link: string) => {
-    const target = path.posix.join(path.posix.dirname(s.file), link);
+  const linked = s.lede.replace(/\]\((?!https?:)([^)]+)\)/g, (_m, link: string) => {
+    const target = link.startsWith("#")
+      ? `${s.file}${link}`
+      : path.posix.join(path.posix.dirname(s.file), link);
     return `](${GITHUB_REPO}/blob/${ref}/${target})`;
   });
   return linked

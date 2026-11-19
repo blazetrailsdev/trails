@@ -41,7 +41,7 @@ jobs:
           mkdir -p scripts/parity/output
           echo "$GITHUB_SHA" > scripts/parity/output/build.sha
           gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main \
-            --event push --status success --limit 10 --json databaseId,headSha \
+            --event push --status completed --limit 50 --json databaseId,headSha \
             --jq '.[] | "\(.databaseId) \(.headSha)"' |
           while read -r id sha; do
             if gh run download "$id" --repo "$GITHUB_REPOSITORY" \
