@@ -48,18 +48,21 @@ type CallbackObject = {
 type CallbackFilter<C = Base> = ActionCallback<C> | AroundCallback<C> | string | CallbackObject;
 
 /** @internal */
+type AnyCallbackFilter = CallbackFilter<never>;
+
+/** @internal */
 type CallbackOptionsWithFilters = CallbackOptions & {
-  filters?: CallbackFilter<never>[];
+  filters?: AnyCallbackFilter[];
 };
 
 /** @internal */
 export class ActionFilter implements CallbackPredicateLike {
-  private readonly _filters: ReadonlyArray<CallbackFilter<never>>;
+  private readonly _filters: ReadonlyArray<AnyCallbackFilter>;
   private readonly _conditionalKey: "only" | "except";
   private readonly _actions: ReadonlySet<string>;
 
   constructor(
-    filters: ReadonlyArray<CallbackFilter<never>>,
+    filters: ReadonlyArray<AnyCallbackFilter>,
     conditionalKey: "only" | "except",
     actions: string | string[],
   ) {
@@ -149,7 +152,7 @@ export function _insertCallbacks<C = Base>(
 }
 
 /** @internal */
-function _inspectFilter(filter: CallbackFilter<never>): string {
+function _inspectFilter(filter: AnyCallbackFilter): string {
   if (typeof filter === "string") return `:${filter}`;
   const fn = filter as { name?: string };
   return fn.name && fn.name.length > 0 ? `:${fn.name}` : "#<Proc:anonymous>";
