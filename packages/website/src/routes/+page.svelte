@@ -7,6 +7,20 @@
   let { data } = $props();
   let tab = $state("same");
 
+  const installs = {
+    npm: "npm install -g @blazetrails/trails && trails new blog",
+    pnpm: "pnpm add -g @blazetrails/trails && trails new blog",
+    yarn: "yarn global add @blazetrails/trails && trails new blog",
+    bun: "bun add -g @blazetrails/trails && trails new blog",
+  };
+  let pm = $state("npm");
+  let copied = $state(false);
+
+  async function copy() {
+    await navigator.clipboard.writeText(installs[pm]);
+    copied = true;
+  }
+
   const repo = "https://github.com/blazetrailsdev/trails";
   const guides = `${base}/docs/guides/`;
 
@@ -119,6 +133,17 @@
         </a>
       {/each}
     </div>
+    <div class="install">
+      <div class="pms" role="tablist">
+        {#each Object.keys(installs) as k}
+          <button role="tab" aria-selected={pm === k} onclick={() => ((pm = k), (copied = false))}>{k}</button>
+        {/each}
+      </div>
+      <div class="cmd">
+        <code><span class="prompt">$</span> {installs[pm]}</code>
+        <button class="copy" onclick={copy}>{copied ? "Copied" : "Copy"}</button>
+      </div>
+    </div>
     <p class="small">Stay up to date with trails on <a href={repo}>GitHub</a>.</p>
   </section>
 
@@ -134,9 +159,10 @@
 
 <style>
   .page {
-    --red: #d30001;
-    --ink: #261b23;
-    --tint: #f0e7e9;
+    --orange: #e8590c;
+    --mango: #f2b01e;
+    --ink: #2b1d14;
+    --tint: #fdf1d6;
     --display: "Bricolage Grotesque Variable", "Helvetica Neue", Arial, sans-serif;
     --sans: "Instrument Sans Variable", "Helvetica Neue", Arial, system-ui, sans-serif;
     --mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -147,10 +173,10 @@
   }
   a { color: inherit; }
   h1, h2, h3 { font-family: var(--display); }
-  h1, h2 { color: var(--red); font-weight: 800; letter-spacing: -0.035em; margin: 0 auto 1.5rem; }
+  h1, h2 { color: var(--orange); font-weight: 800; letter-spacing: -0.035em; margin: 0 auto 1.5rem; }
   h1 { font-size: 78px; line-height: 72px; max-width: 1200px; }
   h2 { font-size: 56px; line-height: 1; }
-  h3 { color: var(--red); font-size: 28px; margin: 1.5rem 0 0.5rem; }
+  h3 { color: var(--orange); font-size: 28px; margin: 1.5rem 0 0.5rem; }
   .intro { font-size: 26px; line-height: 1.3; max-width: 780px; margin: 0 auto 1.5rem; }
   .small { font-size: 17px; max-width: 760px; margin: 1.5rem auto 0; }
   .cta { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; font-size: 19px; }
@@ -164,29 +190,29 @@
   .left { justify-content: flex-end; }
   .mark { text-decoration: none; }
   .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--ink); }
-  .blaze { color: var(--red); }
+  .blaze { color: var(--orange); }
   .i { position: relative; }
-  .i::before { content: ""; position: absolute; left: 50%; transform: translateX(-50%); top: 0.02em; width: 0.26em; height: 0.17em; background: var(--red); border-radius: 0.035em; }
+  .i::before { content: ""; position: absolute; left: 50%; transform: translateX(-50%); top: 0.02em; width: 0.26em; height: 0.17em; background: var(--mango); border-radius: 0.035em; }
 
   .hero { padding: 40px 24px 80px; }
   .lede { font-size: 30px; line-height: 1.3; max-width: 700px; margin: 0 auto 1.5rem; }
   .lede strong { display: block; }
-  .pill { display: inline-block; background: var(--tint); border-radius: 6px; padding: 6px 14px; font-size: 15px; font-weight: 600; margin-bottom: 56px; }
-  .stage { max-width: 1170px; margin: 0 auto; background: #1d1720; border-radius: 10px; overflow: hidden; text-align: left; box-shadow: 0 30px 60px rgb(0 0 0 / 0.2); }
-  .tabs { display: flex; gap: 4px; padding: 10px 10px 0; background: #2c242a; }
-  .tabs button { font: 600 15px var(--sans); color: #b9aeb5; background: none; border: 0; padding: 10px 18px; border-radius: 6px 6px 0 0; cursor: pointer; }
-  .tabs button[aria-selected="true"] { background: #3a3038; color: #fff; }
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2c242a; }
-  .pane { background: #3a3038; min-height: 380px; }
+  .pill { display: inline-block; background: var(--mango); border-radius: 6px; padding: 6px 14px; font-size: 15px; font-weight: 600; margin-bottom: 56px; }
+  .stage { max-width: 1170px; margin: 0 auto; background: #211710; border-radius: 10px; overflow: hidden; text-align: left; box-shadow: 0 30px 60px rgb(0 0 0 / 0.2); }
+  .tabs { display: flex; gap: 4px; padding: 10px 10px 0; background: #2a1e16; }
+  .tabs button { font: 600 15px var(--sans); color: #d9c6b0; background: none; border: 0; padding: 10px 18px; border-radius: 6px 6px 0 0; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: #3a2a1f; color: #fff; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2a1e16; }
+  .pane { background: #3a2a1f; min-height: 380px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
   .pane :global(.squiggle) { text-decoration: underline wavy #ff5d5d; text-underline-offset: 4px; }
-  .pane :global(.tip) { display: block; width: max-content; max-width: 100%; margin: 6px 0 4px 2ch; padding: 8px 12px; background: #261b23; border: 1px solid #ff5d5d; border-radius: 6px; color: #ffb4b4; font-size: 13px; white-space: normal; }
+  .pane :global(.tip) { display: block; width: max-content; max-width: 100%; margin: 6px 0 4px 2ch; padding: 8px 12px; background: #2b1d14; border: 1px solid #ff5d5d; border-radius: 6px; color: #ffb4b4; font-size: 13px; white-space: normal; }
 
   .company { padding: 40px 24px 100px; }
   .tiles { display: grid; grid-template-columns: repeat(4, 220px); justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 48px 0; }
   .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; text-decoration: none; }
   .tiles li:nth-last-child(2) { grid-column: 2; }
-  .tiles small { font-size: 13px; font-weight: 500; color: #6b5d66; }
+  .tiles small { font-size: 13px; font-weight: 500; color: #7a6450; }
 
   .band { background: var(--tint); padding: 90px 24px; }
   .card { background: #fff; max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px rgb(0 0 0 / 0.08); }
@@ -195,20 +221,28 @@
   .blocks { padding-top: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 560px)); justify-content: center; column-gap: 50px; }
   .block { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; padding-bottom: 60px; }
   .code { display: flex; flex-direction: column; }
-  .code { background: #3a3038; border-radius: 6px; overflow: hidden; text-align: left; }
-  .file { background: #2c242a; color: #cfc5cb; font: 13px var(--mono); text-align: center; padding: 8px; }
-  .code :global(pre) { flex: 1; margin: 0; padding: 20px; font: 13px/1.6 var(--mono); overflow-x: auto; background: #3a3038 !important; }
+  .code { background: #3a2a1f; border-radius: 6px; overflow: hidden; text-align: left; }
+  .file { background: #2a1e16; color: #e4d2bc; font: 13px var(--mono); text-align: center; padding: 8px; }
+  .code :global(pre) { flex: 1; margin: 0; padding: 20px; font: 13px/1.6 var(--mono); overflow-x: auto; background: #3a2a1f !important; }
   .block p { font-size: 17px; margin: 0 auto; max-width: 500px; }
 
   .start { padding: 90px 24px; }
   .cards { display: grid; grid-template-columns: repeat(3, 340px); justify-content: center; gap: 30px; margin-top: 40px; }
   .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); text-decoration: none; font-size: 15px; }
   .start-card strong { font-size: 19px; text-decoration: underline; text-underline-offset: 3px; }
-  .tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--red); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 10px; border-radius: 3px; }
+  .tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--mango); color: var(--ink); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 10px; border-radius: 3px; }
 
+  .install { max-width: 760px; margin: 56px auto 0; text-align: left; }
+  .pms { display: flex; gap: 4px; }
+  .pms button { font: 600 14px var(--mono); color: var(--ink); background: none; border: 0; padding: 8px 14px; border-radius: 6px 6px 0 0; cursor: pointer; }
+  .pms button[aria-selected="true"] { background: var(--ink); color: #fff; }
+  .cmd { display: flex; align-items: center; gap: 16px; background: var(--ink); color: #fbf1e4; border-radius: 0 8px 8px 8px; padding: 18px 20px; }
+  .cmd code { flex: 1; font: 16px var(--mono); overflow-x: auto; white-space: nowrap; }
+  .prompt { color: var(--mango); margin-right: 6px; }
+  .copy { font: 600 13px var(--sans); background: #3a2a1f; color: #fff; border: 0; border-radius: 5px; padding: 6px 12px; cursor: pointer; }
   .foot { background: var(--tint); padding: 60px 24px; font-size: 14px; }
   .foot ul { display: flex; justify-content: center; gap: 28px; list-style: none; margin: 0 0 12px; padding: 0; }
-  .foot p { margin: 0; color: #6b5d66; }
+  .foot p { margin: 0; color: #7a6450; }
 
   @media (max-width: 900px) {
     h1 { font-size: 44px; line-height: 1.05; }
