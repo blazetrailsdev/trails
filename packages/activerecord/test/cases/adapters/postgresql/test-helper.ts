@@ -4,7 +4,12 @@ import type { NotificationSubscriber, NotificationEvent } from "@blazetrails/act
 import { pgAvailable, pgHasHintPlan, pgServerVersion } from "../../../support/describe-if-pg.js";
 import { Base } from "../../../../lib/base.js";
 
-export { describeIfPg, pgServerVersion, PG_TEST_URL } from "../../../support/describe-if-pg.js";
+export {
+  describeIfPg,
+  pgServerVersion,
+  PG_TEST_URL,
+  PG_TEST_CONFIG,
+} from "../../../support/describe-if-pg.js";
 
 export const pgSupportsOptimizerHints = pgAvailable && pgHasHintPlan;
 export const pgSupportsNativePartitioning = pgServerVersion >= 100000;

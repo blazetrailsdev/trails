@@ -11,18 +11,12 @@ import {
   UniqueConstraintDefinition,
 } from "../../../../lib/connection-adapters/postgresql/schema-definitions.js";
 import { Name } from "../../../../lib/connection-adapters/postgresql/utils.js";
-import { describeIfPg, PG_TEST_URL } from "../../../support/describe-if-pg.js";
+import { describeIfPg, PG_TEST_CONFIG } from "../../../support/describe-if-pg.js";
 import { resultFromRowHashes } from "../../../support/result-from-row-hashes.js";
 
 const SCHEMA_NAME = "test_schema_stmts";
 const TABLE_NAME = "things";
 const INDEX_A_NAME = "a_index_things_stmts";
-
-function postgresUrl(): string {
-  const u = new URL(PG_TEST_URL);
-  u.pathname = "/postgres";
-  return u.toString();
-}
 
 async function setup(adapter: PostgreSQLAdapter) {
   await adapter.execute(`CREATE SCHEMA IF NOT EXISTS ${SCHEMA_NAME}`);
@@ -44,7 +38,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     await setup(adapter);
   });
 
@@ -286,7 +280,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("drop database removes the database", { timeout: 30000 }, async () => {
       const tmpDb = "trails_test_drop_db_tmp";
-      const rootAdapter = new PostgreSQLAdapter({ connectionString: postgresUrl() });
+      const rootAdapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG, database: "postgres" });
       try {
         await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);
@@ -311,7 +305,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("recreate database drops and creates", { timeout: 30000 }, async () => {
       const tmpDb = "trails_test_recreate_tmp";
-      const rootAdapter = new PostgreSQLAdapter({ connectionString: postgresUrl() });
+      const rootAdapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG, database: "postgres" });
       try {
         await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { Deadlocked } from "../../../lib/errors.js";
-import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
+import { describeIfPg, PG_TEST_CONFIG } from "../../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 
 const PQTRANS_IDLE = 0;
@@ -15,7 +15,7 @@ function transactionStatus(adapter: PostgreSQLAdapter): number {
 
 describeIfPg("PostgreSQLAdapter transaction_status", () => {
   it("is unknown before a connection is opened", async () => {
-    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       expect(adapter._rawConnection).toBeNull();
     } finally {
@@ -24,7 +24,7 @@ describeIfPg("PostgreSQLAdapter transaction_status", () => {
   });
 
   it("moves idle → in transaction → in failed transaction", async () => {
-    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       await adapter.execute("SELECT 1");
       expect(transactionStatus(adapter)).toBe(PQTRANS_IDLE);
@@ -43,7 +43,7 @@ describeIfPg("PostgreSQLAdapter transaction_status", () => {
   });
 
   it("retryable_query_error? is false inside a broken transaction", async () => {
-    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       await adapter.execute("SELECT 1");
       expect(adapter.isRetryableQueryError(new Deadlocked("deadlock detected"))).toBe(true);

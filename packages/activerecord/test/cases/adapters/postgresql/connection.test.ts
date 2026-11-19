@@ -1,5 +1,5 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG, SQLSubscriber } from "./test-helper.js";
 import { QueryAttribute } from "../../../../lib/relation/query-attribute.js";
 import { Value } from "../../../../lib/type.js";
 import { assertQueriesCount } from "../../../../lib/testing/query-assertions.js";
@@ -10,7 +10,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   let subscriber: SQLSubscriber;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     await adapter.verifyBang();
     subscriber = new SQLSubscriber();
     subscriber.start();
@@ -46,7 +46,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   it("connection options", async () => {
     const optionsAdapter = new PostgreSQLAdapter({
-      connectionString: PG_TEST_URL,
+      ...PG_TEST_CONFIG,
       options: "-c geqo=off",
     });
     try {
@@ -155,7 +155,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   it("set session variable true", async () => {
     const a = new PostgreSQLAdapter({
-      connectionString: PG_TEST_URL,
+      ...PG_TEST_CONFIG,
       variables: { debug_print_plan: true },
     });
     try {
@@ -168,7 +168,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   it("set session variable false", async () => {
     const a = new PostgreSQLAdapter({
-      connectionString: PG_TEST_URL,
+      ...PG_TEST_CONFIG,
       variables: { debug_print_plan: false },
     });
     try {
@@ -182,7 +182,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   it("set session variable nil", async () => {
     await assertNothingRaised(async () => {
       const a = new PostgreSQLAdapter({
-        connectionString: PG_TEST_URL,
+        ...PG_TEST_CONFIG,
         variables: { debug_print_plan: null },
       });
       try {
@@ -196,7 +196,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   it("set session variable default", async () => {
     await assertNothingRaised(async () => {
       const a = new PostgreSQLAdapter({
-        connectionString: PG_TEST_URL,
+        ...PG_TEST_CONFIG,
         variables: { debug_print_plan: ":default" },
       });
       try {
@@ -209,7 +209,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   it("set session timezone", async () => {
     const a = new PostgreSQLAdapter({
-      connectionString: PG_TEST_URL,
+      ...PG_TEST_CONFIG,
       variables: { timezone: "America/New_York" },
     });
     try {

@@ -1,15 +1,30 @@
 import { describe } from "vitest";
 import pg from "pg";
+import { UrlConfig } from "../../lib/database-configurations/url-config.js";
 import { postgresUrl } from "./config.js";
 
 export const PG_TEST_URL = postgresUrl();
+
+export function pgTestConfig(url: string = PG_TEST_URL): {
+  host?: string;
+  port?: number;
+  database?: string;
+  username?: string;
+  password?: string;
+} {
+  const { host, port, database, username, password } = new UrlConfig("test", "primary", url)
+    .configurationHash as Record<string, never>;
+  return { host, port, database, username, password };
+}
+
+export const PG_TEST_CONFIG = pgTestConfig();
 
 async function checkPg(): Promise<{
   available: boolean;
   serverVersionNum: number;
   hasHintPlan: boolean;
 }> {
-  const client = new pg.Client({ connectionString: PG_TEST_URL });
+  const client = new pg.Client({ ...PG_TEST_CONFIG, user: PG_TEST_CONFIG.username });
   try {
     await client.connect();
     const res = await client.query<{ v: string }>(

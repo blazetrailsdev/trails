@@ -1,5 +1,5 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, PG_TEST_CONFIG } from "./test-helper.js";
 
 function databaseName(url: string): string {
   return new URL(url).pathname.replace(/^\//, "");
@@ -8,7 +8,7 @@ function databaseName(url: string): string {
 describeIfPg("AdapterTest", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(() => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
   });
   afterEach(async () => {
     await adapter.disconnectBang();
@@ -21,7 +21,7 @@ describeIfPg("AdapterTest", () => {
 
 describeIfPg("AdvisoryLocksEnabledTest", () => {
   it("advisory locks enabled?", async () => {
-    const base = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const base = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       expect(base.isAdvisoryLocksEnabled()).toBe(true);
     } finally {
@@ -29,7 +29,7 @@ describeIfPg("AdvisoryLocksEnabledTest", () => {
     }
 
     const disabled = new PostgreSQLAdapter({
-      connectionString: PG_TEST_URL,
+      ...PG_TEST_CONFIG,
       advisoryLocks: false,
     });
     try {
@@ -39,7 +39,7 @@ describeIfPg("AdvisoryLocksEnabledTest", () => {
     }
 
     const enabled = new PostgreSQLAdapter({
-      connectionString: PG_TEST_URL,
+      ...PG_TEST_CONFIG,
       advisoryLocks: true,
     });
     try {

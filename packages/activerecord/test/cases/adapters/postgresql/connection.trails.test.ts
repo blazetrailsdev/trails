@@ -1,9 +1,9 @@
 import { it, expect, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 
 describeIfPg("PostgresqlConnectionTest (trails)", () => {
   it("non-default minMessages is applied to connection", async () => {
-    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, minMessages: "notice" });
+    const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG, minMessages: "notice" });
     try {
       const level = await a.clientMinMessages();
       expect(level).toBe("notice");
@@ -13,7 +13,7 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
   });
 
   it("disconnectBang closes the persistent connection", async () => {
-    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
     try {
@@ -28,7 +28,7 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
   });
 
   it("discardBang abandons the connection without closing the socket", async () => {
-    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
     const endSpy = conn ? vi.spyOn(conn, "close") : null;
@@ -49,7 +49,7 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
   });
 
   it("reconnect resets connection so queries work again", async () => {
-    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       await a.reconnect();
       expect(await a.active()).toBe(true);
@@ -61,7 +61,7 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
   });
 
   it("disconnectBang then reconnect restores query capability", async () => {
-    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       await a.disconnectBang();
       expect(await a.active()).toBe(false);

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 import { DateTime as OidDateTime } from "../../../../lib/connection-adapters/postgresql/oid/date-time.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
@@ -9,7 +9,7 @@ import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 describeIfPg("PostgreSQLAdapter OID::DateTime", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
   });
   afterEach(async () => {
     await adapter.disconnectBang();

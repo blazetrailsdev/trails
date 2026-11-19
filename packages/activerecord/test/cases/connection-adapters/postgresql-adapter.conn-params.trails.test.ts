@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
+import { UrlConfig } from "../../../lib/database-configurations/url-config.js";
 
 function clientOptions(config: Record<string, unknown>): Record<string, unknown> {
   const adapter = new PostgreSQLAdapter(config as never);
@@ -9,6 +10,19 @@ function clientOptions(config: Record<string, unknown>): Record<string, unknown>
 }
 
 describe("PostgreSQLAdapter conn_params", () => {
+  it("keeps a URL query's driver keywords and drops keys pg does not read", () => {
+    const config = new UrlConfig(
+      "default_env",
+      "primary",
+      "postgres://localhost/foo?application_name=trails&statement_timeout=5000&reaping_frequency=2",
+    );
+    expect(clientOptions(config.configurationHash)).toEqual({
+      host: "localhost",
+      dbname: "foo",
+      applicationName: "trails",
+    });
+  });
+
   it("forwards only valid pg connection params", () => {
     const options = clientOptions({
       adapter: "postgresql",
@@ -37,8 +51,8 @@ describe("PostgreSQLAdapter conn_params", () => {
       host: "localhost",
       port: 5432,
       applicationName: "trails",
-      connectionTimeoutMillis: 100,
-      ssl: false,
+      connectTimeout: 10,
+      sslmode: "disable",
     });
 
     expect(options).toMatchObject({
@@ -48,8 +62,8 @@ describe("PostgreSQLAdapter conn_params", () => {
       host: "localhost",
       port: 5432,
       applicationName: "trails",
-      connectionTimeoutMillis: 100,
-      ssl: false,
+      connectTimeout: 10,
+      sslmode: "disable",
     });
   });
 
@@ -80,16 +94,13 @@ describe("PostgreSQLAdapter conn_params", () => {
 
   it("forwards driver params that @types/pg omits", () => {
     const options = clientOptions({
-      binary: true,
       replication: "database",
-      enableChannelBinding: true,
+      targetSessionAttrs: "read-write",
+      connectionString: "postgres://localhost/foo",
+      stream: () => null,
     });
 
-    expect(options).toMatchObject({
-      binary: true,
-      replication: "database",
-      enableChannelBinding: true,
-    });
+    expect(options).toEqual({ replication: "database", targetSessionAttrs: "read-write" });
   });
 
   it("renames database to dbname, as Rails maps its param names to PG's", () => {

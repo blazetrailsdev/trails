@@ -28,7 +28,7 @@ type Client = Omit<pg.Client, "connection"> & {
 
 export class Connection {
   client: Client;
-  connParams: pg.ClientConfig | undefined;
+  connParams: Record<string, unknown>;
   prepared = new Map<string, string>();
   readyForQuery = "I";
   bad = false;
@@ -42,9 +42,9 @@ export class Connection {
   static conndefaultsHash = conndefaultsHash;
   static connect = connect;
 
-  constructor(client: object, connParams?: pg.ClientConfig) {
-    this.client = client as Client;
+  constructor(connParams: Record<string, unknown> = {}) {
     this.connParams = connParams;
+    this.client = new pg.Client(_clientConfig(connParams)) as Client;
     listen(this, this.client);
     if (typeof this.client.on === "function") {
       this.client.on("notification", (notification: pg.Notification) => {
@@ -102,10 +102,7 @@ export class Connection {
 
   async reset(): Promise<void> {
     const client = this.client;
-    const iopts = this.connParams ?? {
-      ...(client as unknown as { connectionParameters: pg.ClientConfig }).connectionParameters,
-      password: client.password,
-    };
+    const iopts = _clientConfig(this.connParams);
     const conn = new (client.constructor as new (config: pg.ClientConfig) => Client)(iopts);
     for (const event of client.eventNames()) {
       for (const listener of client.rawListeners(event)) {
@@ -425,32 +422,39 @@ export function escapeBytea(value: Buffer | Uint8Array | string): string {
 }
 
 export function unescapeBytea(value: string | Uint8Array): Uint8Array {
-  if (typeof value !== "string") value = Buffer.from(value).toString("latin1");
-  if (value.startsWith("\\x")) return Uint8Array.from(Buffer.from(value.slice(2), "hex"));
-
-  const bytes: number[] = [];
-  for (let i = 0; i < value.length; i++) {
-    const ch = value[i];
-    if (ch === "\\") {
-      const next = value[i + 1];
-      if (next === "\\") {
-        bytes.push(0x5c);
-        i += 1;
-        continue;
-      }
-      const octal = value.slice(i + 1, i + 4);
-      if (/^[0-7]{3}$/.test(octal)) {
-        const byte = parseInt(octal, 8);
-        if (byte <= 0o377) {
-          bytes.push(byte);
+  const strtext = typeof value === "string" ? value : Buffer.from(value).toString("latin1");
+  const buffer: number[] = [];
+  if (strtext[0] === "\\" && strtext[1] === "x") {
+    let s = 2;
+    while (s < strtext.length) {
+      const v1 = getHex(strtext[s++]);
+      if (s >= strtext.length || v1 === -1) continue;
+      const v2 = getHex(strtext[s++]);
+      if (v2 !== -1) buffer.push((v1 << 4) | v2);
+    }
+  } else {
+    for (let i = 0; i < strtext.length; ) {
+      if (strtext[i] === "\\") {
+        i++;
+        if (strtext[i] === "\\") buffer.push(strtext.charCodeAt(i++));
+        else if (
+          /[0-3]/.test(strtext[i] ?? "") &&
+          /[0-7]/.test(strtext[i + 1] ?? "") &&
+          /[0-7]/.test(strtext[i + 2] ?? "")
+        ) {
+          buffer.push(parseInt(strtext.slice(i, i + 3), 8));
           i += 3;
-          continue;
         }
+      } else {
+        buffer.push(strtext.charCodeAt(i++));
       }
     }
-    bytes.push(ch.charCodeAt(0));
   }
-  return Uint8Array.from(bytes);
+  return Uint8Array.from(buffer);
+}
+
+function getHex(c: string): number {
+  return /^[0-9a-fA-F]$/.test(c) ? parseInt(c, 16) : -1;
 }
 
 const STRING_OIDS = new Set([
@@ -463,37 +467,53 @@ function pgTypeParser(oid: number, format?: string): unknown {
   return pg.types.getTypeParser(oid, "text");
 }
 
-const CONNINFO_KEYWORDS: Record<string, string> = {
-  user: "user",
-  dbname: "database",
-  password: "password",
-  port: "port",
-  host: "host",
-  connectionString: "connectionString",
-  keepAlive: "keepAlive",
-  stream: "stream",
-  statementTimeout: "statement_timeout",
-  ssl: "ssl",
-  queryTimeout: "query_timeout",
-  lockTimeout: "lock_timeout",
-  keepAliveInitialDelayMillis: "keepAliveInitialDelayMillis",
-  idleInTransactionSessionTimeout: "idle_in_transaction_session_timeout",
-  applicationName: "application_name",
-  fallbackApplicationName: "fallback_application_name",
-  connectionTimeoutMillis: "connectionTimeoutMillis",
-  types: "types",
-  options: "options",
-  clientEncoding: "client_encoding",
-  binary: "binary",
-  replication: "replication",
-  enableChannelBinding: "enableChannelBinding",
-  connection: "connection",
-  Promise: "Promise",
-};
+const CONNINFO_KEYWORDS = [
+  "service",
+  "user",
+  "password",
+  "passfile",
+  "channelBinding",
+  "connectTimeout",
+  "dbname",
+  "host",
+  "hostaddr",
+  "port",
+  "clientEncoding",
+  "options",
+  "applicationName",
+  "fallbackApplicationName",
+  "keepalives",
+  "keepalivesIdle",
+  "keepalivesInterval",
+  "keepalivesCount",
+  "tcpUserTimeout",
+  "sslmode",
+  "sslnegotiation",
+  "sslcompression",
+  "sslcert",
+  "sslkey",
+  "sslcertmode",
+  "sslpassword",
+  "sslrootcert",
+  "sslcrl",
+  "sslcrldir",
+  "sslsni",
+  "requirepeer",
+  "requireAuth",
+  "sslMinProtocolVersion",
+  "sslMaxProtocolVersion",
+  "gssencmode",
+  "krbsrvname",
+  "gsslib",
+  "gssdelegation",
+  "replication",
+  "targetSessionAttrs",
+  "loadBalanceHosts",
+];
 
 /** @internal */
 function conndefaults(): { keyword: string; val: string | null }[] {
-  return Object.keys(CONNINFO_KEYWORDS).map((keyword) => ({ keyword, val: null }));
+  return CONNINFO_KEYWORDS.map((keyword) => ({ keyword, val: null }));
 }
 
 export function conndefaultsHash(): Record<string, string | null> {
@@ -504,22 +524,37 @@ export function conndefaultsHash(): Record<string, string | null> {
   return hash;
 }
 
-export async function connect(connParams: Record<string, unknown>): Promise<Connection> {
-  const config: pg.ClientConfig = Object.fromEntries(
-    Object.entries(connParams).map(([key, value]) => [CONNINFO_KEYWORDS[key] ?? key, value]),
-  );
-  const { getTypeParser } = (config.types ?? {}) as Partial<pg.CustomTypesConfig>;
-  config.types = {
-    getTypeParser: ((oid: number, format?: string) =>
-      getTypeParser?.(oid, format as never) ??
-      pgTypeParser(oid, format)) as pg.CustomTypesConfig["getTypeParser"],
+/** @noRailsEquivalent PERMANENT */
+function _clientConfig(connParams: Record<string, unknown>): pg.ClientConfig {
+  const seconds = (value: unknown): number | undefined =>
+    value == null ? undefined : Number(value) * 1000;
+  const sslmode = connParams.sslmode as string | undefined;
+  let ssl: pg.ClientConfig["ssl"];
+  if (sslmode === "disable") ssl = false;
+  else if (sslmode === "require" || (sslmode == null && connParams.requiressl != null)) {
+    ssl = { rejectUnauthorized: false };
+  } else if (sslmode === "verify-ca" || sslmode === "verify-full") ssl = true;
+  return {
+    user: connParams.user as string | undefined,
+    database: connParams.dbname as string | undefined,
+    password: connParams.password as string | undefined,
+    host: connParams.host as string | undefined,
+    port: connParams.port == null ? undefined : Number(connParams.port),
+    options: connParams.options as string | undefined,
+    client_encoding: connParams.clientEncoding as string | undefined,
+    application_name: connParams.applicationName as string | undefined,
+    fallback_application_name: connParams.fallbackApplicationName as string | undefined,
+    connectionTimeoutMillis: seconds(connParams.connectTimeout),
+    keepAlive: connParams.keepalives == null ? undefined : String(connParams.keepalives) !== "0",
+    keepAliveInitialDelayMillis: seconds(connParams.keepalivesIdle),
+    ...(connParams.replication == null ? {} : { replication: connParams.replication }),
+    ssl,
+    types: { getTypeParser: pgTypeParser as pg.CustomTypesConfig["getTypeParser"] },
   };
-  const client = pgConnection(new pg.Client(config), config);
-  await client.connect();
-  return client;
 }
 
-export function pgConnection(client: object, connParams?: pg.ClientConfig): Connection {
-  if (client instanceof Connection) return client;
-  return new Connection(client, connParams);
+export async function connect(connParams: Record<string, unknown>): Promise<Connection> {
+  const conn = new Connection(connParams);
+  await conn.connect();
+  return conn;
 }

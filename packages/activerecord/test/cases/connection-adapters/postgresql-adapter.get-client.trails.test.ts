@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
-import { pgConnection } from "../../../lib/pg/connection.js";
+import { fakePgConnection } from "../../support/fake-pg-connection.js";
 
 interface PrivatePgAdapter {
   _rawConnection: unknown;
@@ -23,17 +23,17 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
   it("isConnected() reflects the raw pg.Client finished? state", () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
 
-    adapter._rawConnection = pgConnection({ _queryable: true, _ending: false, _ended: false });
+    adapter._rawConnection = fakePgConnection({ _queryable: true, _ending: false, _ended: false });
     expect(adapter.isConnected()).toBe(true);
 
-    adapter._rawConnection = pgConnection({ _ending: true });
+    adapter._rawConnection = fakePgConnection({ _ending: true });
     expect(adapter.isConnected()).toBe(false);
-    adapter._rawConnection = pgConnection({ _ended: true });
+    adapter._rawConnection = fakePgConnection({ _ended: true });
     expect(adapter.isConnected()).toBe(false);
 
-    adapter._rawConnection = pgConnection({ _queryable: false });
+    adapter._rawConnection = fakePgConnection({ _queryable: false });
     expect(adapter.isConnected()).toBe(true);
-    adapter._rawConnection = pgConnection({ _connectionError: true });
+    adapter._rawConnection = fakePgConnection({ _connectionError: true });
     expect(adapter.isConnected()).toBe(true);
 
     adapter._rawConnection = null;
@@ -66,7 +66,7 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
         },
       },
     };
-    adapter._rawConnection = pgConnection(fakeClient);
+    adapter._rawConnection = fakePgConnection(fakeClient);
 
     vi.spyOn(
       adapter as unknown as { configureConnection: () => Promise<void> },
