@@ -1,6 +1,7 @@
 <% const signature = this.isTypeScript() ? "(): void" : "()"; -%>
-import * as ApplicationCable from "<%= "../".repeat(this.classPathParts.length) || "./" %>application-cable/channel<%= this.ext() %>";
+import * as ApplicationCable from "<%= "../".repeat((this.isNamespaced() ? this.namespaceDirs().length : 0) + this.classPath().length) || "./" %>application-cable/channel<%= this.ext() %>";
 
+<% this.moduleNamespacing(() => { -%>
 export class <%= this.className().split("::").pop() %>Channel extends ApplicationCable.Channel {
   subscribed<%= signature %> {
     // this.streamFrom("some_channel");
@@ -15,3 +16,4 @@ export class <%= this.className().split("::").pop() %>Channel extends Applicatio
   }
 <% } -%>
 }
+<% }) -%>
