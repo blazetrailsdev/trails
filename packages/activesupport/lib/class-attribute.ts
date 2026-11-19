@@ -88,14 +88,13 @@ export function classAttribute(this: object, ...attrs: (string | ClassAttributeO
     default: defaultValue = null,
   } = options;
 
-  const klass = this as AttributeOwner;
   for (const name of attrs as string[]) {
     if (typeof name !== "string") {
       throw new TypeError(`${inspect(name)} is not a symbol nor a string`);
     }
 
     const namespacedName = `__class_attr_${name}`;
-    ClassAttribute.redefine(klass, name, namespacedName, defaultValue);
+    ClassAttribute.redefine(this as AttributeOwner, name, namespacedName, defaultValue);
 
     const delegators: PropertyDescriptor = {
       configurable: true,
@@ -127,7 +126,8 @@ export function classAttribute(this: object, ...attrs: (string | ClassAttributeO
         this[`@${name}`] = value;
       };
     }
-    if (methods.get || methods.set) Object.defineProperty(klass.prototype, name, methods);
+    if (methods.get || methods.set)
+      Object.defineProperty((this as AttributeOwner).prototype, name, methods);
     rbClearMethodCache();
 
     if (instancePredicate) {
@@ -139,7 +139,7 @@ export function classAttribute(this: object, ...attrs: (string | ClassAttributeO
       });
       if (instanceReader) {
         ClassAttribute.redefineMethod(
-          klass.prototype,
+          (this as AttributeOwner).prototype,
           predicateName,
           false,
           function (this: Slots) {
