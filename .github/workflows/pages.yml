@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: pages
@@ -32,6 +33,31 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Download parity summary
+        # The newest package-summary.json from a successful main CI run's
+        # parity-outputs-<sha> artifact (ci.yml "Upload parity outputs"). No
+        # parity run here; a miss leaves the file absent and the site renders
+        # "—" for every figure.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          mkdir -p scripts/parity/output
+          echo "$GITHUB_SHA" > scripts/parity/output/build.sha
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main \
+            --event push --status success --limit 10 --json databaseId,headSha \
+            --jq '.[] | "\(.databaseId) \(.headSha)"' |
+          while read -r id sha; do
+            if gh run download "$id" --repo "$GITHUB_REPOSITORY" \
+                --name "parity-outputs-$sha" --dir "$RUNNER_TEMP/parity" 2>/dev/null &&
+              cp "$RUNNER_TEMP/parity/scripts/parity/output/package-summary.json" scripts/parity/output/; then
+              echo "$sha" > scripts/parity/output/package-summary.sha
+              echo "parity summary from run $id at $sha"
+              break
+            fi
+            rm -rf "$RUNNER_TEMP/parity"
+          done
+          true
       - run: pnpm --filter @blazetrails/website exec svelte-kit sync
       - name: Build SvelteKit
         run: pnpm --filter @blazetrails/website exec vite build

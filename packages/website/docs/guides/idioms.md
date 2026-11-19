@@ -5,7 +5,7 @@ description: Translation patterns from Rails to Trails — the naming, async, an
 
 # Trails Idioms
 
-> **See also:** [Guides index](./index.md) · [Rails deviations](./activerecord-rails-deviations.md)
+> **See also:** [Guides index](./index.md) · [Packages and their ratified deviations](/packages/)
 
 A Rails developer opening any Trails guide should recognize the shape
 of the code immediately. This page is the translation reference.
@@ -15,9 +15,6 @@ of the code immediately. This page is the translation reference.
 ```ruby
 # Ruby / Rails
 class Post < ActiveRecord::Base
-  attribute :title, :string
-  attribute :published, :boolean, default: false
-
   validates :title, presence: true, length: { minimum: 3 }
 
   before_save :normalize_title
@@ -44,9 +41,6 @@ class Post extends Base {
   declare static published: () => Relation<Post>;
 
   static {
-    Post.attribute("title", "string");
-    Post.attribute("published", "boolean", { default: false });
-
     Post.validates("title", { presence: true, length: { minimum: 3 } });
 
     Post.beforeSave((record) => {
@@ -141,8 +135,9 @@ if (await post.save()) {
 `isValid()` returns a `Promise` and the validation chain is awaited, so
 DB-backed validators (like `uniqueness`) run inline: `await record.isValid()`
 and `save()` both see the same result — there is no separate promise queue
-to drain. See
-[Rails deviations: async propagation](./index.md#async-propagation).
+to drain. There is no synchronous escape hatch: every I/O call in
+JavaScript is async, so the `await` reaches finders, persistence,
+validations, callbacks and transactions alike.
 
 ## Keyword args become one options object
 
@@ -195,22 +190,33 @@ end
 ```
 
 ```ts
-// Trails — note: module-level function, not a static method
-import { transaction } from "@blazetrails/activerecord";
-
-await transaction(Post, async (_tx) => {
+// Trails
+await Post.transaction(async () => {
   await post.saveBang();
   await comment.saveBang();
 });
 ```
 
-See [Rails deviations: block APIs → callback functions](./index.md#block-apis)
-for callback signatures.
+A callback receives the record as its argument, where a Ruby block
+reads it as `self`. An `around` callback receives a `proceed` function
+to run the inner chain, where Ruby yields.
+
+## Modules become `include()` and `extend()`
+
+Ruby's `include SomeModule` and `extend SomeModule` are the
+`include()` and `extend()` functions from `@blazetrails/ruby-compat`,
+with `Included<>` / `Extended<>` to type the result. An
+`included do ... end` block is a hook keyed by the exported `included`
+symbol, run after the module's methods are copied, where Ruby runs the
+block. A single method with no module is a `this`-typed function
+assigned to the class. `ActiveSupport::Concern` is ported as itself.
 
 ## Class bodies use `static {}`
 
 Rails puts class-level configuration in the class body directly.
 Trails puts the equivalent in a `static {}` initializer block.
+Columns are not declared there: as in Rails, a model reflects its
+attributes from the table's schema, and `declare` only types them.
 
 ```ts
 import { Base } from "@blazetrails/activerecord";
@@ -219,7 +225,6 @@ class Post extends Base {
   declare title: string;
 
   static {
-    Post.attribute("title", "string");
     Post.validates("title", { presence: true });
     Post.beforeSave((record) => {
       record.title = record.title.trim();
@@ -243,6 +248,9 @@ surfaces when you need runtime-typed access for generic code.
 | `post[:title]`         | `post.readAttribute("title")`         |
 | `post[:title] = "new"` | `post.writeAttribute("title", "new")` |
 
+Arel's `users[:id]` is `users.get("id")`, an explicit method where Ruby
+defines `[]`.
+
 ## Ranges are a class
 
 Ruby `Range` (`1..10`, `1...10`) has no JS equivalent. Use the `Range`
@@ -258,26 +266,15 @@ Post.where({ views: new Range(100, 1000) });
 Post.where({ views: new Range(100, 1000, true) });
 ```
 
-## Per-async-flow state instead of thread locals
+## Thread locals stay per thread
 
-Rails uses thread locals for current transaction, connection role,
-`Current.user`. Trails uses `AsyncLocalStorage`, scoped per async
-flow.
+Rails keeps the current transaction, connection role and
+`Current.user` in thread locals through
+`ActiveSupport::IsolatedExecutionState`. Trails ports that class, keyed
+on ruby-compat's `Thread`. One `Thread` can hold many in-flight
+promises, so a block that pushes onto a thread-local stack and pops it
+afterwards runs on its own copy (`IsolatedExecutionState.fork`), and a
+sibling promise never sees its push.
 
-```ts
-import { transaction } from "@blazetrails/activerecord";
-
-declare function somethingThatAlsoHitsTheDb(): Promise<void>;
-
-await transaction(Post, async (_tx) => {
-  await post.saveBang(); // inside the transaction
-
-  // A nested await still sees the outer transaction, no threading
-  // needed — AsyncLocalStorage propagates across awaits.
-  await somethingThatAlsoHitsTheDb();
-});
-```
-
-Caveat: if you spawn unattached work (`setTimeout`, unawaited
-promises), you lose the context — same way Rails loses thread locals
-when you spawn a new thread.
+Every promise is awaited or owned by a `Thread`; work started and
+left running would lose both its ordering and its errors.

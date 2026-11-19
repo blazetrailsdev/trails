@@ -1242,6 +1242,7 @@ export default defineConfig(
             "packages/activerecord/scripts/materialize-model-declares.ts",
             "packages/activerecord/scripts/materialize-model-declares.test.ts",
             "packages/website/docs/.vitepress/config.ts",
+            "packages/website/docs/packages/*.ts",
             "vitest.config.ts",
             "vitest.dx-tests.config.ts",
             "packages/ruby-compat/test-setup/class-paths.ts",

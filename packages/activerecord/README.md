@@ -179,9 +179,9 @@ case.
 
 ## Behavioral deviations from Rails
 
-The full catalog (transactions as functions, `AsyncLocalStorage` for per-flow
-state, Proxy-based scope dispatch, enums, ranges, numeric types, adapters) is
-the [ActiveRecord deviations guide](../website/docs/guides/activerecord-rails-deviations.md).
+Every ratified deviation is on the
+[activerecord package page](https://blazetrailsdev.github.io/trails/docs/packages/activerecord), generated from
+[CLAUDE.md](CLAUDE.md) and the root `CLAUDE.md` sections this package cites.
 These are the ones people coming from Rails hit first.
 
 ### 1. Bang and predicate spellings

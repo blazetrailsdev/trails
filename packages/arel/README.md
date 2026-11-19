@@ -13,7 +13,7 @@ As of 2026-09-27: 725 of 728 public Rails methods have a counterpart
 are ported (`pnpm parity:test`). Its novel extra surface (public names with no
 Rails counterpart) is pinned at zero, and its parameter names are gated
 (`pnpm parity:api:extra:gate`, `pnpm parity:api:params`). The deliberate
-differences from Rails are listed in the [Arel deviations guide](../website/docs/guides/arel-rails-deviations.md).
+differences from Rails are listed on the [arel package page](https://blazetrailsdev.github.io/trails/docs/packages/arel).
 
 ## Using it
 
