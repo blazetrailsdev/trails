@@ -10,7 +10,7 @@ export { SimpleDecoder } from "./simple-decoder.js";
 export { SimpleEncoder } from "./simple-encoder.js";
 export { TypeMapByClass } from "./type-map-by-class.js";
 export { TypeMapByOid } from "./type-map-by-oid.js";
-export { Connection, escapeBytea, unescapeBytea } from "./connection.js";
+export { Connection } from "./connection.js";
 import "./text-encoder/array.js";
 import "./text-encoder/integer.js";
 import "./text-encoder/boolean.js";

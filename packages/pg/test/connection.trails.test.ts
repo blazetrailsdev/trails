@@ -18,3 +18,58 @@ describe("PG.connect", () => {
     }
   });
 });
+
+describe("PG::Connection escaping", () => {
+  async function pg() {
+    const { PG } = await import("../lib/index.js");
+    return PG;
+  }
+
+  function conn(PG: Awaited<ReturnType<typeof pg>>, standardConformingStrings = "on") {
+    return Object.assign(Object.create(PG.Connection.prototype), {
+      parameterStatuses: { standard_conforming_strings: standardConformingStrings },
+    }) as import("../lib/connection.js").Connection;
+  }
+
+  it("escape_bytea matches PQescapeBytea without a connection", async () => {
+    const PG = await pg();
+    expect(PG.Connection.escapeBytea("")).toBe("");
+    expect(PG.Connection.escapeBytea(Uint8Array.of(0x00))).toBe("\\\\000");
+    expect(PG.Connection.escapeBytea(Uint8Array.of(0x5c))).toBe("\\\\\\\\");
+    expect(PG.Connection.escapeBytea(Uint8Array.of(0xff))).toBe("\\\\377");
+  });
+
+  it("escape_bytea matches PQescapeByteaConn on a connection", async () => {
+    const PG = await pg();
+    const c = conn(PG);
+    expect(c.escapeBytea("")).toBe("\\x");
+    expect(c.escapeBytea(Uint8Array.of(0x00))).toBe("\\x00");
+    expect(c.escapeBytea(Uint8Array.of(0x5c))).toBe("\\x5c");
+    expect(c.escapeBytea(Uint8Array.of(0xff))).toBe("\\xff");
+    expect(conn(PG, "off").escapeBytea(Uint8Array.of(0xff))).toBe("\\\\xff");
+    expect(c.unescapeBytea(c.escapeBytea("a\\\u0000"))).toEqual(Uint8Array.of(0x61, 0x5c, 0x00));
+  });
+
+  it("escape_string doubles backslashes only without standard_conforming_strings", async () => {
+    const PG = await pg();
+    expect(PG.Connection.escapeString("a\\b'c")).toBe("a\\\\b''c");
+    expect(PG.Connection.escape).toBe(PG.Connection.escapeString);
+    expect(conn(PG).escape("a\\b'c")).toBe("a\\b''c");
+    expect(conn(PG, "off").escapeString("a\\b'c")).toBe("a\\\\b''c");
+  });
+
+  it("quote_ident quotes a string or an Array and raises on a null byte", async () => {
+    const PG = await pg();
+    const { ArgumentError } = await import("@blazetrails/ruby-compat");
+    expect(PG.Connection.quoteIdent('b"c')).toBe('"b""c"');
+    expect(PG.Connection.quoteIdent(["a", 'b"c'])).toBe('"a"."b""c"');
+    expect(() => PG.Connection.quoteIdent("a\u0000b")).toThrow(ArgumentError);
+    expect(() => PG.Connection.quoteIdent("a\u0000b")).toThrow("string contains null byte");
+  });
+
+  it("unescape_bytea is one body for both forms", async () => {
+    const PG = await pg();
+    expect(PG.Connection.unescapeBytea("\\x6869")).toEqual(new TextEncoder().encode("hi"));
+    expect(conn(PG).unescapeBytea("a\\134\\000b")).toEqual(Uint8Array.of(0x61, 0x5c, 0x00, 0x62));
+  });
+});

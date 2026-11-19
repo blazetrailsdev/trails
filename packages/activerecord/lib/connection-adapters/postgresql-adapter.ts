@@ -1546,7 +1546,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   override quoteString(s: string): string {
-    return pgQuoteString(s);
+    return pgQuoteString.call(this, s);
   }
 
   quotedDate(value: Parameters<typeof pgQuotedDate>[0]): string {
@@ -1575,7 +1575,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   override quotedBinary(value: BinaryData): string {
-    return pgQuotedBinary(value);
+    return pgQuotedBinary.call(this, value);
   }
 
   private nativeType(type: string): string {
@@ -1607,7 +1607,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
     if (value === null) return "NULL";
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-    return `'${pgQuoteString(String(value))}'`;
+    return `'${pgQuoteString.call(this, String(value))}'`;
   }
 
   private deferrable(deferrable: "immediate" | "deferred" | undefined): string {
