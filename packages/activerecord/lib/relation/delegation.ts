@@ -158,7 +158,7 @@ export const ClassMethods = {
   },
 };
 
-export function methodMissing(this: Relation<Base>, method: string, ...args: any[]): unknown {
+export function methodMissing(this: Relation<Base>, method: string, ...args: unknown[]): unknown {
   const model: typeof Base = this.model;
   if (rbObjRespondTo(model, method)) {
     if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(ActiveRecord.Base, method)) {
@@ -457,7 +457,7 @@ export class Delegation {
 
   transaction<R>(
     this: DelegationHost,
-    fn: (tx: any) => Promise<R>,
+    fn: (tx: unknown) => Promise<R>,
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
   ): Promise<R | undefined> {
     return this.model.transaction(fn, options);

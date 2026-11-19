@@ -1,3 +1,4 @@
+import type { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { defineModule, kernelArray as Array, pluck } from "@blazetrails/activesupport";
 import {
@@ -157,7 +158,7 @@ export function inBatches<T extends Base>(
     actOnIgnoredOrder.call(this, errorOnIgnore);
   }
 
-  const run = async (block: (relation: any) => unknown): Promise<null> => {
+  const run = async (block: (relation: LoadedRelation<Relation<T>>) => unknown): Promise<null> => {
     await self.model.schemaCache().indexes(self.tableName);
     ensureValidOptionsForBatchingBang.call(self, cursor, start, finish, order);
 
@@ -180,7 +181,7 @@ export function inBatches<T extends Base>(
           order,
           batchLimit,
         },
-        block,
+        block as never,
       );
     } else {
       return batchOnUnloadedRelation.call(
@@ -196,13 +197,17 @@ export function inBatches<T extends Base>(
           remaining,
           batchLimit,
         },
-        block,
+        block as never,
       );
     }
   };
 
   const generator = async function* (): AsyncGenerator<LoadedRelation<Relation<T>>> {
-    type Batch = { relation: any; resume: () => void; stop: (reason: unknown) => void };
+    type Batch = {
+      relation: LoadedRelation<Relation<T>>;
+      resume: () => void;
+      stop: (reason: unknown) => void;
+    };
     const stopped = {};
     const state: { pending: Batch | null; finished: boolean; failure: unknown[] } = {
       pending: null,
@@ -337,12 +342,12 @@ export function ensureValidOptionsForBatchingBang(
 /** @internal */
 export function applyLimits(
   this: Relation<Base>,
-  relation: any,
+  relation: Relation<Base>,
   cursor: string[],
   start: unknown,
   finish: unknown,
   batchOrders: [string, ":asc" | ":desc"][],
-): any {
+): Relation<Base> {
   if (start !== undefined && start !== null) {
     relation = applyStartLimit.call(this, relation, cursor, start, batchOrders);
   }
@@ -355,11 +360,11 @@ export function applyLimits(
 /** @internal */
 export function applyStartLimit(
   this: Relation<Base>,
-  relation: any,
+  relation: Relation<Base>,
   cursor: string[],
   start: unknown,
   batchOrders: [string, ":asc" | ":desc"][],
-): any {
+): Relation<Base> {
   const operators = batchOrders.map(([, order]) => (order === ":desc" ? "lteq" : "gteq"));
   return batchCondition.call(this, relation, cursor, start, operators);
 }
@@ -367,11 +372,11 @@ export function applyStartLimit(
 /** @internal */
 export function applyFinishLimit(
   this: Relation<Base>,
-  relation: any,
+  relation: Relation<Base>,
   cursor: string[],
   finish: unknown,
   batchOrders: [string, ":asc" | ":desc"][],
-): any {
+): Relation<Base> {
   const operators = batchOrders.map(([, order]) => (order === ":desc" ? "gteq" : "lteq"));
   return batchCondition.call(this, relation, cursor, finish, operators);
 }
@@ -379,16 +384,18 @@ export function applyFinishLimit(
 /** @internal */
 export function batchCondition(
   this: Relation<Base>,
-  relation: any,
+  relation: Relation<Base>,
   cursor: string[],
   values: unknown,
   operators: string[],
-): any {
+): Relation<Base> {
   const predicateBuilder = relation.predicateBuilder;
-  const cursorPositions = cursor.map((column, i) => [column, Array(values)[i], operators[i]]);
+  const cursorPositions = cursor.map(
+    (column, i) => [column, Array(values)[i], operators[i]] as [string, unknown, string],
+  );
 
   const [firstClauseColumn, firstClauseValue, operator] = cursorPositions.pop()!;
-  let whereClause: any = predicateBuilder.get(firstClauseColumn, firstClauseValue, operator);
+  let whereClause: Nodes.Node = predicateBuilder.get(firstClauseColumn, firstClauseValue, operator);
 
   for (const [columnName, value, operator] of cursorPositions.reverse()) {
     whereClause = predicateBuilder
@@ -409,7 +416,7 @@ export function buildBatchOrders(
 }
 
 /** @internal */
-export function actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
+export function actOnIgnoredOrder(this: Relation<Base>, errorOnIgnore: boolean | undefined): void {
   const raise = errorOnIgnore !== undefined ? errorOnIgnore : errorOnIgnoredOrder();
   if (raise) {
     throw new ArgumentError(ORDER_IGNORE_MESSAGE);
@@ -429,16 +436,16 @@ export async function batchOnLoadedRelation(
     order,
     batchLimit,
   }: {
-    relation: any;
+    relation: Relation<Base>;
     start: unknown;
     finish: unknown;
     cursor: string[];
     order: ":asc" | ":desc" | (":asc" | ":desc")[];
     batchLimit: number;
   },
-  block: (subrelation: any) => unknown,
+  block: (subrelation: LoadedRelation<Relation<Base>>) => unknown,
 ): Promise<null> {
-  let records: any[] = await relation.toArray();
+  let records = await relation;
   order = buildBatchOrders.call(this, cursor, order).map(([, second]) => second);
 
   if (rtest(start) || rtest(finish)) {
@@ -469,7 +476,7 @@ export async function batchOnLoadedRelation(
 }
 
 /** @internal */
-export function recordCursorValues(this: any, record: any, cursor: string[]): unknown[] {
+export function recordCursorValues(this: unknown, record: Base, cursor: string[]): unknown[] {
   return Object.values(slice(record.attributes, ...cursor));
 }
 
@@ -495,7 +502,7 @@ export function compareValuesForOrder(
 export async function batchOnUnloadedRelation(
   this: Relation<Base>,
   opts: {
-    relation: any;
+    relation: Relation<Base>;
     start: unknown;
     finish: unknown;
     load: boolean;
@@ -505,7 +512,7 @@ export async function batchOnUnloadedRelation(
     remaining: number | null;
     batchLimit: number;
   },
-  block: (yieldedRelation: any) => unknown,
+  block: (yieldedRelation: LoadedRelation<Relation<Base>>) => unknown,
 ): Promise<null> {
   const { start, load, cursor, order, useRanges, batchLimit } = opts;
   let { relation, finish, remaining } = opts;
@@ -518,7 +525,7 @@ export async function batchOnUnloadedRelation(
 
   while (true) {
     let values: unknown[];
-    let yieldedRelation: any;
+    let yieldedRelation!: Relation<Base>;
     if (load) {
       const records = await batchRelation.records();
       values = pluck<any, any>(records, ...cursor);

@@ -274,7 +274,7 @@ describe("RelationTest", () => {
   });
 
   it("merging a hash with unknown keys raises", async () => {
-    await assertRaises([ArgumentError], {}, () => new HashMerger(null, { omg: "lol" }));
+    await assertRaises([ArgumentError], {}, () => new HashMerger(null as never, { omg: "lol" }));
   });
 
   it("merging nil or false raises", async () => {
