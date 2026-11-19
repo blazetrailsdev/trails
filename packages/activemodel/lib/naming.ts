@@ -40,8 +40,8 @@ export class Naming {
 
   static [extended](base: NamingHost): void {
     Object.defineProperty(base.prototype, "modelName", {
-      get(this: object): ModelName {
-        return Reflect.get(this.constructor, "modelName") as ModelName;
+      get(this: { constructor: { modelName: ModelName } }): ModelName {
+        return this.constructor.modelName;
       },
       configurable: true,
     });

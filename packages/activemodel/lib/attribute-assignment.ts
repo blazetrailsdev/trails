@@ -26,8 +26,8 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
   if (capture != null) assignmentCapture = null;
   if (isEmpty(newAttributes)) return;
 
-  const outer: boolean | undefined = Reflect.get(this, assigningSynchronously);
-  Reflect.set(this, assigningSynchronously, true);
+  const outer = this[assigningSynchronously];
+  this[assigningSynchronously] = true;
   try {
     const assigned = this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
     if (capture == null) {
@@ -37,7 +37,7 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
       pendingCaptures.set(this, capture);
     }
   } finally {
-    Reflect.set(this, assigningSynchronously, outer);
+    this[assigningSynchronously] = outer;
   }
 }
 
@@ -108,6 +108,7 @@ export function _assignAttribute(this: AttributeAssignment, k: string, v: unknow
 }
 
 export interface AttributeAssignment {
+  [assigningSynchronously]?: boolean;
   attributeWriterMissing(name: string, value: unknown): void;
   /** @internal */
   sanitizeForMassAssignment(

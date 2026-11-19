@@ -10,6 +10,7 @@ import {
 } from "@blazetrails/activesupport";
 
 interface ConversionRecord {
+  constructor: { paramDelimiter: string };
   isPersisted(): boolean;
   toKey(...args: Parameters<typeof toKey>): ReturnType<typeof toKey>;
 }
@@ -35,7 +36,7 @@ export function toParam(this: ConversionRecord): string | null {
   return this.isPersisted() &&
     (key = this.toKey()) &&
     key.every((part) => part !== null && part !== undefined && part !== false)
-    ? key.map(String).join(Reflect.get(this.constructor, "paramDelimiter") as string)
+    ? key.map(String).join(this.constructor.paramDelimiter)
     : null;
 }
 
