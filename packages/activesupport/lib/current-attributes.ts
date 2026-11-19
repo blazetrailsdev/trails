@@ -68,7 +68,7 @@ export abstract class CurrentAttributes {
    * @missingRailsName generatedAttributeMethods — PERMANENT
    */
   static attribute(...args: unknown[]): void {
-    const ctor = this as unknown as CurrentAttributesClass;
+    const ctor = this as CurrentAttributesClass;
     const lastArg = args[args.length - 1];
     const hasOptions = typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg);
     const options: AttributeDefinition = hasOptions ? (lastArg as AttributeDefinition) : {};
@@ -103,11 +103,11 @@ export abstract class CurrentAttributes {
       Object.defineProperty(ctor, name, {
         configurable: true,
         get(this: typeof CurrentAttributes) {
-          return (this.instance() as unknown as Record<string, unknown>)[name];
+          return Reflect.get(this.instance(), name);
         },
         /** @missingRailsCall with — PERMANENT */
         set(this: typeof CurrentAttributes, value: unknown) {
-          (this.instance() as unknown as Record<string, unknown>)[name] = value;
+          Reflect.set(this.instance(), name, value);
         },
       });
     }
@@ -204,7 +204,7 @@ export abstract class CurrentAttributes {
 
   /** @missingRailsCall with — PERMANENT */
   set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
-    return objectWith(this as unknown as Record<string, unknown>, attributes, () => block());
+    return objectWith(this, attributes, () => block());
   }
 
   reset(): void {
@@ -247,7 +247,7 @@ type CurrentAttributesClass = typeof CurrentAttributes & {
 function generatedAttributeMethods(this: CurrentAttributesClass): Module {
   if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
     const mod = new Module();
-    include(this as unknown as new (...args: unknown[]) => unknown, mod);
+    include(this, mod);
     this._generatedAttributeMethods = mod;
   }
   return this._generatedAttributeMethods!;

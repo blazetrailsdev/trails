@@ -16,13 +16,22 @@ export interface ClassAttributeOptions {
   default?: unknown;
 }
 
+type Slots = Record<string, unknown>;
+type AttributeOwner = abstract new (...args: never) => unknown;
+type AttributeInstance = Slots & { constructor: Slots };
+
 function inspect(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
   return String(value);
 }
 
 export namespace ClassAttribute {
-  export function redefine(owner: any, name: string, namespacedName: string, value: unknown): void {
+  export function redefine(
+    owner: AttributeOwner,
+    name: string,
+    namespacedName: string,
+    value: unknown,
+  ): void {
     if (rbModSingletonP(owner)) {
       const attachedObject = rbClassAttachedObject(owner);
       if (rbObjIsKindOf(attachedObject, Module)) {
@@ -34,20 +43,25 @@ export namespace ClassAttribute {
 
     redefineMethod(owner, namespacedName, true, () => value);
 
-    redefineMethod(owner, `${namespacedName}=`, true, function (this: any, newValue: unknown) {
-      if (owner === this) {
-        value = newValue;
-      } else {
-        ClassAttribute.redefine(this, name, namespacedName, newValue);
-      }
-    });
+    redefineMethod(
+      owner,
+      `${namespacedName}=`,
+      true,
+      function (this: AttributeOwner, newValue: unknown) {
+        if (owner === this) {
+          value = newValue;
+        } else {
+          ClassAttribute.redefine(this, name, namespacedName, newValue);
+        }
+      },
+    );
   }
 
   export function redefineMethod(
-    owner: any,
+    owner: object,
     name: string,
     isPrivate: boolean,
-    fn: (...args: any[]) => unknown,
+    fn: (() => unknown) | ((value: unknown) => void),
   ): void {
     const isWriter = name.endsWith("=");
     const key = isWriter ? name.slice(0, -1) : name;
@@ -62,7 +76,7 @@ export namespace ClassAttribute {
 }
 
 /** @missingRailsName default — PERMANENT */
-export function classAttribute(this: any, ...attrs: (string | ClassAttributeOptions)[]): void {
+export function classAttribute(this: object, ...attrs: (string | ClassAttributeOptions)[]): void {
   const last = attrs[attrs.length - 1];
   const options: ClassAttributeOptions =
     typeof last === "object" && last !== null ? (attrs.pop() as ClassAttributeOptions) : {};
@@ -74,21 +88,22 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     default: defaultValue = null,
   } = options;
 
+  const klass = this as AttributeOwner;
   for (const name of attrs as string[]) {
     if (typeof name !== "string") {
       throw new TypeError(`${inspect(name)} is not a symbol nor a string`);
     }
 
     const namespacedName = `__class_attr_${name}`;
-    ClassAttribute.redefine(this, name, namespacedName, defaultValue);
+    ClassAttribute.redefine(klass, name, namespacedName, defaultValue);
 
     const delegators: PropertyDescriptor = {
       configurable: true,
       enumerable: false,
-      get(this: any) {
+      get(this: Slots) {
         return this[namespacedName];
       },
-      set(this: any, value: unknown) {
+      set(this: Slots, value: unknown) {
         this[namespacedName] = value;
       },
     };
@@ -98,7 +113,7 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     if (rbModSingletonP(this)) {
       Object.assign(methods, delegators);
     } else if (instanceReader) {
-      methods.get = function (this: any) {
+      methods.get = function (this: AttributeInstance) {
         if (Object.hasOwn(this, `@${name}`)) {
           return this[`@${name}`];
         } else {
@@ -108,24 +123,29 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     }
 
     if (instanceWriter) {
-      methods.set = function (this: any, value: unknown) {
+      methods.set = function (this: Slots, value: unknown) {
         this[`@${name}`] = value;
       };
     }
-    if (methods.get || methods.set) Object.defineProperty(this.prototype, name, methods);
+    if (methods.get || methods.set) Object.defineProperty(klass.prototype, name, methods);
     rbClearMethodCache();
 
     if (instancePredicate) {
       const lead = /^_*/.exec(name)![0];
       const bare = name.slice(lead.length);
       const predicateName = `${lead}is${bare.charAt(0).toUpperCase()}${bare.slice(1)}`;
-      ClassAttribute.redefineMethod(this, predicateName, false, function (this: any) {
+      ClassAttribute.redefineMethod(this, predicateName, false, function (this: Slots) {
         return this[name] != null && this[name] !== false;
       });
       if (instanceReader) {
-        ClassAttribute.redefineMethod(this.prototype, predicateName, false, function (this: any) {
-          return this[name] != null && this[name] !== false;
-        });
+        ClassAttribute.redefineMethod(
+          klass.prototype,
+          predicateName,
+          false,
+          function (this: Slots) {
+            return this[name] != null && this[name] !== false;
+          },
+        );
       }
     }
   }

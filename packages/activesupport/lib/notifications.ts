@@ -9,8 +9,7 @@ type FanoutSubscriber = ReturnType<Fanout["subscribe"]>;
 
 const ACTIVE_SUPPORT_NOTIFICATIONS_REGISTRY = Symbol("active_support_notifications_registry");
 
-declare const notificationSubscriberBrand: unique symbol;
-export type NotificationSubscriber = { readonly [notificationSubscriberBrand]: true };
+export type NotificationSubscriber = FanoutSubscriber;
 
 export type { NotificationHandle };
 
@@ -59,7 +58,7 @@ export class Notifications {
     callback: NotificationCallback | EventedListener,
   ): NotificationSubscriber {
     const sub = this.notifier.subscribe(pattern ?? null, callback as FanoutListener, false);
-    return sub as unknown as NotificationSubscriber;
+    return sub;
   }
 
   static monotonicSubscribe(callback: NotificationCallback): NotificationSubscriber;
@@ -85,7 +84,7 @@ export class Notifications {
       callback = patternOrCallback;
     }
     const sub = this.notifier.subscribe(pattern, callback as FanoutListener, true);
-    return sub as unknown as NotificationSubscriber;
+    return sub;
   }
 
   static subscribed<T>(
@@ -139,11 +138,11 @@ export class Notifications {
       this.notifier.unsubscribe(sub);
       callback(event);
     });
-    return sub as unknown as NotificationSubscriber;
+    return sub;
   }
 
   static unsubscribe(subscriberOrName: NotificationSubscriber | string | null): void {
-    this.notifier.unsubscribe(subscriberOrName as unknown as FanoutSubscriber);
+    this.notifier.unsubscribe(subscriberOrName);
   }
 
   static unsubscribeAll(): void {
@@ -156,9 +155,9 @@ export class Notifications {
     block?: (payload: EventPayload) => T,
   ): T extends undefined ? void : T {
     if (!this.notifier.listening(name)) {
-      return (block ? block(payload) : undefined) as any;
+      return (block ? block(payload) : undefined) as T extends undefined ? void : T;
     }
-    return this.instrumenter.instrument(name, payload, block) as any;
+    return this.instrumenter.instrument(name, payload, block) as T extends undefined ? void : T;
   }
 
   static publish(name: string, ...args: unknown[]): void {

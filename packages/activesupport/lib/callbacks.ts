@@ -989,7 +989,7 @@ export function normalizeCallbackParams(
   }
   let options: Record<string, unknown> = {};
   if (rest.length > 0 && isCallbackOptions(rest[rest.length - 1])) {
-    options = rest.pop() as unknown as Record<string, unknown>;
+    options = rest.pop() as Record<string, unknown>;
   }
   if (block) rest.unshift(block);
   return [type, rest as Array<AnyCallback | string | symbol>, { ...options }];
@@ -1109,21 +1109,24 @@ function observeProceed(
   };
   return Object.setPrototypeOf(
     {
-      then(onFulfilled?: any, onRejected?: any) {
+      then(
+        onFulfilled?: ((value: unknown) => unknown) | null,
+        onRejected?: ((reason: unknown) => unknown) | null,
+      ) {
         if (typeof onRejected === "function") {
           tracker.observed = true;
           return observed().then(onFulfilled, onRejected);
         }
         return settle(observed().then(onFulfilled));
       },
-      catch(onRejected?: any) {
+      catch(onRejected?: ((reason: unknown) => unknown) | null) {
         if (typeof onRejected === "function") {
           tracker.observed = true;
           return observed().catch(onRejected);
         }
         return settle(observed().catch(onRejected));
       },
-      finally(onFinally?: any) {
+      finally(onFinally?: (() => void) | null) {
         return settle(observed().finally(onFinally));
       },
     },

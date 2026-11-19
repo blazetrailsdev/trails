@@ -3,6 +3,7 @@ import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 import type { NotificationSubscriber } from "./notifications.js";
 import type { Event } from "./notifications/instrumenter.js";
 import type { AnyClass } from "./descendants-tracker.js";
+import type { Logger } from "./logger.js";
 
 function snakeCase(str: string): string {
   return str.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
@@ -33,6 +34,7 @@ interface ClassState {
   namespace?: string;
   subscriber?: Subscriber;
   notifier?: typeof Notifications;
+  _logLevels?: Map<string, (logger: Logger) => boolean>;
 }
 
 const _classState = new WeakMap<AnyClass, ClassState>();
@@ -69,7 +71,7 @@ export class Subscriber {
     notifier: typeof Notifications = Notifications,
     options?: { inheritAll?: boolean },
   ): Subscriber {
-    const sub = subscriber ?? new (this as any)();
+    const sub = subscriber ?? new this();
     const state = getState(this);
     state.namespace = namespace;
     state.subscriber = sub;
@@ -116,9 +118,9 @@ export class Subscriber {
     const snakeMethod = event.name.slice(0, dotIdx);
     const method =
       eventMethodCandidates(snakeMethod).find(
-        (candidate) => typeof (this as any)[candidate] === "function",
+        (candidate) => typeof Reflect.get(this, candidate) === "function",
       ) ?? null;
-    if (method) (this as any)[method](event);
+    if (method) (Reflect.get(this, method) as (event: Event) => void).call(this, event);
   }
 
   publishEvent(event: Event): void {
@@ -127,9 +129,9 @@ export class Subscriber {
     const snakeMethod = event.name.slice(0, dotIdx);
     const method =
       eventMethodCandidates(snakeMethod).find(
-        (candidate) => typeof (this as any)[candidate] === "function",
+        (candidate) => typeof Reflect.get(this, candidate) === "function",
       ) ?? null;
-    if (method) (this as any)[method](event);
+    if (method) (Reflect.get(this, method) as (event: Event) => void).call(this, event);
   }
 
   private static _invalidEvent(event: string): boolean {
@@ -172,7 +174,7 @@ export class Subscriber {
           key !== "constructor" &&
           !key.startsWith("_") &&
           !baseKeys.has(key) &&
-          typeof (subscriber as any)[key] === "function"
+          typeof Reflect.get(subscriber, key) === "function"
         ) {
           keys.add(key);
         }

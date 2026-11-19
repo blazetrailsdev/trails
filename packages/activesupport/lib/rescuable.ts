@@ -16,7 +16,7 @@ import { safeConstantize } from "./inflector.js";
 
 type ErrorHandler = ((this: any, error: any) => unknown) | string;
 
-type ExceptionClass = (abstract new (...args: any[]) => unknown) | Module;
+type ExceptionClass = (abstract new (...args: never) => unknown) | Module;
 
 interface RescuableClass {
   rescueHandlers: unknown[][];
@@ -69,7 +69,7 @@ export const ClassMethods = {
 
   rescueWithHandler(
     this: RescuableClass,
-    exception: any,
+    exception: unknown,
     {
       object = this,
       visitedExceptions = [],
@@ -84,10 +84,11 @@ export const ClassMethods = {
         ? Promise.resolve(result).then(() => exception)
         : exception;
     } else if (exception != null && exception !== false) {
-      if (visitedExceptions.includes(exception.cause)) {
+      const { cause } = exception as { cause?: unknown };
+      if (visitedExceptions.includes(cause)) {
         return null;
       } else {
-        return this.rescueWithHandler(exception.cause, {
+        return this.rescueWithHandler(cause, {
           object: object,
           visitedExceptions: visitedExceptions,
         });
@@ -163,17 +164,20 @@ extend(Rescuable, Concern);
 );
 export type Rescuable = Included<typeof Rescuable>;
 
-export function rescueWithHandler(this: object, exception: unknown): unknown {
-  return (this.constructor as unknown as RescuableClass).rescueWithHandler(exception, {
+export function rescueWithHandler(
+  this: { constructor: RescuableClass },
+  exception: unknown,
+): unknown {
+  return this.constructor.rescueWithHandler(exception, {
     object: this,
   });
 }
 
 export function handlerForRescue(
-  this: object,
+  this: { constructor: RescuableClass },
   exception: unknown,
 ): ((e: unknown) => unknown) | null {
-  return (this.constructor as unknown as RescuableClass).handlerForRescue(exception, {
+  return this.constructor.handlerForRescue(exception, {
     object: this,
   });
 }
