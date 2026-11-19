@@ -27,7 +27,8 @@ export class IdentityEncoder {
 }
 
 export class RequestEncoder {
-  private static encoders: Map<string, RequestEncoder | IdentityEncoder> = new Map([
+  /** @internal */
+  static encoders: Map<string, RequestEncoder | IdentityEncoder> = new Map([
     [":identity", new IdentityEncoder()],
   ]);
 

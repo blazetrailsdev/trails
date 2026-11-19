@@ -41,6 +41,7 @@ export const Turbo = {
   loadPath: {
     "turbo/test_assertions": () => import("@blazetrails/turbo/test-assertions"),
     "turbo/broadcastable/test_helper": () => import("@blazetrails/turbo/broadcastable/test-helper"),
+    "turbo/system_test_helper": () => import("@blazetrails/turbo/system-test-helper"),
     "turbo/test_assertions/integration_test_assertions": () =>
       import("@blazetrails/turbo/test-assertions/integration-test-assertions"),
   } as Record<string, () => Promise<unknown>>,

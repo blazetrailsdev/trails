@@ -12,7 +12,7 @@ type Block = ((selected: unknown) => unknown) | null;
 export function assertTurboStream(
   this: IntegrationTestAssertionsHost,
   {
-    status = "ok",
+    status = ":ok",
     ...attributes
   }: { status?: number | string; action: string } & Record<string, unknown>,
   block: Block = null,
@@ -25,7 +25,7 @@ export function assertTurboStream(
 export function assertNoTurboStream(
   this: IntegrationTestAssertionsHost,
   {
-    status = "ok",
+    status = ":ok",
     ...attributes
   }: { status?: number | string; action: string } & Record<string, unknown>,
 ): unknown {

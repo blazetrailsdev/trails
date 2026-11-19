@@ -1,5 +1,6 @@
 import { TopLevel } from "@blazetrails/ruby-compat";
 import { Message } from "../models/message.js";
+import type { TagBuilder } from "../../../../lib/app/models/turbo/streams/tag-builder.js";
 import { ApplicationController } from "./application-controller.js";
 
 declare module "@blazetrails/ruby-compat" {
@@ -8,10 +9,13 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
+type UrlHelpers = { messageUrl(options: object): string };
+
 export class MessagesController extends ApplicationController {
   declare message: Message;
   declare otherMessage: Message;
   declare messages: unknown;
+  declare turboStream: TagBuilder;
 
   async show(): Promise<void> {
     this.message = await Message.find(this.params.get("id"));
@@ -27,6 +31,19 @@ export class MessagesController extends ApplicationController {
   }
 
   section(): void {}
+
+  async create(): Promise<void> {
+    await this.respondTo((format) => {
+      format.html(() => this.redirectTo((this as unknown as UrlHelpers).messageUrl({ id: 1 })));
+      (format as unknown as Record<string, (block: () => unknown) => unknown>).turbo_stream(
+        async () =>
+          this.render({
+            turbo_stream: await this.turboStream.append("messages", "message_1"),
+            status: ":created",
+          } as never),
+      );
+    });
+  }
 
   update(): void {
     this.message = new Message({ id: 1, content: "My message" });
