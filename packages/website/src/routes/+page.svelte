@@ -1,4 +1,5 @@
 <script>
+  import { base } from "$app/paths";
   const packages = [
     { name: "ActiveRecord", path: "activerecord", desc: "ORM with migrations, associations, and query building", coverage: "71%" },
     { name: "ActiveModel", path: "activemodel", desc: "Validations, callbacks, dirty tracking, serialization", coverage: "95%" },
@@ -53,7 +54,7 @@ const users = await User.where({ name: "Alice" })
     <!-- Nav overlay -->
     <nav class="absolute top-0 left-0 right-0 z-20">
       <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-        <a href="/" class="text-xl font-bold" style="color: #7db060;">BlazeTrails</a>
+        <a href="{base}/" class="text-xl font-bold" style="color: #7db060;">BlazeTrails</a>
         <div class="flex items-center gap-6">
           <a href="https://github.com/blazetrailsdev/blazetrails" class="text-sm" style="color: #e4ded4cc;" onmouseenter={(e) => e.currentTarget.style.color = '#e4ded4'} onmouseleave={(e) => e.currentTarget.style.color = '#e4ded4cc'}>GitHub</a>
         </div>
