@@ -3,7 +3,8 @@
 
   const repo = "https://github.com/blazetrailsdev/trails";
   const docs = `${base}/docs/`;
-  const gettingStarted = `${base}/docs/guides/getting-started`;
+  const gettingStarted = `${base}/docs/guides/`;
+  const parity = `${repo}/blob/main/docs/parity-gates.md`;
 
   const navLeft = [
     { label: "Docs", href: docs },
@@ -13,12 +14,11 @@
   ];
   const navRight = [
     { label: "Source", href: repo },
-    { label: "Parity", href: `${base}/docs/packages/` },
+    { label: "Parity", href: parity },
     { label: "Changelog", href: `${repo}/commits/main` },
     { label: "GitHub", href: repo },
   ];
 
-  // Filled by website-parity-numbers-at-build; a missing figure renders "—".
   const figures = [
     { value: "—", label: "contributors" },
     { value: "—", label: "packages published" },
@@ -89,7 +89,7 @@
 
 <div class="page">
   <div class="announce">
-    <a href="{base}/docs/packages/">Parity figures for every package, measured on each commit to main &rarr;</a>
+    <a href={parity}>How every ported method is checked against the Rails source &rarr;</a>
   </div>
 
   <nav class="nav">
@@ -171,7 +171,7 @@
       <div class="group">
         <h3>{g.name}</h3>
         <ul>
-          {#each g.pkgs as p}<li><a href="{base}/docs/api/{p}/">{p}</a></li>{/each}
+          {#each g.pkgs as p}<li><a href="{repo}/tree/main/packages/{p}">{p}</a></li>{/each}
         </ul>
       </div>
     {/each}
@@ -181,7 +181,7 @@
     <div class="col card">
       <h2>Why a faithful port.</h2>
       <p>One mental model for two runtimes. A team that knows Rails can read a trails app on day one, and a fix found in either codebase points straight at its counterpart in the other.</p>
-      <a class="cta" href="{base}/docs/idioms">Read how Ruby idioms translate &rsaquo;</a>
+      <a class="cta" href="{base}/docs/guides/idioms">Read how Ruby idioms translate &rsaquo;</a>
     </div>
   </section>
 

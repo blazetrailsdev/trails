@@ -10,7 +10,6 @@ const config = {
       base: process.env.SITE_BASE ?? "",
     },
     prerender: {
-      // /docs/ is the VitePress build, written into the same output directory.
       handleHttpError: ({ path, message }) => {
         if (path.startsWith(`${process.env.SITE_BASE ?? ""}/docs/`)) return;
         throw new Error(message);
