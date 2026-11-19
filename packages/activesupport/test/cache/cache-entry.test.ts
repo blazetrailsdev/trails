@@ -1,10 +1,26 @@
 import { describe, expect, it } from "vitest";
 
+import { Time } from "@blazetrails/date";
 import { Entry } from "../../lib/cache/entry.js";
+import { assertNot, assertPredicate } from "../../lib/testing/assertions.js";
+import { stub } from "../../lib/testing/method-call-assertions.js";
 
 describe("CacheEntryTest", () => {
-  it.skip("expired");
-  it.skip("initialize with expires at");
+  it("expired", async () => {
+    let entry = new Entry("value");
+    assertNot(entry.isExpired(), "entry not expired");
+    entry = new Entry("value", { expiresIn: 60 });
+    assertNot(entry.isExpired(), "entry not expired");
+    await stub(Time, "now", Time.at(entry.expiresAt! + 1), [], () => {
+      assertPredicate(entry, (e: Entry) => e.isExpired(), "entry is expired");
+    });
+  });
+
+  it("initialize with expires at", () => {
+    const entry = new Entry("value", { expiresIn: 60 });
+    const clone = new Entry("value", { expiresAt: entry.expiresAt });
+    expect(clone.expiresAt).toBe(entry.expiresAt);
+  });
 
   it("bytesize of a compressed Array includes Marshal framing overhead", () => {
     const value = Array.from({ length: 200 }, (_, i) => i % 10);

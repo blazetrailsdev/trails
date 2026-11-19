@@ -919,7 +919,10 @@ describe("InflectorTest", () => {
     it(`clear ${inflectionType}`, () => {
       withInflections((inflect) => {
         inflect.clear(inflectionType);
-        expect([...inflect[inflectionType]]).toEqual([]);
+        assert(
+          [...inflect[inflectionType]].length === 0,
+          `${inflectionType} inflections should be empty after clear :${inflectionType}`,
+        );
       });
     });
   }

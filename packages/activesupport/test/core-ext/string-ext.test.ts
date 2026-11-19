@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
 import { toDate, toDatetime, toTime } from "../../lib/core-ext/string/conversions.js";
-import { ArgumentError, DateTime, Temporal, Time } from "@blazetrails/date";
+import { ArgumentError, Date as RbDate, DateTime, Temporal, Time } from "@blazetrails/date";
 import { at, from, to, first, last, indent, indentBang, exclude } from "../../lib/string-utils.js";
 import {
   registerConstantizeFixtures,
@@ -22,6 +22,7 @@ import {
   assertRaises,
   assertRespondTo,
   assertNil,
+  assertEqual,
 } from "../../lib/testing/assertions.js";
 import { inquiry } from "../../lib/core-ext/string/inquiry.js";
 import {
@@ -459,6 +460,8 @@ describe("StringConversionsTest", () => {
     expect(toDatetime("2039-02-27 23:50")!.toS()).toEqual(
       DateTime.civil(2039, 2, 27, 23, 50).toS(),
     );
+    assertEqual(0, toDatetime("2039-02-27 23:50")!.offset);
+    expect(toDatetime("2039-02-27 23:50")!.start).toBe(RbDate.ITALY);
     expect(toDatetime("2039-02-27T23:50:19.275038-04:00")!.inspect()).toEqual(
       DateTime.civil(2039, 2, 27, 23, 50, new Rational(19275038, 1000000), "-04:00").inspect(),
     );

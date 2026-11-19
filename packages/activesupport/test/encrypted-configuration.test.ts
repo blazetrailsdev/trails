@@ -62,7 +62,12 @@ describe("EncryptedConfigurationTest", () => {
 
     assertEqual({}, await credentials.config());
   });
-  it.skip("writing with element assignment and reading with element reference");
+  it("writing with element assignment and reading with element reference", async () => {
+    await credentials.config();
+    const creds = credentials as unknown as Record<string, any>;
+    creds.set("foo", 42);
+    assertEqual(42, creds.get("foo"));
+  });
   it.skip("writing with dynamic accessor and reading with element reference");
   it.skip("change configuration by key file");
   it("raises helpful error when loading invalid content", async () => {
