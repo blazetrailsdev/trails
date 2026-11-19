@@ -1330,6 +1330,11 @@ ratified here so no port re-derives them.
   `CaptureBlockEngine` rerun at `:902-1000`, whose `check_output` skips the src
   comparison, `:39-47`) is permanently unportable; `Buffer`'s runtime is pinned
   by `capture-block.trails.test.ts` instead. Ruled by the operator on 2026-11-11.
+- **A Marshal blob written by Ruby.** `Marshal.load` of a stream a Ruby process
+  dumped (`activerecord/test/cases/marshal_serialization_test.rb:18-55`, its
+  Rails 6.1 / 7.1 fixtures) is out of scope: the stream carries Ruby class
+  paths and ivar layouts no trails object reproduces. Ruled by the operator on
+  2026-11-19.
 - **`initialize` on an allocated receiver.** See § "A revived object copies a
   constructed instance".
 

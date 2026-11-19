@@ -37,6 +37,6 @@ export const ACTIVERECORD_UNPORTED_FILES: UnportedFile[] = [
     ],
     reason:
       "Unmarshals Marshal blobs written by real Ruby Rails 6.1/7.1 processes; loading " +
-      "Ruby-written Marshal data is out of scope by operator ruling (2026-11-19).",
+      'Ruby-written Marshal data is out of scope (CLAUDE.md, "Runtime facts Node does not expose").',
   },
 ];
