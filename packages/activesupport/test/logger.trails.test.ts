@@ -140,6 +140,27 @@ describe("LoggerThreadSafeLevel", () => {
     logger.localLevel = null;
     expect(logger.localLevel).toBeNull();
   });
+
+  it("keeps each concurrent async log_at block at its own level", async () => {
+    const logger = new Logger({ write: () => {} });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const seen: Array<number | null> = [];
+
+    const debug = logger.logAt(Logger.DEBUG, async () => {
+      await gate;
+      seen.push(logger.localLevel);
+    });
+    const error = logger.logAt(Logger.ERROR, async () => {
+      await gate;
+      seen.push(logger.localLevel);
+    });
+    release();
+    await Promise.all([debug, error]);
+
+    expect(seen).toEqual([Logger.DEBUG, Logger.ERROR]);
+    expect(logger.localLevel).toBeNull();
+  });
 });
 
 describe("Logger#add block", () => {

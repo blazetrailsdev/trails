@@ -1,6 +1,38 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { MessagePack, UnserializableObjectError } from "../../lib/message-pack.js";
 import { env as ENV, setEnv, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { DateTime, Temporal, Time } from "@blazetrails/date";
+import {
+  BigDecimal,
+  Complex,
+  Generic,
+  IPAddr,
+  Marshal,
+  Pathname,
+  Range,
+  Rational,
+  URI,
+  complex,
+  rational,
+  rbCDate,
+  rbCDateTime,
+  rbCInteger,
+  rbCSymbol,
+} from "@blazetrails/ruby-compat";
+import {
+  Duration,
+  days,
+  hours,
+  minutes,
+  months,
+  seconds,
+  weeks,
+  years,
+} from "../../lib/duration.js";
+import { TimeWithZone } from "../../lib/time-with-zone.js";
+import { TimeZone } from "../../lib/values/time-zone.js";
+import { HashWithIndifferentAccess } from "../../lib/hash-with-indifferent-access.js";
+
 import { assertNotNil } from "../../lib/testing/assertions.js";
 
 class HasValue {
@@ -50,6 +82,168 @@ describe("MessagePackCacheSerializerTest", () => {
   beforeAll(() => {
     constSet(TopLevel, "DefinesJsonCreate", DefinesJsonCreate);
     constSet(TopLevel, "DefinesFromMsgpackExt", DefinesFromMsgpackExt);
+  });
+
+  it("includes signature in message", () => {
+    expect(MessagePack.CacheSerializer.isSignature(dump(""))).toBeTruthy();
+    expect(MessagePack.CacheSerializer.isSignature(Marshal.dump(""))).toBeFalsy();
+    expect(MessagePack.CacheSerializer.isSignature(Buffer.from("{}"))).toBeFalsy();
+  });
+
+  it("#signature? handles non-ASCII-only non-binary-encoded strings", () => {
+    expect(MessagePack.CacheSerializer.isSignature(dump("ümlaut"))).toBeTruthy();
+    expect(MessagePack.CacheSerializer.isSignature("ümlaut")).toBeFalsy();
+  });
+
+  it("roundtrips Symbol", () => {
+    assertRoundtrip(":some_symbol");
+  });
+
+  it("enshrines type IDs", () => {
+    MessagePack.CacheSerializer.warmup();
+    const actual = Object.fromEntries(
+      MessagePack.CacheSerializer.messagePackFactory
+        .registeredTypes()
+        .map((e) => [e.type, e.class]),
+    );
+    expect(actual).toEqual({
+      0: rbCSymbol,
+      1: rbCInteger,
+      2: BigDecimal,
+      3: Rational,
+      4: Complex,
+      5: rbCDateTime,
+      6: rbCDate,
+      7: Time,
+      8: TimeWithZone,
+      9: TimeZone,
+      10: Duration,
+      11: Range,
+      12: Set,
+      13: Generic,
+      14: IPAddr,
+      15: Pathname,
+      16: RegExp,
+      17: HashWithIndifferentAccess,
+      127: Object,
+    });
+  });
+
+  it("roundtrips very large Integer", () => {
+    assertRoundtrip(2n ** 512n);
+  });
+
+  it("roundtrips BigDecimal", () => {
+    assertRoundtrip(new BigDecimal("9876543210.0123456789"));
+  });
+
+  it("roundtrips Rational", () => {
+    assertRoundtrip(rational(1, 3));
+  });
+
+  it("optimizes Rational zero encoding", () => {
+    assertRoundtrip(rational(0, 1));
+
+    const serializedZero = dump(rational(0, 1));
+    const serializedNonzero = dump(rational(1, 1));
+    expect(serializedZero.length).toBeLessThan(serializedNonzero.length);
+  });
+
+  it("roundtrips Complex", () => {
+    assertRoundtrip(complex(1, -1));
+  });
+
+  it("roundtrips Set", () => {
+    assertRoundtrip(new Set([null, true, 2, "three"]));
+  });
+
+  it("roundtrips DateTime", () => {
+    assertRoundtrip(
+      DateTime.civil(
+        1999,
+        12,
+        31,
+        12,
+        34,
+        rational(56, 1).add(rational(789, 1000)),
+        rational(-1, 2),
+      ),
+    );
+    assertRoundtrip(DateTime.now());
+  });
+
+  it("roundtrips Date", () => {
+    assertRoundtrip(Temporal.PlainDate.from("1999-12-31"));
+    assertRoundtrip(Temporal.Now.plainDateISO());
+  });
+
+  it("roundtrips Time", () => {
+    assertRoundtrip(Time.new(1999, 12, 31, 12, 34, new Rational(789, 1000).add(56), "-12:00"));
+    assertRoundtrip(Time.now());
+  });
+
+  it("roundtrips ActiveSupport::TimeWithZone", () => {
+    assertRoundtrip(
+      new TimeWithZone(
+        Temporal.Instant.from("1999-12-31T12:34:56.789Z"),
+        TimeZone.find("Australia/Lord_Howe")!,
+      ),
+    );
+    assertRoundtrip(Time.current());
+  });
+
+  it("roundtrips ActiveSupport::TimeZone", () => {
+    assertRoundtrip(TimeZone.find("Eastern Time (US & Canada)")!);
+  });
+
+  it("roundtrips ActiveSupport::Duration", () => {
+    assertRoundtrip(
+      years(1)
+        .plus(months(2))
+        .plus(weeks(3))
+        .plus(days(4))
+        .plus(hours(5))
+        .plus(minutes(6))
+        .plus(seconds(7)),
+    );
+    assertRoundtrip(months(1).plus(days(1)));
+  });
+
+  it("roundtrips Range", () => {
+    assertRoundtrip(new Range(1, 2));
+    assertRoundtrip(new Range(1, 2, true));
+    assertRoundtrip(new Range(1, null));
+    assertRoundtrip(new Range(1, null, true));
+    assertRoundtrip(new Range(null, 2));
+    assertRoundtrip(new Range(null, 2, true));
+    assertRoundtrip(new Range("1", "2"));
+    assertRoundtrip(new Range("1", "2", true));
+  });
+
+  it("roundtrips URI::Generic", () => {
+    assertRoundtrip(URI.parse("https://example.com/#test"));
+  });
+
+  it("roundtrips IPAddr", () => {
+    assertRoundtrip(new IPAddr("127.0.0.1"));
+    assertRoundtrip(new IPAddr("1.1.1.1/16"));
+    expect((load(dump(new IPAddr("1.1.1.1/16"))) as IPAddr).prefix).toBe(16);
+
+    assertRoundtrip(new IPAddr("::1"));
+    assertRoundtrip(new IPAddr("1:1:1:1:1:1:1:1/64"));
+    expect((load(dump(new IPAddr("1:1:1:1:1:1:1:1/64"))) as IPAddr).prefix).toBe(64);
+  });
+
+  it("roundtrips Pathname", () => {
+    assertRoundtrip(new Pathname(import.meta.url));
+  });
+
+  it("roundtrips Regexp", () => {
+    assertRoundtrip(/.*/s);
+  });
+
+  it("roundtrips ActiveSupport::HashWithIndifferentAccess", () => {
+    assertRoundtrip(new HashWithIndifferentAccess({ a: true, b: 2, c: "three" }));
   });
 
   it("works with ENV['TRAILS_MAX_THREADS']", () => {

@@ -141,6 +141,7 @@ export const REQUIRED_TEST_MODULES: Record<string, string> = {
     "packages/activesupport/test/cache/behaviors/cache-store-serializer-behavior.ts",
   cacheStoreVersionBehavior:
     "packages/activesupport/test/cache/behaviors/cache-store-version-behavior.ts",
+  connectionPoolBehavior: "packages/activesupport/test/cache/behaviors/connection-pool-behavior.ts",
   encodedKeyCacheBehavior:
     "packages/activesupport/test/cache/behaviors/encoded-key-cache-behavior.ts",
   failureRaisingBehavior: "packages/activesupport/test/cache/behaviors/failure-raising-behavior.ts",
