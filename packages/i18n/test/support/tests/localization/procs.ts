@@ -78,7 +78,7 @@ export function inspectArgs(args: unknown[], kwargs: Record<string, unknown>): s
       return arg.strftime("%a, %d %b %Y %H:%M:%S %Z").replace("+0000", "+00:00");
     } else if (arg instanceof RubyDate) {
       return arg.strftime("%a, %d %b %Y");
-    } else if (arg != null && typeof arg === "object" && !Array.isArray(arg)) {
+    } else if (arg != null && typeof arg === "object") {
       const hash = arg as Record<string, unknown>;
       delete hash.fallbackInProgress;
       delete hash.fallbackOriginalLocale;
