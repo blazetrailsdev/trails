@@ -300,9 +300,6 @@ for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
 }
 
 declare module "@blazetrails/date" {
-  namespace DateTime {
-    export function current(): DateTime;
-  }
   interface DateTime {
     change(options: ChangeOptions): DateTime;
     advance(options: AdvanceOptions): DateTime;
