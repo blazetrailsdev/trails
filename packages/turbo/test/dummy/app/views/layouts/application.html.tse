@@ -6,6 +6,7 @@
 
     <%= stylesheetLinkTag("application", { media: "all" }) %>
     <%= yield("head") %>
+    <%= javascriptIncludeTag("/app/javascript/application.js", { type: "module" }) %>
   </head>
 
   <body class="<%= isTurboNativeApp() ? "turbo-native" : "" %>">

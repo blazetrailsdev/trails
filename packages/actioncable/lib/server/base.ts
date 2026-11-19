@@ -1,5 +1,5 @@
 import { cattrAccessor, include, runLoadHooks, type Included } from "@blazetrails/activesupport";
-import { Monitor } from "@blazetrails/ruby-compat";
+import { Monitor, rbDeclareIvar } from "@blazetrails/ruby-compat";
 import { INTERNAL } from "../action-cable.js";
 import { Server } from "../namespaces.js";
 import { StreamEventLoop } from "../connection/stream-event-loop.js";
@@ -104,6 +104,7 @@ export class Base {
     return (this.config.connectionClass() as ConnectionClass).identifiers;
   }
 }
+rbDeclareIvar(Base, "@pubsub", "_pubsub");
 include(Base, Broadcasting);
 include(Base, Connections);
 cattrAccessor.call(Base, "config", { instanceAccessor: false, default: new Configuration() });

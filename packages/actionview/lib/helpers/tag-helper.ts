@@ -10,6 +10,7 @@ import {
   isBlank,
   isPlainObject,
   isPresent,
+  underscore,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
 import {
@@ -724,7 +725,7 @@ export class TagBuilder {
 
   /** @internal */
   private prefixTagOption(prefix: string, key: string, value: unknown, escape: boolean): string {
-    key = `${prefix}-${dasherize(String(key))}`;
+    key = `${prefix}-${dasherize(underscore(String(key)))}`;
     if (
       !(typeof value === "string" || value instanceof SafeBuffer || value instanceof BigDecimal)
     ) {
