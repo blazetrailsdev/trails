@@ -51,10 +51,6 @@ export interface RawConnectionPeekHost {
   _rawConnection: PGConnection | null;
 }
 
-/**
- * @missingRailsCall valid_raw_connection — PERMANENT
- * @inventedArm ?? — PERMANENT
- */
 export function escapeBytea(
   this: RawConnectionPeekHost,
   value: Uint8Array | string | null | undefined,
@@ -118,10 +114,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
   return abstractQuote.call(this, value);
 }
 
-/**
- * @missingRailsCall with_raw_connection — PERMANENT
- * @inventedArm ?? — PERMANENT
- */
+/** @missingRailsCall with_raw_connection — PERMANENT */
 export function quoteString(this: RawConnectionPeekHost, s: string): string {
   return (this._rawConnection ?? PG.Connection).escape(s);
 }
