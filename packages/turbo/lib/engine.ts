@@ -157,17 +157,24 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    /** @inventedArm await — PERMANENT */
+    /**
+     * @inventedArm await — PERMANENT
+     * @inventedArm if — PERMANENT
+     */
     this.initializer("turbo.test_assertions", async () => {
-      if (TopLevel.ActiveSupport?.TestCase === undefined) return;
       const { TestAssertions: testAssertions } = (await Turbo.loadPath[
         "turbo/test_assertions"
       ]()) as {
         TestAssertions: typeof TestAssertions;
       };
-      const { TestHelper: testHelper } = (await Turbo.loadPath[
-        "turbo/broadcastable/test_helper"
-      ]()) as { TestHelper: typeof BroadcastableTestHelper };
+      const testHelper =
+        constDefined(TopLevel, "ActionCable") && constDefined(TopLevel, "ActiveJob")
+          ? (
+              (await Turbo.loadPath["turbo/broadcastable/test_helper"]()) as {
+                TestHelper: typeof BroadcastableTestHelper;
+              }
+            ).TestHelper
+          : null;
       const { IntegrationTestAssertions: integrationTestAssertions } = (await Turbo.loadPath[
         "turbo/test_assertions/integration_test_assertions"
       ]()) as { IntegrationTestAssertions: typeof IntegrationTestAssertions };
@@ -181,7 +188,7 @@ export class Engine extends TrailsEngine {
       onLoad("action_cable", () => {
         onLoad("active_support_test_case", function (this: object) {
           if ("ActiveJob" in TopLevel) {
-            include(this, testHelper);
+            include(this, testHelper!);
           }
         });
       });
