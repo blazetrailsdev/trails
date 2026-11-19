@@ -337,7 +337,8 @@ export function inlinedHookTags(
  * those mirrors within the module's own package. The include graph is built
  * per package, so a constructor in another package is credited on its tag,
  * which {@link inlinedHookTags} has already resolved to the module's `def`.
- * A guarded tag is credited wherever it sits: its guard is the include test.
+ * A guarded tag on a module no Rails class of its package mixes in is
+ * credited wherever it sits: its guard is the include test.
  */
 export function inlinedHookCreditedBy(
   module: string,
@@ -350,7 +351,9 @@ export function inlinedHookCreditedBy(
     .get(`${module}#${hook}`)
     ?.find(
       (tagged) =>
-        tagged.guarded === true || tagged.package !== pkg || includerFiles.has(tagged.tsFile),
+        (tagged.guarded === true && includerFiles.size === 0) ||
+        tagged.package !== pkg ||
+        includerFiles.has(tagged.tsFile),
     );
 }
 

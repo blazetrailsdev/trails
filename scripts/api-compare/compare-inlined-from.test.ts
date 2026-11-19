@@ -331,20 +331,41 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
 });
 
 describe("inlinedFromTags on a constructor", () => {
-  const ctorOf = (body: string) => {
+  const ctorOf = (body: string, head = "") => {
     const file = ts.createSourceFile(
-      "t.ts",
-      `class T {\n  /** @inlinedFrom ActiveModel::Attributes#initialize rails/v8.0.2/activemodel/lib/active_model/attributes.rb:106-109 */\n  constructor() {\n${body}\n  }\n}`,
+      "packages/activemodel/lib/t.ts",
+      `${head}\nclass T {\n  /** @inlinedFrom ActiveModel::Attributes#initialize rails/v8.0.2/activemodel/lib/active_model/attributes.rb:106-109 */\n  constructor() {\n${body}\n  }\n}`,
       ts.ScriptTarget.Latest,
       true,
     );
-    return (file.statements[0] as ts.ClassDeclaration).members[0];
+    const klass = file.statements.find(ts.isClassDeclaration)!;
+    return klass.members[0];
   };
 
   it("marks the tag guarded when an isModuleIncluded(new.target, Mod) guard tests its module", () => {
     expect(
       inlinedFromTags(ctorOf("if (isModuleIncluded(new.target, Attributes)) {}"))?.[0].guarded,
     ).toBe(true);
+  });
+
+  it("follows a same-file predicate over new.target to the module it tests", () => {
+    const head =
+      'import { Attributes } from "./attributes.js";\n' +
+      "function _includesAttributes(klass) { return isModuleIncluded(klass, Attributes); }";
+    const body = "const klass = new.target;\nif (_includesAttributes(klass)) {}";
+    expect(inlinedFromTags(ctorOf(body, head))?.[0].guarded).toBe(true);
+  });
+
+  it("matches the guard's namespace and import package, not its last name alone", () => {
+    expect(
+      inlinedFromTags(ctorOf("if (isModuleIncluded(new.target, ActiveRecord.Attributes)) {}"))?.[0]
+        .guarded,
+    ).toBeUndefined();
+    const head = 'import { Attributes } from "@blazetrails/activerecord";';
+    expect(
+      inlinedFromTags(ctorOf("if (isModuleIncluded(new.target, Attributes)) {}", head))?.[0]
+        .guarded,
+    ).toBeUndefined();
   });
 
   it("leaves an unguarded segment, or one guarded on another module, unmarked", () => {

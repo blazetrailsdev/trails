@@ -3123,29 +3123,111 @@ export function inlinedFromTags(node: ts.Node): InlinedFrom[] | undefined {
   if (!ts.isConstructorDeclaration(node)) return tags;
   const guards = includedGuardsOf(node);
   return tags.map((tag) =>
-    guards.has(tag.module.split("::").pop()!) ? { ...tag, guarded: true as const } : tag,
+    guards.some((guard) => guardNames(guard, tag)) ? { ...tag, guarded: true as const } : tag,
   );
 }
 
+/** A module a constructor's include guard tests, as {@link includedGuardsOf} reads it. */
+interface IncludedGuard {
+  /** The guard argument's name segments (`Attributes`, `Encryption.EncryptedFixtures`). */
+  path: string[];
+  /** The package the argument's import resolves to, where it is an imported binding. */
+  pkg?: string;
+}
+
+/** Whether `guard` names the Ruby module `tag` cites, namespace and package included. */
+function guardNames(guard: IncludedGuard, tag: InlinedFrom): boolean {
+  const rubyPath = tag.module.split("::");
+  if (guard.path.length > rubyPath.length) return false;
+  const tail = rubyPath.slice(rubyPath.length - guard.path.length);
+  if (tail.some((segment, i) => segment !== guard.path[i])) return false;
+  return guard.pkg === undefined || guard.pkg === tag.file.split("/")[0];
+}
+
 /**
- * The modules a constructor's top-level `if (isModuleIncluded(new.target, Mod))`
- * statements test, by the guard argument's last name segment (CLAUDE.md, "A
- * module installed at run time is inlined behind a guard").
+ * The modules a constructor's top-level include guards test (CLAUDE.md, "A
+ * module installed at run time is inlined behind a guard"): an
+ * `if (isModuleIncluded(new.target, Mod))`, or an `if (pred(klass))` whose
+ * `klass` is `new.target` and whose same-file `pred` answers
+ * `isModuleIncluded(<its parameter>, Mod)` (a cached predicate).
  */
-function includedGuardsOf(ctor: ts.ConstructorDeclaration): Set<string> {
-  const guards = new Set<string>();
+function includedGuardsOf(ctor: ts.ConstructorDeclaration): IncludedGuard[] {
+  const sf = ctor.getSourceFile();
+  const isNewTarget = (e: ts.Expression) => ts.isMetaProperty(e) && e.name.text === "target";
+  const newTargetLocals = new Set<string>();
+  for (const stmt of ctor.body?.statements ?? []) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const decl of stmt.declarationList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.initializer && isNewTarget(decl.initializer)) {
+        newTargetLocals.add(decl.name.text);
+      }
+    }
+  }
+  const isTarget = (e: ts.Expression) =>
+    isNewTarget(e) || (ts.isIdentifier(e) && newTargetLocals.has(e.text));
+  const testedBy = (call: ts.CallExpression, target: (e: ts.Expression) => boolean) =>
+    ts.isIdentifier(call.expression) &&
+    call.expression.text === "isModuleIncluded" &&
+    call.arguments.length === 2 &&
+    target(call.arguments[0])
+      ? call.arguments[1]
+      : undefined;
+  const predicateModule = (name: string): ts.Expression | undefined => {
+    for (const stmt of sf.statements) {
+      if (!ts.isFunctionDeclaration(stmt) || stmt.name?.text !== name) continue;
+      const param = stmt.parameters[0]?.name;
+      if (param === undefined || !ts.isIdentifier(param)) return undefined;
+      let found: ts.Expression | undefined;
+      const visit = (n: ts.Node) => {
+        if (found === undefined && ts.isCallExpression(n)) {
+          found = testedBy(n, (e) => ts.isIdentifier(e) && e.text === param.text);
+        }
+        if (found === undefined) ts.forEachChild(n, visit);
+      };
+      if (stmt.body) visit(stmt.body);
+      return found;
+    }
+    return undefined;
+  };
+  const guards: IncludedGuard[] = [];
   for (const stmt of ctor.body?.statements ?? []) {
     if (!ts.isIfStatement(stmt) || !ts.isCallExpression(stmt.expression)) continue;
-    const { expression: callee, arguments: args } = stmt.expression;
-    if (!ts.isIdentifier(callee) || callee.text !== "isModuleIncluded" || args.length !== 2) {
-      continue;
-    }
-    const [target, mod] = args;
-    if (!ts.isMetaProperty(target) || target.name.text !== "target") continue;
-    if (ts.isIdentifier(mod)) guards.add(mod.text);
-    else if (ts.isPropertyAccessExpression(mod)) guards.add(mod.name.text);
+    const call = stmt.expression;
+    const mod =
+      testedBy(call, isTarget) ??
+      (ts.isIdentifier(call.expression) &&
+      call.arguments.length === 1 &&
+      isTarget(call.arguments[0])
+        ? predicateModule(call.expression.text)
+        : undefined);
+    if (mod === undefined) continue;
+    const path = mod.getText(sf).split(".");
+    guards.push({ path, ...importedPackage(sf, path[0]) });
   }
   return guards;
+}
+
+/** The package an imported binding's specifier names: its own for a relative one. */
+function importedPackage(sf: ts.SourceFile, binding: string): { pkg?: string } {
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+    const bindings = stmt.importClause?.namedBindings;
+    const names = [
+      stmt.importClause?.name?.text,
+      ...(bindings && ts.isNamedImports(bindings)
+        ? bindings.elements.map((e) => e.name.text)
+        : bindings
+          ? [bindings.name.text]
+          : []),
+    ];
+    if (!names.includes(binding)) continue;
+    const spec = stmt.moduleSpecifier.text;
+    const pkg = spec.startsWith(".")
+      ? /(?:^|\/)packages\/([^/]+)\//.exec(sf.fileName)?.[1]
+      : /^@blazetrails\/([^/]+)/.exec(spec)?.[1];
+    return pkg === undefined ? {} : { pkg };
+  }
+  return {};
 }
 
 /**

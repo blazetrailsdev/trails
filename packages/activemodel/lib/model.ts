@@ -10,7 +10,7 @@ import {
   type Included,
   type Extended,
 } from "@blazetrails/activesupport";
-import { isModuleIncluded, rbObjDup, type Hash } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, methodCacheSerial, rbObjDup, type Hash } from "@blazetrails/ruby-compat";
 import type { Translation } from "./translation.js";
 import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
@@ -37,6 +37,21 @@ export interface Model extends API, Access, Naming {
 
   /** @internal */
   initializeDup(other: unknown): void;
+}
+
+/** @perf 100ns — PERMANENT */
+const _includesAttributesCache = new WeakMap<object, { serial: number; value: boolean }>();
+
+/** @perf 100ns — PERMANENT */
+function _includesAttributes(klass: {
+  prototype: object;
+}): klass is { prototype: object; _defaultAttributes(): AttributeSet } {
+  const hit = _includesAttributesCache.get(klass);
+  if (hit && hit.serial === methodCacheSerial) return hit.value;
+  const serial = methodCacheSerial;
+  const value = isModuleIncluded(klass, Attributes);
+  _includesAttributesCache.set(klass, { serial, value });
+  return value;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -133,9 +148,9 @@ export class Model {
    * @inlinedFrom ActiveModel::Attributes#initialize rails/v8.0.2/activemodel/lib/active_model/attributes.rb:106-109
    */
   constructor(attributes: Record<string, unknown> | Map<string, unknown> | null = {}) {
-    const klass = new.target as typeof Model & { _defaultAttributes(): AttributeSet };
-    if (isModuleIncluded(new.target, Attributes)) {
-      (this as { _attributes?: AttributeSet })._attributes = klass._defaultAttributes().deepDup();
+    const klass = new.target;
+    if (_includesAttributes(klass)) {
+      Reflect.set(this, "_attributes", klass._defaultAttributes().deepDup());
     }
 
     if (attributes != null) this.assignAttributes(attributes);
