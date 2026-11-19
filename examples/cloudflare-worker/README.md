@@ -7,7 +7,7 @@ inside `Post.transaction`), one `.tse` view and one Active Record model, `Post`.
 ```bash
 terraform -chdir=infra init
 terraform -chdir=infra apply -var account_id=<cloudflare account id>   # Neon Postgres + Hyperdrive
-pnpm run deploy   # posts table (psql), views + `trails build` + esbuild bundle, `wrangler deploy`
+pnpm run deploy   # posts table (db/setup.ts), views + `trails build` + esbuild bundle, `wrangler deploy`
 ```
 
 `pnpm run dev` serves the same bundle under `wrangler dev` (workerd) against a local Postgres:
