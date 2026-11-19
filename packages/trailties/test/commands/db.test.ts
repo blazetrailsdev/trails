@@ -51,6 +51,7 @@ import { Actions } from "../../lib/command/actions.js";
 import { block, getPath } from "@blazetrails/ruby-compat";
 
 let seedLoads = 0;
+const seedEnhancers: Array<() => void> = [];
 
 async function runTaskLogging(task: string, logs: string[]): Promise<void> {
   const previous = getProcessAdapter();
@@ -108,6 +109,7 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
       await rbFLoad(
         path.resolve(import.meta.dirname, "../../../activerecord/lib/trailties/databases.ts"),
       );
+      for (const enhance of seedEnhancers) enhance();
       await rake.invokeTask(task);
     });
   } finally {
@@ -1112,6 +1114,40 @@ export class CreatePosts extends Migration.Current {
     } finally {
       await verify.disconnectBang();
     }
+  });
+
+  it("db:seed disconnects every pool the seeds left connected", async () => {
+    const dbFile = path.join(tmpDir, "seed-disconnect.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "seeds.ts"),
+      `import { Base } from "@blazetrails/activerecord";
+await (await Base.leaseConnection()).execute("SELECT 1");`,
+    );
+    let connectedAfterSeed: boolean | undefined;
+    const { DSL } = await import("@blazetrails/rake");
+    const enhance = () =>
+      DSL.task(
+        "db:seed",
+        block(() => {
+          connectedAfterSeed = Base.connectionHandler
+            .connectionPoolList("all")
+            .some((pool) => pool.isConnected());
+        }),
+      );
+    seedEnhancers.push(enhance);
+    try {
+      await runTask("db:seed");
+    } finally {
+      seedEnhancers.pop();
+    }
+    expect(connectedAfterSeed).toBe(false);
   });
 
   it("db prepare creates, migrates, and seeds a fresh database", async () => {

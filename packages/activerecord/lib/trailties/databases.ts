@@ -549,7 +549,11 @@ DSL.namespace("db", (dbNamespace) => {
     { seed: "load_config" },
     block(async () => {
       await dbNamespace.get("abort_if_pending_migrations")!.invoke();
-      await DatabaseTasks.loadSeed();
+      try {
+        await DatabaseTasks.loadSeed();
+      } finally {
+        await ActiveRecord.disconnectAllBang();
+      }
     }),
   );
 
