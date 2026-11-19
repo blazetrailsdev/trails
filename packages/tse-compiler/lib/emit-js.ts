@@ -41,7 +41,21 @@ export const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
 
 export const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
-const ASYNC_ARROW_RE = /(?<!\basync\s*)(\([^()]*\)|[A-Za-z_$][\w$]*)(\s*=>\s*\{\s*)$/;
+function asyncArrow(value: string): string {
+  const arrow = /\s*=>\s*\{\s*$/.exec(value)!;
+  let start = arrow.index;
+  if (value[start - 1] === ")") {
+    let depth = 0;
+    for (start -= 1; start >= 0; start--) {
+      if (value[start] === ")") depth++;
+      else if (value[start] === "(" && --depth === 0) break;
+    }
+  } else {
+    while (start > 0 && /[\w$]/.test(value[start - 1])) start--;
+  }
+  if (/(?<![\w$])async\s+$/.test(value.slice(0, start))) return value;
+  return `${value.slice(0, start)}async ${value.slice(start)}`;
+}
 
 export const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
 
@@ -242,7 +256,7 @@ export function* emitSteps(
       innerDepths.push(0);
       innerAwaits.push(awaits);
       innerCallExprParens.push(netUnclosedParens(node.value) + (awaits ? 1 : 0));
-      const value = awaits ? node.value.replace(ASYNC_ARROW_RE, "async $1$2") : node.value;
+      const value = awaits ? asyncArrow(node.value) : node.value;
       yield { node: { ...node, value }, bufRef, awaits };
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1];
