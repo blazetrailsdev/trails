@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Enumerator, Thread } from "@blazetrails/ruby-compat";
 import { Deprecation } from "../../lib/deprecation.js";
 import { assertNotPredicate, assertPredicate } from "../../lib/testing/assertions.js";
 import { Deprecators } from "../../lib/deprecation/deprecators.js";
@@ -41,9 +41,7 @@ describe("DeprecationTest", () => {
   });
 
   it("#each without block returns an Enumerator", () => {
-    expect(deprecators.each()).toBeInstanceOf(
-      (globalThis as unknown as { Iterator: abstract new () => unknown }).Iterator,
-    );
+    expect(deprecators.each()).toBeInstanceOf(Enumerator);
     expect(Array.from(deprecators.each(), (deprecator) => deprecator.gemName).sort()).toEqual(
       [...deprecatorNames].sort(),
     );

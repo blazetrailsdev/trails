@@ -401,9 +401,5 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
     return Enumerable.asJson(value as Iterable<unknown>, options);
   }
 
-  if (typeof (value as { toJSON?: unknown }).toJSON === "function") {
-    return (value as { toJSON(): unknown }).toJSON();
-  }
-
   return Object.asJson(value as object, options);
 }

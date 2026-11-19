@@ -401,14 +401,4 @@ export class Deprecation {
       return block();
     }
   }
-
-  deprecateMethod(target: object, methodName: string, message?: string): void {
-    const self = this;
-    const original = (target as Record<string, unknown>)[methodName];
-    if (typeof original !== "function") return;
-    (target as Record<string, unknown>)[methodName] = function (...args: unknown[]) {
-      self.deprecationWarning(methodName, message);
-      return (original as (...a: unknown[]) => unknown).apply(this, args);
-    };
-  }
 }

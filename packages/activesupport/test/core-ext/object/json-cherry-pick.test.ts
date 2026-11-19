@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
 import { asJson } from "../../../lib/core-ext/object/json.js";
 
 describe("JsonCherryPickTest", () => {
   it("time as json", () => {
-    const expected = new Date(2004, 6, 25);
-    const actual = new Date(asJson(expected) as string);
-    expect(actual.getTime()).toEqual(expected.getTime());
+    const expected = Time.new(2004, 7, 25);
+    const actual = Time.parse(asJson(expected) as string);
+    expect(actual).toEqual(expected);
   });
 
   it("date as json", () => {

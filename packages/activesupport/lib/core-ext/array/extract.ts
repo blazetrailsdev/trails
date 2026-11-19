@@ -1,9 +1,31 @@
-export function extractBang<T>(array: T[], predicate: (item: T) => boolean): T[] {
-  const extracted: T[] = [];
-  for (let i = array.length - 1; i >= 0; i--) {
-    if (predicate(array[i])) {
-      extracted.unshift(...array.splice(i, 1));
-    }
-  }
-  return extracted;
+import { ARRAY_METHOD_TABLE, block, Enumerator, rtest, toEnum } from "@blazetrails/ruby-compat";
+
+export function extractBang<T>(array: T[], predicate: (item: T) => boolean): T[];
+export function extractBang<T>(array: T[]): Enumerator<T>;
+export function extractBang<T>(array: T[], predicate?: (item: T) => boolean): T[] | Enumerator<T> {
+  if (predicate == null)
+    return toEnum<T>(
+      array,
+      "extractBang",
+      block(() => array.length),
+    );
+
+  const extractedElements: T[] = [];
+
+  array.splice(
+    0,
+    array.length,
+    ...array.filter((element) => {
+      if (rtest(predicate(element))) {
+        extractedElements.push(element);
+        return false;
+      }
+      return true;
+    }),
+  );
+
+  return extractedElements;
 }
+
+ARRAY_METHOD_TABLE.extractBang = (self: unknown[], ...args: unknown[]) =>
+  args[0] == null ? extractBang(self) : extractBang(self, args[0] as (item: unknown) => boolean);
