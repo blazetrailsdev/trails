@@ -68,6 +68,7 @@ export class Engine extends TrailsEngine {
     this.isolateNamespace(Turbo);
     this.config.eagerLoadNamespaces.push(Turbo);
     this.config.set("turbo", new OrderedOptions());
+    /** @missingRailsArgs test_connect_after_actions= — PERMANENT */
     this.config.turbo.testConnectAfterActions = [];
 
     this.config.paths().add("config/routes.ts", {
