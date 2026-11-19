@@ -17,7 +17,7 @@ async function app(manifest: object): Promise<string> {
 }
 
 describe("Bundler.require", () => {
-  it("requires dependencies for :default and devDependencies for :test", async () => {
+  it("requires dependencies for :default and nothing for :test", async () => {
     const root = await app({
       dependencies: { "@blazetrails/dep": "*" },
       devDependencies: { "@blazetrails/dev": "*" },
@@ -28,6 +28,6 @@ describe("Bundler.require", () => {
     expect(seen.bundled).toEqual(["dep"]);
     seen.bundled = [];
     await Dir.chdir(root, () => Bundler.require("test"));
-    expect(seen.bundled).toEqual(["dev"]);
+    expect(seen.bundled).toEqual([]);
   });
 });
