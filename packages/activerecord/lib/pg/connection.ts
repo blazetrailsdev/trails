@@ -44,16 +44,32 @@ export class Connection {
 
   static async new<T extends Connection>(
     this: { prototype: T },
+    connParams?: Record<string, unknown>,
+  ): Promise<T>;
+  static async new<T extends Connection, R>(
+    this: { prototype: T },
+    connParams: Record<string, unknown>,
+    block: (conn: T) => R | Promise<R>,
+  ): Promise<R>;
+  static async new<T extends Connection, R>(
+    this: { prototype: T },
     connParams: Record<string, unknown> = {},
-  ): Promise<T> {
+    block?: (conn: T) => R | Promise<R>,
+  ): Promise<T | R> {
     const conn = rbClassNewInstance(this, connParams);
     await conn.connect();
+
+    if (block !== undefined) {
+      try {
+        return await block(conn);
+      } finally {
+        await conn.close();
+      }
+    }
     return conn;
   }
 
-  static connect(connParams: Record<string, unknown>): Promise<Connection> {
-    return Connection.new(connParams);
-  }
+  static connect = Connection.new;
 
   protected constructor(connParams: Record<string, unknown> = {}) {
     this.connParams = connParams;

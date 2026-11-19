@@ -212,6 +212,11 @@ describe("PostgreSQL quoting", () => {
   it("skips invalid hex digits pairwise, as PQunescapeBytea does", () => {
     expect(pgUnescapeBytea("\\x6g6869 7")).toEqual(new TextEncoder().encode("hi"));
     expect(pgUnescapeBytea("\\x686")).toEqual(new TextEncoder().encode("h"));
+    expect(pgUnescapeBytea("\\xzz41")).toEqual(new TextEncoder().encode("A"));
+    expect(pgUnescapeBytea("\\xz41")).toEqual(new TextEncoder().encode("A"));
+    expect(pgUnescapeBytea("\\x4z41")).toEqual(new TextEncoder().encode("A"));
+    expect(pgUnescapeBytea("\\x 41")).toEqual(new TextEncoder().encode("A"));
+    expect(pgUnescapeBytea("\\x de ad")).toEqual(Uint8Array.from([0xde, 0xad]));
   });
 
   it("unescapes the bytes Type::Binary#deserialize hands it", () => {
