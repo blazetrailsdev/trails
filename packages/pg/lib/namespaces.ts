@@ -9,7 +9,7 @@ import type {
 import type { Constants } from "./pg.js";
 
 export interface PGNamespace extends Readonly<{
-  Connection: abstract new (...args: never[]) => object;
+  Connection: { readonly prototype: object; [Symbol.hasInstance](value: unknown): boolean };
 }> {
   readonly name: string;
   Constants: typeof Constants;

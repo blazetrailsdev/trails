@@ -80,7 +80,7 @@ describeIfPg("PG::Error#result (trails)", () => {
     await expect(PostgreSQLAdapter.newClient(params)).rejects.toBeInstanceOf(
       ConnectionNotEstablished,
     );
-    const error = (await new Connection(params).connect().catch((e: unknown) => e)) as PG.Error;
+    const error = (await Connection.new(params).catch((e: unknown) => e)) as PG.Error;
     expect(error).toBeInstanceOf(PG.ConnectionBad);
     expect(error.message.endsWith("\n")).toBe(true);
     expect(error.result).toBeNull();

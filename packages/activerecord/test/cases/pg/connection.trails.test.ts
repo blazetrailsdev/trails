@@ -1,7 +1,7 @@
 import pg from "pg";
 import { it, expect, describe, vi } from "vitest";
 import { fakePgConnection } from "../../support/fake-pg-connection.js";
-import { IO } from "@blazetrails/ruby-compat";
+import { IO, rbClassNewInstance } from "@blazetrails/ruby-compat";
 import { Connection, escapeBytea, unescapeBytea } from "../../../lib/pg/connection.js";
 import { PG } from "../../../lib/pg/pg.js";
 import { cancelAnyRunningQuery } from "../../../lib/connection-adapters/postgresql/database-statements.js";
@@ -379,7 +379,7 @@ describe("pgConnection without a returned Proxy", () => {
         return this.#label;
       }
     }
-    const conn = new Traced({});
+    const conn = rbClassNewInstance(Traced, {});
     expect(conn.constructor).toBe(Traced);
     expect(conn.label()).toBe("traced");
     expect(fakePgConnection({})).toBeInstanceOf(Connection);

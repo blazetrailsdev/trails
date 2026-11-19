@@ -1,4 +1,5 @@
 import pg from "pg";
+import { rbClassNewInstance } from "@blazetrails/ruby-compat";
 import { vi } from "vitest";
 import { Connection } from "../../lib/pg/connection.js";
 
@@ -7,7 +8,7 @@ export function fakePgConnection(client: object): Connection {
     return client;
   } as never);
   try {
-    return new Connection();
+    return rbClassNewInstance(Connection, {});
   } finally {
     spy.mockRestore();
   }

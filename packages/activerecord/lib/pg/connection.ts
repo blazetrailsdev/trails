@@ -1,5 +1,6 @@
 import pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
+import { rbClassNewInstance } from "@blazetrails/ruby-compat";
 import { ConnectionBad, Error as PGError, ServerError, UnableToSend } from "@blazetrails/pg";
 import { PG } from "./pg.js";
 
@@ -40,9 +41,21 @@ export class Connection {
   parameterStatuses: Record<string, string> = {};
 
   static conndefaultsHash = conndefaultsHash;
-  static connect = connect;
 
-  constructor(connParams: Record<string, unknown> = {}) {
+  static async new<T extends Connection>(
+    this: { prototype: T },
+    connParams: Record<string, unknown> = {},
+  ): Promise<T> {
+    const conn = rbClassNewInstance(this, connParams);
+    await conn.connect();
+    return conn;
+  }
+
+  static connect(connParams: Record<string, unknown>): Promise<Connection> {
+    return Connection.new(connParams);
+  }
+
+  protected constructor(connParams: Record<string, unknown> = {}) {
     this.connParams = connParams;
     this.client = new pg.Client(_clientConfig(connParams)) as Client;
     listen(this, this.client);
@@ -551,10 +564,4 @@ function _clientConfig(connParams: Record<string, unknown>): pg.ClientConfig {
     ssl,
     types: { getTypeParser: pgTypeParser as pg.CustomTypesConfig["getTypeParser"] },
   };
-}
-
-export async function connect(connParams: Record<string, unknown>): Promise<Connection> {
-  const conn = new Connection(connParams);
-  await conn.connect();
-  return conn;
 }
