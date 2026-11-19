@@ -48,7 +48,7 @@ describeIfPg("PostgreSQL bytea round trip", () => {
 
   it("hands deserialize the escaped text and decodes bytea for query", async () => {
     await connection.execute("INSERT INTO bytea_data_type (payload) VALUES ('\\x5c5c')");
-    const executed = await connection.execute("SELECT payload FROM bytea_data_type");
+    const executed = Array.from(await connection.execute("SELECT payload FROM bytea_data_type"));
     expect(executed[0].payload).toBe("\\x5c5c");
     const rows = await connection.query("SELECT payload FROM bytea_data_type");
     expect(rows).toEqual([[Uint8Array.from([0x5c, 0x5c])]]);

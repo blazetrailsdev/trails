@@ -45,7 +45,7 @@ describeIfPg("PostgresqlReferentialIntegrityTest (trails)", () => {
       await adapter.beginTransaction({ _lazy: false });
       try {
         await expect(adapter.checkAllForeignKeysValidBang()).rejects.toThrow();
-        const result = await adapter.execute("SELECT 1 AS n");
+        const result = Array.from(await adapter.execute("SELECT 1 AS n"));
         expect(result[0].n).toBe(1);
       } finally {
         await adapter.commitTransaction();
@@ -67,7 +67,7 @@ describeIfPg("PostgresqlReferentialIntegrityTest (trails)", () => {
       try {
         await adapter.checkAllForeignKeysValidBang();
 
-        const result = await adapter.execute("SELECT 1 AS n");
+        const result = Array.from(await adapter.execute("SELECT 1 AS n"));
         expect(result[0].n).toBe(1);
       } finally {
         await adapter.commitTransaction();

@@ -8,6 +8,7 @@ import {
   TypeError,
   warn,
 } from "@blazetrails/ruby-compat";
+import { PG } from "./namespaces.js";
 
 function _rbCheckFrozen(obj: object): void {
   if (Object.isFrozen(obj)) {
@@ -99,3 +100,6 @@ export class CompositeCoder extends Coder {
     return this._delimiter ?? ",";
   }
 }
+
+PG.Coder = Coder;
+PG.CompositeCoder = CompositeCoder;

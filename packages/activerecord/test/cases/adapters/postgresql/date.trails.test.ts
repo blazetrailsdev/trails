@@ -14,9 +14,9 @@ describeIfPg("PostgreSQLAdapter OID::Date", () => {
   });
 
   it("decodes infinity and -infinity off the wire", async () => {
-    const pos = await adapter.execute("SELECT 'infinity'::date AS val");
+    const pos = Array.from(await adapter.execute("SELECT 'infinity'::date AS val"));
     expect(new OidDate().castValue(pos[0].val)).toBe(DateInfinity);
-    const neg = await adapter.execute("SELECT '-infinity'::date AS val");
+    const neg = Array.from(await adapter.execute("SELECT '-infinity'::date AS val"));
     expect(new OidDate().castValue(neg[0].val)).toBe(DateNegativeInfinity);
   });
 
@@ -29,7 +29,9 @@ describeIfPg("PostgreSQLAdapter OID::Date", () => {
       const negStr = oidDate.serialize(DateNegativeInfinity)!;
       await adapter.execute(`INSERT INTO pg_dates_inf (last_read) VALUES ('${posStr}'::date)`);
       await adapter.execute(`INSERT INTO pg_dates_inf (last_read) VALUES ('${negStr}'::date)`);
-      const rows = await adapter.execute("SELECT last_read FROM pg_dates_inf ORDER BY id");
+      const rows = Array.from(
+        await adapter.execute("SELECT last_read FROM pg_dates_inf ORDER BY id"),
+      );
       expect(oidDate.castValue(rows[0].last_read)).toBe(DateInfinity);
       expect(oidDate.castValue(rows[1].last_read)).toBe(DateNegativeInfinity);
     } finally {
@@ -43,7 +45,7 @@ describeIfPg("PostgreSQLAdapter OID::Date", () => {
     expect(date.year).toBe(-1);
     expect(date.month).toBe(12);
     expect(date.day).toBe(25);
-    const rows = await adapter.execute("SELECT '0002-12-25 BC'::date AS val");
+    const rows = Array.from(await adapter.execute("SELECT '0002-12-25 BC'::date AS val"));
     const roundTripped = oidDate.castValue(rows[0].val) as Temporal.PlainDate;
     expect(roundTripped).toBeInstanceOf(Temporal.PlainDate);
     expect(roundTripped.year).toBe(-1);

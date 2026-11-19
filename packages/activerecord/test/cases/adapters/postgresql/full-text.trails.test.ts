@@ -23,7 +23,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const rows = await adapter.execute(
         `SELECT text_vector FROM tsvectors WHERE text_vector @@ to_tsquery('cat')`,
       );
-      expect(rows).toHaveLength(1);
+      expect(Array.from(rows)).toHaveLength(1);
     });
   });
 });

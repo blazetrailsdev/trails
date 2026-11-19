@@ -50,7 +50,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       options: "-c geqo=off",
     });
     try {
-      const result = await optionsAdapter.execute("SHOW geqo");
+      const result = Array.from(await optionsAdapter.execute("SHOW geqo"));
       expect(result[0]?.geqo).toBe("off");
     } finally {
       await optionsAdapter.disconnectBang();
@@ -59,24 +59,24 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   it("reset", async () => {
     await adapter.execute("SET geqo TO off");
-    const before = await adapter.execute("SHOW geqo");
+    const before = Array.from(await adapter.execute("SHOW geqo"));
     expect(before[0]?.geqo).toBe("off");
 
     await adapter.resetBang();
 
-    const after = await adapter.execute("SHOW geqo");
+    const after = Array.from(await adapter.execute("SHOW geqo"));
     expect(after[0]?.geqo).toBe("on");
   });
 
   it("reset with transaction", async () => {
     await adapter.execute("SET geqo TO off");
-    const before = await adapter.execute("SHOW geqo");
+    const before = Array.from(await adapter.execute("SHOW geqo"));
     expect(before[0]?.geqo).toBe("off");
 
     await adapter.beginTransaction({ _lazy: false });
     await adapter.resetBang();
 
-    const after = await adapter.execute("SHOW geqo");
+    const after = Array.from(await adapter.execute("SHOW geqo"));
     expect(after[0]?.geqo).toBe("on");
   });
 
@@ -213,7 +213,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       variables: { timezone: "America/New_York" },
     });
     try {
-      const rows = await a.execute("SHOW TIME ZONE");
+      const rows = Array.from(await a.execute("SHOW TIME ZONE"));
       expect(rows[0]?.TimeZone).toBe("America/New_York");
     } finally {
       await a.disconnectBang();
@@ -232,7 +232,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const gotLock = await adapter.getAdvisoryLock(lockId);
     expect(gotLock).toBeTruthy();
 
-    const advisoryLock = (await adapter.execute(listAdvisoryLocks)).find(
+    const advisoryLock = Array.from(await adapter.execute(listAdvisoryLocks)).find(
       (l) => BigInt(l.lock_id as string) === lockId,
     );
     expect(advisoryLock).toBeTruthy();
@@ -240,7 +240,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const releasedLock = await adapter.releaseAdvisoryLock(lockId);
     expect(releasedLock).toBeTruthy();
 
-    const advisoryLocks = (await adapter.execute(listAdvisoryLocks)).filter(
+    const advisoryLocks = Array.from(await adapter.execute(listAdvisoryLocks)).filter(
       (l) => BigInt(l.lock_id as string) === lockId,
     );
     assertEmpty(advisoryLocks);

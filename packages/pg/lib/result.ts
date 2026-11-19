@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Enumerable, include } from "@blazetrails/ruby-compat";
 import type pg from "pg";
 import { Constants as PGConstants } from "./pg.js";
 import { PG } from "./namespaces.js";
@@ -32,11 +32,12 @@ const _ERROR_FIELDS: Record<number, keyof pg.DatabaseError> = {
   [PGConstants.PG_DIAG_CONSTRAINT_NAME]: "constraint",
 };
 
-export class Result extends Array<Record<string, unknown>> {
-  /** @noRailsEquivalent CONVERGEABLE pg-result-is-not-an-array-execute-returns-the-raw-driver-result */
-  static get [Symbol.species]() {
-    return Array;
-  }
+export class Result {
+  declare filterMap: <R>(
+    block: (row: Record<string, unknown>) => R | false | null | undefined,
+  ) => R[];
+  declare map: <R>(block: (row: Record<string, unknown>) => R) => R[];
+  declare [Symbol.iterator]: () => IterableIterator<Record<string, unknown>>;
 
   readonly #native: pg.QueryResult;
   #typemap: PGTypeMapByOid | null = null;
@@ -44,13 +45,8 @@ export class Result extends Array<Record<string, unknown>> {
   readonly #error: DatabaseErrorFields | null;
 
   constructor(native: pg.QueryResult, error: DatabaseErrorFields | null = null) {
-    super();
     this.#native = native;
     this.#error = error;
-    const fields = this.fields();
-    for (const row of (native.rows ?? []) as unknown[][]) {
-      this.push(Object.fromEntries(fields.map((name, j) => [name, row[j]])));
-    }
   }
 
   mapTypesBang(typeMap: PGTypeMapByOid): this {
@@ -108,17 +104,22 @@ export class Result extends Array<Record<string, unknown>> {
     return (this.#native.fields ?? []).map((f) => f.name);
   }
 
-  override values(): unknown[][] & ArrayIterator<Record<string, unknown>> {
+  values(): unknown[][] {
     return ((this.#native.rows ?? []) as unknown[][]).map((row, i) =>
       row.map((_, j) => this.#typecastResultValue(i, j)),
-    ) as unknown[][] & ArrayIterator<Record<string, unknown>>;
+    );
+  }
+
+  each(block: (tuple: Record<string, unknown>) => void): this {
+    const fields = this.fields();
+    for (let i = 0; i < this.ntuples(); i++) {
+      block(Object.fromEntries(fields.map((name, j) => [name, this.#typecastResultValue(i, j)])));
+    }
+    return this;
   }
 
   set typeMap(typemap: PGTypeMapByOid) {
     this.#typemap = typemap;
-    this.fields().forEach((name, j) => {
-      this.forEach((tuple, i) => (tuple[name] = this.#typecastResultValue(i, j)));
-    });
   }
 
   get typeMap(): PGTypeMapByOid | null {
@@ -133,5 +134,7 @@ export class Result extends Array<Record<string, unknown>> {
     return typeof value !== "string" || !decoder ? value : decoder.decode(value);
   }
 }
+
+include(Result as new (...args: never[]) => unknown, Enumerable);
 
 PG.Result = Result;

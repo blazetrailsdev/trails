@@ -28,7 +28,7 @@ describeIfPg("PostgreSQLAdapter OID::DateTime", () => {
       const serialized = adapter.quotedDate(instant);
       expect(serialized).toBe(literal);
 
-      const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
+      const rows = Array.from(await adapter.execute(`SELECT '${serialized}'::timestamp AS val`));
       const roundTripped = rows[0].val as RubyTime;
       expect(roundTripped).toBeInstanceOf(RubyTime);
       expect(roundTripped.toI()).toBe(instant.toI());
@@ -61,7 +61,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("timestamp type cast", async () => {
-      const rows = await adapter.execute("SELECT TIMESTAMP '2023-06-15 14:30:00' AS val");
+      const rows = Array.from(
+        await adapter.execute("SELECT TIMESTAMP '2023-06-15 14:30:00' AS val"),
+      );
       expect(rows[0].val).toBeInstanceOf(RubyTime);
       expect((rows[0].val as RubyTime).getutc().year).toBe(2023);
     });
@@ -89,12 +91,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("timestamp infinity", async () => {
-      const rows = await adapter.execute("SELECT 'infinity'::timestamp AS val");
+      const rows = Array.from(await adapter.execute("SELECT 'infinity'::timestamp AS val"));
       expect(rows[0].val).toBeDefined();
     });
 
     it("timestamp before epoch", async () => {
-      const rows = await adapter.execute("SELECT TIMESTAMP '1969-12-31 23:59:59' AS val");
+      const rows = Array.from(
+        await adapter.execute("SELECT TIMESTAMP '1969-12-31 23:59:59' AS val"),
+      );
       expect(rows[0].val).toBeInstanceOf(RubyTime);
       expect((rows[0].val as RubyTime).getutc().year).toBe(1969);
     });
@@ -119,7 +123,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("datetime type cast", async () => {
-      const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 10:00:00' AS val");
+      const rows = Array.from(
+        await adapter.execute("SELECT TIMESTAMP '2023-01-15 10:00:00' AS val"),
+      );
       expect(rows[0].val).toBeInstanceOf(RubyTime);
     });
 

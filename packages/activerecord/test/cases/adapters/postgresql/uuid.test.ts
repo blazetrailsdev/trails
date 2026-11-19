@@ -397,11 +397,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("id allows default override via nil", async () => {
-      const colDesc = (
+      const colDesc = Array.from(
         await adapter.execute(`SELECT pg_get_expr(d.adbin, d.adrelid) as default
                                   FROM pg_attribute a
                                   LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
-                                  WHERE a.attname='id' AND a.attrelid = 'pg_uuids'::regclass`)
+                                  WHERE a.attname='id' AND a.attrelid = 'pg_uuids'::regclass`),
       )[0];
       expect(colDesc["default"]).toBeNull();
     });

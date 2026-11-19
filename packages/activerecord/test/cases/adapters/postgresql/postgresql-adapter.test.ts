@@ -200,7 +200,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             "id",
             "ex_id_seq",
           );
-          const rows = await connection.execute("select max(id) as max from ex");
+          const rows = Array.from(await connection.execute("select max(id) as max from ex"));
           const expected = Number(rows[0].max);
           expect(Number((result as { rows: unknown[][] }).rows[0][0])).toBe(expected);
         } finally {
@@ -219,7 +219,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             [],
             "id",
           );
-          const rows = await connection.execute("select max(id) as max from ex");
+          const rows = Array.from(await connection.execute("select max(id) as max from ex"));
           const expected = Number(rows[0].max);
           expect(Number((result as { rows: unknown[][] }).rows[0][0])).toBe(expected);
         } finally {
@@ -238,7 +238,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             [],
             "id",
           );
-          const rows = await connection.execute("select max(id) as max from ex");
+          const rows = Array.from(await connection.execute("select max(id) as max from ex"));
           const expected = Number(rows[0].max);
           expect(Number((result as { rows: unknown[][] }).rows[0][0])).toBe(expected);
         } finally {
@@ -257,7 +257,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             [],
             "id",
           );
-          const rows = await connection.execute("select max(id) as max from ex");
+          const rows = Array.from(await connection.execute("select max(id) as max from ex"));
           const expected = Number(rows[0].max);
           expect(Number((result as { rows: unknown[][] }).rows[0][0])).toBe(expected);
         } finally {
@@ -588,7 +588,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("translate no connection exception to not established", async () => {
-      const pidRows = await adapter.execute("SELECT pg_backend_pid() AS pid");
+      const pidRows = Array.from(await adapter.execute("SELECT pg_backend_pid() AS pid"));
       const pid = (pidRows[0] as { pid: number }).pid;
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
         await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
@@ -723,7 +723,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         const raw = ((await adapter.rawConnection()) as any).client;
         raw.on("notice", listener);
         try {
-          const result = await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$");
+          const result = Array.from(
+            await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$"),
+          );
           expect(result).toEqual([]);
         } finally {
           raw.removeListener("notice", listener);
@@ -797,8 +799,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("allowlist of warnings to ignore", async () => {
       await self().withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
-        const rows = await adapter.execute(
-          "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
+        const rows = Array.from(
+          await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
         );
         expect(rows).toEqual([]);
       });
@@ -806,8 +808,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("allowlist of warning codes to ignore", async () => {
       await self().withDbWarningsAction("raise", ["01000"], async () => {
-        const rows = await adapter.execute(
-          "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
+        const rows = Array.from(
+          await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
         );
         expect(rows).toEqual([]);
       });
@@ -815,7 +817,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("does not raise notice level warnings", async () => {
       await self().withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
-        const result = await adapter.execute("DROP TABLE IF EXISTS non_existent_table");
+        const result = Array.from(await adapter.execute("DROP TABLE IF EXISTS non_existent_table"));
 
         expect(result).toEqual([]);
       });

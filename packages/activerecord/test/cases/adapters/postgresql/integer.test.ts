@@ -30,7 +30,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("schema properly respects bigint ranges", async () => {
       await adapter.execute(`INSERT INTO "pg_integers" DEFAULT VALUES`);
-      const rows = await adapter.execute(`SELECT "quota" FROM "pg_integers"`);
+      const rows = Array.from(await adapter.execute(`SELECT "quota" FROM "pg_integers"`));
       const type = new BigIntegerType({ limit: 8 });
       const value = type.cast(rows[0].quota);
       expect(value).toBe(TWO_GB);

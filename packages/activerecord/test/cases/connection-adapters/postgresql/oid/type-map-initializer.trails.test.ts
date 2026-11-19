@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { Enumerable } from "@blazetrails/ruby-compat";
 import type { ValueType } from "@blazetrails/activemodel";
 import { Array as OidArray } from "../../../../../lib/connection-adapters/postgresql/oid/array.js";
 import { Enum } from "../../../../../lib/connection-adapters/postgresql/oid/enum.js";
 import { RangeType } from "../../../../../lib/connection-adapters/postgresql/oid/range.js";
 import { HashLookupTypeMap } from "../../../../../lib/type/hash-lookup-type-map.js";
-import { TypeMapInitializer } from "../../../../../lib/connection-adapters/postgresql/oid/type-map-initializer.js";
+import {
+  TypeMapInitializer,
+  type PgTypeRow,
+} from "../../../../../lib/connection-adapters/postgresql/oid/type-map-initializer.js";
 import { Vector } from "../../../../../lib/connection-adapters/postgresql/oid/vector.js";
 
 const integerSubtype = {
@@ -18,14 +22,16 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     store.registerType("int4", integerSubtype);
     store.registerType(23, integerSubtype);
 
-    new TypeMapInitializer(store).run([
-      row({ oid: 1007, typname: "_int4", typinput: "array_in", typelem: 23 }),
-      row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
-      row({ oid: 5000, typname: "mood", typtype: "e" }),
-      row({ oid: 6000, typname: "positive_int", typtype: "d", typbasetype: 23 }),
-      row({ oid: 7000, typname: "int_pair", typelem: 23 }),
-      row({ oid: 8000, typname: "int4" }),
-    ]);
+    new TypeMapInitializer(store).run(
+      new Enumerable([
+        row({ oid: 1007, typname: "_int4", typinput: "array_in", typelem: 23 }),
+        row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
+        row({ oid: 5000, typname: "mood", typtype: "e" }),
+        row({ oid: 6000, typname: "positive_int", typtype: "d", typbasetype: 23 }),
+        row({ oid: 7000, typname: "int_pair", typelem: 23 }),
+        row({ oid: 8000, typname: "int4" }),
+      ]),
+    );
 
     expect(store.lookup(1007)).toBeInstanceOf(OidArray);
     expect(store.lookup(3904)).toBeInstanceOf(RangeType);
@@ -51,10 +57,12 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
         }) as unknown as ValueType,
     );
 
-    new TypeMapInitializer(store).run([
-      row({ oid: "1007", typname: "_int4", typinput: "array_in", typelem: "23" }),
-      row({ oid: "3904", typname: "int4range", typtype: "r", rngsubtype: "23" }),
-    ]);
+    new TypeMapInitializer(store).run(
+      new Enumerable([
+        row({ oid: "1007", typname: "_int4", typinput: "array_in", typelem: "23" }),
+        row({ oid: "3904", typname: "int4range", typtype: "r", rngsubtype: "23" }),
+      ]),
+    );
 
     const array = store.lookup(1007, { scale: 2 }) as OidArray;
     const range = store.lookup(3904, { scale: 4 }) as RangeType;
@@ -69,15 +77,19 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     const store = new HashLookupTypeMap();
     store.registerType("numeric", integerSubtype);
 
-    new TypeMapInitializer(store).run([
-      row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 }),
-    ]);
+    new TypeMapInitializer(store).run(
+      new Enumerable([
+        row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 }),
+      ]),
+    );
     expect(store.lookup(1231)).not.toBeInstanceOf(OidArray);
 
     store.aliasType(1700, "numeric");
-    new TypeMapInitializer(store).run([
-      row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 }),
-    ]);
+    new TypeMapInitializer(store).run(
+      new Enumerable([
+        row({ oid: 1231, typname: "_numeric", typinput: "array_in", typelem: 1700 }),
+      ]),
+    );
     expect(store.lookup(1231)).toBeInstanceOf(OidArray);
   });
 
@@ -93,7 +105,7 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
   });
 });
 
-function row(overrides: Partial<Parameters<TypeMapInitializer["run"]>[0][number]>) {
+function row(overrides: Partial<PgTypeRow>) {
   return {
     oid: 1,
     typname: "type",

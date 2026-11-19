@@ -39,13 +39,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         `INSERT INTO tsvectors (text_vector) VALUES ($$'text' 'vector'$$::tsvector)`,
       );
-      const rows = await adapter.execute(`SELECT text_vector FROM tsvectors`);
+      const rows = Array.from(await adapter.execute(`SELECT text_vector FROM tsvectors`));
       expect(String(rows[0].text_vector)).toBe("'text' 'vector'");
 
       await adapter.execute(
         `UPDATE tsvectors SET text_vector = $$'new' 'text' 'vector'$$::tsvector`,
       );
-      const updated = await adapter.execute(`SELECT text_vector FROM tsvectors`);
+      const updated = Array.from(await adapter.execute(`SELECT text_vector FROM tsvectors`));
       expect(updated).toBeTruthy();
       expect(String(updated[0].text_vector)).toBe("'new' 'text' 'vector'");
     });

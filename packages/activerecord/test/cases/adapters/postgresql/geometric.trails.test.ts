@@ -21,10 +21,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`
         CREATE TABLE test_geometric_types (id serial primary key, a_line line)
       `);
-      const rows = await adapter.execute(`
+      const rows = Array.from(
+        await adapter.execute(`
         SELECT udt_name FROM information_schema.columns
         WHERE table_name = 'test_geometric_types' AND column_name = 'a_line'
-      `);
+      `),
+      );
       expect(rows[0].udt_name).toBe("line");
     });
 
@@ -36,10 +38,12 @@ describeIfPg("PostgreSQLAdapter", () => {
           a_line line DEFAULT '{1,2,3}'
         )
       `);
-      const rows = await adapter.execute(`
+      const rows = Array.from(
+        await adapter.execute(`
         SELECT column_default FROM information_schema.columns
         WHERE table_name = 'test_geometric_types' AND column_name = 'a_line'
-      `);
+      `),
+      );
       expect(rows[0].column_default).toBeTruthy();
     });
 
@@ -51,7 +55,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_line) VALUES ($1)`, "SQL", [
         "{2,3,5.5}",
       ]);
-      const rows = await adapter.execute(`SELECT a_line FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_line FROM test_geometric_types`));
       expect(rows[0].a_line).toMatch(/2.*3.*5\.5/);
     });
 
@@ -63,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_line) VALUES ($1)`, "SQL", [
         "{1,2,3}",
       ]);
-      const rows = await adapter.execute(`SELECT a_line FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_line FROM test_geometric_types`));
       expect(rows[0].a_line).toBeTruthy();
     });
 
@@ -72,10 +76,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`
         CREATE TABLE test_geometric_types (id serial primary key, a_lseg lseg)
       `);
-      const rows = await adapter.execute(`
+      const rows = Array.from(
+        await adapter.execute(`
         SELECT udt_name FROM information_schema.columns
         WHERE table_name = 'test_geometric_types' AND column_name = 'a_lseg'
-      `);
+      `),
+      );
       expect(rows[0].udt_name).toBe("lseg");
     });
 
@@ -87,7 +93,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_lseg) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4)]",
       ]);
-      const rows = await adapter.execute(`SELECT a_lseg FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_lseg FROM test_geometric_types`));
       expect(rows[0].a_lseg).toMatch(/1.*2.*3.*4/);
     });
 
@@ -99,7 +105,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_lseg) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4)]",
       ]);
-      const rows = await adapter.execute(`SELECT a_lseg FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_lseg FROM test_geometric_types`));
       expect(rows[0].a_lseg).toBeTruthy();
     });
 
@@ -108,10 +114,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`
         CREATE TABLE test_geometric_types (id serial primary key, a_box box)
       `);
-      const rows = await adapter.execute(`
+      const rows = Array.from(
+        await adapter.execute(`
         SELECT udt_name FROM information_schema.columns
         WHERE table_name = 'test_geometric_types' AND column_name = 'a_box'
-      `);
+      `),
+      );
       expect(rows[0].udt_name).toBe("box");
     });
 
@@ -123,7 +131,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_box) VALUES ($1)`, "SQL", [
         "(3,4),(1,2)",
       ]);
-      const rows = await adapter.execute(`SELECT a_box FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_box FROM test_geometric_types`));
       expect(rows[0].a_box).toMatch(/3.*4.*1.*2/);
     });
 
@@ -135,7 +143,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_box) VALUES ($1)`, "SQL", [
         "(3,4),(1,2)",
       ]);
-      const rows = await adapter.execute(`SELECT a_box FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_box FROM test_geometric_types`));
       expect(rows[0].a_box).toBeTruthy();
     });
 
@@ -144,10 +152,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`
         CREATE TABLE test_geometric_types (id serial primary key, a_path path)
       `);
-      const rows = await adapter.execute(`
+      const rows = Array.from(
+        await adapter.execute(`
         SELECT udt_name FROM information_schema.columns
         WHERE table_name = 'test_geometric_types' AND column_name = 'a_path'
-      `);
+      `),
+      );
       expect(rows[0].udt_name).toBe("path");
     });
 
@@ -159,8 +169,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4),(5,6)]",
       ]);
-      const rows = await adapter.execute(
-        `SELECT isopen(a_path) AS is_open FROM test_geometric_types`,
+      const rows = Array.from(
+        await adapter.execute(`SELECT isopen(a_path) AS is_open FROM test_geometric_types`),
       );
       expect(rows[0].is_open).toBe(true);
     });
@@ -173,8 +183,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, "SQL", [
         "((1,2),(3,4),(5,6))",
       ]);
-      const rows = await adapter.execute(
-        `SELECT isclosed(a_path) AS is_closed FROM test_geometric_types`,
+      const rows = Array.from(
+        await adapter.execute(`SELECT isclosed(a_path) AS is_closed FROM test_geometric_types`),
       );
       expect(rows[0].is_closed).toBe(true);
     });
@@ -187,7 +197,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4)]",
       ]);
-      const rows = await adapter.execute(`SELECT a_path FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_path FROM test_geometric_types`));
       expect(rows[0].a_path).toMatch(/1.*2.*3.*4/);
     });
 
@@ -199,7 +209,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4)]",
       ]);
-      const rows = await adapter.execute(`SELECT a_path FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_path FROM test_geometric_types`));
       expect(rows[0].a_path).toBeTruthy();
     });
 
@@ -208,10 +218,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`
         CREATE TABLE test_geometric_types (id serial primary key, a_polygon polygon)
       `);
-      const rows = await adapter.execute(`
+      const rows = Array.from(
+        await adapter.execute(`
         SELECT udt_name FROM information_schema.columns
         WHERE table_name = 'test_geometric_types' AND column_name = 'a_polygon'
-      `);
+      `),
+      );
       expect(rows[0].udt_name).toBe("polygon");
     });
 
@@ -223,7 +235,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_polygon) VALUES ($1)`, "SQL", [
         "((1,2),(3,4),(5,6))",
       ]);
-      const rows = await adapter.execute(`SELECT a_polygon FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_polygon FROM test_geometric_types`));
       expect(rows[0].a_polygon).toMatch(/1.*2.*3.*4.*5.*6/);
     });
 
@@ -235,7 +247,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_polygon) VALUES ($1)`, "SQL", [
         "((1,2),(3,4),(5,6))",
       ]);
-      const rows = await adapter.execute(`SELECT a_polygon FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_polygon FROM test_geometric_types`));
       expect(rows[0].a_polygon).toBeTruthy();
     });
 
@@ -244,10 +256,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`
         CREATE TABLE test_geometric_types (id serial primary key, a_circle circle)
       `);
-      const rows = await adapter.execute(`
+      const rows = Array.from(
+        await adapter.execute(`
         SELECT udt_name FROM information_schema.columns
         WHERE table_name = 'test_geometric_types' AND column_name = 'a_circle'
-      `);
+      `),
+      );
       expect(rows[0].udt_name).toBe("circle");
     });
 
@@ -259,7 +273,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_circle) VALUES ($1)`, "SQL", [
         "<(1,2),3>",
       ]);
-      const rows = await adapter.execute(`SELECT a_circle FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_circle FROM test_geometric_types`));
       const circle = rows[0].a_circle;
       const str = typeof circle === "object" ? JSON.stringify(circle) : String(circle);
       expect(str).toMatch(/1.*2.*3/);
@@ -273,7 +287,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO test_geometric_types (a_circle) VALUES ($1)`, "SQL", [
         "<(1,2),3>",
       ]);
-      const rows = await adapter.execute(`SELECT a_circle FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_circle FROM test_geometric_types`));
       expect(rows[0].a_circle).toBeTruthy();
     });
 
@@ -283,7 +297,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         CREATE TABLE test_geometric_types (id serial primary key, a_point point)
       `);
       await adapter.execute(`INSERT INTO test_geometric_types (a_point) VALUES (NULL)`);
-      const rows = await adapter.execute(`SELECT a_point FROM test_geometric_types`);
+      const rows = Array.from(await adapter.execute(`SELECT a_point FROM test_geometric_types`));
       expect(rows[0].a_point).toBeNull();
     });
   });

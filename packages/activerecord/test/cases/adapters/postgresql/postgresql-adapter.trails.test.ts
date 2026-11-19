@@ -83,8 +83,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     try {
       await adapter.execute(`DROP TABLE IF EXISTS abba, test_no_returning CASCADE`);
 
-      const tables = await adapter.execute(
-        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'ex_%'`,
+      const tables = Array.from(
+        await adapter.execute(
+          `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'ex_%'`,
+        ),
       );
       for (const t of tables) {
         await adapter.execute(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);
@@ -145,8 +147,10 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("pk and sequence for table with serial pk", async () => {
       await adapter.execute(`CREATE TABLE "ex_serial" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
-      const rows = await adapter.execute(
-        `SELECT column_name FROM information_schema.columns WHERE table_name = 'ex_serial' AND column_default LIKE 'nextval%'`,
+      const rows = Array.from(
+        await adapter.execute(
+          `SELECT column_name FROM information_schema.columns WHERE table_name = 'ex_serial' AND column_default LIKE 'nextval%'`,
+        ),
       );
       expect(rows).toHaveLength(1);
       expect(rows[0].column_name).toBe("id");
@@ -156,8 +160,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         `CREATE TABLE "ex_bigserial" ("id" BIGSERIAL PRIMARY KEY, "name" TEXT)`,
       );
-      const rows = await adapter.execute(
-        `SELECT data_type FROM information_schema.columns WHERE table_name = 'ex_bigserial' AND column_name = 'id'`,
+      const rows = Array.from(
+        await adapter.execute(
+          `SELECT data_type FROM information_schema.columns WHERE table_name = 'ex_bigserial' AND column_name = 'id'`,
+        ),
       );
       expect(rows).toHaveLength(1);
       expect(rows[0].data_type).toBe("bigint");
@@ -297,7 +303,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("translate exception query cancelled", async () => {
       await adapter.beginTransaction({ _lazy: false });
       try {
-        const pidRows = await adapter.execute(`SELECT pg_backend_pid() AS pid`);
+        const pidRows = Array.from(await adapter.execute(`SELECT pg_backend_pid() AS pid`));
         const pid = (pidRows[0] as { pid: number }).pid;
         const sleepPromise = adapter.execute(`SELECT pg_sleep(10)`).then(
           () => null,
@@ -307,8 +313,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
           const deadline = Date.now() + 2000;
           while (Date.now() < deadline) {
-            const rows = await adapter2.execute(
-              `SELECT 1 FROM pg_stat_activity WHERE pid = ${pid} AND query LIKE '%pg_sleep%' AND state = 'active'`,
+            const rows = Array.from(
+              await adapter2.execute(
+                `SELECT 1 FROM pg_stat_activity WHERE pid = ${pid} AND query LIKE '%pg_sleep%' AND state = 'active'`,
+              ),
             );
             if (rows.length > 0) break;
             await new Promise<void>((r) => setTimeout(r, 10));
@@ -327,7 +335,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
         await new Promise<void>((r) => setTimeout(r, 100));
         await other.lock.synchronize(() => other.rollbackDbTransaction());
-        await expect(foreign).resolves.toHaveLength(1);
+        expect(Array.from(await foreign)).toHaveLength(1);
       } finally {
         await other.disconnectBang();
       }
@@ -371,7 +379,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await resetting;
 
         expect(other._rawConnection).not.toBeNull();
-        await expect(other.execute("SELECT 1 AS n")).resolves.toHaveLength(1);
+        expect(Array.from(await other.execute("SELECT 1 AS n"))).toHaveLength(1);
       } finally {
         await other.disconnectBang();
       }
@@ -400,7 +408,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
         await new Promise<void>((r) => setTimeout(r, 100));
         const resetting = other.resetBang();
-        await expect(foreign).resolves.toHaveLength(1);
+        expect(Array.from(await foreign)).toHaveLength(1);
         await resetting;
       } finally {
         await other.disconnectBang();
@@ -417,7 +425,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }, 0);
         await other.lock.synchronize(async () => {
           await new Promise<void>((r) => setTimeout(r, 50));
-          const rows = await other.execute("SELECT 1 AS n");
+          const rows = Array.from(await other.execute("SELECT 1 AS n"));
           expect(rows).toHaveLength(1);
         });
         await resetting;
@@ -441,7 +449,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await sleep;
         expect(sleepError).toBeInstanceOf(QueryCanceled);
         await other.rollbackDbTransaction();
-        await expect(other.execute("SELECT 1 AS n")).resolves.toHaveLength(1);
+        expect(Array.from(await other.execute("SELECT 1 AS n"))).toHaveLength(1);
       } finally {
         await other.disconnectBang();
       }
@@ -582,7 +590,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.beginDbTransaction();
       try {
         await adapter.internalExecQuery("SELECT $1::integer AS n", "SQL", [1], { prepare: true });
-        const rows = await adapter.execute("SELECT name FROM pg_prepared_statements");
+        const rows = Array.from(await adapter.execute("SELECT name FROM pg_prepared_statements"));
         expect(rows.length).toBeGreaterThan(0);
       } finally {
         await adapter.rollbackDbTransaction();
@@ -595,7 +603,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.internalExecQuery("SELECT $1::integer + $2::integer AS n", "SQL", [1, 2], {
           prepare: true,
         });
-        const rows = await adapter.execute("SELECT name FROM pg_prepared_statements");
+        const rows = Array.from(await adapter.execute("SELECT name FROM pg_prepared_statements"));
         expect(rows.length).toBeGreaterThan(0);
       } finally {
         await adapter.rollbackDbTransaction();
@@ -605,7 +613,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG, preparedStatements: false });
       try {
         expect(a.preparedStatements).toBe(false);
-        const result = await a.execute("SELECT 1 AS n");
+        const result = Array.from(await a.execute("SELECT 1 AS n"));
         expect(result[0]["n"]).toBe(1);
       } finally {
         await a.disconnectBang();
@@ -672,7 +680,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         null,
         [9007199254740991],
       );
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_bigint"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_bigint"`));
       expect(Number(rows[0].val)).toBe(9007199254740991);
     });
 
@@ -694,7 +702,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execInsert(`INSERT INTO "ex_json" ("val") VALUES ($1)`, null, [
         JSON.stringify(obj),
       ]);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_json"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_json"`));
 
       expect(JSON.parse(rows[0].val as string)).toEqual(obj);
     });
@@ -718,7 +726,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`CREATE TABLE "ex_backslash" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
       const value = "a\\b";
       await adapter.execInsert(`INSERT INTO "ex_backslash" ("val") VALUES ($1)`, null, [value]);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_backslash"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_backslash"`));
       expect(rows[0].val).toBe(value);
     });
 
@@ -726,7 +734,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.enableExtension("hstore");
       await adapter.execute(`CREATE TABLE "ex_hs" ("id" SERIAL PRIMARY KEY, "val" HSTORE)`);
       await adapter.execute(`INSERT INTO "ex_hs" ("val") VALUES ('"a"=>"1", "b"=>"2"')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_hs"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_hs"`));
       expect(typeof rows[0].val).toBe("string");
       expect(String(rows[0].val)).toContain("a");
     });
@@ -757,35 +765,35 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("xml decoding", async () => {
       await adapter.execute(`CREATE TABLE "ex_xml" ("id" SERIAL PRIMARY KEY, "val" XML)`);
       await adapter.execute(`INSERT INTO "ex_xml" ("val") VALUES ('<root>hello</root>')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_xml"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_xml"`));
       expect(String(rows[0].val)).toContain("<root>hello</root>");
     });
 
     it("cidr decoding", async () => {
       await adapter.execute(`CREATE TABLE "ex_cidr" ("id" SERIAL PRIMARY KEY, "val" CIDR)`);
       await adapter.execute(`INSERT INTO "ex_cidr" ("val") VALUES ('192.168.1.0/24')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_cidr"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_cidr"`));
       expect(String(rows[0].val)).toBe("192.168.1.0/24");
     });
 
     it("inet decoding", async () => {
       await adapter.execute(`CREATE TABLE "ex_inet" ("id" SERIAL PRIMARY KEY, "val" INET)`);
       await adapter.execute(`INSERT INTO "ex_inet" ("val") VALUES ('192.168.1.1')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_inet"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_inet"`));
       expect(String(rows[0].val)).toBe("192.168.1.1");
     });
 
     it("macaddr decoding", async () => {
       await adapter.execute(`CREATE TABLE "ex_mac" ("id" SERIAL PRIMARY KEY, "val" MACADDR)`);
       await adapter.execute(`INSERT INTO "ex_mac" ("val") VALUES ('08:00:2b:01:02:03')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_mac"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_mac"`));
       expect(String(rows[0].val)).toBe("08:00:2b:01:02:03");
     });
 
     it("point decoding", async () => {
       await adapter.execute(`CREATE TABLE "ex_point" ("id" SERIAL PRIMARY KEY, "val" POINT)`);
       await adapter.execute(`INSERT INTO "ex_point" ("val") VALUES ('(1.5, 2.5)')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_point"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_point"`));
       const val = rows[0].val;
       expect(val).toBeTruthy();
     });
@@ -793,60 +801,66 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("bit decoding", async () => {
       await adapter.execute(`CREATE TABLE "ex_bit" ("id" SERIAL PRIMARY KEY, "val" BIT(8))`);
       await adapter.execute(`INSERT INTO "ex_bit" ("val") VALUES (B'10101010')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_bit"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_bit"`));
       expect(String(rows[0].val)).toBe("10101010");
     });
 
     it("range decoding", async () => {
       await adapter.execute(`CREATE TABLE "ex_rng" ("id" SERIAL PRIMARY KEY, "val" INT4RANGE)`);
       await adapter.execute(`INSERT INTO "ex_rng" ("val") VALUES ('[1,10)')`);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_rng"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_rng"`));
       expect(typeof rows[0].val).toBe("string");
       expect(String(rows[0].val)).toContain("1");
     });
 
     it("date time decoding", async () => {
-      const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
+      const rows = Array.from(
+        await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`),
+      );
       expect(rows[0].val).toBeInstanceOf(RubyTime);
     });
 
     it("date decoding", async () => {
-      const rows = await adapter.execute(`SELECT DATE '2023-06-15' AS val`);
+      const rows = Array.from(await adapter.execute(`SELECT DATE '2023-06-15' AS val`));
       expect(rows[0].val).toBe("2023-06-15");
     });
 
     it("time decoding", async () => {
-      const rows = await adapter.execute(`SELECT TIME '14:30:00' AS val`);
+      const rows = Array.from(await adapter.execute(`SELECT TIME '14:30:00' AS val`));
       expect(rows[0].val).toBeTruthy();
       expect(String(rows[0].val)).toContain("14:30");
     });
 
     it("timestamp decoding", async () => {
-      const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
+      const rows = Array.from(
+        await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`),
+      );
       const d = rows[0].val as RubyTime;
       expect(d).toBeInstanceOf(RubyTime);
       expect(d.getutc().year).toBe(2023);
     });
 
     it("timestamp with time zone decoding", async () => {
-      const rows = await adapter.execute(`SELECT TIMESTAMPTZ '2023-06-15 10:30:00+00' AS val`);
+      const rows = Array.from(
+        await adapter.execute(`SELECT TIMESTAMPTZ '2023-06-15 10:30:00+00' AS val`),
+      );
       const d = rows[0].val as RubyTime;
       expect(d).toBeInstanceOf(RubyTime);
       expect(d.getutc().year).toBe(2023);
     });
 
     it("interval decoding", async () => {
-      const rows = await adapter.execute(`SELECT INTERVAL '1 day 2 hours' AS val`);
+      const rows = Array.from(await adapter.execute(`SELECT INTERVAL '1 day 2 hours' AS val`));
       expect(rows[0].val).toBeTruthy();
     });
 
     it("money decoding", async () => {
-      const rows = await adapter.execute(`SELECT '$12.34'::money AS val`);
+      const rows = Array.from(await adapter.execute(`SELECT '$12.34'::money AS val`));
       expect(String(rows[0].val)).toContain("12.34");
     });
 
     it("oid decoding", async () => {
-      const rows = await adapter.execute(`SELECT 42::oid AS val`);
+      const rows = Array.from(await adapter.execute(`SELECT 42::oid AS val`));
       expect(Number(rows[0].val)).toBe(42);
     });
 
@@ -862,7 +876,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         const result = await noReturn.execInsert(
           `INSERT INTO "ex_insert_ret5" ("number") VALUES (1)`,
         );
-        const rows = await noReturn.execute(`SELECT max(id) AS max_id FROM "ex_insert_ret5"`);
+        const rows = Array.from(
+          await noReturn.execute(`SELECT max(id) AS max_id FROM "ex_insert_ret5"`),
+        );
         const maxId = Number(rows[0]["max_id"]);
         expect(Number((result as any).rows[0][0])).toBe(maxId);
       } finally {
@@ -884,7 +900,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
 
         expect((result as { toArray(): unknown[] }).toArray?.()).toEqual([]);
-        const rows = await adapter.execute(`SELECT id, n FROM "ex_insert_pkfalse"`);
+        const rows = Array.from(await adapter.execute(`SELECT id, n FROM "ex_insert_pkfalse"`));
         expect(rows[0].id).toBe(101);
         expect(rows[0].n).toBe(42);
       } finally {
@@ -911,7 +927,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.beginTransaction({ _lazy: false });
       await adapter.execute(`INSERT INTO "ex_txn" ("val") VALUES ('committed')`);
       await adapter.commitTransaction();
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_txn"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_txn"`));
       expect(rows).toHaveLength(1);
       expect(rows[0].val).toBe("committed");
     });
@@ -922,7 +938,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.beginTransaction({ _lazy: false });
       await adapter.execute(`INSERT INTO "ex_txn_rb" ("val") VALUES ('during')`);
       await adapter.rollbackTransaction();
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_txn_rb"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_txn_rb"`));
       expect(rows).toHaveLength(1);
       expect(rows[0].val).toBe("before");
     });
@@ -936,7 +952,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.rollbackToSavepoint("sp1");
       await adapter.execute(`INSERT INTO "ex_txn_sp" ("val") VALUES ('c')`);
       await adapter.commitTransaction();
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_txn_sp" ORDER BY "id"`);
+      const rows = Array.from(await adapter.execute(`SELECT "val" FROM "ex_txn_sp" ORDER BY "id"`));
       expect(rows.map((r) => r.val)).toEqual(["a", "c"]);
     });
   });
@@ -1013,7 +1029,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("handles null bind values", async () => {
       await adapter.execute(`CREATE TABLE "ex_null" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
       await adapter.execInsert(`INSERT INTO "ex_null" ("val") VALUES ($1)`, null, [null]);
-      const rows = await adapter.execute(`SELECT "val" FROM "ex_null" WHERE "val" IS NULL`);
+      const rows = Array.from(
+        await adapter.execute(`SELECT "val" FROM "ex_null" WHERE "val" IS NULL`),
+      );
       expect(rows).toHaveLength(1);
       expect(rows[0].val).toBeNull();
     });
@@ -1112,8 +1130,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("beginIsolatedDbTransaction starts a transaction with isolation level", async () => {
       await adapter.beginIsolatedDbTransaction(":serializable");
       try {
-        const rows = await adapter.execute(
-          `SELECT current_setting('transaction_isolation') AS iso`,
+        const rows = Array.from(
+          await adapter.execute(`SELECT current_setting('transaction_isolation') AS iso`),
         );
         expect((rows[0] as { iso: string }).iso.toLowerCase()).toBe("serializable");
       } finally {
@@ -1209,7 +1227,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("sessionAuth changes the session authorization", async () => {
-      const rows = await adapter.execute("SELECT current_user");
+      const rows = Array.from(await adapter.execute("SELECT current_user"));
       const currentUser = (rows[0] as { current_user: string }).current_user;
       try {
         await expect(adapter.sessionAuth(currentUser)).resolves.toBeUndefined();
@@ -1348,7 +1366,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute(`INSERT INTO "abba" ("n") VALUES (2)`);
       })();
       await Promise.all([inTx, bare]);
-      const rows = await adapter.execute(`SELECT COUNT(*)::int AS c FROM "abba"`);
+      const rows = Array.from(await adapter.execute(`SELECT COUNT(*)::int AS c FROM "abba"`));
       expect(rows[0]["c"]).toBe(2);
       await adapter.execute('DROP TABLE IF EXISTS "abba" CASCADE');
     });
@@ -1757,7 +1775,7 @@ describeIfPg("PostgreSQLAdapter#active", () => {
   it("returns false once the backend behind a live client is terminated", async () => {
     const adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
-      const pidRows = await adapter.execute("SELECT pg_backend_pid() AS pid");
+      const pidRows = Array.from(await adapter.execute("SELECT pg_backend_pid() AS pid"));
       const pid = (pidRows[0] as { pid: number }).pid;
       expect(await adapter.active()).toBe(true);
 
@@ -1778,7 +1796,7 @@ describeIfPg("PostgreSQLAdapter#active", () => {
         typeMap: { isKey(oid: number): boolean };
       };
       const getOidTypeSpy = vi.spyOn(adapter, "getOidType");
-      const rows = await adapter.execute("SELECT 'regprocedure'::regtype::oid AS oid");
+      const rows = Array.from(await adapter.execute("SELECT 'regprocedure'::regtype::oid AS oid"));
       const oid = Number((rows[0] as { oid: number | string }).oid);
       getOidTypeSpy.mockClear();
 

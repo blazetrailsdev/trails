@@ -30,14 +30,18 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("UnloggedTablesTest", () => {
     it("logged by default", async () => {
       await connection.createTable(TABLE_NAME, () => {});
-      const rows = (await connection.execute(LOGGED_QUERY)) as Array<Record<string, string>>;
+      const rows = Array.from(await connection.execute(LOGGED_QUERY)) as Array<
+        Record<string, string>
+      >;
       expect(rows[0]["relpersistence"]).toBe(LOGGED);
     });
 
     it("unlogged in test environment when unlogged setting enabled", async () => {
       PostgreSQLAdapter.createUnloggedTables = true;
       await connection.createTable(TABLE_NAME, () => {});
-      const rows = (await connection.execute(LOGGED_QUERY)) as Array<Record<string, string>>;
+      const rows = Array.from(await connection.execute(LOGGED_QUERY)) as Array<
+        Record<string, string>
+      >;
       expect(rows[0]["relpersistence"]).toBe(UNLOGGED);
     });
 
@@ -54,14 +58,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       await connection.changeTable(TABLE_NAME, {}, async (t) => {
         await t.column("name", "string");
       });
-      const rows = (await connection.execute(LOGGED_QUERY)) as Array<Record<string, string>>;
+      const rows = Array.from(await connection.execute(LOGGED_QUERY)) as Array<
+        Record<string, string>
+      >;
       expect(rows[0]["relpersistence"]).toBe(LOGGED);
     });
 
     it("gracefully handles temporary tables", async () => {
       PostgreSQLAdapter.createUnloggedTables = true;
       await connection.createTable(TABLE_NAME, { temporary: true }, () => {});
-      const rows = (await connection.execute(LOGGED_QUERY)) as Array<Record<string, string>>;
+      const rows = Array.from(await connection.execute(LOGGED_QUERY)) as Array<
+        Record<string, string>
+      >;
       expect(rows[0]["relpersistence"]).toBe(TEMPORARY);
     });
   });

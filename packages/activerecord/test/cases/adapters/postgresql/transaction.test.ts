@@ -55,7 +55,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("raises Interrupt when canceling statement via interrupt", async () => {
       const other = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
       try {
-        const rows = await adapter.execute("SELECT pg_backend_pid() AS pid");
+        const rows = Array.from(await adapter.execute("SELECT pg_backend_pid() AS pid"));
         const pid = (rows[0] as { pid: number }).pid;
         const start = Date.now();
         let slowError: unknown;
@@ -118,7 +118,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.beginDbTransaction();
         await adapter.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`);
-        const otherRows = await other.execute("SELECT pg_backend_pid() AS pid");
+        const otherRows = Array.from(await other.execute("SELECT pg_backend_pid() AS pid"));
         const otherPid = (otherRows[0] as { pid: number }).pid;
         const blocked = other.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`);
         const canceler = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });

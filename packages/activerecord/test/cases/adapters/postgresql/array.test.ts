@@ -220,13 +220,13 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("select with strings", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
-      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
+      const rows = Array.from(await adapter.execute(`SELECT tags FROM pg_arrays`));
       expect(rows[0].tags).toEqual(["1", "2", "3"]);
     });
 
     it("rewrite with strings", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
-      const rows = await adapter.execute(`SELECT id FROM pg_arrays`);
+      const rows = Array.from(await adapter.execute(`SELECT id FROM pg_arrays`));
       const id = rows[0].id;
       await adapter.execQuery(
         `UPDATE pg_arrays SET tags = '{"1","2","3","4"}' WHERE id = $1`,
@@ -241,13 +241,13 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("select with integers", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
-      const rows = await adapter.execute(`SELECT ratings FROM pg_arrays`);
+      const rows = Array.from(await adapter.execute(`SELECT ratings FROM pg_arrays`));
       expect(rows[0].ratings).toEqual([1, 2, 3]);
     });
 
     it("rewrite with integers", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
-      const rows = await adapter.execute(`SELECT id FROM pg_arrays`);
+      const rows = Array.from(await adapter.execute(`SELECT id FROM pg_arrays`));
       const id = rows[0].id;
       await adapter.execQuery(`UPDATE pg_arrays SET ratings = '{2,3,4}' WHERE id = $1`, "SQL", [
         id,
@@ -364,7 +364,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
         textArray.serialize(tags),
       ]);
-      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
+      const rows = Array.from(await adapter.execute(`SELECT tags FROM pg_arrays`));
       expect(rows[0].tags).toEqual(tags);
     });
 

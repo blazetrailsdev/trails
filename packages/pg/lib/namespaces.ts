@@ -6,6 +6,7 @@ import type {
   ServerError,
   UnableToSend,
 } from "./exceptions.js";
+import type { Coder, CompositeCoder } from "./coder.js";
 import type { Constants } from "./pg.js";
 import type { Result } from "./result.js";
 import type { Array as TextDecoderArray } from "./text-decoder/array.js";
@@ -21,6 +22,8 @@ export interface PGNamespace extends Readonly<{
   UnableToSend: typeof UnableToSend;
   ConnectionBad: typeof ConnectionBad;
   FeatureNotSupported: typeof FeatureNotSupported;
+  Coder: typeof Coder;
+  CompositeCoder: typeof CompositeCoder;
   Result: typeof Result;
   TextEncoder: { Array: typeof TextEncoderArray };
   TextDecoder: { Array: typeof TextDecoderArray };

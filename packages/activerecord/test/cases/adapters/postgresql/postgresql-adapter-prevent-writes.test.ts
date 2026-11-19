@@ -65,7 +65,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         await Base.whilePreventingWrites(async () => {
           const rows = await connection.execute("SELECT * FROM ex WHERE data = '138853948594'");
-          expect((rows as unknown[]).length).toBe(1);
+          expect(Array.from(rows as Iterable<unknown>).length).toBe(1);
         });
       });
     });
@@ -73,13 +73,17 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("doesnt error when a show query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
         const rows = await connection.execute("SHOW TIME ZONE");
-        expect((rows as unknown[]).length).toBe(1);
+        expect(Array.from(rows as Iterable<unknown>).length).toBe(1);
       });
     });
 
     it("doesnt error when a set query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        expect(await connection.execute("SET standard_conforming_strings = on")).toEqual([]);
+        expect(
+          Array.from(
+            (await connection.execute("SET standard_conforming_strings = on")) as Iterable<unknown>,
+          ),
+        ).toEqual([]);
       });
     });
 
@@ -91,7 +95,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const rows = await connection.execute(
             "/*action:index*/(\n( SELECT * FROM ex WHERE data = '138853948594' ) )",
           );
-          expect((rows as unknown[]).length).toBe(1);
+          expect(Array.from(rows as Iterable<unknown>).length).toBe(1);
         });
       });
     });
@@ -100,12 +104,22 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withExampleTable(async () => {
         await Base.whilePreventingWrites(async () => {
           await connection.transaction(async () => {
-            expect(await connection.execute("DECLARE cur_ex CURSOR FOR SELECT * FROM ex")).toEqual(
-              [],
-            );
-            expect(await connection.execute("FETCH cur_ex")).toEqual([]);
-            expect(await connection.execute("MOVE cur_ex")).toEqual([]);
-            expect(await connection.execute("CLOSE cur_ex")).toEqual([]);
+            expect(
+              Array.from(
+                (await connection.execute(
+                  "DECLARE cur_ex CURSOR FOR SELECT * FROM ex",
+                )) as Iterable<unknown>,
+              ),
+            ).toEqual([]);
+            expect(
+              Array.from((await connection.execute("FETCH cur_ex")) as Iterable<unknown>),
+            ).toEqual([]);
+            expect(
+              Array.from((await connection.execute("MOVE cur_ex")) as Iterable<unknown>),
+            ).toEqual([]);
+            expect(
+              Array.from((await connection.execute("CLOSE cur_ex")) as Iterable<unknown>),
+            ).toEqual([]);
           });
         });
       });

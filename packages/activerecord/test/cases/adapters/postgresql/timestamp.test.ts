@@ -245,9 +245,11 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("adds column as timestamp", async () => {
       await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
-      const rows = await adapter.execute(
-        `SELECT data_type FROM information_schema.columns
+      const rows = Array.from(
+        await adapter.execute(
+          `SELECT data_type FROM information_schema.columns
          WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
+        ),
       );
       expect(rows[0]?.data_type).toBe("timestamp without time zone");
     });
@@ -255,9 +257,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("adds column as timestamptz if datetime type changed", async () => {
       await self().withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
-        const rows = await adapter.execute(
-          `SELECT data_type FROM information_schema.columns
+        const rows = Array.from(
+          await adapter.execute(
+            `SELECT data_type FROM information_schema.columns
            WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
+          ),
         );
         expect(rows[0]?.data_type).toBe("timestamp with time zone");
       });
@@ -274,9 +278,11 @@ describeIfPg("PostgreSQLAdapter", () => {
             }),
           ),
       );
-      const rows = await adapter.execute(
-        `SELECT data_type, udt_name FROM information_schema.columns
+      const rows = Array.from(
+        await adapter.execute(
+          `SELECT data_type, udt_name FROM information_schema.columns
          WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
+        ),
       );
       expect(rows[0]).toEqual({ data_type: "USER-DEFINED", udt_name: "custom_time_format" });
     });
