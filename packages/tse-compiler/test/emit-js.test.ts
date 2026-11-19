@@ -57,12 +57,42 @@ describe("compileJs", () => {
         "<% items.forEach((i) => { %><%= cache(i, () => { %>baz<% }) %><% }) %>",
       { async: true },
     );
-    expect(code).toContain("_ob.append(await ( cache((a), { b: (1) }, () => {");
+    expect(code).toContain("_ob.append(await ( cache((a), { b: (1) }, async () => {");
     expect(code).toContain("}) ));");
     expect(code).toContain("_ob.append( cache(i, () => {");
     expect(
       () =>
         new Function(`return async function () { ${code.replace(/^export default /, "return ")} }`),
+    ).not.toThrow();
+  });
+
+  it("runs an awaited block-expr body as an async callback that awaits its own expressions", () => {
+    const { code } = compileJs(
+      '<%= formWith({}, (f) => { %><%= render("p") %><% if (x) { %><%= yield %><% } %>' +
+        "<% items.forEach((i) => { %><%= i %><% }) %><% }) %>",
+      { async: true },
+    );
+    expect(code).toContain("_ob.append(await ( formWith({}, async (f) => {");
+    expect(code).toContain('context.outputBuffer.append(await ( render("p") ));');
+    expect(code).toContain("context.outputBuffer.append(await ( (await yield) ));");
+    expect(code).toContain("context.outputBuffer.append( i );");
+  });
+
+  it("makes an awaited block-expr arrow async once, whatever its parameter list", () => {
+    const code = (src: string) => compileJs(src, { async: true }).code;
+    expect(code("<%= f(async abc => { %>x<% }) %>")).toContain("f(async abc => {");
+    expect(code("<%= f(async (a) => { %>x<% }) %>")).toContain("f(async (a) => {");
+    expect(code("<%= f(abc => { %>x<% }) %>")).toContain("f(async abc => {");
+    const defaults = code(
+      "<%= f((a = g()) => { %><%= a %><% }) %><%= f(({ x } = h()) => { %>y<% }) %>",
+    );
+    expect(defaults).toContain("f(async (a = g()) => {");
+    expect(defaults).toContain("f(async ({ x } = h()) => {");
+    expect(
+      () =>
+        new Function(
+          `return async function () { ${defaults.replace(/^export default /, "return ")} }`,
+        ),
     ).not.toThrow();
   });
 

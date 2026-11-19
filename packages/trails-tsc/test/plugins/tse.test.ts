@@ -132,9 +132,9 @@ describe("virtualizeTse", () => {
   it("virtualizes a blockExpr with deferred append close", () => {
     const out = virtualizeTse("<%= forEach(items, (item) => { %><li><%= item %></li><% }) %>");
     const lines = out.split("\n");
-    expect(lines).toContain("  _ob.append(await (forEach(items, (item) => {");
+    expect(lines).toContain("  _ob.append(await (forEach(items, async (item) => {");
     expect(lines).toContain('  context.outputBuffer.safeAppend("<li>");');
-    expect(lines).toContain("  context.outputBuffer.append(item);");
+    expect(lines).toContain("  context.outputBuffer.append(await (item));");
     expect(lines).toContain('  context.outputBuffer.safeAppend("</li>");');
     expect(lines).toContain("  })));");
   });
@@ -142,10 +142,9 @@ describe("virtualizeTse", () => {
   it("virtualizes nested blockExprs and closes each in order", () => {
     const out = virtualizeTse("<%= outer((x) => { %><%= inner((y) => { %><% }) %><% }) %>");
     const lines = out.split("\n");
-    expect(lines).toContain("  _ob.append(await (outer((x) => {");
-    expect(lines).toContain("  context.outputBuffer.append(inner((y) => {");
-    expect(lines.filter((l) => l === "  }));")).toHaveLength(1);
-    expect(lines.filter((l) => l === "  })));")).toHaveLength(1);
+    expect(lines).toContain("  _ob.append(await (outer(async (x) => {");
+    expect(lines).toContain("  context.outputBuffer.append(await (inner(async (y) => {");
+    expect(lines.filter((l) => l === "  })));")).toHaveLength(2);
   });
 
   it("does not consume a blockExpr closer on inner code braces including } else {", () => {
@@ -153,7 +152,7 @@ describe("virtualizeTse", () => {
       "<%= forEach(items, (item) => { %><% if (x) { %><%= item %><% } else { %><%= other %><% } %><% }) %>",
     );
     const lines = out.split("\n");
-    expect(lines).toContain("  _ob.append(await (forEach(items, (item) => {");
+    expect(lines).toContain("  _ob.append(await (forEach(items, async (item) => {");
     expect(lines.filter((l) => l === "  })));")).toHaveLength(1);
   });
 

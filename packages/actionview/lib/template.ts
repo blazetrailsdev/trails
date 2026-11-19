@@ -148,7 +148,6 @@ export class Template {
   private _methodName?: string;
   private readonly _objectId = ++nextObjectId;
   private _compiled = false;
-  private _compiledStreaming = false;
 
   constructor(
     source: string | SourcesFile,
@@ -316,10 +315,9 @@ export class Template {
     }: { implicitLocals?: readonly string[]; addToStack?: boolean } = {},
     block?: (...name: unknown[]) => unknown,
   ): Promise<string | SafeBuffer | null> {
-    const streaming = buffer instanceof StreamingBuffer;
     try {
       return await this.instrumentRenderTemplate<Promise<string | SafeBuffer | null>>(async () => {
-        await this.compileBang(view, streaming);
+        await this.compileBang(view);
 
         if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
           const localsToIgnore = implicitLocals.filter((l) => !this._strictLocalKeys!.includes(l));
@@ -328,7 +326,7 @@ export class Template {
 
         if (buffer) {
           await view._run(
-            streaming ? this.streamingMethodName() : this.methodName(),
+            this.methodName(),
             this,
             locals,
             buffer as OutputBuffer,
@@ -372,24 +370,15 @@ export class Template {
     return this.inspect();
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs compile — PERMANENT
-   */
-  private async compileBang(view: Base, streaming = false): Promise<void> {
-    if (streaming ? this._compiledStreaming : this._compiled) return;
+  /** @internal */
+  private async compileBang(view: Base): Promise<void> {
+    if (this._compiled) return;
 
     const mod = view.compiledMethodContainer();
 
-    await this.instrument<Promise<void>>("!compile_template", () => this.compile(mod, streaming));
+    await this.instrument<Promise<void>>("!compile_template", () => this.compile(mod));
 
-    if (streaming) this._compiledStreaming = true;
-    else this._compiled = true;
-  }
-
-  /** @internal */
-  private streamingMethodName(): string {
-    return `${this.methodName()}_streaming`;
+    this._compiled = true;
   }
 
   /**
@@ -419,8 +408,8 @@ export class Template {
   }
 
   /** @internal */
-  protected async compile(mod: CompiledMethodContainer, streaming = false): Promise<void> {
-    const methodName = streaming ? this.streamingMethodName() : this.methodName();
+  protected async compile(mod: CompiledMethodContainer): Promise<void> {
+    const methodName = this.methodName();
     const { source: compiledSource, methodArguments } = this.compiledSource();
     const strictLocals = this.isStrictLocals();
 
