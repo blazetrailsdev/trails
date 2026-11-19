@@ -5,8 +5,8 @@ arm64). It has one controller (`PostsController`), one `.tse` view and one Activ
 on SQLite through the `node-sqlite` adapter, so the function ships no native addon, or on RDS PostgreSQL.
 
 ```bash
-pnpm run build          # views + `trails build` AOT maps + seed DB + esbuild bundle -> dist/handler.mjs
-pnpm run package        # build/lambda.zip (bundle, libxml2-wasm, app/, config/, config.ts, db/)
+pnpm run build          # views + `trails build` AOT maps + seed DB + esbuild bundle -> dist/handler.mjs + chunks
+pnpm run package        # build/lambda.zip (bundle chunks, app/, config/, config.ts, db/)
 pnpm run invoke:local   # run it under public.ecr.aws/lambda/nodejs:26 (Runtime Interface Emulator)
 pnpm run deploy         # terraform apply in infra/: function + public Function URL
 ```
@@ -46,8 +46,9 @@ function's environment, so keep the state private.
   driver of an adapter the app imports. `bundle.mjs` needs no driver stub.
 - `pnpm check:vite` (`bundle-vite.mjs`) builds the app as a Vite (Rollup) SSR bundle and serves
   `GET /posts` from it, after `pnpm build`.
-- `libxml2-wasm` stays external. Its top-level await, which nokogiri → html-sanitizer → ActionView
-  `Base` reach, breaks esbuild's lazy module initialisation.
+- The bundle is split (`splitting: true`). `libxml2-wasm` is reached only through
+  `Nokogiri.loadPath["nokogiri/extension"]`, a dynamic import, and esbuild's lazy initialisation of
+  an inlined top-level-await module never settles. A split chunk is a real ES module.
 - `/var/task` is read-only, so the seed DB is copied to `/tmp` at cold start, and the production logger
   writes to stdout.
 - `config.ts` is the generated app's rackup file. `Application.findRoot` looks for it to find the app

@@ -1798,9 +1798,14 @@ Ruled by the operator on 2026-11-13.
 
 Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#an-adapter-file-is-loaded-by-an-awaited-step-connectionadaptersresolves-require).
 The one-line rule: ESM has no synchronous `require`, so
-`ConnectionAdapters.load` awaits the adapter's `import()` before `resolve`. The
-one other `require` ported that way is `active_support/message_pack`, awaited
-at boot ([packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#active_supportmessage_pack-is-loaded-by-an-awaited-step-at-boot-serializerwithfallbacks-require)).
+`ConnectionAdapters.load` awaits the adapter's `import()` before `resolve`. Two
+other `require`s are ported that way, both awaited at boot:
+`active_support/message_pack`
+([packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#active_supportmessage_pack-is-loaded-by-an-awaited-step-at-boot-serializerwithfallbacks-require)),
+and `nokogiri/extension.rb`'s load of the native extension,
+`Nokogiri.loadPath["nokogiri/extension"]`, which seats libxml2-wasm's
+bindings on `Nokogiri.LibXml2` so no top-level await sits in the boot graph
+(`action_view.require_nokogiri`; tests await it in a setup file).
 
 ## A variant's method names are camelCase (`ImageProcessingTransformer`)
 
