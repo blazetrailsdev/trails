@@ -20,7 +20,7 @@ import {
   ValueTooLong,
 } from "../../../../lib/errors.js";
 import { PG } from "../../../../lib/pg/pg.js";
-import { Connection, type PGConnection } from "../../../../lib/pg/connection.js";
+import { Connection, type Connection as PGConnection } from "@blazetrails/pg";
 import { withSecondAdapter } from "../../../support/second-connection.js";
 import { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
 import { itIfSupports } from "../../../support/supports.js";
@@ -1311,7 +1311,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await a.connect();
         const raw = a._rawConnectionForTest() as Connection;
         const client = raw.client;
-        const pid = (await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+        const pid = (await raw.query("SELECT pg_backend_pid() AS pid")).getvalue(0, 0);
         await raw.query("BEGIN");
 
         await a.reconnect();
@@ -1319,7 +1319,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(a._rawConnectionForTest()).toBe(raw);
         expect(raw.client).not.toBe(client);
         expect(raw.transactionStatus()).toBe(0);
-        expect((await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid).not.toBe(pid);
+        expect((await raw.query("SELECT pg_backend_pid() AS pid")).getvalue(0, 0)).not.toBe(pid);
       } finally {
         await a.disconnectBang();
       }
@@ -1343,7 +1343,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
 
         expect(a._rawConnectionForTest()).not.toBe(raw);
-        expect((await a._rawConnectionForTest()!.query("SELECT 1 AS one")).rows[0].one).toBe(1);
+        expect((await a._rawConnectionForTest()!.query("SELECT 1 AS one")).getvalue(0, 0)).toBe(1);
       } finally {
         await a.disconnectBang();
       }

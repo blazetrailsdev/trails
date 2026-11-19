@@ -2,7 +2,7 @@ import "../../../constants.postgresql-oid-bytea.generated.js";
 
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { BinaryType, BinaryData } from "@blazetrails/activemodel";
-import { unescapeBytea } from "../../../pg/connection.js";
+import { unescapeBytea } from "@blazetrails/pg";
 
 export class Bytea extends BinaryType {
   override deserialize(value: unknown): unknown {

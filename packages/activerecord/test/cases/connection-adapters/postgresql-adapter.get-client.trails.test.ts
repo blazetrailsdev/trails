@@ -50,7 +50,7 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
     });
 
     const fakeClient = {
-      query: vi.fn(async (sql: string) => {
+      query: vi.fn(async ({ text: sql }: { text: string }) => {
         order.push(sql);
         if (sql === "DISCARD ALL") {
           await discardGate;

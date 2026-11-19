@@ -37,8 +37,13 @@ other method a `SCOPED_SKIP_GROUPS` entry, each "not called by activerecord".
 | `ConnectionBad`                   | `ext/pg_errors.c:89`                                 | `postgresql_adapter.rb:808,947`                                          |
 | `FeatureNotSupported`             | `ext/errorcodes.def:49-50` (`0A000`)                 | `postgresql/database_statements.rb:142`                                  |
 
-`PG::Connection`, `PG::Result` and the coders still live in
-`packages/activerecord/lib/pg/` until their RFC 0186 move stories land.
+`connection.ts` is `PG::Connection` (`ext/pg_connection.c`); node-pg is reached
+only through `engine/node-pg.ts`, which `PG.connect` loads by an awaited
+`import()`, so a missing `pg` npm package raises `LoadError` there and nowhere
+earlier. `type-map-by-oid.ts`, `type-map-by-class.ts`, `simple-encoder.ts`,
+`simple-decoder.ts` and `text-encoder/{integer,boolean}.ts` are the gem's type
+maps and coders `add_pg_encoders` / `add_pg_decoders` build. The text decoders
+still live in activerecord's `postgresql/pg-text-decoder.ts`.
 
 The specs need a PostgreSQL server, so this package's tests run on CI's
 PostgreSQL lane.

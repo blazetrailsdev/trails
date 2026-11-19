@@ -1,32 +1,10 @@
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
-import { unescapeBytea } from "../../pg/connection.js";
+import { SimpleDecoder, unescapeBytea } from "@blazetrails/pg";
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-export abstract class PGSimpleDecoder {
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  readonly oid: number;
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  readonly name: string;
-
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  constructor({ oid, name }: { oid: number; name: string }) {
-    this.oid = oid;
-    this.name = name;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  toH(): { oid: number; name: string } {
-    return { oid: this.oid, name: this.name };
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  abstract decode(string: string): unknown;
-}
-
-/** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-class Integer extends PGSimpleDecoder {
+class Integer extends SimpleDecoder {
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
     const value = BigInt(string);
@@ -36,7 +14,7 @@ class Integer extends PGSimpleDecoder {
 }
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-class Float extends PGSimpleDecoder {
+class Float extends SimpleDecoder {
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
     return parseFloat(string);
@@ -44,7 +22,7 @@ class Float extends PGSimpleDecoder {
 }
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-class Numeric extends PGSimpleDecoder {
+class Numeric extends SimpleDecoder {
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
     return new BigDecimal(string);
@@ -52,7 +30,7 @@ class Numeric extends PGSimpleDecoder {
 }
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-class Boolean extends PGSimpleDecoder {
+class Boolean extends SimpleDecoder {
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
     return string === "t";
@@ -65,9 +43,7 @@ const TIMESTAMP_APP_LOCAL = 0x2;
 const TIMESTAMP =
   /^(\d{1,7})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)(?:\.(\d+))?(?:([+-])(\d\d)(?::(\d\d))?(?::(\d\d))?)?( BC)?$/;
 
-class Timestamp extends PGSimpleDecoder {
-  protected flags = 0;
-
+class Timestamp extends SimpleDecoder {
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
     const m = TIMESTAMP.exec(string);
@@ -140,11 +116,13 @@ class Timestamp extends PGSimpleDecoder {
 class TimestampUtc extends Timestamp {}
 
 class TimestampLocal extends Timestamp {
-  protected override flags = TIMESTAMP_DB_LOCAL | TIMESTAMP_APP_LOCAL;
+  constructor(hash: Record<string, unknown> | null = null, kwargs: Record<string, unknown> = {}) {
+    super(null, { ...hash, ...kwargs, flags: TIMESTAMP_DB_LOCAL | TIMESTAMP_APP_LOCAL });
+  }
 }
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-class Bytea extends PGSimpleDecoder {
+class Bytea extends SimpleDecoder {
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
     return unescapeBytea(string);
@@ -152,7 +130,7 @@ class Bytea extends PGSimpleDecoder {
 }
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-class Date extends PGSimpleDecoder {
+class Date extends SimpleDecoder {
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
     const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(string);
@@ -176,17 +154,3 @@ export const PGTextDecoder = {
   Bytea,
   Date,
 };
-
-/** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-export class PGTypeMapByOid {
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  readonly coders = new Map<number, PGSimpleDecoder>();
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  defaultTypeMap: PGTypeMapByOid | null = null;
-
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  addCoder(coder: PGSimpleDecoder): this {
-    this.coders.set(coder.oid, coder);
-    return this;
-  }
-}

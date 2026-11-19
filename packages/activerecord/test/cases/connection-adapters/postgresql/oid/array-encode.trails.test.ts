@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FrozenError } from "@blazetrails/ruby-compat";
 import { Coder } from "@blazetrails/pg";
-import {
-  PGTextDecoder,
-  PGTypeMapByOid,
-} from "../../../../../lib/connection-adapters/postgresql/pg-text-decoder.js";
+import { PGTextDecoder } from "../../../../../lib/connection-adapters/postgresql/pg-text-decoder.js";
 import { PG } from "../../../../../lib/pg/pg.js";
 
 describe("PostgreSQL array literal encoding", () => {
@@ -113,8 +110,8 @@ describe("PG::Result", () => {
 
   it("type_map= casts per read, so setting it twice is safe", () => {
     const result = new PG.Result(native());
-    const typeMap = new PGTypeMapByOid().addCoder(
-      new PGTextDecoder.Integer({ oid: 23, name: "int4" }),
+    const typeMap = new PG.TypeMapByOid().addCoder(
+      new PGTextDecoder.Integer(null, { oid: 23, name: "int4" }),
     );
     result.typeMap = typeMap;
     expect(result.mapTypesBang(typeMap).values()).toEqual([[1]]);

@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import pg from "pg";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import {
-  PGTextDecoder,
-  PGTypeMapByOid,
-} from "../../../../lib/connection-adapters/postgresql/pg-text-decoder.js";
+import { PGTextDecoder } from "../../../../lib/connection-adapters/postgresql/pg-text-decoder.js";
+import { PG } from "../../../../lib/pg/pg.js";
 import { fakePgConnection } from "../../../support/fake-pg-connection.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
@@ -13,14 +11,16 @@ const OID_TIMESTAMP = 1114;
 const OID_TIMESTAMPTZ = 1184;
 const OID_INT8 = 20;
 
-const map = new PGTypeMapByOid()
-  .addCoder(new PGTextDecoder.TimestampWithTimeZone({ oid: OID_TIMESTAMPTZ, name: "timestamptz" }))
-  .addCoder(new PGTextDecoder.TimestampUtc({ oid: OID_TIMESTAMP, name: "timestamp" }))
-  .addCoder(new PGTextDecoder.Date({ oid: OID_DATE, name: "date" }))
-  .addCoder(new PGTextDecoder.Integer({ oid: OID_INT8, name: "int8" }));
+const map = new PG.TypeMapByOid()
+  .addCoder(
+    new PGTextDecoder.TimestampWithTimeZone(null, { oid: OID_TIMESTAMPTZ, name: "timestamptz" }),
+  )
+  .addCoder(new PGTextDecoder.TimestampUtc(null, { oid: OID_TIMESTAMP, name: "timestamp" }))
+  .addCoder(new PGTextDecoder.Date(null, { oid: OID_DATE, name: "date" }))
+  .addCoder(new PGTextDecoder.Integer(null, { oid: OID_INT8, name: "int8" }));
 
 function parse(oid: number, value: string): unknown {
-  return map.coders.get(oid)!.decode(value);
+  return map._lookupOid(0, oid)!.decode(value);
 }
 
 describe("PGTextDecoder — timestamptz (OID 1184)", () => {
@@ -104,18 +104,18 @@ describe("PGTextDecoder — int8 (OID 20)", () => {
 
 describe("PGTextDecoder — Float, Boolean", () => {
   it("decodes the text wire form", () => {
-    expect(new PGTextDecoder.Float({ oid: 701, name: "float8" }).decode("1.5")).toBe(1.5);
-    expect(new PGTextDecoder.Float({ oid: 701, name: "float8" }).decode("NaN")).toBeNaN();
-    expect(new PGTextDecoder.Boolean({ oid: 16, name: "bool" }).decode("t")).toBe(true);
-    expect(new PGTextDecoder.Boolean({ oid: 16, name: "bool" }).decode("f")).toBe(false);
+    expect(new PGTextDecoder.Float(null, { oid: 701, name: "float8" }).decode("1.5")).toBe(1.5);
+    expect(new PGTextDecoder.Float(null, { oid: 701, name: "float8" }).decode("NaN")).toBeNaN();
+    expect(new PGTextDecoder.Boolean(null, { oid: 16, name: "bool" }).decode("t")).toBe(true);
+    expect(new PGTextDecoder.Boolean(null, { oid: 16, name: "bool" }).decode("f")).toBe(false);
   });
 });
 
 describe("PGTextDecoder — TimestampWithoutTimeZone", () => {
   it("reads the timestamp in the local zone, and keeps the coder's oid and name", () => {
-    const utc = map.coders.get(OID_TIMESTAMP)!;
-    const local = new PGTextDecoder.TimestampWithoutTimeZone({ ...utc.toH() });
-    expect(local.toH()).toEqual({ oid: OID_TIMESTAMP, name: "timestamp" });
+    const utc = map._lookupOid(0, OID_TIMESTAMP)!;
+    const local = new PGTextDecoder.TimestampWithoutTimeZone(null, { ...utc.toH() });
+    expect(local.toH()).toEqual({ oid: OID_TIMESTAMP, format: 0, flags: 0x3, name: "timestamp" });
     const naive = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
     expect(
       (local.decode("2026-04-26 14:23:55") as RubyTime).getutc().toZonedDateTime().toInstant()
@@ -131,7 +131,7 @@ describe("PGConnection#typeMapForResults", () => {
       getTypeParser: () => () => "from the client",
       query: async (config: never) => (queries.push(config), { rows: [], fields: [] }),
     });
-    expect(client.typeMapForResults.coders.size).toBe(0);
+    expect(client.typeMapForResults.coders().length).toBe(0);
     client.typeMapForResults = map;
     await client.asyncExec("SELECT 1");
     const { getTypeParser } = queries[0].types;
@@ -198,19 +198,21 @@ describe("PGTextDecoder — timestamps match Time.new", () => {
   ];
 
   class TimestampUtcToLocal extends PGTextDecoder.TimestampUtc {
-    protected override flags = 0x2;
+    constructor(hash: null, kwargs: Record<string, unknown>) {
+      super(hash, { ...kwargs, flags: 0x2 });
+    }
   }
 
   const coders = [
-    [new TimestampUtcToLocal({ oid: OID_TIMESTAMP, name: "timestamp" }), false, true],
-    [new PGTextDecoder.TimestampUtc({ oid: OID_TIMESTAMP, name: "timestamp" }), false, false],
+    [new TimestampUtcToLocal(null, { oid: OID_TIMESTAMP, name: "timestamp" }), false, true],
+    [new PGTextDecoder.TimestampUtc(null, { oid: OID_TIMESTAMP, name: "timestamp" }), false, false],
     [
-      new PGTextDecoder.TimestampWithTimeZone({ oid: OID_TIMESTAMPTZ, name: "timestamptz" }),
+      new PGTextDecoder.TimestampWithTimeZone(null, { oid: OID_TIMESTAMPTZ, name: "timestamptz" }),
       false,
       false,
     ],
     [
-      new PGTextDecoder.TimestampWithoutTimeZone({ oid: OID_TIMESTAMP, name: "timestamp" }),
+      new PGTextDecoder.TimestampWithoutTimeZone(null, { oid: OID_TIMESTAMP, name: "timestamp" }),
       true,
       true,
     ],
@@ -229,7 +231,7 @@ describe("PGTextDecoder — timestamps match Time.new", () => {
 
   it("takes the timespec path only where Date.UTC agrees with Time.new", () => {
     const spy = vi.spyOn(RubyTime, "timespecNew");
-    const coder = new PGTextDecoder.TimestampUtc({ oid: OID_TIMESTAMP, name: "timestamp" });
+    const coder = new PGTextDecoder.TimestampUtc(null, { oid: OID_TIMESTAMP, name: "timestamp" });
     try {
       coder.decode("2026-11-06 19:33:14.918");
       expect(spy).toHaveBeenCalledTimes(1);
