@@ -796,6 +796,7 @@ export default defineConfig({
             "packages/solid-cache/test/lib/generators/**/*.test.ts",
             "packages/actionmailbox/test/generators/**/*.test.ts",
             "packages/actiontext/test/generators/**/*.test.ts",
+            "packages/stimulus/test/generators/**/*.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
@@ -806,6 +807,7 @@ export default defineConfig({
             "./packages/solid-cache/test/support/build-templates.ts",
             "./packages/actionmailbox/test/support/build-templates.ts",
             "./packages/actiontext/test/support/build-templates.ts",
+            "./packages/stimulus/test/support/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
         },
@@ -877,7 +879,7 @@ export default defineConfig({
           name: "stimulus",
           globals: true,
           include: ["packages/stimulus/test/**/*.test.ts"],
-          exclude: SHARED_EXCLUDE,
+          exclude: [...SHARED_EXCLUDE, "packages/stimulus/test/generators/**"],
           setupFiles: [
             "./packages/ruby-compat/test-setup/class-paths.ts",
             "./packages/vitest-matchers/lib/setup.ts",

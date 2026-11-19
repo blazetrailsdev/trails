@@ -293,4 +293,21 @@ describe("test_help wires a booted app into the test case classes", () => {
     expect(rbModName(AppConnection)).toBe("ApplicationCable::Connection");
     expect((ActionCable.server() as Server).config.connectionClass()).toBe(AppConnection);
   });
+
+  it("skips the fixture transaction for a TestCase subclass with useTransactionalTests = false", () => {
+    class NonTransactionalTest extends TestCase {
+      static {
+        this.useTransactionalTests = false;
+      }
+    }
+    class TransactionalTest extends TestCase {}
+
+    expect(NonTransactionalTest.useTransactionalTests).toBe(false);
+    expect(TestCase.useTransactionalTests).toBe(true);
+    type Host = { isRunInTransaction(): boolean };
+    expect((new NonTransactionalTest("test_x") as unknown as Host).isRunInTransaction()).toBe(
+      false,
+    );
+    expect((new TransactionalTest("test_x") as unknown as Host).isRunInTransaction()).toBe(true);
+  });
 });

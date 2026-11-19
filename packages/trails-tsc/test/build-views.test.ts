@@ -387,6 +387,51 @@ describe("buildViews", { timeout: 30_000 }, () => {
     );
   });
 
+  it("types a template's instance assigns from every controller that renders it", async () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "node_modules/@blazetrails/ruby-compat/package.json",
+      '{ "name": "@blazetrails/ruby-compat", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/ruby-compat/index.d.ts",
+      "export declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/package.json",
+      '{ "name": "@blazetrails/actionview", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/index.d.ts",
+      [
+        "export interface TemplateRegistry {}",
+        "export type TemplateLocals<T> = T;",
+        "export declare const TopLevel: {};",
+        "export declare class Base {}",
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/controllers/story-pages-controller.ts",
+      [
+        "export class StoryPagesController {",
+        "  declare page: { title: string };",
+        "  render(..._args: unknown[]): void {}",
+        '  renderPage(): void { this.render({ template: "stories/show" }); }',
+        "}",
+      ].join("\n"),
+    );
+    write(cwd, "app/views/stories/show.html.tse", "<%= this.page.title %>");
+    await buildViews({ cwd });
+    const show = fs.readFileSync(path.join(cwd, ".trails/views/stories/show.html.tse.ts"), "utf8");
+    expect(show).toContain("      : never;");
+    expect(viewDiagnostics(cwd)).toEqual([]);
+  });
+
   it("keeps the any fallback for a partial some unresolved render site may reach", async () => {
     const cwd = mkScratch();
     write(cwd, "app/models/post.ts", "export class Post {}");

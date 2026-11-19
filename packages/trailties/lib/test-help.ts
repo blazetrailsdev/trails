@@ -17,6 +17,14 @@ declare module "@blazetrails/activesupport/test-case" {
     const setupFixtureAccessors: Extended<typeof ClassMethods>["setupFixtureAccessors"];
     const usesTransaction: Extended<typeof ClassMethods>["usesTransaction"];
     const isUsesTransaction: Extended<typeof ClassMethods>["isUsesTransaction"];
+    let fixturePaths: string[];
+    let fixtureTableNames: string[];
+    let fixtureClassNames: Record<string, unknown>;
+    let useTransactionalTests: boolean;
+    let useInstantiatedFixtures: boolean | string;
+    let preLoadedFixtures: boolean;
+    let lockThreads: boolean;
+    let fixtureSets: Record<string, string>;
   }
 }
 
@@ -46,7 +54,7 @@ onLoad("active_support_test_case", function (this: typeof TestCase & FixtureHost
 });
 
 onLoad("action_dispatch_integration_test", function (this: FixtureHost) {
-  this.fixturePaths = [...this.fixturePaths, ...(TestCase as unknown as FixtureHost).fixturePaths];
+  this.fixturePaths = [...this.fixturePaths, ...TestCase.fixturePaths];
 });
 
 onLoad("action_controller_test_case", function (this: typeof TestCase) {
