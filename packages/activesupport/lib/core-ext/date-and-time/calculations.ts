@@ -114,17 +114,17 @@ export function tomorrow(this: Receiver): Result {
 }
 
 export function isToday(this: Receiver): boolean {
-  return toDate.call(this).equals(RubyDate.current());
+  return toDate.call(this).equals(RubyDate.current().toDate());
 }
 
 export function isTomorrow(this: Receiver): boolean {
-  return toDate.call(this).equals(tomorrow.call(new RubyDate(RubyDate.current())).toDate());
+  return toDate.call(this).equals(RubyDate.current().tomorrow().toDate());
 }
 
 export const isNextDay = isTomorrow;
 
 export function isYesterday(this: Receiver): boolean {
-  return toDate.call(this).equals(yesterday.call(new RubyDate(RubyDate.current())).toDate());
+  return toDate.call(this).equals(RubyDate.current().yesterday().toDate());
 }
 
 export const isPrevDay = isYesterday;

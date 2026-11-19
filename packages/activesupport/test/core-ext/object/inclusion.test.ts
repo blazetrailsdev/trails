@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { isIn, presenceIn } from "../../../lib/index.js";
 import { ArgumentError } from "../../../lib/hash-utils.js";
-import { Temporal } from "@blazetrails/date";
 import { Range } from "@blazetrails/ruby-compat/range";
-import { tomorrow } from "../../../lib/core-ext/date/calculations.js";
+import { current, tomorrow } from "../../../lib/core-ext/date/calculations.js";
 import { assertNil } from "../../../lib/testing/assertions.js";
 
 describe("InTest", () => {
@@ -36,8 +35,8 @@ describe("InTest", () => {
   });
 
   it("in date range", () => {
-    expect(isIn(Temporal.Now.plainDateISO(), new Range(null, tomorrow()))).toBeTruthy();
-    expect(isIn(Temporal.Now.plainDateISO(), new Range(tomorrow(), null))).toBeFalsy();
+    expect(isIn(current(), new Range(null, tomorrow()))).toBeTruthy();
+    expect(isIn(current(), new Range(tomorrow(), null))).toBeFalsy();
   });
 
   it("no method catching", () => {

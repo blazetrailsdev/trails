@@ -163,7 +163,7 @@ describe("DurationTest", () => {
   });
 
   it("minus with duration does not break subtraction of date from date", async () => {
-    await assertNothingRaised(() => minusWithDuration(current(), current()));
+    await assertNothingRaised(() => minusWithDuration(current().toDate(), current().toDate()));
   });
 
   it("unary plus", () => {

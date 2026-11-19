@@ -44,20 +44,20 @@ export function findBeginningOfWeekBang(weekStart: string): string {
   return weekStart;
 }
 
-export function yesterday(): Temporal.PlainDate {
+export function yesterday(): RubyDate {
   return advance(current(), { days: -1 });
 }
 
-export function tomorrow(): Temporal.PlainDate {
+export function tomorrow(): RubyDate {
   return advance(current(), { days: 1 });
 }
 
-export function current(): Temporal.PlainDate {
+export function current(): RubyDate {
   const zone = timeZone();
   if (zone) {
-    return zone.today();
+    return new RubyDate(zone.today());
   }
-  return Temporal.Now.plainDateISO();
+  return new RubyDate(Temporal.Now.plainDateISO());
 }
 
 export function ago(date: Temporal.PlainDate, seconds: number): TimeWithZone | RubyTime {
@@ -230,7 +230,7 @@ export function compareWithoutCoercion(
 
 declare module "@blazetrails/date" {
   namespace Date {
-    export function current(): Temporal.PlainDate;
+    export function current(): RubyDate;
     export function beginningOfWeek(): string;
     export function setBeginningOfWeek(weekStart: string): void;
   }

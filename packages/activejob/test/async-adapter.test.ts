@@ -19,7 +19,7 @@ describe.skipIf(!isAdapterIs("async"))("AsyncAdapterTest", () => {
 
   it("in immediate run, enqueue with wait: runs immediately", async () => {
     await (
-      HelloJob.set({ waitUntil: noon(tomorrow()) }) as {
+      HelloJob.set({ waitUntil: noon(tomorrow().toDate()) }) as {
         performLater(...args: unknown[]): Promise<unknown>;
       }
     ).performLater("Alex");

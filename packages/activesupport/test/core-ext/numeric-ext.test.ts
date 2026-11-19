@@ -127,7 +127,7 @@ describe("NumericExtTimeAndDateTimeTest", () => {
 });
 
 describe("NumericExtDateTest", () => {
-  const today = DateExt.current();
+  const today = DateExt.current().toDate();
 
   it("date plus duration", () => {
     expect(DateExt.plusWithDuration.call(today, Duration.day(1))).toEqual(

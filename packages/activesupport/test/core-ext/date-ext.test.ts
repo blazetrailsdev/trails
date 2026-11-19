@@ -178,7 +178,9 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("compare to time", () => {
-    expect(Temporal.PlainDate.compare(DateExt.yesterday(), toDate(new Date())) < 0).toBeTruthy();
+    expect(
+      Temporal.PlainDate.compare(DateExt.yesterday().toDate(), toDate(new Date())) < 0,
+    ).toBeTruthy();
   });
 
   it("to datetime", () => {
@@ -260,7 +262,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("yesterday constructor", () => {
-    expect(DateExt.yesterday()).toEqual(DateExt.current().subtract({ days: 1 }));
+    expect(DateExt.yesterday().toS()).toBe(DateExt.current().advance({ days: -1 }).toS());
   });
 
   it("yesterday constructor when zone is not set", () => {
@@ -273,7 +275,7 @@ describe("DateExtCalculationsTest", () => {
     withEnvTz("UTC", () => {
       withTzDefault(TimeZone.find("Eastern Time (US & Canada)"), () => {
         travelTo(RubyTime.local(2000, 1, 1), {}, () => {
-          expect(DateExt.yesterday().toString()).toEqual(pd(1999, 12, 30).toString());
+          expect(DateExt.yesterday().toS()).toBe(rd(1999, 12, 30).toS());
         });
       });
     });
@@ -295,7 +297,7 @@ describe("DateExtCalculationsTest", () => {
     withEnvTz("UTC", () => {
       withTzDefault(TimeZone.find("Europe/Paris"), () => {
         travelTo(RubyTime.local(1999, 12, 31, 23), {}, () => {
-          expect(DateExt.tomorrow().toString()).toEqual(pd(2000, 1, 2).toString());
+          expect(DateExt.tomorrow().toS()).toBe(rd(2000, 1, 2).toS());
         });
       });
     });
@@ -438,15 +440,15 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("past", () => {
-    expect(isPast.call(new RubyDate(DateExt.current().subtract({ days: 1 })))).toBe(true);
-    expect(isPast.call(new RubyDate(DateExt.current()))).toBe(false);
-    expect(isPast.call(new RubyDate(DateExt.current().add({ days: 1 })))).toBe(false);
+    expect(isPast.call(DateExt.current().advance({ days: -1 }))).toBe(true);
+    expect(isPast.call(DateExt.current())).toBe(false);
+    expect(isPast.call(DateExt.current().advance({ days: 1 }))).toBe(false);
   });
 
   it("future", () => {
-    expect(isFuture.call(new RubyDate(DateExt.current().subtract({ days: 1 })))).toBe(false);
-    expect(isFuture.call(new RubyDate(DateExt.current()))).toBe(false);
-    expect(isFuture.call(new RubyDate(DateExt.current().add({ days: 1 })))).toBe(true);
+    expect(isFuture.call(DateExt.current().advance({ days: -1 }))).toBe(false);
+    expect(isFuture.call(DateExt.current())).toBe(false);
+    expect(isFuture.call(DateExt.current().advance({ days: 1 }))).toBe(true);
   });
 
   it("current returns date today when zone not set", () => {
@@ -454,7 +456,7 @@ describe("DateExtCalculationsTest", () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(RubyTime.local(1999, 12, 31, 23).toZonedDateTime().epochMilliseconds);
       try {
-        expect(DateExt.current().toString()).toEqual(RubyDate.today().toString());
+        expect(DateExt.current().toDate().toString()).toEqual(RubyDate.today().toString());
       } finally {
         vi.useRealTimers();
       }
@@ -465,7 +467,9 @@ describe("DateExtCalculationsTest", () => {
     setZone(TimeZone.find("Eastern Time (US & Canada)"));
     try {
       withEnvTz("US/Central", () => {
-        expect(DateExt.current().toString()).toEqual((zone() as TimeZone).today().toString());
+        expect(DateExt.current().toDate().toString()).toEqual(
+          (zone() as TimeZone).today().toString(),
+        );
       });
     } finally {
       setZone(null);

@@ -677,18 +677,18 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
 
   it("assert enqueued with", async ({ testCase: t }: HelperContext) => {
     await t.assertEnqueuedWith({ job: LoggingJob, queue: "default" }, () =>
-      LoggingJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
+      LoggingJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater(),
     );
   });
 
   it("assert enqueued with with no block", async ({ testCase: t }: HelperContext) => {
-    await LoggingJob.set({ waitUntil: noon(tomorrow()) }).performLater();
+    await LoggingJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater();
     await t.assertEnqueuedWith({ job: LoggingJob, queue: "default" });
   });
 
   it("assert enqueued with when queue name is symbol", async ({ testCase: t }: HelperContext) => {
     await t.assertEnqueuedWith({ job: LoggingJob, queue: ":default" }, () =>
-      LoggingJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
+      LoggingJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater(),
     );
   });
 
@@ -761,7 +761,7 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
   it("assert enqueued with args", async ({ testCase: t }: HelperContext) => {
     await assertRaises([ArgumentError], {}, () =>
       t.assertEnqueuedWith({ class: LoggingJob } as AssertEnqueuedWithOptions, () =>
-        NestedJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
+        NestedJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater(),
       ),
     );
   });
@@ -770,7 +770,7 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
     const facets = {
       job: HelloJob,
       args: ["Rails"],
-      at: noon(tomorrow()),
+      at: noon(tomorrow().toDate()),
       queue: "important",
     };
 
@@ -832,14 +832,14 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
 
   it("assert enqueued with with no block args", async ({ testCase: t }: HelperContext) => {
     await assertRaises([ArgumentError], {}, async () => {
-      await NestedJob.set({ waitUntil: noon(tomorrow()) }).performLater();
+      await NestedJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater();
       await t.assertEnqueuedWith({ class: LoggingJob } as AssertEnqueuedWithOptions);
     });
   });
 
   it("assert enqueued with with at option", async ({ testCase: t }: HelperContext) => {
-    await t.assertEnqueuedWith({ job: HelloJob, at: noon(tomorrow()) }, () =>
-      HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
+    await t.assertEnqueuedWith({ job: HelloJob, at: noon(tomorrow().toDate()) }, () =>
+      HelloJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater(),
     );
   });
 
@@ -852,15 +852,15 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
   it("assert enqueued with with no block with at option", async ({
     testCase: t,
   }: HelperContext) => {
-    await HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater();
-    await t.assertEnqueuedWith({ job: HelloJob, at: noon(tomorrow()) });
+    await HelloJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater();
+    await t.assertEnqueuedWith({ job: HelloJob, at: noon(tomorrow().toDate()) });
   });
 
   it("assert enqueued with wait until with performed", async ({ testCase: t }: HelperContext) => {
     await t.assertEnqueuedWith({ job: LoggingJob }, () =>
       t.performEnqueuedJobs({ only: HelloJob }, async () => {
-        await HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater("david");
-        await LoggingJob.set({ waitUntil: noon(tomorrow()) }).performLater("enqueue");
+        await HelloJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater("david");
+        await LoggingJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater("enqueue");
       }),
     );
     await t.assertEnqueuedJobs(1);
@@ -2223,13 +2223,13 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
   });
 
   it("assert performed with with at option", async ({ testCase: t }: HelperContext) => {
-    await t.assertPerformedWith({ job: HelloJob, at: noon(tomorrow()) }, () =>
-      HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
+    await t.assertPerformedWith({ job: HelloJob, at: noon(tomorrow().toDate()) }, () =>
+      HelloJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater(),
     );
 
     await assertRaise([Assertion], {}, () =>
       t.assertPerformedWith({ job: HelloJob, at: noon(Date.today()) }, () =>
-        HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
+        HelloJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater(),
       ),
     );
   });
@@ -2249,13 +2249,13 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
   it("assert performed with without block with at option", async ({
     testCase: t,
   }: HelperContext) => {
-    await HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater();
+    await HelloJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater();
 
     await t.performEnqueuedJobs();
 
-    await t.assertPerformedWith({ job: HelloJob, at: noon(tomorrow()) });
+    await t.assertPerformedWith({ job: HelloJob, at: noon(tomorrow().toDate()) });
 
-    await HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater();
+    await HelloJob.set({ waitUntil: noon(tomorrow().toDate()) }).performLater();
 
     await t.performEnqueuedJobs();
 
@@ -2275,7 +2275,7 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
     const facets = {
       job: HelloJob,
       args: ["Rails"],
-      at: noon(tomorrow()),
+      at: noon(tomorrow().toDate()),
       queue: "important",
     };
 
