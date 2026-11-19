@@ -10,6 +10,7 @@
   "rules": [
     {
       "type": "Text",
+      "fallthrough": false,
       "globs": [
         "config.ts",
         "app/**/*.ts",
