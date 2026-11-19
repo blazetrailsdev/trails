@@ -574,7 +574,6 @@ ${requireStatements.join("\n")}`;
       if (packageManager === "pnpm" && entry.options.github != null) {
         entry.options.glob = `/packages/${name.replace("@blazetrails/", "")}`;
       }
-      if (packageManager === "pnpm" && entry.options.path != null) entry.options.link = "true";
       if (group != null) entry.options.group = group;
       return entry;
     });
@@ -1046,12 +1045,12 @@ export class GemfileEntry {
 
   /** @missingRailsArgs join — PERMANENT */
   toString(): string {
-    const { github, branch, glob, path, link } = this.options;
+    const { github, branch, glob, path } = this.options;
     let specifier: string;
     if (github != null) {
       specifier = `github:${github}${branch ? `#${branch}` : ""}${glob ? `&path:${glob}` : ""}`;
     } else if (path != null) {
-      specifier = `${link ? "link" : "file"}:${path}`;
+      specifier = `file:${path}`;
     } else if (this.version != null) {
       specifier = [this.version].flat().join(" ");
     } else {

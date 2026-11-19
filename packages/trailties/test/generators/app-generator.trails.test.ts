@@ -265,8 +265,8 @@ describe("AppGenerator (trails-only)", () => {
 
     const trailties = File.join(Generators.TRAILS_DEV_PATH, "packages", "trailties");
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.dependencies["@blazetrails/trailties"]).toBe(`link:${trailties}`);
-    expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toMatch(/^link:.*trails-tsc$/);
+    expect(pkg.dependencies["@blazetrails/trailties"]).toBe(`file:${trailties}`);
+    expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toMatch(/^file:.*trails-tsc$/);
     const workspace = File.read(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"));
     expect(workspace).toContain(`  "@blazetrails/trailties": "link:${trailties}"`);
     expect(workspace).toContain(`  "@blazetrails/arel": "link:`);
