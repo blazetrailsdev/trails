@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { include, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { include, rbModName, rbObjRespondTo, reduce } from "@blazetrails/ruby-compat";
 import { StreamName } from "./app/channels/turbo/streams/stream-name.js";
 import { Turbo } from "./turbo-trails.js";
 
@@ -29,7 +29,7 @@ function turboCableStreamSource(
   { connected, channel, signedStreamName }: TurboCableStreamSourceOptions,
 ): string {
   let xpath = `.//*[local-name() = 'turbo-cable-stream-source']`;
-  xpath = where(xpath, reduce(new SignedStreamNameConditions(locator)));
+  xpath = where(xpath, orConditions(new SignedStreamNameConditions(locator)));
   if (connected !== undefined) xpath = addAttributeCondition(xpath, "connected", connected);
   if (channel !== undefined)
     xpath = addAttributeCondition(
@@ -41,22 +41,23 @@ function turboCableStreamSource(
     if (signedStreamName === true || signedStreamName === false || signedStreamName === null) {
       xpath = addAttributeCondition(xpath, "signed-stream-name", signedStreamName);
     } else {
-      xpath = where(xpath, reduce(new SignedStreamNameConditions(signedStreamName)));
+      xpath = where(xpath, orConditions(new SignedStreamNameConditions(signedStreamName)));
     }
   }
   return `xpath=${xpath}`;
 }
 
 /** @noRailsEquivalent PERMANENT */
-function where(xpath: string, condition: string | null): string {
-  return condition === null ? xpath : `${xpath}[${condition}]`;
+function orConditions(conditions: SignedStreamNameConditions): string | null {
+  return (reduce(
+    conditions,
+    (memo: unknown, condition: unknown) => `${memo as string} or ${condition as string}`,
+  ) ?? null) as string | null;
 }
 
 /** @noRailsEquivalent PERMANENT */
-function reduce(conditions: SignedStreamNameConditions): string | null {
-  const yielded: string[] = [];
-  conditions.each((condition) => yielded.push(condition));
-  return yielded.length === 0 ? null : yielded.join(" or ");
+function where(xpath: string, condition: string | null): string {
+  return condition === null ? xpath : `${xpath}[${condition}]`;
 }
 
 /** @noRailsEquivalent PERMANENT */
