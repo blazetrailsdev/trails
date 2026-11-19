@@ -1,4 +1,5 @@
 import "../constants.rake.generated.js";
+import { disconnectAllBang } from "@blazetrails/activerecord";
 import { Rake, TaskManager, type Application as RakeApplication } from "@blazetrails/rake";
 import { extend, regexpEscape } from "@blazetrails/ruby-compat";
 import { Actions } from "../command/actions.js";
@@ -22,29 +23,37 @@ export class RakeCommand extends Base {
       .map((task) => [task.nameWithArgs(), task.comment]);
   }
 
+  /**
+   * @inventedArm try — CONVERGEABLE rake-command-exits-when-the-task-returns
+   * @inventedArm disconnectAllBang — CONVERGEABLE rake-command-exits-when-the-task-returns
+   */
   static override async perform(
     task: string,
     args: string[],
     _config: Record<string, unknown>,
   ): Promise<void> {
-    await this.withRake([task, ...args], async (rake) => {
-      const unrecognizedTask = rake.topLevelTasks
-        .filter((t) => t !== "default")
-        .find((t) => {
-          const name = /[^[]+/.exec(t)?.[0];
-          return name === undefined || !rake.lookup(name);
-        });
-      if (unrecognizedTask !== undefined) {
-        this._rakeTasks = rake.tasks;
-        throw new UnrecognizedCommandError(
-          unrecognizedTask,
-          (await printingCommands()).map(([name]) => name),
-        );
-      }
+    try {
+      await this.withRake([task, ...args], async (rake) => {
+        const unrecognizedTask = rake.topLevelTasks
+          .filter((t) => t !== "default")
+          .find((t) => {
+            const name = /[^[]+/.exec(t)?.[0];
+            return name === undefined || !rake.lookup(name);
+          });
+        if (unrecognizedTask !== undefined) {
+          this._rakeTasks = rake.tasks;
+          throw new UnrecognizedCommandError(
+            unrecognizedTask,
+            (await printingCommands()).map(([name]) => name),
+          );
+        }
 
-      rake.options.suppressBacktracePattern = this.nonAppFilePattern();
-      await rake.standardExceptionHandling(() => rake.topLevel());
-    });
+        rake.options.suppressBacktracePattern = this.nonAppFilePattern();
+        await rake.standardExceptionHandling(() => rake.topLevel());
+      });
+    } finally {
+      await disconnectAllBang();
+    }
   }
 
   /** @internal */
