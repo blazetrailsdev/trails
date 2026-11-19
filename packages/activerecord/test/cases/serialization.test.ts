@@ -1,3 +1,4 @@
+import { Time } from "@blazetrails/date";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base } from "../../lib/index.js";
@@ -31,7 +32,7 @@ describe("SerializationTest", () => {
       name: "aaron stack",
       age: 25,
       avatar: "binarydata",
-      created_at: new Date(Date.UTC(2006, 7, 1)),
+      created_at: Time.utc(2006, 8, 1),
       awesome: false,
       preferences: { gem: "<strong>ruby</strong>" },
       alternative_id: null,
