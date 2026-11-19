@@ -84,6 +84,15 @@ export class Job extends Record {
   declare acquireConcurrencyLock: typeof ConcurrencyControls.prototype.acquireConcurrencyLock;
   declare jobClass: typeof ConcurrencyControls.prototype.jobClass;
   declare isBlocked: typeof ConcurrencyControls.prototype.isBlocked;
+  declare releaseConcurrencyLock: typeof ConcurrencyControls.prototype.releaseConcurrencyLock;
+  declare isHoldsConcurrencySlot: typeof ConcurrencyControls.prototype.isHoldsConcurrencySlot;
+  declare isConcurrencyLockRecorded: typeof ConcurrencyControls.prototype.isConcurrencyLockRecorded;
+  declare releaseNextBlockedJob: typeof ConcurrencyControls.prototype.releaseNextBlockedJob;
+  declare recordConcurrencyLock: typeof ConcurrencyControls.prototype.recordConcurrencyLock;
+  declare concurrencyLock: typeof ConcurrencyControls.prototype.concurrencyLock;
+  declare handleConcurrencyConflict: typeof ConcurrencyControls.prototype.handleConcurrencyConflict;
+  declare concurrencyOnConflict: typeof ConcurrencyControls.prototype.concurrencyOnConflict;
+  declare block: typeof ConcurrencyControls.prototype.block;
   declare retry: typeof Retryable.prototype.retry;
   declare failedWith: typeof Retryable.prototype.failedWith;
   declare resetExecutionCounters: typeof Retryable.prototype.resetExecutionCounters;

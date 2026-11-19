@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi, expectTypeOf } from "vitest";
 import "./support/dummy-application.js";
 import { RecordNotUnique } from "@blazetrails/activerecord";
 import { RuntimeError } from "@blazetrails/ruby-compat";
@@ -55,5 +55,14 @@ describe("SolidQueue::Job::Retryable#failed_with (trails)", () => {
 
     expect(await (await job.reload()).isFailed()).toBeTruthy();
     expect(((await job.failedExecution) as FailedExecution).message()).toEqual("boom");
+  });
+});
+
+describe("SolidQueue::Job ConcurrencyControls type (trails)", () => {
+  it("exposes the ConcurrencyControls instance members on Job", () => {
+    expectTypeOf<Job["handleConcurrencyConflict"]>().toBeFunction();
+    expectTypeOf<Job["block"]>().toBeFunction();
+    expectTypeOf<Job["concurrencyOnConflict"]>().toBeFunction();
+    expect(typeof Job.prototype.handleConcurrencyConflict).toBe("function");
   });
 });

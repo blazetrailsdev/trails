@@ -54,6 +54,10 @@ export class Runnable {
     });
   }
 
+  isAlive(this: RunnableHost): boolean | null {
+    return !this.isRunningAsync() || (this._thread?.isAlive() ?? null);
+  }
+
   isBootTimedOut(this: RunnableHost): boolean {
     return this._bootGuard.isTimedOut();
   }

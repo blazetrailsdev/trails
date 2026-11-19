@@ -1,6 +1,6 @@
 import { ActiveJob } from "@blazetrails/activejob";
 import { Concern, extend } from "@blazetrails/activesupport";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbModAttrReader, rbModAttrWriter } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import type { Batch } from "../batch.js";
 
@@ -59,4 +59,14 @@ function isSolidQueueJob(this: BatchIdHost): boolean {
 
 export const BatchId = { enqueue, serialize, deserialize, batch, isSolidQueueJob };
 extend(BatchId, Concern);
+(
+  BatchId as unknown as {
+    included(base: null, block: (this: { prototype: object }) => void): void;
+  }
+).included(null, function (this: { prototype: object }) {
+  rbModAttrReader(this, "batchId");
+  rbModAttrWriter(this, "batchId");
+  rbModAttrReader(this, "callbackBatchId");
+  rbModAttrWriter(this, "callbackBatchId");
+});
 ActiveJob.BatchId = BatchId;

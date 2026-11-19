@@ -7,3 +7,15 @@ describe("SolidQueueAdapter", () => {
     expect(QueueAdapters.lookup("solid_queue")).toBe(SolidQueueAdapter);
   });
 });
+
+describe("SolidQueueAdapter#stopping?", () => {
+  it("reads the class-level stopping flag and ignores the job argument", () => {
+    expect(new SolidQueueAdapter().isStopping()).toBe(false);
+    SolidQueueAdapter.stopping = true;
+    try {
+      expect(new SolidQueueAdapter().isStopping({})).toBe(true);
+    } finally {
+      SolidQueueAdapter.stopping = false;
+    }
+  });
+});

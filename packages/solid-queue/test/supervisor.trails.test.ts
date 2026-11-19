@@ -11,7 +11,12 @@ describe("Supervisor#reap_terminated_forks", () => {
       reapTerminatedForks(): Promise<void>;
     };
     const thread = new Thread(() => new Promise(() => {}));
-    const supervisee = { name: "worker-1", _thread: thread, isStopped: () => true };
+    const supervisee = {
+      name: "worker-1",
+      _thread: thread,
+      isStopped: () => true,
+      isAlive: () => thread.isAlive(),
+    };
     supervisor.forks = { "1": supervisee };
     supervisor.configuredProcesses = {};
     const handleClaimedJobsBy = vi
