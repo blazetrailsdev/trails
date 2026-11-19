@@ -74,10 +74,7 @@ function where(query: Query, condition: string | null): void {
   if (condition !== null) query.xpath += `[${condition}]`;
 }
 
-/**
- * @noRailsEquivalent PERMANENT
- * @inventedArm RegExp — PERMANENT
- */
+/** @noRailsEquivalent PERMANENT */
 function addAttributeConditions(query: Query, name: string, value: AttributeValue): void {
   if (value instanceof RegExp) {
     where(query, `@${name}`);

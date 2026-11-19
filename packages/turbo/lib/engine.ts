@@ -214,20 +214,11 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    /**
-     * @inventedArm await — PERMANENT
-     * @inventedArm if — PERMANENT
-     */
-    this.initializer("turbo.integration_test_request_encoding", async () => {
-      const requestEncoding =
-        ActionDispatch.IntegrationTest !== undefined
-          ? await import("@blazetrails/actionpack/testing")
-          : null;
+    this.initializer("turbo.integration_test_request_encoding", () => {
       onLoad("action_dispatch_integration_test", () => {
-        if (requestEncoding === null) return;
-        const { RequestEncoder, IdentityEncoder } = requestEncoding;
+        const RequestEncoder = ActionDispatch.RequestEncoder!;
         const header = [Mime.get("turbo_stream"), Mime.get("html")].join(",");
-        class TurboStreamEncoder extends IdentityEncoder {
+        class TurboStreamEncoder extends RequestEncoder.IdentityEncoder {
           override get acceptHeader(): string {
             return header;
           }

@@ -32,6 +32,7 @@ import type {
   Session as IntegrationSession,
 } from "./action-dispatch/testing/integration.js";
 import type { TestRequest as DispatchTestRequest } from "./action-dispatch/testing/test-request.js";
+import type { RequestEncoder } from "./action-dispatch/testing/request-encoder.js";
 import type { AssertionResponse } from "./action-dispatch/testing/assertion-response.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
 import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
@@ -113,6 +114,7 @@ export const ActionDispatch = {
   TestRequest: typeof DispatchTestRequest;
   TestResponse: typeof TestResponse;
   AssertionResponse: typeof AssertionResponse;
+  RequestEncoder?: typeof RequestEncoder;
   Integration: { name: string; Session: typeof IntegrationSession };
   Session: typeof Session;
   Http: typeof Http;
