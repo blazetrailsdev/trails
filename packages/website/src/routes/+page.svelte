@@ -68,7 +68,7 @@
   <section class="company">
     <h2>You’re in good company.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
-    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span><small>{data.coverage[t] ?? "—"} of the Rails API</small></a></li>{/each}</ul>
+    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span>{#if data.coverage[t]}<small>{data.coverage[t]} of the Rails API</small>{/if}</a></li>{/each}</ul>
     <p class="small"><strong>These are just a few of the packages.</strong> The gems Rails depends on are ported alongside them.</p>
   </section>
 
