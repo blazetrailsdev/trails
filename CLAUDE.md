@@ -1805,7 +1805,10 @@ other `require`s are ported that way, both awaited at boot:
 and `nokogiri/extension.rb`'s load of the native extension,
 `Nokogiri.loadPath["nokogiri/extension"]`, which seats libxml2-wasm's
 bindings on `Nokogiri.LibXml2` so no top-level await sits in the boot graph
-(`action_view.require_nokogiri`; tests await it in a setup file).
+(`action_view.require_nokogiri`). Code outside a booted application,
+html-sanitizer, actiontext or turbo used as a library among it, awaits that
+load itself before its first parse, as tests do in a setup file; an unawaited
+read is a plain `TypeError` at the call site.
 
 ## A variant's method names are camelCase (`ImageProcessingTransformer`)
 
