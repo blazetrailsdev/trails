@@ -18,11 +18,10 @@ import { Maintenance } from "./supervisor/maintenance.js";
 import { Pidfiled } from "./supervisor/pidfiled.js";
 import { Signals } from "./supervisor/signals.js";
 
-/** @internal */
-export interface Supervisee {
+interface Supervisee {
   name: string;
   mode: unknown;
-  _thread?: { kill(): unknown; toKill: boolean; join(): Promise<unknown> };
+  _thread?: { kill(): unknown; toKill: boolean };
   isAlive(): boolean | null;
   isBootTimedOut(): boolean;
   markAsReaped(): void;

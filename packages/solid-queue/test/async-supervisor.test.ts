@@ -250,7 +250,6 @@ describe("AsyncSupervisorTest", () => {
       configuredProcesses: Record<string, unknown>;
       releaseClaimedJobsBy(...args: unknown[]): Promise<void>;
       startProcess(configuredProcess: unknown): Promise<void>;
-      handleThreadError(error: unknown): void;
       checkAndReplaceTerminatedProcesses(): Promise<void>;
     };
 
@@ -269,7 +268,6 @@ describe("AsyncSupervisorTest", () => {
       .spyOn(supervisor, "releaseClaimedJobsBy")
       .mockRejectedValue(new ConnectionNotEstablished("connection is closed"));
     const startProcess = vi.spyOn(supervisor, "startProcess").mockResolvedValue(undefined);
-    vi.spyOn(supervisor, "handleThreadError").mockImplementation(() => {});
 
     await assertNothingRaised(async () => {
       await supervisor.checkAndReplaceTerminatedProcesses();
