@@ -1,4 +1,5 @@
 import "../constants.destroy.generated.js";
+import { underscore } from "@blazetrails/activesupport";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { Generators } from "../generators.js";
@@ -26,7 +27,8 @@ export class DestroyCommand extends Base {
     await this.bootApplicationBang();
     await this.loadGenerators();
 
-    await Generators.invoke(generator, this.args as string[], {
+    /** @inventedArm underscore — PERMANENT */
+    await Generators.invoke(underscore(generator), this.args as string[], {
       behavior: "revoke",
       destinationRoot: root()?.toString(),
     });

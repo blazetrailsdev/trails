@@ -103,6 +103,7 @@ class Host extends AppBase {
 }
 
 describe("PluginBuilder", () => {
+  const cwd = Dir.pwd();
   let root: string;
   const generator = (mode: Host["mode"]) => {
     const g = new Host([root], { quiet: true }, { destinationRoot: root });
@@ -114,6 +115,7 @@ describe("PluginBuilder", () => {
     root = Dir.mktmpdir("plugin-builder");
   });
   afterEach(async () => {
+    Dir.chdir(cwd);
     await FileUtils.rmRf(root);
   });
 

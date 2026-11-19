@@ -525,11 +525,11 @@ describe("Base.help", () => {
     expect(help).toContain("Generates a new cable channel for the server");
   });
 
-  it("--help falls back to the default description and a kebab-case banner", async () => {
+  it("--help falls back to the default description and Rails' snake_case banner", async () => {
     const help = await capture("stdout", () =>
       Generators.invoke("resource_route", ["--help"], { destinationRoot: "/tmp" }),
     );
-    expect(help).toContain("bin/trails generate resource-route NAME");
+    expect(help).toContain("bin/trails generate resource_route NAME");
     expect(help).toContain("Description:\n    Create ");
   });
 

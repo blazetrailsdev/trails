@@ -73,7 +73,11 @@ export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): 
         : "dependencies";
     json[key] = {
       ...json[key],
-      [name]: options.git ? String(options.git) : _versions.join(" ") || "*",
+      [name]: options.git
+        ? String(options.git)
+        : options.path
+          ? `file:${options.path}`
+          : _versions.join(" ") || "*",
     };
     await File.writeAsync("package.json", `${JSON.stringify(json, null, 2)}\n`);
   });

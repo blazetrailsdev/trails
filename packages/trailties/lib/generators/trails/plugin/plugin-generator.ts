@@ -32,6 +32,7 @@ interface PluginBuilderHost {
   chmod(path: string, mode: number, config: object): Promise<unknown>;
   run(command: string, config: object): Promise<unknown>;
   inside(dir: string, config: { verbose?: unknown }, block: () => Promise<void>): Promise<unknown>;
+  gem(name: string, options: { path: string }): Promise<void>;
   invoke(klass: unknown, args: unknown[], opts: object): Promise<unknown>;
   gitInitCommand(): Promise<string>;
   shebang(): string;
@@ -89,9 +90,8 @@ export class PluginBuilder {
     await this.template("README.md");
   }
 
-  /** @missingRailsArgs template — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json */
   async gemfile(this: PluginBuilderHost): Promise<void> {
-    await this.template("pnpm-workspace.yaml");
+    await this.template("Gemfile", "pnpm-workspace.yaml");
   }
 
   async license(this: PluginBuilderHost): Promise<void> {
@@ -102,12 +102,11 @@ export class PluginBuilder {
     }
   }
 
-  /** @missingRailsArgs template — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json */
   async gemspec(this: PluginBuilderHost): Promise<void> {
     /** @inventedArm author — PERMANENT */
     await this.author();
     await this.email();
-    await this.template("package.json");
+    await this.template("%name%.gemspec", "package.json");
   }
 
   async gitignore(this: PluginBuilderHost): Promise<void> {
@@ -266,16 +265,14 @@ this.config.actionController.includeAllHelpers = false;
     await this.chmod("bin", 0o755, { verbose: false });
   }
 
-  /** @missingRailsArgs join — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json */
   async gemfileEntry(this: PluginBuilderHost): Promise<void> {
     if (!this.isInsideApplication()) return;
 
     const gemfileInAppPath = File.join(this.trailsAppPath()!, "package.json");
     if (await File.isExistAsync(gemfileInAppPath)) {
-      const json = JSON.parse(await File.readAsync(gemfileInAppPath));
-      json.dependencies = { ...json.dependencies, [this.name()]: `file:${this.relativePath()}` };
-      const entry = JSON.stringify(json, null, 2) + "\n";
-      await this.createFile(gemfileInAppPath, entry, { force: true });
+      await this.inside(File.expandPath(this.trailsAppPath()!), { verbose: false }, () =>
+        this.gem(this.name(), { path: this.relativePath()! }),
+      );
     }
   }
 }

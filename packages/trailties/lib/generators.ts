@@ -17,9 +17,9 @@ export type GeneratorClass = Omit<typeof Base, "prototype"> & {
 const HIDDEN_FROM_LISTING = [
   "app",
   "plugin",
-  "encrypted-file",
-  "encryption-key-file",
-  "master-key",
+  "encrypted_file",
+  "encryption_key_file",
+  "master_key",
   "credentials",
   "db:system:change",
 ];
@@ -72,7 +72,7 @@ export class Generators {
       orm: false,
       resourceController: "controller",
       resourceRoute: true,
-      scaffoldController: "scaffold-controller",
+      scaffoldController: "scaffold_controller",
       systemTests: null,
       testFramework: null,
       templateEngine: "tse",
@@ -194,7 +194,7 @@ export class Generators {
     base: string | null = null,
     context: string | null = null,
   ): Promise<GeneratorClass | null> {
-    let lookups: string[] = [];
+    const lookups: string[] = [];
     if (base != null) lookups.push(`${base}:${name}`);
     if (context != null) lookups.push(`${name}:${context}`);
 
@@ -206,7 +206,6 @@ export class Generators {
       lookups.push(name);
     }
 
-    lookups = lookups.map((namespace) => dasherize(underscore(namespace)));
     await Generators.lookup(lookups);
 
     const namespaces = new Map(Generators.subclasses().map((k) => [k.namespace(), k]));
@@ -267,8 +266,8 @@ export class Generators {
   static hiddenNamespaces(): string[] {
     return (_hiddenNamespaces ??= [
       "trails",
-      "resource-route",
-      "action-mailbox:install",
+      "resource_route",
+      "action_mailbox:install",
       "devcontainer",
     ]);
   }
@@ -388,7 +387,7 @@ async function requireGenerator(dir: string, base: string, path: string): Promis
   for (const value of Object.values(mod)) {
     if (typeof value === "function" && value.prototype instanceof Base) {
       const klass = value as unknown as GeneratorClass;
-      klass.namespace(namespace.join(":"));
+      klass.namespace(namespace.map((segment) => underscore(segment)).join(":"));
       _subclasses ??= [];
       if (!_subclasses.includes(klass)) _subclasses.push(klass);
       return;

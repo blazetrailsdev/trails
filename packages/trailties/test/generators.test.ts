@@ -63,7 +63,7 @@ describe("GeneratorsTest", () => {
   it("find by namespace with context", async () => {
     const klass = await Generators.findByNamespace("test_unit", null, "model");
     expect(klass).toBeTruthy();
-    expect(klass!.namespace()).toEqual("test-unit:model");
+    expect(klass!.namespace()).toEqual("test_unit:model");
   });
 
   it("fallbacks for generators on find by namespace", async () => {
@@ -71,7 +71,7 @@ describe("GeneratorsTest", () => {
     try {
       const klass = await Generators.findByNamespace("plugin", "remarkable");
       expect(klass).toBeTruthy();
-      expect(klass!.namespace()).toEqual("test-unit:plugin");
+      expect(klass!.namespace()).toEqual("test_unit:plugin");
     } finally {
       delete Generators.fallbacks()["remarkable"];
     }
@@ -82,7 +82,7 @@ describe("GeneratorsTest", () => {
     try {
       const klass = await Generators.findByNamespace("remarkable", "trails", "plugin");
       expect(klass).toBeTruthy();
-      expect(klass!.namespace()).toEqual("test-unit:plugin");
+      expect(klass!.namespace()).toEqual("test_unit:plugin");
     } finally {
       delete Generators.fallbacks()["remarkable"];
     }
@@ -93,7 +93,7 @@ describe("GeneratorsTest", () => {
     /* eslint-disable no-regex-spaces -- the indent width is `print_list`'s, verbatim from generators_test.rb:141-144 */
     expect(output).toMatch(/Trails:/);
     expect(output).toMatch(/^  model$/m);
-    expect(output).toMatch(/^  scaffold-controller$/m);
+    expect(output).toMatch(/^  scaffold_controller$/m);
     expect(output).not.toMatch(/^  app$/m);
     /* eslint-enable no-regex-spaces */
   });
