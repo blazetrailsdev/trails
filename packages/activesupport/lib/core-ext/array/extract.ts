@@ -28,4 +28,4 @@ export function extractBang<T>(array: T[], predicate?: (item: T) => boolean): T[
 }
 
 ARRAY_METHOD_TABLE.extractBang = (self: unknown[], ...args: unknown[]) =>
-  extractBang(self, args[0] as ((item: unknown) => boolean) | undefined);
+  args[0] == null ? extractBang(self) : extractBang(self, args[0] as (item: unknown) => boolean);
