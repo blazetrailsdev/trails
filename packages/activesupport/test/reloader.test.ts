@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Reloader } from "../lib/reloader.js";
 import { Executor } from "../lib/executor.js";
 import { assertNot, assertRaises } from "../lib/testing/assertions.js";
@@ -120,9 +121,9 @@ describe("ReloaderTest", () => {
 
   it("report errors once", async () => {
     const reports = await ErrorCollector.record(async () => {
-      await assertRaises([Error], {}, () => {
+      await assertRaises([RuntimeError], {}, () => {
         reloader.wrap(() => {
-          throw new Error("Oops");
+          throw new RuntimeError("Oops");
         });
       });
     });
