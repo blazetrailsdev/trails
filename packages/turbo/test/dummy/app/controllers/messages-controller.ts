@@ -35,12 +35,11 @@ export class MessagesController extends ApplicationController {
   async create(): Promise<void> {
     await this.respondTo((format) => {
       format.html(() => this.redirectTo((this as unknown as UrlHelpers).messageUrl({ id: 1 })));
-      (format as unknown as Record<string, (block: () => unknown) => unknown>).turbo_stream(
-        async () =>
-          this.render({
-            turbo_stream: await this.turboStream.append("messages", "message_1"),
-            status: ":created",
-          } as never),
+      format.turboStream(async () =>
+        this.render({
+          turboStream: await this.turboStream.append("messages", "message_1"),
+          status: ":created",
+        }),
       );
     });
   }

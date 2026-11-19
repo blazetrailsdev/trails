@@ -7,5 +7,11 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
-export class NotificationsController extends ApplicationController {}
+export class NotificationsController extends ApplicationController {
+  async create(): Promise<void> {
+    await this.respondTo((format) => {
+      format.turboStream(() => this.render("new"));
+    });
+  }
+}
 TopLevel.NotificationsController = NotificationsController;

@@ -16,7 +16,6 @@ import {
   rbObjRespondTo,
   rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
-import { ActionDispatch } from "@blazetrails/actionpack";
 import { ActiveJob, Base, deprecator, Serializers } from "@blazetrails/activejob";
 import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-after-transaction-commit";
 import { LogSubscriber } from "@blazetrails/activejob/log-subscriber";
@@ -135,9 +134,7 @@ export class Trailtie extends BaseTrailtie {
         });
       });
 
-      if (ActionDispatch.IntegrationTest !== undefined) {
-        await ActiveJob.loadPath["active_job/test_helper"]();
-      }
+      await ActiveJob.loadPath["active_job/test_helper"]();
       onLoad("action_dispatch_integration_test", function (this: new () => object) {
         include(this, ActiveJob.TestHelper);
       });

@@ -9,7 +9,7 @@ type Options = Record<string, unknown>;
 interface ActionHelperHost {
   tag(): {
     template(content: unknown): SafeBuffer;
-    turbo_stream(content: unknown, options: Options): SafeBuffer;
+    "turbo-stream"(content: unknown, options: Options): SafeBuffer;
   };
   turboStreamActionTag(action: string, options?: Options): SafeBuffer;
   convertToTurboStreamDomId(target: unknown, options?: { includeSelector?: boolean }): unknown;
@@ -26,14 +26,14 @@ export const ActionHelper = {
       : this.tag().template(htmlSafe(rbObjAsString(template)));
 
     if ((target = this.convertToTurboStreamDomId(target)) != null && target !== false) {
-      return this.tag().turbo_stream(template, { ...attributes, action, target });
+      return this.tag()["turbo-stream"](template, { ...attributes, action, target });
     } else if (
       (targets = this.convertToTurboStreamDomId(targets, { includeSelector: true })) != null &&
       targets !== false
     ) {
-      return this.tag().turbo_stream(template, { ...attributes, action, targets });
+      return this.tag()["turbo-stream"](template, { ...attributes, action, targets });
     } else {
-      return this.tag().turbo_stream(template, { ...attributes, action });
+      return this.tag()["turbo-stream"](template, { ...attributes, action });
     }
   },
 
