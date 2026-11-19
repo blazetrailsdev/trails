@@ -1,7 +1,7 @@
 import type { createServer, InlineConfig, ViteDevServer } from "vite";
 import { type RackMiddleware } from "@blazetrails/rack";
 import { Handler } from "@blazetrails/rackup";
-import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
+import type { HttpRequest, HttpResponse, HttpSocket } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export const vite: {
@@ -53,6 +53,22 @@ export class Server {
           {
             name: "trails-system-testing",
             configureServer(server: ViteDevServer) {
+              server.httpServer?.on("upgrade", (req, socket, head) => {
+                const protocol = req.headers["sec-websocket-protocol"];
+                if (protocol === "vite-hmr" || protocol === "vite-ping") return;
+                new node(vite.app!)
+                  .upgrade(
+                    req as unknown as HttpRequest,
+                    socket as unknown as HttpSocket,
+                    head as Uint8Array,
+                  )
+                  .catch((error: unknown) => {
+                    server.config.logger.error(
+                      error instanceof Error ? (error.stack ?? error.message) : String(error),
+                    );
+                    socket.destroy();
+                  });
+              });
               return () => {
                 server.middlewares.use(async (req, res, next) => {
                   try {
