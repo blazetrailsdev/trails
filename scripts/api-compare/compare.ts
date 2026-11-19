@@ -2491,6 +2491,11 @@ export function misplacedClusterVerdict(
  * is defined at run time on both sides — `Accessors.module_eval` in Ruby,
  * `Object.defineProperty` in `registerDetail` — so the only static TS form it
  * can have is the declaration typing it on the merged interface.
+ *
+ * A `define_model_callbacks` entry (`activemodel/lib/active_model/callbacks.rb:109-152`)
+ * is the same shape: `define_singleton_method` in Ruby and `defineModelCallbacks`
+ * in TS, so `ActiveRecord::Callbacks::ClassMethods`' interface is its only
+ * static form.
  */
 export function declarationOnlyInFile(
   tsFile: string,
@@ -2502,7 +2507,7 @@ export function declarationOnlyInFile(
 ): boolean {
   if (bodylessOwnersByFile.get(tsFile)?.has(name) !== true) return false;
   if (rubyNotes === "alias" && aliasNamesByFile?.get(tsFile)?.has(name) === true) return false;
-  if (rubyNotes === "register_detail") return false;
+  if (rubyNotes === "register_detail" || rubyNotes === "define_model_callbacks") return false;
   return bodiedOwnersByFile.get(tsFile)?.has(name) !== true;
 }
 

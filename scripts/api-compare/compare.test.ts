@@ -4628,6 +4628,18 @@ describe("declarationOnlyInFile", () => {
       declarationOnlyInFile("crud.ts", "compileInsert", bodyless, new Map(), "register_detail"),
     ).toBe(false);
   });
+
+  it("credits a define_model_callbacks entry, defined at run time on both sides", () => {
+    expect(
+      declarationOnlyInFile(
+        "callbacks.ts",
+        "beforeSave",
+        new Map([["callbacks.ts", new Map([["beforeSave", new Set(["ClassMethods"])]])]]),
+        new Map(),
+        "define_model_callbacks",
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("rubyMethodToTsForFqn", () => {
