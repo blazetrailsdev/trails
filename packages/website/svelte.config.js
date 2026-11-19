@@ -11,7 +11,13 @@ const config = {
     },
     prerender: {
       handleHttpError: ({ path, message }) => {
-        if (path.startsWith(`${process.env.SITE_BASE ?? ""}/docs/`)) return;
+        const docs = `${process.env.SITE_BASE ?? ""}/docs/`;
+        if (
+          ["", "guides/", "guides/idioms", "api/@blazetrails/arel/README"].some(
+            (p) => path === docs + p,
+          )
+        )
+          return;
         throw new Error(message);
       },
     },
