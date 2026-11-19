@@ -124,5 +124,7 @@ describe("MessageVerifierTest", () => {
     expect(exception.message).toEqual("Secret should not be nil.");
   });
 
-  it.skip("inspect does not show secrets");
+  it("inspect does not show secrets", () => {
+    expect(verifier.inspect()).toMatch(/^#<ActiveSupport::MessageVerifier:0x[0-9a-f]+>$/);
+  });
 });

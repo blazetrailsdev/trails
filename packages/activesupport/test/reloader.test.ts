@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Reloader } from "../lib/reloader.js";
 import { Executor } from "../lib/executor.js";
-import { assertNot } from "../lib/testing/assertions.js";
+import { assertNot, assertRaises } from "../lib/testing/assertions.js";
+import { ErrorCollector } from "../lib/testing/error-reporter-assertions.js";
 
 describe("ReloaderTest", () => {
   function newReloader(check: () => boolean): typeof Reloader {
@@ -117,5 +118,14 @@ describe("ReloaderTest", () => {
     expect(called).toEqual(["before_unload", "unload", "after_unload", "body"]);
   });
 
-  it.skip("report errors once");
+  it("report errors once", async () => {
+    const reports = await ErrorCollector.record(async () => {
+      await assertRaises([Error], {}, () => {
+        reloader.wrap(() => {
+          throw new Error("Oops");
+        });
+      });
+    });
+    expect(reports.length).toEqual(1);
+  });
 });

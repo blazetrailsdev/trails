@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 
 import { DateTime, Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import { TimeZone } from "../lib/values/time-zone.js";
+import type { TimeWithZone } from "../lib/time-with-zone.js";
 import { setZone, zone } from "../lib/time-zone-config.js";
 import { Rational, RuntimeError } from "@blazetrails/ruby-compat";
 import { Duration } from "../lib/duration.js";
@@ -139,9 +140,41 @@ describe("TimeTravelTest", () => {
     }
   });
 
-  it.skip("time helper travel to with time zone");
+  it("time helper travel to with time zone", () => {
+    withEnvTz("US/Eastern", () => {
+      withTzDefault(TimeZone.find("UTC"), () => {
+        const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+        try {
+          const expectedTime = Duration.minutes(5).ago();
+
+          travelTo(Duration.minutes(5).ago(), {}, () => {
+            expect((zone() as TimeZone).now().toFs("db")).toEqual(
+              (expectedTime as TimeWithZone).toFs("db"),
+            );
+          });
+        } finally {
+          now.mockRestore();
+        }
+      });
+    });
+  });
   it.skip("time helper travel to with different system and application time zones");
-  it.skip("time helper travel to with string for time zone");
+  it("time helper travel to with string for time zone", () => {
+    withEnvTz("US/Eastern", () => {
+      withTzDefault(TimeZone.find("UTC"), () => {
+        const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+        try {
+          const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+
+          travelTo("2004-11-24 01:04:44", {}, () => {
+            expect((zone() as TimeZone).now().toFs("db")).toEqual(toFs(expectedTime, "db"));
+          });
+        } finally {
+          now.mockRestore();
+        }
+      });
+    });
+  });
 
   it("time helper travel to with string and milliseconds", () => {
     withEnvTz("US/Eastern", () => {

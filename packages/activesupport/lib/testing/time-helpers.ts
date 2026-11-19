@@ -2,6 +2,7 @@ import { Date, DateTime, Temporal, Time } from "@blazetrails/date";
 import { Rational, rational, rbCallSuper, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Duration } from "../duration.js";
+import { TimeWithZone } from "../time-with-zone.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
 import { zone as timeZone } from "../time-zone-config.js";
 import { midnight } from "../core-ext/date/calculations.js";
@@ -89,6 +90,7 @@ export function travelTo(
     | globalThis.Date
     | Temporal.Instant
     | Time
+    | TimeWithZone
     | string,
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => unknown,
@@ -130,7 +132,8 @@ export function travelTo(
       : Time.at(new Rational(Temporal.Instant.from(dateOrTime).epochNanoseconds, 1_000_000_000n));
   } else {
     now = dateOrTime;
-    if (now instanceof DateTime) now = toTime(now);
+    if (now instanceof TimeWithZone) now = now.toTime();
+    else if (now instanceof DateTime) now = toTime(now);
     else if (now instanceof Temporal.PlainDateTime || now instanceof Temporal.ZonedDateTime)
       now = toTime(new DateTime(now));
     else if (!(now instanceof Time))

@@ -1,6 +1,16 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const activesupport: Record<string, AssertionReceipt[]> = {
+  "activesupport:core_ext/kernel/concern_test.rb › KernelConcernTest › may be defined at toplevel":
+    [
+      {
+        kind: "assert_kind_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'core_ext/kernel/concern_test.rb:9 `assert_kind_of ActiveSupport::Concern, ::ToplevelConcern` — `Concern` is a plain-object module (CLAUDE.md, "A Ruby module is a JS object or a JS class"), which no JS `instanceof` can test; the port asserts `rbObjIsKindOf(mod, Concern)` equals true',
+      },
+    ],
   "activesupport:cache/behaviors/cache_store_format_version_behavior.rb › format version  uses correct signature for compressed entries":
     [
       {
