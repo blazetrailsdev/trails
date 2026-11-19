@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FrozenError } from "@blazetrails/ruby-compat";
-import { Coder } from "../../../../../lib/pg/coder.js";
+import { Coder } from "@blazetrails/pg";
 import {
   PGTextDecoder,
   PGTypeMapByOid,

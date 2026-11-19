@@ -9,7 +9,6 @@ import {
   warn,
 } from "@blazetrails/ruby-compat";
 
-/** @noRailsEquivalent PERMANENT */
 function _rbCheckFrozen(obj: object): void {
   if (Object.isFrozen(obj)) {
     throw new FrozenError(`can't modify frozen ${rbObjClassname(obj)}: ${rbInspect(obj)}`, {

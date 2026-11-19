@@ -1,8 +1,13 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import type pg from "pg";
-import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
-import { Result as ActiveRecordResult } from "../result.js";
-import { Constants as PGConstants } from "@blazetrails/pg";
+import { Constants as PGConstants } from "./pg.js";
+import { PG } from "./namespaces.js";
+
+/** @noRailsEquivalent CONVERGEABLE pg-type-maps-and-text-encoders-move-to-the-package */
+type PGTypeMapByOid = {
+  readonly coders: Map<number, { decode(value: string): unknown }>;
+  defaultTypeMap: PGTypeMapByOid | null;
+};
 
 type DatabaseErrorFields = Partial<Record<keyof pg.DatabaseError, unknown>>;
 
@@ -34,7 +39,7 @@ export class Result extends Array<Record<string, unknown>> {
   }
 
   readonly #native: pg.QueryResult;
-  #typemap = new PGTypeMapByOid();
+  #typemap: PGTypeMapByOid | null = null;
 
   readonly #error: DatabaseErrorFields | null;
 
@@ -42,11 +47,10 @@ export class Result extends Array<Record<string, unknown>> {
     super();
     this.#native = native;
     this.#error = error;
-    const hashes = new ActiveRecordResult(
-      (native.fields ?? []).map((f) => f.name),
-      (native.rows ?? []) as unknown[][],
-    ).toArray();
-    for (const hash of hashes) this.push(hash);
+    const fields = this.fields();
+    for (const row of (native.rows ?? []) as unknown[][]) {
+      this.push(Object.fromEntries(fields.map((name, j) => [name, row[j]])));
+    }
   }
 
   mapTypesBang(typeMap: PGTypeMapByOid): this {
@@ -117,14 +121,17 @@ export class Result extends Array<Record<string, unknown>> {
     });
   }
 
-  get typeMap(): PGTypeMapByOid {
+  get typeMap(): PGTypeMapByOid | null {
     return this.#typemap;
   }
 
   #typecastResultValue(i: number, j: number): unknown {
     const value = (this.#native.rows as unknown[][])[i][j];
     const oid = this.#native.fields[j].dataTypeID;
-    const decoder = this.#typemap.coders.get(oid) ?? this.#typemap.defaultTypeMap?.coders.get(oid);
+    const decoder =
+      this.#typemap?.coders.get(oid) ?? this.#typemap?.defaultTypeMap?.coders.get(oid);
     return typeof value !== "string" || !decoder ? value : decoder.decode(value);
   }
 }
+
+PG.Result = Result;

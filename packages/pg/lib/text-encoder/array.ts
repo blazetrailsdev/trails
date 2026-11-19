@@ -1,5 +1,6 @@
 import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { CompositeEncoder } from "../composite-encoder.js";
+import { PG } from "../namespaces.js";
 
 function quoteArrayBuffer(pIn: string, delimiter: string): string {
   const needquote =
@@ -29,3 +30,5 @@ export class Array extends CompositeEncoder {
     return rbObjAsString(value);
   }
 }
+
+PG.TextEncoder = { ...PG.TextEncoder, Array };

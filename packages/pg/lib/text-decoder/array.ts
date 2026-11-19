@@ -1,6 +1,7 @@
 import { TypeError } from "@blazetrails/ruby-compat";
 import { Coder } from "../coder.js";
 import { CompositeDecoder } from "../composite-decoder.js";
+import { PG } from "../namespaces.js";
 
 type DecFunc = (word: string, tuple: number, field: number) => unknown;
 
@@ -140,3 +141,5 @@ export class Array extends CompositeDecoder {
     return ret;
   }
 }
+
+PG.TextDecoder = { ...PG.TextDecoder, Array };
