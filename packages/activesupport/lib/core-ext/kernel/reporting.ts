@@ -18,7 +18,7 @@ export function withWarnings<T>(flag: unknown, block: () => T): T {
 
 export function suppress<T>(
   fn: () => T,
-  ...errorClasses: Array<new (...args: any[]) => Error>
+  ...errorClasses: Array<new (...args: never[]) => Error>
 ): T | undefined {
   try {
     return fn();
