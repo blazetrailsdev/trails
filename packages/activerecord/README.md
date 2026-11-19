@@ -318,7 +318,7 @@ await Base.establishConnection({ adapter: "postgresql", url: process.env.DATABAS
 
 ## Examples
 
-[examples/twitter-clone](../../examples/twitter-clone/) is a small Express app
+[examples/twitter-clone](https://github.com/blazetrailsdev/trails/tree/main/examples/twitter-clone) is a small Express app
 with migrations, `belongsTo` / `hasMany` / `hasMany … through`
 (self-referential follows), scopes typed on `Relation<T>`, validations, eager
 loading and error mapping. `pnpm smoke` runs the whole flow against an
