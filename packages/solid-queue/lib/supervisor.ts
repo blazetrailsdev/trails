@@ -116,7 +116,6 @@ export class Supervisor extends Base {
     await this.runStopHooks();
   }
 
-  /** @inventedArm ?. — CONVERGEABLE solid-queue-supervisor-kind-read-before-configuration */
   override get kind(): string {
     return `Supervisor(${this.configuration?.mode()})`;
   }

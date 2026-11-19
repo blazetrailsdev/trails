@@ -8,6 +8,7 @@ import {
 import { Logger, pluck, TopLevel } from "@blazetrails/activesupport";
 import { Process as RubyProcess, StringIO, constSet } from "@blazetrails/ruby-compat";
 import { TestCase } from "@blazetrails/activesupport/test-case";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { SolidQueue } from "../lib/solid-queue.js";
 import {
   AsyncSupervisor,
@@ -270,7 +271,9 @@ describe("AsyncSupervisorTest", () => {
     const startProcess = vi.spyOn(supervisor, "startProcess").mockResolvedValue(undefined);
     vi.spyOn(supervisor, "handleThreadError").mockImplementation(() => {});
 
-    await expect(supervisor.checkAndReplaceTerminatedProcesses()).resolves.toBeUndefined();
+    await assertNothingRaised(async () => {
+      await supervisor.checkAndReplaceTerminatedProcesses();
+    });
     expect(releaseClaimedJobsBy).toHaveBeenCalledTimes(1);
     expect(startProcess).toHaveBeenCalledWith(configuredProcess);
   });

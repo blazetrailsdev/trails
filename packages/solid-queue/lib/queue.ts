@@ -11,9 +11,7 @@ export class Queue {
   declare private _latency: number | undefined;
 
   static async all(): Promise<Queue[]> {
-    return (await Job.select("queue_name").distinct().toArray()).map(
-      (job) => new this(job.queue_name),
-    );
+    return ((await Job.distinctValuesOf("queue_name")) as string[]).map((name) => new this(name));
   }
 
   static findByName(name: string): Queue {
