@@ -27,6 +27,7 @@ export interface AttrNode {
 export interface XmlNode {
   css(...args: unknown[]): NodeSet;
   atCss(...args: unknown[]): XmlNode | undefined;
+  at(...args: unknown[]): XmlNode | undefined;
   xpath(...args: unknown[]): NodeSet;
   atXpath(...args: unknown[]): XmlNode | undefined;
 }

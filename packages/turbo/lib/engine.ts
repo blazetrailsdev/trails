@@ -5,6 +5,9 @@ import { Trails, type Application } from "@blazetrails/trailties";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { File, constDefined } from "@blazetrails/ruby-compat";
 import { Turbo } from "./turbo-trails.js";
+import { TestAssertions } from "./test-assertions.js";
+import { IntegrationTestAssertions } from "./test-assertions/integration-test-assertions.js";
+import { TestHelper as BroadcastableTestHelper } from "./broadcastable/test-helper.js";
 import "./app/channels/turbo/streams-channel.js";
 import "./app/jobs/turbo/streams/action-broadcast-job.js";
 import "./app/jobs/turbo/streams/broadcast-job.js";
@@ -154,10 +157,23 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    /** @missingRailsCall include — CONVERGEABLE turbo-test-helpers */
     this.initializer("turbo.test_assertions", () => {
-      onLoad("active_support_test_case", () => {
+      onLoad("active_support_test_case", function (this: object) {
+        include(this, TestAssertions);
+
         ThreadDebouncer.debouncerClass = ImmediateDebouncer;
+      });
+
+      onLoad("action_cable", () => {
+        onLoad("active_support_test_case", function (this: object) {
+          if ("ActiveJob" in TopLevel) {
+            include(this, BroadcastableTestHelper);
+          }
+        });
+      });
+
+      onLoad("action_dispatch_integration_test", function (this: object) {
+        include(this, IntegrationTestAssertions);
       });
     });
   }

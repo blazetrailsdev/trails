@@ -283,7 +283,7 @@ export namespace Delegation {
                 : { configurable: true, enumerable, writable: true, value },
             );
           }
-          if (!target && _ != null && !set) return value;
+          if (!target && (_ != null || method in Object.prototype) && !set) return value;
           if (set || !target) return send(_, []);
           const first = (...args: unknown[]) => send(_, args);
           iseqLocationSetup(first, file, line);
