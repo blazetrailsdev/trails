@@ -49,7 +49,7 @@ export class Article extends ApplicationRecord {
 
   async byline(): Promise<string> {
     const author = await this.author;
-    return \`Written by \${author.name} on \${this.createdAt.toFormattedS("short")}\`;
+    return \`Written by \${author.name} on \${this.createdAt.toFs("short")}\`;
   }
 
   async deliverLater(): Promise<void> {
