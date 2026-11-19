@@ -89,9 +89,12 @@ describe("SolidQueue::ClaimedExecutionConcurrencyTest", () => {
       () => claimedExecution.perform(),
     );
 
-    assertBlocked(elapsed, "performer");
-    expect(await (await firstJob.reload()).isFailed()).toBe(true);
-    expect(firstJob.isFinished()).toBe(false);
+    expect(
+      elapsed,
+      `performer should have blocked on the claim lock (took ${elapsed.toFixed(3)}s)`,
+    ).toBeGreaterThanOrEqual(0.3);
+    expect(await (await firstJob.reload()).isFailed()).toBeTruthy();
+    expect(firstJob.isFinished()).toBeFalsy();
     expect(await ReadyExecution.count()).toBe(1);
     expect(await BlockedExecution.count()).toBe(1);
     expect(await ClaimedExecution.count()).toBe(0);
@@ -119,8 +122,11 @@ describe("SolidQueue::ClaimedExecutionConcurrencyTest", () => {
       },
     );
 
-    assertBlocked(elapsed, "performer");
-    expect(await (await firstJob.reload()).isFailed()).toBe(true);
+    expect(
+      elapsed,
+      `performer should have blocked on the claim lock (took ${elapsed.toFixed(3)}s)`,
+    ).toBeGreaterThanOrEqual(0.3);
+    expect(await (await firstJob.reload()).isFailed()).toBeTruthy();
     expect(await ReadyExecution.count()).toBe(1);
     expect(await BlockedExecution.count()).toBe(1);
     expect(await FailedExecution.count()).toBe(1);
@@ -145,9 +151,12 @@ describe("SolidQueue::ClaimedExecutionConcurrencyTest", () => {
       () => claimedExecution.release(),
     );
 
-    assertBlocked(elapsed, "release");
-    expect(await (await firstJob.reload()).isFailed()).toBe(true);
-    expect(await firstJob.isReady()).toBe(false);
+    expect(
+      elapsed,
+      `release should have blocked on the claim lock (took ${elapsed.toFixed(3)}s)`,
+    ).toBeGreaterThanOrEqual(0.3);
+    expect(await (await firstJob.reload()).isFailed()).toBeTruthy();
+    expect(await firstJob.isReady()).toBeFalsy();
     expect(await ReadyExecution.count()).toBe(1);
     expect(await BlockedExecution.count()).toBe(1);
     expect(await ClaimedExecution.count()).toBe(0);
@@ -171,9 +180,12 @@ describe("SolidQueue::ClaimedExecutionConcurrencyTest", () => {
       () => process.prune(),
     );
 
-    assertBlocked(elapsed, "pruning");
-    expect((await firstJob.reload()).isFinished()).toBe(true);
-    expect(await firstJob.isFailed()).toBe(false);
+    expect(
+      elapsed,
+      `pruning should have blocked on the claim lock (took ${elapsed.toFixed(3)}s)`,
+    ).toBeGreaterThanOrEqual(0.3);
+    expect((await firstJob.reload()).isFinished()).toBeTruthy();
+    expect(await firstJob.isFailed()).toBeFalsy();
     expect(await ReadyExecution.count()).toBe(1);
     expect(await BlockedExecution.count()).toBe(1);
     expect(await FailedExecution.count()).toBe(0);
@@ -220,7 +232,7 @@ describe("SolidQueue::ClaimedExecutionConcurrencyTest", () => {
 
       await releaser.join(10);
 
-      expect((await firstJob.reload()).isFinished()).toBe(true);
+      expect((await firstJob.reload()).isFinished()).toBeTruthy();
       expect(await ClaimedExecution.count()).toBe(0);
     });
   });
@@ -288,13 +300,6 @@ describe("SolidQueue::ClaimedExecutionConcurrencyTest", () => {
 
     await winner.join(5);
     return elapsed;
-  }
-
-  function assertBlocked(elapsed: number, who: string): void {
-    expect(
-      elapsed,
-      `${who} should have blocked on the claim lock (took ${elapsed.toFixed(3)}s)`,
-    ).toBeGreaterThanOrEqual(0.3);
   }
 
   async function withSkipLocked(value: boolean, block: () => Promise<void>): Promise<void> {

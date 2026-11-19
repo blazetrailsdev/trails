@@ -289,7 +289,7 @@ describe("AsyncProcessesLifecycleTest", () => {
         timeout: shutdownTimeout + 5,
         exitstatus: null,
       });
-      expect(pid.isExists).toBe(false);
+      expect(pid.isExists).toBeFalsy();
 
       await assertCompletedJobResults("no pause");
       await assertJobStatus(noPause, "finished");
