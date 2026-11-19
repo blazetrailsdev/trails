@@ -46,13 +46,8 @@ export interface CastTypeLookupHost {
 const QUOTED_COLUMN_NAMES: Record<string, string> = Object.create(null);
 const QUOTED_TABLE_NAMES: Record<string, string> = Object.create(null);
 
-/** @internal */
-export interface RawConnectionPeekHost {
-  _rawConnection: PGConnection | null;
-}
-
 export function escapeBytea(
-  this: RawConnectionPeekHost,
+  this: { _rawConnection: PGConnection | null },
   value: Uint8Array | string | null | undefined,
 ): string | undefined {
   if (value != null) return (this._rawConnection ?? PG.Connection).escapeBytea(value);
@@ -115,7 +110,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
 }
 
 /** @missingRailsCall with_raw_connection — PERMANENT */
-export function quoteString(this: RawConnectionPeekHost, s: string): string {
+export function quoteString(this: { _rawConnection: PGConnection | null }, s: string): string {
   return (this._rawConnection ?? PG.Connection).escape(s);
 }
 
@@ -136,7 +131,10 @@ export function quotedDate(this: { defaultTimezone: string }, value: TemporalDat
   }
 }
 
-export function quotedBinary(this: RawConnectionPeekHost, value: BinaryData): string {
+export function quotedBinary(
+  this: { _rawConnection: PGConnection | null },
+  value: BinaryData,
+): string {
   return `'${escapeBytea.call(this, value.toString())}'`;
 }
 

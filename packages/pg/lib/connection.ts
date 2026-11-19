@@ -205,6 +205,7 @@ export class Connection {
   declare escape: typeof escapeString;
   declare escapeBytea: typeof escapeBytea;
   declare unescapeBytea: typeof unescapeBytea;
+  declare quoteIdent: typeof quoteIdent;
 
   async waitForNotify(
     timeout: number | null = null,
@@ -340,22 +341,18 @@ function escapeString(this: Connection | typeof Connection, string: string): str
 
 function escapeBytea(this: Connection | typeof Connection, str: Uint8Array | string): string {
   const from = typeof str === "string" ? Buffer.from(str, "binary") : Buffer.from(str);
-  const std =
-    this instanceof Connection
-      ? this.parameterStatuses["standard_conforming_strings"] !== "off"
-      : false;
   if (this instanceof Connection) {
+    const std = this.parameterStatuses["standard_conforming_strings"] !== "off";
     return `${std ? "" : "\\"}\\x${from.toString("hex")}`;
   }
   let to = "";
   for (const c of from) {
     if (c < 0x20 || c > 0x7e) {
-      if (!std) to += "\\";
-      to += "\\" + c.toString(8).padStart(3, "0");
+      to += "\\\\" + c.toString(8).padStart(3, "0");
     } else if (c === 0x27) {
       to += "''";
     } else if (c === 0x5c) {
-      to += std ? "\\\\" : "\\\\\\\\";
+      to += "\\\\\\\\";
     } else {
       to += String.fromCharCode(c);
     }
@@ -363,7 +360,7 @@ function escapeBytea(this: Connection | typeof Connection, str: Uint8Array | str
   return to;
 }
 
-function quoteIdent(this: typeof Connection, strOrArray: unknown): string {
+function quoteIdent(this: Connection | typeof Connection, strOrArray: unknown): string {
   if (Array.isArray(strOrArray)) {
     return strOrArray.map((entry) => quoteIdentifier(stringValue(entry))).join(".");
   }
@@ -483,5 +480,6 @@ Connection.prototype.escapeString = escapeString;
 Connection.prototype.escape = escapeString;
 Connection.prototype.escapeBytea = escapeBytea;
 Connection.prototype.unescapeBytea = unescapeBytea;
+Connection.prototype.quoteIdent = quoteIdent;
 
 PG.Connection = Connection;

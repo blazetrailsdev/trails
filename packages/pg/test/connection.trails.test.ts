@@ -63,6 +63,7 @@ describe("PG::Connection escaping", () => {
     const { ArgumentError } = await import("@blazetrails/ruby-compat");
     expect(PG.Connection.quoteIdent('b"c')).toBe('"b""c"');
     expect(PG.Connection.quoteIdent(["a", 'b"c'])).toBe('"a"."b""c"');
+    expect(conn(PG).quoteIdent("t")).toBe('"t"');
     expect(() => PG.Connection.quoteIdent("a\u0000b")).toThrow(ArgumentError);
     expect(() => PG.Connection.quoteIdent("a\u0000b")).toThrow("string contains null byte");
   });
