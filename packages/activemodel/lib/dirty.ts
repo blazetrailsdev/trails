@@ -155,7 +155,7 @@ export class Dirty {
   /** @internal */
   restoreAttributeBang(attrName: string): void {
     if (this.attributeChanged(attrName)) {
-      (this as unknown as Record<string, unknown>)[attrName] = this.attributeWas(attrName);
+      Reflect.set(this, attrName, this.attributeWas(attrName));
       this.clearAttributeChange(attrName);
     }
   }

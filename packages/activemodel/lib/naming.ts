@@ -41,7 +41,7 @@ export class Naming {
   static [extended](base: NamingHost): void {
     Object.defineProperty(base.prototype, "modelName", {
       get(this: object): ModelName {
-        return (this.constructor as unknown as { modelName: ModelName }).modelName;
+        return Reflect.get(this.constructor, "modelName") as ModelName;
       },
       configurable: true,
     });

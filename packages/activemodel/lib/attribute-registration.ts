@@ -18,6 +18,7 @@ export interface AttributeRegistrationClassMethods {
 }
 
 export interface AttributeHostInternals {
+  new (...args: unknown[]): unknown;
   _cachedDefaultAttributes?: AttributeSet | null;
   _cachedAttributeTypes?: Record<string, ValueType> | Hash<string, ValueType> | null;
   _attributesBuilder?: unknown;
@@ -146,7 +147,7 @@ export const ClassMethods = {
   _defaultAttributes(this: AttributeHostInternals): AttributeSet {
     return (this._cachedDefaultAttributes ||= (() => {
       const attributeSet = new AttributeSet({});
-      registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
+      registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this);
       this.applyPendingAttributeModifications(attributeSet);
       return attributeSet;
     })());
@@ -214,8 +215,8 @@ export const ClassMethods = {
   /** @internal */
   resetDefaultAttributes(this: AttributeHostInternals): void {
     this.resetDefaultAttributesBang();
-    for (const sub of DescendantsTracker.subclasses(this as unknown as HostAsClass)) {
-      (sub as unknown as AttributeHostInternals).resetDefaultAttributes();
+    for (const sub of DescendantsTracker.subclasses(this)) {
+      (sub as AttributeHostInternals).resetDefaultAttributes();
     }
   },
 

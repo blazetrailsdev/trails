@@ -26,9 +26,8 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
   if (capture != null) assignmentCapture = null;
   if (isEmpty(newAttributes)) return;
 
-  const host = this as unknown as Record<symbol, boolean | undefined>;
-  const outer = host[assigningSynchronously];
-  host[assigningSynchronously] = true;
+  const outer: boolean | undefined = Reflect.get(this, assigningSynchronously);
+  Reflect.set(this, assigningSynchronously, true);
   try {
     const assigned = this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
     if (capture == null) {
@@ -38,7 +37,7 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
       pendingCaptures.set(this, capture);
     }
   } finally {
-    host[assigningSynchronously] = outer;
+    Reflect.set(this, assigningSynchronously, outer);
   }
 }
 

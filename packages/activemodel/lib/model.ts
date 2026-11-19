@@ -43,7 +43,9 @@ export interface Model extends API, Access, Naming {
 const _includesAttributesCache = new WeakMap<object, { serial: number; value: boolean }>();
 
 /** @perf 100ns — PERMANENT */
-function _includesAttributes(klass: { prototype: object }): boolean {
+function _includesAttributes(klass: {
+  prototype: object;
+}): klass is { prototype: object; _defaultAttributes(): AttributeSet } {
   const hit = _includesAttributesCache.get(klass);
   if (hit && hit.serial === methodCacheSerial) return hit.value;
   const serial = methodCacheSerial;
@@ -142,12 +144,9 @@ export class Model {
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
   constructor(attributes: Record<string, unknown> | Map<string, unknown> | null = {}) {
-    if (_includesAttributes(new.target)) {
-      (this as unknown as { _attributes: AttributeSet })._attributes = (
-        new.target as unknown as { _defaultAttributes(): AttributeSet }
-      )
-        ._defaultAttributes()
-        .deepDup();
+    const klass = new.target;
+    if (_includesAttributes(klass)) {
+      Reflect.set(this, "_attributes", klass._defaultAttributes().deepDup());
     }
 
     if (attributes != null) this.assignAttributes(attributes);

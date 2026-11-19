@@ -26,7 +26,7 @@ export function toModel<T>(this: T): T {
 }
 
 export function toKey(this: object): unknown[] | null {
-  const key = rbObjRespondTo(this, "id") && (this as unknown as { id: unknown }).id;
+  const key = rbObjRespondTo(this, "id") && Reflect.get(this, "id");
   return key != null && key !== false ? wrap(key) : null;
 }
 
@@ -35,9 +35,7 @@ export function toParam(this: ConversionRecord): string | null {
   return this.isPersisted() &&
     (key = this.toKey()) &&
     key.every((part) => part !== null && part !== undefined && part !== false)
-    ? key
-        .map(String)
-        .join((this.constructor as unknown as { paramDelimiter: string }).paramDelimiter)
+    ? key.map(String).join(Reflect.get(this.constructor, "paramDelimiter") as string)
     : null;
 }
 

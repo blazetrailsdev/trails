@@ -44,13 +44,10 @@ export function hasSecurePassword(
   const digestAttr = `${attribute}_digest`;
   const challengeAttr = `${attribute}Challenge`;
 
-  include(
-    this as unknown as new (...args: unknown[]) => unknown,
-    new InstanceMethodsOnActivation(attribute, { resetToken }),
-  );
+  include(this, new InstanceMethodsOnActivation(attribute, { resetToken }));
 
   if (validations) {
-    include(this as unknown as new (...args: unknown[]) => unknown, Validations);
+    include(this, Validations);
     const klass = this as unknown as typeof Model;
 
     klass.validate((record: Model) => {
@@ -87,7 +84,7 @@ export function hasSecurePassword(
     klass.validatesConfirmationOf(attribute, { allowBlank: true });
   }
 
-  const tokenHost = this as unknown as TokenHost;
+  const tokenHost = this as TokenHost;
   if (resetToken && typeof tokenHost.generatesTokenFor === "function") {
     tokenHost.generatesTokenFor(`${attribute}_reset`, { expiresIn: 15 * 60 }, (record: Model) => {
       const salt = publicSend(record, `${attribute}Salt`) as string | null;
@@ -122,8 +119,8 @@ interface TokenHost {
   findByTokenForBang?: (purpose: string, token: string) => unknown;
 }
 
-function publicSend(record: Model, name: string): unknown {
-  return (record as unknown as Record<string, unknown>)[name];
+function publicSend(record: object, name: string): unknown {
+  return Reflect.get(record, name);
 }
 
 export class InstanceMethodsOnActivation extends Module {
@@ -136,15 +133,15 @@ export class InstanceMethodsOnActivation extends Module {
 
     this.moduleEval((mod) => {
       Object.defineProperty(mod, attribute, {
-        get(this: Model) {
-          return (this as unknown as Record<string, string | null>)[passwordIvar] ?? null;
+        get(this: Record<string, unknown>) {
+          return (this[passwordIvar] as string | null | undefined) ?? null;
         },
-        set(this: Model, unencryptedPassword: unknown) {
+        set(this: Record<string, unknown>, unencryptedPassword: unknown) {
           if (unencryptedPassword == null) {
-            (this as unknown as Record<string, unknown>)[passwordIvar] = null;
+            this[passwordIvar] = null;
             publicSendWriter(this, digestAttr, null);
           } else if ((unencryptedPassword as string).length !== 0) {
-            (this as unknown as Record<string, unknown>)[passwordIvar] = unencryptedPassword;
+            this[passwordIvar] = unencryptedPassword;
             const cost = SecurePassword.minCost
               ? TopLevel.BCrypt!.Engine.MIN_COST
               : TopLevel.BCrypt!.Engine.cost;
@@ -159,21 +156,21 @@ export class InstanceMethodsOnActivation extends Module {
       });
 
       Object.defineProperty(mod, `${attribute}Confirmation`, {
-        get(this: Model) {
-          return (this as unknown as Record<string, unknown>)[confirmationIvar] ?? null;
+        get(this: Record<string, unknown>) {
+          return this[confirmationIvar] ?? null;
         },
-        set(this: Model, value: unknown) {
-          (this as unknown as Record<string, unknown>)[confirmationIvar] = value;
+        set(this: Record<string, unknown>, value: unknown) {
+          this[confirmationIvar] = value;
         },
         configurable: true,
       });
 
       Object.defineProperty(mod, `${attribute}Challenge`, {
-        get(this: Model) {
-          return (this as unknown as Record<string, unknown>)[challengeIvar] ?? null;
+        get(this: Record<string, unknown>) {
+          return this[challengeIvar] ?? null;
         },
-        set(this: Model, value: unknown) {
-          (this as unknown as Record<string, unknown>)[challengeIvar] = value;
+        set(this: Record<string, unknown>, value: unknown) {
+          this[challengeIvar] = value;
         },
         configurable: true,
       });
@@ -206,10 +203,8 @@ export class InstanceMethodsOnActivation extends Module {
     if (options.resetToken) {
       this.moduleEval((mod) => {
         Object.defineProperty(mod, `${attribute}ResetToken`, {
-          get(this: Model) {
-            return (
-              this as unknown as { generateTokenFor(purpose: string): string }
-            ).generateTokenFor(`${attribute}_reset`);
+          get(this: { generateTokenFor(purpose: string): string }) {
+            return this.generateTokenFor(`${attribute}_reset`);
           },
           configurable: true,
         });
@@ -218,6 +213,6 @@ export class InstanceMethodsOnActivation extends Module {
   }
 }
 
-function publicSendWriter(record: Model, name: string, value: unknown): void {
-  (record as unknown as Record<string, unknown>)[name] = value;
+function publicSendWriter(record: object, name: string, value: unknown): void {
+  Reflect.set(record, name, value);
 }
