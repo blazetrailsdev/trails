@@ -1292,7 +1292,7 @@ describe("HttpCacheNoStoreTest", () => {
     }
 
     static {
-      this.beforeAction((c) => (c as HttpCacheNoStoreController).noStore(), {
+      this.beforeAction((c) => c.noStore(), {
         only: "noStoreOverriddenByExpiresIn",
       });
     }
@@ -1302,7 +1302,7 @@ describe("HttpCacheNoStoreTest", () => {
     }
 
     static {
-      this.beforeAction((c) => (c as HttpCacheNoStoreController).expiresIn(Duration.seconds(30)), {
+      this.beforeAction((c) => c.expiresIn(Duration.seconds(30)), {
         only: "expiresInOverriddenByNoStore",
       });
     }
@@ -1312,7 +1312,7 @@ describe("HttpCacheNoStoreTest", () => {
     }
 
     static {
-      this.beforeAction((c) => (c as HttpCacheNoStoreController).noStore(), {
+      this.beforeAction((c) => c.noStore(), {
         only: "noStoreOverriddenByFreshWhen",
       });
     }
@@ -1322,10 +1322,9 @@ describe("HttpCacheNoStoreTest", () => {
     }
 
     static {
-      this.beforeAction(
-        (c) => (c as HttpCacheNoStoreController).freshWhen(null, { etag: "abc123" }),
-        { only: "freshWhenOverriddenByNoStore" },
-      );
+      this.beforeAction((c) => c.freshWhen(null, { etag: "abc123" }), {
+        only: "freshWhenOverriddenByNoStore",
+      });
     }
     async freshWhenOverriddenByNoStore(): Promise<void> {
       this.noStore();
@@ -1333,7 +1332,7 @@ describe("HttpCacheNoStoreTest", () => {
     }
 
     static {
-      this.beforeAction((c) => (c as HttpCacheNoStoreController).expiresNow(), {
+      this.beforeAction((c) => c.expiresNow(), {
         only: "expiresNowOverriddenByNoStore",
       });
     }
@@ -1343,7 +1342,7 @@ describe("HttpCacheNoStoreTest", () => {
     }
 
     static {
-      this.beforeAction((c) => (c as HttpCacheNoStoreController).noStore(), {
+      this.beforeAction((c) => c.noStore(), {
         only: "noStoreOverriddenByExpiresNow",
       });
     }

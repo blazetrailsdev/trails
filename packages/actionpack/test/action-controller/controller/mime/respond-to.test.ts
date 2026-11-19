@@ -335,7 +335,7 @@ class RespondToController extends Base {
   }
 }
 RespondToController.beforeAction((c) => {
-  const controller = c as RespondToController;
+  const controller = c;
   const v = controller.params.get("v");
   if (typeof v === "string") controller.request.variant = `:${v}`;
   else if (Array.isArray(v)) controller.request.variant = v.map((x) => `:${x}`);
