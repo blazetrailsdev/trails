@@ -3,6 +3,7 @@
 # `terraform apply` created in infra/.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+if [ -f .env ]; then set -a; . ./.env; set +a; fi
 hyperdrive_id=$(terraform -chdir=infra output -raw hyperdrive_id)
 node db/setup.ts "$(terraform -chdir=infra output -raw database_url)"
 bash scripts/build.sh

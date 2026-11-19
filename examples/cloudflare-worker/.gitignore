@@ -10,3 +10,4 @@ infra/*.tfstate*
 infra/*.tfvars
 .wrangler/
 wrangler.deploy.jsonc
+.env
