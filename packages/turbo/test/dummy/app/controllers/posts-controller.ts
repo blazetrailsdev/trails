@@ -7,5 +7,11 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
-export class PostsController extends ApplicationController {}
+export class PostsController extends ApplicationController {
+  async create(): Promise<void> {
+    await this.respondTo((format) => {
+      format.turboStream(() => this.render("new"));
+    });
+  }
+}
 TopLevel.PostsController = PostsController;

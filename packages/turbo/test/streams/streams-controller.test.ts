@@ -45,6 +45,33 @@ describe("Turbo::StreamsControllerTest", () => {
     );
   });
 
+  it("show all turbo actions", async () => {
+    const [message1, message5] = (await Message.createBang([
+      { id: 1, content: "My message" },
+      { id: 5, content: "OLLA!" },
+    ])) as unknown as [Message, Message];
+
+    await t.get(urlHelpers().messagePath(message1, { other_message: message5 }), {
+      as: ":turbo_stream",
+    });
+
+    t.assertDomEqual(
+      `<turbo-stream action="remove" target="message_1"></turbo-stream>
+<turbo-stream action="replace" target="message_1"><template>${await render(message1)}</template></turbo-stream>
+<turbo-stream action="replace" target="message_1"><template>Something else</template></turbo-stream>
+<turbo-stream action="replace" target="message_5"><template>Something fifth</template></turbo-stream>
+<turbo-stream method="morph" action="replace" target="message_5"><template>Something fifth</template></turbo-stream>
+<turbo-stream method="morph" action="update" target="message_5"><template>Something fifth</template></turbo-stream>
+<turbo-stream action="replace" target="message_5"><template>${await render(message5)}</template></turbo-stream>
+<turbo-stream action="append" target="messages"><template>${await render(message1)}</template></turbo-stream>
+<turbo-stream action="append" target="messages"><template>${await render(message5)}</template></turbo-stream>
+<turbo-stream action="prepend" target="messages"><template>${await render(message1)}</template></turbo-stream>
+<turbo-stream action="prepend" target="messages"><template>${await render(message5)}</template></turbo-stream>
+`,
+      t.response.body,
+    );
+  });
+
   it("update all turbo actions for multiple targets", async () => {
     const message1 = new Message({ id: 1, content: "My message" });
     const message5 = new Message({ id: 5, content: "OLLA!" });
@@ -68,6 +95,46 @@ describe("Turbo::StreamsControllerTest", () => {
 <turbo-stream action="prepend" targets="#messages"><template>${await render(message1)}</template></turbo-stream>
 <turbo-stream action="prepend" targets="#messages"><template>${await render(message5)}</template></turbo-stream>
 `,
+      t.response.body,
+    );
+  });
+  it("includes html format when rendering turbo_stream actions", async () => {
+    await t.post(urlHelpers().postsPath(), { as: ":turbo_stream" });
+    t.assertDomEqual(
+      `<turbo-stream action="update" target="form-area"><template>
+  Form
+</template></turbo-stream>`,
+      t.response.body,
+    );
+  });
+
+  it("render correct partial for namespaced models", async () => {
+    await t.get(urlHelpers().usersProfilePath({ id: 1 }), { as: ":turbo_stream" });
+    t.assertDomEqual(
+      `<turbo-stream action="replace" target="users_profile_1"><template><p>David</p></template></turbo-stream>
+<turbo-stream action="update" target="users_profile_1"><template><p>David</p></template></turbo-stream>
+`,
+      t.response.body.replace(/\n(?=<\/)/g, ""),
+    );
+  });
+
+  it.skip("render correct partial and I18n with a custom view path in the controller", async () => {
+    await t.get(urlHelpers().adminCompanyPath({ id: 1 }), { as: ":turbo_stream" });
+    t.assertDomEqual(
+      `<turbo-stream action="replace" target="company_1"><template><p>Company:</p>
+<p>Basecamp</p></template></turbo-stream>
+`,
+      t.response.body.replace(/\n(?=<\/)/g, ""),
+    );
+  });
+
+  it("render a renderable object", async () => {
+    await t.post(urlHelpers().notificationsPath(), { as: ":turbo_stream" });
+
+    t.assertDomEqual(
+      `<turbo-stream action="append" target="notifications"><template><div class='notification'>
+  <p>Example notification</p>
+</div></template></turbo-stream>`,
       t.response.body,
     );
   });

@@ -8,11 +8,11 @@ declare module "@blazetrails/ruby-compat" {
 }
 
 export class NotificationComponent {
-  renderIn(
+  async renderIn(
     viewContext: { capture(block: () => unknown): unknown },
     block: () => unknown,
-  ): SafeBuffer {
-    return htmlSafe(`<div class='notification'>${viewContext.capture(block)}</div>`);
+  ): Promise<SafeBuffer> {
+    return htmlSafe(`<div class='notification'>${await viewContext.capture(block)}</div>`);
   }
 }
 TopLevel.NotificationComponent = NotificationComponent;

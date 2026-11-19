@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationController } from "../application-controller.js";
 
 declare module "@blazetrails/ruby-compat" {
@@ -8,7 +8,7 @@ declare module "@blazetrails/ruby-compat" {
 }
 
 export const Admin: Record<string, unknown> = {};
-TopLevel.Admin = Admin;
+constSet(TopLevel, "Admin", Admin);
 
 export class BaseController extends ApplicationController {
   static {
