@@ -286,7 +286,7 @@ describe("TimeZoneTest", () => {
         const time = midnight(date);
 
         travelTo(date, {}, () => {
-          expect(DateExt.current().toString()).toEqual(date.toString());
+          expect(DateExt.current().toDate().toString()).toEqual(date.toString());
           expect(current().toString()).toEqual(time.toString());
         });
       });
