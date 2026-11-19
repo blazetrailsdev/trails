@@ -1,6 +1,21 @@
 import { Dir } from "./dir.js";
 import { File } from "./file.js";
 import { LoadError } from "./load-error.js";
+import { StandardError } from "./standard-error.js";
+
+/**
+ * `Bundler::BundlerError` (`vendor/ruby/v3.3.11/lib/bundler/errors.rb:4`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class BundlerError extends StandardError {}
+
+/**
+ * `Bundler::GemfileNotFound` (`vendor/ruby/v3.3.11/lib/bundler/errors.rb:28`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class GemfileNotFound extends BundlerError {}
 
 /**
  * `Bundler.require` (`vendor/ruby/v3.3.11/lib/bundler.rb:211`), whose
@@ -82,7 +97,7 @@ export const Bundler = {
       const gemfile = File.join(dir, "package.json");
       if (await File.isExistAsync(gemfile)) return gemfile;
       const parent = File.dirname(dir);
-      if (parent === dir) throw new LoadError("Could not locate Gemfile");
+      if (parent === dir) throw new GemfileNotFound("Could not locate Gemfile");
       dir = parent;
     }
   },
