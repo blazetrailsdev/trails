@@ -68,6 +68,49 @@ describe("SafeBufferTest", () => {
     expect(str).toEqual("my_test");
   });
 
+  for (const [unsafeMethod, dummyArgs] of Object.entries({
+    capitalize: null,
+    chomp: null,
+    chop: null,
+    delete: "foo",
+    delete_prefix: "foo",
+    delete_suffix: "foo",
+    downcase: null,
+    gsub: ["foo", "bar"],
+    lstrip: null,
+    next: null,
+    reverse: null,
+    rstrip: null,
+    scrub: null,
+    squeeze: null,
+    strip: null,
+    sub: ["foo", "bar"],
+    succ: null,
+    swapcase: null,
+    tr: ["foo", "bar"],
+    tr_s: ["foo", "bar"],
+    unicode_normalize: null,
+    upcase: null,
+  })) {
+    const name = unsafeMethod.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
+    const args = dummyArgs === null ? [] : [dummyArgs].flat();
+
+    it(`Should not return safe buffer from ${unsafeMethod}`, () => {
+      const alteredBuffer = (
+        buffer[name as keyof SafeBuffer] as (...a: unknown[]) => unknown
+      ).apply(buffer, args);
+      assertNotPredicate(alteredBuffer, isHtmlSafe);
+    });
+
+    it(`Should not return safe buffer from ${unsafeMethod}!`, () => {
+      (buffer[`${name}Bang` as keyof SafeBuffer] as (...a: unknown[]) => unknown).apply(
+        buffer,
+        args,
+      );
+      assertNotPredicate(buffer, isHtmlSafe);
+    });
+  }
+
   it("can assign value into zero-index", () => {
     const buffer = new SafeBuffer("012345");
 
