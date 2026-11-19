@@ -60,7 +60,7 @@ const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = {};
 
 /** A directory or file whose files load one at a time, so each carries its own table and loads no sibling. */
 const LAZY_DIRS: Record<string, string[]> = {
-  turbo: ["app/jobs/turbo/streams/"],
+  turbo: ["app/channels/turbo/streams-channel.ts", "app/jobs/turbo/streams/"],
   activerecord: [
     "connection-adapters/",
     "destroy-association-async-job.ts",

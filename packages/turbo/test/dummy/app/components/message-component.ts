@@ -19,7 +19,7 @@ export class MessageComponent {
   }
 
   format(): string {
-    return "html";
+    return ":html";
   }
 }
 TopLevel.MessageComponent = MessageComponent;

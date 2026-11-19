@@ -1,3 +1,4 @@
+import "../../../constants.streams-channel.generated.js";
 import { Base } from "@blazetrails/actioncable/channel/base";
 import { extend, include } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../turbo-trails.js";

@@ -5,8 +5,7 @@ import { Turbo } from "./turbo-trails.js";
 
 type ElementHandle = object;
 type Locator = {
-  all(): Promise<Locator[]>;
-  elementHandle(): Promise<ElementHandle | null>;
+  elementHandles(): Promise<ElementHandle[]>;
 };
 type Page = {
   locator(selector: string): Locator;
@@ -155,15 +154,14 @@ export async function connectTurboCableStreamSources(
 ): Promise<void> {
   const page = await this.page();
   const { xpath } = turboCableStreamSourceSelector(null, { ...options, connected: false });
-  for (const element of await page.locator(`xpath=${xpath}`).all()) {
-    const context = await element.elementHandle();
+  for (const context of await page.locator(`xpath=${xpath}`).elementHandles()) {
     await page.waitForFunction(isSatisfied, {
       ...turboCableStreamSourceSelector(null, { ...options, connected: true }, "self::"),
       context,
       count: 1,
       negate: false,
     });
-    if (block !== null && context !== null) block(context);
+    if (block !== null) block(context);
   }
 }
 

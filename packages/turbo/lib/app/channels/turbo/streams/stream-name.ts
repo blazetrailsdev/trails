@@ -1,4 +1,5 @@
 import { toParam, tryCall } from "@blazetrails/activesupport";
+import { hashAref } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../../turbo-trails.js";
 
 type ClassMethodsHost = {
@@ -19,7 +20,7 @@ export const StreamName = {
 
   ClassMethods: {
     verifiedStreamNameFromParams(this: ClassMethodsHost): unknown {
-      return this.constructor.verifiedStreamName(this.params["signed_stream_name"]);
+      return this.constructor.verifiedStreamName(hashAref(this.params, "signed_stream_name"));
     },
   },
 
