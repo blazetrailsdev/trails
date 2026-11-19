@@ -5,6 +5,7 @@ export interface EmitJsOptions {
   escapeIgnore?: boolean;
   trim?: boolean;
   erb?: boolean;
+  trimMode?: string | null;
   preamble?: string;
   postamble?: string;
   async?: boolean;
@@ -23,7 +24,7 @@ export interface EmitResult {
 }
 
 export function compileJs(source: string, options: EmitJsOptions = {}): EmitResult {
-  const ast = parse(source, options.trim !== false, options.erb === true);
+  const ast = parse(source, options.trim !== false, options.erb === true, options.trimMode ?? null);
   const { code, mappings } = emit(ast, options);
   const sourceMap =
     options.fileName && options.sourceFileName

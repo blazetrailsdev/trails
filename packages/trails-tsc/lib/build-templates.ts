@@ -35,8 +35,8 @@ async function templatesIn(path: string): Promise<string[]> {
 
 function compileTemplate(source: string, base: string): string {
   const options = {
-    trim: true,
     erb: true,
+    trimMode: "-",
     bufvar: "this.outputBuffer",
     putCmd: "this.outputBuffer.append",
     insertCmd: "((value) => this.outputBuffer.append(rbObjAsString(value)))",

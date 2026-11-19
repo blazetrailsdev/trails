@@ -31,6 +31,15 @@ describe("buildTemplates", () => {
     expect(await render('<%= "%%>" %>', {})).toBe("%>");
   });
 
+  it("trims as ERB's trim_mode '-' does, not as Erubi does", async () => {
+    const source = "a <% let x = 1; -%>\nb\n  <%- let y = 1; %>c\n<% let z = 1; %>\nd";
+    expect(await render(source, {})).toBe("a b\nc\n\nd");
+    expect(await render("q <%- let w = 1; -%>\n  <%= 3 %>\n x <%= 1 -%>\ny", {})).toBe(
+      "q   3\n x 1y",
+    );
+    expect(await render("  <%%= a %>\n", {})).toBe("  <%= a %>\n");
+  });
+
   it("resolves a free name when its line runs, not at render start", async () => {
     expect(await render("<% if (false) { %><%= missing %><% } %>ok", {})).toBe("ok");
   });

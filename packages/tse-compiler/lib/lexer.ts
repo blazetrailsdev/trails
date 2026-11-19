@@ -45,7 +45,13 @@ const text = (value: string, srcLine: number): Token => ({
   srcLine,
 });
 
-export function tokenize(source: string, trim = true, erb = false): Token[] {
+export function tokenize(
+  source: string,
+  trim = true,
+  erb = false,
+  trimMode: string | null = null,
+): Token[] {
+  if (trimMode === "-") return tokenizeExplicitTrim(source);
   const tokens: Token[] = [];
   const starts = buildLineStarts(source);
   const line = (offset: number): number => lineAt(starts, offset);
@@ -118,6 +124,64 @@ export function tokenize(source: string, trim = true, erb = false): Token[] {
       }
     }
     if (buf.length === 0) bufStartOffset = last;
+  }
+  buf += source.slice(last);
+  flush();
+
+  return tokens;
+}
+
+const EXPLICIT_TRIM_TAG_RE =
+  /<%!([\s\S]*?)!%>|<%%|(^[ \t]*)?<%(?!%)(-)?(==|=|#)?((?:%%>|[\s\S])*?)(-)?%>(\r?\n)?/gm;
+
+/**
+ * ERB's `trim_mode: "-"`, `ERB::Compiler::TrimScanner#explicit_trim_line`
+ * (`vendor/ruby/v3.3.11/lib/erb/compiler.rb:204-220`): `<%-` at the head of a
+ * line drops the indentation before it, `-%>` followed by a newline drops the
+ * newline, and every other tag keeps its surrounding whitespace.
+ */
+function tokenizeExplicitTrim(source: string): Token[] {
+  const tokens: Token[] = [];
+  const starts = buildLineStarts(source);
+  const line = (offset: number): number => lineAt(starts, offset);
+  let buf = "";
+  let last = 0;
+  let bufStartOffset = 0;
+  const flush = (): void => {
+    if (buf.length > 0) tokens.push(text(buf, line(bufStartOffset)));
+    buf = "";
+  };
+
+  for (const m of source.matchAll(EXPLICIT_TRIM_TAG_RE)) {
+    if (buf.length === 0) bufStartOffset = last;
+    buf += source.slice(last, m.index);
+    last = m.index + m[0].length;
+    if (m[1] !== undefined) {
+      flush();
+      tokens.push({ kind: "typesMagic", value: m[1], srcLine: line(m.index) });
+      continue;
+    }
+    if (m[0] === "<%%") {
+      buf += "<%";
+      continue;
+    }
+    const indent = m[2] ?? "";
+    if (m[3] === undefined) buf += indent;
+    const tagOffset = m.index + indent.length;
+    const baseKind = KIND[m[4] ?? ""] ?? "code";
+    const kind: TokenKind =
+      baseKind === "expr" && BLOCK_EXPR_RE.test(m[5]) ? "blockExpr" : baseKind;
+    flush();
+    tokens.push({
+      kind,
+      value: m[5].replaceAll("%%>", "%>"),
+      srcLine: line(tagOffset),
+      srcCol: tagOffset + 2 + (m[3]?.length ?? 0) + (m[4]?.length ?? 0) - starts[line(tagOffset)],
+    });
+    if (m[7] !== undefined && m[6] === undefined) {
+      bufStartOffset = last - m[7].length;
+      buf += m[7];
+    }
   }
   buf += source.slice(last);
   flush();
