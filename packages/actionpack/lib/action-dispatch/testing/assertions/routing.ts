@@ -23,7 +23,7 @@ import { ActionController, ActionDispatch } from "../../../namespaces.js";
 import type { IntegrationTest, Session } from "../integration.js";
 
 export interface RoutingAssertionsHost {
-  routes?: RouteSet;
+  routes?: RouteSet | null;
   controller?: unknown;
 }
 
@@ -139,7 +139,7 @@ export namespace ClassMethods {
     this: TestClass<RoutingAssertionsHost>,
     block: (routes: RouteSet) => unknown,
   ): void {
-    let oldRoutes: RouteSet | undefined;
+    let oldRoutes: RouteSet | null | undefined;
     let oldController: unknown;
 
     this.setup(function () {
@@ -154,7 +154,8 @@ export namespace ClassMethods {
 }
 
 export function setup(this: RoutingAssertionsHost): void {
-  if (this.routes == null) this.routes = undefined;
+  this.routes ??= null;
+  RoutingAssertions.superMethod(this, "setup")!();
 }
 
 export function withRouting<T>(
@@ -376,7 +377,7 @@ export function createRoutes<T>(
 /** @internal */
 export function resetRoutes(
   this: RoutingAssertionsHost,
-  oldRoutes: RouteSet | undefined,
+  oldRoutes: RouteSet | null | undefined,
   oldController: unknown,
 ): void {
   this.routes = oldRoutes;

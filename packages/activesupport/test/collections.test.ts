@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Hash } from "@blazetrails/ruby-compat";
-import { toXml as toXmlArray } from "../lib/core-ext/array/conversions.js";
+import { toXml } from "../lib/core-ext/array/conversions.js";
 import {
   deepMerge,
   deepDup,
@@ -660,7 +660,7 @@ describe("ToParamTest", () => {
 
 describe("ToXmlTest", () => {
   it("to xml with hash elements", () => {
-    const xml = toXmlArray(
+    const xml = toXml(
       [
         { name: "David", age: 26, age_in_millis: 820497600000 },
         { name: "Jason", age: 31 },
@@ -677,14 +677,14 @@ describe("ToXmlTest", () => {
   });
 
   it("to xml with non hash elements", () => {
-    const xml = toXmlArray(["1", "2", "3"], { skipInstruct: true, indent: 0 });
+    const xml = toXml(["1", "2", "3"], { skipInstruct: true, indent: 0 });
 
     expect(xml.slice(0, 29)).toBe('<strings type="array"><string');
     expect(xml).toContain("<string>2</string>");
   });
 
   it("to xml with options", () => {
-    const xml = toXmlArray(
+    const xml = toXml(
       [
         { name: "David", street_address: "Paulina" },
         { name: "Jason", street_address: "Evergreen" },
@@ -698,7 +698,7 @@ describe("ToXmlTest", () => {
   });
 
   it("to xml with dedicated name", () => {
-    const xml = toXmlArray(
+    const xml = toXml(
       [
         { name: "David", age: 26, age_in_millis: 820497600000 },
         { name: "Jason", age: 31 },
@@ -710,7 +710,7 @@ describe("ToXmlTest", () => {
   });
 
   it("to xml with indent set", () => {
-    const xml = toXmlArray(
+    const xml = toXml(
       [
         { name: "David", street_address: "Paulina" },
         { name: "Jason", street_address: "Evergreen" },
@@ -726,13 +726,13 @@ describe("ToXmlTest", () => {
   });
 
   it("to xml with empty", () => {
-    const xml = toXmlArray([]);
+    const xml = toXml([]);
     expect(xml).toMatch(/type="array"\/>/);
   });
 
   it("to xml dups options", () => {
     const options = { skipInstruct: true };
-    toXmlArray([], options);
+    toXml([], options);
     expect(options).toEqual({ skipInstruct: true });
   });
 });

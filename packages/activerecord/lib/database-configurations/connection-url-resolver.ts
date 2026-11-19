@@ -1,11 +1,6 @@
 import type { DatabaseConfigOptions } from "./database-config.js";
-import {
-  camelize,
-  compactBlankObj as compactBlank,
-  isBlank,
-  reverseMerge,
-  transformKeys,
-} from "@blazetrails/activesupport";
+import { camelize, isBlank, reverseMerge, transformKeys } from "@blazetrails/activesupport";
+import { compactBlank } from "@blazetrails/activesupport/hash-utils";
 import { type Generic, RFC2396Parser, RuntimeError, stringSplit } from "@blazetrails/ruby-compat";
 import { protocolAdapters } from "../active-record.js";
 

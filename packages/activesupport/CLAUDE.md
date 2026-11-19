@@ -153,3 +153,16 @@ Rails' child ends with
 A Vitest child hands its result back and lets the runner finish, so
 `isolation.ts` calls neither, and dumps the test itself. Both are `PERMANENT`
 receipts. Ruled by the operator on 2026-11-01 (trails#9561).
+
+## A name ported on two receivers is exported once from the barrel (`compact_blank`, `to_fs`, `to_xml`)
+
+Ruby tells `Enumerable#compact_blank` and `Hash#compact_blank`
+(`vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/enumerable.rb:184-186`,
+`:222-224`) apart by receiver. Each ports as a free function at its Rails name
+in its own module (`enumerable-utils.ts`, `hash-utils.ts`), and one flat ESM
+namespace cannot hold both. The barrel `index.ts` exports at most one of them,
+under its Rails name, and never a suffixed alias (`compactBlankObj`,
+`toFsArray`). A caller wanting the other imports it from its module's subpath
+(`@blazetrails/activesupport/hash-utils`,
+`@blazetrails/activesupport/core-ext/array/conversions`), registered as
+§ "Call-time constant resolution" and the root `vitest.config.ts` require.

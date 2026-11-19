@@ -123,6 +123,14 @@ const alias = {
     __dirname,
     "packages/activesupport/lib/core-ext/numeric/bytes.ts",
   ),
+  "@blazetrails/activesupport/core-ext/array/conversions": path.resolve(
+    __dirname,
+    "packages/activesupport/lib/core-ext/array/conversions.ts",
+  ),
+  "@blazetrails/activesupport/hash-utils": path.resolve(
+    __dirname,
+    "packages/activesupport/lib/hash-utils.ts",
+  ),
   "@blazetrails/activesupport/message-verifier": path.resolve(
     __dirname,
     "packages/activesupport/lib/message-verifier.ts",
@@ -590,6 +598,10 @@ export default defineConfig({
   resolve: { alias: aliasEntries },
   test: {
     globals: true,
+    // `TestsWithoutAssertions#after_teardown` prints the test method's
+    // `source_location` (tests_without_assertions.rb:13); vitest records a
+    // task's line only under this flag.
+    includeTaskLocation: true,
     // MUST live at the ROOT config: vitest 3's shared fork pool sizes itself
     // from the root `poolOptions.forks.maxForks` only (createForksPool never
     // consults per-project poolOptions — a project-level `maxForks` is a

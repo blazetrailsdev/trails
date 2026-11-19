@@ -20,6 +20,10 @@
       "@blazetrails/activesupport/key-generator": ["../../activesupport/lib/key-generator.ts"],
       "@blazetrails/activesupport/digest": ["../../activesupport/lib/digest.ts"],
       "@blazetrails/activesupport/temporal": ["../../activesupport/lib/temporal.ts"],
+      "@blazetrails/activesupport/core-ext/array/conversions": [
+        "../../activesupport/lib/core-ext/array/conversions.ts"
+      ],
+      "@blazetrails/activesupport/hash-utils": ["../../activesupport/lib/hash-utils.ts"],
       "@blazetrails/activesupport/core-ext/date/conversions": [
         "../../activesupport/lib/core-ext/date/conversions.ts"
       ],
