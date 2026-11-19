@@ -154,7 +154,7 @@ export class PoParser extends RaccParser {
     this._q = [];
     let m: RegExpMatchArray | null;
     while (str.length !== 0) {
-      if ((m = str.match(/^\s+/))) {
+      if ((m = str.match(/^[ \t\n\v\f\r]+/))) {
         str = str.slice(m[0].length);
       } else if ((m = str.match(/^msgctxt/))) {
         this._q.push(["MSGCTXT", m[0]]);

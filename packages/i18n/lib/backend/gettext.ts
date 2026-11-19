@@ -14,7 +14,6 @@ class PoData extends Hash<string, string> {
 interface GettextHost {
   parse(filename: string): PoData;
   normalize(locale: Locale, data: PoData): TranslationData;
-  /** @internal */
   normalizePluralization(locale: Locale, key: string, value: string): [string, TranslationData];
 }
 
@@ -54,6 +53,7 @@ export const Gettext = {
     return result;
   },
 
+  /** @internal */
   normalizePluralization(locale: Locale, key: string, value: string): [string, TranslationData] {
     key =
       stringSplit(
