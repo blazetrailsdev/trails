@@ -407,8 +407,6 @@
       "connection-adapters/libsql-remote-adapter.ts::LibSQLRemoteAdapter",
       "connection-adapters/libsql-replica-adapter.ts::LibSQLReplicaAdapter",
       "connection-adapters/node-sqlite-adapter.ts::NodeSQLiteAdapter",
-      "connection-adapters/postgresql/pg-text-decoder.ts::PGSimpleDecoder",
-      "connection-adapters/postgresql/pg-text-decoder.ts::PGTypeMapByOid",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredIdsIn",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredIdsNotIn",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredPluck"
@@ -1068,7 +1066,7 @@
     }
   },
   "pg": {
-    "rows": 4,
+    "rows": 5,
     "excluded": [
       "composite-decoder.ts::CompositeDecoder",
       "composite-encoder.ts::CompositeEncoder",
@@ -1077,13 +1075,20 @@
       "exceptions.ts::ServerError",
       "exceptions.ts::UnableToSend",
       "pg.ts::Constants",
+      "simple-decoder.ts::SimpleDecoder",
+      "simple-encoder.ts::SimpleEncoder",
       "text-decoder/array.ts::Array",
-      "text-encoder/array.ts::Array"
+      "text-encoder/array.ts::Array",
+      "text-encoder/boolean.ts::Boolean",
+      "text-encoder/integer.ts::Integer",
+      "type-map-by-class.ts::TypeMapByClass",
+      "type-map-by-oid.ts::TypeMapByOid"
     ],
     "unwalked": [],
     "residue": {
       "coder.ts::Coder": "PG::Coder",
       "coder.ts::CompositeCoder": "PG::CompositeCoder",
+      "connection.ts::Connection": "PG::Connection",
       "exceptions.ts::Error": "PG::Error",
       "result.ts::Result": "PG::Result"
     }

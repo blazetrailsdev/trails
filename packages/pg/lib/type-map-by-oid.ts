@@ -4,6 +4,7 @@ import { PG } from "./namespaces.js";
 
 type Decoder = Coder & { decode(string: string, tuple?: number, field?: number): unknown };
 
+/** @noRailsEquivalent PERMANENT */
 export class TypeMapByOid {
   readonly #format: [Map<number, Decoder>, Map<number, Decoder>] = [new Map(), new Map()];
 

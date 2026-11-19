@@ -4,6 +4,7 @@ import { PG } from "./namespaces.js";
 
 type Encoder = Coder & { encode(value: unknown, encoding?: unknown): string | null };
 
+/** @noRailsEquivalent PERMANENT */
 export class TypeMapByClass {
   readonly #klassToCoder = new Map<object, Encoder>();
 
