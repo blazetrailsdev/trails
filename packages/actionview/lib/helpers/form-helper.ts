@@ -1142,7 +1142,7 @@ export class FormBuilder {
   }
 }
 
-onLoad("action_view", (base: unknown) => {
+onLoad("action_view", (base: object) => {
   cattrAccessor.call(base, "defaultFormBuilder", {
     instanceWriter: false,
     instanceReader: false,

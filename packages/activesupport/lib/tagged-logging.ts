@@ -88,22 +88,21 @@ export const Formatter = {
   },
 
   get tagStack(): TagStack {
-    const self = this as unknown as TaggedFormatter;
-    self._threadKey ??= `activesupport_tagged_logging_tags:${rbObjId(self)}`;
+    this._threadKey ??= `activesupport_tagged_logging_tags:${rbObjId(this)}`;
     return (
-      IsolatedExecutionState.get<TagStack>(self._threadKey) ??
-      IsolatedExecutionState.set(self._threadKey, new TagStack())
+      IsolatedExecutionState.get<TagStack>(this._threadKey) ??
+      IsolatedExecutionState.set(this._threadKey, new TagStack())
     );
   },
 
   get currentTags(): unknown[] {
-    return (this as unknown as TaggedFormatter).tagStack.tags;
+    return this.tagStack.tags;
   },
 
   get tagsText(): string {
-    return (this as unknown as TaggedFormatter).tagStack.formatMessage("") as string;
+    return this.tagStack.formatMessage("") as string;
   },
-};
+} satisfies ThisType<TaggedFormatter>;
 
 export class TagStack {
   private _tags: unknown[] = [];
@@ -149,16 +148,16 @@ export class TagStack {
 
 export const LocalTagStorage = {
   get tagStack(): TagStack {
-    return (this as unknown as { _tagStack: TagStack })._tagStack;
+    return this._tagStack;
   },
   set tagStack(value: TagStack) {
-    (this as unknown as { _tagStack: TagStack })._tagStack = value;
+    this._tagStack = value;
   },
 
   [extended](base: TaggedFormatter): void {
     base.tagStack = new TagStack();
   },
-};
+} satisfies ThisType<{ _tagStack: TagStack }>;
 
 export const TaggedLogging = {
   logger(...args: ConstructorParameters<typeof Logger>): TaggedLogger {

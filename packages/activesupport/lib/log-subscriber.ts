@@ -1,6 +1,7 @@
 import { Subscriber, getClassState } from "./subscriber.js";
 import type { Event } from "./notifications/instrumenter.js";
 import type { Logger } from "./logger.js";
+import type { Notifications } from "./notifications.js";
 import { TopLevel } from "./namespaces.js";
 import { transformKeys } from "./hash-utils.js";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -26,7 +27,7 @@ export class LogSubscriber extends Subscriber {
   static colorizeLogging = true;
 
   static get logLevels(): Map<string, (logger: Logger) => boolean> {
-    const state = getClassState(this) as any;
+    const state = getClassState(this);
     if (!state._logLevels) {
       const parent = Object.getPrototypeOf(this) as typeof LogSubscriber | undefined;
       state._logLevels =
@@ -38,7 +39,7 @@ export class LogSubscriber extends Subscriber {
   }
 
   static set logLevels(value: Map<string, (logger: Logger) => boolean>) {
-    (getClassState(this) as any)._logLevels = value;
+    getClassState(this)._logLevels = value;
   }
 
   static readonly LEVEL_CHECKS: Record<string, (logger: Logger) => boolean> = {
@@ -66,15 +67,15 @@ export class LogSubscriber extends Subscriber {
 
   static flushAllBang(): void {
     const l = this.logger;
-    if (l && typeof (l as any).flush === "function") {
-      (l as any).flush();
+    if (l && "flush" in l && typeof l.flush === "function") {
+      l.flush();
     }
   }
 
   static attachTo(
     namespace: string,
     subscriber?: Subscriber,
-    notifier?: any,
+    notifier?: typeof Notifications,
     options?: { inheritAll?: boolean },
   ): Subscriber {
     const result = super.attachTo(namespace, subscriber, notifier, options);
@@ -113,7 +114,7 @@ export class LogSubscriber extends Subscriber {
           key !== "constructor" &&
           !key.startsWith("_") &&
           !baseKeys.has(key) &&
-          typeof (subscriber as any)[key] === "function"
+          typeof Reflect.get(subscriber, key) === "function"
         ) {
           keys.add(key);
         }
@@ -165,7 +166,8 @@ export class LogSubscriber extends Subscriber {
     if (this.isSilenced(event)) return;
     try {
       super.call(event);
-    } catch (e: any) {
+    } catch (e) {
+      if (!(e instanceof Error)) throw e;
       this._logException(event.name, e);
     }
   }
@@ -175,7 +177,8 @@ export class LogSubscriber extends Subscriber {
     if (this.isSilenced(event)) return;
     try {
       super.publishEvent(event);
-    } catch (e: any) {
+    } catch (e) {
+      if (!(e instanceof Error)) throw e;
       this._logException(event.name, e);
     }
   }
@@ -215,7 +218,7 @@ export class LogSubscriber extends Subscriber {
       c = color;
     } else {
       const name = String(color).toUpperCase();
-      c = (this.constructor as any)[name] ?? "";
+      c = (Reflect.get(this.constructor, name) as string | undefined) ?? "";
     }
     const mode = this._modeFrom(modeOptions);
     const clear = `\x1b[${LogSubscriber.MODES.clear}m`;

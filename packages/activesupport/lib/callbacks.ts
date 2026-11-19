@@ -988,14 +988,16 @@ export function normalizeCallbackParams(
     type = rest.shift() as CallbackKind;
   }
   let options: Record<string, unknown> = {};
-  if (rest.length > 0 && isCallbackOptions(rest[rest.length - 1])) {
-    options = rest.pop() as unknown as Record<string, unknown>;
+  const last = rest[rest.length - 1];
+  if (rest.length > 0 && isCallbackOptions(last)) {
+    rest.pop();
+    options = last;
   }
   if (block) rest.unshift(block);
   return [type, rest as Array<AnyCallback | string | symbol>, { ...options }];
 }
 
-function isCallbackOptions(value: unknown): boolean {
+function isCallbackOptions(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null) return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
@@ -1109,21 +1111,24 @@ function observeProceed(
   };
   return Object.setPrototypeOf(
     {
-      then(onFulfilled?: any, onRejected?: any) {
+      then(
+        onFulfilled?: ((value: unknown) => unknown) | null,
+        onRejected?: ((reason: unknown) => unknown) | null,
+      ) {
         if (typeof onRejected === "function") {
           tracker.observed = true;
           return observed().then(onFulfilled, onRejected);
         }
         return settle(observed().then(onFulfilled));
       },
-      catch(onRejected?: any) {
+      catch(onRejected?: ((reason: unknown) => unknown) | null) {
         if (typeof onRejected === "function") {
           tracker.observed = true;
           return observed().catch(onRejected);
         }
         return settle(observed().catch(onRejected));
       },
-      finally(onFinally?: any) {
+      finally(onFinally?: (() => void) | null) {
         return settle(observed().finally(onFinally));
       },
     },

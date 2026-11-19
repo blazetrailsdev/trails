@@ -20,7 +20,7 @@ export function delegate(this: object, ...methods: (string | DelegateOptions)[])
     prefix = null,
     allowNil = null,
     private: priv = null,
-  } = options as unknown as DelegateOptions;
+  } = options as DelegateOptions;
 
   return Delegation.generate(this, names as string[], {
     location: callerLocations(1, 1)[0],
@@ -48,6 +48,8 @@ export interface MattrOptions {
   location?: unknown;
 }
 
+type MattrTarget = Record<string, unknown> & { prototype?: object };
+
 const VALID_ATTR_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*[!?]?$/;
 
 function assertValidAttrName(name: string): void {
@@ -57,7 +59,7 @@ function assertValidAttrName(name: string): void {
 }
 
 function setMattrDefault(
-  target: any,
+  target: MattrTarget,
   name: string,
   storageKey: string,
   options: MattrOptions,
@@ -70,8 +72,11 @@ function setMattrDefault(
   }
 }
 
-export function mattrReader(this: any, ...syms: (string | MattrOptions | Block<unknown>)[]): void {
-  const target = this;
+export function mattrReader(
+  this: object,
+  ...syms: (string | MattrOptions | Block<unknown>)[]
+): void {
+  const target = this as MattrTarget;
   const blk = rbBlockGivenP(syms[syms.length - 1]) ? (syms.pop() as () => unknown) : null;
   const options = extractOptionsBang(syms) as MattrOptions;
   options.location ??= callerLocations(1, 1)[0];
@@ -89,7 +94,7 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions | Block<u
       const definition = (methodTable: object) =>
         defineAccessorHalf(methodTable, sym, { get: () => target[sym] });
       if (this instanceof Module) {
-        target.moduleEval(definition);
+        this.moduleEval(definition);
       } else if (target.prototype) {
         definition(target.prototype);
       }
@@ -101,8 +106,11 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions | Block<u
 
 export const cattrReader = mattrReader;
 
-export function mattrWriter(this: any, ...syms: (string | MattrOptions | Block<unknown>)[]): void {
-  const target = this;
+export function mattrWriter(
+  this: object,
+  ...syms: (string | MattrOptions | Block<unknown>)[]
+): void {
+  const target = this as MattrTarget;
   const blk = rbBlockGivenP(syms[syms.length - 1]) ? (syms.pop() as () => unknown) : null;
   const options = extractOptionsBang(syms) as MattrOptions;
   options.location ??= callerLocations(1, 1)[0];
@@ -128,7 +136,7 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions | Block<u
           },
         });
       if (this instanceof Module) {
-        target.moduleEval(definition);
+        this.moduleEval(definition);
       } else if (target.prototype) {
         definition(target.prototype);
       }
@@ -141,7 +149,7 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions | Block<u
 export const cattrWriter = mattrWriter;
 
 export function mattrAccessor(
-  this: any,
+  this: object,
   ...syms: (string | MattrOptions | Block<unknown>)[]
 ): void {
   const blk = rbBlockGivenP(syms[syms.length - 1]) ? (syms.pop() as Block<unknown>) : null;
