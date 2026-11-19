@@ -1,16 +1,6 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const activesupport: Record<string, AssertionReceipt[]> = {
-  "activesupport:core_ext/kernel/concern_test.rb › KernelConcernTest › may be defined at toplevel":
-    [
-      {
-        kind: "assert_kind_of",
-        value: null,
-        as: "assert_equal",
-        reason:
-          'core_ext/kernel/concern_test.rb:9 `assert_kind_of ActiveSupport::Concern, ::ToplevelConcern` — `Concern` is a plain-object module (CLAUDE.md, "A Ruby module is a JS object or a JS class"), which no JS `instanceof` can test; the port asserts `rbObjIsKindOf(mod, Concern)` equals true',
-      },
-    ],
   "activesupport:cache/behaviors/cache_store_format_version_behavior.rb › format version  uses correct signature for compressed entries":
     [
       {
@@ -67,6 +57,16 @@ export const activesupport: Record<string, AssertionReceipt[]> = {
         "core_ext/duration_test.rb:18 `assert_kind_of Integer` — a JS number has no Integer class; the port asserts `Number.isInteger(d.toI())`",
     },
   ],
+  "activesupport:core_ext/kernel/concern_test.rb › KernelConcernTest › may be defined at toplevel":
+    [
+      {
+        kind: "assert_kind_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'core_ext/kernel/concern_test.rb:9 `assert_kind_of ActiveSupport::Concern, ::ToplevelConcern` — `Concern` is a plain-object module (CLAUDE.md, "A Ruby module is a JS object or a JS class"), which no JS `instanceof` can test; the port asserts `rbObjIsKindOf(mod, Concern)` equals true',
+      },
+    ],
   "activesupport:core_ext/module_test.rb › ModuleTest › delegation arity to self class": [
     {
       kind: "assert_equal",
