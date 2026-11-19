@@ -65,6 +65,17 @@ export class Scheduler extends Base {
     };
   }
 
+  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.7.2/lib/solid_queue/processes/runnable.rb:18-28 */
+  override async stop(): Promise<void> {
+    await super.stop();
+
+    await this.wakeUp();
+
+    if (!this.isSupervised()) {
+      await this._thread?.join();
+    }
+  }
+
   /** @internal */
   static readonly STATIC_SLEEP_INTERVAL = 60;
 

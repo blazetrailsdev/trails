@@ -15,6 +15,7 @@ export class Record extends Base {
 
   static {
     this.abstractClass = true;
+    this.strictLoadingByDefault = false;
 
     include(this, DistinctValues);
   }

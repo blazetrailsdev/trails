@@ -4,7 +4,6 @@ import {
   IO,
   rbObjId,
   NotImplementedError,
-  rbCallSuper,
   type PipeIO,
   Thread,
   classModule,
@@ -37,8 +36,6 @@ interface RunnableHost {
   isRunningInline(): boolean;
   isRunningAsync(): boolean;
   isRunningAsFork(): boolean;
-  isSupervised(): boolean;
-  wakeUp(): Promise<void>;
   createThread(block: () => unknown): Thread;
   handleThreadError(error: unknown): void;
 }
@@ -55,15 +52,6 @@ export class Runnable {
       await this.boot();
       await this.run();
     });
-  }
-
-  async stop(this: RunnableHost): Promise<void> {
-    await rbCallSuper(this, Runnable.prototype.stop);
-    await this.wakeUp();
-
-    if (!this.isSupervised()) {
-      await this._thread?.join();
-    }
   }
 
   isAlive(this: RunnableHost): boolean | null {

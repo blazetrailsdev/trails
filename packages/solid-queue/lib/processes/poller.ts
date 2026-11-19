@@ -23,6 +23,17 @@ export class Poller extends Base {
     return { ...(await super.metadata()), polling_interval: this.pollingInterval };
   }
 
+  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.7.2/lib/solid_queue/processes/runnable.rb:18-28 */
+  override async stop(): Promise<void> {
+    await super.stop();
+
+    await this.wakeUp();
+
+    if (!this.isSupervised()) {
+      await this._thread?.join();
+    }
+  }
+
   /** @internal */
   async run(): Promise<void> {
     await this.startLoop();
@@ -50,10 +61,7 @@ export class Poller extends Base {
     throw new NotImplementedError();
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs silence — PERMANENT
-   */
+  /** @internal */
   async withPollingVolume<T>(block: () => Promise<T>): Promise<T> {
     return await SolidQueue.instrument("polling", {}, async () => {
       if (SolidQueue.isSilencePolling() && ActiveRecord.Base.logger) {
