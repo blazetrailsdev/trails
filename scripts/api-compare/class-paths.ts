@@ -1017,19 +1017,21 @@ async function main(): Promise<void> {
   if (check) await checkConstantResidue(tables, process.argv.includes("--record"), stale, only);
   const targets = (
     await Promise.all(
-      [...tables].map(async ([dir, entries]) => [
-        [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
-        [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded && !e.table)] as const,
-        ...[
-          ...new Set([
-            ...(SEPARATE_SUBPATH_ENTRIES[dir]
-              ? [separateTable(SEPARATE_SUBPATH_ENTRIES[dir])]
-              : []),
-            ...entries.flatMap((e) => (e.table ? [e.table] : [])),
-            ...(LAZY_DIRS[dir] ? await lazyTablesOnDisk(dir) : []),
-          ]),
-        ].map((table) => [dir, table, entries.filter((e) => e.table === table)] as const),
-      ]),
+      [...tables]
+        .filter(([dir]) => dir !== "ruby-compat")
+        .map(async ([dir, entries]) => [
+          [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
+          [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded && !e.table)] as const,
+          ...[
+            ...new Set([
+              ...(SEPARATE_SUBPATH_ENTRIES[dir]
+                ? [separateTable(SEPARATE_SUBPATH_ENTRIES[dir])]
+                : []),
+              ...entries.flatMap((e) => (e.table ? [e.table] : [])),
+              ...(LAZY_DIRS[dir] ? await lazyTablesOnDisk(dir) : []),
+            ]),
+          ].map((table) => [dir, table, entries.filter((e) => e.table === table)] as const),
+        ]),
     )
   ).flat();
   if (only === undefined || only === "ruby-compat") {
