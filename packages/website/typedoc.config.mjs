@@ -19,10 +19,11 @@ export default {
   ],
   entryPointStrategy: "packages",
   out: "docs/api",
-  plugin: ["typedoc-plugin-markdown"],
+  plugin: ["typedoc-plugin-markdown", "./scripts/typedoc-dangling-symbol-ids.mjs"],
   readme: "none",
   githubPages: false,
   excludeInternal: true,
+  skipErrorChecking: true,
   blockTags: [...OptionDefaults.blockTags, ...apiCompareTags],
   excludeTags: [...OptionDefaults.excludeTags, ...apiCompareTags],
   outputFileStrategy: "members",
@@ -32,5 +33,6 @@ export default {
   packageOptions: {
     entryPoints: ["lib/index.ts"],
     excludeInternal: true,
+    skipErrorChecking: true,
   },
 };
