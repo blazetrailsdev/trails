@@ -316,6 +316,8 @@ defineConstants([
   [() => m94.StringInquirer, "ActiveSupport::StringInquirer"],
   [() => m95.Subscriber, "ActiveSupport::Subscriber"],
   [() => m96.SyntaxErrorProxy, "ActiveSupport::SyntaxErrorProxy"],
+  [() => m96.BacktraceLocation, "ActiveSupport::SyntaxErrorProxy::BacktraceLocation"],
+  [() => m96.BacktraceLocationProxy, "ActiveSupport::SyntaxErrorProxy::BacktraceLocationProxy"],
   [() => m97.TaggedLogging, "ActiveSupport::TaggedLogging"],
   [() => m97.Formatter, "ActiveSupport::TaggedLogging::Formatter"],
   [() => m97.LocalTagStorage, "ActiveSupport::TaggedLogging::LocalTagStorage"],

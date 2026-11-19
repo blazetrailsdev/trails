@@ -704,7 +704,7 @@
     }
   },
   "activesupport": {
-    "rows": 191,
+    "rows": 193,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
