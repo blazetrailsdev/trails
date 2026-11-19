@@ -63,6 +63,7 @@ export const ActiveSupport = {
   BroadcastLogger: typeof BroadcastLogger;
   Logger: typeof Logger;
   Duration: typeof Duration;
+  TimeWithZone?: typeof import("./time-with-zone.js").TimeWithZone;
   TestCase?: typeof import("./test-case.js").TestCase;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
   Inflector: typeof Inflector;

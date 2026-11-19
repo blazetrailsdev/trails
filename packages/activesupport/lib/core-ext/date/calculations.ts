@@ -1,4 +1,4 @@
-import { Temporal, Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
+import { Temporal, Date as RubyDate, Time as RubyTime, type DateTime } from "@blazetrails/date";
 import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
@@ -236,12 +236,36 @@ declare module "@blazetrails/date" {
   }
   interface Date {
     change(options: { year?: number; month?: number; day?: number }): Date;
+    advance(options: { years?: number; months?: number; weeks?: number; days?: number }): Date;
+    beginningOfDay(): TimeWithZone | RubyTime | DateTime;
+    midnight(): TimeWithZone | RubyTime | DateTime;
+    endOfDay(): TimeWithZone | RubyTime | DateTime;
   }
 }
 
 Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek });
 
 Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { change });
+
+for (const [name, value] of Object.entries({
+  advance(
+    this: RubyDate,
+    options: { years?: number; months?: number; weeks?: number; days?: number },
+  ): RubyDate {
+    return advance(this, options);
+  },
+  beginningOfDay(this: RubyDate): TimeWithZone | RubyTime {
+    return beginningOfDay(this.toDate());
+  },
+  midnight(this: RubyDate): TimeWithZone | RubyTime {
+    return midnight(this.toDate());
+  },
+  endOfDay(this: RubyDate): TimeWithZone | RubyTime {
+    return endOfDay(this.toDate());
+  },
+})) {
+  Object.defineProperty(RubyDate.prototype, name, { value, writable: true, configurable: true });
+}
 
 Object.defineProperty(RubyDate.prototype, "change", {
   value: function (

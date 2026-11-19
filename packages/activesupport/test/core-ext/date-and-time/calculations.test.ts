@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import {
   yesterday,
   tomorrow,
@@ -50,15 +51,15 @@ function dateTimeInit(
   hour: number,
   minute: number,
   second: number,
-  usec: number = 0,
-): { date: Temporal.PlainDate; time: Date } {
+  usec: number | Rational = 0,
+): { date: RubyDate; time: RubyTime } {
   return {
-    date: new Temporal.PlainDate(year, month, day),
-    time: new Date(year, month - 1, day, hour, minute, second, Math.floor(usec / 1000)),
+    date: new RubyDate(year, month, day),
+    time: RubyTime.local(year, month, day, hour, minute, second, usec),
   };
 }
 
-const LAST_USEC = 999999999 / 1000;
+const LAST_USEC = new Rational(999999999, 1000);
 
 function withBwDefault(bw: string, block: () => void): void {
   const oldBw = dateBeginningOfWeek();
@@ -72,13 +73,11 @@ function withBwDefault(bw: string, block: () => void): void {
 
 function expectSame(
   actual: { date: unknown; time: unknown },
-  expected: { date: Temporal.PlainDate; time: Date },
+  expected: { date: RubyDate; time: RubyTime },
 ): void {
-  expect((actual.date as Temporal.PlainDate).toString()).toBe(expected.date.toString());
-  const time = actual.time as Temporal.Instant | Date;
-  expect(time instanceof Date ? time.getTime() : time.epochMilliseconds).toBe(
-    expected.time.getTime(),
-  );
+  expect((actual.date as RubyDate).toS()).toBe(expected.date.toS());
+  expect((actual.time as RubyTime).toS()).toBe(expected.time.toS());
+  expect((actual.time as RubyTime).nsec).toBe(expected.time.nsec);
 }
 
 describe("DateAndTimeBehavior", () => {
@@ -331,16 +330,14 @@ describe("DateAndTimeBehavior", () => {
 
   it("next_week_with_default_beginning_of_week_set", () => {
     withBwDefault(":tuesday", () => {
-      const from = new Date(2012, 2, 21);
+      const from = RubyTime.local(2012, 3, 21);
       for (const [day, y, m, d] of [
         [":wednesday", 2012, 3, 28],
         [":saturday", 2012, 3, 31],
         [":tuesday", 2012, 3, 27],
         [":monday", 2012, 4, 2],
       ] as [string, number, number, number][]) {
-        expect((nextWeek.call(from, day) as Temporal.Instant).epochMilliseconds).toBe(
-          new Date(y, m - 1, d).getTime(),
-        );
+        expect((nextWeek.call(from, day) as RubyTime).toS()).toBe(RubyTime.local(y, m, d).toS());
       }
     });
   });
@@ -456,16 +453,14 @@ describe("DateAndTimeBehavior", () => {
 
   it("prev_week_with_default_beginning_of_week", () => {
     withBwDefault(":tuesday", () => {
-      const from = new Date(2012, 2, 21);
+      const from = RubyTime.local(2012, 3, 21);
       for (const [day, y, m, d] of [
         [":wednesday", 2012, 3, 14],
         [":saturday", 2012, 3, 17],
         [":tuesday", 2012, 3, 13],
         [":monday", 2012, 3, 19],
       ] as [string, number, number, number][]) {
-        expect((prevWeek.call(from, day) as Temporal.Instant).epochMilliseconds).toBe(
-          new Date(y, m - 1, d).getTime(),
-        );
+        expect((prevWeek.call(from, day) as RubyTime).toS()).toBe(RubyTime.local(y, m, d).toS());
       }
     });
   });
@@ -591,7 +586,7 @@ describe("DateAndTimeBehavior", () => {
         [3, 1],
         [2, 0],
       ]) {
-        expect(daysToWeekStart.call(new Date(2012, 2, d, 0, 0, 0))).toBe(expected);
+        expect(daysToWeekStart.call(RubyTime.local(2012, 3, d))).toBe(expected);
       }
     });
   });

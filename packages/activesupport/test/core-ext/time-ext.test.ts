@@ -1684,12 +1684,12 @@ describe("TimeExtCalculationsTest", () => {
   it("past with time current as time local", () => {
     withEnvTz("US/Eastern", () => {
       withTimeCurrent(d(2005, 2, 10, 15, 30, 45), () => {
-        expect(isPast.call(d(2005, 2, 10, 15, 30, 44))).toBe(true);
-        expect(isPast.call(d(2005, 2, 10, 15, 30, 45))).toBe(false);
-        expect(isPast.call(d(2005, 2, 10, 15, 30, 46))).toBe(false);
-        expect(isPast.call(utc(2005, 2, 10, 20, 30, 44))).toBe(true);
-        expect(isPast.call(utc(2005, 2, 10, 20, 30, 45))).toBe(false);
-        expect(isPast.call(utc(2005, 2, 10, 20, 30, 46))).toBe(false);
+        expect(isPast.call(RubyTime.local(2005, 2, 10, 15, 30, 44))).toBe(true);
+        expect(isPast.call(RubyTime.local(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isPast.call(RubyTime.local(2005, 2, 10, 15, 30, 46))).toBe(false);
+        expect(isPast.call(RubyTime.utc(2005, 2, 10, 20, 30, 44))).toBe(true);
+        expect(isPast.call(RubyTime.utc(2005, 2, 10, 20, 30, 45))).toBe(false);
+        expect(isPast.call(RubyTime.utc(2005, 2, 10, 20, 30, 46))).toBe(false);
       });
     });
   });
@@ -1701,12 +1701,12 @@ describe("TimeExtCalculationsTest", () => {
         "Central Time (US & Canada)",
       ) as TimeWithZone;
       withTimeCurrent(twz, () => {
-        expect(isPast.call(d(2005, 2, 10, 10, 30, 44))).toBe(true);
-        expect(isPast.call(d(2005, 2, 10, 10, 30, 45))).toBe(false);
-        expect(isPast.call(d(2005, 2, 10, 10, 30, 46))).toBe(false);
-        expect(isPast.call(utc(2005, 2, 10, 15, 30, 44))).toBe(true);
-        expect(isPast.call(utc(2005, 2, 10, 15, 30, 45))).toBe(false);
-        expect(isPast.call(utc(2005, 2, 10, 15, 30, 46))).toBe(false);
+        expect(isPast.call(RubyTime.local(2005, 2, 10, 10, 30, 44))).toBe(true);
+        expect(isPast.call(RubyTime.local(2005, 2, 10, 10, 30, 45))).toBe(false);
+        expect(isPast.call(RubyTime.local(2005, 2, 10, 10, 30, 46))).toBe(false);
+        expect(isPast.call(RubyTime.utc(2005, 2, 10, 15, 30, 44))).toBe(true);
+        expect(isPast.call(RubyTime.utc(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isPast.call(RubyTime.utc(2005, 2, 10, 15, 30, 46))).toBe(false);
       });
     });
   });
@@ -1714,12 +1714,12 @@ describe("TimeExtCalculationsTest", () => {
   it("future with time current as time local", () => {
     withEnvTz("US/Eastern", () => {
       withTimeCurrent(d(2005, 2, 10, 15, 30, 45), () => {
-        expect(isFuture.call(d(2005, 2, 10, 15, 30, 44))).toBe(false);
-        expect(isFuture.call(d(2005, 2, 10, 15, 30, 45))).toBe(false);
-        expect(isFuture.call(d(2005, 2, 10, 15, 30, 46))).toBe(true);
-        expect(isFuture.call(utc(2005, 2, 10, 20, 30, 44))).toBe(false);
-        expect(isFuture.call(utc(2005, 2, 10, 20, 30, 45))).toBe(false);
-        expect(isFuture.call(utc(2005, 2, 10, 20, 30, 46))).toBe(true);
+        expect(isFuture.call(RubyTime.local(2005, 2, 10, 15, 30, 44))).toBe(false);
+        expect(isFuture.call(RubyTime.local(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isFuture.call(RubyTime.local(2005, 2, 10, 15, 30, 46))).toBe(true);
+        expect(isFuture.call(RubyTime.utc(2005, 2, 10, 20, 30, 44))).toBe(false);
+        expect(isFuture.call(RubyTime.utc(2005, 2, 10, 20, 30, 45))).toBe(false);
+        expect(isFuture.call(RubyTime.utc(2005, 2, 10, 20, 30, 46))).toBe(true);
       });
     });
   });
@@ -1731,12 +1731,12 @@ describe("TimeExtCalculationsTest", () => {
         "Central Time (US & Canada)",
       ) as TimeWithZone;
       withTimeCurrent(twz, () => {
-        expect(isFuture.call(d(2005, 2, 10, 10, 30, 44))).toBe(false);
-        expect(isFuture.call(d(2005, 2, 10, 10, 30, 45))).toBe(false);
-        expect(isFuture.call(d(2005, 2, 10, 10, 30, 46))).toBe(true);
-        expect(isFuture.call(utc(2005, 2, 10, 15, 30, 44))).toBe(false);
-        expect(isFuture.call(utc(2005, 2, 10, 15, 30, 45))).toBe(false);
-        expect(isFuture.call(utc(2005, 2, 10, 15, 30, 46))).toBe(true);
+        expect(isFuture.call(RubyTime.local(2005, 2, 10, 10, 30, 44))).toBe(false);
+        expect(isFuture.call(RubyTime.local(2005, 2, 10, 10, 30, 45))).toBe(false);
+        expect(isFuture.call(RubyTime.local(2005, 2, 10, 10, 30, 46))).toBe(true);
+        expect(isFuture.call(RubyTime.utc(2005, 2, 10, 15, 30, 44))).toBe(false);
+        expect(isFuture.call(RubyTime.utc(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isFuture.call(RubyTime.utc(2005, 2, 10, 15, 30, 46))).toBe(true);
       });
     });
   });
@@ -2384,8 +2384,8 @@ describe("TimeExtMarshalingTest", () => {
   });
 
   it("last quarter on 31st", () => {
-    expect((lastQuarter.call(d(2004, 5, 31)) as Temporal.Instant).epochMilliseconds).toBe(
-      d(2004, 2, 29).getTime(),
+    expect((lastQuarter.call(RubyTime.local(2004, 5, 31)) as RubyTime).toS()).toBe(
+      RubyTime.local(2004, 2, 29).toS(),
     );
   });
 });

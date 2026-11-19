@@ -40,6 +40,7 @@ import {
 import { advance as timeAdvance } from "./time-ext.js";
 import { since as datetimeSince, subsec } from "./core-ext/date-time/calculations.js";
 import { deprecator } from "./deprecator.js";
+import { ActiveSupport } from "./namespaces.js";
 import { inTimeZone, type DateOrTime } from "./core-ext/date-and-time/zones.js";
 import {
   preserveTimezone,
@@ -943,3 +944,5 @@ rbDefineAllocFunc(TimeWithZone, (klass) => Object.create(klass.prototype) as Tim
 
 YAML.loadTags["!ruby/object:ActiveSupport::TimeWithZone"] = "ActiveSupport::TimeWithZone";
 YAML.dumpTags.set(TimeWithZone, "!ruby/object:ActiveSupport::TimeWithZone");
+
+ActiveSupport.TimeWithZone = TimeWithZone;
