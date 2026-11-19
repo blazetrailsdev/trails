@@ -1,5 +1,4 @@
 import type { Base } from "./base.js";
-import type { Relation } from "./relation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   classAttribute,
@@ -47,9 +46,9 @@ export async function updateCounters(
   counters: CounterCacheCounters,
 ): Promise<number> {
   if (this.isCompositePrimaryKey() && Array.isArray(id) && !Array.isArray(id[0])) id = [id];
-  return (
-    this.unscoped().whereBang(new Map([[this.primaryKey, id]])) as Relation<Base>
-  ).updateCounters(counters);
+  return this.unscoped()
+    .whereBang(new Map([[this.primaryKey, id]]))
+    .updateCounters(counters);
 }
 
 export type CounterCacheCounters = Record<string, number | CounterCacheTouchOption | undefined>;

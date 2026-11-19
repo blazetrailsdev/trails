@@ -285,10 +285,10 @@ function preloadBang<R extends QueryMethodsHost>(this: R, ...args: AssociationSp
   return this;
 }
 
-async function extractAssociated(this: QueryMethodsHost, association: string): Promise<any[]> {
-  const records: any[] = await preload.call(this, association).records();
-  const associated: any[] = [];
-  for (const record of records) associated.push(await record[association]);
+async function extractAssociated(this: QueryMethodsHost, association: string): Promise<unknown[]> {
+  const records = await preload.call(this, association).records();
+  const associated: unknown[] = [];
+  for (const record of records) associated.push(await rbFSend(record, association));
   return associated;
 }
 
@@ -706,7 +706,7 @@ function where(
   );
 }
 
-function whereBang<R extends QueryMethodsHost>(this: R, opts: any, ...rest: unknown[]): R {
+function whereBang<R extends QueryMethodsHost>(this: R, opts: unknown, ...rest: unknown[]): R {
   const clause = buildWhereClause.call(this, opts, rest);
   this.whereClause = this.whereClause.plus(clause);
   return this;
@@ -725,7 +725,7 @@ function rewhere<R extends QueryMethodsHost>(
   return rel;
 }
 
-function isRelationLike(value: unknown): boolean {
+function isRelationLike(value: unknown): value is import("../relation.js").Relation<any, boolean> {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -876,15 +876,15 @@ function assertStructurallyCompatible(
   }
 }
 
-function isStructurallyCompatible<R extends QueryMethodsHost>(this: R, other: any): boolean {
+function isStructurallyCompatible<R extends QueryMethodsHost>(this: R, other: R): boolean {
   return structurallyIncompatibleValuesFor.call(this, other).length === 0;
 }
 
-function and<R extends QueryMethodsHost>(this: R, other: any): R {
+function and<R extends QueryMethodsHost>(this: R, other: R): R {
   return (andBang<R>).call(this.spawn(), other);
 }
 
-function andBang<R extends QueryMethodsHost>(this: R, other: any): R {
+function andBang<R extends QueryMethodsHost>(this: R, other: R): R {
   assertRelationForCombining(other, "and");
   assertStructurallyCompatible(this, other, "and");
   this.whereClause = this.whereClause.union(other.whereClause);
@@ -893,13 +893,13 @@ function andBang<R extends QueryMethodsHost>(this: R, other: any): R {
   return this;
 }
 
-function or<R extends QueryMethodsHost>(this: R, other: any): R {
+function or<R extends QueryMethodsHost>(this: R, other: R): R {
   assertRelationForCombining(other, "or");
   if (this._isNone) return other.spawn();
   return (orBang<R>).call(this.spawn(), other);
 }
 
-function orBang<R extends QueryMethodsHost>(this: R, other: any): R {
+function orBang<R extends QueryMethodsHost>(this: R, other: R): R {
   assertRelationForCombining(other, "or");
   assertStructurallyCompatible(this, other, "or");
   this.whereClause = this.whereClause.or(other.whereClause);
@@ -1023,11 +1023,19 @@ function createWithBang<R extends QueryMethodsHost>(
   return this;
 }
 
-function from<R extends QueryMethodsHost>(this: R, value: any, subqueryName?: string): R {
+function from<R extends QueryMethodsHost>(
+  this: R,
+  value: string | QueryMethodsHost | ArelNode,
+  subqueryName?: string,
+): R {
   return (fromBang<R>).call(this.spawn(), value, subqueryName);
 }
 
-function fromBang<R extends QueryMethodsHost>(this: R, value: any, subqueryName?: string): R {
+function fromBang<R extends QueryMethodsHost>(
+  this: R,
+  value: string | QueryMethodsHost | ArelNode,
+  subqueryName?: string,
+): R {
   this.fromClause = new FromClause(value ?? null, subqueryName ?? null);
   return this;
 }
@@ -1160,7 +1168,7 @@ const excluding = excludingWithCallee("excluding");
 
 const without = excludingWithCallee("without");
 
-function excludingBang<R extends QueryMethodsHost>(this: R, records: any[]): R {
+function excludingBang<R extends QueryMethodsHost>(this: R, records: unknown[]): R {
   const pk = this.primaryKey;
 
   const deferredRelations = records.filter((r) => isRelationLike(r));

@@ -14,7 +14,7 @@ import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import type { SingularAssociation } from "../associations/singular-association.js";
 
-type Scope = Omit<Relation<Base>, "then">;
+type Scope = Omit<Relation<Base>, "then" | "catch" | "finally">;
 
 export function validatesUniquenessOf(
   this: {
@@ -111,7 +111,7 @@ export class UniquenessValidator extends EachValidator {
     const comparison = await klass.withConnection((connection) =>
       relation.bindAttribute(attribute, value, (attr, bind) => {
         if (bind.isUnboundable()) {
-          none = relation.noneBang() as Scope;
+          none = relation.noneBang();
           return null;
         }
 

@@ -1951,8 +1951,18 @@ type QueryMethodsChainKeys = {
     : never;
 }[Exclude<
   keyof typeof QueryMethods,
-  "group" | "groupBang" | "regroup" | "regroupBang" | "unscope" | "unscopeBang"
+  QueryMethodsDeclaredKeys | "groupBang" | "regroupBang" | "unscopeBang"
 >];
+
+type QueryMethodsDeclaredKeys =
+  | "group"
+  | "regroup"
+  | "unscope"
+  | "and"
+  | "or"
+  | "from"
+  | "isStructurallyCompatible"
+  | "extractAssociated";
 
 type QueryMethodsChain<Self> = {
   [K in QueryMethodsChainKeys]: (typeof QueryMethods)[K] extends (
@@ -1965,7 +1975,7 @@ type QueryMethodsChain<Self> = {
 
 export interface Relation<T extends Base, G extends boolean = false>
   extends
-    Omit<Included<typeof QueryMethods>, QueryMethodsChainKeys>,
+    Omit<Included<typeof QueryMethods>, QueryMethodsChainKeys | QueryMethodsDeclaredKeys>,
     QueryMethodsChain<Relation<T, G>>,
     Included<typeof Explain>,
     Included<SignedIdRelationMethods<T>>,

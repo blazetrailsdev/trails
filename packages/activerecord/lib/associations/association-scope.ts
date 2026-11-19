@@ -26,6 +26,8 @@ type ChainReflection =
   | RuntimeReflection
   | (ReflectionProxy & (AssociationReflection | ThroughReflection | PolymorphicReflection));
 
+type ScopeRelation = Omit<Relation<Base>, "then" | "catch" | "finally">;
+
 export class ReflectionProxy extends SimpleDelegator {
   readonly aliasedTable: ArelTable | Nodes.TableAlias;
 
@@ -78,7 +80,7 @@ export class AssociationScope {
 
   scope(association: AssociationScopeable): unknown {
     const { owner, reflection, klass } = association;
-    let scope: Relation<Base> = klass.unscoped();
+    let scope: ScopeRelation = klass.unscoped();
     const chain = this.getChain(reflection, association, scope.aliasTracker());
 
     scope.extendingBang(...reflection.extensions());
@@ -97,23 +99,23 @@ export class AssociationScope {
   }
 
   private applyScope(
-    scope: Relation<Base>,
+    scope: ScopeRelation,
     table: ArelTable | Nodes.TableAlias,
     key: string,
     value: unknown,
-  ): Relation<Base> {
+  ): ScopeRelation {
     if (rbEqual(scope.table, table)) {
-      return scope.whereBang({ [key]: value }) as Relation<Base>;
+      return scope.whereBang({ [key]: value });
     } else {
-      return scope.whereBang({ [table.name as string]: { [key]: value } }) as Relation<Base>;
+      return scope.whereBang({ [table.name as string]: { [key]: value } });
     }
   }
 
   private lastChainScope(
-    scope: Relation<Base>,
+    scope: ScopeRelation,
     reflection: ChainReflection,
     owner: Base,
-  ): Relation<Base> {
+  ): ScopeRelation {
     const primaryKey = kernelArray(reflection.joinPrimaryKey());
     const foreignKey = kernelArray(reflection.joinForeignKey);
 
@@ -149,10 +151,10 @@ export class AssociationScope {
   }
 
   private nextChainScope(
-    scope: Relation<Base>,
+    scope: ScopeRelation,
     reflection: ChainReflection,
     nextReflection: ChainReflection,
-  ): Relation<Base> {
+  ): ScopeRelation {
     const primaryKey = kernelArray(reflection.joinPrimaryKey());
     const foreignKey = kernelArray(reflection.joinForeignKey);
 
@@ -172,14 +174,10 @@ export class AssociationScope {
       scope = this.applyScope(scope, table, reflection.type, value);
     }
 
-    return scope.joinsBang(this.join(foreignTable, constraints)) as Relation<Base>;
+    return scope.joinsBang(this.join(foreignTable, constraints));
   }
 
-  #addConstraints(
-    scope: Relation<Base>,
-    owner: Base,
-    chain: Array<ChainReflection>,
-  ): Relation<Base> {
+  #addConstraints(scope: ScopeRelation, owner: Base, chain: Array<ChainReflection>): ScopeRelation {
     scope = this.lastChainScope(scope, chain.at(-1)!, owner);
 
     eachCons(chain, 2, ([reflection, nextReflection]) => {
