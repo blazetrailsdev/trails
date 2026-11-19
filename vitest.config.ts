@@ -575,6 +575,7 @@ const otherSetupFiles = [
   "./packages/arel/test/support/test-setup-engine.ts",
   "./packages/actionview/test/support/setup-compile-template.ts",
   "./packages/ruby-compat/test-setup/class-paths.ts",
+  "./packages/nokogiri/test/support/setup-extension.ts",
 ];
 
 export default defineConfig({
@@ -674,6 +675,7 @@ export default defineConfig({
               : []),
             "./packages/activerecord/test/support/test-setup-dy.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/nokogiri/test/support/setup-extension.ts",
             // Opt-in DDL timing profiler, gated on DDL_PROFILE=1 (dormant/no-op when off).
             ...(process.env.DDL_PROFILE === "1"
               ? ["./packages/activerecord/test/support/test-setup-ddl-profile.ts"]
@@ -701,7 +703,10 @@ export default defineConfig({
           name: "sqlite-drivers",
           include: SQLITE_DRIVER_TESTS,
           exclude: [...SHARED_EXCLUDE],
-          setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
+          setupFiles: [
+            "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/nokogiri/test/support/setup-extension.ts",
+          ],
         },
       },
       {
@@ -834,6 +839,7 @@ export default defineConfig({
           setupFiles: [
             "./packages/vitest-matchers/lib/setup.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/nokogiri/test/support/setup-extension.ts",
           ],
         },
       },
@@ -844,7 +850,10 @@ export default defineConfig({
           globals: true,
           include: ["packages/zeitwerk/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
-          setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
+          setupFiles: [
+            "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/nokogiri/test/support/setup-extension.ts",
+          ],
         },
       },
       {
@@ -856,6 +865,7 @@ export default defineConfig({
           exclude: SHARED_EXCLUDE,
           setupFiles: [
             "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/nokogiri/test/support/setup-extension.ts",
             "./packages/vitest-matchers/lib/setup.ts",
           ],
         },
@@ -869,6 +879,7 @@ export default defineConfig({
           exclude: SHARED_EXCLUDE,
           setupFiles: [
             "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/nokogiri/test/support/setup-extension.ts",
             "./packages/vitest-matchers/lib/setup.ts",
           ],
         },
@@ -882,6 +893,7 @@ export default defineConfig({
           exclude: [...SHARED_EXCLUDE, "packages/stimulus/test/generators/**"],
           setupFiles: [
             "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/nokogiri/test/support/setup-extension.ts",
             "./packages/vitest-matchers/lib/setup.ts",
           ],
         },
@@ -893,7 +905,10 @@ export default defineConfig({
           globals: true,
           include: ["packages/raabro/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
-          setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
+          setupFiles: [
+            "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/nokogiri/test/support/setup-extension.ts",
+          ],
         },
       },
       {
@@ -906,6 +921,7 @@ export default defineConfig({
           setupFiles: [
             "./packages/vitest-matchers/lib/setup.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/nokogiri/test/support/setup-extension.ts",
           ],
         },
       },

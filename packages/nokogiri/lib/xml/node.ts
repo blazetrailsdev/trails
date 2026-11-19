@@ -1,15 +1,8 @@
-import {
-  XmlAttribute as LibXmlAttribute,
-  XmlCData as LibXmlCData,
-  XmlElement as LibXmlElement,
-  XmlText as LibXmlText,
-  XmlTreeNode,
-} from "libxml2-wasm";
-import { xmlAddChild, xmlUnlinkNode } from "libxml2-wasm/lib/libxml2.mjs";
+import type { XmlAttribute as LibXmlAttribute, XmlTreeNode } from "libxml2-wasm";
 import type { DefaultTreeAdapterMap } from "parse5";
 import { ArgumentError, StringIO, include, rbObjClassname } from "@blazetrails/ruby-compat";
 
-import { XML } from "../namespaces.js";
+import { XML, Nokogiri } from "../namespaces.js";
 
 import type { Node } from "../html5/node.js";
 import type { XmlDocument } from "./document.js";
@@ -51,7 +44,7 @@ export class XmlNode {
   }
 
   get namespaces(): Record<string, string> {
-    if (!(this._node instanceof LibXmlElement)) return {};
+    if (!(this._node instanceof Nokogiri.LibXml2!.XmlElement)) return {};
     const hash: Record<string, string> = {};
     for (const [prefix, href] of Object.entries(this._node.namespaces)) {
       const key = prefix ? `xmlns:${prefix}` : "xmlns";
@@ -61,26 +54,32 @@ export class XmlNode {
   }
 
   get name(): string {
-    if (this._node instanceof LibXmlElement) return this._node.name;
-    if (this._node instanceof LibXmlText) return "#text";
-    if (this._node instanceof LibXmlCData) return "#cdata-section";
+    if (this._node instanceof Nokogiri.LibXml2!.XmlElement) return this._node.name;
+    if (this._node instanceof Nokogiri.LibXml2!.XmlText) return "#text";
+    if (this._node instanceof Nokogiri.LibXml2!.XmlCData) return "#cdata-section";
     return "#node";
   }
 
   isElement(): boolean {
-    return this._node instanceof LibXmlElement;
+    return this._node instanceof Nokogiri.LibXml2!.XmlElement;
   }
 
   isText(): boolean {
-    return this._node instanceof LibXmlText;
+    return this._node instanceof Nokogiri.LibXml2!.XmlText;
   }
 
   isCdata(): boolean {
-    return this._node instanceof LibXmlCData;
+    return this._node instanceof Nokogiri.LibXml2!.XmlCData;
   }
 
   isBlank(): boolean {
-    if (!(this._node instanceof LibXmlText || this._node instanceof LibXmlCData)) return false;
+    if (
+      !(
+        this._node instanceof Nokogiri.LibXml2!.XmlText ||
+        this._node instanceof Nokogiri.LibXml2!.XmlCData
+      )
+    )
+      return false;
     return /^[ \t\n\r]*$/.test(this.content);
   }
 
@@ -89,7 +88,7 @@ export class XmlNode {
   }
 
   get children(): XmlNode[] {
-    if (!(this._node instanceof LibXmlElement)) return [];
+    if (!(this._node instanceof Nokogiri.LibXml2!.XmlElement)) return [];
     const result: XmlNode[] = [];
     let child = this._node.firstChild;
     while (child !== null) {
@@ -114,12 +113,12 @@ export class XmlNode {
   }
 
   unlink(): this {
-    xmlUnlinkNode(this.pointerId);
+    Nokogiri.LibXml2!.xmlUnlinkNode(this.pointerId);
     return this;
   }
 
   set(name: string, value: string): void {
-    if (this._node instanceof LibXmlElement) this._node.setAttr(name, value);
+    if (this._node instanceof Nokogiri.LibXml2!.XmlElement) this._node.setAttr(name, value);
   }
 
   values(): string[] {
@@ -131,7 +130,7 @@ export class XmlNode {
   }
 
   get attributeNodes(): AttrNode[] {
-    if (!(this._node instanceof LibXmlElement)) return [];
+    if (!(this._node instanceof Nokogiri.LibXml2!.XmlElement)) return [];
     return this._node.attrs.map((a: LibXmlAttribute) => ({
       nodeName: a.name,
       value: a.value,
@@ -209,7 +208,7 @@ export class XmlNode {
     options: number,
   ): StringIO {
     io.write(
-      this._node instanceof LibXmlElement
+      this._node instanceof Nokogiri.LibXml2!.XmlElement
         ? this._node.toString({
             format: (options & SaveOptions.FORMAT) !== 0,
             noEmptyTags: (options & SaveOptions.NO_EMPTY_TAGS) !== 0,
@@ -245,14 +244,14 @@ export class XmlNode {
 
   /** @internal */
   protected addChildNode(node: XmlNode): void {
-    xmlUnlinkNode(node.pointerId);
-    xmlAddChild(this.pointerId, node.pointerId);
+    Nokogiri.LibXml2!.xmlUnlinkNode(node.pointerId);
+    Nokogiri.LibXml2!.xmlAddChild(this.pointerId, node.pointerId);
   }
 
   /** @internal */
   protected addChildNodeAndReparentAttrs(node: XmlNode): void {
     this.addChildNode(node);
-    if (!(node._node instanceof LibXmlElement)) return;
+    if (!(node._node instanceof Nokogiri.LibXml2!.XmlElement)) return;
     for (const attrNode of node._node.attrs.filter((a) => a.name.includes(":"))) {
       const { name, value } = attrNode;
       attrNode.remove();

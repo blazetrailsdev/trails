@@ -1,7 +1,5 @@
 import type { DefaultTreeAdapterMap } from "parse5";
-import {
-  XmlAttribute as LibXmlAttribute,
-  XmlComment as LibXmlComment,
+import type {
   XmlDocument as LibXmlDocument,
   XmlElement as LibXmlElement,
   XmlNode,
@@ -17,7 +15,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 import { Node } from "../html5/node.js";
-import { XML } from "../namespaces.js";
+import { XML, Nokogiri } from "../namespaces.js";
 import { Attr } from "./attr.js";
 import { XmlNode as XMLNode } from "./node.js";
 import { NodeSet } from "./node-set.js";
@@ -203,9 +201,9 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
   kind(node): NodeKind {
     if (node instanceof NamespaceNode) return "namespace";
     if (node instanceof LibXmlRoot) return "root";
-    if (node instanceof LibXmlAttribute) return "attribute";
-    if (node instanceof LibXmlElement) return "element";
-    if (node instanceof LibXmlComment) return "comment";
+    if (node instanceof Nokogiri.LibXml2!.XmlAttribute) return "attribute";
+    if (node instanceof Nokogiri.LibXml2!.XmlElement) return "element";
+    if (node instanceof Nokogiri.LibXml2!.XmlComment) return "comment";
     if (node.eval("boolean(self::processing-instruction())") === true) {
       return "processing-instruction";
     }
@@ -218,14 +216,14 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
   },
   children(node) {
     if (node instanceof LibXmlRoot) return node.doc.find("/node()") as LibXmlXPathNode[];
-    if (!(node instanceof LibXmlElement)) return [];
+    if (!(node instanceof Nokogiri.LibXml2!.XmlElement)) return [];
     return node.find("node()") as LibXmlXPathNode[];
   },
   attributes(node) {
-    return node instanceof LibXmlElement ? node.attrs : [];
+    return node instanceof Nokogiri.LibXml2!.XmlElement ? node.attrs : [];
   },
   namespaces(node) {
-    if (!(node instanceof LibXmlElement)) return [];
+    if (!(node instanceof Nokogiri.LibXml2!.XmlElement)) return [];
     let byPtr = libXmlNamespaces.get(node.doc);
     if (byPtr === undefined) libXmlNamespaces.set(node.doc, (byPtr = new Map()));
     const namespaces = namespaceNodes(node, node.namespaces, byPtr.get(libXmlPtr(node)));
@@ -234,23 +232,39 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
   },
   localName(node) {
     if (node instanceof NamespaceNode) return node.prefix ?? "";
-    if (node instanceof LibXmlElement || node instanceof LibXmlAttribute) return node.name;
+    if (
+      node instanceof Nokogiri.LibXml2!.XmlElement ||
+      node instanceof Nokogiri.LibXml2!.XmlAttribute
+    )
+      return node.name;
     if (node instanceof LibXmlRoot) return "";
     return node.eval("local-name()") as string;
   },
   qualifiedName(node) {
     if (node instanceof NamespaceNode) return node.prefix ?? "";
-    if (!(node instanceof LibXmlElement || node instanceof LibXmlAttribute)) return "";
+    if (
+      !(
+        node instanceof Nokogiri.LibXml2!.XmlElement ||
+        node instanceof Nokogiri.LibXml2!.XmlAttribute
+      )
+    )
+      return "";
     return node.prefix ? `${node.prefix}:${node.name}` : node.name;
   },
   namespaceUri(node) {
-    if (!(node instanceof LibXmlElement || node instanceof LibXmlAttribute)) return null;
+    if (
+      !(
+        node instanceof Nokogiri.LibXml2!.XmlElement ||
+        node instanceof Nokogiri.LibXml2!.XmlAttribute
+      )
+    )
+      return null;
     return node.namespaceUri || null;
   },
   stringValue(node) {
     if (node instanceof LibXmlRoot) return node.doc.root.content;
     if (node instanceof NamespaceNode) return node.href;
-    if (node instanceof LibXmlAttribute) return node.value;
+    if (node instanceof Nokogiri.LibXml2!.XmlAttribute) return node.value;
     return node.content;
   },
   key(node) {
@@ -396,10 +410,11 @@ export class XPathContext {
 
   private static unwrap(node: ContextHost): [Tree<XPathNode>, XPathNode] {
     const host = node._node;
-    if (host instanceof LibXmlDocument) {
+    if (host instanceof Nokogiri.LibXml2!.XmlDocument) {
       return [LIBXML_TREE as Tree<XPathNode>, libXmlRoot(host)];
     }
-    if (host instanceof XmlTreeNode) return [LIBXML_TREE as Tree<XPathNode>, host];
+    if (host instanceof Nokogiri.LibXml2!.XmlTreeNode)
+      return [LIBXML_TREE as Tree<XPathNode>, host];
     return [PARSE5_TREE as Tree<XPathNode>, host as Parse5Node];
   }
 
@@ -412,10 +427,10 @@ export class XPathContext {
     if (node instanceof NamespaceNode) {
       return new Namespace(node, this._document) as unknown as Node;
     }
-    if (node instanceof LibXmlAttribute || node instanceof Parse5AttrNode) {
+    if (node instanceof Nokogiri.LibXml2!.XmlAttribute || node instanceof Parse5AttrNode) {
       return new Attr(node, this._document) as unknown as Node;
     }
-    if (node instanceof XmlNode)
+    if (node instanceof Nokogiri.LibXml2!.XmlNode)
       return new XMLNode(node as XmlTreeNode, this._document) as unknown as Node;
     if (this._tree.kind(node) === "root") return this._document as Node;
     return new Node(node as DefaultTreeAdapterMap["childNode"], this._document);

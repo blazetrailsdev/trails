@@ -23,6 +23,7 @@ import {
   Template,
   ViewReloader,
 } from "@blazetrails/actionview";
+import { Nokogiri } from "@blazetrails/nokogiri";
 import { Dir } from "@blazetrails/ruby-compat";
 import type { Application } from "../application.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
@@ -175,6 +176,14 @@ export class Trailtie extends BaseTrailtie {
         });
       }
     });
+
+    this.initializer(
+      "action_view.require_nokogiri",
+      { before: "load_environment_config" },
+      async () => {
+        await Nokogiri.loadPath["nokogiri/extension"]();
+      },
+    );
 
     this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {
       app.deprecators.set("actionView", deprecator());

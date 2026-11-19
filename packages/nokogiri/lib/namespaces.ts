@@ -61,5 +61,20 @@ export const CSS = { name: "Nokogiri::CSS" } as {
   Tokenizer: typeof Tokenizer;
 };
 
-export const Nokogiri = { name: "Nokogiri", XML, HTML5, CSS };
+export type LibXml2 = typeof import("libxml2-wasm") &
+  Pick<typeof import("libxml2-wasm/lib/libxml2.mjs"), "xmlAddChild" | "xmlUnlinkNode">;
+
+const loadPath: Record<string, () => Promise<unknown>> = {
+  "nokogiri/extension": () => import("./extension.js"),
+};
+
+export const Nokogiri = { name: "Nokogiri", loadPath, XML, HTML5, CSS } as {
+  name: string;
+  loadPath: Record<string, () => Promise<unknown>>;
+  /** @noRailsEquivalent PERMANENT */
+  LibXml2?: LibXml2;
+  XML: typeof XML;
+  HTML5: typeof HTML5;
+  CSS: typeof CSS;
+};
 constSet(TopLevel, "Nokogiri", Nokogiri);
