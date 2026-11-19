@@ -82,6 +82,7 @@ export class Signals {
   /**
    * @internal
    * @missingRailsArgs kill — PERMANENT
+   * @inventedArm if — CONVERGEABLE solid-queue-fork-mode-unported-register
    */
   signalProcess(this: SignalsHost, pid: string, signal: Signal): void {
     const supervisee = this.processInstances[pid];

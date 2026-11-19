@@ -1,4 +1,4 @@
-import { Process } from "@blazetrails/ruby-compat";
+import { Process, SystemCallError } from "@blazetrails/ruby-compat";
 import { ProcessExitError } from "./processes/process-exit-error.js";
 import { SolidQueue } from "./solid-queue.js";
 import { Supervisor } from "./supervisor.js";
@@ -52,19 +52,19 @@ export class ForkSupervisor extends Supervisor {
       await this.replaceFork(pid, status!);
     }
 
-    this.checkBootTimeouts();
+    await this.checkBootTimeouts();
   }
 
   /** @internal */
-  private checkBootTimeouts(): void {
+  private async checkBootTimeouts(): Promise<void> {
     for (const [pid, instance] of Object.entries(this.processInstances)) {
-      if (instance.isBootTimedOut()) this.terminateUnreadyProcess(pid);
+      if (instance.isBootTimedOut()) await this.terminateUnreadyProcess(pid);
     }
   }
 
   /** @internal */
-  private terminateUnreadyProcess(pid: string): void {
-    SolidQueue.instrument(
+  private async terminateUnreadyProcess(pid: string): Promise<void> {
+    await SolidQueue.instrument(
       "fork_boot_timeout",
       { process: this.processInstances[pid], pid: pid },
       () => {
@@ -78,23 +78,27 @@ export class ForkSupervisor extends Supervisor {
    * @missingRailsArgs waitpid2 — PERMANENT
    */
   private async reapTerminatedForks(): Promise<void> {
-    while (true) {
-      const [pid, status] = this.waitpid2() ?? [];
-      if (pid == null) break;
+    try {
+      while (true) {
+        const [pid, status] = this.waitpid2() ?? [];
+        if (pid == null) break;
 
-      const terminatedFork = this.processInstances[pid];
-      if (terminatedFork) {
-        delete this.processInstances[pid];
-        terminatedFork.markAsReaped();
+        const terminatedFork = this.processInstances[pid];
+        if (terminatedFork) {
+          delete this.processInstances[pid];
+          terminatedFork.markAsReaped();
 
-        if (!status!.isExited() || status!.exitstatus! > 0) {
-          await this.attemptToReleaseClaimedJobsBy(terminatedFork, {
-            withError: new ProcessExitError(status!),
-          });
+          if (!status!.isExited() || status!.exitstatus! > 0) {
+            await this.attemptToReleaseClaimedJobsBy(terminatedFork, {
+              withError: new ProcessExitError(status!),
+            });
+          }
         }
-      }
 
-      delete this.configuredProcesses[pid];
+        delete this.configuredProcesses[pid];
+      }
+    } catch (error) {
+      if (!(error instanceof SystemCallError)) throw error;
     }
   }
 

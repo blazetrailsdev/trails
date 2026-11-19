@@ -254,10 +254,6 @@ export interface Supervisor {
     terminatedProcess: { name: string },
     options: { withError: Error },
   ): Promise<void>;
-  releaseClaimedJobsBy(
-    terminatedProcess: { name: string },
-    options: { withError: Error },
-  ): Promise<void>;
   processSignalQueue(): Promise<void>;
   signalProcesses(pids: string[], signal: "QUIT" | "INT" | "TERM" | "KILL"): void;
   signalProcess(pid: string, signal: "QUIT" | "INT" | "TERM" | "KILL"): void;
