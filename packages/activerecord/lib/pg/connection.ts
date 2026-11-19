@@ -63,7 +63,7 @@ export class Connection {
       try {
         return await block(conn);
       } finally {
-        await conn.close();
+        await conn.finish();
       }
     }
     return conn;
@@ -97,12 +97,15 @@ export class Connection {
     }
   }
 
-  async close(): Promise<void> {
+  async finish(): Promise<void> {
     try {
       await this.client.end();
     } catch (error) {
       throw pgError(this, error);
     }
+  }
+  close(): Promise<void> {
+    return this.finish();
   }
 
   async setClientEncoding(encoding: string): Promise<void> {

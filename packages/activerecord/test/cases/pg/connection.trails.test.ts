@@ -461,7 +461,7 @@ describe("PG::Connection.new and its connect alias", () => {
 
   it("yields the connection to a block and closes it after", async () => {
     const connect = vi.spyOn(Connection.prototype, "connect").mockResolvedValue(undefined);
-    const close = vi.spyOn(Connection.prototype, "close").mockResolvedValue(undefined);
+    const close = vi.spyOn(Connection.prototype, "finish").mockResolvedValue(undefined);
     try {
       expect(await Connection.new({}, (conn) => conn instanceof Connection)).toBe(true);
       expect(close).toHaveBeenCalledTimes(1);
