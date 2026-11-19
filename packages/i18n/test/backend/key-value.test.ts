@@ -1,3 +1,4 @@
+import { include } from "@blazetrails/ruby-compat";
 import * as TestCase from "../support/test-case.js";
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { KeyValue, type Store } from "../../lib/backend/key-value.js";
@@ -7,7 +8,8 @@ import { config, t, type TranslateKey } from "../../lib/i18n.js";
 import type { TranslateOptions } from "../../lib/backend/base.js";
 import { deepSymbolizeKeys, type TranslationData } from "../../lib/utils.js";
 
-class FallbacksBackend extends Fallbacks(KeyValue) {}
+class FallbacksBackend extends KeyValue {}
+include(FallbacksBackend, Fallbacks);
 
 describe("I18nBackendKeyValueTest", () => {
   let backend: KeyValue;

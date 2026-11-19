@@ -15,5 +15,6 @@ describe("SafeListSanitizer scrub_node", () => {
     expect(new SafeListSanitizer({ prune: true }).sanitize("<p>a<script>x</script>c</p>")).toBe(
       "<p>ac</p>",
     );
+    expect(new SafeListSanitizer({ prune: true }).sanitize("a<script>x</script>c")).toBe("ac");
   });
 });

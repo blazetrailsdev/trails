@@ -8,7 +8,8 @@ import { config, setDefaultLocale, t, type Locale } from "../../lib/i18n.js";
 
 class PluralizationSimple extends Simple {}
 include(PluralizationSimple, Pluralization);
-class Backend extends Fallbacks(PluralizationSimple) {}
+class Backend extends PluralizationSimple {}
+include(Backend, Fallbacks);
 
 afterEach(TestCase.teardown);
 
