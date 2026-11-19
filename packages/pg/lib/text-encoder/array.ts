@@ -31,4 +31,4 @@ export class Array extends CompositeEncoder {
   }
 }
 
-PG.TextEncoder = { ...PG.TextEncoder, Array };
+PG.TextEncoder.Array = Array;

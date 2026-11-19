@@ -1,4 +1,11 @@
-import { ArgumentError, Enumerable, include } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  block as rbBlock,
+  Enumerable,
+  include,
+  toEnum,
+  type Enumerator,
+} from "@blazetrails/ruby-compat";
 import type pg from "pg";
 import { Constants as PGConstants } from "./pg.js";
 import { PG } from "./namespaces.js";
@@ -110,7 +117,17 @@ export class Result {
     );
   }
 
-  each(block: (tuple: Record<string, unknown>) => void): this {
+  each(): Enumerator<Record<string, unknown>>;
+  each(block: (tuple: Record<string, unknown>) => void): this;
+  each(
+    block?: (tuple: Record<string, unknown>) => void,
+  ): this | Enumerator<Record<string, unknown>> {
+    if (!block)
+      return toEnum(
+        this,
+        "each",
+        rbBlock(() => this.ntuples()),
+      );
     const fields = this.fields();
     for (let i = 0; i < this.ntuples(); i++) {
       block(Object.fromEntries(fields.map((name, j) => [name, this.#typecastResultValue(i, j)])));

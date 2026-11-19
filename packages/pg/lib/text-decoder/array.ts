@@ -142,4 +142,4 @@ export class Array extends CompositeDecoder {
   }
 }
 
-PG.TextDecoder = { ...PG.TextDecoder, Array };
+PG.TextDecoder.Array = Array;

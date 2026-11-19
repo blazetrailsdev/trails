@@ -25,11 +25,15 @@ export interface PGNamespace extends Readonly<{
   Coder: typeof Coder;
   CompositeCoder: typeof CompositeCoder;
   Result: typeof Result;
-  TextEncoder: { Array: typeof TextEncoderArray };
-  TextDecoder: { Array: typeof TextDecoderArray };
+  readonly TextEncoder: { Array: typeof TextEncoderArray };
+  readonly TextDecoder: { Array: typeof TextDecoderArray };
 }
 
-export const PG = { name: "PG" } as PGNamespace & typeof Constants;
+export const PG = {
+  name: "PG",
+  TextEncoder: {},
+  TextDecoder: {},
+} as PGNamespace & typeof Constants;
 
 TopLevel.PG = PG;
 
