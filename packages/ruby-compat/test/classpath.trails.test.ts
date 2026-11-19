@@ -9,7 +9,7 @@ import { NameError } from "../lib/name-error.js";
 describe("rbModName over the generated class-path table", () => {
   it("answers a generated path", () => {
     class Generated {}
-    defineConstants([[() => Generated, "Outer::Inner::Generated"]]);
+    defineConstants([[{ Generated }, "Generated", "Outer::Inner::Generated"]]);
     expect(rbModName(Generated)).toBe("Outer::Inner::Generated");
     expect(rbModToS(Generated)).toBe("Outer::Inner::Generated");
     expect(rbPathToClass("Outer::Inner::Generated")).toBe(Generated);
@@ -30,12 +30,15 @@ describe("rbModName over the generated class-path table", () => {
     class Outer {}
     class Resolved {}
     defineConstants([
-      [() => Outer, "ConstGetOuter"],
-      [() => Resolved, "ConstGetOuter::Resolved"],
+      [{ Outer }, "Outer", "ConstGetOuter"],
+      [{ Resolved }, "Resolved", "ConstGetOuter::Resolved"],
       [
-        () => {
-          throw new ReferenceError("Cannot access before initialization");
+        {
+          get ConstGetTdz(): unknown {
+            throw new ReferenceError("Cannot access before initialization");
+          },
         },
+        "ConstGetTdz",
         "ConstGetTdz",
       ],
     ]);
@@ -58,7 +61,7 @@ describe("rbModName over the generated class-path table", () => {
 
   it("constGet raises NameError for a row whose namespace has no seat", () => {
     class Leaf {}
-    defineConstants([[() => Leaf, "ConstGetUnseated::Leaf"]]);
+    defineConstants([[{ Leaf }, "Leaf", "ConstGetUnseated::Leaf"]]);
     expect(() => constGet(Object, "ConstGetUnseated::Leaf")).toThrow(
       "uninitialized constant ConstGetUnseated",
     );
@@ -68,7 +71,7 @@ describe("rbModName over the generated class-path table", () => {
     const Owner = class Owner {};
     class Seated {}
     constSet(Owner, "Seated", Seated);
-    defineConstants([[() => Seated, "Elsewhere::Seated"]]);
+    defineConstants([[{ Seated }, "Seated", "Elsewhere::Seated"]]);
     expect(rbModName(Seated)).toBe("Owner::Seated");
     expect(classPathMismatches()).toContainEqual(["Owner::Seated", "Elsewhere::Seated"]);
   });
@@ -86,10 +89,13 @@ describe("rbModName over the generated class-path table", () => {
     let reads = 0;
     defineConstants([
       [
-        () => {
-          reads++;
-          return Later;
+        {
+          get Later(): unknown {
+            reads++;
+            return Later;
+          },
         },
+        "Later",
         "Deferred::Later",
       ],
     ]);
@@ -102,21 +108,34 @@ describe("rbModName over the generated class-path table", () => {
   });
 
   it("resolves another class's pending entry on the next registration", () => {
-    defineConstants([[() => Actual, "Deferred::Swept"]]);
+    defineConstants([
+      [
+        {
+          get Actual(): unknown {
+            return Actual;
+          },
+        },
+        "Actual",
+        "Deferred::Swept",
+      ],
+    ]);
     class Probe {}
     expect(rbModName(Probe)).toBe("Probe");
     class Actual {}
     expect(rbModName(Actual)).toBe("Actual");
-    defineConstants([[() => class {}, "Deferred::Other"]]);
+    defineConstants([[{ Other: class {} }, "Other", "Deferred::Other"]]);
     expect(rbModName(Actual)).toBe("Deferred::Swept");
   });
 
   it("reports a thunk still unresolved when the check runs", () => {
     defineConstants([
       [
-        () => {
-          throw new ReferenceError("Cannot access 'Never' before initialization");
+        {
+          get Never(): unknown {
+            throw new ReferenceError("Cannot access 'Never' before initialization");
+          },
         },
+        "Never",
         "Deferred::Never",
       ],
     ]);
@@ -124,7 +143,17 @@ describe("rbModName over the generated class-path table", () => {
   });
 
   it("resolves a plain-object module whose row was in TDZ at the first lookup", () => {
-    defineConstants([[() => LateModule, "Deferred::LateModule"]]);
+    defineConstants([
+      [
+        {
+          get LateModule(): unknown {
+            return LateModule;
+          },
+        },
+        "LateModule",
+        "Deferred::LateModule",
+      ],
+    ]);
     class Probe {}
     expect(rbModName(Probe)).toBe("Probe");
     const LateModule = {};
@@ -133,7 +162,7 @@ describe("rbModName over the generated class-path table", () => {
 
   it("seats a plain-object module", () => {
     const Mod = {};
-    defineConstants([[() => Mod, "Outer::PlainModule"]]);
+    defineConstants([[{ Mod }, "Mod", "Outer::PlainModule"]]);
     expect(rbModName(Mod)).toBe("Outer::PlainModule");
     expect(rbPathToClass("Outer::PlainModule")).toBe(Mod);
   });
@@ -143,7 +172,7 @@ describe("rbModName over the generated class-path table", () => {
     class Rebound {}
     const Walked = { Inner: Rebound };
     (TopLevel as Record<string, unknown>).Walked = Walked;
-    defineConstants([[() => Inner, "Walked::Inner"]]);
+    defineConstants([[{ Inner }, "Inner", "Walked::Inner"]]);
     expect(rbPathToClass("Walked::Inner")).toBe(Rebound);
     delete (TopLevel as Record<string, unknown>).Walked;
   });
