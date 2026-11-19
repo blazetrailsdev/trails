@@ -145,6 +145,7 @@ describe("SolidQueue::BatchTest", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await Job.destroyAll();
     await Batch.destroyAll();
   });
@@ -329,9 +330,7 @@ describe("SolidQueue::BatchTest", () => {
         const events: Array<{ payload: { [key: string]: unknown } }> = [];
 
         expect(await nextJob.isBlocked()).toBeTruthy();
-        const stub = vi
-          .spyOn(Batch.prototype, "enqueueCallbackJobs")
-          .mockRejectedValue(callbackError);
+        vi.spyOn(Batch.prototype, "enqueueCallbackJobs").mockRejectedValue(callbackError);
 
         await objectWith(
           SolidQueue,
@@ -358,11 +357,11 @@ describe("SolidQueue::BatchTest", () => {
         expect(await batch.batchExecutions.toArray()).toBeEmpty();
         expect(await Job.where({ class_name: BatchCompletionJob.name }).count()).toBe(0);
         expect(events.length).toBe(1);
-        expect(events[0].payload["batch_id"]).toBe(batch.id);
-        expect(events[0].payload["job_id"]).toBe(job.id);
-        expect(events[0].payload["error"]).toBe(callbackError);
+        expect(sole(events).payload["batch_id"]).toBe(batch.id);
+        expect(sole(events).payload["job_id"]).toBe(job.id);
+        expect(sole(events).payload["error"]).toBe(callbackError);
 
-        stub.mockRestore();
+        vi.restoreAllMocks();
         await Batch.sweepStalled();
 
         expect((await batch.reload()).isFinished()).toBeTruthy();
