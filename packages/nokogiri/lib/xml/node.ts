@@ -99,6 +99,10 @@ export class XmlNode {
     return result;
   }
 
+  get elementChildren(): XmlNode[] {
+    return this.children.filter((child) => child.isElement());
+  }
+
   set children(nodeOrTags: XmlNode | NodeSet | DocumentFragment | string) {
     const coerced = this.coerce(nodeOrTags);
     new NodeSet(this.document, this.children as unknown as Node[]).unlink();

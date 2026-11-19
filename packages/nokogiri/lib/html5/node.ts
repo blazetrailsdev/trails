@@ -132,10 +132,6 @@ export class Node extends XmlNode {
     return childNodes(this._node as Parse5Parent, this.document);
   }
 
-  get elementChildren(): Node[] {
-    return this.children.filter((child) => child.isElement());
-  }
-
   set children(nodeOrTags: Node | DocumentFragment | NodeSet | string) {
     const coerced = this.coerce(nodeOrTags);
     new NodeSet(this.document, this.children).unlink();

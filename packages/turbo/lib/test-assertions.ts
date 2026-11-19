@@ -1,6 +1,12 @@
-import { Concern, delegate, extend } from "@blazetrails/activesupport";
+import {
+  Concern,
+  delegate,
+  extend,
+  extractOptionsBang,
+  included,
+} from "@blazetrails/activesupport";
 import { RecordIdentifier } from "@blazetrails/actionview/record-identifier.js";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbBlockGivenP, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Turbo } from "./turbo-trails.js";
 
 type Block = ((selected: unknown) => unknown) | null;
@@ -44,12 +50,18 @@ export const TestAssertions = {
   },
 
   assertTurboFrame(this: TestAssertionsHost, ...args: unknown[]): unknown {
-    const block = typeof args.at(-1) === "function" ? (args.pop() as Block) : null;
-    const last = args.at(-1);
-    const options = (
-      last != null && Object.getPrototypeOf(last) === Object.prototype ? args.pop() : {}
-    ) as { loading?: string | null; src?: string | null; target?: string | null; count?: number };
-    const { loading = null, src = null, target = null, count = 1 } = options;
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as Block) : null;
+    const {
+      loading = null,
+      src = null,
+      target = null,
+      count = 1,
+    } = extractOptionsBang(args) as {
+      loading?: string | null;
+      src?: string | null;
+      target?: string | null;
+      count?: number;
+    };
     const ids = args;
     const id = rbObjRespondTo(ids[0], "toKey")
       ? RecordIdentifier.domId(...(ids as [unknown, string?]))
@@ -62,23 +74,14 @@ export const TestAssertions = {
   },
 
   assertNoTurboFrame(this: TestAssertionsHost, ...args: unknown[]): unknown {
-    const block = typeof args.at(-1) === "function" ? args.pop() : null;
-    const last = args.at(-1);
-    const options =
-      last != null && Object.getPrototypeOf(last) === Object.prototype ? args.pop() : {};
-    return this.assertTurboFrame(
-      ...args,
-      { ...(options as object), count: 0 },
-      ...(block ? [block] : []),
-    );
+    const block = rbBlockGivenP(args.at(-1)) ? args.pop() : null;
+    const options = extractOptionsBang(args);
+    return this.assertTurboFrame(...args, { ...options, count: 0 }, ...(block ? [block] : []));
+  },
+
+  [included](base: { prototype: object }): void {
+    delegate.call(base.prototype, "domId", "domClass", { to: RecordIdentifier });
   },
 };
 extend(TestAssertions, Concern);
-(
-  TestAssertions as unknown as {
-    included(base: null, block: (this: { prototype: object }) => void): void;
-  }
-).included(null, function (this: { prototype: object }) {
-  delegate.call(this.prototype, "domId", "domClass", { to: RecordIdentifier });
-});
 Object.assign(Turbo, { TestAssertions });

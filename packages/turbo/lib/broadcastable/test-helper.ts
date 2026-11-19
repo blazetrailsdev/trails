@@ -1,4 +1,11 @@
-import { ActiveSupportJSON, Concern, extend, include, pluralize } from "@blazetrails/activesupport";
+import {
+  ActiveSupportJSON,
+  Concern,
+  extend,
+  include,
+  included,
+  pluralize,
+} from "@blazetrails/activesupport";
 import { assert, assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { TestHelper as ActionCableTestHelper } from "@blazetrails/actioncable/test-helper";
 import { HTML5 } from "@blazetrails/nokogiri";
@@ -75,18 +82,15 @@ export const TestHelper = {
       const html = ActiveSupportJSON.decode(payload as string) as string;
       const document = HTML5.Document.parse(html);
 
-      return document.at("body")!.elementChildren;
+      return document.at("body")!.elementChildren as Html5Node[];
     });
+  },
+
+  [included](base: object): void {
+    include(base, ActionCableTestHelper);
+
+    include(base, StreamName);
   },
 };
 extend(TestHelper, Concern);
-(
-  TestHelper as unknown as {
-    included(base: null, block: (this: object) => void): void;
-  }
-).included(null, function (this: object) {
-  include(this, ActionCableTestHelper);
-
-  include(this, StreamName);
-});
 Object.assign(Broadcastable, { TestHelper });

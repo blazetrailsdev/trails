@@ -29,4 +29,18 @@ describe("TestHtml5Nokogumbo", () => {
     expect(doc.xpath("main/span").toXml()).toBe("<span>content</span>");
     expect(doc.xpath("comment()").text).toBe(" test comment ");
   });
+
+  it("template", () => {
+    const source = `<template id="productrow">
+  <tr>
+    <td class="record"></td>
+    <td></td>
+  </tr>
+</template>
+`;
+    const doc = DocumentFragment.parse(source);
+    const template = doc.at("template")!;
+    expect(template.get("id")).toBe("productrow");
+    expect(template.at("td")!.get("class")).toBe("record");
+  });
 });
