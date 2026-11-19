@@ -1938,9 +1938,45 @@ export interface Relation<T extends Base, G extends boolean = false> {
   _arel?: SelectManager;
 }
 
+type QueryMethodsChainKeys = {
+  [K in keyof typeof QueryMethods]: (typeof QueryMethods)[K] extends (
+    this: never,
+    ...args: never[]
+  ) => infer R
+    ? 0 extends 1 & R
+      ? never
+      : R extends _qm.QueryMethodsHost
+        ? K
+        : never
+    : never;
+}[Exclude<
+  keyof typeof QueryMethods,
+  QueryMethodsDeclaredKeys | "groupBang" | "regroupBang" | "unscopeBang"
+>];
+
+type QueryMethodsDeclaredKeys =
+  | "group"
+  | "regroup"
+  | "unscope"
+  | "and"
+  | "or"
+  | "from"
+  | "isStructurallyCompatible"
+  | "extractAssociated";
+
+type QueryMethodsChain<Self> = {
+  [K in QueryMethodsChainKeys]: (typeof QueryMethods)[K] extends (
+    this: never,
+    ...args: infer A
+  ) => unknown
+    ? (...args: A) => K extends `${string}Bang` ? Omit<Self, "then" | "catch" | "finally"> : Self
+    : never;
+};
+
 export interface Relation<T extends Base, G extends boolean = false>
   extends
-    Included<typeof QueryMethods>,
+    Omit<Included<typeof QueryMethods>, QueryMethodsChainKeys | QueryMethodsDeclaredKeys>,
+    QueryMethodsChain<Relation<T, G>>,
     Included<typeof Explain>,
     Included<SignedIdRelationMethods<T>>,
     Included<TokenForRelationMethods<T>>,
@@ -2051,7 +2087,7 @@ export interface Relation<T extends Base, G extends boolean = false>
   /** @internal */
   arelColumnsFromHash(fields: Record<PropertyKey, unknown>): unknown[];
   select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...fields: (string | ArelNode | Record<string, unknown>)[]): Relation<T, G>;
+  select(...fields: _qm.SelectArg[]): Relation<T, G>;
   reselect(
     ...args: (string | ArelNode | Record<string, unknown> | readonly (string | ArelNode)[])[]
   ): Relation<T, G>;

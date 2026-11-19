@@ -41,7 +41,7 @@ const NOT_SET: unknown = Object.freeze({});
 export interface CurrentAttributes extends Included<typeof Callbacks> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export abstract class CurrentAttributes {
+export class CurrentAttributes {
   declare static TestHelper: typeof TestHelper;
   declare static defaults: Record<string, AttributeValue>;
   declare static isDefaults: boolean;
@@ -123,7 +123,7 @@ export abstract class CurrentAttributes {
     const instances = (this as typeof CurrentAttributes).currentInstances();
     let instance = instances.get(key);
     if (instance === undefined) {
-      instance = new (this as unknown as new () => CurrentAttributes)();
+      instance = new this();
       instances.set(key, instance);
     }
     return instance as InstanceType<T>;

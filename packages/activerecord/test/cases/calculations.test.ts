@@ -1933,9 +1933,9 @@ describe("CalculationsTest", () => {
   it("having with strong parameters", async () => {
     const params = new ProtectedParams({ credit_limit: "50" });
 
-    await assertRaises([ForbiddenAttributesError], {}, async () => {
-      Account.group("id").having(params);
-    });
+    await assertRaises([ForbiddenAttributesError], {}, async () =>
+      Account.group("id").having(params),
+    );
 
     const result = await Account.group("id").having(params.permitBang());
     expect(result[0].credit_limit).toEqual(50);

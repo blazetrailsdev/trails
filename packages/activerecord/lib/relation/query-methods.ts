@@ -70,7 +70,7 @@ import {
   wrap,
 } from "@blazetrails/activesupport";
 
-export class WhereChain<R = any> {
+export class WhereChain<R extends QueryMethodsHost = QueryMethodsHost> {
   private _scope: R;
 
   constructor(scope: R) {
@@ -84,14 +84,14 @@ export class WhereChain<R = any> {
     opts: Record<string, unknown> | Map<unknown, unknown> | unknown[] | string,
     ...rest: unknown[]
   ): R {
-    const scope = this._scope as unknown as QueryMethodsHost;
+    const scope = this._scope;
     const whereClause = buildWhereClause.call(scope, opts, rest);
     scope.whereClause = scope.whereClause.plus(whereClause.invert());
     return this._scope;
   }
 
   associated(...associations: string[]): R {
-    const scope = this._scope as unknown as QueryMethodsHost;
+    const scope = this._scope;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
       if (
@@ -110,7 +110,7 @@ export class WhereChain<R = any> {
       if (reflection.options.className) {
         this.not({ [association]: associationConditions });
       } else {
-        this.not({ [reflection.tableName]: associationConditions });
+        this.not({ [reflection.tableName!]: associationConditions });
       }
     }
 
@@ -118,7 +118,7 @@ export class WhereChain<R = any> {
   }
 
   missing(...associations: string[]): R {
-    const scope = this._scope as unknown as QueryMethodsHost;
+    const scope = this._scope;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
       leftOuterJoinsBang.call(scope, association);
@@ -129,7 +129,7 @@ export class WhereChain<R = any> {
       if (reflection.options.className) {
         whereBang.call(scope, { [association]: associationConditions });
       } else {
-        whereBang.call(scope, { [reflection.tableName]: associationConditions });
+        whereBang.call(scope, { [reflection.tableName!]: associationConditions });
       }
     }
 
@@ -137,7 +137,7 @@ export class WhereChain<R = any> {
   }
 
   private scopeAssociationReflection(association: string): WhereChainReflection {
-    const model = (this._scope as unknown as QueryMethodsHost).model as any;
+    const model = this._scope.model;
     const reflection = model._reflectOnAssociation(association);
     if (!reflection) {
       throw new ArgumentError(
@@ -150,7 +150,7 @@ export class WhereChain<R = any> {
 
 interface WhereChainReflection {
   name: string;
-  tableName: string;
+  tableName: string | null;
   options: Record<string, unknown>;
   associationPrimaryKey(): string | string[];
 }
@@ -170,6 +170,19 @@ export type AssociationSpec =
   | AssociationSpec[]
   | { [assoc: string]: AssociationSpec | AssociationSpec[] };
 
+export type SelectArg =
+  | string
+  | ArelNode
+  | Record<string, unknown>
+  | readonly (string | ArelNode)[];
+
+export type WithArg = Record<
+  string,
+  | import("../relation.js").Relation<any, boolean>
+  | string
+  | Array<import("../relation.js").Relation<any, boolean> | string>
+>;
+
 export type JoinSpec = AssociationSpec | Nodes.Join | JoinSpec[];
 
 export const FROZEN_EMPTY_ARRAY: readonly never[] = Object.freeze([]);
@@ -187,7 +200,7 @@ export type OrderArg =
   | Map<ArelNode | string, OrderDirection>
   | null;
 
-interface QueryMethodsHost {
+export interface QueryMethodsHost {
   primaryKey: string | string[];
   _values: Record<string, unknown>;
   _arel?: SelectManager;
@@ -199,7 +212,7 @@ interface QueryMethodsHost {
   includesValues: AssociationSpec[];
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
-  selectValues: any[];
+  selectValues: unknown[];
   groupValues: Array<string | ArelNode>;
   orderValues: Array<string | ArelNode>;
   joinsValues: (AssociationSpec | string | Nodes.Join | JoinDependency)[];
@@ -226,59 +239,63 @@ interface QueryMethodsHost {
   readonly isLoaded: boolean;
   records(): Promise<import("../base.js").Base[]>;
   aliasTracker(joins?: Nodes.Node[], aliases?: Hash<string, number>): AliasTracker;
-  clone(): any;
-  spawn(): any;
-  except(...skips: ExceptSkip[]): any;
+  clone(): this;
+  spawn(): this;
+  except(...skips: ExceptSkip[]): this;
   /** @internal */
   buildArel(connection: unknown, aliases?: AliasTracker): any;
+  arel(aliases?: AliasTracker): SelectManager;
   skipPreloadingValue: boolean;
   model: typeof import("../base.js").Base;
   table: ArelTable;
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
 }
 
-function includes(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+function includes<R extends QueryMethodsHost>(this: R, ...args: AssociationSpec[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":includes", args);
-  return includesBang.apply(this.spawn(), args);
+  return (includesBang<R>).apply(this.spawn(), args);
 }
 
-function includesBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+function includesBang<R extends QueryMethodsHost>(this: R, ...args: AssociationSpec[]): R {
   this.includesValues = union(this.includesValues, args);
   return this;
 }
 
-function all(this: QueryMethodsHost): any {
+function all<R extends QueryMethodsHost>(this: R): R {
   return this.spawn();
 }
 
-function eagerLoad(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+function eagerLoad<R extends QueryMethodsHost>(this: R, ...args: AssociationSpec[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":eager_load", args);
-  return eagerLoadBang.apply(this.spawn(), args);
+  return (eagerLoadBang<R>).apply(this.spawn(), args);
 }
 
-function eagerLoadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+function eagerLoadBang<R extends QueryMethodsHost>(this: R, ...args: AssociationSpec[]): R {
   this.eagerLoadValues = union(this.eagerLoadValues, args);
   return this;
 }
 
-function preload(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+function preload<R extends QueryMethodsHost>(this: R, ...args: AssociationSpec[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":preload", args);
-  return preloadBang.apply(this.spawn(), args);
+  return (preloadBang<R>).apply(this.spawn(), args);
 }
 
-function preloadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+function preloadBang<R extends QueryMethodsHost>(this: R, ...args: AssociationSpec[]): R {
   this.preloadValues = union(this.preloadValues, args);
   return this;
 }
 
-async function extractAssociated(this: QueryMethodsHost, association: string): Promise<any[]> {
-  const records = await preload.call(this, association);
-  const associated: any[] = [];
-  for (const record of records) associated.push(await record[association]);
+async function extractAssociated(this: QueryMethodsHost, association: string): Promise<unknown[]> {
+  const records = await preload.call(this, association).records();
+  const associated: unknown[] = [];
+  for (const record of records) associated.push(await rbFSend(record, association));
   return associated;
 }
 
-function references(this: QueryMethodsHost, ...tableNames: Array<string | Nodes.SqlLiteral>): any {
+function references<R extends QueryMethodsHost>(
+  this: R,
+  ...tableNames: Array<string | Nodes.SqlLiteral>
+): R {
   checkIfMethodHasArgumentsBang.call(this, ":references", tableNames);
   return referencesBang.apply(this.spawn(), tableNames);
 }
@@ -310,42 +327,53 @@ function unionReferences(
   return result;
 }
 
-function withCte(this: QueryMethodsHost, block: (...args: any[]) => unknown): never;
-function withCte(this: QueryMethodsHost, ...args: any[]): any;
-function withCte(this: QueryMethodsHost, ...args: any[]): any {
+function withCte<R extends QueryMethodsHost>(
+  this: R,
+  block: (...args: unknown[]) => unknown,
+): never;
+function withCte<R extends QueryMethodsHost>(this: R, ...args: WithArg[]): R;
+function withCte<R extends QueryMethodsHost>(this: R, ...args: unknown[]): R {
   if (args.some((cte) => typeof cte === "function")) {
     throw new ArgumentError("ActiveRecord::Relation#with does not accept a block");
   }
   checkIfMethodHasArgumentsBang.call(this, ":with", args);
-  return withBang.apply(this.spawn(), args);
+  return (withBang<R>).apply(this.spawn(), args as WithArg[]);
 }
 
-function withBang(this: QueryMethodsHost, ...args: unknown[]): any {
+function withBang<R extends QueryMethodsHost>(this: R, ...args: WithArg[]): R {
   const processed = processWithArgs.call(this, args);
   this.withValues = union(this.withValues, processed);
   return this;
 }
 
-function withRecursive(this: QueryMethodsHost, ...args: any[]): any {
+function withRecursive<R extends QueryMethodsHost>(this: R, ...args: WithArg[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":with_recursive", args);
-  return withRecursiveBang.apply(this.spawn(), args);
+  return (withRecursiveBang<R>).apply(this.spawn(), args);
 }
 
-function withRecursiveBang(this: QueryMethodsHost, ...args: unknown[]): any {
+function withRecursiveBang<R extends QueryMethodsHost>(this: R, ...args: WithArg[]): R {
   const processed = processWithArgs.call(this, args);
   this.withValues = union(this.withValues, processed);
   this._withIsRecursive = true;
   return this;
 }
 
-function select(this: QueryMethodsHost, block: (record: any) => unknown): Promise<any[]>;
-function select(this: QueryMethodsHost, ...fields: any[]): any;
-function select(this: QueryMethodsHost, ...fields: any[]): any {
+function select<R extends QueryMethodsHost>(
+  this: R,
+  block: (record: import("../base.js").Base) => unknown,
+): Promise<import("../base.js").Base[]>;
+function select<R extends QueryMethodsHost>(this: R, ...fields: SelectArg[]): R;
+function select<R extends QueryMethodsHost>(
+  this: R,
+  ...fields: (SelectArg | ((record: import("../base.js").Base) => unknown))[]
+): R | Promise<import("../base.js").Base[]> {
   if (fields.length >= 1 && typeof fields[fields.length - 1] === "function") {
     if (fields.length > 1) {
       throw new ArgumentError("`select' with block doesn't take arguments.");
     }
-    return this.records().then((records) => records.filter(fields[0]));
+    return this.records().then((records) =>
+      records.filter(fields[0] as (record: import("../base.js").Base) => unknown),
+    );
   }
   checkIfMethodHasArgumentsBang.call(
     this,
@@ -353,75 +381,75 @@ function select(this: QueryMethodsHost, ...fields: any[]): any {
     fields,
     "Call `select' with at least one field.",
   );
-  fields = processSelectArgs.call(this, fields);
-  return _selectBang.apply(this.spawn(), fields);
+  fields = processSelectArgs.call(this, fields as SelectArg[]);
+  return (_selectBang<R>).apply(this.spawn(), fields as SelectArg[]);
 }
 
-function reselect(this: QueryMethodsHost, ...args: any[]): any {
+function reselect<R extends QueryMethodsHost>(this: R, ...args: SelectArg[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":reselect", args);
   args = processSelectArgs.call(this, args);
-  return reselectBang.apply(this.spawn(), args);
+  return (reselectBang<R>).apply(this.spawn(), args);
 }
 
-function reselectBang(this: QueryMethodsHost, ...args: any[]): any {
+function reselectBang<R extends QueryMethodsHost>(this: R, ...args: SelectArg[]): R {
   this.selectValues = args;
   return this;
 }
 
-function _selectBang(this: QueryMethodsHost, ...fields: any[]): any {
+function _selectBang<R extends QueryMethodsHost>(this: R, ...fields: unknown[]): R {
   this.selectValues = union(this.selectValues, fields);
   return this;
 }
 
-function group(this: QueryMethodsHost, ...args: (string | ArelNode)[]): any {
+function group<R extends QueryMethodsHost>(this: R, ...args: (string | ArelNode)[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":group", args as unknown[]);
-  return groupBang.apply(this.spawn(), args);
+  return (groupBang<R>).apply(this.spawn(), args);
 }
 
-function groupBang(
-  this: QueryMethodsHost,
+function groupBang<R extends QueryMethodsHost>(
+  this: R,
   ...args: (string | import("@blazetrails/arel").ArelNode)[]
-): any {
+): R {
   this.groupValues = [...this.groupValues, ...(args as string[])];
   return this;
 }
 
-function regroup(this: QueryMethodsHost, ...args: string[]): any {
+function regroup<R extends QueryMethodsHost>(this: R, ...args: string[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":regroup", args);
-  return regroupBang.apply(this.spawn(), args);
+  return (regroupBang<R>).apply(this.spawn(), args);
 }
 
-function regroupBang(
-  this: QueryMethodsHost,
+function regroupBang<R extends QueryMethodsHost>(
+  this: R,
   ...args: (string | import("@blazetrails/arel").ArelNode)[]
-): any {
+): R {
   this.groupValues = [...(args as string[])];
   return this;
 }
 
-function order(this: QueryMethodsHost, ...args: OrderArg[]): any {
+function order<R extends QueryMethodsHost>(this: R, ...args: OrderArg[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":order", args as unknown[], undefined, () => {
     sanitizeOrderArguments.call(this, args as unknown[]);
   });
-  return orderBang.apply(this.spawn(), args);
+  return (orderBang<R>).apply(this.spawn(), args);
 }
 
-function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
+function orderBang<R extends QueryMethodsHost>(this: R, ...args: OrderArg[]): R {
   if (args.length > 0) preprocessOrderArgs.call(this, args as unknown[]);
   this.orderValues = union(this.orderValues, args as unknown[]) as typeof this.orderValues;
   return this;
 }
 
-function inOrderOf(
-  this: QueryMethodsHost,
+function inOrderOf<R extends QueryMethodsHost>(
+  this: R,
   column: string | ArelNode,
   values: unknown[],
   filter = true,
-): any {
+): R {
   this.model.disallowRawSqlBang([column], {
     permit: this.model.adapterClass().columnNameWithOrderMatcher(),
   });
-  if (values.length === 0) return noneBang.call(this.spawn());
+  if (values.length === 0) return (noneBang<R>).call(this.spawn());
 
   const references = columnReferences([column]);
   if (references.length > 0) referencesBang.call(this, ...references);
@@ -435,7 +463,7 @@ function inOrderOf(
   const arelColumn: any =
     column instanceof Nodes.SqlLiteral ? column : orderColumn.call(this, String(column));
 
-  let scope = orderBang.call(
+  let scope = (orderBang<R>).call(
     this.spawn(),
     buildCaseForValuePosition.call(this, arelColumn, values, { filter }),
   );
@@ -445,20 +473,20 @@ function inOrderOf(
       ? (arelColumn.in(values.filter((v) => v !== null)) as Nodes.Node).or(arelColumn.eq(null))
       : arelColumn.in(values);
 
-    scope = whereBang.call(scope, whereClause);
+    scope = (whereBang<R>).call(scope, whereClause);
   }
 
   return scope;
 }
 
-function reorder(this: QueryMethodsHost, ...args: OrderArg[]): any {
+function reorder<R extends QueryMethodsHost>(this: R, ...args: OrderArg[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":reorder", args as unknown[], undefined, () => {
     sanitizeOrderArguments.call(this, args as unknown[]);
   });
-  return reorderBang.apply(this.spawn(), args);
+  return (reorderBang<R>).apply(this.spawn(), args);
 }
 
-function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
+function reorderBang<R extends QueryMethodsHost>(this: R, ...args: OrderArg[]): R {
   preprocessOrderArgs.call(this, args as unknown[]);
   args = uniq(args);
   this.reorderingValue = true;
@@ -535,12 +563,12 @@ export const EXCEPT_ONLY_KEYS: readonly ExceptKey[] = [
 
 export type ExceptSkip = ExceptKey | (string & {});
 
-function unscope(this: QueryMethodsHost, ...args: UnscopeArg[]): any {
+function unscope<R extends QueryMethodsHost>(this: R, ...args: UnscopeArg[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":unscope", args as unknown[]);
-  return unscopeBang.apply(this.spawn(), args);
+  return (unscopeBang<R>).apply(this.spawn(), args);
 }
 
-function unscopeBang(this: QueryMethodsHost, ...args: UnscopeArg[]): any {
+function unscopeBang<R extends QueryMethodsHost>(this: R, ...args: UnscopeArg[]): R {
   this.unscopeValues = [...this.unscopeValues, ...args];
 
   for (let scope of args as unknown[]) {
@@ -573,27 +601,30 @@ function unscopeBang(this: QueryMethodsHost, ...args: UnscopeArg[]): any {
   return this;
 }
 
-function joins(this: QueryMethodsHost, ...args: JoinSpec[]): any {
+function joins<R extends QueryMethodsHost>(this: R, ...args: JoinSpec[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":joins", args as unknown[]);
-  return joinsBang.apply(this.spawn(), args as (string | Nodes.Join)[]);
+  return (joinsBang<R>).apply(this.spawn(), args as (string | Nodes.Join)[]);
 }
 
-function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join | JoinDependency)[]): any {
+function joinsBang<R extends QueryMethodsHost>(
+  this: R,
+  ...args: (string | Nodes.Join | JoinDependency)[]
+): R {
   this.joinsValues = union(this.joinsValues, args);
   return this;
 }
 
-function leftOuterJoins(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+function leftOuterJoins<R extends QueryMethodsHost>(this: R, ...args: AssociationSpec[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":left_outer_joins", args);
-  return leftOuterJoinsBang.apply(this.spawn(), args);
+  return (leftOuterJoinsBang<R>).apply(this.spawn(), args);
 }
 
-function leftJoins(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+function leftJoins<R extends QueryMethodsHost>(this: R, ...args: AssociationSpec[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":left_joins", args);
-  return leftOuterJoinsBang.apply(this.spawn(), args);
+  return (leftOuterJoinsBang<R>).apply(this.spawn(), args);
 }
 
-function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+function leftOuterJoinsBang<R extends QueryMethodsHost>(this: R, ...args: AssociationSpec[]): R {
   this.leftOuterJoinsValues = union(this.leftOuterJoinsValues, args);
   return this;
 }
@@ -675,17 +706,17 @@ function where(
   );
 }
 
-function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
+function whereBang<R extends QueryMethodsHost>(this: R, opts: unknown, ...rest: unknown[]): R {
   const clause = buildWhereClause.call(this, opts, rest);
   this.whereClause = this.whereClause.plus(clause);
   return this;
 }
 
-function rewhere(
-  this: QueryMethodsHost,
+function rewhere<R extends QueryMethodsHost>(
+  this: R,
   conditions: Record<string, unknown> | Map<string, unknown> | null,
-): any {
-  if (conditions == null) return unscope.call(this, ":where");
+): R {
+  if (conditions == null) return (unscope<R>).call(this, ":where");
   conditions = sanitizeForbiddenAttributes(conditions);
   const rel = this.spawn();
   const newClause = buildWhereClause.call(rel, conditions);
@@ -694,7 +725,7 @@ function rewhere(
   return rel;
 }
 
-function isRelationLike(value: unknown): boolean {
+function isRelationLike(value: unknown): value is import("../relation.js").Relation<any, boolean> {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -703,11 +734,11 @@ function isRelationLike(value: unknown): boolean {
   );
 }
 
-function invertWhere(this: QueryMethodsHost): any {
-  return invertWhereBang.call(this.spawn());
+function invertWhere<R extends QueryMethodsHost>(this: R): R {
+  return (invertWhereBang<R>).call(this.spawn());
 }
 
-function invertWhereBang(this: QueryMethodsHost): any {
+function invertWhereBang<R extends QueryMethodsHost>(this: R): R {
   this.whereClause = this.whereClause.invert();
   return this;
 }
@@ -845,15 +876,15 @@ function assertStructurallyCompatible(
   }
 }
 
-function isStructurallyCompatible(this: QueryMethodsHost, other: any): boolean {
+function isStructurallyCompatible<R extends QueryMethodsHost>(this: R, other: R): boolean {
   return structurallyIncompatibleValuesFor.call(this, other).length === 0;
 }
 
-function and(this: QueryMethodsHost, other: any): any {
-  return andBang.call(this.spawn(), other);
+function and<R extends QueryMethodsHost>(this: R, other: R): R {
+  return (andBang<R>).call(this.spawn(), other);
 }
 
-function andBang(this: QueryMethodsHost, other: any): any {
+function andBang<R extends QueryMethodsHost>(this: R, other: R): R {
   assertRelationForCombining(other, "and");
   assertStructurallyCompatible(this, other, "and");
   this.whereClause = this.whereClause.union(other.whereClause);
@@ -862,13 +893,13 @@ function andBang(this: QueryMethodsHost, other: any): any {
   return this;
 }
 
-function or(this: QueryMethodsHost, other: any): any {
+function or<R extends QueryMethodsHost>(this: R, other: R): R {
   assertRelationForCombining(other, "or");
   if (this._isNone) return other.spawn();
-  return orBang.call(this.spawn(), other);
+  return (orBang<R>).call(this.spawn(), other);
 }
 
-function orBang(this: QueryMethodsHost, other: any): any {
+function orBang<R extends QueryMethodsHost>(this: R, other: R): R {
   assertRelationForCombining(other, "or");
   assertStructurallyCompatible(this, other, "or");
   this.whereClause = this.whereClause.or(other.whereClause);
@@ -877,53 +908,53 @@ function orBang(this: QueryMethodsHost, other: any): any {
   return this;
 }
 
-function having(
-  this: QueryMethodsHost,
+function having<R extends QueryMethodsHost>(
+  this: R,
   opts: string | Record<string, unknown> | Nodes.Node | Nodes.SqlLiteral,
   ...rest: unknown[]
-): any {
+): R {
   if (opts == null || isBlank(opts)) return this;
-  return havingBang.call(this.spawn(), opts, ...rest);
+  return (havingBang<R>).call(this.spawn(), opts, ...rest);
 }
 
-function havingBang(
-  this: QueryMethodsHost,
+function havingBang<R extends QueryMethodsHost>(
+  this: R,
   opts: string | Record<string, unknown> | Nodes.Node | Nodes.SqlLiteral,
   ...rest: unknown[]
-): any {
+): R {
   this.havingClause = this.havingClause.plus(buildWhereClause.call(this, opts, rest));
   return this;
 }
 
-function limit(this: QueryMethodsHost, value: number | string | null): any {
-  return limitBang.call(this.spawn(), value);
+function limit<R extends QueryMethodsHost>(this: R, value: number | string | null): R {
+  return (limitBang<R>).call(this.spawn(), value);
 }
 
-function limitBang(this: QueryMethodsHost, value: number | string | null): any {
+function limitBang<R extends QueryMethodsHost>(this: R, value: number | string | null): R {
   this.limitValue = value;
   return this;
 }
 
-function offset(this: QueryMethodsHost, value: number | string | null): any {
-  return offsetBang.call(this.spawn(), value);
+function offset<R extends QueryMethodsHost>(this: R, value: number | string | null): R {
+  return (offsetBang<R>).call(this.spawn(), value);
 }
 
-function offsetBang(this: QueryMethodsHost, value: number | string | null): any {
+function offsetBang<R extends QueryMethodsHost>(this: R, value: number | string | null): R {
   this.offsetValue = value;
   return this;
 }
 
-function lock(
-  this: QueryMethodsHost,
+function lock<R extends QueryMethodsHost>(
+  this: R,
   locks: string | Arel.Nodes.SqlLiteral | boolean | null = true,
-): any {
-  return lockBang.call(this.spawn(), locks);
+): R {
+  return (lockBang<R>).call(this.spawn(), locks);
 }
 
-function lockBang(
-  this: QueryMethodsHost,
+function lockBang<R extends QueryMethodsHost>(
+  this: R,
   locks: string | Arel.Nodes.SqlLiteral | boolean | null = true,
-): any {
+): R {
   if (
     typeof locks === "string" ||
     locks instanceof Arel.Nodes.SqlLiteral ||
@@ -937,11 +968,11 @@ function lockBang(
   return this;
 }
 
-function none(this: QueryMethodsHost): any {
-  return noneBang.call(this.spawn());
+function none<R extends QueryMethodsHost>(this: R): R {
+  return (noneBang<R>).call(this.spawn());
 }
 
-function noneBang(this: QueryMethodsHost): any {
+function noneBang<R extends QueryMethodsHost>(this: R): R {
   if (!this._isNone) {
     this.whereClause = this.whereClause.plus(new WhereClause([new Nodes.SqlLiteral("1=0")]));
     this._isNone = true;
@@ -949,39 +980,39 @@ function noneBang(this: QueryMethodsHost): any {
   return this;
 }
 
-function isNullRelation(this: QueryMethodsHost): boolean {
+function isNullRelation<R extends QueryMethodsHost>(this: R): boolean {
   return this._isNone;
 }
 
-function readonly(this: QueryMethodsHost, value = true): any {
-  return readonlyBang.call(this.spawn(), value);
+function readonly<R extends QueryMethodsHost>(this: R, value = true): R {
+  return (readonlyBang<R>).call(this.spawn(), value);
 }
 
-function readonlyBang(this: QueryMethodsHost, value = true): any {
+function readonlyBang<R extends QueryMethodsHost>(this: R, value = true): R {
   this.readonlyValue = value;
   return this;
 }
 
-function strictLoading(this: QueryMethodsHost, value = true): any {
-  return strictLoadingBang.call(this.spawn(), value);
+function strictLoading<R extends QueryMethodsHost>(this: R, value = true): R {
+  return (strictLoadingBang<R>).call(this.spawn(), value);
 }
 
-function strictLoadingBang(this: QueryMethodsHost, value = true): any {
+function strictLoadingBang<R extends QueryMethodsHost>(this: R, value = true): R {
   this.strictLoadingValue = value;
   return this;
 }
 
-function createWith(
-  this: QueryMethodsHost,
+function createWith<R extends QueryMethodsHost>(
+  this: R,
   value: Record<string, unknown> | Map<string, unknown> | null,
-): any {
-  return createWithBang.call(this.spawn(), value);
+): R {
+  return (createWithBang<R>).call(this.spawn(), value);
 }
 
-function createWithBang(
-  this: QueryMethodsHost,
+function createWithBang<R extends QueryMethodsHost>(
+  this: R,
   value: Record<string, unknown> | Map<string, unknown> | null,
-): any {
+): R {
   if (value) {
     value = sanitizeForbiddenAttributes(value);
     // eslint-disable-next-line blazetrails/ruby-compat-native-required -- value may be a Map, which merge converts through to_hash
@@ -992,38 +1023,52 @@ function createWithBang(
   return this;
 }
 
-function from(this: QueryMethodsHost, value: any, subqueryName?: string): any {
-  return fromBang.call(this.spawn(), value, subqueryName);
+function from<R extends QueryMethodsHost>(
+  this: R,
+  value: string | QueryMethodsHost | ArelNode,
+  subqueryName?: string,
+): R {
+  return (fromBang<R>).call(this.spawn(), value, subqueryName);
 }
 
-function fromBang(this: QueryMethodsHost, value: any, subqueryName?: string): any {
+function fromBang<R extends QueryMethodsHost>(
+  this: R,
+  value: string | QueryMethodsHost | ArelNode,
+  subqueryName?: string,
+): R {
   this.fromClause = new FromClause(value ?? null, subqueryName ?? null);
   return this;
 }
 
-function distinct(this: QueryMethodsHost, value = true): any {
-  return distinctBang.call(this.spawn(), value);
+function distinct<R extends QueryMethodsHost>(this: R, value = true): R {
+  return (distinctBang<R>).call(this.spawn(), value);
 }
 
-function distinctBang(this: QueryMethodsHost, value = true): any {
+function distinctBang<R extends QueryMethodsHost>(this: R, value = true): R {
   this.distinctValue = value;
   return this;
 }
 
-function extending(this: QueryMethodsHost, block: (mod: Record<string, unknown>) => void): any;
-function extending(this: QueryMethodsHost, ...modules: object[]): any;
-function extending(this: QueryMethodsHost, ...modules: object[]): any {
+function extending<R extends QueryMethodsHost>(
+  this: R,
+  block: (mod: Record<string, unknown>) => void,
+): R;
+function extending<R extends QueryMethodsHost>(this: R, ...modules: object[]): R;
+function extending<R extends QueryMethodsHost>(this: R, ...modules: object[]): R {
   const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
   if (any(modules) || block) {
-    return extendingBang.call(this.spawn(), ...modules, ...(block ? [block] : []));
+    return (extendingBang<R>).call(this.spawn(), ...modules, ...(block ? [block] : []));
   } else {
     return this;
   }
 }
 
-function extendingBang(this: QueryMethodsHost, block: (mod: Record<string, unknown>) => void): any;
-function extendingBang(this: QueryMethodsHost, ...modules: object[]): any;
-function extendingBang(this: QueryMethodsHost, ...modules: object[]): any {
+function extendingBang<R extends QueryMethodsHost>(
+  this: R,
+  block: (mod: Record<string, unknown>) => void,
+): R;
+function extendingBang<R extends QueryMethodsHost>(this: R, ...modules: object[]): R;
+function extendingBang<R extends QueryMethodsHost>(this: R, ...modules: object[]): R {
   const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
   if (block) {
     const mod: Record<string, unknown> = {};
@@ -1038,47 +1083,47 @@ function extendingBang(this: QueryMethodsHost, ...modules: object[]): any {
   return this;
 }
 
-function optimizerHints(this: QueryMethodsHost, ...args: string[]): any {
+function optimizerHints<R extends QueryMethodsHost>(this: R, ...args: string[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":optimizer_hints", args);
-  return optimizerHintsBang.apply(this.spawn(), args);
+  return (optimizerHintsBang<R>).apply(this.spawn(), args);
 }
 
-function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
+function optimizerHintsBang<R extends QueryMethodsHost>(this: R, ...args: string[]): R {
   this.optimizerHintsValues = [...new Set([...this.optimizerHintsValues, ...args])];
   return this;
 }
 
-function reverseOrder(this: QueryMethodsHost): any {
-  return reverseOrderBang.call(this.spawn());
+function reverseOrder<R extends QueryMethodsHost>(this: R): R {
+  return (reverseOrderBang<R>).call(this.spawn());
 }
 
-function reverseOrderBang(this: QueryMethodsHost): any {
+function reverseOrderBang<R extends QueryMethodsHost>(this: R): R {
   const orders = compactBlank(this.orderValues as unknown[]);
   this.orderValues = reverseSqlOrder.call(this, orders) as typeof this.orderValues;
   return this;
 }
 
-function skipQueryCacheBang(this: QueryMethodsHost, value = true): any {
+function skipQueryCacheBang<R extends QueryMethodsHost>(this: R, value = true): R {
   this.skipQueryCacheValue = value;
   return this;
 }
 
-function skipPreloadingBang(this: QueryMethodsHost): any {
+function skipPreloadingBang<R extends QueryMethodsHost>(this: R): R {
   this.skipPreloadingValue = true;
   return this;
 }
 
-function annotate(this: QueryMethodsHost, ...args: string[]): any {
+function annotate<R extends QueryMethodsHost>(this: R, ...args: string[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":annotate", args);
-  return annotateBang.apply(this.spawn(), args);
+  return (annotateBang<R>).apply(this.spawn(), args);
 }
 
-function annotateBang(this: QueryMethodsHost, ...args: string[]): any {
+function annotateBang<R extends QueryMethodsHost>(this: R, ...args: string[]): R {
   this.annotateValues = [...this.annotateValues, ...args];
   return this;
 }
 
-function uniqBang(this: QueryMethodsHost, name?: string): any {
+function uniqBang<R extends QueryMethodsHost>(this: R, name?: string): R {
   if (name === undefined) return this;
   const values = this._values[name];
   if (Array.isArray(values) && values.length > 0) {
@@ -1123,7 +1168,7 @@ const excluding = excludingWithCallee("excluding");
 
 const without = excludingWithCallee("without");
 
-function excludingBang(this: QueryMethodsHost, records: any[]): any {
+function excludingBang<R extends QueryMethodsHost>(this: R, records: unknown[]): R {
   const pk = this.primaryKey;
 
   const deferredRelations = records.filter((r) => isRelationLike(r));
@@ -1182,18 +1227,18 @@ export function constructJoinDependency(
 // @internal
 
 /** @internal */
-function asyncBang(this: QueryMethodsHost): QueryMethodsHost {
+function asyncBang<R extends QueryMethodsHost>(this: R): QueryMethodsHost {
   this._async = true;
   return this;
 }
 
 /** @internal */
-export function async(this: QueryMethodsHost): QueryMethodsHost {
+export function async<R extends QueryMethodsHost>(this: R): QueryMethodsHost {
   return asyncBang.call(this.spawn());
 }
 
 /** @internal */
-export function assertModifiableBang(this: QueryMethodsHost): void {
+export function assertModifiableBang<R extends QueryMethodsHost>(this: R): void {
   if (this.isLoaded || this._arel) {
     throw new UnmodifiableRelation();
   }
@@ -1229,7 +1274,7 @@ export function flattenedArgs(args: unknown[]): unknown[] {
 const VALID_DIRECTIONS = new Set([":asc", ":desc", ":ASC", ":DESC", "asc", "desc", "ASC", "DESC"]);
 
 /** @internal */
-export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
+export function validateOrderArgs<R extends QueryMethodsHost>(this: R, args: unknown[]): void {
   for (const arg of args) {
     if (!isHash(arg)) continue;
     // eslint-disable-next-line blazetrails/ruby-compat-native-required -- arg may be a Hash, which eachPair dispatches on
@@ -1356,7 +1401,10 @@ export function isDoesNotSupportReverse(order: string | Nodes.SqlLiteral): boole
 }
 
 /** @internal */
-export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown[] {
+export function reverseSqlOrder<R extends QueryMethodsHost>(
+  this: R,
+  orderQuery: unknown[],
+): unknown[] {
   if (orderQuery.length === 0) {
     const primaryKey = this.model.primaryKey as string;
     if (primaryKey) return [this.table.get(primaryKey).desc()];
@@ -1434,7 +1482,10 @@ export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
 }
 
 /** @internal */
-export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
+export function sanitizeOrderArguments<R extends QueryMethodsHost>(
+  this: R,
+  orderArgs: unknown[],
+): unknown[] {
   orderArgs.splice(
     0,
     orderArgs.length,
@@ -1444,7 +1495,10 @@ export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknow
 }
 
 /** @internal */
-export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
+export function preprocessOrderArgs<R extends QueryMethodsHost>(
+  this: R,
+  orderArgs: unknown[],
+): void {
   this.model.disallowRawSqlBang(flattenedArgs(orderArgs) as (string | symbol | ArelNode)[], {
     permit: this.model.adapterClass().columnNameWithOrderMatcher(),
   });
@@ -1515,7 +1569,10 @@ export function buildCaseForValuePosition(
 }
 
 /** @internal */
-export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]): unknown[] {
+export function resolveArelAttributes<R extends QueryMethodsHost>(
+  this: R,
+  attrs: unknown[],
+): unknown[] {
   return attrs.flatMap((attr) => {
     if (attr != null && isModuleIncluded((attr as object).constructor, Predications)) {
       return [attr];
@@ -1728,7 +1785,7 @@ function escapeRegex(s: string): string {
 }
 
 /** @internal */
-export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
+export function isTableNameMatches<R extends QueryMethodsHost>(this: R, from: unknown): boolean {
   const tableName = escapeRegex(this.table.name as string);
   const quotedTableName = escapeRegex(
     this.model.adapterClass().quoteTableName(this.table.name as string),
@@ -1771,7 +1828,7 @@ export function arelColumn(
 }
 
 /** @internal */
-export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
+export function arelColumns<R extends QueryMethodsHost>(this: R, columns: unknown[]): unknown[] {
   return columns.flatMap((field) => {
     if (typeof field === "string" || field instanceof Nodes.SqlLiteral) {
       return arelColumn.call(this, String(field));
@@ -1822,7 +1879,7 @@ export function arelColumnsFromHash(
 }
 
 /** @internal */
-export function orderColumn(this: QueryMethodsHost, field: string): unknown {
+export function orderColumn<R extends QueryMethodsHost>(this: R, field: string): unknown {
   return arelColumn.call(this, field, (attrName: string) => {
     if (attrName === "count" && this.groupValues.length > 0) {
       return this.table.get(attrName);
@@ -1835,9 +1892,12 @@ export function orderColumn(this: QueryMethodsHost, field: string): unknown {
 }
 
 /** @internal */
-export function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): unknown[] {
+export function processSelectArgs<R extends QueryMethodsHost>(
+  this: R,
+  fields: SelectArg[],
+): SelectArg[] {
   return fields.flatMap((field) => {
-    if (isPlainObject(field)) return arelColumnAliasesFromHash.call(this, field);
+    if (isPlainObject(field)) return arelColumnAliasesFromHash.call(this, field) as SelectArg[];
     return [field];
   });
 }
@@ -1868,7 +1928,7 @@ export function arelColumnAliasesFromHash(
 }
 
 /** @internal */
-export function buildFrom(this: QueryMethodsHost): ArelNode | string {
+export function buildFrom<R extends QueryMethodsHost>(this: R): ArelNode | string {
   let opts: FromClause["value"] = this.fromClause.value;
   let name = this.fromClause.name;
   if (opts instanceof ActiveRecord.Relation) {
@@ -1904,9 +1964,9 @@ export function buildWithExpressionFromValue(
   if (value instanceof Nodes.SqlLiteral) return new Nodes.Grouping(value);
   if (value !== null && typeof value === "object" && "arel" in value) {
     if (nested) {
-      return (value as any).arel().ast;
+      return (value as { arel(): SelectManager }).arel().ast;
     } else {
-      return (value as any).arel();
+      return (value as { arel(): SelectManager }).arel();
     }
   }
   if (value instanceof SelectManager) return value;
@@ -1962,7 +2022,7 @@ export function eachJoinDependencies(
 }
 
 /** @internal */
-export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
+export function buildJoinDependencies<R extends QueryMethodsHost>(this: R): JoinDependency[] {
   let joins = union(this.joinsValues as AssociationSpec[], this.leftOuterJoinsValues);
   if (this.eagerLoadValues.length > 0) joins = union(joins, this.eagerLoadValues);
   if (this.includesValues.length > 0) joins = union(joins, this.includesValues);
@@ -2174,7 +2234,10 @@ export function buildJoins(
 }
 
 /** @internal */
-export function buildWith(this: QueryMethodsHost, arel: SelectManager): SelectManager | undefined {
+export function buildWith<R extends QueryMethodsHost>(
+  this: R,
+  arel: SelectManager,
+): SelectManager | undefined {
   if (this.withValues.length === 0) return;
 
   const withStatements = this.withValues.map((withValue) =>

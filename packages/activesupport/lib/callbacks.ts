@@ -244,9 +244,17 @@ export class InstanceExec2 implements CallTemplate {
 }
 
 export class ProcCall implements CallTemplate {
-  readonly overrideTarget: ((...args: any[]) => unknown) | Value | null;
+  readonly overrideTarget:
+    | ((target: object, value: unknown, block?: (() => unknown) | null) => unknown)
+    | Value
+    | null;
 
-  constructor(target: ((...args: any[]) => unknown) | Value | null) {
+  constructor(
+    target:
+      | ((target: object, value: unknown, block?: (() => unknown) | null) => unknown)
+      | Value
+      | null,
+  ) {
     this.overrideTarget = target;
   }
 
@@ -266,7 +274,10 @@ export class ProcCall implements CallTemplate {
 }
 
 function call(
-  receiver: ((...args: any[]) => unknown) | Value | object,
+  receiver:
+    | ((target: object, value: unknown, block?: (() => unknown) | null) => unknown)
+    | Value
+    | object,
   target: object,
   value: unknown,
   block?: (() => unknown) | null,
@@ -1048,7 +1059,7 @@ export interface ClassMethods<T extends object = object> {
   resetCallbacks(name: string): void;
 }
 
-interface CallbacksClass {
+interface CallbacksClass extends AnyClass {
   prototype: object;
   __callbacks: Record<string, CallbackChain>;
   readonly descendants: CallbacksClass[];
@@ -1282,7 +1293,7 @@ export const ClassMethods = {
     if (!Object.hasOwn(this, "__class_attr___callbacks")) {
       this.__callbacks = { ...this.__callbacks };
       if (!rbModSingletonP(this)) {
-        let klass = this as unknown as AnyClass;
+        let klass: AnyClass = this;
         for (let superclass; (superclass = rbClassSuperclass(klass)); klass = superclass) {
           DescendantsTracker.registerSubclass(superclass, klass);
         }

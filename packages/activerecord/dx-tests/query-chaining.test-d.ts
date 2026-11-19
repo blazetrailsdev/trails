@@ -219,4 +219,9 @@ describe("query chaining DX", () => {
     assertType(Post.where("title = ?", "x"));
     assertType(Post.where().not({ published: false }));
   });
+
+  it("a chained where(...).order(...) keeps the model type", () => {
+    const rel = {} as Relation<Post>;
+    expectTypeOf(rel.where({ published: true }).order("title")).toEqualTypeOf<Relation<Post>>();
+  });
 });

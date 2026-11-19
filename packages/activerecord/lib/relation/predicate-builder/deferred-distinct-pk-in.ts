@@ -3,7 +3,7 @@ import { Nodes, type ArelNode } from "@blazetrails/arel";
 import type { Relation } from "../../relation.js";
 import type { Base } from "../../base.js";
 
-type DeferredIds = { ids(): Promise<unknown[]> };
+type DeferredIds = { ids(): unknown[] | Promise<unknown[]> };
 
 /** @noRailsEquivalent PERMANENT */
 export class DeferredPluck implements PromiseLike<unknown[]> {

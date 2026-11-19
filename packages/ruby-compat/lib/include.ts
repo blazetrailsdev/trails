@@ -1777,6 +1777,12 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
 
 export type Extended<M extends object> = CallableMethods<M>;
 
+type ExtendedAll<M> = (M extends object ? (host: Extended<M>) => void : never) extends (
+  host: infer I,
+) => void
+  ? I
+  : never;
+
 /**
  * Mirrors: Ruby's Object#clone — vendor/ruby/v3.3.11/object.c:536 `rb_obj_clone`, via
  * `rb_obj_clone_setup` (:457-527): a new object of the same class carrying a
@@ -2121,10 +2127,10 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
  *   extend(Base, ConnectionHandlingMethods);
  *   // Now Base.connectedTo(...) works
  */
-export function extend<T extends AnyClass | object>(
-  klass: T,
-  ...argv: Array<ModuleObject | AnyClass | Module>
-): T {
+export function extend<
+  T extends AnyClass | object,
+  M extends ModuleObject | AnyClass | Module = ModuleObject | AnyClass | Module,
+>(klass: T, ...argv: M[]): T & ExtendedAll<M> {
   let argc = argv.length;
   if (argc < 1) {
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1+)`);
@@ -2133,7 +2139,7 @@ export function extend<T extends AnyClass | object>(
   while (argc--) {
     extendObject(klass, argv[argc]);
   }
-  return klass;
+  return klass as T & ExtendedAll<M>;
 }
 
 function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {

@@ -18,6 +18,12 @@ export namespace SecurePassword {
       options?: { validations?: boolean; resetToken?: boolean },
     ): void;
   }
+
+  export type InstanceMethodsOnActivation<Attribute extends string = "password"> = {
+    [K in Attribute | `${Attribute}Confirmation` | `${Attribute}Challenge`]?: unknown;
+  } & {
+    readonly [K in `${Attribute}Salt`]?: string | null;
+  };
 }
 
 /**
