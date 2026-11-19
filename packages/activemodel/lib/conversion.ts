@@ -27,7 +27,7 @@ export function toModel<T>(this: T): T {
 }
 
 export function toKey(this: object): unknown[] | null {
-  const key = rbObjRespondTo(this, "id") && Reflect.get(this, "id");
+  const key: unknown = rbObjRespondTo(this, "id") && Reflect.get(this, "id");
   return key != null && key !== false ? wrap(key) : null;
 }
 
