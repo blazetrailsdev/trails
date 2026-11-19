@@ -100,11 +100,74 @@ Trails.application.routes().draw(function () {
   },
 ];
 
+const railsPost = `class Post < ApplicationRecord
+  belongs_to :author, optional: true
+  has_many :comments, dependent: :destroy
+
+  validates :title, presence: true
+
+  scope :published, -> { where(published: true) }
+end`;
+
+const trailsPost = `export class Post extends ApplicationRecord {
+  static {
+    this.belongsTo("author", { optional: true });
+    this.hasMany("comments", { dependent: "destroy" });
+
+    this.validates("title", { presence: true });
+
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
+  }
+}`;
+
+const check = `import { Post } from "./post.ts";
+
+export class Check {
+  static async run(): Promise<void> {
+    const post = await Post.find(1);
+    const n: number = post.title;
+  }
+}`;
+
+const checkError =
+  "app/models/check.ts(6,11): error TS2322: Type 'string | null' is not assignable to type 'number'.";
+
 export async function load() {
   const parity = await loadParity();
   return {
     measuredAt: shortSha(parity.measuredAt),
     coverage: Object.fromEntries(parity.packages.map((p) => [p.name, percent(p.api)])),
+    hero: {
+      rails: await codeToHtml(railsPost, { lang: "ruby", theme: "github-dark" }),
+      trails: await codeToHtml(trailsPost, { lang: "ts", theme: "github-dark" }),
+      check: await codeToHtml(check, {
+        lang: "ts",
+        theme: "github-dark",
+        decorations: [
+          {
+            start: { line: 5, character: 10 },
+            end: { line: 5, character: 11 },
+            properties: { class: "squiggle" },
+          },
+        ],
+        transformers: [
+          {
+            line(node, line) {
+              if (line === 6) {
+                node.children.push({
+                  type: "element",
+                  tagName: "span",
+                  properties: { class: "tip" },
+                  children: [{ type: "text", value: checkError }],
+                });
+              }
+            },
+          },
+        ],
+      }),
+    },
     blocks: await Promise.all(
       blocks.map(async ({ code, lang, ...rest }) => ({
         ...rest,

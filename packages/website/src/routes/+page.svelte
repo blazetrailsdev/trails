@@ -5,6 +5,7 @@
   import { base } from "$app/paths";
 
   let { data } = $props();
+  let tab = $state("same");
 
   const repo = "https://github.com/blazetrailsdev/trails";
   const guides = `${base}/docs/guides/`;
@@ -55,7 +56,20 @@
     <h1>Convention over configuration.<br />Now with types.</h1>
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
     <span class="pill">trails &mdash; pre-release &middot; measured at {data.measuredAt}</span>
-    <div class="video">Editor video placeholder</div>
+    <div class="stage">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === "same"} onclick={() => (tab = "same")}>Same method</button>
+        <button role="tab" aria-selected={tab === "caught"} onclick={() => (tab = "caught")}>Caught by the compiler</button>
+      </div>
+      {#if tab === "same"}
+        <div class="split">
+          <div class="pane"><div class="file">app/models/post.rb &middot; Rails</div>{@html data.hero.rails}</div>
+          <div class="pane"><div class="file">app/models/post.ts &middot; trails</div>{@html data.hero.trails}</div>
+        </div>
+      {:else}
+        <div class="pane"><div class="file">app/models/check.ts &middot; pnpm build</div>{@html data.hero.check}</div>
+      {/if}
+    </div>
   </header>
 
   <section class="company">
@@ -157,7 +171,15 @@
   .lede { font-size: 30px; line-height: 1.3; max-width: 700px; margin: 0 auto 1.5rem; }
   .lede strong { display: block; }
   .pill { display: inline-block; background: var(--tint); border-radius: 6px; padding: 6px 14px; font-size: 15px; font-weight: 600; margin-bottom: 56px; }
-  .video { max-width: 1170px; aspect-ratio: 16 / 9; margin: 0 auto; background: #1d1720; border-radius: 10px; color: #8a7f86; display: grid; place-items: center; font-size: 18px; box-shadow: 0 30px 60px rgb(0 0 0 / 0.2); }
+  .stage { max-width: 1170px; margin: 0 auto; background: #1d1720; border-radius: 10px; overflow: hidden; text-align: left; box-shadow: 0 30px 60px rgb(0 0 0 / 0.2); }
+  .tabs { display: flex; gap: 4px; padding: 10px 10px 0; background: #2c242a; }
+  .tabs button { font: 600 15px var(--sans); color: #b9aeb5; background: none; border: 0; padding: 10px 18px; border-radius: 6px 6px 0 0; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: #3a3038; color: #fff; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2c242a; }
+  .pane { background: #3a3038; min-height: 380px; }
+  .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
+  .pane :global(.squiggle) { text-decoration: underline wavy #ff5d5d; text-underline-offset: 4px; }
+  .pane :global(.tip) { display: block; width: max-content; max-width: 100%; margin: 6px 0 4px 2ch; padding: 8px 12px; background: #261b23; border: 1px solid #ff5d5d; border-radius: 6px; color: #ffb4b4; font-size: 13px; white-space: normal; }
 
   .company { padding: 40px 24px 100px; }
   .tiles { display: grid; grid-template-columns: repeat(4, 220px); justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 48px 0; }
@@ -195,7 +217,7 @@
     .nav ul { justify-content: center; flex-wrap: wrap; gap: 16px; }
     .tiles { grid-template-columns: repeat(2, 1fr); }
     .tiles li:nth-last-child(2) { grid-column: auto; }
-    .blocks, .cards { grid-template-columns: 1fr; }
+    .blocks, .cards, .split { grid-template-columns: 1fr; }
     .card { padding: 40px 24px; }
   }
 </style>
