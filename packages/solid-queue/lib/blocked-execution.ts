@@ -48,7 +48,6 @@ export class BlockedExecution extends Execution {
       const execution = await this.ordered()
         .where({ concurrency_key: concurrencyKey })
         .limit(1)
-        .useIndex("index_solid_queue_blocked_executions_for_release")
         .nonBlockingLock()
         .first();
       if (execution) {
