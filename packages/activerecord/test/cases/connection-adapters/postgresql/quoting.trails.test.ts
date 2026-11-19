@@ -1,5 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { unescapeBytea as pgUnescapeBytea } from "../../../../lib/pg/connection.js";
+import { unescapeBytea as pgUnescapeBytea } from "@blazetrails/pg";
 import { quotingHost } from "../../../support/quoting-host.js";
 import {
   BinaryData,

@@ -1,42 +1,37 @@
-import pg from "pg";
-import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
-import { rbClassNewInstance } from "@blazetrails/ruby-compat";
-import { ConnectionBad, Error as PGError, ServerError, UnableToSend } from "@blazetrails/pg";
-import { PG } from "./pg.js";
+import { LoadError, rbClassNewInstance } from "@blazetrails/ruby-compat";
+import { ConnectionBad, UnableToSend } from "./exceptions.js";
+import { PG } from "./namespaces.js";
+import type { Result } from "./result.js";
+import type { TypeMapByClass } from "./type-map-by-class.js";
+import { TypeMapByOid } from "./type-map-by-oid.js";
+import type * as NodePg from "./engine/node-pg.js";
 
-export type PGConnection = Connection;
+let engine: typeof NodePg | null = null;
 
-type QueryConfig = string | Record<string, unknown> | null;
-type Query = (config: QueryConfig) => Promise<pg.QueryResult | pg.QueryResult[]>;
-
-const OID_BYTEA = 17;
-const OID_BYTEA_ARRAY = 1001;
-
-type Protocol = pg.Connection & {
-  connect(portOrPath: string | number, host?: string): void;
-  cancel(processID: number, secretKey: number): void;
-};
-type Client = Omit<pg.Client, "connection"> & {
-  connection?: Protocol;
-  processID?: number | null;
-  secretKey?: number | null;
-  _activeQuery?: unknown;
-  _ending?: boolean;
-  _ended?: boolean;
-  _queryable?: boolean;
-  _connectionError?: boolean;
-};
+/** @noRailsEquivalent PERMANENT */
+async function _requireEngine(): Promise<typeof NodePg> {
+  try {
+    return (engine ??= await import("./engine/node-pg.js"));
+  } catch (error) {
+    const { code, cause } = error as { code?: string; cause?: { code?: string } };
+    if (code !== "ERR_MODULE_NOT_FOUND" && cause?.code !== "ERR_MODULE_NOT_FOUND") throw error;
+    const loadError = new LoadError("cannot load such file -- pg");
+    loadError.path = "pg";
+    throw loadError;
+  }
+}
 
 export class Connection {
-  client: Client;
+  client: NodePg.Client;
   connParams: Record<string, unknown>;
   prepared = new Map<string, string>();
   readyForQuery = "I";
   bad = false;
-  pendingResult: Promise<{ result: PG.Result } | { error: unknown }> | null = null;
+  pendingResult: Promise<{ result: Result } | { error: unknown }> | null = null;
   pendingResultTaken = false;
-  typeMapForResults = new PGTypeMapByOid();
-  notifies: pg.Notification[] = [];
+  typeMapForResults = new TypeMapByOid();
+  typeMapForQueries: TypeMapByClass | null = null;
+  notifies: NodePg.Notification[] = [];
   notifyWaiter: ((error?: unknown) => void) | null = null;
   parameterStatuses: Record<string, string> = {};
 
@@ -56,6 +51,7 @@ export class Connection {
     connParams: Record<string, unknown> = {},
     block?: (conn: T) => R | Promise<R>,
   ): Promise<T | R> {
+    await _requireEngine();
     const conn = rbClassNewInstance(this, connParams);
     await conn.connect();
 
@@ -73,10 +69,10 @@ export class Connection {
 
   protected constructor(connParams: Record<string, unknown> = {}) {
     this.connParams = connParams;
-    this.client = new pg.Client(_clientConfig(connParams)) as Client;
-    listen(this, this.client);
+    this.client = engine!.newClient(connParams);
+    engine!.listen(this, this.client);
     if (typeof this.client.on === "function") {
-      this.client.on("notification", (notification: pg.Notification) => {
+      this.client.on("notification", (notification: NodePg.Notification) => {
         this.notifies.push(notification);
         this.notifyWaiter?.();
       });
@@ -85,23 +81,14 @@ export class Connection {
     }
   }
 
-  query(...args: unknown[]): Promise<pg.QueryResult> {
-    try {
-      return Promise.resolve(
-        (this.client.query as unknown as (...args: unknown[]) => unknown)(...args),
-      ).catch((error: unknown) => {
-        throw pgError(this, error);
-      }) as Promise<pg.QueryResult>;
-    } catch (error) {
-      return Promise.reject(pgError(this, error));
-    }
-  }
+  declare query: Connection["asyncExec"];
+  declare exec: Connection["asyncExec"];
 
   async finish(): Promise<void> {
     try {
       await this.client.end();
     } catch (error) {
-      throw pgError(this, error);
+      throw engine!.pgError(this, error);
     }
   }
   close(): Promise<void> {
@@ -112,16 +99,16 @@ export class Connection {
     await this.query(`SET client_encoding TO '${this.escapeString(encoding)}'`);
   }
 
-  setNoticeReceiver(block: (result: PG.Result) => void): void {
+  setNoticeReceiver(block: (result: Result) => void): void {
     this.client.removeAllListeners("notice");
     this.client.on("notice", (notice) => {
-      block(new PG.Result({ command: "", rowCount: null, oid: 0, fields: [], rows: [] }, notice));
+      block(engine!.emptyResult(notice));
     });
   }
 
   connect(): Promise<unknown> {
     return this.client.connect().catch((error: unknown) => {
-      throw pgError(this, error, ConnectionBad);
+      throw engine!.pgError(this, error, ConnectionBad);
     });
   }
 
@@ -134,14 +121,14 @@ export class Connection {
 
   async reset(): Promise<void> {
     const client = this.client;
-    const iopts = _clientConfig(this.connParams);
-    const conn = new (client.constructor as new (config: pg.ClientConfig) => Client)(iopts);
+    const iopts = engine!._clientConfig(this.connParams);
+    const conn = new (client.constructor as new (config: typeof iopts) => NodePg.Client)(iopts);
     for (const event of client.eventNames()) {
       for (const listener of client.rawListeners(event)) {
         conn.on(event as "error", listener as () => void);
       }
     }
-    listen(this, conn);
+    engine!.listen(this, conn);
     this.prepared.clear();
     this.readyForQuery = "I";
     this.bad = false;
@@ -151,7 +138,7 @@ export class Connection {
       .end()
       .then(() => conn.connect())
       .catch((error: unknown) => {
-        throw pgError(this, error, ConnectionBad);
+        throw engine!.pgError(this, error, ConnectionBad);
       });
     this.client = conn;
   }
@@ -168,7 +155,7 @@ export class Connection {
     }
   }
 
-  prepare(stmtName: string, sql: string): Promise<void> {
+  prepare(stmtName: string, sql: string): Promise<Result> {
     return new Promise((resolve, reject) => {
       const submittable = {
         name: stmtName,
@@ -178,43 +165,22 @@ export class Connection {
           connection.sync();
           return null;
         },
-        handleError: (error: unknown) => reject(pgError(this, error)),
+        handleError: (error: unknown) => reject(engine!.pgError(this, error)),
         handleReadyForQuery: () => {
           this.prepared.set(stmtName, sql);
-          resolve();
+          resolve(engine!.emptyResult());
         },
       };
-      this.query(submittable).catch(reject);
+      engine!.submit(this, submittable).catch(reject);
     });
   }
 
-  async execPrepared(stmtName: string, params: unknown[]): Promise<PG.Result> {
-    const text = this.prepared.get(stmtName);
-    return result(
-      await (this.query as unknown as Query)({
-        name: stmtName,
-        text,
-        values: params.map(param),
-        rowMode: "array",
-        types: types(this),
-      }).catch((error: unknown) => {
-        throw pgError(this, error);
-      }),
-    );
+  execPrepared(stmtName: string, params: unknown[]): Promise<Result> {
+    return engine!.execute(this, this.prepared.get(stmtName), params, stmtName);
   }
 
-  async asyncExec(sql: string | null): Promise<PG.Result> {
-    return result(
-      await (this.query as unknown as Query)(
-        sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
-      ).catch((error: unknown) => {
-        throw pgError(this, error);
-      }),
-    );
-  }
-
-  exec(sql: string | null): Promise<PG.Result> {
-    return this.asyncExec(sql);
+  asyncExec(sql: string | null): Promise<Result> {
+    return engine!.execute(this, sql);
   }
 
   isFinished(): boolean {
@@ -271,7 +237,7 @@ export class Connection {
     this.pendingResultTaken = false;
   }
 
-  async getLastResult(): Promise<PG.Result | null> {
+  async getLastResult(): Promise<Result | null> {
     const pending = this.pendingResult;
     if (pending == null) return null;
     if (this.pendingResultTaken) {
@@ -288,17 +254,8 @@ export class Connection {
     }
   }
 
-  async execParams(sql: string | null, params: unknown[]): Promise<PG.Result> {
-    return result(
-      await (this.query as unknown as Query)({
-        text: sql,
-        values: params.map(param),
-        rowMode: "array",
-        types: types(this),
-      }).catch((error: unknown) => {
-        throw pgError(this, error);
-      }),
-    );
+  execParams(sql: string | null, params: unknown[]): Promise<Result> {
+    return engine!.execute(this, sql, params);
   }
 
   unescapeBytea(value: string | Uint8Array): Uint8Array {
@@ -345,7 +302,7 @@ export class Connection {
     const { processID: bePid, secretKey: beKey, connection, host, port } = this.client;
     if (connection == null) throw new ConnectionBad("connection is closed", { connection: this });
     return new Promise<string | null>((resolve) => {
-      const cl = new (connection.constructor as new () => Protocol)();
+      const cl = new (connection.constructor as new () => NodePg.Protocol)();
       cl.on("error", (err: unknown) => resolve(String(err)));
       cl.on("end", () => resolve(null));
       cl.once("connect", () => {
@@ -362,90 +319,6 @@ export class Connection {
   asyncCancel(): Promise<string | null> {
     return this.cancel();
   }
-}
-
-function listen(conn: Connection, client: Client): void {
-  const connection = client.connection;
-  if (typeof connection?.on === "function") {
-    connection.on("readyForQuery", (message: { status?: string }) => {
-      if (typeof message?.status === "string") conn.readyForQuery = message.status;
-    });
-    connection.on(
-      "parameterStatus",
-      (message: { parameterName: string; parameterValue: string }) => {
-        conn.parameterStatuses[message.parameterName] = message.parameterValue;
-      },
-    );
-    connection.on("errorMessage", () => {
-      if (conn.readyForQuery === "T") conn.readyForQuery = "E";
-    });
-  }
-}
-
-function types(conn: Connection): { getTypeParser(oid: number, format?: string): unknown } {
-  return {
-    getTypeParser(oid: number, format?: string): unknown {
-      if ((oid === OID_BYTEA || oid === OID_BYTEA_ARRAY) && format !== "binary") {
-        return (value: unknown) => value;
-      }
-      const coder = format !== "binary" && conn.typeMapForResults.coders.get(oid);
-      if (coder) return (value: string) => coder.decode(value);
-      return conn.client.getTypeParser(oid, format as "text");
-    },
-  };
-}
-
-type BinaryParam = { value?: unknown; format?: unknown };
-
-function param(value: unknown): unknown {
-  if (value instanceof Number) return value.valueOf();
-  if (typeof value === "object" && value !== null && (value as BinaryParam).format === 1) {
-    const bytes = (value as BinaryParam).value;
-    if (bytes instanceof Uint8Array && Object.keys(value).length === 2) {
-      return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    }
-  }
-  return value;
-}
-
-function pgError(conn: Connection, error: unknown, klass?: typeof PGError): unknown {
-  if (
-    !(error instanceof Error) ||
-    error instanceof PGError ||
-    error instanceof TypeError ||
-    error instanceof RangeError ||
-    error instanceof ReferenceError ||
-    error instanceof SyntaxError
-  ) {
-    return error;
-  }
-  const { _ending, _ended, _queryable, _connectionError } = conn.client;
-  let wrapped: PGError;
-  if (klass != null) {
-    wrapped = new klass(`${error.message}\n`, { connection: conn });
-  } else if (error instanceof pg.DatabaseError) {
-    wrapped = new ServerError(error.message, {
-      connection: conn,
-      result: new PG.Result({ command: "", rowCount: null, oid: 0, fields: [], rows: [] }, error),
-    });
-  } else if (conn.bad) {
-    wrapped = new ConnectionBad("no connection to the server\n", { connection: conn });
-  } else if (_ending === true) {
-    wrapped = new ConnectionBad("connection is closed", { connection: conn });
-  } else if (_ended === true || _queryable === false || _connectionError === true) {
-    wrapped = new ConnectionBad(`${error.message}\n`, { connection: conn });
-  } else {
-    wrapped = new UnableToSend(`${error.message}\n`, { connection: conn });
-  }
-  wrapped.cause = error;
-  if (wrapped instanceof ConnectionBad || (error as { severity?: string }).severity === "FATAL") {
-    conn.bad = true;
-  }
-  return wrapped;
-}
-
-function result(raw: pg.QueryResult | pg.QueryResult[]): PG.Result {
-  return new PG.Result(Array.isArray(raw) ? raw[raw.length - 1] : raw);
 }
 
 export function escapeBytea(value: Buffer | Uint8Array | string): string {
@@ -487,16 +360,6 @@ export function unescapeBytea(value: string | Uint8Array): Uint8Array {
 
 function getHex(c: string): number {
   return /^[0-9a-fA-F]$/.test(c) ? parseInt(c, 16) : -1;
-}
-
-const STRING_OIDS = new Set([
-  114, 600, 718, 1017, 1082, 1114, 1115, 1182, 1183, 1184, 1185, 1186, 1187, 1270, 3802,
-]);
-
-function pgTypeParser(oid: number, format?: string): unknown {
-  if (format === "binary") return pg.types.getTypeParser(oid, "binary");
-  if (STRING_OIDS.has(oid)) return (v: unknown) => v;
-  return pg.types.getTypeParser(oid, "text");
 }
 
 const CONNINFO_KEYWORDS = [
@@ -556,31 +419,7 @@ export function conndefaultsHash(): Record<string, string | null> {
   return hash;
 }
 
-/** @noRailsEquivalent PERMANENT */
-function _clientConfig(connParams: Record<string, unknown>): pg.ClientConfig {
-  const seconds = (value: unknown): number | undefined =>
-    value == null ? undefined : Number(value) * 1000;
-  const sslmode = connParams.sslmode as string | undefined;
-  let ssl: pg.ClientConfig["ssl"];
-  if (sslmode === "disable") ssl = false;
-  else if (sslmode === "require" || (sslmode == null && connParams.requiressl != null)) {
-    ssl = { rejectUnauthorized: false };
-  } else if (sslmode === "verify-ca" || sslmode === "verify-full") ssl = true;
-  return {
-    user: connParams.user as string | undefined,
-    database: connParams.dbname as string | undefined,
-    password: connParams.password as string | undefined,
-    host: connParams.host as string | undefined,
-    port: connParams.port == null ? undefined : Number(connParams.port),
-    options: connParams.options as string | undefined,
-    client_encoding: connParams.clientEncoding as string | undefined,
-    application_name: connParams.applicationName as string | undefined,
-    fallback_application_name: connParams.fallbackApplicationName as string | undefined,
-    connectionTimeoutMillis: seconds(connParams.connectTimeout),
-    keepAlive: connParams.keepalives == null ? undefined : String(connParams.keepalives) !== "0",
-    keepAliveInitialDelayMillis: seconds(connParams.keepalivesIdle),
-    ...(connParams.replication == null ? {} : { replication: connParams.replication }),
-    ssl,
-    types: { getTypeParser: pgTypeParser as pg.CustomTypesConfig["getTypeParser"] },
-  };
-}
+Connection.prototype.exec = Connection.prototype.asyncExec;
+Connection.prototype.query = Connection.prototype.asyncExec;
+
+PG.Connection = Connection;

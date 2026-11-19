@@ -11,11 +11,18 @@ import type { Constants } from "./pg.js";
 import type { Result } from "./result.js";
 import type { Array as TextDecoderArray } from "./text-decoder/array.js";
 import type { Array as TextEncoderArray } from "./text-encoder/array.js";
+import type { Boolean as TextEncoderBoolean } from "./text-encoder/boolean.js";
+import type { Integer as TextEncoderInteger } from "./text-encoder/integer.js";
+import type { Connection } from "./connection.js";
+import type { SimpleDecoder } from "./simple-decoder.js";
+import type { SimpleEncoder } from "./simple-encoder.js";
+import type { TypeMapByClass } from "./type-map-by-class.js";
+import type { TypeMapByOid } from "./type-map-by-oid.js";
 
-export interface PGNamespace extends Readonly<{
-  Connection: { readonly prototype: object; [Symbol.hasInstance](value: unknown): boolean };
-}> {
+export interface PGNamespace {
   readonly name: string;
+  Connection: typeof Connection;
+  connect(connParams?: Record<string, unknown>): Promise<Connection>;
   Constants: typeof Constants;
   Error: typeof Error;
   ServerError: typeof ServerError;
@@ -24,8 +31,16 @@ export interface PGNamespace extends Readonly<{
   FeatureNotSupported: typeof FeatureNotSupported;
   Coder: typeof Coder;
   CompositeCoder: typeof CompositeCoder;
+  SimpleEncoder: typeof SimpleEncoder;
+  SimpleDecoder: typeof SimpleDecoder;
   Result: typeof Result;
-  readonly TextEncoder: { Array: typeof TextEncoderArray };
+  TypeMapByClass: typeof TypeMapByClass;
+  TypeMapByOid: typeof TypeMapByOid;
+  readonly TextEncoder: {
+    Array: typeof TextEncoderArray;
+    Integer: typeof TextEncoderInteger;
+    Boolean: typeof TextEncoderBoolean;
+  };
   readonly TextDecoder: { Array: typeof TextDecoderArray };
 }
 

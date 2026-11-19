@@ -9,12 +9,7 @@ import {
 import type pg from "pg";
 import { Constants as PGConstants } from "./pg.js";
 import { PG } from "./namespaces.js";
-
-/** @noRailsEquivalent CONVERGEABLE pg-type-maps-and-text-encoders-move-to-the-package */
-type PGTypeMapByOid = {
-  readonly coders: Map<number, { decode(value: string): unknown }>;
-  defaultTypeMap: PGTypeMapByOid | null;
-};
+import type { TypeMapByOid } from "./type-map-by-oid.js";
 
 type DatabaseErrorFields = Partial<Record<keyof pg.DatabaseError, unknown>>;
 
@@ -47,7 +42,7 @@ export class Result {
   declare [Symbol.iterator]: () => IterableIterator<Record<string, unknown>>;
 
   readonly #native: pg.QueryResult;
-  #typemap: PGTypeMapByOid | null = null;
+  #typemap: TypeMapByOid | null = null;
 
   readonly #error: DatabaseErrorFields | null;
 
@@ -56,7 +51,7 @@ export class Result {
     this.#error = error;
   }
 
-  mapTypesBang(typeMap: PGTypeMapByOid): this {
+  mapTypesBang(typeMap: TypeMapByOid): this {
     this.typeMap = typeMap;
     return this;
   }
@@ -135,20 +130,19 @@ export class Result {
     return this;
   }
 
-  set typeMap(typemap: PGTypeMapByOid) {
+  set typeMap(typemap: TypeMapByOid) {
     this.#typemap = typemap;
   }
 
-  get typeMap(): PGTypeMapByOid | null {
+  get typeMap(): TypeMapByOid | null {
     return this.#typemap;
   }
 
   #typecastResultValue(i: number, j: number): unknown {
     const value = (this.#native.rows as unknown[][])[i][j];
     const oid = this.#native.fields[j].dataTypeID;
-    const decoder =
-      this.#typemap?.coders.get(oid) ?? this.#typemap?.defaultTypeMap?.coders.get(oid);
-    return typeof value !== "string" || !decoder ? value : decoder.decode(value);
+    const decoder = this.#typemap?._lookupOid(0, oid);
+    return typeof value !== "string" || !decoder ? value : decoder.decode(value, i, j);
   }
 }
 

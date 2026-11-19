@@ -8,7 +8,7 @@ import {
   NoDatabaseError,
   StatementInvalid,
 } from "../../../../lib/errors.js";
-import { Connection, type PGConnection } from "../../../../lib/pg/connection.js";
+import { Connection, type Connection as PGConnection } from "@blazetrails/pg";
 import { PG } from "../../../../lib/pg/pg.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 
@@ -88,7 +88,7 @@ describeIfPg("PG::Error#result (trails)", () => {
 
   it("a severed connection met by a mocked raw query is still a ConnectionFailed", async () => {
     const conn = await rawConnection();
-    vi.spyOn(conn, "query").mockRejectedValue(
+    vi.spyOn(conn, "asyncExec").mockRejectedValue(
       new PG.ConnectionBad("Connection terminated unexpectedly\n"),
     );
     const error = await adapter.execute("SELECT 1").catch((e: unknown) => e);

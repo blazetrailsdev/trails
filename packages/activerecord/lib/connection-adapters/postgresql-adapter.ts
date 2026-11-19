@@ -9,6 +9,9 @@ import {
   block,
   excSetupMessage,
   fetch,
+  rbCFalseClass,
+  rbCInteger,
+  rbCTrueClass,
   rbObjRespondTo,
   setEnv,
   filterMap,
@@ -75,7 +78,7 @@ import { Text as ArText } from "../type/text.js";
 import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
-import { type PGConnection } from "../pg/connection.js";
+import { type Connection as PGConnection } from "@blazetrails/pg";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -129,9 +132,12 @@ import type {
   SchemaNamespaceStatements,
 } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
-import { PGSimpleDecoder, PGTextDecoder, PGTypeMapByOid } from "./postgresql/pg-text-decoder.js";
+import { PGTextDecoder } from "./postgresql/pg-text-decoder.js";
 
-type PGDecoderClass = new (options: { oid: number; name: string }) => PGSimpleDecoder;
+type PGDecoderClass = new (
+  hash: undefined,
+  kwargs: { oid: number; name: string },
+) => PG.SimpleDecoder;
 
 const VALUE_LIMIT_VIOLATION = "22001";
 const NUMERIC_VALUE_OUT_OF_RANGE = "22003";
@@ -385,14 +391,14 @@ export class PostgreSQLAdapter
   declare protected _connectionParameters: Record<string, unknown>;
   private _typeMap: HashLookupTypeMap | null = null;
   /** @internal */
-  _typeMapForResults = new PGTypeMapByOid();
+  _typeMapForResults = new PG.TypeMapByOid();
 
   /** @internal */
   _regtypeOids: Map<string, number> = new Map();
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning: unknown = true;
   private _mappedDefaultTimezone: "utc" | "local" | null = null;
-  private timestampDecoder: PGSimpleDecoder | null = null;
+  private timestampDecoder: PG.SimpleDecoder | null = null;
   private _schemaSearchPathMemo: string | null = null;
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
   /** @internal */
@@ -874,7 +880,7 @@ export class PostgreSQLAdapter
   }
   async getDatabaseVersion(): Promise<number> {
     return await this.withRawConnection({}, async (conn) => {
-      const version = await this._serverVersion(conn as pg.Client);
+      const version = await this._serverVersion(conn as PGConnection);
       if (version === 0) {
         throw new ConnectionFailed("Could not determine PostgreSQL version");
       }
@@ -1174,6 +1180,7 @@ export class PostgreSQLAdapter
       } catch (e) {
         throw excSetupMessage(await this.translateExceptionClass(e, sql, binds), e);
       }
+      await conn.getLastResult();
       await this._statements.set(sqlKey, { name: nextkey });
     }
     return this._statements.get(sqlKey)!.name;
@@ -1328,7 +1335,13 @@ export class PostgreSQLAdapter
   private _hasPgHintPlan?: boolean;
 
   /** @internal */
-  addPgEncoders(): void {}
+  addPgEncoders(): void {
+    const map = new PG.TypeMapByClass();
+    map.set(rbCInteger, new PG.TextEncoder.Integer());
+    map.set(rbCTrueClass, new PG.TextEncoder.Boolean());
+    map.set(rbCFalseClass, new PG.TextEncoder.Boolean());
+    this._rawConnection!.typeMapForQueries = map;
+  }
 
   /** @internal */
   async updateTypemapForDefaultTimezone(): Promise<true | undefined> {
@@ -1342,7 +1355,7 @@ export class PostgreSQLAdapter
           ? PGTextDecoder.TimestampUtc
           : PGTextDecoder.TimestampWithoutTimeZone;
 
-      this.timestampDecoder = new decoderClass({ ...this.timestampDecoder.toH() });
+      this.timestampDecoder = new decoderClass(undefined, { ...this.timestampDecoder.toH() });
       this._rawConnection.typeMapForResults.addCoder(this.timestampDecoder);
 
       this._mappedDefaultTimezone = defaultTimezone();
@@ -1353,7 +1366,10 @@ export class PostgreSQLAdapter
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs new — CONVERGEABLE call-args-gate-resolves-inherited-constructor-padding
+   */
   async addPgDecoders(): Promise<void> {
     this._mappedDefaultTimezone = null;
     this.timestampDecoder = null;
@@ -1385,14 +1401,16 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
       this.constructCoder(row, codersByName[row.typname]),
     );
 
-    const map = new PGTypeMapByOid();
+    const map = new PG.TypeMapByOid();
     coders.forEach((coder) => map.addCoder(coder));
     this._rawConnection!.typeMapForResults = map;
 
-    this._typeMapForResults = new PGTypeMapByOid();
+    this._typeMapForResults = new PG.TypeMapByOid();
     this._typeMapForResults.defaultTypeMap = map;
-    this._typeMapForResults.addCoder(new PGTextDecoder.Bytea({ oid: 17, name: "bytea" }));
-    this._typeMapForResults.addCoder(new MoneyDecoder({ oid: 790, name: "money" }));
+    this._typeMapForResults.addCoder(
+      new PGTextDecoder.Bytea(undefined, { oid: 17, name: "bytea" }),
+    );
+    this._typeMapForResults.addCoder(new MoneyDecoder(undefined, { oid: 790, name: "money" }));
 
     this.timestampDecoder = coders.find((coder) => coder.name === "timestamp") ?? null;
     await this.updateTypemapForDefaultTimezone();
@@ -1402,9 +1420,9 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   constructCoder(
     row: { oid: string | number; typname: string },
     coderClass: PGDecoderClass | undefined,
-  ): PGSimpleDecoder | undefined {
+  ): PG.SimpleDecoder | undefined {
     if (!coderClass) return;
-    return new coderClass({ oid: Number(row.oid), name: row.typname });
+    return new coderClass(undefined, { oid: Number(row.oid), name: row.typname });
   }
 
   static columnNameMatcher(): RegExp {
@@ -1516,9 +1534,9 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   /** @internal */
-  async _serverVersion(client: pg.Client): Promise<number> {
+  async _serverVersion(client: PGConnection): Promise<number> {
     const result = await client.query("SHOW server_version_num");
-    return parseInt(String(result.rows[0]?.server_version_num ?? "0"), 10);
+    return parseInt(String(result.getvalue(0, 0) ?? "0"), 10);
   }
 
   checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;
@@ -2043,7 +2061,7 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
   }
 }
 
-export class MoneyDecoder extends PGSimpleDecoder {
+export class MoneyDecoder extends PG.SimpleDecoder {
   static readonly TYPE = new Money();
 
   decode(value: string): string | null {

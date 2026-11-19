@@ -24,6 +24,8 @@ export class Coder {
   static readonly FORMAT_ERROR_TO_STRING = 0x8;
   static readonly FORMAT_ERROR_TO_PARTIAL = 0xc;
 
+  #oid = 0;
+  #format = 0;
   #flags = 0;
   #name: string | null = null;
 
@@ -38,6 +40,24 @@ export class Coder {
     for (const [key, val] of Object.entries(hash ?? kwargs)) {
       rbFSend(this, `${key}=`, val);
     }
+  }
+
+  set oid(oid: number) {
+    _rbCheckFrozen(this);
+    this.#oid = oid;
+  }
+
+  get oid(): number {
+    return this.#oid;
+  }
+
+  set format(format: number) {
+    _rbCheckFrozen(this);
+    this.#format = format;
+  }
+
+  get format(): number {
+    return this.#format;
   }
 
   set flags(flags: number) {
@@ -56,6 +76,15 @@ export class Coder {
   set name(value: string | null) {
     _rbCheckFrozen(this);
     this.#name = value;
+  }
+
+  toH(): { oid: number; format: number; flags: number; name: string | null } {
+    return {
+      oid: this.oid,
+      format: this.format,
+      flags: this.flags,
+      name: this.name,
+    };
   }
 }
 

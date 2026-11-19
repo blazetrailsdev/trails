@@ -1,6 +1,5 @@
-import type { PGTypeMapByOid } from "./pg-text-decoder.js";
 import { PG } from "../../pg/pg.js";
-import type { PGConnection } from "../../pg/connection.js";
+import type { Connection as PGConnection } from "@blazetrails/pg";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
@@ -78,7 +77,7 @@ interface ExecuteHost extends PerformQueryHost {
 interface QueryHost {
   internalExecute(sql: string, name?: string | null): Promise<unknown>;
   /** @internal */
-  _typeMapForResults: PGTypeMapByOid;
+  _typeMapForResults: PG.TypeMapByOid;
 }
 
 export async function query(

@@ -30,3 +30,5 @@ export const Constants = {
 
 PG.Constants = Constants;
 Object.assign(PG, Constants);
+
+PG.connect = (connParams = {}) => PG.Connection.connect(connParams);

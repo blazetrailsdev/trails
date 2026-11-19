@@ -2,7 +2,7 @@ import pg from "pg";
 import { it, expect, describe, vi } from "vitest";
 import { fakePgConnection } from "../../support/fake-pg-connection.js";
 import { IO, rbClassNewInstance } from "@blazetrails/ruby-compat";
-import { Connection, escapeBytea, unescapeBytea } from "../../../lib/pg/connection.js";
+import { Connection, escapeBytea, unescapeBytea } from "@blazetrails/pg";
 import { PG } from "../../../lib/pg/pg.js";
 import { cancelAnyRunningQuery } from "../../../lib/connection-adapters/postgresql/database-statements.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
@@ -203,8 +203,8 @@ describe("PG::Error#result on every carrier path", () => {
       code: "08006",
     });
     const bare = Object.assign(new Error("socket"), { code: "08006" });
-    const client = fakePgConnection({ query: (error: unknown) => Promise.reject(error) });
-    const query = client.query.bind(client) as unknown as (error: Error) => Promise<unknown>;
+    const query = (error: Error): Promise<unknown> =>
+      fakePgConnection({ query: () => Promise.reject(error) }).query("SELECT 1");
     const raised = (await query(server).catch((e: unknown) => e)) as PG.Error;
     expect(raised).toBeInstanceOf(PG.ServerError);
     expect(raised).not.toBeInstanceOf(PG.ConnectionBad);
@@ -408,9 +408,13 @@ describe("pgConnection without a returned Proxy", () => {
   it("set_client_encoding sets the session's client_encoding", async () => {
     const query = vi.fn(() => Promise.resolve({ rows: [] }));
     await fakePgConnection({ query }).setClientEncoding("utf8");
-    expect(query).toHaveBeenCalledWith("SET client_encoding TO 'utf8'");
+    expect(query).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "SET client_encoding TO 'utf8'" }),
+    );
     await fakePgConnection({ query }).setClientEncoding("it's");
-    expect(query).toHaveBeenLastCalledWith("SET client_encoding TO 'it''s'");
+    expect(query).toHaveBeenLastCalledWith(
+      expect.objectContaining({ text: "SET client_encoding TO 'it''s'" }),
+    );
   });
 
   it("set_notice_receiver replaces the previous receiver", () => {

@@ -22,7 +22,7 @@ import * as DdlHelper from "../../../support/ddl-helper.js";
 import { withSecondAdapter } from "../../../support/second-connection.js";
 import { Name } from "../../../../lib/connection-adapters/postgresql/utils.js";
 import { ConnectionBad } from "@blazetrails/pg";
-import type { PGConnection } from "../../../../lib/pg/connection.js";
+import type { Connection as PGConnection } from "@blazetrails/pg";
 
 let adapter: PostgreSQLAdapter;
 
