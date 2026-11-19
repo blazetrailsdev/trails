@@ -38,7 +38,7 @@
 </script>
 
 <svelte:head>
-  <title>trails</title>
+  <title>BlazeTrails</title>
 </svelte:head>
 
 <div class="page">
@@ -46,8 +46,8 @@
 
   <nav class="nav">
     <ul class="left">{#each navLeft as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
-    <a href="{base}/" class="mark" aria-label="trails home">
-      <span class="wm">tra<span class="i">ı</span>ls</span>
+    <a href="{base}/" class="mark" aria-label="BlazeTrails home">
+      <span class="wm"><span class="blaze">blaze</span>tra<span class="i">ı</span>ls</span>
     </a>
     <ul class="right">{#each navRight as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
   </nav>
@@ -102,9 +102,9 @@
 
   <section class="band">
     <div class="card">
-      <h2>Optimized for happiness.</h2>
-      <p class="small">trails has united and cultivated a strong tribe around a wide set of heretical thoughts about the nature of programming and programmers. Understanding these thoughts will help you understand the design of the framework.</p>
-      <a class="cta" href="{base}/docs/guides/idioms">Read the trails idioms &rsaquo;</a>
+      <h2>Optimized for seasoned Rails developers.</h2>
+      <p class="small"><strong>Bring the Rails you already know, and let agents write the types.</strong> Use the vocabulary you know to write Rails at the speed of agents. Deploy serverless to Lambda or Cloudflare. Use Active Record in a React Native app. Run the full stack in the browser. Dream big.</p>
+      <a class="cta" href="{base}/docs/guides/idioms">Blaze trails &rsaquo;</a>
     </div>
   </section>
 
@@ -164,6 +164,7 @@
   .left { justify-content: flex-end; }
   .mark { text-decoration: none; }
   .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--ink); }
+  .blaze { color: var(--red); }
   .i { position: relative; }
   .i::before { content: ""; position: absolute; left: 50%; transform: translateX(-50%); top: 0.02em; width: 0.26em; height: 0.17em; background: var(--red); border-radius: 0.035em; }
 
