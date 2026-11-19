@@ -53,7 +53,7 @@ describe("loadParity", () => {
         packages: [
           {
             name: "arel",
-            railsCounterpart: "arel",
+            railsCounterpart: "activerecord",
             permanentSkips: { "CLAUDE.md#cited": [], "CLAUDE.md#stub": [] },
           },
         ],
@@ -82,9 +82,7 @@ describe("loadParity", () => {
     const arel = data.packages[0];
     expect(percent(arel.api)).toBe("75%");
     expect(percent(arel.tests)).toBe("50%");
-    expect(arel.railsVersion).toBeNull();
-    await fs.mkdir(path.join(root, "vendor/rails/v8.0.2/arel"), { recursive: true });
-    expect((await loadParity(root)).packages[0].railsVersion).toBe("v8.0.2");
+    expect(arel.railsVersion).toBe("v8.0.2");
     const page = packagePage(data, "arel");
     expect(page).toContain("| Measured at | abcdef0123 |");
     expect(page).toContain("### Cited rule");

@@ -28,6 +28,22 @@ export const SUMMARY_SHA_PATH = "scripts/parity/output/package-summary.sha";
 export const BUILD_SHA_PATH = "scripts/parity/output/build.sha";
 export const GITHUB_REPO = "https://github.com/blazetrailsdev/trails";
 
+/** The gems of the Rails repository, the top-level directories of `vendor/rails/v8.0.2/`. */
+export const RAILS_FRAMEWORKS: ReadonlySet<string> = new Set([
+  "actioncable",
+  "actionmailbox",
+  "actionmailer",
+  "actionpack",
+  "actiontext",
+  "actionview",
+  "activejob",
+  "activemodel",
+  "activerecord",
+  "activestorage",
+  "activesupport",
+  "railties",
+]);
+
 export interface PackageFigures {
   name: string;
   description: string | null;
@@ -98,11 +114,6 @@ export async function loadParity(root = REPO_ROOT): Promise<ParityData> {
     "vendor/sources.lock.json",
     root,
   );
-  const isRailsGem = (gem: string) =>
-    fs.stat(path.join(root, "vendor/rails", lock?.sources.rails?.ref ?? "", gem)).then(
-      () => true,
-      () => false,
-    );
   const packages: PackageFigures[] = [];
   for (const { dir, description } of await publishedPackages(root)) {
     const entry: PackageSummary | undefined = valid?.packages.find((p) => p.name === dir);
@@ -112,7 +123,7 @@ export async function loadParity(root = REPO_ROOT): Promise<ParityData> {
       counterpart === null
         ? null
         : (lock?.sources[counterpart] ??
-          ((await isRailsGem(counterpart)) ? lock?.sources.rails : null));
+          (RAILS_FRAMEWORKS.has(counterpart) ? lock?.sources.rails : null));
     packages.push({
       name: dir,
       description,
@@ -156,14 +167,14 @@ export function sectionsFor(summary: Summary, pkg: string): ClaudeSection[] {
   const entry = summary.packages.find((p) => p.name === pkg);
   for (const key of Object.keys(entry?.permanentSkips ?? {})) if (key !== "") cited.add(key);
   const byKey = new Map(summary.claudeSections.map((s) => [`${s.file}#${s.anchor}`, s]));
-  const out = summary.claudeSections.filter((s) => s.file === own);
+  const wanted = new Set<ClaudeSection>();
   for (const key of cited) {
     let s = byKey.get(key);
     const moved = s && /^Moved to \[[^\]]*\]\(([^)#]+)#([^)]+)\)/.exec(s.lede);
     if (moved) s = byKey.get(`${moved[1]}#${moved[2]}`);
-    if (s && !out.includes(s)) out.push(s);
+    if (s) wanted.add(s);
   }
-  return out;
+  return summary.claudeSections.filter((s) => s.file === own || wanted.has(s));
 }
 
 function renderLede(s: ClaudeSection, ref: string): string {
