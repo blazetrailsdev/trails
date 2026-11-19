@@ -70,6 +70,8 @@ describe("Base#render: a block body inside a template", () => {
         '[<%= capture(() => { %><%= render({ partial: "test/p" }) %><% }) %>]',
       "test/_content_tag.html.tse":
         '<%= contentTag("div", null, null, true, () => { %><%= render({ partial: "test/p" }) %><% }) %>',
+      "test/_tag_builder.html.tse":
+        '<%= tag().div(() => { %><%= render({ partial: "test/p" }) %><% }) %>',
       "test/_content_for.html.tse":
         '<%= contentFor("x", () => { %><%= render({ partial: "test/p" }) %><% }) %><%= contentFor("x") %>',
       "test/_form_with.html.tse":
@@ -86,6 +88,10 @@ describe("Base#render: a block body inside a template", () => {
 
   it("awaits a render nested inside a contentTag block", async () => {
     expect(String(await view.render({ partial: "test/content_tag" }))).toBe("<div><b>p</b></div>");
+  });
+
+  it("awaits a render nested inside a tag builder block", async () => {
+    expect(String(await view.render({ partial: "test/tag_builder" }))).toBe("<div><b>p</b></div>");
   });
 
   it("awaits a render nested inside a contentFor block", async () => {
