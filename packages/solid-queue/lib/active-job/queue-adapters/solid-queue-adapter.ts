@@ -1,8 +1,11 @@
 import { constSet } from "@blazetrails/ruby-compat";
 import { QueueAdapters } from "@blazetrails/activejob";
+import { classAttribute } from "@blazetrails/activesupport";
 
 import { Time } from "@blazetrails/date";
 import { Job } from "../../job.js";
+import { SolidQueue } from "../../solid-queue.js";
+import "../../worker.js";
 
 type ActiveJob = Parameters<typeof Job.enqueue>[0];
 
@@ -13,6 +16,12 @@ declare module "@blazetrails/activejob/namespaces" {
 }
 
 export class SolidQueueAdapter {
+  declare static stopping: boolean;
+
+  isStopping(_job: unknown = null): boolean {
+    return (this.constructor as typeof SolidQueueAdapter).stopping;
+  }
+
   isEnqueueAfterTransactionCommit(): boolean {
     return true;
   }
@@ -29,5 +38,14 @@ export class SolidQueueAdapter {
     return await Job.enqueueAll(activeJobs);
   }
 }
+
+classAttribute.call(SolidQueueAdapter, "stopping", {
+  default: false,
+  instanceWriter: false,
+  instancePredicate: false,
+});
+SolidQueue.onWorkerStop(() => {
+  SolidQueueAdapter.stopping = true;
+});
 
 constSet(QueueAdapters, "SolidQueueAdapter", SolidQueueAdapter);
