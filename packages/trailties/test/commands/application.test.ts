@@ -9,12 +9,12 @@ describe("Trails::Command::ApplicationTest", { timeout: 60_000 }, () => {
   it("trails new without path prints help", async () => {
     const output = await runApplicationCommand("new");
 
-    expect(output.startsWith("No value provided for required arguments")).toBe(false);
+    expect(output.startsWith("No value provided for required arguments")).toBeFalsy();
 
     expect(
       output.includes(
         "The `trails new` command creates a new Trails application with a default\n    directory structure and configuration at the path you specify.",
       ),
-    ).toBe(true);
+    ).toBeTruthy();
   });
 });

@@ -28,7 +28,7 @@ describe("Trails::Command::InitializersTest", { timeout: 120_000 }, () => {
     const initialOutputLength = initialOutput.split("\n").length;
 
     expect(initialOutputLength).toBeGreaterThan(0);
-    expect(initialOutput.includes("set_added_test_module")).toBe(false);
+    expect(initialOutput.includes("set_added_test_module")).toBeFalsy();
 
     await t.addToConfig(`
       this.initializer("set_added_test_module", () => {});
@@ -38,7 +38,7 @@ describe("Trails::Command::InitializersTest", { timeout: 120_000 }, () => {
     const finalOutputLength = finalOutput.split("\n").length;
 
     expect(finalOutputLength - initialOutputLength).toBe(1);
-    expect(finalOutput.includes("set_added_test_module")).toBe(true);
+    expect(finalOutput.includes("set_added_test_module")).toBeTruthy();
   });
 
   it("prints out initializers only specified in environment option", async () => {

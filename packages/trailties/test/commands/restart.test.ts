@@ -25,7 +25,7 @@ describe("Trails::Command::RestartTest", { timeout: 120_000 }, () => {
   it("trails restart touches tmp/restart.txt", async () => {
     const restartTxt = await t.appPath("tmp", "restart.txt");
     await t.trails("restart");
-    expect(await File.isExistAsync(restartTxt)).toBe(true);
+    expect(await File.isExistAsync(restartTxt)).toBeTruthy();
 
     const prevMtime = (await File.mtimeAsync(restartTxt)).getTime();
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -37,6 +37,6 @@ describe("Trails::Command::RestartTest", { timeout: 120_000 }, () => {
   it("trails restart should work even if tmp folder does not exist", async () => {
     await FileUtils.rmRAsync(await t.appPath("tmp"));
     await t.trails("restart");
-    expect(await File.isExistAsync(await t.appPath("tmp", "restart.txt"))).toBe(true);
+    expect(await File.isExistAsync(await t.appPath("tmp", "restart.txt"))).toBeTruthy();
   });
 });
