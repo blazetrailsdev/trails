@@ -251,10 +251,10 @@ describe("PostgreSQL quoting", () => {
     expect(quotedBinary.call(HOST, new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe("'\\x1f8b'");
   });
 
-  it("escapes through the gem singleton before a connection exists", () => {
+  it("escapes for standard_conforming_strings before a connection exists", () => {
     const cold = { _rawConnection: null };
-    expect(quoteString.call(cold, "a\\b'c")).toBe("a\\\\b''c");
-    expect(quotedBinary.call(cold, new BinaryData(Uint8Array.of(0x00, 0x41)))).toBe("'\\\\000A'");
+    expect(quoteString.call(cold, "a\\b'c")).toBe("a\\b''c");
+    expect(quotedBinary.call(cold, new BinaryData(Uint8Array.of(0x00, 0x41)))).toBe("'\\x0041'");
   });
 
   it("quotedBinary wraps escape_bytea output in SQL quotes", () => {

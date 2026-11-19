@@ -46,11 +46,18 @@ export interface CastTypeLookupHost {
 const QUOTED_COLUMN_NAMES: Record<string, string> = Object.create(null);
 const QUOTED_TABLE_NAMES: Record<string, string> = Object.create(null);
 
+/** @inventedArm if — PERMANENT */
 export function escapeBytea(
   this: { _rawConnection: PGConnection | null },
   value: Uint8Array | string | null | undefined,
 ): string | undefined {
-  if (value != null) return (this._rawConnection ?? PG.Connection).escapeBytea(value);
+  if (value != null) {
+    if (this._rawConnection == null) {
+      const bytes = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
+      return `\\x${bytes.toString("hex")}`;
+    }
+    return this._rawConnection.escapeBytea(value);
+  }
 }
 
 export async function unescapeBytea(
@@ -109,9 +116,13 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
   return abstractQuote.call(this, value);
 }
 
-/** @missingRailsCall with_raw_connection — PERMANENT */
+/**
+ * @missingRailsCall with_raw_connection — PERMANENT
+ * @inventedArm if — PERMANENT
+ */
 export function quoteString(this: { _rawConnection: PGConnection | null }, s: string): string {
-  return (this._rawConnection ?? PG.Connection).escape(s);
+  if (this._rawConnection == null) return s.replace(/'/g, "''");
+  return this._rawConnection.escape(s);
 }
 
 export function quoteTableNameForAssignment(_table: string, attr: string): string {
