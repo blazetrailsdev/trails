@@ -52,6 +52,7 @@ export interface HttpServer {
   address(): string | { port: number } | null;
   on(event: "upgrade", listener: HttpUpgradeListener): unknown;
   on(event: "close", listener: () => void): unknown;
+  on(event: "error", listener: (error: Error) => void): unknown;
 }
 
 /**

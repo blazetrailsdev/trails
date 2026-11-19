@@ -119,17 +119,23 @@ export async function loadIseqEval(fname: string, fresh = false): Promise<Record
       ? undefined
       : compiledFiles.get(full);
   let exports: Record<string, unknown>;
-  if (compiled !== undefined) {
-    exports = (await compiled()) as Record<string, unknown>;
-  } else {
-    const { pathToFileURL } = getPath();
-    if (pathToFileURL === undefined) throw new LoadError(`cannot load such file -- ${fname}`);
-    const path = pathToFileURL(fname);
-    if (fresh) path.search = `?${(loads += 1)}`;
-    exports = (await (importer !== null ? importer(path.href) : import(path.href))) as Record<
-      string,
-      unknown
-    >;
+  try {
+    if (compiled !== undefined) {
+      exports = (await compiled()) as Record<string, unknown>;
+    } else {
+      const { pathToFileURL } = getPath();
+      if (pathToFileURL === undefined) throw new LoadError(`cannot load such file -- ${fname}`);
+      const path = pathToFileURL(fname);
+      if (fresh) path.search = `?${(loads += 1)}`;
+      exports = (await (importer !== null ? importer(path.href) : import(path.href))) as Record<
+        string,
+        unknown
+      >;
+    }
+  } catch (e) {
+    if ((e as { code?: unknown } | null)?.code !== "ERR_MODULE_NOT_FOUND") throw e;
+    const missing = /Cannot find (?:module|package) '([^']+)'/.exec((e as Error).message);
+    throw new LoadError(`cannot load such file -- ${missing?.[1] ?? fname}`);
   }
   loadedFiles.set(full, exports);
   return exports;

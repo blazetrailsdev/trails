@@ -13,6 +13,7 @@ import {
   type Included,
   rbFBackquote,
   rbFSend,
+  rbFSystem,
   rbObjRespondTo,
   regexpEscape,
 } from "@blazetrails/ruby-compat";
@@ -24,7 +25,7 @@ import { Base, type GeneratorOptions, type GeneratorConfig } from "./base.js";
 import { DATABASES, Database, type DatabaseName } from "./database.js";
 import { Error } from "./base.js";
 import { AppName } from "./app-name.js";
-import { getPackageManager, packageManagerInstall } from "../package-manager.js";
+import { getPackageManager } from "../package-manager.js";
 
 export type AppBaseOptions = GeneratorOptions & {
   appPath: string;
@@ -709,12 +710,26 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
-  protected installCommand(command: string): void {
+  protected async installCommand(command: string, env: Record<string, string> = {}): Promise<void> {
     const pm = getPackageManager(this.destinationRoot, {
       fallback: (this as unknown as { packageManager?: string }).packageManager,
     });
     this.sayStatus("run", `${pm.name} ${command}`);
-    packageManagerInstall(this.destinationRoot, pm);
+    await this.execInstallCommand(pm.name, command, env);
+  }
+
+  /** @internal */
+  protected async execInstallCommand(
+    installCommand: string,
+    command: string,
+    env: Record<string, string>,
+  ): Promise<void> {
+    const fullCommand = `"${installCommand}" ${command}`;
+    if (this.options.quiet) {
+      await rbFSystem(env, fullCommand, { out: "/dev/null" });
+    } else {
+      await rbFSystem(env, fullCommand);
+    }
   }
 
   /** @internal */
@@ -724,7 +739,7 @@ ${requireStatements.join("\n")}`;
 
   /** @internal */
   protected async runInstall(): Promise<void> {
-    if (this.isInstall()) this.installCommand("install");
+    if (this.isInstall()) await this.installCommand("install");
   }
 
   /**

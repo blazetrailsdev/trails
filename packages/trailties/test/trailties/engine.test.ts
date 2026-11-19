@@ -9,7 +9,7 @@ import {
   NullInternalMetadata,
   NullSchemaMigration,
 } from "@blazetrails/activerecord";
-import { Dir, File, getFs, include } from "@blazetrails/ruby-compat";
+import { constGet, Dir, File, getFs, include, TopLevel } from "@blazetrails/ruby-compat";
 import type { Bukkit, Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { Engine } from "../../lib/engine.js";
@@ -200,6 +200,81 @@ describe("RailtiesTest::EngineTest", () => {
       expect(output[1]).toMatch(
         /Copied migration \d+_create_blogs\.blog_engine\.ts from blog_engine/,
       );
+    },
+  );
+
+  it(
+    "do not create table_name_prefix method if it already exists",
+    { timeout: 240_000 },
+    async () => {
+      await plugin.write(
+        "lib/bukkits.ts",
+        `
+import { Engine } from "@blazetrails/trailties";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+export const Bukkits = {
+  name: "Bukkits",
+  get tableNamePrefix() {
+    return "foo";
+  },
+};
+constSet(TopLevel, "Bukkits", Bukkits);
+export class BukkitsEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.isolateNamespace(Bukkits);
+  }
+}
+`,
+      );
+
+      await t.bootTrails();
+
+      expect((constGet(TopLevel, "Bukkits") as { tableNamePrefix: string }).tableNamePrefix).toBe(
+        "foo",
+      );
+    },
+  );
+
+  it(
+    "take ActiveRecord table_name_prefix into consideration when defining table_name_prefix",
+    { timeout: 240_000 },
+    async () => {
+      await plugin.write(
+        "lib/bukkits.ts",
+        `
+import { Engine } from "@blazetrails/trailties";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+export const Bukkits = { name: "Bukkits" };
+constSet(TopLevel, "Bukkits", Bukkits);
+export class BukkitsEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.isolateNamespace(Bukkits);
+  }
+}
+`,
+      );
+
+      await plugin.write(
+        "app/models/bukkits/post.ts",
+        `
+import { Base } from "@blazetrails/activerecord";
+export class Post extends Base {}
+`,
+      );
+
+      await t.addToConfig(`this.config.activeRecord.tableNamePrefix = "ar_prefix_";`);
+
+      await t.bootTrails();
+
+      const Bukkits = constGet(TopLevel, "Bukkits") as { tableNamePrefix: string };
+      const Post = constGet(Bukkits, "Post") as {
+        tableName: string;
+        modelName: { paramKey: string; routeKey: string };
+      };
+      expect(Post.tableName).toBe("ar_prefix_bukkits_posts");
+      expect(Bukkits.tableNamePrefix).toBe("ar_prefix_bukkits_");
     },
   );
 });

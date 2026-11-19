@@ -1,9 +1,19 @@
 import { RouteSet, type DrawCallback, type Request } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { TopLevel } from "@blazetrails/activesupport";
-import { KERNEL_METHODS, PROTOCOL_PROBES, prepend, rbCallSuper } from "@blazetrails/ruby-compat";
+import {
+  KERNEL_METHODS,
+  NoMethodError,
+  PROTOCOL_PROBES,
+  prepend,
+  rbCallSuper,
+  rbFSend,
+  rbInspect,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 
 type MethodMissingModule = {
+  methodMissing(this: object, name: string, ...args: unknown[]): unknown;
   respondToMissing(this: object, name: string, includeAll?: boolean): boolean;
 };
 
@@ -94,8 +104,9 @@ export class LazyRouteSet extends RouteSet {
           ) {
             return Reflect.get(target, name, receiver);
           }
-          receiver.respondToMissing(name);
-          return undefined;
+          if (!receiver.respondToMissing(name)) return undefined;
+          if (name in receiver) return (receiver as Record<string, unknown>)[name];
+          return (...args: unknown[]) => receiver.methodMissing(name, ...args);
         },
       }),
     );
@@ -141,9 +152,20 @@ export class LazyRouteSet extends RouteSet {
   /** @internal */
   private methodMissingModule(): MethodMissingModule {
     return (this._methodMissingModule ??= {
-      respondToMissing(this: object, _name: string, _includeAll: boolean = false): boolean {
-        TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-        return false;
+      methodMissing(this: object, name: string, ...args: unknown[]): unknown {
+        if (TopLevel.Trails!.application?.reloadRoutesUnlessLoaded()) {
+          return rbFSend(this, name, ...args);
+        } else {
+          throw new NoMethodError(`undefined method '${name}' for ${rbInspect(this)}`, name);
+        }
+      },
+
+      respondToMissing(this: object, name: string, _includeAll: boolean = false): boolean {
+        if (TopLevel.Trails!.application?.reloadRoutesUnlessLoaded()) {
+          return rbObjRespondTo(this, name);
+        } else {
+          return false;
+        }
       },
     });
   }

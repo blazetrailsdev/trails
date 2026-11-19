@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MockRequest } from "@blazetrails/rack";
+import { Model } from "@blazetrails/activemodel";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Engine } from "../lib/engine.js";
 import { Application } from "../lib/application.js";
 import { Configuration as TrailtieConfiguration } from "../lib/trailtie/configuration.js";
@@ -80,6 +82,22 @@ describe("Engine.isolate_namespace", () => {
     expect(mod.tableNamePrefix).toBe("blog_admin_");
     expect(mod.isUseRelativeModelNaming!()).toBe(true);
     expect(mod.trailtieRoutesUrlHelpers!()).toBe(routes.urlHelpers());
+  });
+
+  it("reaches a model under the seated namespace through module_parents", () => {
+    class ShopEngine extends Engine {}
+    Engine.register(ShopEngine, new URL("./fixtures/initializer-engine", import.meta.url).pathname);
+    const Shop: Parameters<typeof Engine.isolateNamespace>[0] = { name: "Shop" };
+    constSet(TopLevel, "Shop", Shop);
+    ShopEngine.isolateNamespace(Shop);
+    class Product extends Model {}
+    constSet(Shop, "Product", Product);
+
+    expect(Product.modelName.name).toBe("Shop::Product");
+    expect(Product.modelName.paramKey).toBe("product");
+    expect(Product.modelName.routeKey).toBe("products");
+    expect(Product.modelName.singularRouteKey).toBe("product");
+    expect(Product.modelName.i18nKey).toBe("shop/product");
   });
 });
 

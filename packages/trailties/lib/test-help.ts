@@ -66,9 +66,8 @@ onLoad("action_controller_test_case", function (this: typeof TestCase) {
 });
 
 onLoad("action_dispatch_integration_test", function (this: typeof TestCase) {
-  async function beforeSetup(this: { routes?: unknown }) {
+  function beforeSetup(this: { routes?: unknown }) {
     this.routes = Trails.application!.routes();
-    await Trails.application!.reloadRoutesUnlessLoaded();
     return rbCallSuper(this, beforeSetup);
   }
   rbModDefineMethod(this, "beforeSetup", beforeSetup);

@@ -2,6 +2,7 @@ import {
   EOFError,
   getHttpAsync,
   stderr,
+  stdout,
   STDERR,
   StringIO,
   TCPSocket,
@@ -84,8 +85,15 @@ export class Node {
       });
     });
     Node.server = server;
-    return new Promise<HttpServer>((resolve) => {
-      server.listen(options.Port ?? 8080, options.Host ?? "localhost", () => resolve(server));
+    const host = options.Host ?? "localhost";
+    return new Promise<HttpServer>((resolve, reject) => {
+      server.on("error", reject);
+      server.listen(options.Port ?? 8080, host, () => {
+        const address = server.address();
+        const port = typeof address === "object" && address !== null ? address.port : options.Port;
+        stdout.write(`* Listening on http://${host}:${port}\n`);
+        resolve(server);
+      });
     });
   }
 
