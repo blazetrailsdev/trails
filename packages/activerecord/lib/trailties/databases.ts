@@ -545,6 +545,7 @@ DSL.namespace("db", (dbNamespace) => {
   );
 
   DSL.desc("Load the seed data from db/seeds.rb");
+  /** @inventedArm disconnectAllBang — PERMANENT */
   DSL.task(
     { seed: "load_config" },
     block(async () => {

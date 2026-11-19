@@ -1116,40 +1116,6 @@ export class CreatePosts extends Migration.Current {
     }
   });
 
-  it("db:seed disconnects every pool the seeds left connected", async () => {
-    const dbFile = path.join(tmpDir, "seed-disconnect.sqlite3");
-    fs.writeFileSync(
-      path.join(tmpDir, "config", "database.ts"),
-      `export default {
-  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
-  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
-};`,
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, "db", "seeds.ts"),
-      `import { Base } from "@blazetrails/activerecord";
-await (await Base.leaseConnection()).execute("SELECT 1");`,
-    );
-    let connectedAfterSeed: boolean | undefined;
-    const { DSL } = await import("@blazetrails/rake");
-    const enhance = () =>
-      DSL.task(
-        "db:seed",
-        block(() => {
-          connectedAfterSeed = Base.connectionHandler
-            .connectionPoolList("all")
-            .some((pool) => pool.isConnected());
-        }),
-      );
-    seedEnhancers.push(enhance);
-    try {
-      await runTask("db:seed");
-    } finally {
-      seedEnhancers.pop();
-    }
-    expect(connectedAfterSeed).toBe(false);
-  });
-
   it("db prepare creates, migrates, and seeds a fresh database", async () => {
     const dbFile = path.join(tmpDir, "prepare.sqlite3");
     fs.writeFileSync(
@@ -2298,16 +2264,30 @@ await AnimalsRecord.establishConnection({ adapter: "sqlite3", database: ${JSON.s
     );
     setEnginePath(path.join(tmpDir, "boot.ts"));
     await runTask("db:migrate");
+    let connectedAfterSeed: unknown[] | undefined;
+    seedEnhancers.push(() =>
+      DSL.task(
+        "db:seed",
+        block(() => {
+          connectedAfterSeed = Base.connectionHandler
+            .connectionPoolList("all")
+            .filter((pool) => pool.isConnected());
+        }),
+      ),
+    );
 
-    await runTask("db:seed");
+    try {
+      await runTask("db:seed");
+    } finally {
+      seedEnhancers.pop();
+    }
 
     const Dog = (globalThis as { __dbSeedDog?: unknown }).__dbSeedDog;
     delete (globalThis as { __dbSeedDog?: unknown }).__dbSeedDog;
     expect(Dog).toBeDefined();
     expect(await rowCountIn(animalsDb(), "dogs")).toBe(1);
     expect(await tableIn(primaryDb(), "dogs")).toBe(false);
-    const { Base } = await import("@blazetrails/activerecord");
-    expect(Base.connectionHandler.connectionPools.filter((pool) => pool.isConnected())).toEqual([]);
+    expect(connectedAfterSeed).toEqual([]);
   });
 
   it("db migrate names each migration it runs and does not claim to be up to date", async () => {
