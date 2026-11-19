@@ -41,7 +41,7 @@ export class StimulusGenerator extends NamedBase {
 
   /** @internal */
   private stimulusAttributeValue(controllerName: string): string {
-    return controllerName.replace(/\//g, "--").replaceAll("_", "-");
+    return controllerName.replaceAll("/", "--").replaceAll("_", "-");
   }
 }
 

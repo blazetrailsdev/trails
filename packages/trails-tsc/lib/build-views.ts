@@ -495,8 +495,12 @@ function bindCheckedTypes(
       let untyped = false;
       if (site === "unknown") unknownTarget = true;
       else if (site !== undefined && "assigns" in site) {
-        for (const v of views.filter((v) => named(v.rel.replace(/\.[^/]*$/u, ""), site.assigns))) {
-          renderedBy.set(v, (renderedBy.get(v) ?? new Set()).add(controller!));
+        if (controller !== undefined) {
+          for (const v of views.filter((v) =>
+            named(v.rel.replace(/\.[^/]*$/u, ""), site.assigns),
+          )) {
+            renderedBy.set(v, (renderedBy.get(v) ?? new Set()).add(controller));
+          }
         }
       } else if (site !== undefined && "template" in site) {
         const { template } = site;
