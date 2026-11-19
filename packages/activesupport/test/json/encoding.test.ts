@@ -396,9 +396,15 @@ describe("TestJSONEncoding", () => {
     const userBirthday = new UserNameAndDate("David", new RubyDate(2010, 1, 1));
     const custom = new Custom("David", userBirthday);
 
-    const jsonStrings = ActiveSupportJSON.encode(userEmail);
-    const jsonStringAndDate = ActiveSupportJSON.encode(userBirthday);
-    const jsonCustom = ActiveSupportJSON.encode(custom);
+    let jsonStrings = "";
+    let jsonStringAndDate = "";
+    let jsonCustom = "";
+
+    expect(() => {
+      jsonStrings = ActiveSupportJSON.encode(userEmail);
+      jsonStringAndDate = ActiveSupportJSON.encode(userBirthday);
+      jsonCustom = ActiveSupportJSON.encode(custom);
+    }).not.toThrow();
 
     expect(ActiveSupportJSON.decode(jsonCustom)).toEqual({
       name: "David",

@@ -181,3 +181,24 @@ describe("an executor-wrapped spec", () => {
     expect(AppExecutor.active()).toBe(true);
   });
 });
+
+describe("autorun locates the test method (tests_without_assertions.rb:13)", () => {
+  let warn: MockInstance<typeof console.warn>;
+
+  beforeAll(() => {
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    warn.mockRestore();
+  });
+
+  it("makes no assertions", () => {});
+
+  it("prints the test's own line in the missing-assertions warning", (context) => {
+    const subject = context.task.suite!.tasks.find((t) => t.name === "makes no assertions")!;
+    const err = warn.mock.calls.map((c) => String(c[0])).join("\n");
+    const line = err.match(/`test_makes_no_assertions` .+autorun\.trails\.test\.ts:(\d+)/)?.[1];
+    expect(Number(line)).toBe(subject.location!.line);
+  });
+});

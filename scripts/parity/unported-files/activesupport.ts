@@ -241,15 +241,11 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "core_ext/class/attribute_test.rb",
-    tests: [
-      "when defined in a class's singleton",
-      "works well with module singleton classes",
-      "allow to prepend accessors",
-    ],
+    tests: ["when defined in a class's singleton", "allow to prepend accessors"],
     reason:
-      "The first two declare `class_attribute` inside a class's or module's own singleton " +
+      "The first declares `class_attribute` inside a class's own singleton " +
       "class (`class << self`), whose lookup chain is what core_ext/class/attribute.rb:86-120 " +
-      "walks; the third asserts `singleton_class.prepend` wraps the generated reader and " +
+      "walks; the second asserts `singleton_class.prepend` wraps the generated reader and " +
       "writer. A JS class has no metaclass apart from its own statics and no " +
       "`Module#prepend`, so there is no receiver for either shape.",
   },
@@ -277,9 +273,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     tests: [
       "process status",
       "non utf8 string transcodes",
-      "struct to json with options",
-      "struct to json with options nested",
-      "struct encoding",
       "data encoding",
       "json gem dump by passing active support encoder",
       "json gem generate by passing active support encoder",
@@ -289,19 +282,9 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Each encodes a Ruby-only receiver or goes through the Ruby `json` gem: " +
       "`Process::Status` from a spawned child process via `$?` (encoding_test.rb:39-44), " +
-      "a Shift_JIS String transcoded to UTF-8 (:84-89), `Struct`/`Struct.new` members " +
-      "(:159-186, :319-347) and `Data.define` (:349-356), `JSON.dump`/`generate`/" +
+      "a Shift_JIS String transcoded to UTF-8 (:84-89), `Data.define` (:349-356), `JSON.dump`/`generate`/" +
       "`pretty_generate` dispatching into the gem's `to_json(state)` protocol (:377-400), " +
-      "and `STDOUT` as an IO (:482-484). None of the five has a JS counterpart.",
-  },
-  {
-    testFile: "core_ext/time_with_zone_test.rb",
-    tests: ["to yaml", "ruby to yaml", "yaml load", "ruby yaml load"],
-    reason:
-      "Round-trip TimeWithZone through Psych — `to_yaml` emits the " +
-      "`!ruby/object:ActiveSupport::TimeWithZone` tag and `YAML.load` rebuilds it from the " +
-      "`utc`/`zone`/`time` ivars (time_with_zone.rb:174-181). YAML with Ruby object tags " +
-      "has no JS equivalent, and Psych is an unported format across the repo.",
+      "and `STDOUT` as an IO (:482-484). None of them has a JS counterpart.",
   },
   {
     testFile: "time_zone_test.rb",

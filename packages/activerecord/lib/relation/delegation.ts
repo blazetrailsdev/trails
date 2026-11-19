@@ -11,11 +11,10 @@ import {
   publicInstanceMethods,
   split,
   toSentence,
-  toFsArray,
-  toXmlArray,
   without,
   type XmlBuilder,
 } from "@blazetrails/activesupport";
+import { toFs, toXml } from "@blazetrails/activesupport/core-ext/array/conversions";
 import { NotImplementedError } from "../errors.js";
 import {
   Module,
@@ -256,9 +255,9 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     records.map((record) =>
       (record as unknown as { asJson(o?: SerializeOptions): unknown }).asJson(options),
     ),
-  toFs: (records, format?: string) => toFsArray(records, format),
+  toFs: (records, format?: string) => toFs(records, format),
   toXml: (records, options?: ToXmlOptions, block?: (builder: XmlBuilder) => void) =>
-    toXmlArray(records, options, block),
+    toXml(records, options, block),
   encodeWith: (records, coder: Psych.Coder) => rbFSend(records, "encodeWith", coder),
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;

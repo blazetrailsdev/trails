@@ -10,7 +10,8 @@ import {
 } from "../../lib/index.js";
 import { assertQueriesCount, assertNoQueries } from "../../lib/testing/query-assertions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { isBlank, isPresent, toXmlArray } from "@blazetrails/activesupport";
+import { isBlank, isPresent } from "@blazetrails/activesupport";
+import { toXml } from "@blazetrails/activesupport/core-ext/array/conversions";
 import {
   assertDifference,
   assertEmpty,
@@ -190,7 +191,7 @@ describe("RelationTest", () => {
 
   it("to xml", async () => {
     await expect(Bird.all().toXml()).resolves.not.toThrow();
-    await expect((async () => toXmlArray(await Bird.all()))()).resolves.not.toThrow();
+    await expect((async () => toXml(await Bird.all()))()).resolves.not.toThrow();
   });
 
   it("scoped all", async () => {

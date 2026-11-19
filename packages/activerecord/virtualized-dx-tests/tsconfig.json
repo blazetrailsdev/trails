@@ -33,6 +33,10 @@
       "@blazetrails/activesupport/message-verifier": [
         "../../activesupport/lib/message-verifier.ts"
       ],
+      "@blazetrails/activesupport/core-ext/array/conversions": [
+        "../../activesupport/lib/core-ext/array/conversions.ts"
+      ],
+      "@blazetrails/activesupport/hash-utils": ["../../activesupport/lib/hash-utils.ts"],
       "@blazetrails/activesupport/core-ext/date/conversions": [
         "../../activesupport/lib/core-ext/date/conversions.ts"
       ],
