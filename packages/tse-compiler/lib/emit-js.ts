@@ -41,6 +41,8 @@ export const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
 
 export const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
+const ASYNC_ARROW_RE = /(?<!\basync\s*)(\([^()]*\)|[A-Za-z_$][\w$]*)(\s*=>\s*\{\s*)$/;
+
 export const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
 
 const REGEX_PRECEDING_KEYWORD_RE =
@@ -215,12 +217,21 @@ export function* emitSteps(
 ): Generator<EmitStep> {
   const innerDepths: number[] = [];
   const innerCallExprParens: number[] = [];
+  const innerAwaits: boolean[] = [];
   let braceDepth = 0;
   const functionDepths: number[] = [];
+  const trackFunctions = (node: TseNode): void => {
+    if (node.kind !== "code" || async !== true) return;
+    braceDepth += netBraceDepth(node.value);
+    while (functionDepths.length > 0 && braceDepth < functionDepths[functionDepths.length - 1]) {
+      functionDepths.pop();
+    }
+    if (FUNCTION_BLOCK_RE.test(node.value.trimEnd())) functionDepths.push(braceDepth);
+  };
   for (const node of nodes) {
     const insideBlock = innerDepths.length > 0;
     const bufRef = insideBlock ? bufvar : "_ob";
-    const awaits = async === true && !insideBlock && functionDepths.length === 0;
+    const awaits = async === true && functionDepths.length === 0 && innerAwaits.every((a) => a);
     if (node.kind === "blockExpr") {
       const trimmed = node.value.trim();
       if (!ARROW_BLOCK_RE.test(trimmed)) {
@@ -229,31 +240,26 @@ export function* emitSteps(
         );
       }
       innerDepths.push(0);
+      innerAwaits.push(awaits);
       innerCallExprParens.push(netUnclosedParens(node.value) + (awaits ? 1 : 0));
-      yield { node, bufRef, awaits };
+      const value = awaits ? node.value.replace(ASYNC_ARROW_RE, "async $1$2") : node.value;
+      yield { node: { ...node, value }, bufRef, awaits };
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
         innerDepths.pop();
+        innerAwaits.pop();
         const callExprParens = innerCallExprParens.pop()!;
         const closingParens = (node.value.match(/\)/g) ?? []).length;
         const suffix = ")".repeat(Math.max(0, 1 + callExprParens - closingParens)) + ";";
         yield { node, bufRef, awaits: false, suffix };
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        yield { node, bufRef: bufvar, awaits: false };
+        trackFunctions(node);
+        yield { node, bufRef: bufvar, awaits };
       }
     } else {
-      if (node.kind === "code" && async === true) {
-        braceDepth += netBraceDepth(node.value);
-        while (
-          functionDepths.length > 0 &&
-          braceDepth < functionDepths[functionDepths.length - 1]
-        ) {
-          functionDepths.pop();
-        }
-        if (FUNCTION_BLOCK_RE.test(node.value.trimEnd())) functionDepths.push(braceDepth);
-      }
+      trackFunctions(node);
       yield { node, bufRef, awaits };
     }
   }

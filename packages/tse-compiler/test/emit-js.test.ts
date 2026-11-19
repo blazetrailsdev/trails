@@ -57,13 +57,25 @@ describe("compileJs", () => {
         "<% items.forEach((i) => { %><%= cache(i, () => { %>baz<% }) %><% }) %>",
       { async: true },
     );
-    expect(code).toContain("_ob.append(await ( cache((a), { b: (1) }, () => {");
+    expect(code).toContain("_ob.append(await ( cache((a), { b: (1) }, async () => {");
     expect(code).toContain("}) ));");
     expect(code).toContain("_ob.append( cache(i, () => {");
     expect(
       () =>
         new Function(`return async function () { ${code.replace(/^export default /, "return ")} }`),
     ).not.toThrow();
+  });
+
+  it("runs an awaited block-expr body as an async callback that awaits its own expressions", () => {
+    const { code } = compileJs(
+      '<%= formWith({}, (f) => { %><%= render("p") %><% if (x) { %><%= yield %><% } %>' +
+        "<% items.forEach((i) => { %><%= i %><% }) %><% }) %>",
+      { async: true },
+    );
+    expect(code).toContain("_ob.append(await ( formWith({}, async (f) => {");
+    expect(code).toContain('context.outputBuffer.append(await ( render("p") ));');
+    expect(code).toContain("context.outputBuffer.append(await ( (await yield) ));");
+    expect(code).toContain("context.outputBuffer.append( i );");
   });
 
   it("does not count braces inside string literals when deciding what an async render awaits", () => {
