@@ -11,62 +11,83 @@ export const BIGDECIMAL_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*
 
 export type NumberFormatOptions = object;
 
-const DEFAULTS: Record<string, Record<string, unknown>> = {
-  format: {
-    separator: ".",
-    delimiter: ",",
-    precision: 3,
-    significant: false,
-    stripInsignificantZeros: false,
-  },
-  currency: {
-    format: "%u%n",
-    negativeFormat: "-%u%n",
-    unit: "$",
-    separator: ".",
-    delimiter: ",",
-    precision: 2,
-    significant: false,
-    stripInsignificantZeros: false,
-  },
-  percentage: {
-    delimiter: "",
-    format: "%n%",
-  },
-  precision: {
-    delimiter: "",
-  },
-  human: {
-    delimiter: "",
-    precision: 3,
-    significant: true,
-    stripInsignificantZeros: true,
-    storage_units: {
-      format: "%n %u",
-      units: {
-        byte: new Hash<unknown, unknown>().set(":one", "Byte").set(":other", "Bytes"),
-        kb: "KB",
-        mb: "MB",
-        gb: "GB",
-        tb: "TB",
-        pb: "PB",
-        eb: "EB",
-        zb: "ZB",
-      },
-    },
-    decimal_units: {
-      format: "%n %u",
-      units: {
-        unit: "",
-        thousand: "Thousand",
-        million: "Million",
-        billion: "Billion",
-        trillion: "Trillion",
-        quadrillion: "Quadrillion",
-      },
-    },
-  },
-};
+const DEFAULTS = new Hash<string, unknown>()
+  .set(
+    ":format",
+    new Hash<string, unknown>()
+      .set(":separator", ".")
+      .set(":delimiter", ",")
+      .set(":precision", 3)
+      .set(":significant", false)
+      .set(":stripInsignificantZeros", false),
+  )
+  .set(
+    ":currency",
+    new Hash<string, unknown>().set(
+      ":format",
+      new Hash<string, unknown>()
+        .set(":format", "%u%n")
+        .set(":negativeFormat", "-%u%n")
+        .set(":unit", "$")
+        .set(":separator", ".")
+        .set(":delimiter", ",")
+        .set(":precision", 2)
+        .set(":significant", false)
+        .set(":stripInsignificantZeros", false),
+    ),
+  )
+  .set(
+    ":percentage",
+    new Hash<string, unknown>().set(
+      ":format",
+      new Hash<string, unknown>().set(":delimiter", "").set(":format", "%n%"),
+    ),
+  )
+  .set(
+    ":precision",
+    new Hash<string, unknown>().set(":format", new Hash<string, unknown>().set(":delimiter", "")),
+  )
+  .set(
+    ":human",
+    new Hash<string, unknown>()
+      .set(
+        ":format",
+        new Hash<string, unknown>()
+          .set(":delimiter", "")
+          .set(":precision", 3)
+          .set(":significant", true)
+          .set(":stripInsignificantZeros", true),
+      )
+      .set(
+        ":storage_units",
+        new Hash<string, unknown>()
+          .set(":format", "%n %u")
+          .set(
+            ":units",
+            new Hash<string, unknown>()
+              .set(":byte", "Bytes")
+              .set(":kb", "KB")
+              .set(":mb", "MB")
+              .set(":gb", "GB")
+              .set(":tb", "TB"),
+          ),
+      )
+      .set(
+        ":decimal_units",
+        new Hash<string, unknown>()
+          .set(":format", "%n %u")
+          .set(
+            ":units",
+            new Hash<string, unknown>()
+              .set(":unit", "")
+              .set(":thousand", "Thousand")
+              .set(":million", "Million")
+              .set(":billion", "Billion")
+              .set(":trillion", "Trillion")
+              .set(":quadrillion", "Quadrillion"),
+          ),
+      ),
+  );
 
 export abstract class NumberConverter<TOptions extends NumberFormatOptions = NumberFormatOptions> {
   protected number: unknown;
@@ -135,17 +156,16 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   }
 
   protected defaultFormatOptions(): Record<string, unknown> {
+    const options = rbObjDup(DEFAULTS.get(":format") as Hash<string, unknown>);
     const ns = (this.constructor as typeof NumberConverter).namespace;
-    const base = rbObjDup(DEFAULTS.format);
-    if (ns && DEFAULTS[ns]) {
-      const nsDefaults = DEFAULTS[ns];
-      for (const [k, v] of Object.entries(nsDefaults)) {
-        if (typeof v !== "object" || v === null) {
-          base[k] = v;
-        }
-      }
+    if (ns) {
+      for (const [k, v] of (DEFAULTS.get(`:${ns}`) as Hash<string, unknown>).get(":format") as Hash<
+        string,
+        unknown
+      >)
+        options.set(k, v);
     }
-    return base;
+    return Object.fromEntries([...options].map(([k, v]) => [symbolToS(k), v]));
   }
 
   protected i18nFormatOptions(): Record<string, unknown> {
@@ -189,13 +209,8 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   }
 
   private defaultValue(key: string): unknown {
-    const parts = key.split(".");
-    let current: unknown = DEFAULTS;
-    for (const part of parts) {
-      if (current === null || current === undefined || typeof current !== "object")
-        return undefined;
-      current = (current as Record<string, unknown>)[part];
-    }
-    return current;
+    return key
+      .split(".")
+      .reduce<unknown>((defaults, k) => (defaults as Hash<string, unknown>).get(`:${k}`), DEFAULTS);
   }
 }

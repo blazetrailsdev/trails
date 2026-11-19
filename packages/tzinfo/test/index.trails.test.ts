@@ -62,4 +62,8 @@ describe("Timezone abbreviations answer tzdata's, as TZInfo does", () => {
   it("rejects an identifier Intl accepts but tzdata has no zone for", () => {
     expect(() => Timezone.get("+05:00")).toThrow(InvalidTimezoneIdentifier);
   });
+
+  it("rejects an identifier that differs from a tzdata zone only in case", () => {
+    expect(() => Timezone.get("america/new_york")).toThrow(InvalidTimezoneIdentifier);
+  });
 });

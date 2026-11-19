@@ -379,7 +379,10 @@ export class Timezone {
         if (!(error instanceof RangeError)) throw error;
         throw new InvalidTimezoneIdentifier(`Invalid identifier: ${identifier}`);
       }
-      if (tzdataAbbreviation(identifier, 0) === undefined) {
+      if (
+        !this.allIdentifiers().includes(identifier) ||
+        tzdataAbbreviation(identifier, 0) === undefined
+      ) {
         throw new InvalidTimezoneIdentifier(`Invalid identifier: ${identifier}`);
       }
       loadedTimezoneIdentifiers.add(identifier);
