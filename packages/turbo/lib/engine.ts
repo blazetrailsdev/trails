@@ -1,10 +1,13 @@
-import { ActionController, Mime, MimeType } from "@blazetrails/actionpack";
+import { ActionController, ActionDispatch, Mime, MimeType } from "@blazetrails/actionpack";
 import { OrderedOptions, TopLevel, include, onLoad } from "@blazetrails/activesupport";
 import "@blazetrails/trailties/trailties/action-controller";
 import { Trails, type Application } from "@blazetrails/trailties";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { File, constDefined } from "@blazetrails/ruby-compat";
 import { Turbo } from "./turbo-trails.js";
+import type { TestAssertions } from "./test-assertions.js";
+import type { IntegrationTestAssertions } from "./test-assertions/integration-test-assertions.js";
+import type { TestHelper as BroadcastableTestHelper } from "./broadcastable/test-helper.js";
 import "./app/channels/turbo/streams-channel.js";
 import "./app/jobs/turbo/streams/action-broadcast-job.js";
 import "./app/jobs/turbo/streams/broadcast-job.js";
@@ -154,10 +157,51 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    /** @missingRailsCall include — CONVERGEABLE turbo-test-helpers */
-    this.initializer("turbo.test_assertions", () => {
-      onLoad("active_support_test_case", () => {
+    /**
+     * @inventedArm await — PERMANENT
+     * @inventedArm if — PERMANENT
+     */
+    this.initializer("turbo.test_assertions", async () => {
+      const testAssertions =
+        TopLevel.ActiveSupport?.TestCase !== undefined
+          ? (
+              (await Turbo.loadPath["turbo/test_assertions"]()) as {
+                TestAssertions: typeof TestAssertions;
+              }
+            ).TestAssertions
+          : null;
+      onLoad("active_support_test_case", function (this: object) {
+        if (testAssertions !== null) include(this, testAssertions);
+
         ThreadDebouncer.debouncerClass = ImmediateDebouncer;
+      });
+
+      const testHelper =
+        TopLevel.ActiveSupport?.TestCase !== undefined && constDefined(TopLevel, "ActiveJob")
+          ? (
+              (await Turbo.loadPath["turbo/broadcastable/test_helper"]()) as {
+                TestHelper: typeof BroadcastableTestHelper;
+              }
+            ).TestHelper
+          : null;
+      onLoad("action_cable", () => {
+        onLoad("active_support_test_case", function (this: object) {
+          if (testHelper !== null) {
+            include(this, testHelper);
+          }
+        });
+      });
+
+      const integrationTestAssertions =
+        ActionDispatch.IntegrationTest !== undefined
+          ? (
+              (await Turbo.loadPath["turbo/test_assertions/integration_test_assertions"]()) as {
+                IntegrationTestAssertions: typeof IntegrationTestAssertions;
+              }
+            ).IntegrationTestAssertions
+          : null;
+      onLoad("action_dispatch_integration_test", function (this: object) {
+        if (integrationTestAssertions !== null) include(this, integrationTestAssertions);
       });
     });
   }

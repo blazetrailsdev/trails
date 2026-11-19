@@ -27,6 +27,7 @@ export interface AttrNode {
 export interface XmlNode {
   css(...args: unknown[]): NodeSet;
   atCss(...args: unknown[]): XmlNode | undefined;
+  at(...args: unknown[]): XmlNode | undefined;
   xpath(...args: unknown[]): NodeSet;
   atXpath(...args: unknown[]): XmlNode | undefined;
 }
@@ -96,6 +97,10 @@ export class XmlNode {
       child = child.next;
     }
     return result;
+  }
+
+  get elementChildren(): XmlNode[] {
+    return this.children.filter((child) => child.isElement());
   }
 
   set children(nodeOrTags: XmlNode | NodeSet | DocumentFragment | string) {

@@ -1430,6 +1430,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
       '@blazetrails/rake':
         specifier: workspace:*
         version: link:../rake

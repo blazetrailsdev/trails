@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ActionController, Mime } from "@blazetrails/actionpack";
 import { rbModAncestors } from "@blazetrails/ruby-compat";
+import { TestCase } from "@blazetrails/activesupport/test-case";
 import "./test-helper.js";
 import { Engine } from "../lib/engine.js";
 import { StreamsChannel } from "../lib/app/channels/turbo/streams-channel.js";
@@ -9,6 +10,13 @@ import { StreamsHelper } from "../lib/app/helpers/turbo/streams-helper.js";
 type Renderer = (this: object, html: string, options: object) => unknown;
 
 describe("Turbo::Engine", () => {
+  it("includes the test assertions and broadcast test helper into ActiveSupport::TestCase", () => {
+    const proto = TestCase.prototype as unknown as Record<string, unknown>;
+    expect(typeof proto.assertTurboStream).toBe("function");
+    expect(typeof proto.assertTurboFrame).toBe("function");
+    expect(typeof proto.captureTurboStreamBroadcasts).toBe("function");
+  });
+
   it("registers the turbo_stream mime type", () => {
     expect(Mime.get("turbo_stream")!.toString()).toBe("text/vnd.turbo-stream.html");
   });

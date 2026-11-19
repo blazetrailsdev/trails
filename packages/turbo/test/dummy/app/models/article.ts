@@ -1,8 +1,14 @@
 import type { AssociationProxy } from "@blazetrails/activerecord";
 import type { Comment } from "./comment.js";
 import { parameterize } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationRecord } from "./application-record.js";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Article?: typeof Article;
+  }
+}
 
 export class Article extends ApplicationRecord {
   declare body: string;
@@ -28,4 +34,4 @@ export class Article extends ApplicationRecord {
     });
   }
 }
-constSet(TopLevel, "Article", Article);
+TopLevel.Article = Article;

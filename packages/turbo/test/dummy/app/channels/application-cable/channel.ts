@@ -1,7 +1,13 @@
 import { ActionCable } from "@blazetrails/actioncable";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    ApplicationCable?: typeof ApplicationCable;
+  }
+}
 
 export class Channel extends ActionCable.Channel.Base {}
 
 export const ApplicationCable: { Channel: typeof Channel; Connection?: unknown } = { Channel };
-constSet(TopLevel, "ApplicationCable", ApplicationCable);
+TopLevel.ApplicationCable = ApplicationCable;

@@ -32,6 +32,7 @@
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rake": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*"

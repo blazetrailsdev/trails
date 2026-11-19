@@ -4,7 +4,7 @@ import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-h
 import { assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
 import type { Included } from "@blazetrails/activesupport";
 import { domId } from "@blazetrails/actionview/record-identifier.js";
-import { Thread, constSet, include } from "@blazetrails/ruby-compat";
+import { Thread, include } from "@blazetrails/ruby-compat";
 import { withProductionDebouncer } from "../test-helper.js";
 import { StreamsChannel } from "../../lib/app/channels/turbo/streams-channel.js";
 import { ActionHelper } from "../../lib/app/helpers/turbo/streams/action-helper.js";
@@ -20,7 +20,7 @@ import { Comment } from "../dummy/app/models/comment.js";
 class BroadcastableTest extends TestCase {}
 include(BroadcastableTest, ActiveJobTestHelper);
 include(BroadcastableTest, ActionHelper);
-constSet(Turbo, "BroadcastableTest", BroadcastableTest);
+Object.assign(Turbo, { BroadcastableTest });
 
 for (const name of [
   "BroadcastableArticleTest",
@@ -31,7 +31,7 @@ for (const name of [
   const klass = class extends TestCase {};
   include(klass, ActiveJobTestHelper);
   include(klass, ActionHelper);
-  constSet(Turbo, name, klass);
+  Object.assign(Turbo, { [name]: klass });
 }
 
 class MessageThatRendersError extends Message {

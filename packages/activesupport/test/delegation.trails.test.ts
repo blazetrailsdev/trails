@@ -5,6 +5,19 @@ import { Delegation, DelegationError } from "../lib/delegation.js";
 import { delegate } from "../lib/module-ext.js";
 
 describe("Delegation.generate", () => {
+  it("answers nil.to_s for a toString delegated to a nil target with allowNil", () => {
+    class Message {
+      content: string | null = null;
+    }
+    delegate.call(Message.prototype, "toString", { to: "content", allowNil: true });
+
+    expect(typeof new Message().toString).toBe("function");
+    expect(String(new Message())).toBe("");
+    const message = new Message();
+    message.content = "hi";
+    expect(String(message)).toBe("hi");
+  });
+
   it("calls a nil target bare when nilable is false", () => {
     class Order {
       customer: { name(): string } | null = null;

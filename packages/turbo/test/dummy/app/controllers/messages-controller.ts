@@ -1,6 +1,12 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { Message } from "../models/message.js";
 import { ApplicationController } from "./application-controller.js";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    MessagesController?: typeof MessagesController;
+  }
+}
 
 export class MessagesController extends ApplicationController {
   declare message: Message;
@@ -26,4 +32,4 @@ export class MessagesController extends ApplicationController {
     this.message = new Message({ id: 1, content: "My message" });
   }
 }
-constSet(TopLevel, "MessagesController", MessagesController);
+TopLevel.MessagesController = MessagesController;

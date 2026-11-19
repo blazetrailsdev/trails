@@ -44,6 +44,7 @@ export class Node extends XmlNode {
   declare xpath: (...args: unknown[]) => NodeSet;
   declare atXpath: (...args: unknown[]) => Node | undefined;
   declare search: (...args: unknown[]) => NodeSet;
+  declare at: (...args: unknown[]) => Node | undefined;
 
   static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly ELEMENT_NODE = 1;
@@ -624,6 +625,7 @@ HTML5.Node = Node;
 
 /** @noRailsEquivalent PERMANENT */
 export function childNodes(parent: Parse5Parent, document: unknown = null): Node[] {
-  const nodes = (parent as { childNodes?: Parse5Node[] }).childNodes ?? [];
+  const content = (parent as { content?: Parse5Parent }).content;
+  const nodes = ((content ?? parent) as { childNodes?: Parse5Node[] }).childNodes ?? [];
   return nodes.map((node) => new Node(node, document));
 }

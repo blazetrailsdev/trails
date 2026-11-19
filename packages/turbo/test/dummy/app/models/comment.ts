@@ -1,6 +1,12 @@
 import type { Article } from "./article.js";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationRecord } from "./application-record.js";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Comment?: typeof Comment;
+  }
+}
 
 export class Comment extends ApplicationRecord {
   declare body: string;
@@ -19,4 +25,4 @@ export class Comment extends ApplicationRecord {
     });
   }
 }
-constSet(TopLevel, "Comment", Comment);
+TopLevel.Comment = Comment;

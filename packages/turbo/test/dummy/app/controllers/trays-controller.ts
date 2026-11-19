@@ -1,5 +1,11 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationController } from "./application-controller.js";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    TraysController?: typeof TraysController;
+  }
+}
 
 type Host = Record<string, (...args: unknown[]) => unknown>;
 
@@ -32,4 +38,4 @@ export class TraysController extends ApplicationController {
     }
   }
 }
-constSet(TopLevel, "TraysController", TraysController);
+TopLevel.TraysController = TraysController;

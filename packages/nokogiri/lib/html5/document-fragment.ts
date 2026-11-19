@@ -11,6 +11,7 @@ type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 // @ts-expect-error TS2417: CLAUDE.md, "Override signature on the static side".
 export class DocumentFragment extends XmlDocumentFragment {
   declare document: Document;
+  declare at: (...args: unknown[]) => Node | undefined;
   /**
    * @internal
    * @noRailsEquivalent PERMANENT

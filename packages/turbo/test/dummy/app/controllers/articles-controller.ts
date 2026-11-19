@@ -1,7 +1,13 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { constSet, RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
+import { RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
 import { Article } from "../models/article.js";
 import { ApplicationController } from "./application-controller.js";
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    ArticlesController?: typeof ArticlesController;
+  }
+}
 
 type UrlHelpers = { articlesUrl(): string };
 
@@ -60,4 +66,4 @@ export class ArticlesController extends ApplicationController {
     if (!isPresent(this.params.get("_method"))) throw new RuntimeError("unhandled exception");
   }
 }
-constSet(TopLevel, "ArticlesController", ArticlesController);
+TopLevel.ArticlesController = ArticlesController;

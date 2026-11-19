@@ -155,6 +155,8 @@ export interface TestHelper {
   pubsubAdapter: typeof pubsubAdapter;
   broadcasts(stream: string): unknown[];
   clearMessages(stream: string): unknown[];
+  /** @internal */
+  newBroadcastsFrom: typeof newBroadcastsFrom;
 }
 Object.assign(TestHelper.prototype, {
   beforeSetup,
@@ -164,6 +166,7 @@ Object.assign(TestHelper.prototype, {
   captureBroadcasts,
   assertBroadcastOn,
   pubsubAdapter,
+  newBroadcastsFrom,
 });
 delegate.call(TestHelper.prototype, "broadcasts", "clearMessages", { to: "pubsubAdapter" });
 ActionCable.TestHelper = TestHelper;

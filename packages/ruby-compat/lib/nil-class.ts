@@ -12,6 +12,8 @@ export const NilClass: Readonly<Record<string, (...args: unknown[]) => unknown>>
     toF: () => 0.0,
     /** `vendor/ruby/v3.3.11/object.c:4415` `rb_nil_to_s`. */
     toS: () => "",
+    /** `vendor/ruby/v3.3.11/object.c:4415` `rb_nil_to_s`, at its JS spelling. */
+    toString: () => "",
     /** `vendor/ruby/v3.3.11/object.c:4416` `nil_to_a`. */
     toA: () => [],
     /** `vendor/ruby/v3.3.11/object.c:4417` `nil_to_h`. */

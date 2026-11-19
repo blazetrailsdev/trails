@@ -41,6 +41,13 @@ export function search(this: SearchableHost, ...args: unknown[]): NodeSet {
   return this.xpath(...[...xpaths, ns, handler, binds].filter((x) => x != null));
 }
 
+export function at(
+  this: SearchableHost & { search(...args: unknown[]): NodeSet },
+  ...args: unknown[]
+): Node | undefined {
+  return this.search(...args).first();
+}
+
 export function css(this: SearchableHost, ...args: unknown[]): NodeSet {
   const [rules, handler, ns] = this.extractParams(args);
 
