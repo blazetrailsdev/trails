@@ -461,16 +461,27 @@ function bindCheckedTypes(
     }
     return [nonNull];
   };
-  const sources: { file: string; prefix?: string; inController: boolean }[] = [
+  const renderedBy = new Map<ViewShim, Set<Controller>>();
+  const sources: {
+    file: string;
+    prefix?: string;
+    inController: boolean;
+    controller?: Controller;
+  }[] = [
     ...views.map((v) => ({
       file: v.outBase + ".ts",
       prefix: path.posix.dirname(v.rel),
       inController: false,
     })),
-    ...controllers.map((c) => ({ file: c.file, prefix: dasherize(c.path), inController: true })),
+    ...controllers.map((c) => ({
+      file: c.file,
+      prefix: dasherize(c.path),
+      inController: true,
+      controller: c,
+    })),
     ...helperFiles.map((file) => ({ file, inController: false })),
   ];
-  for (const { file, prefix, inController } of sources) {
+  for (const { file, prefix, inController, controller } of sources) {
     const sf = program.getSourceFile(file);
     if (sf === undefined) continue;
     const named = (key: string | null, name: string): boolean =>
@@ -483,7 +494,11 @@ function bindCheckedTypes(
       const bound = new Map<string, string>();
       let untyped = false;
       if (site === "unknown") unknownTarget = true;
-      else if (site !== undefined && "template" in site) {
+      else if (site !== undefined && "assigns" in site) {
+        for (const v of views.filter((v) => named(v.rel.replace(/\.[^/]*$/u, ""), site.assigns))) {
+          renderedBy.set(v, (renderedBy.get(v) ?? new Set()).add(controller!));
+        }
+      } else if (site !== undefined && "template" in site) {
         const { template } = site;
         if (template === undefined) unknownTemplate = true;
         else targets.push(...views.filter((v) => named(v.rel.replace(/\.[^/]*$/u, ""), template)));
@@ -515,8 +530,12 @@ function bindCheckedTypes(
           bound.set(`${variable}_iteration`, 'import("@blazetrails/actionview").PartialIteration');
         } else if (object) bound.set(variable!, baseText(checker.getTypeAtLocation(object)));
       }
-      const locals = site === undefined || site === "unknown" ? undefined : site.locals;
+      const locals =
+        site === undefined || site === "unknown" || "assigns" in site ? undefined : site.locals;
       for (const target of targets) {
+        if (controller !== undefined) {
+          renderedBy.set(target, (renderedBy.get(target) ?? new Set()).add(controller));
+        }
         if (target.strictLocals) continue;
         if (untyped) unresolved.add(target);
         const seen = renders.get(target) ?? { calls: 0, keys: new Map<string, number>() };
@@ -561,7 +580,12 @@ function bindCheckedTypes(
   for (const view of views) {
     const rendering =
       view.layout === undefined
-        ? view.controller && [view.controller]
+        ? [
+            ...new Set([
+              ...(view.controller ? [view.controller] : []),
+              ...(renderedBy.get(view) ?? []),
+            ]),
+          ]
         : controllers.filter((c) => {
             const rendered = layouts.get(c);
             return rendered === "every" || rendered?.has(view.layout!);
@@ -831,7 +855,8 @@ function sourceDeclaration(
 type RenderSite =
   | { name: string; locals?: ts.Expression; options?: ts.ObjectLiteralExpression }
   | { object: ts.Expression; locals?: ts.Expression }
-  | { template: string | undefined; locals?: ts.Expression; untyped?: boolean };
+  | { template: string | undefined; locals?: ts.Expression; untyped?: boolean }
+  | { assigns: string };
 
 function renderSite(
   call: ts.CallExpression,
@@ -848,7 +873,7 @@ function renderSite(
   if (!first) return undefined;
   if (ts.isStringLiteral(first)) {
     if (!inController) return { name: first.text, locals: second };
-    if (second === undefined || !passesLocals(second)) return undefined;
+    if (second === undefined || !passesLocals(second)) return { assigns: first.text };
     const typeable =
       ts.isObjectLiteralExpression(second) &&
       !second.properties.map(propertyName).includes(undefined);
@@ -864,9 +889,13 @@ function renderSite(
   const block = !inController && second !== undefined && isFunction(second);
   const partialKey = block ? "layout" : "partial";
   if (!keys.includes(partialKey)) {
-    if (!keys.includes("locals")) return undefined;
     const template = option(first, "template");
     const action = template ? undefined : option(first, "action");
+    if (!keys.includes("locals")) {
+      const named = template ?? action;
+      if (!inController || named === undefined || !ts.isStringLiteral(named)) return undefined;
+      return { assigns: action ? dasherize(underscore(named.text)) : named.text };
+    }
     const named = template ?? action;
     return {
       template: named

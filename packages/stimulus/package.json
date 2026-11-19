@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "rm -rf dist/install/app && mkdir -p dist/install && cp -R lib/install/app dist/install/"
+    "build:templates": "rm -rf dist/install/app && mkdir -p dist/install && cp -R lib/install/app dist/install/ && node -e \"require('fs').cpSync('lib/generators', 'dist/generators', { recursive: true, filter: (source) => !/\\\\.ts$/.test(source) })\" && trails-tsc-views build-templates dist/generators"
   },
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
@@ -43,6 +43,7 @@
     }
   ],
   "devDependencies": {
+    "@blazetrails/trails-tsc": "workspace:*",
     "@types/node": "25.3.5"
   }
 }

@@ -1253,6 +1253,9 @@ importers:
         specifier: workspace:*
         version: link:../trailties
     devDependencies:
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
       '@types/node':
         specifier: 25.3.5
         version: 25.3.5
