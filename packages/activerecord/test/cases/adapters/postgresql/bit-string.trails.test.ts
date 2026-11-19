@@ -56,8 +56,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await connection.execute(
         `INSERT INTO postgresql_bit_strings (a_bit, a_bit_varying) VALUES (B'11111111', B'1111')`,
       );
-      const rows = await connection.execute(
-        `SELECT a_bit, a_bit_varying FROM postgresql_bit_strings`,
+      const rows = Array.from(
+        await connection.execute(`SELECT a_bit, a_bit_varying FROM postgresql_bit_strings`),
       );
       expect(rows[0].a_bit).toBe("11111111");
       expect(rows[0].a_bit_varying).toBe("1111");

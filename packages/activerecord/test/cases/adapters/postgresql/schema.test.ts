@@ -825,11 +825,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("reset pk sequence", async () => {
       const seqName = `${SCHEMA_NAME}.${UNMATCHED_SEQUENCE_NAME}`;
       await adapter.execute(`SELECT setval('${seqName}', 123)`);
-      const before = await adapter.execute(`SELECT nextval('${seqName}') AS val`);
+      const before = Array.from(await adapter.execute(`SELECT nextval('${seqName}') AS val`));
       expect(Number(before[0].val)).toBe(124);
 
       await adapter.resetPkSequenceBang(`${SCHEMA_NAME}.${UNMATCHED_PK_TABLE_NAME}`);
-      const after = await adapter.execute(`SELECT nextval('${seqName}') AS val`);
+      const after = Array.from(await adapter.execute(`SELECT nextval('${seqName}') AS val`));
       expect(Number(after[0].val)).toBe(1);
     });
 
@@ -838,7 +838,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.setPkSequenceBang(tableName, 123);
       const result = await adapter.pkAndSequenceFor(`"${SCHEMA_NAME}"."${PK_TABLE_NAME}"`);
       const qualifiedSeq = result![1]!.quoted();
-      const rows = await adapter.execute(`SELECT nextval('${qualifiedSeq}') AS val`);
+      const rows = Array.from(await adapter.execute(`SELECT nextval('${qualifiedSeq}') AS val`));
       expect(Number(rows[0].val)).toBe(124);
       await adapter.resetPkSequenceBang(tableName);
     });

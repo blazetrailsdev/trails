@@ -1,5 +1,6 @@
 import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { CompositeEncoder } from "../composite-encoder.js";
+import { PG } from "../namespaces.js";
 
 function quoteArrayBuffer(pIn: string, delimiter: string): string {
   const needquote =
@@ -20,6 +21,7 @@ function writeArray(self: Array, value: readonly unknown[], quote: boolean): str
   return `{${out.join(self.delimiter)}}`;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class Array extends CompositeEncoder {
   encode(value: readonly unknown[], encoding?: unknown): string;
   encode(value: unknown, encoding?: unknown): string | null;
@@ -29,3 +31,5 @@ export class Array extends CompositeEncoder {
     return rbObjAsString(value);
   }
 }
+
+PG.TextEncoder.Array = Array;

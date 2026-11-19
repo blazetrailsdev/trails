@@ -1,6 +1,6 @@
 import "../../../constants.postgresql-oid-type-map-initializer.generated.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
-import { toI } from "@blazetrails/ruby-compat";
+import { toI, type Enumerable } from "@blazetrails/ruby-compat";
 
 import { HashLookupTypeMap } from "../../../type/hash-lookup-type-map.js";
 import { Array as OidArray } from "./array.js";
@@ -29,8 +29,8 @@ export class TypeMapInitializer {
     this.store = store;
   }
 
-  run(records: PgTypeRow[]): PgTypeRow[] {
-    const nodes = records.filter((row) => !this.store.isKey(toI(row.oid) as number));
+  run(records: Enumerable<PgTypeRow>): PgTypeRow[] {
+    const nodes = records.reject((row: PgTypeRow) => this.store.isKey(toI(row.oid) as number));
     const mapped = extract(nodes, (row) => this.store.isKey(row.typname));
     const ranges = extract(nodes, (row) => row.typtype === "r");
     const enums = extract(nodes, (row) => row.typtype === "e");

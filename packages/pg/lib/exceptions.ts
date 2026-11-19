@@ -1,10 +1,6 @@
 import { StandardError } from "@blazetrails/ruby-compat";
 import { PG } from "./namespaces.js";
-
-export interface Result {
-  errorField(fieldcode: number): string | null;
-  resultErrorField(fieldcode: number): string | null;
-}
+import type { Result } from "./result.js";
 
 export class Error extends StandardError {
   readonly connection: object | null;

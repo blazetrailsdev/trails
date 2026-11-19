@@ -1,6 +1,7 @@
 import { TypeError } from "@blazetrails/ruby-compat";
 import { Coder } from "../coder.js";
 import { CompositeDecoder } from "../composite-decoder.js";
+import { PG } from "../namespaces.js";
 
 type DecFunc = (word: string, tuple: number, field: number) => unknown;
 
@@ -80,6 +81,7 @@ function readArrayWithoutDim(
   return array;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class Array extends CompositeDecoder {
   decode(string: string | null, tuple: number | null = null, field: number | null = null) {
     if (string == null) return null;
@@ -140,3 +142,5 @@ export class Array extends CompositeDecoder {
     return ret;
   }
 }
+
+PG.TextDecoder.Array = Array;

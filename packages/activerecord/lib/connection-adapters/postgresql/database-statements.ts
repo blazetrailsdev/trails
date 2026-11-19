@@ -13,7 +13,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { aryJoin, b, eachWithIndex, fetch, rbRegMatchP } from "@blazetrails/ruby-compat";
+import { aryJoin, b, count, eachWithIndex, fetch, rbRegMatchP } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -338,7 +338,7 @@ export async function performQuery(
 
   this.verifiedBang();
   this.handleWarnings(result);
-  notificationPayload.row_count = result.length;
+  notificationPayload.row_count = count(result);
   return result;
 }
 

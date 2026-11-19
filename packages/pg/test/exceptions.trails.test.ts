@@ -1,11 +1,18 @@
 import { StandardError } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
-import { ConnectionBad, Constants, Error, FeatureNotSupported, ServerError } from "../lib/index.js";
+import {
+  ConnectionBad,
+  Constants,
+  Error,
+  FeatureNotSupported,
+  Result,
+  ServerError,
+} from "../lib/index.js";
 
 describe("PG::Error", () => {
   it("carries connection and result and aliases error to message", () => {
     const connection = {};
-    const result = { errorField: () => null, resultErrorField: () => null };
+    const result = new Result({ command: "", rowCount: null, oid: 0, fields: [], rows: [] });
     const err = new ConnectionBad("gone", { connection, result });
     expect(err).toBeInstanceOf(Error);
     expect(err).toBeInstanceOf(StandardError);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FrozenError } from "@blazetrails/ruby-compat";
-import { Coder } from "../../../../../lib/pg/coder.js";
+import { Coder } from "@blazetrails/pg";
 import {
   PGTextDecoder,
   PGTypeMapByOid,
@@ -119,7 +119,7 @@ describe("PG::Result", () => {
     result.typeMap = typeMap;
     expect(result.mapTypesBang(typeMap).values()).toEqual([[1]]);
     expect(result.getvalue(0, 0)).toBe(1);
-    expect(result[0]).toEqual({ n: 1 });
+    expect(Array.from(result)[0]).toEqual({ n: 1 });
   });
 
   it("raises ArgumentError out of range", () => {

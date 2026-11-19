@@ -53,7 +53,7 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
     try {
       await a.reconnect();
       expect(await a.active()).toBe(true);
-      const rows = await a.execute("SELECT 1 AS n");
+      const rows = Array.from(await a.execute("SELECT 1 AS n"));
       expect(rows[0]?.n).toBe(1);
     } finally {
       await a.disconnectBang();
@@ -67,7 +67,7 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
       expect(await a.active()).toBe(false);
       await a.reconnect();
       expect(await a.active()).toBe(true);
-      const rows = await a.execute("SELECT 2 AS n");
+      const rows = Array.from(await a.execute("SELECT 2 AS n"));
       expect(rows[0]?.n).toBe(2);
     } finally {
       await a.disconnectBang();

@@ -8,8 +8,8 @@ import {
   TypeError,
   warn,
 } from "@blazetrails/ruby-compat";
+import { PG } from "./namespaces.js";
 
-/** @noRailsEquivalent PERMANENT */
 function _rbCheckFrozen(obj: object): void {
   if (Object.isFrozen(obj)) {
     throw new FrozenError(`can't modify frozen ${rbObjClassname(obj)}: ${rbInspect(obj)}`, {
@@ -100,3 +100,6 @@ export class CompositeCoder extends Coder {
     return this._delimiter ?? ",";
   }
 }
+
+PG.Coder = Coder;
+PG.CompositeCoder = CompositeCoder;

@@ -28,14 +28,14 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   });
 
   it("execute runs a non-row-returning statement and returns no rows", async () => {
-    await expect(adapter.execute(`CREATE TABLE pq_ddl (id integer)`)).resolves.toEqual([]);
+    expect(Array.from(await adapter.execute(`CREATE TABLE pq_ddl (id integer)`))).toEqual([]);
     await adapter.execute(`DROP TABLE pq_ddl`);
-    await expect(adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`)).resolves.toEqual([]);
+    expect(Array.from(await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`))).toEqual([]);
   });
 
   it("execute still returns rows for a row-returning statement", async () => {
     await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`);
-    await expect(adapter.execute(`SELECT nick FROM pq`)).resolves.toEqual([{ nick: "a" }]);
+    expect(Array.from(await adapter.execute(`SELECT nick FROM pq`))).toEqual([{ nick: "a" }]);
   });
 
   it("update and delete source affected rows through the affectedRows port", async () => {
@@ -81,9 +81,13 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
 
   it("does not prevent a read routed through execute while preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      await expect(
-        connection.execute(`SELECT * FROM subscribers WHERE nick = 'pq'`),
-      ).resolves.toEqual([]);
+      expect(
+        Array.from(
+          (await connection.execute(
+            `SELECT * FROM subscribers WHERE nick = 'pq'`,
+          )) as Iterable<unknown>,
+        ),
+      ).toEqual([]);
     });
   });
 

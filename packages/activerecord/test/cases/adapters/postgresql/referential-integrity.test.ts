@@ -38,7 +38,7 @@ async function withDummyTable(adapter: PostgreSQLAdapter, fn: () => Promise<void
 }
 
 async function assertTransactionIsNotBroken(adapter: PostgreSQLAdapter): Promise<void> {
-  const rows = await adapter.execute("SELECT 1 AS n");
+  const rows = Array.from(await adapter.execute("SELECT 1 AS n"));
   expect(rows[0].n).toBe(1);
 }
 
@@ -146,12 +146,14 @@ describeIfPg("PostgreSQLAdapter", () => {
           )
         `);
 
-        const rows = await adapter.execute(`
+        const rows = Array.from(
+          await adapter.execute(`
           SELECT count(*) AS count
             FROM information_schema.table_constraints
            WHERE constraint_schema = 'referential_integrity_test_schema'
              AND constraint_type = 'FOREIGN KEY'
-        `);
+        `),
+        );
         expect(Number(rows[0].count)).toBe(1);
 
         await adapter.checkAllForeignKeysValidBang();

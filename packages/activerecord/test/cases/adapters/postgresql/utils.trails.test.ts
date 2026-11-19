@@ -18,7 +18,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`INSERT INTO movies (movieid, name) VALUES (2, 'b')`);
       await adapter.execute(`SELECT setval('movies_movieid_seq', 100)`);
       await adapter.resetPkSequenceBang("movies");
-      const rows = await adapter.execute(`SELECT nextval('movies_movieid_seq') AS val`);
+      const rows = Array.from(await adapter.execute(`SELECT nextval('movies_movieid_seq') AS val`));
       expect(Number(rows[0].val)).toBe(3);
     });
   });

@@ -1,8 +1,20 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  block as rbBlock,
+  Enumerable,
+  include,
+  toEnum,
+  type Enumerator,
+} from "@blazetrails/ruby-compat";
 import type pg from "pg";
-import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
-import { Result as ActiveRecordResult } from "../result.js";
-import { Constants as PGConstants } from "@blazetrails/pg";
+import { Constants as PGConstants } from "./pg.js";
+import { PG } from "./namespaces.js";
+
+/** @noRailsEquivalent CONVERGEABLE pg-type-maps-and-text-encoders-move-to-the-package */
+type PGTypeMapByOid = {
+  readonly coders: Map<number, { decode(value: string): unknown }>;
+  defaultTypeMap: PGTypeMapByOid | null;
+};
 
 type DatabaseErrorFields = Partial<Record<keyof pg.DatabaseError, unknown>>;
 
@@ -27,26 +39,21 @@ const _ERROR_FIELDS: Record<number, keyof pg.DatabaseError> = {
   [PGConstants.PG_DIAG_CONSTRAINT_NAME]: "constraint",
 };
 
-export class Result extends Array<Record<string, unknown>> {
-  /** @noRailsEquivalent CONVERGEABLE pg-result-is-not-an-array-execute-returns-the-raw-driver-result */
-  static get [Symbol.species]() {
-    return Array;
-  }
+export class Result {
+  declare filterMap: <R>(
+    block: (row: Record<string, unknown>) => R | false | null | undefined,
+  ) => R[];
+  declare map: <R>(block: (row: Record<string, unknown>) => R) => R[];
+  declare [Symbol.iterator]: () => IterableIterator<Record<string, unknown>>;
 
   readonly #native: pg.QueryResult;
-  #typemap = new PGTypeMapByOid();
+  #typemap: PGTypeMapByOid | null = null;
 
   readonly #error: DatabaseErrorFields | null;
 
   constructor(native: pg.QueryResult, error: DatabaseErrorFields | null = null) {
-    super();
     this.#native = native;
     this.#error = error;
-    const hashes = new ActiveRecordResult(
-      (native.fields ?? []).map((f) => f.name),
-      (native.rows ?? []) as unknown[][],
-    ).toArray();
-    for (const hash of hashes) this.push(hash);
   }
 
   mapTypesBang(typeMap: PGTypeMapByOid): this {
@@ -104,27 +111,47 @@ export class Result extends Array<Record<string, unknown>> {
     return (this.#native.fields ?? []).map((f) => f.name);
   }
 
-  override values(): unknown[][] & ArrayIterator<Record<string, unknown>> {
+  values(): unknown[][] {
     return ((this.#native.rows ?? []) as unknown[][]).map((row, i) =>
       row.map((_, j) => this.#typecastResultValue(i, j)),
-    ) as unknown[][] & ArrayIterator<Record<string, unknown>>;
+    );
+  }
+
+  each(): Enumerator<Record<string, unknown>>;
+  each(block: (tuple: Record<string, unknown>) => void): this;
+  each(
+    block?: (tuple: Record<string, unknown>) => void,
+  ): this | Enumerator<Record<string, unknown>> {
+    if (!block)
+      return toEnum(
+        this,
+        "each",
+        rbBlock(() => this.ntuples()),
+      );
+    const fields = this.fields();
+    for (let i = 0; i < this.ntuples(); i++) {
+      block(Object.fromEntries(fields.map((name, j) => [name, this.#typecastResultValue(i, j)])));
+    }
+    return this;
   }
 
   set typeMap(typemap: PGTypeMapByOid) {
     this.#typemap = typemap;
-    this.fields().forEach((name, j) => {
-      this.forEach((tuple, i) => (tuple[name] = this.#typecastResultValue(i, j)));
-    });
   }
 
-  get typeMap(): PGTypeMapByOid {
+  get typeMap(): PGTypeMapByOid | null {
     return this.#typemap;
   }
 
   #typecastResultValue(i: number, j: number): unknown {
     const value = (this.#native.rows as unknown[][])[i][j];
     const oid = this.#native.fields[j].dataTypeID;
-    const decoder = this.#typemap.coders.get(oid) ?? this.#typemap.defaultTypeMap?.coders.get(oid);
+    const decoder =
+      this.#typemap?.coders.get(oid) ?? this.#typemap?.defaultTypeMap?.coders.get(oid);
     return typeof value !== "string" || !decoder ? value : decoder.decode(value);
   }
 }
+
+include(Result as new (...args: never[]) => unknown, Enumerable);
+
+PG.Result = Result;

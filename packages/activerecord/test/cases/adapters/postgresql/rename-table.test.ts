@@ -70,12 +70,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
 
     async function numIndicesNamed(name: string): Promise<number> {
-      return (
+      return Array.from(
         await adapter.execute(`
           SELECT 1 FROM "pg_index"
             JOIN "pg_class" ON "pg_index"."indexrelid" = "pg_class"."oid"
             WHERE "pg_class"."relname" = '${name}'
-        `)
+        `),
       ).length;
     }
   });

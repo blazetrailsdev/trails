@@ -25,12 +25,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("QuotingTest", () => {
     it("type cast true", async () => {
-      const rows = await adapter.execute("SELECT TRUE AS val");
+      const rows = Array.from(await adapter.execute("SELECT TRUE AS val"));
       expect(rows[0].val).toBe(true);
     });
 
     it("type cast false", async () => {
-      const rows = await adapter.execute("SELECT FALSE AS val");
+      const rows = Array.from(await adapter.execute("SELECT FALSE AS val"));
       expect(rows[0].val).toBe(false);
     });
 

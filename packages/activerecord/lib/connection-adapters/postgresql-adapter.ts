@@ -13,6 +13,7 @@ import {
   setEnv,
   filterMap,
   toA,
+  type Enumerable,
 } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import {
@@ -1107,7 +1108,7 @@ export class PostgreSQLAdapter
       const records = (await this.internalExecute(query, "SCHEMA", [], {
         allowRetry: true,
         materializeTransactions: false,
-      })) as PgTypeRow[];
+      })) as Enumerable<PgTypeRow>;
       this._captureRegtypeOids(records);
       initializer.run(records);
     });
@@ -1379,8 +1380,10 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
     const result = (await this.internalExecute(query, "SCHEMA", [], {
       allowRetry: true,
       materializeTransactions: false,
-    })) as { oid: string | number; typname: string }[];
-    const coders = filterMap(result, (row) => this.constructCoder(row, codersByName[row.typname]));
+    })) as Enumerable<{ oid: string | number; typname: string }>;
+    const coders = result.filterMap((row: { oid: string | number; typname: string }) =>
+      this.constructCoder(row, codersByName[row.typname]),
+    );
 
     const map = new PGTypeMapByOid();
     coders.forEach((coder) => map.addCoder(coder));
@@ -1423,7 +1426,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   /** @internal */
   declare _rawConnection: PGConnection | null;
 
-  private _captureRegtypeOids(records: PgTypeRow[]): void {
+  private _captureRegtypeOids(records: Iterable<PgTypeRow>): void {
     for (const row of records) {
       const oid = Number(row.oid);
       for (const name of [row.typname, row.formatType, row.aliasName]) {
@@ -1616,7 +1619,7 @@ export interface PostgreSQLAdapter {
     sql: string | null,
     name?: string | null,
     options?: { allowRetry?: boolean },
-  ): Promise<Record<string, unknown>[]>;
+  ): Promise<PG.Result>;
 
   execInsert(
     sql: string,

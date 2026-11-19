@@ -44,7 +44,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       `CREATE SERVER foreign_server FOREIGN DATA WRAPPER postgres_fdw ` +
         `OPTIONS (dbname ${quoteLit(fdwDb)})`,
     );
-    const currentUserRows = await adapter.execute("SELECT current_user AS u");
+    const currentUserRows = Array.from(await adapter.execute("SELECT current_user AS u"));
     const fdwUser = String((currentUserRows[0] as { u: string }).u);
     const userMappingOpts = fdwPassword
       ? `OPTIONS (user ${quoteLit(fdwUser)}, password ${quoteLit(fdwPassword)})`

@@ -26,7 +26,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("integer types", async () => {
       await adapter.execute(`INSERT INTO "pg_integers" DEFAULT VALUES`);
-      const rows = await adapter.execute(`SELECT * FROM "pg_integers"`);
+      const rows = Array.from(await adapter.execute(`SELECT * FROM "pg_integers"`));
       expect(typeof rows[0].small).toBe("number");
       expect(typeof rows[0].medium).toBe("number");
       expect(typeof rows[0].big).toBe("bigint");
@@ -50,7 +50,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("preserves exact value above Number.MAX_SAFE_INTEGER", async () => {
       const unsafe = 9007199254740993n;
       await adapter.execInsert(`INSERT INTO "pg_integers" ("quota") VALUES ($1)`, null, [unsafe]);
-      const rows = await adapter.execute(`SELECT "quota" FROM "pg_integers"`);
+      const rows = Array.from(await adapter.execute(`SELECT "quota" FROM "pg_integers"`));
       const type = new BigIntegerType({ limit: 8 });
       expect(type.cast(rows[0].quota)).toBe(unsafe);
     });
@@ -58,7 +58,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("update round-trip preserves value", async () => {
       await adapter.execInsert(`INSERT INTO "pg_integers" ("quota") VALUES ($1)`, null, [BIG]);
       await adapter.execUpdate(`UPDATE "pg_integers" SET "quota" = $1`, null, [BIG + 1n]);
-      const rows = await adapter.execute(`SELECT "quota" FROM "pg_integers"`);
+      const rows = Array.from(await adapter.execute(`SELECT "quota" FROM "pg_integers"`));
       const type = new BigIntegerType({ limit: 8 });
       expect(type.cast(rows[0].quota)).toBe(BIG + 1n);
     });
