@@ -1949,14 +1949,17 @@ type QueryMethodsChainKeys = {
         ? K
         : never
     : never;
-}[Exclude<keyof typeof QueryMethods, "group" | "regroup" | "unscope" | `${string}Bang`>];
+}[Exclude<
+  keyof typeof QueryMethods,
+  "group" | "groupBang" | "regroup" | "regroupBang" | "unscope" | "unscopeBang"
+>];
 
 type QueryMethodsChain<Self> = {
   [K in QueryMethodsChainKeys]: (typeof QueryMethods)[K] extends (
     this: never,
     ...args: infer A
   ) => unknown
-    ? (...args: A) => Self
+    ? (...args: A) => K extends `${string}Bang` ? Omit<Self, "then" | "catch" | "finally"> : Self
     : never;
 };
 

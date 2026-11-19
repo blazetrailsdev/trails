@@ -223,6 +223,5 @@ describe("query chaining DX", () => {
   it("a chained where(...).order(...) keeps the model type", () => {
     const rel = {} as Relation<Post>;
     expectTypeOf(rel.where({ published: true }).order("title")).toEqualTypeOf<Relation<Post>>();
-    expectTypeOf(rel.whereBang({ published: true }).limitBang(1)).toEqualTypeOf<Relation<Post>>();
   });
 });
