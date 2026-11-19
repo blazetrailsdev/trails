@@ -36,10 +36,16 @@ export function onLoad(name: string, options: HookOptions | Hook, callback?: Hoo
   bucket(loadHooks, name).push([block, options]);
 }
 
-/** @inventedArm map — PERMANENT */
-export function runLoadHooks(name: string, base: any): unknown[] {
+export function runLoadHooks(name: string, base: any): unknown {
   bucket(loaded, name).push(base);
-  return bucket(loadHooks, name).map(([hook, options]) => executeHook(name, base, options, hook));
+  let ran: unknown;
+  for (const [hook, options] of bucket(loadHooks, name)) {
+    ran =
+      ran instanceof Promise
+        ? ran.then(() => executeHook(name, base, options, hook))
+        : executeHook(name, base, options, hook);
+  }
+  return ran;
 }
 
 /** @internal */

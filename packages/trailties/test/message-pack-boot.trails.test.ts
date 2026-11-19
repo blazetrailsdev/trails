@@ -107,9 +107,7 @@ describe("active_support/message_pack is awaited at boot", () => {
     ActiveSupportTrailtie.config.set("activeSupport", { messageSerializer: ":message_pack" });
     const railtieApp = app();
     await runTrailtieInitializers(ActiveSupportTrailtie, railtieApp);
-    await expect(Promise.all(runLoadHooks("after_initialize", railtieApp))).rejects.toThrow(
-      LoadError,
-    );
+    await expect(runLoadHooks("after_initialize", railtieApp)).rejects.toThrow(LoadError);
   });
 
   it("raises LoadError when the cookies serializer names message_pack and the peer is absent", async () => {
@@ -119,9 +117,7 @@ describe("active_support/message_pack is awaited at boot", () => {
     });
     const railtieApp = app();
     await runTrailtieInitializers(ActionDispatchTrailtie, railtieApp);
-    await expect(Promise.all(runLoadHooks("after_initialize", railtieApp))).rejects.toThrow(
-      LoadError,
-    );
+    await expect(runLoadHooks("after_initialize", railtieApp)).rejects.toThrow(LoadError);
   });
 
   it("leaves the load alone for a json message serializer and cookies serializer", async () => {
@@ -162,7 +158,7 @@ describe("active_support/message_pack is awaited at boot", () => {
     const railtieApp = app();
     await runTrailtieInitializers(ActiveSupportTrailtie, railtieApp);
     expect(Codec.defaultSerializer).toBe(defaultSerializer);
-    await Promise.all(runLoadHooks("after_initialize", railtieApp));
+    await runLoadHooks("after_initialize", railtieApp);
     expect(Codec.defaultSerializer).toBe("message_pack");
   });
 
@@ -173,7 +169,7 @@ describe("active_support/message_pack is awaited at boot", () => {
     await runTrailtieInitializers(ActiveSupportTrailtie, railtieApp);
     ActiveSupportTrailtie.config.set("activeSupport", { messageSerializer: ":message_pack" });
     expect(ActiveSupport.MessagePack).toBeUndefined();
-    await Promise.all(runLoadHooks("after_initialize", railtieApp));
+    await runLoadHooks("after_initialize", railtieApp);
     expect(ActiveSupport.MessagePack).toBeDefined();
   });
 
@@ -189,7 +185,7 @@ describe("active_support/message_pack is awaited at boot", () => {
       const railtieApp = app();
       await runTrailtieInitializers(ActiveSupportTrailtie, railtieApp);
       await runTrailtieInitializers(ActionDispatchTrailtie, railtieApp);
-      await Promise.all(runLoadHooks("after_initialize", railtieApp));
+      await runLoadHooks("after_initialize", railtieApp);
       expect(Codec.defaultSerializer).toBe(messageSerializer);
     }
     expect(verboseAtLoad).toEqual([]);

@@ -1312,8 +1312,8 @@ export function reorderedCalls(
   };
   const flagged = reordered((name) => tsCalls.indexOf(name));
   if (flagged === undefined) return [];
-  if (rubyCalls.includes("merge") && tsCalls.includes(NATIVE_SPREAD)) {
-    const spreadAt = tsCalls.indexOf(NATIVE_SPREAD);
+  const spreadAt = tsCalls.indexOf(NATIVE_SPREAD);
+  if (rubyCalls.includes("merge") && spreadAt !== -1 && spreadAt < tsCalls.indexOf("merge")) {
     if (reordered((name) => (name === "merge" ? spreadAt : tsCalls.indexOf(name))) === undefined)
       return [];
   }
