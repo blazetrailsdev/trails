@@ -865,9 +865,22 @@ function padsDefaultedParams(
   });
 }
 
-/** Two argument keys naming the same value. Only `ref:` keys have more than one
- *  spelling; a literal key is already canonical. */
+/** A gem manifest Rails names, against the npm manifests the port writes in its
+ *  place: an app's or plugin's `Gemfile` is its `package.json` or
+ *  `pnpm-workspace.yaml`, and a gemspec is its `package.json`. Ruled by the
+ *  operator on 2026-11-18. */
+const RUBY_MANIFEST_FILES: Record<string, readonly string[]> = {
+  "str:Gemfile": ["str:package.json", "str:pnpm-workspace.yaml"],
+  "str:%name%.gemspec": ["str:package.json"],
+};
+
+/** Two argument keys naming the same value. Only `ref:` keys and a Ruby gem
+ *  manifest ({@link RUBY_MANIFEST_FILES}) have more than one spelling; any other
+ *  literal key is already canonical. */
 function argKeysEqual(rubyKey: string, tsKey: string): boolean {
+  if (Object.hasOwn(RUBY_MANIFEST_FILES, rubyKey) && RUBY_MANIFEST_FILES[rubyKey].includes(tsKey)) {
+    return true;
+  }
   if (rubyKey.startsWith(CALLEE_PREFIX)) {
     return calleeKeys(rubyKey.slice(CALLEE_PREFIX.length)).includes(tsKey);
   }

@@ -89,7 +89,6 @@ export class PluginBuilder {
     await this.template("README.md");
   }
 
-  /** @missingRailsArgs template — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json */
   async gemfile(this: PluginBuilderHost): Promise<void> {
     await this.template("pnpm-workspace.yaml");
   }
@@ -102,7 +101,6 @@ export class PluginBuilder {
     }
   }
 
-  /** @missingRailsArgs template — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json */
   async gemspec(this: PluginBuilderHost): Promise<void> {
     /** @inventedArm author — PERMANENT */
     await this.author();
@@ -266,7 +264,6 @@ this.config.actionController.includeAllHelpers = false;
     await this.chmod("bin", 0o755, { verbose: false });
   }
 
-  /** @missingRailsArgs join — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json */
   async gemfileEntry(this: PluginBuilderHost): Promise<void> {
     if (!this.isInsideApplication()) return;
 

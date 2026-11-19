@@ -156,6 +156,39 @@ describe("compareCallArgs colon-kept Symbol spelling", () => {
   });
 });
 
+describe("compareCallArgs gem manifest", () => {
+  // plugin_generator.rb:53-63 `template "Gemfile"` / `template "%name%.gemspec"`.
+  it("reads a Gemfile as the npm manifest the port writes", () => {
+    for (const ts of ["str:package.json", "str:pnpm-workspace.yaml"]) {
+      expect(
+        compareCallArgs(site("template", ["str:Gemfile"]), site("template", [ts])).verdict,
+      ).toBe("match");
+    }
+  });
+
+  it("reads a gemspec as package.json only", () => {
+    expect(
+      compareCallArgs(
+        site("template", ["str:%name%.gemspec"]),
+        site("template", ["str:package.json"]),
+      ).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(
+        site("template", ["str:%name%.gemspec"]),
+        site("template", ["str:pnpm-workspace.yaml"]),
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("does not read the npm manifest as a gem manifest", () => {
+    expect(
+      compareCallArgs(site("template", ["str:package.json"]), site("template", ["str:Gemfile"]))
+        .verdict,
+    ).toBe("mismatch");
+  });
+});
+
 describe("compareCallArgs marked method-name Symbol", () => {
   // strong_parameters.rb:911 `return to_enum(:transform_keys!) unless block_given?`.
   it("reads a bang-named Symbol as the TS spelling of that method", () => {

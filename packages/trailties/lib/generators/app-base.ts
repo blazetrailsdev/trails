@@ -508,10 +508,7 @@ ${requireStatements.join("\n")}`;
     return !!(this.options.dev || this.options.edge || this.options.main);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall rails_version_specifier — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json
-   */
+  /** @internal */
   trailsGemfileEntry(name: string, packageManager: string): string {
     const subdirectory =
       packageManager === "pnpm" ? `&path:/packages/${name.replace("@blazetrails/", "")}` : "";
@@ -523,7 +520,20 @@ ${requireStatements.join("\n")}`;
     } else if (this.options.main) {
       return `github:blazetrailsdev/trails#main${subdirectory}`;
     } else {
-      return "*";
+      return [this.trailsVersionSpecifier()].flat().join(" ");
+    }
+  }
+
+  /**
+   * @internal
+   * @inventedArm replace — PERMANENT
+   */
+  protected trailsVersionSpecifier(gemVersion = Trails.gemVersion()): string | string[] {
+    if (gemVersion.segments().length === 3 || gemVersion.release().segments().length === 3) {
+      return `~${`${gemVersion}`.replace(/^(\d+\.\d+\.\d+)\.(?=[A-Za-z])/, "$1-")}`;
+    } else {
+      const patch = gemVersion.segments().slice(0, 3).join(".");
+      return [`~${patch}`, `>=${gemVersion}`];
     }
   }
 
