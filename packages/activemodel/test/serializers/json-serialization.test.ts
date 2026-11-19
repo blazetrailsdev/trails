@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ActiveSupportJSON, asJson } from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
 import { Contact } from "../models/contact.js";
 import { Address } from "../models/address.js";
 
@@ -16,7 +17,7 @@ describe("JsonSerializationTest", () => {
       country: "India",
     });
     contact.age = 16;
-    contact.createdAt = new Date(Date.UTC(2006, 7, 1));
+    contact.createdAt = Time.utc(2006, 8, 1);
     contact.awesome = true;
     contact.preferences = { shows: "anime" };
   });
@@ -27,9 +28,7 @@ describe("JsonSerializationTest", () => {
     expect(json).not.toMatch(/^\{"contact":\{/);
     expect(json).toMatch(/"name":"Konata Izumi"/);
     expect(json).toMatch(/"age":16/);
-    expect(json).toContain(
-      `"createdAt":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
-    );
+    expect(json).toContain(`"createdAt":${ActiveSupportJSON.encode(Time.utc(2006, 8, 1))}`);
     expect(json).toMatch(/"awesome":true/);
     expect(json).toMatch(/"preferences":\{"shows":"anime"\}/);
   });
@@ -43,9 +42,7 @@ describe("JsonSerializationTest", () => {
       expect(json).toMatch(/^\{"contact":\{/);
       expect(json).toMatch(/"name":"Konata Izumi"/);
       expect(json).toMatch(/"age":16/);
-      expect(json).toContain(
-        `"createdAt":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
-      );
+      expect(json).toContain(`"createdAt":${ActiveSupportJSON.encode(Time.utc(2006, 8, 1))}`);
       expect(json).toMatch(/"awesome":true/);
       expect(json).toMatch(/"preferences":\{"shows":"anime"\}/);
     } finally {
@@ -71,9 +68,7 @@ describe("JsonSerializationTest", () => {
     expect(json).toMatch(/^\{"json_contact":\{/);
     expect(json).toMatch(/"name":"Konata Izumi"/);
     expect(json).toMatch(/"age":16/);
-    expect(json).toContain(
-      `"createdAt":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
-    );
+    expect(json).toContain(`"createdAt":${ActiveSupportJSON.encode(Time.utc(2006, 8, 1))}`);
     expect(json).toMatch(/"awesome":true/);
     expect(json).toMatch(/"preferences":\{"shows":"anime"\}/);
   });
@@ -83,9 +78,7 @@ describe("JsonSerializationTest", () => {
 
     expect(json).toMatch(/"name":"Konata Izumi"/);
     expect(json).toMatch(/"age":16/);
-    expect(json).toContain(
-      `"createdAt":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
-    );
+    expect(json).toContain(`"createdAt":${ActiveSupportJSON.encode(Time.utc(2006, 8, 1))}`);
     expect(json).toMatch(/"awesome":true/);
     expect(json).toMatch(/"preferences":\{"shows":"anime"\}/);
   });
@@ -96,9 +89,7 @@ describe("JsonSerializationTest", () => {
     expect(json).toMatch(/"name":"Konata Izumi"/);
     expect(json).toMatch(/"age":16/);
     expect(json).not.toMatch(/"awesome":true/);
-    expect(json).not.toContain(
-      `"createdAt":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
-    );
+    expect(json).not.toContain(`"createdAt":${ActiveSupportJSON.encode(Time.utc(2006, 8, 1))}`);
     expect(json).not.toMatch(/"preferences":\{"shows":"anime"\}/);
   });
 
@@ -108,9 +99,7 @@ describe("JsonSerializationTest", () => {
     expect(json).not.toMatch(/"name":"Konata Izumi"/);
     expect(json).not.toMatch(/"age":16/);
     expect(json).toMatch(/"awesome":true/);
-    expect(json).toContain(
-      `"createdAt":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
-    );
+    expect(json).toContain(`"createdAt":${ActiveSupportJSON.encode(Time.utc(2006, 8, 1))}`);
     expect(json).toMatch(/"preferences":\{"shows":"anime"\}/);
   });
 
@@ -263,7 +252,7 @@ describe("JsonSerializationTest", () => {
 
     expect(result.name).toEqual(contact.name);
     expect(result.age).toEqual(contact.age);
-    expect(new Date(result.createdAt as string)).toEqual(contact.createdAt);
+    expect(Time.parse(result.createdAt as string)).toEqual(contact.createdAt);
     expect(result.awesome).toEqual(contact.awesome);
     expect(result.preferences).toEqual(contact.preferences);
   });
@@ -274,7 +263,7 @@ describe("JsonSerializationTest", () => {
 
     expect(result.name).toEqual(contact.name);
     expect(result.age).toEqual(contact.age);
-    expect(new Date(result.createdAt as string)).toEqual(contact.createdAt);
+    expect(Time.parse(result.createdAt as string)).toEqual(contact.createdAt);
     expect(result.awesome).toEqual(contact.awesome);
     expect(result.preferences).toEqual(contact.preferences);
   });
@@ -285,7 +274,7 @@ describe("JsonSerializationTest", () => {
 
     expect(result.name).toEqual(contact.name);
     expect(result.age).toEqual(contact.age);
-    expect(new Date(result.createdAt as string)).toEqual(contact.createdAt);
+    expect(Time.parse(result.createdAt as string)).toEqual(contact.createdAt);
     expect(result.awesome).toEqual(contact.awesome);
     expect(result.preferences).toEqual(contact.preferences);
   });
@@ -298,7 +287,7 @@ describe("JsonSerializationTest", () => {
 
     expect(json).toMatch(/"name":"Konata Izumi"/);
     expect(json).toMatch(
-      new RegExp(`"createdAt":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`),
+      new RegExp(`"createdAt":${ActiveSupportJSON.encode(Time.utc(2006, 8, 1))}`),
     );
     expect(json).not.toMatch(/"awesome":/);
     expect(json).not.toMatch(/"preferences":/);
@@ -316,7 +305,7 @@ describe("JsonSerializationTest", () => {
 
     expect(json).toMatch(/"name":"Konata Izumi"/);
     expect(json).not.toMatch(
-      new RegExp(`"createdAt":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`),
+      new RegExp(`"createdAt":${ActiveSupportJSON.encode(Time.utc(2006, 8, 1))}`),
     );
     expect(json).not.toMatch(/"awesome":/);
     expect(json).not.toMatch(/"preferences":/);

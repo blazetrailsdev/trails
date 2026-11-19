@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Enumerator } from "@blazetrails/ruby-compat";
 import { extractBang } from "../../../lib/index.js";
 
 describe("ExtractTest", () => {
@@ -17,17 +18,12 @@ describe("ExtractTest", () => {
     const numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     const arrayId = numbers;
 
-    let error: unknown;
-    try {
-      (extractBang as (array: number[]) => number[])(numbers);
-    } catch (e) {
-      error = e;
-    }
+    const extractEnumerator = extractBang(numbers);
 
-    expect(error).toBeInstanceOf(TypeError);
-    expect(numbers.length).toBe(10);
+    expect(extractEnumerator).toBeInstanceOf(Enumerator);
+    expect(extractEnumerator.size()).toBe(numbers.length);
 
-    const oddNumbers = extractBang(numbers, (n) => n % 2 !== 0);
+    const oddNumbers = extractEnumerator.each((n: number) => n % 2 !== 0);
 
     expect(oddNumbers).toEqual([1, 3, 5, 7, 9]);
     expect(numbers).toEqual([0, 2, 4, 6, 8]);

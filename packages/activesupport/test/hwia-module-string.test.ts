@@ -107,7 +107,7 @@ describe("DeprecationTest", () => {
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const obj = { greet: () => "hello" };
     dep.behavior = "stderr";
-    dep.deprecateMethod(obj, "greet", "greet is deprecated");
+    dep.deprecateMethods(obj, { greet: "greet is deprecated" });
     const result = obj.greet();
     expect(result).toBe("hello");
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("greet is deprecated"));

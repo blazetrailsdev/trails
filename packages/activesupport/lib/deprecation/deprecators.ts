@@ -1,3 +1,4 @@
+import { Enumerator, toEnum } from "@blazetrails/ruby-compat";
 import type { Deprecation, DeprecationBehaviorInput } from "../deprecation.js";
 
 type OptionName = "silenced" | "debug" | "behavior" | "disallowedBehavior" | "disallowedWarnings";
@@ -21,10 +22,10 @@ export class Deprecators {
   }
 
   /** @missingRailsCall each_value — PERMANENT */
-  each(): IterableIterator<Deprecation>;
+  each(): Enumerator<Deprecation>;
   each(block: (deprecator: Deprecation) => void): void;
-  each(block?: (deprecator: Deprecation) => void): IterableIterator<Deprecation> | void {
-    if (!block) return this._deprecators.values();
+  each(block?: (deprecator: Deprecation) => void): Enumerator<Deprecation> | void {
+    if (!block) return toEnum<Deprecation>(this, "each");
     for (const deprecator of this._deprecators.values()) block(deprecator);
   }
 
