@@ -31,6 +31,9 @@ export class GemfileNotFound extends BundlerError {}
  * @noRailsEquivalent PERMANENT
  */
 export const Bundler = {
+  BundlerError,
+  GemfileNotFound,
+
   /** @noRailsEquivalent PERMANENT */
   async require(...groups: string[]): Promise<void> {
     if (groups.length === 0) groups = ["default"];
