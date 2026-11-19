@@ -47,8 +47,8 @@ export class Runnable {
     (this as unknown as RunnableHost)._mode = mode;
   }
 
-  async start(this: RunnableHost): Promise<void> {
-    await this.runInMode(async () => {
+  async start(this: RunnableHost): Promise<unknown> {
+    return await this.runInMode(async () => {
       await this.boot();
       await this.run();
     });
