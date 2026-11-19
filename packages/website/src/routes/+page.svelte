@@ -90,7 +90,7 @@
       {:else}
         <div class="pane ai">
           <img class="meme" src="{base}/claude-push-rails-to-typescript.jpg" width="343" height="604" alt="Patrick Star meme. Top panel: Claude: take Rails. Bottom panel: and push it to TypeScript. Make no mistakes." />
-          <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, Anthropic's AI model, working from the vendored Rails source under human direction and review. Every change, whoever wrote it, has to pass the same parity gates and CI before it merges.</p>
+          <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, Anthropic's AI model, working from the vendored Rails source under human direction and review.</p>
         </div>
       {/if}
     </div>
