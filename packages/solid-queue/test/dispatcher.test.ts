@@ -27,6 +27,10 @@ import {
   assertNoRegisteredProcesses,
 } from "./support/processes-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
+import {
+  assertDeprecated,
+  assertNotDeprecated,
+} from "@blazetrails/activesupport/testing/deprecation";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 function assertCalledAtLeast(
@@ -99,10 +103,55 @@ describe("DispatcherTest", () => {
 
       const process = (await Process.first()) as Process;
       expect(process.kind).toBe("Dispatcher");
-      assertMetadata(process, { polling_interval: 0.1, batch_size: 10 });
+      assertMetadata(process, { polling_interval: 0.1, batch_size: 10, batch_maintenance: true });
+      expect(process.metadata.get("concurrency_maintenance_interval")).toBeUndefined();
     } finally {
       await noConcurrencyMaintenanceDispatcher.stop();
     }
+  });
+
+  it("batch maintenance is optional", async () => {
+    const noBatchMaintenanceDispatcher = new Dispatcher({
+      pollingInterval: 0.1,
+      batchSize: 10,
+      batchMaintenance: false,
+    });
+    try {
+      await noBatchMaintenanceDispatcher.start();
+
+      await waitForRegisteredProcesses(1, { timeout: 1 });
+
+      const process = (await Process.first()) as Process;
+      expect(process.kind).toBe("Dispatcher");
+      assertMetadata(process, { concurrency_maintenance_interval: 600, batch_maintenance: false });
+    } finally {
+      await noBatchMaintenanceDispatcher.stop();
+    }
+  });
+
+  it("batch maintenance is skipped with a deprecation warning until the batches schema is migrated", async () => {
+    vi.spyOn(SolidQueue.Batch!, "isMigrated").mockResolvedValue(false);
+    const sweepStalled = vi.spyOn(SolidQueue.Batch!, "sweepStalled");
+
+    const maintenance = new Dispatcher.Maintenance(600, 10, { concurrency: false, batches: true });
+
+    await assertDeprecated(/pending database migrations/, SolidQueue.deprecator(), async () => {
+      await maintenance["sweepStalledBatches"]();
+    });
+
+    await assertNotDeprecated(SolidQueue.deprecator(), async () => {
+      await maintenance["sweepStalledBatches"]();
+    });
+    expect(sweepStalled).not.toHaveBeenCalled();
+  });
+
+  it("ConcurrencyMaintenance remains constructible with its original signature", () => {
+    const maintenance = new Dispatcher.ConcurrencyMaintenance(600, 100);
+
+    expect(maintenance.interval).toBe(600);
+    expect(maintenance.batchSize).toBe(100);
+    expect(maintenance.isConcurrency()).toBeTruthy();
+    expect(maintenance.isBatches()).toBeFalsy();
   });
 
   async function withPolling(silence: boolean, block: () => Promise<void>) {

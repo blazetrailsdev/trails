@@ -17,7 +17,7 @@ export class BatchExecution extends Execution {
     this.belongsTo("batch");
 
     this.scope("withFinishedJobs", function () {
-      return this.joins("job").merge(SolidQueue.Job!.finished());
+      return this.joins(":job").merge(SolidQueue.Job!.finished());
     });
     this.scope("withFailedJobs", function () {
       return this.joins({ job: "failedExecution" });

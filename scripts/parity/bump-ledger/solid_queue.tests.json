@@ -55,15 +55,6 @@
   },
   {
     "package": "solid-queue",
-    "rubyFile": "unit/dispatcher_test.rb",
-    "path": "DispatcherTest > concurrency maintenance is optional",
-    "kind": "changed",
-    "from": "v1.1.3",
-    "to": "v1.7.2",
-    "story": "solid-queue-v1-7-2-remaining-drift"
-  },
-  {
-    "package": "solid-queue",
     "rubyFile": "integration/concurrency_controls_test.rb",
     "path": "ConcurrencyControlsTest > don't block claimed executions that get released",
     "kind": "changed",

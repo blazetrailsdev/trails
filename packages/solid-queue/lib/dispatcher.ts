@@ -1,6 +1,7 @@
 import { include, seconds } from "@blazetrails/activesupport";
 import { Configuration } from "./configuration.js";
 import { ConcurrencyMaintenance } from "./dispatcher/concurrency-maintenance.js";
+import { Maintenance } from "./dispatcher/maintenance.js";
 import {
   LifecycleHooks,
   type ClassMethods as LifecycleHooksClassMethods,
@@ -14,6 +15,7 @@ interface DispatcherOptions {
   pollingInterval?: unknown;
   concurrencyMaintenance?: boolean;
   concurrencyMaintenanceInterval?: number;
+  batchMaintenance?: boolean;
   [key: string]: unknown;
 }
 
@@ -28,19 +30,21 @@ export class Dispatcher extends Poller {
   declare static clearHooks: typeof LifecycleHooksClassMethods.clearHooks;
 
   static ConcurrencyMaintenance = ConcurrencyMaintenance;
+  static Maintenance = Maintenance;
 
   static {
     include(this, LifecycleHooks);
 
     this.afterBoot(":runStartHooks");
-    this.afterBoot(":startConcurrencyMaintenance");
-    this.beforeShutdown(":stopConcurrencyMaintenance");
+    this.afterBoot(":startMaintenance");
+    this.beforeShutdown(":stopMaintenance");
     this.beforeShutdown(":runStopHooks");
     this.afterShutdown(":runExitHooks");
   }
 
   batchSize: number;
-  concurrencyMaintenance: ConcurrencyMaintenance | null = null;
+  /** @internal */
+  maintenance: Maintenance | null = null;
 
   constructor(options: DispatcherOptions = {}) {
     options = { ...Configuration.DISPATCHER_DEFAULTS, ...options };
@@ -48,10 +52,14 @@ export class Dispatcher extends Poller {
     super(options as { pollingInterval: unknown });
     this.batchSize = options.batchSize!;
 
-    if (options.concurrencyMaintenance) {
-      this.concurrencyMaintenance = new ConcurrencyMaintenance(
+    if (options.concurrencyMaintenance || options.batchMaintenance) {
+      this.maintenance = new Maintenance(
         options.concurrencyMaintenanceInterval!,
         options.batchSize!,
+        {
+          concurrency: options.concurrencyMaintenance!,
+          batches: options.batchMaintenance!,
+        },
       );
     }
   }
@@ -60,7 +68,7 @@ export class Dispatcher extends Poller {
     return {
       ...(await super.metadata()),
       batch_size: this.batchSize,
-      concurrency_maintenance_interval: this.concurrencyMaintenance?.interval,
+      ...(this.maintenance?.metadata() ?? {}),
     };
   }
 
@@ -77,13 +85,13 @@ export class Dispatcher extends Poller {
   }
 
   /** @internal */
-  startConcurrencyMaintenance(): void {
-    this.concurrencyMaintenance?.start();
+  startMaintenance(): void {
+    this.maintenance?.start();
   }
 
   /** @internal */
-  stopConcurrencyMaintenance(): void {
-    this.concurrencyMaintenance?.stop();
+  stopMaintenance(): void {
+    this.maintenance?.stop();
   }
 
   /** @internal */
