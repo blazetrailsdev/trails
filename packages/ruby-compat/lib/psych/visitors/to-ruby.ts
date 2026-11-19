@@ -9,6 +9,7 @@ import { Range } from "../../range.js";
 import { rational } from "../../rational.js";
 import { rbGetAllocFunc } from "../../include.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
+import { isSymbol, symbolToS } from "../../symbol.js";
 import type { Struct, StructInstance } from "../../struct.js";
 import { Psych } from "../../psych.js";
 
@@ -322,8 +323,8 @@ export class ToRuby extends Visitor {
             break;
           case "ivars":
             eachSlice<Node, Node[]>((value as Mapping).children, 2, ([k, v]) => {
-              const iv = String(this.accept(k));
-              rbObjIvarSet(hash, iv.startsWith(":") ? iv.slice(1) : iv, this.accept(v));
+              const iv = this.accept(k) as string;
+              rbObjIvarSet(hash, isSymbol(iv) ? symbolToS(iv) : iv, this.accept(v));
             });
             break;
         }
