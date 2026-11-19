@@ -54,7 +54,7 @@ onLoad("active_support_test_case", function (this: typeof TestCase & FixtureHost
 });
 
 onLoad("action_dispatch_integration_test", function (this: FixtureHost) {
-  this.fixturePaths = [...this.fixturePaths, ...(TestCase as unknown as FixtureHost).fixturePaths];
+  this.fixturePaths = [...this.fixturePaths, ...TestCase.fixturePaths];
 });
 
 onLoad("action_controller_test_case", function (this: typeof TestCase) {
