@@ -1,11 +1,22 @@
 import {
   ArgumentError,
+  FrozenError,
+  rbInspect,
   rbFCaller,
   rbFSend,
   rbObjClassname,
   TypeError,
   warn,
 } from "@blazetrails/ruby-compat";
+
+/** @noRailsEquivalent PERMANENT */
+function _rbCheckFrozen(obj: object): void {
+  if (Object.isFrozen(obj)) {
+    throw new FrozenError(`can't modify frozen ${rbObjClassname(obj)}: ${rbInspect(obj)}`, {
+      receiver: obj,
+    });
+  }
+}
 
 export class Coder {
   static readonly FORMAT_ERROR_MASK = 0xc;
@@ -30,6 +41,7 @@ export class Coder {
   }
 
   set flags(flags: number) {
+    _rbCheckFrozen(this);
     this.#flags = flags;
   }
 
@@ -42,6 +54,7 @@ export class Coder {
   }
 
   set name(value: string | null) {
+    _rbCheckFrozen(this);
     this.#name = value;
   }
 }
@@ -52,6 +65,7 @@ export class CompositeCoder extends Coder {
   declare private _delimiter: string | undefined;
 
   set elementsType(elemType: Coder | null) {
+    _rbCheckFrozen(this);
     if (elemType != null && !(elemType instanceof Coder)) {
       throw new TypeError(
         `wrong elements type ${rbObjClassname(elemType)} (expected some kind of PG::Coder)`,
@@ -65,6 +79,7 @@ export class CompositeCoder extends Coder {
   }
 
   setNeedsQuotation(needsQuotation: unknown): void {
+    _rbCheckFrozen(this);
     this._needsQuotation = needsQuotation != null && needsQuotation !== false;
   }
 
@@ -73,6 +88,7 @@ export class CompositeCoder extends Coder {
   }
 
   set delimiter(delimiter: string) {
+    _rbCheckFrozen(this);
     if (typeof delimiter !== "string") {
       throw new TypeError(`no implicit conversion of ${rbObjClassname(delimiter)} into String`);
     }

@@ -1,12 +1,8 @@
 import pg from "pg";
 import { it, expect, describe, vi } from "vitest";
-import { IO } from "@blazetrails/ruby-compat";
-import {
-  Connection,
-  escapeBytea,
-  pgConnection,
-  unescapeBytea,
-} from "../../../lib/pg/connection.js";
+import { fakePgConnection } from "../../support/fake-pg-connection.js";
+import { IO, rbClassNewInstance } from "@blazetrails/ruby-compat";
+import { Connection, escapeBytea, unescapeBytea } from "../../../lib/pg/connection.js";
 import { PG } from "../../../lib/pg/pg.js";
 import { cancelAnyRunningQuery } from "../../../lib/connection-adapters/postgresql/database-statements.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
@@ -15,7 +11,7 @@ import { ConnectionNotEstablished } from "../../../lib/errors.js";
 describe("pgConnection socket_io", () => {
   it("reopen unrefs and strips listeners, and never closes the socket", () => {
     const stream = { unref: vi.fn(), removeAllListeners: vi.fn(), end: vi.fn(), destroy: vi.fn() };
-    pgConnection({ connection: { stream } }).socketIo()?.reopen(IO.NULL);
+    fakePgConnection({ connection: { stream } }).socketIo()?.reopen(IO.NULL);
     expect(stream.removeAllListeners).toHaveBeenCalledOnce();
     expect(stream.unref).toHaveBeenCalledOnce();
     expect(stream.end).not.toHaveBeenCalled();
@@ -23,7 +19,7 @@ describe("pgConnection socket_io", () => {
   });
 
   it("is nil for a client with no socket", () => {
-    expect(pgConnection({}).socketIo()).toBeNull();
+    expect(fakePgConnection({}).socketIo()).toBeNull();
   });
 });
 
@@ -42,7 +38,7 @@ describe("pgConnection transaction_status and status", () => {
 
   it("follows ReadyForQuery, an error inside a transaction, and an in-flight query", () => {
     const connection = protocol();
-    const client = pgConnection({ connection, _activeQuery: null as unknown });
+    const client = fakePgConnection({ connection, _activeQuery: null as unknown });
     expect(client.transactionStatus()).toBe(0);
     connection.emit("readyForQuery", { status: "T" });
     expect(client.transactionStatus()).toBe(2);
@@ -55,8 +51,8 @@ describe("pgConnection transaction_status and status", () => {
   });
 
   it("is CONNECTION_BAD once the client is ending", () => {
-    expect(pgConnection({}).status()).toBe(0);
-    expect(pgConnection({ _ending: true }).status()).toBe(1);
+    expect(fakePgConnection({}).status()).toBe(0);
+    expect(fakePgConnection({ _ending: true }).status()).toBe(1);
   });
 });
 
@@ -64,7 +60,7 @@ describe("PG::Connection#send_query and #get_last_result", () => {
   it("dispatches without waiting and hands each result to get_last_result", async () => {
     const raw = { rows: [[1]], fields: [{ name: "?column?" }], rowCount: 1, command: "SELECT" };
     const query = vi.fn(() => Promise.resolve(raw));
-    const client = pgConnection({ query });
+    const client = fakePgConnection({ query });
     expect(client.sendQuery("SELECT 1")).toBeUndefined();
     expect(query).toHaveBeenCalledOnce();
     expect(() => client.sendQuery("SELECT 2")).toThrow("another command is already in progress");
@@ -80,7 +76,7 @@ describe("PG::Connection#send_query and #get_last_result", () => {
   });
 
   it("get_last_result raises the failure of the query send_query dispatched", async () => {
-    const client = pgConnection({
+    const client = fakePgConnection({
       _queryable: false,
       query: () =>
         Promise.reject(new Error("Client has encountered a connection error and is not queryable")),
@@ -91,7 +87,7 @@ describe("PG::Connection#send_query and #get_last_result", () => {
   });
 
   it("raises connection is closed on a finished connection", () => {
-    const client = pgConnection({ _ending: true, query: vi.fn() });
+    const client = fakePgConnection({ _ending: true, query: vi.fn() });
     expect(() => client.sendQuery("SELECT 1")).toThrow("connection is closed");
   });
 });
@@ -131,7 +127,7 @@ describe("PG::Connection#cancel and #block", () => {
       host: "db",
       port: 5432,
     };
-    return { sent, client: pgConnection(pgClient) };
+    return { sent, client: fakePgConnection(pgClient) };
   }
 
   it("answers nil once the postmaster closes the cancel connection", async () => {
@@ -148,9 +144,9 @@ describe("PG::Connection#cancel and #block", () => {
   });
 
   it("block answers true with no command in flight, and false once the timeout passes", async () => {
-    expect(await pgConnection({ _activeQuery: null }).block()).toBe(true);
+    expect(await fakePgConnection({ _activeQuery: null }).block()).toBe(true);
     const connection = { on: vi.fn(), off: vi.fn() };
-    expect(await pgConnection({ _activeQuery: {}, connection }).block(0.001)).toBe(false);
+    expect(await fakePgConnection({ _activeQuery: {}, connection }).block(0.001)).toBe(false);
     expect(connection.off).toHaveBeenCalledTimes(5);
 
     const listeners: (() => void)[] = [];
@@ -159,7 +155,7 @@ describe("PG::Connection#cancel and #block", () => {
       off: vi.fn(),
     };
     const clear = vi.spyOn(globalThis, "clearTimeout");
-    const blocked = pgConnection({ _activeQuery: {}, connection: live }).block(30);
+    const blocked = fakePgConnection({ _activeQuery: {}, connection: live }).block(30);
     listeners.at(-1)!();
     expect(await blocked).toBe(true);
     expect(clear).toHaveBeenCalledOnce();
@@ -176,7 +172,7 @@ describe("PG::Error#result on every carrier path", () => {
 
   it("rewraps a rejection from async_exec, exec_params, exec_prepared and query", async () => {
     const client = () =>
-      pgConnection({
+      fakePgConnection({
         _ended: true,
         query: (_config: unknown) => Promise.reject(terminated()),
       });
@@ -207,7 +203,7 @@ describe("PG::Error#result on every carrier path", () => {
       code: "08006",
     });
     const bare = Object.assign(new Error("socket"), { code: "08006" });
-    const client = pgConnection({ query: (error: unknown) => Promise.reject(error) });
+    const client = fakePgConnection({ query: (error: unknown) => Promise.reject(error) });
     const query = client.query.bind(client) as unknown as (error: Error) => Promise<unknown>;
     const raised = (await query(server).catch((e: unknown) => e)) as PG.Error;
     expect(raised).toBeInstanceOf(PG.ServerError);
@@ -218,7 +214,7 @@ describe("PG::Error#result on every carrier path", () => {
   });
 
   it("rewraps the error prepare is handed", async () => {
-    const client = pgConnection({
+    const client = fakePgConnection({
       _queryable: false,
       query: (submittable: { handleError(error: unknown): void }) => {
         submittable.handleError(terminated());
@@ -229,7 +225,7 @@ describe("PG::Error#result on every carrier path", () => {
   });
 
   it("a finished connection raises the gem's connection is closed", async () => {
-    const client = pgConnection({
+    const client = fakePgConnection({
       _ending: true,
       query: () => Promise.reject(new Error("Client was closed and is not queryable")),
     });
@@ -239,7 +235,7 @@ describe("PG::Error#result on every carrier path", () => {
   });
 
   it("rewraps an error raised by a member the client answers", async () => {
-    const client = pgConnection({ end: () => Promise.reject(terminated()) });
+    const client = fakePgConnection({ end: () => Promise.reject(terminated()) });
     await expect(client.close()).rejects.toBeInstanceOf(PG.UnableToSend);
   });
 });
@@ -247,7 +243,9 @@ describe("PG::Error#result on every carrier path", () => {
 describe("PG::Error", () => {
   it("is the class of every error the connection raises, and of no other", async () => {
     const bug = new TypeError("values is not iterable");
-    await expect(pgConnection({ query: () => Promise.reject(bug) }).query("")).rejects.toBe(bug);
+    await expect(fakePgConnection({ query: () => Promise.reject(bug) }).query("")).rejects.toBe(
+      bug,
+    );
     expect(bug).not.toBeInstanceOf(PG.Error);
     for (const driver of [
       new pg.DatabaseError("boom", 0, "error"),
@@ -256,7 +254,7 @@ describe("PG::Error", () => {
       new Error("Query read timeout"),
       new Error("a message no shape test knew"),
     ]) {
-      const error = await pgConnection({ query: () => Promise.reject(driver) })
+      const error = await fakePgConnection({ query: () => Promise.reject(driver) })
         .query("")
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(PG.Error);
@@ -268,7 +266,7 @@ describe("PG::Error", () => {
   });
 
   it("cancel on a closed connection raises PG::ConnectionBad", async () => {
-    const error = await pgConnection({})
+    const error = await fakePgConnection({})
       .cancel()
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PG.ConnectionBad);
@@ -314,7 +312,7 @@ describe("cancel_any_running_query", () => {
   }
 
   it("rescues PG::Error", async () => {
-    const conn = pgConnection({});
+    const conn = fakePgConnection({});
     await expect(cancelAnyRunningQuery.call(host(conn.cancel.bind(conn)))).resolves.toBeUndefined();
   });
 
@@ -335,7 +333,7 @@ describe("PG::Connection#wait_for_notify", () => {
 
   it("yields a queued notification and answers its channel", async () => {
     const client = emitter();
-    const conn = pgConnection(client);
+    const conn = fakePgConnection(client);
     client.emit("notification", { channel: "chat", processId: 7, payload: "hi" });
     const yielded: unknown[] = [];
     expect(await conn.waitForNotify(1, (...args) => yielded.push(args))).toBe("chat");
@@ -344,7 +342,7 @@ describe("PG::Connection#wait_for_notify", () => {
 
   it("answers nil on timeout and raises when the connection ends", async () => {
     const client = emitter();
-    const conn = pgConnection(client);
+    const conn = fakePgConnection(client);
     expect(await conn.waitForNotify(0.01)).toBeNull();
     const waiting = conn.waitForNotify(null);
     client.emit("end");
@@ -355,7 +353,7 @@ describe("PG::Connection#wait_for_notify", () => {
 describe("PG::Connection#escape_string", () => {
   it("doubles backslashes only when standard_conforming_strings is off", () => {
     const connection = emitter2();
-    const conn = pgConnection({ on: () => {}, connection });
+    const conn = fakePgConnection({ on: () => {}, connection });
     expect(conn.escapeString("a'\\b")).toBe("a''\\b");
     connection.emit("parameterStatus", {
       parameterName: "standard_conforming_strings",
@@ -381,20 +379,19 @@ describe("pgConnection without a returned Proxy", () => {
         return this.#label;
       }
     }
-    const conn = new Traced({});
-    expect(pgConnection(conn)).toBe(conn);
-    expect(pgConnection(conn).constructor).toBe(Traced);
+    const conn = rbClassNewInstance(Traced, {});
+    expect(conn.constructor).toBe(Traced);
     expect(conn.label()).toBe("traced");
-    expect(pgConnection({})).toBeInstanceOf(Connection);
+    expect(fakePgConnection({})).toBeInstanceOf(Connection);
   });
 
   it("does not answer a member the client defines and Connection does not", () => {
-    const conn = pgConnection({ escapeLiteral: (s: string) => `'${s}'` });
+    const conn = fakePgConnection({ escapeLiteral: (s: string) => `'${s}'` });
     expect("escapeLiteral" in conn).toBe(false);
   });
 
   it("query rejects when the client throws synchronously", async () => {
-    const conn = pgConnection({
+    const conn = fakePgConnection({
       query: () => {
         throw new Error("Client was closed and is not queryable");
       },
@@ -404,15 +401,15 @@ describe("pgConnection without a returned Proxy", () => {
 
   it("close ends the client", async () => {
     const end = vi.fn(() => Promise.resolve());
-    await pgConnection({ end }).close();
+    await fakePgConnection({ end }).close();
     expect(end).toHaveBeenCalledTimes(1);
   });
 
   it("set_client_encoding sets the session's client_encoding", async () => {
     const query = vi.fn(() => Promise.resolve({ rows: [] }));
-    await pgConnection({ query }).setClientEncoding("utf8");
+    await fakePgConnection({ query }).setClientEncoding("utf8");
     expect(query).toHaveBeenCalledWith("SET client_encoding TO 'utf8'");
-    await pgConnection({ query }).setClientEncoding("it's");
+    await fakePgConnection({ query }).setClientEncoding("it's");
     expect(query).toHaveBeenLastCalledWith("SET client_encoding TO 'it''s'");
   });
 
@@ -423,7 +420,7 @@ describe("pgConnection without a returned Proxy", () => {
       removeAllListeners: (event: string) => delete listeners[event],
       emit: (event: string, result: unknown) => listeners[event]?.forEach((fn) => fn(result)),
     };
-    const conn = pgConnection(client);
+    const conn = fakePgConnection(client);
     const first = vi.fn();
     const second = vi.fn();
     conn.setNoticeReceiver(first);
@@ -439,14 +436,44 @@ describe("pgConnection without a returned Proxy", () => {
 
 describe("PG::Connection#escape_identifier", () => {
   it("quotes the identifier and doubles embedded double quotes", () => {
-    expect(pgConnection({}).escapeIdentifier('my"chan')).toBe('"my""chan"');
+    expect(fakePgConnection({}).escapeIdentifier('my"chan')).toBe('"my""chan"');
   });
 });
 
 describe("PG::Connection#finished?", () => {
   it("is true once the client is ending or has ended", () => {
-    expect(pgConnection({}).isFinished()).toBe(false);
-    expect(pgConnection({ _ending: true }).isFinished()).toBe(true);
-    expect(pgConnection({ _ended: true }).isFinished()).toBe(true);
+    expect(fakePgConnection({}).isFinished()).toBe(false);
+    expect(fakePgConnection({ _ending: true }).isFinished()).toBe(true);
+    expect(fakePgConnection({ _ended: true }).isFinished()).toBe(true);
+  });
+});
+
+describe("PG::Connection.new and its connect alias", () => {
+  it("connect builds the receiver's class, as alias connect new does", async () => {
+    class Sub extends Connection {}
+    const spy = vi.spyOn(Connection.prototype, "connect").mockResolvedValue(undefined);
+    try {
+      expect(await Sub.connect({})).toBeInstanceOf(Sub);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("yields the connection to a block and closes it after", async () => {
+    const connect = vi.spyOn(Connection.prototype, "connect").mockResolvedValue(undefined);
+    const close = vi.spyOn(Connection.prototype, "finish").mockResolvedValue(undefined);
+    try {
+      expect(await Connection.new({}, (conn) => conn instanceof Connection)).toBe(true);
+      expect(close).toHaveBeenCalledTimes(1);
+      await expect(
+        Connection.new({}, () => {
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+      expect(close).toHaveBeenCalledTimes(2);
+    } finally {
+      connect.mockRestore();
+      close.mockRestore();
+    }
   });
 });

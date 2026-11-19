@@ -1,13 +1,13 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 import { Date as OidDate } from "../../../../lib/connection-adapters/postgresql/oid/date.js";
 
 describeIfPg("PostgreSQLAdapter OID::Date", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
   });
   afterEach(async () => {
     await adapter.disconnectBang();

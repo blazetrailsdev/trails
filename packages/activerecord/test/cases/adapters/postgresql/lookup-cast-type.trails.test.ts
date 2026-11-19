@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { IntegerType, StringType } from "@blazetrails/activemodel";
 import { Enum } from "../../../../lib/connection-adapters/postgresql/oid/enum.js";
-import { describeIfPg, PG_TEST_URL, PostgreSQLAdapter } from "./test-helper.js";
+import { describeIfPg, PG_TEST_CONFIG, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
 
@@ -37,7 +37,7 @@ describeIfPg("PostgreSQLAdapter#lookupCastType", () => {
       await connection.execute("CREATE DOMAIN lookup_cast_type_schema.zipcode AS integer");
       await connection.execute("CREATE TYPE lookup_cast_type_schema.mood AS ENUM ('ok', 'bad')");
 
-      const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+      const adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
       try {
         await adapter.execute("SELECT 1");
 

@@ -1,14 +1,14 @@
 import { fixtures } from "../../../support/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 
 describeIfPg("Migration", () => {
   const { self } = fixtures([]);
 
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     await adapter.execute("DROP TABLE IF EXISTS strings");
     await adapter.execute(
       `CREATE TABLE strings (id serial primary key, somedate character varying)`,

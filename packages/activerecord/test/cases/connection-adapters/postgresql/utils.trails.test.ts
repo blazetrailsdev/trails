@@ -2,7 +2,7 @@ import { TypeError } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import {
   describeIfPg,
-  PG_TEST_URL,
+  PG_TEST_CONFIG,
   PostgreSQLAdapter,
 } from "../../adapters/postgresql/test-helper.js";
 import { Name } from "../../../../lib/connection-adapters/postgresql/utils.js";
@@ -21,7 +21,7 @@ describe("PostgreSQL::Name#quoted", () => {
 
 describeIfPg("PostgreSQL quote_table_name", () => {
   it("raises quote_ident's TypeError for a nil table name", async () => {
-    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       expect(() => adapter.quoteTableName(null)).toThrow(TypeError);
       expect(() => adapter.quoteTableName(null)).toThrow(

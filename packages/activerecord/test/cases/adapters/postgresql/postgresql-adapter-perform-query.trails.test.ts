@@ -1,5 +1,5 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG, SQLSubscriber } from "./test-helper.js";
 import { QueryAttribute } from "../../../../lib/relation/query-attribute.js";
 import { Value } from "../../../../lib/type.js";
 import { Base } from "../../../../lib/base.js";
@@ -14,7 +14,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   fixtures([]);
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     await adapter.execute(`DROP TABLE IF EXISTS pq`);
     await adapter.execute(`DROP TABLE IF EXISTS pq_ddl`);
     await adapter.execute(`CREATE TABLE pq (id serial primary key, nick character varying(255))`);
@@ -96,7 +96,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   });
   it("configureConnection re-applies session variables through internalExecute on reset, reconnect and discard", async () => {
     const live = new PostgreSQLAdapter({
-      connectionString: PG_TEST_URL,
+      ...PG_TEST_CONFIG,
       variables: { statement_timeout: "4321" },
     });
     const subscriber = new SQLSubscriber();

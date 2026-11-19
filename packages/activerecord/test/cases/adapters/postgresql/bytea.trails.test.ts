@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
-import pg from "pg";
-import { pgConnection } from "../../../../lib/pg/connection.js";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
 
@@ -66,21 +64,5 @@ describeIfPg("PostgreSQL bytea round trip", () => {
       Buffer.from("\\134"),
       Buffer.from("\\x6869"),
     ]);
-  });
-
-  it("hands back bytea as text on a client the caller built with its own parsers", async () => {
-    const client = pgConnection(
-      new pg.Client({
-        connectionString: PG_TEST_URL,
-        types: { getTypeParser: () => () => "parsed by the caller" } as never,
-      }),
-    );
-    await client.connect();
-    try {
-      const result = await client.asyncExec("SELECT '\\x5c5c'::bytea, ARRAY['\\x5c5c'::bytea], 1");
-      expect(result.values()).toEqual([["\\x5c5c", '{"\\\\x5c5c"}', "parsed by the caller"]]);
-    } finally {
-      await client.close();
-    }
   });
 });

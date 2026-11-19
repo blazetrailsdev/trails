@@ -1,13 +1,14 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
+import { fakePgConnection } from "../../../support/fake-pg-connection.js";
 import pg from "pg";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 import {
   ConnectionFailed,
   ConnectionNotEstablished,
   NoDatabaseError,
   StatementInvalid,
 } from "../../../../lib/errors.js";
-import { pgConnection, type PGConnection } from "../../../../lib/pg/connection.js";
+import { Connection, type PGConnection } from "../../../../lib/pg/connection.js";
 import { PG } from "../../../../lib/pg/pg.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 
@@ -17,7 +18,7 @@ describeIfPg("PG::Error#result (trails)", () => {
   fixtures([]);
 
   beforeEach(() => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
   });
 
   afterEach(async () => {
@@ -75,13 +76,11 @@ describeIfPg("PG::Error#result (trails)", () => {
   });
 
   it("a failed connect is a ConnectionBad before new_client translates it", async () => {
-    const params = { host: "localhost", port: 59999, database: "nonexistent" };
-    await expect(
-      PostgreSQLAdapter.newClient({ host: "localhost", port: 59999, dbname: "nonexistent" }),
-    ).rejects.toBeInstanceOf(ConnectionNotEstablished);
-    const error = (await pgConnection(new pg.Client(params))
-      .connect()
-      .catch((e: unknown) => e)) as PG.Error;
+    const params = { host: "localhost", port: 59999, dbname: "nonexistent" };
+    await expect(PostgreSQLAdapter.newClient(params)).rejects.toBeInstanceOf(
+      ConnectionNotEstablished,
+    );
+    const error = (await Connection.new(params).catch((e: unknown) => e)) as PG.Error;
     expect(error).toBeInstanceOf(PG.ConnectionBad);
     expect(error.message.endsWith("\n")).toBe(true);
     expect(error.result).toBeNull();
@@ -125,7 +124,7 @@ describeIfPg("PG::Error#result (trails)", () => {
       new pg.DatabaseError("cached plan must not change result type", 0, "error"),
       { code: "0A000", routine: "RevalidateCachedQuery" },
     );
-    const raised = await pgConnection({ query: () => Promise.reject(error) })
+    const raised = await fakePgConnection({ query: () => Promise.reject(error) })
       .asyncExec("SELECT 1")
       .catch((e: unknown) => e);
     expect(adapter.isCachedPlanFailure(error as never)).toBe(false);

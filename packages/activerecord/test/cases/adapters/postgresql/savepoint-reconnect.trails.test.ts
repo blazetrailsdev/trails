@@ -1,5 +1,5 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 import { ConnectionFailed } from "../../../../lib/errors.js";
 
 interface RetryLoopSeams {
@@ -11,7 +11,7 @@ describeIfPg("PostgreSQLAdapter savepoint statements dirty the parent (trails)",
   let adapter: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     await adapter.connectBang();
   });
   afterEach(async () => {

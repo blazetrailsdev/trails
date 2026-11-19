@@ -3,7 +3,7 @@ import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport/te
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../../../lib/base.js";
 import { UrlConfig } from "../../../../lib/database-configurations/url-config.js";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, PG_TEST_CONFIG } from "./test-helper.js";
 import { itIfSupports } from "../../../support/supports.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import * as Arel from "@blazetrails/arel";
@@ -43,12 +43,12 @@ async function withExampleTable(
 }
 
 function connectionWithoutInsertReturning(): PostgreSQLAdapter {
-  return new PostgreSQLAdapter({ connectionString: PG_TEST_URL, insertReturning: false });
+  return new PostgreSQLAdapter({ ...PG_TEST_CONFIG, insertReturning: false });
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
   });
 
   afterEach(async () => {
@@ -92,7 +92,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const clientSpy = vi
         .spyOn(pgModule, "Client" as never)
         .mockImplementation((() => fakeClient) as never);
-      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+      const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
       try {
         const error = await assertRaises([ConnectionNotEstablished], {}, () =>
           a.execute("SELECT 1"),
@@ -129,7 +129,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         const error = await assertRaises([ConnectionNotEstablished], {}, async () => {
           connection = new PostgreSQLAdapter({
-            connectionString: PG_TEST_URL.replace(/\/[^/?]*(\?|$)/, "/postgres$1"),
+            ...PG_TEST_CONFIG,
+            database: "postgres",
           });
           await connection.execQuery("SELECT 1");
         });
@@ -163,9 +164,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("database exists returns true when the database exists", async () => {
-      expect(
-        await PostgreSQLAdapter.databaseExists({ connectionString: PG_TEST_URL }),
-      ).toBeTruthy();
+      expect(await PostgreSQLAdapter.databaseExists({ ...PG_TEST_CONFIG })).toBeTruthy();
     });
 
     it("primary key", async () => {
@@ -823,7 +822,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("date decoding enabled", async () => {
-      const connection = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+      const connection = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
 
       try {
         await withPostgresqlApdaterDecodeDates(async () => {
@@ -839,7 +838,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("date decoding disabled", async () => {
-      const connection = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+      const connection = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
 
       try {
         const date = await connection.selectValue("select '2024-01-01'::date");

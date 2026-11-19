@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { IPAddr } from "@blazetrails/ruby-compat";
 import { Cidr } from "../../../../lib/connection-adapters/postgresql/oid/cidr.js";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
   });
   afterEach(async () => {
     await adapter.disconnectBang();

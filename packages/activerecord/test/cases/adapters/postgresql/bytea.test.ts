@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import pg from "pg";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
 import {
@@ -107,7 +107,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("via to sql with complicating connection", async () => {
-      const other = new pg.Client({ connectionString: PG_TEST_URL });
+      const other = new pg.Client({ ...PG_TEST_CONFIG });
       await other.connect();
       try {
         await other.query("SET standard_conforming_strings = off");

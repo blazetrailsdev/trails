@@ -5,7 +5,7 @@ import {
   PGTextDecoder,
   PGTypeMapByOid,
 } from "../../../../lib/connection-adapters/postgresql/pg-text-decoder.js";
-import { pgConnection } from "../../../../lib/pg/connection.js";
+import { fakePgConnection } from "../../../support/fake-pg-connection.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
 const OID_DATE = 1082;
@@ -127,7 +127,7 @@ describe("PGTextDecoder — TimestampWithoutTimeZone", () => {
 describe("PGConnection#typeMapForResults", () => {
   it("decodes a text column through its coder and leaves the rest to the client", async () => {
     const queries: { types: { getTypeParser(oid: number, format?: string): unknown } }[] = [];
-    const client = pgConnection({
+    const client = fakePgConnection({
       getTypeParser: () => () => "from the client",
       query: async (config: never) => (queries.push(config), { rows: [], fields: [] }),
     });

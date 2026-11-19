@@ -3,13 +3,13 @@ import {
   describeIfPg,
   pgSupportsNativePartitioning,
   PostgreSQLAdapter,
-  PG_TEST_URL,
+  PG_TEST_CONFIG,
 } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
   });
   afterEach(async () => {
     await adapter.dropTable("partitioned_events", { ifExists: true });

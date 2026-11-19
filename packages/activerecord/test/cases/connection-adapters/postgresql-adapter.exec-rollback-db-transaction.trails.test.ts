@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
+import { describeIfPg, PG_TEST_CONFIG } from "../../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 
 async function inTransaction(adapter: PostgreSQLAdapter): Promise<boolean> {
@@ -24,7 +24,7 @@ function client(adapter: PostgreSQLAdapter): unknown {
 
 describeIfPg("PostgreSQLAdapter exec_rollback_db_transaction", () => {
   it("rolls back so the next statement is not left mid-transaction", async () => {
-    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       await adapter.beginDbTransaction();
       expect(await inTransaction(adapter)).toBe(true);
@@ -40,7 +40,7 @@ describeIfPg("PostgreSQLAdapter exec_rollback_db_transaction", () => {
   });
 
   it("reconnects for the next statement when the socket was severed under it", async () => {
-    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       await adapter.beginDbTransaction();
       await (client(adapter) as { close(): Promise<void> }).close();

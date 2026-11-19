@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
+import { describeIfPg, PG_TEST_CONFIG } from "../../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 import { loadAdapterSpecificSchema } from "../../support/load-schema-helper.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
@@ -8,7 +8,7 @@ class StopLoad extends Error {}
 
 describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
   it("defaults the uuid primary keys to uuid_generate_v4()", async () => {
-    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    const adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     const emitted = new Map<string, string>();
 
     try {

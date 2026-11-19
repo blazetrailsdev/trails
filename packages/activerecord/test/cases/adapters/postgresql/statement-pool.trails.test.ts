@@ -1,10 +1,10 @@
 import { describe, it, beforeEach, afterEach, expect, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     adapter.preparedStatements = true;
   });
   afterEach(async () => {
@@ -30,7 +30,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("statement pool max", async () => {
-      const limited = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, statementLimit: 1 });
+      const limited = new PostgreSQLAdapter({ ...PG_TEST_CONFIG, statementLimit: 1 });
       await limited.beginDbTransaction();
       try {
         await limited.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
@@ -95,7 +95,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("reads statementLimit from the config hash (database.yml shape)", async () => {
       const configured = new PostgreSQLAdapter({
-        connectionString: PG_TEST_URL,
+        ...PG_TEST_CONFIG,
         statementLimit: 7,
       });
       await configured.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
@@ -106,7 +106,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("reads preparedStatements from the config hash", async () => {
       const configured = new PostgreSQLAdapter({
-        connectionString: PG_TEST_URL,
+        ...PG_TEST_CONFIG,
         preparedStatements: false,
       });
       expect(configured.preparedStatements).toBe(false);
@@ -115,7 +115,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("passes a non-boolean preparedStatements config through as Rails does", async () => {
       const cast = new PostgreSQLAdapter({
-        connectionString: PG_TEST_URL,
+        ...PG_TEST_CONFIG,
         preparedStatements: "false" as unknown as boolean,
       });
       try {
@@ -124,7 +124,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await cast.disconnectBang();
       }
       const zero = new PostgreSQLAdapter({
-        connectionString: PG_TEST_URL,
+        ...PG_TEST_CONFIG,
         preparedStatements: 0 as unknown as boolean,
       });
       try {
@@ -133,7 +133,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await zero.disconnectBang();
       }
 
-      const adapter2 = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+      const adapter2 = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
       try {
         (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
         expect(adapter2.preparedStatements).toBe(true);

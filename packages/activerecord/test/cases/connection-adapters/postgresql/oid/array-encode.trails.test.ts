@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { FrozenError } from "@blazetrails/ruby-compat";
 import { Coder } from "../../../../../lib/pg/coder.js";
 import {
   PGTextDecoder,
@@ -126,5 +127,20 @@ describe("PG::Result", () => {
     expect(() => result.ftype(1)).toThrow("invalid field number 1");
     expect(() => result.fmod(1)).toThrow("Column number is out of range: 1");
     expect(() => result.getvalue(1, 0)).toThrow("invalid tuple number 1");
+  });
+});
+
+describe("PG coder writers on a frozen coder", () => {
+  it("raise FrozenError before any other check, as rb_check_frozen does", () => {
+    const coder = new PG.TextEncoder.Array(null, { name: "text[]" });
+    Object.freeze(coder);
+    const frozen = /^can't modify frozen \S+: #<.*>$/;
+    expect(() => (coder.flags = 1)).toThrow(FrozenError);
+    expect(() => (coder.flags = 1)).toThrow(frozen);
+    expect(() => (coder.name = "int[]")).toThrow(frozen);
+    expect(() => (coder.elementsType = "nope" as never)).toThrow(frozen);
+    expect(() => coder.setNeedsQuotation(false)).toThrow(frozen);
+    expect(() => (coder.delimiter = ";;")).toThrow(frozen);
+    expect(coder.name).toBe("text[]");
   });
 });

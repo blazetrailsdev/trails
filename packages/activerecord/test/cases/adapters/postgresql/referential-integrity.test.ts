@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 import { isBlank } from "@blazetrails/activesupport";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { InvalidForeignKey, StatementInvalid } from "../../../../lib/errors.js";
@@ -45,7 +45,7 @@ async function assertTransactionIsNotBroken(adapter: PostgreSQLAdapter): Promise
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
   });
   afterEach(async () => {
     try {

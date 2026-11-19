@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 import { InvalidForeignKey } from "../../../../lib/errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
@@ -7,7 +7,7 @@ import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertio
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
   });
   afterEach(async () => {
     await adapter.disconnectBang();

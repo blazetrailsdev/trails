@@ -1,5 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { pgConnection, unescapeBytea as pgUnescapeBytea } from "../../../../lib/pg/connection.js";
+import { unescapeBytea as pgUnescapeBytea } from "../../../../lib/pg/connection.js";
 import { quotingHost } from "../../../support/quoting-host.js";
 import {
   BinaryData,
@@ -10,6 +10,7 @@ import {
 import { Temporal } from "@blazetrails/date";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
+import { fakePgConnection } from "../../../support/fake-pg-connection.js";
 import { PG } from "../../../../lib/pg/pg.js";
 import { Data as ArrayData } from "../../../../lib/connection-adapters/postgresql/oid/array.js";
 import { Data as BitData } from "../../../../lib/connection-adapters/postgresql/oid/bit.js";
@@ -204,6 +205,20 @@ describe("PostgreSQL quoting", () => {
     expect(pgUnescapeBytea("a\\134\\000b")).toEqual(Uint8Array.from([0x61, 0x5c, 0x00, 0x62]));
   });
 
+  it("swallows a backslash before an unrecognized escape, as PQunescapeBytea does", () => {
+    expect(pgUnescapeBytea("a\\qb\\9c")).toEqual(new TextEncoder().encode("aqb9c"));
+  });
+
+  it("skips invalid hex digits pairwise, as PQunescapeBytea does", () => {
+    expect(pgUnescapeBytea("\\x6g6869 7")).toEqual(new TextEncoder().encode("hi"));
+    expect(pgUnescapeBytea("\\x686")).toEqual(new TextEncoder().encode("h"));
+    expect(pgUnescapeBytea("\\xzz41")).toEqual(new TextEncoder().encode("A"));
+    expect(pgUnescapeBytea("\\xz41")).toEqual(new TextEncoder().encode("A"));
+    expect(pgUnescapeBytea("\\x4z41")).toEqual(new TextEncoder().encode("A"));
+    expect(pgUnescapeBytea("\\x 41")).toEqual(new TextEncoder().encode("A"));
+    expect(pgUnescapeBytea("\\x de ad")).toEqual(Uint8Array.from([0xde, 0xad]));
+  });
+
   it("unescapes the bytes Type::Binary#deserialize hands it", () => {
     expect(pgUnescapeBytea(new TextEncoder().encode("\\x6869"))).toEqual(
       new TextEncoder().encode("hi"),
@@ -211,7 +226,7 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("unescape_bytea asks the valid raw connection, and only for a value", async () => {
-    const host = { validRawConnection: async () => pgConnection({}) };
+    const host = { validRawConnection: async () => fakePgConnection({}) };
     expect(await unescapeBytea.call(host, "\\x6869")).toEqual(new TextEncoder().encode("hi"));
     expect(await unescapeBytea.call(host, null)).toBeUndefined();
   });

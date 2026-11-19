@@ -1,12 +1,12 @@
 import { StringIO } from "@blazetrails/ruby-compat";
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../../../lib/index.js";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 
 describeIfPg("PostgresqlExtensionMigrationTest (trails)", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    adapter = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     await adapter.disableExtension("citext", { force: "cascade" });
   });
   afterEach(async () => {

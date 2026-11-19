@@ -14,7 +14,7 @@ import {
   PostgreSQLAdapter,
   type StatementPool,
 } from "../../../lib/connection-adapters/postgresql-adapter.js";
-import { pgConnection } from "../../../lib/pg/connection.js";
+import { fakePgConnection } from "../../support/fake-pg-connection.js";
 
 const UUID_OID = 2950;
 
@@ -30,7 +30,7 @@ async function makeAdapter(
   const adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
   await loadTypeMap(adapter);
   const fakeClient = { query: queryImpl, release: () => {} };
-  (adapter as unknown as { _rawConnection: unknown })._rawConnection = pgConnection(fakeClient);
+  (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakePgConnection(fakeClient);
   adapter.verifiedBang();
   adapter.typeMap.aliasType(UUID_OID, "uuid");
   adapter.typeMap.aliasType(23, "int4");
@@ -166,7 +166,8 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
       },
       release: () => {},
     };
-    (adapter as unknown as { _rawConnection: unknown })._rawConnection = pgConnection(fakeClient);
+    (adapter as unknown as { _rawConnection: unknown })._rawConnection =
+      fakePgConnection(fakeClient);
     adapter.verifiedBang();
   });
 
@@ -232,7 +233,7 @@ describe("PostgreSQLAdapter#sqlKey", () => {
       adapter as unknown as {
         prepareStatement: (s: string, b: unknown[], c: unknown) => Promise<string>;
       }
-    ).prepareStatement(sql, [], pgConnection(client as object));
+    ).prepareStatement(sql, [], fakePgConnection(client as object));
 
   it("scopes the pool key to the current schema_search_path", () => {
     setMemo("schema_a, public");

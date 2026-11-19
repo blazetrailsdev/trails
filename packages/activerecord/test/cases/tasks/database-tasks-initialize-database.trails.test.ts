@@ -3,12 +3,12 @@ import pg from "pg";
 import { DatabaseTasks, initializeDatabase } from "../../../lib/tasks/database-tasks.js";
 import { UrlConfig } from "../../../lib/database-configurations/url-config.js";
 import { Base } from "../../../lib/base.js";
-import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
+import { describeIfPg, PG_TEST_URL, PG_TEST_CONFIG } from "../../support/describe-if-pg.js";
 import { restoreWorkerConnection } from "../../support/connection.js";
 import { fixtures } from "../../support/use-fixtures.js";
 
 async function adminQuery(sql: string): Promise<pg.QueryResult> {
-  const client = new pg.Client({ connectionString: PG_TEST_URL });
+  const client = new pg.Client({ ...PG_TEST_CONFIG });
   await client.connect();
   try {
     return await client.query(sql);
