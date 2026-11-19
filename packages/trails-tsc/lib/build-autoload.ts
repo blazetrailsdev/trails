@@ -181,7 +181,13 @@ const LOADED_PATHS = new Set([
  */
 async function writeLoadFunction(trailsDir: string, root: string, file: string): Promise<string> {
   const path = getPath();
-  const out = File.join(trailsDir, "compiled", `${path.relative!(root, file)}`);
+  const out = File.join(
+    trailsDir,
+    "compiled",
+    ...path.relative!(root, file)
+      .split("/")
+      .map((segment) => (segment === ".." ? "__parent" : segment)),
+  );
   const dir = File.dirname(file);
   const outDir = File.dirname(out);
   const text = await getFs().readFile(file, "utf8");
@@ -203,9 +209,9 @@ async function writeLoadFunction(trailsDir: string, root: string, file: string):
     const edits: [number, number, string][] = [];
     const visit = (child: ts.Node): void => {
       if (ts.isMetaProperty(child) && child.keywordToken === ts.SyntaxKind.ImportKeyword) {
-        throw new Error(
-          `${file}: import.meta cannot be read in a file trails build compiles to a function`,
-        );
+        edits.push([child.getStart(sf), child.getEnd(), "__importMeta"]);
+        meta = true;
+        return;
       }
       if (
         ts.isCallExpression(child) &&
@@ -230,6 +236,7 @@ async function writeLoadFunction(trailsDir: string, root: string, file: string):
       .replace(/^export\s+default\s+/, "")
       .replace(/^export\s+/, "");
   let reexports = 0;
+  let meta = false;
   for (const statement of sf.statements) {
     if (
       ts.isExportDeclaration(statement) &&
@@ -305,6 +312,15 @@ async function writeLoadFunction(trailsDir: string, root: string, file: string):
     } else {
       body.push(bodyText(statement));
     }
+  }
+  const original = path.relative!(outDir, file);
+  if (meta) {
+    top.push(
+      'import { getPath as __getPath } from "@blazetrails/ruby-compat";',
+      `const __importUrl = new URL(${JSON.stringify(original)}, import.meta.url).href;`,
+      "const __importFilename = __getPath().fileURLToPath(__importUrl);",
+      'const __importMeta = { ...import.meta, url: __importUrl, filename: __importFilename, dirname: __importFilename.slice(0, __importFilename.lastIndexOf("/")) };',
+    );
   }
   const source = [
     ...top,

@@ -449,7 +449,11 @@ describe("buildAutoload", () => {
           initializers: { tsort: () => [] },
         },
       };
-      await expect(buildAutoload()).rejects.toThrow(/import\.meta cannot be read/);
+      await buildAutoload();
+      const meta = await import(File.expandPath(".trails/compiled/config/initializers/meta.ts"));
+      expect(File.realpath((await meta.default()).here)).toBe(
+        File.realpath(File.expandPath("config/initializers")),
+      );
     } finally {
       Dir.chdir(pwd);
       FileUtils.rmRf(tmp);

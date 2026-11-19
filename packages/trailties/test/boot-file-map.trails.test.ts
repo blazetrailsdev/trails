@@ -53,7 +53,7 @@ Trails.application.routes().draw(function () {
       write(`${engineRoot}/config/initializers/blog.ts`, record);
       write(
         `${root}/boot.mjs`,
-        `const { default: app } = await import("./.trails/entry.generated.js");
+        `const app = await (await import("./.trails/entry.generated.js")).default();
 const drawn = [...globalThis.__loaded];
 await app.loadSeed();
 console.log(JSON.stringify({ drawn, loaded: globalThis.__loaded }));
@@ -78,7 +78,9 @@ console.log(JSON.stringify({ drawn, loaded: globalThis.__loaded }));
 
       const boot = File.read(`${root}/.trails/boot.generated.js`);
       for (const rel of ["../blog/config/routes.ts", "../blog/config/initializers/blog.ts"]) {
-        expect(boot).toContain(`${JSON.stringify(rel)}: () => import("../${rel}"),`);
+        expect(boot).toContain(
+          `${JSON.stringify(rel)}: async () => (await import("./compiled/${rel.replace("../", "__parent/")}")).default(),`,
+        );
       }
 
       const [stdout, stderr] = await Open3.capture3(env, node, `${root}/boot.mjs`);
