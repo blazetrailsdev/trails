@@ -25,8 +25,9 @@ export class GemfileNotFound extends BundlerError {}
  * its `dependencies` are the `:default` group. `devDependencies` are build
  * tools, not gems a group requires at boot, so no other group names any. Each
  * `@blazetrails/*` gem port in `dependencies` is imported from the app's
- * `node_modules`, as Bundler requires each gem by its name. A port is found in the nearest `node_modules` at or
- * above the app, as Node resolves a bare specifier.
+ * `node_modules`, as Bundler requires each gem by its name. A port is found
+ * in the nearest `node_modules` at or above the app, as Node resolves a bare
+ * specifier.
  *
  * @noRailsEquivalent PERMANENT
  */
