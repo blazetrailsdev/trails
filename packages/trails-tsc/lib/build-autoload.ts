@@ -1,3 +1,4 @@
+import ts from "typescript-5";
 import { Dir, File, TopLevel, getFs, getPath } from "@blazetrails/ruby-compat";
 import { Registry, writeArtifacts } from "@blazetrails/zeitwerk";
 
@@ -85,8 +86,8 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
     );
     if (await File.isExistAsync(environmentFile)) {
       const trailsDir = File.expandPath(".trails", root);
-      await writeBoot(trailsDir, root, application);
-      await writeEntry(trailsDir, applicationFile, environmentFile, tagged);
+      await writeBoot(trailsDir, root, application, environmentFile);
+      await writeEntry(trailsDir, root, applicationFile, environmentFile, tagged);
     }
   }
   return dirs;
@@ -159,16 +160,125 @@ async function viewEntries(
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
+const LOADED_PATHS = new Set([
+  "config/routes.ts",
+  "config/routes",
+  "config/environments",
+  "config/initializers",
+  "db/seeds.ts",
+]);
+
+/**
+ * Writes `file` to `.trails/compiled/` with its top-level statements in an
+ * exported function, so a registered thunk evaluates the body on each call as
+ * `Kernel#load` does, and a bundle that inlines every dynamic import
+ * (Rollup's `inlineDynamicImports`) evaluates only the declaration at load.
+ * Imports and type declarations stay at the top level; exports are answered
+ * by the function.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+async function writeLoadFunction(trailsDir: string, root: string, file: string): Promise<string> {
+  const path = getPath();
+  const out = File.join(trailsDir, "compiled", `${path.relative!(root, file)}`);
+  const dir = File.dirname(file);
+  const outDir = File.dirname(out);
+  const text = await getFs().readFile(file, "utf8");
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const typed = /\.[cm]?ts$/.test(file);
+  const top: string[] = [];
+  const body: string[] = [];
+  const names: string[] = [];
+  const rewrite = (spec: ts.Expression) => {
+    const value = (spec as ts.StringLiteral).text;
+    if (!value.startsWith(".")) return spec.getText(sf);
+    const relative = path.relative!(outDir, File.expandPath(value, dir));
+    return JSON.stringify(relative.startsWith(".") ? relative : `./${relative}`);
+  };
+  const isExported = (node: ts.Node) =>
+    ts.canHaveModifiers(node) &&
+    (ts.getModifiers(node) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+  const strip = (node: ts.Node) =>
+    node
+      .getText(sf)
+      .replace(/^export\s+default\s+/, "")
+      .replace(/^export\s+/, "");
+  for (const statement of sf.statements) {
+    if (
+      (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
+      statement.moduleSpecifier !== undefined
+    ) {
+      const spec = statement.moduleSpecifier;
+      top.push(
+        `${text.slice(statement.getStart(sf), spec.getStart(sf))}${rewrite(spec)}${text.slice(spec.getEnd(), statement.getEnd())}`,
+      );
+    } else if (
+      ts.isInterfaceDeclaration(statement) ||
+      ts.isTypeAliasDeclaration(statement) ||
+      ts.isModuleDeclaration(statement) ||
+      (ts.canHaveModifiers(statement) &&
+        (ts.getModifiers(statement) ?? []).some((m) => m.kind === ts.SyntaxKind.DeclareKeyword))
+    ) {
+      top.push(statement.getText(sf));
+    } else if (ts.isExportAssignment(statement)) {
+      body.push(`__exports.default = ${statement.expression.getText(sf)};`);
+    } else if (ts.isExportDeclaration(statement)) {
+      const clause = statement.exportClause;
+      if (clause !== undefined && ts.isNamedExports(clause) && !statement.isTypeOnly) {
+        for (const spec of clause.elements) {
+          if (!spec.isTypeOnly)
+            body.push(
+              `__exports[${JSON.stringify(spec.name.text)}] = ${(spec.propertyName ?? spec.name).getText(sf)};`,
+            );
+        }
+      }
+    } else if (isExported(statement)) {
+      body.push(strip(statement));
+      const isDefault = (ts.getModifiers(statement as ts.HasModifiers) ?? []).some(
+        (m) => m.kind === ts.SyntaxKind.DefaultKeyword,
+      );
+      const declared = ts.isVariableStatement(statement)
+        ? statement.declarationList.declarations.map((d) => d.name)
+        : [(statement as ts.FunctionDeclaration | ts.ClassDeclaration).name];
+      for (const name of declared) {
+        if (name === undefined || !ts.isIdentifier(name)) continue;
+        names.push(
+          `__exports[${JSON.stringify(isDefault ? "default" : name.text)}] = ${name.text};`,
+        );
+      }
+    } else {
+      body.push(statement.getText(sf));
+    }
+  }
+  const source = [
+    ...top,
+    "",
+    "export default async function () {",
+    `  const __exports${typed ? ": Record<string, unknown>" : ""} = {};`,
+    ...body.flatMap((statement) => statement.split("\n").map((line) => `  ${line}`)),
+    ...names.map((line) => `  ${line}`),
+    "  return __exports;",
+    "}",
+    "",
+  ].join("\n");
+  await getFs().mkdir!(outDir, { recursive: true });
+  await getFs().writeFile!(out, source);
+  return out;
+}
+
 async function writeBoot(
   trailsDir: string,
   root: string,
   application: BootApplication,
+  environmentFile?: string,
 ): Promise<void> {
   const path = getPath();
   const engines = [application, ...(application.railties?.() ?? [])].filter(
     (engine): engine is BootEngine => typeof (engine as BootEngine).paths === "function",
   );
   const files = new Set<string>();
+  const loaded = new Set<string>();
   const views: [string, string][] = [];
   for (const engine of engines) {
     const engineRoot = engine.config.root ?? root;
@@ -194,7 +304,10 @@ async function writeBoot(
         continue;
       }
       if (key !== "config/environments") {
-        for (const file of await node.existent()) files.add(file);
+        for (const file of await node.existent()) {
+          files.add(file);
+          if (LOADED_PATHS.has(key) && !(await File.isDirectoryAsync(file))) loaded.add(file);
+        }
         continue;
       }
       const glob = `*.{${(node.extensions() ?? ["ts", "js"]).join(",")}}`;
@@ -202,8 +315,10 @@ async function writeBoot(
         const dir = File.expandPath(raw, engineRoot);
         if (!(await File.isDirectoryAsync(dir))) continue;
         for (const file of (await Dir.globAsync(glob, 0, { base: dir })).sort()) {
-          if (!File.basename(file, File.extname(file)).includes("."))
+          if (!File.basename(file, File.extname(file)).includes(".")) {
             files.add(File.join(dir, file));
+            loaded.add(File.join(dir, file));
+          }
         }
       }
     }
@@ -211,10 +326,22 @@ async function writeBoot(
   for (const dir of application.config.helpersPaths ?? []) {
     if (await File.isDirectoryAsync(dir)) await helperFiles(dir, files);
   }
-  const entries = [...files].map((file) => {
-    const specifier = path.relative!(trailsDir, file);
-    return `  ${JSON.stringify(path.relative!(root, file))}: () => import(${JSON.stringify(specifier.startsWith(".") ? specifier : `./${specifier}`)}),`;
-  });
+  if (environmentFile !== undefined) loaded.add(environmentFile);
+  const entries: string[] = [];
+  for (const file of files) {
+    const key = JSON.stringify(path.relative!(root, file));
+    if (!loaded.has(file)) {
+      const specifier = path.relative!(trailsDir, file);
+      entries.push(
+        `  ${key}: () => import(${JSON.stringify(specifier.startsWith(".") ? specifier : `./${specifier}`)}),`,
+      );
+      continue;
+    }
+    const specifier = path.relative!(trailsDir, await writeLoadFunction(trailsDir, root, file));
+    entries.push(
+      `  ${key}: async () => (await import(${JSON.stringify(specifier.startsWith(".") ? specifier : `./${specifier}`)})).default(),`,
+    );
+  }
   const boot = [
     `import { ${views.length === 0 ? "" : "loadIseqEval, "}registerCompiledFiles } from "@blazetrails/ruby-compat";`,
     'import { Application } from "@blazetrails/trailties";',
@@ -242,6 +369,7 @@ async function writeBoot(
 
 async function writeEntry(
   trailsDir: string,
+  root: string,
   applicationFile: string,
   environmentFile: string,
   tagged: [string, string][],
@@ -271,8 +399,11 @@ async function writeEntry(
     "",
   ].join("\n");
   const entry = [
+    'import { loadIseqEval } from "@blazetrails/ruby-compat";',
+    'import { Application } from "@blazetrails/trailties";',
     'import "./autoload/install.generated.js";',
-    `export default (await import(${JSON.stringify(specifier(trailsDir, environmentFile))})).default;`,
+    "",
+    `export default async () => (await loadIseqEval(\`\${Application.findRoot(import.meta.dirname)}/${getPath().relative!(root, environmentFile)}\`)).default;`,
     "",
   ].join("\n");
   const fs = getFs();

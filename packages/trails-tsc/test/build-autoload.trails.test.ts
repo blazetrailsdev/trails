@@ -111,8 +111,11 @@ describe("buildAutoload", () => {
 
       expect(File.read(".trails/entry.generated.js")).toEqual(
         [
+          'import { loadIseqEval } from "@blazetrails/ruby-compat";',
+          'import { Application } from "@blazetrails/trailties";',
           'import "./autoload/install.generated.js";',
-          'export default (await import("../config/environment.ts")).default;',
+          "",
+          "export default async () => (await loadIseqEval(`${Application.findRoot(import.meta.dirname)}/config/environment.ts`)).default;",
           "",
         ].join("\n"),
       );
@@ -300,6 +303,16 @@ describe("buildAutoload", () => {
         "config/environments/test.ts",
         "config/initializers/deep/inflections.ts",
         "db/seeds.ts",
+        "config/environment.ts",
+        "vendor/blog/config/routes.ts",
+        "vendor/blog/config/initializers/blog.ts",
+      ]) {
+        expect(boot).toContain(
+          `${JSON.stringify(rel)}: async () => (await import("./compiled/${rel}")).default(),`,
+        );
+        expect(File.isExist(`.trails/compiled/${rel}`)).toBe(true);
+      }
+      for (const rel of [
         "app/helpers/application-helper.ts",
         "app/helpers/admin/users_helper.ts",
         "config/database.ts",
@@ -308,8 +321,6 @@ describe("buildAutoload", () => {
         "config/storage/production.ts",
         "config/my.settings.ts",
         "lib/helpers/extra-helper.ts",
-        "vendor/blog/config/routes.ts",
-        "vendor/blog/config/initializers/blog.ts",
       ]) {
         expect(boot).toContain(`${JSON.stringify(rel)}: () => import("../${rel}"),`);
       }
@@ -350,10 +361,10 @@ describe("buildAutoload", () => {
         File.realpath(File.expandPath(".trails")),
       ]);
       expect(registered.map(([r]) => File.expandPath(r))).toEqual([root]);
-      const drawn = await import(File.expandPath("config/routes.ts"));
+      expect((globalThis as Record<string, unknown>).__routesEvaluated).toBeUndefined();
       await rbFLoad(File.expandPath("config/routes.ts"));
       expect((globalThis as Record<string, unknown>).__routesEvaluated).toBe(1);
-      expect(seats.Drawn).toBe(drawn.Drawn);
+      expect(seats.Drawn).toEqual({});
     } finally {
       delete seats.Drawn;
       delete (globalThis as Record<string, unknown>).__routesEvaluated;

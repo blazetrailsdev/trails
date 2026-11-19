@@ -189,7 +189,8 @@ export class Trailtie extends BaseTrailtie {
 
     this.console(async (app) => {
       if ((app as Application).isSandbox()) {
-        await import("@blazetrails/activerecord/trailties/console-sandbox");
+        const feature = "@blazetrails/activerecord/trailties/console-sandbox";
+        await import(feature);
       }
       if (!Logger.isLoggerOutputsTo(Trails.logger!, STDERR, STDOUT)) {
         const console = new Logger(STDERR);

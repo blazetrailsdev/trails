@@ -39,7 +39,7 @@ function's environment, so keep the state private.
 ## How it is put together
 
 - `serverless/lambda.ts` exposes an API Gateway v2 / Function URL `handler`, a fetch-style `fetch` and a
-  raw `rack` entry. It boots during Lambda's INIT phase through `.trails/entry.generated.js`, which
+  raw `rack` entry. It boots during Lambda's INIT phase by calling `.trails/entry.generated.js`'s default export, which
   `trails build` writes. It reuses the website's `packages/website/src/lib/frontiers/rack-bridge.ts`.
 - `config/database.ts` imports the adapter modules the app is configured with. The built-in
   adapters' `ConnectionAdapters.loadPath` specifiers are computed, so a bundler only pulls in the

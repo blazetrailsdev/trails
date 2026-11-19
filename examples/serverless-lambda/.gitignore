@@ -2,6 +2,7 @@ node_modules/
 .trails/
 dist/
 dist-vite/
+dist-vite-inline/
 build/
 db/*.sqlite3*
 log/
