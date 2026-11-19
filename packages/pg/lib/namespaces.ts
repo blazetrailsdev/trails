@@ -24,6 +24,7 @@ export interface PGNamespace {
   Connection: typeof Connection;
   connect(connParams?: Record<string, unknown>): Promise<Connection>;
   Constants: typeof Constants;
+  ERROR_CLASSES: Record<string, typeof Error>;
   Error: typeof Error;
   ServerError: typeof ServerError;
   UnableToSend: typeof UnableToSend;
@@ -55,5 +56,22 @@ TopLevel.PG = PG;
 declare module "@blazetrails/ruby-compat" {
   interface TopLevelConstants {
     PG?: typeof PG;
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export declare namespace PG {
+  export type Connection = import("./connection.js").Connection;
+  export type Result = import("./result.js").Result;
+  export type Error = import("./exceptions.js").Error;
+  export type TypeMapByOid = import("./type-map-by-oid.js").TypeMapByOid;
+  export type SimpleDecoder = import("./simple-decoder.js").SimpleDecoder;
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  export namespace TextEncoder {
+    export type Array = import("./text-encoder/array.js").Array;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  export namespace TextDecoder {
+    export type Array = import("./text-decoder/array.js").Array;
   }
 }

@@ -9,7 +9,7 @@ import {
   StatementInvalid,
 } from "../../../../lib/errors.js";
 import { Connection, type Connection as PGConnection } from "@blazetrails/pg";
-import { PG } from "../../../../lib/pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import { fixtures } from "../../../support/use-fixtures.js";
 
 describeIfPg("PG::Error#result (trails)", () => {
@@ -42,6 +42,15 @@ describeIfPg("PG::Error#result (trails)", () => {
     expect(cause.result?.errorField(PG.PG_DIAG_SQLSTATE)).toBe("42P01");
     expect(cause.connection).not.toBeNull();
     expect(cause).not.toBeInstanceOf(PG.ConnectionBad);
+  });
+
+  it("a server error raises the class its SQLSTATE names, as lookup_error_class does", async () => {
+    const error = (await adapter
+      .execute("SELECT count(*) FROM pg_class FOR UPDATE")
+      .catch((e: unknown) => e)) as StatementInvalid;
+    const cause = error.cause as PG.Error;
+    expect(cause).toBeInstanceOf(PG.FeatureNotSupported);
+    expect(cause.result?.errorField(PG.PG_DIAG_SQLSTATE)).toBe("0A000");
   });
 
   it("a server error's result is a PG::Result answering every diagnostic field", async () => {

@@ -95,6 +95,13 @@ export interface CallSite {
    * as `rubyCompat` for a core extension activesupport ports as a function.
    */
   activeSupport?: string;
+  /**
+   * TS side only: the short class name a `new` expression constructs
+   * (`MoneyDecoder` for `new MoneyDecoder(…)`, `Bytea` for
+   * `new PGTextDecoder.Bytea(…)`), so the call-args gate can resolve the
+   * constructor the class inherits rather than any `constructor` in scope.
+   */
+  newOf?: string;
 }
 
 export interface ParamInfo {

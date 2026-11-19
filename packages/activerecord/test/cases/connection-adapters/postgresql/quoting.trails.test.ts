@@ -10,7 +10,7 @@ import { Temporal } from "@blazetrails/date";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
 import { fakePgConnection } from "../../../support/fake-pg-connection.js";
-import { PG } from "../../../../lib/pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import { Data as ArrayData } from "../../../../lib/connection-adapters/postgresql/oid/array.js";
 import { Data as BitData } from "../../../../lib/connection-adapters/postgresql/oid/bit.js";
 import { Data as XmlData } from "../../../../lib/connection-adapters/postgresql/oid/xml.js";

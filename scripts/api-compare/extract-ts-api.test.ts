@@ -6337,7 +6337,6 @@ describe("sub-package de-overlap", () => {
     expect(overlappingSubDirs("activerecord")).toEqual([
       packageSrcDir("mysql2"),
       packageSrcDir("sqlite3"),
-      path.join(packageSrcDir("activerecord"), "pg"),
     ]);
     expect(packageSrcDir("activerecord-test-support")).toBe(
       path.join(path.dirname(packageSrcDir("activerecord")), "test", "support"),
@@ -7107,7 +7106,7 @@ describe("callArgs", () => {
           }
         }`,
       ),
-    ).toEqual([{ name: "constructor", args: ["const:CIPHER_TYPE"], flags: [] }]);
+    ).toEqual([{ name: "constructor", args: ["const:CIPHER_TYPE"], flags: [], newOf: "Cipher" }]);
   });
 
   it("reads new Enumerable(x).m(...) as a site on receiver x", () => {
@@ -7145,7 +7144,7 @@ describe("callArgs", () => {
       ),
     ).toEqual([
       { name: "wrap", args: ["call:constructor"], flags: [] },
-      { name: "constructor", args: ["const:CIPHER_TYPE"], flags: [] },
+      { name: "constructor", args: ["const:CIPHER_TYPE"], flags: [], newOf: "Cipher" },
     ]);
   });
 
@@ -7433,7 +7432,7 @@ describe("callArgs", () => {
       ),
     ).toEqual([
       { name: "visit", args: ["call:constructor"], flags: [] },
-      { name: "constructor", args: ["num:1"], flags: [] },
+      { name: "constructor", args: ["num:1"], flags: [], newOf: "Node" },
     ]);
   });
 

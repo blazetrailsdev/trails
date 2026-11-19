@@ -1,4 +1,4 @@
-import { PG } from "../../pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import type { Connection as PGConnection } from "@blazetrails/pg";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
@@ -315,12 +315,14 @@ export async function performQuery(
         result = await rawConnection.execPrepared(stmtKey, typeCastedBinds);
         break;
       } catch (error) {
-        if (this.isCachedPlanFailure(error as Parameters<typeof this.isCachedPlanFailure>[0])) {
+        if (!(error instanceof PG.FeatureNotSupported)) throw error;
+        if (this.isCachedPlanFailure(error)) {
           if (this.isInTransaction()) {
-            throw new PreparedStatementCacheExpired(
-              (error as { message?: string })?.message ?? "cached plan expired",
-              { sql: sql as string, binds, cause: error },
-            );
+            throw new PreparedStatementCacheExpired(error.message, {
+              sql: sql as string,
+              binds,
+              cause: error,
+            });
           } else {
             await this._statements.delete(this.sqlKey(sql));
             continue;

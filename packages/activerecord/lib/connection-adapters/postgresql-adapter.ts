@@ -4,7 +4,6 @@ import type {
   DatabaseConfig,
   DatabaseConfigOptions,
 } from "../database-configurations/database-config.js";
-import pg from "pg";
 import {
   block,
   excSetupMessage,
@@ -197,7 +196,7 @@ import {
 } from "./abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
-import { PG } from "../pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { databaseCli, defaultTimezone } from "../active-record.js";
 import { dbWarningsAction } from "../active-record.js";
@@ -498,7 +497,7 @@ export class PostgreSQLAdapter
   /** @internal */
   executeBatch = pgExecuteBatch;
 
-  constructor(config: (pg.PoolConfig & PostgreSQLAdapterOptions) | DatabaseConfigOptions);
+  constructor(config: (Record<string, unknown> & PostgreSQLAdapterOptions) | DatabaseConfigOptions);
   /** @deprecated */
   constructor(
     rawConnection: PGConnection,
@@ -1366,10 +1365,7 @@ export class PostgreSQLAdapter
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs new — CONVERGEABLE call-args-gate-resolves-inherited-constructor-padding
-   */
+  /** @internal */
   async addPgDecoders(): Promise<void> {
     this._mappedDefaultTimezone = null;
     this.timestampDecoder = null;

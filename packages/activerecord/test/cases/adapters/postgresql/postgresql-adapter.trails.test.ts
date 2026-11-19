@@ -19,7 +19,7 @@ import {
   SerializationFailure,
   ValueTooLong,
 } from "../../../../lib/errors.js";
-import { PG } from "../../../../lib/pg/pg.js";
+import { PG } from "@blazetrails/pg";
 import { Connection, type Connection as PGConnection } from "@blazetrails/pg";
 import { withSecondAdapter } from "../../../support/second-connection.js";
 import { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";

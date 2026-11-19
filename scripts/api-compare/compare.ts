@@ -4510,6 +4510,45 @@ export function buildEntitiesByName(
  * cross-package walk exists for (`AR::Base extends AM::Model`, AR
  * `type/text.ts` extends AM `type/string.ts`).
  */
+/**
+ * The constructor signature a `new className(…)` reaches: the class's own
+ * `constructor`, else the nearest one up its `superclass` chain, across
+ * packages (`MoneyDecoder` → `PG.SimpleDecoder` → `PG.Coder`). Undefined when
+ * the class or a link of the chain does not resolve to one entity.
+ */
+export function constructorSigsThroughSuperclass(
+  entitiesByName: Map<string, ClassInfo[]>,
+  className: string,
+  childFile: string,
+  isForeign?: (candidate: ClassInfo) => boolean,
+  packageOf?: (candidate: ClassInfo) => string | undefined,
+): ParamInfo[][] | undefined {
+  let entity = resolveEntityByDeclaringFile(
+    entitiesByName.get(className) ?? [],
+    childFile,
+    undefined,
+    undefined,
+    isForeign,
+    packageOf,
+  );
+  const seen = new Set<ClassInfo>();
+  while (entity !== null && !seen.has(entity)) {
+    seen.add(entity);
+    const ctors = entity.instanceMethods.filter((m) => m.name === "constructor");
+    if (ctors.length > 0) return ctors.map(arityParams);
+    if (entity.superclass === undefined) return undefined;
+    entity = resolveEntityByDeclaringFile(
+      entitiesByName.get(entity.superclass.split(".").at(-1)!) ?? [],
+      entity.file ?? childFile,
+      entity.superclassFile,
+      undefined,
+      isForeign,
+      packageOf,
+    );
+  }
+  return undefined;
+}
+
 export function resolveEntityByDeclaringFile(
   candidates: ClassInfo[],
   childFile: string,
@@ -4780,6 +4819,20 @@ export function main() {
     // (file → Ruby module short name → the file's owners that mix it in),
     // memoized: `resolveTsOwner` asks once per matched pair.
     const graphHosts = new Map<string, Map<string, Set<string>>>();
+    const ctorForeign = new Set<ClassInfo>();
+    const ctorPkgOf = new Map<ClassInfo, string>();
+    const ctorEntities = buildEntitiesByName(pkg, ts, ctorForeign, ctorPkgOf);
+    const inheritedConstructorSigs = (
+      className: string,
+      tsFile: string,
+    ): ParamInfo[][] | undefined =>
+      constructorSigsThroughSuperclass(
+        ctorEntities,
+        className,
+        tsFile,
+        (c) => ctorForeign.has(c),
+        (c) => ctorPkgOf.get(c),
+      );
     const includeHosts = (tsFile: string, rubyModule: string): ReadonlySet<string> => {
       const short = rubyModule.split("::").at(-1) ?? rubyModule;
       const byModule = graphHosts.get(tsFile) ?? new Map<string, Set<string>>();
@@ -6096,13 +6149,14 @@ export function main() {
             ruby,
             ts,
             rubyName,
-            resolveCalleeSigs(
-              portedWithArgsSigs(tsFile, ts.name),
-              tsParamsByNameInDeps.get(ts.name),
-              ts.recv === undefined && tsClass !== undefined
-                ? (tsParamsByFileOwnerNameInPkg.get(tsFile)?.get(`${tsClass}#${ts.name}`) ?? [])
-                : [],
-            ),
+            (ts.newOf !== undefined ? inheritedConstructorSigs(ts.newOf, tsFile) : undefined) ??
+              resolveCalleeSigs(
+                portedWithArgsSigs(tsFile, ts.name),
+                tsParamsByNameInDeps.get(ts.name),
+                ts.recv === undefined && tsClass !== undefined
+                  ? (tsParamsByFileOwnerNameInPkg.get(tsFile)?.get(`${tsClass}#${ts.name}`) ?? [])
+                  : [],
+              ),
             rubyParamsByName.get(ruby.name),
           );
           if (result.verdict === "skip") {

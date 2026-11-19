@@ -36,6 +36,11 @@ other method a `SCOPED_SKIP_GROUPS` entry, each "not called by activerecord".
 | `UnableToSend`                    | `ext/pg_errors.c:88`                                 | raised by the wrapper                                                    |
 | `ConnectionBad`                   | `ext/pg_errors.c:89`                                 | `postgresql_adapter.rb:808,947`                                          |
 | `FeatureNotSupported`             | `ext/errorcodes.def:49-50` (`0A000`)                 | `postgresql/database_statements.rb:142`                                  |
+| `ERROR_CLASSES`                   | `ext/pg_errors.c:76`                                 | `lookup_error_class` (`ext/pg_errors.c:36-69`), in `engine/node-pg.ts`   |
+
+The package defines only the SQLSTATE classes trails names. Adding one is a
+class in `exceptions.ts` plus its `ERROR_CLASSES` rows from `ext/errorcodes.def`;
+an unlisted SQLSTATE raises `ServerError`, as the gem does for one it lacks.
 
 `connection.ts` is `PG::Connection` (`ext/pg_connection.c`); node-pg is reached
 only through `engine/node-pg.ts`, which `PG.connect` loads by an awaited
