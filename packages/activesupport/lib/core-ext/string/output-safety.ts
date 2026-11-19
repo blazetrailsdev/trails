@@ -119,7 +119,6 @@ function strRange(str: string, args: ArefArgs): [number, number] {
 
 type BlockFn = (...params: unknown[]) => unknown;
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `SafeBuffer` interface below.
 export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJson") {
   static readonly UNSAFE_STRING_METHODS = [
     "capitalize",
@@ -419,34 +418,6 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     return new SafeBuffer(newString, isHtmlSafe);
   }
 }
-
-type UnsafeStringMethod =
-  | "capitalize"
-  | "chomp"
-  | "chop"
-  | "delete"
-  | "deletePrefix"
-  | "deleteSuffix"
-  | "downcase"
-  | "lstrip"
-  | "next"
-  | "reverse"
-  | "rstrip"
-  | "scrub"
-  | "squeeze"
-  | "strip"
-  | "succ"
-  | "swapcase"
-  | "tr"
-  | "trS"
-  | "unicodeNormalize"
-  | "upcase";
-
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the methods `UNSAFE_STRING_METHODS.each` class_evals (`output_safety.rb:150-163`); the class/interface merge is how they surface on the type side. */
-export interface SafeBuffer
-  extends
-    Record<UnsafeStringMethod, (...args: unknown[]) => string>,
-    Record<`${UnsafeStringMethod}Bang`, (...args: unknown[]) => SafeBuffer | null> {}
 
 for (const unsafeMethod of SafeBuffer.UNSAFE_STRING_METHODS) {
   const name = unsafeMethod.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());

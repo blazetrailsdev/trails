@@ -13,6 +13,8 @@ import {
   assertNil,
 } from "../lib/testing/assertions.js";
 
+type Methods = Record<string, (...args: unknown[]) => unknown>;
+
 describe("SafeBufferTest", () => {
   let buffer: SafeBuffer;
 
@@ -96,17 +98,12 @@ describe("SafeBufferTest", () => {
     const args = dummyArgs === null ? [] : [dummyArgs].flat();
 
     it(`Should not return safe buffer from ${unsafeMethod}`, () => {
-      const alteredBuffer = (
-        buffer[name as keyof SafeBuffer] as (...a: unknown[]) => unknown
-      ).apply(buffer, args);
+      const alteredBuffer = (buffer as unknown as Methods)[name].apply(buffer, args);
       assertNotPredicate(alteredBuffer, isHtmlSafe);
     });
 
     it(`Should not return safe buffer from ${unsafeMethod}!`, () => {
-      (buffer[`${name}Bang` as keyof SafeBuffer] as (...a: unknown[]) => unknown).apply(
-        buffer,
-        args,
-      );
+      (buffer as unknown as Methods)[`${name}Bang`].apply(buffer, args);
       assertNotPredicate(buffer, isHtmlSafe);
     });
   }
