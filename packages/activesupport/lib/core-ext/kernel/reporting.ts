@@ -19,11 +19,11 @@ export function withWarnings<T>(flag: unknown, block: () => T): T {
 export function suppress<T>(
   fn: () => T,
   ...errorClasses: Array<new (...args: never[]) => Error>
-): T | undefined {
+): T | null {
   try {
     return fn();
   } catch (e) {
-    if (errorClasses.some((cls) => e instanceof cls)) return undefined;
+    if (errorClasses.some((cls) => e instanceof cls)) return null;
     throw e;
   }
 }
