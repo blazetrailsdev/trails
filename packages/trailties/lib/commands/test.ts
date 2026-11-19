@@ -1,5 +1,5 @@
 import "../constants.test.generated.js";
-import { LOAD_PATH, LoadError, rbFSystem, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { LOAD_PATH, LoadError, rbFSystem } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { UnrecognizedCommandError, root } from "../command.js";
@@ -17,14 +17,6 @@ export class TestCommand extends Base {
 
     for (const name of Runner.TEST_FOLDERS) {
       klass.desc(name, `Run tests in test/${name}`);
-      Object.defineProperty(this.prototype, name, {
-        value(this: TestCommand, ...args: string[]) {
-          return this.perform(`test/${name}`, ...args);
-        },
-        writable: true,
-        configurable: true,
-      });
-      rbClearMethodCache();
       klass.methodAdded(name);
     }
 
@@ -38,6 +30,14 @@ export class TestCommand extends Base {
     klass.methodAdded("system");
     klass.desc("generators", "Run tests in test/lib/generators");
     klass.methodAdded("generators");
+    this.methodAdded("models");
+    this.methodAdded("helpers");
+    this.methodAdded("channels");
+    this.methodAdded("controllers");
+    this.methodAdded("mailers");
+    this.methodAdded("integration");
+    this.methodAdded("jobs");
+    this.methodAdded("mailboxes");
   }
 
   static executable(...args: [string?]): string {
@@ -64,6 +64,38 @@ export class TestCommand extends Base {
       await this.runPrepareTask();
     }
     await Runner.run(args);
+  }
+
+  async models(...args: string[]): Promise<void> {
+    await this.perform("test/models", ...args);
+  }
+
+  async helpers(...args: string[]): Promise<void> {
+    await this.perform("test/helpers", ...args);
+  }
+
+  async channels(...args: string[]): Promise<void> {
+    await this.perform("test/channels", ...args);
+  }
+
+  async controllers(...args: string[]): Promise<void> {
+    await this.perform("test/controllers", ...args);
+  }
+
+  async mailers(...args: string[]): Promise<void> {
+    await this.perform("test/mailers", ...args);
+  }
+
+  async integration(...args: string[]): Promise<void> {
+    await this.perform("test/integration", ...args);
+  }
+
+  async jobs(...args: string[]): Promise<void> {
+    await this.perform("test/jobs", ...args);
+  }
+
+  async mailboxes(...args: string[]): Promise<void> {
+    await this.perform("test/mailboxes", ...args);
   }
 
   async all(...args: string[]): Promise<void> {

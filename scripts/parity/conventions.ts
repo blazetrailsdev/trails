@@ -1158,6 +1158,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      'PERMANENT: trailties CLAUDE.md, "`TestParser` reads TypeScript, so its Ripper fallback is not ported". ' +
       "`class TestParser < Ripper` (test_unit/test_parser.rb:52-133) is the " +
       "fallback for a Ruby without Prism, parsing Ruby through Ripper's event " +
       "callbacks. The port reads TypeScript through the compiler API in the " +

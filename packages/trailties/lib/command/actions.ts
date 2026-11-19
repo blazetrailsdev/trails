@@ -41,7 +41,7 @@ async function loadTasks(): Promise<void> {
 async function loadGenerators(): Promise<void> {
   if (ENGINE_PATH != null) {
     const engine = (await Engine.find(ENGINE_ROOT!))!;
-    Generators.namespace = engine.trailtieNamespace() ?? null;
+    Generators.namespace = engine.railtieNamespace() ?? null;
     await engine.loadGenerators();
   } else {
     await Trails.application!.loadGenerators();

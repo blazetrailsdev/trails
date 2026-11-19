@@ -382,9 +382,11 @@ async function requireGenerator(dir: string, base: string, path: string): Promis
   if (!File.isExist(path)) throw new LoadError(`cannot load such file -- ${path}`);
   const { Base } = await import("./generators/base.js");
   const mod = (await import(getPath().pathToFileURL!(path).href)) as Record<string, unknown>;
-  const namespace = getPath()
-    .dirname(path.slice(File.join(dir, base).length + 1))
-    .split(/[\\/]/);
+  const relative = path.slice(File.join(dir, base).length + 1);
+  const namespace =
+    getPath().dirname(relative) === "."
+      ? [File.basename(relative, EXTENSION).replace(/-generator$/, "")]
+      : getPath().dirname(relative).split(/[\\/]/);
   for (const value of Object.values(mod)) {
     if (typeof value === "function" && value.prototype instanceof Base) {
       const klass = value as unknown as GeneratorClass;

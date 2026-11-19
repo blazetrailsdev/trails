@@ -78,6 +78,9 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "html_safe",
   "to_query",
   "to_sentence",
+  // active_support/core_ext/module/introspection.rb:53-63 — `Module#module_parents`,
+  // exported by @blazetrails/activesupport as `moduleParents(mod)`.
+  "module_parents",
   // active_support/core_ext/array/extract_options.rb — `args.extract_options!`,
   // exported by @blazetrails/activesupport as `extractOptionsBang(args)`.
   "extract_options!",

@@ -30,6 +30,7 @@ import {
   Sendfile,
   TempfileReaper,
 } from "@blazetrails/rack";
+import { LoadError } from "@blazetrails/ruby-compat";
 import { DatabaseSelector, ShardSelector } from "@blazetrails/activerecord";
 import { Logger } from "../rack/logger.js";
 import { SilenceRequest } from "../rack/silence-request.js";
@@ -81,6 +82,8 @@ export class DefaultMiddlewareStack {
         headers,
       });
     }
+
+    this.loadRackCache();
 
     if (config.allowConcurrency === false) {
       stack.use(Lock);
@@ -162,6 +165,16 @@ export class DefaultMiddlewareStack {
     }
 
     return stack;
+  }
+
+  /** @internal */
+  private loadRackCache(): Record<string, unknown> | null {
+    const rackCache = this.config.actionDispatch.rackCache as unknown;
+    if (rackCache == null || rackCache === false) return null;
+
+    const error = new LoadError("cannot load such file -- rack/cache");
+    error.message += " Be sure to add rack-cache to your Gemfile";
+    throw error;
   }
 
   /** @internal */
