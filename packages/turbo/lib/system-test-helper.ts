@@ -30,7 +30,7 @@ type Expectation = Query & {
 };
 
 /** @noRailsEquivalent PERMANENT */
-function turboCableStreamSource(
+function turboCableStreamSourceSelector(
   locator: unknown,
   { connected, channel, signedStreamName }: TurboCableStreamSourceOptions,
   axis = ".//",
@@ -141,7 +141,7 @@ async function assertSelector(
   }
   const page = await host.page();
   await page.waitForFunction(isSatisfied, {
-    ...turboCableStreamSource(locator, options),
+    ...turboCableStreamSourceSelector(locator, options),
     context: null,
     count: options.count ?? null,
     negate,
@@ -154,11 +154,11 @@ export async function connectTurboCableStreamSources(
   block: Block = null,
 ): Promise<void> {
   const page = await this.page();
-  const { xpath } = turboCableStreamSource(null, { ...options, connected: false });
+  const { xpath } = turboCableStreamSourceSelector(null, { ...options, connected: false });
   for (const element of await page.locator(`xpath=${xpath}`).all()) {
     const context = await element.elementHandle();
     await page.waitForFunction(isSatisfied, {
-      ...turboCableStreamSource(null, { ...options, connected: true }, "self::"),
+      ...turboCableStreamSourceSelector(null, { ...options, connected: true }, "self::"),
       context,
       count: 1,
       negate: false,
