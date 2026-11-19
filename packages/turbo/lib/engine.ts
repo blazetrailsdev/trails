@@ -3,7 +3,7 @@ import { OrderedOptions, TopLevel, include, onLoad } from "@blazetrails/activesu
 import "@blazetrails/trailties/trailties/action-controller";
 import { Trails, type Application } from "@blazetrails/trailties";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
-import { File, constDefined } from "@blazetrails/ruby-compat";
+import { File, LoadError, constDefined } from "@blazetrails/ruby-compat";
 import { Turbo } from "./turbo-trails.js";
 import type { TestAssertions } from "./test-assertions.js";
 import type { IntegrationTestAssertions } from "./test-assertions/integration-test-assertions.js";
@@ -186,7 +186,10 @@ export class Engine extends TrailsEngine {
             ).TestAssertions
           : null;
       onLoad("active_support_test_case", function (this: object) {
-        if (testAssertions !== null) include(this, testAssertions);
+        if (testAssertions === null) {
+          throw new LoadError("cannot load such file -- turbo/test_assertions");
+        }
+        include(this, testAssertions);
 
         ThreadDebouncer.debouncerClass = ImmediateDebouncer;
       });
@@ -201,7 +204,10 @@ export class Engine extends TrailsEngine {
           : null;
       onLoad("action_cable", () => {
         onLoad("active_support_test_case", function (this: object) {
-          if (testHelper !== null) {
+          if (constDefined(TopLevel, "ActiveJob")) {
+            if (testHelper === null) {
+              throw new LoadError("cannot load such file -- turbo/broadcastable/test_helper");
+            }
             include(this, testHelper);
           }
         });
@@ -216,7 +222,12 @@ export class Engine extends TrailsEngine {
             ).IntegrationTestAssertions
           : null;
       onLoad("action_dispatch_integration_test", function (this: object) {
-        if (integrationTestAssertions !== null) include(this, integrationTestAssertions);
+        if (integrationTestAssertions === null) {
+          throw new LoadError(
+            "cannot load such file -- turbo/test_assertions/integration_test_assertions",
+          );
+        }
+        include(this, integrationTestAssertions);
       });
     });
 

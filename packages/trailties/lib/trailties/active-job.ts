@@ -9,6 +9,7 @@ import {
 import {
   block,
   eachPair,
+  LoadError,
   rbModName,
   rbObjClass,
   except,
@@ -139,6 +140,9 @@ export class Trailtie extends BaseTrailtie {
         await ActiveJob.loadPath["active_job/test_helper"]();
       }
       onLoad("action_dispatch_integration_test", function (this: new () => object) {
+        if (ActiveJob.TestHelper === undefined) {
+          throw new LoadError("cannot load such file -- active_job/test_helper");
+        }
         include(this, ActiveJob.TestHelper);
       });
     });
