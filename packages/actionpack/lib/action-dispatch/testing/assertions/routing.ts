@@ -4,14 +4,15 @@ import {
   include,
   InvalidURIError,
   Module,
+  NoMethodError,
   rbFSend,
+  rbObjClassname,
   rbObjClone,
   rbObjMethod,
   rbObjRespondTo,
   rbObjSingletonClass,
   URI,
   type Method,
-  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import { Concern } from "@blazetrails/activesupport";
 import { Assertion, assertEqual, message } from "@blazetrails/activesupport/testing/assertions";
@@ -22,7 +23,7 @@ import { ActionController, ActionDispatch } from "../../../namespaces.js";
 import type { IntegrationTest, Session } from "../integration.js";
 
 export interface RoutingAssertionsHost {
-  routes?: RouteSet | null;
+  routes?: RouteSet;
   controller?: unknown;
 }
 
@@ -138,7 +139,7 @@ export namespace ClassMethods {
     this: TestClass<RoutingAssertionsHost>,
     block: (routes: RouteSet) => unknown,
   ): void {
-    let oldRoutes: RouteSet | null | undefined;
+    let oldRoutes: RouteSet | undefined;
     let oldController: unknown;
 
     this.setup(function () {
@@ -153,8 +154,7 @@ export namespace ClassMethods {
 }
 
 export function setup(this: RoutingAssertionsHost): void {
-  this.routes ??= null;
-  rbCallSuper(this, setup);
+  if (this.routes == null) this.routes = undefined;
 }
 
 export function withRouting<T>(
@@ -272,7 +272,15 @@ export function methodMissing(
   if (this.controller != null && this.routes?.namedRoutes?.isRouteDefined(selector)) {
     return rbFSend(this.controller, selector, ...args);
   } else {
-    return rbCallSuper(this, methodMissing, selector, ...args);
+    const super_ = RoutingAssertions.superMethod(this, "methodMissing");
+    if (super_ !== undefined) return super_(selector, ...args);
+    throw new NoMethodError(
+      `undefined method '${selector}' for an instance of ${rbObjClassname(this)}`,
+      selector,
+      args,
+      false,
+      { receiver: this },
+    );
   }
 }
 
@@ -368,7 +376,7 @@ export function createRoutes<T>(
 /** @internal */
 export function resetRoutes(
   this: RoutingAssertionsHost,
-  oldRoutes: RouteSet | null | undefined,
+  oldRoutes: RouteSet | undefined,
   oldController: unknown,
 ): void {
   this.routes = oldRoutes;
@@ -426,26 +434,33 @@ export type RoutingAssertions = {
   failOn: typeof failOn;
 };
 
-export const RoutingAssertions = {
-  ClassMethods,
-  setup,
-  withRouting,
-  assertRecognizes,
-  assertGenerates,
-  assertRouting,
-  methodMissing,
-  createRoutes,
-  resetRoutes,
-  recognizedRequestFor,
-  failOn,
-} as RoutingAssertions & { ClassMethods: typeof ClassMethods };
-extend(RoutingAssertions, Concern);
-Concern.included.call(
-  RoutingAssertions,
-  null,
-  /** @inventedArm if — PERMANENT */
-  function (this: { prototype: object }) {
-    if (this.prototype === undefined) return;
-    spliceMethodMissing(Object.getPrototypeOf(this.prototype) as object);
-  },
-);
+export const RoutingAssertions = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
+
+  mod.moduleEval((m) => {
+    Object.assign(m, {
+      setup,
+      withRouting,
+      assertRecognizes,
+      assertGenerates,
+      assertRouting,
+      methodMissing,
+      createRoutes,
+      resetRoutes,
+      recognizedRequestFor,
+      failOn,
+    });
+  });
+
+  Concern.included.call(
+    mod,
+    null,
+    /** @inventedArm if — PERMANENT */
+    function (this: { prototype: object }) {
+      if (this.prototype === undefined) return;
+      spliceMethodMissing(Object.getPrototypeOf(this.prototype) as object);
+    },
+  );
+});

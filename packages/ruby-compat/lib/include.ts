@@ -58,7 +58,6 @@ import {
   rbObjClass,
   rbObjSingletonClass,
   rbInspect,
-  rbObjClassname,
   rbCString,
   rbCSymbol,
   rbCTime,
@@ -2270,7 +2269,6 @@ export interface KernelModule {
   initializeDup(this: object, orig: unknown): object;
   initializeClone(this: object, orig: unknown): object;
   freeze(this: object): object;
-  methodMissing(this: object, mid: string, ...args: unknown[]): never;
   abort: typeof abort;
   rand: typeof kernelRand;
   srand: typeof kernelSrand;
@@ -2329,20 +2327,6 @@ export const Kernel = {
   /** @noRailsEquivalent PERMANENT */
   freeze(this: object): object {
     return Object.freeze(this);
-  },
-  /**
-   * `BasicObject#method_missing` (`rb_method_missing`, vendor/ruby/v3.3.11/vm_eval.c:945).
-   *
-   * @noRailsEquivalent PERMANENT
-   */
-  methodMissing(this: object, mid: string, ...args: unknown[]): never {
-    throw new NoMethodError(
-      `undefined method '${mid}' for an instance of ${rbObjClassname(this)}`,
-      mid,
-      args,
-      false,
-      { receiver: this },
-    );
   },
 } as KernelModule;
 

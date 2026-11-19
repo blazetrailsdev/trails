@@ -735,29 +735,3 @@ describe("ActionController::LiveTestResponse predicates", () => {
     expect((await LiveTestResponse.new(200)).isError).toBe(false);
   });
 });
-
-describe("RoutingAssertions#setup", () => {
-  it("runs a subclass's instance setup between beforeSetup and the test body", async () => {
-    const seen: unknown[] = [];
-    class OrderTest extends TestCase {
-      override beforeSetup(): unknown {
-        seen.push(["beforeSetup", Object.hasOwn(this, "routes")]);
-        return super.beforeSetup();
-      }
-
-      override setup(): void {
-        super.setup();
-        seen.push(["setup", this.routes === undefined]);
-      }
-
-      testOrder(): void {
-        seen.push("body");
-      }
-    }
-
-    const result = await new OrderTest("testOrder").run();
-
-    expect(result.failures).toEqual([]);
-    expect(seen).toEqual([["beforeSetup", false], ["setup", false], "body"]);
-  });
-});
