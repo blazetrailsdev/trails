@@ -8,13 +8,10 @@
     { label: "Source", href: repo },
     { label: "Docs", href: `${base}/docs/` },
     { label: "API", href: `${base}/docs/api/@blazetrails/arel/README` },
-    { label: "Community", href: `${repo}/discussions` },
   ];
   const navRight = [
-    { label: "News", href: `${repo}/commits/main` },
     { label: "Guides", href: guides },
     { label: "Parity", href: `${repo}/blob/main/docs/parity-gates.md` },
-    { label: "Contribute", href: `${repo}/blob/main/CONTRIBUTING.md` },
   ];
 
   const tiles = [
@@ -28,84 +25,101 @@
 
   const blocks = [
     {
-      file: "app/models/article.rb",
+      file: "app/models/article.ts",
       title: "Active Records make modeling easy.",
       body: "Databases come to life with business logic encapsulated in rich objects. Modeling associations between tables, providing callbacks when saved, encrypting sensitive data seamlessly, and expressing SQL queries beautifully.",
-      code: `class Article < ApplicationRecord
-  belongs_to :author, default: -> { Current.user }
-  has_many   :comments
+      code: `import { ApplicationRecord } from "./application-record.js";
+import { Current } from "./current.js";
 
-  has_one_attached :cover_image
-  has_rich_text :content, encrypted: true
-  enum status: %i[ drafted published ]
+export class Article extends ApplicationRecord {
+  static {
+    this.belongsTo("author", { default: () => Current.user });
+    this.hasMany("comments");
 
-  scope :recent, -> { order(created_at: :desc).limit(25) }
+    this.hasOneAttached("coverImage");
+    this.hasRichText("content", { encrypted: true });
+    this.enum("status", ["drafted", "published"]);
 
-  after_save_commit :deliver_later, if: :published?
+    this.scope("recent", function () {
+      return this.order({ created_at: "desc" }).limit(25);
+    });
 
-  def byline
-    "Written by #{author.name} on #{created_at.to_s(:short)}"
-  end
+    this.afterSaveCommit("deliverLater", { if: "isPublished" });
+  }
 
-  def deliver_later
-    Article::DeliveryJob.perform_later(self)
-  end
-end`,
+  async byline(): Promise<string> {
+    const author = await this.author;
+    return \`Written by \${author.name} on \${this.createdAt.toFormattedS("short")}\`;
+  }
+
+  async deliverLater(): Promise<void> {
+    await Article.DeliveryJob.performLater(this);
+  }
+}`,
     },
     {
-      file: "app/controllers/articles_controller.rb",
+      file: "app/controllers/articles-controller.ts",
       title: "Action Controllers handle all requests.",
       body: "Controllers expose the domain model to the web, process incoming parameters, set caching headers, and render templates, responding with either HTML or JSON.",
-      code: `class ArticlesController < ApplicationController
-  def index
-    @articles = Article.recent
-  end
+      code: `import { Article } from "../models/article.js";
+import { ApplicationController } from "./application-controller.js";
 
-  def show
-    @article = Article.find(params[:id])
-    fresh_when etag: @article
-  end
+export class ArticlesController extends ApplicationController {
+  declare articles: Article[];
+  declare article: Article;
 
-  def create
-    article = Article.create!(article_params)
-    redirect_to article
-  end
+  async index(): Promise<void> {
+    this.articles = await Article.recent();
+  }
 
-  private
-    def article_params
-      params.expect(article: [ :title, :content ])
-    end
-end`,
+  async show(): Promise<void> {
+    this.article = await Article.find(this.params.expect("id"));
+    await this.freshWhen({ etag: this.article });
+  }
+
+  async create(): Promise<void> {
+    const article = await Article.createBang(this._articleParams());
+    await this.redirectTo(article);
+  }
+
+  private _articleParams() {
+    return this.params.expect({ article: ["title", "content"] });
+  }
+}`,
     },
     {
-      file: "app/views/articles/show.html.erb",
-      title: "Action Views mix Ruby and HTML.",
-      body: "Templates can use the full versatility of Ruby, excessive code is extracted into helpers, and the domain model is used directly and interwoven with the HTML.",
-      code: `<h1><%= @article.title %></h1>
+      file: "app/views/articles/show.html.tse",
+      title: "Action Views mix TypeScript and HTML.",
+      body: "Templates can use the full versatility of TypeScript, excessive code is extracted into helpers, and the domain model is used directly and interwoven with the HTML.",
+      code: `<h1><%= this.article.title %></h1>
 
-<%= image_tag @article.cover_image.url %>
+<%= imageTag(this.article.coverImage.url()) %>
 
-<p><%= @article.content %></p>
+<p><%= this.article.content %></p>
 
-<%= link_to "Edit", edit_article_path(@article) if Current.user.admin? %>`,
+<% if (Current.user.isAdmin()) { %>
+  <%= linkTo("Edit", editArticlePath(this.article)) %>
+<% } %>`,
     },
     {
-      file: "config/routes.rb",
+      file: "config/routes.ts",
       title: "Action Dispatch routes URLs.",
       body: "Configure how URLs connect to the controllers using the routing domain language. Routes expose the bundle of actions that go together as a resource: index, show, new, create, edit, update, destroy.",
-      code: `Rails.application.routes.draw do
-  resources :articles do    # /articles, /articles/1
-    resources :comments     # /articles/1/comments, /comments/1
-  end
+      code: `import { Trails } from "@blazetrails/trailties";
 
-  root to: "articles#index" # /
-end`,
+Trails.application.routes().draw(function () {
+  this.resources("articles", function () { // /articles, /articles/1
+    this.resources("comments");             // /articles/1/comments, /comments/1
+  });
+
+  this.root("articles#index");              // /
+});`,
     },
   ];
 
   const cards = [
     { tag: "Learning", title: "Read the guides", body: "Learn what the frameworks can do and how they fit together.", href: guides },
-    { tag: "Contributing", title: "Contribute on GitHub", body: "File bug reports and make pull-requests.", href: repo },
+    { tag: "Source", title: "Browse on GitHub", body: "Read the code and the Rails source it mirrors.", href: repo },
     { tag: "Keeping up", title: "See what’s new", body: "The latest releases and updates on development.", href: `${repo}/commits/main` },
   ];
 </script>
@@ -150,10 +164,6 @@ end`,
   </section>
 
   <section class="band">
-    <h2>Building it together.</h2>
-    <p class="intro">People have <a href="{repo}/graphs/contributors"><strong>contributed code to trails</strong></a>, and many more have served the community through evangelism, documentation, and bug reports. Join us!</p>
-    <a class="cta" href="{repo}/blob/main/CONTRIBUTING.md">Read the contributing guide &rsaquo;</a>
-
     <div class="card">
       <h2>Everything you need.</h2>
       <p class="intro"><strong>trails is a full-stack framework.</strong> It ships with all the tools needed to build amazing web apps on both the front and back end with strong conventions that keep your agents from producing a huge, unmaintainable mess.</p>
