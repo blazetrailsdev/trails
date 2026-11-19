@@ -283,6 +283,8 @@ export interface PerformQueryHost extends HandleWarningsHost {
   isInTransaction(): boolean;
   sqlKey(sql: string | null): string;
   _statements: StatementPool;
+  lock: { synchronize<T>(block: () => Promise<T>): Promise<T> };
+  pool: unknown;
   verifiedBang(): void;
   /** @internal */
   handleWarnings(sql: unknown): void;
@@ -318,13 +320,11 @@ export async function performQuery(
         if (!(error instanceof PG.FeatureNotSupported)) throw error;
         if (this.isCachedPlanFailure(error)) {
           if (this.isInTransaction()) {
-            throw new PreparedStatementCacheExpired(error.message, {
-              sql: sql as string,
-              binds,
-              cause: error,
-            });
+            throw new PreparedStatementCacheExpired(error.message, { connectionPool: this.pool });
           } else {
-            await this._statements.delete(this.sqlKey(sql));
+            await this.lock.synchronize(async () => {
+              await this._statements.delete(this.sqlKey(sql));
+            });
             continue;
           }
         }
