@@ -8,11 +8,12 @@ import {
   rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
+import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import type { Association } from "./associations/association.js";
 import type { BelongsToAssociation } from "./associations/belongs-to-association.js";
 import type { CollectionAssociation } from "./associations/collection-association.js";
 import type { HasOneAssociation } from "./associations/has-one-association.js";
-import { RecordInvalid } from "./validations.js";
+import { RecordInvalid, type ValidationContextArg } from "./validations.js";
 import { Rollback } from "./errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import { associationInstanceGet } from "./associations.js";
@@ -24,6 +25,7 @@ const AUTOSAVING_BELONGS_TO_FOR = Symbol.for("blazetrails.autosavingBelongsToFor
 
 interface AutosaveAssociationHost {
   [key: symbol]: unknown;
+  constructor: typeof Base;
   _markedForDestruction: boolean;
   _destroyedByAssociation: unknown;
   isNewRecord(): boolean;
@@ -47,8 +49,7 @@ interface AutosaveAssociationHost {
     objects: unknown[];
     isAny(): boolean;
   };
-  _validationContext?: unknown;
-  constructor: { primaryKey?: string | string[]; name: string; _reflections: object };
+  _validationContext?: ValidationContextArg;
 }
 
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
@@ -136,7 +137,10 @@ export const AutosaveAssociation = {
   saveBelongsToAssociation,
 };
 
-export function build(model: typeof Base, reflection: unknown): unknown {
+export function build(
+  model: typeof Base,
+  reflection: AssociationReflection | ThroughReflection,
+): unknown {
   return addAutosaveAssociationCallbacks.call(model, reflection);
 }
 
@@ -159,7 +163,7 @@ interface ExtensionList {
 /** @internal */
 export async function saveCollectionAssociation(
   this: AutosaveAssociationHost,
-  reflection: any,
+  reflection: AssociationReflection | ThroughReflection,
 ): Promise<void> {
   const association = associationInstanceGet.call(
     this,
@@ -217,7 +221,7 @@ export async function saveCollectionAssociation(
 /** @internal */
 export async function saveHasOneAssociation(
   this: AutosaveAssociationHost,
-  reflection: any,
+  reflection: AssociationReflection | ThroughReflection,
 ): Promise<unknown> {
   const association = associationInstanceGet.call(
     this,
@@ -255,7 +259,7 @@ export async function saveHasOneAssociation(
     }
 
     const inverseAssociation =
-      reflection.inverseOf() && record.association(reflection.inverseOf().name);
+      reflection.inverseOf() && record.association(reflection.inverseOf()!.name);
     if (inverseAssociation && record.isAutosavingBelongsToFor(inverseAssociation)) return;
 
     const saved = await record.save({ validate: !autosave });
@@ -265,7 +269,10 @@ export async function saveHasOneAssociation(
 }
 
 /** @internal */
-export async function saveBelongsToAssociation(this: AutosaveAssociationHost, reflection: any) {
+export async function saveBelongsToAssociation(
+  this: AutosaveAssociationHost,
+  reflection: AssociationReflection | ThroughReflection,
+) {
   const association = associationInstanceGet.call(
     this,
     reflection.name,
@@ -318,14 +325,14 @@ export function associatedRecordsToValidateOrSave(
   this: AutosaveAssociationHost,
   association: any,
   newRecord: boolean,
-  autosave: boolean,
+  autosave: unknown,
 ): any[] | null {
   if (newRecord || this.customValidationContext()) {
     return association && association.target;
   } else if (autosave) {
-    return association.target.filter((record: any) => record.changedForAutosave());
+    return association.target.filter((record: Base) => record.changedForAutosave());
   } else {
-    return association.target.filter((record: any) => record.isNewRecord());
+    return association.target.filter((record: Base) => record.isNewRecord());
   }
 }
 
@@ -342,7 +349,8 @@ export function isNestedRecordsChangedForAutosave(this: AutosaveAssociationHost)
           reflection.name,
         ) as Association | null;
         return (
-          association && wrap(association.target).some((record: any) => record.changedForAutosave())
+          association &&
+          wrap(association.target).some((record: Base) => record.changedForAutosave())
         );
       }
       return false;
@@ -355,7 +363,7 @@ export function isNestedRecordsChangedForAutosave(this: AutosaveAssociationHost)
 /** @internal */
 export async function validateHasOneAssociation(
   this: AutosaveAssociationHost,
-  reflection: any,
+  reflection: AssociationReflection | ThroughReflection,
 ): Promise<void> {
   const association = associationInstanceGet.call(
     this,
@@ -365,7 +373,7 @@ export async function validateHasOneAssociation(
   if (!(record && (record.changedForAutosave() || this.customValidationContext()))) return;
 
   const inverseAssociation =
-    reflection.inverseOf() && record.association(reflection.inverseOf().name);
+    reflection.inverseOf() && record.association(reflection.inverseOf()!.name);
   if (
     inverseAssociation &&
     (record.isValidatingBelongsToFor(inverseAssociation) ||
@@ -379,7 +387,7 @@ export async function validateHasOneAssociation(
 /** @internal */
 export async function validateBelongsToAssociation(
   this: AutosaveAssociationHost,
-  reflection: any,
+  reflection: AssociationReflection | ThroughReflection,
 ): Promise<void> {
   const association = associationInstanceGet.call(
     this,
@@ -400,7 +408,7 @@ export async function validateBelongsToAssociation(
 /** @internal */
 export async function validateCollectionAssociation(
   this: AutosaveAssociationHost,
-  reflection: any,
+  reflection: AssociationReflection | ThroughReflection,
 ): Promise<void> {
   const association = associationInstanceGet.call(
     this,
@@ -423,7 +431,7 @@ export async function validateCollectionAssociation(
 export async function isAssociationValid(
   this: AutosaveAssociationHost,
   association: any,
-  record: any,
+  record: Base,
 ): Promise<boolean> {
   if (record.isDestroyed() || (association.options.autosave && record.markedForDestruction()))
     return true;
@@ -436,12 +444,12 @@ export async function isAssociationValid(
     associatedErrors = record.errors.objects;
   } else {
     associatedErrors = record.errors.objects.filter(
-      (error: any) => error instanceof AssociationsNestedError,
+      (error: unknown) => error instanceof AssociationsNestedError,
     );
   }
 
   if (association.options.autosave) {
-    if (this === record) return false;
+    if ((this as object) === record) return false;
     for (const error of associatedErrors) {
       this.errors.objects.push(new AssociationsNestedError(association, error));
     }
@@ -468,19 +476,23 @@ export async function aroundSaveCollectionAssociation(
 }
 
 /** @internal */
-export function _isRecordChanged(reflection: any, record: any, key: unknown[]): boolean {
+export function _isRecordChanged(
+  reflection: AssociationReflection | ThroughReflection,
+  record: Base,
+  key: unknown[],
+): boolean {
   return (
     record.isNewRecord() ||
     isAssociationForeignKeyChanged(reflection, record, key) ||
     isInversePolymorphicAssociationChanged(reflection, record) ||
-    record.isWillSaveChangeToAttribute(reflection.foreignKey())
+    record.isWillSaveChangeToAttribute(reflection.foreignKey() as string)
   );
 }
 
 /** @internal */
 export function isAssociationForeignKeyChanged(
-  reflection: any,
-  record: any,
+  reflection: AssociationReflection | ThroughReflection,
+  record: Base,
   key: unknown[],
 ): boolean {
   if (reflection.isThroughReflection()) return false;
@@ -495,18 +507,24 @@ export function isAssociationForeignKeyChanged(
 }
 
 /** @internal */
-export function isInversePolymorphicAssociationChanged(reflection: any, record: any): boolean {
+export function isInversePolymorphicAssociationChanged(
+  reflection: AssociationReflection | ThroughReflection,
+  record: Base,
+): boolean {
   if (!reflection.inverseOf()?.isPolymorphic()) return false;
 
-  const className = record._readAttribute(reflection.inverseOf().foreignType);
-  return reflection.activeRecord !== record.constructor.polymorphicClassFor(className);
+  const className = record._readAttribute(reflection.inverseOf()!.foreignType!);
+  return reflection.activeRecord !== record.constructor.polymorphicClassFor(className as string);
 }
 
 /** @internal */
-export function computePrimaryKey(reflection: any, record: any): string | string[] {
+export function computePrimaryKey(
+  reflection: AssociationReflection | ThroughReflection,
+  record: Pick<Base, "constructor">,
+): string | string[] {
   let primaryKeyOptions, queryConstraints;
   if ((primaryKeyOptions = reflection.options.primaryKey)) {
-    return primaryKeyOptions;
+    return primaryKeyOptions as string | string[];
   } else if (
     reflection.options.queryConstraints &&
     (queryConstraints = queryConstraintsList.call(record.constructor))
@@ -555,7 +573,10 @@ export function defineNonCyclicMethod(
 }
 
 /** @internal */
-export function addAutosaveAssociationCallbacks(this: typeof Base, reflection: any): void {
+export function addAutosaveAssociationCallbacks(
+  this: typeof Base,
+  reflection: AssociationReflection | ThroughReflection,
+): void {
   const saveMethod = `:autosaveAssociatedRecordsFor_${reflection.name}`;
 
   if (reflection.isCollection()) {
@@ -583,7 +604,10 @@ export function addAutosaveAssociationCallbacks(this: typeof Base, reflection: a
 }
 
 /** @internal */
-export function defineAutosaveValidationCallbacks(this: typeof Base, reflection: any): void {
+export function defineAutosaveValidationCallbacks(
+  this: typeof Base,
+  reflection: AssociationReflection | ThroughReflection,
+): void {
   const validationMethod = `:validateAssociatedRecordsFor_${reflection.name}`;
   if (reflection.isValidate() && !rbModMethodDefined(this, validationMethod.slice(1))) {
     let method: string;

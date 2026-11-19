@@ -334,8 +334,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       _readAttribute: (key: string) => values[key],
       isWillSaveChangeToAttribute: () => false,
     };
-    expect(_isRecordChanged(reflection, record, [1, 2])).toBe(false);
-    expect(_isRecordChanged(reflection, record, [1, 3])).toBe(true);
+    expect(_isRecordChanged(reflection as never, record as never, [1, 2])).toBe(false);
+    expect(_isRecordChanged(reflection as never, record as never, [1, 3])).toBe(true);
   });
 });
 
@@ -475,7 +475,7 @@ describe("AutosaveAssociation::AssociationBuilderExtension.build", () => {
     }
     const before = callbacks(Convict).length;
 
-    build(Convict, Prisoner.reflectOnAssociation("ship"));
+    build(Convict, Prisoner.reflectOnAssociation("ship")!);
 
     expect(callbacks(Convict).length).toBeGreaterThan(before);
   });
@@ -573,7 +573,10 @@ describe("computePrimaryKey", () => {
 
   it("returns explicit reflection primaryKey option as-is", () => {
     const record = makeRecord({ primaryKey: "id" });
-    const result = computePrimaryKey({ options: { primaryKey: "custom_id" } }, record);
+    const result = computePrimaryKey(
+      { options: { primaryKey: "custom_id" } } as never,
+      record as never,
+    );
     expect(result).toBe("custom_id");
   });
 
@@ -583,7 +586,10 @@ describe("computePrimaryKey", () => {
       queryConstraintsList: ["tenant_id", "id"],
       hasQueryConstraints: true,
     });
-    const result = computePrimaryKey({ options: { queryConstraints: true } }, record);
+    const result = computePrimaryKey(
+      { options: { queryConstraints: true } } as never,
+      record as never,
+    );
     expect(result).toEqual(["tenant_id", "id"]);
   });
 
@@ -593,7 +599,7 @@ describe("computePrimaryKey", () => {
       queryConstraintsList: ["shop_id", "id"],
       hasQueryConstraints: true,
     });
-    const result = computePrimaryKey({ options: {} }, record);
+    const result = computePrimaryKey({ options: {} } as never, record as never);
     expect(result).toEqual(["shop_id", "id"]);
   });
 
@@ -606,27 +612,27 @@ describe("computePrimaryKey", () => {
     const result = computePrimaryKey(
       {
         options: { foreignKey: "order_id" },
-      },
-      record,
+      } as never,
+      record as never,
     );
     expect(result).toBe("id");
   });
 
   it("collapses CPK to 'id' when composite PK includes id and no queryConstraints", () => {
     const record = makeRecord({ primaryKey: ["shop_id", "id"] });
-    const result = computePrimaryKey({ options: {} }, record);
+    const result = computePrimaryKey({ options: {} } as never, record as never);
     expect(result).toBe("id");
   });
 
   it("returns full composite PK when CPK has no 'id' column", () => {
     const record = makeRecord({ primaryKey: ["shop_id", "status"] });
-    const result = computePrimaryKey({ options: {} }, record);
+    const result = computePrimaryKey({ options: {} } as never, record as never);
     expect(result).toEqual(["shop_id", "status"]);
   });
 
   it("returns class primary key for non-composite, non-constrained record", () => {
     const record = makeRecord({ primaryKey: "id" });
-    const result = computePrimaryKey({ options: {} }, record);
+    const result = computePrimaryKey({ options: {} } as never, record as never);
     expect(result).toBe("id");
   });
 });

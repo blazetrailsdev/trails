@@ -1,4 +1,4 @@
-import type { MacroType } from "../../reflection.js";
+import type { MacroType, AssociationReflection } from "../../reflection.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   NotImplementedError,
@@ -10,6 +10,7 @@ import { assertValidKeys, kernelArray } from "@blazetrails/activesupport";
 import { ConfigurationError } from "../../errors.js";
 import * as Reflection from "../../reflection.js";
 import { Builder } from "../../namespaces.js";
+import type { Base } from "../../base.js";
 
 /** @internal */
 export interface AssociationInstanceHost {
@@ -33,7 +34,7 @@ export interface AssociationProxyLike {
 
 type ExtensionModule = {
   validOptions: () => string[];
-  build: (model: any, reflection: any) => void;
+  build: (model: typeof Base, reflection: AssociationReflection) => void;
 };
 
 export class Association {
@@ -52,9 +53,9 @@ export class Association {
   ];
 
   static build(
-    model: any,
+    model: typeof Base,
     name: string,
-    scope: ((...args: any[]) => any) | null,
+    scope: AssociationReflection["scope"],
     options: Record<string, unknown> = {},
     block?: (mod: Record<string, unknown>) => void,
   ): any {
@@ -75,9 +76,9 @@ export class Association {
   }
 
   static createReflection(
-    model: any,
+    model: typeof Base,
     name: string,
-    scope: ((...args: any[]) => any) | null,
+    scope: AssociationReflection["scope"],
     options: Record<string, unknown>,
     block?: (mod: Record<string, unknown>) => void,
   ): any {
@@ -96,7 +97,7 @@ export class Association {
     return Reflection.create(macro, name, scope, options, model);
   }
 
-  static buildScope(scope: ((...args: any[]) => any) | null): ((...args: any[]) => any) | null {
+  static buildScope(scope: AssociationReflection["scope"]): AssociationReflection["scope"] {
     if (scope && scope.length === 0) {
       const orig = scope;
       return function (this: unknown) {
@@ -120,15 +121,15 @@ export class Association {
   }
 
   static defineExtensions(
-    _model: any,
+    _model: typeof Base,
     _name: string,
     _block?: (mod: Record<string, unknown>) => void,
   ): any {
     return undefined;
   }
 
-  static defineCallbacks(model: any, reflection: any): void {
-    const dependent = reflection.options.dependent;
+  static defineCallbacks(model: typeof Base, reflection: AssociationReflection): void {
+    const dependent = reflection.options.dependent as string | undefined;
     if (dependent) {
       this.checkDependentOptions(dependent, model);
       this.addDestroyCallbacks(model, reflection);
@@ -140,7 +141,7 @@ export class Association {
     }
   }
 
-  static defineAccessors(model: any, reflection: any): void {
+  static defineAccessors(model: typeof Base, reflection: AssociationReflection): void {
     const mixin: Module = model.generatedAssociationMethods();
     const name = reflection.name;
     this.defineReaders(mixin, name);
@@ -171,16 +172,19 @@ export class Association {
     });
   }
 
-  static defineValidations(_model: any, _reflection: any): void {}
+  static defineValidations(_model: typeof Base, _reflection: AssociationReflection): void {}
 
-  static defineChangeTrackingMethods(_model: any, _reflection: any): void {}
+  static defineChangeTrackingMethods(
+    _model: typeof Base,
+    _reflection: AssociationReflection,
+  ): void {}
 
   static validDependentOptions(): string[] {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/builder/association.rb:127
     throw new NotImplementedError();
   }
 
-  static checkDependentOptions(dependent: string, model: any): void {
+  static checkDependentOptions(dependent: string, model: typeof Base): void {
     if (dependent === "destroyAsync" && !model.destroyAssociationAsyncJob) {
       const errMessage =
         "A valid destroy_association_async_job is required to use `dependent: :destroyAsync` on associations";
@@ -194,12 +198,12 @@ export class Association {
     }
   }
 
-  static addDestroyCallbacks(model: any, reflection: any): void {
+  static addDestroyCallbacks(model: typeof Base, reflection: AssociationReflection): void {
     const name = reflection.name;
     model.beforeDestroy((o: any) => o.association(name).handleDependency());
   }
 
-  static addAfterCommitJobsCallback(model: any, dependent: string): void {
+  static addAfterCommitJobsCallback(model: typeof Base, dependent: string): void {
     if (dependent === "destroyAsync") {
       const mixin: Module = model.generatedAssociationMethods();
 
