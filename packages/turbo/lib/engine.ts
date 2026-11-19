@@ -68,7 +68,8 @@ export class Engine extends TrailsEngine {
     this.isolateNamespace(Turbo);
     this.config.eagerLoadNamespaces.push(Turbo);
     this.config.set("turbo", new OrderedOptions());
-    this.config.turbo.testConnectAfterActions = ["visit"];
+    /** @missingRailsArgs test_connect_after_actions= — PERMANENT */
+    this.config.turbo.testConnectAfterActions = [];
 
     this.config.paths().add("config/routes.ts", {
       with: File.join(import.meta.dirname, "config", `routes${File.extname(import.meta.filename)}`),
