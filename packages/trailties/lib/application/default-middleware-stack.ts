@@ -83,6 +83,7 @@ export class DefaultMiddlewareStack {
       });
     }
 
+    /** @missingRailsCall use — CONVERGEABLE default-middleware-stack-omits-rack-cache */
     this.loadRackCache();
 
     if (config.allowConcurrency === false) {
@@ -172,9 +173,12 @@ export class DefaultMiddlewareStack {
     const rackCache = this.config.actionDispatch.rackCache as unknown;
     if (rackCache == null || rackCache === false) return null;
 
-    const error = new LoadError("cannot load such file -- rack/cache");
-    error.message += " Be sure to add rack-cache to your Gemfile";
-    throw error;
+    try {
+      throw new LoadError("cannot load such file -- rack/cache");
+    } catch (error) {
+      (error as LoadError).message += " Be sure to add rack-cache to your Gemfile";
+      throw error;
+    }
   }
 
   /** @internal */
