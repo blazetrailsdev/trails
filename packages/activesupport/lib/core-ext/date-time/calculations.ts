@@ -300,8 +300,15 @@ for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
 }
 
 declare module "@blazetrails/date" {
+  namespace DateTime {
+    export function current(): DateTime;
+  }
   interface DateTime {
     change(options: ChangeOptions): DateTime;
+    advance(options: AdvanceOptions): DateTime;
+    beginningOfDay(): DateTime;
+    midnight(): DateTime;
+    endOfDay(): DateTime;
     isUtc(): boolean;
     getutc(): Time;
     getlocal(utcOffset?: number | string | null): Time;
@@ -309,9 +316,23 @@ declare module "@blazetrails/date" {
   }
 }
 
+Object.assign(RubyDateTime, { current });
+
 Object.assign(RubyDateTime.prototype, {
   change(this: RubyDateTime, options: ChangeOptions): DateTime {
     return change(this, options);
+  },
+  advance(this: RubyDateTime, options: AdvanceOptions): DateTime {
+    return advance(this, options);
+  },
+  beginningOfDay(this: RubyDateTime): DateTime {
+    return beginningOfDay(this);
+  },
+  midnight(this: RubyDateTime): DateTime {
+    return midnight(this);
+  },
+  endOfDay(this: RubyDateTime): DateTime {
+    return endOfDay(this);
   },
   isUtc(this: RubyDateTime): boolean {
     return isUtc(this);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal, Time } from "@blazetrails/date";
+import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import {
   isToday,
   isTomorrow,
@@ -14,40 +14,43 @@ import {
 } from "../../../lib/core-ext/date-and-time/calculations.js";
 
 describe("DateAndTime::Calculations predicates (trails)", () => {
-  const today = Temporal.Now.plainDateISO();
+  const now = Temporal.Now.plainDateISO();
+  const today = new RubyDate(now);
+  const yesterday = new RubyDate(now.subtract({ days: 1 }));
+  const tomorrow = new RubyDate(now.add({ days: 1 }));
 
   it("today? is true only for the current day", () => {
-    expect(isToday.call(today.subtract({ days: 1 }))).toBe(false);
+    expect(isToday.call(yesterday)).toBe(false);
     expect(isToday.call(today)).toBe(true);
-    expect(isToday.call(today.add({ days: 1 }))).toBe(false);
+    expect(isToday.call(tomorrow)).toBe(false);
   });
 
   it("tomorrow? and yesterday? key off Date.current", () => {
-    expect(isTomorrow.call(today.add({ days: 1 }))).toBe(true);
+    expect(isTomorrow.call(tomorrow)).toBe(true);
     expect(isTomorrow.call(today)).toBe(false);
-    expect(isYesterday.call(today.subtract({ days: 1 }))).toBe(true);
+    expect(isYesterday.call(yesterday)).toBe(true);
     expect(isYesterday.call(today)).toBe(false);
   });
 
   it("past? and future? compare against the class's current", () => {
-    expect(isPast.call(today.subtract({ days: 1 }))).toBe(true);
-    expect(isPast.call(today.add({ days: 1 }))).toBe(false);
-    expect(isFuture.call(today.add({ days: 1 }))).toBe(true);
-    expect(isFuture.call(today.subtract({ days: 1 }))).toBe(false);
-    expect(isPast.call(new Date(Date.now() - 1000))).toBe(true);
-    expect(isFuture.call(new Date(Date.now() + 60_000))).toBe(true);
+    expect(isPast.call(yesterday)).toBe(true);
+    expect(isPast.call(tomorrow)).toBe(false);
+    expect(isFuture.call(tomorrow)).toBe(true);
+    expect(isFuture.call(yesterday)).toBe(false);
+    expect(isPast.call(Time.now().advance({ seconds: -1 }))).toBe(true);
+    expect(isFuture.call(Time.now().advance({ seconds: 60 }))).toBe(true);
   });
 
   it("all_day, all_week, all_month, all_quarter and all_year span their period", () => {
-    const at = new Temporal.PlainDate(2005, 2, 22);
+    const at = new RubyDate(2005, 2, 22);
     for (const [range, from, to] of [
       [allWeek.call(at), "2005-02-21", "2005-02-27"],
       [allMonth.call(at), "2005-02-01", "2005-02-28"],
       [allQuarter.call(at), "2005-01-01", "2005-03-31"],
       [allYear.call(at), "2005-01-01", "2005-12-31"],
     ] as [{ begin: unknown; end: unknown; excludeEnd: boolean }, string, string][]) {
-      expect(String(range.begin)).toBe(from);
-      expect(String(range.end)).toBe(to);
+      expect((range.begin as RubyDate).toS()).toBe(from);
+      expect((range.end as RubyDate).toS()).toBe(to);
       expect(range.excludeEnd).toBe(false);
     }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Date as RubyDate, DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { TimeWithZone } from "../lib/time-with-zone.js";
 import {
   beginningOfDay,
   middleOfDay,
@@ -82,7 +83,35 @@ function withDateCurrent<T>(today: Temporal.PlainDate, fn: () => T): T {
 }
 
 function asDate(instant: unknown): Date {
+  if (instant instanceof RubyTime) return new Date(instant.toZonedDateTime().epochMilliseconds);
+  if (instant instanceof DateTime)
+    return new Date(instant.toTime().toZonedDateTime().epochMilliseconds);
+  if (instant instanceof RubyDate)
+    return new Date(Number(instant.year), instant.month - 1, instant.day);
+  if (instant instanceof TimeWithZone)
+    return new Date(instant.utc().toZonedDateTime().epochMilliseconds);
   return new Date((instant as Temporal.Instant).epochMilliseconds);
+}
+
+function inst(value: unknown): Temporal.Instant {
+  return Temporal.Instant.fromEpochMilliseconds(asDate(value).getTime());
+}
+
+function rb(
+  value: Date | Temporal.PlainDate | DateTime | RubyTime | RubyDate,
+): RubyTime | RubyDate {
+  if (value instanceof Date) {
+    return RubyTime.local(
+      value.getFullYear(),
+      value.getMonth() + 1,
+      value.getDate(),
+      value.getHours(),
+      value.getMinutes(),
+      value.getSeconds(),
+      value.getMilliseconds() * 1000,
+    );
+  }
+  return value instanceof Temporal.PlainDate ? new RubyDate(value) : value;
 }
 
 describe("TimeExtCalculationsTest", () => {
@@ -231,14 +260,14 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next_week", () => {
     const monday = d(2023, 1, 9);
-    const result = asDate(nextWeek.call(monday, ":monday"));
+    const result = asDate(nextWeek.call(rb(monday), ":monday"));
     expect(result.getDay()).toBe(1);
     expect(result > monday).toBe(true);
   });
 
   it("prev_week", () => {
     const monday = d(2023, 1, 16);
-    const result = asDate(prevWeek.call(monday, ":monday"));
+    const result = asDate(prevWeek.call(rb(monday), ":monday"));
     expect(result.getDay()).toBe(1);
     expect(result < monday).toBe(true);
   });
@@ -271,14 +300,14 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next_occurring", () => {
     const monday = d(2023, 1, 9);
-    const result = asDate(nextOccurring.call(monday, ":friday"));
+    const result = asDate(nextOccurring.call(rb(monday), ":friday"));
     expect(result.getDay()).toBe(5);
     expect(result > monday).toBe(true);
   });
 
   it("prev_occurring", () => {
     const monday = d(2023, 1, 16);
-    const result = asDate(prevOccurring.call(monday, ":friday"));
+    const result = asDate(prevOccurring.call(rb(monday), ":friday"));
     expect(result.getDay()).toBe(5);
     expect(result < monday).toBe(true);
   });
@@ -296,9 +325,9 @@ describe("TimeExtCalculationsTest", () => {
 
   it("is_today, is_tomorrow, is_yesterday", () => {
     const now = new Date();
-    expect(isToday.call(now)).toBe(true);
-    expect(isTomorrow.call(asDate(nextDay(now)))).toBe(true);
-    expect(isYesterday.call(asDate(prevDay(now)))).toBe(true);
+    expect(isToday.call(rb(now))).toBe(true);
+    expect(isTomorrow.call(rb(asDate(nextDay(now))))).toBe(true);
+    expect(isYesterday.call(rb(asDate(prevDay(now))))).toBe(true);
   });
 
   it("is_past", () => {
@@ -338,40 +367,40 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("all_day", () => {
-    const range = allDay.call(d(2023, 5, 15, 10, 30, 0));
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allDay.call(rb(d(2023, 5, 15, 10, 30, 0)));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(start).toEqual(i(2023, 5, 15, 0, 0, 0));
     expect(asDate(end).getHours()).toBe(23);
     expect(asDate(end).getMinutes()).toBe(59);
   });
 
   it("all_week", () => {
-    const { begin, end } = allWeek.call(d(2023, 1, 11));
-    expect(asDate(begin as Temporal.Instant).getDay()).toBe(1);
-    expect(asDate(end as Temporal.Instant).getDay()).toBe(0);
+    const { begin, end } = allWeek.call(rb(d(2023, 1, 11)));
+    expect(asDate(begin).getDay()).toBe(1);
+    expect(asDate(end).getDay()).toBe(0);
   });
 
   it("all_month", () => {
-    const range = allMonth.call(d(2023, 2, 15));
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allMonth.call(rb(d(2023, 2, 15)));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(start).toEqual(i(2023, 2, 1, 0, 0, 0));
     expect(asDate(end).getDate()).toBe(28);
   });
 
   it("all_quarter", () => {
-    const range = allQuarter.call(d(2023, 5, 15));
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allQuarter.call(rb(d(2023, 5, 15)));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(start).toEqual(i(2023, 4, 1, 0, 0, 0));
     expect(asDate(end).getMonth()).toBe(5);
   });
 
   it("all_year", () => {
-    const range = allYear.call(d(2023, 6, 15));
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allYear.call(rb(d(2023, 6, 15)));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(start).toEqual(i(2023, 1, 1, 0, 0, 0));
     expect(end).toEqual(i(2023, 12, 31, 23, 59, 59, 999));
   });
@@ -401,7 +430,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("last week", () => {
     const t = d(2005, 2, 4, 10, 10, 10);
-    const result = asDate(lastWeek.call(t, ":monday"));
+    const result = asDate(lastWeek.call(rb(t), ":monday"));
     expect(result.getDay()).toBe(1);
     expect(result < t).toBe(true);
   });
@@ -465,28 +494,28 @@ describe("TimeExtCalculationsTest", () => {
 
   it("today with time local", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isToday.call(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
-      expect(isToday.call(RubyTime.local(2000, 1, 1, 0))).toBe(true);
-      expect(isToday.call(RubyTime.local(2000, 1, 1, 23, 59, 59))).toBe(true);
-      expect(isToday.call(RubyTime.local(2000, 1, 2, 0))).toBe(false);
+      expect(isToday.call(rb(RubyTime.local(1999, 12, 31, 23, 59, 59)))).toBe(false);
+      expect(isToday.call(rb(RubyTime.local(2000, 1, 1, 0)))).toBe(true);
+      expect(isToday.call(rb(RubyTime.local(2000, 1, 1, 23, 59, 59)))).toBe(true);
+      expect(isToday.call(rb(RubyTime.local(2000, 1, 2, 0)))).toBe(false);
     });
   });
 
   it("yesterday with time local", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isYesterday.call(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(true);
-      expect(isYesterday.call(RubyTime.local(2000, 1, 1, 0))).toBe(false);
-      expect(isYesterday.call(RubyTime.local(1999, 12, 31))).toBe(true);
-      expect(isYesterday.call(RubyTime.local(2000, 1, 2, 0))).toBe(false);
+      expect(isYesterday.call(rb(RubyTime.local(1999, 12, 31, 23, 59, 59)))).toBe(true);
+      expect(isYesterday.call(rb(RubyTime.local(2000, 1, 1, 0)))).toBe(false);
+      expect(isYesterday.call(rb(RubyTime.local(1999, 12, 31)))).toBe(true);
+      expect(isYesterday.call(rb(RubyTime.local(2000, 1, 2, 0)))).toBe(false);
     });
   });
 
   it("tomorrow with time local", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isTomorrow.call(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
-      expect(isTomorrow.call(RubyTime.local(2000, 1, 2, 0))).toBe(true);
-      expect(isTomorrow.call(RubyTime.local(2000, 1, 2, 23, 59, 59))).toBe(true);
-      expect(isTomorrow.call(RubyTime.local(2000, 1, 1, 0))).toBe(false);
+      expect(isTomorrow.call(rb(RubyTime.local(1999, 12, 31, 23, 59, 59)))).toBe(false);
+      expect(isTomorrow.call(rb(RubyTime.local(2000, 1, 2, 0)))).toBe(true);
+      expect(isTomorrow.call(rb(RubyTime.local(2000, 1, 2, 23, 59, 59)))).toBe(true);
+      expect(isTomorrow.call(rb(RubyTime.local(2000, 1, 1, 0)))).toBe(false);
     });
   });
 
@@ -542,19 +571,19 @@ describe("TimeExtCalculationsTest", () => {
 
   it("today with time utc", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isToday.call(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
-      expect(isToday.call(RubyTime.utc(2000, 1, 1, 0))).toBe(true);
-      expect(isToday.call(RubyTime.utc(2000, 1, 1, 23, 59, 59))).toBe(true);
-      expect(isToday.call(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
+      expect(isToday.call(rb(RubyTime.utc(1999, 12, 31, 23, 59, 59)))).toBe(false);
+      expect(isToday.call(rb(RubyTime.utc(2000, 1, 1, 0)))).toBe(true);
+      expect(isToday.call(rb(RubyTime.utc(2000, 1, 1, 23, 59, 59)))).toBe(true);
+      expect(isToday.call(rb(RubyTime.utc(2000, 1, 2, 0)))).toBe(false);
     });
   });
 
   it("yesterday with time utc", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isYesterday.call(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(true);
-      expect(isYesterday.call(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
-      expect(isYesterday.call(RubyTime.utc(1999, 12, 31))).toBe(true);
-      expect(isYesterday.call(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
+      expect(isYesterday.call(rb(RubyTime.utc(1999, 12, 31, 23, 59, 59)))).toBe(true);
+      expect(isYesterday.call(rb(RubyTime.utc(2000, 1, 1, 0)))).toBe(false);
+      expect(isYesterday.call(rb(RubyTime.utc(1999, 12, 31)))).toBe(true);
+      expect(isYesterday.call(rb(RubyTime.utc(2000, 1, 2, 0)))).toBe(false);
     });
   });
 
@@ -566,10 +595,10 @@ describe("TimeExtCalculationsTest", () => {
 
   it("tomorrow with time utc", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isTomorrow.call(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
-      expect(isTomorrow.call(RubyTime.utc(2000, 1, 2, 0))).toBe(true);
-      expect(isTomorrow.call(RubyTime.utc(2000, 1, 2, 23, 59, 59))).toBe(true);
-      expect(isTomorrow.call(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
+      expect(isTomorrow.call(rb(RubyTime.utc(1999, 12, 31, 23, 59, 59)))).toBe(false);
+      expect(isTomorrow.call(rb(RubyTime.utc(2000, 1, 2, 0)))).toBe(true);
+      expect(isTomorrow.call(rb(RubyTime.utc(2000, 1, 2, 23, 59, 59)))).toBe(true);
+      expect(isTomorrow.call(rb(RubyTime.utc(2000, 1, 1, 0)))).toBe(false);
     });
   });
 
@@ -721,19 +750,19 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("beginning_of_week", () => {
-    const result = asDate(beginningOfWeek.call(d(2023, 1, 11)));
+    const result = asDate(beginningOfWeek.call(rb(d(2023, 1, 11))));
     expect(result.getDay()).toBe(1);
     expect(result.getDate()).toBe(9);
   });
 
   it("beginning_of_week with sunday start", () => {
-    const result = asDate(beginningOfWeek.call(d(2023, 1, 11), ":sunday"));
+    const result = asDate(beginningOfWeek.call(rb(d(2023, 1, 11)), ":sunday"));
     expect(result.getDay()).toBe(0);
     expect(result.getDate()).toBe(8);
   });
 
   it("end_of_week", () => {
-    const result = asDate(endOfWeek.call(d(2023, 1, 11)));
+    const result = asDate(endOfWeek.call(rb(d(2023, 1, 11))));
     expect(result.getDay()).toBe(0);
     expect(result.getDate()).toBe(15);
   });
@@ -779,15 +808,15 @@ describe("DateExtCalculationsTest", () => {
 
   it("next_week various days", () => {
     const mon = d(2023, 1, 9);
-    expect(asDate(nextWeek.call(mon, ":wednesday")).getDay()).toBe(3);
-    expect(asDate(nextWeek.call(mon, ":friday")).getDay()).toBe(5);
-    expect(asDate(nextWeek.call(mon, ":sunday")).getDay()).toBe(0);
+    expect(asDate(nextWeek.call(rb(mon), ":wednesday")).getDay()).toBe(3);
+    expect(asDate(nextWeek.call(rb(mon), ":friday")).getDay()).toBe(5);
+    expect(asDate(nextWeek.call(rb(mon), ":sunday")).getDay()).toBe(0);
   });
 
   it("prev_week various days", () => {
     const mon = d(2023, 1, 16);
-    expect(asDate(prevWeek.call(mon, ":wednesday")).getDay()).toBe(3);
-    expect(asDate(prevWeek.call(mon, ":friday")).getDay()).toBe(5);
+    expect(asDate(prevWeek.call(rb(mon), ":wednesday")).getDay()).toBe(3);
+    expect(asDate(prevWeek.call(rb(mon), ":friday")).getDay()).toBe(5);
   });
 
   it("to fs", () => {
@@ -827,7 +856,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("last week", () => {
     const date = d(2005, 2, 21);
-    const result = asDate(lastWeek.call(date, ":monday"));
+    const result = asDate(lastWeek.call(rb(date), ":monday"));
     expect(result.getDay()).toBe(1);
     expect(result < date).toBe(true);
   });
@@ -843,13 +872,13 @@ describe("DateExtCalculationsTest", () => {
   it("yesterday constructor", () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    expect(isYesterday.call(yesterday)).toBe(true);
+    expect(isYesterday.call(rb(yesterday))).toBe(true);
   });
 
   it("tomorrow constructor", () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    expect(isTomorrow.call(tomorrow)).toBe(true);
+    expect(isTomorrow.call(rb(tomorrow))).toBe(true);
   });
 
   it("last quarter on 31st", () => {
@@ -926,9 +955,9 @@ describe("DateExtCalculationsTest", () => {
 
   it("all day", () => {
     const date = d(2005, 2, 21);
-    const range = allDay.call(date);
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allDay.call(rb(date));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(asDate(start).getHours()).toBe(0);
     expect(asDate(end).getHours()).toBe(23);
     expect(asDate(end).getDate()).toBe(21);
@@ -937,48 +966,48 @@ describe("DateExtCalculationsTest", () => {
   it("yesterday constructor when zone is not set", () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    expect(isYesterday.call(yesterday)).toBe(true);
+    expect(isYesterday.call(rb(yesterday))).toBe(true);
   });
 
   it("yesterday constructor when zone is set", () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    expect(isYesterday.call(yesterday)).toBe(true);
+    expect(isYesterday.call(rb(yesterday))).toBe(true);
   });
 
   it("tomorrow constructor when zone is not set", () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    expect(isTomorrow.call(tomorrow)).toBe(true);
+    expect(isTomorrow.call(rb(tomorrow))).toBe(true);
   });
 
   it("tomorrow constructor when zone is set", () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    expect(isTomorrow.call(tomorrow)).toBe(true);
+    expect(isTomorrow.call(rb(tomorrow))).toBe(true);
   });
 
   it("all day when zone is set", () => {
     const date = d(2005, 2, 21);
-    const range = allDay.call(date);
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allDay.call(rb(date));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(asDate(start).getDate()).toBe(21);
     expect(asDate(end).getDate()).toBe(21);
   });
 
   it("all week", () => {
     const date = d(2005, 2, 21);
-    const { begin, end } = allWeek.call(date);
-    expect(asDate(begin as Temporal.Instant).getDay()).toBe(1);
-    expect(asDate(end as Temporal.Instant).getDay()).toBe(0);
+    const { begin, end } = allWeek.call(rb(date));
+    expect(asDate(begin).getDay()).toBe(1);
+    expect(asDate(end).getDay()).toBe(0);
   });
 
   it("all month", () => {
     const date = d(2005, 2, 15);
-    const range = allMonth.call(date);
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allMonth.call(rb(date));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(asDate(start).getDate()).toBe(1);
     expect(asDate(start).getMonth()).toBe(1);
     expect(asDate(end).getDate()).toBe(28);
@@ -986,18 +1015,18 @@ describe("DateExtCalculationsTest", () => {
 
   it("all quarter", () => {
     const date = d(2005, 2, 15);
-    const range = allQuarter.call(date);
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allQuarter.call(rb(date));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(asDate(start).getMonth()).toBe(0);
     expect(asDate(end).getMonth()).toBe(2);
   });
 
   it("all year", () => {
     const date = d(2005, 6, 15);
-    const range = allYear.call(date);
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allYear.call(rb(date));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(asDate(start).getMonth()).toBe(0);
     expect(asDate(end).getMonth()).toBe(11);
   });
@@ -1025,7 +1054,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("current returns date today when zone not set", () => {
-    expect(isToday.call(new Date())).toBe(true);
+    expect(isToday.call(rb(new Date()))).toBe(true);
   });
 
   it("date advance should not change passed options hash", () => {
@@ -1093,14 +1122,14 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("next_occurring from datetime", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    const result = asDate(nextOccurring.call(dt, ":friday"));
+    const result = asDate(nextOccurring.call(rb(dt), ":friday"));
     expect(result.getDay()).toBe(5);
     expect(result > dt).toBe(true);
   });
 
   it("prev_occurring from datetime", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    const result = asDate(prevOccurring.call(dt, ":monday"));
+    const result = asDate(prevOccurring.call(rb(dt), ":monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
@@ -1117,16 +1146,16 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("beginning_of_week from datetime", () => {
     const dt = d(2005, 2, 4, 10, 10, 10);
-    const result = asDate(beginningOfWeek.call(dt));
+    const result = asDate(beginningOfWeek.call(rb(dt)));
     expect(result.getDay()).toBe(1);
     expect(result.getHours()).toBe(0);
   });
 
   it("all_day from datetime", () => {
     const dt = d(2005, 2, 4, 10, 30, 0);
-    const range = allDay.call(dt);
-    const start = range.begin as Temporal.Instant;
-    const end = range.end as Temporal.Instant;
+    const range = allDay.call(rb(dt));
+    const start = inst(range.begin);
+    const end = inst(range.end);
     expect(asDate(start).getHours()).toBe(0);
     expect(asDate(end).getHours()).toBe(23);
     expect(asDate(end).getDate()).toBe(4);
@@ -1242,14 +1271,14 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("last week", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    const result = asDate(lastWeek.call(dt, ":monday"));
+    const result = asDate(lastWeek.call(rb(dt), ":monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
 
   it("date time should have correct last week for leap year", () => {
     const dt = d(2016, 3, 7);
-    const result = asDate(lastWeek.call(dt, ":monday"));
+    const result = asDate(lastWeek.call(rb(dt), ":monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
@@ -1269,24 +1298,24 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("today with offset", () => {
     const t = new Date();
-    expect(isToday.call(t)).toBe(true);
+    expect(isToday.call(rb(t))).toBe(true);
   });
 
   it("today without offset", () => {
     const t = new Date();
-    expect(isToday.call(t)).toBe(true);
+    expect(isToday.call(rb(t))).toBe(true);
   });
 
   it("yesterday with offset", () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    expect(isYesterday.call(yesterday)).toBe(true);
+    expect(isYesterday.call(rb(yesterday))).toBe(true);
   });
 
   it("yesterday without offset", () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    expect(isYesterday.call(yesterday)).toBe(true);
+    expect(isYesterday.call(rb(yesterday))).toBe(true);
   });
 
   it("prev day without offset", () => {
@@ -1298,13 +1327,13 @@ describe("DateTimeExtCalculationsTest", () => {
   it("tomorrow with offset", () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    expect(isTomorrow.call(tomorrow)).toBe(true);
+    expect(isTomorrow.call(rb(tomorrow))).toBe(true);
   });
 
   it("tomorrow without offset", () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    expect(isTomorrow.call(tomorrow)).toBe(true);
+    expect(isTomorrow.call(rb(tomorrow))).toBe(true);
   });
 
   it("next day without offset", () => {
@@ -1409,11 +1438,11 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("current returns date today when zone is not set", () => {
-    expect(isToday.call(new Date())).toBe(true);
+    expect(isToday.call(rb(new Date()))).toBe(true);
   });
 
   it("current without time zone", () => {
-    expect(isToday.call(new Date())).toBe(true);
+    expect(isToday.call(rb(new Date()))).toBe(true);
   });
 
   it("blank?", () => {

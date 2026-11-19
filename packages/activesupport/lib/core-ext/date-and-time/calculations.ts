@@ -4,26 +4,18 @@ import {
   DateTime as RubyDateTime,
   Time as RubyTime,
 } from "@blazetrails/date";
-import * as date from "../date/calculations.js";
-import * as dateTime from "../date-time/calculations.js";
-import * as time from "../../time-ext.js";
-import { TimeWithZone } from "../../time-with-zone.js";
-import { instantFrom } from "../../temporal.js";
+import type { TimeWithZone } from "../../time-with-zone.js";
+import { ActiveSupport } from "../../namespaces.js";
+import { Tryable } from "../object/try.js";
 import { cmp, fetch, include, Range, TopLevel, type Included } from "@blazetrails/ruby-compat";
 import { actsLike } from "../object/acts-like.js";
 import * as DateAndTimeCalculations from "./calculations.js";
 
-export type DateOrTime = Temporal.PlainDate | RubyDate | Date;
+type Receiver = RubyDate | RubyTime;
 
-export type Comparable = DateOrTime | DateTime | TimeWithZone | Temporal.Instant;
+type Result = Receiver;
 
-type DateTime = RubyDateTime;
-
-export type DateOrInstant = Temporal.PlainDate | RubyDate | Temporal.Instant;
-
-type Receiver = DateOrTime | DateTime | Temporal.Instant | RubyTime;
-
-type Result = DateOrInstant | DateTime | RubyTime;
+export type Comparable = Receiver | TimeWithZone | Temporal.PlainDate | Temporal.Instant;
 
 export const DAYS_INTO_WEEK: Record<string, number> = {
   ":sunday": 0,
@@ -41,56 +33,33 @@ function advance(
   this: Receiver,
   options: { years?: number; months?: number; weeks?: number; days?: number },
 ): Result {
-  // boundary: once Time includes this module (time/calculations.rb:12) `advance` is Time's own (core_ext/time/calculations.rb:194), so a RubyTime receiver answers it itself and returns a RubyTime, the way Ruby's method resolution does.
-  if (this instanceof RubyTime) {
-    return (this as unknown as { advance(options: unknown): RubyTime }).advance(options);
-  }
-  if (this instanceof RubyDateTime) return dateTime.advance(this, options);
-  const self = receiver(this);
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return self instanceof Date ? time.advance(self, options) : date.advance(self, options);
+  return this.advance(options);
 }
 
 function toDate(this: Receiver): Temporal.PlainDate {
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  if (this instanceof Date) return time.toDate(this);
-  return this instanceof RubyDate || this instanceof RubyTime
-    ? this.toDate()
-    : (this as Temporal.PlainDate);
+  return this.toDate();
 }
 
 function wday(this: Receiver): number {
-  if (this instanceof RubyTime) return this.wday;
-  const self = receiver(this);
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  if (self instanceof Date) return self.getDay();
-  return self instanceof RubyDate ? self.wday : self.dayOfWeek % 7;
+  return this.wday;
 }
 
-function classCurrent(this: Receiver): Comparable | RubyTime {
-  if (this instanceof RubyTime) return RubyTime.current();
-  if (this instanceof RubyDateTime) {
-    return dateTime.current();
-  }
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return this instanceof Date ? time.current() : date.current();
+function classCurrent(this: Receiver): Comparable {
+  return (this.constructor as typeof RubyDate | typeof RubyTime).current();
 }
 
-function compare(this: Receiver, other: Comparable | RubyTime): number {
+function compare(this: Receiver, other: Comparable): number {
   return cmp(toInstant(this).epochNanoseconds, toInstant(other).epochNanoseconds)!;
 }
 
-function toInstant(dateOrTime: Comparable | RubyTime): Temporal.Instant {
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  if (dateOrTime instanceof Date) return instantFrom(dateOrTime);
-  if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc().toZonedDateTime().toInstant();
+function toInstant(dateOrTime: Comparable): Temporal.Instant {
+  if (dateOrTime instanceof ActiveSupport.TimeWithZone!)
+    return dateOrTime.utc().toZonedDateTime().toInstant();
   if (dateOrTime instanceof RubyTime) return dateOrTime.toZonedDateTime().toInstant();
   if (dateOrTime instanceof Temporal.Instant) return dateOrTime;
   if (dateOrTime instanceof RubyDateTime) return dateOrTime.toTime().toZonedDateTime().toInstant();
-  if (dateOrTime instanceof Temporal.PlainDateTime)
-    return dateOrTime.toZonedDateTime("UTC").toInstant();
-  if (dateOrTime instanceof Temporal.ZonedDateTime) return dateOrTime.toInstant();
-  return toDate.call(dateOrTime).toZonedDateTime("UTC").toInstant();
+  if (dateOrTime instanceof RubyDate) return dateOrTime.toDate().toZonedDateTime("UTC").toInstant();
+  return dateOrTime.toZonedDateTime("UTC").toInstant();
 }
 
 function change(
@@ -105,64 +74,19 @@ function change(
     nsec?: number;
   },
 ): Result {
-  if (this instanceof RubyTime) return this.change(options);
-  if (this instanceof RubyDateTime) return dateTime.change(this, options);
-  const self = receiver(this);
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return self instanceof Date ? time.change(self, options) : date.change(self, options);
-}
-
-function receiver(dateOrTime: Receiver): DateOrTime {
-  if (dateOrTime instanceof RubyTime) return receiver(dateOrTime.toZonedDateTime().toInstant());
-  // boundary: the `Time` arm's receiver is a JS `Date`, which is what this rebuilds.
-  return dateOrTime instanceof Temporal.Instant
-    ? new Date(dateOrTime.epochMilliseconds)
-    : (dateOrTime as DateOrTime);
+  return this.change(options);
 }
 
 function year(this: Receiver): number {
-  if (this instanceof RubyTime) return this.year;
-  const self = receiver(this);
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return self instanceof Date ? self.getFullYear() : Number(self.year);
+  return Number(this.year);
 }
 
 function month(this: Receiver): number {
-  if (this instanceof RubyTime) return this.month;
-  const self = receiver(this);
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return self instanceof Date ? self.getMonth() + 1 : self.month;
+  return this.month;
 }
 
 function day(this: Receiver): number {
-  if (this instanceof RubyTime) return this.day;
-  const self = receiver(this);
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return self instanceof Date ? self.getDate() : self.day;
-}
-
-function hour(this: Receiver): number {
-  if (this instanceof RubyTime) return this.hour;
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return this instanceof Date ? this.getHours() : 0;
-}
-
-function min(this: Receiver): number {
-  if (this instanceof RubyTime) return this.min;
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return this instanceof Date ? this.getMinutes() : 0;
-}
-
-function sec(this: Receiver): number {
-  if (this instanceof RubyTime) return this.sec;
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return this instanceof Date ? this.getSeconds() : 0;
-}
-
-function nsec(this: Receiver): number | undefined {
-  if (this instanceof RubyTime) return this.nsec;
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return this instanceof Date ? this.getMilliseconds() * 1_000_000 : undefined;
+  return this.day;
 }
 
 function nextDay(this: Receiver): Result {
@@ -173,14 +97,12 @@ function prevDay(this: Receiver): Result {
   return advance.call(this, { days: -1 });
 }
 
-function beginningOfDay(this: Receiver): TimeWithZone | Temporal.Instant | RubyTime {
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return this instanceof Date ? time.beginningOfDay(this) : date.beginningOfDay(toDate.call(this));
+function beginningOfDay(this: Receiver): RubyTime | RubyDate | TimeWithZone {
+  return this.beginningOfDay();
 }
 
-function endOfDay(this: Receiver): TimeWithZone | Temporal.Instant | RubyTime {
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return this instanceof Date ? time.endOfDay(this) : date.endOfDay(toDate.call(this));
+function endOfDay(this: Receiver): RubyTime | RubyDate | TimeWithZone {
+  return this.endOfDay();
 }
 
 export function yesterday(this: Receiver): Result {
@@ -192,17 +114,17 @@ export function tomorrow(this: Receiver): Result {
 }
 
 export function isToday(this: Receiver): boolean {
-  return toDate.call(this).equals(date.current());
+  return toDate.call(this).equals(RubyDate.current().toDate());
 }
 
 export function isTomorrow(this: Receiver): boolean {
-  return toDate.call(this).equals(tomorrow.call(date.current()) as Temporal.PlainDate);
+  return toDate.call(this).equals(RubyDate.current().tomorrow().toDate());
 }
 
 export const isNextDay = isTomorrow;
 
 export function isYesterday(this: Receiver): boolean {
-  return toDate.call(this).equals(yesterday.call(date.current()) as Temporal.PlainDate);
+  return toDate.call(this).equals(RubyDate.current().yesterday().toDate());
 }
 
 export const isPrevDay = isYesterday;
@@ -295,7 +217,7 @@ export const atBeginningOfYear = beginningOfYear;
 
 export function nextWeek(
   this: Receiver,
-  givenDayInNextWeek: string = date.beginningOfWeek(),
+  givenDayInNextWeek: string = RubyDate.beginningOfWeek(),
   { sameTime = false }: { sameTime?: boolean } = {},
 ): Result {
   const result = firstHour.call(
@@ -322,7 +244,7 @@ export function nextQuarter(this: Receiver): Result {
 
 export function prevWeek(
   this: Receiver,
-  startDay: string = date.beginningOfWeek(),
+  startDay: string = RubyDate.beginningOfWeek(),
   { sameTime = false }: { sameTime?: boolean } = {},
 ): Result {
   const result = firstHour.call(
@@ -358,19 +280,20 @@ export function lastYear(this: Receiver): Result {
   return yearsAgo.call(this, 1);
 }
 
-export function daysToWeekStart(this: Receiver, startDay: string = date.beginningOfWeek()): number {
+export function daysToWeekStart(
+  this: Receiver,
+  startDay: string = RubyDate.beginningOfWeek(),
+): number {
   const startDayNumber = fetch<number>(DAYS_INTO_WEEK, startDay);
   return (((wday.call(this) - startDayNumber) % 7) + 7) % 7;
 }
 
-export function beginningOfWeek(this: Receiver, startDay: string = date.beginningOfWeek()): Result {
+export function beginningOfWeek(
+  this: Receiver,
+  startDay: string = RubyDate.beginningOfWeek(),
+): Result {
   const result = daysAgo.call(this, daysToWeekStart.call(this, startDay));
-  if (result instanceof RubyDateTime) return dateTime.beginningOfDay(result);
-  return actsLike.call(this, "time")
-    ? result instanceof RubyTime
-      ? result.midnight()
-      : time.midnight(receiver(result) as Date)
-    : result;
+  return actsLike.call(this, "time") ? (result.midnight() as Result) : result;
 }
 
 export const atBeginningOfWeek = beginningOfWeek;
@@ -379,7 +302,7 @@ export function monday(this: Receiver): Result {
   return beginningOfWeek.call(this, ":monday");
 }
 
-export function endOfWeek(this: Receiver, startDay: string = date.beginningOfWeek()): Result {
+export function endOfWeek(this: Receiver, startDay: string = RubyDate.beginningOfWeek()): Result {
   return lastHour.call(this, daysSince.call(this, 6 - daysToWeekStart.call(this, startDay)));
 }
 
@@ -390,7 +313,7 @@ export function sunday(this: Receiver): Result {
 }
 
 export function endOfMonth(this: Receiver): Result {
-  const lastDay = time.daysInMonth(month.call(this), year.call(this));
+  const lastDay = RubyTime.daysInMonth(month.call(this), year.call(this));
   return lastHour.call(this, daysSince.call(this, lastDay - day.call(this)));
 }
 
@@ -402,11 +325,14 @@ export function endOfYear(this: Receiver): Result {
 
 export const atEndOfYear = endOfYear;
 
-export function allDay(this: Receiver): Range<TimeWithZone | Temporal.Instant | RubyTime> {
+export function allDay(this: Receiver): Range<RubyTime | RubyDate | TimeWithZone> {
   return new Range(beginningOfDay.call(this), endOfDay.call(this));
 }
 
-export function allWeek(this: Receiver, startDay: string = date.beginningOfWeek()): Range<Result> {
+export function allWeek(
+  this: Receiver,
+  startDay: string = RubyDate.beginningOfWeek(),
+): Range<Result> {
   return new Range(beginningOfWeek.call(this, startDay), endOfWeek.call(this, startDay));
 }
 
@@ -436,28 +362,19 @@ export function prevOccurring(this: Receiver, dayOfWeek: string): Result {
 
 /** @internal */
 function firstHour(this: Receiver, dateOrTime: Result): Result {
-  if (dateOrTime instanceof RubyDateTime) return dateTime.beginningOfDay(dateOrTime);
-  return actsLike.call(dateOrTime, "time")
-    ? dateOrTime instanceof RubyTime
-      ? dateOrTime.beginningOfDay()
-      : time.beginningOfDay(receiver(dateOrTime) as Date)
-    : dateOrTime;
+  return actsLike.call(dateOrTime, "time") ? (dateOrTime.beginningOfDay() as Result) : dateOrTime;
 }
 
 /** @internal */
 function lastHour(this: Receiver, dateOrTime: Result): Result {
-  if (dateOrTime instanceof RubyDateTime) return dateTime.endOfDay(dateOrTime);
-  return actsLike.call(dateOrTime, "time")
-    ? dateOrTime instanceof RubyTime
-      ? dateOrTime.endOfDay()
-      : time.endOfDay(receiver(dateOrTime) as Date)
-    : dateOrTime;
+  return actsLike.call(dateOrTime, "time") ? (dateOrTime.endOfDay() as Result) : dateOrTime;
 }
 
 /** @internal */
 function daysSpan(this: Receiver, day: string): number {
   return (
-    (((fetch<number>(DAYS_INTO_WEEK, day) - fetch<number>(DAYS_INTO_WEEK, date.beginningOfWeek())) %
+    (((fetch<number>(DAYS_INTO_WEEK, day) -
+      fetch<number>(DAYS_INTO_WEEK, RubyDate.beginningOfWeek())) %
       7) +
       7) %
     7
@@ -467,10 +384,10 @@ function daysSpan(this: Receiver, day: string): number {
 /** @internal */
 function copyTimeTo(this: Receiver, other: Result): Result {
   return change.call(other, {
-    hour: hour.call(this),
-    min: min.call(this),
-    sec: sec.call(this),
-    nsec: nsec.call(this),
+    hour: (this as RubyTime).hour,
+    min: (this as RubyTime).min,
+    sec: (this as RubyTime).sec,
+    nsec: Tryable.try(this, "nsec") as number | undefined,
   });
 }
 

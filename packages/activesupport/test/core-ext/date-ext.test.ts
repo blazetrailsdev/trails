@@ -46,6 +46,7 @@ import { ArgumentError, setZone, zone } from "../../lib/time-zone-config.js";
 import { Time as RubyTime } from "@blazetrails/date";
 import { travelTo } from "../../lib/testing/time-helpers.js";
 import { TimeZone } from "../../lib/values/time-zone.js";
+import { TimeWithZone } from "../../lib/time-with-zone.js";
 import { withEnvTz } from "../../lib/time-zone-test-helpers.js";
 
 function withTzDefault<T>(tz: TimeZone | null, fn: () => T): T {
@@ -73,6 +74,11 @@ function rd(year: number, month: number, day: number): RubyDate {
 }
 
 function asDate(instant: unknown): Date {
+  if (instant instanceof RubyTime) return new Date(instant.toZonedDateTime().epochMilliseconds);
+  if (instant instanceof RubyDate)
+    return new Date(Number(instant.year), instant.month - 1, instant.day);
+  if (instant instanceof TimeWithZone)
+    return new Date(instant.utc().toZonedDateTime().epochMilliseconds);
   return new Date((instant as Temporal.Instant).epochMilliseconds);
 }
 
@@ -172,7 +178,9 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("compare to time", () => {
-    expect(Temporal.PlainDate.compare(DateExt.yesterday(), toDate(new Date())) < 0).toBeTruthy();
+    expect(
+      Temporal.PlainDate.compare(DateExt.yesterday().toDate(), toDate(new Date())) < 0,
+    ).toBeTruthy();
   });
 
   it("to datetime", () => {
@@ -196,8 +204,8 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("sunday", () => {
-    expect(toDate(asDate(endOfWeek.call(d(2008, 3, 2))))).toEqual(pd(2008, 3, 2));
-    expect(toDate(asDate(endOfWeek.call(d(2008, 2, 29))))).toEqual(pd(2008, 3, 2));
+    expect(toDate(asDate(endOfWeek.call(rd(2008, 3, 2))))).toEqual(pd(2008, 3, 2));
+    expect(toDate(asDate(endOfWeek.call(rd(2008, 2, 29))))).toEqual(pd(2008, 3, 2));
   });
 
   it("beginning of week in calendar reform", () => {
@@ -239,11 +247,11 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("last week", () => {
-    expect(toDate(asDate(lastWeek.call(d(2005, 5, 17))))).toEqual(pd(2005, 5, 9));
-    expect(toDate(asDate(lastWeek.call(d(2007, 1, 7))))).toEqual(pd(2006, 12, 25));
-    expect(toDate(asDate(lastWeek.call(d(2010, 2, 19), ":friday")))).toEqual(pd(2010, 2, 12));
-    expect(toDate(asDate(lastWeek.call(d(2010, 2, 19), ":saturday")))).toEqual(pd(2010, 2, 13));
-    expect(toDate(asDate(lastWeek.call(d(2010, 3, 4), ":saturday")))).toEqual(pd(2010, 2, 27));
+    expect(toDate(asDate(lastWeek.call(rd(2005, 5, 17))))).toEqual(pd(2005, 5, 9));
+    expect(toDate(asDate(lastWeek.call(rd(2007, 1, 7))))).toEqual(pd(2006, 12, 25));
+    expect(toDate(asDate(lastWeek.call(rd(2010, 2, 19), ":friday")))).toEqual(pd(2010, 2, 12));
+    expect(toDate(asDate(lastWeek.call(rd(2010, 2, 19), ":saturday")))).toEqual(pd(2010, 2, 13));
+    expect(toDate(asDate(lastWeek.call(rd(2010, 3, 4), ":saturday")))).toEqual(pd(2010, 2, 27));
   });
 
   it("last quarter on 31st", () => {
@@ -254,7 +262,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("yesterday constructor", () => {
-    expect(DateExt.yesterday()).toEqual(DateExt.current().subtract({ days: 1 }));
+    expect(DateExt.yesterday().toS()).toBe(DateExt.current().advance({ days: -1 }).toS());
   });
 
   it("yesterday constructor when zone is not set", () => {
@@ -267,7 +275,7 @@ describe("DateExtCalculationsTest", () => {
     withEnvTz("UTC", () => {
       withTzDefault(TimeZone.find("Eastern Time (US & Canada)"), () => {
         travelTo(RubyTime.local(2000, 1, 1), {}, () => {
-          expect(DateExt.yesterday().toString()).toEqual(pd(1999, 12, 30).toString());
+          expect(DateExt.yesterday().toS()).toBe(rd(1999, 12, 30).toS());
         });
       });
     });
@@ -289,7 +297,7 @@ describe("DateExtCalculationsTest", () => {
     withEnvTz("UTC", () => {
       withTzDefault(TimeZone.find("Europe/Paris"), () => {
         travelTo(RubyTime.local(1999, 12, 31, 23), {}, () => {
-          expect(DateExt.tomorrow().toString()).toEqual(pd(2000, 1, 2).toString());
+          expect(DateExt.tomorrow().toS()).toBe(rd(2000, 1, 2).toS());
         });
       });
     });
@@ -366,8 +374,11 @@ describe("DateExtCalculationsTest", () => {
   it("all day", () => {
     const beginningOfDay = d(2011, 6, 7, 0, 0, 0);
     const endOfDay = d(2011, 6, 7, 23, 59, 59, 999);
-    const { begin, end } = allDay.call(d(2011, 6, 7));
-    expect([begin, end]).toEqual([instant(beginningOfDay), instant(endOfDay)]);
+    const { begin, end } = allDay.call(rd(2011, 6, 7));
+    expect([instant(asDate(begin)), instant(asDate(end))]).toEqual([
+      instant(beginningOfDay),
+      instant(endOfDay),
+    ]);
   });
 
   it("all day when zone is set", () => {
@@ -376,7 +387,7 @@ describe("DateExtCalculationsTest", () => {
       withTzDefault(zone, () => {
         const beginningOfDay = zone.local(2011, 6, 7, 0, 0, 0);
         const endOfDay = zone.local(2011, 6, 7, 23, 59, 59, 999.999999);
-        const allDayRange = dateAllDay.call(pd(2011, 6, 7));
+        const allDayRange = dateAllDay.call(rd(2011, 6, 7));
         expect([String(allDayRange.begin), String(allDayRange.end)]).toEqual([
           String(beginningOfDay),
           String(endOfDay),
@@ -386,23 +397,23 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("all week", () => {
-    expect(rubyRange(allWeek.call(d(2011, 6, 7)))).toEqual([pd(2011, 6, 6), pd(2011, 6, 12)]);
-    expect(rubyRange(allWeek.call(d(2011, 6, 7), ":sunday"))).toEqual([
+    expect(rubyRange(allWeek.call(rd(2011, 6, 7)))).toEqual([pd(2011, 6, 6), pd(2011, 6, 12)]);
+    expect(rubyRange(allWeek.call(rd(2011, 6, 7), ":sunday"))).toEqual([
       pd(2011, 6, 5),
       pd(2011, 6, 11),
     ]);
   });
 
   it("all month", () => {
-    expect(rubyRange(allMonth.call(d(2011, 6, 7)))).toEqual([pd(2011, 6, 1), pd(2011, 6, 30)]);
+    expect(rubyRange(allMonth.call(rd(2011, 6, 7)))).toEqual([pd(2011, 6, 1), pd(2011, 6, 30)]);
   });
 
   it("all quarter", () => {
-    expect(rubyRange(allQuarter.call(d(2011, 6, 7)))).toEqual([pd(2011, 4, 1), pd(2011, 6, 30)]);
+    expect(rubyRange(allQuarter.call(rd(2011, 6, 7)))).toEqual([pd(2011, 4, 1), pd(2011, 6, 30)]);
   });
 
   it("all year", () => {
-    expect(rubyRange(allYear.call(d(2011, 6, 7)))).toEqual([pd(2011, 1, 1), pd(2011, 12, 31)]);
+    expect(rubyRange(allYear.call(rd(2011, 6, 7)))).toEqual([pd(2011, 1, 1), pd(2011, 12, 31)]);
   });
 
   it("xmlschema", () => {
@@ -429,15 +440,15 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("past", () => {
-    expect(isPast.call(DateExt.current().subtract({ days: 1 }))).toBe(true);
+    expect(isPast.call(DateExt.current().advance({ days: -1 }))).toBe(true);
     expect(isPast.call(DateExt.current())).toBe(false);
-    expect(isPast.call(DateExt.current().add({ days: 1 }))).toBe(false);
+    expect(isPast.call(DateExt.current().advance({ days: 1 }))).toBe(false);
   });
 
   it("future", () => {
-    expect(isFuture.call(DateExt.current().subtract({ days: 1 }))).toBe(false);
+    expect(isFuture.call(DateExt.current().advance({ days: -1 }))).toBe(false);
     expect(isFuture.call(DateExt.current())).toBe(false);
-    expect(isFuture.call(DateExt.current().add({ days: 1 }))).toBe(true);
+    expect(isFuture.call(DateExt.current().advance({ days: 1 }))).toBe(true);
   });
 
   it("current returns date today when zone not set", () => {
@@ -445,7 +456,7 @@ describe("DateExtCalculationsTest", () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(RubyTime.local(1999, 12, 31, 23).toZonedDateTime().epochMilliseconds);
       try {
-        expect(DateExt.current().toString()).toEqual(RubyDate.today().toString());
+        expect(DateExt.current().toDate().toString()).toEqual(RubyDate.today().toString());
       } finally {
         vi.useRealTimers();
       }
@@ -456,7 +467,9 @@ describe("DateExtCalculationsTest", () => {
     setZone(TimeZone.find("Eastern Time (US & Canada)"));
     try {
       withEnvTz("US/Central", () => {
-        expect(DateExt.current().toString()).toEqual((zone() as TimeZone).today().toString());
+        expect(DateExt.current().toDate().toString()).toEqual(
+          (zone() as TimeZone).today().toString(),
+        );
       });
     } finally {
       setZone(null);
