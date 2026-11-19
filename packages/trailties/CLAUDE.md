@@ -243,6 +243,15 @@ top-level `await` is barred from a package's root import graph
 the `typescript` import, the shape of § "An adapter file is loaded by an awaited
 step" in the root `CLAUDE.md`.
 
+## `TestParser` reads TypeScript, so its Ripper fallback is not ported
+
+`test_unit/test_parser.rb` has two arms: the Prism arm (`:10-44`) and, for a
+Ruby without Prism, `class TestParser < Ripper` (`:52-133`), which parses Ruby
+through Ripper's event callbacks. A trails test file is TypeScript, read
+through the compiler API in the Prism arm's `ranges`, so no Ripper event
+exists to handle. The fallback's nineteen members are a scoped skip in
+`scripts/parity/conventions.ts`, permanent and receipted against this section.
+
 ## `runner` evaluates its code argument (`RunnerCommand#perform`'s `eval`)
 
 `RunnerCommand#perform` evals a code string or stdin at `TOPLEVEL_BINDING`
@@ -299,3 +308,46 @@ mechanism"; its cross-table rules and
     first reload.
   - Only the reloader's own `route_sets` record. A `draw` on any other route
     set runs during the prefetch.
+
+## A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)
+
+A trails app ships through npm and pnpm, so Rails' Gemfile, Bundler and
+gemspec surface (`vendor/rails/v8.0.2/railties/lib/rails/generators/app_base.rb`'s
+`GemfileEntry`, `gemfile_entries`, the `*_gemfile_entry` builders,
+`exec_bundle_command`, `add_bundler_platforms`; `plugin_generator.rb`'s gemspec;
+`benchmark_generator.rb`'s `add_ips_to_gemfile`) is ported onto this mapping.
+Ruled by the operator on 2026-11-19.
+
+| Ruby                                                                                                                                                                                                                                                                                                                                                                                                                                     | Node                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Gemfile / `GemfileEntry` / `gemfile_entries`                                                                                                                                                                                                                                                                                                                                                                                             | `package.json` dependencies; one entry is one `name: specifier`                                                                    |
+| `bundle install` / `exec_bundle_command` / `after_bundle`                                                                                                                                                                                                                                                                                                                                                                                | `pnpm install`, callbacks in the same order                                                                                        |
+| gemspec                                                                                                                                                                                                                                                                                                                                                                                                                                  | the plugin's `package.json`                                                                                                        |
+| `.ruby-version` / `ruby_version`                                                                                                                                                                                                                                                                                                                                                                                                         | `.node-version`                                                                                                                    |
+| devcontainer Ruby base image, `ruby_version` build arg, Ruby features                                                                                                                                                                                                                                                                                                                                                                    | `mcr.microsoft.com/devcontainers/javascript-node` image, `NODE_VERSION` from `.node-version`, Node features                        |
+| solid_queue / solid_cache / solid_cable gems                                                                                                                                                                                                                                                                                                                                                                                             | `@blazetrails/solid-queue` / `solid-cache` / `solid-cable`                                                                         |
+| rubocop (`--skip-rubocop`, binstub, `lint` CI job)                                                                                                                                                                                                                                                                                                                                                                                       | eslint                                                                                                                             |
+| `bin/importmap audit` (`scan_js` CI job)                                                                                                                                                                                                                                                                                                                                                                                                 | `pnpm audit`                                                                                                                       |
+| `bundle exec X`                                                                                                                                                                                                                                                                                                                                                                                                                          | `pnpm exec X`                                                                                                                      |
+| `tailwind_gemfile_entry` / tailwindcss-rails (`--css tailwind`)                                                                                                                                                                                                                                                                                                                                                                          | `@tailwindcss/vite` in `vite.config.ts` plus `@import "tailwindcss"`; `app-base.ts`'s `tailwindcss:install` call converges onto it |
+| `bundle lock --add-platform`, bundler binstub, bootsnap, thruster (`--skip-thruster`, `bin/thrust`; trailties' unused `skipThruster` option is deleted), brakeman (`--skip-brakeman`, binstub, `scan_ruby` CI job), benchmark-ips (`add_ips_to_gemfile`), `Bundler.with_original_env`, jbuilder (`--skip-jbuilder`), dartsass-rails, cssbundling-rails, jsbundling-rails, rdoc (`doc:app`), Gemfile-only gems with no trails npm package | permanent: not ported                                                                                                              |
+
+- **Names stay Rails'.** A port of `GemfileEntry` and its builders keeps the
+  Rails names (per `docs/ruby-ts-conventions.md`), and its body writes the
+  mapped Node artifact. `trailsGemfileEntry`
+  (`packages/trailties/lib/generators/app-base.ts`) is an invented name and
+  converges onto `rails_gemfile_entry`'s ported spelling.
+- **A ported test reads the mapping.** A Gemfile assertion asserts the mapped
+  `package.json` entry. A test on a permanent row is parked as `it.skip` under
+  a `PERMANENT-SKIP:` line citing this section.
+- **Puma is not ported.** `trails server` always serves through rackup's
+  `Handler::Node` (`node:http`). `web_server_gemfile_entry`, `config/puma.rb`,
+  `--using puma` and `Server::Command`'s Puma recommendation are not ported,
+  and a test asserting on Puma is parked `PERMANENT-SKIP:` citing this
+  section. Clustered serving on `node:cluster` is a separate post-launch RFC.
+  Ruled by the operator on 2026-11-19.
+- **web-console is a separate RFC.** `app_generator_test.rb`'s `test_web_console`
+  (`:789`) and `test_skip_dev_gems` (`:1032`), and `api_app_generator_test.rb:44`'s
+  web-console assertion, belong to the post-launch web-console RFC
+  (`web-console-railtie-and-app-generator-entry`); RFC 0248 neither ports nor
+  waits for them.

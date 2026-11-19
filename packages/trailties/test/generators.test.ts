@@ -1,15 +1,37 @@
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
+import { File, LOAD_PATH } from "@blazetrails/ruby-compat";
+import { Application } from "../lib/application.js";
 import { Generators } from "../lib/generators.js";
+import { Trails } from "../lib/trails.js";
 
 const GENERATORS_PATH = nodePath.join(
   decodeURIComponent(new URL("../lib/", import.meta.url).pathname),
   "generators",
 );
 
+const FIXTURES = decodeURIComponent(new URL("./fixtures", import.meta.url).pathname);
+
+class GeneratorsTestApp extends Application {}
+
+const originalApplication = Trails.application;
+const originalTemplatesPath = [...Generators.templatesPath()];
+let fixturesLib: string;
+
 beforeAll(async () => {
+  Trails.application = GeneratorsTestApp.instance();
+  Trails.application.config.setRoot(FIXTURES);
+  Generators.templatesPath().push(File.join(FIXTURES, "lib", "templates"));
+  fixturesLib = File.join(Trails.root()!, "lib");
+  LOAD_PATH.unshift(fixturesLib);
   await Generators.lookupBang();
+});
+
+afterAll(() => {
+  LOAD_PATH.splice(LOAD_PATH.indexOf(fixturesLib), 1);
+  Generators.templatesPath().splice(0, Infinity, ...originalTemplatesPath);
+  Trails.application = originalApplication;
 });
 
 async function help(): Promise<string> {
@@ -102,6 +124,13 @@ describe("GeneratorsTest", () => {
     const output = await help();
     expect(output).not.toMatch(/app\W/);
     expect(output).not.toMatch(/[^:]plugin/);
+  });
+
+  it("source paths for not namespaced generators", async () => {
+    const mspec = await Generators.findByNamespace("fixjour");
+    expect(mspec!.sourcePaths()).toContain(
+      File.join(Trails.root()!, "lib", "templates", "fixjour"),
+    );
   });
 
   it("hide namespace", () => {

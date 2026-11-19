@@ -45,7 +45,7 @@ import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 
 type IsolatedNamespace = {
   name: string;
-  trailtieNamespace?: () => typeof Engine;
+  railtieNamespace?: () => typeof Engine;
   tableNamePrefix?: string;
   isUseRelativeModelNaming?: () => boolean;
   trailtieHelpersPaths?: () => Promise<string[]>;
@@ -113,9 +113,9 @@ export class Engine extends Trailtie {
 
     this.isolated(true);
 
-    if (!rbObjRespondTo(mod, "trailtieNamespace")) {
+    if (!rbObjRespondTo(mod, "railtieNamespace")) {
       const [name, railtie] = [this.engineName(), this] as const;
-      mod.trailtieNamespace = () => railtie;
+      mod.railtieNamespace = () => railtie;
 
       if (!rbObjRespondTo(mod, "tableNamePrefix")) {
         Object.defineProperty(mod, "tableNamePrefix", {

@@ -18,11 +18,11 @@ export interface RouteSetLike {
 }
 
 export class RoutesReloader {
-  paths: string[] = [];
-  routeSets: RouteSetLike[] = [];
-  externalRoutes: string[] = [];
-  eagerLoad = false;
-  loaded = false;
+  paths: string[];
+  routeSets: RouteSetLike[];
+  externalRoutes: string[];
+  eagerLoad: boolean;
+  loaded: boolean;
   /** @internal */
   runAfterLoadPaths: () => void = () => {};
   private _updater?: FileUpdateChecker<void>;
@@ -30,6 +30,14 @@ export class RoutesReloader {
   private _drawn: [RouteSetLike, DrawCallback][] | null = null;
   /** @internal */
   private _prefetching?: Promise<void>;
+
+  constructor() {
+    this.paths = [];
+    this.routeSets = [];
+    this.externalRoutes = [];
+    this.eagerLoad = false;
+    this.loaded = false;
+  }
 
   async executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
     if (this.isUpdated()) await this.prefetchBang();

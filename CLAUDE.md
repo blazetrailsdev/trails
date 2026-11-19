@@ -1732,7 +1732,10 @@ are permanent, and a Trilogy-only test arm is dropped.
 
 A Rails 8 app serves JavaScript through importmap-rails and assets through
 propshaft (`railties/lib/rails/generators/app_base.rb`'s `javascript`
-default of `importmap`). trails ports neither gem. Vite fills both roles,
+default of `importmap`), and an older one through Sprockets
+(sprockets-rails). trails ports none of the three. Sprockets was ruled out of
+scope by the operator on 2026-11-19; the heading keeps its original wording so
+citations resolve. Vite fills both roles,
 through ports of the `vite_ruby` and `vite_rails` gems
 (`vendor/vite_ruby/v3.11.1/`): `ViteRuby::Config` reads
 `config/vite.json`, `ViteRuby::Manifest` resolves entries,
@@ -1792,12 +1795,24 @@ dependencies, not ports.
 - dry-cli is not ported. `bin/vite` (`ViteRuby::CLI`) is built on
   `@blazetrails/thor`, with the gem's command class names and `call`
   bodies unchanged and one receipt on the base class and option DSL.
-- importmap-rails' and propshaft's unported-files rows are permanent, as
-  Trilogy's are. A Rails test arm that exists only for importmap or propshaft
+- importmap-rails', propshaft's and Sprockets' unported-files rows are
+  permanent, as Trilogy's are, and so are railties' asset-pipeline test files
+  (`application/sprockets_assets_test.rb`, `assets_test.rb`,
+  `asset_debugging_test.rb`), each of which boots an app on Sprockets or
+  Propshaft. A Rails test arm that exists only for importmap or propshaft
   is dropped. `vite_hanami`, `vite_padrino` and `vite_plugin_legacy` are not
   ported.
 
 Ruled by the operator on 2026-11-13.
+
+## Rails API-doc tooling is not ported (`Rails::API::Task`, `RDoc::Generator::API`)
+
+`railties/lib/rails/api/task.rb` and `api/generator.rb` build the Rails
+repository's own API documentation with SDoc and RDoc. They ship inside
+railties but document the Rails repo, not an application. trails' API docs
+are built by its own TypeDoc pipeline (`packages/website`), which is not a
+mirror of either class. Both files' unported-files rows are permanent, as
+Trilogy's are. Ruled by the operator on 2026-11-19.
 
 ## An adapter file is loaded by an awaited step (`ConnectionAdapters.resolve`'s `require`)
 

@@ -7,7 +7,7 @@ type MethodMissingModule = {
   respondToMissing(this: object, name: string, includeAll?: boolean): boolean;
 };
 
-class NamedRouteCollection extends RouteSet.NamedRouteCollection {
+export class NamedRouteCollection extends RouteSet.NamedRouteCollection {
   override isRouteDefined(name: string): boolean {
     TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.isRouteDefined(name);

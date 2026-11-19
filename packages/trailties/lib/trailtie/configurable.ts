@@ -1,5 +1,6 @@
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Trailtie } from "../trailtie.js";
+import type { Configuration } from "./configuration.js";
 import { ownState, readOwnState } from "./per-class-state.js";
 
 const SEALED_KEY = "_sealedFromInheritance";
@@ -23,4 +24,18 @@ export function assertNotSealed(subclass: typeof Trailtie): void {
   }
 }
 
-export const Configurable = { sealAgainstInheritance, assertNotSealed };
+export const ClassMethods = {
+  get config(): Configuration {
+    return (this as unknown as typeof Trailtie).instance().config;
+  },
+
+  instance(this: typeof Trailtie): Trailtie {
+    return ownState(this, "_instance", () => new (this as unknown as new () => Trailtie)());
+  },
+
+  configure(this: typeof Trailtie, block: (this: typeof Trailtie) => void): void {
+    block.call(this);
+  },
+};
+
+export const Configurable = { ClassMethods, sealAgainstInheritance, assertNotSealed };

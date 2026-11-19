@@ -30,7 +30,7 @@ export class Trailtie extends Initializable {
   static readonly _registry: Array<typeof Trailtie> = [];
 
   protected _config?: Configuration;
-  private _trailtieNamespace?: { readonly name: string };
+  private _railtieNamespace?: { readonly name: string };
 
   constructor() {
     super();
@@ -43,19 +43,13 @@ export class Trailtie extends Initializable {
   static subclasses(): Array<typeof Trailtie> {
     return [...Trailtie._registry]
       .filter((s) => Object.getPrototypeOf(s) === this && !s.isAbstractRailtie())
-      .sort(
-        (a, b) =>
-          (readOwnState<number>(a, "_loadIndex") ?? 0) -
-          (readOwnState<number>(b, "_loadIndex") ?? 0),
-      );
+      .sort((a, b) => (a.loadIndex() ?? 0) - (b.loadIndex() ?? 0));
   }
 
   static register(subclass: typeof Trailtie): void {
     if (Trailtie._registry.includes(subclass)) return;
     assertNotSealed(subclass);
-    if (readOwnState<number>(subclass, "_loadIndex") === undefined) {
-      writeOwnState(subclass, "_loadIndex", ++loadCounter);
-    }
+    if (subclass.loadIndex() === undefined) subclass.incrementLoadIndex();
     Trailtie._registry.push(subclass);
   }
 
@@ -83,6 +77,16 @@ export class Trailtie extends Initializable {
 
   static configure(block: (this: Trailtie) => void): void {
     this.instance().configure(block);
+  }
+
+  /** @internal */
+  protected static loadIndex(): number | undefined {
+    return readOwnState<number>(this, "_loadIndex");
+  }
+
+  /** @internal */
+  protected static incrementLoadIndex(): void {
+    writeOwnState(this, "_loadIndex", ++loadCounter);
   }
 
   static rakeTasks(block: TrailtieBlock): void {
@@ -136,9 +140,9 @@ export class Trailtie extends Initializable {
     block.call(this);
   }
 
-  trailtieNamespace(): { readonly name: string } | undefined {
-    return (this._trailtieNamespace ??= moduleParents(this.constructor).find((n) =>
-      rbObjRespondTo(n, "trailtieNamespace"),
+  railtieNamespace(): { readonly name: string } | undefined {
+    return (this._railtieNamespace ??= moduleParents(this.constructor).find((n) =>
+      rbObjRespondTo(n, "railtieNamespace"),
     ) as { readonly name: string } | undefined);
   }
 

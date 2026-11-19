@@ -1,5 +1,5 @@
 import "../constants.test.generated.js";
-import { LOAD_PATH, LoadError, rbFSystem, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { LOAD_PATH, LoadError, rbFSystem } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { UnrecognizedCommandError, root } from "../command.js";
@@ -15,18 +15,22 @@ export class TestCommand extends Base {
     klass.desc("test [PATHS...]", "Run tests except system tests");
     klass.methodAdded("perform");
 
-    for (const name of Runner.TEST_FOLDERS) {
-      klass.desc(name, `Run tests in test/${name}`);
-      Object.defineProperty(this.prototype, name, {
-        value(this: TestCommand, ...args: string[]) {
-          return this.perform(`test/${name}`, ...args);
-        },
-        writable: true,
-        configurable: true,
-      });
-      rbClearMethodCache();
-      klass.methodAdded(name);
-    }
+    klass.desc("models", "Run tests in test/models");
+    klass.methodAdded("models");
+    klass.desc("helpers", "Run tests in test/helpers");
+    klass.methodAdded("helpers");
+    klass.desc("channels", "Run tests in test/channels");
+    klass.methodAdded("channels");
+    klass.desc("controllers", "Run tests in test/controllers");
+    klass.methodAdded("controllers");
+    klass.desc("mailers", "Run tests in test/mailers");
+    klass.methodAdded("mailers");
+    klass.desc("integration", "Run tests in test/integration");
+    klass.methodAdded("integration");
+    klass.desc("jobs", "Run tests in test/jobs");
+    klass.methodAdded("jobs");
+    klass.desc("mailboxes", "Run tests in test/mailboxes");
+    klass.methodAdded("mailboxes");
 
     klass.desc("all", "Run all tests, including system tests");
     klass.methodAdded("all");
@@ -64,6 +68,38 @@ export class TestCommand extends Base {
       await this.runPrepareTask();
     }
     await Runner.run(args);
+  }
+
+  async models(...args: string[]): Promise<void> {
+    await this.perform("test/models", ...args);
+  }
+
+  async helpers(...args: string[]): Promise<void> {
+    await this.perform("test/helpers", ...args);
+  }
+
+  async channels(...args: string[]): Promise<void> {
+    await this.perform("test/channels", ...args);
+  }
+
+  async controllers(...args: string[]): Promise<void> {
+    await this.perform("test/controllers", ...args);
+  }
+
+  async mailers(...args: string[]): Promise<void> {
+    await this.perform("test/mailers", ...args);
+  }
+
+  async integration(...args: string[]): Promise<void> {
+    await this.perform("test/integration", ...args);
+  }
+
+  async jobs(...args: string[]): Promise<void> {
+    await this.perform("test/jobs", ...args);
+  }
+
+  async mailboxes(...args: string[]): Promise<void> {
+    await this.perform("test/mailboxes", ...args);
   }
 
   async all(...args: string[]): Promise<void> {
