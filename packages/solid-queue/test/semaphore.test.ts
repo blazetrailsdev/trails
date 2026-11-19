@@ -4,6 +4,7 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
+import { AbstractMysqlAdapter } from "@blazetrails/activerecord/connection-adapters/abstract-mysql-adapter.js";
 import { minutes, seconds } from "@blazetrails/activesupport";
 import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -198,9 +199,10 @@ describe("SolidQueue::SemaphoreTest", () => {
 
   it("dispatchers with jobs for the same concurrency keys in different order don't deadlock", async (ctx) => {
     await skipOnSqlite(ctx);
+    const connection = await Record.leaseConnection();
     ctx.skip(
-      ((await Record.leaseConnection()) as { isMariadb?(): boolean }).isMariadb?.() === true,
-      "MariaDB's innodb_snapshot_isolation raises on the second dispatcher's semaphore lock; solid_queue's CI runs MySQL 8 only",
+      connection instanceof AbstractMysqlAdapter && connection.isMariadb(),
+      "CONVERGEABLE solid-queue-mariadb-snapshot-isolation-dispatch",
     );
 
     const jobs: Job[] = [];
