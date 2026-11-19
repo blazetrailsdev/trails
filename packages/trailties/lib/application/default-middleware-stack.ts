@@ -179,6 +179,16 @@ export class DefaultMiddlewareStack {
       (error as LoadError).message += " Be sure to add rack-cache to your Gemfile";
       throw error;
     }
+
+    if (rackCache === true) {
+      return {
+        metastore: "rails:/",
+        entitystore: "rails:/",
+        verbose: false,
+      };
+    } else {
+      return rackCache as Record<string, unknown>;
+    }
   }
 
   /** @internal */
