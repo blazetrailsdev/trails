@@ -64,8 +64,7 @@ describe("YamlSerializationTest", () => {
     expect(t.attributes).toEqual(topic.attributes);
   });
 
-  it.skip("active record relation serialization", () => {
-    // BLOCKED: relation-to-yaml-psych-dump
+  it("active record relation serialization", () => {
     expect(() => YAML.dump([Topic.all()])).not.toThrow();
   });
 

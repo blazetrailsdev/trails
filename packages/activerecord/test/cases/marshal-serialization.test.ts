@@ -33,7 +33,7 @@ describe("MarshalSerializationTest", () => {
   }
 
   it.skip("deserializing rails 6 1 marshal basic", async () => {
-    // BLOCKED: activerecord-load-rails-written-marshal-fixtures
+    // PERMANENT-SKIP: unmarshalling Ruby-written Marshal blobs is out of scope (operator ruling, 2026-11-19).
     const topic = Marshal.load(await marshalFixture("rails_6_1_topic")) as Topic;
 
     expect(topic.isNewRecord()).toBeFalsy();
@@ -43,7 +43,7 @@ describe("MarshalSerializationTest", () => {
   });
 
   it.skip("deserializing rails 6 1 marshal with loaded association cache", async () => {
-    // BLOCKED: activerecord-load-rails-written-marshal-fixtures
+    // PERMANENT-SKIP: unmarshalling Ruby-written Marshal blobs is out of scope (operator ruling, 2026-11-19).
     const topic = Marshal.load(await marshalFixture("rails_6_1_topic_associations")) as Topic;
 
     expect(topic.isNewRecord()).toBeFalsy();
@@ -55,7 +55,7 @@ describe("MarshalSerializationTest", () => {
   });
 
   it.skip("deserializing rails 7 1 marshal basic", async () => {
-    // BLOCKED: activerecord-load-rails-written-marshal-fixtures
+    // PERMANENT-SKIP: unmarshalling Ruby-written Marshal blobs is out of scope (operator ruling, 2026-11-19).
     const topic = Marshal.load(await marshalFixture("rails_7_1_topic")) as Topic;
 
     expect(topic.isNewRecord()).toBeFalsy();
@@ -65,7 +65,7 @@ describe("MarshalSerializationTest", () => {
   });
 
   it.skip("deserializing rails 7 1 marshal with loaded association cache", async () => {
-    // BLOCKED: activerecord-load-rails-written-marshal-fixtures
+    // PERMANENT-SKIP: unmarshalling Ruby-written Marshal blobs is out of scope (operator ruling, 2026-11-19).
     const topic = Marshal.load(await marshalFixture("rails_7_1_topic_associations")) as Topic;
 
     expect(topic.isNewRecord()).toBeFalsy();
