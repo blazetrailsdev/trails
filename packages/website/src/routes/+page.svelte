@@ -59,8 +59,8 @@
   </nav>
 
   <header class="hero">
-    <h1>Accelerate your agents with convention over configuration.</h1>
-    <p class="lede"><strong>trails scales from PROMPT to IPO.</strong> Token-efficient code that's easy for agents to write and beautiful for humans to review.</p>
+    <h1>Convention over configuration.<br />Now with types.</h1>
+    <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
     <span class="pill">trails &mdash; pre-release</span>
     <div class="video">Editor video placeholder</div>
   </header>
@@ -139,7 +139,7 @@
   }
   a { color: inherit; }
   h1, h2 { color: var(--red); font-weight: 700; letter-spacing: -0.02em; margin: 0 auto 1.5rem; }
-  h1 { font-size: 78px; line-height: 72px; max-width: 1000px; }
+  h1 { font-size: 78px; line-height: 72px; max-width: 1200px; }
   h2 { font-size: 56px; line-height: 1; }
   h3 { color: var(--red); font-size: 28px; margin: 1.5rem 0 0.5rem; }
   .intro { font-size: 26px; line-height: 1.3; max-width: 780px; margin: 0 auto 1.5rem; }
