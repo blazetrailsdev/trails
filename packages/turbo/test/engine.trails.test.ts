@@ -23,7 +23,7 @@ describe("Turbo::Engine", () => {
 
   it("renders turbo_stream: html with the turbo_stream content type", () => {
     const render = (ActionController.Base.prototype as unknown as Record<string, Renderer>)[
-      "_render_with_renderer_turbo_stream"
+      "_render_with_renderer_turboStream"
     ];
     const controller = { mediaType: null, contentType: null };
 

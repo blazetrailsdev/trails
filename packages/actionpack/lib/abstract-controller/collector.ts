@@ -1,4 +1,4 @@
-import { Module, underscore } from "@blazetrails/activesupport";
+import { Module, camelize, underscore } from "@blazetrails/activesupport";
 import {
   KERNEL_METHODS,
   NoMethodError,
@@ -50,7 +50,7 @@ Collector.generateMethodForMime = generateMethodForMime;
 function generateMethodForMime(mime: MimeType | string): void {
   const sym = typeof mime === "string" ? mime : mime.toSym()!;
   Collector.defineMethod(
-    symbolToS(sym),
+    camelize(symbolToS(sym), "lower"),
     function (
       this: { custom(mime: MimeType | undefined, ...args: unknown[]): unknown },
       ...args: unknown[]
@@ -65,7 +65,7 @@ MimeType.SET.each((mime) => {
 });
 
 MimeType.registerCallback((mime) => {
-  if (!Collector.instanceMethods().includes(symbolToS(mime.toSym()!))) {
+  if (!Collector.instanceMethods().includes(camelize(symbolToS(mime.toSym()!), "lower"))) {
     generateMethodForMime(mime);
   }
 });

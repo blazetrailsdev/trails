@@ -41,6 +41,12 @@ export interface TurboConfig extends OrderedOptions {
   signedStreamVerifierKey?: string | null;
 }
 
+declare module "@blazetrails/actionpack" {
+  interface RenderOptions {
+    turboStream?: unknown;
+  }
+}
+
 declare module "@blazetrails/trailties/trailtie/configuration" {
   interface Configuration {
     turbo: TurboConfig;
@@ -147,7 +153,7 @@ export class Engine extends TrailsEngine {
 
     this.initializer("turbo.renderer", () => {
       ActionController.Renderers.add(
-        "turbo_stream",
+        "turboStream",
         function (this: RendererHost, turboStreamsHtml: unknown) {
           if (this.mediaType == null) this.contentType = Mime.get("turbo_stream")!;
           return turboStreamsHtml;
