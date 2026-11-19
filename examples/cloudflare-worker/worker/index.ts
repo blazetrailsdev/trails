@@ -9,7 +9,6 @@ interface Env {
 }
 
 let booted: Promise<typeof Trails.application> | undefined;
-// Reading a Hyperdrive binding is I/O, which workerd refuses at module scope.
 function boot(env: Env) {
   return (booted ??= (async () => {
     setEnv("DATABASE_URL", env.HYPERDRIVE.connectionString);
@@ -24,8 +23,6 @@ export default {
     try {
       return rackResponseToFetchResponse(await app.call(await requestToRackEnvWithBody(request)));
     } finally {
-      // A socket opened during one request cannot be used by another, so no connection outlives
-      // its request. Hyperdrive pools the connections to Postgres.
       await Base.connectionHandler.clearAllConnectionsBang();
     }
   },
