@@ -45,7 +45,7 @@ describe("AssertionsTest", () => {
     await t.assertNoTurboCableStreamSource("junk");
   }, 60_000);
 
-  it.skip("#assert_turbo_cable_stream_source supports String collection filters", async () => {
+  it("#assert_turbo_cable_stream_source supports String collection filters", async () => {
     await visit(urlHelpers().messagesPath());
 
     await t.assertTurboCableStreamSource({ connected: true, count: 1 });

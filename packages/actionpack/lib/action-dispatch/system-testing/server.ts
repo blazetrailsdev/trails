@@ -57,11 +57,7 @@ export class Server {
                 const protocol = req.headers["sec-websocket-protocol"];
                 if (protocol === "vite-hmr" || protocol === "vite-ping") return;
                 new node(vite.app!)
-                  .upgrade(
-                    req as unknown as HttpRequest,
-                    socket as unknown as HttpSocket,
-                    head as Uint8Array,
-                  )
+                  .upgrade(req as HttpRequest, socket as HttpSocket, head as Uint8Array)
                   .catch((error: unknown) => {
                     server.config.logger.error(
                       error instanceof Error ? (error.stack ?? error.message) : String(error),
