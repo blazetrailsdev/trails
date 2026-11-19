@@ -1331,7 +1331,7 @@ ratified here so no port re-derives them.
   comparison, `:39-47`) is permanently unportable; `Buffer`'s runtime is pinned
   by `capture-block.trails.test.ts` instead. Ruled by the operator on 2026-11-11.
 - **A Marshal blob written by Ruby.** `Marshal.load` of a stream a Ruby process
-  dumped (`activerecord/test/cases/marshal_serialization_test.rb:18-55`, its
+  dumped (`activerecord/test/cases/marshal_serialization_test.rb:18-57`, its
   Rails 6.1 / 7.1 fixtures) is out of scope: the stream carries Ruby class
   paths and ivar layouts no trails object reproduces. Ruled by the operator on
   2026-11-19.
