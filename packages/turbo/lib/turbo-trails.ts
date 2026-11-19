@@ -30,6 +30,7 @@ import type { NavigationController } from "./app/controllers/turbo/native/naviga
 import type { RequestIdTracking } from "./app/controllers/concerns/turbo/request-id-tracking.js";
 import type { Broadcastable } from "./app/models/concerns/turbo/broadcastable.js";
 import type { TagBuilder } from "./app/models/turbo/streams/tag-builder.js";
+import type { SystemTestHelper } from "./system-test-helper.js";
 import type { Tasks } from "./tasks/turbo-tasks.js";
 import type { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
 
@@ -93,6 +94,7 @@ export const Turbo = {
   /** @internal */
   _signedStreamVerifierKey?: string | Uint8Array | null;
   Engine?: typeof Engine;
+  SystemTestHelper?: typeof SystemTestHelper;
   DriveHelper?: typeof DriveHelper;
   FramesHelper?: typeof FramesHelper;
   IncludesHelper?: typeof IncludesHelper;

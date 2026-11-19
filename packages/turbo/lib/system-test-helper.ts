@@ -219,4 +219,4 @@ export const SystemTestHelper = {
   assertNoTurboCableStreamSource,
   SignedStreamNameConditions,
 };
-Object.assign(Turbo, { SystemTestHelper });
+Turbo.SystemTestHelper = SystemTestHelper;
