@@ -1,7 +1,7 @@
 /**
  * Converts between the fetch API (Request/Response) and Rack's env/response
- * tuple format. Runs in the service worker to bridge iframe fetch events
- * to the in-browser Rack app.
+ * tuple format, for the fetch-style entries of the serverless-lambda and
+ * cloudflare-worker examples.
  *
  * No Node.js dependencies — uses only browser APIs.
  */

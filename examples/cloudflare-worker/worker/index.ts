@@ -25,6 +25,7 @@ function boot(env: Env) {
 }
 
 export default {
+  /** Clears every connection after the request: workerd does not let one request use a socket another opened, and Hyperdrive pools the connections to Postgres. */
   async fetch(request: Request, env: Env): Promise<Response> {
     const app = await boot(env);
     try {
