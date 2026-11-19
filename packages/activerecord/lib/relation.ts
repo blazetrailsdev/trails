@@ -1949,10 +1949,7 @@ type QueryMethodsChainKeys = {
         ? K
         : never
     : never;
-}[Exclude<
-  keyof typeof QueryMethods,
-  "group" | "groupBang" | "regroup" | "regroupBang" | "unscope" | "unscopeBang"
->];
+}[Exclude<keyof typeof QueryMethods, "group" | "regroup" | "unscope" | `${string}Bang`>];
 
 type QueryMethodsChain<Self> = {
   [K in QueryMethodsChainKeys]: (typeof QueryMethods)[K] extends (
@@ -2077,7 +2074,7 @@ export interface Relation<T extends Base, G extends boolean = false>
   /** @internal */
   arelColumnsFromHash(fields: Record<PropertyKey, unknown>): unknown[];
   select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...fields: (string | ArelNode | Record<string, unknown>)[]): Relation<T, G>;
+  select(...fields: _qm.SelectArg[]): Relation<T, G>;
   reselect(
     ...args: (string | ArelNode | Record<string, unknown> | readonly (string | ArelNode)[])[]
   ): Relation<T, G>;

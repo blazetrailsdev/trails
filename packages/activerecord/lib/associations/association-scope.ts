@@ -103,9 +103,9 @@ export class AssociationScope {
     value: unknown,
   ): Relation<Base> {
     if (rbEqual(scope.table, table)) {
-      return scope.whereBang({ [key]: value });
+      return scope.whereBang({ [key]: value }) as Relation<Base>;
     } else {
-      return scope.whereBang({ [table.name as string]: { [key]: value } });
+      return scope.whereBang({ [table.name as string]: { [key]: value } }) as Relation<Base>;
     }
   }
 
@@ -172,7 +172,7 @@ export class AssociationScope {
       scope = this.applyScope(scope, table, reflection.type, value);
     }
 
-    return scope.joinsBang(this.join(foreignTable, constraints));
+    return scope.joinsBang(this.join(foreignTable, constraints)) as Relation<Base>;
   }
 
   #addConstraints(

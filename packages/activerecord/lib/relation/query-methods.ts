@@ -170,6 +170,19 @@ export type AssociationSpec =
   | AssociationSpec[]
   | { [assoc: string]: AssociationSpec | AssociationSpec[] };
 
+export type SelectArg =
+  | string
+  | ArelNode
+  | Record<string, unknown>
+  | readonly (string | ArelNode)[];
+
+export type WithArg = Record<
+  string,
+  | import("../relation.js").Relation<any, boolean>
+  | string
+  | Array<import("../relation.js").Relation<any, boolean> | string>
+>;
+
 export type JoinSpec = AssociationSpec | Nodes.Join | JoinSpec[];
 
 export const FROZEN_EMPTY_ARRAY: readonly never[] = Object.freeze([]);
@@ -314,28 +327,28 @@ function unionReferences(
   return result;
 }
 
-function withCte(this: QueryMethodsHost, block: (...args: any[]) => unknown): never;
-function withCte(this: QueryMethodsHost, ...args: any[]): any;
-function withCte(this: QueryMethodsHost, ...args: any[]): any {
+function withCte(this: QueryMethodsHost, block: (...args: unknown[]) => unknown): never;
+function withCte(this: QueryMethodsHost, ...args: WithArg[]): any;
+function withCte(this: QueryMethodsHost, ...args: unknown[]): any {
   if (args.some((cte) => typeof cte === "function")) {
     throw new ArgumentError("ActiveRecord::Relation#with does not accept a block");
   }
   checkIfMethodHasArgumentsBang.call(this, ":with", args);
-  return withBang.apply(this.spawn(), args);
+  return withBang.apply(this.spawn(), args as WithArg[]);
 }
 
-function withBang<R extends QueryMethodsHost>(this: R, ...args: unknown[]): R {
+function withBang<R extends QueryMethodsHost>(this: R, ...args: WithArg[]): R {
   const processed = processWithArgs.call(this, args);
   this.withValues = union(this.withValues, processed);
   return this;
 }
 
-function withRecursive<R extends QueryMethodsHost>(this: R, ...args: any[]): R {
+function withRecursive<R extends QueryMethodsHost>(this: R, ...args: WithArg[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":with_recursive", args);
   return withRecursiveBang.apply(this.spawn(), args) as R;
 }
 
-function withRecursiveBang<R extends QueryMethodsHost>(this: R, ...args: unknown[]): R {
+function withRecursiveBang<R extends QueryMethodsHost>(this: R, ...args: WithArg[]): R {
   const processed = processWithArgs.call(this, args);
   this.withValues = union(this.withValues, processed);
   this._withIsRecursive = true;
@@ -343,13 +356,18 @@ function withRecursiveBang<R extends QueryMethodsHost>(this: R, ...args: unknown
 }
 
 function select(this: QueryMethodsHost, block: (record: any) => unknown): Promise<any[]>;
-function select(this: QueryMethodsHost, ...fields: any[]): any;
-function select(this: QueryMethodsHost, ...fields: any[]): any {
+function select(this: QueryMethodsHost, ...fields: SelectArg[]): any;
+function select(
+  this: QueryMethodsHost,
+  ...fields: (SelectArg | ((record: import("../base.js").Base) => unknown))[]
+): any {
   if (fields.length >= 1 && typeof fields[fields.length - 1] === "function") {
     if (fields.length > 1) {
       throw new ArgumentError("`select' with block doesn't take arguments.");
     }
-    return this.records().then((records) => records.filter(fields[0]));
+    return this.records().then((records) =>
+      records.filter(fields[0] as (record: import("../base.js").Base) => unknown),
+    );
   }
   checkIfMethodHasArgumentsBang.call(
     this,
@@ -357,22 +375,22 @@ function select(this: QueryMethodsHost, ...fields: any[]): any {
     fields,
     "Call `select' with at least one field.",
   );
-  fields = processSelectArgs.call(this, fields);
-  return _selectBang.apply(this.spawn(), fields);
+  fields = processSelectArgs.call(this, fields as SelectArg[]);
+  return _selectBang.apply(this.spawn(), fields as SelectArg[]);
 }
 
-function reselect<R extends QueryMethodsHost>(this: R, ...args: any[]): R {
+function reselect<R extends QueryMethodsHost>(this: R, ...args: SelectArg[]): R {
   checkIfMethodHasArgumentsBang.call(this, ":reselect", args);
   args = processSelectArgs.call(this, args);
   return reselectBang.apply(this.spawn(), args) as R;
 }
 
-function reselectBang<R extends QueryMethodsHost>(this: R, ...args: any[]): R {
+function reselectBang<R extends QueryMethodsHost>(this: R, ...args: SelectArg[]): R {
   this.selectValues = args;
   return this;
 }
 
-function _selectBang<R extends QueryMethodsHost>(this: R, ...fields: any[]): R {
+function _selectBang<R extends QueryMethodsHost>(this: R, ...fields: unknown[]): R {
   this.selectValues = union(this.selectValues, fields);
   return this;
 }
@@ -1862,10 +1880,10 @@ export function orderColumn<R extends QueryMethodsHost>(this: R, field: string):
 /** @internal */
 export function processSelectArgs<R extends QueryMethodsHost>(
   this: R,
-  fields: unknown[],
-): unknown[] {
+  fields: SelectArg[],
+): SelectArg[] {
   return fields.flatMap((field) => {
-    if (isPlainObject(field)) return arelColumnAliasesFromHash.call(this, field);
+    if (isPlainObject(field)) return arelColumnAliasesFromHash.call(this, field) as SelectArg[];
     return [field];
   });
 }

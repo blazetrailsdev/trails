@@ -41,18 +41,8 @@ export class Body {
   }
 }
 
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- CLAUDE.md, "Override signature on the static side". */
-// @ts-expect-error TS2430: CLAUDE.md, "Override signature on the static side".
-export interface StreamingTemplateRenderer {
-  render(
-    context: ViewContext,
-    options: RenderOptions,
-  ): Promise<Body | (string | SafeBuffer | Uint8Array | null)[]>;
-}
-
 /** @internal */
 export class StreamingTemplateRenderer extends TemplateRenderer {
-  /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
   // @ts-expect-error TS2416: CLAUDE.md, "Override signature on the static side".
   protected override async renderTemplate(
     view: ViewContext & ConstructorParameters<typeof StreamingFlow>[0],

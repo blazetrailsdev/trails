@@ -111,7 +111,7 @@ export class UniquenessValidator extends EachValidator {
     const comparison = await klass.withConnection((connection) =>
       relation.bindAttribute(attribute, value, (attr, bind) => {
         if (bind.isUnboundable()) {
-          none = relation.noneBang();
+          none = relation.noneBang() as Scope;
           return null;
         }
 
