@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 hyperdrive_id=$(terraform -chdir=infra output -raw hyperdrive_id)
-psql "$(terraform -chdir=infra output -raw database_url)" -q -f db/schema.sql
+node db/setup.ts "$(terraform -chdir=infra output -raw database_url)"
 bash scripts/build.sh
 sed "s/00000000000000000000000000000000/$hyperdrive_id/" wrangler.jsonc > wrangler.deploy.jsonc
 pnpm exec wrangler deploy --config wrangler.deploy.jsonc

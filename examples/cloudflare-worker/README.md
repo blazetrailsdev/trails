@@ -13,12 +13,12 @@ pnpm run deploy   # posts table (psql), views + `trails build` + esbuild bundle,
 `pnpm run dev` serves the same bundle under `wrangler dev` (workerd) against a local Postgres:
 `wrangler.jsonc`'s `localConnectionString` is `postgres://trails:trails@localhost:5432/trails`, or set
 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`. Create the table with
-`psql <url> -f db/schema.sql`.
+`node db/setup.ts <url>`.
 
 ## Infrastructure (`infra/`)
 
 Terraform creates the Hyperdrive config and, unless `database_url` is set, a Neon Postgres project.
-`pnpm run deploy` (`scripts/deploy.sh`) reads its outputs, creates the `posts` table, writes
+`pnpm run deploy` (`scripts/deploy.sh`) reads its outputs, creates the `posts` table (`db/setup.ts`, through the trails PostgreSQL adapter), writes
 `wrangler.deploy.jsonc` with the Hyperdrive id, and uploads the script with `wrangler deploy`, which also
 enables its `workers.dev` subdomain. The script is the build's output, so wrangler and not Terraform
 uploads it.
