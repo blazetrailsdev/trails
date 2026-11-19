@@ -1,5 +1,4 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { unescapeBytea as pgUnescapeBytea } from "@blazetrails/pg";
 import { quotingHost } from "../../../support/quoting-host.js";
 import {
   BinaryData,
@@ -24,6 +23,7 @@ import {
   quoteDefaultExpression,
   type CastTypeLookupHost,
   quotedBinary,
+  quoteString,
   quotedDate as quotedDateFn,
   quoteSchemaName,
   quoteTableNameForAssignment,
@@ -32,7 +32,13 @@ import {
 } from "../../../../lib/connection-adapters/postgresql/quoting.js";
 import { Range } from "@blazetrails/ruby-compat";
 
-const HOST = quotingHost({ quotedDate: quotedDateFn, quotedBinary });
+const HOST = quotingHost({
+  quotedDate: quotedDateFn,
+  quotedBinary,
+  _rawConnection: Object.assign(Object.create(PG.Connection.prototype), {
+    parameterStatuses: { standard_conforming_strings: "on" },
+  }) as import("@blazetrails/pg").Connection,
+});
 const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
   quotedDateFn.call(HOST, value);
 const quote = (value: unknown): string | null => quoteFn.call(HOST, value);
@@ -198,29 +204,31 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("unescapes hex bytea values we now own locally", () => {
-    expect(pgUnescapeBytea("\\x6869")).toEqual(new TextEncoder().encode("hi"));
+    expect(PG.Connection.unescapeBytea("\\x6869")).toEqual(new TextEncoder().encode("hi"));
   });
 
   it("unescapes legacy octal bytea with escaped backslashes", () => {
-    expect(pgUnescapeBytea("a\\134\\000b")).toEqual(Uint8Array.from([0x61, 0x5c, 0x00, 0x62]));
+    expect(PG.Connection.unescapeBytea("a\\134\\000b")).toEqual(
+      Uint8Array.from([0x61, 0x5c, 0x00, 0x62]),
+    );
   });
 
   it("swallows a backslash before an unrecognized escape, as PQunescapeBytea does", () => {
-    expect(pgUnescapeBytea("a\\qb\\9c")).toEqual(new TextEncoder().encode("aqb9c"));
+    expect(PG.Connection.unescapeBytea("a\\qb\\9c")).toEqual(new TextEncoder().encode("aqb9c"));
   });
 
   it("skips invalid hex digits pairwise, as PQunescapeBytea does", () => {
-    expect(pgUnescapeBytea("\\x6g6869 7")).toEqual(new TextEncoder().encode("hi"));
-    expect(pgUnescapeBytea("\\x686")).toEqual(new TextEncoder().encode("h"));
-    expect(pgUnescapeBytea("\\xzz41")).toEqual(new TextEncoder().encode("A"));
-    expect(pgUnescapeBytea("\\xz41")).toEqual(new TextEncoder().encode("A"));
-    expect(pgUnescapeBytea("\\x4z41")).toEqual(new TextEncoder().encode("A"));
-    expect(pgUnescapeBytea("\\x 41")).toEqual(new TextEncoder().encode("A"));
-    expect(pgUnescapeBytea("\\x de ad")).toEqual(Uint8Array.from([0xde, 0xad]));
+    expect(PG.Connection.unescapeBytea("\\x6g6869 7")).toEqual(new TextEncoder().encode("hi"));
+    expect(PG.Connection.unescapeBytea("\\x686")).toEqual(new TextEncoder().encode("h"));
+    expect(PG.Connection.unescapeBytea("\\xzz41")).toEqual(new TextEncoder().encode("A"));
+    expect(PG.Connection.unescapeBytea("\\xz41")).toEqual(new TextEncoder().encode("A"));
+    expect(PG.Connection.unescapeBytea("\\x4z41")).toEqual(new TextEncoder().encode("A"));
+    expect(PG.Connection.unescapeBytea("\\x 41")).toEqual(new TextEncoder().encode("A"));
+    expect(PG.Connection.unescapeBytea("\\x de ad")).toEqual(Uint8Array.from([0xde, 0xad]));
   });
 
   it("unescapes the bytes Type::Binary#deserialize hands it", () => {
-    expect(pgUnescapeBytea(new TextEncoder().encode("\\x6869"))).toEqual(
+    expect(PG.Connection.unescapeBytea(new TextEncoder().encode("\\x6869"))).toEqual(
       new TextEncoder().encode("hi"),
     );
   });
@@ -240,11 +248,17 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("accepts the Type::Binary::Data Rails' quoted_binary is given", () => {
-    expect(quotedBinary(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe("'\\x1f8b'");
+    expect(quotedBinary.call(HOST, new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe("'\\x1f8b'");
+  });
+
+  it("escapes for standard_conforming_strings before a connection exists", () => {
+    const cold = { _rawConnection: null };
+    expect(quoteString.call(cold, "a\\b'c")).toBe("a\\b''c");
+    expect(quotedBinary.call(cold, new BinaryData(Uint8Array.of(0x00, 0x41)))).toBe("'\\x0041'");
   });
 
   it("quotedBinary wraps escape_bytea output in SQL quotes", () => {
-    expect(quotedBinary(new BinaryData("ab"))).toBe("'\\x6162'");
+    expect(quotedBinary.call(HOST, new BinaryData("ab"))).toBe("'\\x6162'");
   });
 
   it("quote(BinaryData) unwraps to bytes via quotedBinary", () => {

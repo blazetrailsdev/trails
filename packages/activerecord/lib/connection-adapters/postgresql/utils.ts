@@ -1,6 +1,7 @@
 import "../../constants.postgresql-utils.generated.js";
 import { rbHash } from "@blazetrails/activesupport";
-import { rbEqual, rbObjClass, stringValue } from "@blazetrails/ruby-compat";
+import { PG } from "@blazetrails/pg";
+import { rbEqual, rbObjClass } from "@blazetrails/ruby-compat";
 
 export class Name {
   static readonly SEPARATOR = ".";
@@ -18,11 +19,14 @@ export class Name {
   }
 
   quoted(): string {
-    const quoteIdent = (str: unknown) => `"${stringValue(str).replace(/"/g, '""')}"`;
     if (this.schema != null) {
-      return quoteIdent(this.schema) + Name.SEPARATOR + quoteIdent(this.identifier);
+      return (
+        PG.Connection.quoteIdent(this.schema) +
+        Name.SEPARATOR +
+        PG.Connection.quoteIdent(this.identifier)
+      );
     } else {
-      return quoteIdent(this.identifier);
+      return PG.Connection.quoteIdent(this.identifier);
     }
   }
 

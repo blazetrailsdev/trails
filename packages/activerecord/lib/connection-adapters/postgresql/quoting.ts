@@ -14,7 +14,7 @@ import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import { escapeBytea as pgEscapeBytea, type Connection as PGConnection } from "@blazetrails/pg";
+import { PG, type Connection as PGConnection } from "@blazetrails/pg";
 import { format, rbFSend, toS, rbObjRespondTo, Range, Rational } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
 
@@ -46,8 +46,18 @@ export interface CastTypeLookupHost {
 const QUOTED_COLUMN_NAMES: Record<string, string> = Object.create(null);
 const QUOTED_TABLE_NAMES: Record<string, string> = Object.create(null);
 
-export function escapeBytea(value: Uint8Array | string | null | undefined): string | undefined {
-  if (value != null) return pgEscapeBytea(value);
+/** @inventedArm if — PERMANENT */
+export function escapeBytea(
+  this: { _rawConnection: PGConnection | null },
+  value: Uint8Array | string | null | undefined,
+): string | undefined {
+  if (value != null) {
+    if (this._rawConnection == null) {
+      const bytes = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
+      return `\\x${bytes.toString("hex")}`;
+    }
+    return this._rawConnection.escapeBytea(value);
+  }
 }
 
 export async function unescapeBytea(
@@ -83,7 +93,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
   }
 
   if (value instanceof XmlData) {
-    return `xml '${quoteString(value.toString())}'`;
+    return `xml '${this.quoteString(value.toString())}'`;
   }
   if (value instanceof BitData) {
     if (value.isBinary()) return `B'${value.toString()}'`;
@@ -106,9 +116,13 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
   return abstractQuote.call(this, value);
 }
 
-/** @missingRailsCall with_raw_connection — PERMANENT */
-export function quoteString(s: string): string {
-  return s.replace(/'/g, "''");
+/**
+ * @missingRailsCall with_raw_connection — PERMANENT
+ * @inventedArm if — PERMANENT
+ */
+export function quoteString(this: { _rawConnection: PGConnection | null }, s: string): string {
+  if (this._rawConnection == null) return s.replace(/'/g, "''");
+  return this._rawConnection.escape(s);
 }
 
 export function quoteTableNameForAssignment(_table: string, attr: string): string {
@@ -128,8 +142,11 @@ export function quotedDate(this: { defaultTimezone: string }, value: TemporalDat
   }
 }
 
-export function quotedBinary(value: BinaryData): string {
-  return `'${escapeBytea(value.toString())}'`;
+export function quotedBinary(
+  this: { _rawConnection: PGConnection | null },
+  value: BinaryData,
+): string {
+  return `'${escapeBytea.call(this, value.toString())}'`;
 }
 
 export function quoteDefaultExpression(
@@ -265,7 +282,7 @@ export function columnNameWithOrderMatcher(): RegExp {
 }
 
 export function quoteColumnName(name: unknown): string {
-  return (QUOTED_COLUMN_NAMES[name as string] ||= `"${toS(name).replace(/"/g, '""')}"`);
+  return (QUOTED_COLUMN_NAMES[name as string] ||= PG.Connection.quoteIdent(toS(name)));
 }
 
 export function quoteTableName(name: unknown): string {

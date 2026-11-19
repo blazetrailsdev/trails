@@ -1,7 +1,7 @@
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational, rbFCaller, warn } from "@blazetrails/ruby-compat";
-import { SimpleDecoder, unescapeBytea } from "@blazetrails/pg";
+import { PG, SimpleDecoder } from "@blazetrails/pg";
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
 class Integer extends SimpleDecoder {
@@ -125,7 +125,7 @@ class TimestampLocal extends Timestamp {
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
 class Bytea extends SimpleDecoder {
   decode(string: string): unknown {
-    return unescapeBytea(string);
+    return PG.Connection.unescapeBytea(string);
   }
 }
 

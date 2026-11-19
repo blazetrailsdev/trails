@@ -1,4 +1,9 @@
-import { LoadError, rbClassNewInstance } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  LoadError,
+  rbClassNewInstance,
+  stringValue,
+} from "@blazetrails/ruby-compat";
 import { ConnectionBad, UnableToSend } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { Result } from "./result.js";
@@ -36,6 +41,11 @@ export class Connection {
   parameterStatuses: Record<string, string> = {};
 
   static conndefaultsHash = conndefaultsHash;
+  static escapeString = escapeString;
+  static escape = escapeString;
+  static escapeBytea = escapeBytea;
+  static unescapeBytea = unescapeBytea;
+  static quoteIdent = quoteIdent;
 
   static async new<T extends Connection>(
     this: { prototype: T },
@@ -191,12 +201,11 @@ export class Connection {
     return `"${str.replace(/"/g, '""')}"`;
   }
 
-  escapeString(str: string): string {
-    const escaped = str.replace(/'/g, "''");
-    return this.parameterStatuses["standard_conforming_strings"] === "off"
-      ? escaped.replace(/\\/g, "\\\\")
-      : escaped;
-  }
+  declare escapeString: typeof escapeString;
+  declare escape: typeof escapeString;
+  declare escapeBytea: typeof escapeBytea;
+  declare unescapeBytea: typeof unescapeBytea;
+  declare quoteIdent: typeof quoteIdent;
 
   async waitForNotify(
     timeout: number | null = null,
@@ -258,10 +267,6 @@ export class Connection {
     return engine!.execute(this, sql, params);
   }
 
-  unescapeBytea(value: string | Uint8Array): Uint8Array {
-    return unescapeBytea(value);
-  }
-
   socketIo(): { reopen(path: string): void } | null {
     const stream = (
       this.client as unknown as {
@@ -321,12 +326,62 @@ export class Connection {
   }
 }
 
-export function escapeBytea(value: Buffer | Uint8Array | string): string {
-  const buffer = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
-  return `\\x${buffer.toString("hex")}`;
+function escapeString(this: Connection | typeof Connection, string: string): string {
+  const std =
+    this instanceof Connection
+      ? this.parameterStatuses["standard_conforming_strings"] !== "off"
+      : false;
+  let result = "";
+  for (const c of stringValue(string)) {
+    if (c === "'" || (c === "\\" && !std)) result += c;
+    result += c;
+  }
+  return result;
 }
 
-export function unescapeBytea(value: string | Uint8Array): Uint8Array {
+function escapeBytea(this: Connection | typeof Connection, str: Uint8Array | string): string {
+  const from = typeof str === "string" ? Buffer.from(str, "binary") : Buffer.from(str);
+  if (this instanceof Connection) {
+    const std = this.parameterStatuses["standard_conforming_strings"] !== "off";
+    return `${std ? "" : "\\"}\\x${from.toString("hex")}`;
+  }
+  let to = "";
+  for (const c of from) {
+    if (c < 0x20 || c > 0x7e) {
+      to += "\\\\" + c.toString(8).padStart(3, "0");
+    } else if (c === 0x27) {
+      to += "''";
+    } else if (c === 0x5c) {
+      to += "\\\\\\\\";
+    } else {
+      to += String.fromCharCode(c);
+    }
+  }
+  return to;
+}
+
+function quoteIdent(this: Connection | typeof Connection, strOrArray: unknown): string {
+  if (Array.isArray(strOrArray)) {
+    return strOrArray.map((entry) => quoteIdentifier(stringValue(entry))).join(".");
+  }
+  return quoteIdentifier(stringValue(strOrArray));
+}
+
+/** @internal */
+function quoteIdentifier(value: string): string {
+  let out = '"';
+  for (const c of value) {
+    if (c === '"') out += '"';
+    else if (c === "\0") throw new ArgumentError("string contains null byte");
+    out += c;
+  }
+  return out + '"';
+}
+
+function unescapeBytea(
+  this: Connection | typeof Connection,
+  value: string | Uint8Array,
+): Uint8Array {
   const strtext = typeof value === "string" ? value : Buffer.from(value).toString("latin1");
   const buffer: number[] = [];
   if (strtext[0] === "\\" && strtext[1] === "x") {
@@ -421,5 +476,10 @@ export function conndefaultsHash(): Record<string, string | null> {
 
 Connection.prototype.exec = Connection.prototype.asyncExec;
 Connection.prototype.query = Connection.prototype.asyncExec;
+Connection.prototype.escapeString = escapeString;
+Connection.prototype.escape = escapeString;
+Connection.prototype.escapeBytea = escapeBytea;
+Connection.prototype.unescapeBytea = unescapeBytea;
+Connection.prototype.quoteIdent = quoteIdent;
 
 PG.Connection = Connection;

@@ -2,7 +2,7 @@ import pg from "pg";
 import { it, expect, describe, vi } from "vitest";
 import { fakePgConnection } from "../../support/fake-pg-connection.js";
 import { IO, rbClassNewInstance } from "@blazetrails/ruby-compat";
-import { Connection, escapeBytea, unescapeBytea } from "@blazetrails/pg";
+import { Connection } from "@blazetrails/pg";
 import { PG } from "../../../lib/pg/pg.js";
 import { cancelAnyRunningQuery } from "../../../lib/connection-adapters/postgresql/database-statements.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
@@ -89,13 +89,6 @@ describe("PG::Connection#send_query and #get_last_result", () => {
   it("raises connection is closed on a finished connection", () => {
     const client = fakePgConnection({ _ending: true, query: vi.fn() });
     expect(() => client.sendQuery("SELECT 1")).toThrow("connection is closed");
-  });
-});
-
-describe("PG::Connection.escape_bytea", () => {
-  it("renders the hex format unescape_bytea reads back", () => {
-    expect(escapeBytea(Buffer.from("hi"))).toBe("\\x6869");
-    expect(unescapeBytea(escapeBytea("a\\\u0000"))).toEqual(Uint8Array.from([0x61, 0x5c, 0x00]));
   });
 });
 
