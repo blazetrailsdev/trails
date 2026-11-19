@@ -3,10 +3,11 @@ import { OrderedOptions, TopLevel, include, onLoad } from "@blazetrails/activesu
 import "@blazetrails/trailties/trailties/action-controller";
 import { Trails, type Application } from "@blazetrails/trailties";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
-import { File, NoMethodError, constDefined } from "@blazetrails/ruby-compat";
+import { File, constDefined } from "@blazetrails/ruby-compat";
 import { Turbo } from "./turbo-trails.js";
 import type { TestAssertions } from "./test-assertions.js";
 import type { IntegrationTestAssertions } from "./test-assertions/integration-test-assertions.js";
+import type { IdentityEncoder } from "@blazetrails/actionpack/testing";
 import type { SystemTestHelper } from "./system-test-helper.js";
 import type { TestHelper as BroadcastableTestHelper } from "./broadcastable/test-helper.js";
 import "./app/channels/turbo/streams-channel.js";
@@ -26,6 +27,13 @@ import "./app/controllers/turbo/native/navigation-controller.js";
 import { ImmediateDebouncer } from "./app/models/turbo/immediate-debouncer.js";
 import { ThreadDebouncer } from "./app/models/turbo/thread-debouncer.js";
 import { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
+
+declare module "@blazetrails/actionpack/testing" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace RequestEncoder {
+    let TurboStreamEncoder: typeof IdentityEncoder | undefined;
+  }
+}
 
 export interface TurboConfig extends OrderedOptions {
   testConnectAfterActions?: string[];
@@ -224,7 +232,7 @@ export class Engine extends TrailsEngine {
             return header;
           }
         }
-        Object.assign(RequestEncoder, { TurboStreamEncoder });
+        RequestEncoder.TurboStreamEncoder = TurboStreamEncoder;
 
         RequestEncoder.encoders.set(":turbo_stream", new TurboStreamEncoder());
       });
@@ -251,10 +259,7 @@ export class Engine extends TrailsEngine {
             this: { connectTurboCableStreamSources(): Promise<void> },
             ...args: unknown[]
           ) {
-            if (superMethod === undefined) {
-              throw new NoMethodError(`super: no superclass method '${method}'`);
-            }
-            const result = await superMethod.apply(this, args);
+            const result = await superMethod!.apply(this, args);
             await this.connectTurboCableStreamSources();
             return result;
           };
