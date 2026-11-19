@@ -210,10 +210,7 @@ export class AppBuilder extends ActionMethods {
     await this.template("node-version", ".node-version");
   }
 
-  /**
-   * @inventedArm if — PERMANENT
-   * @missingRailsArgs template — PERMANENT
-   */
+  /** @inventedArm if — PERMANENT */
   async gemfile(): Promise<void> {
     await this.template("package.json");
     if (this.options.dev && this.packageManager === "pnpm")

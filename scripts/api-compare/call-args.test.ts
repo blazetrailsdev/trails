@@ -16,6 +16,12 @@ function site(name: string, args: string[], flags: string[] = []): CallSite {
 }
 
 describe("normalizeArg", () => {
+  it("reads a gem manifest as the npm manifest", () => {
+    expect(normalizeArg("str:Gemfile")).toBe(normalizeArg("str:package.json"));
+    expect(normalizeArg("str:%name%.gemspec")).toBe(normalizeArg("str:pnpm-workspace.yaml"));
+    expect(normalizeArg("str:Rakefile")).not.toBe(normalizeArg("str:package.json"));
+  });
+
   it("camelizes identifiers", () => {
     expect(normalizeArg("id:join_str")).toBe("ref:joinStr");
   });
