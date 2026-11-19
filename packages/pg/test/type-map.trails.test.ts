@@ -19,6 +19,7 @@ describe("PG::TypeMapByClass", () => {
     expect(map._lookupKlass(3)).toBe(int);
     expect(map._lookupKlass(true)).toBe(bool);
     expect(map._lookupKlass("x")).toBeNull();
+    expect(map._lookupKlass(1.5)).toBeNull();
     map.set(rbCInteger, null);
     map.set(rbCNumeric, int);
     expect(map._lookupKlass(3)).toBe(int);

@@ -81,9 +81,8 @@ export class Connection {
     }
   }
 
-  query(sql: string | null): Promise<Result> {
-    return this.asyncExec(sql);
-  }
+  declare query: Connection["asyncExec"];
+  declare exec: Connection["asyncExec"];
 
   async finish(): Promise<void> {
     try {
@@ -182,10 +181,6 @@ export class Connection {
 
   asyncExec(sql: string | null): Promise<Result> {
     return engine!.execute(this, sql);
-  }
-
-  exec(sql: string | null): Promise<Result> {
-    return this.asyncExec(sql);
   }
 
   isFinished(): boolean {
@@ -423,5 +418,8 @@ export function conndefaultsHash(): Record<string, string | null> {
   }
   return hash;
 }
+
+Connection.prototype.exec = Connection.prototype.asyncExec;
+Connection.prototype.query = Connection.prototype.asyncExec;
 
 PG.Connection = Connection;

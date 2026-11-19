@@ -114,7 +114,7 @@ describe("PGTextDecoder — Float, Boolean", () => {
 describe("PGTextDecoder — TimestampWithoutTimeZone", () => {
   it("reads the timestamp in the local zone, and keeps the coder's oid and name", () => {
     const utc = map._lookupOid(0, OID_TIMESTAMP)!;
-    const local = new PGTextDecoder.TimestampWithoutTimeZone(null, { ...utc.toH() });
+    const local = new PGTextDecoder.TimestampWithoutTimeZone(undefined, { ...utc.toH() });
     expect(local.toH()).toEqual({ oid: OID_TIMESTAMP, format: 0, flags: 0x3, name: "timestamp" });
     const naive = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
     expect(
@@ -212,7 +212,10 @@ describe("PGTextDecoder — timestamps match Time.new", () => {
       false,
     ],
     [
-      new PGTextDecoder.TimestampWithoutTimeZone(null, { oid: OID_TIMESTAMP, name: "timestamp" }),
+      new PGTextDecoder.TimestampWithoutTimeZone(undefined, {
+        oid: OID_TIMESTAMP,
+        name: "timestamp",
+      }),
       true,
       true,
     ],

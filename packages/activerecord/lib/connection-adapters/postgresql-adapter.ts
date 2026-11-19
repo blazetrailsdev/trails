@@ -1368,7 +1368,7 @@ export class PostgreSQLAdapter
 
   /**
    * @internal
-   * @missingRailsArgs new — PERMANENT
+   * @missingRailsArgs new — CONVERGEABLE call-args-gate-resolves-inherited-constructor-padding
    */
   async addPgDecoders(): Promise<void> {
     this._mappedDefaultTimezone = null;

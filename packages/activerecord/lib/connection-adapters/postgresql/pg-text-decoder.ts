@@ -1,6 +1,6 @@
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, rbFCaller, warn } from "@blazetrails/ruby-compat";
 import { SimpleDecoder, unescapeBytea } from "@blazetrails/pg";
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
@@ -116,7 +116,13 @@ class Timestamp extends SimpleDecoder {
 class TimestampUtc extends Timestamp {}
 
 class TimestampLocal extends Timestamp {
-  constructor(hash: Record<string, unknown> | null = null, kwargs: Record<string, unknown> = {}) {
+  constructor(hash: Record<string, unknown> = {}, kwargs: Record<string, unknown> = {}) {
+    if (Object.keys(hash).length > 0) {
+      warn(
+        `PG::Coder.new(hash) is deprecated. Please use keyword arguments instead! Called from ${rbFCaller()[0]}`,
+        { category: ":deprecated" },
+      );
+    }
     super(null, { ...hash, ...kwargs, flags: TIMESTAMP_DB_LOCAL | TIMESTAMP_APP_LOCAL });
   }
 }
