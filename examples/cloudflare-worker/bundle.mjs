@@ -19,7 +19,7 @@ const result = await build({
   target: "es2023",
   outfile: "dist/worker.js",
   external: ["node:*", "cloudflare:*"],
-  minify: false,
+  minify: true,
   define: { "import.meta.url": JSON.stringify("file:///bundle/dist/worker.js") },
   banner: {
     js: "import{createRequire as __cr}from'node:module';const require=__cr(\"file:///bundle/dist/worker.js\");",
