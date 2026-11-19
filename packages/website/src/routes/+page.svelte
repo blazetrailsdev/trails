@@ -78,14 +78,20 @@
       <div class="tabs">
         <button aria-pressed={tab === "same"} onclick={() => (tab = "same")}>Same method</button>
         <button aria-pressed={tab === "caught"} onclick={() => (tab = "caught")}>Caught by the compiler</button>
+        <button aria-pressed={tab === "ai"} onclick={() => (tab = "ai")}>AI disclaimer</button>
       </div>
       {#if tab === "same"}
         <div class="split">
           <div class="pane"><div class="file">app/models/post.rb &middot; Rails</div>{@html data.hero.rails}</div>
           <div class="pane"><div class="file">app/models/post.ts &middot; trails</div>{@html data.hero.trails}</div>
         </div>
-      {:else}
+      {:else if tab === "caught"}
         <div class="pane"><div class="file">app/models/check.ts &middot; pnpm build</div>{@html data.hero.check}</div>
+      {:else}
+        <div class="pane ai">
+          <img class="meme" src="{base}/claude-push-rails-to-typescript.jpg" width="343" height="604" alt="Patrick Star meme. Top panel: Claude: take Rails. Bottom panel: and push it to TypeScript. Make no mistakes." />
+          <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, Anthropic's AI model, working from the vendored Rails source under human direction and review. Every change, whoever wrote it, has to pass the same parity gates and CI before it merges.</p>
+        </div>
       {/if}
     </div>
   </header>
@@ -209,6 +215,9 @@
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2a1e16; }
   .pane { background: #3a2a1f; min-height: 380px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
+  .ai { display: flex; align-items: center; justify-content: center; gap: 48px; padding: 32px 40px; }
+  .meme { display: block; width: 260px; height: auto; border-radius: 8px; }
+  .disclaimer { max-width: 560px; margin: 0; font-size: 19px; line-height: 1.5; color: #fbf1e4; }
   .pane :global(.squiggle) { text-decoration: underline wavy #ff5d5d; text-underline-offset: 4px; }
   .pane :global(.tip) { display: block; width: max-content; max-width: 100%; margin: 6px 0 4px 2ch; padding: 8px 12px; background: #2b1d14; border: 1px solid #ff5d5d; border-radius: 6px; color: #ffb4b4; font-size: 13px; white-space: normal; }
 
@@ -257,6 +266,7 @@
     .tiles { grid-template-columns: repeat(2, 1fr); }
     .tiles li:nth-last-child(2) { grid-column: auto; }
     .blocks, .cards, .split { grid-template-columns: 1fr; }
+    .ai { flex-direction: column; }
     .card { padding: 40px 24px; }
   }
 </style>
