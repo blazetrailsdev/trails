@@ -57,6 +57,10 @@ describe("DispatcherTest", () => {
 
   beforeAll(async () => {
     await loadAppSchema();
+    for (const model of [Job, ScheduledExecution, ReadyExecution]) {
+      await model.loadSchema();
+      model.defineAttributeMethods();
+    }
     ApplicationJob.queueAdapter = new SolidQueueAdapter();
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
