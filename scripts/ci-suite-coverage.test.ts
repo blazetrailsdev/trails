@@ -1417,6 +1417,29 @@ describe("CI runs every tooling test suite", () => {
   );
 
   it(
+    "sets website_only only when every changed path is under packages/website/",
+    { timeout: 60_000 },
+    async () => {
+      const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+
+      const siteOnly = await runGate(
+        "packages/website/src/routes/+page.svelte\npackages/website/docs/guides/active-record-basics.md",
+      );
+      expect(siteOnly.website_only).toBe("true");
+      expect(siteOnly.website_affected).toBe("true");
+      expect(siteOnly.unit_packages).toBe("none");
+      expect(siteOnly.activerecord_affected).toBe("false");
+
+      const withPackage = await runGate(
+        "packages/website/src/routes/+page.svelte\npackages/activerecord/src/base.ts",
+      );
+      expect(withPackage.website_only).toBe("false");
+
+      expect((await runGate("packages/websites/x.ts")).website_only).toBe("false");
+    },
+  );
+
+  it(
     "sets actioncable_only only when every changed path is in the actioncable-only set",
     { timeout: 60_000 },
     async () => {

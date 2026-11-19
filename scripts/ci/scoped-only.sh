@@ -2,6 +2,7 @@
 set -euo pipefail
 THOR_ONLY_RE='^(packages/thor/|vendor/thor/|scripts/parity/unported-files/thor\.ts$|scripts/api-compare/call-mismatches-(exclude|unreviewed)/thor/)'
 ACTIONCABLE_ONLY_RE='^(packages/actioncable/|scripts/parity/unported-files/actioncable\.ts$)'
+WEBSITE_ONLY_RE='^packages/website/'
 files="${1:-}"
 if [ "$files" = - ]; then files=$(cat); fi
 scoped_only() {
@@ -13,6 +14,7 @@ scoped_only() {
 }
 scoped_only thor_only "$THOR_ONLY_RE"
 scoped_only actioncable_only "$ACTIONCABLE_ONLY_RE"
+scoped_only website_only "$WEBSITE_ONLY_RE"
 infra="${2:-}"
 ar_re="${3:-}"
 AR_SCOPE_RE='^packages/(activestorage|solid-queue|solid-cable|solid-cache|activerecord-cli|trails-tsc)/'
