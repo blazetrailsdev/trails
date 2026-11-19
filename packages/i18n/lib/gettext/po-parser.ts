@@ -171,15 +171,15 @@ export class PoParser extends RaccParser {
       } else if ((m = str.match(/^\[(\d+)\]/))) {
         this._q.push(["PLURAL_NUM", m[1]]);
         str = str.slice(m[0].length);
-      } else if ((m = str.match(/^#~(.*)/))) {
+      } else if ((m = str.match(/^#~([^\n]*)/))) {
         STDERR.print(this._("Warning: obsolete msgid exists.\n"));
         STDERR.print(`         ${m[0]}\n`);
         this._q.push(["COMMENT", m[0]]);
         str = str.slice(m[0].length);
-      } else if ((m = str.match(/^#(.*)/))) {
+      } else if ((m = str.match(/^#([^\n]*)/))) {
         this._q.push(["COMMENT", m[0]]);
         str = str.slice(m[0].length);
-      } else if ((m = str.match(/^"(.*)"/))) {
+      } else if ((m = str.match(/^"([^\n]*)"/))) {
         this._q.push(["STRING", m[1]]);
         str = str.slice(m[0].length);
       } else {
