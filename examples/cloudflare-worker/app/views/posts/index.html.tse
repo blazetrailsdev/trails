@@ -1,0 +1,10 @@
+<h1>Posts</h1>
+<ul>
+<% for (const post of posts) { %>
+  <li><%= post.title %></li>
+<% } %>
+</ul>
+<%= formWith({ url: "/posts", scope: "post" }, (form) => { %>
+  <%= form.textField("title") %>
+  <%= form.submit("Create post") %>
+<% }) %>

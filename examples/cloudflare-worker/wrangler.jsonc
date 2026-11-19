@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trails-cloudflare-worker",
+  "main": "dist/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "no_bundle": true,
+  "base_dir": ".",
+  "find_additional_modules": true,
+  "rules": [
+    {
+      "type": "Text",
+      "globs": [
+        "config.ts",
+        "app/**/*.ts",
+        "app/views/**/*.tse",
+        "config/application.ts",
+        "config/environment.ts",
+        "config/routes.ts",
+        "config/environments/*.ts",
+      ],
+    },
+  ],
+  "workers_dev": true,
+  "vars": { "TRAILS_ENV": "production" },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "postgres://trails:trails@localhost:5432/trails",
+    },
+  ],
+}

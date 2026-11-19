@@ -1,0 +1,5 @@
+import { Trails } from "@blazetrails/trailties";
+Trails.application.routes().draw(function () {
+  this.resources("posts", { only: ["index", "create"] });
+  this.get("health", { to: "posts#health" });
+});

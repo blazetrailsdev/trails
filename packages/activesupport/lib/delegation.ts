@@ -333,10 +333,17 @@ export namespace Delegation {
     file: string,
     line: number,
   ): (this: Record<string, unknown>, ...args: unknown[]) => unknown {
-    return new Function(
-      "body",
-      `${"\n".repeat(Math.max(0, line - 3))}return function (...args) { return body.apply(this, args); };\n//# sourceURL=${file.replace(/[^/]*$/, "./$&")}`,
-    )(body) as (this: Record<string, unknown>, ...args: unknown[]) => unknown;
+    try {
+      return new Function(
+        "body",
+        `${"\n".repeat(Math.max(0, line - 3))}return function (...args) { return body.apply(this, args); };\n//# sourceURL=${file.replace(/[^/]*$/, "./$&")}`,
+      )(body) as (this: Record<string, unknown>, ...args: unknown[]) => unknown;
+    } catch (e) {
+      if (!(e instanceof EvalError)) throw e;
+      return function (this: Record<string, unknown>, ...args: unknown[]) {
+        return body.apply(this, args);
+      };
+    }
   }
 
   const methodMissingLayers = new WeakSet<object>();

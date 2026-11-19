@@ -39,6 +39,8 @@ the run prints (`scripts/quickstart/run.sh`), on Linux with SQLite and with
 Use **Node 26** or later; the workspace's `engines` field enforces it at
 `pnpm install`.
 
+<!-- #region quickstart-build -->
+
 ```sh
 git clone https://github.com/blazetrailsdev/trails.git
 cd trails
@@ -49,7 +51,11 @@ pnpm build            # tsc --build over the workspace, ~10s
 export TRAILS=$PWD
 ```
 
+<!-- #endregion quickstart-build -->
+
 ### 2. Generate an application
+
+<!-- #region quickstart-new -->
 
 ```sh
 cd ..
@@ -84,7 +90,11 @@ overrides, then install:
 pnpm install
 ```
 
+<!-- #endregion quickstart-new -->
+
 ### 3. Scaffold a resource and migrate
+
+<!-- #region quickstart-scaffold -->
 
 ```sh
 bin/trails generate scaffold Post title:string body:text
@@ -148,11 +158,15 @@ export class CreatePosts extends Migration.get(8.0) {
 }
 ```
 
+<!-- #endregion quickstart-scaffold -->
+
 ### 4. Query from a script
 
 The model the generator wrote declares no attributes; they come from the
 table. Its `toString` makes the class render as `Post`, as Ruby's `Module#to_s`
 does.
+
+<!-- #region quickstart-query -->
 
 ```ts
 // app/models/post.ts (generated)
@@ -221,11 +235,15 @@ trails> await Post.where({ title: "Hello" }).count()
 1
 ```
 
+<!-- #endregion quickstart-query -->
+
 ### 5. Serve it
 
 The scaffold is a complete CRUD resource: a controller with `index` through
 `destroy`, a `setPost` before-action and `postParams()` over `params.expect`,
 and views ported from Rails' scaffold templates.
+
+<!-- #region quickstart-server -->
 
 ```sh
 bin/trails server -p 3927   # the default port is 3000; this run used 3927
@@ -236,6 +254,8 @@ bin/trails server -p 3927   # the default port is 3000; this run used 3927
 => Vite dev server with HMR enabled
 => Ctrl+C to stop
 ```
+
+<!-- #endregion quickstart-server -->
 
 Open `http://localhost:3927/posts` and the scaffold works as it does in Rails:
 
