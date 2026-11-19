@@ -1,11 +1,12 @@
 import { defineConfig } from "vitepress";
 
+const siteBase = process.env.SITE_BASE ?? "";
 const siteRoot = process.env.SITE_ROOT || "https://blazetrails.dev";
 
 export default defineConfig({
   title: "BlazeTrails",
   description: "Trails API for TypeScript",
-  base: "/docs/",
+  base: `${siteBase}/docs/`,
   outDir: "../build/docs",
   cleanUrls: true,
 
