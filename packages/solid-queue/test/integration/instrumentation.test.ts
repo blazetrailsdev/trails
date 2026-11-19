@@ -19,6 +19,7 @@ import {
   Job,
   Process,
   ReadyExecution,
+  RecurringExecution,
   RecurringTask,
   ScheduledExecution,
   Scheduler,
@@ -494,7 +495,7 @@ describe("InstrumentationTest", () => {
 
     const events = await subscribed("enqueue_recurring_task.solid_queue", async () => {
       for (const scheduler of schedulers) await scheduler.start();
-      await sleep(1.01);
+      await waitWhileWithTimeout(1.1, async () => (await RecurringExecution.count()) < 2);
       for (const scheduler of schedulers) await scheduler.stop();
     });
 
