@@ -38,6 +38,7 @@ describe("buildTemplates", () => {
       "q   3\n x 1y",
     );
     expect(await render("  <%%= a %>\n", {})).toBe("  <%= a %>\n");
+    expect(await render("a %%> b\n<%- let x = 1; -%>\n%%>", {})).toBe("a %%> b\n%%>");
   });
 
   it("resolves a free name when its line runs, not at render start", async () => {
