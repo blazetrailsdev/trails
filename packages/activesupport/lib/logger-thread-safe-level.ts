@@ -54,11 +54,9 @@ export class LoggerThreadSafeLevel {
   logAt<T>(level: number | LogLevel, fn: () => T): T {
     return IsolatedExecutionState.fork(this.localLevelKey, () => {
       const oldLocalLevel = this.localLevel;
+      this.localLevel = level;
       return rbEnsure(
-        () => {
-          this.localLevel = level;
-          return fn();
-        },
+        () => fn(),
         () => {
           this.localLevel = oldLocalLevel;
         },
