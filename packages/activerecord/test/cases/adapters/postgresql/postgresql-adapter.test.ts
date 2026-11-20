@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
-import { Temporal } from "@blazetrails/date";
+import { Date as RubyDate } from "@blazetrails/date";
 import { Base } from "../../../../lib/base.js";
 import { UrlConfig } from "../../../../lib/database-configurations/url-config.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, PG_TEST_CONFIG } from "./test-helper.js";
@@ -828,11 +828,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       try {
         await withPostgresqlApdaterDecodeDates(async () => {
-          const date = (await connection.selectValue(
-            "select '2024-01-01'::date",
-          )) as Temporal.PlainDate;
-          expect(date).toEqual(Temporal.PlainDate.from("2024-01-01"));
-          expect(date.constructor).toBe(Temporal.PlainDate);
+          const date = (await connection.selectValue("select '2024-01-01'::date")) as RubyDate;
+          expect(date).toEqual(new RubyDate(2024, 1, 1));
+          expect(date.constructor).toBe(RubyDate);
         });
       } finally {
         await connection.disconnectBang();

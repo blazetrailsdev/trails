@@ -10,6 +10,18 @@ import type { Coder, CompositeCoder } from "./coder.js";
 import type { Constants } from "./pg.js";
 import type { Result } from "./result.js";
 import type { Array as TextDecoderArray } from "./text-decoder/array.js";
+import type { Integer as TextDecoderInteger } from "./text-decoder/integer.js";
+import type { Float as TextDecoderFloat } from "./text-decoder/float.js";
+import type { Numeric as TextDecoderNumeric } from "./text-decoder/numeric.js";
+import type { Boolean as TextDecoderBoolean } from "./text-decoder/boolean.js";
+import type { Bytea as TextDecoderBytea } from "./text-decoder/bytea.js";
+import type { Date as TextDecoderDate } from "./text-decoder/date.js";
+import type {
+  Timestamp as TextDecoderTimestamp,
+  TimestampLocal as TextDecoderTimestampLocal,
+  TimestampUtc as TextDecoderTimestampUtc,
+  TimestampUtcToLocal as TextDecoderTimestampUtcToLocal,
+} from "./text-decoder/timestamp.js";
 import type { Array as TextEncoderArray } from "./text-encoder/array.js";
 import type { Boolean as TextEncoderBoolean } from "./text-encoder/boolean.js";
 import type { Integer as TextEncoderInteger } from "./text-encoder/integer.js";
@@ -42,7 +54,21 @@ export interface PGNamespace {
     Integer: typeof TextEncoderInteger;
     Boolean: typeof TextEncoderBoolean;
   };
-  readonly TextDecoder: { Array: typeof TextDecoderArray };
+  readonly TextDecoder: {
+    Array: typeof TextDecoderArray;
+    Integer: typeof TextDecoderInteger;
+    Float: typeof TextDecoderFloat;
+    Numeric: typeof TextDecoderNumeric;
+    Boolean: typeof TextDecoderBoolean;
+    Bytea: typeof TextDecoderBytea;
+    Date: typeof TextDecoderDate;
+    Timestamp: typeof TextDecoderTimestamp;
+    TimestampUtc: typeof TextDecoderTimestampUtc;
+    TimestampUtcToLocal: typeof TextDecoderTimestampUtcToLocal;
+    TimestampLocal: typeof TextDecoderTimestampLocal;
+    TimestampWithoutTimeZone: typeof TextDecoderTimestampLocal;
+    TimestampWithTimeZone: typeof TextDecoderTimestamp;
+  };
 }
 
 export const PG = {

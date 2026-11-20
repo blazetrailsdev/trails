@@ -23,6 +23,10 @@ export class Coder {
   static readonly FORMAT_ERROR_TO_RAISE = 0x4;
   static readonly FORMAT_ERROR_TO_STRING = 0x8;
   static readonly FORMAT_ERROR_TO_PARTIAL = 0xc;
+  static readonly TIMESTAMP_DB_UTC = 0x0;
+  static readonly TIMESTAMP_DB_LOCAL = 0x1;
+  static readonly TIMESTAMP_APP_UTC = 0x0;
+  static readonly TIMESTAMP_APP_LOCAL = 0x2;
 
   #oid = 0;
   #format = 0;

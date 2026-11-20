@@ -131,7 +131,6 @@ import type {
   SchemaNamespaceStatements,
 } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
-import { PGTextDecoder } from "./postgresql/pg-text-decoder.js";
 
 type PGDecoderClass = new (
   hash: undefined,
@@ -1351,8 +1350,8 @@ export class PostgreSQLAdapter
     ) {
       const decoderClass =
         defaultTimezone() === "utc"
-          ? PGTextDecoder.TimestampUtc
-          : PGTextDecoder.TimestampWithoutTimeZone;
+          ? PG.TextDecoder.TimestampUtc
+          : PG.TextDecoder.TimestampWithoutTimeZone;
 
       this.timestampDecoder = new decoderClass(undefined, { ...this.timestampDecoder.toH() });
       this._rawConnection.typeMapForResults.addCoder(this.timestampDecoder);
@@ -1371,18 +1370,18 @@ export class PostgreSQLAdapter
     this.timestampDecoder = null;
 
     const codersByName: Record<string, PGDecoderClass> = {
-      int2: PGTextDecoder.Integer,
-      int4: PGTextDecoder.Integer,
-      int8: PGTextDecoder.Integer,
-      oid: PGTextDecoder.Integer,
-      float4: PGTextDecoder.Float,
-      float8: PGTextDecoder.Float,
-      numeric: PGTextDecoder.Numeric,
-      bool: PGTextDecoder.Boolean,
-      timestamp: PGTextDecoder.TimestampUtc,
-      timestamptz: PGTextDecoder.TimestampWithTimeZone,
+      int2: PG.TextDecoder.Integer,
+      int4: PG.TextDecoder.Integer,
+      int8: PG.TextDecoder.Integer,
+      oid: PG.TextDecoder.Integer,
+      float4: PG.TextDecoder.Float,
+      float8: PG.TextDecoder.Float,
+      numeric: PG.TextDecoder.Numeric,
+      bool: PG.TextDecoder.Boolean,
+      timestamp: PG.TextDecoder.TimestampUtc,
+      timestamptz: PG.TextDecoder.TimestampWithTimeZone,
     };
-    if (this.decodeDates) codersByName["date"] = PGTextDecoder.Date;
+    if (this.decodeDates) codersByName["date"] = PG.TextDecoder.Date;
 
     const knownCoderTypes = Object.keys(codersByName).map((n) => this.quote(n));
     const query = `SELECT t.oid, t.typname
@@ -1404,7 +1403,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
     this._typeMapForResults = new PG.TypeMapByOid();
     this._typeMapForResults.defaultTypeMap = map;
     this._typeMapForResults.addCoder(
-      new PGTextDecoder.Bytea(undefined, { oid: 17, name: "bytea" }),
+      new PG.TextDecoder.Bytea(undefined, { oid: 17, name: "bytea" }),
     );
     this._typeMapForResults.addCoder(new MoneyDecoder(undefined, { oid: 790, name: "money" }));
 
@@ -2060,7 +2059,7 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
 export class MoneyDecoder extends PG.SimpleDecoder {
   static readonly TYPE = new Money();
 
-  decode(value: string): string | null {
+  decode(value: string, _tuple: number | null = null, _field: number | null = null): string | null {
     return MoneyDecoder.TYPE.deserialize(value) as string | null;
   }
 }
