@@ -37,7 +37,7 @@ import {
   waitForRegisteredProcesses,
   assertNoRegisteredProcesses,
 } from "./support/processes-test-helper.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 async function waitForJobsToFinishFor(timeout = 1) {
   await waitWhileWithTimeout(timeout, () => Job.where({ finished_at: null }).isAny());
@@ -45,7 +45,6 @@ async function waitForJobsToFinishFor(timeout = 1) {
 
 describe("WorkerTest", () => {
   let worker: Worker;
-  let originalOnThreadError: typeof SolidQueue.onThreadError;
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
@@ -56,19 +55,13 @@ describe("WorkerTest", () => {
   });
 
   beforeEach(() => {
-    originalOnThreadError = SolidQueue.onThreadError;
-    SolidQueue.onThreadError = (error) => {
-      if (!(error instanceof ExpectedTestError)) originalOnThreadError?.(error);
-    };
     worker = new Worker({ queues: "background", threads: 3, pollingInterval: 0.2 });
   });
 
   afterEach(async () => {
     await worker.stop();
     vi.restoreAllMocks();
-    SolidQueue.onThreadError = originalOnThreadError;
-    JobBuffer.values.length = 0;
-    await destroyRecords();
+    JobBuffer.clear();
   });
 
   afterAll(() => {

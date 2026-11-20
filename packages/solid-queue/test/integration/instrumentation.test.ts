@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "../support/dummy-application.js";
 import { Deadlocked } from "@blazetrails/activerecord";
 import {
@@ -28,7 +28,7 @@ import {
   SolidQueueAdapter,
   Worker,
 } from "../../lib/index.js";
-import { AddToBufferJob, JobBuffer } from "../support/add-to-buffer-job.js";
+import { AddToBufferJob } from "../support/add-to-buffer-job.js";
 import { ApplicationJob } from "../support/application-job.js";
 import { ExpectedTestError } from "../support/expected-test-error.js";
 import { JobResult, StoreResultJob } from "../support/job-result.js";
@@ -41,7 +41,7 @@ import {
 import { loadAppSchema } from "../support/queue-schema.js";
 import { RaisingJob } from "../support/raising-job.js";
 import { NonOverlappingUpdateResultJob } from "../support/non-overlapping-update-result-job.js";
-import { destroyRecords } from "../test-helper.js";
+import "../test-helper.js";
 
 type NotificationArgs = [string, unknown, unknown, unknown, { [key: string]: unknown }];
 
@@ -68,7 +68,6 @@ function assertEvent(
 }
 
 describe("InstrumentationTest", () => {
-  let originalOnThreadError: typeof SolidQueue.onThreadError;
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
@@ -80,19 +79,9 @@ describe("InstrumentationTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
-  beforeEach(() => {
-    originalOnThreadError = SolidQueue.onThreadError;
-    SolidQueue.onThreadError = (error) => {
-      if (!(error instanceof ExpectedTestError)) originalOnThreadError?.(error);
-    };
-  });
-
   afterEach(async () => {
     vi.restoreAllMocks();
     travelBack();
-    SolidQueue.onThreadError = originalOnThreadError;
-    JobBuffer.clear();
-    await destroyRecords();
   });
 
   afterAll(() => {

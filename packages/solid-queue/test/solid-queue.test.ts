@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import { SolidQueue, VERSION } from "../lib/index.js";
 
 describe("SolidQueueTest", () => {

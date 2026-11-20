@@ -32,7 +32,7 @@ import {
 } from "../support/processes-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { destroyRecords } from "../test-helper.js";
+import "../test-helper.js";
 
 async function enqueueStoreResultJob(
   value: string,
@@ -129,10 +129,6 @@ describe("AsyncProcessesLifecycleTest", () => {
   });
 
   beforeEach(async () => {
-    await destroyRecords();
-  });
-
-  beforeEach(async () => {
     pid = runSupervisor({
       mode: "async",
       workers: [{ queues: "background" }, { queues: "default", threads: 5 }],
@@ -145,7 +141,6 @@ describe("AsyncProcessesLifecycleTest", () => {
   afterEach(async () => {
     if (pid.isExists) await pid.terminate();
     vi.restoreAllMocks();
-    await destroyRecords();
   });
 
   afterAll(() => {

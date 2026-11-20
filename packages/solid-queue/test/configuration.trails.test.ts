@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Configuration } from "../lib/configuration.js";
 import { RecurringTask } from "../lib/recurring-task.js";

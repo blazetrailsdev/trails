@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import { freezeTime, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { RecurringJob, RecurringTask } from "../lib/index.js";
 import { JobBuffer } from "./support/add-to-buffer-job.js";

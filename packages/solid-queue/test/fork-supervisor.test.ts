@@ -34,7 +34,7 @@ import {
 } from "./support/processes-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 const dummyRoot = `${import.meta.dirname}/support/dummy`;
 
@@ -84,10 +84,6 @@ describe("SupervisorTest", () => {
   let previousPidfile: unknown;
   let pidfile: string;
 
-  beforeEach(async () => {
-    await destroyRecords();
-  });
-
   beforeEach(() => {
     previousPidfile = SolidQueue.supervisorPidfile;
     pidfile = `${import.meta.dirname}/support/dummy/tmp/pids/pidfile_${SecureRandom.hex()}.pid`;
@@ -105,7 +101,6 @@ describe("SupervisorTest", () => {
     SolidQueue.supervisorPidfile = previousPidfile;
     if (await File.isExistAsync(pidfile)) await File.deleteAsync(pidfile);
     vi.restoreAllMocks();
-    await destroyRecords();
   });
 
   afterAll(() => {

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "../support/dummy-application.js";
 import {
   permanentConnectionCheckout,
@@ -25,7 +25,7 @@ import {
   waitForProcessTerminationWithTimeout,
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
-import { destroyRecords } from "../test-helper.js";
+import "../test-helper.js";
 
 class SupervisorBootSignalTest extends TestCase {
   static {
@@ -67,13 +67,8 @@ describe("SupervisorBootSignalTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
-  beforeEach(async () => {
-    await destroyRecords();
-  });
-
   afterEach(async () => {
     vi.restoreAllMocks();
-    await destroyRecords();
   });
 
   afterAll(() => {

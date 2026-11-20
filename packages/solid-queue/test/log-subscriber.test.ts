@@ -15,7 +15,7 @@ import { Time } from "@blazetrails/date";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { LogSubscriber, Process, SolidQueue } from "../lib/index.js";
 import { loadAppSchema } from "./support/queue-schema.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 describe("LogSubscriberTest", () => {
   let oldLogger: Logger;
@@ -38,7 +38,6 @@ describe("LogSubscriberTest", () => {
     BaseLogSubscriber.logSubscribers().length = 0;
     testHelperTeardown.call(t);
     SolidQueue.logger = oldLogger;
-    await destroyRecords();
   });
 
   function attachLogSubscriber() {

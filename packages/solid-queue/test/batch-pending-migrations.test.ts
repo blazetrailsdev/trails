@@ -43,10 +43,6 @@ describe("BatchPendingMigrationsTest", () => {
   });
 
   beforeEach(async () => {
-    await destroyRecords();
-  });
-
-  beforeEach(async () => {
     await migrate("down");
   });
 

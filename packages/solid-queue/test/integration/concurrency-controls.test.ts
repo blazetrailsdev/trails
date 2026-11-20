@@ -30,11 +30,7 @@ import { DiscardableUpdateResultJob } from "../support/discardable-update-result
 import { NonOverlappingUpdateResultJob } from "../support/non-overlapping-update-result-job.js";
 import { ThrottledUpdateResultJob } from "../support/throttled-update-result-job.js";
 import { UpdateResultJob } from "../support/update-result-job.js";
-import {
-  assertNoUnfinishedJobs,
-  silentOnThreadErrorFor,
-  waitForJobsToFinishFor,
-} from "../support/jobs-test-helper.js";
+import { assertNoUnfinishedJobs, waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
 import {
   runSupervisor,
   sleep,
@@ -72,7 +68,6 @@ constSet(TopLevel, "ConcurrencyControlsTest", ConcurrencyControlsTest);
 describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   let result: JobResult;
   let run: ReturnType<typeof runSupervisor>;
-  let onThreadError: typeof SolidQueue.onThreadError;
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
@@ -87,8 +82,6 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   beforeEach(async () => {
-    onThreadError = SolidQueue.onThreadError;
-    SolidQueue.onThreadError = silentOnThreadErrorFor(ExpectedTestError, onThreadError);
     result = await JobResult.createBang({ queue_name: "default", status: "seq: " });
 
     const defaultWorker = { queues: "default", pollingInterval: 0.1, processes: 3, threads: 2 };
@@ -103,7 +96,6 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     await run.terminate();
     await waitForRegisteredProcesses(0, { timeout: 5 });
     vi.restoreAllMocks();
-    SolidQueue.onThreadError = onThreadError;
     await destroyRecords();
   });
 

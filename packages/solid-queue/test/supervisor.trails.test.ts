@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
