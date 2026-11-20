@@ -4,80 +4,193 @@ import { Coder } from "../coder.js";
 import { SimpleDecoder } from "../simple-decoder.js";
 import { PG } from "../namespaces.js";
 
-const TIMESTAMP =
-  /^(\d{1,7})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)(?:\.(\d+))?(?:([+-])(\d\d)(?::(\d\d))?(?::(\d\d))?)?( BC)?$/;
+/** @internal */
+function isdigit(c: string | undefined): boolean {
+  return c !== undefined && c >= "0" && c <= "9";
+}
+
+/** @internal */
+function charToDigit(c: string): number {
+  return c.charCodeAt(0) - 48;
+}
+
+/** @internal */
+function str2ToInt(str: string, p: number): number {
+  return charToDigit(str[p]) * 10 + charToDigit(str[p + 1]);
+}
+
+/** @internal */
+function parseYear(val: string, str: { p: number }): number {
+  let year = 0;
+  let i: number;
+  let p = str.p;
+
+  for (i = 0; isdigit(val[p]) && i < 7; i++, p++) {
+    year = 10 * year + charToDigit(val[p]);
+  }
+
+  str.p = p;
+  return year;
+}
+
+const TZ_NEG = 1;
+const TZ_POS = 2;
 
 /** @noRailsEquivalent PERMANENT */
 export class Timestamp extends SimpleDecoder {
   /** @noRailsEquivalent PERMANENT */
   decode(string: string, _tuple: number | null = null, _field: number | null = null): unknown {
-    const m = TIMESTAMP.exec(string);
-    let year = Number(m?.[1]);
+    return pgTextDecTimestamp(this, string);
+  }
+}
 
-    if (year > 0 && m) {
-      if (m[12]) year = -year + 1;
-      const nsec = BigInt((m[7] ?? "").slice(0, 9).padEnd(9, "0"));
-      const local = !m[8] && this.flags & Coder.TIMESTAMP_DB_LOCAL;
-      if (!local && year <= 275759) {
-        const ms = globalThis.Date.UTC(
-          year,
-          Number(m[2]) - 1,
-          Number(m[3]),
-          Number(m[4]),
-          Number(m[5]),
-          Number(m[6]),
-        );
-        if (year >= 100 && !Number.isNaN(ms)) {
-          let gmtOffset = 0;
-          if (m[8]) {
-            gmtOffset = Number(m[9]) * 3600 + Number(m[10] ?? 0) * 60 + Number(m[11] ?? 0);
-            if (m[8] === "-") gmtOffset = -gmtOffset;
-          }
-          const epochNs = BigInt(ms - gmtOffset * 1000) * 1_000_000n + nsec;
-          if (m[8]) return Time.timespecNew(epochNs, gmtOffset);
-          return Time.timespecNew(
-            epochNs,
-            this.flags & Coder.TIMESTAMP_APP_LOCAL ? "local" : "utc",
-          );
-        }
-      }
-      const secValue = nsec
-        ? new Rational(BigInt(m[6]) * 1_000_000_000n + nsec, 1_000_000_000n)
-        : Number(m[6]);
+/** @internal */
+function pgTextDecTimestamp(conv: Timestamp, val: string): unknown {
+  const s = { p: 0 };
+  let nsec = 0;
+  let tzGiven = 0;
+  let tzHour = 0;
+  let tzMin = 0;
+  let tzSec = 0;
 
-      if (m[8]) {
-        let gmtOffset = Number(m[9]) * 3600 + Number(m[10] ?? 0) * 60 + Number(m[11] ?? 0);
-        if (m[8] === "-") gmtOffset = -gmtOffset;
-        return Time.new(
-          year,
-          Number(m[2]),
-          Number(m[3]),
-          Number(m[4]),
-          Number(m[5]),
-          secValue,
-          gmtOffset,
-        );
+  let year = parseYear(val, s);
+  let str = s.p;
+
+  if (
+    year > 0 &&
+    val[str] === "-" &&
+    isdigit(val[str + 1]) &&
+    isdigit(val[str + 2]) &&
+    val[str + 3] === "-" &&
+    isdigit(val[str + 4]) &&
+    isdigit(val[str + 5]) &&
+    val[str + 6] === " " &&
+    isdigit(val[str + 7]) &&
+    isdigit(val[str + 8]) &&
+    val[str + 9] === ":" &&
+    isdigit(val[str + 10]) &&
+    isdigit(val[str + 11]) &&
+    val[str + 12] === ":" &&
+    isdigit(val[str + 13]) &&
+    isdigit(val[str + 14])
+  ) {
+    const mon = str2ToInt(val, str + 1);
+    str += 3;
+    const day = str2ToInt(val, str + 1);
+    str += 3;
+    const hour = str2ToInt(val, str + 1);
+    str += 3;
+    const min = str2ToInt(val, str + 1);
+    str += 3;
+    const sec = str2ToInt(val, str + 1);
+    str += 3;
+
+    if (val[str] === "." && isdigit(val[str + 1])) {
+      const coef = [100000000, 10000000, 1000000, 100000, 10000, 1000, 100, 10, 1];
+      let i: number;
+
+      str++;
+      for (i = 0; i < 9 && isdigit(val[str]); i++) {
+        nsec += coef[i] * charToDigit(val[str++]);
       }
-      const res = Time.new(
-        year,
-        Number(m[2]),
-        Number(m[3]),
-        Number(m[4]),
-        Number(m[5]),
-        secValue,
-        this.flags & Coder.TIMESTAMP_DB_LOCAL ? null : 0,
-      );
-      if (this.flags & Coder.TIMESTAMP_DB_LOCAL && this.flags & Coder.TIMESTAMP_APP_LOCAL) {
-        return res;
-      } else if (this.flags & Coder.TIMESTAMP_APP_LOCAL) {
-        return res.getlocal();
-      } else {
-        return res.utc();
+      while (isdigit(val[str])) str++;
+    }
+
+    if ((val[str] === "+" || val[str] === "-") && isdigit(val[str + 1]) && isdigit(val[str + 2])) {
+      tzGiven = val[str] === "-" ? TZ_NEG : TZ_POS;
+      tzHour = str2ToInt(val, str + 1);
+      str += 3;
+
+      if (val[str] === ":" && isdigit(val[str + 1]) && isdigit(val[str + 2])) {
+        tzMin = str2ToInt(val, str + 1);
+        str += 3;
+      }
+      if (val[str] === ":" && isdigit(val[str + 1]) && isdigit(val[str + 2])) {
+        tzSec = str2ToInt(val, str + 1);
+        str += 3;
       }
     }
 
-    return string;
+    if (val[str] === " " && val[str + 1] === "B" && val[str + 2] === "C") {
+      year = -year + 1;
+      str += 3;
+    }
+
+    if (str === val.length) {
+      let secValue: number | Rational;
+      let gmtOffsetValue: number | null;
+
+      if (tzGiven) {
+        const time = timegm(year, mon, day, hour, min, sec);
+        if (time !== -1) {
+          let gmtOffset = tzHour * 3600 + tzMin * 60 + tzSec;
+          if (tzGiven === TZ_NEG) {
+            gmtOffset = -gmtOffset;
+          }
+          return Time.timespecNew(
+            BigInt(time - gmtOffset) * 1_000_000_000n + BigInt(nsec),
+            gmtOffset,
+          );
+        }
+      } else if (!(conv.flags & Coder.TIMESTAMP_DB_LOCAL)) {
+        const time = timegm(year, mon, day, hour, min, sec);
+        if (time !== -1) {
+          return Time.timespecNew(
+            BigInt(time) * 1_000_000_000n + BigInt(nsec),
+            conv.flags & Coder.TIMESTAMP_APP_LOCAL ? "local" : "utc",
+          );
+        }
+      }
+
+      if (nsec) {
+        const secNumerator = sec * 1000000 + Math.trunc(nsec / 1000);
+        const secDenominator = 1000000;
+        secValue = new Rational(secNumerator, secDenominator);
+      } else {
+        secValue = sec;
+      }
+
+      if (tzGiven) {
+        let gmtOffset = tzHour * 3600 + tzMin * 60 + tzSec;
+        if (tzGiven === TZ_NEG) {
+          gmtOffset = -gmtOffset;
+        }
+        gmtOffsetValue = gmtOffset;
+      } else {
+        gmtOffsetValue = conv.flags & Coder.TIMESTAMP_DB_LOCAL ? null : 0;
+      }
+
+      const res = Time.new(year, mon, day, hour, min, secValue, gmtOffsetValue);
+
+      if (tzGiven) {
+        return res;
+      } else {
+        if (conv.flags & Coder.TIMESTAMP_DB_LOCAL && conv.flags & Coder.TIMESTAMP_APP_LOCAL) {
+          return res;
+        } else if (conv.flags & Coder.TIMESTAMP_APP_LOCAL) {
+          return res.getlocal();
+        } else {
+          return res.utc();
+        }
+      }
+    }
   }
+
+  return val;
+}
+
+/** @internal */
+function timegm(
+  year: number,
+  mon: number,
+  day: number,
+  hour: number,
+  min: number,
+  sec: number,
+): number {
+  if (year < 100 || year > 275759) return -1;
+  const ms = globalThis.Date.UTC(year, mon - 1, day, hour, min, sec);
+  return Number.isNaN(ms) ? -1 : ms / 1000;
 }
 
 export class TimestampUtc extends Timestamp {

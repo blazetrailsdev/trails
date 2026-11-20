@@ -4,7 +4,7 @@ import {
   rbClassNewInstance,
   stringValue,
 } from "@blazetrails/ruby-compat";
-import { ConnectionBad, UnableToSend } from "./exceptions.js";
+import { ConnectionBad, Error as PgError, UnableToSend } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { Result } from "./result.js";
 import type { TypeMapByClass } from "./type-map-by-class.js";
@@ -211,8 +211,22 @@ export class Connection {
     return this.client._ending === true || this.client._ended === true;
   }
 
-  escapeIdentifier(str: string): string {
-    return `"${str.replace(/"/g, '""')}"`;
+  escapeIdentifier(string: unknown): string {
+    if (this.client._ending === true) {
+      throw new ConnectionBad("connection is closed", { connection: this });
+    }
+    const str = stringValue(string);
+    if (str.includes("\0")) throw new ArgumentError("string contains null byte");
+    if (/\p{Surrogate}/u.test(str)) {
+      throw new PgError("invalid multibyte character\n", { connection: this });
+    }
+
+    let escaped = '"';
+    for (const c of str) {
+      if (c === '"') escaped += '"';
+      escaped += c;
+    }
+    return escaped + '"';
   }
 
   declare escapeString: typeof escapeString;
