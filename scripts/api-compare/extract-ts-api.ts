@@ -1280,8 +1280,6 @@ export function extractFromProgram(
       }
     });
 
-    // `onLoad("…", () => { class X extends … {} Ns.X = X; })` — Ruby's
-    // `on_load(…) { class Ns::X … end }`: a class a load hook defines and seats.
     const visitHookClasses = (node: ts.Node): void => {
       ts.forEachChild(node, visitHookClasses);
       if (!ts.isBlock(node) || ts.isSourceFile(node.parent)) return;
@@ -4320,8 +4318,6 @@ function readPrototypeDelegateCall(
 ): ClassAttributeCall | null {
   const [recv, ...rest] = node.arguments;
   const enclosing = enclosingEntity(node);
-  // `included do delegate … end`: `[included](base) { delegate.call(base.prototype, …) }`
-  // on a plain-object Concern defines the delegators on every includer.
   const hookBase = enclosing?.seatsModule ? includedHookBase(node) : undefined;
   const receiver =
     recv === undefined
