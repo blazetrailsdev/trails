@@ -14,11 +14,6 @@ function hasWriter(target: object, name: string): boolean {
   return false;
 }
 
-/** @internal */
-function isActualMethod(config: Configuration, key: string): boolean {
-  return !Object.hasOwn(Configuration._options, key) && config.isRespondTo(key);
-}
-
 export class Configuration {
   /** @internal */
   static readonly _eagerLoadNamespaces: unknown[] = [];
@@ -118,10 +113,15 @@ export class Configuration {
     return basicObjRespondTo(this, name) || Object.hasOwn(Configuration._options, name);
   }
 
+  /** @internal */
+  private isActualMethod(key: string): boolean {
+    return !Object.hasOwn(Configuration._options, key) && this.isRespondTo(key);
+  }
+
   methodMissing(name: string, ...args: unknown[]): unknown {
     if (name.endsWith("=")) {
       const key = name.slice(0, -1);
-      if (isActualMethod(this, key)) {
+      if (this.isActualMethod(key)) {
         throw new NoMethodError(`Cannot assign to \`${key}\`, it is a configuration method`);
       }
       return (Configuration._options[key] = args[0]);

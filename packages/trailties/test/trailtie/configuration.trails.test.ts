@@ -32,6 +32,13 @@ describe("Railtie::Configuration (trails)", () => {
     expect(config.neverSetKey).toBe(1);
   });
 
+  it("reassigns an option it already stores", () => {
+    const config = new Configuration() as Configuration & { reassignedOption: unknown };
+    config.reassignedOption = 1;
+    config.reassignedOption = 2;
+    expect(config.reassignedOption).toBe(2);
+  });
+
   it("answers JS protocol probes without raising", () => {
     const config = new Configuration() as Configuration & { then: unknown };
     expect(config.then).toBeUndefined();
