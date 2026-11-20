@@ -21,9 +21,9 @@ import {
   STDERR,
   STDOUT,
   rbModGt,
+  rbModName,
 } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
-import { rbModName } from "@blazetrails/ruby-compat";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import { Fixture } from "@blazetrails/activerecord/fixtures.js";
