@@ -43,10 +43,9 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   // `log_subscriber/test_helper.rb`, which AR's own log_subscriber and enum
   // tests include.
   {
-    pattern: "cache/redis_cache_store.rb",
     testFile: "redis_cache_store_test.rb",
     package: "activesupport",
-    reason: SOLID_STACK_ONLY,
+    reason: "CONVERGEABLE port-redis-cache-store-test",
   },
   {
     pattern: "cache/mem_cache_store.rb",

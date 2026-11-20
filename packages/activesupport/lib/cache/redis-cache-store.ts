@@ -2,6 +2,9 @@ import { createPool, type Pool } from "generic-pool";
 import { Redis, ReplyError, type ChainableCommander, type RedisOptions } from "ioredis";
 import {
   ArgumentError,
+  b,
+  byteslice,
+  Gem,
   Hash,
   NotImplementedError,
   prepend,
@@ -10,6 +13,9 @@ import {
   type Included,
 } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "../namespaces.js";
+import { wrap } from "../core-ext/array/wrap.js";
+import { pluck } from "../enumerable-utils.js";
+import { extractOptionsBang } from "../hash-utils.js";
 import { Digest } from "../digest.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import { Entry } from "./entry.js";
@@ -44,6 +50,16 @@ export const DEFAULT_ERROR_HANDLER: ErrorHandler = ({ method, returning, excepti
 };
 
 const SCAN_BATCH_SIZE = 1000;
+
+/** @noRailsEquivalent PERMANENT */
+function _parseInfo(info: string): Record<string, string> {
+  return Object.fromEntries(
+    info
+      .split("\r\n")
+      .filter((line) => line.includes(":") && !line.startsWith("#"))
+      .map((line) => [line.slice(0, line.indexOf(":")), line.slice(line.indexOf(":") + 1)]),
+  );
+}
 
 /** @noRailsEquivalent PERMANENT */
 async function _then<T>(redis: RedisClient, block: (c: Redis) => T | Promise<T>): Promise<T> {
@@ -98,8 +114,9 @@ export class RedisCacheStore extends Store implements CacheStore {
     url,
     ...redisOptions
   }: { url?: string } & RedisOptions): Redis {
-    const options = { ...DEFAULT_REDIS_OPTIONS, ...redisOptions, lazyConnect: true };
-    return url == null ? new Redis(options) : new Redis(url, options);
+    return url == null
+      ? new Redis({ ...DEFAULT_REDIS_OPTIONS, ...redisOptions, lazyConnect: true })
+      : new Redis(url, { ...DEFAULT_REDIS_OPTIONS, ...redisOptions, lazyConnect: true });
   }
 
   readonly maxKeyBytesize: number;
@@ -145,7 +162,19 @@ export class RedisCacheStore extends Store implements CacheStore {
   }
 
   override async readMulti(...names: unknown[]): Promise<Map<unknown, unknown>> {
-    return await super.readMulti(...names);
+    if (names.length === 0) return new Map();
+
+    let options = extractOptionsBang(names) as StoreOptions;
+    options = this.mergedOptions(options);
+    const keys = await Promise.all(names.map((name) => this.normalizeKey(name, options)));
+
+    return await this.instrumentMulti("read_multi", keys, options, async (payload) => {
+      const results = await this.readMultiEntries(names, options);
+      const hits: Buffer[] = [];
+      for (const name of results.keys()) hits.push(await this.normalizeKey(name, options));
+      payload.hits = hits;
+      return results;
+    });
   }
 
   override async deleteMatched(matcher: unknown, options?: StoreOptions): Promise<void> {
@@ -177,7 +206,7 @@ export class RedisCacheStore extends Store implements CacheStore {
     options = this.mergedOptions(options);
     const key = await this.normalizeKey(name, options);
     return await this.instrument("increment", key, { amount }, async () => {
-      return await this.failsafe("increment", null, () => this.changeCounter(key, amount, options));
+      return await this.failsafe("increment", () => this.changeCounter(key, amount, options));
     });
   }
 
@@ -189,9 +218,7 @@ export class RedisCacheStore extends Store implements CacheStore {
     options = this.mergedOptions(options);
     const key = await this.normalizeKey(name, options);
     return await this.instrument("decrement", key, { amount }, async () => {
-      return await this.failsafe("decrement", null, () =>
-        this.changeCounter(key, -amount, options),
-      );
+      return await this.failsafe("decrement", () => this.changeCounter(key, -amount, options));
     });
   }
 
@@ -200,7 +227,7 @@ export class RedisCacheStore extends Store implements CacheStore {
   }
 
   override async clear(options?: StoreOptions): Promise<void> {
-    await this.failsafe("clear", null, async () => {
+    await this.failsafe("clear", async () => {
       const namespace = this.mergedOptions(options).namespace;
       if (namespace != null && namespace !== false) {
         await this.deleteMatched("*", { namespace });
@@ -216,8 +243,8 @@ export class RedisCacheStore extends Store implements CacheStore {
 
   /** @internal */
   private async pipelineEntries<T>(
-    entries: [string, T][],
-    block: (pipe: ChainableCommander, entries: [string, T][]) => void | Promise<void>,
+    entries: [Buffer, T][],
+    block: (pipe: ChainableCommander, entries: [Buffer, T][]) => void | Promise<void>,
   ): Promise<void> {
     await _then(this.redis, async (c) => {
       const pipe = c.pipeline();
@@ -227,15 +254,13 @@ export class RedisCacheStore extends Store implements CacheStore {
   }
 
   /** @internal */
-  protected async readEntry(key: string, options: StoreOptions): Promise<Entry | null> {
+  protected async readEntry(key: Buffer, options: StoreOptions): Promise<Entry | null> {
     return this.deserializeEntry(await this.readSerializedEntry(key, options), options);
   }
 
   /** @internal */
-  protected async readSerializedEntry(key: string, _options?: StoreOptions): Promise<unknown> {
-    return await this.failsafe("read_entry", null, () =>
-      _then(this.redis, (c) => c.getBuffer(key)),
-    );
+  protected async readSerializedEntry(key: Buffer, _options?: StoreOptions): Promise<unknown> {
+    return await this.failsafe("read_entry", () => _then(this.redis, (c) => c.getBuffer(key)));
   }
 
   /** @internal */
@@ -248,11 +273,13 @@ export class RedisCacheStore extends Store implements CacheStore {
     if (names.length === 0) return results;
 
     const raw = Object.hasOwn(options, "raw") ? options.raw : false;
-    const keys: string[] = [];
+    const keys: Buffer[] = [];
     for (const name of names) keys.push(await this.normalizeKey(name, options));
 
-    const values = await this.failsafe("read_multi_entries", [] as (Buffer | null)[], () =>
-      _then(this.redis, (c) => c.mgetBuffer(...keys)),
+    const values = await this.failsafe(
+      "read_multi_entries",
+      { returning: [] as (Buffer | null)[] },
+      () => _then(this.redis, (c) => c.mgetBuffer(...keys)),
     );
 
     for (const [i, name] of names.entries()) {
@@ -278,7 +305,7 @@ export class RedisCacheStore extends Store implements CacheStore {
   }
 
   /** @internal */
-  protected async writeEntry(key: string, entry: Entry, options: StoreOptions): Promise<boolean> {
+  protected async writeEntry(key: Buffer, entry: Entry, options: StoreOptions): Promise<boolean> {
     const raw = options.raw ?? false;
     return await this.writeSerializedEntry(key, this.serializeEntry(entry, { ...options, raw }), {
       ...options,
@@ -288,7 +315,7 @@ export class RedisCacheStore extends Store implements CacheStore {
 
   /** @internal */
   protected async writeSerializedEntry(
-    key: string,
+    key: Buffer,
     payload: unknown,
     {
       raw = false,
@@ -314,7 +341,7 @@ export class RedisCacheStore extends Store implements CacheStore {
       (pipeline as ChainableCommander).set(key, value, ...(modifiers as ["PX", number]));
       return true;
     } else {
-      return (await this.failsafe("write_entry", null, () =>
+      return (await this.failsafe("write_entry", { returning: null }, () =>
         _then(
           this.redis,
           async (c) => (await c.set(key, value, ...(modifiers as ["PX", number]))) != null,
@@ -324,18 +351,18 @@ export class RedisCacheStore extends Store implements CacheStore {
   }
 
   /** @internal */
-  protected async deleteEntry(key: string, _options: StoreOptions): Promise<boolean> {
-    return await this.failsafe("delete_entry", false, () =>
+  protected async deleteEntry(key: Buffer, _options: StoreOptions): Promise<boolean> {
+    return await this.failsafe("delete_entry", { returning: false }, () =>
       _then(this.redis, async (c) => (await c.del(key)) === 1),
     );
   }
 
   /** @internal */
   protected override async deleteMultiEntries(
-    entries: string[],
+    entries: Buffer[],
     _options: StoreOptions,
   ): Promise<number> {
-    return await this.failsafe("delete_multi_entries", 0, () =>
+    return await this.failsafe("delete_multi_entries", { returning: 0 }, () =>
       _then(this.redis, (c) => c.del(...entries)),
     );
   }
@@ -347,8 +374,8 @@ export class RedisCacheStore extends Store implements CacheStore {
   ): Promise<Hash<string | Uint8Array, Entry>> {
     if (entries.size === 0) return entries;
 
-    await this.failsafe("write_multi_entries", null, () =>
-      this.pipelineEntries([...entries] as [string, Entry][], async (pipeline, shardedEntries) => {
+    await this.failsafe("write_multi_entries", () =>
+      this.pipelineEntries([...entries] as [Buffer, Entry][], async (pipeline, shardedEntries) => {
         options = { ...options };
         options.pipeline = pipeline;
         for (const [key, entry] of shardedEntries) {
@@ -359,19 +386,25 @@ export class RedisCacheStore extends Store implements CacheStore {
     return entries;
   }
 
-  /** @internal */
-  protected override async normalizeKey(key: unknown, options?: StoreOptions): Promise<string> {
-    return this.truncateKey((await super.normalizeKey(key, options)) as string);
+  /**
+   * @internal
+   * @missingRailsArgs b — PERMANENT
+   */
+  protected override async normalizeKey(key: unknown, options?: StoreOptions): Promise<Buffer> {
+    return this.truncateKey(b(await super.normalizeKey(key, options)));
   }
 
-  /** @internal */
-  private truncateKey(key: string): string {
-    if (key && Buffer.byteLength(key) > this.maxKeyBytesize) {
+  /**
+   * @internal
+   * @inventedArm from — PERMANENT
+   */
+  private truncateKey(key: Uint8Array): Buffer {
+    if (key && key.length > this.maxKeyBytesize) {
       const suffix = `:hash:${Digest.hexdigest(key)}`;
-      const truncateAt = this.maxKeyBytesize - Buffer.byteLength(suffix);
-      return `${Buffer.from(key).subarray(0, truncateAt).toString("latin1")}${suffix}`;
+      const truncateAt = this.maxKeyBytesize - b(suffix).length;
+      return Buffer.concat([byteslice(key, 0, truncateAt)!, b(suffix)]);
     } else {
-      return key;
+      return Buffer.from(key);
     }
   }
 
@@ -397,7 +430,15 @@ export class RedisCacheStore extends Store implements CacheStore {
   }
 
   /** @internal */
-  private async changeCounter(key: string, amount: number, options: StoreOptions): Promise<number> {
+  private serializeEntries(
+    entries: Hash<string | Uint8Array, Entry>,
+    options: StoreOptions = {},
+  ): Map<string | Uint8Array, unknown> {
+    return new Map([...entries].map(([key, entry]) => [key, this.serializeEntry(entry, options)]));
+  }
+
+  /** @internal */
+  private async changeCounter(key: Buffer, amount: number, options: StoreOptions): Promise<number> {
     return await _then(this.redis, async (c) => {
       const expiresIn = options.expiresIn as number | null | undefined;
       let count: number;
@@ -422,21 +463,32 @@ export class RedisCacheStore extends Store implements CacheStore {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs pluck — PERMANENT
+   */
   private async isSupportsExpireNx(): Promise<boolean> {
     if (this._supportsExpireNx !== undefined) return this._supportsExpireNx;
-    const redisVersions = await _then(this.redis, async (c) =>
-      [await c.info("server")].map((info) => /redis_version:(\S+)/.exec(info)?.[1] ?? "0"),
+    const redisVersions = await _then(
+      this.redis,
+      async (c) =>
+        pluck(
+          wrap<Record<string, string>>(_parseInfo(await c.info("server"))),
+          "redis_version",
+        ) as string[],
     );
-    return (this._supportsExpireNx = redisVersions.every((v) => Number(v.split(".")[0]) >= 7));
+    return (this._supportsExpireNx = redisVersions.every(
+      (v) => (new Gem.Version(v).compare(new Gem.Version("7.0.0")) ?? -1) >= 0,
+    ));
   }
 
   /** @internal */
-  private async failsafe<T, R>(
+  private async failsafe<T, R = null>(
     method: string,
-    returning: R,
-    block: () => T | Promise<T>,
+    ...args: [{ returning?: R }, () => T | Promise<T>] | [() => T | Promise<T>]
   ): Promise<T | R> {
+    const block = args.pop() as () => T | Promise<T>;
+    const { returning = null as R } = (args[0] ?? {}) as { returning?: R };
     try {
       return await block();
     } catch (error) {
