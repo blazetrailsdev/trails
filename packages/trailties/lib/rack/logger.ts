@@ -76,6 +76,7 @@ export class Logger {
     });
   }
 
+  /** @internal */
   get logger(): ActiveSupportLogger | null {
     return Trails.logger;
   }
