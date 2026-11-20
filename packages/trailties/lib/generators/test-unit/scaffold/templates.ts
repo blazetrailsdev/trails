@@ -151,9 +151,10 @@ const systemTest: Template = function () {
   const showUrl = `${camelize(`${singular}_url`, false)}`;
   const root = "../".repeat(this.classPath().length + 1);
   const modelClassName = this.className().split("::").pop();
+  const namespaceDirs = this["isNamespaced"]() ? this["namespaceDirs"]() : [];
   return `import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApplicationSystemTestCase } from "${root}application-system-test-case${this.ext()}";
-import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
+import { ${modelClassName} } from "../${root}app/models/${[...namespaceDirs, this.filePath()].join("/")}.js";
 
 export class ${testClassName} extends ApplicationSystemTestCase {
   declare "@${singular}": ${modelClassName};
