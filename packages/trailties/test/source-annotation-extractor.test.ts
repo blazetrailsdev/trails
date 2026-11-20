@@ -131,6 +131,16 @@ describe("SourceAnnotationExtractor", () => {
     expect(await enumerate(null, { tag: true })).toBe(`app/a.scss:\n  * [1] [TODO] styled\n\n`);
   });
 
+  test("re-registering a default extension set replaces its builder", async () => {
+    Annotation.registerExtensions(
+      "yml",
+      "yaml",
+      (tag) => new RegExp(`;\\s*(${tag}):?\\s*(.*)$`, "m"),
+    );
+    w("config/a.yml", "; TODO: semi\n# TODO: hash");
+    expect(await enumerate(null, { tag: true })).toBe(`config/a.yml:\n  * [1] [TODO] semi\n\n`);
+  });
+
   test("registerTags adds new tags; unregistered tags are ignored", async () => {
     w("app/a.ts", "// TESTME: yes");
     w("app/b.ts", "// BAD: no");

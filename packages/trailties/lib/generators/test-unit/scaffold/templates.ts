@@ -10,19 +10,25 @@ function header(this: ScaffoldGenerator) {
   const modelClassName = this.className().split("::").pop();
   const singular = this.singularTableName();
   const fixtureName = this.fixtureName();
+  const mountable = this["isMountableEngine"]();
+  const engine = mountable
+    ? `
+    include(this, (constGet(Object, "${this["namespace"]()!.name}::Engine") as Engine).routes().urlHelpers());
+`
+    : "";
   const root = "../".repeat(this.controllerClassPath().length + 1);
   const preamble = `import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
+${mountable ? 'import { include } from "@blazetrails/activesupport";\nimport type { Engine } from "@blazetrails/trailties";\n' : ""}import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
 import "${root}test-helper.js";
 
 export class ${testClassName} extends IntegrationTest {
   declare "@${singular}": ${modelClassName};
 
   static {
-    constSet(${owner}, "${testClassName}", this);
+    constSet(${owner}, "${testClassName}", this);${engine}
     this.setup(async function (this: ${testClassName}) {
       this["@${singular}"] = await this.${fixtureName}("one");
     });
