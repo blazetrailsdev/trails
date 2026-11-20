@@ -699,9 +699,8 @@ describe("HasOneAssociationsTest", () => {
     assertPredicate(await readHasOne(firm, "readonlyAccount"), (r: any) => r.isReadonly());
   });
 
-  it.skip("has one proxy should not respond to private methods", () => {
-    // PERMANENT-SKIP: asserts NoMethodError on a private call — CLAUDE.md § "Method visibility is compile-time only".
-  });
+  // PERMANENT-SKIP: asserts NoMethodError on a private call — CLAUDE.md § "Method visibility is compile-time only".
+  it.skip("has one proxy should not respond to private methods", () => {});
 
   it("has one proxy should respond to private methods via send", async () => {
     await assertNothingRaised(async () => {
