@@ -19,7 +19,6 @@ import {
   Job,
   Process,
   ReadyExecution,
-  Semaphore,
   SolidQueue,
   SolidQueueAdapter,
   Worker,
@@ -38,6 +37,7 @@ import {
   waitForRegisteredProcesses,
   assertNoRegisteredProcesses,
 } from "./support/processes-test-helper.js";
+import { destroyRecords } from "./test-helper.js";
 
 async function waitForJobsToFinishFor(timeout = 1) {
   await waitWhileWithTimeout(timeout, () => Job.where({ finished_at: null }).isAny());
@@ -68,10 +68,7 @@ describe("WorkerTest", () => {
     vi.restoreAllMocks();
     SolidQueue.onThreadError = originalOnThreadError;
     JobBuffer.values.length = 0;
-    await Job.destroyAll();
-    await Process.destroyAll();
-    await Semaphore.deleteAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

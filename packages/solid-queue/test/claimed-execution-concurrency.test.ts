@@ -34,6 +34,7 @@ import { ApplicationJob } from "./support/application-job.js";
 import { JobResult } from "./support/job-result.js";
 import { NonOverlappingUpdateResultJob } from "./support/non-overlapping-update-result-job.js";
 import { loadAppSchema } from "./support/queue-schema.js";
+import { destroyRecords } from "./test-helper.js";
 
 class ClaimedExecutionConcurrencyTest extends TestCase {
   static {
@@ -62,14 +63,15 @@ describe("SolidQueue::ClaimedExecutionConcurrencyTest", () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     process = await Process.register({ kind: "Worker", pid: 42, name: "worker-123" });
   });
 
   afterEach(async () => {
-    await Job.destroyAll();
-    await Semaphore.deleteAll();
-    await Process.destroyAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   it("a stale performer that loses the claim lock to pruning does not finish or re-promote a pruned job", async (ctx) => {

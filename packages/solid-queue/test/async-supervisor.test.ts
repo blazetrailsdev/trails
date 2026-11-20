@@ -15,7 +15,6 @@ import {
   ClaimedExecution,
   Configuration,
   FailedExecution,
-  Job,
   Process,
   ReadyExecution,
   SolidQueueAdapter,
@@ -31,6 +30,7 @@ import {
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
 } from "./support/processes-test-helper.js";
+import { destroyRecords } from "./test-helper.js";
 
 class AsyncSupervisorTest extends TestCase {
   static {
@@ -86,14 +86,17 @@ describe("AsyncSupervisorTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   beforeEach(() => {
     vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(`${import.meta.dirname}/support/dummy`);
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await Job.destroyAll();
-    await Process.destroyAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

@@ -6,24 +6,12 @@ import { isPresent } from "@blazetrails/activesupport";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { constSet, File, FileUtils, loadIseqEval, TopLevel } from "@blazetrails/ruby-compat";
-import {
-  Batch,
-  ClaimedExecution,
-  FailedExecution,
-  Job,
-  Process,
-  ReadyExecution,
-  Record,
-  RecurringTask,
-  ScheduledExecution,
-  Semaphore,
-  SolidQueueAdapter,
-} from "../lib/index.js";
+import { Batch, Job, Record, SolidQueueAdapter } from "../lib/index.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 import { ApplicationJob } from "./support/application-job.js";
 import { ExpectedTestError } from "./support/expected-test-error.js";
-import { JobResult } from "./support/job-result.js";
 import { loadAppSchema } from "./support/queue-schema.js";
+import { destroyRecords } from "./test-helper.js";
 
 const template = decodeURIComponent(
   new URL(
@@ -52,6 +40,10 @@ describe("BatchPendingMigrationsTest", () => {
   beforeAll(async () => {
     await loadAppSchema();
     ApplicationJob.queueAdapter = new SolidQueueAdapter();
+  });
+
+  beforeEach(async () => {
+    await destroyRecords();
   });
 
   beforeEach(async () => {
@@ -116,17 +108,5 @@ describe("BatchPendingMigrationsTest", () => {
     Batch._migrated = null;
 
     await Record.connectionPool().disconnectBang();
-  }
-
-  async function destroyRecords(): Promise<void> {
-    await Job.destroyAll();
-    await Process.destroyAll();
-    await Semaphore.deleteAll();
-    await RecurringTask.deleteAll();
-    await ScheduledExecution.deleteAll();
-    await ReadyExecution.deleteAll();
-    await ClaimedExecution.deleteAll();
-    await FailedExecution.deleteAll();
-    await JobResult.deleteAll();
   }
 });

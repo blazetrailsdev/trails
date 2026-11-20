@@ -4,14 +4,7 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import {
-  Job,
-  Process,
-  Record,
-  RecurringTask,
-  Scheduler,
-  SolidQueueAdapter,
-} from "../../lib/index.js";
+import { Job, Record, RecurringTask, Scheduler, SolidQueueAdapter } from "../../lib/index.js";
 import { ApplicationJob } from "../support/application-job.js";
 import { JobResult } from "../support/job-result.js";
 import "../support/add-to-buffer-job.js";
@@ -24,6 +17,7 @@ import {
 import { waitForJobsToBeEnqueued, waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { destroyRecords } from "../test-helper.js";
 
 type TaskAttrs = { class?: string; schedule?: string; args?: unknown[] };
 
@@ -61,6 +55,10 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     run = runSupervisor({ skipRecurring: false });
     await waitForRegisteredProcesses(5, { timeout: 3 });
   });
@@ -69,10 +67,7 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
     await run.terminate();
     vi.restoreAllMocks();
 
-    await Process.destroyAll();
-    await Job.destroyAll();
-    await RecurringTask.deleteAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

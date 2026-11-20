@@ -9,7 +9,6 @@ import { TopLevel, constSet, excSetBacktrace } from "@blazetrails/ruby-compat";
 import {
   FailedExecution,
   Job,
-  Process,
   ReadyExecution,
   SolidQueue,
   SolidQueueAdapter,
@@ -22,6 +21,7 @@ import { LargeErrorMessageJob } from "./support/large-error-message-job.js";
 import { ExpectedTestError } from "./support/expected-test-error.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import { silentOnThreadErrorFor } from "./support/jobs-test-helper.js";
+import { destroyRecords } from "./test-helper.js";
 
 class InfiniteRecursionJob extends ApplicationJob {
   static {
@@ -114,8 +114,7 @@ describe("SolidQueue::FailedExecutionTest", () => {
   afterEach(async () => {
     SolidQueue.onThreadError = originalOnThreadError;
     JobBuffer.clear();
-    await Job.destroyAll();
-    await Process.destroyAll();
+    await destroyRecords();
   });
 
   it("run job that fails", async () => {

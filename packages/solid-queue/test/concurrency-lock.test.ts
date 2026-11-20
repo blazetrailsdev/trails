@@ -25,6 +25,7 @@ import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 import { ApplicationJob } from "./support/application-job.js";
 import { ExpectedTestError } from "./support/expected-test-error.js";
 import { loadAppSchema } from "./support/queue-schema.js";
+import { destroyRecords } from "./test-helper.js";
 
 class NonOverlappingJob extends ApplicationJob {
   static {
@@ -69,9 +70,7 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
 
   afterEach(async () => {
     travelBack();
-    await Job.destroyAll();
-    await Semaphore.deleteAll();
-    await Process.destroyAll();
+    await destroyRecords();
   });
 
   async function semaphore(): Promise<Semaphore> {

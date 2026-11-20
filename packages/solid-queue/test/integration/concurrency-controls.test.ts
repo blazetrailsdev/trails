@@ -15,7 +15,6 @@ import {
   BlockedExecution,
   FailedExecution,
   Job,
-  Process,
   Record,
   Semaphore,
   SolidQueue,
@@ -43,6 +42,7 @@ import {
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
+import { destroyRecords } from "../test-helper.js";
 
 async function assertStoredSequence(result: JobResult, ...sequences: string[][]) {
   const expected = sequences.map(
@@ -82,6 +82,10 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     onThreadError = SolidQueue.onThreadError;
     SolidQueue.onThreadError = silentOnThreadErrorFor(ExpectedTestError, onThreadError);
     result = await JobResult.createBang({ queue_name: "default", status: "seq: " });
@@ -98,10 +102,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     await run.terminate();
     vi.restoreAllMocks();
     SolidQueue.onThreadError = onThreadError;
-    await Job.destroyAll();
-    await JobResult.deleteAll();
-    await Process.destroyAll();
-    await Semaphore.deleteAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

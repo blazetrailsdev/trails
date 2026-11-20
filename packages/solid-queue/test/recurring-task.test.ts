@@ -17,7 +17,6 @@ import { Fugit, type Cron } from "@blazetrails/fugit";
 import { constGet, constSet } from "@blazetrails/ruby-compat";
 import {
   Job,
-  Process,
   ReadyExecution,
   RecurringTask,
   SolidQueue,
@@ -28,6 +27,7 @@ import { ApplicationJob } from "./support/application-job.js";
 import { JobBuffer } from "./support/add-to-buffer-job.js";
 import { ErrorBuffer } from "./support/error-buffer.js";
 import { loadAppSchema } from "./support/queue-schema.js";
+import { destroyRecords } from "./test-helper.js";
 
 class JobWithoutArguments extends ApplicationJob {
   perform(): void {
@@ -127,9 +127,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     JobBuffer.values.length = 0;
-    await Job.destroyAll();
-    await Process.destroyAll();
-    await RecurringTask.deleteAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

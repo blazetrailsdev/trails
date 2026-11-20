@@ -41,6 +41,7 @@ import {
 import { loadAppSchema } from "../support/queue-schema.js";
 import { RaisingJob } from "../support/raising-job.js";
 import { NonOverlappingUpdateResultJob } from "../support/non-overlapping-update-result-job.js";
+import { destroyRecords } from "../test-helper.js";
 
 type NotificationArgs = [string, unknown, unknown, unknown, { [key: string]: unknown }];
 
@@ -91,11 +92,7 @@ describe("InstrumentationTest", () => {
     travelBack();
     SolidQueue.onThreadError = originalOnThreadError;
     JobBuffer.clear();
-    await Job.destroyAll();
-    await Process.destroyAll();
-    await Semaphore.deleteAll();
-    await RecurringTask.deleteAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

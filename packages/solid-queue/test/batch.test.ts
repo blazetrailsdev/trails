@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import {
   permanentConnectionCheckout,
@@ -49,6 +49,7 @@ import { ExpectedTestError } from "./support/expected-test-error.js";
 import { JobResult } from "./support/job-result.js";
 import { NonOverlappingUpdateResultJob } from "./support/non-overlapping-update-result-job.js";
 import { loadAppSchema } from "./support/queue-schema.js";
+import { destroyRecords } from "./test-helper.js";
 
 class BatchWithArgumentsJob extends ApplicationJob {
   declare batch: () => Promise<Batch | null>;
@@ -144,9 +145,13 @@ describe("SolidQueue::BatchTest", () => {
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
   });
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   afterEach(async () => {
     vi.restoreAllMocks();
-    await Job.destroyAll();
+    await destroyRecords();
     await Batch.destroyAll();
   });
 

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
 import {
   permanentConnectionCheckout,
@@ -25,6 +25,7 @@ import {
   waitForRegisteredProcesses,
   assertMetadata,
 } from "./support/processes-test-helper.js";
+import { destroyRecords } from "./test-helper.js";
 
 class SchedulerTest extends TestCase {
   static {
@@ -45,10 +46,12 @@ describe("SchedulerTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   afterEach(async () => {
-    await Job.destroyAll();
-    await Process.destroyAll();
-    await RecurringTask.deleteAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

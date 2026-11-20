@@ -9,7 +9,6 @@ import { Logger, seconds } from "@blazetrails/activesupport";
 import { StringIO } from "@blazetrails/ruby-compat";
 import {
   Dispatcher,
-  Job,
   Process,
   ReadyExecution,
   ScheduledExecution,
@@ -32,6 +31,7 @@ import {
   assertNotDeprecated,
 } from "@blazetrails/activesupport/testing/deprecation";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { destroyRecords } from "./test-helper.js";
 
 function assertCalledAtLeast(
   spy: { mock: { calls: unknown[][] } },
@@ -62,6 +62,10 @@ describe("DispatcherTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   beforeEach(() => {
     dispatcher = new Dispatcher({ pollingInterval: 0.1, batchSize: 10 });
   });
@@ -69,8 +73,7 @@ describe("DispatcherTest", () => {
   afterEach(async () => {
     await dispatcher.stop();
     vi.restoreAllMocks();
-    await Job.destroyAll();
-    await Process.destroyAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

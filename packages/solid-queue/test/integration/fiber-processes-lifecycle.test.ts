@@ -6,7 +6,7 @@ import {
 } from "@blazetrails/activerecord/active-record";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
-import { ClaimedExecution, Job, Process, SolidQueueAdapter } from "../../lib/index.js";
+import { ClaimedExecution, Job, SolidQueueAdapter } from "../../lib/index.js";
 import { Process as RbProcess, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Record } from "../../lib/record.js";
 import { waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
@@ -24,6 +24,7 @@ import {
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
+import { destroyRecords } from "../test-helper.js";
 
 async function enqueueStoreResultJob(
   value: string,
@@ -101,6 +102,10 @@ describe("FiberProcessesLifecycleTest", () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     previousIsolationLevel = IsolatedExecutionState.isolationLevel;
     run = runSupervisor(
       { workers: [{ queues: "background", fibers: 3, pollingInterval: 0.1 }] },
@@ -118,9 +123,7 @@ describe("FiberProcessesLifecycleTest", () => {
     if (previousIsolationLevel != null)
       IsolatedExecutionState.isolationLevel = previousIsolationLevel;
     vi.restoreAllMocks();
-    await Job.destroyAll();
-    await JobResult.deleteAll();
-    await Process.destroyAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

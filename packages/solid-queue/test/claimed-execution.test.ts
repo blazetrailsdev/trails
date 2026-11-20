@@ -34,6 +34,7 @@ import { AddToBufferJob, JobBuffer } from "./support/add-to-buffer-job.js";
 import { ErrorBuffer } from "./support/error-buffer.js";
 import { RaisingJob } from "./support/raising-job.js";
 import { loadAppSchema } from "./support/queue-schema.js";
+import { destroyRecords } from "./test-helper.js";
 
 describe("SolidQueue::ClaimedExecutionTest", () => {
   let process: Process;
@@ -58,9 +59,7 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     JobBuffer.clear();
-    await Job.destroyAll();
-    await Semaphore.deleteAll();
-    await Process.destroyAll();
+    await destroyRecords();
   });
 
   afterAll(() => {
