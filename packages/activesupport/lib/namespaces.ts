@@ -125,9 +125,7 @@ declare module "@blazetrails/ruby-compat" {
           paths(): {
             get(
               path: string,
-            ):
-              | { firstSync(): string | undefined; toAry(): string[]; toA(): Promise<string[]> }
-              | undefined;
+            ): { first(): string | undefined; toAry(): string[]; toA(): string[] } | undefined;
           };
         };
         initialized(): boolean;
@@ -149,7 +147,7 @@ declare module "@blazetrails/ruby-compat" {
         migrationRailties(): Array<{
           railtieName: string;
           root(): string | null;
-          paths?(): { get(path: string): { first(): Promise<string | undefined> } | undefined };
+          paths?(): { get(path: string): { first(): string | undefined } | undefined };
         }>;
         call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
       } | null;

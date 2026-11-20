@@ -10,6 +10,6 @@ describe("ActionCable::Engine", () => {
   });
 
   it("finds no lib/tasks files under its root", async () => {
-    expect(await Engine.instance().paths().get("lib/tasks")!.existent()).toEqual([]);
+    expect(Engine.instance().paths().get("lib/tasks")!.existent()).toEqual([]);
   });
 });

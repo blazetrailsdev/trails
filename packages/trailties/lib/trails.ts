@@ -149,7 +149,7 @@ export class Trails {
     const app = Trails.application;
     if (!app) return null;
     const paths = app.paths();
-    const expanded = await paths.get("public")?.expanded();
+    const expanded = paths.get("public")?.expanded();
     return expanded?.[0] ?? null;
   }
 

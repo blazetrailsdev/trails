@@ -240,7 +240,7 @@ export class Engine extends Trailtie {
 
   async helpersPaths(): Promise<string[]> {
     const node = this.paths().get("app/helpers");
-    return node ? await node.existent() : [];
+    return node ? node.existent() : [];
   }
 
   eagerLoadBang(): void | Promise<void> {}
@@ -294,12 +294,12 @@ export class Engine extends Trailtie {
   /** @internal */
   override async runTasksBlocks(app: unknown): Promise<void> {
     await super.runTasksBlocks(app);
-    for (const ext of (await this.paths().get("lib/tasks")!.existent()).sort()) await rbFLoad(ext);
+    for (const ext of this.paths().get("lib/tasks")!.existent().sort()) await rbFLoad(ext);
   }
 
   /** @internal */
   private async hasMigrations(): Promise<boolean> {
-    return (await this.paths().get("db/migrate")!.existent()).length > 0;
+    return this.paths().get("db/migrate")!.existent().length > 0;
   }
 
   async loadServer(app: unknown = this): Promise<this> {
@@ -338,7 +338,7 @@ export class Engine extends Trailtie {
   }
 
   async loadSeed(): Promise<void> {
-    const seedFile = ((await this.paths().get("db/seeds.ts")?.existent()) ?? [])[0];
+    const seedFile = (this.paths().get("db/seeds.ts")?.existent() ?? [])[0];
     if (seedFile !== undefined) {
       await this.runCallbacks("load_seed", async () => {
         await rbFLoad(seedFile);
@@ -369,7 +369,7 @@ export class Engine extends Trailtie {
 
   /** @internal */
   protected async isHasMigrations(): Promise<boolean> {
-    return (await this.paths().get("db/migrate")!.existent()).length > 0;
+    return this.paths().get("db/migrate")!.existent().length > 0;
   }
 
   /** @internal */
@@ -392,7 +392,7 @@ export class Engine extends Trailtie {
   async _allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
     if (this._allLoadPathsCache) return this._allLoadPathsCache;
     const paths = this.paths();
-    const out = [...(await paths.loadPaths())];
+    const out = [...paths.loadPaths()];
     if (addAutoloadPathsToLoadPath) {
       out.push(...(await this._allAutoloadPaths()));
       out.push(...(await this._allAutoloadOncePaths()));
@@ -430,7 +430,7 @@ Engine.initializer(
   "load_environment_config",
   { before: "load_environment_hook", group: "all" },
   async function (this: Engine) {
-    for (const environment of (await this.paths().get("config/environments")?.existent()) ?? []) {
+    for (const environment of this.paths().get("config/environments")?.existent() ?? []) {
       await rbFRequireFile(environment);
     }
   },
@@ -480,7 +480,7 @@ Engine.initializer("make_routes_lazy", { before: "bootstrap_hook" }, function (t
 Engine.initializer("add_routing_paths", async function (this: Engine, ...args: unknown[]) {
   const app = args[0] as EngineInitializerApp;
   const paths = this.paths();
-  const routingPaths = (await paths.get("config/routes.ts")?.existent()) ?? [];
+  const routingPaths = paths.get("config/routes.ts")?.existent() ?? [];
   const externalPaths = paths.get("config/routes")?.toAry() ?? [];
   this.routes().drawPaths.push(...externalPaths);
   app.routes().drawPaths.push(...externalPaths);
@@ -493,7 +493,7 @@ Engine.initializer("add_routing_paths", async function (this: Engine, ...args: u
 });
 
 Engine.initializer("add_view_paths", async function (this: Engine) {
-  const views = (await this.paths().get("app/views")?.existent()) ?? [];
+  const views = this.paths().get("app/views")?.existent() ?? [];
   if (views.length === 0) return;
   onLoad("action_controller", (base: ActionControllerBaseLike) => {
     if (typeof base.prependViewPath === "function") base.prependViewPath(views);
@@ -517,13 +517,13 @@ Engine.initializer("add_fixture_paths", async function (this: Engine) {
 Engine.initializer("prepend_helpers_path", async function (this: Engine, ...args: unknown[]) {
   const app = args[0] as EngineInitializerApp;
   if (!this.isolated() || (app as unknown) === this) {
-    const helpers = (await this.paths().get("app/helpers")?.existent()) ?? [];
+    const helpers = this.paths().get("app/helpers")?.existent() ?? [];
     app.config.helpersPaths.unshift(...helpers);
   }
 });
 
 Engine.initializer("load_config_initializers", async function (this: Engine) {
-  const existent = (await this.paths().get("config/initializers")?.existent()) ?? [];
+  const existent = this.paths().get("config/initializers")?.existent() ?? [];
   for (const initializer of existent.sort()) {
     await this.loadConfigInitializer(initializer);
   }

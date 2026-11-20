@@ -65,7 +65,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
         return logger;
       } catch (error) {
         if (!(error instanceof StandardError)) throw error;
-        const path = await this.config.paths().get("log")!.first();
+        const path = this.config.paths().get("log")!.first();
         const logger = TaggedLogging.new(new Logger(STDERR));
         logger.level = Logger.WARN;
         logger.warn(

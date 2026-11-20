@@ -29,7 +29,7 @@ describe("ActiveStorage::Engine", () => {
   });
 
   it("finds its routes file through the config/routes.ts path", async () => {
-    const routes = await Engine.config.paths().get("config/routes.ts")!.existent();
+    const routes = Engine.config.paths().get("config/routes.ts")!.existent();
     expect(routes).toEqual([File.expandPath("../lib/config/routes.ts", import.meta.dirname)]);
   });
 

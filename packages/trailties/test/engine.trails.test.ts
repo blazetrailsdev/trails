@@ -116,9 +116,9 @@ describe("Engine#config paths", () => {
 
     const paths = PackageEngine.instance().paths();
     const root = new URL("./fixtures/package-engine", import.meta.url).pathname;
-    expect(await paths.loadPaths()).toEqual([out]);
-    expect(await paths.get("lib/tasks")!.expanded()).toEqual([`${root}/lib/tasks`]);
-    expect(await paths.get("lib/assets")!.expanded()).toEqual([`${root}/lib/assets`]);
+    expect(paths.loadPaths()).toEqual([out]);
+    expect(paths.get("lib/tasks")!.expanded()).toEqual([`${root}/lib/tasks`]);
+    expect(paths.get("lib/assets")!.expanded()).toEqual([`${root}/lib/assets`]);
   });
 });
 
@@ -139,7 +139,7 @@ describe("Engine lib/tasks", () => {
     const root = new URL("./fixtures/tasks-engine", import.meta.url).pathname;
     Engine.register(TasksEngine, root);
 
-    expect(await TasksEngine.instance().paths().get("lib/tasks")!.existent()).toEqual([
+    expect(TasksEngine.instance().paths().get("lib/tasks")!.existent()).toEqual([
       `${root}/lib/tasks/sample.rake.ts`,
     ]);
   });

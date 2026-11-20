@@ -54,9 +54,9 @@ export class Trailtie extends BaseTrailtie {
       const paths = app.config.paths();
       const options = app.config.actionMailer;
 
-      options.assetsDir ??= await paths.get("public")!.first();
-      options.javascriptsDir ??= await paths.get("public/javascripts")!.first();
-      options.stylesheetsDir ??= await paths.get("public/stylesheets")!.first();
+      options.assetsDir ??= paths.get("public")!.first();
+      options.javascriptsDir ??= paths.get("public/javascripts")!.first();
+      options.stylesheetsDir ??= paths.get("public/stylesheets")!.first();
       if (options.showPreviews == null) {
         options.showPreviews = TopLevel.Trails!.env.isDevelopment();
       }

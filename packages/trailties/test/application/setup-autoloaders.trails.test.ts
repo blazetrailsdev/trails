@@ -49,7 +49,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
     dir("app/views/concerns");
 
     const config = new EngineConfiguration(root);
-    const eagerLoad = await config.paths().eagerLoad();
+    const eagerLoad = config.paths().eagerLoad();
 
     expect(eagerLoad).toContain(File.join(root, "app/models"));
     expect(eagerLoad).not.toContain(File.join(root, "app/views"));

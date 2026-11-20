@@ -55,31 +55,31 @@ export class Root {
     return Array.from(new Set(this.values()));
   }
 
-  autoloadOnce(): Promise<string[]> {
+  autoloadOnce(): string[] {
     return this.filterBy((path) => path.isAutoloadOnce());
   }
 
-  eagerLoad(): Promise<string[]> {
+  eagerLoad(): string[] {
     return this.filterBy((path) => path.isEagerLoad());
   }
 
-  autoloadPaths(): Promise<string[]> {
+  autoloadPaths(): string[] {
     return this.filterBy((path) => path.isAutoload());
   }
 
-  loadPaths(): Promise<string[]> {
+  loadPaths(): string[] {
     return this.filterBy((path) => path.isLoadPath());
   }
 
-  private async filterBy(block: (path: Path) => boolean): Promise<string[]> {
+  private filterBy(block: (path: Path) => boolean): string[] {
     const out: string[] = [];
     for (const path of this.allPaths()) {
       if (!block(path)) continue;
-      const paths = await path.existentDirectories();
+      const paths = path.existentDirectories();
       const excluded = new Set<string>();
       for (const p of path.children()) {
         if (block(p)) continue;
-        for (const d of await p.existentDirectories()) excluded.add(d);
+        for (const d of p.existentDirectories()) excluded.add(d);
       }
       for (const d of paths) if (!excluded.has(d)) out.push(d);
     }
@@ -125,19 +125,12 @@ export class Path {
     return this._root.valuesAt(...keys.sort()) as Path[];
   }
 
-  async first(): Promise<string | undefined> {
-    return (await this.expanded())[0];
+  first(): string | undefined {
+    return this.expanded()[0];
   }
 
-  async last(): Promise<string | undefined> {
-    return (await this.expanded()).at(-1);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE paths-path-expanded-is-async-over-a-sync-dir-glob */
-  firstSync(): string | undefined {
-    if (this._root.path === null) throw new Error("You need to set a path root");
-    const path = this._paths[0];
-    return path === undefined ? undefined : File.expandPath(path, this._root.path);
+  last(): string | undefined {
+    return this.expanded().at(-1);
   }
 
   autoloadOnceBang(): void {
@@ -201,7 +194,7 @@ export class Path {
   toAry(): string[] {
     return this._paths;
   }
-  toA(): Promise<string[]> {
+  toA(): string[] {
     return this.expanded();
   }
 
@@ -209,13 +202,13 @@ export class Path {
     return this.glob?.match(/\{([\S]+)\}/)?.[1].split(",");
   }
 
-  async expanded(): Promise<string[]> {
+  expanded(): string[] {
     if (this._root.path === null) throw new Error("You need to set a path root");
     const result: string[] = [];
     for (const raw of this._paths) {
       const path = File.expandPath(raw, this._root.path);
       if (this.glob && File.isDirectory(path)) {
-        result.push(...(await this.filesIn(path)));
+        result.push(...this.filesIn(path));
       } else {
         result.push(path);
       }
@@ -223,8 +216,8 @@ export class Path {
     return Array.from(new Set(result));
   }
 
-  async existent(): Promise<string[]> {
-    return (await this.expanded()).filter((f) => {
+  existent(): string[] {
+    return this.expanded().filter((f) => {
       const doesExist = File.isExist(f);
 
       if (!doesExist && File.isSymlink(f)) {
@@ -236,15 +229,15 @@ export class Path {
     });
   }
 
-  async existentDirectories(): Promise<string[]> {
+  existentDirectories(): string[] {
     const out: string[] = [];
-    for (const f of await this.expanded()) if (File.isDirectory(f)) out.push(f);
+    for (const f of this.expanded()) if (File.isDirectory(f)) out.push(f);
     return out;
   }
 
   /** @internal */
-  private async filesIn(path: string): Promise<string[]> {
-    let files = await Dir.globAsync(this.glob!, 0, { base: path });
+  private filesIn(path: string): string[] {
+    let files = Dir.glob(this.glob!, { base: path });
     if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
     return files.map((file) => File.join(path, file)).sort();
   }
