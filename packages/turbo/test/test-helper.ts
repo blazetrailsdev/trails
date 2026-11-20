@@ -1,12 +1,16 @@
-import { afterAll } from "vitest";
-import { Logger, TopLevel, objectWith, setTrailsRoot } from "@blazetrails/activesupport";
+import { afterAll, beforeEach } from "vitest";
+import { Logger, TopLevel, delegate, objectWith, setTrailsRoot } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, Migrator } from "@blazetrails/activerecord";
 import { Trails } from "@blazetrails/trailties";
 import { ActionController } from "@blazetrails/actionpack";
-import { File, Thread } from "@blazetrails/ruby-compat";
+import { IntegrationTest } from "@blazetrails/actionpack/testing";
+import { TestCase as ChannelTestCase } from "@blazetrails/actioncable/channel/test-case.js";
+import { File, Thread, include } from "@blazetrails/ruby-compat";
 import { expect } from "vitest";
 import { Debouncer } from "../lib/app/models/turbo/debouncer.js";
 import { ThreadDebouncer } from "../lib/app/models/turbo/thread-debouncer.js";
+import { Turbo } from "../lib/turbo-trails.js";
+import { ApplicationController } from "./dummy/app/controllers/application-controller.js";
 
 const configurations = Base.configurations();
 Trails.env = "test";
@@ -28,6 +32,21 @@ await DatabaseTasks.purge(
 Migrator.migrationsPaths = [File.expandPath("dummy/db/migrate", import.meta.dirname)];
 await Base.establishConnection();
 await Base.connectionPool().migrationContext.migrate();
+
+const ActionViewTestCaseExtensions = {};
+delegate.call(ActionViewTestCaseExtensions, "render", { to: ApplicationController });
+
+beforeEach(() => {
+  Turbo.currentRequestId = null;
+
+  for (const key of Thread.current().keys()) {
+    if (key.startsWith("turbo-")) Thread.current().set(key, null);
+  }
+});
+
+include(IntegrationTest, ActionViewTestCaseExtensions);
+
+include(ChannelTestCase, ActionViewTestCaseExtensions);
 
 afterAll(async () => {
   await Base.establishConnection(configurations.configsFor({ envName: "arunit", name: "primary" }));

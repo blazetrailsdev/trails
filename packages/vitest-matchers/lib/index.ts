@@ -46,12 +46,12 @@ function result(
   state: MatcherState,
   pass: boolean,
   received: unknown,
-  what: string,
+  what: string | (() => string),
 ): { pass: boolean; message: () => string } {
   return {
     pass,
     message: () =>
-      `expected ${state.utils.printReceived(received)} ${state.isNot ? "not " : ""}${what}`,
+      `expected ${state.utils.printReceived(received)} ${state.isNot ? "not " : ""}${typeof what === "function" ? what() : what}`,
   };
 }
 
@@ -98,7 +98,7 @@ export const matchers = {
   },
   toInclude(this: MatcherState, received: unknown, ...expected: unknown[]) {
     const pass = expected.every((e) => includes(received, e));
-    return result(this, pass, received, `to include ${this.utils.printExpected(expected)}`);
+    return result(this, pass, received, () => `to include ${this.utils.printExpected(expected)}`);
   },
   toContainExactly(this: MatcherState, received: unknown, ...expected: unknown[]) {
     const what = `to contain exactly ${this.utils.printExpected(expected)}`;

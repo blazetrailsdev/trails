@@ -55,10 +55,6 @@ describe("Turbo::BroadcastableTest", () => {
   });
 
   beforeEach(() => {
-    Turbo.currentRequestId = null;
-    for (const key of Thread.current().keys()) {
-      if (key.startsWith("turbo-")) Thread.current().set(key, null);
-    }
     message = new Message({ id: 1, content: "Hello!" }) as Message & Broadcasting;
   });
 
