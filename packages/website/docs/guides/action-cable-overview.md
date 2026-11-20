@@ -212,11 +212,12 @@ channel uses `streamFor(currentUser)`, and any part of the application calls
 
 ### Subscription Adapter
 
-`config/cable.yml` names an adapter per environment. `async` keeps everything
-in one process and suits development; `test` records broadcasts for
-assertions; `postgresql` and `redis` fan out across processes. A Trails
-application defaults to **Solid Cable**, which stores messages in a database
-table and polls it, so no extra service is needed — see the
+`config/cable.ts` exports an adapter setting per environment, where Rails
+reads `config/cable.yml`. `async` keeps everything in one process and suits
+development; `test` records broadcasts for assertions; `postgresql` and
+`redis` fan out across processes, and the generated application uses `redis`
+in production. **Solid Cable** is a further adapter that stores messages in a
+database table and polls it, so no extra service is needed — see the
 [solid-cable package](/packages/solid-cable).
 
 ### Allowed Request Origins
