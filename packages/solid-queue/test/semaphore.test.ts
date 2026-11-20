@@ -31,6 +31,7 @@ import { ApplicationJob } from "./support/application-job.js";
 import { JobResult } from "./support/job-result.js";
 import { NonOverlappingUpdateResultJob } from "./support/non-overlapping-update-result-job.js";
 import { loadAppSchema } from "./support/queue-schema.js";
+import { destroyRecords } from "./test-helper.js";
 
 class NonOverlappingByKeyJob extends ApplicationJob {
   static {
@@ -74,9 +75,7 @@ describe("SolidQueue::SemaphoreTest", () => {
   afterEach(async () => {
     travelBack();
     vi.restoreAllMocks();
-    await Job.destroyAll();
-    await Semaphore.deleteAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   it("a job records the semaphore it created, not one deleted after its transaction began", async (ctx) => {

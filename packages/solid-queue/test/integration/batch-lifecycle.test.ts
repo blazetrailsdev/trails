@@ -13,15 +13,7 @@ import {
 import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import type { Time } from "@blazetrails/date";
 import { RuntimeError, TopLevel, constSet } from "@blazetrails/ruby-compat";
-import {
-  Batch,
-  Dispatcher,
-  Job,
-  Process,
-  SolidQueue,
-  SolidQueueAdapter,
-  Worker,
-} from "../../lib/index.js";
+import { Batch, Dispatcher, Job, SolidQueue, SolidQueueAdapter, Worker } from "../../lib/index.js";
 import { ApplicationJob } from "../support/application-job.js";
 import { AddToBufferJob, JobBuffer } from "../support/add-to-buffer-job.js";
 import { JobResult } from "../support/job-result.js";
@@ -33,6 +25,7 @@ import {
   waitForBatchesToFinishFor,
   waitForJobsToFinishFor,
 } from "../support/jobs-test-helper.js";
+import { destroyRecords } from "../test-helper.js";
 
 class FailingJobError extends RuntimeError {}
 
@@ -207,9 +200,9 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
 
     JobBuffer.clear();
 
-    await Job.destroyAll();
+    await destroyRecords();
     await Batch.destroyAll();
-    await Process.destroyAll();
+    await destroyRecords();
 
     ApplicationJob.enqueueAfterTransactionCommit = false;
     SolidQueue.preserveFinishedJobs = true;

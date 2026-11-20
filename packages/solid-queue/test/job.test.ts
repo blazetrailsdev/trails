@@ -38,6 +38,7 @@ import { JobResult, StoreResultJob } from "./support/job-result.js";
 import { ShardedJobResult } from "./support/sharded-job-result.js";
 import { ShardedRecord } from "./support/sharded-record.js";
 import { loadAppSchema } from "./support/queue-schema.js";
+import { destroyRecords } from "./test-helper.js";
 
 class NonOverlappingJob extends ApplicationJob {
   static {
@@ -124,9 +125,7 @@ describe("SolidQueue::JobTest", () => {
   afterEach(async () => {
     travelBack();
     vi.restoreAllMocks();
-    await Job.destroyAll();
-    await Semaphore.deleteAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   async function assertJobCounts(

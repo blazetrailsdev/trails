@@ -7,8 +7,6 @@ import {
 import { Hash, RuntimeError, tally } from "@blazetrails/ruby-compat";
 import {
   Dispatcher,
-  Job,
-  Process,
   Record,
   Scheduler,
   SolidQueue,
@@ -22,6 +20,7 @@ import { loadAppSchema } from "../support/queue-schema.js";
 import { runSupervisor, waitForRegisteredProcesses } from "../support/processes-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { destroyRecords } from "../test-helper.js";
 
 class LifecycleHooksTest extends TestCase {
   static {
@@ -42,9 +41,7 @@ describe("LifecycleHooksTest", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await Job.destroyAll();
-    await Process.destroyAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

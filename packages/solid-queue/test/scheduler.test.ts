@@ -25,6 +25,7 @@ import {
   waitForRegisteredProcesses,
   assertMetadata,
 } from "./support/processes-test-helper.js";
+import { destroyRecords } from "./test-helper.js";
 
 class SchedulerTest extends TestCase {
   static {
@@ -46,9 +47,7 @@ describe("SchedulerTest", () => {
   });
 
   afterEach(async () => {
-    await Job.destroyAll();
-    await Process.destroyAll();
-    await RecurringTask.deleteAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

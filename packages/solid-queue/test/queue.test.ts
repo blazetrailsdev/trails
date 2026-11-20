@@ -16,6 +16,7 @@ import { loadAppSchema } from "./support/queue-schema.js";
 import { NonOverlappingUpdateResultJob } from "./support/non-overlapping-update-result-job.js";
 import { ApplicationJob } from "./support/application-job.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
+import { destroyRecords } from "./test-helper.js";
 
 describe("QueueTest", () => {
   let backgroundQueue: Queue;
@@ -37,10 +38,9 @@ describe("QueueTest", () => {
 
   afterEach(async () => {
     travelBack();
-    await Job.destroyAll();
+    await destroyRecords();
     await Pause.deleteAll();
-    await Semaphore.deleteAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   it("count jobs currently in a queue", async () => {

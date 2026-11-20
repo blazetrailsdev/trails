@@ -8,7 +8,6 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import {
   ClaimedExecution,
-  Job,
   Process,
   ReadyExecution,
   Record,
@@ -26,6 +25,7 @@ import {
   waitForProcessTerminationWithTimeout,
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
+import { destroyRecords } from "../test-helper.js";
 
 class SupervisorBootSignalTest extends TestCase {
   static {
@@ -69,9 +69,7 @@ describe("SupervisorBootSignalTest", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await Job.destroyAll();
-    await Process.destroyAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   afterAll(() => {

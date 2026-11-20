@@ -16,9 +16,10 @@ import {
   Worker,
 } from "../lib/index.js";
 import { ApplicationJob } from "./support/application-job.js";
-import { JobResult, StoreResultJob } from "./support/job-result.js";
+import { StoreResultJob } from "./support/job-result.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import { waitForRegisteredProcesses } from "./support/processes-test-helper.js";
+import { destroyRecords } from "./test-helper.js";
 
 describe("SolidQueue::ProcessTest", () => {
   beforeAll(async () => {
@@ -29,9 +30,7 @@ describe("SolidQueue::ProcessTest", () => {
   afterEach(async () => {
     travelBack();
     vi.restoreAllMocks();
-    await Job.destroyAll();
-    await Process.destroyAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   async function enqueueThreeOnNewQueue(): Promise<Job[]> {

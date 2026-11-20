@@ -20,6 +20,7 @@ import { loadAppSchema } from "./support/queue-schema.js";
 import { ThrottledUpdateResultJob } from "./support/throttled-update-result-job.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 import { Pause } from "../lib/pause.js";
+import { destroyRecords } from "./test-helper.js";
 
 describe("SolidQueue::ReadyExecutionTest", () => {
   let jobs: Relation<Job>;
@@ -43,10 +44,9 @@ describe("SolidQueue::ReadyExecutionTest", () => {
   });
 
   afterEach(async () => {
-    await Job.destroyAll();
-    await Semaphore.deleteAll();
+    await destroyRecords();
     await Pause.deleteAll();
-    await JobResult.deleteAll();
+    await destroyRecords();
   });
 
   async function assertClaimedJobs(count: number, block: () => Promise<unknown>): Promise<void> {
