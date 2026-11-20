@@ -220,6 +220,18 @@ export default defineConfig(
     languageOptions: { sourceType: "commonjs", globals: { module: "writable" } },
   },
   {
+    files: [
+      "examples/react-native-notes/*.config.js",
+      "examples/react-native-notes/{babel,shims,headless}/*.js",
+    ],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: { module: "writable", require: "readonly", __dirname: "readonly" },
+    },
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+
+  {
     plugins: {
       "unused-imports": unusedImports,
     },

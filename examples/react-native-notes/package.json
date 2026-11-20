@@ -1,0 +1,34 @@
+{
+  "name": "@blazetrails/example-react-native-notes",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.ts",
+  "description": "An Expo (React Native) notes app on @blazetrails/activerecord and expo-sqlite",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "bundle": "expo export --platform android --output-dir dist",
+    "typecheck": "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json",
+    "headless": "TRAILS_HEADLESS=1 expo export:embed --entry-file headless/entry.ts --platform android --dev false --bundle-output dist/headless.js --reset-cache && node headless/run.mjs dist/headless.js"
+  },
+  "dependencies": {
+    "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/date": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "expo": "~58.0.26",
+    "expo-crypto": "~58.0.8",
+    "expo-sqlite": "~58.0.18",
+    "path-browserify": "^1.0.1",
+    "react": "19.3.0",
+    "react-native": "0.88.1"
+  },
+  "devDependencies": {
+    "@blazetrails/activerecord-cli": "workspace:*",
+    "@types/path-browserify": "^1.0.3",
+    "@types/react": "~19.3.0",
+    "babel-preset-expo": "~58.0.26"
+  }
+}
