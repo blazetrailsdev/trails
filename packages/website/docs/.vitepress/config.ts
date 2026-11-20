@@ -56,6 +56,14 @@ export default defineConfig({
           ],
         },
         {
+          text: "Models",
+          items: [
+            { text: "Active Record Basics", link: "/guides/active-record-basics" },
+            { text: "Active Record Callbacks", link: "/guides/active-record-callbacks" },
+            { text: "Active Model Basics", link: "/guides/active-model-basics" },
+          ],
+        },
+        {
           text: "Views",
           items: [
             { text: "Action View Overview", link: "/guides/action-view-overview" },

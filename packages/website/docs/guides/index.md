@@ -26,13 +26,13 @@ ratified deviations from Rails are on its [package page](/packages/).
 
 | Rails guide                   | Trails guide                                                                                                                                              | Packages                                                                     |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Active Record Basics          | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-basics.md))      | [activerecord](/packages/activerecord)                                       |
+| Active Record Basics          | [Active Record Basics](./active-record-basics.md)                                                                                                         | [activerecord](/packages/activerecord)                                       |
 | Active Record Migrations      | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-migrations.md))  | [activerecord](/packages/activerecord)                                       |
 | Active Record Validations     | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-validations.md)) | [activerecord](/packages/activerecord), [activemodel](/packages/activemodel) |
-| Active Record Callbacks       | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-callbacks.md))   | [activerecord](/packages/activerecord), [activemodel](/packages/activemodel) |
+| Active Record Callbacks       | [Active Record Callbacks](./active-record-callbacks.md)                                                                                                   | [activerecord](/packages/activerecord), [activemodel](/packages/activemodel) |
 | Active Record Associations    | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-association-basics.md))        | [activerecord](/packages/activerecord)                                       |
 | Active Record Query Interface | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-querying.md))    | [activerecord](/packages/activerecord), [arel](/packages/arel)               |
-| Active Model Basics           | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-model-basics.md))       | [activemodel](/packages/activemodel)                                         |
+| Active Model Basics           | [Active Model Basics](./active-model-basics.md)                                                                                                           | [activemodel](/packages/activemodel)                                         |
 
 ## Views
 
