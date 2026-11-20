@@ -1148,7 +1148,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hi web users! here is some cached stuff");
   });
 
-  // PERMANENT-SKIP: ruled by the repo owner on 2026-10-26 — `@name` and the private `name` helper (`render_test.rb:52-57`) are one JS property on the view.
+  // PERMANENT-SKIP: ruled by the operator on 2026-10-26 — `@name` and the private `name` helper (`render_test.rb:52-57`) are one JS property on the view.
   test.skip("rendering with conflicting local vars", async () => {
     await testCase.get("renderingWithConflictingLocalVars");
     expect(testCase.response.body).toBe(
