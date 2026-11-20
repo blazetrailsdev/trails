@@ -830,7 +830,7 @@ export class Lint {
   }
 
   async call(env: Record<string, any> | null = null): Promise<[number, Record<string, any>, any]> {
-    return new Wrapper(this.app, env).response();
+    return await new Wrapper(this.app, env).response();
   }
 
   static LintError = LintError;
