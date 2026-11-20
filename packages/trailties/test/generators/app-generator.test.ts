@@ -1,6 +1,15 @@
-import { Dir, File, FileUtils, Gem, Process, rbFBackquote } from "@blazetrails/ruby-compat";
+import {
+  Bundler,
+  Dir,
+  File,
+  FileUtils,
+  Gem,
+  Process,
+  env,
+  rbFBackquote,
+} from "@blazetrails/ruby-compat";
 import { assertNoChanges, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
-import { capture } from "@blazetrails/activesupport/testing/stream";
+import { capture, quietly } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Actions from "../../lib/generators/actions.js";
@@ -92,6 +101,22 @@ function assertOption(generator: { options: unknown }, option: string): void {
     (generator.options as Record<string, unknown>)[option],
     `Expected generator option :${option} to be truthy.`,
   ).toBeTruthy();
+}
+
+function assertNodeFiles(): Promise<void> {
+  return t
+    .assertFile(".node-version", (content: string) => {
+      expect(content).toMatch(/\d+\.\d+\.\d+/);
+    })
+    .then(() =>
+      t.assertFile("Dockerfile", (content: string) => {
+        expect(content).toMatch("pnpm");
+      }),
+    );
+}
+
+function resetDesc(): void {
+  delete (AppGenerator as unknown as { _desc?: string })._desc;
 }
 
 describe("AppGeneratorTest", () => {
@@ -498,6 +523,665 @@ describe("AppGeneratorTest", () => {
       expect(content).toMatch("db/cache_migrate");
       expect(content).toMatch("db/cable_migrate");
     });
+  });
+
+  it("skip bundle", async () => {
+    const bundleCommands: string[] = [];
+    const stub = vi
+      .spyOn(
+        AppGenerator.prototype as unknown as { installCommand(c: string): Promise<void> },
+        "installCommand",
+      )
+      .mockImplementation(async (command: string) => {
+        bundleCommands.push(command);
+      });
+    try {
+      await t.runGenerator([t.destinationRoot, "--skip-install"]);
+    } finally {
+      stub.mockRestore();
+    }
+
+    expect(bundleCommands).toBeEmpty();
+    await t.assertFile("package.json");
+  });
+
+  it("invalid javascript option raises an error", async () => {
+    const content = await capture("stderr", () =>
+      t.runGenerator([t.destinationRoot, "-j", "unknown"]),
+    );
+    expect(content).toMatch(/Expected '--javascript' to be one of/);
+  });
+
+  it("invalid css option raises an error", async () => {
+    const content = await capture("stderr", () =>
+      t.runGenerator([t.destinationRoot, "-c", "unknown"]),
+    );
+    expect(content).toMatch(/Expected '--css' to be one of/);
+  });
+
+  it("app update does not generate assets initializer when asset pipeline is not used", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-asset-pipeline"]);
+    await runAppUpdate.call(t);
+
+    t.assertNoFile("config/initializers/assets.ts");
+  });
+
+  it("app update does not generate action cable contents when skip action cable is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-action-cable"]);
+    await runAppUpdate.call(t);
+
+    t.assertNoFile("config/cable.ts");
+    await t.assertFile("config/environments/production.ts", (content: string) => {
+      assertNoMatch(/config\.actionCable/, content);
+    });
+    await t.assertFile("config/database.ts", (content: string) => {
+      assertNoMatch(/cable:/, content);
+    });
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — bootsnap is not ported.
+  it.skip("app update does not generate bootsnap contents when skip bootsnap is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-bootsnap"]);
+    await runAppUpdate.call(t);
+
+    await t.assertFile("config/boot.ts", (content: string) => {
+      assertNoMatch(/import "bootsnap\/setup"/, content);
+    });
+  });
+
+  it("app update preserves skip rubocop", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-eslint"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      await assertNoChanges(
+        () => File.isExist("bin/eslint"),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip system test", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-system-test"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await t.assertFile(config, /generators\(\)\.systemTests/);
+      await assertNoChanges(
+        async () =>
+          (await File.readlinesAsync(config)).filter((l) => /generators\(\)\.systemTests/.test(l)),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update does not generate active storage contents when skip active storage is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-active-storage"]);
+
+    await runAppUpdate.call(t);
+
+    await t.assertFile("config/environments/development.ts", (content: string) => {
+      assertNoMatch(/config\.activeStorage/, content);
+    });
+    await t.assertFile("config/environments/production.ts", (content: string) => {
+      assertNoMatch(/config\.activeStorage/, content);
+    });
+    await t.assertFile("config/environments/test.ts", (content: string) => {
+      assertNoMatch(/config\.activeStorage/, content);
+    });
+
+    t.assertNoFile("config/storage.ts");
+  });
+
+  it("app update does not generate active storage contents when skip active record is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-active-record"]);
+    await runAppUpdate.call(t);
+
+    await t.assertFile("config/environments/development.ts", (content: string) => {
+      assertNoMatch(/config\.activeStorage/, content);
+    });
+    await t.assertFile("config/environments/production.ts", (content: string) => {
+      assertNoMatch(/config\.activeStorage/, content);
+    });
+    await t.assertFile("config/environments/test.ts", (content: string) => {
+      assertNoMatch(/config\.activeStorage/, content);
+    });
+
+    t.assertNoFile("config/storage.ts");
+  });
+
+  it("app update silence deprecate message", async () => {
+    await t.runGenerator();
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      await File.open("config/initializers/deprecation.ts", "a", (file) =>
+        file.puts("Trails.deprecator.warn('test deprecation message');"),
+      );
+
+      const stderr = await capture("stderr", () => runAppUpdate.call(t));
+      assertNoMatch(/test deprecation message/, stderr);
+    });
+  });
+
+  it("generator skips action mailbox when skip action mailbox is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-action-mailbox"]);
+    await t.assertFile(
+      "config/application.ts",
+      /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-mailbox"/m,
+    );
+  });
+
+  it("generator skips action text when skip action text is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-action-text"]);
+    await t.assertFile(
+      "config/application.ts",
+      /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-text"/m,
+    );
+  });
+
+  it("app update does not change config target version", async () => {
+    await t.runGenerator();
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      const content = await File.readAsync(config);
+      await File.writeAsync(
+        config,
+        content.replace(/config\.loadDefaults\("[^"]*"\)/g, 'config.loadDefaults("5.1")'),
+      );
+    });
+
+    await runAppUpdate.call(t);
+
+    await t.assertFile("config/application.ts", /\s+this\.config\.loadDefaults\("5\.1"\)/);
+  });
+
+  it("app update does not change app name when app name is hyphenated name", async () => {
+    const appRoot = File.join(t.destinationRoot, "hyphenated-app");
+    await t.runGenerator([appRoot, "-d", "postgresql"]);
+
+    await t.assertFile(`${appRoot}/config/database.ts`, (content: string) => {
+      expect(content).toMatch(/hyphenated_app_development/);
+      assertNoMatch(/hyphenated-app_development/, content);
+    });
+
+    await t.assertFile(`${appRoot}/config/cable.ts`, (content: string) => {
+      expect(content).toMatch(/hyphenated_app/);
+      assertNoMatch(/hyphenated-app/, content);
+    });
+
+    await runAppUpdate.call(t, appRoot);
+
+    await t.assertFile(`${appRoot}/config/cable.ts`, (content: string) => {
+      expect(content).toMatch(/hyphenated_app/);
+      assertNoMatch(/hyphenated-app/, content);
+    });
+  });
+
+  it("application names are not singularized", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "hats")]);
+    await t.assertFile("hats/config/environment.ts", /Trails\.initialize\(\)/);
+  });
+
+  it("application name is normalized in config", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "MyWebSite"), "-d", "postgresql"]);
+    await t.assertFile(
+      "MyWebSite/app/views/layouts/application.html.tse",
+      /contentFor\("title"\) \?\? "My Web Site"/,
+    );
+    await t.assertFile("MyWebSite/config/database.ts", /my_web_site_production/);
+  });
+
+  it("gemfile has no whitespace errors", async () => {
+    await t.runGenerator();
+    const absolute = File.expandPath("package.json", t.destinationRoot);
+    for (const line of await File.readlinesAsync(absolute)) {
+      assertNoMatch(/^[ \t]+$/, line);
+    }
+  });
+
+  it("config database is added by default", async () => {
+    await t.runGenerator();
+    await t.assertFile("config/database.ts", /sqlite3/);
+    await t.assertFile("package.json", /"better-sqlite3": "\^13/);
+  });
+
+  it("config mysql database", async () => {
+    await t.runGenerator([t.destinationRoot, "-d", "mysql"]);
+    await t.assertFile("config/database.ts", /mysql/);
+    await t.assertFile("package.json", /"mysql2": "\^3/);
+  });
+
+  it("config database app name with period", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "common.usage.com"), "-d", "postgresql"]);
+    await t.assertFile("common.usage.com/config/database.ts", /common_usage_com/);
+  });
+
+  it("config postgresql database", async () => {
+    await t.runGenerator([t.destinationRoot, "-d", "postgresql"]);
+    await t.assertFile("config/database.ts", /postgresql/);
+    await t.assertFile("package.json", /"pg": "\^8/);
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — Puma is not ported.
+  it.skip("generator defaults to puma version", async () => {
+    await t.runGenerator([t.destinationRoot]);
+    await t.assertFile("package.json", /"puma": "\W+ \d/);
+  });
+
+  it("action cable redis gems", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-solid"]);
+    await assertNoGem("redis");
+  });
+
+  it("generator configures decrypted diffs by default", async () => {
+    await t.runGenerator();
+    await t.assertFile(".gitattributes", /\.enc diff=/);
+  });
+
+  it("generator does not configure decrypted diffs when skip decrypted diffs is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-decrypted-diffs"]);
+    await t.assertFile(".gitattributes", (content: string) => {
+      assertNoMatch(/\.enc diff=/, content);
+    });
+  });
+
+  it("generator if skip test is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-test"]);
+
+    await t.assertFile(
+      "config/application.ts",
+      /^\/\/\s+import\s+"@blazetrails\/trailties\/test-unit\/trailtie"/m,
+    );
+
+    await assertNoGem("playwright");
+    await assertNoGem("@playwright/test");
+
+    t.assertNoDirectory("test");
+
+    await t.assertFile(".github/workflows/ci.yml", (file: string) => {
+      assertNoMatch(/test:.\s*runs-on/s, file);
+    });
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jbuilder is not ported.
+  it.skip("generator if skip jbuilder is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-jbuilder"]);
+    await assertNoGem("jbuilder");
+  });
+
+  it("generator if skip active job is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-active-job"]);
+    t.assertNoFile("app/jobs/application-job.ts");
+    await t.assertFile("config/environments/production.ts", (content: string) => {
+      assertNoMatch(/config\.activeJob/, content);
+    });
+    await t.assertFile("config/application.ts", (content: string) => {
+      expect(content).toMatch(/^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/active-job"/m);
+      expect(content).toMatch(
+        /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/active-storage"/m,
+      );
+      expect(content).toMatch(
+        /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-mailer"/m,
+      );
+    });
+  });
+
+  it("generator if skip system test is given", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-system-test"]);
+    await assertNoGem("playwright");
+    await assertNoGem("@playwright/test");
+
+    await t.assertDirectory("test");
+
+    t.assertNoDirectory("test/system");
+
+    await t.assertFile(".github/workflows/ci.yml", (content: string) => {
+      expect(content).toMatch(/db:test:prepare && pnpm test/);
+      assertNoMatch(/test:system/, content);
+      assertNoMatch(/screenshots/, content);
+    });
+  });
+
+  it("viewport meta tag is present", async () => {
+    await t.runGenerator([t.destinationRoot]);
+
+    await t.assertFile("app/views/layouts/application.html.tse", (contents: string) => {
+      expect(contents).toMatch(/<meta name="viewport"/);
+    });
+  });
+
+  it("javascript is skipped if required", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-javascript"]);
+
+    t.assertNoFile("app/javascript");
+
+    await t.assertFile("app/views/layouts/application.html.tse", (contents: string) => {
+      expect(contents).toMatch(/stylesheetLinkTag\("application"\) %>/);
+    });
+
+    await t.assertFile(".github/workflows/ci.yml", (file: string) => {
+      assertNoMatch(/scan_js/, file);
+    });
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jbuilder is not ported.
+  it.skip("inclusion of jbuilder", async () => {
+    await t.runGenerator();
+    await assertGem("jbuilder");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — the debug gem has no trails npm package.
+  it.skip("inclusion of a debugger", async () => {
+    await t.runGenerator();
+    await assertGem("debug");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — thruster is not ported.
+  it.skip("inclusion of thruster", async () => {
+    await t.runGenerator();
+    await assertGem("thruster");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — thruster is not ported.
+  it.skip("thruster is skipped if required", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-thruster"]);
+
+    await assertNoGem("thruster");
+    t.assertNoFile("bin/thrust");
+  });
+
+  it("inclusion of rubocop", async () => {
+    await t.runGenerator();
+    await assertGem("eslint");
+    await t.assertFile(
+      "config/environments/development.ts",
+      /\/\/ Apply autocorrection by ESLint to files generated by `bin\/trails generate`\./,
+    );
+  });
+
+  it("rubocop is skipped if required", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-eslint"]);
+
+    await assertNoGem("eslint");
+    t.assertNoFile("bin/eslint");
+    t.assertNoFile("eslint.config.mjs");
+    await t.assertFile("config/environments/development.ts", (content: string) => {
+      assertNoMatch(
+        /\/\/ Apply autocorrection by ESLint to files generated by `bin\/trails generate`\./,
+        content,
+      );
+    });
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — brakeman is not ported.
+  it.skip("inclusion of brakeman", async () => {
+    await t.runGenerator();
+    await assertGem("brakeman");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — brakeman is not ported.
+  it.skip("brakeman is skipped if required", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-brakeman"]);
+
+    await assertNoGem("brakeman");
+    t.assertNoFile("bin/brakeman");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — brakeman is not ported.
+  it.skip("both brakeman and rubocop binstubs are skipped if required", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-brakeman", "--skip-eslint"]);
+
+    t.assertNoFile("bin/eslint");
+    t.assertNoFile("bin/brakeman");
+  });
+
+  it("kamal storage volume is skipped if required", async () => {
+    await runGeneratorInstance([
+      t.destinationRoot,
+      "--skip-active-storage",
+      "--database=postgresql",
+    ]);
+
+    await t.assertFile("config/deploy.yml", (content: string) => {
+      assertNoMatch(/storage:\/app\/storage/, content);
+    });
+  });
+
+  it("usage read from file", async () => {
+    resetDesc();
+    const usage = File.join(templateRoot, "USAGE");
+    await File.writeAsync(usage, "USAGE FROM FILE");
+    const stub = vi
+      .spyOn(AppGenerator as unknown as { usagePath(): Promise<string | null> }, "usagePath")
+      .mockResolvedValue(usage);
+    try {
+      expect(await AppGenerator.desc()).toBe("USAGE FROM FILE");
+      expect(stub).toHaveBeenCalledOnce();
+    } finally {
+      stub.mockRestore();
+      resetDesc();
+    }
+  });
+
+  it("default usage", async () => {
+    resetDesc();
+    const stub = vi
+      .spyOn(AppGenerator as unknown as { usagePath(): Promise<string | null> }, "usagePath")
+      .mockResolvedValue(null);
+    try {
+      expect(await AppGenerator.desc()).toMatch(/Create trails files for app generator/);
+      expect(stub).toHaveBeenCalledOnce();
+    } finally {
+      stub.mockRestore();
+      resetDesc();
+    }
+  });
+
+  it("default namespace", () => {
+    expect(AppGenerator.namespace()).toMatch("trails:app");
+  });
+
+  it("file is added for backwards compatibility", async () => {
+    const generator = t.generator() as unknown as {
+      file(path: string, data: string): Promise<unknown>;
+    };
+    await capture("stdout", () => generator.file("lib/test-file.ts", "here's test data"));
+    await t.assertFile("lib/test-file.ts", "here's test data");
+  });
+
+  it("pretend option", async () => {
+    const output = (await t.runGenerator([
+      File.join(t.destinationRoot, "myapp"),
+      "--pretend",
+    ])) as string;
+    assertNoMatch(/run {2}pnpm install/, output);
+    assertNoMatch(/run {2}git init/, output);
+  });
+
+  it("force option overwrites every file except master key", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "myapp")]);
+    const output = (await t.runGenerator([
+      File.join(t.destinationRoot, "myapp"),
+      "--force",
+    ])) as string;
+    expect(output).toMatch(/force/);
+    assertNoMatch(/force {2}config\/master\.key/, output);
+  });
+
+  it("application name with spaces", async () => {
+    const path = File.join(t.destinationRoot, "foo bar");
+
+    await t.runGenerator([path, "-d", "postgresql"]);
+
+    await t.assertFile("foo bar/config/database.ts", /database: "foo_bar_development"/);
+  });
+
+  it("generation runs bundle install", async () => {
+    const bundleCommands: string[] = [];
+    await runGeneratorInstance([t.destinationRoot], bundleCommands);
+
+    expect(bundleCommands.filter((c) => /^install/.test(c))).not.toBeEmpty();
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — `bundle lock --add-platform` is not ported.
+  it.skip("generation runs bundle lock for linux", async () => {
+    const bundleCommands: string[] = [];
+    await runGeneratorInstance([t.destinationRoot], bundleCommands);
+
+    expect(bundleCommands.filter((c) => /^lock --add-platform=\S+-linux/.test(c))).not.toEqual([]);
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — `Bundler.with_original_env` is not ported.
+  it.skip("generation use original bundle environment", async () => {
+    const generator = t.generator([t.destinationRoot]) as unknown as {
+      execBundleCommand(): void;
+      invokeAll(): Promise<unknown>;
+    };
+
+    vi.spyOn(
+      Bundler as unknown as { originalEnv(): Record<string, string> },
+      "originalEnv",
+    ).mockReturnValue({ BUNDLE_RUBYONRAILS__ORG: "user:pass" });
+    vi.spyOn(generator, "execBundleCommand").mockImplementation(() => {
+      expect(env["BUNDLE_RUBYONRAILS__ORG"]).toBe("user:pass");
+    });
+    await quietly(() => generator.invokeAll());
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — the bundler binstub is not ported.
+  it.skip("bundler binstub", async () => {
+    const bundleCommands: string[] = [];
+    await runGeneratorInstance([t.destinationRoot], bundleCommands);
+
+    expect(bundleCommands.filter((c) => c === "binstubs bundler")).toHaveLength(1);
+  });
+
+  it("skip javascript option", async () => {
+    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--skip-javascript"]);
+
+    expect(railsCommands).not.toContain("importmap:install");
+    expect(railsCommands).not.toContain("turbo:install stimulus:install");
+
+    await assertNoGem("vite-plugin-ruby");
+    await assertNoGem("jsbundling-rails");
+
+    await t.assertFile("config/initializers/content-security-policy.ts", (content: string) => {
+      assertNoMatch(/policy\.connectSrc/, content);
+    });
+
+    await t.assertFile(".gitattributes", (content: string) => {
+      assertNoMatch(/pnpm-lock\.yaml/, content);
+    });
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jsbundling-rails is not ported.
+  it.skip("webpack option", async () => {
+    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--javascript=webpack"]);
+    expect(railsCommands).toContain("javascript:install:webpack");
+    await assertGem("jsbundling-rails");
+    await assertNodeFiles();
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jsbundling-rails is not ported.
+  it.skip("esbuild option", async () => {
+    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--javascript=esbuild"]);
+    expect(railsCommands).toContain("javascript:install:esbuild");
+    await assertGem("jsbundling-rails");
+    await assertNodeFiles();
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jsbundling-rails is not ported.
+  it.skip("esbuild option with javascript argument", async () => {
+    await t.runGenerator([t.destinationRoot, "--javascript", "esbuild"]);
+    await assertGem("jsbundling-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jsbundling-rails is not ported.
+  it.skip("esbuild option with j argument", async () => {
+    await t.runGenerator([t.destinationRoot, "-j", "esbuild"]);
+    await assertGem("jsbundling-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jsbundling-rails is not ported.
+  it.skip("esbuild option with js argument", async () => {
+    await t.runGenerator([t.destinationRoot, "--js", "esbuild"]);
+    await assertGem("jsbundling-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jsbundling-rails is not ported.
+  it.skip("bun option", async () => {
+    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--javascript=bun"]);
+    expect(railsCommands).toContain("javascript:install:bun");
+    await assertGem("jsbundling-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jsbundling-rails is not ported.
+  it.skip("bun option with javascript argument", async () => {
+    await t.runGenerator([t.destinationRoot, "--javascript", "bun"]);
+    await assertGem("jsbundling-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jsbundling-rails is not ported.
+  it.skip("bun option with j argument", async () => {
+    await t.runGenerator([t.destinationRoot, "-j", "bun"]);
+    await assertGem("jsbundling-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — jsbundling-rails is not ported.
+  it.skip("bun option with js argument", async () => {
+    await t.runGenerator([t.destinationRoot, "--js", "bun"]);
+    await assertGem("jsbundling-rails");
+  });
+
+  it("skip javascript option with skip javascript argument", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-javascript"]);
+    await assertNoGem("@hotwired/stimulus");
+    await assertNoGem("@hotwired/turbo-rails");
+    await assertNoGem("vite-plugin-ruby");
+  });
+
+  it("skip javascript option with J argument", async () => {
+    await t.runGenerator([t.destinationRoot, "-J"]);
+    await assertNoGem("@hotwired/stimulus");
+    await assertNoGem("@hotwired/turbo-rails");
+    await assertNoGem("vite-plugin-ruby");
+  });
+
+  it("skip javascript option with skip js argument", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-js"]);
+    await assertNoGem("@hotwired/stimulus");
+    await assertNoGem("@hotwired/turbo-rails");
+    await assertNoGem("vite-plugin-ruby");
+  });
+
+  it("hotwire", async () => {
+    const railsCommands = await runGeneratorInstance([t.destinationRoot]);
+
+    expect(railsCommands).toContain("turbo:install stimulus:install");
+    await t.assertFile("app/views/layouts/application.html.tse", (content: string) => {
+      expect(content).toMatch(/data-turbo-track/);
+    });
+  });
+
+  it("skip hotwire", async () => {
+    await runGeneratorInstance([t.destinationRoot, "--skip-hotwire"]);
+
+    await assertNoGem("@hotwired/turbo-rails");
+    await t.assertFile("app/views/layouts/application.html.tse", (content: string) => {
+      assertNoMatch(/data-turbo-track/, content);
+    });
+    t.assertNoFile("app/javascript/entrypoints/application.js");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — cssbundling-rails is not ported.
+  it.skip("css option with tailwind uses cssbundling gem when using node", async () => {
+    await t.runGenerator([t.destinationRoot, "--css=tailwind", "--javascript=esbuild"]);
+    await assertGem("cssbundling-rails");
+    await assertNoGem("tailwindcss-rails");
   });
 });
 

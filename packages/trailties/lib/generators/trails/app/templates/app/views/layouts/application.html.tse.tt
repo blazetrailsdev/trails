@@ -17,8 +17,13 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
 
+<% if (this.options.skipHotwire || this.options.skipJavascript) { -%>
     <%%# Includes all stylesheet files in app/assets/stylesheets %>
     <%%= stylesheetLinkTag("application") %>
+<% } else { -%>
+    <%%# Includes all stylesheet files in app/assets/stylesheets %>
+    <%%= stylesheetLinkTag("application", { "data-turbo-track": "reload" }) %>
+<% } -%>
   </head>
 
   <body>

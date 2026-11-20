@@ -847,6 +847,11 @@ export class AppGenerator extends AppBase {
   }
 
   /** @internal */
+  protected file(...args: Array<string | Record<string, unknown> | (() => unknown)>): unknown {
+    return this.createFile(...(args as Parameters<AppGenerator["createFile"]>));
+  }
+
+  /** @internal */
   protected afterBundle(block: () => unknown): void {
     this.afterBundleCallbacks.push(block);
   }
