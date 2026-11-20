@@ -1,6 +1,8 @@
 import "./constants.variant-record.generated.js";
 import { runLoadHooks, type Extended } from "@blazetrails/activesupport";
 import type { ClassMethods } from "./attached/model.js";
+import "./attached/model.js";
+import "./reflection.js";
 import { ActiveStorage } from "./active-storage.js";
 import type { One } from "./attached/one.js";
 import { Record } from "./record.js";

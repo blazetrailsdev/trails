@@ -24,6 +24,8 @@ import {
   type Included,
   type Tempfile,
 } from "@blazetrails/ruby-compat";
+import "./attached/model.js";
+import "./reflection.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Analyzable } from "./blob/analyzable.js";
 import { Identifiable } from "./blob/identifiable.js";

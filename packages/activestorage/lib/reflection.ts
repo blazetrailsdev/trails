@@ -1,6 +1,6 @@
-import { MacroReflection, type Base } from "@blazetrails/activerecord";
-import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { MacroReflection, Reflection, type Base } from "@blazetrails/activerecord";
+import { classAttribute, Concern, extend, onLoad } from "@blazetrails/activesupport";
+import { include, prepend, rbCallSuper, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { NamedVariant } from "./named-variant.js";
 
 export class HasAttachedReflection extends MacroReflection {
@@ -72,4 +72,10 @@ export const ActiveRecordExtensions = { ClassMethods };
 extend(ActiveRecordExtensions, Concern);
 Concern.included.call(ActiveRecordExtensions, null, function (this: typeof Base) {
   classAttribute.call(this, "attachmentReflections", { instanceWriter: false, default: {} });
+});
+
+/** @inventedArm onLoad — PERMANENT */
+onLoad("active_record", function (this: typeof Base) {
+  include(this, ActiveRecordExtensions);
+  prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
 });
