@@ -818,7 +818,7 @@ export default defineConfig({
             "packages/solid-cache/test/lib/generators/**/*.test.ts",
             "packages/actionmailbox/test/generators/**/*.test.ts",
             "packages/actiontext/test/generators/**/*.test.ts",
-            "packages/stimulus/test/generators/**/*.test.ts",
+            "packages/stimulus/test/generator.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
@@ -907,7 +907,7 @@ export default defineConfig({
           name: "stimulus",
           globals: true,
           include: ["packages/stimulus/test/**/*.test.ts"],
-          exclude: [...SHARED_EXCLUDE, "packages/stimulus/test/generators/**"],
+          exclude: [...SHARED_EXCLUDE, "packages/stimulus/test/generator.test.ts"],
           setupFiles: [
             "./packages/ruby-compat/test-setup/class-paths.ts",
             "./packages/nokogiri/test/support/setup-extension.ts",
