@@ -469,6 +469,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         // ported as `@blazetrails/sqlite3`.
         name: "sqlite3",
         libPath: "lib/sqlite3",
+        testPath: "test",
       },
     ],
   },

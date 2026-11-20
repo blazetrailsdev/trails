@@ -37,6 +37,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "bcrypt",
     "msgpack",
     "pg",
+    "sqlite3",
     "marcel",
     "chronic",
     "builder",
