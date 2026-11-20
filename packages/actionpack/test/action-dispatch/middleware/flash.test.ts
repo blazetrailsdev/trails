@@ -51,19 +51,19 @@ function makeHost(initial: Record<string, unknown> = {}): FlashRequestHost &
 }
 
 describe("Flash::RequestMethods", () => {
-  it("flash builds from session on first access", () => {
+  it("flash builds from session on first access", async () => {
     const host = makeHost({ flash: { flashes: { notice: "hi" }, discard: [] } });
-    const f = host.flash!;
+    const f = await host.flash;
     expect(f.get("notice")).toBe("hi");
     expect(host.env[KEY]).toBe(f);
   });
 
-  it("flash setter stores the value and a subsequent get returns it (no session rebuild)", () => {
+  it("flash setter stores the value and a subsequent get returns it (no session rebuild)", async () => {
     const host = makeHost({ flash: { flashes: { stale: "old" }, discard: [] } });
     const fresh = new FlashHash({ notice: "fresh" });
     host.flash = fresh;
-    expect(host.flash).toBe(fresh);
-    expect(host.flash.get("notice")).toBe("fresh");
+    expect(await host.flash).toBe(fresh);
+    expect((await host.flash).get("notice")).toBe("fresh");
   });
 
   it("flashHash returns null when flash has not been touched", () => {
@@ -71,13 +71,13 @@ describe("Flash::RequestMethods", () => {
     expect(host.flashHash()).toBeNull();
   });
 
-  it("commitFlash writes toSessionValue into the session and replaces the cache with a dup", () => {
+  it("commitFlash writes toSessionValue into the session and replaces the cache with a dup", async () => {
     const host = makeHost();
     const f = new FlashHash({ notice: "hi", drop: "x" });
     f.discard("drop");
     host.flash = f;
 
-    commitFlash.call(host);
+    await commitFlash.call(host);
 
     expect(host.session._store.get("flash")).toEqual({ discard: [], flashes: { notice: "hi" } });
     const cached = host.flashHash();
@@ -85,23 +85,23 @@ describe("Flash::RequestMethods", () => {
     expect(cached!.get("notice")).toBe("hi");
   });
 
-  it("commitFlash deletes session['flash'] when the projected hash is empty", () => {
+  it("commitFlash deletes session['flash'] when the projected hash is empty", async () => {
     const host = makeHost({ flash: { flashes: { gone: "x" } } });
-    const f = host.flash!;
+    const f = await host.flash;
     f.discard("gone");
 
-    commitFlash.call(host);
+    await commitFlash.call(host);
 
     expect(host.session._store.has("flash")).toBe(false);
   });
 
-  it("commitFlash is a no-op when session is disabled", () => {
+  it("commitFlash is a no-op when session is disabled", async () => {
     const host = makeHost();
     host.session._setEnabled(false);
     const f = new FlashHash({ notice: "hi" });
     host.flash = f;
 
-    commitFlash.call(host);
+    await commitFlash.call(host);
 
     expect(host.session._store.has("flash")).toBe(false);
   });

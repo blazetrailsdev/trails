@@ -61,8 +61,8 @@ describe("add_flash_types readers", () => {
     await t.followRedirectBang();
     t.assertResponse(":success");
 
-    expect((t.controller as NoticesController).notice).toBe("Post was successfully created.");
-    expect((t.controller as NoticesController).alert).toBeUndefined();
+    expect(await (t.controller as NoticesController).notice).toBe("Post was successfully created.");
+    expect(await (t.controller as NoticesController).alert).toBeUndefined();
     expect(t.body).toBe('<p style="color: green">Post was successfully created.</p>');
   });
 

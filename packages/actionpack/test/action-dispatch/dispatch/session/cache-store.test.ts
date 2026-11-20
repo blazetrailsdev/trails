@@ -27,12 +27,12 @@ class TestController extends Base {
   }
 
   async setSessionValue(): Promise<void> {
-    this.session.set("foo", "bar");
+    await this.session.set("foo", "bar");
     await this.head(":ok");
   }
 
   async getSessionValue(): Promise<void> {
-    await this.render({ plain: `foo: ${rbInspect(this.session.get("foo"))}` });
+    await this.render({ plain: `foo: ${rbInspect(await this.session.get("foo"))}` });
   }
 
   async getSessionId(): Promise<void> {
@@ -40,9 +40,9 @@ class TestController extends Base {
   }
 
   async callResetSession(): Promise<void> {
-    this.session.get("bar");
+    await this.session.get("bar");
     await this.resetSession();
-    this.session.set("bar", "baz");
+    await this.session.set("bar", "baz");
     await this.head(":ok");
   }
 }

@@ -42,13 +42,13 @@ describe("Session", () => {
     const req = makeReq();
     const session = Session.disabled(req);
     await session.destroy();
-    expect(session.isEmpty()).toBe(true);
+    expect(await session.isEmpty()).toBe(true);
   });
 
   it("write to a disabled session raises DisabledSessionError", async () => {
     const req = makeReq();
     const session = Session.disabled(req);
-    expect(() => session.set("foo", "bar")).toThrow(DisabledSessionError);
+    await expect(session.set("foo", "bar")).rejects.toThrow(DisabledSessionError);
   });
 
   it("destroy deletes the session through the store and reloads the new sid", async () => {
@@ -78,8 +78,12 @@ describe("Session", () => {
     };
     const session = await Session.create(store, req, {});
 
-    expect(() => session.update(null)).toThrow("no implicit conversion of NilClass into Hash");
-    expect(() => session.update([1, 2])).toThrow("no implicit conversion of Array into Hash");
+    await expect(session.update(null)).rejects.toThrow(
+      "no implicit conversion of NilClass into Hash",
+    );
+    await expect(session.update([1, 2])).rejects.toThrow(
+      "no implicit conversion of Array into Hash",
+    );
   });
 
   it("delete removes the session from the request", async () => {
@@ -111,7 +115,7 @@ describe("Session", () => {
     expect(loadSession).not.toHaveBeenCalled();
     expect(session.isLoaded()).toBe(false);
 
-    session.get("foo");
+    await session.get("foo");
     const inspected = session.inspect();
     expect(inspected).toMatch(/^#<ActionDispatch::Request::Session:0x[0-9a-f]+ @by=/);
     expect(inspected).toContain(', @delegate={"a"=>1}, @loaded=true, ');
@@ -129,5 +133,23 @@ describe("Session", () => {
     const session = new MySession(store, req, {});
 
     expect(session.inspect()).toMatch(/^#<MySession:0x[0-9a-f]+ not yet loaded>$/);
+  });
+});
+
+describe("Session lazy async load", () => {
+  it("loads once when two accessors race, so neither write is lost", async () => {
+    const loadSession = vi.fn(async () => [1, {}] as [unknown, Record<string, unknown>]);
+    const store = {
+      loadSession,
+      sessionExists: () => true,
+      deleteSession: async () => null,
+      extractSessionId: () => 1,
+    };
+    const s = await Session.create(store, makeReq(), {});
+
+    await Promise.all([s.set("a", 1), s.set("b", 2)]);
+
+    expect(await s.toHash()).toEqual({ a: 1, b: 2 });
+    expect(loadSession).toHaveBeenCalledTimes(1);
   });
 });

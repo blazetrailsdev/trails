@@ -61,16 +61,16 @@ class TestController extends Base {
   }
 
   async persistentSessionId(): Promise<void> {
-    await this.render({ plain: this.session.get("session_id") as string });
+    await this.render({ plain: (await this.session.get("session_id")) as string });
   }
 
   async setSessionValue(): Promise<void> {
-    this.session.set("foo", "bar");
+    await this.session.set("foo", "bar");
     await this.render({ body: null });
   }
 
   async getSessionValue(): Promise<void> {
-    await this.render({ plain: `foo: ${rbInspect(this.session.get("foo"))}` });
+    await this.render({ plain: `foo: ${rbInspect(await this.session.get("foo"))}` });
   }
 
   async getSessionId(): Promise<void> {
@@ -85,7 +85,7 @@ class TestController extends Base {
   }
 
   async callSessionClear(): Promise<void> {
-    this.session.clear();
+    await this.session.clear();
     await this.head(":ok");
   }
 
@@ -95,7 +95,7 @@ class TestController extends Base {
   }
 
   async raiseDataOverflow(): Promise<void> {
-    this.session.set("foo", "bye!".repeat(1024));
+    await this.session.set("foo", "bye!".repeat(1024));
     await this.head(":ok");
   }
 

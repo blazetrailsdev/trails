@@ -5916,15 +5916,15 @@ describe("FlashRedirectTest", () => {
 
   class FooController extends Base {
     async bar(): Promise<void> {
-      await this.render({ plain: (this.flash.get("foo") as string | undefined) || "foo" });
+      await this.render({ plain: ((await this.flash).get("foo") as string | undefined) || "foo" });
     }
   }
 
   const Routes = new RouteSet();
   Routes.draw(function () {
     this.get("/foo", {
-      to: this.redirect((_params, req) => {
-        req.flash!.set("foo", "bar");
+      to: this.redirect(async (_params, req) => {
+        (await req.flash).set("foo", "bar");
         return "/bar";
       }),
     });

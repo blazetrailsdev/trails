@@ -62,8 +62,8 @@ class PostsController extends Base {
 
   async create() {
     const title = this.params.get("title");
-    this.flash.set("notice", "Post created!");
-    this.session.set("lastPost", title);
+    (await this.flash).set("notice", "Post created!");
+    await this.session.set("lastPost", title);
     this.status = ":created";
     await this.render({ json: { title, created: true } });
   }
@@ -82,12 +82,12 @@ class PostsController extends Base {
   }
 
   async createAndRedirect() {
-    this.flash.set("notice", "Post created!");
+    (await this.flash).set("notice", "Post created!");
     await this.redirectTo("/posts/flash");
   }
 
   async showFlash() {
-    await this.render({ plain: String(this.flash.get("notice") ?? "none") });
+    await this.render({ plain: String((await this.flash).get("notice") ?? "none") });
   }
 
   async renderHtml() {
@@ -105,7 +105,7 @@ class PostsController extends Base {
   }
 
   async readSession() {
-    const lastPost = this.session.get("lastPost") ?? "none";
+    const lastPost = (await this.session.get("lastPost")) ?? "none";
     await this.render({ json: { lastPost } });
   }
 
@@ -159,17 +159,17 @@ class AdminPostsController extends Base {
 
 class SessionsController extends Base {
   async create() {
-    this.session.set("userId", 42);
+    await this.session.set("userId", 42);
     await this.redirectTo("/posts");
   }
 
   async show() {
-    const userId = this.session.get("userId") ?? null;
+    const userId = (await this.session.get("userId")) ?? null;
     await this.render({ json: { userId } });
   }
 
   async destroy() {
-    this.session.set("userId", undefined);
+    await this.session.set("userId", undefined);
     await this.head(204);
   }
 }
@@ -389,7 +389,7 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("flash", () => {
     it("flash is accessible after request", async () => {
       await app.post("/posts", { params: { title: "Flash!" } });
-      expect(app.flash().get("notice")).toBe("Post created!");
+      expect((await app.flash()).get("notice")).toBe("Post created!");
     });
 
     it("flash survives a redirect and is swept on the request after", async () => {
@@ -405,7 +405,7 @@ describe("ActionDispatch::IntegrationTest", () => {
 
     it("assertFlash throws when not set", async () => {
       await app.get("/posts");
-      expect(app.flash().get("notice")).toBeUndefined();
+      expect((await app.flash()).get("notice")).toBeUndefined();
     });
   });
 

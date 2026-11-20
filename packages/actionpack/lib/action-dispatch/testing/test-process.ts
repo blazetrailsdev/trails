@@ -11,7 +11,7 @@ import { ActionDispatch } from "../../namespaces.js";
 /** @internal */
 export interface TestProcessRequest extends RequestCookieMethodsHost {
   session: Session;
-  flash: FlashHash;
+  flash: Promise<FlashHash>;
 }
 
 /** @internal */
@@ -55,7 +55,7 @@ export function session(this: TestProcessHost): Session {
   return this.request.session;
 }
 
-export function flash(this: TestProcessHost): FlashHash {
+export function flash(this: TestProcessHost): Promise<FlashHash> {
   return this.request.flash;
 }
 

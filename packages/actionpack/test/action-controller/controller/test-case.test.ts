@@ -59,24 +59,24 @@ class TestController extends Base {
   }
 
   async setFlash() {
-    const prev = this.flash.get("test") ?? "";
-    this.flash.set("test", `>${prev}<`);
+    const prev = (await this.flash).get("test") ?? "";
+    (await this.flash).set("test", `>${prev}<`);
     await this.render({ plain: "ignore me" });
   }
 
   async deleteFlash() {
-    this.flash.delete("test");
+    (await this.flash).delete("test");
     await this.render({ plain: "ignore me" });
   }
 
   async setFlashNow() {
-    this.flash.now.set("test_now", `>${this.flash.get("test_now") ?? ""}<`);
+    (await this.flash).now.set("test_now", `>${(await this.flash).get("test_now") ?? ""}<`);
     await this.render({ plain: "ignore me" });
   }
 
   async setSession() {
-    this.session.set("string", "A wonder");
-    this.session.set("symbol", "it works");
+    await this.session.set("string", "A wonder");
+    await this.session.set("symbol", "it works");
     await this.render({ plain: "Success" });
   }
 
@@ -356,24 +356,24 @@ describe("TestCaseTest", () => {
 
   it("process without flash", async () => {
     await tc.process("setFlash");
-    assertEqual("><", tc.flash().get("test"));
+    assertEqual("><", (await tc.flash()).get("test"));
   });
 
   it("process with flash", async () => {
     await tc.process("setFlash", { method: "GET", flash: { test: "value" } });
-    assertEqual(">value<", tc.flash().get("test"));
+    assertEqual(">value<", (await tc.flash()).get("test"));
   });
 
   it("process with flash now", async () => {
     await tc.process("setFlashNow", { method: "GET", flash: { test_now: "value_now" } });
-    assertEqual(">value_now<", tc.flash().get("test_now"));
+    assertEqual(">value_now<", (await tc.flash()).get("test_now"));
   });
 
   it("process delete flash", async () => {
     await tc.process("setFlash");
     await tc.process("deleteFlash");
-    assertEmpty(tc.flash());
-    assertEmpty(tc.session());
+    assertEmpty(await tc.flash());
+    await assertEmpty(tc.session());
   });
 
   it("process with session", async () => {
@@ -409,7 +409,7 @@ describe("TestCaseTest", () => {
   });
 
   it("process merges session arg", async () => {
-    tc.session().set("foo", "bar");
+    await tc.session().set("foo", "bar");
     await tc.get("noOp", { session: { bar: "baz" } });
     assertEqual("bar", tc.session().get("foo"));
     assertEqual("baz", tc.session().get("bar"));
@@ -423,7 +423,7 @@ describe("TestCaseTest", () => {
   });
 
   it("process overwrites existing session arg", async () => {
-    tc.session().set("foo", "bar");
+    await tc.session().set("foo", "bar");
     await tc.get("noOp", { session: { foo: "baz" } });
     assertEqual("baz", tc.session().get("foo"));
   });
@@ -620,7 +620,7 @@ describe("TestCaseTest", () => {
     );
 
     assertEqual("bar", tc.session().get("foo"));
-    assertEqual("created", tc.flash().get("notice"));
+    assertEqual("created", (await tc.flash()).get("notice"));
   });
 
   it("params passing with integer", async () => {

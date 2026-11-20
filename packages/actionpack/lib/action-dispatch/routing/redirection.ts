@@ -66,8 +66,8 @@ export class Redirect<B = unknown> extends Endpoint {
     });
   }
 
-  buildResponse(req: Request): Promise<Response> {
-    const uri = URI.parse(this.path(req.pathParameters as Record<string, string>, req));
+  async buildResponse(req: Request): Promise<Response> {
+    const uri = URI.parse(await this.path(req.pathParameters as Record<string, string>, req));
 
     if (!uri.host) {
       if (this.relativePath(uri.path)) {
@@ -81,7 +81,7 @@ export class Redirect<B = unknown> extends Endpoint {
     uri.host ??= req.host;
     if (!req.isStandardPort) uri.port ??= req.port;
 
-    req.commitFlash();
+    await req.commitFlash();
 
     const body = "";
     const headers = {
@@ -92,8 +92,8 @@ export class Redirect<B = unknown> extends Endpoint {
     return Response.new(this.status, headers, [body]);
   }
 
-  path(params: Record<string, string>, request: Request): string {
-    return rbProcCall(this.block, params, request) as string;
+  path(params: Record<string, string>, request: Request): string | Promise<string> {
+    return rbProcCall(this.block, params, request) as string | Promise<string>;
   }
 
   inspect(): string {

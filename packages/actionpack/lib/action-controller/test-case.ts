@@ -295,7 +295,7 @@ async function process(
     parameters["format"] = format;
   }
 
-  this.setupRequest(this.controllerClassName(), action, parameters, session, flash, xhr);
+  await this.setupRequest(this.controllerClassName(), action, parameters, session, flash, xhr);
   return this.processControllerResponse(action, this.cookies(), xhr);
 }
 
@@ -358,7 +358,7 @@ function buildResponse(
 }
 
 /** @internal */
-function setupRequest(
+async function setupRequest(
   this: Behavior,
   controllerClassName: string,
   action: string,
@@ -366,7 +366,7 @@ function setupRequest(
   session: Record<string, unknown> | undefined,
   flash: Record<string, string> | undefined,
   xhr: boolean,
-): void {
+): Promise<void> {
   const generatedExtras = this.routes!.generateExtras({
     ...parameters,
     controller: controllerClassName,
@@ -384,8 +384,8 @@ function setupRequest(
     queryStringKeys,
   );
 
-  if (session) this.request.session.update(session);
-  this.request.flash!.update(flash ?? {});
+  if (session) await this.request.session.update(session);
+  (await this.request.flash).update(flash ?? {});
 
   if (xhr) {
     this.request.setHeader("HTTP_X_REQUESTED_WITH", "XMLHttpRequest");
@@ -445,11 +445,11 @@ async function processControllerResponse(
     }
     this.response.toA();
 
-    const flashValue = this.request.flash!.toSessionValue();
+    const flashValue = (await this.request.flash).toSessionValue();
     if (flashValue) {
-      this.request.session.set("flash", flashValue);
+      await this.request.session.set("flash", flashValue);
     } else {
-      this.request.session.delete("flash");
+      await this.request.session.delete("flash");
     }
 
     if (xhr) {
