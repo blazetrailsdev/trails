@@ -171,7 +171,7 @@
       <li><a href={repo}>Source</a></li>
       <li><a href="{repo}/blob/main/LICENSES.md">License</a></li>
     </ul>
-    <p>trails is an independent TypeScript re-implementation of Ruby on Rails. The Rails trademarks are the intellectual property of David Heinemeier Hanson, and exclusively licensed to the Rails Foundation. Uses of ‘Rails’ and ‘Ruby on Rails’ in this website are for identification purposes only and do not imply an endorsement by or affiliation with Rails, the trademark owner, or the Rails Foundation.</p>
+    <p>trails is an independent TypeScript re-implementation of Ruby on Rails. The Rails trademarks are the intellectual property of David Heinemeier Hansson, and exclusively licensed to the Rails Foundation. Uses of ‘Rails’ and ‘Ruby on Rails’ in this website are for identification purposes only and do not imply an endorsement by or affiliation with Rails, the trademark owner, or the Rails Foundation.</p>
   </footer>
 </div>
 
