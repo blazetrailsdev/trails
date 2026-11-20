@@ -3,12 +3,6 @@ import { File } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { Base } from "../../base.js";
 
-const DEFAULT_TEMPLATE = `# aws:
-#   access_key_id: 123
-#   secret_access_key: 345
-
-`;
-
 export class EncryptedFileGenerator extends Base {
   static {
     this.methodAdded("addEncryptedFileSilently");
@@ -17,15 +11,24 @@ export class EncryptedFileGenerator extends Base {
   async addEncryptedFileSilently(
     filePath: string,
     keyPath: string,
-    template: string = DEFAULT_TEMPLATE,
+    template: string = this.encryptedFileTemplate(),
   ): Promise<void> {
-    if (File.isExist(filePath)) return;
-    const file = new EncryptedFile({
-      contentPath: filePath,
-      keyPath,
-      envKey: "TRAILS_MASTER_KEY",
-      raiseIfMissingKey: true,
-    });
-    await file.write(template);
+    if (!File.isExist(filePath)) {
+      await new EncryptedFile({
+        contentPath: filePath,
+        keyPath,
+        envKey: "TRAILS_MASTER_KEY",
+        raiseIfMissingKey: true,
+      }).write(template);
+    }
+  }
+
+  /** @internal */
+  private encryptedFileTemplate(): string {
+    return `# aws:
+#   access_key_id: 123
+#   secret_access_key: 345
+
+`;
   }
 }

@@ -172,6 +172,7 @@ export const PHRASE_RENAMES: Record<string, string> = {
   skip_bundle: "skip_install",
   gemfile_entry: "package_entry",
   gemfile_entries: "package_entries",
+  edit_gemfile: "edit_package_json",
   load_ruby_config: "load_ts_config",
   vite_ruby: "vite_assets",
 };
@@ -1172,6 +1173,30 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "add_bundler_platforms",
     ],
     rubyFiles: ["generators/app_base.rb"],
+    packages: ["trailties"],
+  },
+  {
+    reason:
+      'PERMANENT: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": ' +
+      "`github` writes a Gemfile `github` source block, and `append_file_with_newline` " +
+      "appends a Gemfile line for `gem` / `gem_group` / `github` (generators/actions.rb:125-140, " +
+      ":511-515); `gem` writes the `package.json` entry instead, so neither has a mapped artifact.",
+    names: ["github", "append_file_with_newline"],
+    rubyFiles: ["generators/actions.rb", "generators/base.rb"],
+    packages: ["trailties"],
+  },
+  {
+    reason:
+      'PERMANENT: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": ' +
+      "benchmark-ips (`add_ips_to_gemfile`, and the `ips_installed?` guard it sits behind, " +
+      "rails/benchmark/benchmark_generator.rb:18-27) is a row that section marks not ported, and " +
+      "`.ruby-version` (`ruby_version`, rails/app/app_generator.rb:54-56) maps onto `.node-version`, " +
+      "which `node_version` already writes.",
+    names: ["add_ips_to_gemfile", "ips_installed?", "ruby_version"],
+    rubyFiles: [
+      "generators/rails/benchmark/benchmark_generator.rb",
+      "generators/rails/app/app_generator.rb",
+    ],
     packages: ["trailties"],
   },
   {

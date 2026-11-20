@@ -126,9 +126,27 @@ export class ScaffoldGenerator extends Base {
   }
 
   /** @internal */
+  isBoolean(name: string): boolean {
+    const attribute = this.attributes.find((attr) => attr.name === name);
+    return attribute?.type === "boolean";
+  }
+
+  /** @internal */
   isVirtual(name: string): boolean {
     const attribute = this.attributes.find((attr) => attr.name === name);
     return attribute?.virtual() ?? false;
+  }
+
+  /** @internal */
+  isDatetime(name: string): boolean {
+    const attribute = this.attributes.find((attr) => attr.name === name);
+    return attribute?.type === "datetime";
+  }
+
+  /** @internal */
+  isTime(name: string): boolean {
+    const attribute = this.attributes.find((attr) => attr.name === name);
+    return attribute?.type === "time";
   }
 }
 

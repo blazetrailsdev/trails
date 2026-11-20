@@ -1,5 +1,5 @@
 import "../constants.model-helpers.generated.js";
-import { pluralize, singularize, underscore } from "@blazetrails/activesupport";
+import { mattrAccessor, pluralize, singularize, underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { NamedBase } from "./named-base.js";
@@ -40,12 +40,10 @@ function isInflectionImpossible(this: ModelHelpersHost, name: string): boolean {
   );
 }
 
-export const ModelHelpers = {
+const _ModelHelpers = {
   PLURAL_MODEL_NAME_WARN_MESSAGE,
   IRREGULAR_MODEL_NAME_WARN_MESSAGE,
   INFLECTION_IMPOSSIBLE_ERROR_MESSAGE,
-  skipWarn: false,
-
   isPluralModelName,
   isIrregularModelName,
   isInflectionImpossible,
@@ -58,3 +56,6 @@ export const ModelHelpers = {
     });
   },
 };
+
+export const ModelHelpers = _ModelHelpers as typeof _ModelHelpers & { skipWarn: boolean | null };
+mattrAccessor.call(ModelHelpers, "skipWarn");

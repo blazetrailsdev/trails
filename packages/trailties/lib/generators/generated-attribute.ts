@@ -177,10 +177,24 @@ export class GeneratedAttribute {
   }
 
   toString(): string {
-    const opts = printOptions(this.attrOptions);
-    if (this.hasUniqIndex()) return `${this.name}:${this.type}${opts}:uniq`;
-    if (this.hasIndex()) return `${this.name}:${this.type}${opts}:index`;
-    return `${this.name}:${this.type}${opts}`;
+    if (this.hasUniqIndex()) return `${this.name}:${this.type}${this.printAttributeOptions()}:uniq`;
+    if (this.hasIndex()) return `${this.name}:${this.type}${this.printAttributeOptions()}:index`;
+    return `${this.name}:${this.type}${this.printAttributeOptions()}`;
+  }
+
+  /** @internal */
+  private printAttributeOptions(): string {
+    if (Object.keys(this.attrOptions).length === 0) {
+      return "";
+    } else if (this.attrOptions.size != null) {
+      return `{${this.attrOptions.size}}`;
+    } else if (this.attrOptions.limit != null) {
+      return `{${this.attrOptions.limit}}`;
+    } else if (this.attrOptions.precision != null && this.attrOptions.scale != null) {
+      return `{${this.attrOptions.precision},${this.attrOptions.scale}}`;
+    } else {
+      return `{${Object.keys(this.attrOptions).join(",")}}`;
+    }
   }
 }
 
@@ -212,13 +226,4 @@ function inspectOption(value: unknown): string {
       .join(", ")} }`;
   }
   return JSON.stringify(value);
-}
-
-function printOptions(opts: AttrOptions): string {
-  const k = Object.keys(opts);
-  if (k.length === 0) return "";
-  if (opts.size) return `{${opts.size}}`;
-  if (opts.limit != null) return `{${opts.limit}}`;
-  if (opts.precision != null && opts.scale != null) return `{${opts.precision},${opts.scale}}`;
-  return `{${k.join(",")}}`;
 }

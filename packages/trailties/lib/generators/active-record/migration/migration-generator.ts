@@ -23,7 +23,7 @@ export class MigrationGenerator extends Base {
   async createMigrationFile(): Promise<void> {
     const name = this.name;
     this.setLocalAssignsBang();
-    this.validateFileName();
+    this.validateFileNameBang();
     await this.migrationTemplate(
       this._migrationTemplate,
       File.join(this.dbMigratePath(), `${underscore(name)}${this.ext()}`),
@@ -31,7 +31,7 @@ export class MigrationGenerator extends Base {
   }
 
   /** @internal */
-  private validateFileName(): void {
+  private validateFileNameBang(): void {
     if (!/^[_a-z0-9]+$/.test(this.fileName)) throw new IllegalMigrationNameError(this.fileName);
   }
 
