@@ -15,7 +15,10 @@ import { ExpectedTestError } from "./support/expected-test-error.js";
 import { JobBuffer } from "./support/add-to-buffer-job.js";
 import { silentOnThreadErrorFor } from "./support/jobs-test-helper.js";
 
-type SolidQueueTestCase = TestCase & { _onThreadError: typeof SolidQueue.onThreadError };
+type SolidQueueTestCase = TestCase & {
+  constructor: { useTransactionalTests: boolean };
+  _onThreadError: typeof SolidQueue.onThreadError;
+};
 
 export async function destroyRecords() {
   await Job.destroyAll();
@@ -34,7 +37,7 @@ TestCase.setup(async function (this: SolidQueueTestCase) {
   SolidQueue.onThreadError = silentOnThreadErrorFor(ExpectedTestError, this._onThreadError);
   SolidQueueAdapter.stopping = false;
 
-  if (!(this.constructor as { useTransactionalTests?: boolean }).useTransactionalTests) {
+  if (!this.constructor.useTransactionalTests) {
     await destroyRecords();
   }
 });
@@ -43,14 +46,12 @@ TestCase.teardown(async function (this: SolidQueueTestCase) {
   SolidQueue.onThreadError = this._onThreadError;
   JobBuffer.clear();
 
-  if (
-    SolidQueue.supervisorPidfile &&
-    (await File.isExistAsync(SolidQueue.supervisorPidfile as string))
-  ) {
-    await File.deleteAsync(SolidQueue.supervisorPidfile as string);
+  const supervisorPidfile = SolidQueue.supervisorPidfile as string | null;
+  if (supervisorPidfile && (await File.isExistAsync(supervisorPidfile))) {
+    await File.deleteAsync(supervisorPidfile);
   }
 
-  if (!(this.constructor as { useTransactionalTests?: boolean }).useTransactionalTests) {
+  if (!this.constructor.useTransactionalTests) {
     await destroyRecords();
   }
 });
