@@ -2,7 +2,6 @@ import {
   aryDeleteIf,
   extend,
   kernelCatch,
-  kernelCatchSync,
   NoMethodError,
   rbBlockGivenP,
   rbClassSuperclass,
@@ -338,7 +337,7 @@ export class Environment extends Struct.new("target", "halted", "value") {
 export class Before {
   readonly userCallback: (target: object, value: unknown) => unknown;
   readonly userConditions: Array<(target: object, value: unknown) => boolean>;
-  readonly terminator:
+  readonly haltedLambda:
     | ((target: object, fn: () => unknown) => boolean | Promise<boolean>)
     | false
     | undefined;
@@ -356,7 +355,8 @@ export class Before {
   ) {
     this.userCallback = userCallback;
     this.userConditions = userConditions;
-    this.terminator = chainConfig.terminator;
+    const haltedLambda = chainConfig.terminator;
+    this.haltedLambda = haltedLambda;
     this.filter = filter;
     this.name = name;
   }
@@ -400,7 +400,7 @@ export class Before {
   /** @noRailsEquivalent PERMANENT */
   private _callFilter(env: Environment): Environment | Promise<Environment> {
     const { target, value, syncChain } = env;
-    const terminatorFn = this.terminator;
+    const terminatorFn = this.haltedLambda;
     const resultLambda = () => this.userCallback(target, value);
 
     if (terminatorFn === false) {
@@ -450,32 +450,6 @@ export class Before {
       return env;
     }
 
-    let terminate = true;
-    const block = () => {
-      const cbResult = resultLambda();
-      if (!isThenable(cbResult)) {
-        terminate = false;
-        return;
-      }
-      if (syncChain !== undefined) {
-        new Thread(() => cbResult);
-        throw new RuntimeError(
-          `Async callback on sync chain "${syncChain}" — before returned a Promise`,
-        );
-      }
-      return Promise.resolve(cbResult).then(() => {
-        terminate = false;
-      });
-    };
-    const caught =
-      syncChain !== undefined ? kernelCatchSync(":abort", block) : kernelCatch(":abort", block);
-    if (isThenable(caught)) {
-      return Promise.resolve(caught).then(() => {
-        if (terminate) this.halt(env);
-        return env;
-      });
-    }
-    if (terminate) this.halt(env);
     return env;
   }
 
@@ -879,7 +853,7 @@ export class CallbackChain {
 
   constructor(name: string, config: DefineCallbacksOptions = {}) {
     this.name = name;
-    this.config = { ...config };
+    this.config = { scope: ["kind"], terminator: this.defaultTerminator(), ...config };
     this.chain = [];
   }
 
@@ -984,6 +958,27 @@ export class CallbackChain {
 
   get isEmpty(): boolean {
     return this.chain.length === 0;
+  }
+
+  /** @internal */
+  private defaultTerminator(): (
+    target: object,
+    resultLambda: () => unknown,
+  ) => boolean | Promise<boolean> {
+    return (_target, resultLambda) => {
+      let terminate = true;
+      const caught = kernelCatch(":abort", () => {
+        const r = resultLambda();
+        if (isThenable(r)) {
+          return Promise.resolve(r).then(() => {
+            terminate = false;
+          });
+        }
+        terminate = false;
+      });
+      if (isThenable(caught)) return Promise.resolve(caught).then(() => terminate);
+      return terminate;
+    };
   }
 }
 
