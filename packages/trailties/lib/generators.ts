@@ -169,7 +169,6 @@ export class Generators {
   static async lookupBang(): Promise<void> {
     for (const dir of LOAD_PATH) {
       for (const path of await Dir.globAsync(File.join(dir, ...Generators.fileLookupPaths()))) {
-        if (/\.(test|d)\./.test(path)) continue;
         const base = Generators.lookupPaths().find((b) =>
           path.startsWith(File.join(dir, b) + "/"),
         )!;
