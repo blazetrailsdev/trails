@@ -1,6 +1,6 @@
 import { OptionDefaults } from "typedoc";
 
-// api-compare's JSDoc tag family (`docs/infrastructure/api-build-stub-generation-plan.md`)
+// api-compare's JSDoc tag family (the tasks repo's `archive/trails-docs/infrastructure/api-build-stub-generation-plan.md`)
 // is machinery, not user documentation: declare the tags so TypeDoc does not
 // warn on them, and exclude them so they never render. Both options replace
 // TypeDoc's defaults rather than extending them, hence the spreads.

@@ -2,7 +2,7 @@
 /**
  * parity:api:build — reconcile per-method `@missingRailsCall` (and, under
  * `--kind args`, `@missingRailsArgs`) JSDoc blocks (minimal,
- * reconcile-only slice of docs/infrastructure/api-build-stub-generation-plan.md;
+ * reconcile-only slice of the tasks repo's archive/trails-docs/infrastructure/api-build-stub-generation-plan.md;
  * stub generation is a later phase).
  *
  * Reads the call-mismatch artifact (output/call-mismatches.json,
@@ -22,7 +22,7 @@
  *   - existing tags that still apply are kept byte-for-byte (idempotent:
  *     a second run produces zero edits);
  *   - a tag with no reason fails the run (see the empty-reason contract in
- *     docs/infrastructure/api-build-stub-generation-plan.md);
+ *     the tasks repo's archive/trails-docs/infrastructure/api-build-stub-generation-plan.md);
  *   - reasons for newly-added tags migrate from the committed baselines
  *     (call-mismatches-exclude/);
  *   - the unreviewed high-water marks of the sources whose baseline rows were

@@ -97,7 +97,7 @@ export async function main(): Promise<number> {
     for (const error of errors) console.error(`parity:api:reasons: ${error}`);
     console.error(
       `parity:api:reasons: ${errors.length} tag(s) without a reason — see the empty-reason ` +
-        "contract in docs/infrastructure/api-build-stub-generation-plan.md.",
+        "contract in the tasks repo's archive/trails-docs/infrastructure/api-build-stub-generation-plan.md.",
     );
     return 1;
   }

@@ -27,7 +27,7 @@ export const JS_RESERVED_WORDS: ReadonlySet<string> = new Set(
  * Token-level Ruby→TS renames applied before camelization.
  *
  * `erb` → `tse`: trails uses a `.tse` (Trails Server Embedded) template
- * extension in place of Rails' `.erb` — see docs/actionview-100-percent.md.
+ * extension in place of Rails' `.erb` — see the tasks repo's `archive/trails-docs/actionview-100-percent.md`.
  * There is no `erb` anywhere in trails: the rename fires on an underscore
  * boundary AND on a CamelCase one, so a constant fragment carries it too
  * (`ERBUtilTest` → `TSEUtilTest`) rather than only `erb_util` → `tseUtil`.

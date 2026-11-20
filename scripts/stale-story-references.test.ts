@@ -2,12 +2,10 @@ import { describe, it, expect, beforeAll } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  collectFrozenMarkdownFiles,
   collectMarkdownFiles,
   extractMarkdownStoryReferences,
   extractStoryReferences,
   loadStories,
-  scanFrozenStoryReferences,
   scanStoryReferences,
   staleStoryReferences,
   type IndexStory,
@@ -131,7 +129,7 @@ describe("stale story references", () => {
   it("flags a pending citation in markdown prose", () => {
     const refs = extractMarkdownStoryReferences(
       "Trails drops the subsecond part; the encoder is converged by\n`activesupport-json-encoding-time-precision`.\n",
-      "docs/activesupport.md",
+      "docs/example.md",
     );
     expect(staleStoryReferences(refs, STORIES)).toHaveLength(1);
   });
@@ -139,7 +137,7 @@ describe("stale story references", () => {
   it("ends a markdown block at a blank line", () => {
     const refs = extractMarkdownStoryReferences(
       "The encoder is converged by a later phase.\n\n`activesupport-json-encoding-time-precision` is the story id.\n",
-      "docs/activesupport.md",
+      "docs/example.md",
     );
     expect(refs).toEqual([]);
   });
@@ -147,16 +145,15 @@ describe("stale story references", () => {
   it("ignores a promise quoted inside a fenced code block", () => {
     const refs = extractMarkdownStoryReferences(
       "Example:\n\n```ts\n// Converged by `cache-entry-remaining-methods`.\n```\n",
-      "docs/index.md",
+      "docs/example.md",
     );
     expect(refs).toEqual([]);
   });
 
   it("scans no markdown outside the trails tree", async () => {
     const files = await collectMarkdownFiles(REPO_ROOT);
-    expect(files).toContain(path.join("docs", "index.md"));
+    expect(files).toContain(path.join("docs", "parity-gates.md"));
     expect(files.filter((file) => file.startsWith(`tasks${path.sep}`))).toEqual([]);
-    expect(files.filter((file) => file.startsWith(path.join("docs", "activerecord")))).toEqual([]);
   });
 
   // The tasks repo is public and checked out into `tasks/` by the Unit Tests
@@ -193,8 +190,6 @@ describe("stale story references", () => {
 
   let treeStories: IndexStory[];
   let treeRefs: Awaited<ReturnType<typeof scanStoryReferences>>;
-  let frozenFiles: string[];
-  let frozenRefs: Awaited<ReturnType<typeof scanFrozenStoryReferences>>;
   let scanFailure: Error | undefined;
 
   beforeAll(async () => {
@@ -205,12 +200,6 @@ describe("stale story references", () => {
       treeRefs = await scan("scanStoryReferences over the trails tree", () =>
         scanStoryReferences(REPO_ROOT),
       );
-      frozenFiles = await scan("collectFrozenMarkdownFiles over the frozen tree", () =>
-        collectFrozenMarkdownFiles(REPO_ROOT),
-      );
-      frozenRefs = await scan("scanFrozenStoryReferences over the frozen tree", () =>
-        scanFrozenStoryReferences(REPO_ROOT),
-      );
     } catch (error) {
       scanFailure = error as Error;
     }
@@ -220,19 +209,6 @@ describe("stale story references", () => {
     if (scanFailure) throw scanFailure;
     const stale = staleStoryReferences(treeRefs, treeStories);
     expect(stale.map((ref) => `${ref.file}:${ref.line} ${ref.slug}`)).toEqual([]);
-  });
-
-  it("inventories stale citations in the frozen tree without gating on them", () => {
-    if (scanFailure) throw scanFailure;
-    expect(frozenFiles).toContain(path.join("docs", "activerecord", "parity-verification.md"));
-    const stale = staleStoryReferences(frozenRefs, treeStories);
-    if (stale.length > 0) {
-      console.warn(
-        `frozen-tree stale story citations (not gated):\n${stale
-          .map((ref) => `  ${ref.file}:${ref.line} ${ref.slug}`)
-          .join("\n")}`,
-      );
-    }
   });
 
   it("reads each story's status from its own frontmatter", () => {
