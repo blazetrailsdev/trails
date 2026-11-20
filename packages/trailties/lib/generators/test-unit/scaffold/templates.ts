@@ -1,3 +1,4 @@
+import { camelize, humanize, pluralize } from "@blazetrails/activesupport";
 import type { ScaffoldGenerator } from "./scaffold-generator.js";
 
 type Template = (this: ScaffoldGenerator) => string;
@@ -140,7 +141,95 @@ describe("${testPath}", () => {
 `;
 };
 
-export const TEMPLATES: Record<"functional_test" | "api_functional_test", Template> = {
+const systemTest: Template = function () {
+  const className = pluralize(this.className());
+  const testClassName = `${className.split("::").pop()}Test`;
+  const humanName = this.humanName();
+  const singular = this.singularTableName();
+  const plural = this.pluralTableName();
+  const indexUrl = `${camelize(`${plural}_url`, false)}`;
+  const showUrl = `${camelize(`${singular}_url`, false)}`;
+  const root = "../".repeat(this.classPath().length + 1);
+  const fields = (update: boolean) =>
+    Object.entries(this.attributesHash())
+      .map(([attr, value]) => {
+        if (this.isBoolean(attr)) {
+          return `    if (${value}) await page.getByLabel("${humanize(attr)}").check();\n`;
+        } else if (update && (this.isDatetime(attr) || this.isTime(attr))) {
+          return `    await page.getByLabel("${humanize(attr)}").fill(String(${value}));\n`;
+        } else {
+          return `    await page.getByLabel("${humanize(attr)}").fill(${value});\n`;
+        }
+      })
+      .join("");
+  return `import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ApplicationSystemTestCase } from "${root}application-system-test-case${this.ext()}";
+
+export class ${testClassName} extends ApplicationSystemTestCase {
+  declare "@${singular}": unknown;
+
+  static {
+    this.setup(async function (this: ${testClassName}) {
+      this["@${singular}"] = await this.${this.fixtureName()}("one");
+    });
+  }
+}
+
+describe("${className}Test", () => {
+  let t: ${testClassName};
+
+  beforeEach(() => {
+    t = new ${testClassName}(expect.getState().currentTestName!);
+  });
+
+  afterEach(async () => {
+    await t._context?.close();
+  });
+
+  it("visiting the index", async () => {
+    const page = await t.page();
+    await page.goto(t.${indexUrl}());
+    await expect.element(page.locator("h1", { hasText: "${pluralize(humanName)}" })).toBeInTheDocument();
+  });
+
+  it("should create ${humanName.toLowerCase()}", async () => {
+    const page = await t.page();
+    await page.goto(t.${indexUrl}());
+    await page.getByText("New ${humanName.toLowerCase()}").click();
+
+${fields(false)}    await page.getByText("Create ${humanName}").click();
+
+    await expect.element(page.getByText("${humanName} was successfully created")).toBeInTheDocument();
+    await page.getByText("Back").click();
+  });
+
+  it("should update ${humanName}", async () => {
+    const page = await t.page();
+    await page.goto(t.${showUrl}(t["@${singular}"]));
+    await page.getByText("Edit this ${humanName.toLowerCase()}").first().click();
+
+${fields(true)}    await page.getByText("Update ${humanName}").click();
+
+    await expect.element(page.getByText("${humanName} was successfully updated")).toBeInTheDocument();
+    await page.getByText("Back").click();
+  });
+
+  it("should destroy ${humanName}", async () => {
+    const page = await t.page();
+    await page.goto(t.${showUrl}(t["@${singular}"]));
+    await page.getByText("Destroy this ${humanName.toLowerCase()}").first().click();
+
+    await expect.element(page.getByText("${humanName} was successfully destroyed")).toBeInTheDocument();
+  });
+});
+`;
+};
+
+export const TEMPLATES: Record<
+  "functional_test" | "api_functional_test" | "system_test",
+  Template
+> = {
+  system_test: systemTest,
   functional_test: functionalTest,
   api_functional_test: apiFunctionalTest,
 };

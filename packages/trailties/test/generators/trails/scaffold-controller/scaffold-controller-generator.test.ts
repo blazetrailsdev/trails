@@ -328,6 +328,8 @@ describe("ScaffoldControllerGeneratorTest", () => {
       assertMatch('(t.adminUserUrl(t["@user"])', content);
       assertNoMatch(/\bt\.(new|edit)?[uU]sers?(Path|Url)/, content);
     });
+
+    await t.assertFile("test/system/users.test.ts");
   });
 
   it.skip("controller tests pass by default inside mountable engine", () => {});
