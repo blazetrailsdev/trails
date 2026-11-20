@@ -62,6 +62,10 @@ describe("DispatcherTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   beforeEach(() => {
     dispatcher = new Dispatcher({ pollingInterval: 0.1, batchSize: 10 });
   });

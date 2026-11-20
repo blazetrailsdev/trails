@@ -202,7 +202,6 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
 
     await destroyRecords();
     await Batch.destroyAll();
-    await destroyRecords();
 
     ApplicationJob.enqueueAfterTransactionCommit = false;
     SolidQueue.preserveFinishedJobs = true;

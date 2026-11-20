@@ -102,6 +102,10 @@ describe("FiberProcessesLifecycleTest", () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     previousIsolationLevel = IsolatedExecutionState.isolationLevel;
     run = runSupervisor(
       { workers: [{ queues: "background", fibers: 3, pollingInterval: 0.1 }] },

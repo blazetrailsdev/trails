@@ -39,6 +39,10 @@ describe("LifecycleHooksTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   afterEach(async () => {
     vi.restoreAllMocks();
     await destroyRecords();

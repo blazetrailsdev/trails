@@ -129,6 +129,10 @@ describe("AsyncProcessesLifecycleTest", () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     pid = runSupervisor({
       mode: "async",
       workers: [{ queues: "background" }, { queues: "default", threads: 5 }],

@@ -145,6 +145,10 @@ describe("SolidQueue::BatchTest", () => {
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
   });
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   afterEach(async () => {
     vi.restoreAllMocks();
     await destroyRecords();

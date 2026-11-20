@@ -55,6 +55,10 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     run = runSupervisor({ skipRecurring: false });
     await waitForRegisteredProcesses(5, { timeout: 3 });
   });

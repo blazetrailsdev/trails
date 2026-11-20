@@ -46,7 +46,6 @@ describe("SolidQueue::ReadyExecutionTest", () => {
   afterEach(async () => {
     await destroyRecords();
     await Pause.deleteAll();
-    await destroyRecords();
   });
 
   async function assertClaimedJobs(count: number, block: () => Promise<unknown>): Promise<void> {

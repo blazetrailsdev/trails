@@ -40,7 +40,6 @@ describe("QueueTest", () => {
     travelBack();
     await destroyRecords();
     await Pause.deleteAll();
-    await destroyRecords();
   });
 
   it("count jobs currently in a queue", async () => {

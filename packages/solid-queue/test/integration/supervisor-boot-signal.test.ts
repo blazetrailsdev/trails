@@ -67,6 +67,10 @@ describe("SupervisorBootSignalTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   afterEach(async () => {
     vi.restoreAllMocks();
     await destroyRecords();

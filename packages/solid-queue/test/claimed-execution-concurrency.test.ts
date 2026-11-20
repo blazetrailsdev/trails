@@ -63,6 +63,10 @@ describe("SolidQueue::ClaimedExecutionConcurrencyTest", () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     process = await Process.register({ kind: "Worker", pid: 42, name: "worker-123" });
   });
 

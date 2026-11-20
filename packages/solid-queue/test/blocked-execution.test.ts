@@ -54,6 +54,10 @@ describe("SolidQueue::BlockedExecutionTest", () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     result = await JobResult.createBang({ queue_name: "default" });
   });
 

@@ -82,6 +82,10 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     onThreadError = SolidQueue.onThreadError;
     SolidQueue.onThreadError = silentOnThreadErrorFor(ExpectedTestError, onThreadError);
     result = await JobResult.createBang({ queue_name: "default", status: "seq: " });

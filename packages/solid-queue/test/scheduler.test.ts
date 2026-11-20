@@ -46,6 +46,10 @@ describe("SchedulerTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   afterEach(async () => {
     await destroyRecords();
   });

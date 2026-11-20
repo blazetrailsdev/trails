@@ -69,6 +69,10 @@ describe("SolidQueue::SemaphoreTest", () => {
   });
 
   beforeEach(async () => {
+    await destroyRecords();
+  });
+
+  beforeEach(async () => {
     result = await JobResult.createBang({ queue_name: "default" });
   });
 

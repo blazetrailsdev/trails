@@ -84,6 +84,10 @@ describe("SupervisorTest", () => {
   let previousPidfile: unknown;
   let pidfile: string;
 
+  beforeEach(async () => {
+    await destroyRecords();
+  });
+
   beforeEach(() => {
     previousPidfile = SolidQueue.supervisorPidfile;
     pidfile = `${import.meta.dirname}/support/dummy/tmp/pids/pidfile_${SecureRandom.hex()}.pid`;
