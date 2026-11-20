@@ -104,6 +104,18 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("action_dispatch.configure", (app) => {
+      this.config.afterInitialize(() => {
+        const cookiesSerializer = this.config.actionDispatch.cookiesSerializer;
+        if (
+          typeof cookiesSerializer === "string" &&
+          cookiesSerializer.includes("message_pack") &&
+          TopLevel.ActiveSupport!.MessagePack === undefined
+        ) {
+          return TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
+        }
+        return undefined;
+      });
+
       HttpURL.secureProtocol = app.config.forceSsl;
       HttpURL.tldLength = app.config.actionDispatch.tldLength;
 
@@ -132,17 +144,6 @@ export class Trailtie extends BaseTrailtie {
 
       CacheRequest.strictFreshness = app.config.actionDispatch.strictFreshness;
       ActionDispatch.testApp = app;
-    });
-
-    this.initializer("action_dispatch.require_message_pack", async () => {
-      const cookiesSerializer = this.config.actionDispatch.cookiesSerializer;
-      if (
-        typeof cookiesSerializer === "string" &&
-        cookiesSerializer.includes("message_pack") &&
-        TopLevel.ActiveSupport!.MessagePack === undefined
-      ) {
-        await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
-      }
     });
   }
 }

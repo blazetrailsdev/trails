@@ -105,7 +105,9 @@ describe("active_support/message_pack is awaited at boot", () => {
 
   it("raises LoadError when the message serializer names message_pack and the peer is absent", async () => {
     ActiveSupportTrailtie.config.set("activeSupport", { messageSerializer: ":message_pack" });
-    await expect(runTrailtieInitializers(ActiveSupportTrailtie, app())).rejects.toThrow(LoadError);
+    const railtieApp = app();
+    await runTrailtieInitializers(ActiveSupportTrailtie, railtieApp);
+    await expect(runLoadHooks("after_initialize", railtieApp)).rejects.toThrow(LoadError);
   });
 
   it("raises LoadError when the cookies serializer names message_pack and the peer is absent", async () => {
@@ -113,7 +115,9 @@ describe("active_support/message_pack is awaited at boot", () => {
       ...(savedActionDispatch as object),
       cookiesSerializer: ":message_pack",
     });
-    await expect(runTrailtieInitializers(ActionDispatchTrailtie, app())).rejects.toThrow(LoadError);
+    const railtieApp = app();
+    await runTrailtieInitializers(ActionDispatchTrailtie, railtieApp);
+    await expect(runLoadHooks("after_initialize", railtieApp)).rejects.toThrow(LoadError);
   });
 
   it("leaves the load alone for a json message serializer and cookies serializer", async () => {
@@ -154,8 +158,19 @@ describe("active_support/message_pack is awaited at boot", () => {
     const railtieApp = app();
     await runTrailtieInitializers(ActiveSupportTrailtie, railtieApp);
     expect(Codec.defaultSerializer).toBe(defaultSerializer);
-    runLoadHooks("after_initialize", railtieApp);
+    await runLoadHooks("after_initialize", railtieApp);
     expect(Codec.defaultSerializer).toBe("message_pack");
+  });
+
+  it("loads message_pack after initialize for a serializer set in config/initializers", async () => {
+    ActiveSupport.loadPath[MESSAGE_PACK] = seatingLoad;
+    ActiveSupportTrailtie.config.set("activeSupport", {});
+    const railtieApp = app();
+    await runTrailtieInitializers(ActiveSupportTrailtie, railtieApp);
+    ActiveSupportTrailtie.config.set("activeSupport", { messageSerializer: ":message_pack" });
+    expect(ActiveSupport.MessagePack).toBeUndefined();
+    await runLoadHooks("after_initialize", railtieApp);
+    expect(ActiveSupport.MessagePack).toBeDefined();
   });
 
   it("passes a serializer object and a bare format name to Codec.default_serializer untouched", async () => {
@@ -170,7 +185,7 @@ describe("active_support/message_pack is awaited at boot", () => {
       const railtieApp = app();
       await runTrailtieInitializers(ActiveSupportTrailtie, railtieApp);
       await runTrailtieInitializers(ActionDispatchTrailtie, railtieApp);
-      runLoadHooks("after_initialize", railtieApp);
+      await runLoadHooks("after_initialize", railtieApp);
       expect(Codec.defaultSerializer).toBe(messageSerializer);
     }
     expect(verboseAtLoad).toEqual([]);

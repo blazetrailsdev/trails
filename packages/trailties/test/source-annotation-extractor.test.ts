@@ -144,3 +144,11 @@ test("Annotation#toString — line padding + optional tag prefix", () => {
   expect(new Annotation(7, "TODO", "x").toString({ tag: true })).toBe("[7] [TODO] x");
   expect(new Annotation(7, "TODO", "x").toString({ indent: 3 })).toBe("[  7] x");
 });
+
+describe("ParserExtractor", () => {
+  test("skips a file with an unbalanced brace", async () => {
+    w("app/broken.ts", "function f() {\n  // TODO: unreachable\n");
+    w("app/ok.ts", "// TODO: kept");
+    expect(await enumerate(null, { tag: true })).toBe(`app/ok.ts:\n  * [1] [TODO] kept\n\n`);
+  });
+});

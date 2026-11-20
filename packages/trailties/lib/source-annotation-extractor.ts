@@ -86,6 +86,11 @@ export class Parser {
   parse(): void {
     api ??= new tokenizer!.API();
     const sourceFile = api.createSourceFile(this.file, this.source);
+    const { diagnostics } = api.transpileModule(this.source, {
+      fileName: this.file,
+      reportDiagnostics: true,
+    });
+    this._error = diagnostics !== undefined && diagnostics.length > 0;
     const literals = new Map<number, number>();
     const queue: Node[] = [sourceFile];
     let node: Node | undefined;
@@ -102,7 +107,6 @@ export class Parser {
     scanner.setText(this.source);
     let kind = scanner.scan();
     while (kind !== EndOfFile) {
-      if (scanner.isUnterminated()) this._error = true;
       const start = scanner.getTokenStart();
       const end = literals.get(start);
       if (end !== undefined) scanner.resetTokenState(end);

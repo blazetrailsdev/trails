@@ -86,7 +86,7 @@ export class ModelGenerator extends Base {
       bodyLines.push("    this.hasSecurePassword();");
     }
 
-    const staticBlock = bodyLines.length > 0 ? `\n  static {\n${bodyLines.join("\n")}\n  }\n` : "";
+    const staticBlock = bodyLines.length > 0 ? `  static {\n${bodyLines.join("\n")}\n  }\n` : "";
     const ext = this.ext();
 
     await this.createFile(
@@ -94,9 +94,6 @@ export class ModelGenerator extends Base {
       `${importPath}
 
 export class ${className} extends ${parentClass} {
-  static toString(): string {
-    return ${JSON.stringify(this.className())};
-  }
 ${staticBlock}}
 `,
     );

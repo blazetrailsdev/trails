@@ -160,8 +160,8 @@ Finisher.initializer("eager_load!", async function (this: FinisherHost) {
   }
 });
 
-Finisher.initializer("finisher_hook", function (this: FinisherHost) {
-  runLoadHooks("after_initialize", this);
+Finisher.initializer("finisher_hook", async function (this: FinisherHost) {
+  await runLoadHooks("after_initialize", this);
 });
 
 export class MonitorHook {

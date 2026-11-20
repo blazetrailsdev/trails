@@ -117,23 +117,25 @@ export class Trailtie extends BaseTrailtie {
     this.initializer("active_support.set_default_message_serializer", (app) => {
       this.config.afterInitialize(() => {
         const messageSerializer = app.config.activeSupport.messageSerializer;
-        if (messageSerializer != null) {
-          Codec.defaultSerializer = (
-            isSymbol(messageSerializer) ? symbolToS(messageSerializer) : messageSerializer
-          ) as typeof Codec.defaultSerializer;
+        const setDefaultSerializer = (): void => {
+          if (messageSerializer != null) {
+            Codec.defaultSerializer = (
+              isSymbol(messageSerializer) ? symbolToS(messageSerializer) : messageSerializer
+            ) as typeof Codec.defaultSerializer;
+          }
+        };
+        if (
+          typeof messageSerializer === "string" &&
+          messageSerializer.includes("message_pack") &&
+          TopLevel.ActiveSupport!.MessagePack === undefined
+        ) {
+          return TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]().then(
+            setDefaultSerializer,
+          );
         }
+        setDefaultSerializer();
+        return undefined;
       });
-    });
-
-    this.initializer("active_support.require_message_pack", async (app) => {
-      const messageSerializer = app.config.activeSupport.messageSerializer;
-      if (
-        typeof messageSerializer === "string" &&
-        messageSerializer.includes("message_pack") &&
-        TopLevel.ActiveSupport!.MessagePack === undefined
-      ) {
-        await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
-      }
     });
   }
 }
