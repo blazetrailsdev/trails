@@ -261,6 +261,7 @@ const ARRAY: ReadonlySet<string> = new Set(["array"]);
 const HASH: ReadonlySet<string> = new Set(["hash"]);
 const NUMERIC: ReadonlySet<string> = new Set(["numeric"]);
 const STRING: ReadonlySet<string> = new Set(["string"]);
+const STRING_OR_EXPR: ReadonlySet<string> = new Set(["string", "expr", "local"]);
 
 /** How a port writes each native Hash form, for a gate message to name. */
 export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
@@ -528,9 +529,9 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["strip", { form: "trim", receivers: "explicit", creditedKinds: STRING }],
   ["rstrip", { form: "trimEnd", receivers: "explicit", creditedKinds: STRING }],
   ["chomp", { form: "chomp", receivers: "explicit", creditedKinds: STRING }],
-  ["gsub", { form: "gsub", receivers: "explicit" }],
-  ["sub", { form: "sub", receivers: "explicit" }],
-  ["sub!", { form: "sub", receivers: "explicit" }],
+  ["gsub", { form: "gsub", receivers: "explicit", creditedKinds: STRING_OR_EXPR }],
+  ["sub", { form: "sub", receivers: "explicit", creditedKinds: STRING_OR_EXPR }],
+  ["sub!", { form: "sub", receivers: "explicit", creditedKinds: STRING_OR_EXPR }],
   [
     "sleep",
     {

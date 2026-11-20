@@ -1,22 +1,9 @@
 import { Notifications } from "./notifications.js";
-import { rbFSend, rbModMethodDefined, TypeError } from "@blazetrails/ruby-compat";
+import { camelized, rbFSend, rbModMethodDefined, TypeError } from "@blazetrails/ruby-compat";
+import { underscore } from "./inflector.js";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 import type { NotificationSubscriber } from "./notifications.js";
 import type { Event } from "./notifications/instrumenter.js";
-
-/** @noRailsEquivalent PERMANENT */
-function snakeCase(str: string): string {
-  return str.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
-}
-
-/** @noRailsEquivalent PERMANENT */
-function camelCase(str: string): string {
-  if (str.endsWith("?")) {
-    const base = camelCase(str.slice(0, -1));
-    return "is" + base.charAt(0).toUpperCase() + base.slice(1);
-  }
-  return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-}
 
 export class Subscriber {
   patterns: Map<string, NotificationSubscriber>;
@@ -67,7 +54,7 @@ export class Subscriber {
 
   static methodAdded(event: string): void {
     if (rbModMethodDefined(this, event) && this.notifier) {
-      event = snakeCase(event);
+      event = underscore(event);
       this.addEventSubscriber(event);
     }
   }
@@ -152,7 +139,7 @@ export class Subscriber {
       proto = Object.getPrototypeOf(proto);
     }
 
-    return Array.from(keys).map((k) => snakeCase(k));
+    return Array.from(keys).map((k) => underscore(k));
   }
 
   constructor() {
@@ -160,19 +147,24 @@ export class Subscriber {
   }
 
   call(event: Event): unknown {
-    const method = event.name.slice(0, _index(event.name, "."));
-    return rbFSend(this, camelCase(method), event);
+    const index = event.name.indexOf(".");
+    if (index === -1) throw new TypeError("no implicit conversion from nil to integer");
+    const method = event.name.slice(0, index);
+    return rbFSend(
+      this,
+      camelized(method.endsWith("?") ? `is_${method.slice(0, -1)}` : method),
+      event,
+    );
   }
 
   publishEvent(event: Event): unknown {
-    const method = event.name.slice(0, _index(event.name, "."));
-    return rbFSend(this, camelCase(method), event);
+    const index = event.name.indexOf(".");
+    if (index === -1) throw new TypeError("no implicit conversion from nil to integer");
+    const method = event.name.slice(0, index);
+    return rbFSend(
+      this,
+      camelized(method.endsWith("?") ? `is_${method.slice(0, -1)}` : method),
+      event,
+    );
   }
-}
-
-/** @noRailsEquivalent PERMANENT */
-function _index(str: string, substring: string): number {
-  const index = str.indexOf(substring);
-  if (index === -1) throw new TypeError("no implicit conversion from nil to integer");
-  return index;
 }

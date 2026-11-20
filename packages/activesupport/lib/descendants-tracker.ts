@@ -3,7 +3,6 @@ import { classModule, inherited, ObjectSpace, setClassDefinedHook } from "@blaze
 export type AnyClass = abstract new (...args: never) => unknown;
 
 const _subclassMap = new globalThis.WeakMap<AnyClass, DescendantsTracker.WeakSet<AnyClass>>();
-let _excludedDescendants: WeakSet<AnyClass> | null = null;
 let _clearDisabled = false;
 
 export const ReloadedClassesFiltering = {
@@ -24,7 +23,7 @@ export class WeakSet<T extends object> extends ObjectSpace.WeakMap<T, boolean> {
   }
 }
 
-_excludedDescendants = new WeakSet<AnyClass>();
+let _excludedDescendants: WeakSet<AnyClass> | null = new WeakSet<AnyClass>();
 
 export function registerSubclass(parent: AnyClass, child: AnyClass): void {
   if (!_subclassMap.has(parent)) _subclassMap.set(parent, new WeakSet<AnyClass>());
