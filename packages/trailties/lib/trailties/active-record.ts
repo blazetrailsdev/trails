@@ -366,6 +366,11 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
+    this.initializer("active_record.add_watchable_files", async (app) => {
+      const path = await app.paths().get("db")!.first();
+      this.config.watchableFiles.push(`${path}/schema.ts`, `${path}/structure.sql`);
+    });
+
     this.initializer("active_record.clear_active_connections", () => {
       this.config.afterInitialize(() => {
         onLoad("active_record", async (base: typeof Base) => {

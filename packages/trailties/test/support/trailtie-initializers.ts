@@ -12,6 +12,10 @@ export async function runTrailtieInitializers(
   if (app?.config instanceof Configuration && current?.config?.databaseConfiguration == null) {
     Trails.application = app as Application;
   }
+  if (app?.config instanceof Configuration && !("paths" in app)) {
+    const config = app.config;
+    Object.assign(app, { paths: () => config.paths() });
+  }
   const context = klass.instance();
   for (const initializer of klass.initializers) {
     await initializer.bind(context).run(...args);

@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { getFs, getOsAsync, getPath, rbObjClassname } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  FileUtils,
+  getFs,
+  getOsAsync,
+  getPath,
+  rbObjClassname,
+} from "@blazetrails/ruby-compat";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "../../lib/trailties/active-record.js";
@@ -7,6 +14,7 @@ import { Trailtie as ActionDispatchTrailtie } from "../../lib/trailties/action-d
 import {
   Deprecators,
   EncryptedConfiguration,
+  FileUpdateChecker,
   Logger,
   NotificationEvent,
   Notifications,
@@ -325,6 +333,33 @@ describe("RailtieTest (trails-only)", () => {
 
       expect(booted.tagsFormatter).toBe("sqlcommenter");
     });
+  });
+});
+
+describe("ActiveRecord::Railtie active_record.add_watchable_files", () => {
+  it("added files (like db/schema.rb) also trigger reloading", async () => {
+    const tmp = Dir.mktmpdir("add-watchable-files");
+    const watchableFiles = new TrailtieConfiguration().watchableFiles;
+    const before = watchableFiles.length;
+    try {
+      await runTrailtieInitializers(Trailtie, {
+        ...blogApp(),
+        config: Object.assign(new Configuration(tmp), { filterParameters: [] }),
+      });
+      expect(watchableFiles.slice(before)).toEqual([
+        `${tmp}/db/schema.ts`,
+        `${tmp}/db/structure.sql`,
+      ]);
+
+      const checker = new FileUpdateChecker(watchableFiles.slice(before), {}, () => {});
+      expect(checker.isUpdated()).toBe(false);
+      FileUtils.mkdirP(`${tmp}/db`);
+      FileUtils.touch(`${tmp}/db/schema.ts`);
+      expect(checker.isUpdated()).toBe(true);
+    } finally {
+      watchableFiles.splice(before);
+      FileUtils.rmRf(tmp);
+    }
   });
 });
 

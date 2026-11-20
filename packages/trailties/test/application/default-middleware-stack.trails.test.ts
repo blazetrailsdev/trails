@@ -32,6 +32,8 @@ import { Logger } from "../../lib/rack/logger.js";
 import { SilenceRequest } from "../../lib/rack/silence-request.js";
 import { Configuration } from "../../lib/application/configuration.js";
 import { DefaultMiddlewareStack } from "../../lib/application/default-middleware-stack.js";
+import { Trails } from "../../lib/trails.js";
+import { Logger as ActiveSupportLogger } from "@blazetrails/activesupport";
 
 function defaultStack(mutate: (c: Configuration) => void = () => {}) {
   const paths = new Root("/app");
@@ -125,7 +127,13 @@ describe("DefaultMiddlewareStack (trails)", () => {
       ":method": "POST",
       ":params": { _method: "patch" },
     });
-    await (rbFSend(stack.build(endpoint), "call", env) as Promise<RackResponse>);
+    const logger = Trails.logger;
+    Trails.logger = new ActiveSupportLogger(null);
+    try {
+      await (rbFSend(stack.build(endpoint), "call", env) as Promise<RackResponse>);
+    } finally {
+      Trails.logger = logger;
+    }
     expect(seen).toBe("PATCH");
   });
 });

@@ -33,6 +33,7 @@ import {
 import { LoadError } from "@blazetrails/ruby-compat";
 import { DatabaseSelector, ShardSelector } from "@blazetrails/activerecord";
 import { Logger } from "../rack/logger.js";
+import type { Tagger } from "../rack/logger.js";
 import { SilenceRequest } from "../rack/silence-request.js";
 import type { Configuration } from "./configuration.js";
 import type { Root } from "../paths.js";
@@ -107,7 +108,7 @@ export class DefaultMiddlewareStack {
       stack.use(SilenceRequest, { path });
     }
 
-    stack.use(Logger, { taggers: config.logTags });
+    stack.use(Logger, config.logTags as Tagger[]);
     stack.use(ShowExceptions, this._showExceptionsApp());
     stack.use(DebugExceptions, this.app, config.debugExceptionResponseFormat);
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Logger } from "../../lib/rack/logger.js";
+import type { Tagger } from "../../lib/rack/logger.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent as Event } from "@blazetrails/activesupport";
 import type { RackApp, RackBody, RackResponse } from "@blazetrails/rack";
@@ -9,6 +10,21 @@ const emptyBody = (): RackBody => ({
 });
 
 const okApp: RackApp = async () => [200, {}, emptyBody()];
+
+class TestLogger extends Logger {
+  private _testLogger: unknown;
+
+  constructor(logger: unknown, app: RackApp = okApp, taggers: Tagger[] | null = null) {
+    super(app, taggers);
+    this._testLogger = logger;
+  }
+
+  override get logger(): any {
+    return this._testLogger;
+  }
+}
+
+const NULL = { info() {} };
 
 const closeBody = (body: RackBody): void => {
   (body as unknown as { close: () => void }).close();
@@ -21,7 +37,7 @@ describe("Rack::Logger", () => {
       (event: Event) => events.push(event),
       "request.action_dispatch",
       async () => {
-        const middleware = new Logger(okApp);
+        const middleware = new TestLogger(NULL);
         const [, , body] = await middleware.call({ REQUEST_METHOD: "GET" });
         closeBody(body);
       },
@@ -40,16 +56,18 @@ describe("Rack::Logger", () => {
       (event: Event) => events.push(event),
       "request.action_dispatch",
       async () => {
-        const middleware = new Logger(failingApp, {
-          logger: {
-            pushTags: (...tags) => tags,
+        const middleware = new TestLogger(
+          {
+            info() {},
+            pushTags: (...tags: string[]) => tags,
             popTags: (n = 1) => {
               popped.push(n);
               return [];
             },
           },
-          taggers: ["t"],
-        });
+          failingApp,
+          ["t"],
+        );
         try {
           await middleware.call({ REQUEST_METHOD: "GET" });
         } catch (e) {
@@ -64,7 +82,7 @@ describe("Rack::Logger", () => {
 
   it("logger does not mutate app return", async () => {
     const response = Object.freeze([200, {}, emptyBody()]) as RackResponse;
-    const middleware = new Logger(async () => response);
+    const middleware = new TestLogger(NULL, async () => response);
     const out = await middleware.call({ REQUEST_METHOD: "GET" });
     expect(out).not.toBe(response);
     expect(out[0]).toBe(200);
@@ -72,11 +90,9 @@ describe("Rack::Logger", () => {
 
   it("logger is flushed after request finished", async () => {
     const calls: string[] = [];
-    const middleware = new Logger(okApp, {
-      logger: {
-        info(block) {
-          calls.push(block());
-        },
+    const middleware = new TestLogger({
+      info(block: () => string) {
+        calls.push(block());
       },
     });
     const [, , body] = await middleware.call({
@@ -90,9 +106,10 @@ describe("Rack::Logger", () => {
   it("logger pushes tags", async () => {
     const pushed: string[][] = [];
     const popped: number[] = [];
-    const middleware = new Logger(okApp, {
-      logger: {
-        pushTags(...tags) {
+    const middleware = new TestLogger(
+      {
+        info() {},
+        pushTags(...tags: string[]) {
           pushed.push(tags);
           return tags;
         },
@@ -101,8 +118,9 @@ describe("Rack::Logger", () => {
           return [];
         },
       },
-      taggers: ["tag1", (request) => request.requestMethod, ":remoteIp"],
-    });
+      okApp,
+      ["tag1", (request) => request.requestMethod, ":remoteIp"],
+    );
     const [, , body] = await middleware.call({ REQUEST_METHOD: "GET", REMOTE_ADDR: "127.0.0.1" });
     expect(pushed).toEqual([["tag1", "GET", "127.0.0.1"]]);
     closeBody(body);

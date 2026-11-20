@@ -86,3 +86,22 @@ describe("Rack::Response#[]", () => {
     expect(response.get("Content-Type")).toBe(response.getHeader("Content-Type"));
   });
 });
+
+describe("Rack::Response#buffered_body!", () => {
+  it("writes each part through the writer and closes the buffered body once", () => {
+    let closed = 0;
+    const body = {
+      each(fn: (part: string) => void) {
+        fn("a");
+        fn("b");
+      },
+      close() {
+        closed += 1;
+      },
+    };
+    const response = new Response(body);
+    response.write("c");
+    expect(closed).toBe(1);
+    expect(response.body).toEqual(["a", "b", "c"]);
+  });
+});
