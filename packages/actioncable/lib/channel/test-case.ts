@@ -207,9 +207,9 @@ function stubConnection(this: Host, identifiers: Data = {}): ConnectionStub {
 async function subscribe(this: Host, params: Data = {}): Promise<StubbedSubscription> {
   this._connection ??= stubConnection.call(this);
   this._subscription = new ((this.constructor as unknown as BehaviorClass).channelClass())(
-    this.connection as never,
+    this.connection,
     CHANNEL_IDENTIFIER,
-    withIndifferentAccess(params) as never,
+    withIndifferentAccess(params),
   ) as StubbedSubscription;
   include(rbObjSingletonClass(this.subscription!), ChannelStub);
   await this.subscription!.subscribeToChannel();
