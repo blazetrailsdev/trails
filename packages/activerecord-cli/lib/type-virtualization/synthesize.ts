@@ -470,13 +470,39 @@ function renderSingularAssoc(
 
 function renderAttached(info: ClassInfo, call: AttachedCall): RenderedLine[] {
   const memberName = renderDeclaredMemberName(call.name);
-  const proxy = call.kind === "hasOneAttached" ? "One" : "Many";
+  const one = call.kind === "hasOneAttached";
   const suffix = camelize(call.name);
-  return [
-    line(`declare ${memberName}: ${AS_IMPORT}.${proxy};`, call.name, false),
+  const assoc = (record: string): string =>
+    one
+      ? `${AS_IMPORT}.${record} | null | Promise<${AS_IMPORT}.${record} | null>`
+      : `${AR_IMPORT}.AssociationProxy<${AS_IMPORT}.${record}>`;
+  const plural = one ? "" : "s";
+  const lines: RenderedLine[] = [];
+  if (info.calls.find((c) => c.kind === call.kind) === call) {
+    lines.push(
+      line(
+        `declare static ${call.kind}: typeof ${AS_IMPORT}.Model.ClassMethods.${call.kind};`,
+        call.kind,
+        true,
+      ),
+    );
+  }
+  lines.push(
+    line(`declare ${memberName}: ${AS_IMPORT}.${one ? "One" : "Many"};`, call.name, false),
     line(`declare set${suffix}: (attachable: unknown) => Promise<void>;`, `set${suffix}`, false),
+    line(
+      `declare ${call.name}Attachment${plural}: ${assoc("Attachment")};`,
+      `${call.name}Attachment${plural}`,
+      false,
+    ),
+    line(
+      `declare ${call.name}Blob${plural}: ${assoc("Blob")};`,
+      `${call.name}Blob${plural}`,
+      false,
+    ),
     scopeLine(info, `withAttached${suffix}`, []),
-  ];
+  );
+  return lines;
 }
 
 function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
