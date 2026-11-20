@@ -910,11 +910,11 @@ describe("TCTimestamp", () => {
 
   it("for timestamp treat offset as utc utc", () => {
     const orig = new Timestamp(1476316800, 0, "utc");
-    forTest([orig, "treat_as_utc"], (t) => expect(t).toBe(orig));
+    forTest([orig, "treatAsUtc"], (t) => expect(t).toBe(orig));
   });
 
   it("for timestamp treat offset as utc with zero offset", () => {
-    forTest([new Timestamp(1476316800, 0, 0), "treat_as_utc"], (t) => {
+    forTest([new Timestamp(1476316800, 0, 0), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476316800);
       expect(t.subSecond).toEqual(0);
       expect(t.utcOffset).toEqual(0);
@@ -923,7 +923,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for timestamp treat offset as utc with offset", () => {
-    forTest([new Timestamp(1476316800, 0, 3600), "treat_as_utc"], (t) => {
+    forTest([new Timestamp(1476316800, 0, 3600), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476320400);
       expect(t.subSecond).toEqual(0);
       expect(t.utcOffset).toEqual(0);
@@ -932,7 +932,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for timestamp treat offset as utc sub second", () => {
-    forTest([new Timestamp(1476316800, R(1, 10), 3600), "treat_as_utc"], (t) => {
+    forTest([new Timestamp(1476316800, R(1, 10), 3600), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476320400);
       expect(t.subSecond).toEqual(R(1, 10));
       expect(t.utcOffset).toEqual(0);
@@ -941,7 +941,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for timestamp treat offset as utc no offset", () => {
-    forTest([new Timestamp(1476316800), "treat_as_utc"], (t) => {
+    forTest([new Timestamp(1476316800), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476316800);
       expect(t.subSecond).toEqual(0);
       expect(t.utcOffset).toEqual(0);
@@ -950,7 +950,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for timestamp treat offset as utc subclass utc", () => {
-    forTest([new TestTimestampSubclass(1476316800, R(1, 10), "utc"), "treat_as_utc"], (t) => {
+    forTest([new TestTimestampSubclass(1476316800, R(1, 10), "utc"), "treatAsUtc"], (t) => {
       expect(t.constructor).toEqual(Timestamp);
       expect(t.value).toEqual(1476316800);
       expect(t.subSecond).toEqual(R(1, 10));
@@ -1054,7 +1054,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for time treat offset as utc utc", () => {
-    forTest([Time.utc(2016, 10, 13, 0, 0, 0), "treat_as_utc"], (t) => {
+    forTest([Time.utc(2016, 10, 13, 0, 0, 0), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476316800);
       expect(t.utcOffset).toEqual(0);
       expect(t.isUtc()).toEqual(true);
@@ -1062,7 +1062,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for time treat offset as utc with zero offset", () => {
-    forTest([Time.new(2016, 10, 13, 0, 0, 0, 0), "treat_as_utc"], (t) => {
+    forTest([Time.new(2016, 10, 13, 0, 0, 0, 0), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476316800);
       expect(t.utcOffset).toEqual(0);
       expect(t.isUtc()).toEqual(true);
@@ -1070,7 +1070,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for time treat offset as utc with offset", () => {
-    forTest([Time.new(2016, 10, 13, 0, 0, 0, 3600), "treat_as_utc"], (t) => {
+    forTest([Time.new(2016, 10, 13, 0, 0, 0, 3600), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476316800);
       expect(t.utcOffset).toEqual(0);
       expect(t.isUtc()).toEqual(true);
@@ -1140,7 +1140,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for datetime treat offset as utc utc", () => {
-    forTest([new DateTime(2016, 10, 13, 0, 0, 0), "treat_as_utc"], (t) => {
+    forTest([new DateTime(2016, 10, 13, 0, 0, 0), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476316800);
       expect(t.utcOffset).toEqual(0);
       expect(t.isUtc()).toEqual(true);
@@ -1148,7 +1148,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for datetime treat offset as utc with offset", () => {
-    forTest([new DateTime(2016, 10, 13, 0, 0, 0, R(1, 24)), "treat_as_utc"], (t) => {
+    forTest([new DateTime(2016, 10, 13, 0, 0, 0, R(1, 24)), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476316800);
       expect(t.utcOffset).toEqual(0);
       expect(t.isUtc()).toEqual(true);
@@ -1214,7 +1214,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for time like treat offset as utc", () => {
-    forTest([new TimeLike(1476316800, 0), "treat_as_utc"], (t) => {
+    forTest([new TimeLike(1476316800, 0), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476316800);
       expect(t.utcOffset).toEqual(0);
       expect(t.isUtc()).toEqual(true);
@@ -1283,7 +1283,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for time like with offset treat offset as utc with zero offset", () => {
-    forTest([new TimeLikeWithOffset(1476316800, 0, 0), "treat_as_utc"], (t) => {
+    forTest([new TimeLikeWithOffset(1476316800, 0, 0), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476316800);
       expect(t.utcOffset).toEqual(0);
       expect(t.isUtc()).toEqual(true);
@@ -1291,7 +1291,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for time like with offset treat offset as utc with offset", () => {
-    forTest([new TimeLikeWithOffset(1476316800, 0, 3600), "treat_as_utc"], (t) => {
+    forTest([new TimeLikeWithOffset(1476316800, 0, 3600), "treatAsUtc"], (t) => {
       expect(t.value).toEqual(1476320400);
       expect(t.utcOffset).toEqual(0);
       expect(t.isUtc()).toEqual(true);
@@ -1339,7 +1339,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for time like with offset treat float offset as utc", () => {
-    forTest([new TimeLikeWithOffset(1476316800, 0, 3600.1), "treat_as_utc"], (t) => {
+    forTest([new TimeLikeWithOffset(1476316800, 0, 3600.1), "treatAsUtc"], (t) => {
       expect(t.value).toBeInstanceOf(rbCInteger);
       expect(t.value).toEqual(1476320400);
       expect(t.utcOffset).toEqual(0);
@@ -1347,7 +1347,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for time like with offset treat nil offset as utc", () => {
-    forTest([new TimeLikeWithOffset(1476316800, 0, null), "treat_as_utc"], (t) => {
+    forTest([new TimeLikeWithOffset(1476316800, 0, null), "treatAsUtc"], (t) => {
       expect(t.value).toBeInstanceOf(rbCInteger);
       expect(t.value).toEqual(1476316800);
       expect(t.utcOffset).toEqual(0);

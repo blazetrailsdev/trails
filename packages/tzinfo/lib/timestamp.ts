@@ -19,7 +19,7 @@ import {
 
 type UtcOffset = number | "utc" | null;
 type SubSecond = number | Rational;
-type Offset = "preserve" | "ignore" | "treat_as_utc";
+type Offset = "preserve" | "ignore" | "treatAsUtc";
 type ForBlock = (timestamp: Timestamp) => unknown;
 
 interface TimeLike {
@@ -85,7 +85,7 @@ export class Timestamp implements Comparable {
         ignoreOffset = true;
         targetUtcOffset = null;
         break;
-      case "treat_as_utc":
+      case "treatAsUtc":
         ignoreOffset = true;
         targetUtcOffset = "utc";
         break;
