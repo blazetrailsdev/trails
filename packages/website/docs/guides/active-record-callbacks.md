@@ -326,13 +326,16 @@ class PictureFile extends Base {
 
 ## Halting Execution
 
-Callbacks for one operation run inside its transaction. To stop a `before`
+The validation, save, create, update and destroy callbacks run inside the
+operation's transaction; `afterCommit` and `afterRollback` run once it has
+ended. To stop a `before`
 callback from letting the operation continue, call `kernelThrow(":abort")`
 from [ruby-compat](/packages/ruby-compat), the port of Ruby's `throw :abort`.
 The tag keeps its colon because it stands for a Ruby Symbol, as
 [`CLAUDE.md`](https://github.com/blazetrailsdev/trails/blob/main/CLAUDE.md#ruby-idioms-that-do-not-translate-literally)
 rules.
-`save` then returns `false`, the `Bang` forms raise `RecordNotSaved`, and the
+`save` then returns `false`, `saveBang` and `createBang` raise `RecordNotSaved`
+(see [`!` becomes `Bang`](./idioms.md#becomes-bang)), and the
 transaction rolls back:
 
 ```ts
