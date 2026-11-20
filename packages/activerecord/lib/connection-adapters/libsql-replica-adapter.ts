@@ -3,7 +3,7 @@ import { ConnectionAdapters } from "../namespaces.js";
 
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { ConfigurationError } from "../errors.js";
-import { libsqlReplicaDriver, type SyncableSqliteConnection } from "../sqlite/libsql.js";
+import { libsqlReplicaDriver, type SyncableSqliteConnection } from "@blazetrails/sqlite3/libsql";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */

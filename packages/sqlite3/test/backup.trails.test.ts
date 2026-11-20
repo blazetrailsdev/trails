@@ -1,8 +1,8 @@
 import { it, expect } from "vitest";
 import { File, getOs } from "@blazetrails/ruby-compat";
-import { SQLite3Constants } from "../../../lib/sqlite-adapter.js";
-import { Backup } from "../../../lib/sqlite/backup.js";
-import { betterSqlite3Driver } from "../../../lib/sqlite/better-sqlite3.js";
+import { SQLite3Constants } from "../lib/driver.js";
+import { Backup } from "../lib/backup.js";
+import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 
 it("SQLite3::Backup backup all", async () => {
   const file = `${getOs().tmpdir()}/backup-${Date.now()}-${Math.random()}.sqlite3`;

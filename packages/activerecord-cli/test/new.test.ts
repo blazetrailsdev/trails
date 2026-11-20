@@ -72,7 +72,7 @@ describe("ArNewTest", () => {
     const config = await readFile(join(appDir, "config/database.ts"), "utf8");
     expect(config).toContain('adapter: "node-sqlite"');
     const dbTs = await readFile(join(appDir, "db.ts"), "utf8");
-    expect(dbTs).not.toContain("@blazetrails/activerecord/sqlite/node-sqlite");
+    expect(dbTs).not.toContain("@blazetrails/sqlite3/node-sqlite");
     const pkg = JSON.parse(await readFile(join(appDir, "package.json"), "utf8"));
     expect(Object.keys(pkg.dependencies)).not.toContain("node-sqlite");
     expect(Object.keys(pkg.dependencies)).not.toContain("better-sqlite3");

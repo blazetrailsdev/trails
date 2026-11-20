@@ -1,7 +1,6 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-libsql-engines MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
 import Database from "libsql";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
-import { ConfigurationError } from "../errors.js";
+import { File, FileUtils, RuntimeError } from "@blazetrails/ruby-compat";
 import {
   type ColumnInfo,
   type RunResult,
@@ -15,9 +14,10 @@ import {
   type SqliteStatement,
   type SyncSqliteConnection,
   type SyncSqliteStatement,
-} from "../sqlite-adapter.js";
-import { isRemoteLibsqlUrl, resolveUriDatabasePath } from "./sqlite-uri.js";
+} from "./driver.js";
+import { resolveUriDatabasePath } from "./sqlite-uri.js";
 import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
+import "./constants.generated.js";
 
 /** @internal */
 function bindArgs(binds?: SqliteBinds): unknown[] {
@@ -261,14 +261,10 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
   }
 }
 
-export { isRemoteLibsqlUrl };
-
 /** @internal */
 function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
   if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
-    throw new ConfigurationError(
-      "SQLITE_OPEN_SHAREDCACHE is not supported by the libsql-remote driver",
-    );
+    throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the libsql-remote driver");
   }
   const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };
   if (config.authToken !== undefined) {
@@ -309,7 +305,7 @@ export interface LibsqlReplicaOptions extends Database.Options {
 /** @internal */
 export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOptions {
   if (!isReplicaConfig(config)) {
-    throw new ConfigurationError(
+    throw new RuntimeError(
       "libsql embedded-replica mode requires a non-empty `syncUrl` in " +
         "driverOptions (alongside the local replica path); none was provided.",
     );
@@ -325,7 +321,7 @@ export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOpti
       !Number.isFinite(opts.syncPeriod) ||
       opts.syncPeriod <= 0
     ) {
-      throw new ConfigurationError(
+      throw new RuntimeError(
         "libsql embedded-replica `syncPeriod` must be a positive number of " +
           `seconds (got ${String(opts.syncPeriod)}); omit it for caller-driven sync.`,
       );
@@ -395,7 +391,7 @@ export const libsqlDriver: SqliteDriver = {
     }
     const destPath = resolveUriDatabasePath(destination);
     if (destPath === null) {
-      throw new ConfigurationError(
+      throw new RuntimeError(
         "libsql restoreFromPath cannot populate an in-memory destination " +
           `(${destination}) via the file-clone fallback; libsql's backup() ` +
           "primitive is required for memory-backed restores.",

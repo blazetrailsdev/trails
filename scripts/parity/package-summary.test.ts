@@ -103,12 +103,12 @@ beforeEach(async () => {
       { package: "activerecord", tsFile: "a.ts" },
       { package: "activerecord", tsFile: "a.ts", kind: "args" },
       { package: "activerecord", tsFile: "a.ts", kind: "rubyCompat" },
-      { package: "sqlite3", tsFile: "s.ts" },
+      { package: "mysql2", tsFile: "s.ts" },
     ]),
   );
   await write(
     "scripts/api-compare/extra-surface-mark.json",
-    JSON.stringify({ activerecord: { novel: 2, total: 5 }, sqlite3: { novel: 1, total: 1 } }),
+    JSON.stringify({ activerecord: { novel: 2, total: 5 }, mysql2: { novel: 1, total: 1 } }),
   );
   await write(
     "scripts/api-compare/output/api-comparison.json",
@@ -156,7 +156,7 @@ beforeEach(async () => {
           ],
         },
         {
-          package: "sqlite3",
+          package: "mysql2",
           paramNames: { compared: 2 },
           predicatesCompared: 0,
           predicateKindMismatches: [],
@@ -208,7 +208,7 @@ beforeEach(async () => {
       mismatches: [
         { package: "activerecord", rubyFile: "a.rb", rubyName: "x" },
         { package: "activerecord", rubyFile: "a.rb", rubyName: "x" },
-        { package: "sqlite3", rubyFile: "s.rb", rubyName: "y" },
+        { package: "mysql2", rubyFile: "s.rb", rubyName: "y" },
       ],
     }),
   );

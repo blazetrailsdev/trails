@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { type SqliteConnection, SQLite3Constants } from "../../../lib/sqlite-adapter.js";
+import { type SqliteConnection, SQLite3Constants } from "../lib/driver.js";
 import { File, getOs } from "@blazetrails/ruby-compat";
-import { isNodeSqliteAvailable, nodeSqliteDriver } from "../../../lib/sqlite/node-sqlite.js";
+import { isNodeSqliteAvailable, nodeSqliteDriver } from "../lib/node-sqlite.js";
 
 describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip", () => {
   let conn: SqliteConnection;
@@ -213,7 +213,6 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite restoreFro
     removeTempFiles();
     const tpl = await nodeSqliteDriver.open({ database: templatePath });
     await tpl.exec(
-      // eslint-disable-next-line blazetrails/require-table-teardown
       "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT);" +
         "INSERT INTO gadgets (label) VALUES ('alpha'), ('beta');",
     );

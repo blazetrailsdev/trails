@@ -629,6 +629,7 @@ export const PACKAGE_CORE_CLASSES: readonly [string, string, string][] = [
  * `file::tsName` and the site relative to `vendor/`.
  */
 export const GEM_EXT_CLASSES: readonly [string, string, string, string][] = [
+  ["sqlite3", "backup.ts::Backup", "SQLite3::Backup", "sqlite3/v2.6.0/ext/sqlite3/backup.c:180"],
   [
     "msgpack",
     "extension-value.ts::ExtensionValue",

@@ -1,4 +1,4 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-node-sqlite-engine MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
 import { createRequire } from "node:module";
 import { File, LoadError } from "@blazetrails/ruby-compat";
 import {
@@ -14,9 +14,10 @@ import {
   type SqliteStatement,
   type SyncSqliteConnection,
   type SyncSqliteStatement,
-} from "../sqlite-adapter.js";
+} from "./driver.js";
 import { resolveUriDatabasePath } from "./sqlite-uri.js";
 import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
+import "./constants.generated.js";
 
 type NodeSqliteModule = typeof import("node:sqlite");
 let nodeSqlite: NodeSqliteModule | undefined;

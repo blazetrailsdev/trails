@@ -9,7 +9,7 @@ import { ConnectionPool } from "../../lib/connection-adapters/abstract/connectio
 import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/connection-handler.js";
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";
-import { betterSqlite3Driver } from "../../lib/sqlite/better-sqlite3.js";
+import { betterSqlite3Driver } from "@blazetrails/sqlite3/better-sqlite3";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import type { SqliteConnection, SqliteDriver } from "../../lib/sqlite-adapter.js";
 import { load, register } from "../../lib/connection-adapters.js";

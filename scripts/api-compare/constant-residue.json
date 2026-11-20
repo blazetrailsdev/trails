@@ -1215,6 +1215,43 @@
       "processes/runnable.ts::NullGuard": "SolidQueue::Processes::BootGuards::NullGuard"
     }
   },
+  "sqlite3": {
+    "rows": 30,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "backup.ts::Backup": "SQLite3::Backup",
+      "database.ts::Database": "SQLite3::Database",
+      "errors.ts::AbortException": "SQLite3::AbortException",
+      "errors.ts::AuthorizationException": "SQLite3::AuthorizationException",
+      "errors.ts::BusyException": "SQLite3::BusyException",
+      "errors.ts::CantOpenException": "SQLite3::CantOpenException",
+      "errors.ts::ConstraintException": "SQLite3::ConstraintException",
+      "errors.ts::CorruptException": "SQLite3::CorruptException",
+      "errors.ts::EmptyException": "SQLite3::EmptyException",
+      "errors.ts::Exception": "SQLite3::Exception",
+      "errors.ts::FormatException": "SQLite3::FormatException",
+      "errors.ts::FullException": "SQLite3::FullException",
+      "errors.ts::IOException": "SQLite3::IOException",
+      "errors.ts::InternalException": "SQLite3::InternalException",
+      "errors.ts::InterruptException": "SQLite3::InterruptException",
+      "errors.ts::LockedException": "SQLite3::LockedException",
+      "errors.ts::MemoryException": "SQLite3::MemoryException",
+      "errors.ts::MismatchException": "SQLite3::MismatchException",
+      "errors.ts::MisuseException": "SQLite3::MisuseException",
+      "errors.ts::NotADatabaseException": "SQLite3::NotADatabaseException",
+      "errors.ts::NotFoundException": "SQLite3::NotFoundException",
+      "errors.ts::PermissionException": "SQLite3::PermissionException",
+      "errors.ts::ProtocolException": "SQLite3::ProtocolException",
+      "errors.ts::RangeException": "SQLite3::RangeException",
+      "errors.ts::ReadOnlyException": "SQLite3::ReadOnlyException",
+      "errors.ts::SQLException": "SQLite3::SQLException",
+      "errors.ts::SchemaChangedException": "SQLite3::SchemaChangedException",
+      "errors.ts::TooBigException": "SQLite3::TooBigException",
+      "errors.ts::UnsupportedException": "SQLite3::UnsupportedException",
+      "pragmas.ts::Pragmas": "SQLite3::Pragmas"
+    }
+  },
   "stimulus": {
     "rows": 1,
     "excluded": [],

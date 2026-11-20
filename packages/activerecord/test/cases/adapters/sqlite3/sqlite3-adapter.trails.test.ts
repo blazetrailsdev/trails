@@ -5,7 +5,7 @@ import { newSqlitePool } from "../../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Errno, File, FileUtils } from "@blazetrails/ruby-compat";
-import { BusyException, CantOpenException } from "../../../../lib/sqlite/errors.js";
+import { BusyException, CantOpenException } from "@blazetrails/sqlite3";
 import {
   ActiveRecordError,
   NoDatabaseError,

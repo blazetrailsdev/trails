@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { rbModName } from "@blazetrails/ruby-compat";
+import { Backup } from "../lib/backup.js";
 import {
   BusyException,
   ConstraintException,
@@ -9,8 +11,8 @@ import {
   rbSqlite3Raise,
   rbSqlite3RaiseWithSql,
   status2klass,
-} from "../../../lib/sqlite/errors.js";
-import { betterSqlite3Driver } from "../../../lib/sqlite/better-sqlite3.js";
+} from "../lib/errors.js";
+import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 
 const raised = (fn: () => never): unknown => {
   try {
@@ -38,8 +40,9 @@ describe("status2klass", () => {
   });
 
   it("names each class under the SQLite3 namespace", () => {
-    expect(ReadOnlyException.name).toBe("SQLite3::ReadOnlyException");
+    expect(rbModName(ReadOnlyException)).toBe("SQLite3::ReadOnlyException");
     expect(new BusyException("busy").name).toBe("SQLite3::BusyException");
+    expect(rbModName(Backup)).toBe("SQLite3::Backup");
   });
 });
 

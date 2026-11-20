@@ -1,4 +1,4 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: capabilities, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-expo-sqlite-engine MOVED-BY-SHORT-NAME: capabilities, open. */
 import { createRequire } from "node:module";
 import {
   type ColumnInfo,
@@ -11,10 +11,10 @@ import {
   type SqliteOpenConfig,
   SQLite3Constants,
   type SqliteStatement,
-} from "../sqlite-adapter.js";
-import { LoadError } from "@blazetrails/ruby-compat";
-import { ConfigurationError } from "../errors.js";
+} from "./driver.js";
+import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
 import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
+import "./constants.generated.js";
 
 /** @internal */
 interface ExpoSQLiteStatement {
@@ -407,9 +407,7 @@ export const expoSqliteDriver: SqliteDriver = {
       );
     }
     if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
-      throw new ConfigurationError(
-        "SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver",
-      );
+      throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver");
     }
     try {
       const db = await expoSqlite.openDatabaseAsync(config.database, {

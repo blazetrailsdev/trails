@@ -4,7 +4,7 @@ import { b, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
-import { execBatch, retryBusy } from "../../sqlite/busy-wait.js";
+import { execBatch, retryBusy } from "@blazetrails/sqlite3";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import {
   combineMultiStatements,

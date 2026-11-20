@@ -1,20 +1,6 @@
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite-uri-helpers-port-memory-database-as-rails-computes-it
- */
-export function isRemoteLibsqlUrl(url: string): boolean {
-  return (
-    url.startsWith("libsql://") ||
-    url.startsWith("https://") ||
-    url.startsWith("http://") ||
-    url.startsWith("wss://") ||
-    url.startsWith("ws://")
-  );
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite-uri-helpers-port-memory-database-as-rails-computes-it
+ * @noRailsEquivalent CONVERGEABLE sqlite3-libsql-engines
  */
 export function resolveUriDatabasePath(database: string): string | null {
   if (database === ":memory:") return null;

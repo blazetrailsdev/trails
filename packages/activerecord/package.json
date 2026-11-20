@@ -74,7 +74,8 @@
     "@blazetrails/date": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
-    "@blazetrails/i18n": "workspace:*"
+    "@blazetrails/i18n": "workspace:*",
+    "@blazetrails/sqlite3": "workspace:*"
   },
   "peerDependencies": {
     "@blazetrails/activejob": "workspace:*",
@@ -140,11 +141,6 @@
       "source": "rails",
       "ref": "v8.0.2",
       "sha": "3235827585d87661942c91bc81f64f56d710f0b2"
-    },
-    {
-      "source": "sqlite3",
-      "ref": "v2.6.0",
-      "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
     }
   ]
 }

@@ -6334,10 +6334,7 @@ describe("sub-package de-overlap", () => {
   }
 
   it("maps activerecord's src/support to the activerecord-test-support package", () => {
-    expect(overlappingSubDirs("activerecord")).toEqual([
-      packageSrcDir("mysql2"),
-      packageSrcDir("sqlite3"),
-    ]);
+    expect(overlappingSubDirs("activerecord")).toEqual([packageSrcDir("mysql2")]);
     expect(packageSrcDir("activerecord-test-support")).toBe(
       path.join(path.dirname(packageSrcDir("activerecord")), "test", "support"),
     );
@@ -9222,7 +9219,7 @@ describe("object-literal modules and Struct.new constants", () => {
   });
 
   it("does not credit a string-valued data property as an accessor slot", () => {
-    // activerecord/lib/sqlite/better-sqlite3.ts: `name: "better-sqlite3"` is a driver tag, not state
+    // sqlite3/lib/better-sqlite3.ts: `name: "better-sqlite3"` is a driver tag, not state
     const info = extractFromFiles("/p", {
       "driver.ts": `
         declare function extend<T>(obj: T, ...mods: object[]): T;

@@ -41,8 +41,9 @@
     "@blazetrails/trailties": "workspace:*"
   },
   "devDependencies": {
-    "@blazetrails/vitest-matchers": "workspace:*",
-    "@blazetrails/trails-tsc": "workspace:*"
+    "@blazetrails/sqlite3": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*"
   },
   "engines": {
     "node": ">=26"

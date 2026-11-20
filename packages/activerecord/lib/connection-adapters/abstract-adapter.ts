@@ -1830,7 +1830,7 @@ export class AbstractAdapter implements Quoting {
   ): Promise<unknown> {
     if (nativeError instanceof ActiveRecordError) return nativeError;
 
-    const message = `${(nativeError as Error).constructor.name}: ${(nativeError as Error).message}`;
+    const message = `${rbModName((nativeError as Error).constructor)}: ${(nativeError as Error).message}`;
 
     const activeRecordError = (await this.translateException(nativeError, {
       message,

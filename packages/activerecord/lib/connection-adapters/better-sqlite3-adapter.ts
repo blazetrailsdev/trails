@@ -1,7 +1,7 @@
 import { ConnectionAdapters } from "../namespaces.js";
 
 import type { SqliteDriver } from "../sqlite-adapter.js";
-import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
+import { betterSqlite3Driver } from "@blazetrails/sqlite3/better-sqlite3";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */

@@ -1,4 +1,6 @@
-import { SQLite3Constants } from "../sqlite-adapter.js";
+import { rbModName } from "@blazetrails/ruby-compat";
+import { SQLite3Constants } from "./driver.js";
+import { SQLite3 } from "./namespaces.js";
 
 export class Exception extends Error {
   code: number | null = null;
@@ -11,7 +13,7 @@ export class Exception extends Error {
 
   constructor(message?: string) {
     super(message);
-    this.name = new.target.name;
+    this.name = rbModName(new.target) ?? new.target.name;
     this.#message = message ?? this.name;
     delete (this as { message?: string }).message;
   }
@@ -94,41 +96,37 @@ export class RangeException extends Exception {}
 
 export class NotADatabaseException extends Exception {}
 
-for (const [name, klass] of Object.entries({
-  Exception,
-  SQLException,
-  InternalException,
-  PermissionException,
-  AbortException,
-  BusyException,
-  LockedException,
-  MemoryException,
-  ReadOnlyException,
-  InterruptException,
-  IOException,
-  CorruptException,
-  NotFoundException,
-  FullException,
-  CantOpenException,
-  ProtocolException,
-  EmptyException,
-  SchemaChangedException,
-  TooBigException,
-  ConstraintException,
-  MismatchException,
-  MisuseException,
-  UnsupportedException,
-  AuthorizationException,
-  FormatException,
-  RangeException,
-  NotADatabaseException,
-})) {
-  Object.defineProperty(klass, "name", { value: `SQLite3::${name}` });
-}
+SQLite3.AbortException = AbortException;
+SQLite3.AuthorizationException = AuthorizationException;
+SQLite3.BusyException = BusyException;
+SQLite3.CantOpenException = CantOpenException;
+SQLite3.ConstraintException = ConstraintException;
+SQLite3.CorruptException = CorruptException;
+SQLite3.EmptyException = EmptyException;
+SQLite3.Exception = Exception;
+SQLite3.FormatException = FormatException;
+SQLite3.FullException = FullException;
+SQLite3.InternalException = InternalException;
+SQLite3.InterruptException = InterruptException;
+SQLite3.IOException = IOException;
+SQLite3.LockedException = LockedException;
+SQLite3.MemoryException = MemoryException;
+SQLite3.MismatchException = MismatchException;
+SQLite3.MisuseException = MisuseException;
+SQLite3.NotADatabaseException = NotADatabaseException;
+SQLite3.NotFoundException = NotFoundException;
+SQLite3.PermissionException = PermissionException;
+SQLite3.ProtocolException = ProtocolException;
+SQLite3.RangeException = RangeException;
+SQLite3.ReadOnlyException = ReadOnlyException;
+SQLite3.SchemaChangedException = SchemaChangedException;
+SQLite3.SQLException = SQLException;
+SQLite3.TooBigException = TooBigException;
+SQLite3.UnsupportedException = UnsupportedException;
 
 const { ErrorCode } = SQLite3Constants;
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-0180-sqlite3-gem-story */
 export function status2klass(status: number): typeof Exception | null {
   switch (status & 0xff) {
     case ErrorCode.OK:
@@ -192,7 +190,7 @@ export function status2klass(status: number): typeof Exception | null {
 
 const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-better-sqlite3-engine */
 function nativeStatus(error: unknown): number | null {
   const { errcode, rawCode, code, message } = (error ?? {}) as Record<string, unknown>;
   if (typeof errcode === "number") return errcode & 0xff;
@@ -209,7 +207,7 @@ function nativeStatus(error: unknown): number | null {
   return null;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-better-sqlite3-engine */
 function sqlite3Errmsg(error: unknown): string {
   const { code, message } = error as { code?: unknown; message: string };
   if (code === "ERR_INTERNAL_SQLITE_ERROR") {
@@ -221,7 +219,7 @@ function sqlite3Errmsg(error: unknown): string {
   return message;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-0180-sqlite3-gem-story */
 export function rbSqlite3Raise(error: unknown): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);
@@ -234,7 +232,7 @@ export function rbSqlite3Raise(error: unknown): never {
   throw exception;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-0180-sqlite3-gem-story */
 export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);

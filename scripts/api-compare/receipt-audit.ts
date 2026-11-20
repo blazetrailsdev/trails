@@ -204,7 +204,7 @@ async function readSources(ts: ApiManifest, filterPkg: string | null): Promise<S
   for (const pkg of Object.keys(ts.packages)) {
     if (filterPkg !== null && pkg !== filterPkg) continue;
     const root = packageSrcDir(pkg);
-    // A nested package's files (`src/sqlite/` is `sqlite3`) are its own, as
+    // A nested package's files (`lib/mysql2/` is `mysql2`) are its own, as
     // the extractor attributes them.
     const nested = overlappingSubDirs(pkg).map((dir) => path.relative(root, dir) + path.sep);
     const entries = await fsp.readdir(root, { recursive: true }).catch(() => [] as string[]);

@@ -4,9 +4,9 @@ import type { DatabaseConfig } from "../database-configurations/database-config.
 import { sortByBang, anybits, fetch, rbRegMatchP, rbObjAsString } from "@blazetrails/ruby-compat";
 import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
-import { Pragmas } from "../sqlite/pragmas.js";
-import { retryBusy, setBusyHandlerTimeout } from "../sqlite/busy-wait.js";
-import { BusyException } from "../sqlite/errors.js";
+import { Pragmas } from "@blazetrails/sqlite3";
+import { retryBusy, setBusyHandlerTimeout } from "@blazetrails/sqlite3";
+import { BusyException } from "@blazetrails/sqlite3";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
@@ -1070,7 +1070,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /**
    * @internal
-   * @missingRailsCall busy_handler — PERMANENT
    * @inventedArm setBusyTimeout — PERMANENT
    * @inventedArm retryBusy — PERMANENT
    */

@@ -1,4 +1,4 @@
-import type { SqliteConnection } from "../sqlite-adapter.js";
+import type { SqliteConnection } from "./driver.js";
 import { BusyException } from "./errors.js";
 
 /** @noRailsEquivalent PERMANENT */

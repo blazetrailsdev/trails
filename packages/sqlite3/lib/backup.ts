@@ -1,6 +1,6 @@
+import { SQLite3 } from "./namespaces.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { SQLite3Constants, type SqliteConnection } from "../sqlite-adapter.js";
-import { quoteColumnName, quoteTableName } from "../connection-adapters/sqlite3/quoting.js";
+import { SQLite3Constants, type SqliteConnection } from "./driver.js";
 import { Database } from "./database.js";
 import { Exception } from "./errors.js";
 
@@ -42,10 +42,10 @@ export class Backup {
       for (const [, , sql] of objects) await dstdb.exec(sql);
       for (const [type, name] of objects) {
         if (type !== "table") continue;
-        const table = quoteTableName(name);
+        const table = `"${name.replace(/"/g, '""')}"`;
         const columns = (
           (await dstdb.pragma(`sqlite3_backup.table_info(${table})`)) as { name: string }[]
-        ).map((column) => quoteColumnName(column.name));
+        ).map((column) => `"${column.name.replace(/"/g, '""')}"`);
         await dstdb.exec(
           `INSERT INTO main.${table} (${columns.join(", ")}) ` +
             `SELECT ${columns.join(", ")} FROM sqlite3_backup.${table}`,
@@ -55,7 +55,6 @@ export class Backup {
         "SELECT count(*) FROM sqlite3_backup.sqlite_master WHERE name = 'sqlite_sequence'",
       );
       if (Number(sequences) > 0) {
-        // eslint-disable-next-line blazetrails/no-raw-sql -- a raw driver handle has no Arel connection; the copy is SQLite's own catalog
         await dstdb.exec("DELETE FROM main.sqlite_sequence");
         await dstdb.exec(
           "INSERT INTO main.sqlite_sequence (name, seq) " +
@@ -75,3 +74,5 @@ export class Backup {
     return null;
   }
 }
+
+SQLite3.Backup = Backup;

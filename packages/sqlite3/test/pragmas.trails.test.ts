@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { SyncSqliteConnection } from "../../../lib/sqlite-adapter.js";
-import { betterSqlite3Driver } from "../../../lib/sqlite/better-sqlite3.js";
-import { Pragmas } from "../../../lib/sqlite/pragmas.js";
+import type { SyncSqliteConnection } from "../lib/driver.js";
+import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
+import { Pragmas } from "../lib/pragmas.js";
 
 describe("SQLite3::Pragmas readers", () => {
   it("read back what the setters write, through the raw connection's getFirstValue", async () => {
