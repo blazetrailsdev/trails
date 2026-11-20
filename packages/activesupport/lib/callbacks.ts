@@ -57,7 +57,7 @@ export type AnyCallback<T extends object = object> =
 export type CallbackObject = object;
 
 export interface RunCallbacksOptions {
-  strict?: "sync";
+  strict?: "sync" | false;
 }
 
 function isThenable(v: unknown): v is PromiseLike<unknown> {

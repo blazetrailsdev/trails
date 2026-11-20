@@ -134,9 +134,8 @@ describe("CollectionAwaitableWriters", () => {
 
   it("create with an ids= key reaches the association writer", async () => {
     const post = await Post.create({ title: "t", body: "b" });
-    await expect(Author.create({ name: "Bill", postIds: [post.id] })).rejects.toThrow(
-      CollectionIdsAssignmentError,
-    );
+    const author = (await Author.create({ name: "Bill", postIds: [post.id] })) as any;
+    expect(await author.postIds).toEqual([post.id]);
   });
 
   it("constructor-form habtm ids= reaches the association writer", async () => {

@@ -82,7 +82,7 @@ export abstract class CollectionAssociation extends Association {
     this.replace(records) as Base[];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
+  /** @noRailsEquivalent PERMANENT */
   syncIdsWrite(_ids: unknown[]): never {
     throw new CollectionIdsAssignmentError(this.reflection.name);
   }

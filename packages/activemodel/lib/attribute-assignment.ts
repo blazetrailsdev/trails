@@ -23,18 +23,20 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
     assignmentCapture?.attributes === newAttributes || assignmentCapture?.attributes === undefined
       ? assignmentCapture
       : null;
-  if (capture != null) assignmentCapture = null;
+  if (capture != null) {
+    assignmentCapture = null;
+    pendingCaptures.set(this, capture);
+  }
   if (isEmpty(newAttributes)) return;
 
   const outer = this[assigningSynchronously];
-  this[assigningSynchronously] = true;
+  this[assigningSynchronously] = capture == null;
   try {
     const assigned = this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
     if (capture == null) {
       assertAssignedSynchronously(assigned, "assignAttributes");
     } else if (assigned instanceof Promise) {
       capture.assigned = assigned;
-      pendingCaptures.set(this, capture);
     }
   } finally {
     this[assigningSynchronously] = outer;
@@ -181,10 +183,19 @@ export function capturingAssignment<R>(build: () => R): [R, Promise<void> | unde
  * @noRailsEquivalent PERMANENT
  */
 export function deferringToAssignment(record: object, rest: () => unknown): boolean {
-  const capture = pendingCaptures.get(record);
+  let capture = pendingCaptures.get(record);
+  if (capture === undefined && assignmentCapture?.attributes === null) {
+    capture = assignmentCapture;
+    assignmentCapture = null;
+  }
   if (capture === undefined) return false;
   pendingCaptures.delete(record);
-  capture.assigned = capture.assigned!.then(rest).then(() => {});
+  if (capture.assigned === undefined) {
+    const rested = rest();
+    if (rested instanceof Promise) capture.assigned = rested.then(() => {});
+  } else {
+    capture.assigned = capture.assigned.then(rest).then(() => {});
+  }
   return true;
 }
 
@@ -197,9 +208,9 @@ export async function awaitingAssignment<R, K = never>(
   block: ((record: K) => void | Promise<void>) | undefined,
   build: (block?: (record: K) => unknown) => R,
 ): Promise<R> {
-  const capture: AssignmentCapture = { attributes };
+  const capture: AssignmentCapture = { attributes: attributes ?? null };
   let yielded: unknown;
-  if (attributes != null) assignmentCapture = capture;
+  assignmentCapture = capture;
   let record: R;
   try {
     record = build(
@@ -208,7 +219,6 @@ export async function awaitingAssignment<R, K = never>(
           yielded = block(record);
           if (yielded instanceof Promise && capture.assigned === undefined) {
             capture.assigned = yielded;
-            pendingCaptures.set(record as object, capture);
           }
           return yielded;
         }),

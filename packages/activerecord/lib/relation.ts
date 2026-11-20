@@ -28,7 +28,7 @@ import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetra
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique } from "./errors.js";
 import { groupBy, max, min } from "@blazetrails/ruby-compat";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, awaitingAssignment } from "@blazetrails/activemodel";
 import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
 
 import { applyThenable } from "./relation/thenable.js";
@@ -990,9 +990,12 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   async findOrInitializeBy(
     attributes: Record<string, unknown>,
-    block?: (r: T) => void,
+    block?: (r: T) => void | Promise<void>,
   ): Promise<T> {
-    return (await this.findBy(attributes)) || this.new(attributes, block);
+    return (
+      (await this.findBy(attributes)) ||
+      awaitingAssignment(attributes, block, (block) => this.new(attributes, block))
+    );
   }
 
   async firstOrCreate(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T> {
@@ -1008,9 +1011,12 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   async firstOrInitialize(
     attributes?: Record<string, unknown>,
-    block?: (r: T) => void,
+    block?: (r: T) => void | Promise<void>,
   ): Promise<T> {
-    return (await this.first()) || this.new(attributes, block);
+    return (
+      (await this.first()) ||
+      awaitingAssignment(attributes, block, (block) => this.new(attributes, block))
+    );
   }
 
   async insertAll(

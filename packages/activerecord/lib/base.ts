@@ -1324,9 +1324,12 @@ export class Base extends Model {
     if (attributes != null) this.assignAttributes(attributes);
 
     if (!allocating) {
-      const deferred = deferringToAssignment(this, async () => {
-        await initBlock?.(this);
-        this._runInitializeCallbacks();
+      const deferred = deferringToAssignment(this, () => {
+        const yielded: unknown = initBlock?.(this);
+        if (yielded instanceof Promise) {
+          return yielded.then(() => this.runCallbacks("initialize", undefined, { strict: false }));
+        }
+        return this.runCallbacks("initialize", undefined, { strict: false });
       });
       if (!deferred) {
         initBlock?.(this);
