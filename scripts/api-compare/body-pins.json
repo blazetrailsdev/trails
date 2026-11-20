@@ -59611,6 +59611,13 @@
   {
     "package": "activesupport",
     "rubyFile": "core_ext/enumerable.rb",
+    "rubyName": "maximum",
+    "digest": "2783588945f65eb1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activesupport",
+    "rubyFile": "core_ext/enumerable.rb",
     "rubyName": "sum",
     "digest": "deabb14209d12d3d",
     "ref": "v8.0.2"
@@ -65484,13 +65491,6 @@
   {
     "package": "activesupport",
     "rubyFile": "test_case.rb",
-    "rubyName": "freeze_time",
-    "digest": "453b8105067d8b0e",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "test_case.rb",
     "rubyName": "stub_const",
     "digest": "2f2c4344179ed39c",
     "ref": "v8.0.2"
@@ -65514,27 +65514,6 @@
     "rubyFile": "test_case.rb",
     "rubyName": "test_order=",
     "digest": "f2e4267b31e4152c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "test_case.rb",
-    "rubyName": "travel",
-    "digest": "ded3dadf8c8dbf17",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "test_case.rb",
-    "rubyName": "travel_back",
-    "digest": "472739f3b96cc8e1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "test_case.rb",
-    "rubyName": "travel_to",
-    "digest": "12c5d52a1c4ae456",
     "ref": "v8.0.2"
   },
   {
