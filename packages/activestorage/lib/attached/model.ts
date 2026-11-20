@@ -312,6 +312,7 @@ Model.ClassMethods = ClassMethods;
 
 Attached.Model = Model;
 
+/** @inventedArm onLoad — PERMANENT */
 onLoad("active_record", function (this: typeof Base) {
   include(this, Model);
 });

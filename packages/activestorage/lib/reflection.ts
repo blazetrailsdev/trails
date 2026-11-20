@@ -74,6 +74,7 @@ Concern.included.call(ActiveRecordExtensions, null, function (this: typeof Base)
   classAttribute.call(this, "attachmentReflections", { instanceWriter: false, default: {} });
 });
 
+/** @inventedArm onLoad — PERMANENT */
 onLoad("active_record", function (this: typeof Base) {
   include(this, ActiveRecordExtensions);
   prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
