@@ -262,7 +262,7 @@ Person.modelName.human();
 #### Customize the Name of the Model
 
 A model in a namespace can choose whether the namespace shows up in its
-generated names, by having the namespace answer `useRelativeModelNaming`.
+generated names, by having the namespace answer `isUseRelativeModelNaming()`.
 
 ### SecurePassword
 

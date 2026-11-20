@@ -357,7 +357,7 @@ propagates to the caller.
 
 These write to the database without running callbacks, so use them with care:
 `updateColumn`, `updateColumns`, `updateAll`, `deleteAll`, `delete`,
-`insertAll`, `upsertAll`, `increment` and `decrement` on a class, and
+`insertAll`, `upsertAll`, `incrementCounter`, `decrementCounter` and
 `touchAll`.
 
 ## Transaction Callbacks
