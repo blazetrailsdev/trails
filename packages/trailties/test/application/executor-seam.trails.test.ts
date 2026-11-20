@@ -134,7 +134,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
 describe("Trails::Application#executor and #reloader are per-application (trails)", () => {
   class TestApplication extends Application {}
 
-  it("does not share callbacks between two applications", () => {
+  it("does not share callbacks between two applications", async () => {
     const one = new TestApplication();
     const two = new TestApplication();
 
@@ -143,10 +143,10 @@ describe("Trails::Application#executor and #reloader are per-application (trails
 
     const ran: string[] = [];
     one.executor.toRun(() => ran.push("one"));
-    two.executor.wrap(() => {});
+    await two.executor.wrap(() => {});
 
     expect(ran).toEqual([]);
-    one.executor.wrap(() => {});
+    await one.executor.wrap(() => {});
     expect(ran).toEqual(["one"]);
   });
 

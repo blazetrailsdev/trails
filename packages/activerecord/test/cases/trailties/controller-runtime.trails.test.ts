@@ -24,7 +24,7 @@ FakeInstrumentation.ClassMethods = {
 
 class FakeController {
   dbRuntime: number | null = null;
-  logger: { "info?": boolean } | null = null;
+  logger: { isInfo(): boolean } | null = null;
   viewRuntime: number | null = null;
   processedWith: unknown[] = [];
   declare processAction: (action: string, ...args: unknown[]) => unknown;
@@ -143,7 +143,7 @@ describe("ControllerRuntimeTest", () => {
       RuntimeRegistry.setSqlRuntime(RuntimeRegistry.sqlRuntime() + 5.0);
       RuntimeRegistry.setQueriesCount(RuntimeRegistry.queriesCount() + 1);
       const controller = new FakeController();
-      controller.logger = { "info?": false };
+      controller.logger = { isInfo: () => false };
       expect(controller.cleanupViewRuntime(() => 3.0)).toBe(3.0);
     });
 
@@ -152,7 +152,7 @@ describe("ControllerRuntimeTest", () => {
       RuntimeRegistry.setQueriesCount(RuntimeRegistry.queriesCount() + 1);
       const controller = new FakeController();
       controller.dbRuntime = 1.0;
-      controller.logger = { "info?": true };
+      controller.logger = { isInfo: () => true };
 
       controller.cleanupViewRuntime(() => 0);
 
@@ -162,7 +162,7 @@ describe("ControllerRuntimeTest", () => {
 
     it("subtracts the queries run inside the block from the measured runtime", () => {
       const controller = new FakeController();
-      controller.logger = { "info?": true };
+      controller.logger = { isInfo: () => true };
 
       const result = controller.cleanupViewRuntime(() => {
         RuntimeRegistry.setSqlRuntime(RuntimeRegistry.sqlRuntime() + 4.0);
@@ -176,7 +176,7 @@ describe("ControllerRuntimeTest", () => {
 
     it("subtracts the queries of a block that deferred its render to a promise", async () => {
       const controller = new FakeController();
-      controller.logger = { "info?": true };
+      controller.logger = { isInfo: () => true };
 
       const result = await controller.cleanupViewRuntime(async () => {
         await Promise.resolve();

@@ -31,7 +31,7 @@ describe("ReloaderTest", () => {
     assertNot(completed);
 
     prepared = false;
-    reloader.wrap(() => {
+    await reloader.wrap(() => {
       expect(prepared).toBeTruthy();
       prepared = false;
     });
@@ -47,17 +47,17 @@ describe("ReloaderTest", () => {
     expect(i).toBe(1);
   });
 
-  it("only run when check passes", () => {
+  it("only run when check passes", async () => {
     let r = newReloader(() => true);
     let invoked = false;
     r.toRun(() => (invoked = true));
-    r.wrap(() => {});
+    await r.wrap(() => {});
     expect(invoked).toBeTruthy();
 
     r = newReloader(() => false);
     invoked = false;
     r.toRun(() => (invoked = true));
-    r.wrap(() => {});
+    await r.wrap(() => {});
     assertNot(invoked);
   });
 
@@ -69,7 +69,7 @@ describe("ReloaderTest", () => {
     reloader.executor.toRun(() => called.push("executor_run"));
     reloader.executor.toComplete(() => called.push("executor_complete"));
 
-    reloader.wrap(() => {});
+    await reloader.wrap(() => {});
     expect(called).toEqual([
       "executor_run",
       "reloader_run",
@@ -92,7 +92,7 @@ describe("ReloaderTest", () => {
     reloader.check = () => false;
 
     called = [];
-    reloader.wrap(() => {});
+    await reloader.wrap(() => {});
     expect(called).toEqual(["executor_run", "executor_complete"]);
 
     called = [];
@@ -107,22 +107,22 @@ describe("ReloaderTest", () => {
     ]);
   });
 
-  it("class unload block", () => {
+  it("class unload block", async () => {
     const called: string[] = [];
     reloader.beforeClassUnload(() => called.push("before_unload"));
     reloader.afterClassUnload(() => called.push("after_unload"));
     reloader.toRun(function (this: Reloader) {
       this.classUnloadBang(() => called.push("unload"));
     });
-    reloader.wrap(() => called.push("body"));
+    await reloader.wrap(() => called.push("body"));
 
     expect(called).toEqual(["before_unload", "unload", "after_unload", "body"]);
   });
 
   it("report errors once", async () => {
     const reports = await ErrorCollector.record(async () => {
-      await assertRaises([RuntimeError], {}, () => {
-        reloader.wrap(() => {
+      await assertRaises([RuntimeError], {}, async () => {
+        await reloader.wrap(() => {
           throw new RuntimeError("Oops");
         });
       });

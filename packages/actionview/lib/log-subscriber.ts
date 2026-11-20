@@ -73,7 +73,7 @@ export class Start implements UtilsHost {
    */
   isSilenced(_: unknown): boolean {
     const l = this.logger();
-    return l == null || !l["debug?"];
+    return l == null || !l.isDebug();
   }
 }
 

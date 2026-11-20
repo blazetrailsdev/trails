@@ -2,7 +2,7 @@ import { Thread } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "./solid-queue.js";
 
 export const AppExecutor = {
-  wrapInAppExecutor<T>(block: () => T): T {
+  wrapInAppExecutor<T>(block: () => T): T | Promise<Awaited<T>> {
     if (SolidQueue.appExecutor) {
       return SolidQueue.appExecutor.wrap(block, { source: "application.solid_queue" });
     } else {

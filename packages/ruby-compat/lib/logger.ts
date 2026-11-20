@@ -105,7 +105,7 @@ export class Logger {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  get "debug?"(): boolean {
+  isDebug(): boolean {
     return this.level <= Logger.DEBUG;
   }
 
@@ -115,7 +115,7 @@ export class Logger {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  get "info?"(): boolean {
+  isInfo(): boolean {
     return this.level <= Logger.INFO;
   }
 
@@ -125,7 +125,7 @@ export class Logger {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  get "warn?"(): boolean {
+  isWarn(): boolean {
     return this.level <= Logger.WARN;
   }
 
@@ -135,7 +135,7 @@ export class Logger {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  get "error?"(): boolean {
+  isError(): boolean {
     return this.level <= Logger.ERROR;
   }
 
@@ -145,7 +145,7 @@ export class Logger {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  get "fatal?"(): boolean {
+  isFatal(): boolean {
     return this.level <= Logger.FATAL;
   }
 

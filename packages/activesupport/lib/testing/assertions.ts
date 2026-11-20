@@ -621,7 +621,7 @@ export async function _assertNothingRaisedOrWarn<T>(
     if (!(e instanceof UnexpectedError)) throw e;
 
     const logger = taggedLogger();
-    if (logger && (logger as { "warn?"?: boolean })["warn?"]) {
+    if (logger && (logger as { isWarn?(): boolean }).isWarn?.()) {
       const warning =
         `${_testCaseIdentity()}: ${classNameOf(e.error)} raised.\n` +
         "If you expected this exception, use `assert_raises` as near to the code that raises as possible.\n" +

@@ -132,7 +132,11 @@ export class RunnerCommand extends Base {
   }
 
   /** @internal */
-  private conditionalExecutor<T>(enabled: boolean, args: { source: string }, block: () => T): T {
+  private conditionalExecutor<T>(
+    enabled: boolean,
+    args: { source: string },
+    block: () => T,
+  ): T | Promise<Awaited<T>> {
     if (enabled) {
       return Trails.application!.executor.wrap(block, args);
     } else {

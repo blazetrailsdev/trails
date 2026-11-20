@@ -116,7 +116,9 @@ export const SolidQueue = {
   Processes: { name: string; BootGuards?: typeof import("./processes/runnable.js").BootGuards };
   DEFAULT_LOGGER: Logger;
   logger: Logger;
-  appExecutor: { wrap<T>(block: () => T, options?: { source?: string }): T } | null;
+  appExecutor: {
+    wrap<T>(block: () => T, options?: { source?: string }): T | Promise<Awaited<T>>;
+  } | null;
   onThreadError: ((error: unknown) => unknown) | null;
   connectsTo: Record<string, unknown> | null;
   useSkipLocked: boolean;

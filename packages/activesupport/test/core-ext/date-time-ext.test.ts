@@ -134,6 +134,31 @@ function dt(
 const END_OF_PERIOD_SEC = new Rational(59999999999, 1000000000);
 
 describe("DateTimeExtCalculationsTest", () => {
+  it("next week at same time", () => {
+    expect(dt(2005, 2, 22, 15, 15, 10).nextWeek(":monday", { sameTime: true })).toEqual(
+      dt(2005, 2, 28, 15, 15, 10),
+    );
+    expect(
+      dt(2005, 2, 22, 15, 15, new Rational(10999999, 1000000)).nextWeek(":monday", {
+        sameTime: true,
+      }),
+    ).toEqual(dt(2005, 2, 28, 15, 15, new Rational(10999999, 1000000)));
+    expect(
+      dt(2005, 2, 22, 15, 15, new Rational(10999999999, 1000000000)).nextWeek(":monday", {
+        sameTime: true,
+      }),
+    ).toEqual(dt(2005, 2, 28, 15, 15, new Rational(10999999999, 1000000000)));
+    expect(dt(2005, 2, 22, 15, 15, 10).nextWeek(":friday", { sameTime: true })).toEqual(
+      dt(2005, 3, 4, 15, 15, 10),
+    );
+    expect(dt(2006, 10, 23, 0, 0, 0).nextWeek(":monday", { sameTime: true })).toEqual(
+      dt(2006, 10, 30, 0, 0, 0),
+    );
+    expect(dt(2006, 10, 23, 0, 0, 0).nextWeek(":wednesday", { sameTime: true })).toEqual(
+      dt(2006, 11, 1, 0, 0, 0),
+    );
+  });
+
   it("to fs", () => {
     const datetime = dt(2005, 2, 21, 14, 30, 0);
     expect(toFs(datetime, "db")).toBe("2005-02-21 14:30:00");

@@ -58,11 +58,11 @@ describe("ActiveSupport::LogSubscriber::TestHelper", () => {
 
   it("answers a severity predicate from its level", () => {
     const logger = new MockLogger(Logger.WARN);
-    expect(logger["debug?"]).toBe(false);
-    expect(logger["warn?"]).toBe(true);
-    expect(logger["unknown?"]).toBe(true);
+    expect(logger.isDebug()).toBe(false);
+    expect(logger.isWarn()).toBe(true);
+    expect(logger.isUnknown()).toBe(true);
     logger.level = Logger.DEBUG;
-    expect(logger["debug?"]).toBe(true);
+    expect(logger.isDebug()).toBe(true);
   });
 
   it("lets an including class overwrite setLogger", () => {

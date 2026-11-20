@@ -82,23 +82,23 @@ class CustomLogger {
     }
   }
 
-  get "debug?"(): boolean {
+  isDebug(): boolean {
     return (this.level as number) <= Logger.DEBUG;
   }
 
-  get "info?"(): boolean {
+  isInfo(): boolean {
     return (this.level as number) <= Logger.INFO;
   }
 
-  get "warn?"(): boolean {
+  isWarn(): boolean {
     return (this.level as number) <= Logger.WARN;
   }
 
-  get "error?"(): boolean {
+  isError(): boolean {
     return (this.level as number) <= Logger.ERROR;
   }
 
-  get "fatal?"(): boolean {
+  isFatal(): boolean {
     return (this.level as number) <= Logger.FATAL;
   }
 
@@ -354,70 +354,70 @@ describe("BroadcastLoggerTest", () => {
     log1.level = Logger.DEBUG;
     log2.level = Logger.FATAL;
 
-    expect(logger["debug?"]).toBeTruthy();
+    expect(logger.isDebug()).toBeTruthy();
   });
 
   it("#debug? is false when all loggers are below DEBUG level", () => {
     log1.level = Logger.ERROR;
     log2.level = Logger.FATAL;
 
-    expect(logger["debug?"]).toBeFalsy();
+    expect(logger.isDebug()).toBeFalsy();
   });
 
   it("#info? is true when at least one logger's level is at or above INFO level", () => {
     log1.level = Logger.DEBUG;
     log2.level = Logger.FATAL;
 
-    expect(logger["info?"]).toBeTruthy();
+    expect(logger.isInfo()).toBeTruthy();
   });
 
   it("#info? is false when all loggers are below INFO", () => {
     log1.level = Logger.ERROR;
     log2.level = Logger.FATAL;
 
-    expect(logger["info?"]).toBeFalsy();
+    expect(logger.isInfo()).toBeFalsy();
   });
 
   it("#warn? is true when at least one logger's level is at or above WARN level", () => {
     log1.level = Logger.DEBUG;
     log2.level = Logger.FATAL;
 
-    expect(logger["warn?"]).toBeTruthy();
+    expect(logger.isWarn()).toBeTruthy();
   });
 
   it("#warn? is false when all loggers are below WARN", () => {
     log1.level = Logger.ERROR;
     log2.level = Logger.FATAL;
 
-    expect(logger["warn?"]).toBeFalsy();
+    expect(logger.isWarn()).toBeFalsy();
   });
 
   it("#error? is true when at least one logger's level is at or above ERROR level", () => {
     log1.level = Logger.DEBUG;
     log2.level = Logger.FATAL;
 
-    expect(logger["error?"]).toBeTruthy();
+    expect(logger.isError()).toBeTruthy();
   });
 
   it("#error? is false when all loggers are below ERROR", () => {
     log1.level = Logger.FATAL;
     log2.level = Logger.FATAL;
 
-    expect(logger["error?"]).toBeFalsy();
+    expect(logger.isError()).toBeFalsy();
   });
 
   it("#fatal? is true when at least one logger's level is at or above FATAL level", () => {
     log1.level = Logger.DEBUG;
     log2.level = Logger.FATAL;
 
-    expect(logger["fatal?"]).toBeTruthy();
+    expect(logger.isFatal()).toBeTruthy();
   });
 
   it("#fatal? is false when all loggers are below FATAL", () => {
     log1.level = Logger.UNKNOWN;
     log2.level = Logger.UNKNOWN;
 
-    expect(logger["fatal?"]).toBeFalsy();
+    expect(logger.isFatal()).toBeFalsy();
   });
 
   it("calling a method that no logger in the broadcast have implemented", () => {

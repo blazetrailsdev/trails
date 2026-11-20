@@ -58,18 +58,12 @@ export class MockLogger {
   declare fatal: (message?: unknown, block?: () => unknown) => unknown[];
   /** @noRailsEquivalent PERMANENT */
   declare unknown: (message?: unknown, block?: () => unknown) => unknown[];
-  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
-  declare readonly "debug?": boolean;
-  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
-  declare readonly "info?": boolean;
-  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
-  declare readonly "warn?": boolean;
-  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
-  declare readonly "error?": boolean;
-  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
-  declare readonly "fatal?": boolean;
-  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
-  declare readonly "unknown?": boolean;
+  declare isDebug: () => boolean;
+  declare isInfo: () => boolean;
+  declare isWarn: () => boolean;
+  declare isError: () => boolean;
+  declare isFatal: () => boolean;
+  declare isUnknown: () => boolean;
 
   constructor(level: number = MockLogger.DEBUG) {
     this._flushCount = 0;
@@ -124,12 +118,16 @@ for (const [severity, value] of Object.entries(LOG_LEVELS) as [LogLevel, number]
     configurable: true,
   });
   rbClearMethodCache();
-  Object.defineProperty(MockLogger.prototype, `${severity.slice(1)}?`, {
-    get(this: MockLogger): boolean {
-      return value >= (this._level as number);
+  Object.defineProperty(
+    MockLogger.prototype,
+    `is${severity.slice(1, 2).toUpperCase()}${severity.slice(2)}`,
+    {
+      value(this: MockLogger): boolean {
+        return value >= (this._level as number);
+      },
+      configurable: true,
     },
-    configurable: true,
-  });
+  );
   rbClearMethodCache();
 }
 

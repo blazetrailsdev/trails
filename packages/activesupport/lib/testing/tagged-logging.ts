@@ -5,7 +5,7 @@ type TaggedLogger = {
   warn(msg: unknown): void;
   debug(msg: unknown): void;
   info?(msg: unknown): unknown;
-  readonly "info?"?: boolean;
+  isInfo?(): boolean;
 };
 
 let taggedLoggerValue: TaggedLogger | null = null;
@@ -16,7 +16,7 @@ export function setTaggedLogger(logger: TaggedLogger | null): void {
 
 export function beforeSetup(this: object): unknown {
   const logger = taggedLogger();
-  if (logger && logger["info?"]) {
+  if (logger && logger.isInfo?.()) {
     const heading = _testCaseIdentity(": ");
     const divider = "-".repeat(heading.length);
     logger.info?.(divider);

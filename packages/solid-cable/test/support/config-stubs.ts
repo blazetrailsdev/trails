@@ -28,7 +28,7 @@ export class ConfigStub {
 export class ExectorStub {
   runBang(): void {}
 
-  wrap<T>(block: () => T): T {
+  wrap<T>(block: () => T): T | Promise<Awaited<T>> {
     return Executor.wrap(block);
   }
 }

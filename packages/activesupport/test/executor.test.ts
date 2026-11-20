@@ -70,24 +70,24 @@ describe("ExecutorTest", () => {
     }
   });
 
-  it("wrap invokes callbacks", () => {
+  it("wrap invokes callbacks", async () => {
     const called: string[] = [];
     executor.toRun(() => called.push("run"));
     executor.toComplete(() => called.push("complete"));
 
-    executor.wrap(() => {
+    await executor.wrap(() => {
       called.push("body");
     });
 
     expect(called).toEqual(["run", "body", "complete"]);
   });
 
-  it("callbacks share state", () => {
+  it("callbacks share state", async () => {
     let result: boolean | undefined = false;
     executor.toRun((target: object) => ((target as { foo?: boolean }).foo = true));
     executor.toComplete((target: object) => (result = (target as { foo?: boolean }).foo));
 
-    executor.wrap(() => {});
+    await executor.wrap(() => {});
 
     expect(result).toBeTruthy();
   });
@@ -118,14 +118,14 @@ describe("ExecutorTest", () => {
     expect(called).toEqual(["run_1", "complete"]);
   });
 
-  it("avoids double wrapping", () => {
+  it("avoids double wrapping", async () => {
     const called: string[] = [];
     executor.toRun(() => called.push("run"));
     executor.toComplete(() => called.push("complete"));
 
-    executor.wrap(() => {
+    await executor.wrap(async () => {
       called.push("early");
-      executor.wrap(() => {
+      await executor.wrap(() => {
         called.push("body");
       });
       called.push("late");
@@ -134,7 +134,7 @@ describe("ExecutorTest", () => {
     expect(called).toEqual(["run", "early", "body", "late", "complete"]);
   });
 
-  it("hooks carry state", () => {
+  it("hooks carry state", async () => {
     let suppliedState: unknown = "none";
 
     const hook = {
@@ -146,12 +146,12 @@ describe("ExecutorTest", () => {
 
     executor.registerHook(hook);
 
-    executor.wrap(() => {});
+    await executor.wrap(() => {});
 
     expect(suppliedState).toBe("some_state");
   });
 
-  it("nil state is sufficient", () => {
+  it("nil state is sufficient", async () => {
     let suppliedState: unknown = "none";
 
     const hook = {
@@ -163,7 +163,7 @@ describe("ExecutorTest", () => {
 
     executor.registerHook(hook);
 
-    executor.wrap(() => {});
+    await executor.wrap(() => {});
 
     assertNil(suppliedState);
   });
@@ -208,7 +208,7 @@ describe("ExecutorTest", () => {
     expect(suppliedState).toBe("some_state");
   });
 
-  it("hook insertion order", () => {
+  it("hook insertion order", async () => {
     const invoked: string[] = [];
     const suppliedState: unknown[] = [];
 
@@ -231,7 +231,7 @@ describe("ExecutorTest", () => {
     executor.registerHook(new HookClass("c"), { outer: true });
     executor.registerHook(new HookClass("d"));
 
-    executor.wrap(() => {});
+    await executor.wrap(() => {});
 
     expect(invoked).toEqual([
       "run_c",
@@ -246,7 +246,7 @@ describe("ExecutorTest", () => {
     expect(suppliedState).toEqual(["state_a", "state_b", "state_d", "state_c"]);
   });
 
-  it("separate classes can wrap", () => {
+  it("separate classes can wrap", async () => {
     const otherExecutor = class extends Executor {};
 
     const called: string[] = [];
@@ -255,8 +255,8 @@ describe("ExecutorTest", () => {
     otherExecutor.toRun(() => called.push("other_run"));
     otherExecutor.toComplete(() => called.push("other_complete"));
 
-    executor.wrap(() => {
-      otherExecutor.wrap(() => {
+    await executor.wrap(async () => {
+      await otherExecutor.wrap(() => {
         called.push("body");
       });
     });

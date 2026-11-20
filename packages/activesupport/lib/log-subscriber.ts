@@ -44,9 +44,9 @@ export class LogSubscriber extends Subscriber {
   declare private static _logLevels?: Map<string, (logger: Logger) => boolean>;
 
   static readonly LEVEL_CHECKS: Record<string, (logger: Logger) => boolean> = {
-    debug: (logger) => !logger["debug?"],
-    info: (logger) => !logger["info?"],
-    error: (logger) => !logger["error?"],
+    debug: (logger) => !logger.isDebug(),
+    info: (logger) => !logger.isInfo(),
+    error: (logger) => !logger.isError(),
   };
 
   private static _logger: Logger | null = null;

@@ -12,6 +12,17 @@ export const ReloadedClassesFiltering = {
       _subclassMap.get(this as unknown as AnyClass)?.toArray() ?? [],
     );
   },
+
+  get descendants(): AnyClass[] {
+    const subclasses = (this as unknown as { subclasses: AnyClass[] }).subclasses;
+    return DescendantsTracker.rejectBang(
+      subclasses.concat(
+        subclasses.flatMap(
+          (klass) => (klass as unknown as { descendants: AnyClass[] }).descendants,
+        ),
+      ),
+    );
+  },
 };
 
 export class WeakSet<T extends object> {
