@@ -71,7 +71,7 @@ describe("PG::Connection against a server", () => {
       yielded = c;
       return (await c.exec("SELECT 1 AS one")).getvalue(0, 0);
     });
-    expect(value).toBe("1");
+    expect(value).toBe(1);
     expect(yielded!.isFinished()).toBe(true);
   });
 
