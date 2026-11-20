@@ -78,6 +78,7 @@ export { CommonLogger } from "./common-logger.js";
 export { ShowExceptions } from "./show-exceptions.js";
 export { BadRequest } from "./bad-request.js";
 export { Runtime } from "./runtime.js";
+export { Config } from "./config.js";
 export { Files } from "./files.js";
 export { Lint, LintError } from "./lint.js";
 export { Head } from "./head.js";

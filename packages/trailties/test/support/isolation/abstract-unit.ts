@@ -23,6 +23,7 @@ import { MockRequest } from "@blazetrails/rack";
 import { ConnectionAdapters } from "@blazetrails/activerecord";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Application } from "../../../lib/application.js";
+import { Configuration as TrailtieConfiguration } from "../../../lib/trailtie/configuration.js";
 import type { EnvHelpers } from "../env-helpers.js";
 import { Trails, _resetEnv } from "../../../lib/trails.js";
 import { Paths, TRAILS_FRAMEWORK_ROOT } from "./paths.js";
@@ -129,6 +130,8 @@ export class Generation {
   declare _prevTrailsAppClass: typeof Application.appClass;
   declare _prevTrailsApplication: typeof Trails.application;
   declare _prevTrailsEnv: string | undefined;
+  declare _prevAppMiddleware: typeof TrailtieConfiguration._appMiddleware;
+  declare _prevTrailtieOptions: [Record<string, unknown>, Record<string, unknown>][];
 
   async buildApp(options: { initializers?: boolean; multiDb?: boolean } = {}): Promise<void> {
     const fs = getFs();
@@ -136,6 +139,14 @@ export class Generation {
     this._prevTrailsApplication = Trails.application;
     Application.appClass = null;
     Trails.application = null;
+    this._prevAppMiddleware = TrailtieConfiguration._appMiddleware;
+    TrailtieConfiguration._appMiddleware = undefined;
+    this._prevTrailtieOptions = Object.values(TrailtieConfiguration._options)
+      .filter(
+        (options): options is Record<string, unknown> =>
+          typeof options === "object" && options !== null,
+      )
+      .map((options) => [options, { ...options }]);
 
     this._prevTrailsEnv = ENV["TRAILS_ENV"];
     setEnv("TRAILS_ENV", "development");
@@ -239,6 +250,11 @@ export class Generation {
     if (this._prevTrailsEnv != null) setEnv("TRAILS_ENV", this._prevTrailsEnv);
     if (this._prevTrailsAppClass != null) Application.appClass = this._prevTrailsAppClass;
     if (this._prevTrailsApplication != null) Trails.application = this._prevTrailsApplication;
+    TrailtieConfiguration._appMiddleware = this._prevAppMiddleware;
+    for (const [options, snapshot] of this._prevTrailtieOptions ?? []) {
+      for (const key of Object.keys(options)) if (!(key in snapshot)) delete options[key];
+      Object.assign(options, snapshot);
+    }
     await FileUtils.rmRfAsync(await this.tmpPath());
   }
 
