@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   Dir,
+  env,
+  setEnv,
   FileUtils,
   getFs,
   getOsAsync,
@@ -31,6 +33,7 @@ import {
 } from "@blazetrails/actionpack";
 import {
   ActiveRecord,
+  ActiveRecordError,
   Base,
   LogSubscriber,
   Migration,
@@ -333,6 +336,73 @@ describe("RailtieTest (trails-only)", () => {
 
       expect(booted.tagsFormatter).toBe("sqlcommenter");
     });
+  });
+});
+
+describe("ActiveRecord::Railtie active_record.define_attribute_methods", () => {
+  const defineFor = async (
+    checkSchemaCacheDumpVersion: boolean,
+    isCached: (tableName: string) => Promise<boolean | null>,
+  ): Promise<string[]> => {
+    const saved = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
+    const trailsEnv = env.TRAILS_ENV;
+    const defined: string[] = [];
+    const model = {
+      tableName: "posts",
+      connectionPool: () => ({ schemaReflection: { isCached } }),
+      defineAttributeMethods: () => defined.push("posts"),
+    };
+    try {
+      resetLoadHooks();
+      setEnv("TRAILS_ENV", "production");
+      _resetTrailsEnv();
+      Trailtie.config.set("activeRecord", { ...saved, checkSchemaCacheDumpVersion });
+      const app = {
+        ...blogApp(),
+        config: Object.assign(new Configuration("/nonexistent-app"), {
+          filterParameters: [],
+          eagerLoad: true,
+        }),
+      };
+      const initializer = Trailtie.initializers.find(
+        (i) => i.name === "active_record.define_attribute_methods",
+      )!;
+      await initializer.bind(Trailtie.instance()).run(app);
+      await runLoadHooks("after_initialize", app);
+      await runLoadHooks("active_record", { descendants: [model] });
+    } finally {
+      Trailtie.config.set("activeRecord", saved);
+      setEnv("TRAILS_ENV", trailsEnv);
+      _resetTrailsEnv();
+      resetLoadHooks();
+    }
+    return defined;
+  };
+
+  it("defines attribute methods for a cached table when check_schema_cache_dump_version=false", async () => {
+    expect(await defineFor(false, async () => true)).toEqual(["posts"]);
+  });
+
+  it("skips a table the schema cache does not hold", async () => {
+    expect(await defineFor(false, async () => null)).toEqual([]);
+  });
+
+  it("skips every model when check_schema_cache_dump_version=true", async () => {
+    expect(await defineFor(true, async () => true)).toEqual([]);
+  });
+
+  it("warns instead of raising on an ActiveRecordError", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await defineFor(false, async () => {
+        throw new ActiveRecordError("database is down");
+      });
+      expect(warn).toHaveBeenCalledWith(
+        "Failed to define attribute methods because of ActiveRecordError: database is down",
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

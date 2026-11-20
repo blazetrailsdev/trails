@@ -14,12 +14,11 @@ interface TaggedLoggerLike {
   popTags?(count?: number): string[];
 }
 
-export class Logger extends LogSubscriber {
+export class Logger {
   private app: RackApp | { call: RackApp };
   private taggers: Tagger[];
 
   constructor(app: RackApp | { call: RackApp }, taggers: Tagger[] | null = null) {
-    super();
     this.app = app;
     this.taggers = taggers ?? [];
   }
@@ -77,7 +76,7 @@ export class Logger extends LogSubscriber {
     });
   }
 
-  override get logger(): ActiveSupportLogger | null {
+  get logger(): ActiveSupportLogger | null {
     return Trails.logger;
   }
 
