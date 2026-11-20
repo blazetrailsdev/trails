@@ -21,20 +21,27 @@ describe("TestUnit::Generators::ScaffoldGenerator", () => {
 
   it("names the fixture after the engine namespace and includes the engine's url helpers inside a mountable engine", async () => {
     Generators.namespace = { name: "Bukkits" };
-    const root = Dir.mktmpdir();
-    setEngineRoot(root);
-    const out = await generate("post");
-    const test = File.read(File.join(out, "test/controllers/bukkits/posts-controller.test.ts"));
-    expect(test).toContain('await this.bukkitsPosts("one")');
-    expect(test).toContain(
-      'include(this, (constGet(Object, "Bukkits::Engine") as Engine).routes().urlHelpers());',
+    setEngineRoot(Dir.mktmpdir());
+    const out = await generate("product_line");
+    const test = File.read(
+      File.join(out, "test/controllers/bukkits/product-lines-controller.test.ts"),
     );
+    expect(test).toContain('import { Bukkits } from "../../../lib/bukkits/engine.js";');
+    expect(test).toContain(
+      'import { ProductLine } from "../../../app/models/bukkits/product_line.js";',
+    );
+    expect(test).toContain(
+      'constSet(constGet(Object, "Bukkits") as object, "ProductLinesControllerTest", this);',
+    );
+    expect(test).toContain("include(this, Bukkits.Engine.routes().urlHelpers());");
+    expect(test).toContain('await this.bukkits_product_lines("one")');
+    expect(test).toContain('describe("Bukkits::ProductLinesControllerTest"');
   });
 
   it("names the fixture after the table outside an engine", async () => {
-    const out = await generate("post");
-    const test = File.read(File.join(out, "test/controllers/posts-controller.test.ts"));
-    expect(test).toContain('await this.posts("one")');
+    const out = await generate("product_line");
+    const test = File.read(File.join(out, "test/controllers/product-lines-controller.test.ts"));
+    expect(test).toContain('await this.product_lines("one")');
     expect(test).not.toContain("urlHelpers");
   });
 });

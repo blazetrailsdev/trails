@@ -3,25 +3,34 @@ import type { ScaffoldGenerator } from "./scaffold-generator.js";
 type Template = (this: ScaffoldGenerator) => string;
 
 function header(this: ScaffoldGenerator) {
+  const namespaceDirs = this["isNamespaced"]() ? this["namespaceDirs"]() : [];
+  const namespace = namespaceDirs.length > 0 ? this["namespace"]()!.name : "";
   const testClassName = `${this.controllerClassName().split("::").pop()}ControllerTest`;
-  const testPath = `${this.controllerClassName()}ControllerTest`;
-  const namespace = this.controllerClassName().split("::").slice(0, -1).join("::");
-  const owner = namespace === "" ? "TopLevel" : `constGet(Object, "${namespace}") as object`;
+  const modulePath = [namespace, ...this.controllerClassName().split("::").slice(0, -1)]
+    .filter((m) => m !== "")
+    .join("::");
+  const testPath = [modulePath, testClassName].filter((m) => m !== "").join("::");
+  const owner = modulePath === "" ? "TopLevel" : `constGet(Object, "${modulePath}") as object`;
   const modelClassName = this.className().split("::").pop();
   const singular = this.singularTableName();
   const fixtureName = this.fixtureName();
+  const root = "../".repeat(namespaceDirs.length + this.controllerClassPath().length + 1);
   const mountable = this["isMountableEngine"]();
-  const engine = mountable
-    ? `
-    include(this, (constGet(Object, "${this["namespace"]()!.name}::Engine") as Engine).routes().urlHelpers());
+  const engineImport = mountable
+    ? `import { include } from "@blazetrails/activesupport";
+import { ${namespace.split("::")[0]} } from "../${root}lib/${namespaceDirs.join("/")}/engine.js";
 `
     : "";
-  const root = "../".repeat(this.controllerClassPath().length + 1);
+  const engine = mountable
+    ? `
+    include(this, ${namespace.replaceAll("::", ".")}.Engine.routes().urlHelpers());
+`
+    : "";
   const preamble = `import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
-${mountable ? 'import { include } from "@blazetrails/activesupport";\nimport type { Engine } from "@blazetrails/trailties";\n' : ""}import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
+${engineImport}import { ${modelClassName} } from "../${root}app/models/${[...namespaceDirs, this.filePath()].join("/")}.js";
 import "${root}test-helper.js";
 
 export class ${testClassName} extends IntegrationTest {

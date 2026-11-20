@@ -1,7 +1,6 @@
 import "../../../constants.test-unit-scaffold-scaffold-generator.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rails::Generators::ResourceHelpers` (`test_unit/scaffold/scaffold_generator.rb:9`); the class/interface merge is how a mixin surfaces on the type side. */
 import {
-  camelize,
   include,
   type Included,
   pluralize,
@@ -94,7 +93,7 @@ export class ScaffoldGenerator extends Base {
 
   fixtureName(): string {
     return (this._fixtureName ??= this.isMountableEngine()
-      ? camelize([...this.namespaceDirs(), this.tableName()].join("_"), false)
+      ? [...this.namespaceDirs(), this.tableName()].join("_")
       : this.tableName());
   }
 
