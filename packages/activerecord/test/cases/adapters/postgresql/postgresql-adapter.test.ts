@@ -745,7 +745,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("logs warnings when behaviour log", async () => {
       await self().withDbWarningsAction("log", undefined, async () => {
         const sqlWarning = "[ActiveRecord::SQLWarning] PostgreSQL SQL warning (01000)";
-        const logger = { warn: vi.fn() };
+        const logger = { isDebug: () => false, isInfo: () => false, warn: vi.fn() };
         const previousLogger = Base.logger;
         Base.logger = logger as never;
         try {

@@ -14,11 +14,11 @@ export const ReloadedClassesFiltering = {
   },
 
   get descendants(): AnyClass[] {
-    const subclasses = (this as unknown as { subclasses: AnyClass[] }).subclasses;
+    const subclasses = this.subclasses;
     return DescendantsTracker.rejectBang(
       subclasses.concat(
         subclasses.flatMap(
-          (klass) => (klass as unknown as { descendants: AnyClass[] }).descendants,
+          (klass) => (klass as AnyClass & { descendants: AnyClass[] }).descendants,
         ),
       ),
     );

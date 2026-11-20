@@ -15,6 +15,7 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { MockLogger } from "@blazetrails/activesupport/log-subscriber/test-helper";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   embedAuthenticityTokenInRemoteForms,
@@ -312,34 +313,6 @@ CustomCsrfTokenStorageStrategyController.protectFromForgery({
   with: "reset_session",
   store: new CustomCsrfTokenStorageStrategyController.CustomStrategy(),
 });
-
-class MockLogger {
-  private _logged = new Map<string, string[]>();
-
-  logged(level: string): string[] {
-    return this._logged.get(level) ?? [];
-  }
-
-  debug(message: string): void {
-    this.add("debug", message);
-  }
-
-  info(message: string): void {
-    this.add("info", message);
-  }
-
-  warn(message: string): void {
-    this.add("warn", message);
-  }
-
-  error(message: string): void {
-    this.add("error", message);
-  }
-
-  private add(level: string, message: string): void {
-    this._logged.set(level, [...this.logged(level), message]);
-  }
-}
 
 type CsrfPrivate = { formAuthenticityToken(): string };
 
@@ -745,7 +718,7 @@ function RequestForgeryProtectionTests(
         );
       });
 
-      expect(logger.logged("warn").at(-1)).toMatch(
+      expect(logger.logged(":warn").at(-1)).toMatch(
         "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
       );
     } finally {
@@ -761,8 +734,8 @@ function RequestForgeryProtectionTests(
     try {
       await assertBlocked(() => tc.post("index"));
 
-      expect(logger.logged("warn").length).toBe(1);
-      expect(logger.logged("warn").at(-1)).toMatch(/CSRF token authenticity/);
+      expect(logger.logged(":warn").length).toBe(1);
+      expect(logger.logged(":warn").at(-1)).toMatch(/CSRF token authenticity/);
     } finally {
       Base.logger = oldLogger;
     }
@@ -777,7 +750,7 @@ function RequestForgeryProtectionTests(
     try {
       await assertBlocked(() => tc.post("index"));
 
-      expect(logger.logged("warn").length).toBe(0);
+      expect(logger.logged(":warn").length).toBe(0);
     } finally {
       Base.logger = oldLogger;
       Base.logWarningOnCsrfFailure = true;
@@ -813,8 +786,8 @@ function RequestForgeryProtectionTests(
     try {
       await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
 
-      expect(logger.logged("warn").length).toBe(1);
-      expect(logger.logged("warn").at(-1)).toMatch(
+      expect(logger.logged(":warn").length).toBe(1);
+      expect(logger.logged(":warn").at(-1)).toMatch(
         /<script> tag on another site requested protected JavaScript/,
       );
     } finally {
@@ -831,7 +804,7 @@ function RequestForgeryProtectionTests(
     try {
       await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
 
-      expect(logger.logged("warn").length).toBe(0);
+      expect(logger.logged(":warn").length).toBe(0);
     } finally {
       Base.logger = oldLogger;
       Base.logWarningOnCsrfFailure = true;
@@ -1138,7 +1111,7 @@ describe("CustomAuthenticityParamControllerTest", () => {
       .mockReturnValue(true);
     try {
       await tc.post("index", { params: { custom_token_name: "foobar" } });
-      expect(logger.logged("warn").length).toBe(0);
+      expect(logger.logged(":warn").length).toBe(0);
     } finally {
       stub.mockRestore();
     }
@@ -1147,7 +1120,7 @@ describe("CustomAuthenticityParamControllerTest", () => {
   it("should warn if form authenticity param does not match form authenticity token", async () => {
     Base.logger = logger as never;
     await tc.post("index", { params: { custom_token_name: "bazqux" } });
-    expect(logger.logged("warn").length).toBe(1);
+    expect(logger.logged(":warn").length).toBe(1);
   });
 });
 

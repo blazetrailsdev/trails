@@ -256,7 +256,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
       await adapter.execute(
         `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
       );
-      const logger = { warn: vi.fn() };
+      const logger = { isDebug: () => false, isInfo: () => false, warn: vi.fn() };
       Base.logger = logger as never;
       await self().withDbWarningsAction("log", undefined, async () => {
         await adapter.execute(`SET SESSION sql_mode=''`);

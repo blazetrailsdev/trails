@@ -294,7 +294,7 @@ describe("StreamingTemplateRenderer", () => {
 
       const fatal = vi.fn();
       const oldLogger = Base.logger;
-      Base.logger = { fatal };
+      Base.logger = { isDebug: () => false, fatal };
       try {
         const renderer = new StreamingTemplateRenderer(lc);
         const chunks = await collectChunks(
@@ -361,7 +361,7 @@ describe("StreamingTemplateRenderer", () => {
 
       const fatal = vi.fn();
       const oldLogger = Base.logger;
-      Base.logger = { fatal };
+      Base.logger = { isDebug: () => false, fatal };
       try {
         await collectChunks(body);
       } finally {
