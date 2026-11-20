@@ -1,5 +1,10 @@
 import { SQLite3 } from "./namespaces.js";
 
+const DEBUG = 0x00001;
+const ANALYZE_TABLES = 0x00002;
+const LIMIT_ANALYZE = 0x00010;
+const CHECK_ALL_TABLES = 0x10000;
+
 export const Constants = {
   Open: {
     READWRITE: 0x00000002,
@@ -37,11 +42,11 @@ export const Constants = {
     DONE: 101,
   },
   Optimize: {
-    DEBUG: 0x00001,
-    ANALYZE_TABLES: 0x00002,
-    LIMIT_ANALYZE: 0x00010,
-    CHECK_ALL_TABLES: 0x10000,
-    DEFAULT: 0x00002 | 0x00010,
+    DEBUG,
+    ANALYZE_TABLES,
+    LIMIT_ANALYZE,
+    CHECK_ALL_TABLES,
+    DEFAULT: ANALYZE_TABLES | LIMIT_ANALYZE,
   },
 } as const;
 
