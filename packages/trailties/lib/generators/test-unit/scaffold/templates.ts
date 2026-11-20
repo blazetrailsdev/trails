@@ -150,18 +150,6 @@ const systemTest: Template = function () {
   const indexUrl = `${camelize(`${plural}_url`, false)}`;
   const showUrl = `${camelize(`${singular}_url`, false)}`;
   const root = "../".repeat(this.classPath().length + 1);
-  const fields = (update: boolean) =>
-    Object.entries(this.attributesHash())
-      .map(([attr, value]) => {
-        if (this.isBoolean(attr)) {
-          return `    if (${value}) await page.getByLabel("${humanize(attr)}").check();\n`;
-        } else if (update && (this.isDatetime(attr) || this.isTime(attr))) {
-          return `    await page.getByLabel("${humanize(attr)}").fill(String(${value}));\n`;
-        } else {
-          return `    await page.getByLabel("${humanize(attr)}").fill(${value});\n`;
-        }
-      })
-      .join("");
   return `import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApplicationSystemTestCase } from "${root}application-system-test-case${this.ext()}";
 
@@ -197,7 +185,13 @@ describe("${className}Test", () => {
     await page.goto(t.${indexUrl}());
     await page.getByText("New ${humanName.toLowerCase()}").click();
 
-${fields(false)}    await page.getByText("Create ${humanName}").click();
+${Object.entries(this.attributesHash())
+  .map(([attr, value]) =>
+    this.isBoolean(attr)
+      ? `    if (${value}) await page.getByLabel("${humanize(attr)}").check();\n`
+      : `    await page.getByLabel("${humanize(attr)}").fill(${value});\n`,
+  )
+  .join("")}    await page.getByText("Create ${humanName}").click();
 
     await expect.element(page.getByText("${humanName} was successfully created")).toBeInTheDocument();
     await page.getByText("Back").click();
@@ -208,7 +202,15 @@ ${fields(false)}    await page.getByText("Create ${humanName}").click();
     await page.goto(t.${showUrl}(t["@${singular}"]));
     await page.getByText("Edit this ${humanName.toLowerCase()}").first().click();
 
-${fields(true)}    await page.getByText("Update ${humanName}").click();
+${Object.entries(this.attributesHash())
+  .map(([attr, value]) =>
+    this.isBoolean(attr)
+      ? `    if (${value}) await page.getByLabel("${humanize(attr)}").check();\n`
+      : this.isDatetime(attr) || this.isTime(attr)
+        ? `    await page.getByLabel("${humanize(attr)}").fill(String(${value}));\n`
+        : `    await page.getByLabel("${humanize(attr)}").fill(${value});\n`,
+  )
+  .join("")}    await page.getByText("Update ${humanName}").click();
 
     await expect.element(page.getByText("${humanName} was successfully updated")).toBeInTheDocument();
     await page.getByText("Back").click();
