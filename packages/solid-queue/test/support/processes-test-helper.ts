@@ -1,13 +1,88 @@
 import { expect, vi } from "vitest";
 import { isPresent, TopLevel } from "@blazetrails/activesupport";
-import { SystemExit, Timeout, getProcessAdapter } from "@blazetrails/ruby-compat";
+import {
+  Errno,
+  IO,
+  Process as RbProcess,
+  SystemExit,
+  Timeout,
+  getProcessAdapter,
+  rbFFork,
+} from "@blazetrails/ruby-compat";
 import { Process } from "../../lib/process.js";
+import { SolidQueue } from "../../lib/solid-queue.js";
 import { Record as SolidQueueRecord } from "../../lib/record.js";
 import { Supervisor } from "../../lib/supervisor.js";
 
 export const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
 const dummyRoot = `${import.meta.dirname}/dummy`;
+
+type Status = InstanceType<typeof RbProcess.Status>;
+const SIGNALS: { [signo: number]: string } = { 2: "INT", 3: "QUIT", 9: "KILL", 15: "TERM" };
+const forkedSupervisors = new Set<number>();
+const reaped = new Map<number, Status>();
+
+function forkSupervisor(options: { [key: string]: unknown }, capturedIo: boolean, pipes: IO[]) {
+  const pid = rbFFork(
+    `${import.meta.dirname}/supervisor-fork-entry.js`,
+    {
+      boot: `${dummyRoot}/config/environment.ts`,
+      root: dummyRoot,
+      supervisorPidfile: SolidQueue.supervisorPidfile,
+      options: { skipRecurring: true, ...options },
+      capturedIo,
+    },
+    pipes as Parameters<typeof rbFFork>[2],
+  );
+  forkedSupervisors.add(pid);
+  return pid;
+}
+
+export function runSupervisorAsFork(options: { [key: string]: unknown } = {}): number {
+  return forkSupervisor(options, false, []);
+}
+
+export async function runSupervisorAsForkWithCapturedIo(
+  options: { [key: string]: unknown } = {},
+): Promise<[number, string, string]> {
+  const [reader, writer] = IO.pipe();
+  const pid = forkSupervisor(options, true, [writer]);
+  writer.close();
+  await waitForRegisteredProcesses(4, { timeout: 10 });
+  const err = reader.readNonblock(1 << 20, null, { exception: false });
+  return [pid, "", err instanceof Uint8Array ? new TextDecoder().decode(err) : ""];
+}
+
+export function reapProcesses(): void {
+  try {
+    let waited: [number, Status] | null;
+    while ((waited = RbProcess.waitpid2(-1, RbProcess.WNOHANG)) !== null) {
+      reaped.set(waited[0], waited[1]);
+    }
+  } catch (error) {
+    if (!(error instanceof Errno.ECHILD)) throw error;
+  }
+}
+
+export function isProcessExists(pid: number): boolean {
+  reapProcesses();
+  try {
+    RbProcess.kill(0, pid);
+    return true;
+  } catch (error) {
+    if (error instanceof Errno.ESRCH) return false;
+    throw error;
+  }
+}
+
+async function waitpid2(pid: number): Promise<Status | null> {
+  while (forkedSupervisors.has(pid) ? !reaped.has(pid) : isProcessExists(pid)) {
+    reapProcesses();
+    await sleep(0.01);
+  }
+  return reaped.get(pid) ?? null;
+}
 
 export function runSupervisor(options: { [key: string]: unknown } = {}, block?: () => void) {
   vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
@@ -47,12 +122,16 @@ export function runSupervisor(options: { [key: string]: unknown } = {}, block?: 
 }
 
 export function signalProcess(
-  pid: ReturnType<typeof runSupervisor>,
+  pid: number | ReturnType<typeof runSupervisor>,
   signal: "TERM" | "INT" | "QUIT" | "KILL",
   { wait = null }: { wait?: number | null } = {},
 ) {
   return (async () => {
     if (wait != null) await sleep(wait);
+    if (typeof pid === "number") {
+      RbProcess.kill(signal, pid);
+      return;
+    }
     const supervisor = pid.supervisor;
     supervisor.signalQueue().push(signal);
     await supervisor.interrupt();
@@ -127,20 +206,44 @@ export function findProcessesRegisteredAs(kind: string) {
 }
 
 export async function terminateProcess(
-  pid: ReturnType<typeof runSupervisor>,
-  { timeout = 10, signal = "TERM" }: { timeout?: number; signal?: "TERM" | "INT" | "QUIT" } = {},
+  pid: number | ReturnType<typeof runSupervisor>,
+  {
+    timeout = 10,
+    signal = "TERM",
+  }: { timeout?: number; signal?: "TERM" | "INT" | "QUIT" | "KILL" } = {},
 ) {
   await signalProcess(pid, signal);
-  await waitForProcessTerminationWithTimeout(pid, { timeout });
+  await waitForProcessTerminationWithTimeout(pid, { timeout, signaled: signal });
 }
 
 export async function waitForProcessTerminationWithTimeout(
-  run: ReturnType<typeof runSupervisor>,
-  { timeout = 10, exitstatus = 0 }: { timeout?: number; exitstatus?: number | null } = {},
+  run: number | ReturnType<typeof runSupervisor>,
+  {
+    timeout = 10,
+    exitstatus = 0,
+    signaled = null,
+  }: { timeout?: number; exitstatus?: number | null; signaled?: string | null } = {},
 ) {
   try {
     await Timeout.timeout(timeout, null, null, async () => {
-      if (run.isExists) {
+      if (typeof run === "number") {
+        if (isProcessExists(run) || reaped.has(run)) {
+          const status = await waitpid2(run);
+          if (status === null) return;
+          if (status.exitstatus() != null && exitstatus != null) {
+            expect(
+              status.exitstatus(),
+              `Expected pid ${run} to exit with status ${exitstatus}`,
+            ).toEqual(exitstatus);
+          }
+          if (status.termsig() != null) {
+            expect(
+              SIGNALS[status.termsig()!],
+              `Expected pid ${run} to be terminated with signal ${signaled}`,
+            ).toEqual(signaled);
+          }
+        }
+      } else if (run.isExists) {
         const error = await run.terminate().then(
           () => null,
           (e: unknown) => e,

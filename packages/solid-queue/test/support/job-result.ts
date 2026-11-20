@@ -1,4 +1,4 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, exitBang, TopLevel } from "@blazetrails/ruby-compat";
 import { include, type Included } from "@blazetrails/activesupport";
 import { GlobalID, Identification } from "@blazetrails/globalid";
 import { ApplicationRecord } from "./application-record.js";
@@ -28,7 +28,13 @@ export class StoreResultJob extends ApplicationJob {
       status = "completed",
       pause = null,
       exception = null,
-    }: { status?: string; pause?: number | null; exception?: (new () => Error) | null } = {},
+      exitValue = null,
+    }: {
+      status?: string;
+      pause?: number | null;
+      exception?: (new () => Error) | null;
+      exitValue?: number | null;
+    } = {},
   ): Promise<void> {
     const result = await JobResult.createBang({
       queue_name: this.queueName,
@@ -38,6 +44,7 @@ export class StoreResultJob extends ApplicationJob {
 
     if (pause != null) await new Promise((resolve) => setTimeout(resolve, pause * 1000));
     if (exception != null) throw new exception();
+    if (exitValue != null) exitBang(exitValue);
 
     await result.updateBang({ status });
   }
