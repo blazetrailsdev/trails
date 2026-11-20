@@ -22,13 +22,15 @@ export class Session {
       : Time.at(0);
   }
 
-  lastWriteTimestamp(): Time {
-    return Session.convertTimestampToTime(this.session.get("lastWrite") as number | undefined);
+  async lastWriteTimestamp(): Promise<Time> {
+    return Session.convertTimestampToTime(
+      (await this.session.get("lastWrite")) as number | undefined,
+    );
   }
 
-  updateLastWriteTimestamp(): number {
+  async updateLastWriteTimestamp(): Promise<number> {
     const lastWrite = Session.convertTimeToTimestamp(Time.now());
-    this.session.set("lastWrite", lastWrite);
+    await this.session.set("lastWrite", lastWrite);
     return lastWrite;
   }
 

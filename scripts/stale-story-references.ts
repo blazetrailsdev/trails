@@ -36,7 +36,6 @@ const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "vendor", "__snapshot
 const SOURCE_ROOTS = ["packages", "scripts", "eslint"];
 
 const MARKDOWN_SKIP_DIRS = new Set([...SKIP_DIRS, "tasks"]);
-const FROZEN_MARKDOWN_TREES = [path.join("docs", "activerecord")];
 
 // Its test states a stale promise verbatim as a fixture, and the line-based
 // scan reads that template literal as a real comment.
@@ -158,9 +157,7 @@ export async function collectSourceFiles(
  * checkout of the tasks repo (a symlink in agent worktrees, so it is never
  * walked as a directory anyway; the name is excluded so a plain checkout
  * behaves the same way) whose story files legitimately cite landed stories as
- * dependencies and provenance. The frozen trees are left to
- * `collectFrozenMarkdownFiles` — a finding there could not be resolved by
- * correcting the prose, so it is inventoried rather than gated.
+ * dependencies and provenance.
  */
 export async function collectMarkdownFiles(
   root: string,
@@ -176,7 +173,6 @@ export async function collectMarkdownFiles(
   for (const entry of entries) {
     const abs = path.join(dir, entry.name);
     const rel = path.relative(root, abs);
-    if (FROZEN_MARKDOWN_TREES.includes(rel)) continue;
     if (entry.isDirectory()) {
       if (!MARKDOWN_SKIP_DIRS.has(entry.name)) await collectMarkdownFiles(root, abs, acc);
     } else if (entry.name.endsWith(".md")) {
@@ -184,35 +180,6 @@ export async function collectMarkdownFiles(
     }
   }
   return acc;
-}
-
-/**
- * Repo-relative `.md` paths under the frozen trees `collectMarkdownFiles`
- * leaves out — the population the inventory covers.
- */
-export async function collectFrozenMarkdownFiles(root: string): Promise<string[]> {
-  const acc: string[] = [];
-  for (const tree of FROZEN_MARKDOWN_TREES) {
-    await collectMarkdownFiles(root, path.join(root, tree), acc);
-  }
-  return acc;
-}
-
-/**
- * Every pending citation in the frozen trees — `docs/activerecord/`, frozen by
- * RFC 0011 Phase 4, whose prose CI's `Docs ActiveRecord Freeze` job forbids
- * editing. This is an inventory, not a gate: a finding here has no legal fix,
- * so it is a note for the freeze cutover rather than a failure. Kept out of
- * `scanStoryReferences` so the hard gate stays scoped to the editable tree.
- */
-export async function scanFrozenStoryReferences(repoRoot: string): Promise<StoryReference[]> {
-  const refs: StoryReference[] = [];
-  for (const file of await collectFrozenMarkdownFiles(repoRoot)) {
-    refs.push(
-      ...extractMarkdownStoryReferences(await readFile(path.join(repoRoot, file), "utf8"), file),
-    );
-  }
-  return refs;
 }
 
 /** Every pending citation in the source roots this check covers. */

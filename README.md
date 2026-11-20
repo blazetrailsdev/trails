@@ -513,7 +513,7 @@ Post.where("created_at > ?", Temporal.Instant.from("2020-01-01T00:00:00Z")).toSq
 
 The longer guide is [Trails Idioms](packages/website/docs/guides/idioms.md).
 The places where trails diverges from Rails on purpose, and why, are catalogued
-per package on the [package pages](https://blazetrailsdev.github.io/trails/docs/packages/), generated from each package's
+per package on the [package pages](https://blazetrails.dev/docs/packages/), generated from each package's
 ratified `CLAUDE.md` sections.
 
 ### Database adapters
@@ -559,8 +559,7 @@ What the schema-driven typing covers today, checked against the app above:
   with other scopes.
 
 The `trails-tsc` language-service plugin in the generated `tsconfig.json` covers
-`.tse` views only. Editor support for model virtualization is tracked in
-[docs/infrastructure/virtual-source-files-plan.md](docs/infrastructure/virtual-source-files-plan.md).
+`.tse` views only. Editor support for model virtualization is not built yet.
 
 Outside a trailties app, dump the schema from a live database with
 `ar db:schema:dump`, then point `trails-tsc --schema db/schema.ts` at it. See

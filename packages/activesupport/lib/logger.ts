@@ -1,6 +1,7 @@
 import {
   Logger as RubyLogger,
   rbInspect,
+  rbObjRespondTo,
   stdout,
   type Logdev,
   type LoggerKwargs,
@@ -74,9 +75,7 @@ export class Logger extends RubyLogger {
 
   private static normalizeSources(sources: unknown[]): unknown[] {
     return sources.map((source) => {
-      if (typeof (source as { path?: unknown })?.path === "string") {
-        source = (source as { path: string }).path;
-      }
+      if (rbObjRespondTo(source, "path")) source = (source as { path(): unknown }).path();
       if (typeof source === "string" && File.isExist(source)) source = File.realpath(source);
       return source;
     });

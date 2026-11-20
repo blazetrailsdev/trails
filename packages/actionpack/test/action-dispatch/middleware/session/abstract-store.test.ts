@@ -137,7 +137,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       const store = new WritingStore(undefined, { expireAfter: 60 });
       const req: any = new Request({});
       await (store as any).prepareSession(req);
-      req.session.set("user", 1);
+      await req.session.set("user", 1);
 
       const before = Date.now();
       await (store as any).commitSession(req, { setCookie: () => {} });

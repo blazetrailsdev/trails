@@ -7,8 +7,8 @@ import { Base } from "../../base.js";
 import { readingRole, writingRole } from "../../active-record.js";
 
 export interface ResolverContext {
-  lastWriteTimestamp(): Time;
-  updateLastWriteTimestamp(): void;
+  lastWriteTimestamp(): Time | Promise<Time>;
+  updateLastWriteTimestamp(): unknown;
   save(response: unknown): void;
 }
 
@@ -38,7 +38,7 @@ export class Resolver {
   }
 
   async read<T>(blk: () => T | Promise<T>): Promise<T> {
-    if (this.isReadFromPrimary()) {
+    if (await this.isReadFromPrimary()) {
       return this.readFromPrimary(blk);
     } else {
       return this.readFromReplica(blk);
@@ -62,12 +62,12 @@ export class Resolver {
     return this.delay;
   }
 
-  private isReadFromPrimary(): boolean {
-    return !this.isTimeSinceLastWriteOk();
+  private async isReadFromPrimary(): Promise<boolean> {
+    return !(await this.isTimeSinceLastWriteOk());
   }
 
-  private isTimeSinceLastWriteOk(): boolean {
-    const elapsed = Time.now().minus(this.context.lastWriteTimestamp());
+  private async isTimeSinceLastWriteOk(): Promise<boolean> {
+    const elapsed = Time.now().minus(await this.context.lastWriteTimestamp());
     const sendToReplicaDelay = this.sendToReplicaDelay();
     return rbCmpint(cmp(elapsed, sendToReplicaDelay), elapsed, sendToReplicaDelay) >= 0;
   }
@@ -101,7 +101,7 @@ export class Resolver {
           try {
             return await blk();
           } finally {
-            this.context.updateLastWriteTimestamp();
+            await this.context.updateLastWriteTimestamp();
           }
         },
       ),

@@ -84,8 +84,7 @@
     "better-sqlite3": "^13.0.3",
     "expo-sqlite": "^15.0.0 || ^16.0.0 || ^58.0.0",
     "libsql": "^0.5.29",
-    "mysql2": "^3.18.2",
-    "pg": "^8.19.0"
+    "mysql2": "^3.18.2"
   },
   "peerDependenciesMeta": {
     "@blazetrails/activejob": {
@@ -108,9 +107,6 @@
     },
     "mysql2": {
       "optional": true
-    },
-    "pg": {
-      "optional": true
     }
   },
   "files": [
@@ -126,6 +122,7 @@
     "@blazetrails/pg": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
+    "pg": "^8.19.0",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "engines": {

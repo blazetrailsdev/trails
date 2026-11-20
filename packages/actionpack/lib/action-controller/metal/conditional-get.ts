@@ -62,11 +62,11 @@ export async function freshWhen(
 
   if (strongEtag != null && strongEtag !== false) {
     this.response.strongEtag(
-      this.combineEtags(strongEtag, { lastModified, public: public_, template }),
+      await this.combineEtags(strongEtag, { lastModified, public: public_, template }),
     );
   } else if ((weakEtag != null && weakEtag !== false) || (template != null && template !== false)) {
     this.response.weakEtag(
-      this.combineEtags(weakEtag, { lastModified, public: public_, template }),
+      await this.combineEtags(weakEtag, { lastModified, public: public_, template }),
     );
   }
 
@@ -157,14 +157,14 @@ Concern.included.call(ConditionalGet, null, function (this: object) {
 });
 
 /** @internal */
-export function combineEtags(
+export async function combineEtags(
   this: { etaggers: Etagger[] },
   validator: unknown,
   options: Record<string, unknown> = {},
-): unknown[] {
-  return [validator, ...this.etaggers.map((etagger) => etagger.call(this, options))].filter(
-    (e) => e !== null && e !== undefined,
-  );
+): Promise<unknown[]> {
+  const etags: unknown[] = [];
+  for (const etagger of this.etaggers) etags.push(await etagger.call(this, options));
+  return [validator, ...etags].filter((e) => e !== null && e !== undefined);
 }
 
 ActionController.ConditionalGet = ConditionalGet;

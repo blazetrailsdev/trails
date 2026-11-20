@@ -313,7 +313,7 @@ The two worked examples:
   names `fixtures({ … })` the canonical test surface. The row went stale and the
   tests stayed out of the denominator anyway. That is the failure mode this
   section exists to prevent — the registry grew from 18 entries in May 2026 to
-  ~200 in August (`docs/infrastructure/parity-convergence-forecast.md`, Part 1).
+  ~200 in August (the tasks repo's `archive/trails-docs/infrastructure/parity-convergence-forecast.md`, Part 1).
 
 When a _specific_ Rails case is genuinely unportable — it exercises a Ruby-only
 mechanism inside an otherwise ported file — exclude that case with a

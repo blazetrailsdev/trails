@@ -16,7 +16,7 @@ class Host {
 let klass: typeof Host;
 let controller: Host;
 const etag = (etagger: Etagger): void => klass.etag(etagger);
-const combineEtags = (validator: unknown, options?: Record<string, unknown>): unknown[] =>
+const combineEtags = (validator: unknown, options?: Record<string, unknown>): Promise<unknown[]> =>
   controller.combineEtags(validator, options);
 
 beforeEach(() => {
@@ -26,63 +26,63 @@ beforeEach(() => {
 });
 
 describe("combineEtags", () => {
-  it("returns [validator] when no etaggers are registered", () => {
-    expect(combineEtags("abc")).toEqual(["abc"]);
+  it("returns [validator] when no etaggers are registered", async () => {
+    expect(await combineEtags("abc")).toEqual(["abc"]);
   });
 
-  it("filters out undefined validator", () => {
-    expect(combineEtags(undefined)).toEqual([]);
+  it("filters out undefined validator", async () => {
+    expect(await combineEtags(undefined)).toEqual([]);
   });
 
-  it("appends etagger results to validator", () => {
+  it("appends etagger results to validator", async () => {
     etag(() => "etag1");
-    expect(combineEtags("validator", { public: true })).toEqual(["validator", "etag1"]);
+    expect(await combineEtags("validator", { public: true })).toEqual(["validator", "etag1"]);
   });
 
-  it("passes options to each etagger", () => {
+  it("passes options to each etagger", async () => {
     etag((opts) => `val-${String(opts.public)}`);
-    expect(combineEtags("v", { public: true })).toEqual(["v", "val-true"]);
+    expect(await combineEtags("v", { public: true })).toEqual(["v", "val-true"]);
   });
 
-  it("filters out undefined returns from etaggers", () => {
+  it("filters out undefined returns from etaggers", async () => {
     etag(() => "etag1");
     etag(() => undefined);
     etag(() => "etag2");
-    expect(combineEtags("v")).toEqual(["v", "etag1", "etag2"]);
+    expect(await combineEtags("v")).toEqual(["v", "etag1", "etag2"]);
   });
 
-  it("combines multiple etaggers", () => {
+  it("combines multiple etaggers", async () => {
     etag(() => "etag1");
     etag(() => "etag2");
-    expect(combineEtags("validator")).toEqual(["validator", "etag1", "etag2"]);
+    expect(await combineEtags("validator")).toEqual(["validator", "etag1", "etag2"]);
   });
 
-  it("returns only etagger results when validator is undefined", () => {
+  it("returns only etagger results when validator is undefined", async () => {
     etag(() => "etag1");
-    expect(combineEtags(undefined)).toEqual(["etag1"]);
+    expect(await combineEtags(undefined)).toEqual(["etag1"]);
   });
 
-  it("preserves empty-string etags (Ruby compact only drops nil)", () => {
+  it("preserves empty-string etags (Ruby compact only drops nil)", async () => {
     etag(() => "");
     etag(() => undefined);
     etag(() => "real");
-    expect(combineEtags("v")).toEqual(["v", "", "real"]);
+    expect(await combineEtags("v")).toEqual(["v", "", "real"]);
   });
 
-  it("binds the controller as `this` when invoking each etagger (mirrors Rails instance_exec)", () => {
+  it("binds the controller as `this` when invoking each etagger (mirrors Rails instance_exec)", async () => {
     const etagger = vi.fn(function () {
       return "etag-from-controller";
     });
     etag(etagger);
-    expect(combineEtags("v")).toEqual(["v", "etag-from-controller"]);
+    expect(await combineEtags("v")).toEqual(["v", "etag-from-controller"]);
     expect(etagger.mock.contexts[0]).toBe(controller);
   });
 
-  it("etag writes are local to the class that writes", () => {
+  it("etag writes are local to the class that writes", async () => {
     etag(() => "parent");
     const child = class extends klass {};
     child.etag(() => "child");
-    expect(new child().combineEtags("v")).toEqual(["v", "parent", "child"]);
-    expect(combineEtags("v")).toEqual(["v", "parent"]);
+    expect(await new child().combineEtags("v")).toEqual(["v", "parent", "child"]);
+    expect(await combineEtags("v")).toEqual(["v", "parent"]);
   });
 });

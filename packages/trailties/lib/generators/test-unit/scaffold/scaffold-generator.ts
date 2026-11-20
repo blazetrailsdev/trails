@@ -87,12 +87,14 @@ export class ScaffoldGenerator extends Base {
         ...this.controllerClassPath(),
         `${dasherize(this.controllerFileName)}-controller.test${this.ext()}`,
       ),
-      TEMPLATES[templateFile].call(this),
+      await this.insideTemplate(async () => TEMPLATES[templateFile].call(this)),
     );
   }
 
   fixtureName(): string {
-    return (this._fixtureName ??= this.tableName());
+    return (this._fixtureName ??= this.isMountableEngine()
+      ? [...this.namespaceDirs(), this.tableName()].join("_")
+      : this.tableName());
   }
 
   /** @internal */

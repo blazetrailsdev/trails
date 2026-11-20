@@ -107,11 +107,11 @@ describe("FileStoreTest", () => {
 
     await store.write(submaximalKey + "AB", "value");
     await store.deleteMatched(/AB/);
-    assertNot(await store.exist(submaximalKey + "AB"));
+    assertNot(await store.isExist(submaximalKey + "AB"));
 
     await store.write(submaximalKey + "/A", "value");
     await store.deleteMatched(/A/);
-    assertNot(await store.exist(submaximalKey + "/A"));
+    assertNot(await store.isExist(submaximalKey + "/A"));
   });
 
   it("delete matched when cache directory does not exist", async () => {
@@ -191,9 +191,9 @@ describe("FileStoreTest", () => {
     const now = vi.spyOn(Time, "now").mockReturnValue(time.plus(15));
     try {
       await store.cleanup();
-      assertNot(await store.exist("foo"));
-      assert(await store.exist("baz"));
-      assert(await store.exist("quux"));
+      assertNot(await store.isExist("foo"));
+      assert(await store.isExist("baz"));
+      assert(await store.isExist("quux"));
       expect(readdirSync(cacheDir).length).toEqual(2);
     } finally {
       now.mockRestore();

@@ -270,7 +270,7 @@ SkipProtectionWhenUnprotectedController.skipForgeryProtection();
 
 class CookieCsrfTokenStorageStrategyController extends Base {
   async reset(): Promise<void> {
-    this.resetCsrfToken(this.request);
+    await this.resetCsrfToken(this.request);
     await this.head(":ok");
   }
 
@@ -279,8 +279,8 @@ class CookieCsrfTokenStorageStrategyController extends Base {
   }
 
   /** @internal */
-  private commitToken(): void {
-    this.request.commitCsrfToken();
+  private async commitToken(): Promise<void> {
+    await this.request.commitCsrfToken();
   }
 }
 include(CookieCsrfTokenStorageStrategyController, RequestForgeryProtectionActions);
@@ -351,7 +351,7 @@ function RequestForgeryProtectionTests(
   overrides: {
     testCase?: new (name: string) => TestCase;
     setup?: (tc: TestCase) => void;
-    initializeCsrfToken?: (tc: TestCase, token: string) => void;
+    initializeCsrfToken?: (tc: TestCase, token: string) => void | Promise<void>;
     assertNotBlocked?: (tc: TestCase, block: () => Promise<unknown>) => Promise<void>;
   } = {},
 ) {
@@ -570,7 +570,7 @@ function RequestForgeryProtectionTests(
   });
 
   it("should allow post with token", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     await stub(
       tc.controller as unknown as CsrfPrivate,
       "formAuthenticityToken",
@@ -587,7 +587,7 @@ function RequestForgeryProtectionTests(
   it("should allow post with strict encoded token", async () => {
     const tokenLength = Math.ceil((32 * 4.0) / 3);
     const tokenIncludingUrlUnsafeChars = "+/".padEnd(tokenLength, "A");
-    initializeCsrfToken(tokenIncludingUrlUnsafeChars);
+    await initializeCsrfToken(tokenIncludingUrlUnsafeChars);
     await stub(
       tc.controller as unknown as CsrfPrivate,
       "formAuthenticityToken",
@@ -602,7 +602,7 @@ function RequestForgeryProtectionTests(
   });
 
   it("should allow patch with token", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     await stub(
       tc.controller as unknown as CsrfPrivate,
       "formAuthenticityToken",
@@ -617,7 +617,7 @@ function RequestForgeryProtectionTests(
   });
 
   it("should allow put with token", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     await stub(
       tc.controller as unknown as CsrfPrivate,
       "formAuthenticityToken",
@@ -632,7 +632,7 @@ function RequestForgeryProtectionTests(
   });
 
   it("should allow delete with token", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     await stub(
       tc.controller as unknown as CsrfPrivate,
       "formAuthenticityToken",
@@ -647,32 +647,32 @@ function RequestForgeryProtectionTests(
   });
 
   it("should allow post with token in header", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     tc.request.env["HTTP_X_CSRF_TOKEN"] = TOKEN;
     await assertNotBlocked(() => tc.post("index"));
   });
 
   it("should allow delete with token in header", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     tc.request.env["HTTP_X_CSRF_TOKEN"] = TOKEN;
     await assertNotBlocked(() => tc.delete("index"));
   });
 
   it("should allow patch with token in header", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     tc.request.env["HTTP_X_CSRF_TOKEN"] = TOKEN;
     await assertNotBlocked(() => tc.patch("index"));
   });
 
   it("should allow put with token in header", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     tc.request.env["HTTP_X_CSRF_TOKEN"] = TOKEN;
     await assertNotBlocked(() => tc.put("index"));
   });
 
   it("should allow post with origin checking and correct origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
-      initializeCsrfToken();
+      await initializeCsrfToken();
       await stub(
         tc.controller as unknown as CsrfPrivate,
         "formAuthenticityToken",
@@ -690,7 +690,7 @@ function RequestForgeryProtectionTests(
 
   it("should allow post with origin checking and no origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
-      initializeCsrfToken();
+      await initializeCsrfToken();
       await stub(
         tc.controller as unknown as CsrfPrivate,
         "formAuthenticityToken",
@@ -707,7 +707,7 @@ function RequestForgeryProtectionTests(
 
   it("should raise for post with null origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
-      initializeCsrfToken();
+      await initializeCsrfToken();
       await stub(
         tc.controller as unknown as CsrfPrivate,
         "formAuthenticityToken",
@@ -730,7 +730,7 @@ function RequestForgeryProtectionTests(
     Base.logger = logger as never;
     try {
       await forgeryProtectionOriginCheck(async () => {
-        initializeCsrfToken();
+        await initializeCsrfToken();
         await stub(
           tc.controller as unknown as CsrfPrivate,
           "formAuthenticityToken",
@@ -839,7 +839,7 @@ function RequestForgeryProtectionTests(
   });
 
   it("should allow non get js without xhr header", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     await assertCrossOriginNotBlocked(() =>
       tc.post("sameOriginJs", { params: { custom_authenticity_token: TOKEN } }),
     );
@@ -869,7 +869,7 @@ function RequestForgeryProtectionTests(
   });
 
   it("csrf token is not saved if it is nil", async () => {
-    (tc.controller as Base).commitCsrfToken(tc.request);
+    await (tc.controller as Base).commitCsrfToken(tc.request);
     expect(tc.session().get("_csrf_token")).toBeUndefined();
   });
 
@@ -882,14 +882,14 @@ function RequestForgeryProtectionTests(
     );
   });
 
-  function initializeCsrfToken(token = TOKEN): void {
+  async function initializeCsrfToken(token = TOKEN): Promise<void> {
     if (overrides.initializeCsrfToken) return overrides.initializeCsrfToken(tc, token);
-    tc.session().set("_csrf_token", token);
+    await tc.session().set("_csrf_token", token);
   }
 
   async function assertBlocked(block: () => Promise<unknown>): Promise<unknown> {
     if (assertBlockedOverride) return assertBlockedOverride(block);
-    tc.session().set("something_like_user_id", 1);
+    await tc.session().set("something_like_user_id", 1);
     await block();
     expect(
       tc.session().get("something_like_user_id"),
@@ -900,7 +900,7 @@ function RequestForgeryProtectionTests(
 
   async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
     if (overrides.assertNotBlocked) return overrides.assertNotBlocked(tc, block);
-    tc.session().set("something_like_user_id", 1);
+    await tc.session().set("something_like_user_id", 1);
     await assertNothingRaised(block);
     expect(tc.session().get("something_like_user_id")).toBe(1);
     tc.assertResponse(":success");
@@ -921,7 +921,7 @@ function RequestForgeryProtectionTests(
   }
 
   async function assertCrossOriginNotBlocked(block: () => Promise<unknown>): Promise<void> {
-    tc.session().set("something_like_user_id", 1);
+    await tc.session().set("something_like_user_id", 1);
     await assertNothingRaised(block);
     expect(tc.session().get("something_like_user_id")).toBe(1);
     tc.assertResponse(":success");
@@ -992,7 +992,7 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
 
   it("raised exception message explains why it occurred", async () => {
     await forgeryProtectionOriginCheck(async () => {
-      initializeCsrfToken();
+      await initializeCsrfToken();
       await stub(
         t().controller as unknown as CsrfPrivate,
         "formAuthenticityToken",
@@ -1179,13 +1179,16 @@ describe("PerFormTokensControllerTest", () => {
     return formCsrfToken!;
   }
 
-  function assertMatchesSessionTokenOnServer(formToken: string, method = "post"): void {
+  async function assertMatchesSessionTokenOnServer(
+    formToken: string,
+    method = "post",
+  ): Promise<void> {
     const actual = rbFSend(
       tc.controller,
       "unmaskToken",
       binaryBytes(Base64.urlsafeDecode64(formToken)),
     );
-    const expected = rbFSend(
+    const expected = await rbFSend(
       tc.controller,
       "perFormCsrfToken",
       null,
@@ -1199,8 +1202,9 @@ describe("PerFormTokensControllerTest", () => {
     await tc.get("index");
 
     const expected = RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH;
-    const actual = (rbFSend(tc.controller, "perFormCsrfToken", null, "/path", "post") as Bytes)
-      .length;
+    const actual = (
+      (await rbFSend(tc.controller, "perFormCsrfToken", null, "/path", "post")) as Bytes
+    ).length;
     expect(actual).toBe(expected);
   });
 
@@ -1209,7 +1213,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
@@ -1223,7 +1227,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     tc.request.env["QUERY_STRING"] = "key=value";
@@ -1237,7 +1241,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/foo/bar<";
     const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
@@ -1251,7 +1255,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_two";
     await assertRaises([InvalidAuthenticityToken], {}, () =>
@@ -1264,7 +1268,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertRaises([InvalidAuthenticityToken], {}, () =>
@@ -1277,7 +1281,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken, "delete");
+    await assertMatchesSessionTokenOnServer(formToken, "delete");
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertRaises([InvalidAuthenticityToken], {}, () =>
@@ -1290,7 +1294,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken, "post");
+    await assertMatchesSessionTokenOnServer(formToken, "post");
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
@@ -1304,7 +1308,7 @@ describe("PerFormTokensControllerTest", () => {
 
       const formToken = assertPresenceAndFetchFormCsrfToken();
 
-      assertMatchesSessionTokenOnServer(formToken, verb);
+      await assertMatchesSessionTokenOnServer(formToken, verb);
 
       tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
       await assertNothingRaised(() =>
@@ -1316,7 +1320,7 @@ describe("PerFormTokensControllerTest", () => {
   it("accepts global csrf token", async () => {
     await tc.get("index");
 
-    const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
+    const token = (await rbFSend(tc.controller, "formAuthenticityToken")) as string;
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
@@ -1328,7 +1332,7 @@ describe("PerFormTokensControllerTest", () => {
   it("does not return old csrf token", async () => {
     await tc.get("index");
 
-    const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
+    const token = (await rbFSend(tc.controller, "formAuthenticityToken")) as string;
 
     const unmaskedToken = rbFSend(
       tc.controller,
@@ -1336,13 +1340,13 @@ describe("PerFormTokensControllerTest", () => {
       binaryBytes(Base64.urlsafeDecode64(token)),
     );
 
-    expect(unmaskedToken).not.toEqual(rbFSend(tc.controller, "realCsrfToken"));
+    expect(unmaskedToken).not.toEqual(await rbFSend(tc.controller, "realCsrfToken"));
   });
 
   it("returns hmacd token", async () => {
     await tc.get("index");
 
-    const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
+    const token = (await rbFSend(tc.controller, "formAuthenticityToken")) as string;
 
     const unmaskedToken = rbFSend(
       tc.controller,
@@ -1350,7 +1354,7 @@ describe("PerFormTokensControllerTest", () => {
       binaryBytes(Base64.urlsafeDecode64(token)),
     );
 
-    expect(unmaskedToken).toEqual(rbFSend(tc.controller, "globalCsrfToken"));
+    expect(unmaskedToken).toEqual(await rbFSend(tc.controller, "globalCsrfToken"));
   });
 
   it("accepts old csrf token", async () => {
@@ -1359,7 +1363,7 @@ describe("PerFormTokensControllerTest", () => {
     const nonHmacToken = rbFSend(
       tc.controller,
       "maskToken",
-      rbFSend(tc.controller, "realCsrfToken"),
+      await rbFSend(tc.controller, "realCsrfToken"),
     );
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
@@ -1374,7 +1378,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one/";
     await assertNothingRaised(() =>
@@ -1629,7 +1633,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   });
 
   it("should allow when session id in cookie matches session id", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
 
     await stub(
       controller() as unknown as CsrfPrivate,
@@ -1645,7 +1649,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   });
 
   it("should not allow when session id in cookie does not match session id", async () => {
-    initializeCsrfToken(TOKEN, new TestSession());
+    await initializeCsrfToken(TOKEN, new TestSession());
 
     await stub(
       controller() as unknown as CsrfPrivate,
@@ -1662,7 +1666,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
 
   it("should allow when session id in cookie and session id are nil", async () => {
     tc().request.session = new TestSession({}, null as never) as never;
-    initializeCsrfToken(TOKEN, null);
+    await initializeCsrfToken(TOKEN, null);
 
     await stub(
       controller() as unknown as CsrfPrivate,
@@ -1678,7 +1682,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   });
 
   it("should not allow when session id in cookie but session id is nil", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     tc().request.session = new TestSession({}, null as never) as never;
 
     await stub(
@@ -1695,7 +1699,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   });
 
   it("should allow when session id in cookie is nil and session created before token validation", async () => {
-    initializeCsrfToken(TOKEN, null);
+    await initializeCsrfToken(TOKEN, null);
     tc().request.session = new TestSession_(null) as never;
 
     await stub(
@@ -1712,7 +1716,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   });
 
   it("should allow when session id in cookie is nil and session reset before token validation", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     tc().request.session = new TestSession_(tc().session().id()) as never;
 
     await stub(
@@ -1729,7 +1733,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   });
 
   it("should not allow when session id in cookie but request made with no session", async () => {
-    initializeCsrfToken();
+    await initializeCsrfToken();
     tc().request.session = new TestSession_(null) as never;
 
     await stub(
@@ -1778,12 +1782,12 @@ describe("CustomCsrfTokenStorageStrategyControllerTest", () => {
 
   it("csrf token is stored in custom location", async () => {
     await t().post("index");
-    (t().controller as Base).commitCsrfToken(t().request);
+    await (t().controller as Base).commitCsrfToken(t().request);
     assertNot(t().session().isKey("_csrf_token"));
     expect(t().request.env["custom_storage"]).not.toBeNull();
   });
 
-  function initializeCsrfToken(token = TOKEN): void {
+  async function initializeCsrfToken(token = TOKEN): Promise<void> {
     t().request.env["custom_storage"] = token;
   }
 });

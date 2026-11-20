@@ -16,7 +16,7 @@
  * The other four arm tokens — `if`, `loop`, `try`, `rescue` — are report-only
  * and stay that way: `if` alone is 1,891 of the 2,141 rows and measured 70%
  * non-real. See arm-throw-mark.ts for the stratified noise-floor read this gate
- * rests on, and docs/infrastructure/arm-mismatch-noise-floor.md for the record.
+ * rests on, and the tasks repo's `archive/trails-docs/infrastructure/arm-mismatch-noise-floor.md` for the record.
  *
  * Usage:
  *   pnpm tsx scripts/api-compare/lint-arm-throws.ts            # gate (CI)

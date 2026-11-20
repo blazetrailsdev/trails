@@ -36,11 +36,11 @@ describe("MemoryStoreTest", () => {
 
   it("exist returns true when key present", async () => {
     await store.write("key", "value");
-    expect(await store.exist("key")).toBe(true);
+    expect(await store.isExist("key")).toBe(true);
   });
 
   it("exist returns false when key absent", async () => {
-    expect(await store.exist("missing")).toBe(false);
+    expect(await store.isExist("missing")).toBe(false);
   });
 
   it("fetch returns cached value when present", async () => {
@@ -198,11 +198,11 @@ describe("MemoryStorePruningTest", () => {
     await store.read("2");
     await store.read("4");
     await store.prune(recordSize * 3);
-    expect(await store.exist("5")).toBe(true);
-    expect(await store.exist("4")).toBe(true);
-    expect(await store.exist("3")).toBe(false);
-    expect(await store.exist("2")).toBe(true);
-    expect(await store.exist("1")).toBe(false);
+    expect(await store.isExist("5")).toBe(true);
+    expect(await store.isExist("4")).toBe(true);
+    expect(await store.isExist("3")).toBe(false);
+    expect(await store.isExist("2")).toBe(true);
+    expect(await store.isExist("1")).toBe(false);
   });
 });
 
@@ -308,11 +308,11 @@ describe("FileStoreTest", () => {
 
   it("exist returns true when key present", async () => {
     await store.write("key", "value");
-    expect(await store.exist("key")).toBe(true);
+    expect(await store.isExist("key")).toBe(true);
   });
 
   it("exist returns false when key absent", async () => {
-    expect(await store.exist("missing")).toBe(false);
+    expect(await store.isExist("missing")).toBe(false);
   });
 
   it("increment increases value", async () => {

@@ -68,7 +68,6 @@ defineConstants([
   [m25, "SourceAnnotationExtractor", "Trails::SourceAnnotationExtractor"],
   [m25, "Annotation", "Trails::SourceAnnotationExtractor::Annotation"],
   [m25, "ParserExtractor", "Trails::SourceAnnotationExtractor::ParserExtractor"],
-  [m25, "Parser", "Trails::SourceAnnotationExtractor::ParserExtractor::Parser"],
   [m25, "PatternExtractor", "Trails::SourceAnnotationExtractor::PatternExtractor"],
   [m26, "Trailtie", "Trails::Trailtie"],
   [m27, "Configurable", "Trails::Trailtie::Configurable"],

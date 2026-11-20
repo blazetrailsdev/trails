@@ -517,6 +517,7 @@ export class Timezone {
   /**
    * @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info
    * @missingRailsCall period_for — CONVERGEABLE data-timezone-delegates-periods-to-info
+   * @missingRailsCall for — CONVERGEABLE data-timezone-delegates-periods-to-info
    */
   periodForUtc(time: Time): TimezonePeriod {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo)
@@ -592,6 +593,7 @@ export class Timezone {
     return periods;
   }
 
+  /** @missingRailsCall for — CONVERGEABLE data-timezone-delegates-periods-to-info */
   periodForLocal(
     time: Time,
     dst: boolean | null = null,
@@ -619,12 +621,14 @@ export class Timezone {
     return this.periodForUtc(Time.now());
   }
 
+  /** @missingRailsCall for — CONVERGEABLE data-timezone-delegates-periods-to-info */
   utcToLocal(time: Time): Time {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo)
       return time.getlocal(this.info.constantOffset.observedUtcOffset);
     return time.getlocal(this.identifier);
   }
 
+  /** @missingRailsCall for — CONVERGEABLE data-timezone-delegates-periods-to-info */
   localToUtc(
     time: Time | DateTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
     dst: boolean | null = null,

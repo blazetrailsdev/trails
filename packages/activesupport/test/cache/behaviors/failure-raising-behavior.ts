@@ -104,7 +104,7 @@ export function failureRaisingBehavior(host?: FailureRaisingBehaviorHost): void 
     const key = crypto.randomUUID();
     await cache.write(key, alphanumeric());
 
-    await expect(emulatingUnavailability((cache) => cache.exist(key))).rejects.toThrow(
+    await expect(emulatingUnavailability((cache) => cache.isExist(key))).rejects.toThrow(
       host!.unavailableError,
     );
   });

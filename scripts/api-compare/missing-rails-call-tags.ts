@@ -155,7 +155,7 @@ function toCommentLines(comment: string, tag: string): CommentLine[] {
  *  necessarily hand-authored, and backfilling it with a placeholder would turn
  *  an unjustified allowlist entry into a silently blessed one. The family's
  *  empty-reason contract is stated in
- *  docs/infrastructure/api-build-stub-generation-plan.md. */
+ *  the tasks repo's archive/trails-docs/infrastructure/api-build-stub-generation-plan.md. */
 export function parseJsdoc(
   comment: string,
   origin?: JsdocOrigin,

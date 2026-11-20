@@ -1,12 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Logger, SimpleFormatter } from "../lib/logger.js";
 import { IsolatedExecutionState } from "../lib/isolated-execution-state.js";
-import { Fiber, Thread } from "@blazetrails/ruby-compat";
+import { File, Fiber, Tempfile, Thread } from "@blazetrails/ruby-compat";
 import { BroadcastLogger } from "../lib/broadcast-logger.js";
 import { Temporal } from "@blazetrails/date";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, dirname, join, sep } from "node:path";
 
 function makeBuffer() {
   const lines: string[] = [];
@@ -224,23 +221,23 @@ describe("LoggerTest", () => {
   });
 
   it("log outputs to with a filename", () => {
-    const dir = mkdtempSync(join(tmpdir(), "logger-test-"));
-    const path = join(dir, "development.log");
-    writeFileSync(path, "");
-    const t = { path };
-    const broadcast = new BroadcastLogger(new Logger(t.path));
+    const t = Tempfile.new(["development", "log"]);
+    const logger = new BroadcastLogger(new Logger(t.path()));
 
     try {
-      expect(Logger.isLoggerOutputsTo(broadcast, t)).toBeTruthy();
-      expect(Logger.isLoggerOutputsTo(broadcast, path)).toBeTruthy();
+      expect(Logger.isLoggerOutputsTo(logger, t)).toBeTruthy();
+      expect(Logger.isLoggerOutputsTo(logger, t.path())).toBeTruthy();
       expect(
-        Logger.isLoggerOutputsTo(broadcast, `${dirname(path)}${sep}.${sep}${basename(path)}`),
+        Logger.isLoggerOutputsTo(
+          logger,
+          File.join(File.dirname(t.path()!), ".", File.basename(t.path()!)),
+        ),
       ).toBeTruthy();
-      expect(Logger.isLoggerOutputsTo(broadcast, "log/production.log")).toBeFalsy();
-      expect(Logger.isLoggerOutputsTo(broadcast, makeBuffer())).toBeFalsy();
+      expect(Logger.isLoggerOutputsTo(logger, "log/production.log")).toBeFalsy();
+      expect(Logger.isLoggerOutputsTo(logger, makeBuffer())).toBeFalsy();
     } finally {
-      broadcast.close();
-      rmSync(dir, { recursive: true, force: true });
+      logger.close();
+      t.close(true);
     }
   });
 

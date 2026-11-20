@@ -1,6 +1,6 @@
 <h1>Forgot your password?</h1>
 
-<%%= flash().get("alert") != null ? tag.div(flash().get("alert"), { style: "color:red" }) : null %>
+<%%= (await flash()).get("alert") != null ? tag.div((await flash()).get("alert"), { style: "color:red" }) : null %>
 
 <%%= formWith({ url: passwordsPath() }, (form) => { %>
   <%%= form.emailField("email_address", { required: true, autofocus: true, autocomplete: "username", placeholder: "Enter your email address", value: params().get("email_address") }) %><br>

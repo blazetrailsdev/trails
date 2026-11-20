@@ -1,7 +1,9 @@
 import { b } from "@blazetrails/ruby-compat";
 import { afterEach, expect, it } from "vitest";
 import "../../../lib/message-pack.js";
-import * as Cache from "../../../lib/cache.js";
+import "../../../lib/cache.js";
+import { ActiveSupport } from "../../../lib/namespaces.js";
+import { objectWith } from "../../../lib/core-ext/object/with.js";
 import { UnserializableObjectError } from "../../../lib/message-pack/extensions.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 
@@ -14,17 +16,11 @@ export interface CacheStoreSerializerBehaviorHost {
 
 export function cacheStoreSerializerBehavior(host: CacheStoreSerializerBehaviorHost): void {
   afterEach(async () => {
-    Cache.setFormatVersion(7.0);
+    ActiveSupport.Cache.formatVersion = 7.0;
   });
 
   function withFormat<T>(formatVersion: number, block: () => T): T {
-    const previous = Cache.formatVersion();
-    Cache.setFormatVersion(formatVersion);
-    try {
-      return block();
-    } finally {
-      Cache.setFormatVersion(previous);
-    }
+    return objectWith(ActiveSupport.Cache, { formatVersion }, block);
   }
 
   it("serializer can be specified", async () => {

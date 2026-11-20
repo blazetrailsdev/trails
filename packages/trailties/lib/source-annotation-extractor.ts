@@ -58,80 +58,47 @@ export type ExtensionBuilder = (
 const DEFAULT_DIRECTORIES = ["app", "config", "db", "lib", "test"];
 const DEFAULT_TAGS = ["OPTIMIZE", "FIXME", "TODO"];
 
-export class Parser {
-  comments: Annotation[] = [];
-  pattern: RegExp;
-  private source: string;
-  private file: string;
-  private lineno = 0;
-  private _error = false;
+export class ParserExtractor {
+  constructor(public pattern: RegExp) {}
 
-  constructor(source: string, { pattern, file }: { pattern: RegExp; file: string }) {
-    this.source = source;
-    this.pattern = pattern;
-    this.file = file;
-  }
-
-  onComment(value: string): void {
-    const m = value.match(this.pattern);
-    if (m) this.comments.push(new Annotation(this.lineno, m[1], m[2]));
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  isError(): boolean {
-    return this._error;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  parse(): void {
+  annotations(file: string): Annotation[] {
+    const source = File.read(file);
     api ??= new tokenizer!.API();
-    const sourceFile = api.createSourceFile(this.file, this.source);
-    const { diagnostics } = api.transpileModule(this.source, {
-      fileName: this.file,
+    const result = api.createSourceFile(file, source);
+    const { diagnostics } = api.transpileModule(source, {
+      fileName: file,
       reportDiagnostics: true,
     });
-    this._error = diagnostics !== undefined && diagnostics.length > 0;
+    if (diagnostics !== undefined && diagnostics.length > 0) return [];
+
     const literals = new Map<number, number>();
-    const queue: Node[] = [sourceFile];
+    const queue: Node[] = [result];
     let node: Node | undefined;
     while ((node = queue.pop())) {
       if (node.kind === tokenizer!.SyntaxKind.JsxText) literals.set(node.pos, node.end);
-      else if (tokenizer!.isLiteralLike(node)) literals.set(node.getStart(sourceFile), node.end);
+      else if (tokenizer!.isLiteralLike(node)) literals.set(node.getStart(result), node.end);
       node.forEachChild((child) => {
         queue.push(child);
       });
     }
 
+    const comments: Annotation[] = [];
     const { SingleLineCommentTrivia, MultiLineCommentTrivia, EndOfFile } = tokenizer!.SyntaxKind;
     const scanner = tokenizer!.createScanner(false);
-    scanner.setText(this.source);
+    scanner.setText(source);
     let kind = scanner.scan();
     while (kind !== EndOfFile) {
       const start = scanner.getTokenStart();
       const end = literals.get(start);
       if (end !== undefined) scanner.resetTokenState(end);
       else if (kind === SingleLineCommentTrivia || kind === MultiLineCommentTrivia) {
-        this.lineno = sourceFile.getLineAndCharacterOfPosition(start).line + 1;
-        for (const line of scanner.getTokenText().split(/\r?\n/)) {
-          this.onComment(line);
-          this.lineno += 1;
-        }
+        const startLine = result.getLineAndCharacterOfPosition(start).line + 1;
+        const m = scanner.getTokenText().match(this.pattern);
+        if (m) comments.push(new Annotation(startLine, m[1], m[2]));
       }
       kind = scanner.scan();
     }
-  }
-}
-
-export class ParserExtractor {
-  static Parser = Parser;
-
-  constructor(public pattern: RegExp) {}
-
-  annotations(file: string): Annotation[] {
-    const contents = File.read(file);
-    const parser = new Parser(contents, { pattern: this.pattern, file });
-    parser.parse();
-    return parser.isError() ? [] : parser.comments;
+    return comments;
   }
 }
 
@@ -153,7 +120,7 @@ export class PatternExtractor {
 export class Annotation {
   static directories: string[] = [...DEFAULT_DIRECTORIES];
   static tags: string[] = [...DEFAULT_TAGS];
-  static extensions: Array<{ test: RegExp; builder: ExtensionBuilder }> = [];
+  static extensions = new Map<string, ExtensionBuilder>();
 
   static registerDirectories(...dirs: string[]): void {
     this.directories.push(...dirs);
@@ -165,10 +132,7 @@ export class Annotation {
 
   static registerExtensions(...exts: [...string[], ExtensionBuilder]): void {
     const block = exts.pop() as ExtensionBuilder;
-    this.extensions.push({
-      test: new RegExp(`\\.(${(exts as string[]).join("|")})$`),
-      builder: block,
-    });
+    this.extensions.set(`\\.(${(exts as string[]).join("|")})$`, block);
   }
 
   constructor(
@@ -189,7 +153,7 @@ export class Annotation {
 export function resetAnnotationRegistry(): void {
   Annotation.directories = [...DEFAULT_DIRECTORIES];
   Annotation.tags = [...DEFAULT_TAGS];
-  Annotation.extensions = [];
+  Annotation.extensions = new Map();
   registerDefaults();
 }
 
@@ -251,9 +215,11 @@ export class SourceAnnotationExtractor {
         for (const [k, v] of this.findIn(item)) results.set(k, v);
         continue;
       }
-      const extension = Annotation.extensions.find((e) => e.test.test(item));
+      const extension = [...Annotation.extensions].find(([regexp]) =>
+        new RegExp(regexp).test(item),
+      );
       if (extension) {
-        let pattern = extension.builder(this.tag);
+        let pattern = extension[1](this.tag);
 
         if (pattern == null) continue;
 

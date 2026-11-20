@@ -305,32 +305,32 @@ describe("unverifiedRequestWarningMessage", () => {
 });
 
 describe("isVerifiedRequest", () => {
-  it("returns true when protection is disabled or method is GET/HEAD", () => {
-    expect(isVerifiedRequest.call(controller({ allowForgeryProtection: false }))).toBe(true);
+  it("returns true when protection is disabled or method is GET/HEAD", async () => {
+    expect(await isVerifiedRequest.call(controller({ allowForgeryProtection: false }))).toBe(true);
     expect(
-      isVerifiedRequest.call(
+      await isVerifiedRequest.call(
         controller({
           request: { ...verbs, method: "GET", baseUrl: "https://example.com", cookieJar },
         }),
       ),
     ).toBe(true);
     expect(
-      isVerifiedRequest.call(
+      await isVerifiedRequest.call(
         controller({
           request: { ...verbs, method: "HEAD", baseUrl: "https://example.com", cookieJar },
         }),
       ),
     ).toBe(true);
   });
-  it("requires valid origin and token for POST", () => {
+  it("requires valid origin and token for POST", async () => {
     const env = { "action_controller.csrf_token": generateCsrfToken() };
     const c = controller({
       request: { ...verbs, method: "POST", baseUrl: "https://example.com", cookieJar, env },
     });
-    const masked = maskToken.call(controller(), globalCsrfToken.call(c));
+    const masked = maskToken.call(controller(), await globalCsrfToken.call(c));
     const withParam = (value: unknown) => ({ get: () => value });
     expect(
-      isVerifiedRequest.call({
+      await isVerifiedRequest.call({
         ...c,
         params: withParam(masked),
         formAuthenticityParam,
@@ -338,7 +338,7 @@ describe("isVerifiedRequest", () => {
       } as CsrfController),
     ).toBe(true);
     expect(
-      isVerifiedRequest.call({
+      await isVerifiedRequest.call({
         ...c,
         params: withParam("bogus"),
         formAuthenticityParam,
@@ -365,7 +365,7 @@ describe("P20b/P20c smoke", () => {
     };
   }
 
-  it("mask/unmask round-trips and realCsrfToken is stable per request", () => {
+  it("mask/unmask round-trips and realCsrfToken is stable per request", async () => {
     const raw = decodeCsrfToken(generateCsrfToken());
     expect(
       Buffer.from(
@@ -373,10 +373,10 @@ describe("P20b/P20c smoke", () => {
       ).equals(raw),
     ).toBe(true);
     const c = tokenC();
-    expect(Buffer.from(realCsrfToken.call(c)).equals(realCsrfToken.call(c))).toBe(true);
+    expect(Buffer.from(await realCsrfToken.call(c)).equals(await realCsrfToken.call(c))).toBe(true);
   });
 
-  it("encode/decodeCsrfToken use urlsafe base64 without padding; reject garbage", () => {
+  it("encode/decodeCsrfToken use urlsafe base64 without padding; reject garbage", async () => {
     const raw = Buffer.from("?".repeat(32));
     const encoded = maskToken.call(controller(), raw);
     expect(encoded).not.toMatch(/[+/=]/);
@@ -386,28 +386,28 @@ describe("P20b/P20c smoke", () => {
     expect(() => decodeCsrfToken("!!! not base64 !!!")).toThrow();
   });
 
-  it("isAnyAuthenticityTokenValid: masked global via param + X-CSRF; rejects empty", () => {
+  it("isAnyAuthenticityTokenValid: masked global via param + X-CSRF; rejects empty", async () => {
     const c = tokenC();
-    const masked = maskToken.call(controller(), globalCsrfToken.call(c));
+    const masked = maskToken.call(controller(), await globalCsrfToken.call(c));
     const params = (hash: Record<string, unknown>) => ({ get: (key: string) => hash[key] });
     expect(
-      isAnyAuthenticityTokenValid.call({
+      await isAnyAuthenticityTokenValid.call({
         ...c,
         params: params({ authenticity_token: masked }),
       }),
     ).toBe(true);
     expect(
-      isAnyAuthenticityTokenValid.call({
+      await isAnyAuthenticityTokenValid.call({
         ...c,
         params: params({}),
         request: { ...c.request, xCsrfToken: masked },
       }),
     ).toBe(true);
-    expect(isAnyAuthenticityTokenValid.call({ ...c, params: params({}) })).toBe(false);
-    expect(isValidAuthenticityToken.call(c, null, "")).toBe(false);
+    expect(await isAnyAuthenticityTokenValid.call({ ...c, params: params({}) })).toBe(false);
+    expect(await isValidAuthenticityToken.call(c, null, "")).toBe(false);
   });
 
-  it("isValidPerFormCsrfToken + compareWith{Global,Real}Token", () => {
+  it("isValidPerFormCsrfToken + compareWith{Global,Real}Token", async () => {
     const c = tokenC({
       perFormCsrfTokens: true,
       request: {
@@ -419,23 +419,25 @@ describe("P20b/P20c smoke", () => {
         env: { "action_controller.csrf_token": generateCsrfToken() },
       },
     });
-    expect(isValidPerFormCsrfToken.call(c, perFormCsrfToken.call(c, null, "/posts", "POST"))).toBe(
-      true,
-    );
-    expect(compareWithGlobalToken.call(c, globalCsrfToken.call(c))).toBe(true);
-    expect(compareWithRealToken.call(c, realCsrfToken.call(c))).toBe(true);
     expect(
-      maskedAuthenticityToken.call(c, { formOptions: { action: "/posts", method: "POST" } }),
+      await isValidPerFormCsrfToken.call(c, await perFormCsrfToken.call(c, null, "/posts", "POST")),
+    ).toBe(true);
+    expect(await compareWithGlobalToken.call(c, await globalCsrfToken.call(c))).toBe(true);
+    expect(await compareWithRealToken.call(c, await realCsrfToken.call(c))).toBe(true);
+    expect(
+      await maskedAuthenticityToken.call(c, { formOptions: { action: "/posts", method: "POST" } }),
     ).toBeTruthy();
   });
 
-  it("compareWith{Global,Real}Token and isValidPerFormCsrfToken raise on a length mismatch", () => {
+  it("compareWith{Global,Real}Token and isValidPerFormCsrfToken raise on a length mismatch", async () => {
     const c = tokenC({ perFormCsrfTokens: true });
-    const short = realCsrfToken.call(c).subarray(0, 8);
-    expect(() => compareWithRealToken.call(c, short)).toThrow("string length mismatch.");
-    expect(() => compareWithGlobalToken.call(c, short)).toThrow("string length mismatch.");
-    expect(() => isValidPerFormCsrfToken.call(c, short)).toThrow("string length mismatch.");
-    expect(isValidPerFormCsrfToken.call({ ...c, perFormCsrfTokens: false }, short)).toBe(false);
+    const short = (await realCsrfToken.call(c)).subarray(0, 8);
+    await expect(compareWithRealToken.call(c, short)).rejects.toThrow("string length mismatch.");
+    await expect(compareWithGlobalToken.call(c, short)).rejects.toThrow("string length mismatch.");
+    await expect(isValidPerFormCsrfToken.call(c, short)).rejects.toThrow("string length mismatch.");
+    expect(await isValidPerFormCsrfToken.call({ ...c, perFormCsrfTokens: false }, short)).toBe(
+      false,
+    );
   });
 
   it("requestAuthenticityTokens + formAuthenticityParam honor custom token name", () => {

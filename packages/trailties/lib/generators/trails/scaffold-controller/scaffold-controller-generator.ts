@@ -19,7 +19,6 @@ import type { GeneratorClass } from "../../../generators.js";
 export interface ScaffoldControllerGeneratorOptions extends GeneratorOptions, ModelHelpersOptions {
   api?: boolean;
   skipRoutes?: boolean;
-  test?: boolean;
   helper?: boolean;
   modelName?: string;
   orm?: string | false;

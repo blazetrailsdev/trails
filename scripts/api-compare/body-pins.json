@@ -9704,13 +9704,6 @@
   },
   {
     "package": "actiondispatch",
-    "rubyFile": "middleware/session/mem_cache_store.rb",
-    "rubyName": "prepare_session",
-    "digest": "c50d15a0a47386f0",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
     "rubyFile": "middleware/show_exceptions.rb",
     "rubyName": "call",
     "digest": "6c504fcf3aba360b",

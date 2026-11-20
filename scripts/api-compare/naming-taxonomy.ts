@@ -137,7 +137,7 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "Its twin is an ASCII-8BIT read handed to a byte sink — `gzip.write(part)` " +
       "(deflater.rb:105-106): ruby-compat's `IO#read` answers one char per byte and " +
       "`GzipWriter#write` UTF-8-encodes a string, so the TS hands it the bytes (`Buffer.from`). " +
-      "Ruled permanent by the repo owner on 2026-10-19 (trails#9108).",
+      "Ruled permanent by the operator on 2026-10-19 (trails#9108).",
   },
   {
     name: "module-mixin-receiver",

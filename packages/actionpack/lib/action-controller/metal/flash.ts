@@ -21,12 +21,12 @@ export interface FlashClassHost extends HelpersClassMethods {
   addFlashTypes(...types: string[]): void;
 }
 
-export function flash(this: { request: { flash: FlashHash | null } }): FlashHash | null {
+export function flash(this: { request: { flash: Promise<FlashHash> } }): Promise<FlashHash> {
   return this.request.flash;
 }
 
 export async function redirectTo<FlashType extends string = never>(
-  this: { constructor: unknown; flash: FlashHash },
+  this: { constructor: unknown; flash: Promise<FlashHash> },
   options: RedirectToOptions = {},
   responseOptionsAndFlash: RedirectToResponseOptionsAndFlash<FlashType> = {},
 ): Promise<number> {
@@ -34,14 +34,14 @@ export async function redirectTo<FlashType extends string = never>(
     const type = (responseOptionsAndFlash as Record<string, unknown>)[flashType];
     delete (responseOptionsAndFlash as Record<string, unknown>)[flashType];
     if (type != null && type !== false) {
-      this.flash.set(flashType, type);
+      (await this.flash).set(flashType, type);
     }
   }
 
   const otherFlashes = responseOptionsAndFlash.flash;
   delete responseOptionsAndFlash.flash;
   if (otherFlashes != null && (otherFlashes as unknown) !== false) {
-    this.flash.update(otherFlashes);
+    (await this.flash).update(otherFlashes);
   }
 
   return rbCallSuper(this, redirectTo, options, responseOptionsAndFlash) as Promise<number>;
@@ -52,8 +52,8 @@ export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
     if (this._flashTypes.includes(type)) continue;
 
     Object.defineProperty(this.prototype, type, {
-      get(this: { request: { flash: FlashHash } }) {
-        return this.request.flash.get(type);
+      async get(this: { request: { flash: Promise<FlashHash> } }) {
+        return (await this.request.flash).get(type);
       },
       configurable: true,
     });

@@ -4,6 +4,7 @@ import { fixtures } from "../support/use-fixtures.js";
 import { Post } from "../models/post.js";
 import { Topic } from "../models/topic.js";
 import { Comment } from "../models/comment.js";
+import { Bird } from "../models/bird.js";
 
 describe("RelationTest", () => {
   fixtures(["posts"]);
@@ -59,5 +60,17 @@ describe("RelationTest", () => {
 
     expect(Post.all().distinct().only("distinct").toSql()).toContain("DISTINCT");
     expect(Post.all().distinct().only("where").toSql()).not.toContain("DISTINCT");
+  });
+
+  it("first or initialize without attributes keeps its capture across a nested build", async () => {
+    await Bird.createBang({ color: "yellow", name: "canary" });
+    let nested: Bird | undefined;
+    const parrot = await Bird.where({ color: "green" }).firstOrInitialize(undefined, (bird) => {
+      nested = new Bird({ name: "nested" });
+      bird.enableCount = true;
+    });
+    expect(parrot.totalCount).toBe(1);
+    expect(nested!.totalCount).toBeUndefined();
+    expect(nested!.name).toBe("nested");
   });
 });

@@ -2,7 +2,7 @@ import { deprecator } from "./deprecator.js";
 import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
 import { ActiveSupport } from "./namespaces.js";
 import { preserveTimezone, setPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
-import { formatVersion, setFormatVersion } from "./cache/store.js";
+import "./cache/store.js";
 
 let _testOrder: string | null = null;
 
@@ -25,18 +25,18 @@ export function setTestParallelizationThreshold(value: number): void {
 }
 
 export function cacheFormatVersion(): number {
-  return formatVersion();
+  return ActiveSupport.Cache.formatVersion;
 }
 
 export function setCacheFormatVersion(value: number): void {
-  setFormatVersion(value);
+  ActiveSupport.Cache.formatVersion = value;
 }
 
 export function toTimePreservesTimezone(): boolean | string {
   return preserveTimezone();
 }
 
-export function setToTimePreservesTimezone(value: boolean | string | null): void {
+export function setToTimePreservesTimezone(value: boolean | string | null | undefined): void {
   if (value == null || value === false) {
     deprecator().warn(
       "`to_time` will always preserve the receiver timezone rather than system local time in Rails 8.1. " +
@@ -49,7 +49,7 @@ export function setToTimePreservesTimezone(value: boolean | string | null): void
     );
   }
 
-  setPreserveTimezone(value);
+  setPreserveTimezone(value ?? null);
 }
 
 Object.defineProperties(ActiveSupport, {

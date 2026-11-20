@@ -180,7 +180,7 @@ case.
 ## Behavioral deviations from Rails
 
 Every ratified deviation is on the
-[activerecord package page](https://blazetrailsdev.github.io/trails/docs/packages/activerecord), generated from
+[activerecord package page](https://blazetrails.dev/docs/packages/activerecord), generated from
 [CLAUDE.md](CLAUDE.md) and the root `CLAUDE.md` sections this package cites.
 These are the ones people coming from Rails hit first.
 
@@ -258,7 +258,6 @@ scopes are typed on the class and on `Relation<T>`, so a chain that mixes
 enum scopes and named scopes type-checks.
 
 Editor support (a tsserver plugin for model virtualization) is not built yet.
-See [docs/infrastructure/virtual-source-files-plan.md](../../docs/infrastructure/virtual-source-files-plan.md).
 The `declare`-pattern reference for hand-typed models is
 [`dx-tests/declare-patterns.test-d.ts`](dx-tests/declare-patterns.test-d.ts).
 

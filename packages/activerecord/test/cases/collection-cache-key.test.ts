@@ -3,7 +3,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect } from "vitest";
 import { Base, StatementInvalid, Relation } from "../../lib/index.js";
-import { hexdigest } from "@blazetrails/activesupport";
+import { Digest } from "@blazetrails/activesupport/digest";
 import { assertQueriesCount, assertNoQueries } from "../../lib/testing/query-assertions.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { Developer } from "../models/developer.js";
@@ -68,7 +68,7 @@ describe("CollectionCacheKeyTest", () => {
     expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
 
     const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/)!;
-    expect(m[1]).toBe(hexdigest(developers.toSql()));
+    expect(m[1]).toBe(Digest.hexdigest(developers.toSql()));
     expect(m[2]).toBe(String(await developers.count()));
     expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
@@ -80,7 +80,7 @@ describe("CollectionCacheKeyTest", () => {
     expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
 
     const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/)!;
-    expect(m[1]).toBe(hexdigest(developers.toSql()));
+    expect(m[1]).toBe(Digest.hexdigest(developers.toSql()));
     expect(m[2]).toBe(String(await developers.count()));
     expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
@@ -95,7 +95,7 @@ describe("CollectionCacheKeyTest", () => {
     const m = (await developersWithSelect.cacheKey()).match(
       /^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/,
     )!;
-    expect(m[1]).toBe(hexdigest(developersWithSelect.toSql()));
+    expect(m[1]).toBe(Digest.hexdigest(developersWithSelect.toSql()));
     expect(m[2]).toBe(String(await developers.count()));
     expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
@@ -110,7 +110,7 @@ describe("CollectionCacheKeyTest", () => {
     expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
 
     const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/)!;
-    expect(m[1]).toBe(hexdigest(developers.toSql()));
+    expect(m[1]).toBe(Digest.hexdigest(developers.toSql()));
     expect(m[2]).toBe(String(await developers.count()));
     expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
@@ -125,7 +125,7 @@ describe("CollectionCacheKeyTest", () => {
     expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
 
     const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/)!;
-    expect(m[1]).toBe(hexdigest(developers.toSql()));
+    expect(m[1]).toBe(Digest.hexdigest(developers.toSql()));
     expect(m[2]).toBe(String(await developers.count()));
     expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
@@ -281,7 +281,7 @@ describe("CollectionCacheKeyTest", () => {
       expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+$/);
 
       const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)$/)!;
-      expect(m[1]).toBe(hexdigest(developers.toSql()));
+      expect(m[1]).toBe(Digest.hexdigest(developers.toSql()));
     });
   });
 

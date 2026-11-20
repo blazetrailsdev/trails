@@ -49,22 +49,24 @@ describe("DatabaseSelectorTest", () => {
     session = new Session(sessionStore);
   });
 
-  it("empty session", () => {
-    expect(session.lastWriteTimestamp().toF()).toBe(Time.at(0).toF());
+  it("empty session", async () => {
+    expect((await session.lastWriteTimestamp()).toF()).toBe(Time.at(0).toF());
   });
 
-  it("writing the session timestamps", () => {
-    expect(session.updateLastWriteTimestamp()).toBeTruthy();
+  it("writing the session timestamps", async () => {
+    expect(await session.updateLastWriteTimestamp()).toBeTruthy();
     const session2 = new Session(sessionStore);
-    expect(session.lastWriteTimestamp().toF()).toBe(session2.lastWriteTimestamp().toF());
+    expect((await session.lastWriteTimestamp()).toF()).toBe(
+      (await session2.lastWriteTimestamp()).toF(),
+    );
   });
 
   it("writing session time changes", async () => {
-    expect(session.updateLastWriteTimestamp()).toBeTruthy();
-    const before = session.lastWriteTimestamp();
+    expect(await session.updateLastWriteTimestamp()).toBeTruthy();
+    const before = await session.lastWriteTimestamp();
     await new Promise((r) => setTimeout(r, 100));
-    expect(session.updateLastWriteTimestamp()).toBeTruthy();
-    expect(session.lastWriteTimestamp().toF()).not.toBe(before.toF());
+    expect(await session.updateLastWriteTimestamp()).toBeTruthy();
+    expect((await session.lastWriteTimestamp()).toF()).not.toBe(before.toF());
   });
 
   it("read from replicas", async () => {
@@ -122,8 +124,8 @@ describe("DatabaseSelectorTest", () => {
   it("write to primary and update custom context", async () => {
     class CustomContext extends Session {
       private wrote = false;
-      override updateLastWriteTimestamp(): number {
-        const lastWrite = super.updateLastWriteTimestamp();
+      override async updateLastWriteTimestamp(): Promise<number> {
+        const lastWrite = await super.updateLastWriteTimestamp();
         this.wrote = true;
         return lastWrite;
       }

@@ -2,7 +2,7 @@
  * ESLint rule: rails-file-structure-method-order
  *
  * Method-order slice of the rails-file-structure rule family
- * (docs/rails-file-structure-mirror-plan.md). Enforces that class
+ * (the tasks repo's `archive/trails-docs/infrastructure/rails-file-structure-mirror-plan.md`). Enforces that class
  * members and top-level functions appear in the same source order as
  * their Rails counterparts. The manifest is generated from
  * rails-api.json:
@@ -60,7 +60,7 @@ const MANIFEST_PATH = path.resolve(__dirname, "rails-file-structure-method-order
  * scripts/api-compare/require-rails-api.ts) and get an empty manifest, under
  * which this rule would pass every file. `eslint.config.mjs` uses this to
  * leave the rule unregistered for those runs rather than registering it
- * inert — see docs/infrastructure/rails-file-structure-mirror-plan.md.
+ * inert — see the tasks repo's `archive/trails-docs/infrastructure/rails-file-structure-mirror-plan.md`.
  */
 export function isManifestAvailable(manifestPath = MANIFEST_PATH) {
   // The real manifest is megabytes; go through the cache for the default path
@@ -562,7 +562,7 @@ const rule = {
     // File-level opt-out: `/** @rails-structure-skip … */` in the
     // file's leading-comment block (before any non-comment token)
     // disables the rule for the file. Per
-    // docs/rails-file-structure-mirror-plan.md §5.1. Restricting to
+    // the tasks repo's `archive/trails-docs/infrastructure/rails-file-structure-mirror-plan.md` §5.1. Restricting to
     // leading comments prevents a method-level JSDoc from accidentally
     // suppressing the whole file.
     const firstToken = sourceCode.getFirstToken(sourceCode.ast);

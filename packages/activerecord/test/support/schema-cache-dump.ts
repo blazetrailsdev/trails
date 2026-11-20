@@ -1,5 +1,6 @@
 /** @internal */
-import { getEnv, hexdigest } from "@blazetrails/activesupport";
+import { getEnv } from "@blazetrails/activesupport";
+import { Digest } from "@blazetrails/activesupport/digest";
 import { getOsAsync, File, rbObjDup } from "@blazetrails/ruby-compat";
 import type {
   AbstractAdapter as DatabaseAdapter,
@@ -78,7 +79,7 @@ export function fingerprintOf(shapes: Map<string, string>, tables: ReadonlySet<s
     if (shape === undefined) return MISSING_TABLE;
     parts.push(`${table}\u0000${shape}`);
   }
-  return hexdigest(parts.join("\u0001"));
+  return Digest.hexdigest(parts.join("\u0001"));
 }
 
 const MISSING_TABLE = "missing-table";

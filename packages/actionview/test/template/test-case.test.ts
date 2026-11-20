@@ -153,14 +153,14 @@ describe("GeneralViewTest", () => {
   });
 
   it("delegates notice to request.flash[:notice]", async () => {
-    await assertCalledWith(tc().view().request.flash, "get", ["notice"], {}, () => {
-      void tc().view().notice;
+    await assertCalledWith(await tc().view().request.flash, "get", ["notice"], {}, async () => {
+      await tc().view().notice;
     });
   });
 
   it("delegates alert to request.flash[:alert]", async () => {
-    await assertCalledWith(tc().view().request.flash, "get", ["alert"], {}, () => {
-      void tc().view().alert;
+    await assertCalledWith(await tc().view().request.flash, "get", ["alert"], {}, async () => {
+      await tc().view().alert;
     });
   });
 

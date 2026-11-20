@@ -1,6 +1,6 @@
 /**
  * Builds the manifest(s) consumed by the `rails-file-structure-*`
- * ESLint rule family (docs/infrastructure/rails-file-structure-mirror-plan.md) from
+ * ESLint rule family (the tasks repo's `archive/trails-docs/infrastructure/rails-file-structure-mirror-plan.md`) from
  * scripts/api-compare/output/rails-api.json.
  *
  * Currently emits:

@@ -103,7 +103,7 @@ export class Codec extends Metadata {
     }
   }
 
-  protected override useMessageSerializerForMetadata(): boolean {
+  protected override useMessageSerializerForMetadata(): boolean | null | undefined {
     return !this.forceLegacyMetadataSerializer && super.useMessageSerializerForMetadata();
   }
 }

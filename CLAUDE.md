@@ -308,10 +308,7 @@ as convergence classes.
   `pnpm tasks` (`ready` / `next-bundle` / `claim`) — never by hand-editing an
   `activerecord` plan doc, and never by hand-editing a story's `status:` or
   `pr:` (see "Task state vs. task prose" below — that edit does nothing and
-  fails CI). `docs/activerecord/` is frozen (RFC 0011 Phase 4);
-  CI's `Docs ActiveRecord Freeze` job fails any PR that adds or modifies a
-  file there (allowlist: `docs/activerecord/parity-verification.md`). Other
-  `docs/` trees are not policed and stay live until their own cutover.
+  fails CI).
 - **The `tasks` CLI itself lives in the tasks repo** (`src/cli.ts`, entered
   through its `bin/tasks`). trails' `pnpm tasks` is a shim,
   `scripts/tasks/tasks.sh`, that finds a tasks checkout and hands off; the CLI

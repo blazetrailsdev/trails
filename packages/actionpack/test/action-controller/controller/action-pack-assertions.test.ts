@@ -61,11 +61,11 @@ class ActionPackAssertionsController extends Base {
     await this.head(599);
   }
   async flashMe() {
-    this.flash.set("hello", "my name is inigo montoya...");
+    (await this.flash).set("hello", "my name is inigo montoya...");
     await this.render({ plain: "Inconceivable!" });
   }
   async flashMeNaked() {
-    this.flash.clear();
+    (await this.flash).clear();
     await this.render({ plain: "wow!" });
   }
   async assignThis() {
@@ -77,7 +77,7 @@ class ActionPackAssertionsController extends Base {
     await this.render({ plain: `Mr. ${name}` });
   }
   async sessionStuffing() {
-    this.session.set("xmas", "turkey");
+    await this.session.set("xmas", "turkey");
     await this.render({ plain: "ho ho ho" });
   }
   async raiseExceptionOnGet() {
@@ -302,18 +302,18 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("empty flash", async () => {
     await tc.get("flashMeNaked");
-    assertEmpty(tc.flash());
+    assertEmpty(await tc.flash());
   });
 
   it("flash exist", async () => {
     await tc.get("flashMe");
-    assertPredicate(tc.flash(), (flash) => !flash.isEmpty());
-    assertPredicate(tc.flash().get("hello"), isPresent);
+    assertPredicate(await tc.flash(), (flash) => !flash.isEmpty());
+    assertPredicate((await tc.flash()).get("hello"), isPresent);
   });
 
   it("flash does not exist", async () => {
     await tc.get("nothing");
-    assertEmpty(tc.flash());
+    assertEmpty(await tc.flash());
   });
 
   it("session exist", async () => {

@@ -58,7 +58,7 @@ export class ConfigurationFile {
   }
 
   private render(context?: Binding): string {
-    const { nodes } = tseParse(this.content);
+    const { nodes } = tseParse(this.content, false, true);
     let body = 'let __out = "";\n';
     for (const node of nodes) {
       switch (node.kind) {

@@ -19,13 +19,15 @@ describe("Session::Options without a returned Proxy", () => {
     expect((options as unknown as Record<string, unknown>).a).toBeUndefined();
   });
 
-  it("reaches Persisted's commit checks with its delegate keys", () => {
+  it("reaches Persisted's commit checks with its delegate keys", async () => {
     const store = new CookieStore(undefined, { secret: "x".repeat(64) });
     const asHash = (o: Record<string, unknown>) =>
       new Session.Options(null, o) as unknown as Record<string, unknown>;
     expect(store.isForceOptions(asHash({ drop: true }))).toBe(true);
     expect(store.isForceOptions(asHash({ expireAfter: 60 }))).toBe(true);
     expect(store.isForceOptions(asHash({}))).toBe(false);
-    expect(store.isCommitSession({} as never, {} as never, asHash({ skip: true }))).toBe(false);
+    expect(await store.isCommitSession({} as never, {} as never, asHash({ skip: true }))).toBe(
+      false,
+    );
   });
 });

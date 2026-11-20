@@ -702,7 +702,7 @@
     }
   },
   "activesupport": {
-    "rows": 193,
+    "rows": 192,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -1276,7 +1276,7 @@
     }
   },
   "trailties": {
-    "rows": 169,
+    "rows": 168,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "commands/build.ts::BuildCommand",
@@ -1446,7 +1446,6 @@
       "rack/logger.ts::Logger": "Trails::Rack::Logger",
       "rack/silence-request.ts::SilenceRequest": "Trails::Rack::SilenceRequest",
       "source-annotation-extractor.ts::Annotation": "Trails::SourceAnnotationExtractor::Annotation",
-      "source-annotation-extractor.ts::Parser": "Trails::SourceAnnotationExtractor::ParserExtractor::Parser",
       "source-annotation-extractor.ts::ParserExtractor": "Trails::SourceAnnotationExtractor::ParserExtractor",
       "source-annotation-extractor.ts::PatternExtractor": "Trails::SourceAnnotationExtractor::PatternExtractor",
       "source-annotation-extractor.ts::SourceAnnotationExtractor": "Trails::SourceAnnotationExtractor",

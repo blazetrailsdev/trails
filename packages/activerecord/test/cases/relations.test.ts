@@ -1881,15 +1881,14 @@ describe("RelationTest", () => {
     expect(parrot.color).toBe("green");
   });
 
-  it.skip("first or initialize with block", async () => {
-    // BLOCKED: after_initialize count — Bird's afterInitialize sets totalCount from an async Bird.count(), so it is still 0 when read (bird-total-count-async-after-initialize)
+  it("first or initialize with block", async () => {
     const canary = await Bird.createBang({ color: "yellow", name: "canary" });
     const parrot = await Bird.where({ color: "green" }).firstOrInitialize(
       undefined,
-      (bird: Bird) => {
+      async (bird: Bird) => {
         bird.name = "parrot";
         bird.enableCount = true;
-        expect(canary).toBeTruthy();
+        expect(await Bird.findByBang({ name: "canary" })).toEqual(canary);
       },
     );
     expect(parrot.totalCount).toBe(1);

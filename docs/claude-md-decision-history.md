@@ -34,7 +34,7 @@ Every route around it was tried and each one loses more fidelity than it buys:
 ## Call-time constant resolution (Ruby autoload → ES imports)
 
 **The "ESM has no equivalent" premise was corrected on 2026-10-22** (RFC 0205,
-ruled by the repo owner). The section had read "Every `import` is eager and
+ruled by the operator). The section had read "Every `import` is eager and
 evaluated before the importing module's body, so naming a constant in a method
 body still costs a module-eval edge", and the second half does not follow from
 the first: an ESM import binding is live and is read when the expression runs,
@@ -59,7 +59,7 @@ still plain imports, `nodes/node.ts`'s `new Nodes.Not(this)` among them.
 
 Two shapes were rejected on the way. Converging the seat onto a plain
 `Owner.Name = Klass` assignment and keeping every read going through the
-namespace was the repo owner's first reading of the problem and was rejected as
+namespace was the operator's first reading of the problem and was rejected as
 a relabeling: the 790 calls become 790 assignments, the import graph still says
 nothing about where a class comes from, and the reader still cannot tell
 ("I only want the namespace seating when necessary, I want to lean on ES
@@ -312,7 +312,7 @@ The `Promise::Complete` sites in Rails: `calculate`'s `none` arms
 ## An action's name is its method's name
 
 trails#8573 briefly made `action_name` the Rails (underscored) spelling and
-mapped it to the method; the repo owner reversed it. The reasoning: an
+mapped it to the method; the operator reversed it. The reasoning: an
 application names its own methods and should not have to name them in a
 spelling they do not have, and two spellings for one action with a conversion
 between them somewhere was the alternative.
@@ -320,18 +320,18 @@ between them somewhere was the alternative.
 ## A record is built with `new Klass` only
 
 A static `new` beside the constructor was tried on trails#8659 and rejected by
-the repo owner. Both variants were built on that PR: one where the bare `new`
+the operator. Both variants were built on that PR: one where the bare `new`
 skipped the abstract check and the STI dispatch, and one where the constructor
 re-entered the static method through a marker and ran twice.
 
 ## Trilogy is out of scope
 
-Decided by the repo owner on trails#8579 (2026-10-06); the
+Decided by the operator on trails#8579 (2026-10-06); the
 `activerecord-port-trilogy-adapter` story is closed, not blocked.
 
 ## An adapter file is loaded by an awaited step
 
-Ratified by the repo owner on 2026-10-08. Three alternatives were measured
+Ratified by the operator on 2026-10-08. Three alternatives were measured
 first. An async `resolve` makes `adapter_class` a promise under its synchronous
 readers (`quoted_table_name`, `quoted_primary_key`, `disallow_raw_sql!`).
 Importing every built-in adapter eagerly fails for an application that installs
@@ -352,7 +352,7 @@ trails `ddd629745a`: lines calling each helper name in `packages/*/src/**/*.ts`
 with `hash.ts` excluded, which came to about 336 helper call sites in source
 once member calls on ported classes were taken out.
 
-The repo owner ruled on 2026-10-10: "I don't want things to use hash or
+The operator ruled on 2026-10-10: "I don't want things to use hash or
 hashwithindifferentaccess unless specific features are necessary." RFC 0190
 then taught the TS extractor to mark each native form (`@in`, `@delete`,
 `@assign`, `@spread`, `@entries`) with its receiver's name, and the comparator
@@ -370,7 +370,7 @@ zero helper calls.
 
 ## A translation lookup is synchronous; the load is an awaited step
 
-Ratified by the repo owner on 2026-10-21, after `i18n-backend-cache`
+Ratified by the operator on 2026-10-21, after `i18n-backend-cache`
 (RFC 0193) was filed to port `I18n::Backend::Cache` and twice failed to find a
 shape.
 
@@ -437,7 +437,7 @@ Settled by trails#9180, which also records why the parked
 
 ## Constant lookup and the autoloader: two reversals
 
-The repo owner reversed two rulings on 2026-10-30, in RFC 0213.
+The operator reversed two rulings on 2026-10-30, in RFC 0213.
 
 - **"Constant lookup is an import or a registry" (2026-10-28).** It kept
   `constantize` out of Rails bodies in favour of `registerX` read sides. That
