@@ -30,6 +30,7 @@ export default defineConfig({
       { text: "Docs", link: "/" },
       { text: "Guides", link: "/guides/" },
       { text: "Packages", link: "/packages/" },
+      { text: "Examples", link: "/examples" },
       { text: "Website", link: siteRoot },
       { text: "API Reference", link: "/api/@blazetrails/arel/README" },
     ],
@@ -40,6 +41,7 @@ export default defineConfig({
           text: "Overview",
           items: [
             { text: "Guides", link: "/guides/" },
+            { text: "Getting Started", link: "/guides/getting-started" },
             { text: "Trails Idioms", link: "/guides/idioms" },
           ],
         },

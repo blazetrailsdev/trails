@@ -17,10 +17,10 @@ ratified deviations from Rails are on its [package page](/packages/).
 
 ## Start Here
 
-| Rails guide                | Trails guide                                                                                                                                    | Packages                                                                                                                                         |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Getting Started with Rails | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-getting-started-guide.md)) | [trailties](/packages/trailties), [activerecord](/packages/activerecord), [actionpack](/packages/actionpack), [actionview](/packages/actionview) |
-| Install Ruby on Rails      | Not applicable: trails installs with pnpm; the Node setup is in [Getting Started](#start-here).                                                 | —                                                                                                                                                |
+| Rails guide                | Trails guide                                                                                             | Packages                                                                                                                                         |
+| -------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Getting Started with Rails | [Getting Started with Trails](./getting-started.md)                                                      | [trailties](/packages/trailties), [activerecord](/packages/activerecord), [actionpack](/packages/actionpack), [actionview](/packages/actionview) |
+| Install Ruby on Rails      | Not applicable: trails installs with pnpm; the Node setup is in [Getting Started](./getting-started.md). | —                                                                                                                                                |
 
 ## Models
 

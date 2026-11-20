@@ -1,0 +1,30 @@
+{
+  "name": "@blazetrails/example-cloudflare-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A minimal trails app bundled with esbuild and run on Cloudflare Workers, on PostgreSQL through Hyperdrive",
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "dev": "bash scripts/build.sh && wrangler dev",
+    "deploy": "bash scripts/deploy.sh",
+    "db:migrate": "node bin/trails db:migrate",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trailties": "workspace:*"
+  },
+  "devDependencies": {
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@cloudflare/workers-types": "^4.20251101.0",
+    "@types/node": "^25.3.5",
+    "esbuild": "0.27.3",
+    "wrangler": "^4.86.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@blazetrails/rack": ["./node_modules/@blazetrails/rack/dist/index.d.ts"]
+    }
+  },
+  "include": ["app", "config", "db", "worker", "Rakefile.ts", "config.ts"]
+}

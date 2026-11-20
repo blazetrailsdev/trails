@@ -1,10 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { classModule, NameError, NoMethodError } from "@blazetrails/ruby-compat";
 
 import { Delegation, DelegationError } from "../lib/delegation.js";
 import { delegate } from "../lib/module-ext.js";
 
 describe("Delegation.generate", () => {
+  it("delegates where code generation from strings raises EvalError", () => {
+    vi.stubGlobal("Function", function () {
+      throw new EvalError("Code generation from strings disallowed for this context");
+    });
+    try {
+      class Box {
+        inner = { size: () => 3 };
+        declare size: () => number;
+      }
+      delegate.call(Box.prototype, "size", { to: "inner" });
+      expect(new Box().size()).toBe(3);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("answers nil.to_s for a toString delegated to a nil target with allowNil", () => {
     class Message {
       content: string | null = null;

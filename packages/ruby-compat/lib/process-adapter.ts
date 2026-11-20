@@ -956,7 +956,11 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       const nodeModule = proc.getBuiltinModule?.("node:module") as
         | { setSourceMapsSupport?(enabled: boolean): void }
         | undefined;
-      nodeModule?.setSourceMapsSupport?.(enabled);
+      try {
+        nodeModule?.setSourceMapsSupport?.(enabled);
+      } catch (e) {
+        if ((e as { code?: unknown }).code !== "ERR_METHOD_NOT_IMPLEMENTED") throw e;
+      }
     },
     registerHooks: (hooks) => {
       const nodeModule = proc.getBuiltinModule?.("node:module") as
