@@ -1,32 +1,21 @@
 import { Notifications } from "./notifications.js";
-import { rbModMethodDefined } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModMethodDefined, TypeError } from "@blazetrails/ruby-compat";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 import type { NotificationSubscriber } from "./notifications.js";
 import type { Event } from "./notifications/instrumenter.js";
 
+/** @noRailsEquivalent PERMANENT */
 function snakeCase(str: string): string {
   return str.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 }
 
+/** @noRailsEquivalent PERMANENT */
 function camelCase(str: string): string {
+  if (str.endsWith("?")) {
+    const base = camelCase(str.slice(0, -1));
+    return "is" + base.charAt(0).toUpperCase() + base.slice(1);
+  }
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-const ALREADY_PREDICATE_RE = /^(has|supports|can|should|needs|includes|responds|allows|uses)/;
-
-function eventMethodCandidates(snakeMethod: string): string[] {
-  const camel = camelCase(snakeMethod);
-  if (!snakeMethod.endsWith("?")) return [camel, snakeMethod];
-  const base = snakeMethod.slice(0, -1);
-  const baseCamel = camelCase(base);
-  const isPrefixed = "is" + baseCamel.charAt(0).toUpperCase() + baseCamel.slice(1);
-  const query = baseCamel + "Q";
-  const named = base.startsWith("is_")
-    ? [baseCamel, query]
-    : ALREADY_PREDICATE_RE.test(base)
-      ? [baseCamel, isPrefixed, query]
-      : [isPrefixed, baseCamel, query];
-  return [...named, camel, snakeMethod];
 }
 
 export class Subscriber {
@@ -76,10 +65,9 @@ export class Subscriber {
     this._notifier = undefined;
   }
 
-  /** @inventedArm replace — PERMANENT */
   static methodAdded(event: string): void {
     if (rbModMethodDefined(this, event) && this.notifier) {
-      event = event.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+      event = snakeCase(event);
       this.addEventSubscriber(event);
     }
   }
@@ -171,25 +159,20 @@ export class Subscriber {
     this.patterns = new Map();
   }
 
-  call(event: Event): void {
-    const dotIdx = event.name.indexOf(".");
-    if (dotIdx === -1) return;
-    const snakeMethod = event.name.slice(0, dotIdx);
-    const method =
-      eventMethodCandidates(snakeMethod).find(
-        (candidate) => typeof Reflect.get(this, candidate) === "function",
-      ) ?? null;
-    if (method) (Reflect.get(this, method) as (event: Event) => void).call(this, event);
+  call(event: Event): unknown {
+    const method = event.name.slice(0, _index(event.name, "."));
+    return rbFSend(this, camelCase(method), event);
   }
 
-  publishEvent(event: Event): void {
-    const dotIdx = event.name.indexOf(".");
-    if (dotIdx === -1) return;
-    const snakeMethod = event.name.slice(0, dotIdx);
-    const method =
-      eventMethodCandidates(snakeMethod).find(
-        (candidate) => typeof Reflect.get(this, candidate) === "function",
-      ) ?? null;
-    if (method) (Reflect.get(this, method) as (event: Event) => void).call(this, event);
+  publishEvent(event: Event): unknown {
+    const method = event.name.slice(0, _index(event.name, "."));
+    return rbFSend(this, camelCase(method), event);
   }
+}
+
+/** @noRailsEquivalent PERMANENT */
+function _index(str: string, substring: string): number {
+  const index = str.indexOf(substring);
+  if (index === -1) throw new TypeError("no implicit conversion from nil to integer");
+  return index;
 }

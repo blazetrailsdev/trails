@@ -15,21 +15,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason: "CONVERGEABLE activesupport-port-i18n-railtie",
   },
   // The activesupport `core_ext/*` tail with no trails counterpart (RFC 0072).
-  {
-    pattern: "core_ext/kernel/singleton_class.rb",
-    package: "activesupport",
-    reason: "CONVERGEABLE activesupport-port-kernel-singleton-class",
-  },
-  {
-    pattern: "core_ext/pathname/existence.rb",
-    package: "activesupport",
-    reason: "CONVERGEABLE activesupport-port-pathname-existence",
-  },
-  {
-    pattern: "core_ext/regexp.rb",
-    package: "activesupport",
-    reason: "CONVERGEABLE activesupport-port-core-ext-regexp",
-  },
   // Out-of-closure activesupport families (RFC 0072). trails' scope for the
   // support gems is the `require "active_support/…"` closure of
   // activerecord/lib + activemodel/lib — the set `scripts/api-compare/ar-closure.ts`
@@ -100,12 +85,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     package: "activesupport",
     reason:
       'PERMANENT: exists only to drive the `Parallelization` worker pool or a thread pool for Minitest; vitest owns worker scheduling — CLAUDE.md \u00a7 "Runtime facts Node does not expose", the `fork` bullet (RFC 0246 Open question 2, ruled by the operator on 2026-11-19).',
-  },
-  {
-    pattern: "fork_tracker.rb",
-    testFile: "fork_tracker_test.rb",
-    package: "activesupport",
-    reason: "CONVERGEABLE activesupport-port-fork-tracker",
   },
   {
     pattern: "/railtie.rb",

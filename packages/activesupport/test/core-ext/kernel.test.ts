@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { enableWarnings, silenceWarnings } from "../../lib/core-ext/kernel/reporting.js";
 import { suppress } from "../../lib/core-ext/kernel/reporting.js";
-import { ArgumentError, LoadError, verbose } from "@blazetrails/ruby-compat";
+import { ArgumentError, LoadError, rbObjSingletonClass, verbose } from "@blazetrails/ruby-compat";
+import { classEval } from "../../lib/core-ext/kernel/singleton-class.js";
 import { assertNil } from "../../lib/testing/assertions.js";
 
 describe("KernelTest", () => {
@@ -42,13 +43,12 @@ describe("KernelTest", () => {
   });
 
   it("class eval", () => {
-    const o = class {
-      static x = 1;
-    };
+    const o = {};
+    (rbObjSingletonClass(o) as unknown as { x: number }).x = 1;
     expect(
-      function (this: { x: number }) {
-        return this.x;
-      }.call(o),
+      classEval.call(o, function (this: object) {
+        return (this as { x: number }).x;
+      }),
     ).toEqual(1);
   });
 });
