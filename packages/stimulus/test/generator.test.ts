@@ -6,7 +6,7 @@ import { StimulusGenerator } from "../lib/generators/stimulus/stimulus-generator
 
 class StimulusGeneratorTest extends TestCase {}
 StimulusGeneratorTest.tests(StimulusGenerator);
-StimulusGeneratorTest.destination(File.expandPath("tmp", import.meta.dirname));
+StimulusGeneratorTest.destination(File.expandPath("../tmp", import.meta.dirname));
 registerSpecType(/^StimulusGeneratorTest$/, StimulusGeneratorTest);
 let t: TestCase;
 
