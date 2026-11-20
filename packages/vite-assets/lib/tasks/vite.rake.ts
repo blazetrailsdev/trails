@@ -15,7 +15,6 @@ DSL.namespace("vite", () => {
   DSL.task(
     { build: "vite:verify_install" },
     block(async () => {
-      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().buildFromTask();
     }),
   );
@@ -24,7 +23,6 @@ DSL.namespace("vite", () => {
   DSL.task(
     { build_ssr: "vite:verify_install" },
     block(async () => {
-      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().buildFromTask("--ssr");
     }),
   );
@@ -33,7 +31,6 @@ DSL.namespace("vite", () => {
   DSL.task(
     { build_all: "vite:verify_install" },
     block(async () => {
-      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().buildFromTask();
       if (ViteAssets.config().ssrBuildEnabled) {
         await ViteAssets.commands().buildFromTask("--ssr");
@@ -45,7 +42,6 @@ DSL.namespace("vite", () => {
   DSL.task(
     { clobber: "vite:verify_install" },
     block(async () => {
-      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().clobber();
     }),
   );
