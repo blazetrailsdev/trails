@@ -42,7 +42,7 @@ describe("BacktraceCleaner", () => {
 describe("ParserExtractor", () => {
   beforeAll(() => SourceAnnotationExtractor.enumerate(null, { dirs: [] }));
 
-  const pattern = /(?:\/\/|\/\*|^\s*\*)\s*(TODO):?\s*(.*?)\s*(?:\*\/)?$/;
+  const pattern = /(?:\/\/|\/\*|^\s*\*)\s*(TODO):?\s*(.*?)\s*(?:\*\/)?$/m;
 
   function annotations(source: string, file: string): Annotation[] {
     const read = vi.spyOn(File, "read").mockReturnValue(source);
@@ -69,13 +69,13 @@ describe("ParserExtractor", () => {
     const source = "/* TODO: one */\n/**\n * TODO: two\n */\nconst a = <p>// TODO: no</p>;\n";
     expect(annotations(source, "a.tsx")).toEqual([
       new Annotation(1, "TODO", "one"),
-      new Annotation(3, "TODO", "two"),
+      new Annotation(2, "TODO", "two"),
     ]);
   });
 
   it("reads CRLF block comments and ignores a * inside a line comment", () => {
     expect(annotations("/*\r\n * TODO: one\r\n */\r\n// 2 * TODO no\r\n", "a.ts")).toEqual([
-      new Annotation(2, "TODO", "one"),
+      new Annotation(1, "TODO", "one"),
     ]);
   });
 

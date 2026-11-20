@@ -92,12 +92,9 @@ export class ParserExtractor {
       const end = literals.get(start);
       if (end !== undefined) scanner.resetTokenState(end);
       else if (kind === SingleLineCommentTrivia || kind === MultiLineCommentTrivia) {
-        let startLine = result.getLineAndCharacterOfPosition(start).line + 1;
-        for (const slice of scanner.getTokenText().split(/\r?\n/)) {
-          const m = slice.match(this.pattern);
-          if (m) comments.push(new Annotation(startLine, m[1], m[2]));
-          startLine += 1;
-        }
+        const startLine = result.getLineAndCharacterOfPosition(start).line + 1;
+        const m = scanner.getTokenText().match(this.pattern);
+        if (m) comments.push(new Annotation(startLine, m[1], m[2]));
       }
       kind = scanner.scan();
     }

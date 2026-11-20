@@ -88,7 +88,7 @@ export class ScaffoldGenerator extends Base {
         ...this.controllerClassPath(),
         `${dasherize(this.controllerFileName)}-controller.test${this.ext()}`,
       ),
-      TEMPLATES[templateFile].call(this),
+      await this.insideTemplate(async () => TEMPLATES[templateFile].call(this)),
     );
   }
 
