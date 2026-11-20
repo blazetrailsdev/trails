@@ -1471,7 +1471,7 @@
     }
   },
   "tzinfo": {
-    "rows": 41,
+    "rows": 49,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1490,6 +1490,14 @@
       "data-sources/timezone-info.ts::TimezoneInfo": "TZInfo::DataSources::TimezoneInfo",
       "data-sources/transitions-data-timezone-info.ts::TransitionsDataTimezoneInfo": "TZInfo::DataSources::TransitionsDataTimezoneInfo",
       "data-timezone.ts::DataTimezone": "TZInfo::DataTimezone",
+      "format1/country-definer.ts::CountryDefiner": "TZInfo::Format1::CountryDefiner",
+      "format1/country-index-definition.ts::ClassMethods": "TZInfo::Format1::CountryIndexDefinition::ClassMethods",
+      "format1/country-index-definition.ts::CountryIndexDefinition": "TZInfo::Format1::CountryIndexDefinition",
+      "format1/timezone-definer.ts::TimezoneDefiner": "TZInfo::Format1::TimezoneDefiner",
+      "format1/timezone-definition.ts::ClassMethods": "TZInfo::Format1::TimezoneDefinition::ClassMethods",
+      "format1/timezone-definition.ts::TimezoneDefinition": "TZInfo::Format1::TimezoneDefinition",
+      "format1/timezone-index-definition.ts::ClassMethods": "TZInfo::Format1::TimezoneIndexDefinition::ClassMethods",
+      "format1/timezone-index-definition.ts::TimezoneIndexDefinition": "TZInfo::Format1::TimezoneIndexDefinition",
       "format2/country-definer.ts::CountryDefiner": "TZInfo::Format2::CountryDefiner",
       "format2/country-index-definer.ts::CountryIndexDefiner": "TZInfo::Format2::CountryIndexDefiner",
       "format2/country-index-definition.ts::ClassMethods": "TZInfo::Format2::CountryIndexDefinition::ClassMethods",

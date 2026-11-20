@@ -39,7 +39,7 @@ export class TimezoneDefiner {
     this.previousOffset ??= offset;
   }
 
-  transition(offsetId: string, timestampValue: number): void {
+  transition(offsetId: string, timestampValue: number, ..._rest: unknown[]): void {
     const offset = this.offsets.get(offsetId);
     if (!offset) throw new ArgumentError("offset_id has not been defined");
     if (

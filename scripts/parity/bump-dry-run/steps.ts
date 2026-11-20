@@ -121,6 +121,11 @@ export const NOT_EXERCISED: {
     reason: "TS-side only",
   },
   {
+    name: "tzinfo-data generator freshness check",
+    covers: ["scripts/generate-tzinfo-data"],
+    reason: "reads the vendored tzinfo tree, not the Rails ref",
+  },
+  {
     name: "Missing-call reasons gate",
     covers: ["scripts/api-compare/lint-missing-rails-call-reasons.ts"],
     reason: "TS-side only",

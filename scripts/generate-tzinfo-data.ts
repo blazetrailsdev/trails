@@ -1,6 +1,6 @@
 /**
  * Generates the TS definition modules `TZInfo::DataSources::RubyDataSource`
- * loads from a tzinfo-data Format 2 tree (`<src>/tzinfo/data/**.rb`), one TS
+ * loads from a tzinfo-data Format 1 or Format 2 tree (`<src>/tzinfo/data/**.rb`), one TS
  * module per Ruby file, plus `load-path.ts`, the `TZInfo.loadPath` table
  * `RubyDataSource.load` awaits. Each module opens its Ruby modules on the
  * `TZInfo` namespace and makes the same definer calls, in the same order.
@@ -15,10 +15,13 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const MIXINS: Record<string, string> = {
-  "Format2::TimezoneDefinition": "TimezoneDefinition",
-  "Format2::TimezoneIndexDefinition": "TimezoneIndexDefinition",
-  "Format2::CountryIndexDefinition": "CountryIndexDefinition",
+const MIXINS: Record<string, [format: "Format1" | "Format2", mixin: string]> = {
+  TimezoneDefinition: ["Format1", "TimezoneDefinition"],
+  TimezoneIndexDefinition: ["Format1", "TimezoneIndexDefinition"],
+  CountryIndexDefinition: ["Format1", "CountryIndexDefinition"],
+  "Format2::TimezoneDefinition": ["Format2", "TimezoneDefinition"],
+  "Format2::TimezoneIndexDefinition": ["Format2", "TimezoneIndexDefinition"],
+  "Format2::CountryIndexDefinition": ["Format2", "CountryIndexDefinition"],
 };
 
 function rubyString(literal: string): string {
@@ -41,7 +44,7 @@ export function translate(source: string): string {
   const out: string[] = [];
   const modules: string[] = [];
   const blocks: ("module" | "block")[] = [];
-  let mixin: string | null = null;
+  let mixin: [format: string, mixin: string] | null = null;
   const indent = () => "  ".repeat(blocks.filter((b) => b === "block").length);
 
   for (const raw of source.split("\n")) {
@@ -63,7 +66,7 @@ export function translate(source: string): string {
     } else if ((m = line.match(/^include (\S+)$/))) {
       mixin = MIXINS[m[1]];
       if (mixin === undefined) throw new Error(`unknown mixin ${m[1]}`);
-      out.push(`include(${modules.at(-1)}, TZInfo.Format2.${mixin});`);
+      out.push(`include(${modules.at(-1)}, TZInfo.${mixin[0]}.${mixin[1]});`);
     } else if ((m = line.match(/^([A-Z]\w*) = (.+)$/))) {
       const value = m[2].startsWith("'")
         ? rubyString(m[2])
@@ -77,7 +80,8 @@ export function translate(source: string): string {
     } else if ((m = line.match(/^(?:(\w+)\.)?(\w+)(?: (?!do \|)(.*?))?(?: do \|(\w+)\|)?$/))) {
       const [, recv, meth, args = "", param] = m;
       const target =
-        recv ?? `(${modules.at(-1)} as unknown as Extended<Format2["${mixin}"]["ClassMethods"]>)`;
+        recv ??
+        `(${modules.at(-1)} as unknown as Extended<${mixin![0]}["${mixin![1]}"]["ClassMethods"]>)`;
       const call = `${indent()}${target}.${camelize(meth)}(${translateArgs(args)}`;
       if (param !== undefined) {
         out.push(`${call}${args ? ", " : ""}(${param}) => {`);
@@ -96,9 +100,9 @@ export function translate(source: string): string {
     `import { ${imports.join(", ")} } from "@blazetrails/ruby-compat";`,
     "",
     "type Namespace = { [name: string]: unknown };",
-    ...(uses.includes("Extended<")
-      ? ['type Format2 = NonNullable<typeof TopLevel.TZInfo>["Format2"];']
-      : []),
+    ...(["Format1", "Format2"] as const)
+      .filter((format) => uses.includes(`Extended<${format}[`))
+      .map((format) => `type ${format} = NonNullable<typeof TopLevel.TZInfo>["${format}"];`),
     "",
     ...out,
     "",
@@ -121,6 +125,7 @@ export async function generate(src: string, out: string, location: string): Prom
   const loadPath: string[] = [`  "tzinfo/data": () => import("./tzinfo/data.js"),`];
   for (const file of await rubyFiles(dataDir)) {
     const rel = relative(src, file).replace(/\.rb$/, "");
+    if (!/^tzinfo\/data\/(definitions\/|indexes\/|version$)/.test(rel)) continue;
     const target = join(out, `${rel}.ts`);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, translate(await readFile(file, "utf8")));
@@ -160,5 +165,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error("usage: generate-tzinfo-data.ts <src> <out> <location>");
     process.exit(1);
   }
-  await generate(src, out, location);
+  generate(src, out, location).catch((error: unknown) => {
+    console.error(error);
+    process.exit(1);
+  });
 }
