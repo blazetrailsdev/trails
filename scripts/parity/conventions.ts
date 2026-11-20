@@ -1158,6 +1158,21 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      'PERMANENT: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": ' +
+      "Puma (`web_server_gemfile_entry`), propshaft (`asset_pipeline_gemfile_entry`), jbuilder " +
+      "(`jbuilder_gemfile_entry`) and `bundle lock --add-platform` (`add_bundler_platforms`) " +
+      "are rows that section marks not ported.",
+    names: [
+      "web_server_gemfile_entry",
+      "asset_pipeline_gemfile_entry",
+      "jbuilder_gemfile_entry",
+      "add_bundler_platforms",
+    ],
+    rubyFiles: ["generators/app_base.rb"],
+    packages: ["trailties"],
+  },
+  {
+    reason:
       'PERMANENT: trailties CLAUDE.md, "`TestParser` reads TypeScript, so its Ripper fallback is not ported". ' +
       "`class TestParser < Ripper` (test_unit/test_parser.rb:52-133) is the " +
       "fallback for a Ruby without Prism, parsing Ruby through Ripper's event " +
@@ -1519,6 +1534,16 @@ const RUBY_ONLY_CLASS_FQNS = new Set(RUBY_ONLY_CLASSES.map((c) => c.fqn));
  * Unlike {@link RUBY_ONLY_CLASSES}, the method comparison still scores it.
  */
 export const INHERITANCE_SKIP_CLASSES: RubyOnlyClass[] = [
+  {
+    fqn: "Rails::TestUnitReporter",
+    reason:
+      'PERMANENT: packages/trailties/CLAUDE.md, "`TestUnitReporter` has no `Minitest::StatisticsReporter` superclass (`test_unit/reporter.rb:7`)".',
+  },
+  {
+    fqn: "Rails::TestUnit::TestParser",
+    reason:
+      'PERMANENT: packages/trailties/CLAUDE.md, "`TestParser` reads TypeScript, so its Ripper fallback is not ported": `class TestParser < Ripper` (test_unit/test_parser.rb:52) is the fallback.',
+  },
   {
     fqn: "ActionView::DependencyTracker::RubyTracker",
     reason:
