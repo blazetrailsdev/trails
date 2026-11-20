@@ -1283,6 +1283,9 @@ importers:
         specifier: workspace:*
         version: link:../trailties
     devDependencies:
+      '@blazetrails/sqlite3':
+        specifier: workspace:*
+        version: link:../sqlite3
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc
