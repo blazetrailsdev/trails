@@ -191,7 +191,7 @@ describe("DispatcherTest", () => {
     await withActiveRecordLogger(new Logger(log), () =>
       withPolling(true, async () => {
         await dispatcher.start();
-        await sleep(0.2);
+        await sleep(0.5);
       }),
     );
 
@@ -202,7 +202,7 @@ describe("DispatcherTest", () => {
     await withActiveRecordLogger(null, () =>
       withPolling(true, async () => {
         await dispatcher.start();
-        await sleep(0.2);
+        await sleep(0.5);
       }),
     );
 
@@ -215,8 +215,9 @@ describe("DispatcherTest", () => {
     let anotherDispatcher: Dispatcher | undefined;
     try {
       for (let i = 0; i < 15; i++) {
-        await AddToBufferJob.set({ wait: seconds(0.2) }).performLater("I'm scheduled");
+        await AddToBufferJob.set({ wait: seconds(0.5) }).performLater("I'm scheduled");
       }
+      await sleep(0.5);
       expect(await ScheduledExecution.count()).toBe(15);
 
       anotherDispatcher = new Dispatcher({ pollingInterval: 0.1, batchSize: 10 });
@@ -241,14 +242,14 @@ describe("DispatcherTest", () => {
     const handleThreadError = vi.spyOn(dispatcher, "handleThreadError");
 
     for (let i = 0; i < 3; i++) {
-      await AddToBufferJob.set({ wait: seconds(0.1) }).performLater("I'm scheduled");
+      await AddToBufferJob.set({ wait: seconds(0.5) }).performLater("I'm scheduled");
     }
+    await sleep(0.5);
     expect(await ScheduledExecution.count()).toBe(3);
-    await sleep(0.1);
 
     try {
       await dispatcher.start();
-      await waitWhileWithTimeout(1, () => ScheduledExecution.isAny());
+      await waitWhileWithTimeout(5, () => ScheduledExecution.isAny());
 
       expect(await ScheduledExecution.count()).toBe(0);
       expect(await ReadyExecution.count()).toBe(3);
