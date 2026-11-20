@@ -44,14 +44,7 @@ import {
   assertNotDeprecated,
   collectDeprecations,
 } from "./testing/deprecation.js";
-import {
-  TimeHelpers,
-  travel,
-  travelTo,
-  travelBack,
-  freezeTime,
-  unfreezeTime,
-} from "./testing/time-helpers.js";
+import { TimeHelpers } from "./testing/time-helpers.js";
 import { FileFixtures } from "./testing/file-fixtures.js";
 import "./executor/test-helper.js";
 import "./current-attributes/test-helper.js";
@@ -138,12 +131,6 @@ export class TestCase extends Minitest.Test {
   static collectDeprecations = collectDeprecations;
 
   static stubConst = stubConst;
-
-  static travel = travel;
-  static travelTo = travelTo;
-  static travelBack = travelBack;
-  static freezeTime = freezeTime;
-  static unfreezeTime = unfreezeTime;
 }
 
 include(TestCase, TaggedLogging);

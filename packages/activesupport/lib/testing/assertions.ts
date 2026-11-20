@@ -1,4 +1,4 @@
-import { indexWith } from "../enumerable-utils.js";
+import { indexWith } from "../core-ext/enumerable.js";
 
 import {
   Dir,

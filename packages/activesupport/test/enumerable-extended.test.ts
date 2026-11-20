@@ -1,11 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { sum, any } from "../lib/enumerable-utils.js";
 import {
-  sum,
   indexBy,
   minimum,
   maximum,
   compactBlank,
-  any,
   many,
   excluding,
   including,
@@ -15,7 +14,7 @@ import {
   pick,
   sole,
   pluck,
-} from "../lib/enumerable-utils.js";
+} from "../lib/core-ext/enumerable.js";
 
 interface Payment {
   price: number;
