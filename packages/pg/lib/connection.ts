@@ -126,7 +126,7 @@ export class Connection {
   }
 
   serverVersion(): number {
-    if (this.status() !== PG.CONNECTION_OK) return 0;
+    if (this.status() === PG.CONNECTION_BAD) return 0;
     return this.sversion;
   }
 
