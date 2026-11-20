@@ -251,6 +251,12 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "turbo-rails:streams/action_broadcast_job.rb": "app/jobs/turbo/streams/action-broadcast-job.ts",
   "turbo-rails:streams/broadcast_job.rb": "app/jobs/turbo/streams/broadcast-job.ts",
   "turbo-rails:streams/broadcast_stream_job.rb": "app/jobs/turbo/streams/broadcast-stream-job.ts",
+  "turbo-rails:frames/frame_request.rb": "app/controllers/turbo/frames/frame-request.ts",
+  "turbo-rails:immediate_debouncer.rb": "app/models/turbo/immediate-debouncer.ts",
+  "turbo-rails:request_id_tracking.rb": "app/controllers/concerns/turbo/request-id-tracking.ts",
+  "turbo-rails:streams/broadcasts.rb": "app/channels/turbo/streams/broadcasts.ts",
+  "turbo-rails:streams/turbo_streams_tag_builder.rb":
+    "app/controllers/turbo/streams/turbo-streams-tag-builder.ts",
   // Real ports that live under a different file name than the Ruby one, found
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.

@@ -24,7 +24,8 @@ export class ContentLength {
     ) {
       response[2] = body = rbCheckArrayType(body) as Array<string | Uint8Array>;
       const totalSize = body.reduce(
-        (sum: number, chunk: string | Uint8Array) => sum + Buffer.byteLength(chunk),
+        (sum: number, chunk: string | Uint8Array) =>
+          sum + Buffer.byteLength(chunk instanceof Uint8Array ? chunk : String(chunk)),
         0,
       );
       headers[CONTENT_LENGTH] = String(totalSize);

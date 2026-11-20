@@ -165,6 +165,22 @@ export const CROSS_PACKAGE_TEST_FILES: Record<string, { package: string; tsFile:
     package: "actiontext",
     tsFile: "system/rich-text-editor.system.test.ts",
   },
+  "turbo-rails:capybara_selectors_test.rb": {
+    package: "turbo-rails",
+    tsFile: "capybara-selectors.system.test.ts",
+  },
+  "turbo-rails:system/broadcasts_test.rb": {
+    package: "turbo-rails",
+    tsFile: "system/broadcasts.system.test.ts",
+  },
+  "turbo-rails:system/form_submissions_test.rb": {
+    package: "turbo-rails",
+    tsFile: "system/form-submissions.system.test.ts",
+  },
+  "turbo-rails:system/assertions_test.rb": {
+    package: "turbo-rails",
+    tsFile: "system/assertions.system.test.ts",
+  },
 };
 
 /**

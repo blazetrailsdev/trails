@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import { TestCase } from "@blazetrails/actionview/test-case.js";
 import { File } from "@blazetrails/ruby-compat";
+import { Assertion, assertRaises } from "@blazetrails/activesupport/testing/assertions";
+import type { TestAssertions } from "../../lib/test-assertions.js";
 import { app } from "../test-helper.js";
 import { ApplicationController } from "../dummy/app/controllers/application-controller.js";
 import "../dummy/app/controllers/trays-controller.js";
@@ -54,8 +56,7 @@ describe("Turbo::FrameRequestControllerTest", () => {
     t.assertSelect("meta[name=alternative][content=present]");
   });
 
-  // BLOCKED: rack-etag-digests-only-array-bodies
-  it.skip("frame requests get a unique etag", async () => {
+  it("frame requests get a unique etag", async () => {
     await t.get(trayPath({ id: 1 }));
     const etagWithoutFrame = t.response.headers.get("ETag");
 
@@ -91,5 +92,43 @@ describe("Turbo::FrameRequestViewTest", () => {
     tc.assertDom("html head title", { text: "Dummy" });
     tc.assertDom("html body:not(.turbo-native)");
     tc.assertDom("html body:not(.turbo-native) turbo-frame#tray");
+  });
+
+  describe("Turbo::TestAssertions::FrameTest", () => {
+    type Host = IntegrationTest &
+      Pick<typeof TestAssertions, "assertTurboFrame" | "assertNoTurboFrame"> & {
+        domId(recordOrClass: unknown, prefix?: string | null): string;
+      };
+    let t: Host;
+
+    beforeEach(() => {
+      t = new IntegrationTest(expect.getState().currentTestName!) as Host;
+      t.app = app;
+      app.reloadRoutesUnlessLoaded();
+    });
+
+    it("assert_turbo_frame passes with matching frame", async () => {
+      await t.get(trayPath({ id: 1 }));
+      t.assertTurboFrame("tray");
+    });
+
+    it("assert_turbo_frame fails without matching frame", async () => {
+      await t.get(trayPath({ id: 1 }));
+      await assertRaises([Assertion], {}, () => {
+        t.assertTurboFrame("missing");
+      });
+    });
+
+    it("assert_no_turbo_frame fails with matching frame", async () => {
+      await t.get(trayPath({ id: 1 }));
+      await assertRaises([Assertion], {}, () => {
+        t.assertNoTurboFrame("tray");
+      });
+    });
+
+    it("assert_no_turbo_frame fails without matching frame", async () => {
+      await t.get(trayPath({ id: 1 }));
+      t.assertNoTurboFrame("missing");
+    });
   });
 });

@@ -1280,6 +1280,45 @@ export function extractFromProgram(
       }
     });
 
+    // `onLoad("…", () => { class X extends … {} Ns.X = X; })` — Ruby's
+    // `on_load(…) { class Ns::X … end }`: a class a load hook defines and seats.
+    const visitHookClasses = (node: ts.Node): void => {
+      ts.forEachChild(node, visitHookClasses);
+      if (!ts.isBlock(node) || ts.isSourceFile(node.parent)) return;
+      for (const stmt of node.statements) {
+        if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
+        const name = stmt.name.text;
+        const seated = node.statements.some(
+          (other) =>
+            ts.isExpressionStatement(other) &&
+            ts.isBinaryExpression(other.expression) &&
+            other.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+            ts.isPropertyAccessExpression(other.expression.left) &&
+            other.expression.left.name.text === name &&
+            ts.isIdentifier(other.expression.right) &&
+            other.expression.right.text === name,
+        );
+        if (!seated || info.classes[`${relPath}:${name}`]) continue;
+        let hooked = false;
+        for (let cur: ts.Node | undefined = node.parent; cur && !hooked; cur = cur.parent) {
+          if (
+            ts.isCallExpression(cur) &&
+            ts.isIdentifier(cur.expression) &&
+            cur.expression.text === "onLoad"
+          ) {
+            hooked = true;
+          }
+        }
+        if (!hooked) continue;
+        const classInfo = extractClass(stmt, checker, relPath, srcDir);
+        if (classInfo) {
+          info.classes[`${relPath}:${name}`] = classInfo;
+          fileHasClassOrModule = true;
+        }
+      }
+    };
+    visitHookClasses(sourceFile);
+
     const staticBlockStatements = sourceFile.statements
       .filter(ts.isClassDeclaration)
       .flatMap((klass) => klass.members.filter(ts.isClassStaticBlockDeclaration))
@@ -4258,18 +4297,43 @@ function sameFileConstStrings(name: string, sourceFile: ts.SourceFile): string[]
  * Ruby's `delegate :m, to: :target` in a class module's body
  * (`core_ext/module/delegation.rb:171`), which defines instance readers only.
  */
+/** The base parameter's name when `node` sits in a module literal's `[included](base)` method. */
+function includedHookBase(node: ts.Node): string | undefined {
+  for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
+    if (
+      ts.isMethodDeclaration(cur) &&
+      ts.isComputedPropertyName(cur.name) &&
+      ts.isIdentifier(cur.name.expression) &&
+      cur.name.expression.text === "included" &&
+      ts.isObjectLiteralExpression(cur.parent)
+    ) {
+      const base = cur.parameters[0]?.name;
+      return base && ts.isIdentifier(base) ? base.text : undefined;
+    }
+  }
+  return undefined;
+}
+
 function readPrototypeDelegateCall(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
   const [recv, ...rest] = node.arguments;
+  const enclosing = enclosingEntity(node);
+  // `included do delegate … end`: `[included](base) { delegate.call(base.prototype, …) }`
+  // on a plain-object Concern defines the delegators on every includer.
+  const hookBase = enclosing?.seatsModule ? includedHookBase(node) : undefined;
   const receiver =
     recv === undefined
       ? undefined
-      : ts.isIdentifier(recv)
-        ? sameFileObjectModule(recv.text, sourceFile)
-        : prototypeReceiver(recv);
-  if (receiver === undefined || enclosingEntity(node) !== undefined) return null;
+      : hookBase !== undefined
+        ? prototypeReceiver(recv) === hookBase
+          ? enclosing!.name
+          : undefined
+        : ts.isIdentifier(recv)
+          ? sameFileObjectModule(recv.text, sourceFile)
+          : prototypeReceiver(recv);
+  if (receiver === undefined || (enclosing !== undefined && hookBase === undefined)) return null;
   const opts = rest.at(-1);
   const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
   if (
