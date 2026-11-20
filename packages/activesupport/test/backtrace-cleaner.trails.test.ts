@@ -50,12 +50,12 @@ describe("BacktraceCleanerKindTest", () => {
 
   it("cleanFrame default returns undefined when silenced", () => {
     const cleaner = build();
-    expect(cleaner.cleanFrame("/gems/rack-1.0/lib/rack.rb")).toBeUndefined();
+    expect(cleaner.cleanFrame("/gems/rack-1.0/lib/rack.rb")).toBeNull();
   });
 
   it("cleanFrame with :noise returns undefined when not silenced", () => {
     const cleaner = build();
-    expect(cleaner.cleanFrame("/app/foo.rb", "noise")).toBeUndefined();
+    expect(cleaner.cleanFrame("/app/foo.rb", "noise")).toBeNull();
   });
 
   it("cleanFrame with :noise returns the filtered frame when silenced", () => {

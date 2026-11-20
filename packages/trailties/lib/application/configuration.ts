@@ -91,7 +91,7 @@ export class Configuration extends EngineConfiguration {
   private _debugExceptionResponseFormat: "default" | "api" | null = null;
   x: Custom = new Custom();
   railtiesOrder: Array<string | { instance(): unknown }> = [":all"];
-  relativeUrlRoot: string | null = null;
+  relativeUrlRoot: string | null = getEnv("TRAILS_RELATIVE_URL_ROOT") ?? null;
   requireMasterKey = false;
   private _secretKeyBase: string | null = null;
   credentials = new InheritableOptions(this.credentialsDefaults()) as InheritableOptions & {

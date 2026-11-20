@@ -54,15 +54,15 @@ export class BacktraceCleaner {
   cleanFrame(
     frame: string | object | number | bigint | boolean | null | undefined,
     kind: CleanKind = "silent",
-  ): string | undefined {
+  ): string | null {
     frame = rbObjAsString(frame);
     for (const f of this._filters) frame = f(rbObjAsString(frame));
 
     switch (kind) {
       case "silent":
-        return this._silencers.some((s) => s(frame)) ? undefined : frame;
+        return this._silencers.some((s) => s(frame)) ? null : frame;
       case "noise":
-        return this._silencers.some((s) => s(frame)) ? frame : undefined;
+        return this._silencers.some((s) => s(frame)) ? frame : null;
       default:
         return frame;
     }
