@@ -1466,7 +1466,7 @@ jobs:
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/sqlite3/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           VITEST_SHARD_DURATIONS: sqlite3
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
@@ -1474,6 +1474,8 @@ jobs:
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
         run: pnpm vitest run $AR_SCOPE --project '!system'
+      - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
+        run: pnpm vitest run packages/sqlite3/
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run packages/activerecord-cli
