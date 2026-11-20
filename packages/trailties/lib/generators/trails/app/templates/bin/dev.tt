@@ -9,7 +9,7 @@ const children = readFileSync("Procfile.dev", "utf8")
   .map((line) => line.match(/^([\w-]+):\s*(.+)$/))
   .filter((match) => match)
   .map(([, name, command]) => {
-    const child = spawn(command, [...process.argv.slice(2)], {
+    const child = spawn(command, {
       shell: true,
       stdio: ["inherit", "pipe", "pipe"],
     });
@@ -20,7 +20,11 @@ const children = readFileSync("Procfile.dev", "utf8")
     return child;
   });
 
+let stopping = false;
+
 function stop(code) {
+  if (stopping) return;
+  stopping = true;
   for (const child of children) if (child.exitCode === null) child.kill("SIGTERM");
   process.exitCode = code;
 }

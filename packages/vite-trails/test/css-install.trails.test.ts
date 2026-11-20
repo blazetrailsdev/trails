@@ -36,8 +36,15 @@ describe("css.rake", () => {
 
   it("css:install:tailwind adds the Vite plugin and imports the stylesheet", async () => {
     await (await Task.get("css:install:tailwind")).invoke();
+    await (await Task.get("css:install:tailwind")).execute();
 
-    expect(commands).toEqual(["pnpm add -D tailwindcss @tailwindcss/vite"]);
+    expect(commands).toEqual([
+      "pnpm add -D tailwindcss @tailwindcss/vite",
+      "pnpm add -D tailwindcss @tailwindcss/vite",
+    ]);
+    expect(
+      (await File.readAsync(rootDir.join("vite.config.ts").toString())).match(/tailwindcss\(\)/g),
+    ).toHaveLength(1);
     expect(await File.readAsync(rootDir.join("vite.config.ts").toString())).toContain(
       "    tailwindcss(),\n    RubyPlugin(),",
     );

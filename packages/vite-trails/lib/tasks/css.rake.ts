@@ -1,5 +1,12 @@
 import { DSL } from "@blazetrails/rake";
-import { block, File, Pathname, rbFSystem, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  block,
+  File,
+  Pathname,
+  rbFSystem,
+  STDOUT as $stdout,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 
 const STYLESHEETS: Record<string, [string, string, string]> = {
   tailwind: ["tailwindcss @tailwindcss/vite", "application.css", `@import "tailwindcss";\n`],
@@ -19,7 +26,10 @@ async function install(css: string): Promise<void> {
     await File.writeAsync(entrypoint.toString(), content);
 
   const js = root.join("app/javascript/entrypoints/application.js").toString();
-  if (await File.isExistAsync(js))
+  if (
+    (await File.isExistAsync(js)) &&
+    !(await File.readAsync(js)).includes(`import "./${stylesheet}"`)
+  )
     await File.writeAsync(js, `import "./${stylesheet}"\n`, { mode: "a" });
 
   if (css === "postcss")
@@ -30,14 +40,17 @@ async function install(css: string): Promise<void> {
 
   if (css === "tailwind") {
     const config = root.join("vite.config.ts").toString();
-    if (await File.isExistAsync(config)) {
-      const source = await File.readAsync(config);
-      await File.writeAsync(
-        config,
-        `import tailwindcss from "@tailwindcss/vite"\n` +
-          source.replace(/plugins: \[\n/, `plugins: [\n    tailwindcss(),\n`),
-      );
+    const source = (await File.isExistAsync(config)) ? await File.readAsync(config) : "";
+    if (source.includes("@tailwindcss/vite")) return;
+    if (!/plugins: \[\n/.test(source)) {
+      $stdout.puts(`Add tailwindcss() from "@tailwindcss/vite" to the plugins in ${config}`);
+      return;
     }
+    await File.writeAsync(
+      config,
+      `import tailwindcss from "@tailwindcss/vite"\n` +
+        source.replace(/plugins: \[\n/, `plugins: [\n    tailwindcss(),\n`),
+    );
   }
 }
 

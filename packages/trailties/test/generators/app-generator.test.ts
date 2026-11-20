@@ -480,14 +480,7 @@ describe("AppGeneratorTest", () => {
     await t.assertFile("after_bundle_callback_ran");
   });
 
-  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": cssbundling-rails is not ported.
-  it.skip("css option with tailwind uses cssbundling gem when using node", async () => {
-    await t.runGenerator([t.destinationRoot, "--css=tailwind", "--javascript=esbuild"]);
-    await assertGem("cssbundling-rails");
-    await assertNoGem("tailwindcss-rails");
-  });
-
-  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": dartsass-rails is not ported.
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — dartsass-rails is not ported, and with importmap not offered (CLAUDE.md, "importmap-rails and propshaft are out of scope") every app is a JS runtime, so `runCss` (`app_base.rb:724-734`) never reaches `dartsass:install`.
   it.skip("css option with asset pipeline sass", async () => {
     const railsCommands = await runGeneratorInstance([t.destinationRoot, "--css=sass"]);
 
@@ -497,7 +490,7 @@ describe("AppGeneratorTest", () => {
     await assertGem("dartsass-rails");
   });
 
-  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": cssbundling-rails is not ported.
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — cssbundling-rails is not ported.
   it.skip("css option with sass uses cssbundling gem when using node", async () => {
     await t.runGenerator([t.destinationRoot, "--css=sass", "--javascript=esbuild"]);
     await assertGem("cssbundling-rails");
@@ -510,7 +503,7 @@ describe("AppGeneratorTest", () => {
     expect(railsCommands, "`css:install:postcss` expected to be called, but wasn't.").toContain(
       "css:install:postcss",
     );
-    await t.assertFile("package.json");
+    await assertNodeFiles();
   });
 
   it("configuration of solid", async () => {
