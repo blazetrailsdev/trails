@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { include, rational, type Extended } from "@blazetrails/ruby-compat";
+import { include, rational } from "@blazetrails/ruby-compat";
 import { CountryTimezone, TZInfo } from "../../lib/index.js";
 import { CountryInfo } from "../../lib/data-sources/country-info.js";
 import { CountryDefiner } from "../../lib/format1/country-definer.js";
-import { CountryIndexDefinition } from "../../lib/format1/country-index-definition.js";
+import {
+  CountryIndexDefinition,
+  type CountryIndexDefinitionHost,
+} from "../../lib/format1/country-index-definition.js";
 import { StringDeduper } from "../../lib/string-deduper.js";
 
-type Host = Extended<(typeof CountryIndexDefinition)["ClassMethods"]>;
+type Host = (typeof CountryIndexDefinition)["ClassMethods"] & CountryIndexDefinitionHost;
 
 function newModule(): Host {
   const m = {};

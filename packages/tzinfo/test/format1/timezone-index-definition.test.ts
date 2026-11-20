@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { include, type Extended } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 import { TZInfo } from "../../lib/index.js";
-import { TimezoneIndexDefinition } from "../../lib/format1/timezone-index-definition.js";
+import {
+  TimezoneIndexDefinition,
+  type TimezoneIndexDefinitionHost,
+} from "../../lib/format1/timezone-index-definition.js";
 import { StringDeduper } from "../../lib/string-deduper.js";
 
-type Host = Extended<(typeof TimezoneIndexDefinition)["ClassMethods"]>;
+type Host = (typeof TimezoneIndexDefinition)["ClassMethods"] & TimezoneIndexDefinitionHost;
 
 function newModule(): Host {
   const m = {};
