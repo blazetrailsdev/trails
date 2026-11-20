@@ -55,7 +55,7 @@ function useQuery<T>(query: () => Promise<T[]>) {
   );
   useEffect(() => run(), [run]);
 
-  return { rows, error, run };
+  return { rows, error, run, fail: (e: unknown) => setError(String(e)) };
 }
 
 function Errors({ messages }: { messages: (string | null)[] }) {
@@ -104,7 +104,7 @@ function Notebooks({ onOpen }: { onOpen: (n: Notebook) => void }) {
 }
 
 function Notes({ notebook, onBack }: { notebook: Notebook; onBack: () => void }) {
-  const { rows, error, run } = useQuery(
+  const { rows, error, run, fail } = useQuery(
     useCallback(
       () => notebook.notes.order({ pinned: "desc", created_at: "desc" }).toArray(),
       [notebook],
@@ -117,11 +117,9 @@ function Notes({ notebook, onBack }: { notebook: Notebook; onBack: () => void })
       await notebook.notes.createBang({ title });
       setTitle("");
     });
-  const destroyNotebook = () =>
-    run(async () => {
-      await notebook.destroy();
-      onBack();
-    });
+  const destroyNotebook = () => {
+    serially(() => notebook.destroy()).then(onBack, fail);
+  };
 
   return (
     <View style={{ flex: 1, gap: 8 }}>
