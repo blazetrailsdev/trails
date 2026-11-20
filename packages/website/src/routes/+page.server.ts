@@ -4,84 +4,75 @@ import { loadParity, percent, shortSha } from "$lib/parity";
 
 const blocks = [
   {
-    file: "app/models/article.ts",
+    file: "app/models/project.ts",
     lang: "ts",
     title: "Models are typed classes.",
     body: "A model class maps a table to typed attributes. Declare associations, validations, callbacks and encrypted columns the way Rails does, and build queries by chaining scopes that compile to SQL.",
     code: `import { ApplicationRecord } from "./application-record.js";
-import { Current } from "./current.js";
+import { Task } from "./task.js";
 
-export class Article extends ApplicationRecord {
+export class Project extends ApplicationRecord {
   static {
-    this.belongsTo("author", { default: () => Current.user });
-    this.hasMany("comments");
+    this.belongsTo("owner", { className: "User" });
+    this.hasMany("tasks", { dependent: "destroy" });
+    this.hasOneAttached("logo");
 
-    this.hasOneAttached("coverImage");
-    this.hasRichText("content", { encrypted: true });
-    this.enum("status", ["drafted", "published"]);
+    this.validates("name", { presence: true, uniqueness: true });
+    this.enum("visibility", ["private", "shared"]);
 
-    this.scope("recent", function () {
-      return this.order({ created_at: "desc" }).limit(25);
+    this.scope("active", function () {
+      return this.where({ archivedAt: null });
     });
-
-    this.afterSaveCommit("deliverLater", { if: "isPublished" });
   }
 
-  async byline(): Promise<string> {
-    const author = await this.author;
-    return \`Written by \${author.name} on \${this.createdAt.toFs("short")}\`;
-  }
-
-  async deliverLater(): Promise<void> {
-    await Article.DeliveryJob.performLater(this);
+  async openTaskCount(): Promise<number> {
+    return Task.where({ projectId: this.id, done: false }).count();
   }
 }`,
   },
   {
-    file: "app/controllers/articles-controller.ts",
+    file: "app/controllers/tasks-controller.ts",
     lang: "ts",
     title: "Controllers turn requests into responses.",
     body: "An action reads params, loads records, and renders a view or JSON. Filters, strong parameters and HTTP caching come with it, under the names Rails uses.",
-    code: `import { Article } from "../models/article.js";
+    code: `import { Project } from "../models/project.js";
+import { Task } from "../models/task.js";
 import { ApplicationController } from "./application-controller.js";
 
-export class ArticlesController extends ApplicationController {
-  declare articles: Article[];
-  declare article: Article;
+export class TasksController extends ApplicationController {
+  declare project: Project;
+  declare tasks: Task[];
 
   async index(): Promise<void> {
-    this.articles = await Article.recent();
+    this.project = await Project.find(this.params.expect("projectId"));
+    this.tasks = await Task.where({ projectId: this.project.id }).order("position");
   }
 
-  async show(): Promise<void> {
-    this.article = await Article.find(this.params.expect("id"));
-    await this.freshWhen({ etag: this.article });
+  async update(): Promise<void> {
+    const task = await Task.find(this.params.expect("id"));
+    await task.updateBang(this._taskParams());
+    await this.render({ json: task });
   }
 
-  async create(): Promise<void> {
-    const article = await Article.createBang(this._articleParams());
-    await this.redirectTo(article);
-  }
-
-  private _articleParams() {
-    return this.params.expect({ article: ["title", "content"] });
+  private _taskParams() {
+    return this.params.expect({ task: ["title", "done"] });
   }
 }`,
   },
   {
-    file: "app/views/articles/show.html.tse",
+    file: "app/views/tasks/index.html.tse",
     lang: "erb",
     title: "Views are typed templates.",
     body: "TSE templates embed TypeScript in HTML, and the compiler checks every expression against the controller that renders them. Shared markup goes in partials, shared logic in helpers.",
-    code: `<h1><%= this.article.title %></h1>
+    code: `<h1><%= this.project.name %></h1>
 
-<%= imageTag(this.article.coverImage.url()) %>
+<ul>
+  <% for (const task of this.tasks) { %>
+    <li><%= render(task) %></li>
+  <% } %>
+</ul>
 
-<p><%= this.article.content %></p>
-
-<% if (Current.user.isAdmin()) { %>
-  <%= linkTo("Edit", editArticlePath(this.article)) %>
-<% } %>`,
+<%= linkTo("New task", newProjectTaskPath(this.project)) %>`,
   },
   {
     file: "config/routes.ts",
@@ -91,11 +82,11 @@ export class ArticlesController extends ApplicationController {
     code: `import { Trails } from "@blazetrails/trailties";
 
 Trails.application.routes().draw(function () {
-  this.resources("articles", function () { // /articles, /articles/1
-    this.resources("comments");             // /articles/1/comments, /comments/1
+  this.resources("projects", function () {
+    this.resources("tasks", { only: ["index", "create", "update"] });
   });
 
-  this.root("articles#index");              // /
+  this.root("projects#index");
 });`,
   },
 ];

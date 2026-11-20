@@ -56,7 +56,7 @@
   const cards = [
     { tag: "Learning", title: "Read the guides", body: "Walk through each framework, from models to mailers to WebSockets.", href: guides },
     { tag: "Source", title: "Browse on GitHub", body: "Read the code and the Rails source it mirrors.", href: repo },
-    { tag: "Keeping up", title: "See what’s new", body: "The latest releases and updates on development.", href: `${repo}/commits/main` },
+    { tag: "Keeping up", title: "See what’s new", body: "Recent commits to trails, as they land on main.", href: `${repo}/commits/main` },
   ];
 </script>
 
@@ -108,7 +108,7 @@
     <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
     <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby"} API</small>{/if}</a></li>{/each}</ul>
-    <p class="small"><strong>These are just a few of the packages.</strong> The gems Rails depends on are ported alongside them.</p>
+    <p class="small"><strong>And there are more packages besides these.</strong> The gems Rails depends on are ported alongside them.</p>
   </section>
 
   <section class="band">
@@ -162,7 +162,8 @@
         <button class="copy" onclick={copy}>{copied ? "Copied" : "Copy"}</button>
       </div>
     </div>
-    <p class="small">Stay up to date with trails on <a href={repo}>GitHub</a>.</p>
+    <p class="small">Building interactive pages? trails ports <a href="{repo}/tree/main/packages/turbo">Turbo</a> and <a href="{repo}/tree/main/packages/stimulus">Stimulus</a>, so your app can update its pages over the wire with server-rendered HTML and little custom JavaScript.</p>
+    <p class="small">Follow along on <a href={repo}>GitHub</a>.</p>
   </section>
 
   <footer class="foot">
@@ -192,11 +193,11 @@
   h1, h2, h3 { font-family: var(--display); }
   h1, h2 { color: var(--orange); font-weight: 800; letter-spacing: -0.035em; margin: 0 auto 1.5rem; }
   h1 { font-size: 78px; line-height: 72px; max-width: 1200px; }
-  h2 { font-size: 56px; line-height: 1; }
-  h3 { color: var(--orange); font-size: 28px; margin: 1.5rem 0 0.5rem; }
-  .intro { font-size: 26px; line-height: 1.3; max-width: 780px; margin: 0 auto 1.5rem; }
-  .small { font-size: 17px; max-width: 760px; margin: 1.5rem auto 0; }
-  .cta { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; font-size: 19px; }
+  h2 { font-size: 78px; line-height: 72px; }
+  h3 { color: var(--orange); font-size: 36px; line-height: 34px; margin: 1.5rem 0 0.75rem; }
+  .intro { font-size: 39px; line-height: 44px; max-width: 960px; margin: 0 auto 1.5rem; }
+  .small { font-size: 26px; line-height: 29px; max-width: 900px; margin: 1.5rem auto 0; }
+  .cta { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; font-size: 21px; }
 
   .announce { background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; padding: 8px; }
   .announce a { text-decoration: none; }
@@ -238,6 +239,8 @@
   .tiles small { font-size: 13px; font-weight: 500; color: #7a6450; }
 
   .band { background: var(--tint); padding: 90px 24px; }
+  .company + .band { clip-path: polygon(0 5vw, 100% 0, 100% 100%, 0 100%); padding-top: calc(90px + 5vw); }
+  .band:has(+ .start) { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5vw), 0 100%); padding-bottom: calc(90px + 5vw); }
   .card { background: #fff; max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px rgb(0 0 0 / 0.08); }
   .band > .card:first-child { margin-top: 0; }
 
@@ -247,12 +250,12 @@
   .code { background: #3a2a1f; border-radius: 6px; overflow: hidden; text-align: left; }
   .file { background: #2a1e16; color: #e4d2bc; font: 13px var(--mono); text-align: center; padding: 8px; }
   .code :global(pre) { flex: 1; margin: 0; padding: 20px; font: 13px/1.6 var(--mono); overflow-x: auto; background: #3a2a1f !important; }
-  .block p { font-size: 17px; margin: 0 auto; max-width: 500px; }
+  .block p { font-size: 21px; line-height: 26px; margin: 0 auto; max-width: 500px; }
 
   .start { padding: 90px 24px; }
   .cards { display: grid; grid-template-columns: repeat(3, 340px); justify-content: center; gap: 30px; margin-top: 40px; }
-  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); text-decoration: none; font-size: 15px; }
-  .start-card strong { font-size: 19px; text-decoration: underline; text-underline-offset: 3px; }
+  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); text-decoration: none; font-size: 18px; line-height: 23px; }
+  .start-card strong { font-size: 26px; line-height: 31px; text-decoration: underline; text-underline-offset: 3px; }
   .tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--mango); color: var(--ink); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 10px; border-radius: 3px; }
 
   .install { max-width: 760px; margin: 56px auto 0; text-align: left; }
@@ -269,7 +272,10 @@
 
   @media (max-width: 900px) {
     h1 { font-size: 44px; line-height: 1.05; }
-    h2 { font-size: 38px; }
+    h2 { font-size: 38px; line-height: 1.05; }
+    h3 { font-size: 26px; line-height: 1.15; }
+    .intro { font-size: 24px; line-height: 1.3; }
+    .small { font-size: 19px; line-height: 1.4; }
     .nav { grid-template-columns: 1fr; gap: 12px; }
     .mark { order: -1; justify-self: center; }
     .nav ul { justify-content: center; flex-wrap: wrap; gap: 16px; }
