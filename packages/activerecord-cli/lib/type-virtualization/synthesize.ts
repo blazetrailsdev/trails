@@ -5,6 +5,7 @@ import type {
   ClassInfo,
   RuntimeCall,
   AssociationCall,
+  AttachedCall,
   AttributeCall,
   ScopeCall,
   EnumCall,
@@ -15,6 +16,7 @@ import { tsTypeFor, writerTsTypeFor } from "./type-registry.js";
 const INDENT = "  ";
 
 const AR_IMPORT = `import("@blazetrails/activerecord")`;
+const AS_IMPORT = `import("@blazetrails/activestorage")`;
 
 export type SchemaColumnValue =
   | string
@@ -397,6 +399,9 @@ function renderCall(
     case "belongsTo":
     case "hasOne":
       return renderSingularAssoc(info, call, aliases, targets, isKnownTarget);
+    case "hasOneAttached":
+    case "hasManyAttached":
+      return renderAttached(info, call);
     case "scope":
       return renderScope(info, call);
     case "enum":
@@ -460,6 +465,17 @@ function renderSingularAssoc(
       ...line(`declare ${memberName}: ${readerType};`, call.name, false),
       attribute: { memberName, readerType, writerType: `${target} | null` },
     },
+  ];
+}
+
+function renderAttached(info: ClassInfo, call: AttachedCall): RenderedLine[] {
+  const memberName = renderDeclaredMemberName(call.name);
+  const proxy = call.kind === "hasOneAttached" ? "One" : "Many";
+  const suffix = camelize(call.name);
+  return [
+    line(`declare ${memberName}: ${AS_IMPORT}.${proxy};`, call.name, false),
+    line(`declare set${suffix}: (attachable: unknown) => Promise<void>;`, `set${suffix}`, false),
+    scopeLine(info, `withAttached${suffix}`, []),
   ];
 }
 
