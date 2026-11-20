@@ -11,6 +11,10 @@ export interface DevServerOptions {
   app?: RackApp | RackMiddleware;
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 export class DevServer {
   private port: number;
   private host: string;

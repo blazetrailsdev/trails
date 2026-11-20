@@ -13,6 +13,11 @@ export class Engine extends TrailsEngine {
 
     TrailsEngine.register(this, decodeURIComponent(new URL(".", import.meta.url).pathname));
 
+    this.initializer("vite_trails.proxy", async (app: Application) => {
+      if (await ViteAssets.isRunProxy())
+        app.middleware.insertBefore(0, ViteAssets.DevServerProxy, { sslVerifyNone: true });
+    });
+
     this.config.paths().add("lib/tasks", {
       with: decodeURIComponent(new URL("./tasks", import.meta.url).pathname),
       glob: `*${File.extname(decodeURIComponent(new URL(import.meta.url).pathname))}`,
