@@ -4,98 +4,89 @@ import { loadParity, percent, shortSha } from "$lib/parity";
 
 const blocks = [
   {
-    file: "app/models/article.ts",
+    file: "app/models/project.ts",
     lang: "ts",
-    title: "Active Records make modeling easy.",
-    body: "Databases come to life with business logic encapsulated in rich objects. Modeling associations between tables, providing callbacks when saved, encrypting sensitive data seamlessly, and expressing SQL queries beautifully.",
+    title: "Models are typed classes.",
+    body: "A model class maps a table to typed attributes. Declare associations, validations, callbacks and encrypted columns the way Rails does, and build queries by chaining scopes that compile to SQL.",
     code: `import { ApplicationRecord } from "./application-record.js";
-import { Current } from "./current.js";
+import { Task } from "./task.js";
 
-export class Article extends ApplicationRecord {
+export class Project extends ApplicationRecord {
   static {
-    this.belongsTo("author", { default: () => Current.user });
-    this.hasMany("comments");
+    this.belongsTo("owner", { className: "User" });
+    this.hasMany("tasks", { dependent: "destroy" });
+    this.hasOneAttached("logo");
 
-    this.hasOneAttached("coverImage");
-    this.hasRichText("content", { encrypted: true });
-    this.enum("status", ["drafted", "published"]);
+    this.validates("name", { presence: true, uniqueness: true });
+    this.enum("visibility", ["private", "shared"]);
 
-    this.scope("recent", function () {
-      return this.order({ created_at: "desc" }).limit(25);
+    this.scope("active", function () {
+      return this.where({ archivedAt: null });
     });
-
-    this.afterSaveCommit("deliverLater", { if: "isPublished" });
   }
 
-  async byline(): Promise<string> {
-    const author = await this.author;
-    return \`Written by \${author.name} on \${this.createdAt.toFs("short")}\`;
-  }
-
-  async deliverLater(): Promise<void> {
-    await Article.DeliveryJob.performLater(this);
+  async openTaskCount(): Promise<number> {
+    return Task.where({ projectId: this.id, done: false }).count();
   }
 }`,
   },
   {
-    file: "app/controllers/articles-controller.ts",
+    file: "app/controllers/tasks-controller.ts",
     lang: "ts",
-    title: "Action Controllers handle all requests.",
-    body: "Controllers expose the domain model to the web, process incoming parameters, set caching headers, and render templates, responding with either HTML or JSON.",
-    code: `import { Article } from "../models/article.js";
+    title: "Controllers turn requests into responses.",
+    body: "An action reads params, loads records, and renders a view or JSON. Filters, strong parameters and HTTP caching come with it, under the names Rails uses.",
+    code: `import { Project } from "../models/project.js";
+import { Task } from "../models/task.js";
 import { ApplicationController } from "./application-controller.js";
 
-export class ArticlesController extends ApplicationController {
-  declare articles: Article[];
-  declare article: Article;
+export class TasksController extends ApplicationController {
+  declare project: Project;
+  declare tasks: Task[];
 
   async index(): Promise<void> {
-    this.articles = await Article.recent();
+    this.project = await Project.find(this.params.expect("projectId"));
+    this.tasks = await Task.where({ projectId: this.project.id }).order("position");
   }
 
-  async show(): Promise<void> {
-    this.article = await Article.find(this.params.expect("id"));
-    await this.freshWhen({ etag: this.article });
+  async update(): Promise<void> {
+    const task = await Task.find(this.params.expect("id"));
+    await task.updateBang(this._taskParams());
+    await this.render({ json: task });
   }
 
-  async create(): Promise<void> {
-    const article = await Article.createBang(this._articleParams());
-    await this.redirectTo(article);
-  }
-
-  private _articleParams() {
-    return this.params.expect({ article: ["title", "content"] });
+  private _taskParams() {
+    return this.params.expect({ task: ["title", "done"] });
   }
 }`,
   },
   {
-    file: "app/views/articles/show.html.tse",
+    file: "app/views/tasks/index.html.tse",
     lang: "erb",
-    title: "Action Views mix TypeScript and HTML.",
-    body: "Templates can use the full versatility of TypeScript, excessive code is extracted into helpers, and the domain model is used directly and interwoven with the HTML.",
-    code: `<h1><%= this.article.title %></h1>
+    title: "Views are typed templates.",
+    body: "TSE templates embed TypeScript in HTML, and the compiler checks every expression against the controller that renders them. Shared markup goes in partials, shared logic in helpers.",
+    code: `<h1><%= this.project.name %></h1>
 
-<%= imageTag(this.article.coverImage.url()) %>
+<ul>
+  <% for (const task of this.tasks) { %>
+    <li><%= render(task) %></li>
+  <% } %>
+</ul>
 
-<p><%= this.article.content %></p>
-
-<% if (Current.user.isAdmin()) { %>
-  <%= linkTo("Edit", editArticlePath(this.article)) %>
-<% } %>`,
+<%= linkTo("New task", newProjectTaskPath(this.project)) %>`,
   },
   {
     file: "config/routes.ts",
     lang: "ts",
-    title: "Action Dispatch routes URLs.",
-    body: "Configure how URLs connect to the controllers using the routing domain language. Routes expose the bundle of actions that go together as a resource: index, show, new, create, edit, update, destroy.",
+    title: "Routes map URLs to actions.",
+    body: "Draw routes with the familiar DSL. One resources line gives a model its seven RESTful actions, with path helpers to link to each of them.",
     code: `import { Trails } from "@blazetrails/trailties";
 
 Trails.application.routes().draw(function () {
-  this.resources("articles", function () { // /articles, /articles/1
-    this.resources("comments");             // /articles/1/comments, /comments/1
+  this.resources("projects", function () {
+    this.resources("tasks", { only: ["index", "new", "update"] });
   });
 
-  this.root("articles#index");              // /
+  this.root("projects#index");
 });`,
   },
 ];
@@ -134,6 +125,49 @@ export class Check {
 const checkError =
   "app/models/check.ts(6,11): error TS2322: Type 'string | null' is not assignable to type 'number'.";
 
+const view = `<article>
+  <h1><%= this.post.title %></h1>
+  <p><%= this.post.titel %></p>
+</article>`;
+
+const viewError =
+  "app/views/posts/show.html.tse(3,20): error TS2551: Property 'titel' does not exist on type 'Post'.";
+
+function withError(
+  code: string,
+  lang: string,
+  line: number,
+  from: number,
+  to: number,
+  message: string,
+) {
+  return codeToHtml(code, {
+    lang,
+    theme: "github-dark",
+    decorations: [
+      {
+        start: { line: line - 1, character: from },
+        end: { line: line - 1, character: to },
+        properties: { class: "squiggle" },
+      },
+    ],
+    transformers: [
+      {
+        line(node, n) {
+          if (n === line) {
+            node.children.push({
+              type: "element",
+              tagName: "span",
+              properties: { class: "tip" },
+              children: [{ type: "text", value: message }],
+            });
+          }
+        },
+      },
+    ],
+  });
+}
+
 export async function load() {
   const parity = await loadParity();
   return {
@@ -142,31 +176,8 @@ export async function load() {
     hero: {
       rails: await codeToHtml(railsPost, { lang: "ruby", theme: "github-dark" }),
       trails: await codeToHtml(trailsPost, { lang: "ts", theme: "github-dark" }),
-      check: await codeToHtml(check, {
-        lang: "ts",
-        theme: "github-dark",
-        decorations: [
-          {
-            start: { line: 5, character: 10 },
-            end: { line: 5, character: 11 },
-            properties: { class: "squiggle" },
-          },
-        ],
-        transformers: [
-          {
-            line(node, line) {
-              if (line === 6) {
-                node.children.push({
-                  type: "element",
-                  tagName: "span",
-                  properties: { class: "tip" },
-                  children: [{ type: "text", value: checkError }],
-                });
-              }
-            },
-          },
-        ],
-      }),
+      check: await withError(check, "ts", 6, 10, 11, checkError),
+      view: await withError(view, "erb", 3, 19, 24, viewError),
     },
     blocks: await Promise.all(
       blocks.map(async ({ code, lang, ...rest }) => ({

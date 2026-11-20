@@ -46,12 +46,17 @@
     "solid-cable", "turbo", "stimulus", "vite-trails",
     "i18n", "thor",
   ];
+  const railsGems = new Set([
+    "activerecord", "activemodel", "actionpack", "actionview",
+    "actionmailer", "actionmailbox", "actiontext", "activejob",
+    "activestorage", "actioncable", "activesupport", "arel", "trailties",
+  ]);
 
 
   const cards = [
-    { tag: "Learning", title: "Read the guides", body: "Learn what the frameworks can do and how they fit together.", href: guides },
+    { tag: "Learning", title: "Read the guides", body: "Walk through each framework, from models to mailers to WebSockets.", href: guides },
     { tag: "Source", title: "Browse on GitHub", body: "Read the code and the Rails source it mirrors.", href: repo },
-    { tag: "Keeping up", title: "See what’s new", body: "The latest releases and updates on development.", href: `${repo}/commits/main` },
+    { tag: "Keeping up", title: "See what’s new", body: "Recent commits to trails, as they land on main.", href: `${repo}/commits/main` },
   ];
 </script>
 
@@ -86,11 +91,14 @@
           <div class="pane"><div class="file">app/models/post.ts &middot; trails</div>{@html data.hero.trails}</div>
         </div>
       {:else if tab === "caught"}
-        <div class="pane"><div class="file">app/models/check.ts &middot; pnpm build</div>{@html data.hero.check}</div>
+        <div class="stack">
+          <div class="pane"><div class="file">app/models/check.ts &middot; pnpm build</div>{@html data.hero.check}</div>
+          <div class="pane"><div class="file">app/views/posts/show.html.tse &middot; pnpm build</div>{@html data.hero.view}</div>
+        </div>
       {:else}
         <div class="pane ai">
-          <img class="meme" src="{base}/claude-push-rails-to-typescript.jpg" width="343" height="604" alt="Patrick Star meme. Top panel: Claude: take Rails. Bottom panel: and push it to TypeScript. Make no mistakes." />
-          <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, Anthropic's AI model, working from the vendored Rails source under human direction and review.</p>
+          <img class="meme" src="{base}/push-rails-over-there.jpg" width="500" height="880" alt="Put It Somewhere Else Patrick meme. Top panel: What if we took Rails. Bottom panel: and pushed it over there." />
+          <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, working from the vendored Rails source under human direction and review, with code reviews from Copilot and Codex.</p>
         </div>
       {/if}
     </div>
@@ -99,15 +107,15 @@
   <section class="company">
     <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
-    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the Rails API</small>{/if}</a></li>{/each}</ul>
-    <p class="small"><strong>These are just a few of the packages.</strong> The gems Rails depends on are ported alongside them.</p>
+    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby"} API</small>{/if}</a></li>{/each}</ul>
+    <p class="small"><strong>And there are more packages besides these.</strong> The gems Rails depends on are ported alongside them.</p>
   </section>
 
   <section class="band">
     <div class="card">
-      <h2>Everything you need.</h2>
-      <p class="intro"><strong>trails is a full-stack framework.</strong> It ships with all the tools needed to build amazing web apps on both the front and back end with strong conventions that keep your agents from producing a huge, unmaintainable mess.</p>
-      <p class="small">Rendering HTML templates, updating databases, sending and receiving emails, maintaining live pages via WebSockets, enqueuing jobs for asynchronous work, storing uploads in the cloud, providing solid security protections for common attacks. trails does it all and so much more.</p>
+      <h2>One framework, the whole stack.</h2>
+      <p class="intro"><strong>trails is a full-stack framework.</strong> Models, views, controllers, jobs, mail and real-time updates all come in the box, and shared conventions give your agents one obvious place for every piece of code.</p>
+      <p class="small">Query and migrate your database, render typed templates, send and receive email, push live updates over WebSockets, run background jobs, and store file uploads locally or in the cloud, all from one set of packages.</p>
     </div>
   </section>
 
@@ -126,14 +134,14 @@
 
   <section class="band">
     <div class="card">
-      <h2>Optimized for seasoned Rails developers.</h2>
-      <p class="small"><strong>Bring the Rails you already know, and let agents write the types.</strong> Use the vocabulary you know to write Rails at the speed of agents. Deploy serverless to Lambda or Cloudflare. Use Active Record in a React Native app. Run the full stack in the browser. Dream big.</p>
+      <h2>Built for Rails developers, new and seasoned.</h2>
+      <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to Lambda or Cloudflare. Use Active Record in a React Native app. Run the full stack in the browser. Dream big.</p>
       <a class="cta" href="{base}/docs/guides/idioms">Blaze trails &rsaquo;</a>
     </div>
   </section>
 
   <section class="start">
-    <h2>Let’s get started.</h2>
+    <h2>Start a trails app.</h2>
     <div class="cards">
       {#each cards as c}
         <a class="start-card" href={c.href}>
@@ -154,16 +162,16 @@
         <button class="copy" onclick={copy}>{copied ? "Copied" : "Copy"}</button>
       </div>
     </div>
-    <p class="small">Stay up to date with trails on <a href={repo}>GitHub</a>.</p>
+    <p class="small">Building interactive pages? trails ports <a href="{repo}/tree/main/packages/turbo">Turbo</a> and <a href="{repo}/tree/main/packages/stimulus">Stimulus</a>, so your app can update its pages over the wire with server-rendered HTML and little custom JavaScript.</p>
+    <p class="small">Follow along on <a href={repo}>GitHub</a>.</p>
   </section>
 
   <footer class="foot">
     <ul>
       <li><a href={repo}>Source</a></li>
       <li><a href="{repo}/blob/main/LICENSES.md">License</a></li>
-      <li><a href="{repo}/security">Security</a></li>
     </ul>
-    <p>trails is an independent TypeScript re-implementation of Ruby on Rails. Rails is a trademark of David Heinemeier Hansson; trails is not affiliated with or endorsed by the Rails project.</p>
+    <p>trails is an independent TypeScript re-implementation of Ruby on Rails. The Rails trademarks are the intellectual property of David Heinemeier Hansson, and exclusively licensed to the Rails Foundation. Uses of ‘Rails’ and ‘Ruby on Rails’ in this website are for identification purposes only and do not imply an endorsement by or affiliation with Rails, the trademark owner, or the Rails Foundation.</p>
   </footer>
 </div>
 
@@ -185,11 +193,11 @@
   h1, h2, h3 { font-family: var(--display); }
   h1, h2 { color: var(--orange); font-weight: 800; letter-spacing: -0.035em; margin: 0 auto 1.5rem; }
   h1 { font-size: 78px; line-height: 72px; max-width: 1200px; }
-  h2 { font-size: 56px; line-height: 1; }
-  h3 { color: var(--orange); font-size: 28px; margin: 1.5rem 0 0.5rem; }
-  .intro { font-size: 26px; line-height: 1.3; max-width: 780px; margin: 0 auto 1.5rem; }
-  .small { font-size: 17px; max-width: 760px; margin: 1.5rem auto 0; }
-  .cta { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; font-size: 19px; }
+  h2 { font-size: 78px; line-height: 72px; }
+  h3 { color: var(--orange); font-size: 36px; line-height: 34px; margin: 1.5rem 0 0.75rem; }
+  .intro { font-size: 39px; line-height: 44px; max-width: 960px; margin: 0 auto 1.5rem; }
+  .small { font-size: 26px; line-height: 29px; max-width: 900px; margin: 1.5rem auto 0; }
+  .cta { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; font-size: 21px; }
 
   .announce { background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; padding: 8px; }
   .announce a { text-decoration: none; }
@@ -213,6 +221,7 @@
   .tabs button { font: 600 15px var(--sans); color: #d9c6b0; background: none; border: 0; padding: 10px 18px; border-radius: 6px 6px 0 0; cursor: pointer; }
   .tabs button[aria-pressed="true"] { background: #3a2a1f; color: #fff; }
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2a1e16; }
+  .stack { display: grid; gap: 1px; background: #2a1e16; }
   .pane { background: #3a2a1f; min-height: 380px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
   .ai { display: flex; align-items: center; justify-content: center; gap: 48px; padding: 32px 40px; }
@@ -223,11 +232,15 @@
 
   .company { padding: 40px 24px 100px; }
   .tiles { display: grid; grid-template-columns: repeat(4, 220px); justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 48px 0; }
-  .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; text-decoration: none; }
+  .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; text-decoration: none; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+  .tiles a:hover, .tiles a:focus-visible { background: var(--orange); color: #fff; transform: translateY(-2px); box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); }
+  .tiles a:hover small, .tiles a:focus-visible small { color: rgb(255 255 255 / 0.85); }
   .tiles li:nth-last-child(2) { grid-column: 2; }
   .tiles small { font-size: 13px; font-weight: 500; color: #7a6450; }
 
   .band { background: var(--tint); padding: 90px 24px; }
+  .company + .band { clip-path: polygon(0 5vw, 100% 0, 100% 100%, 0 100%); padding-top: calc(90px + 5vw); }
+  .band:has(+ .start) { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5vw), 0 100%); padding-bottom: calc(90px + 5vw); }
   .card { background: #fff; max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px rgb(0 0 0 / 0.08); }
   .band > .card:first-child { margin-top: 0; }
 
@@ -237,12 +250,12 @@
   .code { background: #3a2a1f; border-radius: 6px; overflow: hidden; text-align: left; }
   .file { background: #2a1e16; color: #e4d2bc; font: 13px var(--mono); text-align: center; padding: 8px; }
   .code :global(pre) { flex: 1; margin: 0; padding: 20px; font: 13px/1.6 var(--mono); overflow-x: auto; background: #3a2a1f !important; }
-  .block p { font-size: 17px; margin: 0 auto; max-width: 500px; }
+  .block p { font-size: 21px; line-height: 26px; margin: 0 auto; max-width: 500px; }
 
   .start { padding: 90px 24px; }
   .cards { display: grid; grid-template-columns: repeat(3, 340px); justify-content: center; gap: 30px; margin-top: 40px; }
-  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); text-decoration: none; font-size: 15px; }
-  .start-card strong { font-size: 19px; text-decoration: underline; text-underline-offset: 3px; }
+  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); text-decoration: none; font-size: 18px; line-height: 23px; }
+  .start-card strong { font-size: 26px; line-height: 31px; text-decoration: underline; text-underline-offset: 3px; }
   .tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--mango); color: var(--ink); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 10px; border-radius: 3px; }
 
   .install { max-width: 760px; margin: 56px auto 0; text-align: left; }
@@ -259,7 +272,10 @@
 
   @media (max-width: 900px) {
     h1 { font-size: 44px; line-height: 1.05; }
-    h2 { font-size: 38px; }
+    h2 { font-size: 38px; line-height: 1.05; }
+    h3 { font-size: 26px; line-height: 1.15; }
+    .intro { font-size: 24px; line-height: 1.3; }
+    .small { font-size: 19px; line-height: 1.4; }
     .nav { grid-template-columns: 1fr; gap: 12px; }
     .mark { order: -1; justify-self: center; }
     .nav ul { justify-content: center; flex-wrap: wrap; gap: 16px; }
