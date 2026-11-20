@@ -1,13 +1,11 @@
 <%
-  const entries = (names) =>
-    Object.fromEntries(names.map((n) => [n, this.trailsGemfileEntry(n, this.packageManager)]));
-  const dep = this.database.pkgDependency;
-  const dbDep =
-    this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
-      ? this.sqliteDriver === "expo-sqlite"
-        ? { "expo-sqlite": "^15.0.0" }
-        : {}
-      : { [dep.name]: dep.version };
+  const devDependencies = ["@blazetrails/activerecord-cli", "@blazetrails/trails-tsc"];
+  const packages = (development) =>
+    JSON.parse(
+      `{${this.packageEntries()
+        .filter((entry) => !entry.commentedOut && devDependencies.includes(entry.name) === development)
+        .join(",")}}`,
+    );
 -%>
 <%= JSON.stringify(
   {
@@ -33,33 +31,9 @@
       "db:reset": "trails db:reset",
       prepare: "trails-tsc-views build --views app/views",
     },
-    dependencies: {
-      ...entries([
-        "@blazetrails/activerecord",
-        "@blazetrails/activemodel",
-        "@blazetrails/date",
-        "@blazetrails/activesupport",
-        "@blazetrails/rack",
-        "@blazetrails/rackup",
-        "@blazetrails/ruby-compat",
-        "@blazetrails/actionpack",
-        "@blazetrails/actionview",
-        "@blazetrails/trailties",
-        ...(this.options.skipActiveJob ? [] : ["@blazetrails/activejob"]),
-        ...(this.options.skipActionMailer ? [] : ["@blazetrails/actionmailer"]),
-        ...(this.skipSolid()
-          ? []
-          : [
-              "@blazetrails/solid-cache",
-              "@blazetrails/solid-queue",
-              ...(this.skipActionCable() ? [] : ["@blazetrails/solid-cable"]),
-            ]),
-        ...(this.skipActionCable() ? [] : ["@blazetrails/actioncable"]),
-      ]),
-      ...dbDep,
-    },
+    dependencies: packages(false),
     devDependencies: {
-      ...entries(["@blazetrails/activerecord-cli", "@blazetrails/trails-tsc"]),
+      ...packages(true),
       "@types/node": "^22.0.0",
       typescript: "^5.8.0",
       vite: "^7.0.0",
@@ -75,7 +49,7 @@
           }),
     },
     ...(this.options.dev && this.packageManager !== "pnpm"
-      ? { overrides: entries(Object.keys(this.trailsDevPackages())) }
+      ? { overrides: Object.fromEntries(Object.entries(this.trailsDevPackages()).map(([n, p]) => [n, `file:${p}`])) }
       : {}),
   },
   null,

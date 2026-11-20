@@ -246,9 +246,13 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("--main without pnpm writes the bare branch specifier", () => {
-    const generator = new AppGenerator(["my-app"], { main: true }, { destinationRoot: tmpDir });
-    expect(generator.trailsGemfileEntry("@blazetrails/trailties", "npm")).toBe(
-      "github:blazetrailsdev/trails#main",
+    const generator = new AppGenerator(
+      ["my-app"],
+      { main: true, packageManager: "npm" },
+      { destinationRoot: tmpDir },
+    );
+    expect(String(generator.trailsPackageEntry()[0])).toBe(
+      '"@blazetrails/activerecord": "github:blazetrailsdev/trails#main"',
     );
   });
 
@@ -261,8 +265,8 @@ describe("AppGenerator (trails-only)", () => {
 
     const trailties = File.join(Generators.TRAILS_DEV_PATH, "packages", "trailties");
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.dependencies["@blazetrails/trailties"]).toBe(`link:${trailties}`);
-    expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toMatch(/^link:.*trails-tsc$/);
+    expect(pkg.dependencies["@blazetrails/trailties"]).toBe(`file:${trailties}`);
+    expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toMatch(/^file:.*trails-tsc$/);
     const workspace = File.read(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"));
     expect(workspace).toContain(`  "@blazetrails/trailties": "link:${trailties}"`);
     expect(workspace).toContain(`  "@blazetrails/arel": "link:`);

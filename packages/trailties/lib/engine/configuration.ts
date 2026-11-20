@@ -5,9 +5,9 @@ import { Root } from "../paths.js";
 import { Generators, MiddlewareStackProxy } from "../configuration.js";
 import { resolveEnv } from "../database.js";
 
-export type RouteSetClass = { newWithConfig(config: EngineConfiguration): RouteSet };
+export type RouteSetClass = { newWithConfig(config: Configuration): RouteSet };
 
-export class EngineConfiguration extends RailtieConfiguration {
+export class Configuration extends RailtieConfiguration {
   private _root: string | null;
   protected _paths?: Root;
   private _generators?: Generators;

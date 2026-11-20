@@ -14,12 +14,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { Base, type GeneratorOptions, type GeneratorConfig } from "../../../../base.js";
-import {
-  Database,
-  DATABASES,
-  type DatabaseName,
-  type PkgDependency,
-} from "../../../../database.js";
+import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
 import { AppName } from "../../../../app-name.js";
 import { Error } from "../../../../base.js";
 
@@ -101,7 +96,7 @@ export class ChangeGenerator extends Base {
   }
 
   async editPackageJson(): Promise<void> {
-    const { name, version } = this.database.pkgDependency;
+    const [name, version] = this.database.gem();
     await this.gsubFile("package.json", this.allDatabaseGemsRegex(), name);
     await this.gsubFile(
       "package.json",
@@ -134,8 +129,8 @@ export class ChangeGenerator extends Base {
   }
 
   /** @internal */
-  private allDatabaseGems(): PkgDependency[] {
-    return Database.all().map((database) => database.pkgDependency);
+  private allDatabaseGems(): [string, string][] {
+    return Database.all().map((database) => database.gem());
   }
 
   /** @internal */
@@ -166,7 +161,7 @@ export class ChangeGenerator extends Base {
 
   /** @internal */
   private allDatabaseGemsRegex(): RegExp {
-    const allDatabaseGemNames = this.allDatabaseGems().map((gem) => gem.name);
+    const allDatabaseGemNames = this.allDatabaseGems().map((gem) => gem[0]);
     return new RegExp(`(\\b${allDatabaseGemNames.join("\\b|\\b")}\\b)`);
   }
 

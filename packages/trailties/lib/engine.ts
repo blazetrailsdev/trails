@@ -38,7 +38,7 @@ import type { RouteSetLike } from "./application/routes-reloader.js";
 import { generateRailtieName, Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
 import { Configuration as TrailtieConfiguration } from "./trailtie/configuration.js";
-import { EngineConfiguration } from "./engine/configuration.js";
+import { Configuration as EngineConfiguration } from "./engine/configuration.js";
 import type { MiddlewareStackProxy } from "./configuration.js";
 import { LazyRouteSet } from "./engine/lazy-route-set.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";

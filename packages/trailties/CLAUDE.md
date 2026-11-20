@@ -332,11 +332,15 @@ Ruled by the operator on 2026-11-19.
 | `tailwind_gemfile_entry` / tailwindcss-rails (`--css tailwind`)                                                                                                                                                                                                                                                                                                                                                                          | `@tailwindcss/vite` in `vite.config.ts` plus `@import "tailwindcss"`; `app-base.ts`'s `tailwindcss:install` call converges onto it |
 | `bundle lock --add-platform`, bundler binstub, bootsnap, thruster (`--skip-thruster`, `bin/thrust`; trailties' unused `skipThruster` option is deleted), brakeman (`--skip-brakeman`, binstub, `scan_ruby` CI job), benchmark-ips (`add_ips_to_gemfile`), `Bundler.with_original_env`, jbuilder (`--skip-jbuilder`), dartsass-rails, cssbundling-rails, jsbundling-rails, rdoc (`doc:app`), Gemfile-only gems with no trails npm package | permanent: not ported                                                                                                              |
 
-- **Names stay Rails'.** A port of `GemfileEntry` and its builders keeps the
-  Rails names (per `docs/ruby-ts-conventions.md`), and its body writes the
-  mapped Node artifact. `trailsGemfileEntry`
-  (`packages/trailties/lib/generators/app-base.ts`) is an invented name and
-  converges onto `rails_gemfile_entry`'s ported spelling.
+- **"Gemfile" is spelled "package".** trails code never says "gemfile". A port
+  of `GemfileEntry` and its builders keeps the rest of each Rails name, with
+  the token translated through `scripts/parity/conventions.ts`:
+  `TS_CLASS_RENAMES` makes `GemfileEntry` `PackageEntry`, and `PHRASE_RENAMES`
+  makes `gemfile_entry` `package_entry` and `gemfile_entries` `package_entries`.
+  So `gemfile_entries` is `packageEntries`, `rails_gemfile_entry` is
+  `trailsPackageEntry`, and the plugin generator's `gemfile_entry` builder is
+  `packageEntry`. Each body writes the mapped Node artifact. Ruled by the
+  operator on 2026-11-20 (trails#10382).
 - **A ported test reads the mapping.** A Gemfile assertion asserts the mapped
   `package.json` entry. A test on a permanent row is parked as `it.skip` under
   a `PERMANENT-SKIP:` line citing this section.

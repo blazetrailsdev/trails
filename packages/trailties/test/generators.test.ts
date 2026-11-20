@@ -1,3 +1,4 @@
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
@@ -35,9 +36,7 @@ afterAll(() => {
 });
 
 async function help(): Promise<string> {
-  const lines: string[] = [];
-  await Generators.printGenerators((m) => lines.push(m));
-  return lines.join("\n");
+  return capture("stdout", () => Generators.printGenerators());
 }
 
 describe("GeneratorsTest", () => {

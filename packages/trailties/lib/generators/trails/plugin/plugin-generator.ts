@@ -264,7 +264,7 @@ this.config.actionController.includeAllHelpers = false;
     await this.chmod("bin", 0o755, { verbose: false });
   }
 
-  async gemfileEntry(this: PluginBuilderHost): Promise<void> {
+  async packageEntry(this: PluginBuilderHost): Promise<void> {
     if (!this.isInsideApplication()) return;
 
     const gemfileInAppPath = File.join(this.trailsAppPath()!, "package.json");
@@ -420,7 +420,7 @@ export class PluginGenerator extends AppBase {
   }
 
   async updateGemfile(): Promise<void> {
-    if (!this.options.skipGemfileEntry) await this.build("gemfileEntry");
+    if (!this.options.skipGemfileEntry) await this.build("packageEntry");
   }
 
   async finishTemplate(): Promise<void> {

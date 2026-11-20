@@ -1,6 +1,14 @@
 import { dasherize, deepMergeBang, underscore } from "@blazetrails/activesupport";
 import "@blazetrails/activesupport/core-ext/string/inflections";
-import { Dir, File, LOAD_PATH, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  LOAD_PATH,
+  LoadError,
+  STDOUT,
+  getPath,
+  regexpEscape,
+} from "@blazetrails/ruby-compat";
 import type { Base, GeneratorConfig } from "./generators/base.js";
 import { noColorBang } from "./command/behavior.js";
 import { Trails } from "./trails.js";
@@ -277,25 +285,21 @@ export class Generators {
     Generators.hiddenNamespaces().push(...namespaces);
   }
 
-  /** @missingRailsArgs print_generators — PERMANENT */
-  static async help(
-    command: string = "generate",
-    output: (msg: string) => void = console.log,
-  ): Promise<void> {
-    output("Usage:");
-    output(`  bin/trails ${command} GENERATOR [args] [options]`);
-    output("");
-    output("General options:");
-    output("  -h, [--help]     # Print generator's options and usage");
-    output("  -p, [--pretend]  # Run but do not make any changes");
-    output("  -f, [--force]    # Overwrite files that already exist");
-    output("  -s, [--skip]     # Skip files that already exist");
-    output("  -q, [--quiet]    # Suppress status output");
-    output("");
-    output("Please choose a generator below.");
-    output("");
+  static async help(command: string = "generate"): Promise<void> {
+    STDOUT.puts("Usage:");
+    STDOUT.puts(`  bin/trails ${command} GENERATOR [args] [options]`);
+    STDOUT.puts();
+    STDOUT.puts("General options:");
+    STDOUT.puts("  -h, [--help]     # Print generator's options and usage");
+    STDOUT.puts("  -p, [--pretend]  # Run but do not make any changes");
+    STDOUT.puts("  -f, [--force]    # Overwrite files that already exist");
+    STDOUT.puts("  -s, [--skip]     # Skip files that already exist");
+    STDOUT.puts("  -q, [--quiet]    # Suppress status output");
+    STDOUT.puts();
+    STDOUT.puts("Please choose a generator below.");
+    STDOUT.puts();
 
-    await Generators.printGenerators(output);
+    await Generators.printGenerators();
   }
 
   static async sortedGroups(): Promise<Array<[string, string[]]>> {
@@ -322,10 +326,9 @@ export class Generators {
     return [["trails", trails], ...[...groups.entries()].sort(([a], [b]) => (a < b ? -1 : 1))];
   }
 
-  /** @missingRailsArgs print_list — PERMANENT */
-  static async printGenerators(output: (msg: string) => void): Promise<void> {
+  static async printGenerators(): Promise<void> {
     for (const [base, namespaces] of await Generators.sortedGroups()) {
-      Generators.printList(base, namespaces, output);
+      Generators.printList(base, namespaces);
     }
   }
 
@@ -365,16 +368,12 @@ export class Generators {
     return (_lookupPaths ??= ["trails/generators", "generators"]);
   }
 
-  private static printList(
-    base: string,
-    namespaces: string[],
-    output: (msg: string) => void,
-  ): void {
+  private static printList(base: string, namespaces: string[]): void {
     namespaces = namespaces.filter((n) => !Generators.hiddenNamespaces().includes(n));
     if (namespaces.length === 0) return;
-    output(`${base.charAt(0).toUpperCase()}${base.slice(1)}:`);
-    for (const n of namespaces) output(`  ${n}`);
-    output("");
+    STDOUT.puts(`${base.charAt(0).toUpperCase()}${base.slice(1)}:`);
+    for (const n of namespaces) STDOUT.puts(`  ${n}`);
+    STDOUT.puts();
   }
 }
 
