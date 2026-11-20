@@ -9,7 +9,7 @@ export function App() {
   const [notebook, setNotebook] = useState<Notebook | null>(null);
 
   useEffect(() => {
-    serially(() => connect({ adapter: "expo-sqlite", database: "file:notes.db" })).then(
+    serially(() => connect({ adapter: "expo-sqlite", database: "notes.db" })).then(
       () => setReady(true),
       (e: Error) => setReady(e),
     );

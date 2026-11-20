@@ -2,7 +2,17 @@ import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import vm from "node:vm";
 
+function checkBinds(params) {
+  for (const v of Array.isArray(params) ? params : Object.values(params)) {
+    const ok =
+      v === null || ["number", "string", "boolean"].includes(typeof v) || v instanceof Uint8Array;
+    if (!ok)
+      throw new Error(`Cannot convert this JS value to a Java value: ${typeof v} ${String(v)}`);
+  }
+}
+
 function result(stmt, params, raw) {
+  checkBinds(params);
   let rows = [];
   let changes = 0;
   let lastInsertRowId = 0;
@@ -57,10 +67,11 @@ const context = vm.createContext({
   crypto: { getRandomValues: (a) => globalThis.crypto.getRandomValues(a) },
   __fakeExpoSqlite: expoSqlite,
 });
+vm.runInContext("delete globalThis.Temporal", context);
 vm.runInContext(readFileSync(process.argv[2], "utf8"), context);
 
 const expected = [
-  "notes: Retro,Standup",
+  "notes: Standup,Retro",
   "pinned: 1",
   "blank save: false Name can't be blank",
   "serialized: 1,2",

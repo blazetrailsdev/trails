@@ -1,3 +1,6 @@
+import "../lib/regexp-modifiers";
+import "../lib/call-site";
+import "../lib/temporal";
 import "../lib/host";
 import "@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js";
 import { Note, Notebook } from "../app/models";
@@ -5,11 +8,13 @@ import { connect, serially } from "../lib/database";
 
 async function run(): Promise<string[]> {
   const out: string[] = [];
-  await connect({ adapter: "expo-sqlite", database: "file:notes.db" });
+  await connect({ adapter: "expo-sqlite", database: "notes.db" });
   const work = await Notebook.createBang({ name: "Work" });
   await work.notes.createBang({ title: "Standup", pinned: true });
   await work.notes.createBang({ title: "Retro" });
-  const titles = (await work.notes.order("title").toArray()).map((n: Note) => n.title);
+  const titles = (await work.notes.order({ pinned: "desc", title: "asc" }).toArray()).map(
+    (n: Note) => n.title,
+  );
   out.push(`notes: ${titles.join(",")}`);
   out.push(`pinned: ${await Note.pinned().count()}`);
   const blank = new Notebook({ name: "" });
