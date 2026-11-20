@@ -1100,6 +1100,10 @@ importers:
       pg:
         specifier: ^8.19.0
         version: 8.20.0
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/raabro:
     dependencies:

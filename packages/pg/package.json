@@ -30,6 +30,9 @@
       "optional": true
     }
   },
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
+  },
   "engines": {
     "node": ">=26"
   },
