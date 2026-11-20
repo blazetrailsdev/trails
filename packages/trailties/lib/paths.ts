@@ -237,7 +237,7 @@ export class Path {
 
   /** @internal */
   private filesIn(path: string): string[] {
-    let files = Dir.glob(this.glob!, 0, { base: path });
+    let files = Dir.glob(this.glob!, { base: path });
     if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
     return files.map((file) => File.join(path, file)).sort();
   }

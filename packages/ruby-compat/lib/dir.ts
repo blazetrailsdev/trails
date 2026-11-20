@@ -544,7 +544,15 @@ export class Dir {
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.glob`
    * (`vendor/ruby/v3.3.11/dir.c:3227`).
    */
-  static glob(pattern: string, flags: number = 0, { base }: { base?: string } = {}): string[] {
+  static glob(
+    pattern: string,
+    flags: number | { base?: string } = 0,
+    { base }: { base?: string } = {},
+  ): string[] {
+    if (typeof flags === "object") {
+      ({ base } = flags);
+      flags = 0;
+    }
     const found: string[] = [];
     for (const expanded of braceExpand(pattern)) {
       const absolute = expanded.startsWith(File.SEPARATOR);
