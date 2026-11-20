@@ -27,8 +27,6 @@ jobs:
     name: Build site
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    env:
-      SITE_BASE: /trails
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm

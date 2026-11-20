@@ -513,7 +513,7 @@ Post.where("created_at > ?", Temporal.Instant.from("2020-01-01T00:00:00Z")).toSq
 
 The longer guide is [Trails Idioms](packages/website/docs/guides/idioms.md).
 The places where trails diverges from Rails on purpose, and why, are catalogued
-per package on the [package pages](https://blazetrailsdev.github.io/trails/docs/packages/), generated from each package's
+per package on the [package pages](https://blazetrails.dev/docs/packages/), generated from each package's
 ratified `CLAUDE.md` sections.
 
 ### Database adapters
