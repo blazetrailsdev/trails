@@ -9,7 +9,6 @@ import {
 import { chomp, htmlSafe, TopLevel } from "@blazetrails/activesupport";
 import * as RubyCompat from "@blazetrails/ruby-compat";
 import { Encoding } from "@blazetrails/ruby-compat";
-import { Base } from "../../lib/base.js";
 import { OutputBuffer } from "../../lib/buffers.js";
 import { WrongEncodingError } from "../../lib/template/error.js";
 import { TSE } from "../../lib/template/handlers/tse.js";
@@ -30,7 +29,7 @@ export async function compileTemplate(
       ? virtualizeTseWithDeltas(template.handler.stripTrailingNewlines ? chomp(source) : source, {
           view: "any",
           localsSignature: template.strictLocalsBang(),
-          ...tseHandlerScope(template, Base.annotateRenderedViewWithFilenames),
+          ...tseHandlerScope(template),
         })
       : virtualizeHandler(handlerCode(template, source), source);
   const { outputText, sourceMapText } = transpileTse(ts);
