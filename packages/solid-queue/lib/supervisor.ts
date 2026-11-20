@@ -157,10 +157,7 @@ export class Supervisor extends Base {
     return this.isStopped();
   }
 
-  /**
-   * @internal
-   * @inventedArm _configuredProcess — PERMANENT
-   */
+  /** @internal */
   protected async startProcess(configuredProcess: ConfiguredProcess): Promise<void> {
     const processInstance = configuredProcess.instantiate() as Supervisee;
     processInstance.supervisedBy(this.process);
