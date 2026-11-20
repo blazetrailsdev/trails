@@ -1,6 +1,48 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const trailties: Record<string, AssertionReceipt[]> = {
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › kamal storage volume is skipped if required":
+    [
+      {
+        kind: "assert_equal",
+        value: "n:1",
+        as: null,
+        reason:
+          "app_generator_test.rb:733 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+      {
+        kind: "assert_equal",
+        value: "n:1",
+        as: null,
+        reason:
+          "app_generator_test.rb:734 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+    ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › skip javascript option": [
+    {
+      kind: "assert_no_node_files",
+      value: null,
+      as: null,
+      reason:
+        "app_generator_test.rb:865 asserts no .node-version and no node-gyp in the Dockerfile; a trails app is a Node app, so both are always written (packages/trailties/CLAUDE.md, A Gemfile is a package.json)",
+    },
+  ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › hotwire": [
+    {
+      kind: "assert_gem",
+      value: "s:turbo-rails",
+      as: null,
+      reason:
+        "app_generator_test.rb:959 asserts the turbo-rails Gemfile entry; in trails turbo:install adds @hotwired/turbo-rails itself (packages/trailties/CLAUDE.md, importmap-rails and propshaft are out of scope), and the test stubs that command",
+    },
+    {
+      kind: "assert_gem",
+      value: "s:stimulus-rails",
+      as: null,
+      reason:
+        "app_generator_test.rb:960 asserts the stimulus-rails Gemfile entry; in trails stimulus:install adds @hotwired/stimulus itself, and the test stubs that command",
+    },
+  ],
   "trailties:command/base_test.rb › Rails::Command::BaseTest › ::executable integrates ::bin": [
     {
       kind: "assert_equal",
