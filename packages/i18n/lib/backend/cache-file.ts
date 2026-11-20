@@ -2,7 +2,6 @@ import { OpenSSL, rbCallSuper, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { InvalidLocaleData } from "../exceptions.js";
 import type { Locale } from "../locale.js";
-import type { TranslationData } from "../utils.js";
 import { _readFile, _readMtime } from "./base.js";
 import { Flatten } from "./flatten.js";
 
@@ -18,10 +17,7 @@ export const CacheFile = {
   pathRoots: null as string[] | null,
 
   /** @internal */
-  loadFile(
-    this: CacheFileHost,
-    filename: string,
-  ): TranslationData | Record<string, unknown> | void {
+  loadFile(this: CacheFileHost, filename: string): unknown {
     const initialized = !rbObjRespondTo(this, "initialized") || this.initialized!();
     const key = Flatten.escapeDefaultSeparator(this.normalizedPath(filename));
     const [oldMtime, oldDigest] =
@@ -35,7 +31,7 @@ export const CacheFile = {
       return;
     }
     rbCallSuper(this, CacheFile.loadFile, filename);
-    this.storeTranslations("i18n", { loadFile: { [key]: [mtime, digest] } });
+    return this.storeTranslations("i18n", { loadFile: { [key]: [mtime, digest] } });
   },
 
   /** @internal */
