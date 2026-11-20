@@ -1726,27 +1726,6 @@ describe("AppGenerator", () => {
 });
 
 describe("AppGeneratorTest", () => {
-  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (dartsass-rails).
-  it.skip("css option with asset pipeline sass", async () => {
-    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--css=sass"]);
-    expect(railsCommands).toContain("dartsass:install");
-    await assertGem("dartsass-rails");
-  });
-
-  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (cssbundling-rails).
-  it.skip("css option with sass uses cssbundling gem when using node", async () => {
-    await t.runGenerator([t.destinationRoot, "--css=sass", "--javascript=esbuild"]);
-    await assertGem("cssbundling-rails");
-    await assertNoGem("dartsass-rails");
-  });
-
-  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (cssbundling-rails).
-  it.skip("css option with cssbundling gem", async () => {
-    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--css=postcss"]);
-    expect(railsCommands).toContain("css:install:postcss");
-    await assertGem("cssbundling-rails");
-  });
-
   // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (cssbundling-rails, jsbundling-rails).
   it.skip("css option with cssbundling gem does not force jsbundling gem", async () => {
     await t.runGenerator([t.destinationRoot, "--css=postcss"]);
