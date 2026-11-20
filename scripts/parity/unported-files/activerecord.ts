@@ -39,4 +39,30 @@ export const ACTIVERECORD_UNPORTED_FILES: UnportedFile[] = [
       "Unmarshals Marshal blobs written by real Ruby Rails 6.1/7.1 processes; loading " +
       'Ruby-written Marshal data is out of scope (CLAUDE.md, "Runtime facts Node does not expose").',
   },
+  {
+    testFile: "has_many_through_disable_joins_associations_test.rb",
+    tests: [
+      "empty on disable joins through",
+      "empty on disable joins through using custom foreign key",
+    ],
+    reason:
+      "Asserts the through-id pluck runs at scope build; it is awaited on the way to SQL " +
+      '(packages/activerecord/CLAUDE.md, "`Relation` is evaluated by an async query").',
+  },
+  {
+    testFile: "destroy_association_async_job_test.rb",
+    tests: [
+      "destroy_association_async_job error shows a missing parent job class, as if ActiveJob were missing",
+    ],
+    reason:
+      "Relies on `autoload` deferring a class body that references an undefined parent; an ES " +
+      'import evaluates it eagerly (CLAUDE.md, "Call-time constant resolution").',
+  },
+  {
+    testFile: "has_one_associations_test.rb",
+    tests: ["has one proxy should not respond to private methods"],
+    reason:
+      "Asserts `respond_to?` differs for private methods; visibility has no runtime residue " +
+      '(CLAUDE.md, "Method visibility is compile-time only").',
+  },
 ];
