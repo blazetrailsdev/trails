@@ -94,10 +94,11 @@ export async function rbFLoad(fname: string): Promise<true> {
   const exports = await loadIseqEval(fname, true);
   for (const [id, val] of Object.entries(exports)) {
     if (!/^[\p{Lu}\p{Lt}]/u.test(id)) continue;
+    if (classDefined !== null && typeof val === "function") {
+      const superclass = rbClassSuperclass(val);
+      if (superclass !== null) classDefined(superclass, val);
+    }
     constSet(TopLevel, id, val);
-    if (classDefined === null || typeof val !== "function") continue;
-    const superclass = rbClassSuperclass(val);
-    if (superclass !== null) classDefined(superclass, val);
   }
   return true;
 }

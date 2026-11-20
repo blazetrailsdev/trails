@@ -27,7 +27,10 @@ interface RescuableClass {
 }
 
 export const ClassMethods = {
-  /** @inventedArm safeConstantize — PERMANENT */
+  /**
+   * @inventedArm safeConstantize — PERMANENT
+   * @inventedArm getOwnPropertyDescriptor — PERMANENT
+   */
   rescueFrom(
     this: Pick<RescuableClass, "rescueHandlers">,
     ...klasses: Array<
