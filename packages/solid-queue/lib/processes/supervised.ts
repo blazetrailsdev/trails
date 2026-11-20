@@ -7,6 +7,7 @@ import {
   exitBang,
   onSignal,
   rbFFork,
+  rbModName,
   rbModAttrReader,
 } from "@blazetrails/ruby-compat";
 
@@ -15,7 +16,7 @@ interface SupervisedHost {
   _supervisor: { id?: unknown; pid: number } | null;
   supervisor: { id?: unknown; pid: number } | null;
   _bootGuard: object;
-  _configuredProcess?: { kind: string; attributes: unknown };
+  _configuredProcess?: { attributes: unknown };
   stop(): unknown;
   procline(string: string): void;
   isSupervised(): boolean;
@@ -53,10 +54,8 @@ export class Supervised {
       new URL("./fork-entry.js", import.meta.url).pathname,
       {
         boot: `${TopLevel.Trails!.root()}/config/environment.ts`,
-        configuredProcess: {
-          kind: this._configuredProcess!.kind,
-          attributes: this._configuredProcess!.attributes,
-        },
+        processClass: rbModName(this.constructor),
+        attributes: this._configuredProcess!.attributes,
         name: this.name,
         supervisorId: this.supervisor!.id,
       },

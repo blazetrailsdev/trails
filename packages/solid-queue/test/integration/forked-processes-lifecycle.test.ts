@@ -142,7 +142,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
       workers: [{ queues: "background" }, { queues: "default", threads: 5 }],
     });
 
-    await waitForRegisteredProcesses(3, { timeout: 10 });
+    await waitForRegisteredProcesses(3, { timeout: 20 });
     await assertRegisteredWorkersFor("background", "default", { supervisorPid: pid });
   });
 

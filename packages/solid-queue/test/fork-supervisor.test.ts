@@ -5,7 +5,13 @@ import {
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
 import { ConnectionNotEstablished } from "@blazetrails/activerecord";
-import { TopLevel as AsTopLevel, isPresent, minutes, pluck } from "@blazetrails/activesupport";
+import {
+  TopLevel as AsTopLevel,
+  isPresent,
+  minutes,
+  pluck,
+  seconds,
+} from "@blazetrails/activesupport";
 import {
   File,
   FileUtils,
@@ -13,6 +19,9 @@ import {
   RuntimeError,
   SecureRandom,
   SystemCallError,
+  Errno,
+  IO,
+  Timeout,
 } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../lib/solid-queue.js";
 import {
@@ -34,6 +43,7 @@ import {
   assertNoRegisteredProcesses,
   assertRegisteredProcesses,
   findProcessesRegisteredAs,
+  forkStalledSupervisor,
   isProcessExists,
   runSupervisorAsFork,
   runSupervisorAsForkWithCapturedIo,
@@ -41,6 +51,7 @@ import {
   terminateProcess,
   waitForProcessTerminationWithTimeout,
   waitForRegisteredProcesses,
+  waitWhileWithTimeout,
 } from "./support/processes-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
@@ -94,7 +105,58 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
   let previousPidfile: unknown;
   let pidfile: string;
+  let previousForkBootTimeout: typeof SolidQueue.forkBootTimeout;
+  let startupLog: string;
+  let stalledSupervisorPid: number | null = null;
   const pids: number[] = [];
+
+  function runStalledSupervisor({
+    startupDelay,
+    withHealthyWorker = false,
+  }: {
+    startupDelay: number;
+    withHealthyWorker?: boolean;
+  }) {
+    const configuredProcesses = [
+      { processClass: "StalledWorker", attributes: { startupLog, startupDelay } },
+    ];
+    if (withHealthyWorker) {
+      configuredProcesses.push({ processClass: "SolidQueue::Worker", attributes: {} as never });
+    }
+    const configuration = { configuredProcesses, mode: "fork" };
+
+    stalledSupervisorPid = forkStalledSupervisor(configuration);
+  }
+
+  async function startupPids(): Promise<number[]> {
+    try {
+      return (await IO.readlinesAsync(startupLog)).map((line) => parseInt(line, 10));
+    } catch (error) {
+      if (error instanceof Errno.ENOENT) return [];
+      throw error;
+    }
+  }
+
+  async function terminateStalledSupervisor() {
+    try {
+      if (stalledSupervisorPid != null && isProcessExists(stalledSupervisorPid)) {
+        await terminateProcess(stalledSupervisorPid);
+      }
+    } catch (error) {
+      if (!(error instanceof Timeout.Error)) throw error;
+      const orphanedPids = [
+        ...(await startupPids()),
+        ...(pluck(await Process.where({ kind: "Worker" }).toArray(), "pid") as number[]),
+      ];
+      for (const pid of new Set(orphanedPids)) {
+        try {
+          RbProcess.kill("KILL", pid);
+        } catch (error) {
+          if (!(error instanceof Errno.ESRCH)) throw error;
+        }
+      }
+    }
+  }
 
   function run(options: { [key: string]: unknown } = {}) {
     const pid = runSupervisorAsFork(options);
@@ -120,10 +182,14 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     previousPidfile = SolidQueue.supervisorPidfile;
     pidfile = `${dummyRoot}/tmp/pids/pidfile_${SecureRandom.hex()}.pid`;
     SolidQueue.supervisorPidfile = pidfile;
+    previousForkBootTimeout = SolidQueue.forkBootTimeout;
+    startupLog = `${dummyRoot}/tmp/pids/startup_${SecureRandom.hex()}.log`;
     vi.spyOn(AsTopLevel.Trails!, "root").mockReturnValue(dummyRoot);
   });
 
   afterEach(async () => {
+    await terminateStalledSupervisor();
+    stalledSupervisorPid = null;
     for (const pid of pids.splice(0)) {
       if (isProcessExists(pid))
         await terminateProcess(pid).catch(() => RbProcess.kill("KILL", pid));
@@ -136,7 +202,9 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
       }
     }
     SolidQueue.supervisorPidfile = previousPidfile;
+    SolidQueue.forkBootTimeout = previousForkBootTimeout;
     if (await File.isExistAsync(pidfile)) await File.deleteAsync(pidfile);
+    if (await File.isExistAsync(startupLog)) await File.deleteAsync(startupLog);
     vi.restoreAllMocks();
     await destroyRecords();
   });
@@ -418,9 +486,28 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     expect(failed!.exceptionClass()).toEqual("RuntimeError");
   });
 
-  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" (`fork`): a child boots for seconds, past the 0.2s / 0.5s `fork_boot_timeout`.
-  it.skip("replace only the fork that does not finish booting", () => {});
+  it("replace only the fork that does not finish booting", async () => {
+    SolidQueue.forkBootTimeout = seconds(10);
+    runStalledSupervisor({ startupDelay: 60, withHealthyWorker: true });
+    await waitForRegisteredProcesses(2, { timeout: 20 });
+    const healthyPid = (await findProcessesRegisteredAs("Worker").sole()).pid;
 
-  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" (`fork`): a child boots for seconds, past the 0.2s / 0.5s `fork_boot_timeout`.
-  it.skip("preserve a fork that finishes booting before the timeout", () => {});
+    await waitWhileWithTimeout(20, async () => (await startupPids()).length < 2);
+
+    expect(isProcessExists((await startupPids())[0])).toBeFalsy();
+    expect((await findProcessesRegisteredAs("Worker").sole()).pid).toEqual(healthyPid);
+  }, 90_000);
+
+  it("preserve a fork that finishes booting before the timeout", async () => {
+    SolidQueue.forkBootTimeout = seconds(10);
+    runStalledSupervisor({ startupDelay: 2 });
+    await waitForRegisteredProcesses(2, { timeout: 20 });
+    const workerPid = (await findProcessesRegisteredAs("StalledWorker").sole()).pid;
+
+    await sleep(11);
+
+    expect(await startupPids()).toEqual([workerPid]);
+    expect(isProcessExists(workerPid)).toBeTruthy();
+    expect((await findProcessesRegisteredAs("StalledWorker").sole()).pid).toEqual(workerPid);
+  }, 90_000);
 });

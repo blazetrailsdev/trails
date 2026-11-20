@@ -22,18 +22,29 @@ const dummyRoot = `${import.meta.dirname}/dummy`;
 
 type Status = InstanceType<typeof RbProcess.Status>;
 
-function forkSupervisor(options: { [key: string]: unknown }, capturedIo: boolean, pipes: IO[]) {
+function forkSupervisor(
+  options: { [key: string]: unknown },
+  capturedIo: boolean,
+  pipes: IO[],
+  configuration: object | null = null,
+) {
   return rbFFork(
     `${import.meta.dirname}/supervisor-fork-entry.js`,
     {
       boot: `${dummyRoot}/config/environment.ts`,
       root: dummyRoot,
       supervisorPidfile: SolidQueue.supervisorPidfile,
+      forkBootTimeout: SolidQueue.forkBootTimeout.toF(),
+      configuration,
       options: { skipRecurring: true, ...options },
       capturedIo,
     },
     pipes as Parameters<typeof rbFFork>[2],
   );
+}
+
+export function forkStalledSupervisor(configuration: object): number {
+  return forkSupervisor({}, false, [], configuration);
 }
 
 export function runSupervisorAsFork(options: { [key: string]: unknown } = {}): number {

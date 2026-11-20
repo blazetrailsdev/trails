@@ -1,20 +1,26 @@
-import { exitBang, rbForkPayload, rbForkedPipe } from "@blazetrails/ruby-compat";
-import { Configuration, Process } from "../index.js";
+import {
+  TopLevel,
+  constGet,
+  exitBang,
+  rbForkPayload,
+  rbForkedPipe,
+} from "@blazetrails/ruby-compat";
+import { Process } from "../index.js";
 import { ForkGuard } from "./runnable.js";
 
-const { boot, configuredProcess, name, supervisorId } = rbForkPayload() as {
+const { boot, processClass, attributes, name, supervisorId } = rbForkPayload() as {
   boot: string;
   name: string;
-  configuredProcess: { kind: string; attributes: Record<string, unknown> };
+  processClass: string;
+  attributes: Record<string, unknown>;
   supervisorId: unknown;
 };
 
 await import(boot);
 
-const instance = new Configuration.Process(
-  configuredProcess.kind,
-  configuredProcess.attributes,
-).instantiate() as {
+const instance = new (constGet(TopLevel, processClass) as new (
+  attributes: Record<string, unknown>,
+) => object)(attributes) as {
   name: string;
   mode: string;
   _bootGuard: ForkGuard;
