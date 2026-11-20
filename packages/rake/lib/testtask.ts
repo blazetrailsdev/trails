@@ -23,7 +23,7 @@ import { TaskLib } from "./tasklib.js";
 type RunStatus = {
   exitstatus(): number | null;
   isSignaled?(): boolean;
-  termsig?(): string | null;
+  termsig?(): number | null;
 };
 
 export class TestTask extends TaskLib {

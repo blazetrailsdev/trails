@@ -3,7 +3,7 @@ import { ArgumentError } from "./argument-error.js";
 import type { IO } from "./io.js";
 import { IOError } from "./io-error.js";
 import { isPlainHash, rbBuiltinClassName, rbInspect } from "./object.js";
-import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
+import { env as processEnv, getProcessAdapter, trapSignm } from "./process-adapter.js";
 import type { WaitStatus } from "./child-process-adapter.js";
 import { Thread } from "./thread.js";
 import { rbWaitpidNohang } from "./fork-children.js";
@@ -192,12 +192,19 @@ class Status {
   }
 
   /**
-   * `Process::Status#termsig` (`pst_wtermsig`, `vendor/ruby/v3.3.11/process.c:1064`).
-   * Node reports the signal's name and no number, and `SignalException.new`
-   * takes either.
+   * `Process::Status#stopsig` (`pst_wstopsig`, `vendor/ruby/v3.3.11/process.c:1006`):
+   * `nil`, since a child Node reports has exited or been signalled, never stopped.
    */
-  termsig(): string | null {
-    return this.#signal;
+  stopsig(): number | null {
+    return null;
+  }
+
+  /**
+   * `Process::Status#termsig` (`pst_wtermsig`, `vendor/ruby/v3.3.11/process.c:1064`):
+   * the signal's number, read from the name Node reports.
+   */
+  termsig(): number | null {
+    return this.#signal === null ? null : trapSignm(this.#signal);
   }
 
   isSuccess(): boolean | null {

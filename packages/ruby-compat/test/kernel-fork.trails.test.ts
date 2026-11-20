@@ -35,6 +35,6 @@ describe("Kernel#fork", () => {
     const [, status] = await waitpid2();
     expect(status.isExited()).toBe(false);
     expect(status.isSignaled()).toBe(true);
-    expect(status.termsig()).toEqual("SIGKILL");
+    expect(status.termsig()).toEqual(9);
   });
 });

@@ -311,19 +311,19 @@ export class LogSubscriber extends BaseLogSubscriber {
   replaceFork(event: Event): void {
     const supervisorPid = event.payload.supervisor_pid;
     const status = event.payload.status as {
-      exitstatus: unknown;
+      exitstatus(): number | null;
       pid: unknown;
       isSignaled(): boolean;
-      stopsig: unknown;
-      termsig: unknown;
+      stopsig(): number | null;
+      termsig(): number | null;
     };
     const attributes = {
       ...slice(event.payload, "pid"),
-      status: status.exitstatus ?? "no exit status set",
+      status: status.exitstatus() ?? "no exit status set",
       pid_from_status: status.pid,
       signaled: status.isSignaled(),
-      stopsig: status.stopsig,
-      termsig: status.termsig,
+      stopsig: status.stopsig(),
+      termsig: status.termsig(),
     };
 
     const replacedFork = event.payload.fork as LoggedProcess | null | undefined;

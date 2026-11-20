@@ -69,7 +69,7 @@ describe("ForkSupervisorTest", () => {
     });
     const failed = (await FailedExecution.last())!;
     expect(String(failed.error!.message)).toContain(
-      `Process pid=${worker.pid} exited unexpectedly. Received unhandled signal SIGKILL.`,
+      `Process pid=${worker.pid} exited unexpectedly. Received unhandled signal 9.`,
     );
 
     await run.terminate();

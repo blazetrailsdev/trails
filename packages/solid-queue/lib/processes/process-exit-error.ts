@@ -5,7 +5,7 @@ interface Status {
   pid: number | string | null;
   exitstatus(): number | null;
   isSignaled(): boolean;
-  termsig(): number | string | null;
+  termsig(): number | null;
 }
 
 export class ProcessExitError extends RuntimeError {
