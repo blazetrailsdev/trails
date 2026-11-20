@@ -28,7 +28,7 @@ const baseConfig = (): BootstrapConfig => ({
   logLevel: "debug",
   logFormatter: null,
   defaultLogFile: async () => ({ write() {} }),
-  paths: () => ({ get: () => ({ first: async () => "log/test.log" }) }),
+  paths: () => ({ get: () => ({ first: () => "log/test.log" }) }),
 });
 
 class TestApp extends Bootstrap implements BootstrapHost {
