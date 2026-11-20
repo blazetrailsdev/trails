@@ -261,6 +261,7 @@ const ARRAY: ReadonlySet<string> = new Set(["array"]);
 const HASH: ReadonlySet<string> = new Set(["hash"]);
 const NUMERIC: ReadonlySet<string> = new Set(["numeric"]);
 const STRING: ReadonlySet<string> = new Set(["string"]);
+const STRING_OR_EXPR: ReadonlySet<string> = new Set(["string", "expr", "local"]);
 
 /** How a port writes each native Hash form, for a gate message to name. */
 export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
@@ -394,6 +395,9 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   half-away `Math.sign(x) * Math.round(Math.abs(x))` (`Math.round` rounds
  *   -2.5 to -2, `float.c` rounds it to -3), `strip` as `.trim()`, `rstrip` as
  *   `.trimEnd()` and `chomp` as `s.endsWith(t) ? s.slice(0, -n) : s`.
+ *   `gsub` is `.replaceAll(p, r)` or `.replace(/re/g, r)`, and `sub` / `sub!`
+ *   `.replace(p, r)`; a `.replace` whose pattern is not a literal credits
+ *   both, since its flags are not visible.
  *   A site on an arm the form does not port — `uniq` with a block,
  *   `count` without one, `round(digits)`, a `chomp` with no literal argument —
  *   records the kind `formless` (extract-ruby-api.rb#FORM_ARMS) and never
@@ -525,6 +529,9 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["strip", { form: "trim", receivers: "explicit", creditedKinds: STRING }],
   ["rstrip", { form: "trimEnd", receivers: "explicit", creditedKinds: STRING }],
   ["chomp", { form: "chomp", receivers: "explicit", creditedKinds: STRING }],
+  ["gsub", { form: "gsub", receivers: "explicit", creditedKinds: STRING_OR_EXPR }],
+  ["sub", { form: "sub", receivers: "explicit", creditedKinds: STRING_OR_EXPR }],
+  ["sub!", { form: "sub", receivers: "explicit", creditedKinds: STRING_OR_EXPR }],
   [
     "sleep",
     {

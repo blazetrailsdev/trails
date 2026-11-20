@@ -2417,6 +2417,12 @@ describe("body call capture", () => {
           s.trim();
           s.trimEnd();
           s.endsWith("x") ? s.slice(0, -1) : s;
+          s.replaceAll("%n", s);
+          s.replace(/^-/, "");
+        }
+        replaced(h: { replace(a: string, b: string): void }, s: string) {
+          h.replace("a", "b");
+          s.replace("a", "b");
         }
         unported(xs: unknown[], h: Record<string, number>, n: number, s: string, k: string) {
           xs.filter((x) => x !== 1);
@@ -2460,6 +2466,8 @@ describe("body call capture", () => {
       "trim",
       "trimEnd",
       "chomp",
+      "gsub",
+      "sub",
     ]) {
       expect(calls("ported")).toContain(`@${form}`);
     }
@@ -2476,6 +2484,9 @@ describe("body call capture", () => {
     ]) {
       expect(calls("unported")).not.toContain(`@${form}`);
     }
+    expect(calls("replaced")).toContain("@sub");
+    expect(calls("replaced").filter((c) => c === "@sub")).toHaveLength(1);
+    expect(calls("replaced")).not.toContain("@gsub");
   });
 
   it("marks an unshift() call as a native form", () => {

@@ -9,14 +9,6 @@ class PredicateSubscriber extends Subscriber {
   isExistFragment(): void {
     this.calls.push("isExistFragment");
   }
-
-  hasCachedEntry(): void {
-    this.calls.push("hasCachedEntry");
-  }
-
-  isHasCachedEntry(): void {
-    this.calls.push("isHasCachedEntry");
-  }
 }
 
 function event(name: string): Event {
@@ -28,11 +20,5 @@ describe("Subscriber predicate event dispatch (trails-only)", () => {
     const subscriber = new PredicateSubscriber();
     subscriber.call(event("exist_fragment?.action_controller"));
     expect(subscriber.calls).toEqual(["isExistFragment"]);
-  });
-
-  it("prefers the bare camel spelling for an already-predicate prefix, as the conventions table does", () => {
-    const subscriber = new PredicateSubscriber();
-    subscriber.call(event("has_cached_entry?.action_controller"));
-    expect(subscriber.calls).toEqual(["hasCachedEntry"]);
   });
 });

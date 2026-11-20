@@ -1,5 +1,6 @@
 import { describe, it } from "vitest";
 
+// PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose", the `fork` bullet.
 describe("ForkTrackerTest", () => {
   it.skip("object fork");
 
