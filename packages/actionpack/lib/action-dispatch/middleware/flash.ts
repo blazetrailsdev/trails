@@ -24,24 +24,25 @@ export interface FlashRequestHost {
   session: {
     isEnabled?(): boolean;
     isLoaded(): boolean;
-    isKey(key: string): boolean;
+    isKey(key: string): boolean | Promise<boolean>;
     get(key: string): unknown;
-    set(key: string, value: unknown): void;
-    delete(key: string): void;
+    set(key: string, value: unknown): unknown;
+    delete(key: string): unknown;
   };
 }
 
 export class RequestMethods {
-  get flash(): FlashHash | null {
+  async flash(): Promise<FlashHash> {
     const flash = this.flashHash();
     if (flash) return flash;
-    return (this.flash = FlashHash.fromSessionValue(
-      (this as unknown as FlashRequestHost).session.get("flash"),
-    ));
+    return this.setFlash(
+      FlashHash.fromSessionValue(await (this as unknown as FlashRequestHost).session.get("flash")),
+    );
   }
 
-  set flash(flash: FlashHash | null) {
+  setFlash<T extends FlashHash | null>(flash: T): T {
     (this as unknown as FlashRequestHost).setHeader(KEY, flash);
+    return flash;
   }
 
   /** @internal */
@@ -53,19 +54,19 @@ export class RequestMethods {
 }
 
 /** @internal */
-export function commitFlash(this: FlashRequestHost): void {
+export async function commitFlash(this: FlashRequestHost): Promise<void> {
   const session = this.session;
   if (session.isEnabled && !session.isEnabled()) return;
 
   const hash = this.flashHash();
-  if (hash && (!hash.isEmpty() || session.isKey("flash"))) {
-    session.set("flash", hash.toSessionValue());
+  if (hash && (!hash.isEmpty() || (await session.isKey("flash")))) {
+    await session.set("flash", hash.toSessionValue());
     this.env[KEY] = rbObjDup(hash);
   }
 
   if (session.isLoaded()) {
-    if (session.isKey("flash") && session.get("flash") == null) {
-      session.delete("flash");
+    if ((await session.isKey("flash")) && (await session.get("flash")) == null) {
+      await session.delete("flash");
     }
   }
 }

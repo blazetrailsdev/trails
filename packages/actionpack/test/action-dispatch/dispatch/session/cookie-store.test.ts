@@ -61,7 +61,7 @@ class TestController extends Base {
   }
 
   async persistentSessionId(): Promise<void> {
-    await this.render({ plain: this.session.get("session_id") as string });
+    await this.render({ plain: (await this.session.get("session_id")) as string });
   }
 
   async setSessionValue(): Promise<void> {

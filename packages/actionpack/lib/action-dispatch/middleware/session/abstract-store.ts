@@ -112,7 +112,7 @@ export const SessionObject = {
     return await rbCallSuper(this, SessionObject.commitSession, req, res);
   },
 
-  prepareSession(this: Persisted, req: Request): RequestSession {
+  prepareSession(this: Persisted, req: Request): Promise<RequestSession> {
     return RequestSession.create(this as any, req, this.defaultOptions);
   },
 

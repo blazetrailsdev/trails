@@ -92,12 +92,15 @@ export class Session {
   private enabled: boolean;
   private _idWas: unknown;
   private idWasInitialized: boolean;
-  private prewarmedSession?: [unknown, Record<string, unknown>];
 
-  static create(store: SessionStore, req: Req, defaultOptions: Record<string, unknown>): Session {
+  static async create(
+    store: SessionStore,
+    req: Req,
+    defaultOptions: Record<string, unknown>,
+  ): Promise<Session> {
     const sessionWas = Session.find(req);
     const session = new Session(store, req);
-    if (sessionWas) session.mergeBang(sessionWas);
+    if (sessionWas) await session.mergeBang(sessionWas);
 
     Session.set(req, session);
     Options.set(req, new Options(store, defaultOptions));
@@ -149,22 +152,20 @@ export class Session {
     return Options.find(this.req) as Options | undefined;
   }
 
-  /** @inventedArm prewarmBang — PERMANENT */
   async destroy(): Promise<void> {
-    this.clear();
+    await this.clear();
 
     if (this.isEnabled()) {
       const options = (this.options() ?? {}) as Options;
       await this.by!.deleteSession(this.req, options.id(this.req), options);
 
       this.loaded = false;
-      await this.prewarmBang();
-      this.loadForWriteBang();
+      await this.loadForWriteBang();
     }
   }
 
-  get(key: unknown): unknown {
-    this.loadForReadBang();
+  async get(key: unknown): Promise<unknown> {
+    await this.loadForReadBang();
     key = String(key);
 
     if (key === "session_id") {
@@ -175,8 +176,8 @@ export class Session {
     }
   }
 
-  dig(...keys: unknown[]): unknown {
-    this.loadForReadBang();
+  async dig(...keys: unknown[]): Promise<unknown> {
+    await this.loadForReadBang();
     keys = keys.map((key, i) => (i === 0 ? String(key) : key));
     let value: unknown = this.delegate;
     for (const key of keys) {
@@ -186,84 +187,84 @@ export class Session {
     return value;
   }
 
-  hasKey(key: unknown): boolean {
-    this.loadForReadBang();
+  async hasKey(key: unknown): Promise<boolean> {
+    await this.loadForReadBang();
     return Object.hasOwn(this.delegate, String(key));
   }
 
-  isKey(key: unknown): boolean {
+  isKey(key: unknown): Promise<boolean> {
     return this.hasKey(key);
   }
 
-  isInclude(key: unknown): boolean {
+  isInclude(key: unknown): Promise<boolean> {
     return this.hasKey(key);
   }
 
-  get keys(): string[] {
-    this.loadForReadBang();
+  async keys(): Promise<string[]> {
+    await this.loadForReadBang();
     return Object.keys(this.delegate);
   }
 
-  get values(): unknown[] {
-    this.loadForReadBang();
+  async values(): Promise<unknown[]> {
+    await this.loadForReadBang();
     return Object.values(this.delegate);
   }
 
-  set(key: unknown, value: unknown): void {
-    this.loadForWriteBang();
+  async set(key: unknown, value: unknown): Promise<void> {
+    await this.loadForWriteBang();
     this.delegate[String(key)] = value;
   }
 
-  store(key: unknown, value: unknown): void {
-    this.set(key, value);
+  async store(key: unknown, value: unknown): Promise<void> {
+    await this.set(key, value);
   }
 
-  clear(): void {
-    this.loadForDeleteBang();
+  async clear(): Promise<void> {
+    await this.loadForDeleteBang();
     this.delegate = {};
   }
 
-  toHash(): Record<string, unknown> {
-    this.loadForReadBang();
+  async toHash(): Promise<Record<string, unknown>> {
+    await this.loadForReadBang();
     return deleteIf({ ...this.delegate }, (_, v) => v == null);
   }
 
-  toH(): Record<string, unknown> {
+  toH(): Promise<Record<string, unknown>> {
     return this.toHash();
   }
 
-  update(hash: unknown): Record<string, unknown> {
+  async update(hash: unknown): Promise<Record<string, unknown>> {
     const other = hash as { toHash?: () => Record<string, unknown> } | null | undefined;
     const respondsToToHash = typeof other?.toHash === "function";
     if (!respondsToToHash && (hash == null || typeof hash !== "object" || Array.isArray(hash))) {
       throw new TypeError(`no implicit conversion of ${classNameOf(hash)} into Hash`);
     }
 
-    this.loadForWriteBang();
+    await this.loadForWriteBang();
     return Object.assign(
       this.delegate,
-      stringifyKeys(respondsToToHash ? other.toHash!() : (hash as Record<string, unknown>)),
+      stringifyKeys(respondsToToHash ? await other.toHash!() : (hash as Record<string, unknown>)),
     );
   }
 
-  mergeBang(hash: unknown): Record<string, unknown> {
+  mergeBang(hash: unknown): Promise<Record<string, unknown>> {
     return this.update(hash);
   }
 
-  delete(key: unknown): unknown {
-    this.loadForDeleteBang();
+  async delete(key: unknown): Promise<unknown> {
+    await this.loadForDeleteBang();
     const k = String(key);
     const value = this.delegate[k];
     delete this.delegate[k];
     return value;
   }
 
-  fetch(
+  async fetch(
     key: unknown,
     defaultValue: unknown = Unspecified,
     block?: (key: string) => unknown,
-  ): unknown {
-    this.loadForReadBang();
+  ): Promise<unknown> {
+    await this.loadForReadBang();
     const k = String(key);
     if (defaultValue === Unspecified) {
       if (Object.hasOwn(this.delegate, k)) return this.delegate[k];
@@ -294,54 +295,43 @@ export class Session {
     return this.loaded;
   }
 
-  isEmpty(): boolean {
-    this.loadForReadBang();
+  async isEmpty(): Promise<boolean> {
+    await this.loadForReadBang();
     return Object.keys(this.delegate).length === 0;
   }
 
-  each(block: (key: string, value: unknown) => void): void {
-    for (const [key, value] of Object.entries(this.toHash())) {
+  async each(block: (key: string, value: unknown) => void): Promise<void> {
+    for (const [key, value] of Object.entries(await this.toHash())) {
       block(key, value);
     }
   }
 
-  idWas(): unknown {
-    this.loadForReadBang();
+  async idWas(): Promise<unknown> {
+    await this.loadForReadBang();
     return this._idWas;
   }
 
-  private loadForReadBang(): void {
-    if (!this.isLoaded() && this.isExists()) this.loadBang();
+  private async loadForReadBang(): Promise<void> {
+    if (!this.isLoaded() && this.isExists()) await this.loadBang();
   }
 
-  private loadForWriteBang(): void {
+  private async loadForWriteBang(): Promise<void> {
     if (this.isEnabled()) {
-      if (!this.isLoaded()) this.loadBang();
+      if (!this.isLoaded()) await this.loadBang();
     } else {
       throw new DisabledSessionError();
     }
   }
 
-  private loadForDeleteBang(): void {
-    if (this.isEnabled() && !this.isLoaded()) this.loadBang();
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  async prewarmBang(): Promise<void> {
-    if (this.isEnabled()) {
-      this.isExists();
-      this.prewarmedSession = await this.by!.loadSession(this.req);
-    }
+  private async loadForDeleteBang(): Promise<void> {
+    if (this.isEnabled() && !this.isLoaded()) await this.loadBang();
   }
 
   /** @internal */
-  loadBang(): void {
+  async loadBang(): Promise<void> {
     if (this.isEnabled()) {
       if (!this.isExists()) this.idWasInitialized = true;
-      const [id, session] =
-        this.prewarmedSession ??
-        (this.by!.loadSession(this.req) as [unknown, Record<string, unknown>]);
-      this.prewarmedSession = undefined;
+      const [id, session] = await this.by!.loadSession(this.req);
       this.options()!.set("id", id);
       hashReplace(this.delegate, stringifyKeys(session));
       if (!this.idWasInitialized) this._idWas = id;

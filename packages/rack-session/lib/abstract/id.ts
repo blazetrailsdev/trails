@@ -313,10 +313,10 @@ export interface PersistedSession {
   id(): unknown;
   options(): Record<string, unknown>;
   isLoaded(): boolean;
-  isEmpty(): boolean;
-  loadBang(): void;
-  toHash(): Record<string, unknown>;
-  mergeBang(other: unknown): void;
+  isEmpty(): boolean | Promise<boolean>;
+  loadBang(): void | Promise<void>;
+  toHash(): Record<string, unknown> | Promise<Record<string, unknown>>;
+  mergeBang(other: unknown): unknown;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -459,14 +459,14 @@ export class Persisted {
   }
 
   /** @internal */
-  isCommitSession(
+  async isCommitSession(
     req: PersistedRequest,
     session: PersistedSession,
     options: Record<string, unknown>,
-  ): boolean {
+  ): Promise<boolean> {
     if (isTruthy(hashAref(options, "skip"))) return false;
     const hasSession =
-      this.isLoadedSession(session) || this.isForcedSessionUpdate(session, options);
+      this.isLoadedSession(session) || (await this.isForcedSessionUpdate(session, options));
     return hasSession && this.isSecurityMatches(req, options);
   }
 
@@ -476,8 +476,11 @@ export class Persisted {
   }
 
   /** @internal */
-  isForcedSessionUpdate(session: PersistedSession, options: Record<string, unknown>): boolean {
-    return this.isForceOptions(options) && isTruthy(session) && !session.isEmpty();
+  async isForcedSessionUpdate(
+    session: PersistedSession,
+    options: Record<string, unknown>,
+  ): Promise<boolean> {
+    return this.isForceOptions(options) && isTruthy(session) && !(await session.isEmpty());
   }
 
   /** @internal */
@@ -508,11 +511,11 @@ export class Persisted {
       if (!isTruthy(sessionId)) return;
     }
 
-    if (!this.isCommitSession(req, session, options)) return;
+    if (!(await this.isCommitSession(req, session, options))) return;
 
-    if (!this.isLoadedSession(session)) session.loadBang();
+    if (!this.isLoadedSession(session)) await session.loadBang();
     if (!isTruthy(sessionId)) sessionId = session.id();
-    const sessionData = session.toHash();
+    const sessionData = await session.toHash();
     for (const k of Object.keys(sessionData)) {
       if (sessionData[k] == null) delete sessionData[k];
     }
