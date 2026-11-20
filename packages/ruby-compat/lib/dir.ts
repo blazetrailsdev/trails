@@ -124,7 +124,13 @@ function segmentMatches(segment: string, name: string, flags = 0): boolean {
   return MAGIC.test(segment) ? fnmatch(segment, name, flags) : unescape(segment) === name;
 }
 
-function globHelper(base: string, segments: string[], found: string[], enumerated: boolean): void {
+function globHelper(
+  base: string,
+  segments: string[],
+  found: string[],
+  enumerated: boolean,
+  flags = 0,
+): void {
   const [segment, ...rest] = segments;
   if (segment === undefined) {
     if (enumerated || File.isExist(base)) found.push(base);
@@ -135,18 +141,19 @@ function globHelper(base: string, segments: string[], found: string[], enumerate
   if (segment === "**" && rest.length > 0) {
     for (const name of children(base)) {
       if (name.startsWith(".")) continue;
-      if (segmentMatches(rest[0], name)) globHelper(join(name), rest.slice(1), found, true);
-      if (File.isDirectory(join(name))) globHelper(join(name), segments, found, true);
+      if (segmentMatches(rest[0], name, flags))
+        globHelper(join(name), rest.slice(1), found, true, flags);
+      if (File.isDirectory(join(name))) globHelper(join(name), segments, found, true, flags);
     }
     return;
   }
   if (!MAGIC.test(segment)) {
-    globHelper(join(unescape(segment)), rest, found, false);
+    globHelper(join(unescape(segment)), rest, found, false, flags);
     return;
   }
   for (const name of children(base)) {
-    if (!fnmatch(segment === "**" ? "*" : segment, name)) continue;
-    globHelper(join(name), rest, found, true);
+    if (!fnmatch(segment === "**" ? "*" : segment, name, flags)) continue;
+    globHelper(join(name), rest, found, true, flags);
   }
 }
 
@@ -536,16 +543,16 @@ export class Dir {
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.glob`
    * (`vendor/ruby/v3.3.11/dir.c:3227`).
    */
-  static glob(pattern: string, _flags: number = 0, { base }: { base?: string } = {}): string[] {
+  static glob(pattern: string, flags: number = 0, { base }: { base?: string } = {}): string[] {
     const found: string[] = [];
     for (const expanded of braceExpand(pattern)) {
       const absolute = expanded.startsWith(File.SEPARATOR);
       const segments = expanded.split(File.SEPARATOR);
       if (absolute) segments.shift();
-      globHelper(absolute ? File.SEPARATOR : (base ?? "."), segments, found, false);
+      globHelper(absolute ? File.SEPARATOR : (base ?? "."), segments, found, false, flags);
     }
     if (base != null) {
-      const prefix = `${base.replace(/\/+$/, "")}/`;
+      const prefix = base.endsWith(File.SEPARATOR) ? base : `${base}${File.SEPARATOR}`;
       return found.map((entry) => (entry.startsWith(prefix) ? entry.slice(prefix.length) : entry));
     }
     if (pattern.startsWith(".")) return found;
