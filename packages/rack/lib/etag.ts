@@ -28,8 +28,13 @@ export class ETag {
 
     let digest: string | null = null;
 
-    if (this.etagStatus(status) && rbCheckArrayType(body) !== null && !this.skipCaching(headers)) {
-      body = rbCheckArrayType(body)!;
+    let ary: unknown[] | null;
+    if (
+      this.etagStatus(status) &&
+      (ary = rbCheckArrayType(body)) !== null &&
+      !this.skipCaching(headers)
+    ) {
+      body = ary;
       digest = this.digestBody(body as string[]);
       if (digest) headers[ETAG] = `W/"${digest}"`;
 
