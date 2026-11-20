@@ -398,7 +398,7 @@ describe("ActiveRecord::Railtie active_record.define_attribute_methods", () => {
         throw new ActiveRecordError("database is down");
       });
       expect(warn).toHaveBeenCalledWith(
-        "Failed to define attribute methods because of ActiveRecordError: database is down",
+        "Failed to define attribute methods because of ActiveRecord::ActiveRecordError: database is down",
       );
     } finally {
       warn.mockRestore();

@@ -1,18 +1,17 @@
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { BodyProxy } from "@blazetrails/rack";
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import { Request } from "@blazetrails/actionpack";
 import { LogSubscriber, Notifications } from "@blazetrails/activesupport";
-import type { NotificationHandle, Logger as ActiveSupportLogger } from "@blazetrails/activesupport";
+import type {
+  NotificationHandle,
+  Logger as ActiveSupportLogger,
+  TaggedLogger,
+} from "@blazetrails/activesupport";
 import { Trails } from "../trails.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export type Tagger = string | ((request: Request) => string);
-
-interface TaggedLoggerLike {
-  pushTags?(...tags: string[]): string[];
-  popTags?(count?: number): string[];
-}
 
 export class Logger {
   private app: RackApp | { call: RackApp };
@@ -26,11 +25,10 @@ export class Logger {
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new Request(env);
 
-    const logger = this.logger as TaggedLoggerLike | null;
-    env["trails.rackLoggerTagCount"] =
-      typeof logger?.pushTags === "function"
-        ? logger.pushTags(...this.computeTags(request)).length
-        : 0;
+    const logger = this.logger;
+    env["trails.rackLoggerTagCount"] = rbObjRespondTo(logger, "pushTags")
+      ? (logger as TaggedLogger).pushTags(...this.computeTags(request)).length
+      : 0;
 
     return this.callApp(request, env);
   }
@@ -86,9 +84,9 @@ export class Logger {
     loggerTagPopCount: number,
   ): void {
     handle.finish();
-    const logger = this.logger as TaggedLoggerLike | null;
-    if (typeof logger?.popTags === "function" && loggerTagPopCount > 0)
-      logger.popTags(loggerTagPopCount);
+    const logger = this.logger;
+    if (rbObjRespondTo(logger, "popTags") && loggerTagPopCount > 0)
+      (logger as TaggedLogger).popTags(loggerTagPopCount);
     LogSubscriber.flushAllBang();
   }
 }

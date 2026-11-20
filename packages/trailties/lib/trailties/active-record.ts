@@ -23,6 +23,7 @@ import {
   rbModGt,
 } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
+import { rbModName } from "@blazetrails/ruby-compat";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import { Fixture } from "@blazetrails/activerecord/fixtures.js";
@@ -270,7 +271,7 @@ export class Trailtie extends BaseTrailtie {
             } catch (error) {
               if (!(error instanceof ActiveRecordError)) throw error;
               console.warn(
-                `Failed to define attribute methods because of ${error.constructor.name}: ${error.message}`,
+                `Failed to define attribute methods because of ${rbModName(error.constructor)}: ${error.message}`,
               );
             }
           }
