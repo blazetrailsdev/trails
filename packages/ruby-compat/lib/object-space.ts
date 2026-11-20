@@ -35,8 +35,51 @@ class WeakMap<K extends object, V = unknown> {
     const added = { key: new WeakRef(key), val: held };
     this.#table.set(key, added);
     this.#entries.add(added);
-    this.#dead.register(key, added);
+    this.#dead.register(key, added, added);
     return val;
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/weakmap.c:495 `wmap_aref` */
+  get(key: K): V | null {
+    const entry = this.#table.get(key);
+    if (entry === undefined) return null;
+    const val = entry.val instanceof WeakRef ? entry.val.deref() : entry.val;
+    return (val ?? null) as V | null;
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/weakmap.c:567 `wmap_has_key` */
+  isKey(key: K): boolean {
+    return this.#table.has(key);
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/weakmap.c:567 `wmap_has_key` */
+  isInclude(key: K): boolean {
+    return this.#table.has(key);
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/weakmap.c:530 `wmap_delete` */
+  delete(key: K): V | null {
+    const entry = this.#table.get(key);
+    if (entry === undefined) return null;
+    const val = this.get(key);
+    this.#table.delete(key);
+    this.#entries.delete(entry);
+    this.#dead.unregister(entry);
+    return val;
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/weakmap.c:370 `wmap_keys` */
+  keys(): K[] {
+    const keys: K[] = [];
+    for (const entry of this.#entries) {
+      const key = entry.key.deref();
+      if (key === undefined) {
+        this.#entries.delete(entry);
+        continue;
+      }
+      keys.push(key);
+    }
+    return keys;
   }
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/weakmap.c:315 */

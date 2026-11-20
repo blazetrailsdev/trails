@@ -74,3 +74,20 @@ describe("ObjectSpace.each_object", () => {
     expect(() => ObjectSpace.eachObject(String, () => null)).toThrow(NotImplementedError);
   });
 });
+
+describe("ObjectSpace::WeakMap readers", () => {
+  it("answers [], key?, keys and delete as weakmap.c does", () => {
+    const map = new ObjectSpace.WeakMap<object, boolean>();
+    const a = {};
+    const b = {};
+    map.set(a, true);
+    expect(map.get(a)).toBe(true);
+    expect(map.get(b)).toBeNull();
+    expect(map.isKey(a)).toBe(true);
+    expect(map.isInclude(b)).toBe(false);
+    expect(map.keys()).toEqual([a]);
+    expect(map.delete(a)).toBe(true);
+    expect(map.delete(a)).toBeNull();
+    expect(map.keys()).toEqual([]);
+  });
+});

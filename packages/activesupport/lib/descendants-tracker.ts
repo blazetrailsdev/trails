@@ -1,83 +1,43 @@
-import { classModule, inherited, setClassDefinedHook } from "@blazetrails/ruby-compat";
+import { classModule, inherited, ObjectSpace, setClassDefinedHook } from "@blazetrails/ruby-compat";
 
 export type AnyClass = abstract new (...args: never) => unknown;
 
 const _subclassMap = new globalThis.WeakMap<AnyClass, DescendantsTracker.WeakSet<AnyClass>>();
-let _excludedDescendants: globalThis.WeakSet<AnyClass> | null = new globalThis.WeakSet<AnyClass>();
+let _excludedDescendants: WeakSet<AnyClass> | null = null;
 let _clearDisabled = false;
 
 export const ReloadedClassesFiltering = {
   get subclasses(): AnyClass[] {
     return DescendantsTracker.rejectBang(
-      _subclassMap.get(this as unknown as AnyClass)?.toArray() ?? [],
+      _subclassMap.get(this as unknown as AnyClass)?.toA() ?? [],
     );
   },
 };
 
-export class WeakSet<T extends object> {
-  private _map: globalThis.WeakMap<T, boolean>;
-  private _refs: WeakRef<T>[] = [];
-  private _addsSinceCompact = 0;
-
-  constructor() {
-    this._map = new globalThis.WeakMap<T, boolean>();
+export class WeakSet<T extends object> extends ObjectSpace.WeakMap<T, boolean> {
+  toA(): T[] {
+    return this.keys();
   }
 
-  add(object: T): void {
-    if (!this._map.has(object)) {
-      this._map.set(object, true);
-      this._refs.push(new WeakRef(object));
-      this._addsSinceCompact++;
-      if (this._addsSinceCompact >= 100) {
-        this._compact();
-      }
-    }
-  }
-
-  private _compact(): void {
-    this._refs = this._refs.filter((ref) => ref.deref() !== undefined);
-    this._addsSinceCompact = 0;
-  }
-
-  isInclude(object: T): boolean {
-    return this._map.has(object);
-  }
-
-  delete(object: T): void {
-    this._map.delete(object);
-    this._refs = this._refs.filter((ref) => {
-      const obj = ref.deref();
-      return obj !== undefined && obj !== object;
-    });
-  }
-
-  toArray(): T[] {
-    const result: T[] = [];
-    const alive: WeakRef<T>[] = [];
-    for (const ref of this._refs) {
-      const obj = ref.deref();
-      if (obj !== undefined) {
-        alive.push(ref);
-        result.push(obj);
-      }
-    }
-    this._refs = alive;
-    return result;
+  append(object: T): void {
+    this.set(object, true);
   }
 }
+
+_excludedDescendants = new WeakSet<AnyClass>();
 
 export function registerSubclass(parent: AnyClass, child: AnyClass): void {
   if (!_subclassMap.has(parent)) _subclassMap.set(parent, new WeakSet<AnyClass>());
   const subs = _subclassMap.get(parent)!;
   if (subs.isInclude(child)) return;
-  subs.add(child);
+  subs.append(child);
   if (inherited in parent) {
     (parent as unknown as Record<symbol, (subclass: AnyClass) => void>)[inherited](child);
   }
 }
 
 export function subclasses(klass: AnyClass): AnyClass[] {
-  const subs = _subclassMap.get(klass)?.toArray() ?? [];
+  const subs = _subclassMap.get(klass)?.toA() ?? [];
   return rejectBang(subs);
 }
 
@@ -100,9 +60,9 @@ export function clear(classes: Iterable<AnyClass>): void {
     );
   }
   for (const klass of classes) {
-    _excludedDescendants!.add(klass);
+    _excludedDescendants!.append(klass);
     for (const descendant of descendants(klass)) {
-      _excludedDescendants!.add(descendant);
+      _excludedDescendants!.append(descendant);
     }
   }
 }
@@ -110,7 +70,7 @@ export function clear(classes: Iterable<AnyClass>): void {
 export function rejectBang(classes: AnyClass[]): AnyClass[] {
   if (_excludedDescendants) {
     for (let i = classes.length - 1; i >= 0; i--) {
-      if (_excludedDescendants.has(classes[i])) classes.splice(i, 1);
+      if (_excludedDescendants.isInclude(classes[i])) classes.splice(i, 1);
     }
   }
   return classes;
