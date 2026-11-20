@@ -57,7 +57,7 @@ export function current(): RubyDate {
   if (zone) {
     return new RubyDate(zone.today());
   }
-  return new RubyDate(Temporal.Now.plainDateISO());
+  return new RubyDate(RubyDate.today());
 }
 
 export function ago(date: Temporal.PlainDate, seconds: number): TimeWithZone | RubyTime {

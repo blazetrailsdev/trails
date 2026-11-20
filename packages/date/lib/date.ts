@@ -1,3 +1,4 @@
+import { Temporal } from "./temporal.js";
 import {
   FloatDomainError,
   FrozenError,
@@ -5,7 +6,6 @@ import {
   TopLevel,
   constSet,
 } from "@blazetrails/ruby-compat";
-import { Temporal } from "@js-temporal/polyfill";
 import {
   ArgumentError,
   cmp,
@@ -25,7 +25,7 @@ import {
   TEMPORAL_METHOD_TABLE,
 } from "@blazetrails/ruby-compat";
 import { rbWarning } from "./rb-warning.js";
-import { Time } from "./time.js";
+import { Time, nowTimeZoneId } from "./time.js";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const ABBR_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -2899,7 +2899,7 @@ function completeFrags(klass: typeof Date | typeof DateTime, parts: DateParts): 
   }
 
   if (g && k !== null && a.length - e) {
-    const d = Temporal.Now.plainDateISO();
+    const d = Date.today();
     const today: Partial<Record<DateFrag, number>> = {
       year: d.year,
       mon: d.month,
@@ -2951,7 +2951,7 @@ function completeFrags(klass: typeof Date | typeof DateTime, parts: DateParts): 
 
   if (g && k === "time") {
     if (klass === DateTime || klass.prototype instanceof DateTime) {
-      const d = Temporal.Now.plainDateISO();
+      const d = Date.today();
       parts.jd ??= cCivilToJd(d.year, d.month, d.day);
     }
   }
@@ -4822,7 +4822,9 @@ export class Date extends rbCDate {
 
   static today(start = DEFAULT_SG): Temporal.PlainDate {
     const sg = val2sg(start);
-    const tm = Temporal.Now.plainDateISO();
+    const tm = Temporal.Instant.fromEpochMilliseconds(globalThis.Date.now())
+      .toZonedDateTimeISO(nowTimeZoneId())
+      .toPlainDate();
 
     const y = tm.year;
     const m = tm.month;
@@ -5642,7 +5644,7 @@ export class Date extends rbCDate {
    * the same defect where they do not (1900 under `Date::JULIAN`).
    *
    * **No seat can satisfy both.** Temporal has no Julian calendar —
-   * `@js-temporal/polyfill` rejects `calendar: "julian"` and CLDR ships only
+   * native Temporal rejects `calendar: "julian"` and CLDR ships only
    * `gregory` and `iso8601` — so a `PlainDate` reads as exactly one absolute
    * day. A seat for a Julian-side day can carry the civil triple MRI spells OR
    * the absolute day MRI derives the weekday from, never both. Ruby has no
@@ -6354,7 +6356,9 @@ export class DateTime extends DateWithoutParseStatics {
 
   static now(start = DEFAULT_SG): DateTime {
     const sg = start;
-    const tm = Temporal.Now.zonedDateTimeISO();
+    const tm = Temporal.Instant.fromEpochMilliseconds(globalThis.Date.now()).toZonedDateTimeISO(
+      nowTimeZoneId(),
+    );
 
     const y = tm.year;
     const m = tm.month;

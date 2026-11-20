@@ -1,4 +1,4 @@
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "./temporal.js";
 import { tzdataAbbreviation } from "./tzdata-abbreviations.js";
 import { tzdataIsdst, tzdataOffsetInstant } from "./tzdata-isdst.js";
 import { rbWarning } from "./rb-warning.js";

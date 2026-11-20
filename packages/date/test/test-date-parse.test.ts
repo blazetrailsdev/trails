@@ -1,4 +1,4 @@
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "../lib/temporal.js";
 import { describe, it, expect } from "vitest";
 import {
   ArgumentError,

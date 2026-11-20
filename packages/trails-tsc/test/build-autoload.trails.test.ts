@@ -400,7 +400,10 @@ describe("buildAutoload", () => {
           "",
         ].join("\n"),
       );
-      File.write("config/initializers/meta.ts", "export const here = import.meta.dirname;\n");
+      File.write(
+        "config/initializers/meta.ts",
+        "export const here = import.meta.dirname;\nexport const sibling = import.meta.resolve('./sibling.ts');\n",
+      );
       const root = Dir.pwd();
       seats.Trails = {
         application: {
@@ -451,8 +454,12 @@ describe("buildAutoload", () => {
       };
       await buildAutoload();
       const meta = await import(File.expandPath(".trails/compiled/config/initializers/meta.ts"));
-      expect(File.realpath((await meta.default()).here)).toBe(
+      const metaExports = await meta.default();
+      expect(File.realpath(metaExports.here)).toBe(
         File.realpath(File.expandPath("config/initializers")),
+      );
+      expect(metaExports.sibling).toBe(
+        new URL("sibling.ts", `file://${File.expandPath("config/initializers")}/`).href,
       );
     } finally {
       Dir.chdir(pwd);

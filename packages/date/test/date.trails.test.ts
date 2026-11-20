@@ -1,4 +1,4 @@
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "../lib/temporal.js";
 import { describe, it, expect, vi } from "vitest";
 import {
   ArgumentError,
@@ -123,7 +123,6 @@ describe("Date", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
     try {
-      expect(Temporal.Now.plainDateISO("UTC").year).toBe(2008);
       const date = RubyDate.parse("Feb 3rd");
       expect([date.year, date.month, date.day]).toEqual([2008, 2, 3]);
     } finally {

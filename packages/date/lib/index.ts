@@ -1,4 +1,4 @@
-export { Temporal } from "@js-temporal/polyfill";
+export { Temporal } from "./temporal.js";
 import "./acts-like.js";
 export {
   ArgumentError,
