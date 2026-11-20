@@ -279,9 +279,7 @@ export class Generators {
     Generators.hiddenNamespaces().push(...namespaces);
   }
 
-  static hideNamespace(...namespaces: string[]): void {
-    Generators.hideNamespaces(...namespaces);
-  }
+  static hideNamespace = this.hideNamespaces;
 
   static async help(command: string = "generate"): Promise<void> {
     STDOUT.puts("Usage:");
