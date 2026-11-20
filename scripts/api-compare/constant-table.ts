@@ -21,7 +21,7 @@ import {
 import { DIR_TO_PACKAGES, ROOT_DIR } from "./config.js";
 
 /** The `TS_CLASS_RENAMES` a Ruby path keeps: `Rails::Railtie` is `Rails::Trailtie`. */
-export const BRAND_RENAMES = ["Railtie", "Railties"];
+export const BRAND_RENAMES = ["Railtie", "Railties", "GemfileEntry"];
 
 export interface PackageLayout {
   /** The namespace `src/` stands for; absent where its directories are the roots. */

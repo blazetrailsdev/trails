@@ -1,19 +1,11 @@
 <%
-  const gemfile = (group) =>
+  const devDependencies = ["@blazetrails/activerecord-cli", "@blazetrails/trails-tsc"];
+  const packages = (development) =>
     JSON.parse(
-      `{${this.gemfileEntries()
-        .filter((entry) => !entry.commentedOut && entry.options.group === group)
+      `{${this.packageEntries()
+        .filter((entry) => !entry.commentedOut && devDependencies.includes(entry.name) === development)
         .join(",")}}`,
     );
-  const [gemName] = this.database.gem();
-  const dbDep =
-    this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
-      ? this.sqliteDriver === "expo-sqlite"
-        ? { "expo-sqlite": "^15.0.0" }
-        : {}
-      : {};
-  const dependencies = gemfile(undefined);
-  if (this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3") delete dependencies[gemName];
 -%>
 <%= JSON.stringify(
   {
@@ -39,9 +31,9 @@
       "db:reset": "trails db:reset",
       prepare: "trails-tsc-views build --views app/views",
     },
-    dependencies: { ...dependencies, ...dbDep },
+    dependencies: packages(false),
     devDependencies: {
-      ...gemfile("development"),
+      ...packages(true),
       "@types/node": "^22.0.0",
       typescript: "^5.8.0",
       vite: "^7.0.0",

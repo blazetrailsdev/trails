@@ -121,6 +121,7 @@ export const TS_CLASS_RENAMES: Record<string, string> = {
   Railties: "Trailties",
   Rails: "Trails",
   Registry: "TypeRegistry",
+  GemfileEntry: "PackageEntry",
   ViteRuby: "ViteAssets",
   ViteRails: "ViteTrails",
 };
@@ -169,6 +170,8 @@ export const PHRASE_RENAMES: Record<string, string> = {
   bundle_command: "install_command",
   bundle_install: "install",
   skip_bundle: "skip_install",
+  gemfile_entry: "package_entry",
+  gemfile_entries: "package_entries",
   load_ruby_config: "load_ts_config",
   vite_ruby: "vite_assets",
 };

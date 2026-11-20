@@ -216,7 +216,7 @@ describe("PluginBuilder", () => {
     const g = generator("plain");
     await File.writeAsync(`${root}/package.json`, '{ "dependencies": {} }');
     g.inApp = true;
-    await g["build"]("gemfileEntry");
+    await g["build"]("packageEntry");
     expect(JSON.parse(await File.readAsync(`${root}/package.json`)).dependencies).toEqual({
       "blog-admin": "file:vendor/blog-admin",
     });

@@ -251,7 +251,7 @@ describe("AppGenerator (trails-only)", () => {
       { main: true, packageManager: "npm" },
       { destinationRoot: tmpDir },
     );
-    expect(String(generator.trailsGemfileEntry()[0])).toBe(
+    expect(String(generator.trailsPackageEntry()[0])).toBe(
       '"@blazetrails/activerecord": "github:blazetrailsdev/trails#main"',
     );
   });

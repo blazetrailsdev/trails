@@ -58,6 +58,8 @@ export abstract class AppBase extends Base {
   declare options: AppBaseOptions;
   declare trailsTemplate?: string;
   private _database?: Database;
+  declare readonly packageManager?: string;
+  declare readonly sqliteDriver?: string;
   /** @internal */
   private _impliedOptions?: Record<string, string[]>;
   /** @internal */
@@ -84,8 +86,8 @@ export abstract class AppBase extends Base {
     this.noCommands(() => this.methodAdded("isDevcontainer"));
     this.noCommands(() => this.methodAdded("skipDevcontainer"));
     this.noCommands(() => this.methodAdded("dependsOnSystemTest"));
-    this.noCommands(() => this.methodAdded("gemfileEntries"));
-    this.noCommands(() => this.methodAdded("trailsGemfileEntry"));
+    this.noCommands(() => this.methodAdded("packageEntries"));
+    this.noCommands(() => this.methodAdded("trailsPackageEntry"));
     this.noCommands(() => this.methodAdded("trailsDevPackages"));
     this.noCommands(() => this.methodAdded("applyTrailsTemplate"));
     this.noCommands(() => this.methodAdded("setDefaultAccessorsBang"));
@@ -510,25 +512,36 @@ ${requireStatements.join("\n")}`;
     return !!(this.options.dev || this.options.edge || this.options.main);
   }
 
-  gemfileEntries(): GemfileEntry[] {
+  packageEntries(): PackageEntry[] {
     return [
-      this.trailsGemfileEntry(),
-      this.databaseGemfileEntry(),
-      this.hotwireGemfileEntry(),
-      this.cssGemfileEntry(),
-      this.cableGemfileEntry(),
+      this.trailsPackageEntry(),
+      this.databasePackageEntry(),
+      this.cssPackageEntry(),
+      this.cablePackageEntry(),
     ]
       .flat()
       .filter((entry) => entry != null)
       .filter(this._gemFilter);
   }
 
-  /** @internal */
-  protected databaseGemfileEntry(): GemfileEntry | undefined {
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
+  protected databasePackageEntry(): PackageEntry | undefined {
     if (this.options.skipActiveRecord) return;
 
     const [gemName, gemVersion] = this.database.gem();
-    return GemfileEntry.version(
+    if (this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3") {
+      if (this.sqliteDriver !== "expo-sqlite") return;
+      return PackageEntry.version(
+        "expo-sqlite",
+        "^15.0.0",
+        `Use ${this.options.database} as the database for Active Record`,
+      );
+    }
+
+    return PackageEntry.version(
       gemName,
       gemVersion,
       `Use ${this.options.database} as the database for Active Record`,
@@ -540,41 +553,39 @@ ${requireStatements.join("\n")}`;
    * @missingRailsArgs github — PERMANENT
    * @missingRailsArgs version — PERMANENT
    */
-  trailsGemfileEntry(): GemfileEntry[] {
-    const packageManager = (this as unknown as { packageManager?: string }).packageManager;
-    return TRAILS_PACKAGES.filter(([, skip]) => !skip?.(this)).map(([name, , group]) => {
-      let entry: GemfileEntry;
+  trailsPackageEntry(): PackageEntry[] {
+    return TRAILS_PACKAGES.filter(([, skip]) => !skip?.(this)).map(([name]) => {
+      let entry: PackageEntry;
       if (this.options.dev) {
-        entry = GemfileEntry.path(
+        entry = PackageEntry.path(
           name,
           this.trailsDevPackages()[name],
           "Use local checkout of Trails",
         );
       } else if (this.options.edge) {
-        entry = GemfileEntry.github(
+        entry = PackageEntry.github(
           name,
           "blazetrailsdev/trails",
           this.edgeBranch(),
           "Use specific branch of Trails",
         );
       } else if (this.options.main) {
-        entry = GemfileEntry.github(
+        entry = PackageEntry.github(
           name,
           "blazetrailsdev/trails",
           "main",
           "Use main development branch of Trails",
         );
       } else {
-        entry = GemfileEntry.version(
+        entry = PackageEntry.version(
           name,
           this.trailsVersionSpecifier(),
           'Bundle edge Trails instead: "@blazetrails/trailties": "github:blazetrailsdev/trails#main"',
         );
       }
-      if (packageManager === "pnpm" && entry.options.github != null) {
+      if (this.packageManager === "pnpm" && entry.options.github != null) {
         entry.options.glob = `/packages/${name.replace("@blazetrails/", "")}`;
       }
-      if (group != null) entry.options.group = group;
       return entry;
     });
   }
@@ -590,26 +601,6 @@ ${requireStatements.join("\n")}`;
       const patch = gemVersion.segments().slice(0, 3).join(".");
       return [`~${patch}`, `>=${gemVersion}`];
     }
-  }
-
-  /**
-   * @internal
-   * @missingRailsArgs floats — PERMANENT
-   */
-  protected hotwireGemfileEntry(): GemfileEntry[] | undefined {
-    if (this.options.skipHotwire) return;
-
-    const turboRailsEntry = GemfileEntry.floats(
-      "@blazetrails/turbo",
-      "Hotwire's SPA-like page accelerator [https://turbo.hotwired.dev]",
-    );
-
-    const stimulusRailsEntry = GemfileEntry.floats(
-      "@blazetrails/stimulus",
-      "Hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]",
-    );
-
-    return [turboRailsEntry, stimulusRailsEntry];
   }
 
   /** @internal */
@@ -737,20 +728,20 @@ ${requireStatements.join("\n")}`;
    * @internal
    * @missingRailsArgs floats — PERMANENT
    */
-  protected cssGemfileEntry(): GemfileEntry | undefined {
+  protected cssPackageEntry(): PackageEntry | undefined {
     if (this.options.api) return;
     if (!this.options.css) return;
 
     if (!this.usingJsRuntime() && this.options.css === "tailwind") {
-      return GemfileEntry.floats("@tailwindcss/vite", "Use Tailwind CSS [https://tailwindcss.com]");
+      return PackageEntry.floats("@tailwindcss/vite", "Use Tailwind CSS [https://tailwindcss.com]");
     }
   }
 
   /** @internal */
-  protected cableGemfileEntry(): GemfileEntry | undefined {
+  protected cablePackageEntry(): PackageEntry | undefined {
     if (!this.options.skipActionCable && this.options.skipSolid) {
       const comment = "Use Redis adapter to run Action Cable in production";
-      return new GemfileEntry("redis", ">= 4.0.1", comment, {}, true);
+      return new PackageEntry("redis", ">= 4.0.1", comment, {}, true);
     }
   }
 
@@ -807,7 +798,7 @@ ${requireStatements.join("\n")}`;
   /** @internal */
   protected async installCommand(command: string, env: Record<string, string> = {}): Promise<void> {
     const pm = getPackageManager(this.destinationRoot, {
-      fallback: (this as unknown as { packageManager?: string }).packageManager,
+      fallback: this.packageManager,
     });
     this.sayStatus("run", `${pm.name} ${command}`);
     await this.execInstallCommand(pm.name, command, env);
@@ -844,7 +835,7 @@ ${requireStatements.join("\n")}`;
   protected async generateBundlerBinstub(): Promise<void> {
     if (this.isInstall()) {
       const pm = getPackageManager(this.destinationRoot, {
-        fallback: (this as unknown as { packageManager?: string }).packageManager,
+        fallback: this.packageManager,
       });
       await this.createFile(
         `bin/${pm.name}`,
@@ -969,7 +960,7 @@ ${requireStatements.join("\n")}`;
 }
 
 /** @noRailsEquivalent PERMANENT */
-type TrailsPackage = [name: string, skip?: (generator: AppBase) => unknown, group?: string];
+type TrailsPackage = [name: string, skip?: (generator: AppBase) => unknown];
 
 /** @noRailsEquivalent PERMANENT */
 const TRAILS_PACKAGES: TrailsPackage[] = [
@@ -989,11 +980,11 @@ const TRAILS_PACKAGES: TrailsPackage[] = [
   ["@blazetrails/solid-queue", (g) => g.options.skipSolid],
   ["@blazetrails/solid-cable", (g) => g.options.skipSolid || g.options.skipActionCable],
   ["@blazetrails/actioncable", (g) => g.options.skipActionCable],
-  ["@blazetrails/activerecord-cli", undefined, "development"],
-  ["@blazetrails/trails-tsc", undefined, "development"],
+  ["@blazetrails/activerecord-cli"],
+  ["@blazetrails/trails-tsc"],
 ];
 
-export class GemfileEntry {
+export class PackageEntry {
   name: string;
   version: string | string[] | null;
   comment: string | null;
@@ -1019,7 +1010,7 @@ export class GemfileEntry {
     github: string,
     branch: string | null = null,
     comment: string | null = null,
-  ): GemfileEntry {
+  ): PackageEntry {
     if (branch) {
       return new this(name, null, comment, { github, branch });
     } else {
@@ -1031,19 +1022,22 @@ export class GemfileEntry {
     name: string,
     version: string | string[],
     comment: string | null = null,
-  ): GemfileEntry {
+  ): PackageEntry {
     return new this(name, version, comment);
   }
 
-  static floats(name: string, comment: string | null = null): GemfileEntry {
+  static floats(name: string, comment: string | null = null): PackageEntry {
     return new this(name, null, comment);
   }
 
-  static path(name: string, path: string, comment: string | null = null): GemfileEntry {
+  static path(name: string, path: string, comment: string | null = null): PackageEntry {
     return new this(name, null, comment, { path });
   }
 
-  /** @missingRailsArgs join — PERMANENT */
+  /**
+   * @inventedArm if — PERMANENT
+   * @missingRailsArgs join — PERMANENT
+   */
   toString(): string {
     const { github, branch, glob, path } = this.options;
     let specifier: string;
