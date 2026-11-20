@@ -40,12 +40,11 @@ export class Process extends Struct.new("kind", "attributes") {
   declare kind: string;
   declare attributes: Options;
 
-  /** @inventedArm assign — CONVERGEABLE solid-queue-fork-child-supervisee-description */
   instantiate(): object {
     const klass = safeConstantize(`SolidQueue::${titleize(this.kind)}`) as new (
       attributes: Options,
     ) => object;
-    return Object.assign(new klass(this.attributes), { _configuredProcess: this });
+    return new klass(this.attributes);
   }
 }
 
