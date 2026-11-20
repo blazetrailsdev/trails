@@ -1822,6 +1822,9 @@ importers:
       '@blazetrails/solid-queue':
         specifier: workspace:*
         version: link:../../packages/solid-queue
+      '@blazetrails/sqlite3':
+        specifier: workspace:*
+        version: link:../../packages/sqlite3
       '@blazetrails/stimulus':
         specifier: workspace:*
         version: link:../../packages/stimulus
