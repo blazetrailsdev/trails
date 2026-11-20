@@ -332,8 +332,9 @@ as convergence classes.
   in ~10s, and the bare `typescript` import is only a version string: package
   code reaches the compiler through `typescript/unstable/*`. The classic 5.x
   API survives only as the `typescript-5` alias (5.9.3), for `scripts/`
-  (import it by that name, never as bare `typescript`), `trails-tsc`, and the
-  lint/typedoc toolchain, whose peers `.pnpmfile.cjs` moves (RFC 0125).
+  (import it by that name, never as bare `typescript`) and `trails-tsc`. The
+  lint/typedoc toolchain runs on TypeScript 6.0, whose `esnext.temporal` lib
+  5.9 lacks; `.pnpmfile.cjs` moves its peers (RFC 0125).
 - **Do NOT run the whole test suite locally** (`pnpm test`, `pnpm -r test`,
   `pnpm --filter activerecord test`, etc.). CI runs the full suite on every
   push. Locally, run only the individual test files or small groups you
