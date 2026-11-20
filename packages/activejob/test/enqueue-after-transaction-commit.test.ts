@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
-import { TestCase } from "@blazetrails/activesupport/test-case";
+import { stubConst } from "@blazetrails/activesupport/testing/constant-stubbing";
 import { block, constSet, constGet } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";
 import { EnqueueError } from "../lib/enqueuing.js";
@@ -86,7 +86,7 @@ const topLevel = TopLevel as Record<string, unknown>;
 describe("EnqueueAfterTransactionCommitTest", () => {
   it("#perform_later wait for transactions to complete before enqueuing the job", async () => {
     const fakeActiveRecord = new FakeActiveRecord();
-    await TestCase.stubConst(
+    await stubConst(
       topLevel,
       "ActiveRecord",
       fakeActiveRecord,
@@ -106,7 +106,7 @@ describe("EnqueueAfterTransactionCommitTest", () => {
 
   it("#perform_later returns the Job instance even if it's delayed by `after_all_transactions_commit`", async () => {
     const fakeActiveRecord = new FakeActiveRecord(false);
-    await TestCase.stubConst(
+    await stubConst(
       topLevel,
       "ActiveRecord",
       fakeActiveRecord,
@@ -121,7 +121,7 @@ describe("EnqueueAfterTransactionCommitTest", () => {
 
   it("#perform_later yields the enqueued Job instance even if it's delayed by `after_all_transactions_commit`", async () => {
     const fakeActiveRecord = new FakeActiveRecord(false);
-    await TestCase.stubConst(
+    await stubConst(
       topLevel,
       "ActiveRecord",
       fakeActiveRecord,
@@ -143,7 +143,7 @@ describe("EnqueueAfterTransactionCommitTest", () => {
 
   it("#perform_later assumes successful enqueue, but update status later", async () => {
     const fakeActiveRecord = new FakeActiveRecord(false);
-    await TestCase.stubConst(
+    await stubConst(
       topLevel,
       "ActiveRecord",
       fakeActiveRecord,

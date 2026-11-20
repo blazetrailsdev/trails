@@ -387,7 +387,7 @@ function copyTimeTo(this: Receiver, other: Result): Result {
     hour: (this as RubyTime).hour,
     min: (this as RubyTime).min,
     sec: (this as RubyTime).sec,
-    nsec: Tryable.try(this, "nsec") as number | undefined,
+    nsec: (Tryable.try(this, "nsec") ?? undefined) as number | undefined,
   });
 }
 

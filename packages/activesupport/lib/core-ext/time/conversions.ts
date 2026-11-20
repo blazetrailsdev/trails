@@ -45,14 +45,12 @@ export function toFs(date: RubyTime, format: string = "default"): string {
 export { toFs as toFormattedS };
 
 export function formattedOffset(
-  date: Date | RubyTime,
+  time: RubyTime,
   colon = true,
   alternateUtcString: string | null = null,
 ): string {
-  const isUtc = date instanceof RubyTime ? date.isUtc() : -date.getTimezoneOffset() * 60 === 0;
-  if (isUtc && alternateUtcString != null) return alternateUtcString;
-  const utcOffset = date instanceof RubyTime ? date.utcOffset : -date.getTimezoneOffset() * 60;
-  return TimeZone.secondsToUtcOffset(utcOffset, colon);
+  if (time.isUtc() && alternateUtcString != null) return alternateUtcString;
+  return TimeZone.secondsToUtcOffset(time.utcOffset, colon);
 }
 
 export function xmlschema(date: Date): string {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { tryBang, tryCall, tryWith } from "../../../lib/try.js";
+import { tryCall } from "../../../lib/try.js";
 import { assertNotRespondTo } from "../../../lib/testing/assertions.js";
+import { block, NoMethodError } from "@blazetrails/ruby-compat";
 import { Tryable, Delegator } from "../../../lib/core-ext/object/try.js";
 
 class PrivateKlass {
@@ -51,13 +52,13 @@ describe("ObjectTryTest", () => {
   it("nonexisting method bang", () => {
     const method = "undefinedMethod";
     assertNotRespondTo(string, method);
-    expect(() => tryBang(str, method)).toThrow(TypeError);
+    expect(() => Tryable.tryBang(str, method)).toThrow(NoMethodError);
   });
 
   it("nonexisting method with arguments bang", () => {
     const method = "undefinedMethod";
     assertNotRespondTo(string, method);
-    expect(() => tryBang(str, method, "llo", "y")).toThrow(TypeError);
+    expect(() => Tryable.tryBang(str, method, "llo", "y")).toThrow(NoMethodError);
   });
 
   it("valid method", () => {
@@ -82,31 +83,48 @@ describe("ObjectTryTest", () => {
   });
 
   it("try only block", () => {
-    expect(tryWith(string, reverse)).toEqual(reverse(string));
+    expect(Tryable.try(string, block(reverse))).toEqual(reverse(string));
   });
 
   it("try only block bang", () => {
-    expect(tryWith(string, reverse)).toEqual(reverse(string));
+    expect(Tryable.tryBang(string, block(reverse))).toEqual(reverse(string));
   });
 
   it("try only block nil", () => {
     let ran = false;
-    tryWith(null, () => {
-      ran = true;
-    });
+    Tryable.try(
+      null,
+      block(() => {
+        ran = true;
+      }),
+    );
     expect(ran).toEqual(false);
   });
 
   it("try with instance eval block", () => {
-    expect(tryWith(string, (s) => reverse(s))).toEqual(reverse(string));
+    expect(
+      Tryable.try(
+        string,
+        block(function (this: string) {
+          return reverse(this);
+        }),
+      ),
+    ).toEqual(reverse(string));
   });
 
   it("try with instance eval block bang", () => {
-    expect(tryWith(string, (s) => reverse(s))).toEqual(reverse(string));
+    expect(
+      Tryable.tryBang(
+        string,
+        block(function (this: string) {
+          return reverse(this);
+        }),
+      ),
+    ).toEqual(reverse(string));
   });
 
   it("try with private method bang", () => {
-    expect(() => tryBang(new PrivateKlass(), "privateMethod")).toThrow(TypeError);
+    expect(() => Tryable.tryBang(new PrivateKlass(), "privateMethod")).toThrow(NoMethodError);
   });
 
   it("try with private method", () => {
@@ -126,19 +144,19 @@ describe("ObjectTryTest", () => {
   });
 
   it("try with private method on delegator", () => {
-    expect(new Decorator(string).try("privateDelegatorMethod")).toBeUndefined();
+    expect(new Decorator(string).try("privateDelegatorMethod")).toBeNull();
   });
 
   it("try with private method on delegator bang", () => {
-    expect(() => new Decorator(string).tryBang("privateDelegatorMethod")).toThrow(TypeError);
+    expect(() => new Decorator(string).tryBang("privateDelegatorMethod")).toThrow(NoMethodError);
   });
 
   it("try with private method on delegator target", () => {
-    expect(new Decorator(new PrivateKlass()).try("privateMethod")).toBeUndefined();
+    expect(new Decorator(new PrivateKlass()).try("privateMethod")).toBeNull();
   });
 
   it("try with private method on delegator target bang", () => {
-    expect(() => new Decorator(new PrivateKlass()).tryBang("privateMethod")).toThrow(TypeError);
+    expect(() => new Decorator(new PrivateKlass()).tryBang("privateMethod")).toThrow(NoMethodError);
   });
 });
 
@@ -149,12 +167,12 @@ describe("Tryable namespace", () => {
   });
 
   it("try returns undefined for null", () => {
-    expect(Tryable.try(null, "greet")).toBeUndefined();
-    expect(Tryable.try(undefined, "greet")).toBeUndefined();
+    expect(Tryable.try(null, "greet")).toBeNull();
+    expect(Tryable.try(undefined, "greet")).toBeNull();
   });
 
   it("try returns undefined for missing method", () => {
-    expect(Tryable.try({ name: "test" }, "greet")).toBeUndefined();
+    expect(Tryable.try({ name: "test" }, "greet")).toBeNull();
   });
 
   it("try passes arguments", () => {
@@ -163,12 +181,12 @@ describe("Tryable namespace", () => {
   });
 
   it("tryBang throws for missing method with descriptive message", () => {
-    expect(() => Tryable.tryBang({}, "greet")).toThrow(TypeError);
+    expect(() => Tryable.tryBang({}, "greet")).toThrow(NoMethodError);
     expect(() => Tryable.tryBang({}, "greet")).toThrow(/undefined method 'greet'/);
   });
 
   it("tryBang returns undefined for null", () => {
-    expect(Tryable.tryBang(null, "greet")).toBeUndefined();
+    expect(Tryable.tryBang(null, "greet")).toBeNull();
   });
 });
 
@@ -184,7 +202,7 @@ describe("Delegator", () => {
 
   it("try returns undefined for null delegate", () => {
     const d = new Delegator(null);
-    expect(d.try("greet")).toBeUndefined();
+    expect(d.try("greet")).toBeNull();
   });
 
   it("tryBang forwards to delegate", () => {
@@ -194,6 +212,6 @@ describe("Delegator", () => {
 
   it("tryBang throws for missing method on delegate", () => {
     const d = new Delegator({ name: "test" });
-    expect(() => d.tryBang("greet")).toThrow(TypeError);
+    expect(() => d.tryBang("greet")).toThrow(NoMethodError);
   });
 });

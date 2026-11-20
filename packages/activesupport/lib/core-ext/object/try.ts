@@ -1,31 +1,38 @@
+import { rbBlockGivenP, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+
 export interface Tryable {
   try(method: string, ...args: unknown[]): unknown;
   tryBang(method: string, ...args: unknown[]): unknown;
 }
 
 export const Tryable = {
-  try(obj: unknown, method: string, ...args: unknown[]): unknown {
-    if (obj == null) return undefined;
-    const target = obj as Record<string, unknown>;
-    const fn = target[method];
-    if (typeof fn === "function") {
-      return fn.apply(obj, args);
+  try(obj: unknown, ...args: unknown[]): unknown {
+    if (obj == null) return null;
+    const block = args.at(-1) as ((this: unknown, self?: unknown) => unknown) | undefined;
+    if (args.length === 1 && rbBlockGivenP(block)) {
+      if (block.length === 0) {
+        return Reflect.apply(block, obj, []);
+      } else {
+        return block(obj);
+      }
+    } else if (rbObjRespondTo(obj, args[0] as string)) {
+      return rbFSend(obj, ...(args as [string, ...unknown[]]));
     }
-    if (args.length === 0) return fn;
-    return undefined;
+    return null;
   },
 
-  tryBang(obj: unknown, method: string, ...args: unknown[]): unknown {
-    if (obj == null) return undefined;
-    const target = obj as Record<string, unknown>;
-    const fn = target[method];
-    if (typeof fn !== "function") {
-      if (args.length === 0 && method in Object(obj)) return fn;
-      throw new TypeError(
-        `undefined method '${method}' for ${obj === null ? "nil:NilClass" : String(obj)}`,
-      );
+  tryBang(obj: unknown, ...args: unknown[]): unknown {
+    if (obj == null) return null;
+    const block = args.at(-1) as ((this: unknown, self?: unknown) => unknown) | undefined;
+    if (args.length === 1 && rbBlockGivenP(block)) {
+      if (block.length === 0) {
+        return Reflect.apply(block, obj, []);
+      } else {
+        return block(obj);
+      }
+    } else {
+      return rbFSend(obj, ...(args as [string, ...unknown[]]));
     }
-    return fn.apply(obj, args);
   },
 };
 
