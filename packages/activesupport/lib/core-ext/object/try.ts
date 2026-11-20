@@ -11,9 +11,9 @@ export const Tryable = {
     const block = args.at(-1);
     if (args.length === 1 && rbBlockGivenP(block)) {
       if (block.length === 0) {
-        return (block as () => unknown).call(obj);
+        return (block as unknown as () => unknown).call(obj);
       } else {
-        return (block as (self: unknown) => unknown)(obj);
+        return (block as unknown as (self: unknown) => unknown)(obj);
       }
     } else if (rbObjRespondTo(obj, args[0] as string)) {
       return rbFSend(obj, ...(args as [string, ...unknown[]]));
@@ -26,9 +26,9 @@ export const Tryable = {
     const block = args.at(-1);
     if (args.length === 1 && rbBlockGivenP(block)) {
       if (block.length === 0) {
-        return (block as () => unknown).call(obj);
+        return (block as unknown as () => unknown).call(obj);
       } else {
-        return (block as (self: unknown) => unknown)(obj);
+        return (block as unknown as (self: unknown) => unknown)(obj);
       }
     } else {
       return rbFSend(obj, ...(args as [string, ...unknown[]]));
