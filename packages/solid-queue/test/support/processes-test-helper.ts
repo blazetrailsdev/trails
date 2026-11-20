@@ -126,6 +126,14 @@ export function findProcessesRegisteredAs(kind: string) {
   return Process.where({ kind });
 }
 
+export async function terminateProcess(
+  pid: ReturnType<typeof runSupervisor>,
+  { timeout = 10, signal = "TERM" }: { timeout?: number; signal?: "TERM" | "INT" | "QUIT" } = {},
+) {
+  await signalProcess(pid, signal);
+  await waitForProcessTerminationWithTimeout(pid, { timeout });
+}
+
 export async function waitForProcessTerminationWithTimeout(
   run: ReturnType<typeof runSupervisor>,
   { timeout = 10, exitstatus = 0 }: { timeout?: number; exitstatus?: number | null } = {},

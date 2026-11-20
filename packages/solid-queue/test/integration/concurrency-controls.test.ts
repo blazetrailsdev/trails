@@ -38,6 +38,7 @@ import {
 import {
   runSupervisor,
   sleep,
+  terminateProcess,
   waitFor,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
@@ -298,15 +299,13 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   it("don't block claimed executions that get released", async () => {
     await NonOverlappingUpdateResultJob.performLater(result, {
       name: "I'll be released to ready",
-      pause: Number(SolidQueue.shutdownTimeout) + 10,
+      pause: Number(SolidQueue.shutdownTimeout) + 30,
     });
     const job = (await Job.last()) as Job;
 
     await waitFor({ timeout: 2 }, async () => (await job.reload()).isClaimed());
 
-    const terminating = sleep(0.1).then(() => run.terminate());
-    await sleep(Number(SolidQueue.shutdownTimeout) + 0.6);
-    await terminating;
+    await terminateProcess(run);
 
     expect((await job.reload()).isFinished()).toBeFalsy();
     expect(await (await job.reload()).isReady()).toBeTruthy();
