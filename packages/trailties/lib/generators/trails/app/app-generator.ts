@@ -847,11 +847,8 @@ export class AppGenerator extends AppBase {
   }
 
   /** @internal */
-  protected file(
-    destination: string,
-    ...args: Array<string | Record<string, unknown> | (() => unknown)>
-  ): unknown {
-    return this.createFile(destination, ...args);
+  protected file(...args: Array<string | Record<string, unknown> | (() => unknown)>): unknown {
+    return this.createFile(...(args as Parameters<AppGenerator["createFile"]>));
   }
 
   /** @internal */
