@@ -7,7 +7,9 @@ import { PG } from "../namespaces.js";
 const TIMESTAMP =
   /^(\d{1,7})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)(?:\.(\d+))?(?:([+-])(\d\d)(?::(\d\d))?(?::(\d\d))?)?( BC)?$/;
 
+/** @noRailsEquivalent PERMANENT */
 export class Timestamp extends SimpleDecoder {
+  /** @noRailsEquivalent PERMANENT */
   decode(string: string, _tuple: number | null = null, _field: number | null = null): unknown {
     const m = TIMESTAMP.exec(string);
     let year = Number(m?.[1]);

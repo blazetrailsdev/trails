@@ -1066,7 +1066,7 @@
     }
   },
   "pg": {
-    "rows": 5,
+    "rows": 9,
     "excluded": [
       "composite-decoder.ts::CompositeDecoder",
       "composite-encoder.ts::CompositeEncoder",
@@ -1078,6 +1078,12 @@
       "simple-decoder.ts::SimpleDecoder",
       "simple-encoder.ts::SimpleEncoder",
       "text-decoder/array.ts::Array",
+      "text-decoder/boolean.ts::Boolean",
+      "text-decoder/bytea.ts::Bytea",
+      "text-decoder/float.ts::Float",
+      "text-decoder/integer.ts::Integer",
+      "text-decoder/numeric.ts::Numeric",
+      "text-decoder/timestamp.ts::Timestamp",
       "text-encoder/array.ts::Array",
       "text-encoder/boolean.ts::Boolean",
       "text-encoder/integer.ts::Integer",
@@ -1090,7 +1096,11 @@
       "coder.ts::CompositeCoder": "PG::CompositeCoder",
       "connection.ts::Connection": "PG::Connection",
       "exceptions.ts::Error": "PG::Error",
-      "result.ts::Result": "PG::Result"
+      "result.ts::Result": "PG::Result",
+      "text-decoder/date.ts::Date": "PG::TextDecoder::Date",
+      "text-decoder/timestamp.ts::TimestampLocal": "PG::TextDecoder::TimestampLocal",
+      "text-decoder/timestamp.ts::TimestampUtc": "PG::TextDecoder::TimestampUtc",
+      "text-decoder/timestamp.ts::TimestampUtcToLocal": "PG::TextDecoder::TimestampUtcToLocal"
     }
   },
   "raabro": { "rows": 3, "excluded": [], "unwalked": [], "residue": {} },
