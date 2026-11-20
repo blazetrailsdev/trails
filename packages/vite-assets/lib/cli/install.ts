@@ -38,6 +38,7 @@ export class Install extends Command {
   declare private replaceFirstLine: typeof FileUtils.replaceFirstLine;
   declare private write: typeof FileUtils.write;
 
+  /** @inventedArm prewarmConfig — PERMANENT */
   override async call({
     packageManager = null,
   }: { packageManager?: string | null } = {}): Promise<void> {

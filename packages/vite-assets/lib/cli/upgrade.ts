@@ -7,6 +7,7 @@ export class Upgrade extends Install {
     this.desc("Updates Vite Ruby related gems and npm packages.");
   }
 
+  /** @inventedArm prewarmConfig — PERMANENT */
   override async call(): Promise<void> {
     await ViteAssets.prewarmConfig();
     await this.upgradeRubyGems();

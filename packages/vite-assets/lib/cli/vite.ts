@@ -53,6 +53,7 @@ export class Vite extends Command {
     });
   }
 
+  /** @inventedArm prewarmConfig — PERMANENT */
   override async call(
     {
       mode,

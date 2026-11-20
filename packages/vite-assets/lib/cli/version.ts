@@ -6,6 +6,7 @@ export class Version extends Command {
     this.desc("Print version");
   }
 
+  /** @inventedArm prewarmConfig — PERMANENT */
   override async call(): Promise<void> {
     await ViteAssets.prewarmConfig();
     return ViteAssets.commands().printInfo();

@@ -6,6 +6,7 @@ export class UpgradePackages extends Install {
     this.desc("Upgrades the npm packages to the recommended versions.");
   }
 
+  /** @inventedArm prewarmConfig — PERMANENT */
   override async call(): Promise<void> {
     await ViteAssets.prewarmConfig();
     this.say("Upgrading npm packages");
