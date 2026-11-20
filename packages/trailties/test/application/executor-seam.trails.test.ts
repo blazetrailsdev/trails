@@ -5,7 +5,8 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Base } from "@blazetrails/activerecord";
 import { Trailtie } from "../../lib/trailties/active-record.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
-import { Deprecators } from "@blazetrails/activesupport";
+import { Deprecators, Logger } from "@blazetrails/activesupport";
+import { Trails } from "../../lib/trails.js";
 import { Application } from "../../lib/application.js";
 import { Configuration } from "../../lib/application/configuration.js";
 import { DefaultMiddlewareStack } from "../../lib/application/default-middleware-stack.js";
@@ -101,10 +102,16 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
       return [200, {}, []] as unknown as RackResponse;
     });
 
-    const [status, , stackBody] = await (rbFSend(stackApp, "call", {
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    } as unknown as RackEnv) as Promise<RackResponse>);
+    const logger = Trails.logger;
+    Trails.logger = new Logger(null);
+    const [status, , stackBody] = await (
+      rbFSend(stackApp, "call", {
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/",
+      } as unknown as RackEnv) as Promise<RackResponse>
+    ).finally(() => {
+      Trails.logger = logger;
+    });
 
     expect(status).toBe(200);
     expect(rows).toEqual([{ one: 1 }]);

@@ -58,7 +58,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
           viewsRoot.slice(appViewsAt + appViews.length),
         )
       : path.join(outDir, "views");
-  const { Base, PathParser, Template, TseHandler, UnboundTemplate, WrongEncodingError } =
+  const { PathParser, Template, TseHandler, UnboundTemplate, WrongEncodingError } =
     await import("@blazetrails/actionview");
   for (const ext of ["ts", "js"]) {
     const application = path.join(cwd, `config/application.${ext}`);
@@ -121,19 +121,16 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
       rel,
       src,
       outBase,
-      handlerScope: tseHandlerScope(
-        {
-          handler: template.handler,
-          format: template.format,
-          get type() {
-            return template.type;
-          },
-          get shortIdentifier() {
-            return template.shortIdentifier;
-          },
+      handlerScope: tseHandlerScope({
+        handler: template.handler,
+        format: template.format,
+        get type() {
+          return template.type;
         },
-        Base.annotateRenderedViewWithFilenames,
-      ),
+        get shortIdentifier() {
+          return template.shortIdentifier;
+        },
+      }),
       strictLocals: ast.localsSignature !== null,
       resolved: false,
       ...(await templateScope(appDir, rel, path.dirname(outBase), helpers, controllers)),

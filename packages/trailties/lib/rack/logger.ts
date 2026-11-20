@@ -1,44 +1,34 @@
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { BodyProxy } from "@blazetrails/rack";
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import { Request } from "@blazetrails/actionpack";
 import { LogSubscriber, Notifications } from "@blazetrails/activesupport";
-import type { NotificationHandle } from "@blazetrails/activesupport";
+import type {
+  NotificationHandle,
+  Logger as ActiveSupportLogger,
+  TaggedLogger,
+} from "@blazetrails/activesupport";
+import { Trails } from "../trails.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export type Tagger = string | ((request: Request) => string);
 
-export interface RackLoggerLike {
-  info?(block: () => string): unknown;
-  pushTags?(...tags: string[]): string[];
-  popTags?(count?: number): string[];
-}
-
-export interface LoggerOptions {
-  logger?: RackLoggerLike;
-  taggers?: Tagger[];
-}
-
-const NOOP_LOGGER: RackLoggerLike = {};
-
 export class Logger {
   private app: RackApp | { call: RackApp };
-  private logger: RackLoggerLike;
   private taggers: Tagger[];
 
-  constructor(app: RackApp | { call: RackApp }, taggers: LoggerOptions = {}) {
+  constructor(app: RackApp | { call: RackApp }, taggers: Tagger[] | null = null) {
     this.app = app;
-    this.logger = taggers.logger ?? NOOP_LOGGER;
-    this.taggers = taggers.taggers ?? [];
+    this.taggers = taggers ?? [];
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new Request(env);
 
-    const tagCount = this.logger.pushTags
-      ? this.logger.pushTags(...this.computeTags(request)).length
+    const logger = this.logger;
+    env["trails.rackLoggerTagCount"] = rbObjRespondTo(logger, "pushTags")
+      ? (logger as TaggedLogger).pushTags(...this.computeTags(request)).length
       : 0;
-    env["trails.rackLoggerTagCount"] = tagCount;
 
     return this.callApp(request, env);
   }
@@ -51,7 +41,7 @@ export class Logger {
     handle.start();
 
     try {
-      this.logger.info?.(() => this.startedRequestMessage(request));
+      this.logger!.info(() => this.startedRequestMessage(request));
       const response = await (rbProcCall(this.app, env) as Promise<RackResponse>);
       const [status, headers, body] = response;
       const wrapped = new BodyProxy(body as AsyncIterable<unknown>, () =>
@@ -84,12 +74,19 @@ export class Logger {
     });
   }
 
+  /** @internal */
+  get logger(): ActiveSupportLogger | null {
+    return Trails.logger;
+  }
+
   private finishRequestInstrumentation(
     handle: NotificationHandle,
     loggerTagPopCount: number,
   ): void {
     handle.finish();
-    if (this.logger.popTags && loggerTagPopCount > 0) this.logger.popTags(loggerTagPopCount);
+    const logger = this.logger;
+    if (rbObjRespondTo(logger, "popTags") && loggerTagPopCount > 0)
+      (logger as TaggedLogger).popTags(loggerTagPopCount);
     LogSubscriber.flushAllBang();
   }
 }

@@ -1,3 +1,4 @@
+import type { Tagger } from "../rack/logger.js";
 import type { MiddlewareFactory } from "@blazetrails/actionpack";
 import {
   ActionDispatch,
@@ -77,7 +78,7 @@ export class Configuration extends EngineConfiguration {
   logger: unknown = null;
   logLevel: LogLevel | number | string = "debug";
   logFormatter: Logger["formatter"] = new SimpleFormatter();
-  logTags: unknown[] = [];
+  logTags: Tagger[] = [];
   logFileSize: number | null = null;
   autoflushLog = true;
   broadcastLogLevel: LogLevel | number | string | null = null;

@@ -171,4 +171,31 @@ describe("Templates are precompiled", () => {
       TopLevel.Trails = savedTrails;
     }
   });
+
+  it("reads annotate_rendered_view_with_filenames when the view renders, not when it was built", async () => {
+    const root = fixture("precompiled-options");
+    const saved = Base.annotateRenderedViewWithFilenames;
+    const savedTrails = TopLevel.Trails;
+    TopLevel.Trails = { root: () => root } as unknown as typeof TopLevel.Trails;
+    try {
+      Base.annotateRenderedViewWithFilenames = true;
+      await buildViews({ cwd: root });
+      Base.annotateRenderedViewWithFilenames = false;
+      let template = find(root, "annotated", "opts");
+      shipped();
+      expect(String(await template.render(view()))).toBe("<p>hi</p>\n");
+
+      Base.annotateRenderedViewWithFilenames = false;
+      await buildViews({ cwd: root });
+      Base.annotateRenderedViewWithFilenames = true;
+      template = find(root, "annotated", "opts");
+      shipped();
+      expect(String(await template.render(view()))).toBe(
+        `<!-- BEGIN app/views/opts/annotated.html.tse --><p>hi</p>\n<!-- END app/views/opts/annotated.html.tse -->`,
+      );
+    } finally {
+      Base.annotateRenderedViewWithFilenames = saved;
+      TopLevel.Trails = savedTrails;
+    }
+  });
 });

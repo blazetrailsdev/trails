@@ -208,7 +208,6 @@ export interface HandlerTemplate {
 
 export function tseHandlerScope(
   template: HandlerTemplate,
-  annotateRenderedViewWithFilenames: boolean,
 ): Pick<TseScope, "escapeIgnore" | "trim" | "preamble" | "postamble"> {
   const ctor = template.handler.constructor as unknown as {
     escapeIgnoreList: string[];
@@ -219,14 +218,10 @@ export function tseHandlerScope(
       template.format != null && ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
     trim: ctor.tseTrimMode === "-",
   };
-  if (
-    annotateRenderedViewWithFilenames &&
-    template.format === ":html" &&
-    template.shortIdentifier
-  ) {
+  if (template.format === ":html" && template.shortIdentifier) {
     const id = template.shortIdentifier;
-    options.preamble = `_ob.safeAppend(${JSON.stringify(`<!-- BEGIN ${id} -->`)});`;
-    options.postamble = `_ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;
+    options.preamble = `if (__view.annotateRenderedViewWithFilenames) _ob.safeAppend(${JSON.stringify(`<!-- BEGIN ${id} -->`)});`;
+    options.postamble = `if (__view.annotateRenderedViewWithFilenames) _ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;
   }
   return options;
 }
@@ -267,7 +262,7 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
     const scopes = ast.localsSignature === null ? "[locals, this, TopLevel]" : "[this, TopLevel]";
     header.push(...scopeLines(body, declared, scopes, (key) => `Scope<${key}>`, header));
   }
-  if (scope?.preamble !== undefined) header.push(`  ${scope.preamble}`);
+  if (scope?.preamble !== undefined) header[header.length - 1] += ` ${scope.preamble}`;
   const footer = [
     ...(scope?.postamble === undefined ? [] : [`  ${scope.postamble}`]),
     "  return _ob;",

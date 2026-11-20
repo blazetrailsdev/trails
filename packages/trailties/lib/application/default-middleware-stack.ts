@@ -107,7 +107,7 @@ export class DefaultMiddlewareStack {
       stack.use(SilenceRequest, { path });
     }
 
-    stack.use(Logger, { taggers: config.logTags });
+    stack.use(Logger, config.logTags);
     stack.use(ShowExceptions, this._showExceptionsApp());
     stack.use(DebugExceptions, this.app, config.debugExceptionResponseFormat);
 

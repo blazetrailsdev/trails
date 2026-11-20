@@ -21,6 +21,7 @@ import {
   STDERR,
   STDOUT,
   rbModGt,
+  rbModName,
 } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
@@ -256,6 +257,28 @@ export class Trailtie extends BaseTrailtie {
       SchemaReflection.checkSchemaCacheDumpVersion = cfg.checkSchemaCacheDumpVersion;
     });
 
+    this.initializer("active_record.define_attribute_methods", (app) => {
+      const checkSchemaCacheDumpVersion = this.config.activeRecord.checkSchemaCacheDumpVersion;
+      this.config.afterInitialize(() => {
+        onLoad("active_record", async (base: typeof Base) => {
+          if (!checkSchemaCacheDumpVersion && app.config.eagerLoad && !Trails.env.isLocal()) {
+            try {
+              for (const model of base.descendants) {
+                if (await model.connectionPool().schemaReflection.isCached(model.tableName!)) {
+                  model.defineAttributeMethods();
+                }
+              }
+            } catch (error) {
+              if (!(error instanceof ActiveRecordError)) throw error;
+              console.warn(
+                `Failed to define attribute methods because of ${rbModName(error.constructor)}: ${error.message}`,
+              );
+            }
+          }
+        });
+      });
+    });
+
     this.initializer("active_record.sqlite3_adapter_strict_strings_by_default", () => {
       const cfg = this.config.activeRecord;
       if (cfg.sqlite3AdapterStrictStringsByDefault) {
@@ -364,6 +387,11 @@ export class Trailtie extends BaseTrailtie {
       this.config.afterInitialize((app) => {
         app.executor.toRun(() => (coldPools.size === 0 ? undefined : warmSchemaCache(coldPools)));
       });
+    });
+
+    this.initializer("active_record.add_watchable_files", async (app) => {
+      const path = await app.paths().get("db")!.first();
+      this.config.watchableFiles.push(`${path}/schema.ts`, `${path}/structure.sql`);
     });
 
     this.initializer("active_record.clear_active_connections", () => {
