@@ -59,8 +59,19 @@ export default defineConfig({
           text: "Models",
           items: [
             { text: "Active Record Basics", link: "/guides/active-record-basics" },
+            { text: "Active Record Migrations", link: "/guides/active-record-migrations" },
             { text: "Active Record Callbacks", link: "/guides/active-record-callbacks" },
             { text: "Active Model Basics", link: "/guides/active-model-basics" },
+          ],
+        },
+        {
+          text: "Advanced Active Record",
+          items: [
+            { text: "Active Record Encryption", link: "/guides/active-record-encryption" },
+            {
+              text: "Composite Primary Keys",
+              link: "/guides/active-record-composite-primary-keys",
+            },
           ],
         },
         {

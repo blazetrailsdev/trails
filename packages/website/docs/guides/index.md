@@ -27,7 +27,7 @@ ratified deviations from Rails are on its [package page](/packages/).
 | Rails guide                   | Trails guide                                                                                                                                              | Packages                                                                     |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Active Record Basics          | [Active Record Basics](./active-record-basics.md)                                                                                                         | [activerecord](/packages/activerecord)                                       |
-| Active Record Migrations      | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-migrations.md))  | [activerecord](/packages/activerecord)                                       |
+| Active Record Migrations      | [Active Record Migrations](./active-record-migrations.md)                                                                                                 | [activerecord](/packages/activerecord)                                       |
 | Active Record Validations     | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-validations.md)) | [activerecord](/packages/activerecord), [activemodel](/packages/activemodel) |
 | Active Record Callbacks       | [Active Record Callbacks](./active-record-callbacks.md)                                                                                                   | [activerecord](/packages/activerecord), [activemodel](/packages/activemodel) |
 | Active Record Associations    | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-association-basics.md))        | [activerecord](/packages/activerecord)                                       |
@@ -90,12 +90,12 @@ ratified deviations from Rails are on its [package page](/packages/).
 
 ## Advanced Active Record
 
-| Rails guide                  | Trails guide                                                                                                                                                         | Packages                                                   |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Active Record and PostgreSQL | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-postgresql.md))             | [activerecord](/packages/activerecord), [pg](/packages/pg) |
-| Multiple Databases           | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-multiple-databases.md))     | [activerecord](/packages/activerecord)                     |
-| Active Record Encryption     | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-encryption.md))             | [activerecord](/packages/activerecord)                     |
-| Composite Primary Keys       | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-composite-primary-keys.md)) | [activerecord](/packages/activerecord)                     |
+| Rails guide                  | Trails guide                                                                                                                                                     | Packages                                                   |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Active Record and PostgreSQL | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-postgresql.md))         | [activerecord](/packages/activerecord), [pg](/packages/pg) |
+| Multiple Databases           | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-multiple-databases.md)) | [activerecord](/packages/activerecord)                     |
+| Active Record Encryption     | [Active Record Encryption](./active-record-encryption.md)                                                                                                        | [activerecord](/packages/activerecord)                     |
+| Composite Primary Keys       | [Composite Primary Keys](./active-record-composite-primary-keys.md)                                                                                              | [activerecord](/packages/activerecord)                     |
 
 ## Extending Rails
 
