@@ -3,7 +3,7 @@ import { File } from "./file.js";
 import { getPath } from "./fs-adapter.js";
 import { LoadError } from "./load-error.js";
 import { constSet } from "./include.js";
-import { TopLevel } from "./object.js";
+import { TopLevel, rbClassSuperclass } from "./object.js";
 import { LOADED_FEATURES, loadingTable, rbFeatureProvided } from "./loaded-features.js";
 
 export { LOADED_FEATURES, loadingTable, rbFeatureProvided };
@@ -93,9 +93,30 @@ export function loadedFileExports(fname: string): Record<string, unknown> | unde
 export async function rbFLoad(fname: string): Promise<true> {
   const exports = await loadIseqEval(fname, true);
   for (const [id, val] of Object.entries(exports)) {
-    if (/^[\p{Lu}\p{Lt}]/u.test(id)) constSet(TopLevel, id, val);
+    if (!/^[\p{Lu}\p{Lt}]/u.test(id)) continue;
+    constSet(TopLevel, id, val);
+    if (classDefined === null || typeof val !== "function") continue;
+    const superclass = rbClassSuperclass(val);
+    if (superclass !== null) classDefined(superclass, val);
   }
   return true;
+}
+
+let classDefined: ((superclass: object, klass: object) => void) | null = null;
+
+/**
+ * Sets the record a class an {@link rbFLoad}ed file defines is added to under
+ * its superclass, the list `rb_class_subclass_add`
+ * (`vendor/ruby/v3.3.11/class.c:99`) keeps for `Class#subclasses` as a
+ * class is created. JS has no hook at `class X extends Y`, so the class is
+ * recorded where the file that defines it is evaluated.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function setClassDefinedHook(
+  fn: ((superclass: object, klass: object) => void) | null,
+): void {
+  classDefined = fn;
 }
 
 /**
