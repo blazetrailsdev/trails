@@ -6,6 +6,7 @@ import { isPlainHash, rbBuiltinClassName, rbInspect } from "./object.js";
 import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
 import type { WaitStatus } from "./child-process-adapter.js";
 import { Thread } from "./thread.js";
+import { rbWaitpidNohang } from "./fork-children.js";
 
 interface SystemCallError extends Error {
   code?: string;
@@ -180,6 +181,11 @@ class Status {
     return this.#status;
   }
 
+  /** `Process::Status#exited?` (`pst_wifexited`, `vendor/ruby/v3.3.11/process.c:1062`). */
+  isExited(): boolean {
+    return this.#status !== null;
+  }
+
   /** `Process::Status#signaled?` (`pst_wifsignaled`, `vendor/ruby/v3.3.11/process.c:1050`). */
   isSignaled(): boolean {
     return this.#signal !== null;
@@ -294,6 +300,35 @@ export class Process {
    */
   static get ppid(): number {
     return getProcessAdapter().ppid!();
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/process.c:9133` — the `waitpid` flag that answers
+   * `nil` rather than block while every child is still running.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process::WNOHANG`.
+   */
+  static readonly WNOHANG = 1;
+
+  /**
+   * `proc_wait2` (`vendor/ruby/v3.3.11/process.c:1486`): `[pid, status]` of the
+   * next child {@link rbFFork} started that exited, also left as
+   * {@link Process.lastStatus}, or `nil` under `WNOHANG` while each is still
+   * running. Raises `Errno::ECHILD` with no child to wait for. Only
+   * `waitpid2(-1, WNOHANG)` is ported: a blocking wait cannot be synchronous.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process.waitpid2`
+   * (`vendor/ruby/v3.3.11/process.c:9159`).
+   */
+  static waitpid2(pid = -1, flags = 0): [number, Status] | null {
+    if (pid !== -1 || flags !== Process.WNOHANG) {
+      throw new NotImplementedError("waitpid2 is only ported for (-1, WNOHANG)");
+    }
+    const waited = rbWaitpidNohang();
+    if (waited === null) return null;
+    const status = new Status(waited);
+    rbLastStatusSet(status);
+    return [waited.pid!, status];
   }
 
   /**

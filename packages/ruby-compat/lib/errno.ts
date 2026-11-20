@@ -242,6 +242,27 @@ class ENOTDIR extends SystemCallError {
 }
 
 /**
+ * `Errno::ECHILD`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: what `waitpid(2)` raises with no child left to wait for.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ECHILD`.
+ */
+class ECHILD extends SystemCallError {
+  static readonly Errno = 10;
+  readonly code = "ECHILD";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "No child processes" : `No child processes - ${mesg}`);
+    this.name = "Errno::ECHILD";
+    this.errno = ECHILD.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ECHILD";
+  }
+}
+
+/**
  * `Errno::ESRCH`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
  * {@link ENOTTY} is. The fs layer's own error carrying `code: "ESRCH"` is this
  * class to `rescue Errno::ESRCH`.
@@ -479,6 +500,7 @@ class ENETUNREACH extends SystemCallError {
 export const Errno = {
   EACCES,
   EAGAIN,
+  ECHILD,
   ECONNABORTED,
   ECONNREFUSED,
   ECONNRESET,

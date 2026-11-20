@@ -4,14 +4,7 @@ import { SolidQueue } from "./solid-queue.js";
 import { Supervisor } from "./supervisor.js";
 import { Timer } from "./timer.js";
 
-interface Status {
-  pid: string;
-  exitstatus: number | null;
-  isExited(): boolean;
-  isSignaled(): boolean;
-  stopsig: null;
-  termsig: null;
-}
+type Status = InstanceType<typeof Process.Status>;
 
 export class ForkSupervisor extends Supervisor {
   /** @internal */
@@ -40,16 +33,13 @@ export class ForkSupervisor extends Supervisor {
     this.signalProcesses(Object.keys(this.processInstances), "QUIT");
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs waitpid2 — PERMANENT
-   */
+  /** @internal */
   protected override async checkAndReplaceTerminatedProcesses(): Promise<void> {
     while (true) {
-      const [pid, status] = this.waitpid2() ?? [];
+      const [pid, status] = Process.waitpid2(-1, Process.WNOHANG) ?? [];
       if (pid == null) break;
 
-      await this.replaceFork(pid, status!);
+      await this.replaceFork(String(pid), status!);
     }
 
     await this.checkBootTimeouts();
@@ -73,14 +63,11 @@ export class ForkSupervisor extends Supervisor {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs waitpid2 — PERMANENT
-   */
+  /** @internal */
   private async reapTerminatedForks(): Promise<void> {
     try {
       while (true) {
-        const [pid, status] = this.waitpid2() ?? [];
+        const [pid, status] = Process.waitpid2(-1, Process.WNOHANG) ?? [];
         if (pid == null) break;
 
         const terminatedFork = this.processInstances[pid];
@@ -88,7 +75,7 @@ export class ForkSupervisor extends Supervisor {
           delete this.processInstances[pid];
           terminatedFork.markAsReaped();
 
-          if (!status!.isExited() || status!.exitstatus! > 0) {
+          if (!status!.isExited() || (status!.exitstatus() ?? 0) > 0) {
             await this.attemptToReleaseClaimedJobsBy(terminatedFork, {
               withError: new ProcessExitError(status!),
             });
@@ -129,28 +116,6 @@ export class ForkSupervisor extends Supervisor {
   /** @internal */
   protected override isAllProcessesTerminated(): boolean {
     return Object.keys(this.processInstances).length === 0;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE solid-queue-fork-mode-unported-register */
-  private waitpid2(): [string, Status] | null {
-    for (const [pid, instance] of Object.entries(this.processInstances)) {
-      if (instance.isAlive()) continue;
-
-      const exitBang = instance._thread!.toKill;
-      const exited = exitBang || instance.isStopped();
-      return [
-        pid,
-        {
-          pid: pid,
-          exitstatus: exitBang ? 1 : exited ? 0 : null,
-          isExited: () => exited,
-          isSignaled: () => false,
-          stopsig: null,
-          termsig: null,
-        },
-      ];
-    }
-    return null;
   }
 }
 

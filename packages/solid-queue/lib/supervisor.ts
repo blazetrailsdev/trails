@@ -160,8 +160,7 @@ export class Supervisor extends Base {
   protected async startProcess(configuredProcess: ConfiguredProcess): Promise<void> {
     const processInstance = configuredProcess.instantiate() as Supervisee;
     processInstance.supervisedBy(this.process);
-    /** @inventedArm isFork — CONVERGEABLE solid-queue-fork-mode-unported-register */
-    processInstance.mode = this.mode().isFork() ? "async" : this.mode();
+    processInstance.mode = String(this.mode());
 
     const processId = String(await processInstance.start());
 

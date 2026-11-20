@@ -95,11 +95,12 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
     run = runSupervisor({ workers: [defaultWorker], dispatchers: [dispatcher] });
 
-    await waitForRegisteredProcesses(5, { timeout: 0.5 });
+    await waitForRegisteredProcesses(5, { timeout: 3 });
   });
 
   afterEach(async () => {
     await run.terminate();
+    await waitForRegisteredProcesses(0, { timeout: 5 });
     vi.restoreAllMocks();
     SolidQueue.onThreadError = onThreadError;
     await destroyRecords();

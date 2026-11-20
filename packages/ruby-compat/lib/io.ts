@@ -1079,6 +1079,7 @@ export class IO {
       length: 0,
       readerClosed: false,
       writerClosed: false,
+      writers: 1,
       waiting: [],
     };
     return [new PipeIO(pipe, "r"), new PipeIO(pipe, "w")];
@@ -1816,11 +1817,40 @@ export const STDERR: IO = prepStdio(stderr, 2, "w", IO, "<STDERR>");
 
 const PIPE_CAPACITY = 64 * 1024;
 
+/**
+ * The copy of a pipe's writer a forked child holds (`rb_fork_ruby`,
+ * `vendor/ruby/v3.3.11/process.c:4249`, duplicates every descriptor): the
+ * reader sees end of file only once this copy is closed too. `write` is what
+ * the child wrote to it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function pipeWriterDup(writer: PipeIO): { write(bytes: Uint8Array): void; close(): void } {
+  const pipe = (writer as unknown as { _pipe: PipeBuffer })._pipe;
+  pipe.writers++;
+  let closed = false;
+  return {
+    write(bytes) {
+      if (closed || pipe.readerClosed || bytes.length === 0) return;
+      pipe.chunks.push(bytes);
+      pipe.length += bytes.length;
+      for (const wake of pipe.waiting.splice(0)) wake();
+    },
+    close() {
+      if (closed) return;
+      closed = true;
+      if (--pipe.writers === 0) pipe.writerClosed = true;
+      for (const wake of pipe.waiting.splice(0)) wake();
+    },
+  };
+}
+
 interface PipeBuffer {
   chunks: Uint8Array[];
   length: number;
   readerClosed: boolean;
   writerClosed: boolean;
+  writers: number;
   waiting: (() => void)[];
 }
 
@@ -2041,7 +2071,7 @@ export class PipeIO extends IO {
     if (this._closed) return null;
     this._closed = true;
     if (this.mode & FMODE_WRITABLE) {
-      this._pipe.writerClosed = true;
+      if (--this._pipe.writers === 0) this._pipe.writerClosed = true;
     } else {
       this._pipe.readerClosed = true;
       this._pipe.chunks = [];

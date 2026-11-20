@@ -40,11 +40,12 @@ export class Process extends Struct.new("kind", "attributes") {
   declare kind: string;
   declare attributes: Options;
 
+  /** @inventedArm assign — PERMANENT */
   instantiate(): object {
     const klass = safeConstantize(`SolidQueue::${titleize(this.kind)}`) as new (
       attributes: Options,
     ) => object;
-    return new klass(this.attributes);
+    return Object.assign(new klass(this.attributes), { _configuredProcess: this });
   }
 }
 

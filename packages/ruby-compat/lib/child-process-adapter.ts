@@ -38,6 +38,12 @@ export interface WaitStatus {
 }
 
 export interface ChildProcessAdapter {
+  fork?(
+    entry: string,
+    env: Record<string, string | undefined>,
+    message: (message: unknown) => void,
+    exit: (status: WaitStatus) => void,
+  ): number;
   spawnSync(cmd: string, args: string[], options?: SpawnSyncOptions): SpawnSyncResult;
   /**
    * Runs the child with the parent's stdio and resolves once it is waited for.
@@ -188,6 +194,15 @@ type NodeChild = {
 };
 
 type NodeChildProcess = {
+  fork: (
+    modulePath: string,
+    args: string[],
+    opts?: unknown,
+  ) => {
+    pid?: number;
+    on(event: "message", listener: (message: unknown) => void): void;
+    on(event: "exit", listener: (code: number | null, signal: string | null) => void): void;
+  };
   spawnSync: (cmd: string, args: string[], opts?: unknown) => NodeSpawnSyncResult;
   spawn: (cmd: string, args: string[], opts?: unknown) => NodeChild;
 };
@@ -228,6 +243,13 @@ function spawnChild(
 
 function wrap(cp: NodeChildProcess): ChildProcessAdapter {
   return {
+    fork(entry, env, message, exit) {
+      const child = cp.fork(entry, [], { env, stdio: ["inherit", "inherit", "inherit", "ipc"] });
+      const pid = child.pid!;
+      child.on("message", message);
+      child.on("exit", (code, signal) => exit({ pid, status: code, signal }));
+      return pid;
+    },
     spawnSync(cmd, args, options) {
       const outFile = options?.out != null ? File.open(options.out, "w") : null;
       const inFile = options?.in != null ? File.open(options.in, "r") : null;
