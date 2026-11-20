@@ -15,15 +15,20 @@ const { boot, root, supervisorPidfile, options, capturedIo } = rbForkPayload() a
   capturedIo: boolean;
 };
 
-let err: ReturnType<typeof rbForkedPipe>[1] | null = null;
+const pipes: ReturnType<typeof rbForkedPipe>[1][] = [];
 if (capturedIo) {
-  const [reader, writer] = rbForkedPipe(0);
-  reader.close();
-  err = writer;
-  getProcessAdapter().stderr.write = (chunk: unknown) => {
-    writer.write(String(chunk));
-    return true;
-  };
+  for (const [index, stream] of [
+    getProcessAdapter().stdout,
+    getProcessAdapter().stderr,
+  ].entries()) {
+    const [reader, writer] = rbForkedPipe(index);
+    reader.close();
+    pipes.push(writer);
+    stream.write = (chunk: unknown) => {
+      writer.write(String(chunk));
+      return true;
+    };
+  }
 }
 
 await import(boot);
@@ -38,5 +43,5 @@ try {
   if (!(error instanceof SystemExit)) throw error;
   status = error.status;
 }
-err?.close();
+for (const writer of pipes) writer.close();
 setTimeout(() => exitBang(status), 50);

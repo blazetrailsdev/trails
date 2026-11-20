@@ -176,7 +176,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await sleep(0.5);
     await assertNoRegisteredProcesses();
 
-    expect(isProcessExists(pid)).toBe(false);
+    expect(isProcessExists(pid)).toBeFalsy();
     expect(error).toMatch(/No processes configured/);
   });
 
@@ -189,22 +189,22 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await sleep(0.5);
     await assertNoRegisteredProcesses();
 
-    expect(isProcessExists(pid)).toBe(false);
+    expect(isProcessExists(pid)).toBeFalsy();
     expect(error).toMatch(/Invalid recurring tasks/);
   });
 
   it("create and delete pidfile", async () => {
-    expect(await File.isExistAsync(pidfile)).toBe(false);
+    expect(await File.isExistAsync(pidfile)).toBeFalsy();
 
     const pid = run();
     await waitForRegisteredProcesses(4, { timeout: 10 });
 
-    expect(await File.isExistAsync(pidfile)).toBe(true);
+    expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).toEqual(pid);
 
     await terminateProcess(pid);
 
-    expect(await File.isExistAsync(pidfile)).toBe(false);
+    expect(await File.isExistAsync(pidfile)).toBeFalsy();
   });
 
   it("abort if there's already a pidfile for a supervisor", async () => {
@@ -214,7 +214,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     const [pid, , err] = await runWithCapturedIo();
     await waitForRegisteredProcesses(4, { timeout: 10 });
 
-    expect(await File.isExistAsync(pidfile)).toBe(true);
+    expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).not.toEqual(pid);
     expect(err).toMatch(/A Solid Queue supervisor is already running/);
 
@@ -227,7 +227,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
 
     await terminateProcess(pid, { signal: "KILL" });
 
-    expect(await File.isExistAsync(pidfile)).toBe(true);
+    expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).toEqual(pid);
 
     await waitForRegisteredProcesses(0);
@@ -235,7 +235,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     pid = run();
     await waitForRegisteredProcesses(4, { timeout: 10 });
 
-    expect(await File.isExistAsync(pidfile)).toBe(true);
+    expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).toEqual(pid);
 
     await terminateProcess(pid);
@@ -274,7 +274,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
       termsig: () => null,
     };
 
-    await expect(supervisor.replaceFork("42", status)).resolves.toBeUndefined();
+    await expect(supervisor.replaceFork("42", status)).resolves.not.toThrow();
     expect(releaseClaimedJobsBy).toHaveBeenCalledOnce();
     expect(startProcess).toHaveBeenCalledExactlyOnceWith(configuredProcess);
   });
@@ -311,11 +311,11 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
       .spyOn(supervisor, "releaseClaimedJobsBy")
       .mockRejectedValue(new ConnectionNotEstablished("connection is closed"));
 
-    await expect(supervisor.reapTerminatedForks()).resolves.toBeUndefined();
+    await expect(supervisor.reapTerminatedForks()).resolves.not.toThrow();
     expect(releaseClaimedJobsBy).toHaveBeenCalledOnce();
 
-    expect(supervisor.processInstances).toEqual({});
-    expect(supervisor.configuredProcesses).toEqual({});
+    expect(supervisor.processInstances).toBeEmpty();
+    expect(supervisor.configuredProcesses).toBeEmpty();
   });
 
   it("fail orphaned executions", async () => {
@@ -391,7 +391,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await Record.uncached(async () => {
       expect(await Process.count()).toEqual(1);
       expect(await Process.findBy({ id: pruned.id })).toBeNull();
-      expect(isPresent(await Process.findBy({ id: notPruned.id }))).toBe(true);
+      expect(isPresent(await Process.findBy({ id: notPruned.id }))).toBeTruthy();
     });
   });
 
@@ -414,13 +414,13 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await supervisor.releaseClaimedJobsBy(terminatedFork, { withError: error });
 
     const failed = await FailedExecution.findBy({ job_id: claimedExecution.job_id });
-    expect(isPresent(failed)).toBe(true);
+    expect(isPresent(failed)).toBeTruthy();
     expect(failed!.exceptionClass()).toEqual("RuntimeError");
   });
 
-  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" (`fork`): the test-defined `StalledWorker` class is not copied into the fork.
+  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" (`fork`): a child boots for seconds, past the 0.2s / 0.5s `fork_boot_timeout`.
   it.skip("replace only the fork that does not finish booting", () => {});
 
-  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" (`fork`): the test-defined `StalledWorker` class is not copied into the fork.
+  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" (`fork`): a child boots for seconds, past the 0.2s / 0.5s `fork_boot_timeout`.
   it.skip("preserve a fork that finishes booting before the timeout", () => {});
 });

@@ -111,8 +111,8 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
   async function assertCleanTermination() {
     await waitForRegisteredProcesses(0, { timeout: 0.2 });
     await assertNoRegisteredProcesses();
-    expect(await ClaimedExecution.isNone()).toBe(true);
-    expect(isProcessExists(pid)).toBe(false);
+    expect(await ClaimedExecution.isNone()).toBeTruthy();
+    expect(isProcessExists(pid)).toBeFalsy();
   }
 
   async function assertRegisteredSupervisorWith(pid: number) {
@@ -122,11 +122,11 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
   }
 
   async function assertNoRegisteredWorkers() {
-    expect(await findProcessesRegisteredAs("Worker").toArray()).toEqual([]);
+    expect(await findProcessesRegisteredAs("Worker").toArray()).toHaveLength(0);
   }
 
   async function assertNoClaimedJobs() {
-    expect(await ClaimedExecution.isNone()).toBe(true);
+    expect(await ClaimedExecution.isNone()).toBeTruthy();
   }
 
   beforeAll(async () => {
@@ -185,7 +185,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     await waitForJobsToFinishFor(2);
     await waitForRegisteredProcesses(1, { timeout: 3 });
 
-    expect(isProcessExists(pid)).toBe(false);
+    expect(isProcessExists(pid)).toBeFalsy();
 
     await assertCompletedJobResults("no pause");
     await assertJobStatus(noPause, "finished");
@@ -220,7 +220,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     signalProcess(pid, "QUIT", { wait: 0.1 });
 
     await waitWhileWithTimeout(2, async () => isProcessExists(pid));
-    expect(isProcessExists(pid)).toBe(false);
+    expect(isProcessExists(pid)).toBeFalsy();
 
     await assertCompletedJobResults("no pause");
     await assertJobStatus(noPause, "finished");
@@ -297,7 +297,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
       { timeout: SolidQueue.shutdownTimeout.toF() + 5 },
       async () => !isProcessExists(pid),
     );
-    expect(isProcessExists(pid)).toBe(false);
+    expect(isProcessExists(pid)).toBeFalsy();
 
     await assertCompletedJobResults("no pause");
     await assertJobStatus(noPause, "finished");
@@ -349,7 +349,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     await assertCompletedJobResults("no exit", "background", 4);
     await assertCompletedJobResults("paused no exit", "default", 1);
 
-    expect(isProcessExists(pid)).toBe(true);
+    expect(isProcessExists(pid)).toBeTruthy();
     await terminateProcess(pid);
 
     for (const job of [exitJob, pauseJob]) await assertJobStatus(job, "failed");
@@ -402,7 +402,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     signalProcess(worker.pid, "KILL", { wait: 0.5 });
 
     await sleep(0.5);
-    expect(await Process.isExists({ id: worker.id })).toBe(true);
+    expect(await Process.isExists({ id: worker.id })).toBeTruthy();
 
     await waitForRegisteredProcesses(4, { timeout: 10 });
 
