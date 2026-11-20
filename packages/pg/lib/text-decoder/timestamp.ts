@@ -179,7 +179,10 @@ function pgTextDecTimestamp(conv: Timestamp, val: string): unknown {
   return val;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 function timegm(
   year: number,
   mon: number,

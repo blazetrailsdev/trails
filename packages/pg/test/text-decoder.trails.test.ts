@@ -6,6 +6,7 @@ describe("PG::TextDecoder bodies", () => {
     const dec = new PG.TextDecoder.Integer();
     expect(dec.decode("123")).toBe(123);
     expect(dec.decode("-123")).toBe(-123);
+    expect(dec.decode("-0")).toBe(0);
     expect(dec.decode("9007199254740993")).toBe(9007199254740993n);
     expect(dec.decode("-9223372036854775808")).toBe(-9223372036854775808n);
   });

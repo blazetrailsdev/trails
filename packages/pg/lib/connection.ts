@@ -212,7 +212,7 @@ export class Connection {
   }
 
   escapeIdentifier(string: unknown): string {
-    if (this.client._ending === true) {
+    if (this.isFinished()) {
       throw new ConnectionBad("connection is closed", { connection: this });
     }
     const str = stringValue(string);
@@ -258,7 +258,7 @@ export class Connection {
   }
 
   sendQuery(sql: string): void {
-    if (this.client._ending === true) {
+    if (this.isFinished()) {
       throw new ConnectionBad("connection is closed", { connection: this });
     }
     if (this.bad) {

@@ -39,7 +39,7 @@ function pgTextDecInteger(val: string): number | bigint {
     }
 
     if (!error) {
-      return neg ? -i : i;
+      return neg ? 0 - i : i;
     }
   }
   return rbCstr2inum(val);
