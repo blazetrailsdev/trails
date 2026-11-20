@@ -5,5 +5,5 @@ export * from "./pragmas.js";
 export * from "./backup.js";
 export * from "./busy-wait.js";
 export * from "./sqlite-uri.js";
-import "./constants.generated.js";
 export { SQLite3 } from "./namespaces.js";
+import "./constants.generated.js";

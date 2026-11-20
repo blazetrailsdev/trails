@@ -16,6 +16,7 @@ import {
   type SyncSqliteConnection,
   type SyncSqliteStatement,
 } from "./driver.js";
+import "./constants.generated.js";
 
 /** @internal */
 function bindArgs(binds?: SqliteBinds): unknown[] {

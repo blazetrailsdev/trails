@@ -4,7 +4,6 @@ import { SQLite3Constants, type SqliteConnection } from "./driver.js";
 import { Database } from "./database.js";
 import { Exception } from "./errors.js";
 
-/** @noRailsEquivalent PERMANENT */
 export class Backup {
   #p: { dstdb: SqliteConnection; srcdb: SqliteConnection; srcname: string } | null = null;
 

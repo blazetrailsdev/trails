@@ -1,3 +1,4 @@
+import { rbModName } from "@blazetrails/ruby-compat";
 import { SQLite3Constants } from "./driver.js";
 import { SQLite3 } from "./namespaces.js";
 
@@ -12,7 +13,7 @@ export class Exception extends Error {
 
   constructor(message?: string) {
     super(message);
-    this.name = new.target.name;
+    this.name = rbModName(new.target) ?? new.target.name;
     this.#message = message ?? this.name;
     delete (this as { message?: string }).message;
   }
@@ -122,38 +123,6 @@ SQLite3.SchemaChangedException = SchemaChangedException;
 SQLite3.SQLException = SQLException;
 SQLite3.TooBigException = TooBigException;
 SQLite3.UnsupportedException = UnsupportedException;
-
-for (const [name, klass] of Object.entries({
-  Exception,
-  SQLException,
-  InternalException,
-  PermissionException,
-  AbortException,
-  BusyException,
-  LockedException,
-  MemoryException,
-  ReadOnlyException,
-  InterruptException,
-  IOException,
-  CorruptException,
-  NotFoundException,
-  FullException,
-  CantOpenException,
-  ProtocolException,
-  EmptyException,
-  SchemaChangedException,
-  TooBigException,
-  ConstraintException,
-  MismatchException,
-  MisuseException,
-  UnsupportedException,
-  AuthorizationException,
-  FormatException,
-  RangeException,
-  NotADatabaseException,
-})) {
-  Object.defineProperty(klass, "name", { value: `SQLite3::${name}` });
-}
 
 const { ErrorCode } = SQLite3Constants;
 

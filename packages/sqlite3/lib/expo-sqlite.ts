@@ -14,6 +14,7 @@ import {
 } from "./driver.js";
 import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
 import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
+import "./constants.generated.js";
 
 /** @internal */
 interface ExpoSQLiteStatement {

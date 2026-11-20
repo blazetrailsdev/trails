@@ -17,6 +17,7 @@ import {
 } from "./driver.js";
 import { resolveUriDatabasePath } from "./sqlite-uri.js";
 import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
+import "./constants.generated.js";
 
 /** @internal */
 function bindArgs(binds?: SqliteBinds): unknown[] {
