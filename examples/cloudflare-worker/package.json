@@ -8,6 +8,7 @@
     "build": "bash scripts/build.sh",
     "dev": "bash scripts/build.sh && wrangler dev",
     "deploy": "bash scripts/deploy.sh",
+    "db:migrate": "node bin/trails db:migrate",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

@@ -13,5 +13,5 @@
       "@blazetrails/rack": ["./node_modules/@blazetrails/rack/dist/index.d.ts"]
     }
   },
-  "include": ["app", "config", "db", "worker", "config.ts"]
+  "include": ["app", "config", "db", "worker", "Rakefile.ts", "config.ts"]
 }

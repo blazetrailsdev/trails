@@ -5,5 +5,11 @@ import "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
  * `config/database.ts`, so there the configuration is `DATABASE_URL`, seated from the Hyperdrive binding in
  * `worker/index.ts`.
  */
-const db = { adapter: "postgresql", url: "postgres://trails:trails@localhost:5432/trails" };
+const db = {
+  adapter: "postgresql",
+  host: "localhost",
+  username: "trails",
+  password: "trails",
+  database: "trails",
+};
 export default { development: db, test: db, production: db };

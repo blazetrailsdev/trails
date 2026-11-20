@@ -7,18 +7,17 @@ inside `Post.transaction`), one `.tse` view and one Active Record model, `Post`.
 ```bash
 terraform -chdir=infra init
 terraform -chdir=infra apply -var account_id=<cloudflare account id>   # Neon Postgres + Hyperdrive
-pnpm run deploy   # posts table (db/setup.ts), views + `trails build` + esbuild bundle, `wrangler deploy`
+pnpm run deploy   # `trails db:migrate`, views + `trails build` + esbuild bundle, `wrangler deploy`
 ```
 
 `pnpm run dev` serves the same bundle under `wrangler dev` (workerd) against a local Postgres:
 `wrangler.jsonc`'s `localConnectionString` is `postgres://trails:trails@localhost:5432/trails`, or set
-`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`. Create the table with
-`node db/setup.ts <url>`.
+`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`. Create the table with `pnpm run db:migrate` (local `config/database.ts`).
 
 ## Infrastructure (`infra/`)
 
 Terraform creates the Hyperdrive config and, unless `database` is set, a Neon Postgres project.
-`pnpm run deploy` (`scripts/deploy.sh`) reads its outputs, creates the `posts` table (`db/setup.ts`, through the trails PostgreSQL adapter), writes
+`pnpm run deploy` (`scripts/deploy.sh`) reads its outputs, runs `trails db:migrate` against `DATABASE_URL` (Rails merges it over `config/database.ts`), writes
 `wrangler.deploy.jsonc` with the Hyperdrive id, and uploads the script with `wrangler deploy`, which also
 enables its `workers.dev` subdomain. The script is the build's output, so wrangler and not Terraform
 uploads it.
