@@ -23,6 +23,7 @@ import {
 import { VERSION } from "../../lib/gem-version.js";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
+import { Generators } from "../../lib/generators.js";
 
 class AppGeneratorApp extends Application {}
 const destinationRoot = Dir.mktmpdir();
@@ -117,6 +118,13 @@ function assertNodeFiles(): Promise<void> {
 
 function resetDesc(): void {
   delete (AppGenerator as unknown as { _desc?: string })._desc;
+}
+
+function assertNotOption(generator: { options: unknown }, option: string): void {
+  expect(
+    (generator.options as Record<string, unknown>)[option],
+    `Expected generator option :${option} to be falsy.`,
+  ).toBeFalsy();
 }
 
 describe("AppGeneratorTest", () => {
@@ -1689,5 +1697,424 @@ describe("AppGenerator", () => {
     t.assertNoFile(".devcontainer/devcontainer.json");
     t.assertNoFile(".devcontainer/Dockerfile");
     t.assertNoFile(".devcontainer/compose.yaml");
+  });
+});
+
+describe("AppGeneratorTest", () => {
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (dartsass-rails).
+  it.skip("css option with asset pipeline sass", async () => {
+    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--css=sass"]);
+    expect(railsCommands).toContain("dartsass:install");
+    await assertGem("dartsass-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (cssbundling-rails).
+  it.skip("css option with sass uses cssbundling gem when using node", async () => {
+    await t.runGenerator([t.destinationRoot, "--css=sass", "--javascript=esbuild"]);
+    await assertGem("cssbundling-rails");
+    await assertNoGem("dartsass-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (cssbundling-rails).
+  it.skip("css option with cssbundling gem", async () => {
+    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--css=postcss"]);
+    expect(railsCommands).toContain("css:install:postcss");
+    await assertGem("cssbundling-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (cssbundling-rails, jsbundling-rails).
+  it.skip("css option with cssbundling gem does not force jsbundling gem", async () => {
+    await t.runGenerator([t.destinationRoot, "--css=postcss"]);
+    await assertNoGem("jsbundling-rails");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (bootsnap).
+  it.skip("bootsnap", async () => {
+    await t.runGenerator([t.destinationRoot, "--no-skip-bootsnap"]);
+    await assertGem("bootsnap");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (bootsnap).
+  it.skip("skip bootsnap", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-bootsnap"]);
+    await assertNoGem("bootsnap");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (bootsnap).
+  it.skip("bootsnap with dev option", async () => {
+    await t.runGenerator([t.destinationRoot, "--dev"]);
+    await assertNoGem("bootsnap");
+  });
+
+  it("inclusion of ruby version", async () => {
+    await t.runGenerator();
+
+    const nodeVersion = /\d+\.\d+\.\d+/.exec(await rbFBackquote("node --version"))![0];
+    await t.assertFile("Dockerfile", new RegExp(`ARG NODE_VERSION=${nodeVersion}`));
+    await t.assertFile(".node-version", (content: string) => {
+      expect(content).toMatch(nodeVersion);
+      expect(content.endsWith("\n"), "expected .node-version to end with newline").toBe(true);
+    });
+  });
+
+  it("default branch main without user default", async () => {
+    const currentDefaultBranch = await rbFBackquote("git config --global init.defaultBranch");
+    await rbFBackquote("git config --global --unset init.defaultBranch");
+    try {
+      await t.runGenerator([t.destinationRoot]);
+      await t.assertFile(".git/HEAD", /main/);
+    } finally {
+      if (currentDefaultBranch.trim() !== "") {
+        await rbFBackquote(`git config --global init.defaultBranch ${currentDefaultBranch}`);
+      }
+    }
+  });
+
+  it("version control initializes git repo with user default branch", async () => {
+    const currentDefaultBranch = await rbFBackquote("git config --global init.defaultBranch");
+    await rbFBackquote("git config --global init.defaultBranch master");
+    try {
+      await t.runGenerator([t.destinationRoot]);
+      await t.assertFile(".git/HEAD", /master/);
+    } finally {
+      if (currentDefaultBranch.trim() === "") {
+        await rbFBackquote("git config --global --unset init.defaultBranch");
+      } else {
+        await rbFBackquote(`git config --global init.defaultBranch ${currentDefaultBranch}`);
+      }
+    }
+  });
+
+  it("create keeps", async () => {
+    await t.runGenerator([t.destinationRoot, ...UNPORTED]);
+    const foldersWithKeep = [
+      "app/assets/images",
+      "app/controllers/concerns",
+      "app/models/concerns",
+      "lib/tasks",
+      "log",
+      "script",
+      "test/fixtures/files",
+      "test/controllers",
+      "test/mailers",
+      "test/models",
+      "test/helpers",
+      "test/integration",
+      "tmp",
+      "tmp/pids",
+    ];
+    for (const folder of foldersWithKeep) await t.assertFile(`${folder}/.keep`);
+  });
+
+  it("principle tasks go before finish template", () => {
+    const tasks = Object.keys((AppGenerator as unknown as { tasks(): object }).tasks());
+
+    expect(tasks.indexOf("finish-template")).toBe(tasks.indexOf("apply-trails-template") - 1);
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" (`bundle lock --add-platform`).
+  it.skip("apply trails template class method does not add bundler platforms", async () => {
+    await t.runGenerator();
+  });
+
+  it("gitignore", async () => {
+    await t.runGenerator();
+
+    await t.assertFile(".gitignore", /config\/master\.key/);
+  });
+
+  it("dockerignore", async () => {
+    await t.runGenerator();
+
+    await t.assertFile(".dockerignore", (content: string) => {
+      expect(content).toMatch(/config\/master\.key/);
+      expect(content).toMatch(/config\/deploy\*\.yml/);
+      expect(content).toMatch(/\.kamal/);
+    });
+  });
+
+  it("dockerignore skip kamal", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-kamal"]);
+
+    await t.assertFile(".dockerignore", (content: string) => {
+      expect(content).not.toMatch(/config\/deploy\*\.yml/);
+      expect(content).not.toMatch(/\.kamal/);
+    });
+  });
+
+  it("skip docker", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-docker"]);
+
+    t.assertNoFile(".dockerignore");
+    t.assertNoFile("Dockerfile");
+    t.assertNoFile("bin/docker-entrypoint");
+  });
+
+  it("system tests directory generated", async () => {
+    await t.runGenerator();
+
+    await t.assertDirectory("test/system");
+    await t.assertFile("test/system/.keep");
+  });
+
+  it("master key is only readable by the owner", async () => {
+    await t.runGenerator();
+
+    const stat = await File.stat(File.join(t.destinationRoot, "config/master.key"));
+    expect((stat.mode & 0o777777).toString(8)).toBe("100600");
+  });
+
+  it("minimal trails app with no skip intermediary implied option", () => {
+    const generator = t.generator([t.destinationRoot], ["--minimal", "--no-skip-active-storage"]);
+
+    assertNotOption(generator, "skipActiveStorage");
+    assertNotOption(generator, "skipActiveJob");
+    assertOption(generator, "skipActionText");
+    assertOption(generator, "skipActionMailbox");
+    assertOption(generator, "skipActionMailer");
+    assertOption(generator, "minimal");
+  });
+
+  it("devcontainer", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "--name=my-app", ...UNPORTED]);
+
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.name).toBe("my_app");
+      expect(content.containerEnv.TRAILS_SYSTEM_TESTING_SERVER_PORT).toBe("45678");
+      expect(content.containerEnv.KAMAL_REGISTRY_PASSWORD).toBe("$KAMAL_REGISTRY_PASSWORD");
+      expect(content.containerEnv.SELENIUM_HOST).toBe("selenium");
+      expect(Object.keys(content.features)).toContain(
+        "ghcr.io/rails/devcontainer/features/activestorage",
+      );
+      expect(Object.keys(content.features)).toContain(
+        "ghcr.io/devcontainers/features/github-cli:1",
+      );
+      expect(Object.keys(content.features)).toContain(
+        "ghcr.io/rails/devcontainer/features/sqlite3",
+      );
+      expect(Object.keys(content.features)).toContain(
+        "ghcr.io/devcontainers/features/docker-outside-of-docker:1",
+      );
+      expect(content.forwardPorts).toContain(3000);
+    });
+    await t.assertFile(".devcontainer/Dockerfile", /ARG NODE_VERSION=/);
+    await assertComposeFile.call(t, (composeConfig) => {
+      expect(composeConfig.get("name")).toBe("my_app");
+
+      const expectedTrailsAppConfig = {
+        build: {
+          context: "..",
+          dockerfile: ".devcontainer/Dockerfile",
+        },
+        volumes: ["../..:/workspaces:cached"],
+        command: "sleep infinity",
+        depends_on: ["selenium"],
+      };
+
+      expect(JSON.parse(JSON.stringify(composeConfig.get("services").get("trails-app")))).toEqual(
+        expectedTrailsAppConfig,
+      );
+
+      const expectedSeleniumConfig = {
+        image: "selenium/standalone-chromium",
+        restart: "unless-stopped",
+      };
+
+      expect(JSON.parse(JSON.stringify(composeConfig.get("services").get("selenium")))).toEqual(
+        expectedSeleniumConfig,
+      );
+    });
+  });
+
+  it("devcontainer skip kamal", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "--name=my-app", "--skip-kamal"]);
+
+    await assertDevcontainerJsonFile.call(t, (devcontainerJson) => {
+      expect(Object.keys(devcontainerJson.features)).not.toContain(
+        "ghcr.io/devcontainers/features/docker-outside-of-docker:1",
+      );
+      expect(Object.keys(devcontainerJson.containerEnv)).not.toContain("KAMAL_REGISTRY_PASSWORD");
+    });
+  });
+
+  it("devcontainer postgresql", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "-d", "postgresql"]);
+
+    await assertComposeFile.call(t, (composeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").get("depends_on")).toContain(
+        "postgres",
+      );
+
+      const expectedPostgresConfig = {
+        image: "postgres:16.1",
+        restart: "unless-stopped",
+        networks: ["default"],
+        volumes: ["postgres-data:/var/lib/postgresql/data"],
+        environment: {
+          POSTGRES_USER: "postgres",
+          POSTGRES_PASSWORD: "postgres",
+        },
+      };
+
+      expect(JSON.parse(JSON.stringify(composeConfig.get("services").get("postgres")))).toEqual(
+        expectedPostgresConfig,
+      );
+      expect(composeConfig.get("volumes").keys()).toContain("postgres-data");
+    });
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.containerEnv.DB_HOST).toBe("postgres");
+      expect(Object.keys(content.features)).toContain(
+        "ghcr.io/rails/devcontainer/features/postgres-client",
+      );
+      expect(content.forwardPorts).toContain(5432);
+    });
+    await t.assertFile("config/database.ts", /host: process\.env\.DB_HOST/);
+  });
+
+  it("devcontainer postgresql skip solid", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "-d", "postgresql", "--skip-solid"]);
+
+    await t.assertFile("config/database.ts", (content: string) => {
+      assertNoMatch("db/queue_migrate", content);
+      assertNoMatch("db/cache_migrate", content);
+      assertNoMatch("db/cable_migrate", content);
+    });
+  });
+
+  it("devcontainer mysql", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "-d", "mysql"]);
+
+    await assertComposeFile.call(t, (composeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").get("depends_on")).toContain("mysql");
+
+      const expectedMysqlConfig = {
+        image: "mysql/mysql-server:8.0",
+        restart: "unless-stopped",
+        environment: {
+          MYSQL_ALLOW_EMPTY_PASSWORD: "true",
+          MYSQL_ROOT_HOST: "%",
+        },
+        volumes: ["mysql-data:/var/lib/mysql"],
+        networks: ["default"],
+      };
+
+      expect(JSON.parse(JSON.stringify(composeConfig.get("services").get("mysql")))).toEqual(
+        expectedMysqlConfig,
+      );
+      expect(composeConfig.get("volumes").keys()).toContain("mysql-data");
+    });
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.containerEnv.DB_HOST).toBe("mysql");
+      expect(Object.keys(content.features)).toContain(
+        "ghcr.io/rails/devcontainer/features/mysql-client",
+      );
+      expect(content.forwardPorts).toContain(3306);
+    });
+    await t.assertFile("config/database.ts", /host: process\.env\.DB_HOST \?\? "127\.0\.0\.1"/);
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Trilogy is out of scope (`trilogy_adapter.rb`, `adapters/trilogy/`)".
+  it.skip("devcontainer trilogy", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "-d", "trilogy"]);
+  });
+
+  it("devcontainer mariadb mysql", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "-d", "mariadb-mysql"]);
+
+    await assertComposeFile.call(t, (composeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").get("depends_on")).toContain(
+        "mariadb",
+      );
+      const expectedMariadbConfig = {
+        image: "mariadb:10.5",
+        restart: "unless-stopped",
+        networks: ["default"],
+        volumes: ["mariadb-data:/var/lib/mysql"],
+        environment: {
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "true",
+        },
+      };
+
+      expect(JSON.parse(JSON.stringify(composeConfig.get("services").get("mariadb")))).toEqual(
+        expectedMariadbConfig,
+      );
+      expect(composeConfig.get("volumes").keys()).toContain("mariadb-data");
+    });
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.containerEnv.DB_HOST).toBe("mariadb");
+      expect(Object.keys(content.features)).toContain(
+        "ghcr.io/rails/devcontainer/features/mysql-client",
+      );
+      expect(content.forwardPorts).toContain(3306);
+    });
+    await t.assertFile("config/database.ts", /host: process\.env\.DB_HOST \?\? "127\.0\.0\.1"/);
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Trilogy is out of scope (`trilogy_adapter.rb`, `adapters/trilogy/`)".
+  it.skip("devcontainer mariadb trilogy", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "-d", "mariadb-trilogy"]);
+  });
+
+  it("devcontainer no selenium when skipping system test", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "--skip-system-test"]);
+
+    await assertComposeFile.call(t, (composeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").get("depends_on")).toBeUndefined();
+      expect(composeConfig.get("services").keys()).not.toContain("selenium");
+    });
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(Object.keys(content.containerEnv)).not.toContain("SELENIUM_HOST");
+      expect(Object.keys(content.containerEnv)).not.toContain("TRAILS_SYSTEM_TESTING_SERVER_PORT");
+    });
+  });
+
+  it("devcontainer no feature when skipping active storage", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "--skip-active-storage"]);
+
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.features["ghcr.io/rails/devcontainer/features/activestorage"]).toBeUndefined();
+    });
+  });
+
+  it("devcontainer no depends on when no dependencies", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "--minimal"]);
+
+    await assertComposeFile.call(t, (composeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").keys()).not.toContain("depends_on");
+    });
+  });
+
+  it("devcontainer adds node tooling when required", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "--javascript=esbuild"]);
+
+    await assertDevcontainerJsonFile.call(t, (devcontainerConfig) => {
+      expect(Object.keys(devcontainerConfig.features)).toContain(
+        "ghcr.io/devcontainers/features/node:1",
+      );
+    });
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)".
+  it.skip("devcontainer does not add node tooling when not required", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer"]);
+
+    await assertDevcontainerJsonFile.call(t, (devcontainerConfig) => {
+      expect(Object.keys(devcontainerConfig.features)).not.toContain(
+        "ghcr.io/devcontainers/features/node:1",
+      );
+    });
+  });
+
+  it("devcontainer dev flag mounts local trails repo", async () => {
+    await runGeneratorInstance([t.destinationRoot, "--devcontainer", "--dev"]);
+
+    await assertDevcontainerJsonFile.call(t, (devcontainerConfig) => {
+      expect(devcontainerConfig.mounts).toHaveLength(1);
+      const trailsMount = devcontainerConfig.mounts[0];
+
+      expect(trailsMount.type).toBe("bind");
+      expect(trailsMount.source).toBe(Generators.TRAILS_DEV_PATH);
+      expect(trailsMount.target).toBe(Generators.TRAILS_DEV_PATH);
+    });
   });
 });
