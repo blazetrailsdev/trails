@@ -1,7 +1,9 @@
 import { createPool, type Pool } from "generic-pool";
 import { Redis, ReplyError, type ChainableCommander, type RedisOptions } from "ioredis";
+import { MaxRetriesPerRequestError } from "ioredis/built/errors/index.js";
 import {
   ArgumentError,
+  rbCmpint,
   b,
   byteslice,
   Gem,
@@ -33,6 +35,7 @@ export const MAX_KEY_BYTESIZE = 1024;
 export const DEFAULT_REDIS_OPTIONS: RedisOptions = {
   connectTimeout: 1000,
   commandTimeout: 1000,
+  lazyConnect: true,
 };
 
 export const DEFAULT_ERROR_HANDLER: ErrorHandler = ({ method, returning, exception }) => {
@@ -115,8 +118,8 @@ export class RedisCacheStore extends Store implements CacheStore {
     ...redisOptions
   }: { url?: string } & RedisOptions): Redis {
     return url == null
-      ? new Redis({ ...DEFAULT_REDIS_OPTIONS, ...redisOptions, lazyConnect: true })
-      : new Redis(url, { ...DEFAULT_REDIS_OPTIONS, ...redisOptions, lazyConnect: true });
+      ? new Redis({ ...DEFAULT_REDIS_OPTIONS, ...redisOptions })
+      : new Redis(url, { ...DEFAULT_REDIS_OPTIONS, ...redisOptions });
   }
 
   readonly maxKeyBytesize: number;
@@ -186,7 +189,10 @@ export class RedisCacheStore extends Store implements CacheStore {
     await this.instrument("delete_matched", pattern, undefined, async () => {
       await _then(this.redis, async (c) => {
         let cursor = "0";
-        const nodes = [c];
+        const nodes =
+          typeof (c as { nodes?: unknown }).nodes === "function"
+            ? (c as unknown as { nodes(): Redis[] }).nodes()
+            : [c];
         for (const node of nodes) {
           do {
             let keys: string[];
@@ -278,7 +284,7 @@ export class RedisCacheStore extends Store implements CacheStore {
 
     const values = await this.failsafe(
       "read_multi_entries",
-      { returning: [] as (Buffer | null)[] },
+      { returning: {} as Record<number, Buffer | null> },
       () => _then(this.redis, (c) => c.mgetBuffer(...keys)),
     );
 
@@ -326,17 +332,17 @@ export class RedisCacheStore extends Store implements CacheStore {
     }: StoreOptions = {},
   ): Promise<boolean> {
     let ttl = expiresIn as number | null;
-    if (raceConditionTtl && ttl && ttl > 0 && !raw) {
+    if (raceConditionTtl != null && ttl != null && ttl > 0 && !raw) {
       ttl += 5 * 60;
     }
 
     const modifiers: (string | number)[] = [];
-    if (unlessExist || ttl) {
+    if (unlessExist || ttl != null) {
+      if (ttl != null) modifiers.push("PX", Math.ceil(1000 * Number(ttl)));
       if (unlessExist) modifiers.push("NX");
-      if (ttl) modifiers.push("PX", Math.ceil(1000 * Number(ttl)));
     }
 
-    const value = payload as string | Buffer;
+    const value = payload instanceof Uint8Array ? Buffer.from(payload) : (payload as string);
     if (pipeline) {
       (pipeline as ChainableCommander).set(key, value, ...(modifiers as ["PX", number]));
       return true;
@@ -477,9 +483,11 @@ export class RedisCacheStore extends Store implements CacheStore {
           "redis_version",
         ) as string[],
     );
-    return (this._supportsExpireNx = redisVersions.every(
-      (v) => (new Gem.Version(v).compare(new Gem.Version("7.0.0")) ?? -1) >= 0,
-    ));
+    return (this._supportsExpireNx = redisVersions.every((v) => {
+      const version = new Gem.Version(v);
+      const minimum = new Gem.Version("7.0.0");
+      return rbCmpint(version.compare(minimum), version, minimum) >= 0;
+    }));
   }
 
   /** @internal */
@@ -494,8 +502,11 @@ export class RedisCacheStore extends Store implements CacheStore {
     } catch (error) {
       if (
         error instanceof ReplyError ||
+        error instanceof MaxRetriesPerRequestError ||
         (error instanceof Error &&
-          ["MaxRetriesPerRequestError", "TimeoutError"].includes(error.name))
+          (error.name === "TimeoutError" ||
+            typeof (error as { code?: unknown }).code === "string" ||
+            error.message === "Connection is closed."))
       ) {
         this._errorHandler?.({ method, exception: error, returning });
         return returning;

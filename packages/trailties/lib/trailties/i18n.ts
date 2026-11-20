@@ -1,4 +1,4 @@
-import { I18n, OrderedOptions, isPlainObject } from "@blazetrails/activesupport";
+import { I18n, OrderedOptions, isPlainObject, wrap } from "@blazetrails/activesupport";
 import { include, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -50,7 +50,7 @@ export class Trailtie extends BaseTrailtie {
         (x) => x != null,
       );
     } else if (isPlainObject(fallbacks) || Array.isArray(fallbacks)) {
-      args = Array.isArray(fallbacks) ? fallbacks : [fallbacks];
+      args = wrap(fallbacks);
     } else {
       args = [I18n.defaultLocale()];
     }
