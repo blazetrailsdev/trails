@@ -1,28 +1,29 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { Shellwords, include } from "@blazetrails/ruby-compat";
+import { Shellwords, env as ENV, include, setEnv } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-interface TestRunnerTest extends Generation {}
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+type Host = Generation & TestRunnerTest;
+
 class TestRunnerTest extends TestCase {
   runTestCommand(
+    this: Host,
     arguments_ = "test/unit/test.test.ts",
     opts: { stderr?: boolean } = {},
   ): Promise<string> {
     return this.trails("t", ...Shellwords.shellwords(arguments_), { allowFailure: true, ...opts });
   }
 
-  createSchema(): Promise<string> {
+  createSchema(this: Host): Promise<string> {
     return this.appFile("db/schema.ts", "");
   }
 
   createTestFile(
+    this: Host,
     path = "unit",
     name = "test",
     { pass = true, print = true }: { pass?: boolean; print?: boolean } = {},
@@ -36,7 +37,7 @@ class TestRunnerTest extends TestCase {
         describe("${camelize(name)}Test", () => {
           it("truth", () => {
             ${print ? `console.log("${camelize(name)}Test");` : ""}
-            expect(${pass}).toBe(true);
+            expect(${pass}, "wups!").toBe(true);
           });
         });
 `,
@@ -46,23 +47,36 @@ class TestRunnerTest extends TestCase {
 include(TestRunnerTest, Isolation);
 registerSpecType(/^TestRunnerTest$/, TestRunnerTest);
 
-describe("TestRunnerTest", { timeout: 300_000 }, () => {
-  let t: TestRunnerTest;
-
-  beforeEach(async () => {
-    t = new TestRunnerTest("test");
+function it(name: string, block: (t: Host) => Promise<void>): void {
+  test(name, async () => {
+    const t = new TestRunnerTest(name) as Host;
     await t.buildApp();
     await t.createSchema();
+    try {
+      await block(t);
+    } finally {
+      await t.teardownApp();
+    }
+  });
+}
+
+describe.concurrent("TestRunnerTest", { timeout: 600_000 }, () => {
+  let trailsEnv: string | undefined;
+
+  beforeAll(() => {
+    trailsEnv = ENV["TRAILS_ENV"];
   });
 
-  afterEach(() => t.teardownApp());
+  afterAll(() => {
+    setEnv("TRAILS_ENV", trailsEnv);
+  });
 
-  it("run single file", async () => {
+  it("run single file", async (t) => {
     await t.createTestFile("models", "foo");
     await t.createTestFile("models", "bar");
     expect(await t.runTestCommand("test/models/foo.test.ts")).toMatch("1 runs, 0 failures");
   });
-  it("run single file with absolute path", async () => {
+  it("run single file with absolute path", async (t) => {
     await t.createTestFile("models", "foo");
     await t.createTestFile("models", "bar");
     expect(await t.runTestCommand(`${await t.appPath()}/test/models/foo.test.ts`)).toMatch(
@@ -70,7 +84,7 @@ describe("TestRunnerTest", { timeout: 300_000 }, () => {
     );
   });
 
-  it("run multiple files", async () => {
+  it("run multiple files", async (t) => {
     await t.createTestFile("models", "foo");
     await t.createTestFile("models", "bar");
     expect(await t.runTestCommand("test/models/foo.test.ts test/models/bar.test.ts")).toMatch(
@@ -78,7 +92,7 @@ describe("TestRunnerTest", { timeout: 300_000 }, () => {
     );
   });
 
-  it("run multiple files with absolute paths", async () => {
+  it("run multiple files with absolute paths", async (t) => {
     await t.createTestFile("models", "foo");
     await t.createTestFile("controllers", "foobar_controller");
     await t.createTestFile("models", "bar");
@@ -91,7 +105,7 @@ describe("TestRunnerTest", { timeout: 300_000 }, () => {
     ).toMatch("2 runs, 0 failures");
   });
 
-  it("run models", async () => {
+  it("run models", async (t) => {
     await t.createTestFile("models", "foo");
     await t.createTestFile("models", "bar");
     await t.createTestFile("controllers", "foobar_controller");
@@ -101,7 +115,7 @@ describe("TestRunnerTest", { timeout: 300_000 }, () => {
     expect(output).toMatch("2 runs, 0 failures");
   });
 
-  it("run helpers", async () => {
+  it("run helpers", async (t) => {
     await t.createTestFile("helpers", "foo_helper");
     await t.createTestFile("helpers", "bar_helper");
     await t.createTestFile("controllers", "foobar_controller");
@@ -111,7 +125,7 @@ describe("TestRunnerTest", { timeout: 300_000 }, () => {
     expect(output).toMatch("2 runs, 0 failures");
   });
 
-  it("run controllers", async () => {
+  it("run controllers", async (t) => {
     await t.createTestFile("controllers", "foo_controller");
     await t.createTestFile("controllers", "bar_controller");
     await t.createTestFile("models", "foo");
@@ -121,7 +135,7 @@ describe("TestRunnerTest", { timeout: 300_000 }, () => {
     expect(output).toMatch("2 runs, 0 failures");
   });
 
-  it("run mailers", async () => {
+  it("run mailers", async (t) => {
     await t.createTestFile("mailers", "foo_mailer");
     await t.createTestFile("mailers", "bar_mailer");
     await t.createTestFile("models", "foo");
@@ -131,7 +145,7 @@ describe("TestRunnerTest", { timeout: 300_000 }, () => {
     expect(output).toMatch("2 runs, 0 failures");
   });
 
-  it("run jobs", async () => {
+  it("run jobs", async (t) => {
     await t.createTestFile("jobs", "foo_job");
     await t.createTestFile("jobs", "bar_job");
     await t.createTestFile("models", "foo");
@@ -141,7 +155,7 @@ describe("TestRunnerTest", { timeout: 300_000 }, () => {
     expect(output).toMatch("2 runs, 0 failures");
   });
 
-  it("run integration", async () => {
+  it("run integration", async (t) => {
     await t.createTestFile("integration", "foo_integration");
     await t.createTestFile("models", "foo");
     const output = await t.runTestCommand("test/integration");
@@ -149,7 +163,7 @@ describe("TestRunnerTest", { timeout: 300_000 }, () => {
     expect(output).toMatch("1 runs, 0 failures");
   });
 
-  it("run all suites", async () => {
+  it("run all suites", async (t) => {
     const suites = [
       "models",
       "helpers",

@@ -55,8 +55,6 @@ describe("RenderingTest", { timeout: 120_000 }, () => {
 
     await t.appFile("app/views/pages/show.html.tse", "<%= params.get('id') %>\n");
 
-    await t.app("development");
-
     await t.get("/pages/foo", {}, { HTTPS: "on" });
     expect(t.lastResponse().status).toBe(200);
 
