@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { RuleTester } from "eslint";
-import ts from "typescript-5";
+import ts from "typescript-6";
 import { describe, expect, it } from "vitest";
 import rule from "./ruby-compat-native-required.mjs";
 

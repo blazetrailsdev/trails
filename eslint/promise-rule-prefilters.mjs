@@ -6,7 +6,7 @@
  * resolves a call nothing else asks about: overload resolution and contextual
  * typing of the arguments are the bulk of both rules' cost.
  */
-import ts from "typescript-5";
+import ts from "typescript-6";
 
 const NEVER_THENABLE =
   ts.TypeFlags.Void |

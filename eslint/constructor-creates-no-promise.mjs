@@ -15,7 +15,7 @@
  *
  * Hard rules: no node:* imports, no process.* references.
  */
-import ts from "typescript-5";
+import ts from "typescript-6";
 
 const CHAINS = new Set(["then", "catch", "finally"]);
 

@@ -116,6 +116,9 @@ importers:
       typescript-5:
         specifier: npm:typescript@5.9.3
         version: typescript@5.9.3
+      typescript-6:
+        specifier: npm:typescript@6.0.3
+        version: typescript@6.0.3
       typescript-eslint:
         specifier: ^8.57.0
         version: 8.57.0(eslint@10.0.3(jiti@2.6.1)(supports-color@8.1.1))(supports-color@8.1.1)
