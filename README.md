@@ -163,19 +163,16 @@ export class CreatePosts extends Migration.get(8.0) {
 ### 4. Query from a script
 
 The model the generator wrote declares no attributes; they come from the
-table. Its `toString` makes the class render as `Post`, as Ruby's `Module#to_s`
-does.
+table.
 
 <!-- #region quickstart-query -->
 
+<!-- prettier-ignore -->
 ```ts
 // app/models/post.ts (generated)
 import { ApplicationRecord } from "./application-record.ts";
 
 export class Post extends ApplicationRecord {
-  static toString(): string {
-    return "Post";
-  }
 }
 ```
 
