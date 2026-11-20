@@ -190,23 +190,166 @@ function renderLede(s: ClaudeSection, ref: string): string {
     .join("`");
 }
 
-/** The markdown of `docs/packages/<pkg>.md`. */
-export function packagePage(data: ParityData, pkg: string): string {
-  const fig = data.packages.find((p) => p.name === pkg);
-  const lines = [`# @blazetrails/${pkg}`, ""];
-  if (fig?.description) lines.push(fig.description, "");
+const DASH = "—";
+
+function escapeCell(text: string): string {
+  return text.replace(/\|/g, "\\|").replace(/</g, "&lt;");
+}
+
+function link(text: string, url: string | null | undefined): string {
+  const code = `\`${text}\``;
+  return url ? `[${code}](${url})` : code;
+}
+
+function details(summary: string, body: string[]): string[] {
+  return ["<details>", `<summary>${summary}</summary>`, "", ...body, "", "</details>", ""];
+}
+
+function fileGap(f: FileRow): number {
+  return f.methodsMissing + (f.testsTotal - f.testsMatched);
+}
+
+function tsUrl(f: FileRow, ref: string): string | null {
+  return f.tsPath ? `${GITHUB_REPO}/blob/${ref}/${f.tsPath}` : null;
+}
+
+function statsLines(data: ParityData, fig: PackageFigures | undefined, files: FileRow[] | null) {
   const counterpart =
     fig?.railsCounterpart == null
       ? "none (TypeScript-only package)"
       : `\`${fig.railsCounterpart}\` ${fig.railsVersion ?? ""}`.trim();
-  lines.push(
+  const ratio = (r: Ratio | null) =>
+    r === null ? DASH : `${percent(r)} (${r.matched} of ${r.total})`;
+  const ported = files === null ? DASH : String(files.filter((f) => f.tsFile !== null).length);
+  const unported = files === null ? DASH : String(files.filter((f) => f.tsFile === null).length);
+  return [
     "| | |",
     "| --- | --- |",
     `| Rails counterpart | ${counterpart} |`,
-    `| API methods matched | ${percent(fig?.api ?? null)} |`,
-    `| Rails tests matched | ${percent(fig?.tests ?? null)} |`,
+    `| API methods matched | ${ratio(fig?.api ?? null)} |`,
+    `| Rails tests matched | ${ratio(fig?.tests ?? null)} |`,
+    `| Ruby files ported | ${ported} |`,
+    `| Ruby files unported | ${unported} |`,
     `| Measured at | ${shortSha(data.measuredAt)} |`,
     "",
+  ];
+}
+
+function gapLines(files: FileRow[] | null, ref: string): string[] {
+  const lines = ["## Gaps by file", ""];
+  if (files === null) return [...lines, DASH, ""];
+  const gaps = files.filter((f) => f.tsFile !== null && fileGap(f) > 0);
+  if (gaps.length === 0) return [...lines, "No gaps recorded for this package.", ""];
+  gaps.sort((a, b) => fileGap(b) - fileGap(a) || a.rubyFile.localeCompare(b.rubyFile));
+  lines.push("Ported files with Rails methods or tests still missing, largest gap first.", "");
+  const table = [
+    "| Ruby file | TypeScript file | Methods missing | Tests matched |",
+    "| --- | --- | ---: | ---: |",
+    ...gaps.map(
+      (f) =>
+        `| ${link(f.rubyFile, f.rubyUrl)} | ${link(f.tsFile!, tsUrl(f, ref))} | ${f.methodsMissing} | ${
+          f.testsTotal === 0 ? DASH : `${f.testsMatched} / ${f.testsTotal}`
+        } |`,
+    ),
+  ];
+  if (gaps.length > 20) lines.push(...details(`All ${gaps.length} files`, table));
+  else lines.push(...table, "");
+  return lines;
+}
+
+function missingLines(files: FileRow[] | null): string[] {
+  const lines = ["## Missing methods", ""];
+  if (files === null) return [...lines, DASH, ""];
+  const withNames = files
+    .filter((f) => (f.missingMethods ?? []).length > 0)
+    .sort((a, b) => b.missingMethods.length - a.missingMethods.length);
+  if (withNames.length === 0) return [...lines, "None recorded for this package.", ""];
+  lines.push(
+    "The Rails methods `parity:api` finds no TypeScript counterpart for, by Ruby file.",
+    "",
+  );
+  for (const f of withNames) {
+    const names = f.missingMethods.map((m) => `\`${m}\``).join(", ");
+    lines.push(
+      ...details(`<code>${escapeCell(f.rubyFile)}</code>: ${f.missingMethods.length} missing`, [
+        names,
+      ]),
+    );
+  }
+  return lines;
+}
+
+function unportedLines(files: FileRow[] | null): string[] {
+  const lines = ["## Unported Ruby files", ""];
+  if (files === null) return [...lines, DASH, ""];
+  const unported = files
+    .filter((f) => f.tsFile === null)
+    .sort((a, b) => a.rubyFile.localeCompare(b.rubyFile));
+  if (unported.length === 0)
+    return [...lines, "Every compared Ruby file has a TypeScript file.", ""];
+  const items = unported.map(
+    (f) => `- ${link(f.rubyFile, f.rubyUrl)} (${f.methodsMatched + f.methodsMissing} methods)`,
+  );
+  if (items.length > 20) lines.push(...details(`All ${items.length} files`, items));
+  else lines.push(...items, "");
+  return lines;
+}
+
+function tagLines(entry: PackageSummary | undefined | null): string[] {
+  const lines = ["## Deviation receipts", ""];
+  if (!entry?.tags) return [...lines, DASH, ""];
+  const rows = Object.entries(entry.tags).filter(
+    ([, c]) => c.PERMANENT + c.CONVERGEABLE + c.none > 0,
+  );
+  if (rows.length === 0) return [...lines, "No receipt tags in this package.", ""];
+  lines.push(
+    "JSDoc receipt tags in the package's source, by the receipt each carries.",
+    "",
+    "| Tag | PERMANENT | CONVERGEABLE | none |",
+    "| --- | ---: | ---: | ---: |",
+    ...rows.map(([t, c]) => `| \`@${t}\` | ${c.PERMANENT} | ${c.CONVERGEABLE} | ${c.none} |`),
+    "",
+  );
+  return lines;
+}
+
+function skipLines(data: ParityData, entry: PackageSummary | undefined | null): string[] {
+  const lines = ["## Permanently skipped tests", ""];
+  if (!entry) return [...lines, DASH, ""];
+  const groups = Object.entries(entry.permanentSkips ?? {}).filter(([, t]) => t.length > 0);
+  if (groups.length === 0) return [...lines, "None.", ""];
+  const headings = new Map(
+    (data.summary?.claudeSections ?? []).map((s) => [`${s.file}#${s.anchor}`, s.heading]),
+  );
+  for (const [key, tests] of groups) {
+    const title = key === "" ? "No section cited" : escapeCell(headings.get(key) ?? key);
+    const items = tests.map((t) => {
+      const url = `${GITHUB_REPO}/blob/${data.buildRef}/${t.file}#L${t.line}`;
+      return `- [${escapeCell(t.testName ?? `${t.file}:${t.line}`)}](${url})`;
+    });
+    lines.push(...details(`${title} (${tests.length})`, items));
+  }
+  return lines;
+}
+
+/** The markdown of `docs/packages/<pkg>.md`. */
+export function packagePage(data: ParityData, pkg: string): string {
+  const fig = data.packages.find((p) => p.name === pkg);
+  const entry = data.summary?.packages.find((p) => p.name === pkg);
+  const files = data.summary ? data.summary.files.filter((f) => f.package === pkg) : null;
+  const lines = [`# @blazetrails/${pkg}`, ""];
+  if (fig?.description) lines.push(fig.description, "");
+  lines.push(...statsLines(data, fig, files), "::: v-pre", "");
+  lines.push(
+    ...gapLines(files, data.buildRef),
+    ...missingLines(files),
+    ...unportedLines(files),
+    ...tagLines(data.summary ? entry : null),
+    ...skipLines(data, data.summary ? entry : null),
+    ":::",
+    "",
+  );
+  lines.push(
     "## Ratified deviations",
     "",
     "Each rule below is ratified in the repository's `CLAUDE.md` files. The first",
@@ -214,7 +357,7 @@ export function packagePage(data: ParityData, pkg: string): string {
     "",
   );
   const sections = data.summary ? sectionsFor(data.summary, pkg) : null;
-  if (sections === null) lines.push("—", "");
+  if (sections === null) lines.push(DASH, "");
   else if (sections.length === 0) lines.push("None recorded for this package.", "");
   if (sections !== null && sections.length > 0) lines.push("::: v-pre", "");
   for (const s of sections ?? []) {
@@ -229,5 +372,11 @@ export function packagePage(data: ParityData, pkg: string): string {
     );
   }
   if (sections !== null && sections.length > 0) lines.push(":::", "");
+  lines.push(
+    "## Source",
+    "",
+    `[packages/${pkg} on GitHub →](${GITHUB_REPO}/tree/${data.buildRef}/packages/${pkg})`,
+    "",
+  );
   return lines.join("\n");
 }

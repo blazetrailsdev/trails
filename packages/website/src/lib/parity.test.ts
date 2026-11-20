@@ -31,7 +31,13 @@ describe("loadParity", () => {
     expect(data.measuredAt).toBeNull();
     expect(data.packages.map((p) => p.name)).toEqual(["arel"]);
     expect(percent(data.packages[0].api)).toBe("—");
-    expect(packagePage(data, "arel")).toContain("| Measured at | — |");
+    const page = packagePage(data, "arel");
+    expect(page).toContain("| Measured at | — |");
+    expect(page).toContain("| Ruby files ported | — |");
+    expect(page).toContain("## Gaps by file\n\n—");
+    expect(page).toContain("## Missing methods\n\n—");
+    expect(page).toContain("## Deviation receipts\n\n—");
+    expect(page).toContain("tree/main/packages/arel");
   });
 
   it("renders a dash when the summary is unreadable", async () => {
@@ -54,13 +60,56 @@ describe("loadParity", () => {
           {
             name: "arel",
             railsCounterpart: "activerecord",
-            permanentSkips: { "CLAUDE.md#cited": [], "CLAUDE.md#stub": [] },
+            tags: {
+              noRailsEquivalent: { PERMANENT: 2, CONVERGEABLE: 1, none: 0 },
+              perf: { PERMANENT: 0, CONVERGEABLE: 0, none: 0 },
+            },
+            permanentSkips: {
+              "CLAUDE.md#cited": [
+                { file: "packages/arel/test/a.test.ts", line: 7, testName: "skipped one" },
+              ],
+              "CLAUDE.md#stub": [],
+            },
           },
         ],
         tagSites: [],
         files: [
-          { package: "arel", methodsMatched: 3, methodsMissing: 1, testsMatched: 1, testsTotal: 2 },
-          { package: "arel", methodsMatched: 3, methodsMissing: 1, testsMatched: 1, testsTotal: 2 },
+          {
+            package: "arel",
+            rubyFile: "small.rb",
+            rubyUrl: "https://github.com/rails/rails/blob/v8.0.2/activerecord/lib/arel/small.rb",
+            tsFile: "small.ts",
+            tsPath: "packages/arel/lib/small.ts",
+            methodsMatched: 3,
+            methodsMissing: 1,
+            missingMethods: ["lone"],
+            testsMatched: 1,
+            testsTotal: 2,
+          },
+          {
+            package: "arel",
+            rubyFile: "big.rb",
+            rubyUrl: null,
+            tsFile: "big.ts",
+            tsPath: "packages/arel/lib/big.ts",
+            methodsMatched: 3,
+            methodsMissing: 1,
+            missingMethods: ["a?", "b!"],
+            testsMatched: 1,
+            testsTotal: 2,
+          },
+          {
+            package: "arel",
+            rubyFile: "gone.rb",
+            rubyUrl: null,
+            tsFile: null,
+            tsPath: null,
+            methodsMatched: 0,
+            methodsMissing: 0,
+            missingMethods: [],
+            testsMatched: 0,
+            testsTotal: 0,
+          },
         ],
         claudeSections: [
           section("CLAUDE.md", "Cited rule", "cited"),
@@ -97,5 +146,22 @@ describe("loadParity", () => {
     expect(page).toContain("`<code>`");
     expect(page).toContain("](https://github.com/blazetrailsdev/trails/blob/fedcba/docs/x.md)");
     expect(page).toContain("blob/fedcba/packages/arel/CLAUDE.md#own");
+    expect(page).toContain("| API methods matched | 75% (6 of 8) |");
+    expect(page).toContain("| Ruby files ported | 2 |");
+    expect(page).toContain("| Ruby files unported | 1 |");
+    expect(page.indexOf("| `big.rb` | [`big.ts`]")).toBeGreaterThan(0);
+    expect(page.indexOf("| `big.rb` |")).toBeLessThan(page.indexOf("| [`small.rb`]"));
+    expect(page).toContain(
+      "| [`small.rb`](https://github.com/rails/rails/blob/v8.0.2/activerecord/lib/arel/small.rb) | [`small.ts`](https://github.com/blazetrailsdev/trails/blob/fedcba/packages/arel/lib/small.ts) | 1 | 1 / 2 |",
+    );
+    expect(page).toContain("<summary><code>big.rb</code>: 2 missing</summary>\n\n`a?`, `b!`");
+    expect(page).toContain("- `gone.rb` (0 methods)");
+    expect(page).toContain("| `@noRailsEquivalent` | 2 | 1 | 0 |");
+    expect(page).not.toContain("`@perf`");
+    expect(page).toContain("<summary>Cited rule (1)</summary>");
+    expect(page).toContain(
+      "[skipped one](https://github.com/blazetrailsdev/trails/blob/fedcba/packages/arel/test/a.test.ts#L7)",
+    );
+    expect(page).toContain("tree/fedcba/packages/arel)");
   });
 });

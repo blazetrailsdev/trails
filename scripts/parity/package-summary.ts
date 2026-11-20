@@ -63,7 +63,12 @@ function cjs<T extends object>(ns: T): T {
   return "default" in ns ? (ns.default as T) : ns;
 }
 const { rowsOfKind } = cjs(callMismatchBaselineModule);
-const { PACKAGE_DIR_OVERRIDES, TS_ONLY_PACKAGES } = cjs(apiCompareConfigModule);
+const {
+  PACKAGE_DIR_OVERRIDES,
+  TS_ONLY_PACKAGES,
+  packageSrcDir,
+  ROOT_DIR: API_ROOT_DIR,
+} = cjs(apiCompareConfigModule);
 
 export function packageDirOf(key: string): string {
   return PACKAGE_DIR_OVERRIDES[key] ?? key;
@@ -121,9 +126,15 @@ export interface PackageSummary {
 export interface FileRow {
   package: string;
   rubyFile: string;
+  /** The Ruby file at its upstream repository's vendored ref, or `null` for a source with no web origin. */
+  rubyUrl: string | null;
   tsFile: string | null;
+  /** `tsFile` from the repository root (`packages/activerecord/lib/base.ts`). */
+  tsPath: string | null;
   methodsMatched: number;
   methodsMissing: number;
+  /** The Ruby names api-compare reports missing from `tsFile`, in its order. */
+  missingMethods: string[];
   testsMatched: number;
   testsTotal: number;
 }
@@ -374,6 +385,7 @@ interface ApiComparison {
       tsFileExists: boolean;
       matched: number;
       missing: number;
+      missingMethods?: { rubyName: string }[];
     }[];
   }[];
 }
@@ -388,6 +400,26 @@ interface TestComparison {
       matched: number;
     }[];
   }[];
+}
+
+/** `rubyFile` of compare key `key` on its upstream's web host, at the vendored ref. */
+export function rubyUrlOf(key: string, rubyFile: string): string | null {
+  for (const s of SOURCES) {
+    const entry = s.packages.find((p) => p.name === key);
+    if (entry === undefined) continue;
+    const repo = s.origin.url.replace(/\.git$/, "");
+    if (!/^https:\/\/github\.com\//.test(repo)) return null;
+    return `${repo}/blob/${s.origin.ref}/${entry.libPath}/${rubyFile}`;
+  }
+  return null;
+}
+
+/** `tsFile` of compare key `key`, from the repository root. */
+export function tsPathOf(key: string, tsFile: string): string {
+  return path.posix.join(
+    path.relative(API_ROOT_DIR, packageSrcDir(key)).split(path.sep).join("/"),
+    tsFile,
+  );
 }
 
 /**
@@ -415,9 +447,12 @@ export function fileRows(api: ApiComparison | null, tests: TestComparison | null
       out.push({
         package: packageDirOf(r.package),
         rubyFile: f.rubyFile,
+        rubyUrl: rubyUrlOf(r.package, f.rubyFile),
         tsFile: f.tsFileExists ? f.expectedTsFile : null,
+        tsPath: f.tsFileExists ? tsPathOf(r.package, f.expectedTsFile) : null,
         methodsMatched: f.matched,
         methodsMissing: f.missing,
+        missingMethods: (f.missingMethods ?? []).map((m) => m.rubyName),
         testsMatched: t?.matched ?? 0,
         testsTotal: t?.total ?? 0,
       });

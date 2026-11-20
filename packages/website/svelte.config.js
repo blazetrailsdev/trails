@@ -15,7 +15,8 @@ const config = {
         if (
           ["", "guides/", "guides/idioms", "api/@blazetrails/arel/README"].some(
             (p) => path === docs + p,
-          )
+          ) ||
+          /^packages\/[a-z0-9-]+$/.test(path.slice(docs.length))
         )
           return;
         throw new Error(message);
