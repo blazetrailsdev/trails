@@ -83,7 +83,7 @@ export class TasksController extends ApplicationController {
 
 Trails.application.routes().draw(function () {
   this.resources("projects", function () {
-    this.resources("tasks", { only: ["index", "create", "update"] });
+    this.resources("tasks", { only: ["index", "new", "update"] });
   });
 
   this.root("projects#index");
