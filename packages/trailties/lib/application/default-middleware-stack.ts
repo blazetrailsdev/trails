@@ -30,7 +30,7 @@ import {
   Sendfile,
   TempfileReaper,
 } from "@blazetrails/rack";
-import { LoadError } from "@blazetrails/ruby-compat";
+import { LoadError, rbFArray } from "@blazetrails/ruby-compat";
 import { DatabaseSelector, ShardSelector } from "@blazetrails/activerecord";
 import { Logger } from "../rack/logger.js";
 import { SilenceRequest } from "../rack/silence-request.js";
@@ -58,7 +58,7 @@ export class DefaultMiddlewareStack {
     const stack = new MiddlewareStack();
     const config = this.config;
 
-    if (config.hosts.length > 0) {
+    if (rbFArray(config.hosts).length !== 0) {
       stack.use(HostAuthorization, config.hosts, config.hostAuthorization);
     }
 
