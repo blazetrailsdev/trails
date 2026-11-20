@@ -15,6 +15,11 @@ export interface AssociationCall {
   options: RecordLiteral;
 }
 
+export interface AttachedCall {
+  kind: "hasOneAttached" | "hasManyAttached";
+  name: string;
+}
+
 export interface ScopeCall {
   kind: "scope";
   name: string;
@@ -38,6 +43,7 @@ export interface AliasAttributeCall {
 export type RuntimeCall =
   | AttributeCall
   | AssociationCall
+  | AttachedCall
   | ScopeCall
   | EnumCall
   | AliasAttributeCall;
@@ -338,6 +344,9 @@ function readThisCall(stmt: ts.Statement): RuntimeCall | null {
     case "belongsTo":
     case "hasOne":
       return readAssociationCall(method, call);
+    case "hasOneAttached":
+    case "hasManyAttached":
+      return readAttachedCall(method, call);
     case "scope":
       return readScopeCall(call);
     case "enum":
@@ -379,6 +388,15 @@ function readAssociationCall(
     name: nameArg.text,
     options: readRecordLiteral(optsArg),
   };
+}
+
+function readAttachedCall(
+  kind: AttachedCall["kind"],
+  call: ts.CallExpression,
+): AttachedCall | null {
+  const [nameArg] = call.arguments;
+  if (!nameArg || !ts.isStringLiteralLikeNode(nameArg)) return null;
+  return { kind, name: nameArg.text };
 }
 
 function readScopeCall(call: ts.CallExpression): ScopeCall | null {

@@ -5,6 +5,7 @@ import type {
   ClassInfo,
   RuntimeCall,
   AssociationCall,
+  AttachedCall,
   AttributeCall,
   ScopeCall,
   EnumCall,
@@ -15,6 +16,7 @@ import { tsTypeFor, writerTsTypeFor } from "./type-registry.js";
 const INDENT = "  ";
 
 const AR_IMPORT = `import("@blazetrails/activerecord")`;
+const AS_IMPORT = `import("@blazetrails/activestorage")`;
 
 export type SchemaColumnValue =
   | string
@@ -397,6 +399,9 @@ function renderCall(
     case "belongsTo":
     case "hasOne":
       return renderSingularAssoc(info, call, aliases, targets, isKnownTarget);
+    case "hasOneAttached":
+    case "hasManyAttached":
+      return renderAttached(info, call);
     case "scope":
       return renderScope(info, call);
     case "enum":
@@ -461,6 +466,43 @@ function renderSingularAssoc(
       attribute: { memberName, readerType, writerType: `${target} | null` },
     },
   ];
+}
+
+function renderAttached(info: ClassInfo, call: AttachedCall): RenderedLine[] {
+  const memberName = renderDeclaredMemberName(call.name);
+  const one = call.kind === "hasOneAttached";
+  const suffix = camelize(call.name);
+  const assoc = (record: string): string =>
+    one
+      ? `${AS_IMPORT}.${record} | null | Promise<${AS_IMPORT}.${record} | null>`
+      : `${AR_IMPORT}.AssociationProxy<${AS_IMPORT}.${record}>`;
+  const plural = one ? "" : "s";
+  const lines: RenderedLine[] = [];
+  if (info.calls.find((c) => c.kind === call.kind) === call) {
+    lines.push(
+      line(
+        `declare static ${call.kind}: typeof ${AS_IMPORT}.Model.ClassMethods.${call.kind};`,
+        call.kind,
+        true,
+      ),
+    );
+  }
+  lines.push(
+    line(`declare ${memberName}: ${AS_IMPORT}.${one ? "One" : "Many"};`, call.name, false),
+    line(`declare set${suffix}: (attachable: unknown) => Promise<void>;`, `set${suffix}`, false),
+    line(
+      `declare ${call.name}Attachment${plural}: ${assoc("Attachment")};`,
+      `${call.name}Attachment${plural}`,
+      false,
+    ),
+    line(
+      `declare ${call.name}Blob${plural}: ${assoc("Blob")};`,
+      `${call.name}Blob${plural}`,
+      false,
+    ),
+    scopeLine(info, `withAttached${suffix}`, []),
+  );
+  return lines;
 }
 
 function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
