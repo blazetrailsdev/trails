@@ -384,7 +384,7 @@ async function setupRequest(
     queryStringKeys,
   );
 
-  if (session) this.request.session.update(session);
+  if (session) await this.request.session.update(session);
   (await this.request.flash).update(flash ?? {});
 
   if (xhr) {
@@ -447,9 +447,9 @@ async function processControllerResponse(
 
     const flashValue = (await this.request.flash).toSessionValue();
     if (flashValue) {
-      this.request.session.set("flash", flashValue);
+      await this.request.session.set("flash", flashValue);
     } else {
-      this.request.session.delete("flash");
+      await this.request.session.delete("flash");
     }
 
     if (xhr) {

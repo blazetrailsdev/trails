@@ -77,7 +77,7 @@ class ActionPackAssertionsController extends Base {
     await this.render({ plain: `Mr. ${name}` });
   }
   async sessionStuffing() {
-    this.session.set("xmas", "turkey");
+    await this.session.set("xmas", "turkey");
     await this.render({ plain: "ho ho ho" });
   }
   async raiseExceptionOnGet() {

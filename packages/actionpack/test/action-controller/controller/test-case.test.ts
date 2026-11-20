@@ -75,8 +75,8 @@ class TestController extends Base {
   }
 
   async setSession() {
-    this.session.set("string", "A wonder");
-    this.session.set("symbol", "it works");
+    await this.session.set("string", "A wonder");
+    await this.session.set("symbol", "it works");
     await this.render({ plain: "Success" });
   }
 
@@ -373,7 +373,7 @@ describe("TestCaseTest", () => {
     await tc.process("setFlash");
     await tc.process("deleteFlash");
     assertEmpty(await tc.flash());
-    assertEmpty(tc.session());
+    await assertEmpty(tc.session());
   });
 
   it("process with session", async () => {
@@ -409,7 +409,7 @@ describe("TestCaseTest", () => {
   });
 
   it("process merges session arg", async () => {
-    tc.session().set("foo", "bar");
+    await tc.session().set("foo", "bar");
     await tc.get("noOp", { session: { bar: "baz" } });
     assertEqual("bar", tc.session().get("foo"));
     assertEqual("baz", tc.session().get("bar"));
@@ -423,7 +423,7 @@ describe("TestCaseTest", () => {
   });
 
   it("process overwrites existing session arg", async () => {
-    tc.session().set("foo", "bar");
+    await tc.session().set("foo", "bar");
     await tc.get("noOp", { session: { foo: "baz" } });
     assertEqual("baz", tc.session().get("foo"));
   });

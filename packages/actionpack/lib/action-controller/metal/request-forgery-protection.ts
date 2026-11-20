@@ -691,7 +691,10 @@ export async function isValidAuthenticityToken(
   return false;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsCall any? — PERMANENT
+ */
 export async function isAnyAuthenticityTokenValid(this: CsrfController): Promise<boolean> {
   for (const token of this.requestAuthenticityTokens()) {
     if (await this.isValidAuthenticityToken(this.session, token)) return true;
