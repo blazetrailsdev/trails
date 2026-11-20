@@ -36,7 +36,7 @@ import {
 } from "../support/processes-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { destroyRecords } from "../test-helper.js";
+import "../test-helper.js";
 
 async function enqueueStoreResultJob(
   value: string,
@@ -137,7 +137,6 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
   });
 
   beforeEach(async () => {
-    await destroyRecords();
     pid = runSupervisorAsFork({
       workers: [{ queues: "background" }, { queues: "default", threads: 5 }],
     });
@@ -156,7 +155,6 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
       }
     }
     vi.restoreAllMocks();
-    await destroyRecords();
   });
 
   afterAll(() => {
