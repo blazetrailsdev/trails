@@ -57,7 +57,7 @@ export type AnyCallback<T extends object = object> =
 export type CallbackObject = object;
 
 export interface RunCallbacksOptions {
-  strict?: "sync";
+  strict?: "sync" | false;
 }
 
 function isThenable(v: unknown): v is PromiseLike<unknown> {
@@ -1223,8 +1223,12 @@ export const ClassMethods = {
       });
 
       Object.defineProperty(this.prototype, `_run${camelize(name)}Callbacks`, {
-        value(this: { runCallbacks: typeof runCallbacks }, block?: () => unknown) {
-          return this.runCallbacks(name, block);
+        value(
+          this: { runCallbacks: typeof runCallbacks },
+          block?: () => unknown,
+          opts?: RunCallbacksOptions,
+        ) {
+          return this.runCallbacks(name, block, opts);
         },
         writable: true,
         configurable: true,

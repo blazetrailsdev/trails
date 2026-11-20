@@ -82,7 +82,7 @@ export abstract class CollectionAssociation extends Association {
     this.replace(records) as Base[];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
+  /** @noRailsEquivalent PERMANENT */
   syncIdsWrite(_ids: unknown[]): never {
     throw new CollectionIdsAssignmentError(this.reflection.name);
   }
@@ -260,8 +260,9 @@ export abstract class CollectionAssociation extends Association {
     }
 
     await this.klass.ensureSchemaLoaded();
-    const record = (await awaitingAssignment(attributes, block, (block) =>
-      this.buildRecord(attributes, block),
+    const attrs = attributes ?? {};
+    const record = (await awaitingAssignment(attrs, block, (block) =>
+      this.buildRecord(attrs, block),
     ))!;
     await this.transaction(async () => {
       let result: boolean | undefined = undefined;

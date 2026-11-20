@@ -94,7 +94,7 @@ export class SingularAssociation extends Association<Base> {
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | null> {
     await this.klass.ensureSchemaLoaded();
-    const record = (await awaitingAssignment(attributes, block, (block) =>
+    const record = (await awaitingAssignment((attributes ??= {}), block, (block) =>
       this.buildRecord(attributes, block),
     ))!;
     const saved = await record.save();

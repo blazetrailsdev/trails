@@ -1701,10 +1701,9 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (author as any).namedCategories.reload()).toContainEqual(category);
   });
 
-  it.skip("collection exists", async () => {
-    // BLOCKED: mass assignment — Category.createBang({ author_ids }) raises UnknownAttributeError — filed as 0155-assertion-surfaced-port-bugs/ctor-mass-assign-collection-ids-unsupported
+  it("collection exists", async () => {
     const author = await Author.find(authors("mary").id);
-    const category = await Category.createBang({ author_ids: [author.id], name: "Primary" });
+    const category = await Category.createBang({ authorIds: [author.id], name: "Primary" });
     expect(await (category as any).authors.isExists({ id: author.id })).toBeTruthy();
     await category.reload();
     expect(await (category as any).authors.isExists({ id: author.id })).toBeTruthy();
