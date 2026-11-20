@@ -1,6 +1,6 @@
 import { isSymbol, rbInspect, toI } from "@blazetrails/ruby-compat";
 
-import type { SqliteBinds } from "../sqlite-adapter.js";
+import type { SqliteBinds } from "./driver.js";
 import { Exception } from "./errors.js";
 
 export const SYNCHRONOUS_MODES: (string | number)[][] = [

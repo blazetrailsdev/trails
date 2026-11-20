@@ -14,6 +14,9 @@
       "path": "../ruby-compat"
     },
     {
+      "path": "../sqlite3"
+    },
+    {
       "path": "../arel"
     },
     {

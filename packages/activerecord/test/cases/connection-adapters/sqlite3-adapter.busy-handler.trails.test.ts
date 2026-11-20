@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
-import { BusyException } from "../../../lib/sqlite/errors.js";
+import { BusyException } from "@blazetrails/sqlite3";
 
 describe("SQLite3Adapter busy handler", () => {
   let dir: string;

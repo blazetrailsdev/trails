@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SQLite3Constants, type SyncSqliteConnection } from "../../../lib/sqlite-adapter.js";
-import { betterSqlite3Driver } from "../../../lib/sqlite/better-sqlite3.js";
-import { Exception } from "../../../lib/sqlite/errors.js";
-import { Pragmas } from "../../../lib/sqlite/pragmas.js";
+import { SQLite3Constants, type SyncSqliteConnection } from "../lib/driver.js";
+import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
+import { Exception } from "../lib/errors.js";
+import { Pragmas } from "../lib/pragmas.js";
 
 describe("SQLite3::TestPragmas", () => {
   let db: SyncSqliteConnection & { testStatements: string[] };

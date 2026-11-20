@@ -29,7 +29,7 @@ import { newSqlitePool } from "../../../support/pooled-sqlite-adapter.js";
 import * as DdlHelper from "../../../support/ddl-helper.js";
 import { NullPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
 import { StatementInvalid, StatementTimeout } from "../../../../lib/errors.js";
-import { BusyException } from "../../../../lib/sqlite/errors.js";
+import { BusyException } from "@blazetrails/sqlite3";
 import type { ConnectionPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
 
 let adapter: SQLite3Adapter;

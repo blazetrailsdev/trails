@@ -93,8 +93,9 @@ const ADAPTER_SPECIFIC_EXCLUDE =
 // load cases/helper.ts, whose connection bootstrap opens a DB at module load.
 // Run them in their own setup-free project.
 const SQLITE_DRIVER_TESTS = [
-  "packages/activerecord/test/cases/sqlite/**/*.test.ts",
+  "packages/sqlite3/test/**/*.test.ts",
   "packages/activerecord/test/cases/sqlite-adapter.trails.test.ts",
+  "packages/activerecord/test/cases/libsql-adapter.trails.test.ts",
 ];
 
 // Clamp to vitest's own host-derived ceiling (numCpus - 1): while the root
@@ -323,18 +324,6 @@ const alias = {
     __dirname,
     "packages/activerecord/lib/sqlite-adapter.ts",
   ),
-  "@blazetrails/activerecord/sqlite/better-sqlite3": path.resolve(
-    __dirname,
-    "packages/activerecord/lib/sqlite/better-sqlite3.ts",
-  ),
-  "@blazetrails/activerecord/sqlite/node-sqlite": path.resolve(
-    __dirname,
-    "packages/activerecord/lib/sqlite/node-sqlite.ts",
-  ),
-  "@blazetrails/activerecord/sqlite/expo-sqlite": path.resolve(
-    __dirname,
-    "packages/activerecord/lib/sqlite/expo-sqlite.ts",
-  ),
   "@blazetrails/activerecord/encryption/message-pack-message-serializer": path.resolve(
     __dirname,
     "packages/activerecord/lib/encryption/message-pack-message-serializer.ts",
@@ -449,6 +438,20 @@ const alias = {
   "@blazetrails/date": path.resolve(__dirname, "packages/date/lib/index.ts"),
   "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/lib/index.ts"),
   "@blazetrails/pg": path.resolve(__dirname, "packages/pg/lib/index.ts"),
+  "@blazetrails/sqlite3/better-sqlite3": path.resolve(
+    __dirname,
+    "packages/sqlite3/lib/better-sqlite3.ts",
+  ),
+  "@blazetrails/sqlite3/libsql": path.resolve(__dirname, "packages/sqlite3/lib/libsql.ts"),
+  "@blazetrails/sqlite3/node-sqlite": path.resolve(
+    __dirname,
+    "packages/sqlite3/lib/node-sqlite.ts",
+  ),
+  "@blazetrails/sqlite3/expo-sqlite": path.resolve(
+    __dirname,
+    "packages/sqlite3/lib/expo-sqlite.ts",
+  ),
+  "@blazetrails/sqlite3": path.resolve(__dirname, "packages/sqlite3/lib/index.ts"),
   "@blazetrails/mail/": path.resolve(__dirname, "packages/mail/lib") + "/",
   "@blazetrails/mail": path.resolve(__dirname, "packages/mail/lib/index.ts"),
   "@blazetrails/thor/": path.resolve(__dirname, "packages/thor/lib") + "/",
@@ -773,6 +776,7 @@ export default defineConfig({
             "packages/vite-trails/**",
             "packages/stimulus/**",
             "packages/fugit/**",
+            "packages/sqlite3/**",
             ...(ARCONN === "postgresql"
               ? []
               : ["packages/actioncable/test/subscription-adapter/postgresql.test.ts"]),

@@ -1,0 +1,66 @@
+{
+  "name": "@blazetrails/sqlite3",
+  "version": "0.1.0",
+  "description": "The SQLite client, mirroring Ruby's sqlite3 gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./better-sqlite3": {
+      "types": "./dist/better-sqlite3.d.ts",
+      "default": "./dist/better-sqlite3.js"
+    },
+    "./libsql": {
+      "types": "./dist/libsql.d.ts",
+      "default": "./dist/libsql.js"
+    },
+    "./node-sqlite": {
+      "types": "./dist/node-sqlite.d.ts",
+      "default": "./dist/node-sqlite.js"
+    },
+    "./expo-sqlite": {
+      "types": "./dist/expo-sqlite.d.ts",
+      "default": "./dist/expo-sqlite.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^13.0.3",
+    "expo-sqlite": "^15.0.0",
+    "libsql": "^0.5.29"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    },
+    "expo-sqlite": {
+      "optional": true
+    },
+    "libsql": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "mirrors": [
+    {
+      "source": "sqlite3",
+      "ref": "v2.6.0",
+      "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
+    }
+  ]
+}

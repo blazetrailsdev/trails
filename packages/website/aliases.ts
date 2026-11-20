@@ -56,6 +56,11 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/et-orbi", "../et-orbi/lib/et-orbi.ts"],
   ["@blazetrails/raabro", "../raabro/lib/raabro.ts"],
   ["@blazetrails/msgpack", "../msgpack/lib/index.ts"],
+  ["@blazetrails/sqlite3/better-sqlite3", "../sqlite3/lib/better-sqlite3.ts"],
+  ["@blazetrails/sqlite3/libsql", "../sqlite3/lib/libsql.ts"],
+  ["@blazetrails/sqlite3/node-sqlite", "../sqlite3/lib/node-sqlite.ts"],
+  ["@blazetrails/sqlite3/expo-sqlite", "../sqlite3/lib/expo-sqlite.ts"],
+  ["@blazetrails/sqlite3", "../sqlite3/lib/index.ts"],
   ["@blazetrails/nokogiri", "../nokogiri/lib/index.ts"],
 ];
 

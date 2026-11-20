@@ -278,8 +278,8 @@ export default defineConfig(
       "packages/activesupport/lib/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
       "packages/activerecord-cli/lib/tsc-wrapper/**",
-      "packages/activerecord/lib/sqlite/node-sqlite.ts",
-      "packages/activerecord/lib/sqlite/expo-sqlite.ts",
+      "packages/sqlite3/lib/node-sqlite.ts",
+      "packages/sqlite3/lib/expo-sqlite.ts",
       "packages/activerecord/lib/encryption/config.ts",
       "packages/activerecord/lib/encryption/context.ts",
       "packages/activerecord/lib/connection-handling.ts",
@@ -988,7 +988,7 @@ export default defineConfig(
   // Package-wide rule relaxations (src + tests). no-explicit-any is handled
   // separately below so it can ratchet per-area.
   {
-    files: ["packages/activerecord/{lib,test}/**/*.ts"],
+    files: ["packages/{activerecord,sqlite3}/{lib,test}/**/*.ts"],
     rules: {
       "@typescript-eslint/no-this-alias": "off",
       "unused-imports/no-unused-vars": "off",
@@ -1107,7 +1107,7 @@ export default defineConfig(
       "packages/*/dx-tests/**/*.test.ts",
       "packages/*/virtualized-dx-tests/**/*.test.ts",
     ],
-    ignores: ["packages/activerecord/**"],
+    ignores: ["packages/activerecord/**", "packages/sqlite3/**"],
     plugins: { vitest },
     rules: {
       "vitest/no-conditional-in-test": "error",
@@ -1148,6 +1148,7 @@ export default defineConfig(
   {
     files: [
       "packages/activerecord/test/**/*.test.ts",
+      "packages/sqlite3/test/**/*.test.ts",
       "packages/activerecord/dx-tests/**/*.test.ts",
       "packages/activerecord/virtualized-dx-tests/**/*.test.ts",
     ],

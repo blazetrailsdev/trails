@@ -2,7 +2,7 @@
 import { ConnectionAdapters } from "../namespaces.js";
 import { extend, hasKey, include, constSet, rbObjAsString } from "@blazetrails/ruby-compat";
 import type { SqliteDriver } from "../sqlite-adapter.js";
-import { libsqlRemoteDriver } from "../sqlite/libsql.js";
+import { libsqlRemoteDriver } from "@blazetrails/sqlite3/libsql";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";

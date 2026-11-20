@@ -14,7 +14,7 @@ import {
   type SqliteStatement,
   type SyncSqliteConnection,
   type SyncSqliteStatement,
-} from "../sqlite-adapter.js";
+} from "./driver.js";
 import { resolveUriDatabasePath } from "./sqlite-uri.js";
 import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 

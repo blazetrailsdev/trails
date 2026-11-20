@@ -1,12 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  type ColumnInfo,
-  type SqliteConnection,
-  SQLite3Constants,
-} from "../../../lib/sqlite-adapter.js";
+import { type ColumnInfo, type SqliteConnection, SQLite3Constants } from "../lib/driver.js";
 import { File, getOs } from "@blazetrails/ruby-compat";
-import { betterSqlite3Driver } from "../../../lib/sqlite/better-sqlite3.js";
-import { CantOpenException } from "../../../lib/sqlite/errors.js";
+import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
+import { CantOpenException } from "../lib/errors.js";
 
 describe("SqliteDriver — better-sqlite3 round-trip", () => {
   let driver: SqliteConnection;
@@ -227,7 +223,6 @@ describe("SqliteDriver — better-sqlite3 restoreFromPath", () => {
     removeTempFiles();
     const tpl = await betterSqlite3Driver.open({ database: templatePath });
     await tpl.exec(
-      // eslint-disable-next-line blazetrails/require-table-teardown
       "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT);" +
         "INSERT INTO gadgets (label) VALUES ('alpha'), ('beta');",
     );

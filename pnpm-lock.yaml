@@ -608,6 +608,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/sqlite3':
+        specifier: workspace:*
+        version: link:../sqlite3
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
@@ -1286,6 +1289,21 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
+
+  packages/sqlite3:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+      better-sqlite3:
+        specifier: ^13.0.3
+        version: 13.0.3
+      expo-sqlite:
+        specifier: ^15.0.0
+        version: 15.2.14(expo@55.0.23)(react-native@0.85.3(@babel/core@7.29.0(supports-color@8.1.1))(react@19.2.6)(supports-color@8.1.1))(react@19.2.6)
+      libsql:
+        specifier: ^0.5.29
+        version: 0.5.29
 
   packages/stimulus:
     dependencies:
@@ -6955,10 +6973,6 @@ packages:
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
-  undici@7.24.7:
-    resolution: {integrity: sha512-H/nlJ/h0ggGC+uRL3ovD+G0i4bqhvsDOpbDv7At5eFLlj2b41L8QliGbnl2H7SnDiYhENphh1tQFJZf+MyfLsQ==}
-    engines: {node: '>=20.18.1'}
-
   undici@7.30.1:
     resolution: {integrity: sha512-03KrMbjIFDWQR5RNPrSw3bd1r12JpyFQl9/yxjUbJtqkjmllqC5lFjZh6ujeuJCKr8EOQvRW872Oy/az+nLYxg==}
     engines: {node: '>=20.18.1'}
@@ -7303,18 +7317,6 @@ packages:
     peerDependencies:
       bufferutil: ^4.0.1
       utf-8-validate: ^5.0.2
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
-  ws@8.20.0:
-    resolution: {integrity: sha512-sAt8BhgNbzCtgGbt2OxmpuryO63ZoDk/sqaB/znQm94T4fCEsy/yV+7CdC1kJhOU9lboAEU7R3kquuycDoibVA==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
     peerDependenciesMeta:
       bufferutil:
         optional: true
@@ -8552,7 +8554,7 @@ snapshots:
       progress: 2.0.3
       prompts: 2.4.2
       resolve-from: 5.0.0
-      semver: 7.7.4
+      semver: 7.8.6
       send: 0.19.2(supports-color@8.1.1)
       slugify: 1.6.9
       source-map-support: 0.5.21
@@ -8561,7 +8563,7 @@ snapshots:
       terminal-link: 2.1.1
       toqr: 0.1.1
       wrap-ansi: 7.0.0
-      ws: 8.20.0
+      ws: 8.21.0
       zod: 3.25.76
     optionalDependencies:
       react-native: 0.85.3(@babel/core@7.29.0(supports-color@8.1.1))(react@19.2.6)(supports-color@8.1.1)
@@ -8592,7 +8594,7 @@ snapshots:
       getenv: 2.0.0
       glob: 13.0.6
       resolve-from: 5.0.0
-      semver: 7.7.4
+      semver: 7.8.6
       slugify: 1.6.9
       xcode: 3.0.1
       xml2js: 0.6.0
@@ -8611,7 +8613,7 @@ snapshots:
       getenv: 2.0.0
       glob: 13.0.6
       resolve-workspace-root: 2.0.1
-      semver: 7.7.4
+      semver: 7.8.6
       slugify: 1.6.9
     transitivePeerDependencies:
       - supports-color
@@ -8656,7 +8658,7 @@ snapshots:
       ignore: 5.3.2
       minimatch: 10.2.4
       resolve-from: 5.0.0
-      semver: 7.7.4
+      semver: 7.8.6
     transitivePeerDependencies:
       - supports-color
 
@@ -8668,7 +8670,7 @@ snapshots:
       getenv: 2.0.0
       jimp-compact: 0.16.1
       parse-png: 2.1.0
-      semver: 7.7.4
+      semver: 7.8.6
     transitivePeerDependencies:
       - supports-color
 
@@ -8772,7 +8774,7 @@ snapshots:
       debug: 4.4.3(supports-color@8.1.1)
       expo: 55.0.23(@babel/core@7.29.0(supports-color@8.1.1))(@expo/dom-webview@55.0.6)(react-native@0.85.3(@babel/core@7.29.0(supports-color@8.1.1))(react@19.2.6)(supports-color@8.1.1))(react@19.2.6)(supports-color@8.1.1)
       resolve-from: 5.0.0
-      semver: 7.7.4
+      semver: 7.8.6
       xml2js: 0.6.0
     transitivePeerDependencies:
       - supports-color
@@ -9174,7 +9176,7 @@ snapshots:
       metro: 0.84.4(supports-color@8.1.1)
       metro-config: 0.84.4(supports-color@8.1.1)
       metro-core: 0.84.4
-      semver: 7.7.4
+      semver: 7.8.6
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -11346,7 +11348,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.1
-      undici: 7.24.7
+      undici: 7.30.1
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -12057,7 +12059,7 @@ snapshots:
     dependencies:
       hosted-git-info: 7.0.2
       proc-log: 4.2.0
-      semver: 7.7.4
+      semver: 7.8.6
       validate-npm-package-name: 5.0.1
 
   nullthrows@1.1.1: {}
@@ -12352,7 +12354,7 @@ snapshots:
       react-refresh: 0.14.2
       regenerator-runtime: 0.13.11
       scheduler: 0.27.0
-      semver: 7.7.4
+      semver: 7.8.6
       stacktrace-parser: 0.1.11
       tinyglobby: 0.2.16
       whatwg-fetch: 3.6.20
@@ -12942,9 +12944,6 @@ snapshots:
 
   undici-types@7.18.2: {}
 
-  undici@7.24.7:
-    optional: true
-
   undici@7.30.1: {}
 
   unenv@2.0.0-rc.24:
@@ -13296,8 +13295,6 @@ snapshots:
   wrappy@1.0.2: {}
 
   ws@7.5.10: {}
-
-  ws@8.20.0: {}
 
   ws@8.21.0: {}
 

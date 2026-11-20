@@ -17,7 +17,7 @@ import {
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Database } from "../../sqlite/database.js";
+import { Database } from "@blazetrails/sqlite3";
 import { BinaryData } from "@blazetrails/activemodel";
 import { isFinite, Rational, toF, toS } from "@blazetrails/ruby-compat";
 import { ConnectionAdapters } from "../../namespaces.js";

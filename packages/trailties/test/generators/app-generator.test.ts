@@ -1479,7 +1479,7 @@ describe("AppGenerator", () => {
     await t.runGenerator([t.destinationRoot, "--database=sqlite3"]);
     await t.assertFile("config/database.ts", (dbConfig: string) => {
       expect(dbConfig).toContain('adapter: "sqlite3"');
-      expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/");
+      expect(dbConfig).not.toContain("@blazetrails/sqlite3");
     });
   });
 
@@ -1498,7 +1498,7 @@ describe("AppGenerator", () => {
     });
     await t.assertFile("config/database.ts", (dbConfig: string) => {
       expect(dbConfig).toContain('adapter: "node-sqlite"');
-      expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/node-sqlite");
+      expect(dbConfig).not.toContain("@blazetrails/sqlite3/node-sqlite");
     });
   });
 

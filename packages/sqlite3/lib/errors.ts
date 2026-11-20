@@ -1,4 +1,4 @@
-import { SQLite3Constants } from "../sqlite-adapter.js";
+import { SQLite3Constants } from "./driver.js";
 
 export class Exception extends Error {
   code: number | null = null;

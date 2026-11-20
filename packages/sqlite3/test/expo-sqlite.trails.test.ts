@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { type SqliteConnection, SQLite3Constants } from "../../../lib/sqlite-adapter.js";
-import { isExpoSqliteAvailable, expoSqliteDriver } from "../../../lib/sqlite/expo-sqlite.js";
+import { type SqliteConnection, SQLite3Constants } from "../lib/driver.js";
+import { isExpoSqliteAvailable, expoSqliteDriver } from "../lib/expo-sqlite.js";
 
 it("expo-sqlite module import does not crash", () => {
   expect(typeof isExpoSqliteAvailable).toBe("boolean");
@@ -249,8 +249,8 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       },
     };
     try {
-      const { expoSqliteDriver: driver } = await import("../../../lib/sqlite/expo-sqlite.js");
-      const errors = await import("../../../lib/sqlite/errors.js");
+      const { expoSqliteDriver: driver } = await import("../lib/expo-sqlite.js");
+      const errors = await import("../lib/errors.js");
       return { conn: await driver.open({ database: ":memory:" }), errors };
     } finally {
       vi.doUnmock("node:module");
@@ -357,7 +357,7 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       }),
     }));
     try {
-      const { expoSqliteDriver: driver } = await import("../../../lib/sqlite/expo-sqlite.js");
+      const { expoSqliteDriver: driver } = await import("../lib/expo-sqlite.js");
       const conn = await driver.open({ database: ":memory:" });
       await conn.exec(`
         INSERT INTO widgets (name) VALUES ('a;b'); -- trailing; comment
@@ -391,7 +391,7 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       }),
     }));
     try {
-      const { expoSqliteDriver: driver } = await import("../../../lib/sqlite/expo-sqlite.js");
+      const { expoSqliteDriver: driver } = await import("../lib/expo-sqlite.js");
       const conn = await driver.open({ database: ":memory:" });
       expect((await conn.prepare("INSERT INTO widgets (name) VALUES ('a')")).reader).toBe(true);
       expect((await conn.prepare("SELECT 1 /* RETURNING */")).reader).toBe(false);
@@ -420,7 +420,7 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       }),
     }));
     try {
-      const { expoSqliteDriver: driver } = await import("../../../lib/sqlite/expo-sqlite.js");
+      const { expoSqliteDriver: driver } = await import("../lib/expo-sqlite.js");
       const conn = await driver.open({ database: ":memory:" });
       const error = await Promise.resolve(conn.prepare("SELECT 1")).then(
         () => null,
@@ -452,7 +452,7 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       }),
     }));
     try {
-      const { expoSqliteDriver: driver } = await import("../../../lib/sqlite/expo-sqlite.js");
+      const { expoSqliteDriver: driver } = await import("../lib/expo-sqlite.js");
       const conn = await driver.open({ database: ":memory:" });
       await expect(conn.prepare("SELECT 1")).rejects.toThrow("SQL logic error");
     } finally {
@@ -475,7 +475,7 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       }),
     }));
     try {
-      const { expoSqliteDriver: driver } = await import("../../../lib/sqlite/expo-sqlite.js");
+      const { expoSqliteDriver: driver } = await import("../lib/expo-sqlite.js");
       const conn = await driver.open({ database: ":memory:" });
       const stmt = await conn.prepare("SELECT id, name FROM widgets WHERE 0");
       expect(await stmt.toA()).toEqual([]);

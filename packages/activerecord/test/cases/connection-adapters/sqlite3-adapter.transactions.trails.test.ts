@@ -166,7 +166,7 @@ describe("SQLite3Adapter transaction control", () => {
     it("sqlite3-adapter and sqlite-drivers dirs use only explicit SQL for transactions", () => {
       const dirs = [
         path.resolve(import.meta.dirname, "../../../lib/connection-adapters"),
-        path.resolve(import.meta.dirname, "../../../lib/sqlite"),
+        path.resolve(import.meta.dirname, "../../../../sqlite3/lib"),
       ];
       const pattern = /\bdriver\.transaction\s*\(/;
       for (const dir of dirs) {

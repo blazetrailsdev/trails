@@ -465,8 +465,8 @@ export const SOURCES: readonly UpstreamSource[] = [
     packages: [
       {
         // The driver-layer gem `SQLite3Adapter` calls into
-        // (`sqlite3_adapter.rb:838-844` reaches `::SQLite3::Pragmas`); its
-        // ports live in `packages/activerecord/lib/sqlite/`.
+        // (`sqlite3_adapter.rb:838-844` reaches `::SQLite3::Pragmas`),
+        // ported as `@blazetrails/sqlite3`.
         name: "sqlite3",
         libPath: "lib/sqlite3",
       },

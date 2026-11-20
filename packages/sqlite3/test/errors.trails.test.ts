@@ -9,8 +9,8 @@ import {
   rbSqlite3Raise,
   rbSqlite3RaiseWithSql,
   status2klass,
-} from "../../../lib/sqlite/errors.js";
-import { betterSqlite3Driver } from "../../../lib/sqlite/better-sqlite3.js";
+} from "../lib/errors.js";
+import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 
 const raised = (fn: () => never): unknown => {
   try {

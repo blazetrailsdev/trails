@@ -1,8 +1,6 @@
 /** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
-import Database from "better-sqlite3";
-import { File } from "@blazetrails/ruby-compat";
-import { ConfigurationError } from "../errors.js";
-import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
+import Database from "libsql";
+import { File, FileUtils, RuntimeError } from "@blazetrails/ruby-compat";
 import {
   type ColumnInfo,
   type RunResult,
@@ -16,7 +14,9 @@ import {
   type SqliteStatement,
   type SyncSqliteConnection,
   type SyncSqliteStatement,
-} from "../sqlite-adapter.js";
+} from "./driver.js";
+import { resolveUriDatabasePath } from "./sqlite-uri.js";
+import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 
 /** @internal */
 function bindArgs(binds?: SqliteBinds): unknown[] {
@@ -26,55 +26,28 @@ function bindArgs(binds?: SqliteBinds): unknown[] {
 }
 
 /** @internal */
-function withNullBinds<T>(source: string, args: unknown[], call: (args: unknown[]) => T): T {
-  const limit = args.length + (source.split("?").length - 1);
-  let padded = args;
-  for (;;) {
-    try {
-      return call(padded);
-    } catch (e) {
-      if (
-        !(e instanceof RangeError) ||
-        !e.message.startsWith("Too few parameter values were provided") ||
-        padded.length >= limit
-      ) {
-        throw e;
-      }
-      padded = [...padded, null];
-    }
-  }
-}
-
-/** @internal */
-class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
+class LibsqlStatement implements SqliteStatement, SyncSqliteStatement {
   constructor(private readonly stmt: Database.Statement) {}
 
-  private bind<T>(binds: SqliteBinds | undefined, call: (args: unknown[]) => T): T {
-    this._columns = null;
-    const args = bindArgs(binds);
+  private call<T>(fn: () => T): T {
     try {
-      if (binds !== undefined && !Array.isArray(binds)) return call(args);
-      return withNullBinds(this.stmt.source, args, call);
+      return fn();
     } catch (e) {
       rbSqlite3Raise(e);
     }
   }
 
   run(binds?: SqliteBinds): RunResult {
-    const result = this.bind(binds, (args) => this.stmt.run(...args));
+    const result = this.call(() => this.stmt.run(...bindArgs(binds)));
     return { changes: result.changes, lastInsertRowid: result.lastInsertRowid };
   }
 
   get(binds?: SqliteBinds): unknown {
-    return this.bind(binds, (args) => this.stmt.get(...args));
+    return this.call(() => this.stmt.get(...bindArgs(binds)));
   }
 
   all(binds?: SqliteBinds): unknown[] {
-    if (!this.stmt.reader) {
-      this.run(binds);
-      return [];
-    }
-    return this.bind(binds, (args) => this.stmt.all(...args));
+    return this.call(() => this.stmt.all(...bindArgs(binds)));
   }
 
   iterate(binds?: SqliteBinds): IterableIterator<unknown> {
@@ -82,7 +55,7 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
       this.run(binds);
       return [][Symbol.iterator]();
     }
-    return this.bind(binds, (args) => this.stmt.iterate(...args));
+    return this.call(() => this.stmt.iterate(...bindArgs(binds)));
   }
 
   private boundParams: SqliteBinds | undefined;
@@ -107,7 +80,7 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
   toA(): unknown[][] {
     this.stmt.raw(true);
     try {
-      return this.bind(this.boundParams, (args) => this.stmt.all(...args) as unknown[][]);
+      return this.call(() => this.stmt.all(...bindArgs(this.boundParams)) as unknown[][]);
     } finally {
       this.stmt.raw(false);
     }
@@ -117,17 +90,14 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
     return this.stmt.reader;
   }
 
-  /** @perf 1.7% — PERMANENT */
-  private _columns: ColumnInfo[] | null = null;
-
   columns(): ColumnInfo[] {
-    return (this._columns ??= this.stmt.columns().map((c) => ({
+    return this.stmt.columns().map((c) => ({
       name: c.name,
       column: c.column,
       table: c.table,
       database: c.database,
       type: c.type,
-    })));
+    }));
   }
 
   setReadBigInts(on: boolean): void {
@@ -146,16 +116,16 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
 }
 
 /** @internal */
-class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection {
+class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
   readonly raw: Database.Database;
 
   constructor(db: Database.Database) {
     this.raw = db;
   }
 
-  prepare(sql: string): BetterSqlite3Statement {
+  prepare(sql: string): LibsqlStatement {
     try {
-      return new BetterSqlite3Statement(this.raw.prepare(sql));
+      return new LibsqlStatement(this.raw.prepare(sql));
     } catch (e) {
       rbSqlite3RaiseWithSql(e, sql);
     }
@@ -255,58 +225,152 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
       rbSqlite3Raise(e);
     }
   }
-}
 
-/** @internal */
-function resolveDatabasePath(database: string): string | null {
-  return database === ":memory:" ? null : database;
-}
-
-/** @internal */
-function rejectSharedCache(config: SqliteOpenConfig): void {
-  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
-    throw new ConfigurationError(
-      "SQLITE_OPEN_SHAREDCACHE is not supported by the better-sqlite3 driver",
-    );
+  async sync(): Promise<void> {
+    await this.raw.sync();
   }
+}
+
+export interface SyncableSqliteConnection extends SqliteConnection {
+  sync(): Promise<void>;
+}
+
+/** @internal */
+function sharedCacheDatabase(config: SqliteOpenConfig): string {
+  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) === 0) return config.database;
+  if (config.database.startsWith("file:")) {
+    const hash = config.database.indexOf("#");
+    const body = hash === -1 ? config.database : config.database.slice(0, hash);
+    const fragment = hash === -1 ? "" : config.database.slice(hash);
+    return `${body}${body.includes("?") ? "&" : "?"}cache=shared${fragment}`;
+  }
+  return `file:${config.database}?cache=shared`;
 }
 
 /** @internal */
 function openDatabase(config: SqliteOpenConfig): Database.Database {
-  rejectSharedCache(config);
   const opts: Database.Options = {
     ...(config.driverOptions as Database.Options | undefined),
     readonly: config.readOnly ?? false,
   };
   try {
-    if (opts.readonly && config.database === ":memory:") {
-      return new Database(new Database(":memory:").serialize(), opts);
-    }
-    return new Database(config.database, opts);
+    return new Database(sharedCacheDatabase(config), opts);
   } catch (e) {
     rbSqlite3Raise(e);
   }
 }
 
+/** @internal */
+function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
+  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
+    throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the libsql-remote driver");
+  }
+  const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };
+  if (config.authToken !== undefined) {
+    (opts as LibsqlReplicaOptions).authToken = config.authToken;
+  }
+  return new Database(config.database, opts);
+}
+
+const remoteCapabilities: SqliteDriverCapabilities = {
+  inProcessSync: false,
+  streaming: false,
+  loadExtension: false,
+  concurrentStatements: false,
+  foreignKeysOnByDefault: false,
+  immediateTransactions: false,
+};
+
+export const libsqlRemoteDriver: SqliteDriver = {
+  name: "libsql-remote",
+  capabilities: remoteCapabilities,
+
+  open(config: SqliteOpenConfig): Promise<SqliteConnection> {
+    return Promise.resolve(new LibsqlConnection(openRemoteDatabase(config)));
+  },
+};
+
+export function isReplicaConfig(config: SqliteOpenConfig): boolean {
+  const syncUrl =
+    config.syncUrl ?? (config.driverOptions as { syncUrl?: unknown } | undefined)?.syncUrl;
+  return typeof syncUrl === "string" && syncUrl.length > 0;
+}
+
+export interface LibsqlReplicaOptions extends Database.Options {
+  authToken?: string;
+  syncPeriod?: number;
+}
+
+/** @internal */
+export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOptions {
+  if (!isReplicaConfig(config)) {
+    throw new RuntimeError(
+      "libsql embedded-replica mode requires a non-empty `syncUrl` in " +
+        "driverOptions (alongside the local replica path); none was provided.",
+    );
+  }
+  const opts: LibsqlReplicaOptions = {
+    ...(config.driverOptions as LibsqlReplicaOptions | undefined),
+  };
+  if (config.syncUrl !== undefined) opts.syncUrl = config.syncUrl;
+  if (config.authToken !== undefined) opts.authToken = config.authToken;
+  if (opts.syncPeriod !== undefined) {
+    if (
+      typeof opts.syncPeriod !== "number" ||
+      !Number.isFinite(opts.syncPeriod) ||
+      opts.syncPeriod <= 0
+    ) {
+      throw new RuntimeError(
+        "libsql embedded-replica `syncPeriod` must be a positive number of " +
+          `seconds (got ${String(opts.syncPeriod)}); omit it for caller-driven sync.`,
+      );
+    }
+  }
+  return opts;
+}
+
+/** @internal */
+function openReplicaDatabase(config: SqliteOpenConfig): Database.Database {
+  return new Database(config.database, buildReplicaOptions(config));
+}
+
+const replicaCapabilities: SqliteDriverCapabilities = {
+  inProcessSync: false,
+  streaming: false,
+  loadExtension: false,
+  concurrentStatements: false,
+  foreignKeysOnByDefault: false,
+  immediateTransactions: false,
+};
+
+export const libsqlReplicaDriver: SqliteDriver = {
+  name: "libsql-replica",
+  capabilities: replicaCapabilities,
+
+  async open(config: SqliteOpenConfig): Promise<SqliteConnection> {
+    return new LibsqlConnection(openReplicaDatabase(config));
+  },
+};
+
 const capabilities: SqliteDriverCapabilities = {
   inProcessSync: true,
   streaming: true,
-  loadExtension: true,
+  loadExtension: false,
   concurrentStatements: true,
   foreignKeysOnByDefault: false,
   immediateTransactions: true,
 };
 
-export const betterSqlite3Driver: SqliteDriver = {
-  name: "better-sqlite3",
+export const libsqlDriver: SqliteDriver = {
+  name: "libsql",
   capabilities,
 
   open(config: SqliteOpenConfig): Promise<SqliteConnection> {
-    return Promise.resolve(new BetterSqlite3Connection(openDatabase(config)));
+    return Promise.resolve(new LibsqlConnection(openDatabase(config)));
   },
 
   databaseExists(config: SqliteOpenConfig): boolean {
-    const path = resolveDatabasePath(config.database);
+    const path = resolveUriDatabasePath(config.database);
     if (path === null) return true;
     try {
       return File.isExist(path);
@@ -319,8 +383,19 @@ export const betterSqlite3Driver: SqliteDriver = {
     const source = new Database(sourcePath, { readonly: true });
     try {
       await source.backup(destination);
+      return;
+    } catch {
     } finally {
       source.close();
     }
+    const destPath = resolveUriDatabasePath(destination);
+    if (destPath === null) {
+      throw new RuntimeError(
+        "libsql restoreFromPath cannot populate an in-memory destination " +
+          `(${destination}) via the file-clone fallback; libsql's backup() ` +
+          "primitive is required for memory-backed restores.",
+      );
+    }
+    FileUtils.cp(resolveUriDatabasePath(sourcePath) ?? sourcePath, destPath);
   },
 };

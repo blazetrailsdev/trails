@@ -11,9 +11,8 @@ import {
   type SqliteOpenConfig,
   SQLite3Constants,
   type SqliteStatement,
-} from "../sqlite-adapter.js";
-import { LoadError } from "@blazetrails/ruby-compat";
-import { ConfigurationError } from "../errors.js";
+} from "./driver.js";
+import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
 import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 
 /** @internal */
@@ -407,9 +406,7 @@ export const expoSqliteDriver: SqliteDriver = {
       );
     }
     if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
-      throw new ConfigurationError(
-        "SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver",
-      );
+      throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver");
     }
     try {
       const db = await expoSqlite.openDatabaseAsync(config.database, {
