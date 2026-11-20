@@ -224,7 +224,9 @@ database table and polls it, so no extra service is needed — see the
 
 The server accepts WebSocket upgrades only from listed origins, a guard against
 cross-site WebSocket hijacking. `allowedRequestOrigins` takes strings and
-regular expressions; in development, when none are set, the Action Cable engine allows any `localhost` port (`packages/actioncable/lib/engine.ts`), and
+regular expressions. In development, when none are set, the Action Cable
+engine allows any `localhost` port (`packages/actioncable/lib/engine.ts:68`,
+mirroring `actioncable/lib/action_cable/engine.rb:45`), and
 `disableRequestForgeryProtection` turns the check off entirely.
 
 ### Consumer Configuration
