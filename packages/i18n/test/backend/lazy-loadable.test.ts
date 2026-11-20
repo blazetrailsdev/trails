@@ -1,7 +1,6 @@
 import * as TestCase from "../support/test-case.js";
 import { Hash, regexpEscape } from "@blazetrails/ruby-compat";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { LazyLoadable } from "../../lib/backend/lazy-loadable.js";
 import { config, setLoadPath, t, withLocale } from "../../lib/i18n.js";
@@ -20,6 +19,7 @@ function h(...pairs: [unknown, unknown][]): Hash<unknown, unknown> {
 }
 
 describe("I18nBackendLazyLoadableTest", () => {
+  const tempFiles = new Map<string, string>();
   let tempCount = 0;
   let lazyModeBackend: LazyLoadable;
   let eagerModeBackend: LazyLoadable;
@@ -27,7 +27,9 @@ describe("I18nBackendLazyLoadableTest", () => {
 
   beforeEach(async () => {
     await TestCase.setup();
-    registerFileReader((filename) => readFile(filename, "utf8"));
+    registerFileReader(async (filename) =>
+      tempFiles.has(filename) ? tempFiles.get(filename)! : readFile(filename, "utf8"),
+    );
 
     lazyModeBackend = new LazyLoadable({ lazyLoad: true });
     eagerModeBackend = new LazyLoadable({ lazyLoad: false });
@@ -65,8 +67,8 @@ describe("I18nBackendLazyLoadableTest", () => {
   ): Promise<void> {
     await backend.reloadBang();
 
-    const path = `${await mkdtemp(`${tmpdir()}/i18n`)}/${name[0]}${++tempCount}${name[1]}`;
-    await writeFile(path, fileContents);
+    const path = `/tmp/${name[0]}${++tempCount}${name[1]}`;
+    tempFiles.set(path, fileContents);
 
     config().loadPath.push(path);
     await preloadTranslationFiles(path);

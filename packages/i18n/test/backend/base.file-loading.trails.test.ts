@@ -120,7 +120,7 @@ describe("I18n::Backend::Base file loading", () => {
   it("re-reads I18n.load_path on reloadBang", async () => {
     let body = "en:\n  foo:\n    bar: baz\n";
     registerFileReader(() => Promise.resolve(body));
-    await config().setLoadPath([`${localesDir()}/en.yml`]);
+    await config().setLoadPath(["mutable.yml"]);
     expect(backend.translate("en", "foo.bar")).toBe("baz");
 
     body = "en:\n  foo:\n    bar: qux\n";
@@ -131,7 +131,7 @@ describe("I18n::Backend::Base file loading", () => {
   it("re-reads I18n.load_path on reloadBang with an eager loaded backend", async () => {
     let body = "en:\n  foo:\n    bar: baz\n";
     registerFileReader(() => Promise.resolve(body));
-    await config().setLoadPath([`${localesDir()}/en.yml`]);
+    await config().setLoadPath(["mutable.yml"]);
     await backend.eagerLoadBang();
     expect(backend.translate("en", "foo.bar")).toBe("baz");
 
@@ -147,7 +147,7 @@ describe("I18n::Backend::Base file loading", () => {
       reads += 1;
       return Promise.resolve("en:\n  foo:\n    bar: baz\n");
     });
-    await config().setLoadPath([`${localesDir()}/en.yml`]);
+    await config().setLoadPath(["mutable.yml"]);
     reads = 0;
 
     await eagerLoadBang();
@@ -160,7 +160,7 @@ describe("I18n::Backend::Base file loading", () => {
   it("serves the mutated file on an eagerLoadBang that follows a reloadBang", async () => {
     let body = "en:\n  foo:\n    bar: baz\n";
     registerFileReader(() => Promise.resolve(body));
-    await config().setLoadPath([`${localesDir()}/en.yml`]);
+    await config().setLoadPath(["mutable.yml"]);
     expect(backend.translate("en", "foo.bar")).toBe("baz");
 
     body = "en:\n  foo:\n    bar: qux\n";
