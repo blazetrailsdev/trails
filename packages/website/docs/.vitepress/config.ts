@@ -56,12 +56,20 @@ export default defineConfig({
           ],
         },
         {
+          text: "Views",
+          items: [
+            { text: "Action View Overview", link: "/guides/action-view-overview" },
+            { text: "Action View Helpers", link: "/guides/action-view-helpers" },
+          ],
+        },
+        {
           text: "Other Components",
           items: [
             { text: "Action Mailer Basics", link: "/guides/action-mailer-basics" },
             { text: "Action Mailbox Basics", link: "/guides/action-mailbox-basics" },
             { text: "Action Text Overview", link: "/guides/action-text-overview" },
             { text: "Action Cable Overview", link: "/guides/action-cable-overview" },
+            { text: "Active Job Basics", link: "/guides/active-job-basics" },
           ],
         },
         {
