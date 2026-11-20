@@ -1,4 +1,4 @@
-import { extend, include } from "@blazetrails/ruby-compat";
+import { constSet, extend, include, type TopLevelConstants } from "@blazetrails/ruby-compat";
 import { prepend as prependModule } from "@blazetrails/ruby-compat/include";
 import { Concern } from "../../concern.js";
 
@@ -16,13 +16,12 @@ export function concerning(
 }
 
 export function concern(
-  this: AnyClass,
+  this: AnyClass | TopLevelConstants,
   topic: string,
   moduleDefinition: (this: ModuleBody, mod: ModuleBody) => void,
 ): ModuleBody {
   const mod: ModuleBody = {};
   extend(mod, Concern);
   moduleDefinition.call(mod, mod);
-  Object.defineProperty(this, topic, { value: mod, writable: true, configurable: true });
-  return mod;
+  return constSet(this, topic, mod);
 }

@@ -174,7 +174,10 @@ describe("MessageEncryptorTest", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
-  it.skip("inspect does not show secrets");
+  it("inspect does not show secrets", () => {
+    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm" });
+    expect(encryptor.inspect()).toMatch(/^#<ActiveSupport::MessageEncryptor:0x[0-9a-f]+>$/);
+  });
 
   it("invalid base64 argument", () => {
     assertNotDecrypted("jrcc<!--esi-->rkls<!--esx-->tyx9");

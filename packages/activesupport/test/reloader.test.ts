@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Reloader } from "../lib/reloader.js";
 import { Executor } from "../lib/executor.js";
-import { assertNot } from "../lib/testing/assertions.js";
+import { assertNot, assertRaises } from "../lib/testing/assertions.js";
+import { ErrorCollector } from "../lib/testing/error-reporter-assertions.js";
 
 describe("ReloaderTest", () => {
   function newReloader(check: () => boolean): typeof Reloader {
@@ -117,5 +119,14 @@ describe("ReloaderTest", () => {
     expect(called).toEqual(["before_unload", "unload", "after_unload", "body"]);
   });
 
-  it.skip("report errors once");
+  it("report errors once", async () => {
+    const reports = await ErrorCollector.record(async () => {
+      await assertRaises([RuntimeError], {}, () => {
+        reloader.wrap(() => {
+          throw new RuntimeError("Oops");
+        });
+      });
+    });
+    expect(reports.length).toEqual(1);
+  });
 });
