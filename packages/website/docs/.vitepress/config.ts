@@ -44,6 +44,20 @@ export default defineConfig({
           ],
         },
         {
+          text: "Controllers",
+          items: [
+            { text: "Action Controller Overview", link: "/guides/action-controller-overview" },
+            {
+              text: "Action Controller Advanced Topics",
+              link: "/guides/action-controller-advanced-topics",
+            },
+          ],
+        },
+        {
+          text: "Other Components",
+          items: [{ text: "Action Cable Overview", link: "/guides/action-cable-overview" }],
+        },
+        {
           text: "Rails Guides",
           items: railsGuideSections.map((text) => ({
             text,

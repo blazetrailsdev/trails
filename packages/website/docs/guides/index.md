@@ -45,11 +45,11 @@ ratified deviations from Rails are on its [package page](/packages/).
 
 ## Controllers
 
-| Rails guide                       | Trails guide                                                                                                                                                      | Packages                           |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| Action Controller Overview        | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-action-controller-overview.md))        | [actionpack](/packages/actionpack) |
-| Action Controller Advanced Topics | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-action-controller-advanced-topics.md)) | [actionpack](/packages/actionpack) |
-| Rails Routing from the Outside In | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-routing.md))                           | [actionpack](/packages/actionpack) |
+| Rails guide                       | Trails guide                                                                                                                            | Packages                           |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Action Controller Overview        | [Action Controller Overview](./action-controller-overview.md)                                                                           | [actionpack](/packages/actionpack) |
+| Action Controller Advanced Topics | [Action Controller Advanced Topics](./action-controller-advanced-topics.md)                                                             | [actionpack](/packages/actionpack) |
+| Rails Routing from the Outside In | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-routing.md)) | [actionpack](/packages/actionpack) |
 
 ## Other Components
 
@@ -61,7 +61,7 @@ ratified deviations from Rails are on its [package page](/packages/).
 | Action Text Overview           | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-action-text-overview.md))           | [actiontext](/packages/actiontext)                                                       |
 | Active Job Basics              | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-job-basics.md))              | [activejob](/packages/activejob), [solid-queue](/packages/solid-queue)                   |
 | Active Storage Overview        | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-storage-overview.md))        | [activestorage](/packages/activestorage), [image-processing](/packages/image-processing) |
-| Action Cable Overview          | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-action-cable-overview.md))          | [actioncable](/packages/actioncable), [solid-cable](/packages/solid-cable)               |
+| Action Cable Overview          | [Action Cable Overview](./action-cable-overview.md)                                                                                                            | [actioncable](/packages/actioncable), [solid-cable](/packages/solid-cable)               |
 
 ## Digging Deeper
 
