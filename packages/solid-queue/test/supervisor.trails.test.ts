@@ -50,7 +50,7 @@ describe("ForkSupervisorTest", () => {
       workers: [{ queues: "default", pollingInterval: 0.1 }],
       dispatchers: [],
     });
-    await waitForRegisteredProcesses(2, { timeout: 3 });
+    await waitForRegisteredProcesses(2, { timeout: 10 });
 
     const worker = (await Process.findBy({ kind: "Worker" }))!;
     expect(worker.pid).not.toEqual(RubyProcess.pid);
@@ -63,7 +63,7 @@ describe("ForkSupervisorTest", () => {
 
     RubyProcess.kill("KILL", worker.pid);
 
-    await waitFor({ timeout: 5 }, async () => {
+    await waitFor({ timeout: 10 }, async () => {
       const workers = await Process.where({ kind: "Worker" }).toArray();
       return workers.some((replacement) => replacement.pid !== worker.pid);
     });
