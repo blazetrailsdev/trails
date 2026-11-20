@@ -44,6 +44,7 @@
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*",
     "@hotwired/turbo-rails": "8.0.23",
     "@types/node": "25.3.5",
     "playwright": "^1.60.0",

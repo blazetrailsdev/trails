@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import { rbGvGet } from "@blazetrails/ruby-compat";
 import "../test-helper.js";
 import { TurboStreamsTagBuilder } from "../../lib/app/controllers/turbo/streams/turbo-streams-tag-builder.js";
