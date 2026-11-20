@@ -994,7 +994,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   ): Promise<T> {
     return (
       (await this.findBy(attributes)) ||
-      awaitingAssignment(attributes, block, (block) => this.new(attributes, block))
+      awaitingAssignment((attributes ??= {}), block, (block) => this.new(attributes, block))
     );
   }
 
@@ -1015,7 +1015,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   ): Promise<T> {
     return (
       (await this.first()) ||
-      awaitingAssignment(attributes, block, (block) => this.new(attributes, block))
+      awaitingAssignment((attributes ??= {}), block, (block) => this.new(attributes, block))
     );
   }
 

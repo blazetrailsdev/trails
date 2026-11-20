@@ -2268,7 +2268,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
   });
 
   it.skip("changing columns", async () => {
-    // PERMANENT-SKIP: PostgreSQL's quote_default_expression runs lookup_cast_type's regtype query (postgresql/quoting.rb:195-197), which trails peeks from the warmed type map — packages/activerecord/CLAUDE.md, "Adapter facts are prewarmed and peeked"
+    // BLOCKED: port bug — see 0155-assertion-surfaced-port-bugs/postgresql-bulk-change-query-count-one-short
     await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.string("name");
       t.date("birthdate");
@@ -2300,7 +2300,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
   });
 
   it.skip("changing column null with default", async () => {
-    // PERMANENT-SKIP: PostgreSQL's quote_default_expression runs lookup_cast_type's regtype query (postgresql/quoting.rb:195-197), which trails peeks from the warmed type map — packages/activerecord/CLAUDE.md, "Adapter facts are prewarmed and peeked"
+    // BLOCKED: port bug — see 0155-assertion-surfaced-port-bugs/postgresql-bulk-change-query-count-one-short
     await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.string("name");
       t.integer("age");

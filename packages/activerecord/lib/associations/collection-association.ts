@@ -260,8 +260,9 @@ export abstract class CollectionAssociation extends Association {
     }
 
     await this.klass.ensureSchemaLoaded();
-    const record = (await awaitingAssignment(attributes, block, (block) =>
-      this.buildRecord(attributes, block),
+    const attrs = attributes ?? {};
+    const record = (await awaitingAssignment(attrs, block, (block) =>
+      this.buildRecord(attrs, block),
     ))!;
     await this.transaction(async () => {
       let result: boolean | undefined = undefined;

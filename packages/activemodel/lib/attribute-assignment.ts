@@ -183,11 +183,7 @@ export function capturingAssignment<R>(build: () => R): [R, Promise<void> | unde
  * @noRailsEquivalent PERMANENT
  */
 export function deferringToAssignment(record: object, rest: () => unknown): boolean {
-  let capture = pendingCaptures.get(record);
-  if (capture === undefined && assignmentCapture?.attributes === null) {
-    capture = assignmentCapture;
-    assignmentCapture = null;
-  }
+  const capture = pendingCaptures.get(record);
   if (capture === undefined) return false;
   pendingCaptures.delete(record);
   if (capture.assigned === undefined) {
@@ -208,9 +204,9 @@ export async function awaitingAssignment<R, K = never>(
   block: ((record: K) => void | Promise<void>) | undefined,
   build: (block?: (record: K) => unknown) => R,
 ): Promise<R> {
-  const capture: AssignmentCapture = { attributes: attributes ?? null };
+  const capture: AssignmentCapture = { attributes };
   let yielded: unknown;
-  assignmentCapture = capture;
+  if (attributes != null) assignmentCapture = capture;
   let record: R;
   try {
     record = build(

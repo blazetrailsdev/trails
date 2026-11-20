@@ -1327,9 +1327,9 @@ export class Base extends Model {
       const deferred = deferringToAssignment(this, () => {
         const yielded: unknown = initBlock?.(this);
         if (yielded instanceof Promise) {
-          return yielded.then(() => this.runCallbacks("initialize", undefined, { strict: false }));
+          return yielded.then(() => this._runInitializeCallbacks(undefined, { strict: false }));
         }
-        return this.runCallbacks("initialize", undefined, { strict: false });
+        return this._runInitializeCallbacks(undefined, { strict: false });
       });
       if (!deferred) {
         initBlock?.(this);
@@ -1393,7 +1393,10 @@ export class Base extends Model {
   }
   declare initializeInternalsCallback: () => void;
   /** @internal */
-  declare _runInitializeCallbacks: (block?: () => unknown) => unknown;
+  declare _runInitializeCallbacks: (
+    block?: () => unknown,
+    opts?: { strict?: "sync" | false },
+  ) => unknown;
   /** @internal */
   declare _runFindCallbacks: (block?: () => unknown) => unknown;
   /** @internal */
