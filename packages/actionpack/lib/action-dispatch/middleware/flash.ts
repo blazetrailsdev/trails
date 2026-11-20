@@ -24,10 +24,10 @@ export interface FlashRequestHost {
   session: {
     isEnabled?(): boolean;
     isLoaded(): boolean;
-    isKey(key: string): boolean | Promise<boolean>;
-    get(key: string): unknown;
-    set(key: string, value: unknown): unknown;
-    delete(key: string): unknown;
+    isKey(key: string): Promise<boolean>;
+    get(key: string): Promise<unknown>;
+    set(key: string, value: unknown): Promise<unknown>;
+    delete(key: string): Promise<unknown>;
   };
 }
 

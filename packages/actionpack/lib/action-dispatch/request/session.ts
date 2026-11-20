@@ -92,6 +92,7 @@ export class Session {
   private enabled: boolean;
   private _idWas: unknown;
   private idWasInitialized: boolean;
+  private loading: Promise<[unknown, Record<string, unknown>]> | null = null;
 
   static async create(
     store: SessionStore,
@@ -160,6 +161,7 @@ export class Session {
       await this.by!.deleteSession(this.req, options.id(this.req), options);
 
       this.loaded = false;
+      this.loading = null;
       await this.loadForWriteBang();
     }
   }
@@ -330,11 +332,17 @@ export class Session {
     if (this.isEnabled() && !this.isLoaded()) await this.loadBang();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   async loadBang(): Promise<void> {
     if (this.isEnabled()) {
       if (!this.isExists()) this.idWasInitialized = true;
-      const [id, session] = await this.by!.loadSession(this.req);
+      const [id, session] = await (this.loading ??= Promise.resolve(
+        this.by!.loadSession(this.req),
+      ));
+      if (this.isLoaded()) return;
       this.options()!.set("id", id);
       hashReplace(this.delegate, stringifyKeys(session));
       if (!this.idWasInitialized) this._idWas = id;

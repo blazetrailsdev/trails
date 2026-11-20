@@ -135,3 +135,21 @@ describe("Session", () => {
     expect(session.inspect()).toMatch(/^#<MySession:0x[0-9a-f]+ not yet loaded>$/);
   });
 });
+
+describe("Session lazy async load", () => {
+  it("loads once when two accessors race, so neither write is lost", async () => {
+    const loadSession = vi.fn(async () => [1, {}] as [unknown, Record<string, unknown>]);
+    const store = {
+      loadSession,
+      sessionExists: () => true,
+      deleteSession: async () => null,
+      extractSessionId: () => 1,
+    };
+    const s = await Session.create(store, makeReq(), {});
+
+    await Promise.all([s.set("a", 1), s.set("b", 2)]);
+
+    expect(await s.toHash()).toEqual({ a: 1, b: 2 });
+    expect(loadSession).toHaveBeenCalledTimes(1);
+  });
+});

@@ -162,10 +162,9 @@ export async function combineEtags(
   validator: unknown,
   options: Record<string, unknown> = {},
 ): Promise<unknown[]> {
-  return [
-    validator,
-    ...(await Promise.all(this.etaggers.map((etagger) => etagger.call(this, options)))),
-  ].filter((e) => e !== null && e !== undefined);
+  const etags: unknown[] = [];
+  for (const etagger of this.etaggers) etags.push(await etagger.call(this, options));
+  return [validator, ...etags].filter((e) => e !== null && e !== undefined);
 }
 
 ActionController.ConditionalGet = ConditionalGet;

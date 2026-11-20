@@ -343,11 +343,11 @@ export interface CsrfRequest {
   xCsrfToken?: string | null;
   env?: Record<string, unknown>;
   session?: {
-    get(key: string): unknown;
-    set(key: string, value: unknown): unknown;
-    delete(key: string): unknown;
+    get(key: string): Promise<unknown>;
+    set(key: string, value: unknown): Promise<unknown>;
+    delete(key: string): Promise<unknown>;
     id?(): unknown;
-    idWas?(): unknown;
+    idWas?(): Promise<unknown>;
   };
   cookieJar(): CookieJar;
 }
