@@ -1,4 +1,5 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite3-libsql-engines MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
+import { SQLite3 } from "./namespaces.js";
+import "./constants.js";
 import Database from "libsql";
 import { File, FileUtils, RuntimeError } from "@blazetrails/ruby-compat";
 import {
@@ -10,7 +11,6 @@ import {
   type SqliteDriver,
   type SqliteDriverCapabilities,
   type SqliteOpenConfig,
-  SQLite3Constants,
   type SqliteStatement,
   type SyncSqliteConnection,
   type SyncSqliteStatement,
@@ -238,7 +238,7 @@ export interface SyncableSqliteConnection extends SqliteConnection {
 
 /** @internal */
 function sharedCacheDatabase(config: SqliteOpenConfig): string {
-  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) === 0) return config.database;
+  if (((config.flags ?? 0) & SQLite3.Constants.Open.SHAREDCACHE) === 0) return config.database;
   if (config.database.startsWith("file:")) {
     const hash = config.database.indexOf("#");
     const body = hash === -1 ? config.database : config.database.slice(0, hash);
@@ -263,7 +263,7 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
 
 /** @internal */
 function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
-  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
+  if (((config.flags ?? 0) & SQLite3.Constants.Open.SHAREDCACHE) !== 0) {
     throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the libsql-remote driver");
   }
   const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };

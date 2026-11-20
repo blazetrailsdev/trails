@@ -1,6 +1,6 @@
 import { rbModName } from "@blazetrails/ruby-compat";
-import { SQLite3Constants } from "./driver.js";
 import { SQLite3 } from "./namespaces.js";
+import "./constants.js";
 
 export class Exception extends Error {
   code: number | null = null;
@@ -124,9 +124,8 @@ SQLite3.SQLException = SQLException;
 SQLite3.TooBigException = TooBigException;
 SQLite3.UnsupportedException = UnsupportedException;
 
-const { ErrorCode } = SQLite3Constants;
+const { ErrorCode } = SQLite3.Constants;
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-0180-sqlite3-gem-story */
 export function status2klass(status: number): typeof Exception | null {
   switch (status & 0xff) {
     case ErrorCode.OK:
@@ -219,7 +218,6 @@ function sqlite3Errmsg(error: unknown): string {
   return message;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-0180-sqlite3-gem-story */
 export function rbSqlite3Raise(error: unknown): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);
@@ -232,7 +230,6 @@ export function rbSqlite3Raise(error: unknown): never {
   throw exception;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-0180-sqlite3-gem-story */
 export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);

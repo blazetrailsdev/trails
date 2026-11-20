@@ -1,6 +1,7 @@
 import { SQLite3 } from "./namespaces.js";
+import "./constants.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { SQLite3Constants, type SqliteConnection } from "./driver.js";
+import { type SqliteConnection } from "./driver.js";
 import { Database } from "./database.js";
 import { Exception } from "./errors.js";
 
@@ -65,7 +66,7 @@ export class Backup {
       await dstdb.exec("DETACH DATABASE sqlite3_backup");
       await dstdb.pragma(`foreign_keys = ${Number(foreignKeys)}`);
     }
-    return SQLite3Constants.ErrorCode.DONE;
+    return SQLite3.Constants.ErrorCode.DONE;
   }
 
   finish(): null {

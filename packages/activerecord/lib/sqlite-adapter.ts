@@ -7,7 +7,6 @@ export {
   type SqliteConnection,
   type SyncSqliteStatement,
   type SyncSqliteConnection,
-  SQLite3Constants,
   type SqliteOpenConfig,
   type SqliteDriverCapabilities,
   type SqliteDriver,

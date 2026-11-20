@@ -1,8 +1,8 @@
+import { SQLite3 } from "@blazetrails/sqlite3";
 import { it, expect } from "vitest";
 import { assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
-import { SQLite3Constants } from "../../../../lib/sqlite-adapter.js";
 import { NodeSQLiteAdapter } from "../../../../lib/connection-adapters/node-sqlite-adapter.js";
 import { Rollback, TransactionIsolationError } from "../../../../lib/errors.js";
 import { inMemoryDb } from "../../../support/adapter-helper.js";
@@ -10,9 +10,9 @@ import { ambientPoolConfiguration } from "../../../support/test-adapter.js";
 
 function sharedCacheFlags(): number {
   return (
-    SQLite3Constants.Open.READWRITE |
-    SQLite3Constants.Open.CREATE |
-    SQLite3Constants.Open.SHAREDCACHE
+    SQLite3.Constants.Open.READWRITE |
+    SQLite3.Constants.Open.CREATE |
+    SQLite3.Constants.Open.SHAREDCACHE
   );
 }
 
@@ -47,7 +47,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
   it("shared_cached? is false when cache-mode is disabled", async () => {
     await withConnection(
       {
-        flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.CREATE,
+        flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.CREATE,
       },
       async (conn) => {
         expect(conn.isSharedCache()).toBeFalsy();

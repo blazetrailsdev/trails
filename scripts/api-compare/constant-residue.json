@@ -1216,11 +1216,12 @@
     }
   },
   "sqlite3": {
-    "rows": 30,
+    "rows": 32,
     "excluded": [],
     "unwalked": [],
     "residue": {
       "backup.ts::Backup": "SQLite3::Backup",
+      "constants.ts::Constants": "SQLite3::Constants",
       "database.ts::Database": "SQLite3::Database",
       "errors.ts::AbortException": "SQLite3::AbortException",
       "errors.ts::AuthorizationException": "SQLite3::AuthorizationException",
@@ -1249,6 +1250,7 @@
       "errors.ts::SchemaChangedException": "SQLite3::SchemaChangedException",
       "errors.ts::TooBigException": "SQLite3::TooBigException",
       "errors.ts::UnsupportedException": "SQLite3::UnsupportedException",
+      "fork-safety.ts::ForkSafety": "SQLite3::ForkSafety",
       "pragmas.ts::Pragmas": "SQLite3::Pragmas"
     }
   },
