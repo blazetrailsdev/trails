@@ -623,9 +623,6 @@ importers:
       mysql2:
         specifier: ^3.18.2
         version: 3.19.0(@types/node@25.3.5)
-      pg:
-        specifier: ^8.19.0
-        version: 8.20.0
     devDependencies:
       '@blazetrails/actionpack':
         specifier: workspace:*
@@ -648,6 +645,9 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
+      pg:
+        specifier: ^8.19.0
+        version: 8.20.0
       typescript:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1
