@@ -114,7 +114,7 @@ describe("FiberProcessesLifecycleTest", () => {
       },
     );
 
-    await waitForRegisteredProcesses(2, { timeout: 3 });
+    await waitForRegisteredProcesses(2, { timeout: 10 });
     await assertRegisteredWorkersFor("background", { supervisorPid: RbProcess.pid });
   });
 

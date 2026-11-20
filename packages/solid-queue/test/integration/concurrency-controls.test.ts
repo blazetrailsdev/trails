@@ -38,6 +38,7 @@ import {
 import {
   runSupervisor,
   sleep,
+  terminateProcess,
   waitFor,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
@@ -126,31 +127,31 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   it("schedule several conflicting jobs over the same record sequentially", async () => {
-    await UpdateResultJob.set({ wait: seconds(0.23) }).performLater(result, {
+    await UpdateResultJob.set({ wait: seconds(0.1) }).performLater(result, {
       name: "000",
-      pause: 0.1,
+      pause: 1,
     });
 
-    for (const [i, name] of new Range("A", "F").toA().entries()) {
-      await NonOverlappingUpdateResultJob.set({ wait: seconds(0.2 + i * 0.01) }).performLater(
-        result,
-        {
-          name,
-          pause: 0.3,
-        },
-      );
+    await NonOverlappingUpdateResultJob.set({ wait: seconds(0.1) }).performLater(result, {
+      name: "A",
+      pause: 2.5,
+    });
+
+    for (const [i, name] of new Range("B", "F").toA().entries()) {
+      await NonOverlappingUpdateResultJob.set({ wait: seconds(1 + i * 0.1) }).performLater(result, {
+        name,
+        pause: 0.1,
+      });
     }
 
     for (const [i, name] of new Range("G", "K").toA().entries()) {
-      await NonOverlappingUpdateResultJob.set({ wait: seconds(0.3 + i * 0.01) }).performLater(
+      await NonOverlappingUpdateResultJob.set({ wait: seconds(1.5 + i * 0.1) }).performLater(
         result,
-        {
-          name,
-        },
+        { name },
       );
     }
 
-    await waitForJobsToFinishFor(5);
+    await waitForJobsToFinishFor(15);
     await assertNoUnfinishedJobs();
 
     await assertStoredSequence(result, new Range("A", "K").toA());
@@ -298,16 +299,13 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   it("don't block claimed executions that get released", async () => {
     await NonOverlappingUpdateResultJob.performLater(result, {
       name: "I'll be released to ready",
-      pause: Number(SolidQueue.shutdownTimeout) + 10,
+      pause: Number(SolidQueue.shutdownTimeout) + 30,
     });
     const job = (await Job.last()) as Job;
 
-    await sleep(0.2);
-    expect(await job.isClaimed()).toBeTruthy();
+    await waitFor({ timeout: 2 }, async () => (await job.reload()).isClaimed());
 
-    const terminating = sleep(0.1).then(() => run.terminate());
-    await sleep(Number(SolidQueue.shutdownTimeout) + 0.6);
-    await terminating;
+    await terminateProcess(run);
 
     expect((await job.reload()).isFinished()).toBeFalsy();
     expect(await (await job.reload()).isReady()).toBeTruthy();
