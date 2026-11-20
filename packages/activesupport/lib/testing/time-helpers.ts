@@ -71,10 +71,6 @@ interface TimeHelpersHost {
 /** @noRailsEquivalent CONVERGEABLE free-time-helper-calls-travel-on-the-test-case */
 const _freeReceiver: TimeHelpersHost = {};
 
-function host(self: object | void): TimeHelpersHost {
-  return (self ?? _freeReceiver) as TimeHelpersHost;
-}
-
 /** @inventedArm if — CONVERGEABLE free-time-helper-calls-travel-on-the-test-case */
 export function afterTeardown(this: object): unknown {
   travelBack.call(this);
@@ -233,18 +229,17 @@ export function freezeTime(
 
 /** @internal */
 function simpleStubs(this: object | void): SimpleStubs {
-  const self = host(this);
-  return (self._simpleStubs ??= new SimpleStubs());
+  return (((this ?? _freeReceiver) as TimeHelpersHost)._simpleStubs ??= new SimpleStubs());
 }
 
 /** @internal */
 function inBlock(this: object | void): boolean {
-  return host(this)._inBlock ?? false;
+  return ((this ?? _freeReceiver) as TimeHelpersHost)._inBlock ?? false;
 }
 
 /** @internal */
 function setInBlock(this: object | void, value: boolean): void {
-  host(this)._inBlock = value;
+  ((this ?? _freeReceiver) as TimeHelpersHost)._inBlock = value;
 }
 
 function currentTime(): globalThis.Date {
