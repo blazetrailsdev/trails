@@ -47,10 +47,7 @@ export class Supervised {
     return isPresent(this.supervisor);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   createFork(this: SupervisedHost, _block: () => Promise<void>): number {
     return rbFFork(
       new URL("./fork-entry.js", import.meta.url).pathname,
