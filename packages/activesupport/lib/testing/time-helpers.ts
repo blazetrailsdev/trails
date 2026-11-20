@@ -63,25 +63,36 @@ export class SimpleStubs {
   }
 }
 
-let _simpleStubs: SimpleStubs | undefined;
-let _inBlock = false;
+interface TimeHelpersHost {
+  _simpleStubs?: SimpleStubs;
+  _inBlock?: boolean;
+}
 
+/** @noRailsEquivalent CONVERGEABLE free-time-helper-calls-travel-on-the-test-case */
+const _freeReceiver: TimeHelpersHost = {};
+
+function host(self: object | void): TimeHelpersHost {
+  return (self ?? _freeReceiver) as TimeHelpersHost;
+}
+
+/** @inventedArm if — CONVERGEABLE free-time-helper-calls-travel-on-the-test-case */
 export function afterTeardown(this: object): unknown {
-  travelBack();
+  travelBack.call(this);
+  if (this !== _freeReceiver) travelBack.call(_freeReceiver);
   return rbCallSuper(this, afterTeardown);
 }
 
-export const TimeHelpers = { afterTeardown };
-
 export function travel(
+  this: object | void,
   duration: Duration | number,
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => unknown,
 ): unknown {
-  return travelTo(plusWithDuration.call(Time.now(), duration), { withUsec }, block);
+  return travelTo.call(this, plusWithDuration.call(Time.now(), duration), { withUsec }, block);
 }
 
 export function travelTo(
+  this: object | void,
   dateOrTime:
     | Temporal.PlainDate
     | DateTime
@@ -95,7 +106,7 @@ export function travelTo(
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => unknown,
 ): unknown {
-  if (block && inBlock()) {
+  if (block && inBlock.call(this)) {
     const travelToNestedBlockCall = `
       Calling \`travel_to\` with a block, when we have previously already made a call to \`travel_to\`, can lead to confusing time stubbing.
 
@@ -150,7 +161,7 @@ export function travelTo(
 
   now = now.getlocal();
 
-  const stubs = simpleStubs();
+  const stubs = simpleStubs.call(this);
   const stubbedTime = stubs.stubbing(Time, "now") ? Time.now() : undefined;
   stubs.stubObject(Time, "now", function (this: typeof Time) {
     return this.at(now);
@@ -183,57 +194,68 @@ export function travelTo(
   if (block) {
     return rbEnsure(
       () => {
-        setInBlock(true);
+        setInBlock.call(this, true);
         return block();
       },
       () => {
         if (stubbedTime) {
-          travelTo(stubbedTime);
+          travelTo.call(this, stubbedTime);
         } else {
-          travelBack();
+          travelBack.call(this);
         }
-        setInBlock(false);
+        setInBlock.call(this, false);
       },
     );
   }
 }
 
-export function travelBack(block?: () => void): void {
-  const stubbedTime = block && simpleStubs().isStubbed() ? currentTimeInstant() : undefined;
+export function travelBack(this: object | void, block?: () => void): void {
+  const stubbedTime =
+    block && simpleStubs.call(this).isStubbed() ? currentTimeInstant() : undefined;
 
   try {
-    simpleStubs().unstubAllBang();
+    simpleStubs.call(this).unstubAllBang();
     if (block) block();
   } finally {
-    if (stubbedTime) travelTo(stubbedTime);
+    if (stubbedTime) travelTo.call(this, stubbedTime);
   }
 }
 
 export { travelBack as unfreezeTime };
 
 export function freezeTime(
+  this: object | void,
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => void,
 ): void {
-  travelTo(currentTime(), { withUsec }, block);
+  travelTo.call(this, currentTime(), { withUsec }, block);
 }
 
 /** @internal */
-function simpleStubs(): SimpleStubs {
-  if (!_simpleStubs) _simpleStubs = new SimpleStubs();
-  return _simpleStubs;
+function simpleStubs(this: object | void): SimpleStubs {
+  const self = host(this);
+  return (self._simpleStubs ??= new SimpleStubs());
 }
 
 /** @internal */
-function inBlock(): boolean {
-  return _inBlock;
+function inBlock(this: object | void): boolean {
+  return host(this)._inBlock ?? false;
 }
 
 /** @internal */
-function setInBlock(value: boolean): void {
-  _inBlock = value;
+function setInBlock(this: object | void, value: boolean): void {
+  host(this)._inBlock = value;
 }
 
 function currentTime(): globalThis.Date {
   return new globalThis.Date(clock.now().epochMilliseconds);
 }
+
+export const TimeHelpers = {
+  afterTeardown,
+  travel,
+  travelTo,
+  travelBack,
+  unfreezeTime: travelBack,
+  freezeTime,
+};

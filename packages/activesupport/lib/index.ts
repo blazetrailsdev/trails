@@ -213,15 +213,14 @@ export { inGroupsOf, inGroups, split } from "./core-ext/array/grouping.js";
 export { extractBang } from "./core-ext/array/extract.js";
 export { toSentence } from "./core-ext/array/conversions.js";
 
+export { sum, any } from "./enumerable-utils.js";
 export {
-  sum,
   indexBy,
   indexWith,
   pluck,
   maximum,
   minimum,
   compactBlank,
-  any,
   many,
   excluding,
   including,
@@ -230,7 +229,7 @@ export {
   without,
   pick,
   sole,
-} from "./enumerable-utils.js";
+} from "./core-ext/enumerable.js";
 export { isIn, presenceIn } from "./core-ext/object/inclusion.js";
 
 export { atomicWrite } from "./core-ext/file/atomic.js";

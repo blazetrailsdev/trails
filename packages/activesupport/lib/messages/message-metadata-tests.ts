@@ -5,7 +5,7 @@ import { Encoding } from "../json/encoding.js";
 import { NullSerializer } from "../message-encryptor.js";
 import { Temporal, Time } from "@blazetrails/date";
 import { Hash, b } from "@blazetrails/ruby-compat";
-import * as TimeHelpers from "../testing/time-helpers.js";
+import { TimeHelpers } from "../testing/time-helpers.js";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { Metadata, type ExpectedMetadataOptions, type MetadataOptions } from "./metadata.js";

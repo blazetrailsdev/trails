@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { sum } from "../../lib/enumerable-utils.js";
 import {
   exclude,
   excluding,
   without,
-  sum,
   indexBy,
   indexWith,
   many,
@@ -14,7 +14,7 @@ import {
   sole,
   minimum,
   maximum,
-} from "../../lib/enumerable-utils.js";
+} from "../../lib/core-ext/enumerable.js";
 import { compactBlank as hashCompactBlank, compactBlankBang } from "../../lib/hash-utils.js";
 import {
   Complex,

@@ -74,6 +74,7 @@ describe("MessageEncryptorTest", () => {
     expect(encryptor.decryptAndVerify(message)).toEqual(data);
   });
 
+  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose"
   it.skip("backwards compat for 64 bytes key", () => {
     const secret = Buffer.from(
       "3942b1bf81e622559ed509e3ff274a780784fe9e75b065866bd270438c74da822219de3156473cc27df1fd590e4baf68c95eeb537b6e4d4c5a10f41635b5597e",

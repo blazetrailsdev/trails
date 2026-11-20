@@ -15,7 +15,7 @@ import {
   DeprecatedObjectProxy,
 } from "../lib/deprecation/proxy-wrappers.js";
 import { deprecate } from "../lib/core-ext/module/deprecation.js";
-import { sole } from "../lib/enumerable-utils.js";
+import { sole } from "../lib/core-ext/enumerable.js";
 import { VERSION } from "../lib/gem-version.js";
 import { ArgumentError } from "../lib/hash-utils.js";
 import { Logger } from "../lib/logger.js";
