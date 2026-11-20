@@ -180,7 +180,7 @@ case.
 ## Behavioral deviations from Rails
 
 Every ratified deviation is on the
-[activerecord package page](https://blazetrailsdev.github.io/trails/docs/packages/activerecord), generated from
+[activerecord package page](https://blazetrails.dev/docs/packages/activerecord), generated from
 [CLAUDE.md](CLAUDE.md) and the root `CLAUDE.md` sections this package cites.
 These are the ones people coming from Rails hit first.
 
