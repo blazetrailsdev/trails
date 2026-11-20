@@ -1,4 +1,4 @@
-import { Duration } from "@blazetrails/activesupport";
+import { Duration, withIndifferentAccess } from "@blazetrails/activesupport";
 import { Mock } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { ArgumentError, block, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -124,7 +124,11 @@ describe("ActionCable::Channel::PeriodicTimersTest", () => {
       null,
       { times: 3, returns: timer },
       async () => {
-        const channel = new ChatChannel(connection as never, "{id: 1}", { id: 1 });
+        const channel = new ChatChannel(
+          connection as never,
+          "{id: 1}",
+          withIndifferentAccess({ id: 1 }),
+        );
 
         await channel.subscribeToChannel();
         await channel.unsubscribeFromChannel();

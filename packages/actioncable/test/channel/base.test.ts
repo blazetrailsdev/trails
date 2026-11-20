@@ -1,4 +1,10 @@
-import { Logger, Notifications, type NotificationEvent } from "@blazetrails/activesupport";
+import {
+  Logger,
+  Notifications,
+  withIndifferentAccess,
+  type HashWithIndifferentAccess,
+  type NotificationEvent,
+} from "@blazetrails/activesupport";
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import {
   StandardError,
@@ -51,13 +57,13 @@ class ChatChannel extends BasicChannel {
     this.rescueFrom(SomeCustomError, { with: ":errorHandler" });
   }
 
-  constructor(connection: TestConnection, identifier: string, params: Data = {}) {
+  constructor(connection: TestConnection, identifier: string, params?: HashWithIndifferentAccess) {
     super(connection as never, identifier, params);
     this._subscribed = false;
   }
 
   override subscribed(): unknown[] {
-    this._room = new Room(this.params["id"]);
+    this._room = new Room(this.params.get("id"));
     return (this._actions = []);
   }
 
@@ -138,7 +144,7 @@ describe("ActionCable::Channel::BaseTest", () => {
   beforeEach(() => {
     user = new User("lifo");
     connection = new TestConnection(user);
-    channel = new ChatChannel(connection, "{id: 1}", { id: 1 });
+    channel = new ChatChannel(connection, "{id: 1}", withIndifferentAccess({ id: 1 }));
   });
 
   async function assertLogged(message: string, block: () => unknown): Promise<void> {
@@ -167,7 +173,7 @@ describe("ActionCable::Channel::BaseTest", () => {
   });
 
   it("channel params", () => {
-    expect(channel.params).toEqual({ id: 1 });
+    expect(channel.params).toEqual(withIndifferentAccess({ id: 1 }));
   });
 
   it("does not log filtered parameters", async () => {

@@ -209,7 +209,7 @@ async function subscribe(this: Host, params: Data = {}): Promise<StubbedSubscrip
   this._subscription = new ((this.constructor as unknown as BehaviorClass).channelClass())(
     this.connection as never,
     CHANNEL_IDENTIFIER,
-    withIndifferentAccess(params) as never,
+    withIndifferentAccess(params),
   ) as StubbedSubscription;
   include(rbObjSingletonClass(this.subscription!), ChannelStub);
   await this.subscription!.subscribeToChannel();

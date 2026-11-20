@@ -8,7 +8,9 @@ import {
   runLoadHooks,
   truncate,
   type Extended,
+  type HashWithIndifferentAccess,
   type Included,
+  withIndifferentAccess,
 } from "@blazetrails/activesupport";
 import {
   AtomicFixnum,
@@ -90,7 +92,7 @@ export class Base {
   /** @internal */
   protected static _actionMethods?: Set<string> | null;
 
-  readonly params: Data;
+  readonly params: HashWithIndifferentAccess;
   readonly connection: ChannelConnection;
   readonly identifier: string;
   /** @internal */
@@ -129,7 +131,11 @@ export class Base {
     this.clearActionMethodsBang();
   }
 
-  constructor(connection: ChannelConnection, identifier: string, params: Data = {}) {
+  constructor(
+    connection: ChannelConnection,
+    identifier: string,
+    params: HashWithIndifferentAccess = withIndifferentAccess({}),
+  ) {
     this.connection = connection;
     this.identifier = identifier;
     this.params = params;
