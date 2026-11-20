@@ -1,6 +1,6 @@
 import { expect, vi } from "vitest";
 import { isPresent, TopLevel } from "@blazetrails/activesupport";
-import { SystemExit, Timeout } from "@blazetrails/ruby-compat";
+import { SystemExit, Timeout, getProcessAdapter } from "@blazetrails/ruby-compat";
 import { Process } from "../../lib/process.js";
 import { Record as SolidQueueRecord } from "../../lib/record.js";
 import { Supervisor } from "../../lib/supervisor.js";
@@ -18,6 +18,9 @@ export function runSupervisor(options: { [key: string]: unknown } = {}, block?: 
     supervisors.push(this);
     started.mockRestore();
     return this.start();
+  });
+  vi.spyOn(getProcessAdapter(), "exit").mockImplementation((code) => {
+    throw new SystemExit(code ?? 0);
   });
   let exited = false;
   block?.();
