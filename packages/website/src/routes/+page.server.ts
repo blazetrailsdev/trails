@@ -63,7 +63,7 @@ export class TasksController extends ApplicationController {
     file: "app/views/tasks/index.html.tse",
     lang: "erb",
     title: "Views are typed templates.",
-    body: "TSE templates embed TypeScript in HTML, and the compiler checks every expression against the controller that renders them. Shared markup goes in partials, shared logic in helpers.",
+    body: "TSE (TypeScript Embedded) is trails' replacement for ERB (Embedded RuBy): the same <% %> and <%= %> tags, with TypeScript inside. The compiler checks every expression against the controller that renders them. Shared markup goes in partials, shared logic in helpers.",
     code: `<h1><%= this.project.name %></h1>
 
 <ul>
@@ -125,13 +125,14 @@ export class Check {
 const checkError =
   "app/models/check.ts(6,11): error TS2322: Type 'string | null' is not assignable to type 'number'.";
 
-const view = `<article>
+const view = `<%# TSE: TypeScript Embedded, trails' ERB. Same tags, typed. %>
+<article>
   <h1><%= this.post.title %></h1>
   <p><%= this.post.titel %></p>
 </article>`;
 
 const viewError =
-  "app/views/posts/show.html.tse(3,20): error TS2551: Property 'titel' does not exist on type 'Post'.";
+  "app/views/posts/show.html.tse(4,20): error TS2551: Property 'titel' does not exist on type 'Post'.";
 
 function withError(
   code: string,
@@ -177,7 +178,7 @@ export async function load() {
       rails: await codeToHtml(railsPost, { lang: "ruby", theme: "github-dark" }),
       trails: await codeToHtml(trailsPost, { lang: "ts", theme: "github-dark" }),
       check: await withError(check, "ts", 6, 10, 11, checkError),
-      view: await withError(view, "erb", 3, 19, 24, viewError),
+      view: await withError(view, "erb", 4, 19, 24, viewError),
     },
     blocks: await Promise.all(
       blocks.map(async ({ code, lang, ...rest }) => ({

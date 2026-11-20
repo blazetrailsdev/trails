@@ -49,8 +49,9 @@ so an action called `bulkEdit` is rendered from `bulk-edit.html.tse`.
 
 ### TSE
 
-TSE is trails' spelling of ERB: the same `<% %>` and `<%= %>` tags, with
-TypeScript inside them instead of Ruby. `<% %>` runs code; `<%= %>` runs code
+TSE (TypeScript Embedded) is trails' replacement for ERB (Embedded RuBy): the
+same `<% %>` and `<%= %>` tags, with TypeScript inside them instead of Ruby,
+checked by the compiler. `<% %>` runs code; `<%= %>` runs code
 and writes the HTML-escaped result. A trailing `-%>` drops the newline after
 the tag.
 

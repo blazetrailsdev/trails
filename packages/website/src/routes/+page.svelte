@@ -107,7 +107,7 @@
   <section class="company">
     <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
-    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby"} API</small>{/if}</a></li>{/each}</ul>
+    <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby"} API</small>{/if}</a></li>{/each}</ul>
     <p class="small"><strong>And there are more packages besides these.</strong> The gems Rails depends on are ported alongside them.</p>
   </section>
 
@@ -162,7 +162,7 @@
         <button class="copy" onclick={copy}>{copied ? "Copied" : "Copy"}</button>
       </div>
     </div>
-    <p class="small">Building interactive pages? trails ports <a href="{repo}/tree/main/packages/turbo">Turbo</a> and <a href="{repo}/tree/main/packages/stimulus">Stimulus</a>, so your app can update its pages over the wire with server-rendered HTML and little custom JavaScript.</p>
+    <p class="small">Building interactive pages? trails ports <a href="{base}/docs/packages/turbo">Turbo</a> and <a href="{base}/docs/packages/stimulus">Stimulus</a>, so your app can update its pages over the wire with server-rendered HTML and little custom JavaScript.</p>
     <p class="small">Follow along on <a href={repo}>GitHub</a>.</p>
   </section>
 
