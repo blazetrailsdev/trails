@@ -178,10 +178,10 @@ import { Migration } from "@blazetrails/activerecord";
 export class AddPriceCheck extends Migration.Current {
   async change(): Promise<void> {
     await this.reversible(async (dir) => {
-      dir.up(async () => {
+      await dir.up(async () => {
         await this.execute("ALTER TABLE products ADD CONSTRAINT price_check CHECK (price > 0)");
       });
-      dir.down(async () => {
+      await dir.down(async () => {
         await this.execute("ALTER TABLE products DROP CONSTRAINT price_check");
       });
     });

@@ -83,7 +83,10 @@ import { Base } from "@blazetrails/activerecord";
 
 class Product extends Base {}
 
-const products = await Product.find([1, "ABC98765"], [7, "ZZZ11111"]);
+const products = await Product.find([
+  [1, "ABC98765"],
+  [7, "ZZZ11111"],
+]);
 ```
 
 ### Using `where`
