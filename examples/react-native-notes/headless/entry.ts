@@ -1,7 +1,4 @@
-import "../lib/regexp-modifiers";
-import "../lib/call-site";
-import "../lib/temporal";
-import "../lib/host";
+import "../lib/hermes";
 import "@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js";
 import { Note, Notebook } from "../app/models";
 import { connect, serially } from "../lib/database";

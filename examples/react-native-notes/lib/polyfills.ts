@@ -1,4 +1,3 @@
-import "./host";
 import { getRandomValues } from "expo-crypto";
 
 const g = globalThis as { crypto?: { getRandomValues?: unknown } };

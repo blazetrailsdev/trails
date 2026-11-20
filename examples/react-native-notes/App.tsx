@@ -1,25 +1,29 @@
 import "@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js";
 import { useCallback, useEffect, useState } from "react";
 import { Button, FlatList, Pressable, SafeAreaView, Text, TextInput, View } from "react-native";
-import { Note, Notebook } from "./app/models";
+import { Notebook } from "./app/models";
 import { connect, serially } from "./lib/database";
 
+type Boot = { state: "migrating" } | { state: "ready" } | { state: "failed"; error: Error };
+
 export function App() {
-  const [ready, setReady] = useState<Error | boolean>(false);
+  const [boot, setBoot] = useState<Boot>({ state: "migrating" });
   const [notebook, setNotebook] = useState<Notebook | null>(null);
 
   useEffect(() => {
     serially(() => connect({ adapter: "expo-sqlite", database: "notes.db" })).then(
-      () => setReady(true),
-      (e: Error) => setReady(e),
+      () => setBoot({ state: "ready" }),
+      (error: Error) => setBoot({ state: "failed", error }),
     );
   }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, padding: 16 }}>
-      {ready instanceof Error ? (
-        <Text selectable>{`${ready.name}: ${ready.message}\n${ready.stack ?? ""}`}</Text>
-      ) : !ready ? (
+      {boot.state === "failed" ? (
+        <Text
+          selectable
+        >{`${boot.error.name}: ${boot.error.message}\n${boot.error.stack ?? ""}`}</Text>
+      ) : boot.state === "migrating" ? (
         <Text>Migrating…</Text>
       ) : notebook ? (
         <Notes notebook={notebook} onBack={() => setNotebook(null)} />
@@ -30,45 +34,64 @@ export function App() {
   );
 }
 
-function report(error: unknown) {
-  console.error(error);
+function useQuery<T>(query: () => Promise<T[]>) {
+  const [rows, setRows] = useState<T[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = useCallback(
+    (action?: () => Promise<unknown>) => {
+      serially(async () => {
+        if (action) await action();
+        return query();
+      }).then(
+        (result) => {
+          setRows(result);
+          setError(null);
+        },
+        (e: unknown) => setError(String(e)),
+      );
+    },
+    [query],
+  );
+  useEffect(() => run(), [run]);
+
+  return { rows, error, run };
+}
+
+function Errors({ messages }: { messages: (string | null)[] }) {
+  return messages
+    .filter((message) => message != null)
+    .map((message, i) => (
+      <Text key={i} style={{ color: "red" }}>
+        {message}
+      </Text>
+    ));
 }
 
 function Notebooks({ onOpen }: { onOpen: (n: Notebook) => void }) {
-  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
+  const { rows, error, run } = useQuery(useCallback(() => Notebook.order("name").toArray(), []));
   const [name, setName] = useState("");
-  const [errors, setErrors] = useState<(string | null)[]>([]);
+  const [invalid, setInvalid] = useState<(string | null)[]>([]);
 
-  const reload = useCallback(async () => {
-    setNotebooks(await serially(() => Notebook.order("name").toArray()));
-  }, []);
-  useEffect(() => {
-    reload().catch(report);
-  }, [reload]);
-
-  const create = async () => {
-    const notebook = new Notebook({ name });
-    if (await serially(() => notebook.save())) {
-      setName("");
-      setErrors([]);
-      await reload();
-    } else {
-      setErrors(notebook.errors.fullMessages);
-    }
-  };
+  const create = () =>
+    run(async () => {
+      const notebook = new Notebook({ name });
+      if (await notebook.save()) {
+        setName("");
+        setInvalid([]);
+      } else {
+        setInvalid(notebook.errors.fullMessages);
+      }
+    });
 
   return (
     <View style={{ flex: 1, gap: 8 }}>
       <Text style={{ fontSize: 24 }}>Notebooks</Text>
       <TextInput placeholder="New notebook" value={name} onChangeText={setName} />
-      <Button title="Create notebook" onPress={() => create().catch(report)} />
-      {errors.map((e, i) => (
-        <Text key={i} style={{ color: "red" }}>
-          {e}
-        </Text>
-      ))}
+      <Button title="Create notebook" onPress={create} />
+      <Errors messages={[...invalid, error]} />
       <FlatList
-        data={notebooks}
+        data={rows}
         keyExtractor={(n) => String(n.id)}
         renderItem={({ item }) => (
           <Pressable onPress={() => onOpen(item)}>
@@ -81,47 +104,37 @@ function Notebooks({ onOpen }: { onOpen: (n: Notebook) => void }) {
 }
 
 function Notes({ notebook, onBack }: { notebook: Notebook; onBack: () => void }) {
-  const [notes, setNotes] = useState<Note[]>([]);
+  const { rows, error, run } = useQuery(
+    useCallback(
+      () => notebook.notes.order({ pinned: "desc", created_at: "desc" }).toArray(),
+      [notebook],
+    ),
+  );
   const [title, setTitle] = useState("");
 
-  const reload = useCallback(async () => {
-    setNotes(
-      await serially(() => notebook.notes.order({ pinned: "desc", createdAt: "desc" }).toArray()),
-    );
-  }, [notebook]);
-  useEffect(() => {
-    reload().catch(report);
-  }, [reload]);
-
-  const create = async () => {
-    await serially(() => notebook.notes.createBang({ title }));
-    setTitle("");
-    await reload();
-  };
-  const togglePin = async (note: Note) => {
-    await serially(() => note.updateBang({ pinned: !note.pinned }));
-    await reload();
-  };
-  const destroyNotebook = async () => {
-    await serially(() => notebook.destroy());
-    onBack();
-  };
+  const create = () =>
+    run(async () => {
+      await notebook.notes.createBang({ title });
+      setTitle("");
+    });
+  const destroyNotebook = () =>
+    run(async () => {
+      await notebook.destroy();
+      onBack();
+    });
 
   return (
     <View style={{ flex: 1, gap: 8 }}>
       <Button title="‹ Notebooks" onPress={onBack} />
       <Text style={{ fontSize: 24 }}>{notebook.name}</Text>
       <TextInput placeholder="New note" value={title} onChangeText={setTitle} />
-      <Button
-        title="Add note"
-        onPress={() => create().catch(report)}
-        disabled={title.trim() === ""}
-      />
+      <Button title="Add note" onPress={create} disabled={title.trim() === ""} />
+      <Errors messages={[error]} />
       <FlatList
-        data={notes}
+        data={rows}
         keyExtractor={(n) => String(n.id)}
         renderItem={({ item }) => (
-          <Pressable onPress={() => togglePin(item).catch(report)}>
+          <Pressable onPress={() => run(() => item.updateBang({ pinned: !item.pinned }))}>
             <Text style={{ fontSize: 18, paddingVertical: 8 }}>
               {item.pinned ? "📌 " : ""}
               {item.title}
@@ -129,7 +142,7 @@ function Notes({ notebook, onBack }: { notebook: Notebook; onBack: () => void })
           </Pressable>
         )}
       />
-      <Button title="Delete notebook" color="red" onPress={() => destroyNotebook().catch(report)} />
+      <Button title="Delete notebook" color="red" onPress={destroyNotebook} />
     </View>
   );
 }
