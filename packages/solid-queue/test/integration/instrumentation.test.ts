@@ -469,7 +469,7 @@ describe("InstrumentationTest", () => {
 
     const events = await subscribed("enqueue_recurring_task.solid_queue", async () => {
       await scheduler.start();
-      await sleep(1.01);
+      await waitWhileWithTimeout(1.1, async () => await RecurringExecution.isNone());
       await scheduler.stop();
     });
 
@@ -524,7 +524,7 @@ describe("InstrumentationTest", () => {
 
     const events = await subscribed("enqueue_recurring_task.solid_queue", async () => {
       await scheduler.start();
-      await sleep(1.01);
+      await sleep(1.5);
       await scheduler.stop();
     });
 
@@ -554,7 +554,7 @@ describe("InstrumentationTest", () => {
 
       const events = await subscribed("enqueue_recurring_task.solid_queue", async () => {
         await scheduler.start();
-        await sleep(1.01);
+        await sleep(1.5);
         await scheduler.stop();
       });
 
