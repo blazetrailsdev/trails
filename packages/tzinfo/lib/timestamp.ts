@@ -39,7 +39,7 @@ export class Timestamp implements Comparable {
     minute = 0,
     second = 0,
     subSecond: SubSecond = 0,
-    utcOffset: UtcOffset | string = null,
+    utcOffset: UtcOffset = null,
   ): Timestamp {
     if (!rbIntegerTypeP(year)) throw new ArgumentError("year must be an Integer");
     if (!rbIntegerTypeP(month)) throw new ArgumentError("month must be an Integer");
@@ -64,7 +64,7 @@ export class Timestamp implements Comparable {
     let value = ((daysSinceEpoch * 24 + hour) * 60 + minute) * 60 + second;
     if (rbIntegerTypeP(utcOffset)) value -= utcOffset;
 
-    return new this(value, subSecond, utcOffset as UtcOffset);
+    return new this(value, subSecond, utcOffset);
   }
 
   static for(

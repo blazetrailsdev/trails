@@ -849,7 +849,7 @@ describe("TCTimestamp", () => {
   });
 
   it("create utc offset not integer or utc", () => {
-    for (const utcOffset of [rbDbl2num(1), "zero"]) {
+    for (const utcOffset of [rbDbl2num(1), "zero"] as never[]) {
       const error = assertRaises(ArgumentError, () =>
         Timestamp.create(2018, 1, 1, 0, 0, 0, 0, utcOffset),
       );
