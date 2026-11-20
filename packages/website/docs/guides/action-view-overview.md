@@ -54,7 +54,7 @@ TypeScript inside them instead of Ruby. `<% %>` runs code; `<%= %>` runs code
 and writes the HTML-escaped result. A trailing `-%>` drops the newline after
 the tag.
 
-```html
+```erb
 <h1>Articles</h1>
 <ul>
   <% for (const article of this.articles) { %>
@@ -110,8 +110,9 @@ rendered from another template and returns a fragment of HTML.
 
 ### Rendering Partials
 
-```html
-<%= render("menu") %> <%= render("shared/footer") %>
+```erb
+<%= render("menu") %>
+<%= render("shared/footer") %>
 ```
 
 The first line renders `_menu.html.tse` from the current template's directory;
@@ -122,12 +123,14 @@ the second reaches into `app/views/shared/`.
 Pull repeated markup into partials so each template reads as an outline of the
 page:
 
-```html
+```erb
 <%= render("shared/ad-banner") %>
 
 <h1>Products</h1>
 <p>Here are a few of our fine products:</p>
-<%= render({ partial: "product", collection: this.products }) %> <%= render("shared/footer") %>
+<%= render({ partial: "product", collection: this.products }) %>
+
+<%= render("shared/footer") %>
 ```
 
 ### Passing Data to Partials with `locals` Option
@@ -135,7 +138,7 @@ page:
 `locals` hands named values to a partial, where they are read as plain
 variables:
 
-```html
+```erb
 <%= render({ partial: "form", locals: { article: this.article, submitLabel: "Save" } }) %>
 ```
 
@@ -146,9 +149,10 @@ Inside `_form.html.tse`, `article` and `submitLabel` are in scope.
 A partial cannot reference a local that was not passed. `localAssigns` holds
 every local the caller supplied, so an optional one can be tested before use:
 
-```html
-<% if (localAssigns.related != null) { %> <%= render({ partial: "related", collection:
-localAssigns.related }) %> <% } %>
+```erb
+<% if (localAssigns.related != null) { %>
+<%= render({ partial: "related", collection: localAssigns.related }) %>
+<% } %>
 ```
 
 ### `render` without `partial` and `locals` Options
@@ -156,7 +160,7 @@ localAssigns.related }) %> <% } %>
 When the only options are a partial name and its locals, they can be passed
 positionally:
 
-```html
+```erb
 <%= render("form", { article: this.article }) %>
 ```
 
@@ -165,7 +169,7 @@ positionally:
 `object` passes a single value under the partial's own name, and `as` renames
 it:
 
-```html
+```erb
 <%= render({ partial: "article", object: this.featured, as: "item" }) %>
 ```
 
@@ -178,8 +182,9 @@ renders `articles/_article.html.tse` with `article` set.
 named after the partial. Passing the array alone works too, when every element
 is a model of the same class:
 
-```html
-<%= render({ partial: "product", collection: this.products }) %> <%= render(this.products) %>
+```erb
+<%= render({ partial: "product", collection: this.products }) %>
+<%= render(this.products) %>
 ```
 
 An empty collection renders `null`, so a fallback reads naturally:
@@ -189,7 +194,7 @@ An empty collection renders `null`, so a fallback reads naturally:
 
 `spacerTemplate` names a partial rendered between each pair of elements:
 
-```html
+```erb
 <%= render({ partial: "product", collection: this.products, spacerTemplate: "product-ruler" }) %>
 ```
 
@@ -200,7 +205,7 @@ and `product_iteration`, an object answering `index`, `size`, `isFirst()` and
 `isLast()`. These local names follow the partial (or `as`) name with Rails'
 `_counter` / `_iteration` suffixes.
 
-```html
+```erb
 <li class="<%= product_iteration.isFirst() ? 'first' : '' %>">
   <%= product_counter + 1 %>. <%= product.name %>
 </li>
@@ -218,7 +223,7 @@ Destructure `localAssigns` with ordinary JavaScript instead.
 A magic comment at the top of a partial declares exactly which locals it
 accepts, with optional defaults:
 
-```html
+```erb
 <%# locals: (article:, submitLabel: "Save") -%>
 <form>…<button><%= submitLabel %></button></form>
 ```
@@ -239,13 +244,13 @@ Choosing layouts from a controller is covered in the
 A partial can have a layout of its own, which is itself a partial and yields to
 the content:
 
-```html
+```erb
 <%= render({ partial: "article", locals: { article: this.article }, layout: "box" }) %>
 ```
 
 `_box.html.tse` wraps the article:
 
-```html
+```erb
 <div class="box"><%= yield %></div>
 ```
 
@@ -254,7 +259,7 @@ the content:
 The `layout` option works with `collection` too, wrapping each element's
 rendering in the layout partial:
 
-```html
+```erb
 <%= render({ partial: "article", collection: this.articles, layout: "box" }) %>
 ```
 

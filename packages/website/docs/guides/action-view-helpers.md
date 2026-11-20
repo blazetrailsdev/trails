@@ -94,7 +94,7 @@ called from templates.
 `buttonTo` renders a one-button form, the safe way to trigger a non-`GET`
 request:
 
-```html
+```erb
 <%= buttonTo("Delete", articlePath(this.article), { method: "delete" }) %>
 ```
 
@@ -103,7 +103,7 @@ request:
 `isCurrentPage` answers whether a URL or route options match the request being
 rendered:
 
-```html
+```erb
 <% if (isCurrentPage(articlesPath())) { %>
 <strong>Articles</strong>
 <% } %>
@@ -114,10 +114,11 @@ rendered:
 `linkTo` takes the link text and a destination: a path, a URL, route options or
 a record.
 
-```html
-<%= linkTo("All articles", articlesPath()) %> <%= linkTo(this.article.title, this.article) %> <%=
-linkTo(articlePath(this.article), { class: "card" }, () => { %>
-<h2><%= this.article.title %></h2>
+```erb
+<%= linkTo("All articles", articlesPath()) %>
+<%= linkTo(this.article.title, this.article) %>
+<%= linkTo(articlePath(this.article), { class: "card" }, () => { %>
+  <h2><%= this.article.title %></h2>
 <% }) %>
 ```
 
@@ -126,7 +127,7 @@ their condition fails.
 
 ### mail_to
 
-```html
+```erb
 <%= mailTo("support@example.com", "Email us", { subject: "Help" }) %>
 ```
 
@@ -137,7 +138,7 @@ their condition fails.
 `urlFor` turns route options, a record or a string into a URL, and is what the
 link helpers call underneath:
 
-```html
+```erb
 <%= urlFor({ controller: "articles", action: "index" }) %>
 ```
 
@@ -148,9 +149,9 @@ link helpers call underneath:
 `sanitize` keeps an allowlist of tags and attributes and strips the rest. It is
 the right tool for user-authored HTML you intend to display:
 
-```html
-<%= sanitize(this.comment.body) %> <%= sanitize(this.comment.body, { tags: ["strong", "em", "a"],
-attributes: ["href"] }) %>
+```erb
+<%= sanitize(this.comment.body) %>
+<%= sanitize(this.comment.body, { tags: ["strong", "em", "a"], attributes: ["href"] }) %>
 ```
 
 The allowlist sanitizer is `@blazetrails/html-sanitizer`, the port of
@@ -179,31 +180,31 @@ whose tags come from the [vite-trails package](/packages/vite-trails).
 
 ### audio_tag
 
-```html
+```erb
 <%= audioTag("sound.wav", { controls: true }) %>
 ```
 
 ### auto_discovery_link_tag
 
-```html
+```erb
 <%= autoDiscoveryLinkTag("rss", articlesUrl({ format: "rss" })) %>
 ```
 
 ### favicon_link_tag
 
-```html
+```erb
 <%= faviconLinkTag() %>
 ```
 
 ### image_tag
 
-```html
+```erb
 <%= imageTag("logo.png", { alt: "Logo", size: "120x40" }) %>
 ```
 
 ### javascript_include_tag
 
-```html
+```erb
 <%= javascriptIncludeTag("https://cdn.example.com/widget.js", { defer: true }) %>
 ```
 
@@ -212,25 +213,25 @@ whose tags come from the [vite-trails package](/packages/vite-trails).
 `pictureTag` renders a `<picture>` with one `<source>` per format and an
 `<img>` fallback.
 
-```html
+```erb
 <%= pictureTag("photo.webp", "photo.jpg", { image: { alt: "Photo" } }) %>
 ```
 
 ### preload_link_tag
 
-```html
+```erb
 <%= preloadLinkTag("fonts/inter.woff2") %>
 ```
 
 ### stylesheet_link_tag
 
-```html
+```erb
 <%= stylesheetLinkTag("print", { media: "print" }) %>
 ```
 
 ### video_tag
 
-```html
+```erb
 <%= videoTag("intro.mp4", { controls: true, poster: "intro.jpg" }) %>
 ```
 
@@ -259,8 +260,9 @@ Content-Security-Policy nonce when asked with `{ nonce: true }`.
 `tag` builds any element. Call it with a name, or use the builder form, where
 the element name is the method:
 
-```html
-<%= tag.div("Hello", { class: "greeting", data: { controller: "hello" } }) %> <%= tag.br() %>
+```erb
+<%= tag.div("Hello", { class: "greeting", data: { controller: "hello" } }) %>
+<%= tag.br() %>
 ```
 
 Attribute objects nest: `data` and `aria` keys become `data-*` and `aria-*`
@@ -284,10 +286,11 @@ tokenList("btn", { "btn-active": true, "btn-disabled": false }); // "btn btn-act
 `capture` renders part of a template into a string instead of the output, so
 it can be stored and placed later:
 
-```html
+```erb
 <% const greeting = capture(() => { %>
 <p>Welcome back, <%= this.user.name %>.</p>
-<% }) %> <%= greeting %>
+<% }) %>
+<%= greeting %>
 ```
 
 ### content_for
@@ -295,13 +298,13 @@ it can be stored and placed later:
 `contentFor` stores markup under a name, and the layout renders it with
 `yield`. A template can add to the page's `<head>` this way:
 
-```html
+```erb
 <% contentFor("head", () => { %>
 <meta name="robots" content="noindex" />
 <% }) %>
 ```
 
-```html
+```erb
 <head>
   <%= yield("head") %>
 </head>
@@ -317,8 +320,10 @@ stores a value and stops further additions to that name.
 `benchmark` times a block and writes the message and elapsed milliseconds to
 the log, at `info` level unless `level` says otherwise:
 
-```html
-<% await benchmark("Rendered sidebar", async () => { %> <%= render("sidebar") %> <% }) %>
+```erb
+<% await benchmark("Rendered sidebar", async () => { %>
+<%= render("sidebar") %>
+<% }) %>
 ```
 
 ### cache
@@ -326,8 +331,10 @@ the log, at `info` level unless `level` says otherwise:
 `cache` stores a rendered fragment in the configured cache store, keyed by its
 argument and a digest of the template, and reuses it on the next render:
 
-```html
-<% await cache(this.article, {}, async () => { %> <%= render(this.article) %> <% }) %>
+```erb
+<% await cache(this.article, {}, async () => { %>
+<%= render(this.article) %>
+<% }) %>
 ```
 
 `cacheIf` and `cacheUnless` cache conditionally. Unlike Rails, `cache` returns
@@ -344,6 +351,6 @@ a promise because reading a store may need I/O.
 `debug` renders an object as YAML inside a `<pre>` tag, a quick way to inspect
 a value while building a page:
 
-```html
+```erb
 <%= debug(this.article) %>
 ```

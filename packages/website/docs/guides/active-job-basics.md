@@ -154,11 +154,14 @@ by prefix. Within a queue, lower `priority` numbers run first.
 
 ### Threads, Processes, and Signals
 
-`bin/jobs` starts a supervisor, which forks the configured dispatchers and
-workers and restarts any that die. `threads` sets how many jobs a worker runs
-concurrently: in trails these are cooperative tasks on Node's event loop, not
-OS threads. `TERM` and `INT` ask the supervisor to finish in-flight jobs and
-stop; `QUIT` stops at once.
+`bin/jobs` starts a supervisor that runs the configured dispatchers and
+workers. Rails' Solid Queue forks each into its own process and replaces any
+that die; trails runs them in the supervisor's own process (async mode) even
+when `fork` is configured, and does not yet replace a terminated one, tracked
+by [solid-queue-fork-mode-unported-register](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0196-solid-stack/stories/solid-queue-fork-mode-unported-register.md).
+`threads` sets how many jobs a worker runs concurrently: in trails these are
+cooperative tasks on Node's event loop, not OS threads. `TERM` and `INT` ask
+the supervisor to finish in-flight jobs and stop; `QUIT` stops at once.
 
 ### Errors When Enqueuing
 
@@ -332,7 +335,7 @@ class RemoteSyncJob extends Base {
 }
 ```
 
-`wait: "polynomially_longer"` backs off on each attempt.
+`wait: ":polynomially_longer"` backs off on each attempt.
 
 ### Deserialization
 
