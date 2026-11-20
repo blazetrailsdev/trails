@@ -1,4 +1,4 @@
-import { classModule, inherited } from "@blazetrails/ruby-compat";
+import { classModule, inherited, setClassDefinedHook } from "@blazetrails/ruby-compat";
 
 export type AnyClass = abstract new (...args: never) => unknown;
 
@@ -141,5 +141,9 @@ export class DescendantsTracker {
     );
   }
 }
+
+setClassDefinedHook((superclass, klass) =>
+  registerSubclass(superclass as AnyClass, klass as AnyClass),
+);
 
 export { DescendantsTracker as default };

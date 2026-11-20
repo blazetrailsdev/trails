@@ -343,6 +343,7 @@ export {
   LOADED_FEATURES,
   LOAD_PATH,
   rbFLoad,
+  setClassDefinedHook,
   compiledFilesIn,
   isCompiledFile,
   loadedFileExports,

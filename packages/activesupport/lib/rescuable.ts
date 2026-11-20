@@ -27,16 +27,23 @@ interface RescuableClass {
 }
 
 export const ClassMethods = {
-  /** @inventedArm safeConstantize — PERMANENT */
+  /**
+   * @inventedArm safeConstantize — PERMANENT
+   * @inventedArm getOwnPropertyDescriptor — PERMANENT
+   */
   rescueFrom(
     this: Pick<RescuableClass, "rescueHandlers">,
     ...klasses: Array<
       ExceptionClass | string | { with?: ErrorHandler } | Exclude<ErrorHandler, string>
     >
   ): void {
-    const block = rbBlockGivenP(klasses[klasses.length - 1])
-      ? (klasses.pop() as Exclude<ErrorHandler, string>)
-      : undefined;
+    const last = klasses[klasses.length - 1];
+    const block =
+      rbBlockGivenP(last) ||
+      (typeof last === "function" &&
+        Object.getOwnPropertyDescriptor(last, "prototype")?.writable !== false)
+        ? (klasses.pop() as Exclude<ErrorHandler, string>)
+        : undefined;
     let { with: with_ = null } = extractOptionsBang(klasses) as {
       with?: ErrorHandler | false | null;
     };
