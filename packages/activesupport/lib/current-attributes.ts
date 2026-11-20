@@ -86,7 +86,7 @@ export class CurrentAttributes {
           batch.push((mod) =>
             Object.defineProperty(mod, name, {
               get(this: CurrentAttributes) {
-                return this.attributes[name];
+                return this.attributes[name] ?? null;
               },
               /** @missingRailsCall with — PERMANENT */
               set(this: CurrentAttributes, value: unknown) {
