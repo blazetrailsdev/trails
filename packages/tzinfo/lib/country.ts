@@ -4,6 +4,7 @@ import {
   isBetween,
   rbHash,
   rbModName,
+  StandardError,
   type Comparable,
 } from "@blazetrails/ruby-compat";
 import { DataSource } from "./data-source.js";
@@ -11,9 +12,7 @@ import type { CountryInfo } from "./data-sources/country-info.js";
 import type { CountryTimezone } from "./country-timezone.js";
 import type { Timezone } from "./timezone.js";
 
-export class InvalidCountryCode extends Error {
-  override name = "InvalidCountryCode";
-}
+export class InvalidCountryCode extends StandardError {}
 
 export class Country implements Comparable {
   static get(code: string): Country {

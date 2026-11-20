@@ -1,5 +1,6 @@
 import { expect, vi } from "vitest";
 import { DateTime, Time } from "@blazetrails/date";
+import type { Rational } from "@blazetrails/ruby-compat";
 import { Timestamp } from "../lib/index.js";
 
 export function assertEqualWithOffset(
@@ -43,4 +44,31 @@ export async function assertSubProcessReturns(
   const actualLines: string[] = [];
   await code((line) => actualLines.push(String(line)));
   expect(actualLines).toEqual(expectedLines);
+}
+
+export const TIME_SUPPORTS_DISTINCT_UTC = !Time.new(2017, 1, 1, 0, 0, 0, 0).isUtc();
+
+export class TimeLike {
+  /** @internal */
+  protected _value: number | null;
+
+  subsec: number | Rational | null;
+
+  constructor(value: number | null, subsec: number | Rational | null) {
+    this._value = value;
+    this.subsec = subsec;
+  }
+
+  toI(): number | null {
+    return this._value;
+  }
+}
+
+export class TimeLikeWithOffset extends TimeLike {
+  utcOffset: number | null;
+
+  constructor(value: number | null, subsec: number | Rational | null, utcOffset: number | null) {
+    super(value, subsec);
+    this.utcOffset = utcOffset;
+  }
 }
