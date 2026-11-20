@@ -25,7 +25,7 @@ export function setTestParallelizationThreshold(value: number): void {
 }
 
 export function cacheFormatVersion(): number {
-  return ActiveSupport.Cache.formatVersion!;
+  return ActiveSupport.Cache.formatVersion;
 }
 
 export function setCacheFormatVersion(value: number): void {
@@ -36,7 +36,7 @@ export function toTimePreservesTimezone(): boolean | string {
   return preserveTimezone();
 }
 
-export function setToTimePreservesTimezone(value: boolean | string | null): void {
+export function setToTimePreservesTimezone(value: boolean | string | null | undefined): void {
   if (value == null || value === false) {
     deprecator().warn(
       "`to_time` will always preserve the receiver timezone rather than system local time in Rails 8.1. " +
@@ -49,7 +49,7 @@ export function setToTimePreservesTimezone(value: boolean | string | null): void
     );
   }
 
-  setPreserveTimezone(value);
+  setPreserveTimezone(value ?? null);
 }
 
 Object.defineProperties(ActiveSupport, {

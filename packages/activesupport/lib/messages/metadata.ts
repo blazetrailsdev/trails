@@ -28,7 +28,7 @@ function isPresent(value: unknown): boolean {
 }
 
 export abstract class Metadata {
-  static useMessageSerializerForMetadata = false;
+  static useMessageSerializerForMetadata: boolean | null | undefined = null;
 
   static readonly ENVELOPE_SERIALIZERS: unknown[] = [...SERIALIZERS.values(), coder];
 
@@ -76,7 +76,7 @@ export abstract class Metadata {
     }
   }
 
-  protected useMessageSerializerForMetadata(): boolean {
+  protected useMessageSerializerForMetadata(): boolean | null | undefined {
     return (
       Metadata.useMessageSerializerForMetadata &&
       Metadata.ENVELOPE_SERIALIZERS.includes(this.serializer)

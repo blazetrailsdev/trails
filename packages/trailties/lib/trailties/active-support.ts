@@ -159,9 +159,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_support.to_time_preserves_timezone", (app) => {
       this.config.afterInitialize(() => {
-        ActiveSupport.setToTimePreservesTimezone(
-          app.config.activeSupport.toTimePreservesTimezone ?? null,
-        );
+        ActiveSupport.setToTimePreservesTimezone(app.config.activeSupport.toTimePreservesTimezone);
       });
     });
 
@@ -235,7 +233,7 @@ export class Trailtie extends BaseTrailtie {
     this.initializer("active_support.set_use_message_serializer_for_metadata", (app) => {
       this.config.afterInitialize(() => {
         Metadata.useMessageSerializerForMetadata =
-          app.config.activeSupport.useMessageSerializerForMetadata ?? false;
+          app.config.activeSupport.useMessageSerializerForMetadata;
       });
     });
   }

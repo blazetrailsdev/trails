@@ -149,7 +149,7 @@ export abstract class Store {
     let coder = this.options.coder as CacheCoder | null | undefined;
     delete this.options.coder;
     if (!hadCoder) {
-      const legacySerializer = ActiveSupport.Cache.formatVersion! < 7.1 && !this.options.serializer;
+      const legacySerializer = ActiveSupport.Cache.formatVersion < 7.1 && !this.options.serializer;
       let serializer = this.options.serializer as Serializer | string | undefined;
       delete this.options.serializer;
       serializer ||= this.defaultSerializer();
@@ -625,7 +625,7 @@ export abstract class Store {
       throw new ArgumentError("Cannot specify :compressor and :coder options together");
     }
 
-    if (ActiveSupport.Cache.formatVersion! < 7.1 && !options.serializer && options.compressor) {
+    if (ActiveSupport.Cache.formatVersion < 7.1 && !options.serializer && options.compressor) {
       throw new ArgumentError(
         "Cannot specify :compressor option when using" +
           " default serializer and cache format version is < 7.1",

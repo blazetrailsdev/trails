@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
+  ActiveSupport,
   CurrentAttributes,
   Deprecators,
   ExecutionContext,
@@ -77,5 +78,25 @@ describe("ActiveSupport::Railtie initialize_beginning_of_week", () => {
     };
     await runTrailtieInitializers(Trailtie, app);
     expect(beginningOfWeek()).toBe(":wednesday");
+  });
+});
+
+describe("ActiveSupport::Railtie set_configs", () => {
+  afterEach(() => {
+    ActiveSupport.Cache.formatVersion = 7.0;
+  });
+
+  it("assigns config.activeSupport through ActiveSupport's writers", async () => {
+    Trailtie.config.set("timeZone", "UTC");
+    Trailtie.config.set("beginningOfWeek", ":monday");
+    Trailtie.config.set("activeSupport", { cacheFormatVersion: 7.1 });
+    const app = {
+      config: Trailtie.config,
+      deprecators: new Deprecators(),
+      executor: class extends Executor {},
+      reloader: class extends Reloader {},
+    };
+    await runTrailtieInitializers(Trailtie, app);
+    expect(ActiveSupport.Cache.formatVersion).toBe(7.1);
   });
 });
