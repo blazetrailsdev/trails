@@ -38,23 +38,19 @@ export class SoleItemExpectedError extends StandardError {}
 
 export function minimum<T>(
   collection: Iterable<T> | Each<T>,
-  key: string | ((item: T) => unknown) | null = null,
+  key: string | ((item: T) => unknown),
 ): unknown {
   return min(
-    key === null
-      ? toA(collection)
-      : map(collection, typeof key === "function" ? key : (element: T) => rbFSend(element, key)),
+    map(collection, typeof key === "function" ? key : (element: T) => rbFSend(element, key)),
   );
 }
 
 export function maximum<T>(
   collection: Iterable<T> | Each<T>,
-  key: string | ((item: T) => unknown) | null = null,
+  key: string | ((item: T) => unknown),
 ): unknown {
   return max(
-    key === null
-      ? toA(collection)
-      : map(collection, typeof key === "function" ? key : (element: T) => rbFSend(element, key)),
+    map(collection, typeof key === "function" ? key : (element: T) => rbFSend(element, key)),
   );
 }
 
@@ -232,8 +228,7 @@ export function sole<T>(collection: Iterable<T> | Each<T>): T {
   }
 }
 
-ENUMERABLE_METHOD_TABLE.maximum = (self: Iterable<unknown>, key: string | null = null) =>
-  maximum(self, key);
+ENUMERABLE_METHOD_TABLE.maximum = (self: Iterable<unknown>, key: string) => maximum(self, key);
 
 ENUMERABLE_METHOD_TABLE.indexBy = (self: Iterable<unknown>, block?: (elem: unknown) => string) =>
   block === undefined ? indexBy(self) : indexBy(self, block);

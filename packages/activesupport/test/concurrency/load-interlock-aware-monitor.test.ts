@@ -1,25 +1,23 @@
 import { describe, it, beforeEach } from "vitest";
 import { Concurrent, Thread } from "@blazetrails/ruby-compat";
-import { ThreadLoadInterlockAwareMonitor } from "../../lib/concurrency/load-interlock-aware-monitor.js";
+import {
+  LoadInterlockAwareMonitor,
+  ThreadLoadInterlockAwareMonitor,
+} from "../../lib/concurrency/load-interlock-aware-monitor.js";
 import { Dependencies } from "../../lib/dependencies.js";
 import { assert } from "../../lib/testing/assertions.js";
 
-describe("LoadInterlockAwareMonitorTest", () => {
-  // BLOCKED: load-interlock-aware-monitor-includes-mixin
-  it.skip("entering with no blocking");
-  // BLOCKED: load-interlock-aware-monitor-includes-mixin
-  it.skip("entering with blocking");
-});
-
-describe("ThreadLoadInterlockAwareMonitorTest", () => {
-  let monitor: ThreadLoadInterlockAwareMonitor;
+function loadInterlockAwareMonitorTests(
+  build: () => LoadInterlockAwareMonitor | ThreadLoadInterlockAwareMonitor,
+): void {
+  let monitor: LoadInterlockAwareMonitor | ThreadLoadInterlockAwareMonitor;
 
   beforeEach(() => {
-    monitor = new ThreadLoadInterlockAwareMonitor();
+    monitor = build();
   });
 
   it("entering with no blocking", async () => {
-    assert(await (monitor as unknown as { monEnter(): Promise<number> }).monEnter());
+    assert(await (monitor as unknown as { monEnter(): unknown }).monEnter());
   });
 
   it("entering with blocking", async () => {
@@ -57,6 +55,14 @@ describe("ThreadLoadInterlockAwareMonitorTest", () => {
     assert(ableToUseMonitor);
     assert(ableToLoad);
   });
+}
+
+describe("LoadInterlockAwareMonitorTest", () => {
+  loadInterlockAwareMonitorTests(() => new LoadInterlockAwareMonitor());
+});
+
+describe("ThreadLoadInterlockAwareMonitorTest", () => {
+  loadInterlockAwareMonitorTests(() => new ThreadLoadInterlockAwareMonitor());
 
   // PERMANENT-SKIP: packages/activesupport/CLAUDE.md, "A thread-owned lock is owned by the Fiber (`ThreadLoadInterlockAwareMonitor`)"
   it.skip("lock owned by thread");

@@ -57,6 +57,7 @@ import { toFs, formattedOffset, xmlschema } from "../lib/core-ext/time/conversio
 import { formattedOffset as dateTimeFormattedOffset } from "../lib/core-ext/date-time/conversions.js";
 import { toTime } from "../lib/core-ext/date-time/compatibility.js";
 import { withEnvTz } from "../lib/time-zone-test-helpers.js";
+import { travelTo } from "../lib/testing/time-helpers.js";
 import { toTime as dateToTime } from "../lib/core-ext/date/conversions.js";
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -339,15 +340,12 @@ describe("TimeExtCalculationsTest", () => {
 
   it("is_past accepts Temporal.Instant with sub-millisecond precision", () => {
     const fixed = Temporal.Instant.from("2025-06-15T12:00:00.000Z");
-    const spy = vi.spyOn(Temporal.Now, "instant").mockReturnValue(fixed);
-    try {
+    travelTo(fixed, { withUsec: true }, () => {
       expect(isPast(fixed.subtract({ nanoseconds: 1 }))).toBe(true);
       expect(isPast(fixed.add({ nanoseconds: 1 }))).toBe(false);
       expect(isPast(Temporal.Instant.from("2000-01-01T00:00:00Z"))).toBe(true);
       expect(isPast(Temporal.Instant.from("2099-01-01T00:00:00Z"))).toBe(false);
-    } finally {
-      spy.mockRestore();
-    }
+    });
   });
 
   it("is_future", () => {
@@ -357,15 +355,12 @@ describe("TimeExtCalculationsTest", () => {
 
   it("is_future accepts Temporal.Instant with sub-millisecond precision", () => {
     const fixed = Temporal.Instant.from("2025-06-15T12:00:00.000Z");
-    const spy = vi.spyOn(Temporal.Now, "instant").mockReturnValue(fixed);
-    try {
+    travelTo(fixed, { withUsec: true }, () => {
       expect(isFuture(fixed.add({ nanoseconds: 1 }))).toBe(true);
       expect(isFuture(fixed.subtract({ nanoseconds: 1 }))).toBe(false);
       expect(isFuture(Temporal.Instant.from("2099-01-01T00:00:00Z"))).toBe(true);
       expect(isFuture(Temporal.Instant.from("2000-01-01T00:00:00Z"))).toBe(false);
-    } finally {
-      spy.mockRestore();
-    }
+    });
   });
 
   it("all_day", () => {

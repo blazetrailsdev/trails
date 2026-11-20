@@ -126,6 +126,25 @@ export function enter(this: object): Promise<void> | void {
 }
 
 /**
+ * `monitor_try_enter` (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:60`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#try_enter`
+ * (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:60`).
+ */
+export function tryEnter(this: object): boolean {
+  const data = monData(this);
+  const owner = currentOwner(data);
+  const entry = data.entries.find((entry) => entry.owner === owner);
+  if (entry) {
+    entry.count += 1;
+    return true;
+  }
+  if (data.entries.length > 0 || data.waiters.length > 0) return false;
+  data.entries.push({ owner, count: 1, thread: Thread.current() });
+  return true;
+}
+
+/**
  * `monitor_exit` (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:98`), after
  * `monitor_check_owner` (`:88`).
  *
@@ -192,11 +211,30 @@ export interface MonitorMixin {
  * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:256`).
  */
 export class Monitor implements MonitorMixin {
-  enter = enter;
-  exit = exit;
-  isMonOwned = isMonOwned;
-  synchronize = synchronize;
+  declare tryEnter: typeof tryEnter;
+  declare enter: typeof enter;
+  declare exit: typeof exit;
+  declare isMonOwned: typeof isMonOwned;
+  declare synchronize: typeof synchronize;
+  declare tryMonEnter: typeof tryEnter;
+  declare monTryEnter: typeof tryEnter;
+  declare monEnter: typeof enter;
+  declare monExit: typeof exit;
+  declare monSynchronize: typeof synchronize;
 }
+
+Object.assign(Monitor.prototype, {
+  tryEnter,
+  enter,
+  exit,
+  isMonOwned,
+  synchronize,
+  tryMonEnter: tryEnter,
+  monTryEnter: tryEnter,
+  monEnter: enter,
+  monExit: exit,
+  monSynchronize: synchronize,
+});
 
 /**
  * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin::ConditionVariable`
