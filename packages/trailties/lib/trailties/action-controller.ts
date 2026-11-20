@@ -65,7 +65,7 @@ export class Trailtie extends BaseTrailtie {
     );
 
     this.initializer("action_controller.assets_config", { group: "all" }, async (app) => {
-      app.config.actionController.assetsDir ??= await app.config.paths().get("public")!.first();
+      app.config.actionController.assetsDir ??= app.config.paths().get("public")!.first();
     });
 
     this.initializer("action_controller.set_helpers_path", async (app) => {
@@ -99,8 +99,8 @@ export class Trailtie extends BaseTrailtie {
       options.logger ??= TopLevel.Trails!.logger;
       options.cacheStore ??= TopLevel.Trails!.cache;
 
-      options.javascriptsDir ??= await paths.get("public/javascripts")!.first();
-      options.stylesheetsDir ??= await paths.get("public/stylesheets")!.first();
+      options.javascriptsDir ??= paths.get("public/javascripts")!.first();
+      options.stylesheetsDir ??= paths.get("public/stylesheets")!.first();
 
       options.assetHost ??= app.config.assetHost;
       options.relativeUrlRoot ??= app.config.relativeUrlRoot;

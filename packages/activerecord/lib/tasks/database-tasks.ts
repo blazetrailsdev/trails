@@ -65,9 +65,8 @@ export class DatabaseTasks {
 
   private static _dbDir: string | null = null;
 
-  /** @missingRailsCall first — CONVERGEABLE paths-path-expanded-is-async-over-a-sync-dir-glob */
   static get dbDir(): string {
-    return (this._dbDir ??= TopLevel.Trails!.application!.config.paths().get("db")!.firstSync()!);
+    return (this._dbDir ??= TopLevel.Trails!.application!.config.paths().get("db")!.first()!);
   }
 
   static set dbDir(value: string) {

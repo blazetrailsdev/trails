@@ -80,12 +80,12 @@ export class EngineConfiguration extends RailtieConfiguration {
   }
 
   async allAutoloadPaths(): Promise<string[]> {
-    return [...this.autoloadPaths, ...(await this.paths().autoloadPaths())];
+    return [...this.autoloadPaths, ...this.paths().autoloadPaths()];
   }
   async allAutoloadOncePaths(): Promise<string[]> {
-    return [...this.autoloadOncePaths, ...(await this.paths().autoloadOnce())];
+    return [...this.autoloadOncePaths, ...this.paths().autoloadOnce()];
   }
   async allEagerLoadPaths(): Promise<string[]> {
-    return [...this.eagerLoadPaths, ...(await this.paths().eagerLoad())];
+    return [...this.eagerLoadPaths, ...this.paths().eagerLoad()];
   }
 }

@@ -101,7 +101,10 @@ function assertFile(
   return Assertions.assertFile.call({ destinationRoot: root }, relative, ...contents);
 }
 
-function assertInitializer(name: string, ...contents: Array<string | RegExp>) {
+function assertInitializer(
+  name: string,
+  ...contents: Array<string | RegExp | ((read: string) => unknown)>
+) {
   return Assertions.assertInitializer.call({ destinationRoot: root }, name, ...contents);
 }
 
@@ -193,6 +196,21 @@ describe("ActionsTest", () => {
     await assertFile("vendor/vendor-file.ts", "// vendor data\n");
   });
 
+  it("vendor should write data to file with block in vendor", async () => {
+    const code =
+      '      console.log("one");\n      console.log("two");\n      console.log("three");\n';
+    await makeGen().vendor("vendor-file.ts", null, () => code);
+    await assertFile(
+      "vendor/vendor-file.ts",
+      'console.log("one");\nconsole.log("two");\nconsole.log("three");\n',
+    );
+  });
+
+  it("lib should write data to file in lib", async () => {
+    await makeGen().lib("my-library.ts", "export class MyLibrary");
+    await assertFile("lib/my-library.ts", "export class MyLibrary\n");
+  });
+
   it("lib should write data to file with block in lib", async () => {
     const code = "      export class MyLib {\n        static MY_CONSTANT = 123;\n      }\n";
     await makeGen().lib("my-library.ts", null, () => code);
@@ -207,6 +225,24 @@ describe("ActionsTest", () => {
   it("initializer should write date to file in config initializers", async () => {
     await makeGen().initializer("constants.ts", "export const MY_CONSTANT = 42;");
     await assertInitializer("constants.ts", "export const MY_CONSTANT = 42;\n");
+  });
+
+  it("rakefile should write date to file with block in lib tasks", async () => {
+    const code =
+      '      task("rock", ["environment"], () => {\n        console.log("Rockin\'");\n      });\n';
+    await makeGen().rakefile("myapp.ts", null, () => code);
+    await assertFile(
+      "lib/tasks/myapp.ts",
+      'task("rock", ["environment"], () => {\n  console.log("Rockin\'");\n});\n',
+    );
+  });
+
+  it("initializer should write date to file with block in config initializers", async () => {
+    const code = "      MyLib.configure((config) => {\n        config.value = 123;\n      });\n";
+    await makeGen().initializer("constants.ts", null, () => code);
+    await assertInitializer("constants.ts", (content: string) => {
+      assertEqual(content, "MyLib.configure((config) => {\n  config.value = 123;\n});\n");
+    });
   });
 
   it("rake should run rake with the default environment", async () => {

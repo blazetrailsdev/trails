@@ -740,7 +740,7 @@ DSL.namespace("railties", () => {
           let path: string | undefined;
           if (
             rbObjRespondTo(railtie, "paths") &&
-            (path = await railtie.paths!().get("db/migrate")!.first()) != null
+            (path = railtie.paths!().get("db/migrate")!.first()) != null
           ) {
             railties[railtie.railtieName] = path;
           }

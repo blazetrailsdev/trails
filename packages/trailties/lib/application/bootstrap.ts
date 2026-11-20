@@ -32,7 +32,7 @@ export interface BootstrapConfig {
   logFileSize?: number | null;
   broadcastLogLevel?: LogLevel | number | string | null;
   defaultLogFile(): Promise<LoggerOutput>;
-  paths(): { get(path: string): { first(): Promise<string | undefined> } | undefined };
+  paths(): { get(path: string): { first(): string | undefined } | undefined };
   cacheStore?: unknown;
   activeSupport: { cacheFormatVersion?: number };
   middleware?: { insertBefore(...args: unknown[]): void };
@@ -65,7 +65,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
         return logger;
       } catch (error) {
         if (!(error instanceof StandardError)) throw error;
-        const path = await this.config.paths().get("log")!.first();
+        const path = this.config.paths().get("log")!.first();
         const logger = TaggedLogging.new(new Logger(STDERR));
         logger.level = Logger.WARN;
         logger.warn(

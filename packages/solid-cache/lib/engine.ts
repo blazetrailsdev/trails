@@ -45,7 +45,7 @@ export class Engine extends TrailsEngine {
 
         let configPathname: Pathname | undefined;
         for (const path of configPaths) {
-          const pathname = new Pathname((await app.config.paths().get(path)!.first())!);
+          const pathname = new Pathname(app.config.paths().get(path)!.first()!);
           if (await File.isExistAsync(pathname.toString())) {
             configPathname = pathname;
             break;

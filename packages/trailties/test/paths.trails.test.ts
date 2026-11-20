@@ -21,7 +21,7 @@ describe("Paths remaining surface", () => {
     expect(path.toAry()).toEqual(["vendor", "app", "lib"]);
     expect(path.extensions()).toEqual(["rb", "ts"]);
     expect(path.absoluteCurrent()).toBe("/trails/app");
-    expect(await path.last()).toBe("/trails/lib");
+    expect(path.last()).toBe("/trails/lib");
     expect(root.keys()).toEqual(["app"]);
     expect(root.valuesAt("app")).toEqual(root.values());
   });

@@ -589,7 +589,7 @@ export class Configuration extends EngineConfiguration {
   /** @missingRailsCall parse — CONVERGEABLE database-configuration-reads-config-database-yml */
   async databaseConfiguration(): Promise<DatabaseConfigModule> {
     try {
-      const path = (await this.paths().get("config/database")!.existent())[0];
+      const path = this.paths().get("config/database")!.existent()[0];
       const yaml = path;
 
       let config: DatabaseConfigModule;
@@ -643,7 +643,7 @@ export class Configuration extends EngineConfiguration {
   /** @missingRailsCall parse — PERMANENT */
   async loadDatabaseYaml(): Promise<Record<string, unknown>> {
     let path: string | undefined;
-    if ((path = (await this.paths().get("config/database")!.existent())[0]) !== undefined) {
+    if ((path = this.paths().get("config/database")!.existent()[0]) !== undefined) {
       const originalRailsConfig = Trails.application!.config;
 
       try {
@@ -663,7 +663,7 @@ export class Configuration extends EngineConfiguration {
   }
 
   async defaultLogFile(): Promise<File> {
-    const path = (await this.paths().get("log")!.first())!;
+    const path = this.paths().get("log")!.first()!;
     if (!File.isExist(File.dirname(path))) {
       await FileUtils.mkdirPAsync(File.dirname(path));
     }

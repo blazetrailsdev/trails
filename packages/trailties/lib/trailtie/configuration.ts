@@ -1,5 +1,5 @@
 import { onLoad } from "@blazetrails/activesupport";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, NoMethodError } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import type { Application } from "../application.js";
 import { Generators, MiddlewareStackProxy } from "../configuration.js";
@@ -109,24 +109,19 @@ export class Configuration {
     this.methodMissing(`${key}=`, value);
   }
 
-  isRespondTo(key: string): boolean {
-    if (!key.startsWith("_")) {
-      if (Object.hasOwn(this, key)) return true;
-      for (let proto = Object.getPrototypeOf(this); proto; proto = Object.getPrototypeOf(proto)) {
-        if (Object.hasOwn(proto, key)) return true;
-      }
-    }
-    return Object.hasOwn(Configuration._options, key);
+  isRespondTo(name: string, includePrivate = false): boolean {
+    return basicObjRespondTo(this, name) || Object.hasOwn(Configuration._options, name);
   }
 
-  private _actualMethod(key: string): boolean {
+  /** @internal */
+  private isActualMethod(key: string): boolean {
     return !Object.hasOwn(Configuration._options, key) && this.isRespondTo(key);
   }
 
   methodMissing(name: string, ...args: unknown[]): unknown {
     if (name.endsWith("=")) {
       const key = name.slice(0, -1);
-      if (this._actualMethod(key)) {
+      if (this.isActualMethod(key)) {
         throw new NoMethodError(`Cannot assign to \`${key}\`, it is a configuration method`);
       }
       return (Configuration._options[key] = args[0]);

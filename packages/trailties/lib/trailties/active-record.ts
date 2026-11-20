@@ -173,10 +173,10 @@ export class Trailtie extends BaseTrailtie {
             let engine: Engine | undefined;
             if (ENGINE_ROOT !== undefined && (engine = await Engine.find(ENGINE_ROOT))) {
               const paths = engine.paths().get("db/migrate")!;
-              if (await paths.existent()) {
+              if (paths.existent()) {
                 ActiveRecord.DatabaseTasks.migrationsPaths = [
                   ...(await ActiveRecord.DatabaseTasks.migrationsPaths),
-                  ...(await paths.toA()),
+                  ...paths.toA(),
                 ];
               }
             }

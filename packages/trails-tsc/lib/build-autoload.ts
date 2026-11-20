@@ -16,9 +16,7 @@ interface BootLoader {
 interface BootPaths {
   get(
     path: string,
-  ):
-    | { toAry(): string[]; extensions(): string[] | undefined; existent(): Promise<string[]> }
-    | undefined;
+  ): { toAry(): string[]; extensions(): string[] | undefined; existent(): string[] } | undefined;
 }
 
 interface BootEngine {
@@ -357,25 +355,25 @@ async function writeBoot(
       const node = engine.paths!().get(key);
       if (node === undefined) continue;
       if (key === "config") {
-        for (const dir of await node.existent()) {
+        for (const dir of node.existent()) {
           if (await File.isDirectoryAsync(dir)) await configFiles(dir, files);
         }
         continue;
       }
       if (key === "app/views") {
-        for (const dir of await node.existent()) {
+        for (const dir of node.existent()) {
           if (await File.isDirectoryAsync(dir)) await viewEntries(trailsDir, root, dir, views);
         }
         continue;
       }
       if (key === "app/helpers") {
-        for (const dir of await node.existent()) {
+        for (const dir of node.existent()) {
           if (await File.isDirectoryAsync(dir)) await helperFiles(dir, files);
         }
         continue;
       }
       if (key !== "config/environments") {
-        for (const file of await node.existent()) {
+        for (const file of node.existent()) {
           files.add(file);
           if (LOADED_PATHS.has(key) && !(await File.isDirectoryAsync(file))) loaded.add(file);
         }

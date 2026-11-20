@@ -388,12 +388,12 @@ export class Application extends Engine {
   async ensureGeneratorTemplatesAdded(): Promise<void> {
     const configuredPaths = this.config.generators().templates;
     const libTemplates = this.paths().get("lib/templates");
-    const existent = libTemplates ? await libTemplates.existent() : [];
+    const existent = libTemplates ? libTemplates.existent() : [];
     configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));
   }
 
   async requireEnvironmentBang(): Promise<void> {
-    const environment = (await (await this.paths()).get("config/environment")!.existent())[0];
+    const environment = this.paths().get("config/environment")!.existent()[0];
     if (environment) await rbFRequireFile(environment);
   }
 
@@ -518,7 +518,7 @@ export class Application extends Engine {
     name: string | Pathname,
     { env = Trails.env.toString() }: { env?: string } = {},
   ): Promise<unknown> {
-    const configDir = ((await this.paths().get("config")?.existent()) ?? [])[0];
+    const configDir = (this.paths().get("config")?.existent() ?? [])[0];
     const yaml = name instanceof Pathname ? name : new Pathname(`${configDir}/${name}`);
     let ext: string | undefined;
     for (const e of name instanceof Pathname ? [""] : [".ts", ".js"]) {

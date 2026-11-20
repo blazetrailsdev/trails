@@ -212,7 +212,7 @@ describe("Trails", () => {
     class PubApp extends Application {}
     Application.register(PubApp);
     const app = PubApp.instance();
-    const stubPath = { expanded: async () => ["/srv/app/public", "/srv/app/public-alt"] };
+    const stubPath = { expanded: () => ["/srv/app/public", "/srv/app/public-alt"] };
     app.paths = () =>
       ({ get: (k: string) => (k === "public" ? stubPath : undefined) }) as unknown as ReturnType<
         typeof app.paths
