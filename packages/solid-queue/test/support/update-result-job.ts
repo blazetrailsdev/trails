@@ -1,7 +1,8 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationJob } from "./application-job.js";
-import { sleep } from "./processes-test-helper.js";
 import type { JobResult } from "./job-result.js";
+
+const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
 export class UpdateResultJob extends ApplicationJob {
   async perform(

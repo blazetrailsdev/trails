@@ -21,6 +21,7 @@ import { Signals } from "./supervisor/signals.js";
 interface Supervisee {
   name: string;
   mode: unknown;
+  _configuredProcess?: ConfiguredProcess;
   _thread?: { kill(): unknown; toKill: boolean };
   isAlive(): boolean | null;
   isBootTimedOut(): boolean;
@@ -160,8 +161,8 @@ export class Supervisor extends Base {
   protected async startProcess(configuredProcess: ConfiguredProcess): Promise<void> {
     const processInstance = configuredProcess.instantiate() as Supervisee;
     processInstance.supervisedBy(this.process);
-    /** @inventedArm isFork — CONVERGEABLE solid-queue-fork-mode-unported-register */
-    processInstance.mode = this.mode().isFork() ? "async" : this.mode();
+    processInstance.mode = this.mode();
+    processInstance._configuredProcess = configuredProcess;
 
     const processId = String(await processInstance.start());
 

@@ -1,16 +1,21 @@
-import { included, isPresent } from "@blazetrails/activesupport";
+import { TopLevel, included, isPresent } from "@blazetrails/activesupport";
 import {
   Process,
+  type PipeIO,
   Thread,
   classModule,
   exitBang,
   onSignal,
+  rbFFork,
   rbModAttrReader,
 } from "@blazetrails/ruby-compat";
 
 interface SupervisedHost {
-  _supervisor: { pid: number } | null;
-  supervisor: { pid: number } | null;
+  name: string;
+  _supervisor: { id?: unknown; pid: number } | null;
+  supervisor: { id?: unknown; pid: number } | null;
+  _bootGuard: object;
+  _configuredProcess?: { kind: string; attributes: unknown };
   stop(): unknown;
   procline(string: string): void;
   isSupervised(): boolean;
@@ -40,6 +45,23 @@ export class Supervised {
   /** @internal */
   isSupervised(this: SupervisedHost): boolean {
     return isPresent(this.supervisor);
+  }
+
+  /** @internal */
+  createFork(this: SupervisedHost, _block: () => Promise<void>): number {
+    return rbFFork(
+      new URL("./fork-entry.js", import.meta.url).pathname,
+      {
+        boot: `${TopLevel.Trails!.root()}/config/environment.ts`,
+        configuredProcess: {
+          kind: this._configuredProcess!.kind,
+          attributes: this._configuredProcess!.attributes,
+        },
+        name: this.name,
+        supervisorId: this.supervisor!.id,
+      },
+      [(this._bootGuard as unknown as { _writer: PipeIO })._writer],
+    );
   }
 
   /** @internal */

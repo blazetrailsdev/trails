@@ -1,5 +1,5 @@
 import { Concern, extend } from "@blazetrails/activesupport";
-import { Thread, classModule, onSignal } from "@blazetrails/ruby-compat";
+import { Errno, Process, Thread, classModule, onSignal } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import type { ClassMethods as CallbacksClassMethods } from "../processes/callbacks.js";
 
@@ -79,17 +79,13 @@ export class Signals {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs kill — PERMANENT
-   * @inventedArm if — CONVERGEABLE solid-queue-fork-mode-unported-register
-   */
+  /** @internal */
   signalProcess(this: SignalsHost, pid: string, signal: Signal): void {
-    const supervisee = this.processInstances[pid];
-    if (supervisee == null) return;
-
-    if (signal === "QUIT" || signal === "KILL") supervisee._thread?.kill();
-    else supervisee.stop().catch((error: unknown) => this.handleThreadError(error));
+    try {
+      Process.kill(signal, Number(pid));
+    } catch (error) {
+      if (!(error instanceof Errno.ESRCH)) throw error;
+    }
   }
 
   /** @internal */

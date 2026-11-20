@@ -393,6 +393,7 @@ export { Complex, complex } from "./complex.js";
 export { NotImplementedError } from "./not-implemented-error.js";
 export { Open3 } from "./open3.js";
 export { Process } from "./process.js";
+export { rbFFork, rbForkPayload, rbForkedPipe } from "./kernel-fork.js";
 export {
   ARGV,
   SystemExit,
@@ -414,6 +415,7 @@ export {
   isRubyTzUptodate,
   registerProcessAdapter,
   setEnv,
+  signo2signm,
   setExitCode,
   setSourceMapsSupport,
   stderr,
