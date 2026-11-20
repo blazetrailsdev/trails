@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "trails notes",
+    "slug": "trails-react-native-notes",
+    "version": "0.0.0",
+    "platforms": ["ios", "android"],
+    "plugins": ["expo-sqlite"]
+  }
+}

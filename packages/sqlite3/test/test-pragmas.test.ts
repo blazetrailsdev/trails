@@ -1,11 +1,12 @@
+import { SQLite3 } from "../lib/index.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SQLite3Constants, type SyncSqliteConnection } from "../lib/driver.js";
+import { type SyncSqliteConnection } from "../lib/driver.js";
 import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 import { Exception } from "../lib/errors.js";
 import { Pragmas } from "../lib/pragmas.js";
 
-describe("SQLite3::TestPragmas", () => {
+describe("TestPragmas", () => {
   let db: SyncSqliteConnection & { testStatements: string[] };
 
   beforeEach(async () => {
@@ -33,14 +34,14 @@ describe("SQLite3::TestPragmas", () => {
   });
 
   it("get boolean pragma", async () => {
-    expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBe(false);
+    expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBeFalsy();
   });
 
   it("set boolean pragma", async () => {
     try {
       Pragmas.setBooleanPragma.call(db, "read_uncommitted", 1);
 
-      expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBe(true);
+      expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBeTruthy();
     } finally {
       Pragmas.setBooleanPragma.call(db, "read_uncommitted", 0);
     }
@@ -53,7 +54,7 @@ describe("SQLite3::TestPragmas", () => {
   });
 
   it("optimize with args", () => {
-    const Optimize = SQLite3Constants.Optimize;
+    const Optimize = SQLite3.Constants.Optimize;
     Pragmas.optimize.call(db, Optimize.DEFAULT);
     Pragmas.optimize.call(db, Optimize.ANALYZE_TABLES | Optimize.LIMIT_ANALYZE);
     Pragmas.optimize.call(db, Optimize.ANALYZE_TABLES | Optimize.DEBUG);

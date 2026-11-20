@@ -288,21 +288,6 @@
     "reason": "The four Marshal cases inside TestSH load Marshal payloads emitted by Ruby 1.4/1.6/1.8/1.9.2 to check the dumped Date representation stays loadable. Ruby-only wire format, same as test_date_marshal.rb above; the rest of the file stays counted."
   },
   {
-    "pattern": "core_ext/kernel/singleton_class.rb",
-    "package": "activesupport",
-    "reason": "CONVERGEABLE activesupport-port-kernel-singleton-class"
-  },
-  {
-    "pattern": "core_ext/pathname/existence.rb",
-    "package": "activesupport",
-    "reason": "CONVERGEABLE activesupport-port-pathname-existence"
-  },
-  {
-    "pattern": "core_ext/regexp.rb",
-    "package": "activesupport",
-    "reason": "CONVERGEABLE activesupport-port-core-ext-regexp"
-  },
-  {
     "testFile": "verifier_test.rb",
     "className": "VerifierTest",
     "tests": ["generates URL-safe messages"],

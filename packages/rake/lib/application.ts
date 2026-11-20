@@ -200,10 +200,7 @@ export class Application {
     await t.invoke(...args);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall gsub — PERMANENT
-   */
+  /** @internal */
   parseTaskString(string: string): [string, string[]] {
     const m = /^([^[]+)(?:\[(.*)\])$/m.exec(String(string));
 

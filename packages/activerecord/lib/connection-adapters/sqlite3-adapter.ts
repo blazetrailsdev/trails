@@ -1,9 +1,9 @@
+import { SQLite3 } from "@blazetrails/sqlite3";
 import "../constants.sqlite3-adapter.generated.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { sortByBang, anybits, fetch, rbRegMatchP, rbObjAsString } from "@blazetrails/ruby-compat";
 import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
-import { SQLite3Constants } from "../sqlite-adapter.js";
 import { Pragmas } from "@blazetrails/sqlite3";
 import { retryBusy, setBusyHandlerTimeout } from "@blazetrails/sqlite3";
 import { BusyException } from "@blazetrails/sqlite3";
@@ -116,6 +116,8 @@ import {
 } from "./abstract/schema-definitions.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { databaseCli } from "../active-record.js";
+
+SQLite3.ForkSafety.suppressWarningsBang();
 
 function isStructuredDefault(value: unknown): boolean {
   if (Array.isArray(value)) return true;
@@ -691,7 +693,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @missingRailsName config — PERMANENT */
   isSharedCache(): boolean {
-    return anybits(fetch(this._config, "flags", 0), SQLite3Constants.Open.SHAREDCACHE);
+    return anybits(fetch(this._config, "flags", 0), SQLite3.Constants.Open.SHAREDCACHE);
   }
 
   override async getDatabaseVersion(): Promise<Version> {

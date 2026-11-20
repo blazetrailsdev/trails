@@ -1,4 +1,5 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite3-node-sqlite-engine MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
+import { SQLite3 } from "./namespaces.js";
+import "./constants.js";
 import { createRequire } from "node:module";
 import { File, LoadError } from "@blazetrails/ruby-compat";
 import {
@@ -10,7 +11,6 @@ import {
   type SqliteDriver,
   type SqliteDriverCapabilities,
   type SqliteOpenConfig,
-  SQLite3Constants,
   type SqliteStatement,
   type SyncSqliteConnection,
   type SyncSqliteStatement,
@@ -268,7 +268,7 @@ function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseS
 }
 
 function sharedCacheDatabase(config: SqliteOpenConfig): string {
-  if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) === 0) return config.database;
+  if (((config.flags ?? 0) & SQLite3.Constants.Open.SHAREDCACHE) === 0) return config.database;
   if (config.database.startsWith("file:")) {
     const hash = config.database.indexOf("#");
     const body = hash === -1 ? config.database : config.database.slice(0, hash);

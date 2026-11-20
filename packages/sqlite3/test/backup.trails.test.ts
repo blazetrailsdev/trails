@@ -1,6 +1,6 @@
+import { SQLite3 } from "../lib/index.js";
 import { it, expect } from "vitest";
 import { File, getOs } from "@blazetrails/ruby-compat";
-import { SQLite3Constants } from "../lib/driver.js";
 import { Backup } from "../lib/backup.js";
 import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 
@@ -17,7 +17,7 @@ it("SQLite3::Backup backup all", async () => {
   );
   await ddb.pragma("foreign_keys = ON");
   const b = new Backup(ddb, "main", sdb, "main");
-  expect(await b.step(-1)).toBe(SQLite3Constants.ErrorCode.DONE);
+  expect(await b.step(-1)).toBe(SQLite3.Constants.ErrorCode.DONE);
   b.finish();
   expect(await ddb.execute("SELECT * FROM foo")).toHaveLength(2);
   expect(await ddb.getFirstValue("SELECT foo_id FROM bar")).toBe(2);

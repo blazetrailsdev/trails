@@ -8909,6 +8909,16 @@ function nativeValueForms(n: ts.Node): string[] {
     case "trim":
     case "trimEnd":
       return args.length === 0 ? [method] : [];
+    case "replaceAll":
+      return args.length === 2 && checkerProvenKind(n.expression.expression) === "sized"
+        ? ["gsub"]
+        : [];
+    case "replace": {
+      if (args.length !== 2 || checkerProvenKind(n.expression.expression) !== "sized") return [];
+      if (ts.isStringLiteralLike(first)) return ["sub"];
+      if (!ts.isRegularExpressionLiteral(first)) return ["sub", "gsub"];
+      return /\/[a-z]*g[a-z]*$/.test(first.text) ? ["gsub"] : ["sub"];
+    }
     case "filter": {
       const [param] = callbackParams(first) ?? [];
       if (param === undefined || !isNotNullTest(callbackResult(first), param)) return [];

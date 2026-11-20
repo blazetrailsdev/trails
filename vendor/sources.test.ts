@@ -530,6 +530,7 @@ describe("vendor/sources.ts", () => {
         "solid-cable",
         "solid-cache",
         "solid-queue",
+        "sqlite3",
         "stimulus-rails",
         "thor",
         "trailties",
