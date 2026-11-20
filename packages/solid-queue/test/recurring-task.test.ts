@@ -27,7 +27,7 @@ import { ApplicationJob } from "./support/application-job.js";
 import { JobBuffer } from "./support/add-to-buffer-job.js";
 import { ErrorBuffer } from "./support/error-buffer.js";
 import { loadAppSchema } from "./support/queue-schema.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 class JobWithoutArguments extends ApplicationJob {
   perform(): void {
@@ -126,8 +126,6 @@ describe("SolidQueue::RecurringTaskTest", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    JobBuffer.values.length = 0;
-    await destroyRecords();
   });
 
   afterAll(() => {

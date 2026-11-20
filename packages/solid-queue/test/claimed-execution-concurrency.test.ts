@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
 import {
   permanentConnectionCheckout,
@@ -34,7 +34,7 @@ import { ApplicationJob } from "./support/application-job.js";
 import { JobResult } from "./support/job-result.js";
 import { NonOverlappingUpdateResultJob } from "./support/non-overlapping-update-result-job.js";
 import { loadAppSchema } from "./support/queue-schema.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 class ClaimedExecutionConcurrencyTest extends TestCase {
   static {
@@ -63,15 +63,7 @@ describe("SolidQueue::ClaimedExecutionConcurrencyTest", () => {
   });
 
   beforeEach(async () => {
-    await destroyRecords();
-  });
-
-  beforeEach(async () => {
     process = await Process.register({ kind: "Worker", pid: 42, name: "worker-123" });
-  });
-
-  afterEach(async () => {
-    await destroyRecords();
   });
 
   it("a stale performer that loses the claim lock to pruning does not finish or re-promote a pruned job", async (ctx) => {

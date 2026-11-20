@@ -31,7 +31,7 @@ import {
   assertNotDeprecated,
 } from "@blazetrails/activesupport/testing/deprecation";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 function assertCalledAtLeast(
   spy: { mock: { calls: unknown[][] } },
@@ -62,10 +62,6 @@ describe("DispatcherTest", () => {
     setPermanentConnectionCheckout(true);
   });
 
-  beforeEach(async () => {
-    await destroyRecords();
-  });
-
   beforeEach(() => {
     dispatcher = new Dispatcher({ pollingInterval: 0.1, batchSize: 10 });
   });
@@ -73,7 +69,6 @@ describe("DispatcherTest", () => {
   afterEach(async () => {
     await dispatcher.stop();
     vi.restoreAllMocks();
-    await destroyRecords();
   });
 
   afterAll(() => {

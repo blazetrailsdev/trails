@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import { Batch, BatchExecution, Job, SolidQueueAdapter } from "../lib/index.js";
 import type {} from "../lib/active-job/batch-id.js";
 import { ApplicationJob } from "./support/application-job.js";

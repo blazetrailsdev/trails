@@ -19,7 +19,7 @@ import { ApplicationJob } from "./support/application-job.js";
 import { StoreResultJob } from "./support/job-result.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import { waitForRegisteredProcesses } from "./support/processes-test-helper.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 describe("SolidQueue::ProcessTest", () => {
   beforeAll(async () => {
@@ -30,7 +30,6 @@ describe("SolidQueue::ProcessTest", () => {
   afterEach(async () => {
     travelBack();
     vi.restoreAllMocks();
-    await destroyRecords();
   });
 
   async function enqueueThreeOnNewQueue(): Promise<Job[]> {

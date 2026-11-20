@@ -20,7 +20,7 @@ import { loadAppSchema } from "./support/queue-schema.js";
 import { ThrottledUpdateResultJob } from "./support/throttled-update-result-job.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 import { Pause } from "../lib/pause.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 describe("SolidQueue::ReadyExecutionTest", () => {
   let jobs: Relation<Job>;
@@ -44,7 +44,6 @@ describe("SolidQueue::ReadyExecutionTest", () => {
   });
 
   afterEach(async () => {
-    await destroyRecords();
     await Pause.deleteAll();
   });
 

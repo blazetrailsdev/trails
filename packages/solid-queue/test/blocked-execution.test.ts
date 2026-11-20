@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
 import {
   permanentConnectionCheckout,
@@ -20,7 +20,7 @@ import {
 import { ApplicationJob } from "./support/application-job.js";
 import { JobResult } from "./support/job-result.js";
 import { loadAppSchema } from "./support/queue-schema.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 class NonOverlappingJob extends ApplicationJob {
   static {
@@ -54,15 +54,7 @@ describe("SolidQueue::BlockedExecutionTest", () => {
   });
 
   beforeEach(async () => {
-    await destroyRecords();
-  });
-
-  beforeEach(async () => {
     result = await JobResult.createBang({ queue_name: "default" });
-  });
-
-  afterEach(async () => {
-    await destroyRecords();
   });
 
   it("release marks the job as failed and destroys the blocked row when the job class no longer resolves", async () => {

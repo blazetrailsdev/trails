@@ -1,6 +1,7 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import { TopLevel, camelize } from "@blazetrails/activesupport";
 import { SystemExit, type Hash } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";

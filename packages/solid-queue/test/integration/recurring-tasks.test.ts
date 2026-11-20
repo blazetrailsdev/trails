@@ -17,7 +17,7 @@ import {
 import { waitForJobsToBeEnqueued, waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { destroyRecords } from "../test-helper.js";
+import "../test-helper.js";
 
 type TaskAttrs = { class?: string; schedule?: string; args?: unknown[] };
 
@@ -55,10 +55,6 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
   });
 
   beforeEach(async () => {
-    await destroyRecords();
-  });
-
-  beforeEach(async () => {
     run = runSupervisor({ skipRecurring: false });
     await waitForRegisteredProcesses(5, { timeout: 3 });
   });
@@ -66,8 +62,6 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
   afterEach(async () => {
     await run.terminate();
     vi.restoreAllMocks();
-
-    await destroyRecords();
   });
 
   afterAll(() => {

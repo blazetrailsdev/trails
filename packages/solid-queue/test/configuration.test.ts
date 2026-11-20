@@ -1,6 +1,7 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import { IsolatedExecutionState, TopLevel } from "@blazetrails/activesupport";
 import { gemVersion } from "@blazetrails/activerecord";
 import { Pathname } from "@blazetrails/ruby-compat";

@@ -25,7 +25,7 @@ import {
   waitForBatchesToFinishFor,
   waitForJobsToFinishFor,
 } from "../support/jobs-test-helper.js";
-import { destroyRecords } from "../test-helper.js";
+import "../test-helper.js";
 
 class FailingJobError extends RuntimeError {}
 
@@ -200,7 +200,7 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
 
     JobBuffer.clear();
 
-    await destroyRecords();
+    await Job.destroyAll();
     await Batch.destroyAll();
 
     ApplicationJob.enqueueAfterTransactionCommit = false;

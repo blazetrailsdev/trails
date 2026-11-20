@@ -28,7 +28,7 @@ import { RaisingJob } from "../support/raising-job.js";
 import { ExpectedTestError } from "../support/expected-test-error.js";
 import { loadAppSchema } from "../support/queue-schema.js";
 import { silentOnThreadErrorFor, waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
-import { destroyRecords } from "../test-helper.js";
+import "../test-helper.js";
 
 async function deletingFinishedJobs(block: () => Promise<void>) {
   const previous = SolidQueue.preserveFinishedJobs;
@@ -70,7 +70,6 @@ describe("JobsLifecycleTest", { timeout: 15_000 }, () => {
     travelBack();
 
     JobBuffer.clear();
-    await destroyRecords();
   });
 
   afterAll(() => {

@@ -16,7 +16,7 @@ import { loadAppSchema } from "./support/queue-schema.js";
 import { NonOverlappingUpdateResultJob } from "./support/non-overlapping-update-result-job.js";
 import { ApplicationJob } from "./support/application-job.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 describe("QueueTest", () => {
   let backgroundQueue: Queue;
@@ -38,7 +38,6 @@ describe("QueueTest", () => {
 
   afterEach(async () => {
     travelBack();
-    await destroyRecords();
     await Pause.deleteAll();
   });
 

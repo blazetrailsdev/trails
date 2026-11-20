@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import {
   permanentConnectionCheckout,
@@ -15,13 +15,13 @@ import {
   Worker,
 } from "../lib/index.js";
 import { ApplicationJob } from "./support/application-job.js";
-import { AddToBufferJob, JobBuffer } from "./support/add-to-buffer-job.js";
+import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 import { RaisingJob } from "./support/raising-job.js";
 import { LargeErrorMessageJob } from "./support/large-error-message-job.js";
 import { ExpectedTestError } from "./support/expected-test-error.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import { silentOnThreadErrorFor } from "./support/jobs-test-helper.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 class InfiniteRecursionJob extends ApplicationJob {
   static {
@@ -90,7 +90,6 @@ async function assertFitsErrorColumn(execution: FailedExecution, limit?: number 
 
 describe("SolidQueue::FailedExecutionTest", () => {
   let worker: Worker;
-  let originalOnThreadError: typeof SolidQueue.onThreadError;
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
@@ -105,16 +104,8 @@ describe("SolidQueue::FailedExecutionTest", () => {
   });
 
   beforeEach(() => {
-    originalOnThreadError = SolidQueue.onThreadError;
-    SolidQueue.onThreadError = silentOnThreadErrorFor([ExpectedTestError], originalOnThreadError);
     worker = new Worker({ queues: "background" });
     worker.mode = "inline";
-  });
-
-  afterEach(async () => {
-    SolidQueue.onThreadError = originalOnThreadError;
-    JobBuffer.clear();
-    await destroyRecords();
   });
 
   it("run job that fails", async () => {

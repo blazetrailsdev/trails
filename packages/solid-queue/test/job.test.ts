@@ -38,7 +38,7 @@ import { JobResult, StoreResultJob } from "./support/job-result.js";
 import { ShardedJobResult } from "./support/sharded-job-result.js";
 import { ShardedRecord } from "./support/sharded-record.js";
 import { loadAppSchema } from "./support/queue-schema.js";
-import { destroyRecords } from "./test-helper.js";
+import "./test-helper.js";
 
 class NonOverlappingJob extends ApplicationJob {
   static {
@@ -119,17 +119,12 @@ describe("SolidQueue::JobTest", () => {
   });
 
   beforeEach(async () => {
-    await destroyRecords();
-  });
-
-  beforeEach(async () => {
     result = await JobResult.createBang({ queue_name: "default" });
   });
 
   afterEach(async () => {
     travelBack();
     vi.restoreAllMocks();
-    await destroyRecords();
   });
 
   async function assertJobCounts(

@@ -24,7 +24,7 @@ import {
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
-import { destroyRecords } from "../test-helper.js";
+import "../test-helper.js";
 
 async function enqueueStoreResultJob(
   value: string,
@@ -102,10 +102,6 @@ describe("FiberProcessesLifecycleTest", () => {
   });
 
   beforeEach(async () => {
-    await destroyRecords();
-  });
-
-  beforeEach(async () => {
     previousIsolationLevel = IsolatedExecutionState.isolationLevel;
     run = runSupervisor(
       { workers: [{ queues: "background", fibers: 3, pollingInterval: 0.1 }] },
@@ -123,7 +119,6 @@ describe("FiberProcessesLifecycleTest", () => {
     if (previousIsolationLevel != null)
       IsolatedExecutionState.isolationLevel = previousIsolationLevel;
     vi.restoreAllMocks();
-    await destroyRecords();
   });
 
   afterAll(() => {

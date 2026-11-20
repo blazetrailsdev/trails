@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import { Engine, SolidQueue } from "../lib/index.js";
 import { Base } from "../lib/processes/base.js";
 import { Record } from "../lib/record.js";

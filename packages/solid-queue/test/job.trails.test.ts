@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi, expectTypeOf } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import { RecordNotUnique } from "@blazetrails/activerecord";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import {

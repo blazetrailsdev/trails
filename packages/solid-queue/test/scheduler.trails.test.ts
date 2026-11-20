@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
+import "./test-helper.js";
 import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { Process, Record, RecurringTask, Scheduler } from "../lib/index.js";
 import "./support/add-to-buffer-job.js";
