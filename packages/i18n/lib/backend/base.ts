@@ -34,6 +34,7 @@ import {
   trTrans,
   classModule,
   include,
+  File,
 } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Temporal, strftime } from "@blazetrails/date";
@@ -51,6 +52,7 @@ export type FileReader = (filename: string) => Promise<string>;
 
 let fileReader: FileReader | undefined;
 const fileContents = new Map<string, string>();
+const fileMtimes = new Map<string, Date>();
 const localeModules = new Map<string, unknown>();
 
 /** @noRailsEquivalent PERMANENT */
@@ -68,6 +70,7 @@ export async function preloadTranslationFiles(...filenames: (string | string[])[
   const paths = filenames.length === 0 ? config().loadPath : filenames;
   for (const filename of paths.flat()) {
     fileContents.set(filename, await readTranslationFile(filename));
+    fileMtimes.set(filename, await File.mtimeAsync(filename));
   }
 }
 
@@ -75,6 +78,7 @@ export async function preloadTranslationFiles(...filenames: (string | string[])[
 export async function reloadTranslationFiles(): Promise<void> {
   if (!fileReader) return;
   fileContents.clear();
+  fileMtimes.clear();
   await preloadTranslationFiles();
 }
 
@@ -104,6 +108,16 @@ export function _readFile(filename: string): string {
     );
   }
   return contents;
+}
+
+export function _readMtime(filename: string): Date {
+  const mtime = fileMtimes.get(filename);
+  if (mtime === undefined) {
+    throw new Error(
+      `I18n cannot stat ${filename}: reading translation files is async, so await I18n.preloadTranslationFiles() after setting I18n.load_path.`,
+    );
+  }
+  return mtime;
 }
 
 function extname(filename: string): string {

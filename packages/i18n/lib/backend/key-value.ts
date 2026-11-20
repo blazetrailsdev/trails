@@ -95,7 +95,7 @@ export class KeyValue {
     const escape = "escape" in options ? options.escape : true;
     const flattened = this.flattenTranslations(locale, data, escape as boolean, this._subtrees);
     for (let [key, value] of Object.entries(flattened)) {
-      key = `${locale}.${key}`;
+      key = `${isSymbol(locale) ? symbolToS(locale) : locale}.${key}`;
 
       if (isHash(value)) {
         let oldValue: unknown;
