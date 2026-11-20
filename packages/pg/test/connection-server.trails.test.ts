@@ -69,9 +69,9 @@ describe("PG::Connection against a server", () => {
     let yielded: Connection | null = null;
     const value = await PG.connect(connParams, async (c) => {
       yielded = c;
-      return (await c.exec("SELECT 1 AS one")).getvalue(0, 0);
+      return (await c.exec("SELECT 'one'::text AS one")).getvalue(0, 0);
     });
-    expect(value).toBe(1);
+    expect(value).toBe("one");
     expect(yielded!.isFinished()).toBe(true);
   });
 
