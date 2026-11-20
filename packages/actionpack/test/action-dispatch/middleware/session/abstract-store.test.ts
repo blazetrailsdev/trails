@@ -139,12 +139,14 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       await (store as any).prepareSession(req);
       req.session.set("user", 1);
 
+      const before = Date.now();
       await (store as any).commitSession(req, { setCookie: () => {} });
+      const after = Date.now() + 1;
 
       expect(cookie.expires).toBeInstanceOf(Time);
-      const deltaMs = (cookie.expires as Time).toF() * 1000 - Date.now();
-      expect(deltaMs).toBeGreaterThan(55_000);
-      expect(deltaMs).toBeLessThanOrEqual(60_000);
+      const expiresMs = (cookie.expires as Time).toF() * 1000;
+      expect(expiresMs).toBeGreaterThanOrEqual(before + 60_000);
+      expect(expiresMs).toBeLessThanOrEqual(after + 60_000);
     });
 
     it("prepareSession wraps in ActionDispatch::Request::Session", async () => {
