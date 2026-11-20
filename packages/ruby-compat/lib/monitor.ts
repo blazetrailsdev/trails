@@ -216,8 +216,11 @@ export class Monitor implements MonitorMixin {
   declare exit: typeof exit;
   declare isMonOwned: typeof isMonOwned;
   declare synchronize: typeof synchronize;
+  /** @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#mon_try_enter` (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:263`). */
   declare monTryEnter: typeof tryEnter;
+  /** @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#mon_enter` (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:264`). */
   declare monEnter: typeof enter;
+  /** @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#mon_exit` (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:265`). */
   declare monExit: typeof exit;
   declare monSynchronize: typeof synchronize;
 }

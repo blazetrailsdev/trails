@@ -11,6 +11,7 @@ import {
   assertEqual,
   assertMatch,
   assertNot,
+  assertNil,
   assertNoMatch,
   assertRaise,
 } from "../lib/testing/assertions.js";
@@ -54,6 +55,7 @@ describe("EncryptedConfigurationTest", () => {
 
       assert(creds.get("something").get("good"));
       assertNot(credentials.dig("something", "bad"));
+      assertNil(creds.get("nothing"));
     } finally {
       setEnv("TRAILS_MASTER_KEY", undefined);
     }
