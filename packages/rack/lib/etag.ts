@@ -1,6 +1,6 @@
 import type { RackHeaders } from "./index.js";
 import { ETAG, CACHE_CONTROL } from "./constants.js";
-import { Digest, rbCheckArrayType, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
+import { Digest, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { Rack } from "./namespaces.js";
 
@@ -23,17 +23,16 @@ export class ETag {
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
-    const [status, headers] = response;
-    let body: unknown = response[2];
+    const [status, headers, body] = response;
 
     let digest: string | null = null;
 
-    if (this.etagStatus(status) && rbObjRespondTo(body, "toAry") && !this.skipCaching(headers)) {
-      body = rbCheckArrayType(body);
-      digest = this.digestBody(body as string[]);
-      if (digest) headers[ETAG] = `W/"${digest}"`;
-
-      response[2] = body;
+    if (this.etagStatus(status) && Array.isArray(body) && !this.skipCaching(headers)) {
+      digest = this.digestBody(body);
+      if (digest) {
+        headers[ETAG] = `W/"${digest}"`;
+        response[2] = body;
+      }
     }
 
     if (!headers[CACHE_CONTROL]) {
