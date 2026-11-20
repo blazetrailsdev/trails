@@ -242,7 +242,7 @@ export class Metal extends AbstractControllerBase {
     this.setRequestBang(request);
     this.setResponseBang(response);
     await this.process(name);
-    request.commitFlash();
+    await request.commitFlash();
     return this.toA();
   }
 

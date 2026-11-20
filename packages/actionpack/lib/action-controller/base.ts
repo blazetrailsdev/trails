@@ -293,7 +293,7 @@ declare class RequestForgeryProtectionPrivate {
   /** @internal */
   protected formAuthenticityToken(options?: {
     formOptions?: { action?: string; method?: string };
-  }): string;
+  }): Promise<string>;
   /** @internal */
   protected isProtectAgainstForgery(): boolean;
 }
@@ -343,7 +343,7 @@ export class Base extends Metal {
     this.abstractBang();
   }
 
-  declare readonly flash: FlashHash;
+  declare readonly flash: Promise<FlashHash>;
   declare static addFlashTypes: typeof addFlashTypes;
 
   declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];

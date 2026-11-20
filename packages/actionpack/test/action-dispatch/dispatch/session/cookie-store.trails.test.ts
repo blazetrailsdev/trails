@@ -24,8 +24,8 @@ describe("CookieStore in a real stack", () => {
         get(key: string): unknown;
         set(key: string, value: unknown): void;
       };
-      const seen = (session.get("counter") as number | undefined) ?? 0;
-      session.set("counter", seen + 1);
+      const seen = ((await session.get("counter")) as number | undefined) ?? 0;
+      await session.set("counter", seen + 1);
       return [200, { "content-type": "text/plain" }, body(String(seen))];
     };
     const store = new CookieStore(app, { key: "_session" });

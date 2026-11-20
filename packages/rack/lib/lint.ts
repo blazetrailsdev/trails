@@ -200,7 +200,7 @@ export class Wrapper {
   /** @missingRailsName response — PERMANENT */
   async response(): Promise<[number, Record<string, any>, any]> {
     if (this.env == null) throw new LintError("No env given");
-    this.checkEnvironment(this.env);
+    await this.checkEnvironment(this.env);
 
     this._response = await (rbProcCall(this._app, this.env) as ReturnType<RackApp>);
     if (!Array.isArray(this._response)) {
@@ -244,7 +244,7 @@ export class Wrapper {
   }
 
   /** @missingRailsArgs frozen? — PERMANENT */
-  checkEnvironment(env: Record<string, any>): void {
+  async checkEnvironment(env: Record<string, any>): Promise<void> {
     if (env === null || typeof env !== "object" || Array.isArray(env)) {
       throw new LintError(`env ${rbInspect(env)} is not a Hash, but ${rbObjClassname(env)}`);
     }
@@ -390,8 +390,8 @@ export class Wrapper {
       if (
         !(
           rbObjRespondTo(session, "toHash") &&
-          rbObjIsKindOf(rbToHashType(session), Hash) &&
-          !Object.isFrozen(rbToHashType(session))
+          rbObjIsKindOf(await (rbToHashType(session) as unknown), Hash) &&
+          !Object.isFrozen(await (rbToHashType(session) as unknown))
         )
       ) {
         throw new LintError(

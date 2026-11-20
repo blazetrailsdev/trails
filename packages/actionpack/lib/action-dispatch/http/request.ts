@@ -543,7 +543,7 @@ export class Request {
 
   async resetSession(): Promise<void> {
     await this.session.destroy();
-    this.resetCsrfToken();
+    await this.resetCsrfToken();
     resetFlashSession.call(this as never);
   }
 
@@ -567,18 +567,22 @@ export class Request {
     return Session.disabled(this);
   }
 
-  resetCsrfToken(): void {
-    const c = this.controllerInstance as { resetCsrfToken?: (req: unknown) => void } | undefined;
-    if (c && typeof c.resetCsrfToken === "function") c.resetCsrfToken(this);
+  async resetCsrfToken(): Promise<void> {
+    const c = this.controllerInstance as
+      | { resetCsrfToken?: (req: unknown) => Promise<void> }
+      | undefined;
+    if (c && typeof c.resetCsrfToken === "function") await c.resetCsrfToken(this);
   }
 
-  commitCsrfToken(): void {
-    const c = this.controllerInstance as { commitCsrfToken?: (req: unknown) => void } | undefined;
-    if (c && typeof c.commitCsrfToken === "function") c.commitCsrfToken(this);
+  async commitCsrfToken(): Promise<void> {
+    const c = this.controllerInstance as
+      | { commitCsrfToken?: (req: unknown) => Promise<void> }
+      | undefined;
+    if (c && typeof c.commitCsrfToken === "function") await c.commitCsrfToken(this);
   }
 
-  commitFlash(): void {
-    commitFlash.call(this as never);
+  async commitFlash(): Promise<void> {
+    await commitFlash.call(this as never);
   }
 
   commitCookieJarBang(): void {

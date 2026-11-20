@@ -38,67 +38,67 @@ class TestController extends Base {
   flashyThis: unknown;
 
   async setFlash(): Promise<void> {
-    this.flash.set("that", "hello");
+    (await this.flash).set("that", "hello");
     await this.render({ inline: "hello" });
   }
 
   async setFlashNow(): Promise<void> {
-    this.flash.now.set("that", "hello");
-    if (this.flash.now.get("foo") == null) this.flash.now.set("foo", "bar");
-    if (this.flash.now.get("foo") == null) this.flash.now.set("foo", "err");
-    this.flashy = this.flash.now.get("that");
-    this.flashCopy = { ...this.flash.toHash() };
+    (await this.flash).now.set("that", "hello");
+    if ((await this.flash).now.get("foo") == null) (await this.flash).now.set("foo", "bar");
+    if ((await this.flash).now.get("foo") == null) (await this.flash).now.set("foo", "err");
+    this.flashy = (await this.flash).now.get("that");
+    this.flashCopy = { ...(await this.flash).toHash() };
     await this.render({ inline: "hello" });
   }
 
   async attemptToUseFlashNow(): Promise<void> {
-    this.flashCopy = { ...this.flash.toHash() };
-    this.flashy = this.flash.get("that");
+    this.flashCopy = { ...(await this.flash).toHash() };
+    this.flashy = (await this.flash).get("that");
     await this.render({ inline: "hello" });
   }
 
   async useFlash(): Promise<void> {
-    this.flashCopy = { ...this.flash.toHash() };
-    this.flashy = this.flash.get("that");
+    this.flashCopy = { ...(await this.flash).toHash() };
+    this.flashy = (await this.flash).get("that");
     await this.render({ inline: "hello" });
   }
 
   async useFlashAndKeepIt(): Promise<void> {
-    this.flashCopy = { ...this.flash.toHash() };
-    this.flashy = this.flash.get("that");
-    this.flash.keep();
+    this.flashCopy = { ...(await this.flash).toHash() };
+    this.flashy = (await this.flash).get("that");
+    (await this.flash).keep();
     await this.render({ inline: "hello" });
   }
 
   async useFlashAndUpdateIt(): Promise<void> {
-    this.flash.update({ this: "hello again" });
-    this.flashCopy = { ...this.flash.toHash() };
+    (await this.flash).update({ this: "hello again" });
+    this.flashCopy = { ...(await this.flash).toHash() };
     await this.render({ inline: "hello" });
   }
 
   async useFlashAfterResetSession(): Promise<void> {
-    this.flash.set("that", "hello");
-    this.flashyThat = this.flash.get("that");
+    (await this.flash).set("that", "hello");
+    this.flashyThat = (await this.flash).get("that");
     await this.resetSession();
-    this.flashyThatReset = this.flash.get("that");
-    this.flash.set("this", "good-bye");
-    this.flashyThis = this.flash.get("this");
+    this.flashyThatReset = (await this.flash).get("that");
+    (await this.flash).set("this", "good-bye");
+    this.flashyThis = (await this.flash).get("this");
     await this.render({ inline: "hello" });
   }
 
   async stdAction(): Promise<void> {
-    this.flashCopy = { ...this.flash.toHash() };
+    this.flashCopy = { ...(await this.flash).toHash() };
     await this.head(":ok");
   }
 
-  filterHaltingAction(): void {
-    this.flashCopy = { ...this.flash.toHash() };
+  async filterHaltingAction(): Promise<void> {
+    this.flashCopy = { ...(await this.flash).toHash() };
   }
 
   async haltAndRedir(): Promise<void> {
-    this.flash.set("foo", "bar");
+    (await this.flash).set("foo", "bar");
     await this.redirectTo({ action: "stdAction" });
-    this.flashCopy = { ...this.flash.toHash() };
+    this.flashCopy = { ...(await this.flash).toHash() };
   }
 
   async redirectWithAlert(): Promise<void> {
@@ -110,12 +110,12 @@ class TestController extends Base {
   }
 
   async renderWithFlashNowAlert(): Promise<void> {
-    this.flash.now.alert = "Beware the nowheres now!";
+    (await this.flash).now.alert = "Beware the nowheres now!";
     await this.render({ inline: "hello" });
   }
 
   async renderWithFlashNowNotice(): Promise<void> {
-    this.flash.now.notice = "Good luck in the somewheres now!";
+    (await this.flash).now.notice = "Good luck in the somewheres now!";
     await this.render({ inline: "hello" });
   }
 
@@ -238,27 +238,27 @@ describe("FlashTest", () => {
 
   it("redirect to with alert", async () => {
     const controller = await get("redirectWithAlert");
-    expect(controller.flash.get("alert")).toBe("Beware the nowheres!");
+    expect((await controller.flash).get("alert")).toBe("Beware the nowheres!");
   });
 
   it("redirect to with notice", async () => {
     const controller = await get("redirectWithNotice");
-    expect(controller.flash.get("notice")).toBe("Good luck in the somewheres!");
+    expect((await controller.flash).get("notice")).toBe("Good luck in the somewheres!");
   });
 
   it("render with flash now alert", async () => {
     const controller = await get("renderWithFlashNowAlert");
-    assertEqual("Beware the nowheres now!", controller.flash.get("alert"));
+    assertEqual("Beware the nowheres now!", (await controller.flash).get("alert"));
   });
 
   it("render with flash now notice", async () => {
     const controller = await get("renderWithFlashNowNotice");
-    assertEqual("Good luck in the somewheres now!", controller.flash.get("notice"));
+    assertEqual("Good luck in the somewheres now!", (await controller.flash).get("notice"));
   });
 
   it("redirect to with other flashes", async () => {
     const controller = await get("redirectWithOtherFlashes");
-    expect(controller.flash.get("joyride")).toBe("Horses!");
+    expect((await controller.flash).get("joyride")).toBe("Horses!");
   });
 
   it("from session value nil returns empty", () => {
@@ -286,7 +286,7 @@ describe("FlashTest", () => {
     const testControllerWithFlashTypeFoo = (() => class extends TestController {})();
     testControllerWithFlashTypeFoo.addFlashTypes("foo");
     const controller = await get("redirectWithFooFlash", testControllerWithFlashTypeFoo);
-    expect(controller.flash.get("foo")).toBe("for great justice");
+    expect((await controller.flash).get("foo")).toBe("for great justice");
   });
 
   it("additional flash types are not listed in actions set", () => {
@@ -315,28 +315,28 @@ class FlashIntegrationTestController extends Base {
   }
 
   async setFlash(): Promise<void> {
-    this.flash.set("that", "hello");
+    (await this.flash).set("that", "hello");
     await this.head(":ok");
   }
 
   async setFlashNow(): Promise<void> {
-    this.flash.now.set("that", "hello");
+    (await this.flash).now.set("that", "hello");
     await this.head(":ok");
   }
 
   async useFlash(): Promise<void> {
-    await this.render({ inline: `flash: ${rbObjAsString(this.flash.get("that"))}` });
+    await this.render({ inline: `flash: ${rbObjAsString((await this.flash).get("that"))}` });
   }
 
   async setFlashOptionally(): Promise<void> {
-    this.flash.now.set("notice", this.params.get("flash"));
+    (await this.flash).now.set("notice", this.params.get("flash"));
     if (await this.isStale(null, { etag: "abe" })) {
       await this.render({ inline: "maybe flash" });
     }
   }
 
   async setBar(): Promise<void> {
-    this.flash.set("bar", "for great justice");
+    (await this.flash).set("bar", "for great justice");
     await this.head(":ok");
   }
 }
@@ -382,7 +382,7 @@ describe("FlashIntegrationTest", () => {
     await withTestRouteSet(async (tc) => {
       await tc.get("/set_flash");
       tc.assertResponse(":success");
-      assertEqual("hello", tc.request.flash!.get("that"));
+      assertEqual("hello", (await tc.request.flash).get("that"));
 
       await tc.get("/use_flash");
       tc.assertResponse(":success");
@@ -425,7 +425,7 @@ describe("FlashIntegrationTest", () => {
       tc.assertResponse(":success");
       assertEqual(
         "for great justice",
-        (tc.controller as FlashIntegrationTestController & { bar: unknown }).bar,
+        await (tc.controller as FlashIntegrationTestController & { bar: unknown }).bar,
       );
     });
   });

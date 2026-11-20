@@ -31,9 +31,9 @@ describe("Rack::Session::Abstract::Persisted", () => {
   });
 
   it("#commit_session? returns false if :skip option is given", async () => {
-    expect(pers.isCommitSession(request(), {} as unknown as PersistedSession, { skip: true })).toBe(
-      false,
-    );
+    expect(
+      await pers.isCommitSession(request(), {} as unknown as PersistedSession, { skip: true }),
+    ).toBe(false);
   });
 
   it("#commit_session writes to rack.errors if session cannot be written", async () => {

@@ -59,18 +59,18 @@ class TestController extends Base {
   }
 
   async setFlash() {
-    const prev = this.flash.get("test") ?? "";
-    this.flash.set("test", `>${prev}<`);
+    const prev = (await this.flash).get("test") ?? "";
+    (await this.flash).set("test", `>${prev}<`);
     await this.render({ plain: "ignore me" });
   }
 
   async deleteFlash() {
-    this.flash.delete("test");
+    (await this.flash).delete("test");
     await this.render({ plain: "ignore me" });
   }
 
   async setFlashNow() {
-    this.flash.now.set("test_now", `>${this.flash.get("test_now") ?? ""}<`);
+    (await this.flash).now.set("test_now", `>${(await this.flash).get("test_now") ?? ""}<`);
     await this.render({ plain: "ignore me" });
   }
 
@@ -356,23 +356,23 @@ describe("TestCaseTest", () => {
 
   it("process without flash", async () => {
     await tc.process("setFlash");
-    assertEqual("><", tc.flash().get("test"));
+    assertEqual("><", (await tc.flash()).get("test"));
   });
 
   it("process with flash", async () => {
     await tc.process("setFlash", { method: "GET", flash: { test: "value" } });
-    assertEqual(">value<", tc.flash().get("test"));
+    assertEqual(">value<", (await tc.flash()).get("test"));
   });
 
   it("process with flash now", async () => {
     await tc.process("setFlashNow", { method: "GET", flash: { test_now: "value_now" } });
-    assertEqual(">value_now<", tc.flash().get("test_now"));
+    assertEqual(">value_now<", (await tc.flash()).get("test_now"));
   });
 
   it("process delete flash", async () => {
     await tc.process("setFlash");
     await tc.process("deleteFlash");
-    assertEmpty(tc.flash());
+    assertEmpty(await tc.flash());
     assertEmpty(tc.session());
   });
 
@@ -620,7 +620,7 @@ describe("TestCaseTest", () => {
     );
 
     assertEqual("bar", tc.session().get("foo"));
-    assertEqual("created", tc.flash().get("notice"));
+    assertEqual("created", (await tc.flash()).get("notice"));
   });
 
   it("params passing with integer", async () => {

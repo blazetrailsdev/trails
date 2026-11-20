@@ -1179,13 +1179,16 @@ describe("PerFormTokensControllerTest", () => {
     return formCsrfToken!;
   }
 
-  function assertMatchesSessionTokenOnServer(formToken: string, method = "post"): void {
+  async function assertMatchesSessionTokenOnServer(
+    formToken: string,
+    method = "post",
+  ): Promise<void> {
     const actual = rbFSend(
       tc.controller,
       "unmaskToken",
       binaryBytes(Base64.urlsafeDecode64(formToken)),
     );
-    const expected = rbFSend(
+    const expected = await rbFSend(
       tc.controller,
       "perFormCsrfToken",
       null,
@@ -1199,8 +1202,9 @@ describe("PerFormTokensControllerTest", () => {
     await tc.get("index");
 
     const expected = RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH;
-    const actual = (rbFSend(tc.controller, "perFormCsrfToken", null, "/path", "post") as Bytes)
-      .length;
+    const actual = (
+      (await rbFSend(tc.controller, "perFormCsrfToken", null, "/path", "post")) as Bytes
+    ).length;
     expect(actual).toBe(expected);
   });
 
@@ -1209,7 +1213,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
@@ -1223,7 +1227,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     tc.request.env["QUERY_STRING"] = "key=value";
@@ -1237,7 +1241,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/foo/bar<";
     const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
@@ -1251,7 +1255,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_two";
     await assertRaises([InvalidAuthenticityToken], {}, () =>
@@ -1264,7 +1268,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertRaises([InvalidAuthenticityToken], {}, () =>
@@ -1277,7 +1281,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken, "delete");
+    await assertMatchesSessionTokenOnServer(formToken, "delete");
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertRaises([InvalidAuthenticityToken], {}, () =>
@@ -1290,7 +1294,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken, "post");
+    await assertMatchesSessionTokenOnServer(formToken, "post");
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
@@ -1304,7 +1308,7 @@ describe("PerFormTokensControllerTest", () => {
 
       const formToken = assertPresenceAndFetchFormCsrfToken();
 
-      assertMatchesSessionTokenOnServer(formToken, verb);
+      await assertMatchesSessionTokenOnServer(formToken, verb);
 
       tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
       await assertNothingRaised(() =>
@@ -1316,7 +1320,7 @@ describe("PerFormTokensControllerTest", () => {
   it("accepts global csrf token", async () => {
     await tc.get("index");
 
-    const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
+    const token = (await rbFSend(tc.controller, "formAuthenticityToken")) as string;
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
@@ -1328,7 +1332,7 @@ describe("PerFormTokensControllerTest", () => {
   it("does not return old csrf token", async () => {
     await tc.get("index");
 
-    const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
+    const token = (await rbFSend(tc.controller, "formAuthenticityToken")) as string;
 
     const unmaskedToken = rbFSend(
       tc.controller,
@@ -1336,13 +1340,13 @@ describe("PerFormTokensControllerTest", () => {
       binaryBytes(Base64.urlsafeDecode64(token)),
     );
 
-    expect(unmaskedToken).not.toEqual(rbFSend(tc.controller, "realCsrfToken"));
+    expect(unmaskedToken).not.toEqual(await rbFSend(tc.controller, "realCsrfToken"));
   });
 
   it("returns hmacd token", async () => {
     await tc.get("index");
 
-    const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
+    const token = (await rbFSend(tc.controller, "formAuthenticityToken")) as string;
 
     const unmaskedToken = rbFSend(
       tc.controller,
@@ -1350,7 +1354,7 @@ describe("PerFormTokensControllerTest", () => {
       binaryBytes(Base64.urlsafeDecode64(token)),
     );
 
-    expect(unmaskedToken).toEqual(rbFSend(tc.controller, "globalCsrfToken"));
+    expect(unmaskedToken).toEqual(await rbFSend(tc.controller, "globalCsrfToken"));
   });
 
   it("accepts old csrf token", async () => {
@@ -1359,7 +1363,7 @@ describe("PerFormTokensControllerTest", () => {
     const nonHmacToken = rbFSend(
       tc.controller,
       "maskToken",
-      rbFSend(tc.controller, "realCsrfToken"),
+      await rbFSend(tc.controller, "realCsrfToken"),
     );
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
@@ -1374,7 +1378,7 @@ describe("PerFormTokensControllerTest", () => {
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
-    assertMatchesSessionTokenOnServer(formToken);
+    await assertMatchesSessionTokenOnServer(formToken);
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one/";
     await assertNothingRaised(() =>

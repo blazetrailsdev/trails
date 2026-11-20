@@ -73,12 +73,12 @@ describe("AbstractSecureStoreTest", () => {
 
     assert(env);
     const session = Session.find(new Request(env!))!;
-    session.set("foo", "bar");
+    await session.set("foo", "bar");
 
     await as.call(env!);
     const session1 = Session.find(new Request(env!))!;
 
     assertNotEqual(session, session1);
-    assertEqual(session.toHash(), session1.toHash());
+    assertEqual(await session.toHash(), await session1.toHash());
   });
 });

@@ -82,7 +82,7 @@ describe("NullSession", () => {
     jar.write(response);
     expect(response.headers["set-cookie"]).toBeUndefined();
   });
-  it("CookieStore round-trips the token through the encrypted jar, bound to the session id", () => {
+  it("CookieStore round-trips the token through the encrypted jar, bound to the session id", async () => {
     const request = buildRequest();
     const jar = new CookieJar(request);
     setCookieJar.call(request, jar);
@@ -101,13 +101,13 @@ describe("NullSession", () => {
     store.store(csrfRequest, "the-token");
 
     expect(jar.get("csrf_token")).not.toContain("the-token");
-    expect(store.fetch(csrfRequest)).toBe("the-token");
+    expect(await store.fetch(csrfRequest)).toBe("the-token");
 
     store.reset(csrfRequest);
-    expect(store.fetch(csrfRequest)).toBeNull();
+    expect(await store.fetch(csrfRequest)).toBeNull();
   });
 
-  it("CookieStore ignores a token stored under another session id", () => {
+  it("CookieStore ignores a token stored under another session id", async () => {
     const request = buildRequest();
     const jar = new CookieJar(request);
     setCookieJar.call(request, jar);
@@ -121,10 +121,10 @@ describe("NullSession", () => {
 
     store.store(csrfRequest, "the-token");
 
-    expect(store.fetch(csrfRequest)).toBeNull();
+    expect(await store.fetch(csrfRequest)).toBeNull();
   });
 
-  it("CookieStore returns null for cookie contents that are not JSON", () => {
+  it("CookieStore returns null for cookie contents that are not JSON", async () => {
     const request = buildRequest();
     const jar = new CookieJar(request);
     setCookieJar.call(request, jar);
@@ -136,10 +136,10 @@ describe("NullSession", () => {
     } as unknown as CsrfRequest;
     jar.encrypted.set("csrf_token", "not json");
 
-    expect(new CookieStore("csrf_token").fetch(csrfRequest)).toBeNull();
+    expect(await new CookieStore("csrf_token").fetch(csrfRequest)).toBeNull();
   });
 
-  it("CookieStore writes the envelope Rails writes, keyed session_id / public_id", () => {
+  it("CookieStore writes the envelope Rails writes, keyed session_id / public_id", async () => {
     const request = buildRequest();
     const jar = new CookieJar(request);
     setCookieJar.call(request, jar);

@@ -1,10 +1,9 @@
 import { hashAref } from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/rack";
 import type { CacheStore as CacheStoreLike } from "@blazetrails/activesupport";
-import { SessionId, type PersistedRequest } from "@blazetrails/rack-session";
+import { SessionId } from "@blazetrails/rack-session";
 import { AbstractSecureStore } from "./abstract-store.js";
 import { Session } from "../../../namespaces.js";
-import type { Session as RequestSession } from "../../request/session.js";
 
 export interface CacheStoreSessionOptions {
   cache?: CacheStoreLike;
@@ -32,13 +31,6 @@ export class CacheStore extends AbstractSecureStore {
       options.expireAfter = Math.floor(cacheExpiresInMs / 1000);
     }
     this.options = options;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  override async prepareSession(req: PersistedRequest): Promise<RequestSession> {
-    const session = super.prepareSession(req) as unknown as RequestSession;
-    await session.prewarmBang();
-    return session;
   }
 
   async findSession(

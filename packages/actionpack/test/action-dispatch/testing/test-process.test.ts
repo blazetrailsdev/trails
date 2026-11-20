@@ -27,7 +27,7 @@ function makeHost(overrides: Partial<TestProcessHost> = {}): TestProcessHost {
       fetchHeader: (_name: string, block: (name: string) => unknown) => block(_name),
       setHeader: () => undefined,
       session: new Session(null, new Request({})),
-      flash: new FlashHash(),
+      flash: Promise.resolve(new FlashHash()),
       cookies: { a: "1" },
     },
     response: { redirectUrl: "/somewhere" },
@@ -51,10 +51,10 @@ describe("TestProcess", () => {
     );
   });
 
-  it("session/flash/redirectToUrl delegate to request/response", () => {
+  it("session/flash/redirectToUrl delegate to request/response", async () => {
     const host = makeHost();
     expect(session.call(host)).toBe(host.request.session);
-    expect(flash.call(host)).toBeInstanceOf(FlashHash);
+    expect(await flash.call(host)).toBeInstanceOf(FlashHash);
     expect(redirectToUrl.call(host)).toBe("/somewhere");
   });
 

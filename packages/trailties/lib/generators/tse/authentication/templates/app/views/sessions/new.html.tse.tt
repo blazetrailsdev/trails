@@ -1,5 +1,5 @@
-<%%= flash().get("alert") != null ? tag.div(flash().get("alert"), { style: "color:red" }) : null %>
-<%%= flash().get("notice") != null ? tag.div(flash().get("notice"), { style: "color:green" }) : null %>
+<%%= (await flash()).get("alert") != null ? tag.div((await flash()).get("alert"), { style: "color:red" }) : null %>
+<%%= (await flash()).get("notice") != null ? tag.div((await flash()).get("notice"), { style: "color:green" }) : null %>
 
 <%%= formWith({ url: sessionPath() }, (form) => { %>
   <%%= form.emailField("email_address", { required: true, autofocus: true, autocomplete: "username", placeholder: "Enter your email address", value: params().get("email_address") }) %><br>

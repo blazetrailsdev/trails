@@ -104,7 +104,7 @@ describe("Integration::Session includes TestProcess", () => {
     session.app = async () => [302, { location: "/there" }, ["moved"]];
     await session.get("/here");
     expect(session.session()).toBe(session.request.session);
-    expect(session.flash()).toBe(session.request.flash);
+    expect(await session.flash()).toBe(await session.request.flash);
     expect(session.redirectToUrl()).toBe(session.response.redirectUrl);
     expect(session.redirectToUrl()).toMatch(/\/there$/);
   });

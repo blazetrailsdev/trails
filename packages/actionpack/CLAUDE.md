@@ -189,28 +189,22 @@ this section. A new instance is not a new decision to argue.
 
 ## A cache-backed session is prewarmed and peeked (`Session::CacheStore#prepare_session`)
 
-Rails loads a session lazily: `Request::Session#load_for_read!` calls
-`load!`, which calls the store's `load_session`
-(`actionpack/lib/action_dispatch/request/session.rb:255-282`), on the first
-`session[...]` read. A cache-backed store's `find_session` reads
-`ActiveSupport::Cache::Store`, which is async in trails because every Node
-cache client is. Making the session accessors async as well was rejected:
-`form_authenticity_token` and `request.flash` read the session from inside a
-template, and a non-streaming template compiles to a synchronous function
-(`actionview/lib/template.ts`).
-
-**The store hooks are async and the accessors stay synchronous and lazy.**
-`writeSession`, `deleteSession` and `commitSession` are async, and
-`Persisted#context` awaits them. `findSession` may answer a promise, and
-`Persisted#loadSession` wraps one with `then` (`@inventedArm then —
-PERMANENT`). Only `Session::CacheStore` prewarms. Its `prepareSession` awaits
-`Request::Session#prewarmBang` before the app runs, and `loadBang` peeks the
-result. `destroy` prewarms again before its `load_for_write!`. The cookie store
-and `Rack::Session::Pool` answer synchronously and still load lazily, so a
-request that never touches the session never decrypts its cookie. A
-rejected `findSession` re-enters `staleSessionCheckBang`'s rescue, so an async
-`ArgumentError` is retried as a synchronous one is.
-Ruled by the operator on 2026-10-16 (trails#8997).
+Superseded. The heading is kept so citations resolve. The session now loads
+lazily, as Rails does: `Request::Session#load_for_read!` calls `load!`, which
+calls the store's `load_session`
+(`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/request/session.rb:255-282`),
+on the first `session[...]` read. A cache-backed store's `find_session` reads
+`ActiveSupport::Cache::Store`, which is async in trails, so every
+`Request::Session` accessor (`get`, `set`, `fetch`, `dig`, `hasKey`, `keys`,
+`values`, `toHash`, `update`, `delete`, `clear`, `isEmpty`, `idWas`) is async
+and awaited at its call site. The same holds for what reads through it:
+`request.flash` and a controller's `flash` / `notice` / `alert` answer a
+promise, and so do `formAuthenticityToken` and the CSRF token chain under it.
+Templates compile to async functions (`actionview/lib/template/handlers/tse.ts`),
+so a view awaits them like any other helper. `Session::CacheStore` has no
+`prepareSession` override and nothing is prewarmed. The original ruling
+(2026-10-16, trails#8997) was lifted by the operator on 2026-11-20 once
+templates became async.
 
 ## Request params are a null-prototype plain object (`ParamBuilder#make_params`)
 
