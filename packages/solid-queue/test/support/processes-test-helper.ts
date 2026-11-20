@@ -5,6 +5,7 @@ import {
   IO,
   Process as RbProcess,
   SystemExit,
+  Thread,
   Timeout,
   getProcessAdapter,
   rbFFork,
@@ -126,12 +127,14 @@ export function signalProcess(
   signal: "TERM" | "INT" | "QUIT" | "KILL",
   { wait = null }: { wait?: number | null } = {},
 ) {
+  if (typeof pid === "number") {
+    return new Thread(async () => {
+      if (wait != null) await sleep(wait);
+      RbProcess.kill(signal, pid);
+    });
+  }
   return (async () => {
     if (wait != null) await sleep(wait);
-    if (typeof pid === "number") {
-      RbProcess.kill(signal, pid);
-      return;
-    }
     const supervisor = pid.supervisor;
     supervisor.signalQueue().push(signal);
     await supervisor.interrupt();
@@ -212,7 +215,8 @@ export async function terminateProcess(
     signal = "TERM",
   }: { timeout?: number; signal?: "TERM" | "INT" | "QUIT" | "KILL" } = {},
 ) {
-  await signalProcess(pid, signal);
+  if (typeof pid === "number") signalProcess(pid, signal);
+  else await signalProcess(pid, signal);
   await waitForProcessTerminationWithTimeout(pid, { timeout, signaled: signal });
 }
 
@@ -258,7 +262,10 @@ export async function waitForProcessTerminationWithTimeout(
       }
     });
   } catch (error) {
-    if (error instanceof Timeout.Error) await signalProcess(run, "KILL");
+    if (error instanceof Timeout.Error) {
+      if (typeof run === "number") signalProcess(run, "KILL");
+      else await signalProcess(run, "KILL");
+    }
     throw error;
   }
 }

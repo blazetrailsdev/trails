@@ -181,7 +181,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     const noPause = await enqueueStoreResultJob("no pause");
     const pause = await enqueueStoreResultJob("pause", "background", { pause: 1 });
 
-    await signalProcess(pid, "KILL", { wait: 0.2 });
+    signalProcess(pid, "KILL", { wait: 0.2 });
     await waitForJobsToFinishFor(2);
     await waitForRegisteredProcesses(1, { timeout: 3 });
 
@@ -199,7 +199,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
   });
 
   it("term supervisor multiple times", async () => {
-    for (let i = 0; i < 5; i++) await signalProcess(pid, "TERM", { wait: 0.1 }).catch(() => {});
+    for (let i = 0; i < 5; i++) signalProcess(pid, "TERM", { wait: 0.1 });
 
     await waitWhileWithTimeout(SolidQueue.shutdownTimeout.toF() + 1, async () =>
       isProcessExists(pid),
@@ -217,7 +217,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
       async () => !(await JobResult.where({ status: "started", value: "pause" }).isExists()),
     );
 
-    await signalProcess(pid, "QUIT", { wait: 0.1 });
+    signalProcess(pid, "QUIT", { wait: 0.1 });
 
     await waitWhileWithTimeout(2, async () => isProcessExists(pid));
     expect(isProcessExists(pid)).toBe(false);
@@ -239,7 +239,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
       async () => !(await JobResult.where({ status: "started", value: "pause" }).isExists()),
     );
 
-    await signalProcess(pid, "TERM", { wait: 0.1 });
+    signalProcess(pid, "TERM", { wait: 0.1 });
     await waitForJobsToFinishFor(3);
 
     await assertCompletedJobResults("no pause");
@@ -261,7 +261,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
       async () => !(await JobResult.where({ status: "started", value: "pause" }).isExists()),
     );
 
-    await signalProcess(pid, "INT", { wait: 0.1 });
+    signalProcess(pid, "INT", { wait: 0.1 });
     await waitForJobsToFinishFor(3);
 
     await assertCompletedJobResults("no pause");
@@ -290,7 +290,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
       async () => !(await JobResult.where({ status: "started", value: "pause" }).isExists()),
     );
 
-    await signalProcess(pid, "TERM", { wait: 0.5 });
+    signalProcess(pid, "TERM", { wait: 0.5 });
     await waitForJobsToFinishFor(2, { except: pause });
 
     await waitFor(
@@ -364,7 +364,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     const worker = (await findProcessesRegisteredAs("Worker").first())!;
 
     await waitWhileWithTimeout(1, async () => (await ReadyExecution.count()) > 0);
-    await signalProcess(worker.pid, "TERM", { wait: 0.1 });
+    signalProcess(worker.pid, "TERM", { wait: 0.1 });
 
     await waitForRegisteredProcesses(2, { timeout: 3 });
     expect(await Process.findBy({ id: worker.id })).toBeNull();
@@ -399,7 +399,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     const worker = (await findProcessesRegisteredAs("Worker").toArray()).find((process) =>
       (process.metadata.get("queues") as string).includes("background"),
     )!;
-    await signalProcess(worker.pid, "KILL", { wait: 0.5 });
+    signalProcess(worker.pid, "KILL", { wait: 0.5 });
 
     await sleep(0.5);
     expect(await Process.isExists({ id: worker.id })).toBe(true);

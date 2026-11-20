@@ -274,7 +274,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
       termsig: () => null,
     };
 
-    await expect(supervisor.replaceFork("42", status)).resolves.not.toThrow();
+    await expect(supervisor.replaceFork("42", status)).resolves.toBeUndefined();
     expect(releaseClaimedJobsBy).toHaveBeenCalledOnce();
     expect(startProcess).toHaveBeenCalledExactlyOnceWith(configuredProcess);
   });
@@ -311,7 +311,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
       .spyOn(supervisor, "releaseClaimedJobsBy")
       .mockRejectedValue(new ConnectionNotEstablished("connection is closed"));
 
-    await expect(supervisor.reapTerminatedForks()).resolves.not.toThrow();
+    await expect(supervisor.reapTerminatedForks()).resolves.toBeUndefined();
     expect(releaseClaimedJobsBy).toHaveBeenCalledOnce();
 
     expect(supervisor.processInstances).toEqual({});
