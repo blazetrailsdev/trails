@@ -8,8 +8,6 @@ import {
   fetch,
   File,
   FileUtils,
-  getFs,
-  getPath,
   Hash,
   exit,
   include,
@@ -23,7 +21,6 @@ import {
   type Included,
 } from "@blazetrails/ruby-compat";
 import {
-  Handler,
   Server as RackupServer,
   type ServerOptions as RackupServerOptions,
 } from "@blazetrails/rackup";
@@ -56,13 +53,6 @@ export interface ServerOptions extends RackupServerOptions {
   earlyHints?: boolean | null;
   SSLEnable?: boolean;
 }
-
-Handler.loadPath["rackup/handler/vite"] = async () => {
-  if (!Trails.env.isDevelopment() || !(await hasViteConfig(Dir.pwd()))) {
-    throw new LoadError("cannot load such file -- rackup/handler/vite");
-  }
-  return import("../server/dev-server.js");
-};
 
 export class Options {
   parseBang(args: string[]): ServerOptions {
@@ -471,16 +461,6 @@ interface ServerCommandOptions extends Record<string, unknown> {
   earlyHints?: boolean | null;
   logToStdout?: boolean | null;
   environment?: string;
-}
-
-/** @noRailsEquivalent PERMANENT */
-async function hasViteConfig(root: string): Promise<boolean> {
-  const fs = getFs();
-  const p = getPath();
-  return (
-    (await fs.exists(p.join(root, "vite.config.ts"))) ||
-    (await fs.exists(p.join(root, "vite.config.js")))
-  );
 }
 
 Trails.Server = Server;

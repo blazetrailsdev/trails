@@ -35,6 +35,16 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         "api_app_generator_test.rb:109 sits in a block assert_no_file never yields; the port's assertNoFile takes no block",
     },
   ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › css option with cssbundling gem":
+    [
+      {
+        kind: "assert_gem",
+        value: "s:cssbundling-rails",
+        as: null,
+        reason:
+          "app_generator_test.rb:1012 asserts the cssbundling-rails Gemfile entry; cssbundling-rails is not ported (packages/trailties/CLAUDE.md, A Gemfile is a package.json) and css:install:postcss comes from @blazetrails/vite-trails",
+      },
+    ],
   "trailties:generators/app_generator_test.rb › AppGeneratorTest › devcontainer": [
     {
       kind: "assert_file",

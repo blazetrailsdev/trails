@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
     "@blazetrails/stimulus": "workspace:*",
     "@blazetrails/turbo": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",

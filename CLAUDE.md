@@ -1781,10 +1781,8 @@ dependencies, not ports.
   where `stimulus_with_node.rb:10-12` appends `import "./controllers"`: from
   `entrypoints/`, `./controllers` does not resolve, and vite-plugin-ruby's
   `~` alias names `sourceCodeDir`. Ruled by the operator on 2026-11-18.
-- `trails server` boots the Rack app, `DevServerProxy` forwards Vite
-  requests, and `bin/vite dev` runs Vite in its own process, as in
-  vite_rails. `trailsPlugin` (Rack-inside-Vite) remains only as test
-  infrastructure.
+- `trailsPlugin` (Rack-inside-Vite) and `server/dev-server.ts` remain only
+  as `@internal` test infrastructure.
 - Package and identifier names follow the `rails` → `trails` token rename
   in `docs/ruby-ts-conventions.md`, compound names included: `vite_rails`
   is `@blazetrails/vite-trails` and `ViteRails::*` is `ViteTrails::*`.
@@ -1792,6 +1790,17 @@ dependencies, not ports.
   `@blazetrails/turbo` and `@blazetrails/stimulus`, as `bcrypt-ruby` is
   `@blazetrails/bcrypt`. vite_ruby is `@blazetrails/vite-assets`. The Rails
   spelling survives only where text quotes the Ruby side.
+- Vite covers CSS as it covers JavaScript: cssbundling-rails is not ported.
+  `runCss` keeps `app_base.rb:724-734`'s dispatch, and in a vite app its
+  `css:install:<css>` arm (one per `CSS_OPTIONS` entry) is defined by
+  `@blazetrails/vite-trails` (`lib/tasks/css.rake.ts`), which adds the npm
+  packages Vite needs and imports the stylesheet from the entrypoint. Ruled by
+  the operator on 2026-11-20.
+- `trails server` serves the Rack app through rackup's Node handler and never
+  starts Vite. `vite_trails.proxy` inserts `DevServerProxy` at position 0 when
+  `ViteAssets.isRunProxy()` (`vite_rails/engine.rb:6-8`), and the generated
+  `bin/dev` runs `Procfile.dev` (`web:` plus `vite: bin/vite dev`), as Rails
+  8's jsbundling layout runs it through foreman.
 - dry-cli is not ported. `bin/vite` (`ViteRuby::CLI`) is built on
   `@blazetrails/thor`, with the gem's command class names and `call`
   bodies unchanged and one receipt on the base class and option DSL.

@@ -7,6 +7,10 @@ export interface TrailsPluginOptions {
   app: RackApp | RackMiddleware;
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 export function trailsPlugin(options: TrailsPluginOptions): Plugin {
   let handler!: InstanceType<typeof Handler.Node>;
 

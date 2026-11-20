@@ -1,3 +1,37 @@
+<% if (!this.options.skipJavascript && this.options.javascript === "vite") { -%>
+import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
+
+process.env.PORT ??= "3000";
+
+const children = readFileSync("Procfile.dev", "utf8")
+  .split("\n")
+  .map((line) => line.match(/^([\w-]+):\s*(.+)$/))
+  .filter((match) => match)
+  .map(([, name, command]) => {
+    const child = spawn(command, {
+      shell: true,
+      stdio: ["inherit", "pipe", "pipe"],
+    });
+    const prefix = (chunk) => chunk.toString().replace(/^(?=.)/gm, `${name} | `);
+    child.stdout.on("data", (chunk) => process.stdout.write(prefix(chunk)));
+    child.stderr.on("data", (chunk) => process.stderr.write(prefix(chunk)));
+    child.on("exit", (code) => stop(code ?? 1));
+    return child;
+  });
+
+let stopping = false;
+
+function stop(code) {
+  if (stopping) return;
+  stopping = true;
+  for (const child of children) if (child.exitCode === null) child.kill("SIGTERM");
+  process.exitCode = code;
+}
+
+process.on("SIGINT", () => stop(0));
+process.on("SIGTERM", () => stop(0));
+<% } else { -%>
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -8,3 +42,4 @@ const { status } = spawnSync(
   { stdio: "inherit" },
 );
 process.exit(status ?? 1);
+<% } -%>

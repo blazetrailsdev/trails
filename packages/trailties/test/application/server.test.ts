@@ -15,17 +15,6 @@ vi.mock("../../lib/command/actions.js", async (importOriginal) => ({
 }));
 vi.mock("@blazetrails/trails-tsc", () => ({ watchViews: async () => ({ close() {} }) }));
 const output = vi.hoisted(() => [] as string[]);
-vi.mock("../../lib/server/dev-server.js", async () => {
-  const { Handler } = await import("@blazetrails/rackup");
-  class DevServer {
-    static async run() {
-      output.push("Listening");
-      return { on() {} };
-    }
-  }
-  Handler.register("vite", DevServer);
-  return { DevServer };
-});
 
 const { ServerCommand } = await import("../../lib/commands/server.js");
 
