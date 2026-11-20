@@ -29,15 +29,9 @@ function rubyString(literal: string): string {
 }
 
 function translateArgs(args: string): string {
-  const tokens = args.match(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|:\w+|-?\d+/g) ?? [];
+  const tokens = args.match(/'(?:[^'\\]|\\.)*'|:\w+|-?\d+/g) ?? [];
   return tokens
-    .map((t) =>
-      t.startsWith("'") || t.startsWith('"')
-        ? rubyString(t)
-        : t.startsWith(":")
-          ? `"${t.slice(1)}"`
-          : t,
-    )
+    .map((t) => (t.startsWith("'") ? rubyString(t) : t.startsWith(":") ? `"${t.slice(1)}"` : t))
     .join(", ");
 }
 

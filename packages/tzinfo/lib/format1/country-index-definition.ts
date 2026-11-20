@@ -6,7 +6,7 @@ import { CountryDefiner } from "./country-definer.js";
 
 export interface CountryIndexDefinitionHost {
   _countries: Record<string, CountryInfo>;
-  _descriptionDeduper: StringDeduper | null;
+  _descriptionDeduper?: StringDeduper | null;
 }
 
 /** @internal */
@@ -45,6 +45,6 @@ Object.defineProperty(CountryIndexDefinition, "appendFeatures", {
   value(this: typeof CountryIndexDefinition, base: object): void {
     rbModAppendFeatures(base, this);
     extend(base, ClassMethods);
-    Object.assign(base, { _countries: {}, _descriptionDeduper: null });
+    Object.assign(base, { _countries: {} });
   },
 });
