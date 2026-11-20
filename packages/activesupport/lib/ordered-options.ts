@@ -1,5 +1,5 @@
 import { presence } from "./core-ext/object/blank.js";
-import { KeyError, rbEqual, rbObjClassname } from "@blazetrails/ruby-compat";
+import { fetch, KeyError, rbEqual, rbObjClassname } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
   static name = "ActiveSupport::OrderedOptions";
@@ -70,6 +70,15 @@ export class OrderedOptions {
       throw new TypeError(`${rbObjClassname(obj)} does not have #dig method`);
     }
     return obj;
+  }
+
+  respondToMissing(_name: string, _includePrivate = false): boolean {
+    return true;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  fetch(key: string, ...rest: unknown[]): unknown {
+    return fetch(this.data, String(key), ...rest);
   }
 
   isExtractableOptions(): boolean {

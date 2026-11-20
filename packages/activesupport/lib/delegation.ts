@@ -352,6 +352,8 @@ export namespace Delegation {
    * @inventedArm then — PERMANENT
    * @inventedArm if — PERMANENT
    */
+  const resolvingWriters = new WeakSet<object>();
+
   export function generateMethodMissing(
     owner: { prototype: object },
     target: string,
@@ -386,7 +388,8 @@ export namespace Delegation {
           prop.startsWith("_") ||
           prop === "then" ||
           KERNEL_METHODS.has(prop) ||
-          Object.hasOwn(receiver, "constructor")
+          Object.hasOwn(receiver, "constructor") ||
+          resolvingWriters.has(receiver as object)
         ) {
           return Reflect.get(obj, prop, receiver);
         }
@@ -410,6 +413,30 @@ export namespace Delegation {
         }
         const value = (__target as Record<string, unknown>)[prop];
         return typeof value === "function" ? value.bind(__target) : value;
+      },
+      set(obj, prop, value, receiver) {
+        if (
+          typeof prop === "symbol" ||
+          prop.startsWith("_") ||
+          prop in obj ||
+          prop === targetName
+        ) {
+          return Reflect.set(obj, prop, value, receiver);
+        }
+        resolvingWriters.add(receiver as object);
+        let __target: unknown;
+        try {
+          __target = (receiver as Record<string, unknown>)[targetName];
+        } catch {
+          __target = null;
+        } finally {
+          resolvingWriters.delete(receiver as object);
+        }
+        if (__target == null || !rbObjRespondTo(__target, `${prop}=`)) {
+          return Reflect.set(obj, prop, value, receiver);
+        }
+        (__target as Record<string, unknown>)[prop] = value;
+        return true;
       },
     });
     methodMissingLayers.add(layer);
