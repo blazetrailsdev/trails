@@ -416,6 +416,10 @@ export class AppBuilder extends ActionMethods {
     await this.directory("public", "public", { recursive: false });
   }
 
+  async script(): Promise<void> {
+    await this.emptyDirectoryWithKeepFile("script");
+  }
+
   async storage(): Promise<void> {
     await this.emptyDirectoryWithKeepFile("storage");
     await this.emptyDirectoryWithKeepFile("tmp/storage");
@@ -577,6 +581,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createLibFiles");
     this.methodAdded("createLogFiles");
     this.methodAdded("createPublicFiles");
+    this.methodAdded("createScriptFolder");
     this.methodAdded("createTmpFiles");
     this.methodAdded("createVendorFiles");
     this.methodAdded("createTestFiles");
@@ -592,6 +597,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("deleteNonApiInitializersIfApiOption");
     this.methodAdded("deleteApiInitializers");
     this.methodAdded("deleteNewFrameworkDefaults");
+    this.methodAdded("finishTemplate");
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
     this.publicCommand("generateBundlerBinstub");
@@ -749,6 +755,11 @@ export class AppGenerator extends AppBase {
     await this.build("publicDirectory");
   }
 
+  async createScriptFolder(): Promise<void> {
+    if (this.options.dummyApp) return;
+    await this.build("script");
+  }
+
   async createTmpFiles(): Promise<void> {
     await this.build("tmp");
   }
@@ -844,6 +855,10 @@ export class AppGenerator extends AppBase {
         `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`,
       );
     }
+  }
+
+  async finishTemplate(): Promise<void> {
+    await this.build("leftovers");
   }
 
   /** @internal */

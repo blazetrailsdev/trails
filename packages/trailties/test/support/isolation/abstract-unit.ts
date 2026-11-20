@@ -24,7 +24,7 @@ import { ConnectionAdapters } from "@blazetrails/activerecord";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Application } from "../../../lib/application.js";
 import type { EnvHelpers } from "../env-helpers.js";
-import { Trails } from "../../../lib/trails.js";
+import { Trails, _resetEnv } from "../../../lib/trails.js";
 import { Paths, TRAILS_FRAMEWORK_ROOT } from "./paths.js";
 
 export { Paths, TRAILS_FRAMEWORK_ROOT };
@@ -68,6 +68,7 @@ export class Rack {
       const oldEnv = ENV["TRAILS_ENV"];
       try {
         setEnv("TRAILS_ENV", env);
+        _resetEnv();
 
         const environment = await this.appPath("config", "environment.ts");
         await import(environment);

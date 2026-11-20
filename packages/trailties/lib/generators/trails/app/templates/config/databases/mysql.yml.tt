@@ -2,13 +2,21 @@ export default {
   development: {
     adapter: "mysql2",
     database: "<%= this.appName() %>_development",
-    host: "localhost",
+<% if (this.database.socket) { -%>
+    socket: "<%= this.database.socket %>",
+<% } else { -%>
+    host: process.env.DB_HOST ?? "<%= this.database.host %>",
+<% } -%>
     port: <%= this.database.port %>,
   },
   test: {
     adapter: "mysql2",
     database: "<%= this.appName() %>_test",
-    host: "localhost",
+<% if (this.database.socket) { -%>
+    socket: "<%= this.database.socket %>",
+<% } else { -%>
+    host: process.env.DB_HOST ?? "<%= this.database.host %>",
+<% } -%>
     port: <%= this.database.port %>,
   },
 <% if (this.options.skipSolid) { -%>
