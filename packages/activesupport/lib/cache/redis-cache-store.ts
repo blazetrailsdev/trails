@@ -200,10 +200,8 @@ export class RedisCacheStore extends Store implements CacheStore {
     await this.instrument("delete_matched", pattern, undefined, async () => {
       await _then(this.redis, async (c) => {
         let cursor = "0";
-        const nodes =
-          typeof (c as { nodes?: unknown }).nodes === "function"
-            ? (c as unknown as { nodes(): Redis[] }).nodes()
-            : [c];
+        const client: Redis & { nodes?: () => Redis[] } = c;
+        const nodes = typeof client.nodes === "function" ? client.nodes() : [c];
         for (const node of nodes) {
           do {
             let keys: string[];
