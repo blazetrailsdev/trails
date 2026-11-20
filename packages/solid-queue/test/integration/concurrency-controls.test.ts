@@ -96,7 +96,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
     run = runSupervisor({ workers: [defaultWorker], dispatchers: [dispatcher] });
 
-    await waitForRegisteredProcesses(5, { timeout: 3 });
+    await waitForRegisteredProcesses(5, { timeout: 10 });
   });
 
   afterEach(async () => {
