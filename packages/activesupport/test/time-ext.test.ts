@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { Rational } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "../lib/time-with-zone.js";
 import {
@@ -53,6 +54,7 @@ import {
 } from "../lib/time-ext.js";
 import { isToday, isTomorrow, isYesterday } from "../lib/core-ext/date-and-time/calculations.js";
 import { toFs, formattedOffset, xmlschema } from "../lib/core-ext/time/conversions.js";
+import { formattedOffset as dateTimeFormattedOffset } from "../lib/core-ext/date-time/conversions.js";
 import { toTime } from "../lib/core-ext/date-time/compatibility.js";
 import { withEnvTz } from "../lib/time-zone-test-helpers.js";
 import { toTime as dateToTime } from "../lib/core-ext/date/conversions.js";
@@ -456,9 +458,9 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("formatted offset with utc", () => {
-    const t = RubyTime.utc(2005, 2, 4, 10, 10, 10);
-    const offset = formattedOffset(t);
-    expect(offset).toMatch(/^[+-]\d{2}:\d{2}$/);
+    expect(formattedOffset(RubyTime.utc(2000))).toEqual("+00:00");
+    expect(formattedOffset(RubyTime.utc(2000), false)).toEqual("+0000");
+    expect(formattedOffset(RubyTime.utc(2000), true, "UTC")).toEqual("UTC");
   });
 
   it("days in month with year", () => {
@@ -1343,15 +1345,15 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("formatted offset with utc", () => {
-    const dt = RubyTime.local(2005, 2, 22, 10, 10, 10);
-    const offset = formattedOffset(dt);
-    expect(offset).toMatch(/^[+-]\d{2}:\d{2}$/);
+    expect(dateTimeFormattedOffset(DateTime.civil(2000))).toEqual("+00:00");
+    expect(dateTimeFormattedOffset(DateTime.civil(2000), false)).toEqual("+0000");
+    expect(dateTimeFormattedOffset(DateTime.civil(2000), true, "UTC")).toEqual("UTC");
   });
 
   it("formatted offset with local", () => {
-    const dt = RubyTime.local(2005, 2, 22, 10, 10, 10);
-    const offset = formattedOffset(dt);
-    expect(typeof offset).toBe("string");
+    const dt = DateTime.civil(2005, 2, 21, 10, 11, 12, new Rational(-5, 24));
+    expect(dateTimeFormattedOffset(dt)).toEqual("-05:00");
+    expect(dateTimeFormattedOffset(dt, false)).toEqual("-0500");
   });
 
   it("compare with time", () => {

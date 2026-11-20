@@ -127,7 +127,7 @@ describe("ObjectTryTest", () => {
   });
 
   it("try with private method on delegator", () => {
-    expect(new Decorator(string).try("privateDelegatorMethod")).toBeUndefined();
+    expect(new Decorator(string).try("privateDelegatorMethod")).toBeNull();
   });
 
   it("try with private method on delegator bang", () => {
@@ -135,7 +135,7 @@ describe("ObjectTryTest", () => {
   });
 
   it("try with private method on delegator target", () => {
-    expect(new Decorator(new PrivateKlass()).try("privateMethod")).toBeUndefined();
+    expect(new Decorator(new PrivateKlass()).try("privateMethod")).toBeNull();
   });
 
   it("try with private method on delegator target bang", () => {
@@ -150,12 +150,12 @@ describe("Tryable namespace", () => {
   });
 
   it("try returns undefined for null", () => {
-    expect(Tryable.try(null, "greet")).toBeUndefined();
-    expect(Tryable.try(undefined, "greet")).toBeUndefined();
+    expect(Tryable.try(null, "greet")).toBeNull();
+    expect(Tryable.try(undefined, "greet")).toBeNull();
   });
 
   it("try returns undefined for missing method", () => {
-    expect(Tryable.try({ name: "test" }, "greet")).toBeUndefined();
+    expect(Tryable.try({ name: "test" }, "greet")).toBeNull();
   });
 
   it("try passes arguments", () => {
@@ -169,7 +169,7 @@ describe("Tryable namespace", () => {
   });
 
   it("tryBang returns undefined for null", () => {
-    expect(Tryable.tryBang(null, "greet")).toBeUndefined();
+    expect(Tryable.tryBang(null, "greet")).toBeNull();
   });
 });
 
@@ -185,7 +185,7 @@ describe("Delegator", () => {
 
   it("try returns undefined for null delegate", () => {
     const d = new Delegator(null);
-    expect(d.try("greet")).toBeUndefined();
+    expect(d.try("greet")).toBeNull();
   });
 
   it("tryBang forwards to delegate", () => {
