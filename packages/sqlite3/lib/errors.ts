@@ -128,7 +128,7 @@ for (const [name, klass] of Object.entries({
 
 const { ErrorCode } = SQLite3Constants;
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-0180-sqlite3-gem-story */
 export function status2klass(status: number): typeof Exception | null {
   switch (status & 0xff) {
     case ErrorCode.OK:
@@ -192,7 +192,7 @@ export function status2klass(status: number): typeof Exception | null {
 
 const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-better-sqlite3-engine */
 function nativeStatus(error: unknown): number | null {
   const { errcode, rawCode, code, message } = (error ?? {}) as Record<string, unknown>;
   if (typeof errcode === "number") return errcode & 0xff;
@@ -209,7 +209,7 @@ function nativeStatus(error: unknown): number | null {
   return null;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-better-sqlite3-engine */
 function sqlite3Errmsg(error: unknown): string {
   const { code, message } = error as { code?: unknown; message: string };
   if (code === "ERR_INTERNAL_SQLITE_ERROR") {
@@ -221,7 +221,7 @@ function sqlite3Errmsg(error: unknown): string {
   return message;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-0180-sqlite3-gem-story */
 export function rbSqlite3Raise(error: unknown): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);
@@ -234,7 +234,7 @@ export function rbSqlite3Raise(error: unknown): never {
   throw exception;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-0180-sqlite3-gem-story */
 export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);

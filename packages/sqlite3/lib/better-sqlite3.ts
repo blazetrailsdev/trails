@@ -1,4 +1,4 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-better-sqlite3-engine MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
 import Database from "better-sqlite3";
 import { File, RuntimeError } from "@blazetrails/ruby-compat";
 import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";

@@ -1,4 +1,4 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-libsql-engines MOVED-BY-SHORT-NAME: capabilities, databaseExists, open. */
 import Database from "libsql";
 import { File, FileUtils, RuntimeError } from "@blazetrails/ruby-compat";
 import {
