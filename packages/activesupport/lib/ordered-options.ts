@@ -72,7 +72,7 @@ export class OrderedOptions {
     return obj;
   }
 
-  respondToMissing(name: string, includePrivate = false): boolean {
+  respondToMissing(name: string, includePrivate: boolean): boolean {
     return true;
   }
 

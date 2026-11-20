@@ -7,7 +7,6 @@ import {
   constDefined,
   rbModRemoveConst,
   autoloadDelete,
-  NameError,
   rbAutoloadLoad,
   rbAutoloadStr,
 } from "@blazetrails/ruby-compat";
@@ -95,7 +94,7 @@ describe("ConstantLookupTest", () => {
     const fileName = new URL("../autoloading-fixtures/raises-no-method-error.ts", import.meta.url)
       .pathname;
     try {
-      await assertRaises([NameError], {}, async () => {
+      await assertRaises([TypeError], {}, async () => {
         rbAutoloadStr(TopLevel, testName, fileName);
         await rbAutoloadLoad(TopLevel, testName);
         ConstantLookupTest.determineConstantFromTestName(testName, () => true);
