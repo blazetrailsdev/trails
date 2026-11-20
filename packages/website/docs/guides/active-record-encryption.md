@@ -232,7 +232,7 @@ The options live on `Encryption.config` and are camelCase:
 ### Encryption Contexts
 
 A context bundles the encryptor, key provider and message serializer in use.
-The `Contexts` helpers run a block under a different one. Each block gets a
+`ActiveRecord.Encryption` answers the `Contexts` helpers, which run a block under a different one. Each block gets a
 context of its own even when several run concurrently, as
 [CLAUDE.md](https://github.com/blazetrailsdev/trails/blob/main/CLAUDE.md#a-thread-local-block-stack-forks-per-async-block-isolatedexecutionstatefork)
 records:
