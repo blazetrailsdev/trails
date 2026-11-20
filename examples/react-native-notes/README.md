@@ -64,4 +64,6 @@ The trails rows are filed in the tasks repo: `expo-sqlite-driver-loads-expo-sqli
 `locale-registration-keyed-on-shared-import-meta-url` (4), `adapter-autoload-map-computed-import-unbundleable` (5),
 `async-context-fallback-raises-on-overlapping-scopes` (6), `secure-random-no-host-random-source-outside-node` (7),
 `sqlite3-adapter-requires-fs-adapter-for-driver-owned-database` (8),
-`process-adapter-required-for-process-pid-outside-node` (9) and `expo-sqlite-driver-passes-file-uri-as-database-name` (14). Rows 15–18 are not filed yet.
+`process-adapter-required-for-process-pid-outside-node` (9), `expo-sqlite-driver-passes-file-uri-as-database-name` (14), `date-requires-native-temporal-global` (15),
+`caller-locations-requires-v8-call-site-to-string` (16), `regexp-to-s-emits-modifier-groups-hermes-rejects` (17)
+and `expo-sqlite-driver-binds-bigint-android-bridge-rejects` (18).
