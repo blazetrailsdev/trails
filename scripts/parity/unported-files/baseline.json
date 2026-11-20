@@ -219,12 +219,6 @@
     "reason": "PERMANENT: its `_fetch` reads a cache store inside the lookup, and every ActiveSupport::Cache store read is async \u2014 CLAUDE.md \u00a7 \"A translation lookup is synchronous; the load is an awaited step\". Opt-in mixin; no default configuration includes it."
   },
   {
-    "pattern": "backend/cache_file.rb",
-    "testFile": "backend/cache_file_test.rb",
-    "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 caches parsed translation files on disk."
-  },
-  {
     "pattern": "backend/interpolation_compiler.rb",
     "testFile": "backend/interpolation_compiler_test.rb",
     "package": "i18n",

@@ -18,12 +18,6 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
       "configuration includes it.",
   },
   {
-    pattern: "backend/cache_file.rb",
-    testFile: "backend/cache_file_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend mixin — caches parsed translation files on disk.",
-  },
-  {
     pattern: "backend/interpolation_compiler.rb",
     testFile: "backend/interpolation_compiler_test.rb",
     package: "i18n",
