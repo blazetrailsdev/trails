@@ -1,7 +1,7 @@
+import { beforeEach, describe, it } from "vitest";
 import { File } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { TestCase } from "@blazetrails/trailties/generators/test-case";
-import { beforeEach, describe, it } from "vitest";
 import { StimulusGenerator } from "../lib/generators/stimulus/stimulus-generator.js";
 
 class StimulusGeneratorTest extends TestCase {}
