@@ -135,8 +135,6 @@ const canonicalTables = canonicalTableNames();
 // thousands of lines. package.json's `lint` script raises it to 10240 MB; a
 // bare `eslint .` OOMs.
 const typescriptEslintRules = tseslint.plugin.rules;
-// typescript-eslint exposes its rules as non-configurable getters, so the
-// prefiltered rules ride a copy of the plugin swapped into its configs.
 const typescriptEslintPlugin = {
   ...tseslint.plugin,
   rules: {
