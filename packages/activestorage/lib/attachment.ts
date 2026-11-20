@@ -4,6 +4,8 @@ import type { Variation } from "./variation.js";
 import { type Base } from "@blazetrails/activerecord";
 import { delegateMissingTo, DelegationError, runLoadHooks } from "@blazetrails/activesupport";
 import { ArgumentError, block, fetch } from "@blazetrails/ruby-compat";
+import "./attached/model.js";
+import "./reflection.js";
 import { ActiveStorage } from "./active-storage.js";
 import type { Blob } from "./blob.js";
 import type { NamedVariant } from "./named-variant.js";

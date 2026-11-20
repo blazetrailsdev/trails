@@ -4,6 +4,7 @@ import {
   compactBlank,
   Concern,
   extend,
+  onLoad,
   TopLevel,
   tryCall,
 } from "@blazetrails/activesupport";
@@ -11,6 +12,7 @@ import {
   ArgumentError,
   block,
   hashDelete,
+  include,
   rbFArray,
   rbCallSuper,
   rbInspect,
@@ -309,3 +311,7 @@ Object.defineProperty(Model, "validateServiceConfiguration", {
 Model.ClassMethods = ClassMethods;
 
 Attached.Model = Model;
+
+onLoad("active_record", function (this: typeof Base) {
+  include(this, Model);
+});
