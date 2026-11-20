@@ -13,7 +13,10 @@ describe("analyzers without ffprobe", () => {
   beforeEach(() => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
     ActiveStorage.paths["ffprobe"] = "trails-no-such-ffprobe";
-    ActiveStorage.logger = { info: (message: string) => logged.push(message) } as never;
+    ActiveStorage.logger = {
+      isInfo: () => true,
+      info: (message: string) => logged.push(message),
+    } as never;
     logged.length = 0;
   });
 

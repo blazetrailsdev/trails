@@ -62,7 +62,7 @@ describe("AssertionsTest", () => {
   it("assert difference warns through the tagged logger and re-raises", async () => {
     const warnings: unknown[] = [];
     TopLevel.Trails = {
-      logger: { warn: (msg: unknown) => warnings.push(msg), debug: () => {}, "warn?": true },
+      logger: { warn: (msg: unknown) => warnings.push(msg), debug: () => {}, isWarn: () => true },
     } as never;
     try {
       let counter = 0;

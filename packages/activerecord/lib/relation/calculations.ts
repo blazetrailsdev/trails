@@ -480,7 +480,7 @@ export async function pick(
   >
 ): Promise<unknown> {
   if (this.loaded && isAllAttributes.call(this, columnNames)) {
-    return enumerablePick(await this.records(), ...(columnNames as never[])) ?? null;
+    return enumerablePick(await this.records(), ...(columnNames as never[]));
   }
 
   return this.limit(1)

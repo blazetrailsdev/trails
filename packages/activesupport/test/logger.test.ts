@@ -103,7 +103,7 @@ describe("LoggerTest", () => {
   it("should know if its loglevel is below a given level", () => {
     for (const level of ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"] as const) {
       logger.level = Logger[level] - 1;
-      expect((logger as any)[`${level.toLowerCase()}?`]).toBeTruthy();
+      expect(logger[`is${level[0]}${level.slice(1).toLowerCase()}` as "isDebug"]()).toBeTruthy();
     }
   });
 

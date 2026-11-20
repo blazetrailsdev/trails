@@ -5,7 +5,7 @@ import * as RuntimeRegistry from "../runtime-registry.js";
 
 interface ControllerRuntimeHost {
   dbRuntime: number | null;
-  logger?: { "info?"?: boolean } | null;
+  logger?: { isInfo?(): boolean } | null;
 }
 
 interface ControllerClass {
@@ -45,7 +45,7 @@ export function processAction(
 
 /** @internal */
 export function cleanupViewRuntime<T>(this: ControllerRuntimeHost, block: () => T): T {
-  if (this.logger?.["info?"]) {
+  if (this.logger?.isInfo?.()) {
     const dbRtBeforeRender = RuntimeRegistry.resetRuntimes();
     this.dbRuntime = (this.dbRuntime ?? 0) + dbRtBeforeRender;
     const runtime = rbCallSuper(this, cleanupViewRuntime, block);

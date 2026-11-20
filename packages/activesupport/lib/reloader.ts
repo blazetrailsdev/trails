@@ -74,7 +74,7 @@ export class Reloader extends ExecutionWrapper {
     }
   }
 
-  static wrap<T>(block: () => T, kwargs: { source?: string } = {}): T {
+  static wrap<T>(block: () => T, kwargs: { source?: string } = {}): T | Promise<Awaited<T>> {
     if (this.active()) return block();
 
     return this.executor.wrap(() => {

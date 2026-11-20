@@ -19,9 +19,9 @@ describe("LoggerSilenceTest", () => {
     logger.level = Logger.INFO;
 
     logger.silence(Logger.DEBUG, () => {
-      assertPredicate(logger, (l) => l["debug?"]);
+      assertPredicate(logger, (l) => l.isDebug());
     });
 
-    assertPredicate(logger, (l) => l["info?"]);
+    assertPredicate(logger, (l) => l.isInfo());
   });
 });

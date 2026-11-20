@@ -23,7 +23,7 @@ describe("LogOnUnpermittedParamsTest", () => {
       log.push(block ? block() : (msg ?? ""));
       return true;
     };
-    const logger = { "debug?": true, debug: push, info: push, warn: push, error: push };
+    const logger = { isDebug: () => true, debug: push, info: push, warn: push, error: push };
     const oldLogger = Base.logger;
     Base.logger = logger as never;
     Notifications.unsubscribeAll();

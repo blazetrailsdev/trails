@@ -23,19 +23,19 @@ export class NullLogger {
   fatal(_progname?: any, _block?: () => any): void {}
   unknown(_progname?: any, _block?: () => any): void {}
 
-  get "info?"(): undefined {
+  isInfo(): undefined {
     return undefined;
   }
-  get "debug?"(): undefined {
+  isDebug(): undefined {
     return undefined;
   }
-  get "warn?"(): undefined {
+  isWarn(): undefined {
     return undefined;
   }
-  get "error?"(): undefined {
+  isError(): undefined {
     return undefined;
   }
-  get "fatal?"(): undefined {
+  isFatal(): undefined {
     return undefined;
   }
 

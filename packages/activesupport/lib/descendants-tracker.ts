@@ -11,6 +11,17 @@ export const ReloadedClassesFiltering = {
       _subclassMap.get(this as unknown as AnyClass)?.toA() ?? [],
     );
   },
+
+  get descendants(): AnyClass[] {
+    const subclasses = this.subclasses;
+    return DescendantsTracker.rejectBang(
+      subclasses.concat(
+        subclasses.flatMap(
+          (klass) => (klass as AnyClass & { descendants: AnyClass[] }).descendants,
+        ),
+      ),
+    );
+  },
 };
 
 export class WeakSet<T extends object> extends ObjectSpace.WeakMap<T, boolean> {

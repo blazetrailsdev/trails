@@ -104,40 +104,40 @@ export class BroadcastLogger {
     return this.dispatch((logger) => logger.unknown(...(args as Parameters<Logger["unknown"]>)));
   }
 
-  get "debug?"(): boolean {
-    return this.broadcasts.some((logger) => logger["debug?"]);
+  isDebug(): boolean {
+    return this.broadcasts.some((logger) => logger.isDebug());
   }
 
   debugBang(): void {
     this.dispatch((logger) => logger.debugBang());
   }
 
-  get "info?"(): boolean {
-    return this.broadcasts.some((logger) => logger["info?"]);
+  isInfo(): boolean {
+    return this.broadcasts.some((logger) => logger.isInfo());
   }
 
   infoBang(): void {
     this.dispatch((logger) => logger.infoBang());
   }
 
-  get "warn?"(): boolean {
-    return this.broadcasts.some((logger) => logger["warn?"]);
+  isWarn(): boolean {
+    return this.broadcasts.some((logger) => logger.isWarn());
   }
 
   warnBang(): void {
     this.dispatch((logger) => logger.warnBang());
   }
 
-  get "error?"(): boolean {
-    return this.broadcasts.some((logger) => logger["error?"]);
+  isError(): boolean {
+    return this.broadcasts.some((logger) => logger.isError());
   }
 
   errorBang(): void {
     this.dispatch((logger) => logger.errorBang());
   }
 
-  get "fatal?"(): boolean {
-    return this.broadcasts.some((logger) => logger["fatal?"]);
+  isFatal(): boolean {
+    return this.broadcasts.some((logger) => logger.isFatal());
   }
 
   fatalBang(): void {

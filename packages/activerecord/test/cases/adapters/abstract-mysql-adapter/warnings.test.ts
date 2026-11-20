@@ -43,7 +43,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("db_warnings_action :log on warning", async () => {
       await self().withDbWarningsAction("log", undefined, async () => {
         const mysqlWarning = `[ActiveRecord::SQLWarning] Truncated incorrect DOUBLE value: 'foo' (1292)`;
-        const logger = { warn: vi.fn() };
+        const logger = { isDebug: () => false, isInfo: () => false, warn: vi.fn() };
         const previousLogger = Base.logger;
         Base.logger = logger as never;
         try {

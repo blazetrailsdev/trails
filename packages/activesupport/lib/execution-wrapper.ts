@@ -117,7 +117,10 @@ export class ExecutionWrapper {
   }
 
   /** @inventedArm resume — PERMANENT */
-  static wrap<T>(block: () => T, { source = "application.active_support" } = {}): T {
+  static wrap<T>(
+    block: () => T,
+    { source = "application.active_support" } = {},
+  ): T | Promise<Awaited<T>> {
     if (this.active()) return block();
 
     return new Fiber(() => {
@@ -133,7 +136,7 @@ export class ExecutionWrapper {
           } finally {
             await ran.completeBang();
           }
-        })() as T;
+        })() as Promise<Awaited<T>>;
       }
       let deferred = false;
       try {
@@ -150,7 +153,7 @@ export class ExecutionWrapper {
               await instance.completeBang();
               throw error;
             },
-          ) as T;
+          );
         }
         return result;
       } catch (error) {
@@ -159,10 +162,10 @@ export class ExecutionWrapper {
       } finally {
         if (!deferred) instance.completeBang();
       }
-    }).resume();
+    }).resume() as T | Promise<Awaited<T>>;
   }
 
-  static perform<T>(block: () => T): T {
+  static perform<T>(block: () => T): T | Promise<Awaited<T>> {
     const instance = new this();
     const ran = instance.run();
     if (isThenable(ran)) {
@@ -173,14 +176,14 @@ export class ExecutionWrapper {
         } finally {
           await instance.complete();
         }
-      })() as T;
+      })() as Promise<Awaited<T>>;
     }
     let deferred = false;
     try {
       const result = block();
       if (isThenable(result)) {
         deferred = true;
-        return Promise.resolve(result).finally(() => instance.complete()) as T;
+        return Promise.resolve(result).finally(() => instance.complete()) as Promise<Awaited<T>>;
       }
       return result;
     } finally {

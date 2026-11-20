@@ -67,13 +67,10 @@ export class Start implements UtilsHost {
 
   finish(_name: string, _id: unknown, _payload: Record<string, unknown>): void {}
 
-  /**
-   * @internal
-   * @missingRailsCall debug? — PERMANENT
-   */
+  /** @internal */
   isSilenced(_: unknown): boolean {
     const l = this.logger();
-    return l == null || !l["debug?"];
+    return l == null || !l.isDebug();
   }
 }
 

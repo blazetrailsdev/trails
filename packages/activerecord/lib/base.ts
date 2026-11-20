@@ -742,10 +742,7 @@ export class Base extends Model {
 
   declare static readonly subclasses: (typeof Base)[];
 
-  static get descendants(): (typeof Base)[] {
-    const subclasses = DescendantsTracker.rejectBang(this.subclasses as never) as (typeof Base)[];
-    return subclasses.concat(subclasses.flatMap((klass) => klass.descendants));
-  }
+  declare static readonly descendants: (typeof Base)[];
 
   declare static logger: Logger | null | undefined;
   declare static isLogger: boolean;
@@ -1990,6 +1987,7 @@ Object.defineProperty(Base, "connection", {
 });
 
 extend(Base, ReloadedClassesFiltering);
+extend(Base, DescendantsTracker);
 extend(Base, { collectionCacheKey: _collectionCacheKey });
 extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
 extend(Base, { configurations: _Core.configurations });

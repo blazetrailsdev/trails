@@ -18,7 +18,7 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   startProcessing(event: Event): void {
-    if (!this.logger?.["info?"]) return;
+    if (!this.logger?.isInfo?.()) return;
 
     const payload = event.payload as {
       controller: string;

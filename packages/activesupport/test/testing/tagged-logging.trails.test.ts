@@ -11,7 +11,7 @@ describe("TaggedLoggingTest", () => {
     setTaggedLogger({
       warn: (msg: unknown) => warnings.push(msg),
       debug: () => {},
-      "warn?": true,
+      isWarn: () => true,
     } as never);
     try {
       let counter = 0;
@@ -40,7 +40,7 @@ describe("TaggedLoggingTest", () => {
       warn: () => {},
       debug: () => {},
       info: (msg: unknown) => infos.push(msg),
-      "info?": true,
+      isInfo: () => true,
     } as never);
     try {
       new TestCase("a test").beforeSetup();
@@ -59,7 +59,7 @@ describe("TaggedLoggingTest", () => {
       warn: () => {},
       debug: () => {},
       info: (msg: unknown) => infos.push(msg),
-      "info?": false,
+      isInfo: () => false,
     } as never);
     try {
       new TestCase("a test").beforeSetup();
