@@ -39,7 +39,7 @@
   },
   "peerDependencies": {
     "better-sqlite3": "^13.0.3",
-    "expo-sqlite": "^15.0.0",
+    "expo-sqlite": "^15.0.0 || ^16.0.0 || ^58.0.0",
     "libsql": "^0.5.29"
   },
   "peerDependenciesMeta": {

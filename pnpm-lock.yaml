@@ -665,7 +665,7 @@ importers:
         version: 13.0.3
       expo-sqlite:
         specifier: ^15.0.0 || ^16.0.0 || ^58.0.0
-        version: 15.2.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
+        version: 58.0.18(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       libsql:
         specifier: ^0.5.29
         version: 0.5.29
@@ -1351,8 +1351,8 @@ importers:
         specifier: ^13.0.3
         version: 13.0.3
       expo-sqlite:
-        specifier: ^15.0.0
-        version: 15.2.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
+        specifier: ^15.0.0 || ^16.0.0 || ^58.0.0
+        version: 58.0.18(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       libsql:
         specifier: ^0.5.29
         version: 0.5.29
@@ -5282,13 +5282,6 @@ packages:
   expo-server@58.1.0:
     resolution: {integrity: sha512-jo7I6uHnP5OQYKx3+7lbpdVVnOEwFj2ryDkQdauUQSwgh2HuMUkiFXWUIVe01ts6DLRoff5U0Tv+uNb3CMq/kw==}
     engines: {node: ^22.13.0 || ^24.3.0 || ^26.0.0 || >=27.0.0}
-
-  expo-sqlite@15.2.14:
-    resolution: {integrity: sha512-6tWnEE0fcir30/e7eVwjeC7eKdncfVnIgo2JvnKpRndedyiFMXLMyOQWNVGnuhnSrPV2BHvGGjLByS/j5VgH4w==}
-    peerDependencies:
-      expo: '*'
-      react: '*'
-      react-native: '*'
 
   expo-sqlite@58.0.18:
     resolution: {integrity: sha512-EbRG/tb4Q+M28sZUY+58TSRrj/bK3RBOoGG8xXeobOJnMuBCMhstoKZlTJpu79ydzqURO5TXdbVhqk9suh39rQ==}
@@ -10560,7 +10553,7 @@ snapshots:
   css-tree@3.2.1:
     dependencies:
       mdn-data: 2.27.1
-      source-map-js: 1.2.1
+      source-map-js: 1.2.4
     optional: true
 
   csstype@3.2.3: {}
@@ -11022,26 +11015,19 @@ snapshots:
 
   expo-server@58.1.0: {}
 
-  expo-sqlite@15.2.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0):
-    dependencies:
-      await-lock: 2.2.2
-      expo: 58.0.26(@babel/core@7.29.0(supports-color@8.1.1))(@expo/dom-webview@58.0.2)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(typescript@7.1.0-dev.20260920.1)
-      react: 19.3.0
-      react-native: 0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
-
-  expo-sqlite@15.2.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1))(react@19.3.0):
-    dependencies:
-      await-lock: 2.2.2
-      expo: 58.0.26(@babel/core@7.29.0(supports-color@8.1.1))(@expo/dom-webview@58.0.2)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(typescript@7.1.0-dev.20260920.1)
-      react: 19.3.0
-      react-native: 0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)
-
   expo-sqlite@58.0.18(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0):
     dependencies:
       await-lock: 2.2.2
       expo: 58.0.26(@babel/core@7.29.0(supports-color@8.1.1))(@expo/dom-webview@58.0.2)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(typescript@7.1.0-dev.20260920.1)
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
+
+  expo-sqlite@58.0.18(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1))(react@19.3.0):
+    dependencies:
+      await-lock: 2.2.2
+      expo: 58.0.26(@babel/core@7.29.0(supports-color@8.1.1))(@expo/dom-webview@58.0.2)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(typescript@7.1.0-dev.20260920.1)
+      react: 19.3.0
+      react-native: 0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)
 
   expo@58.0.26(@babel/core@7.29.0(supports-color@8.1.1))(@expo/dom-webview@58.0.2)(react-native@0.88.1(@babel/core@7.29.0(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(typescript@7.1.0-dev.20260920.1):
     dependencies:
