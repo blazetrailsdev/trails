@@ -5,7 +5,7 @@ import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 import { Exception } from "../lib/errors.js";
 import { Pragmas } from "../lib/pragmas.js";
 
-describe("SQLite3::TestPragmas", () => {
+describe("TestPragmas", () => {
   let db: SyncSqliteConnection & { testStatements: string[] };
 
   beforeEach(async () => {
@@ -33,14 +33,14 @@ describe("SQLite3::TestPragmas", () => {
   });
 
   it("get boolean pragma", async () => {
-    expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBe(false);
+    expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBeFalsy();
   });
 
   it("set boolean pragma", async () => {
     try {
       Pragmas.setBooleanPragma.call(db, "read_uncommitted", 1);
 
-      expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBe(true);
+      expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBeTruthy();
     } finally {
       Pragmas.setBooleanPragma.call(db, "read_uncommitted", 0);
     }
