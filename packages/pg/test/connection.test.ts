@@ -149,8 +149,9 @@ describe("PG::Connection", () => {
     const c = await PG.connect(conninfo);
 
     await c.finish();
-    await expect(c.finish()).rejects.toThrow(/connection is closed/i);
-    await expect(c.finish()).rejects.toMatchObject({ connection: c });
+    const finish = c.finish();
+    await expect(finish).rejects.toThrow(/connection is closed/i);
+    await expect(finish).rejects.toMatchObject({ connection: c });
   });
 
   // BLOCKED: pg-result-type-map-defaults-to-strings-for-oids-with-no-coder
