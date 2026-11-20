@@ -275,11 +275,11 @@ describe("buildAutoload", () => {
         get: (key: string) => ({
           toAry: () => [key],
           extensions: () => globs[key]?.match(/\{(\S+)\}/)?.[1].split(","),
-          existent: async () => {
+          existent: () => {
             const full = File.expandPath(key, engineRoot);
             if (globs[key] === undefined) return File.isExist(full) ? [full] : [];
             if (!File.isDirectory(full)) return [];
-            const found = await Dir.globAsync(globs[key], 0, { base: full });
+            const found = Dir.glob(globs[key], 0, { base: full });
             return found.sort().map((file) => File.join(full, file));
           },
         }),
@@ -411,7 +411,7 @@ describe("buildAutoload", () => {
                 ? {
                     toAry: () => [key],
                     extensions: () => undefined,
-                    existent: async () => [File.expandPath("config/initializers/exports.ts")],
+                    existent: () => [File.expandPath("config/initializers/exports.ts")],
                   }
                 : undefined,
           }),
@@ -442,7 +442,7 @@ describe("buildAutoload", () => {
                 ? {
                     toAry: () => [key],
                     extensions: () => undefined,
-                    existent: async () => [File.expandPath("config/initializers/meta.ts")],
+                    existent: () => [File.expandPath("config/initializers/meta.ts")],
                   }
                 : undefined,
           }),
@@ -478,7 +478,7 @@ describe("buildAutoload", () => {
             get: (key: string) => ({
               toAry: () => [key],
               extensions: () => undefined,
-              existent: async () => {
+              existent: () => {
                 const full = File.expandPath(key, root);
                 return File.isExist(full) ? [full] : [];
               },

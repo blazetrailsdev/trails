@@ -32,7 +32,7 @@ export interface BootstrapConfig {
   logFileSize?: number | null;
   broadcastLogLevel?: LogLevel | number | string | null;
   defaultLogFile(): Promise<LoggerOutput>;
-  paths(): { get(path: string): { first(): Promise<string | undefined> } | undefined };
+  paths(): { get(path: string): { first(): string | undefined } | undefined };
   cacheStore?: unknown;
   activeSupport: { cacheFormatVersion?: number };
   middleware?: { insertBefore(...args: unknown[]): void };
