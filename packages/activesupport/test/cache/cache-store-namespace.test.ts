@@ -30,8 +30,8 @@ describe("CacheStoreNamespaceTest", () => {
     await cache.write("foo", "bar");
     await cache.write("fu", "baz");
     await cache.deleteMatched(/^fo/);
-    assertNot(await cache.exist("foo"));
-    assert(await cache.exist("fu"));
+    assertNot(await cache.isExist("foo"));
+    assert(await cache.isExist("fu"));
   });
 
   it("delete matched key", async () => {
@@ -39,7 +39,7 @@ describe("CacheStoreNamespaceTest", () => {
     await cache.write("foo", "bar");
     await cache.write("fu", "baz");
     await cache.deleteMatched(/OO/i);
-    assertNot(await cache.exist("foo"));
-    assert(await cache.exist("fu"));
+    assertNot(await cache.isExist("foo"));
+    assert(await cache.isExist("fu"));
   });
 });

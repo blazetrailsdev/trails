@@ -2,7 +2,9 @@ import { rbEqual } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { Entry } from "../../../lib/cache/entry.js";
 import { coder } from "../../../lib/cache/coder.js";
-import * as Cache from "../../../lib/cache.js";
+import "../../../lib/cache.js";
+import { ActiveSupport } from "../../../lib/namespaces.js";
+import { objectWith } from "../../../lib/core-ext/object/with.js";
 import { deflate, inflate } from "../../../lib/gzip.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 
@@ -32,17 +34,11 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
   });
 
   afterEach(async () => {
-    Cache.setFormatVersion(7.0);
+    ActiveSupport.Cache.formatVersion = 7.0;
   });
 
   function withFormat<T>(formatVersion: number, block: () => T): T {
-    const previous = Cache.formatVersion();
-    Cache.setFormatVersion(formatVersion);
-    try {
-      return block();
-    } finally {
-      Cache.setFormatVersion(previous);
-    }
+    return objectWith(ActiveSupport.Cache, { formatVersion }, block);
   }
 
   function computeEntrySizeReduction(value: unknown, withOptions: StoreOptions = {}): number {

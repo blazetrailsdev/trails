@@ -10,6 +10,7 @@ import {
   assertNoChanges,
 } from "@blazetrails/activesupport/testing/assertions";
 import { ActiveRecord, StatementTimeout } from "@blazetrails/activerecord";
+import { Gem } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SolidCache } from "../lib/index.js";
 import { useSolidCache, waitForBackgroundTasks } from "./support/test-helper.js";
@@ -51,7 +52,7 @@ describe("SolidCache::ExecutionTest", () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       expect(errorSubscriber.errors.length).toBe(1);
       expect(errorSubscriber.errors[0][0].message).toBe("Boom!");
-      if (gemVersion() >= "7.1") {
+      if (gemVersion().compare(new Gem.Version("7.1"))! >= 0) {
         assertEqual(
           {
             context: {},

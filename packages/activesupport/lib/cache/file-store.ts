@@ -5,7 +5,7 @@ import { Entry } from "./entry.js";
 import { ArgumentError, Store, inspectOptions, type StoreOptions } from "./store.js";
 import { atomicWrite } from "../core-ext/file/atomic.js";
 import { kernelInteger } from "@blazetrails/ruby-compat";
-import { hexdigest } from "../hexdigest.js";
+import { Digest } from "../digest.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
 export const FILENAME_MAX_SIZE = 226;
@@ -203,7 +203,7 @@ export class FileStore extends Store implements CacheStore {
     let fname = encodeWwwFormComponent(key as string);
 
     if (fname.length > FILEPATH_MAX_SIZE) {
-      fname = hexdigest(key as string);
+      fname = Digest.hexdigest(key as string);
     }
 
     let hash = adler32(fname);

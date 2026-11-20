@@ -64,14 +64,14 @@ export function cacheStoreVersionBehavior(host: CacheStoreVersionBehaviorHost): 
     const key = SecureRandom.uuid();
 
     await cache.write(key, SecureRandom.hex(), { version: 1 });
-    expect(await cache.exist(key, { version: 1 })).toBeTruthy();
+    expect(await cache.isExist(key, { version: 1 })).toBeTruthy();
   });
 
   it("exist with wrong version should be false", async () => {
     const key = SecureRandom.uuid();
 
     await cache.write(key, SecureRandom.hex(), { version: 1 });
-    expect(await cache.exist(key, { version: 2 })).toBeFalsy();
+    expect(await cache.isExist(key, { version: 2 })).toBeFalsy();
   });
 
   it("reading and writing with model supporting cache version", async () => {
@@ -123,7 +123,7 @@ export function cacheStoreVersionBehavior(host: CacheStoreVersionBehaviorHost): 
     const value = SecureRandom.hex();
 
     await cache.write(m1v1 as never, value);
-    expect(await cache.exist(m1v1 as never)).toBeTruthy();
+    expect(await cache.isExist(m1v1 as never)).toBeTruthy();
     expect(await cache.fetch(m1v2 as never)).toBeFalsy();
   });
 

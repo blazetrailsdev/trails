@@ -69,7 +69,7 @@ describe("Cache::Store instrumentation", () => {
   it("exist? fires cache_exist?.active_support with the normalized key", async () => {
     await cache.write("1", "aaaaaaaaaa");
     const events = await withInstrumentation("exist?", async () => {
-      await cache.exist("1");
+      await cache.isExist("1");
     });
     expect(events.map((e) => e.name)).toEqual(["cache_exist?.active_support"]);
     expect(events[0].payload.key).toBe(await normalizedKey("1"));

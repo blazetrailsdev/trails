@@ -11,6 +11,7 @@ import {
   kernelInteger,
   rbInspect,
   regexpEscape,
+  toI,
 } from "@blazetrails/ruby-compat";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
 import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
@@ -21,16 +22,9 @@ import { extractOptionsBang, isPlainObject, toParam } from "../hash-utils.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import { cattrAccessor } from "../module-ext.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
+import { ActiveSupport } from "../namespaces.js";
 
-let _formatVersion = 7.0;
-
-export function formatVersion(): number {
-  return _formatVersion;
-}
-
-export function setFormatVersion(value: number): void {
-  _formatVersion = value;
-}
+ActiveSupport.Cache.formatVersion = 7.0;
 
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
@@ -113,25 +107,6 @@ export abstract class Store {
     cattrAccessor.call(this, "raiseOnInvalidCacheExpirationTime", { default: false });
   }
 
-  static with<T>(options: { logger: CacheLogger }, fn: () => T): T {
-    const prev = Store.logger;
-    Store.logger = options.logger;
-    let result: T;
-    try {
-      result = fn();
-    } catch (error) {
-      Store.logger = prev;
-      throw error;
-    }
-    if (typeof (result as { then?: unknown } | null)?.then === "function") {
-      return Promise.resolve(result).finally(() => {
-        Store.logger = prev;
-      }) as T;
-    }
-    Store.logger = prev;
-    return result;
-  }
-
   static retrievePoolOptions(options: StoreOptions): StoreOptions | false | undefined {
     let poolOptions: StoreOptions | boolean | null | undefined;
     if ("pool" in options) {
@@ -174,7 +149,7 @@ export abstract class Store {
     let coder = this.options.coder as CacheCoder | null | undefined;
     delete this.options.coder;
     if (!hadCoder) {
-      const legacySerializer = formatVersion() < 7.1 && !this.options.serializer;
+      const legacySerializer = ActiveSupport.Cache.formatVersion! < 7.1 && !this.options.serializer;
       let serializer = this.options.serializer as Serializer | string | undefined;
       delete this.options.serializer;
       serializer ||= this.defaultSerializer();
@@ -409,7 +384,7 @@ export abstract class Store {
     );
   }
 
-  async exist(name: unknown, options?: StoreOptions): Promise<boolean> {
+  async isExist(name: unknown, options?: StoreOptions): Promise<boolean> {
     options = this.mergedOptions(options);
     const key = await this.normalizeKey(name, options);
     return await this.instrument("exist?", key, undefined, async () => {
@@ -508,14 +483,14 @@ export abstract class Store {
   }
 
   private defaultSerializer(): Serializer {
-    switch (formatVersion()) {
+    switch (ActiveSupport.Cache.formatVersion) {
       case 7.0:
         return SerializerWithFallback.get("marshal_7_0");
       case 7.1:
         return SerializerWithFallback.get("marshal_7_1");
       default:
         throw new ArgumentError(
-          `Unrecognized ActiveSupport::Cache.format_version: ${rbInspect(formatVersion())}`,
+          `Unrecognized ActiveSupport::Cache.format_version: ${rbInspect(ActiveSupport.Cache.formatVersion)}`,
         );
     }
   }
@@ -593,7 +568,7 @@ export abstract class Store {
 
     callOptions = Store.normalizeOptions({ ...callOptions });
 
-    if (callOptions.expiresIn != null && callOptions.expiresAt != null) {
+    if (Object.hasOwn(callOptions, "expiresIn") && Object.hasOwn(callOptions, "expiresAt")) {
       throw new ArgumentError("Either :expires_in or :expires_at can be supplied, but not both");
     }
 
@@ -650,7 +625,7 @@ export abstract class Store {
       throw new ArgumentError("Cannot specify :compressor and :coder options together");
     }
 
-    if (formatVersion() < 7.1 && !options.serializer && options.compressor) {
+    if (ActiveSupport.Cache.formatVersion! < 7.1 && !options.serializer && options.compressor) {
       throw new ArgumentError(
         "Cannot specify :compressor option when using" +
           " default serializer and cache format version is < 7.1",
@@ -766,7 +741,7 @@ export abstract class Store {
     options: StoreOptions,
   ): Promise<Entry | null> {
     if (entry && entry.isExpired()) {
-      const raceTtl = typeof options.raceConditionTtl === "number" ? options.raceConditionTtl : 0;
+      const raceTtl = Number(toI(options.raceConditionTtl));
       if (raceTtl > 0 && Time.now().toF() - (entry.expiresAt ?? 0) <= raceTtl) {
         entry.expiresAt = Time.now().toF() + raceTtl;
         await this.writeEntry(key, entry, { ...options, expiresIn: raceTtl * 2 });

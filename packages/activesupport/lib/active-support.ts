@@ -2,7 +2,7 @@ import { deprecator } from "./deprecator.js";
 import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
 import { ActiveSupport } from "./namespaces.js";
 import { preserveTimezone, setPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
-import { formatVersion, setFormatVersion } from "./cache/store.js";
+import "./cache/store.js";
 
 let _testOrder: string | null = null;
 
@@ -25,11 +25,11 @@ export function setTestParallelizationThreshold(value: number): void {
 }
 
 export function cacheFormatVersion(): number {
-  return formatVersion();
+  return ActiveSupport.Cache.formatVersion!;
 }
 
 export function setCacheFormatVersion(value: number): void {
-  setFormatVersion(value);
+  ActiveSupport.Cache.formatVersion = value;
 }
 
 export function toTimePreservesTimezone(): boolean | string {

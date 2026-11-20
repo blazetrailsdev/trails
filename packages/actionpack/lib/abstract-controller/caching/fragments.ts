@@ -150,7 +150,7 @@ export async function fragmentExist(
   if (!this.isCacheConfigured()) return null;
   key = combinedFragmentCacheKey.call(this, key);
   return (await instrumentFragmentCache.call(this, "exist_fragment?", key, () =>
-    this.cacheStore!.exist(key, options),
+    this.cacheStore!.isExist(key, options),
   )) as boolean | undefined;
 }
 

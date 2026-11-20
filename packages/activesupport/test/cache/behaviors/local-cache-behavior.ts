@@ -175,7 +175,7 @@ export function localCacheBehavior(host?: LocalCacheBehaviorHost): void {
   it("local cache fetch on miss", async () => {
     const key = crypto.randomUUID();
     await cache.withLocalCache(async () => {
-      expect(await cache.exist(key)).toBe(false);
+      expect(await cache.isExist(key)).toBe(false);
       const value = await cache.fetch(key, () => "fetch-yielded");
       expect(value).toBe("fetch-yielded");
 
@@ -231,8 +231,8 @@ export function localCacheBehavior(host?: LocalCacheBehaviorHost): void {
       await cache.write(otherKey, alphanumeric());
       await cache.write(thirdKey, value);
       await cache.deleteMatched(`${prefix}*`);
-      assertNot(await cache.exist(key));
-      assertNot(await cache.exist(otherKey));
+      assertNot(await cache.isExist(key));
+      assertNot(await cache.isExist(otherKey));
       expect(await cache.read(thirdKey)).toBe(value);
     });
   });
@@ -242,7 +242,7 @@ export function localCacheBehavior(host?: LocalCacheBehaviorHost): void {
     await cache.withLocalCache(async () => {
       await cache.write(key, alphanumeric());
       await peek.delete(key);
-      assert(await cache.exist(key));
+      assert(await cache.isExist(key));
     });
   });
 
@@ -281,7 +281,7 @@ export function localCacheBehavior(host?: LocalCacheBehaviorHost): void {
 
     await cache.withLocalCache(async () => {
       await cache.fetch(existingKey, () => "exist");
-      expect(await cache.exist("known-missing")).toBe(false);
+      expect(await cache.isExist("known-missing")).toBe(false);
 
       let results = await cache.fetchMulti(
         knownMissingKey,

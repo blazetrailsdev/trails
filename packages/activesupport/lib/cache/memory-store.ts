@@ -79,7 +79,7 @@ export class MemoryStore extends Store implements CacheStore {
     options: Record<string, unknown>,
   ): Promise<boolean> {
     const payload = this.serializeEntry(entry, options) as Entry | string;
-    if (options.unlessExist && (await this.exist(key, { namespace: null }))) return false;
+    if (options.unlessExist && (await this.isExist(key, { namespace: null }))) return false;
 
     const oldPayload = this.data.get(key);
     if (oldPayload !== undefined) {

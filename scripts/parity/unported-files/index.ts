@@ -35,7 +35,6 @@ import { SOLID_QUEUE_UNPORTED_FILES } from "./solid-queue.js";
 import { THOR_UNPORTED_FILES } from "./thor.js";
 import { TRAILTIES_UNPORTED_FILES } from "./trailties.js";
 import { UNSCOPED_UNPORTED_FILES } from "./unscoped.js";
-import { VERSION_UNPORTED_FILES } from "./version.js";
 import { ZEITWERK_UNPORTED_FILES } from "./zeitwerk.js";
 
 export type { UnportedFile } from "./types.js";
@@ -68,7 +67,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...THOR_UNPORTED_FILES,
   ...TRAILTIES_UNPORTED_FILES,
   ...UNSCOPED_UNPORTED_FILES,
-  ...VERSION_UNPORTED_FILES,
   ...ZEITWERK_UNPORTED_FILES,
 ];
 

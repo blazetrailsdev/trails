@@ -6,6 +6,10 @@ import {
   Executor,
   Reloader,
 } from "@blazetrails/activesupport";
+import {
+  beginningOfWeek,
+  setBeginningOfWeekDefault,
+} from "@blazetrails/activesupport/core-ext/date/calculations";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "../../lib/trailties/active-support.js";
 
@@ -23,6 +27,7 @@ describe("ActiveSupport::Railtie executor hooks", () => {
 
   async function boot() {
     Trailtie.config.set("timeZone", "UTC");
+    Trailtie.config.set("beginningOfWeek", ":monday");
     const app = {
       config: Trailtie.config,
       deprecators: new Deprecators(),
@@ -53,5 +58,24 @@ describe("ActiveSupport::Railtie executor hooks", () => {
     await app.executor.wrap(async () => {
       expect(ExecutionContext.toH()).toEqual({});
     });
+  });
+});
+
+describe("ActiveSupport::Railtie initialize_beginning_of_week", () => {
+  afterEach(() => {
+    setBeginningOfWeekDefault(null);
+  });
+
+  it("routes config.beginningOfWeek into Date.beginningOfWeek", async () => {
+    Trailtie.config.set("timeZone", "UTC");
+    Trailtie.config.set("beginningOfWeek", ":wednesday");
+    const app = {
+      config: Trailtie.config,
+      deprecators: new Deprecators(),
+      executor: class extends Executor {},
+      reloader: class extends Reloader {},
+    };
+    await runTrailtieInitializers(Trailtie, app);
+    expect(beginningOfWeek()).toBe(":wednesday");
   });
 });

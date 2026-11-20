@@ -7,7 +7,8 @@ import {
   uniq,
 } from "@blazetrails/ruby-compat";
 import { Entry } from "../../../lib/cache/entry.js";
-import { formatVersion as cacheFormatVersion, setFormatVersion } from "../../../lib/cache/store.js";
+import { ActiveSupport } from "../../../lib/namespaces.js";
+import { objectWith } from "../../../lib/core-ext/object/with.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 
 /** @internal */
@@ -88,7 +89,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
 
         rbModRemoveConst(CacheStoreFormatVersionBehaviorTest, "RemovedConstant");
         expect(await store.read(key)).toBeNull();
-        expect(await store.exist(key)).toBe(false);
+        expect(await store.isExist(key)).toBe(false);
       } finally {
         try {
           rbModRemoveConst(CacheStoreFormatVersionBehaviorTest, "RemovedConstant");
@@ -147,11 +148,5 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
 }
 
 function withFormat<T>(formatVersion: number, block: () => T): T {
-  const old = cacheFormatVersion();
-  setFormatVersion(formatVersion);
-  try {
-    return block();
-  } finally {
-    setFormatVersion(old);
-  }
+  return objectWith(ActiveSupport.Cache, { formatVersion }, block);
 }

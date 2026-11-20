@@ -2,6 +2,7 @@ import { beforeEach, expect, it } from "vitest";
 import { StringIO, regexpEscape } from "@blazetrails/ruby-compat";
 import { Logger } from "../../../lib/logger.js";
 import { Store, type StoreOptions } from "../../../lib/cache/store.js";
+import { objectWith } from "../../../lib/core-ext/object/with.js";
 
 /** @internal */
 export interface CacheLoggingBehaviorHost {
@@ -70,13 +71,13 @@ export function cacheLoggingBehavior(host: CacheLoggingBehaviorHost): void {
 
   it("exist logging", async () => {
     await assertLogs(new RegExp(`Cache exist\\?: ${keyPattern("foo").source}`), async () => {
-      await cache.exist("foo");
+      await cache.isExist("foo");
     });
 
     await assertLogs(
       new RegExp(`Cache exist\\?: ${keyPattern("foo", { namespace: "bar" }).source}`),
       async () => {
-        await cache.exist("foo", { namespace: "bar" });
+        await cache.isExist("foo", { namespace: "bar" });
       },
     );
   });
@@ -104,7 +105,11 @@ export function cacheLoggingBehavior(host: CacheLoggingBehaviorHost): void {
 
   async function assertLogs(pattern: RegExp | string, block: () => unknown): Promise<void> {
     const io = new StringIO();
-    await Store.with({ logger: new Logger(io, { level: "debug" }) }, async () => await block());
+    await objectWith(
+      Store,
+      { logger: new Logger(io, { level: "debug" }) },
+      async () => await block(),
+    );
     if (typeof pattern === "string") expect(io.string()).toContain(pattern);
     else expect(io.string()).toMatch(pattern);
   }

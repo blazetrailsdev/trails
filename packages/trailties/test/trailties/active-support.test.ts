@@ -8,6 +8,7 @@ import {
   Executor,
   Reloader,
   DEFAULT_BEHAVIORS,
+  runLoadHooks,
   deprecator as activeSupportDeprecator,
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
@@ -30,6 +31,7 @@ describe("RailtieTest", () => {
   beforeEach(() => {
     deprecators = new Deprecators();
     Trailtie.config.set("timeZone", "UTC");
+    Trailtie.config.set("beginningOfWeek", ":monday");
     app = {
       config: Trailtie.config,
       deprecators,
@@ -79,6 +81,7 @@ describe("RailtieTest", () => {
     const custom = new DigestClass("sha256", "OpenSSL::Digest::SHA256");
     Trailtie.config.set("activeSupport", { hashDigestClass: custom } satisfies ActiveSupportConfig);
     await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("after_initialize", app);
     expect(Digest.hashDigestClass).toBe(custom);
   });
 
@@ -112,6 +115,7 @@ describe("RailtieTest", () => {
       deprecation: "raise",
       disallowedDeprecation: "raise",
       disallowedDeprecationWarnings: ["bad"],
+      toTimePreservesTimezone: ":zone",
     } satisfies ActiveSupportConfig);
     const savedBehavior = deprecator.behavior;
     const savedDisallowed = deprecator.disallowedBehavior;
@@ -141,6 +145,7 @@ describe("RailtieTest", () => {
     const appConfig: Record<string, unknown> = {
       activeSupport: { hashDigestClass: custom } satisfies ActiveSupportConfig,
       timeZone: "UTC",
+      beginningOfWeek: ":monday",
     };
     const yieldedApp = {
       config: appConfig,
@@ -150,6 +155,7 @@ describe("RailtieTest", () => {
     };
     Trailtie.config.set("activeSupport", {} satisfies ActiveSupportConfig);
     await runTrailtieInitializers(Trailtie, yieldedApp);
+    runLoadHooks("after_initialize", yieldedApp);
     expect(Digest.hashDigestClass).toBe(custom);
   });
 });

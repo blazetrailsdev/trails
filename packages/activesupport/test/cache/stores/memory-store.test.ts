@@ -175,8 +175,8 @@ describe("MemoryStore delete_matched namespacing", () => {
     await cache.write("foo", "bar");
     await cache.write("fu", "baz");
     await cache.deleteMatched(/oo/);
-    expect(await cache.exist("foo")).toBe(false);
-    expect(await cache.exist("fu")).toBe(true);
+    expect(await cache.isExist("foo")).toBe(false);
+    expect(await cache.isExist("fu")).toBe(true);
   });
 });
 
@@ -215,11 +215,11 @@ describe("MemoryStorePruningTest", () => {
     await store.read("2");
     await store.read("4");
     await store.prune(recordSize * 3);
-    assert(await store.exist("5"));
-    assert(await store.exist("4"));
-    assertNot(await store.exist("3"), "no entry");
-    assert(await store.exist("2"));
-    assertNot(await store.exist("1"), "no entry");
+    assert(await store.isExist("5"));
+    assert(await store.isExist("4"));
+    assertNot(await store.isExist("3"), "no entry");
+    assert(await store.isExist("2"));
+    assertNot(await store.isExist("1"), "no entry");
   });
 
   it("prune size on write", async () => {
@@ -228,17 +228,17 @@ describe("MemoryStorePruningTest", () => {
     await store.read("2");
     await store.read("4");
     await store.write("11", "llllllllll");
-    assert(await store.exist("11"));
-    assert(await store.exist("10"));
-    assert(await store.exist("9"));
-    assert(await store.exist("8"));
-    assert(await store.exist("7"));
-    assertNot(await store.exist("6"), "no entry");
-    assertNot(await store.exist("5"), "no entry");
-    assert(await store.exist("4"));
-    assertNot(await store.exist("3"), "no entry");
-    assert(await store.exist("2"));
-    assertNot(await store.exist("1"), "no entry");
+    assert(await store.isExist("11"));
+    assert(await store.isExist("10"));
+    assert(await store.isExist("9"));
+    assert(await store.isExist("8"));
+    assert(await store.isExist("7"));
+    assertNot(await store.isExist("6"), "no entry");
+    assertNot(await store.isExist("5"), "no entry");
+    assert(await store.isExist("4"));
+    assertNot(await store.isExist("3"), "no entry");
+    assert(await store.isExist("2"));
+    assertNot(await store.isExist("1"), "no entry");
   });
 
   it("prune size on write based on key length", async () => {
@@ -246,16 +246,16 @@ describe("MemoryStorePruningTest", () => {
     for (let i = 1; i <= 9; i++) await store.write(String(i), values[i - 1].repeat(10));
     const longKey = "*".repeat(2 * recordSize);
     await store.write(longKey, "llllllllll");
-    assert(await store.exist(longKey));
-    assert(await store.exist("9"));
-    assert(await store.exist("8"));
-    assert(await store.exist("7"));
-    assert(await store.exist("6"));
-    assertNot(await store.exist("5"), "no entry");
-    assertNot(await store.exist("4"), "no entry");
-    assertNot(await store.exist("3"), "no entry");
-    assertNot(await store.exist("2"), "no entry");
-    assertNot(await store.exist("1"), "no entry");
+    assert(await store.isExist(longKey));
+    assert(await store.isExist("9"));
+    assert(await store.isExist("8"));
+    assert(await store.isExist("7"));
+    assert(await store.isExist("6"));
+    assertNot(await store.isExist("5"), "no entry");
+    assertNot(await store.isExist("4"), "no entry");
+    assertNot(await store.isExist("3"), "no entry");
+    assertNot(await store.isExist("2"), "no entry");
+    assertNot(await store.isExist("1"), "no entry");
   });
 
   it("pruning is capped at a max time", async () => {
@@ -272,11 +272,11 @@ describe("MemoryStorePruningTest", () => {
     await store.write("4", "dddddddddd");
     await store.write("5", "eeeeeeeeee");
     await store.prune(30, 0.001);
-    assert(await store.exist("5"));
-    assert(await store.exist("4"));
-    assert(await store.exist("3"));
-    assert(await store.exist("2"));
-    assertNot(await store.exist("1"), "no entry");
+    assert(await store.isExist("5"));
+    assert(await store.isExist("4"));
+    assert(await store.isExist("3"));
+    assert(await store.isExist("2"));
+    assertNot(await store.isExist("1"), "no entry");
   });
 
   it("cache not mutated", async () => {
@@ -323,7 +323,7 @@ describe("CacheStoreRaceConditionTtlTest", () => {
     await store.write("foo", "stale", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 30));
     let seenDuringRegen: unknown;
-    await store.fetch("foo", { raceConditionTtl: 0.5 }, async () => {
+    await store.fetch("foo", { raceConditionTtl: 1 }, async () => {
       seenDuringRegen = await store.read("foo");
       return "fresh";
     });
