@@ -85,6 +85,21 @@ export function listen(conn: Connection, client: Client): void {
       "parameterStatus",
       (message: { parameterName: string; parameterValue: string }) => {
         conn.parameterStatuses[message.parameterName] = message.parameterValue;
+        if (message.parameterName === "server_version") {
+          const match = /^(\d+)(?:\.(\d+)(?:\.(\d+))?)?/.exec(message.parameterValue);
+          const cnt = match == null ? 0 : match.slice(1).filter((part) => part != null).length;
+          const [vmaj, vmin, vrev] = (match ?? []).slice(1).map(Number);
+          if (cnt == 3) {
+            conn.sversion = (100 * vmaj + vmin) * 100 + vrev;
+          } else if (cnt == 2) {
+            if (vmaj >= 10) conn.sversion = 100 * 100 * vmaj + vmin;
+            else conn.sversion = (100 * vmaj + vmin) * 100;
+          } else if (cnt == 1) {
+            conn.sversion = 100 * 100 * vmaj;
+          } else {
+            conn.sversion = 0;
+          }
+        }
       },
     );
     connection.on("errorMessage", () => {

@@ -143,14 +143,22 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("reconnect after bad connection on check version", async () => {
-      await adapter.getDatabaseVersion();
-      (adapter.pool as unknown as { _serverVersion: unknown })._serverVersion = null;
-      const versionSpy = vi.spyOn(adapter, "_serverVersion").mockResolvedValue(0);
-      const error = await assertRaises([ConnectionFailed], {}, () => adapter.reconnectBang());
-      expect(error.message).toBe("Could not determine PostgreSQL version");
-      versionSpy.mockRestore();
+      const connection = new PostgreSQLAdapter({ ...PG_TEST_CONFIG, connectionRetries: 0 });
+      try {
+        await connection.connectBang();
 
-      await assertNothingRaised(() => adapter.reconnectBang());
+        (connection.pool as unknown as { _serverVersion: unknown })._serverVersion = null;
+        const versionSpy = vi
+          .spyOn(connection._rawConnection as PGConnection, "serverVersion")
+          .mockReturnValue(0);
+        const error = await assertRaises([ConnectionFailed], {}, () => connection.reconnectBang());
+        expect(error.message).toBe("Could not determine PostgreSQL version");
+        versionSpy.mockRestore();
+
+        await assertNothingRaised(() => connection.reconnectBang());
+      } finally {
+        await connection.disconnectBang();
+      }
     });
 
     it("database exists returns false when the database does not exist", async () => {
