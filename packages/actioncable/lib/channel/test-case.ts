@@ -207,7 +207,7 @@ function stubConnection(this: Host, identifiers: Data = {}): ConnectionStub {
 async function subscribe(this: Host, params: Data = {}): Promise<StubbedSubscription> {
   this._connection ??= stubConnection.call(this);
   this._subscription = new ((this.constructor as unknown as BehaviorClass).channelClass())(
-    this.connection,
+    this.connection as never,
     CHANNEL_IDENTIFIER,
     withIndifferentAccess(params),
   ) as StubbedSubscription;
