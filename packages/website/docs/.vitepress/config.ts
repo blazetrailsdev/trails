@@ -57,7 +57,12 @@ export default defineConfig({
         },
         {
           text: "Other Components",
-          items: [{ text: "Action Cable Overview", link: "/guides/action-cable-overview" }],
+          items: [
+            { text: "Action Mailer Basics", link: "/guides/action-mailer-basics" },
+            { text: "Action Mailbox Basics", link: "/guides/action-mailbox-basics" },
+            { text: "Action Text Overview", link: "/guides/action-text-overview" },
+            { text: "Action Cable Overview", link: "/guides/action-cable-overview" },
+          ],
         },
         {
           text: "Rails Guides",
