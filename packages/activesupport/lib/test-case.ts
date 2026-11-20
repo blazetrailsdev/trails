@@ -15,19 +15,12 @@ import {
 import { afterTeardown as testsWithoutAssertionsAfterTeardown } from "./testing/tests-without-assertions.js";
 import {
   Minitest,
-  assertNot,
-  assertNotIncludes,
-  assertRaises,
-  assertRaise,
-  assertNothingRaised,
-  assertDifference,
-  assertNoDifference,
-  assertChanges,
-  assertNoChanges,
+  Assertions,
   assertNotEmpty,
   assertNotEqual,
   assertNotInDelta,
   assertNotInEpsilon,
+  assertNotIncludes,
   assertNotInstanceOf,
   assertNotKindOf,
   assertNoMatch,
@@ -38,12 +31,8 @@ import {
   assertNotSame,
 } from "./testing/assertions.js";
 import { ErrorReporterAssertions } from "./testing/error-reporter-assertions.js";
-import { stubConst } from "./testing/constant-stubbing.js";
-import {
-  assertDeprecated,
-  assertNotDeprecated,
-  collectDeprecations,
-} from "./testing/deprecation.js";
+import { ConstantStubbing } from "./testing/constant-stubbing.js";
+import { Deprecation } from "./testing/deprecation.js";
 import { TimeHelpers } from "./testing/time-helpers.js";
 import { FileFixtures } from "./testing/file-fixtures.js";
 import "./executor/test-helper.js";
@@ -64,8 +53,25 @@ export class TestCase extends Minitest.Test {
   declare static isFileFixturePath: () => boolean;
   declare isFileFixturePath: () => boolean;
   declare fileFixture: typeof FileFixtures.fileFixture;
+  declare assertNot: typeof Assertions.assertNot;
+  declare assertRaises: typeof Assertions.assertRaises;
+  declare assertRaise: typeof Assertions.assertRaise;
+  declare assertNothingRaised: typeof Assertions.assertNothingRaised;
+  declare assertDifference: typeof Assertions.assertDifference;
+  declare assertNoDifference: typeof Assertions.assertNoDifference;
+  declare assertChanges: typeof Assertions.assertChanges;
+  declare assertNoChanges: typeof Assertions.assertNoChanges;
   declare assertNoErrorReported: typeof ErrorReporterAssertions.assertNoErrorReported;
   declare assertErrorReported: typeof ErrorReporterAssertions.assertErrorReported;
+  declare assertDeprecated: typeof Deprecation.assertDeprecated;
+  declare assertNotDeprecated: typeof Deprecation.assertNotDeprecated;
+  declare collectDeprecations: typeof Deprecation.collectDeprecations;
+  declare stubConst: typeof ConstantStubbing.stubConst;
+  declare travel: typeof TimeHelpers.travel;
+  declare travelTo: typeof TimeHelpers.travelTo;
+  declare travelBack: typeof TimeHelpers.travelBack;
+  declare unfreezeTime: typeof TimeHelpers.unfreezeTime;
+  declare freezeTime: typeof TimeHelpers.freezeTime;
   declare static setup: Extended<typeof SetupAndTeardownClassMethods>["setup"];
   declare static teardown: Extended<typeof SetupAndTeardownClassMethods>["teardown"];
 
@@ -103,34 +109,19 @@ export class TestCase extends Minitest.Test {
   /** @internal */
   static taggedLogger = taggedLogger;
 
-  static assertNot = assertNot;
-  static assertNotIncludes = assertNotIncludes;
-  static assertRaises = assertRaises;
-  static assertRaise = assertRaise;
-  static assertNothingRaised = assertNothingRaised;
-  static assertDifference = assertDifference;
-  static assertNoDifference = assertNoDifference;
-  static assertChanges = assertChanges;
-  static assertNoChanges = assertNoChanges;
-
-  static assertNotEmpty = assertNotEmpty;
-  static assertNotEqual = assertNotEqual;
-  static assertNotInDelta = assertNotInDelta;
-  static assertNotInEpsilon = assertNotInEpsilon;
-  static assertNotInstanceOf = assertNotInstanceOf;
-  static assertNotKindOf = assertNotKindOf;
-  static assertNoMatch = assertNoMatch;
-  static assertNotNil = assertNotNil;
-  static assertNotOperator = assertNotOperator;
-  static assertNotPredicate = assertNotPredicate;
-  static assertNotRespondTo = assertNotRespondTo;
-  static assertNotSame = assertNotSame;
-
-  static assertDeprecated = assertDeprecated;
-  static assertNotDeprecated = assertNotDeprecated;
-  static collectDeprecations = collectDeprecations;
-
-  static stubConst = stubConst;
+  declare assertNotEmpty: typeof assertNotEmpty;
+  declare assertNotEqual: typeof assertNotEqual;
+  declare assertNotInDelta: typeof assertNotInDelta;
+  declare assertNotInEpsilon: typeof assertNotInEpsilon;
+  declare assertNotIncludes: typeof assertNotIncludes;
+  declare assertNotInstanceOf: typeof assertNotInstanceOf;
+  declare assertNotKindOf: typeof assertNotKindOf;
+  declare assertNoMatch: typeof assertNoMatch;
+  declare assertNotNil: typeof assertNotNil;
+  declare assertNotOperator: typeof assertNotOperator;
+  declare assertNotPredicate: typeof assertNotPredicate;
+  declare assertNotRespondTo: typeof assertNotRespondTo;
+  declare assertNotSame: typeof assertNotSame;
 }
 
 include(TestCase, TaggedLogging);
@@ -140,9 +131,28 @@ prepend(TestCase, {
 });
 setupAndTeardownPrepended(TestCase);
 prepend(TestCase, { afterTeardown: testsWithoutAssertionsAfterTeardown });
+include(TestCase, Assertions);
 include(TestCase, ErrorReporterAssertions);
+include(TestCase, Deprecation);
+include(TestCase, ConstantStubbing);
 include(TestCase, TimeHelpers);
 include(TestCase, FileFixtures);
+
+Object.assign(TestCase.prototype, {
+  assertNotEmpty,
+  assertNotEqual,
+  assertNotInDelta,
+  assertNotInEpsilon,
+  assertNotIncludes,
+  assertNotInstanceOf,
+  assertNotKindOf,
+  assertNoMatch,
+  assertNotNil,
+  assertNotOperator,
+  assertNotPredicate,
+  assertNotRespondTo,
+  assertNotSame,
+});
 
 ActiveSupport.TestCase = TestCase;
 

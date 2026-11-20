@@ -53,3 +53,7 @@ export function stubConst<T>(
     }
   }
 }
+
+export const ConstantStubbing = {
+  stubConst,
+};

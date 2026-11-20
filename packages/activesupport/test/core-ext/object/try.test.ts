@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { tryBang, tryCall, tryWith } from "../../../lib/try.js";
+import { tryCall, tryWith } from "../../../lib/try.js";
 import { assertNotRespondTo } from "../../../lib/testing/assertions.js";
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import { Tryable, Delegator } from "../../../lib/core-ext/object/try.js";
 
 class PrivateKlass {
@@ -51,13 +52,13 @@ describe("ObjectTryTest", () => {
   it("nonexisting method bang", () => {
     const method = "undefinedMethod";
     assertNotRespondTo(string, method);
-    expect(() => tryBang(str, method)).toThrow(TypeError);
+    expect(() => Tryable.tryBang(str, method)).toThrow(NoMethodError);
   });
 
   it("nonexisting method with arguments bang", () => {
     const method = "undefinedMethod";
     assertNotRespondTo(string, method);
-    expect(() => tryBang(str, method, "llo", "y")).toThrow(TypeError);
+    expect(() => Tryable.tryBang(str, method, "llo", "y")).toThrow(NoMethodError);
   });
 
   it("valid method", () => {
@@ -106,7 +107,7 @@ describe("ObjectTryTest", () => {
   });
 
   it("try with private method bang", () => {
-    expect(() => tryBang(new PrivateKlass(), "privateMethod")).toThrow(TypeError);
+    expect(() => Tryable.tryBang(new PrivateKlass(), "privateMethod")).toThrow(NoMethodError);
   });
 
   it("try with private method", () => {
@@ -130,7 +131,7 @@ describe("ObjectTryTest", () => {
   });
 
   it("try with private method on delegator bang", () => {
-    expect(() => new Decorator(string).tryBang("privateDelegatorMethod")).toThrow(TypeError);
+    expect(() => new Decorator(string).tryBang("privateDelegatorMethod")).toThrow(NoMethodError);
   });
 
   it("try with private method on delegator target", () => {
@@ -138,7 +139,7 @@ describe("ObjectTryTest", () => {
   });
 
   it("try with private method on delegator target bang", () => {
-    expect(() => new Decorator(new PrivateKlass()).tryBang("privateMethod")).toThrow(TypeError);
+    expect(() => new Decorator(new PrivateKlass()).tryBang("privateMethod")).toThrow(NoMethodError);
   });
 });
 
@@ -163,7 +164,7 @@ describe("Tryable namespace", () => {
   });
 
   it("tryBang throws for missing method with descriptive message", () => {
-    expect(() => Tryable.tryBang({}, "greet")).toThrow(TypeError);
+    expect(() => Tryable.tryBang({}, "greet")).toThrow(NoMethodError);
     expect(() => Tryable.tryBang({}, "greet")).toThrow(/undefined method 'greet'/);
   });
 
@@ -194,6 +195,6 @@ describe("Delegator", () => {
 
   it("tryBang throws for missing method on delegate", () => {
     const d = new Delegator({ name: "test" });
-    expect(() => d.tryBang("greet")).toThrow(TypeError);
+    expect(() => d.tryBang("greet")).toThrow(NoMethodError);
   });
 });

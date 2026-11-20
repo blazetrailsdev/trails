@@ -18,16 +18,3 @@ export function tryWith<T, R>(obj: T | null | undefined, fn: (obj: T) => R): R |
   if (obj == null) return undefined;
   return fn(obj);
 }
-
-export function tryBang<T extends object>(
-  obj: T | null | undefined,
-  method: string,
-  ...args: unknown[]
-): unknown {
-  if (obj == null) return undefined;
-  const fn = (obj as any)[method];
-  if (typeof fn !== "function") {
-    throw new TypeError(`undefined method '${method}' for ${String(obj)}`);
-  }
-  return fn.apply(obj, args);
-}

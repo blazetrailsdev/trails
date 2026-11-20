@@ -1,25 +1,25 @@
-import { Deprecation } from "../deprecation.js";
+import { Deprecation as ActiveSupportDeprecation } from "../deprecation.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { DeprecationBehaviorCallable } from "../deprecation.js";
 import { ArgumentError } from "../hash-utils.js";
 import { assert } from "./assertions.js";
 
 export async function assertDeprecated<T>(
-  deprecator: Deprecation,
+  deprecator: ActiveSupportDeprecation,
   block: () => T | Promise<T>,
 ): Promise<T>;
 export async function assertDeprecated<T>(
   match: RegExp | string | null | undefined,
-  deprecator: Deprecation | null | undefined,
+  deprecator: ActiveSupportDeprecation | null | undefined,
   block: () => T | Promise<T>,
 ): Promise<T>;
 export async function assertDeprecated<T>(
-  match: RegExp | string | Deprecation | null | undefined,
-  deprecator?: Deprecation | null | (() => T | Promise<T>),
+  match: RegExp | string | ActiveSupportDeprecation | null | undefined,
+  deprecator?: ActiveSupportDeprecation | null | (() => T | Promise<T>),
   block?: () => T | Promise<T>,
 ): Promise<T> {
   if (typeof deprecator === "function") [deprecator, block] = [null, deprecator];
-  if (match instanceof Deprecation) [match, deprecator] = [null, match];
+  if (match instanceof ActiveSupportDeprecation) [match, deprecator] = [null, match];
 
   if (!deprecator) {
     throw new ArgumentError("No deprecator given");
@@ -38,7 +38,7 @@ export async function assertDeprecated<T>(
 }
 
 export async function assertNotDeprecated<T>(
-  deprecator: Deprecation,
+  deprecator: ActiveSupportDeprecation,
   block: () => T | Promise<T>,
 ): Promise<T> {
   if (deprecator == null) {
@@ -53,7 +53,7 @@ export async function assertNotDeprecated<T>(
 }
 
 export async function collectDeprecations<T>(
-  deprecator: Deprecation,
+  deprecator: ActiveSupportDeprecation,
   block: () => T | Promise<T>,
 ): Promise<[T, string[]]> {
   if (deprecator == null) {
@@ -71,3 +71,9 @@ export async function collectDeprecations<T>(
     deprecator.behavior = oldBehavior;
   }
 }
+
+export const Deprecation = {
+  assertDeprecated,
+  assertNotDeprecated,
+  collectDeprecations,
+};

@@ -456,7 +456,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("formatted offset with utc", () => {
-    const t = new Date("2005-02-04T10:10:10Z");
+    const t = RubyTime.utc(2005, 2, 4, 10, 10, 10);
     const offset = formattedOffset(t);
     expect(offset).toMatch(/^[+-]\d{2}:\d{2}$/);
   });
@@ -1343,13 +1343,13 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("formatted offset with utc", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
+    const dt = RubyTime.local(2005, 2, 22, 10, 10, 10);
     const offset = formattedOffset(dt);
     expect(offset).toMatch(/^[+-]\d{2}:\d{2}$/);
   });
 
   it("formatted offset with local", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
+    const dt = RubyTime.local(2005, 2, 22, 10, 10, 10);
     const offset = formattedOffset(dt);
     expect(typeof offset).toBe("string");
   });

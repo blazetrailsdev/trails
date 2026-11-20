@@ -1,31 +1,22 @@
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+
 export interface Tryable {
   try(method: string, ...args: unknown[]): unknown;
   tryBang(method: string, ...args: unknown[]): unknown;
 }
 
 export const Tryable = {
-  try(obj: unknown, method: string, ...args: unknown[]): unknown {
+  try(obj: unknown, ...args: unknown[]): unknown {
     if (obj == null) return undefined;
-    const target = obj as Record<string, unknown>;
-    const fn = target[method];
-    if (typeof fn === "function") {
-      return fn.apply(obj, args);
+    if (rbObjRespondTo(obj, args[0] as string)) {
+      return rbFSend(obj, ...(args as [string, ...unknown[]]));
     }
-    if (args.length === 0) return fn;
     return undefined;
   },
 
-  tryBang(obj: unknown, method: string, ...args: unknown[]): unknown {
+  tryBang(obj: unknown, ...args: unknown[]): unknown {
     if (obj == null) return undefined;
-    const target = obj as Record<string, unknown>;
-    const fn = target[method];
-    if (typeof fn !== "function") {
-      if (args.length === 0 && method in Object(obj)) return fn;
-      throw new TypeError(
-        `undefined method '${method}' for ${obj === null ? "nil:NilClass" : String(obj)}`,
-      );
-    }
-    return fn.apply(obj, args);
+    return rbFSend(obj, ...(args as [string, ...unknown[]]));
   },
 };
 
