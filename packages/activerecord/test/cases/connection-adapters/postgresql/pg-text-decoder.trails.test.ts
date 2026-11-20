@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import pg from "pg";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { PG } from "@blazetrails/pg";
 import { fakePgConnection } from "../../../support/fake-pg-connection.js";
 import { Rational } from "@blazetrails/ruby-compat";
@@ -71,10 +71,10 @@ describe("PGTextDecoder — timestamp (OID 1114)", () => {
 });
 
 describe("PGTextDecoder — date (OID 1082)", () => {
-  it("returns a Temporal.PlainDate", () => {
+  it("returns a Date", () => {
     const result = parse(OID_DATE, "2026-04-26");
-    expect(result).toBeInstanceOf(Temporal.PlainDate);
-    expect((result as Temporal.PlainDate).toString()).toBe("2026-04-26");
+    expect(result).toBeInstanceOf(RubyDate);
+    expect((result as RubyDate).toDate().toString()).toBe("2026-04-26");
   });
 
   it("leaves 'infinity' a String for the OID type to cast", () => {

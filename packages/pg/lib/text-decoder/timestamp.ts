@@ -81,8 +81,8 @@ export class Timestamp extends SimpleDecoder {
 }
 
 export class TimestampUtc extends Timestamp {
-  constructor(hash: Record<string, unknown> = {}, kwargs: Record<string, unknown> = {}) {
-    if (Object.keys(hash).length > 0) {
+  constructor(hash: Record<string, unknown> | null = {}, kwargs: Record<string, unknown> = {}) {
+    if (Object.keys(hash ?? {}).length > 0) {
       warn(
         `PG::Coder.new(hash) is deprecated. Please use keyword arguments instead! Called from ${rbFCaller()[0]}`,
         { category: ":deprecated" },
@@ -93,8 +93,8 @@ export class TimestampUtc extends Timestamp {
 }
 
 export class TimestampUtcToLocal extends Timestamp {
-  constructor(hash: Record<string, unknown> = {}, kwargs: Record<string, unknown> = {}) {
-    if (Object.keys(hash).length > 0) {
+  constructor(hash: Record<string, unknown> | null = {}, kwargs: Record<string, unknown> = {}) {
+    if (Object.keys(hash ?? {}).length > 0) {
       warn(
         `PG::Coder.new(hash) is deprecated. Please use keyword arguments instead! Called from ${rbFCaller()[0]}`,
         { category: ":deprecated" },
@@ -105,8 +105,8 @@ export class TimestampUtcToLocal extends Timestamp {
 }
 
 export class TimestampLocal extends Timestamp {
-  constructor(hash: Record<string, unknown> = {}, kwargs: Record<string, unknown> = {}) {
-    if (Object.keys(hash).length > 0) {
+  constructor(hash: Record<string, unknown> | null = {}, kwargs: Record<string, unknown> = {}) {
+    if (Object.keys(hash ?? {}).length > 0) {
       warn(
         `PG::Coder.new(hash) is deprecated. Please use keyword arguments instead! Called from ${rbFCaller()[0]}`,
         { category: ":deprecated" },
