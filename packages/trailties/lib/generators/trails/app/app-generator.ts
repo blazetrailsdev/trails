@@ -856,6 +856,7 @@ export class AppGenerator extends AppBase {
       );
     }
   }
+
   async finishTemplate(): Promise<void> {
     await this.build("leftovers");
   }
