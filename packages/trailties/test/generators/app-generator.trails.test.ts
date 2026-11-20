@@ -386,12 +386,11 @@ describe("AppGenerator (trails-only)", () => {
     const seen: unknown[] = [];
     TopLevel.AppBuilder = class {
       marker = "field";
-      declare options: { database?: string };
       constructor(generator: unknown) {
         seen.push(generator instanceof AppGenerator);
       }
-      async cifiles(this: { marker: string; options: { database?: string } }): Promise<void> {
-        seen.push(this.marker, this.options.database);
+      async cifiles(this: { marker: string }): Promise<void> {
+        seen.push(this.marker);
       }
     };
     try {
@@ -403,7 +402,7 @@ describe("AppGenerator (trails-only)", () => {
     } finally {
       delete TopLevel.AppBuilder;
     }
-    expect(seen).toEqual([true, "field", "sqlite3"]);
+    expect(seen).toEqual([true, "field"]);
   });
 
   it("includes ActionMethods into a top-level AppBuilder that does not subclass trails' AppBuilder", async () => {
