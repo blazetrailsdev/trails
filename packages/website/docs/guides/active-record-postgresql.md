@@ -191,9 +191,9 @@ An `interval` column reads as an ActiveSupport `Duration`, the same object
 
 ## UUID Primary Keys
 
-To default every new table to UUID keys, set the generator option for
-primary key type in your application config. Each `createTable` then behaves
-as if you had passed `{ id: "uuid" }`.
+Pass `--primary-key-type uuid` to the model or migration generator and the
+generated `createTable` uses `{ id: "uuid" }`, with `type: "uuid"` on its
+references.
 
 ## Generated Columns
 

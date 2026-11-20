@@ -108,9 +108,6 @@ bin/trails generate migration CreateDogs name:string --database animals
 bin/trails generate model Dog name:string --database animals --parent AnimalsRecord
 ```
 
-The database tasks gain one variant per database, so `db:migrate` runs every
-database and `db:migrate:animals` runs one.
-
 ## Activating Automatic Role Switching
 
 The `DatabaseSelector` middleware sends GET and HEAD requests to the reading
