@@ -15,9 +15,9 @@ export function cacheDeleteMatchedBehavior(host: CacheDeleteMatchedBehaviorHost)
     await cache.write("foo/bar", "baz");
     await cache.write("fu/baz", "bar");
     await cache.deleteMatched(/oo/);
-    assertNot(await cache.exist("foo"));
-    assert(await cache.exist("fu"));
-    assertNot(await cache.exist("foo/bar"));
-    assert(await cache.exist("fu/baz"));
+    assertNot(await cache.isExist("foo"));
+    assert(await cache.isExist("fu"));
+    assertNot(await cache.isExist("foo/bar"));
+    assert(await cache.isExist("fu/baz"));
   });
 }

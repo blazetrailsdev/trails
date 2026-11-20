@@ -121,7 +121,7 @@ export function failureSafetyBehavior(host?: FailureSafetyBehaviorHost): void {
     await cache.write(key, alphanumeric());
 
     await emulatingUnavailability(async (cache) => {
-      expect(await cache.exist(key)).toBeFalsy();
+      expect(await cache.isExist(key)).toBeFalsy();
     });
   });
 

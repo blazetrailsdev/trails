@@ -101,9 +101,10 @@ describe("isSourceUnported package scoping", () => {
   });
 
   it("anchors a leading-slash pattern to a path boundary", () => {
-    // `version.rb` is excluded in each package that has not ported it, but
-    // `gem_version.rb` is ported and owns real surface.
-    expect(isSourceUnported("version.rb", "activesupport")).toBe(true);
+    expect(isSourceUnported("gem_loader.rb", "zeitwerk")).toBe(true);
+    expect(isSourceUnported("loader/gem_loader.rb", "zeitwerk")).toBe(true);
+    expect(isSourceUnported("xgem_loader.rb", "zeitwerk")).toBe(false);
+    expect(isSourceUnported("version.rb", "activesupport")).toBe(false);
     expect(isSourceUnported("version.rb", "activemodel")).toBe(false);
     expect(isSourceUnported("rails/version.rb", "trailties")).toBe(false);
     expect(isSourceUnported("action_view/version.rb", "actionview")).toBe(false);

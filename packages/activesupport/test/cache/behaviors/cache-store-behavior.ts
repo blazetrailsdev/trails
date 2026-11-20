@@ -158,7 +158,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     const write = vi.spyOn(cache, "write");
     try {
       assertNil(await cache.fetch(key, { skipNil: true }, () => null));
-      expect(await cache.exist("foo")).toBe(false);
+      expect(await cache.isExist("foo")).toBe(false);
       expect(write).not.toHaveBeenCalled();
     } finally {
       write.mockRestore();
@@ -378,7 +378,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     );
 
     expect(Object.fromEntries(values)).toEqual({ [key]: key, [otherKey]: null });
-    expect(await cache.exist(otherKey)).toBe(false);
+    expect(await cache.isExist(otherKey)).toBe(false);
   });
 
   it("fetch multi uses write multi entries store provider interface", async () => {
@@ -516,22 +516,22 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   it("exist", async () => {
     const key = crypto.randomUUID();
     await cache.write(key, "bar");
-    expect(await cache.exist(key)).toBe(true);
-    expect(await cache.exist(crypto.randomUUID())).toBe(false);
+    expect(await cache.isExist(key)).toBe(true);
+    expect(await cache.isExist(crypto.randomUUID())).toBe(false);
   });
 
   it("nil exist", async () => {
     const key = crypto.randomUUID();
     await cache.write(key, null);
-    assert(await cache.exist(key));
+    assert(await cache.isExist(key));
   });
 
   it("delete", async () => {
     const key = crypto.randomUUID();
     await cache.write(key, "bar");
-    assert(await cache.exist(key));
+    assert(await cache.isExist(key));
     assertSame(true, await cache.delete(key));
-    assertNot(await cache.exist(key));
+    assertNot(await cache.isExist(key));
   });
 
   it("delete returns false if not exist", async () => {
@@ -542,13 +542,13 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   it("delete multi", async () => {
     const key = crypto.randomUUID();
     await cache.write(key, "bar");
-    assert(await cache.exist(key));
+    assert(await cache.isExist(key));
     const otherKey = crypto.randomUUID();
     await cache.write(otherKey, "world");
-    assert(await cache.exist(otherKey));
+    assert(await cache.isExist(otherKey));
     expect(await cache.deleteMulti([key, crypto.randomUUID(), otherKey])).toEqual(2);
-    assertNot(await cache.exist(key));
-    assertNot(await cache.exist(otherKey));
+    assertNot(await cache.isExist(key));
+    assertNot(await cache.isExist(otherKey));
   });
 
   it("delete multi empty list", async () => {

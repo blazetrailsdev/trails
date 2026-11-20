@@ -4,7 +4,11 @@ import { buildViews } from "@blazetrails/trails-tsc";
 
 const root = decodeURIComponent(new URL(".", import.meta.url).pathname).replace(/\/$/u, "");
 await buildViews({ cwd: root });
-class SourceMapsApp extends Application {}
+class SourceMapsApp extends Application {
+  static {
+    this.config.loadDefaults("8.0");
+  }
+}
 const app = Trails.application ?? new SourceMapsApp();
 app.config.setRoot(root);
 await app.initializeBang();

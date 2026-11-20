@@ -324,6 +324,7 @@ export {
 export { deprecator } from "./deprecator.js";
 export { deprecate } from "./core-ext/module/deprecation.js";
 export { VERSION, gemVersion } from "./gem-version.js";
+export { version } from "./version.js";
 export type {
   DeprecationBehavior,
   DeprecationBehaviorCallable,
@@ -486,7 +487,6 @@ export { OptionMerger } from "./option-merger.js";
 export { ArrayInquirer } from "./array-inquirer.js";
 export { tryCall } from "./try.js";
 export { OrderedOptions, InheritableOptions } from "./ordered-options.js";
-export { hexdigest } from "./hexdigest.js";
 export { WeakSet as DescendantsTrackerWeakSet } from "./descendants-tracker.js";
 export { ActionableError, NonActionable } from "./actionable-error.js";
 export { NullLock } from "./concurrency/null-lock.js";

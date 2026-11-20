@@ -140,6 +140,10 @@ const alias = {
     __dirname,
     "packages/activesupport/lib/messages/codec.ts",
   ),
+  "@blazetrails/activesupport/messages/metadata": path.resolve(
+    __dirname,
+    "packages/activesupport/lib/messages/metadata.ts",
+  ),
   "@blazetrails/activesupport/messages/rotation-configuration": path.resolve(
     __dirname,
     "packages/activesupport/lib/messages/rotation-configuration.ts",

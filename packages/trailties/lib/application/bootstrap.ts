@@ -50,7 +50,6 @@ export abstract class Bootstrap extends Initializable implements BootstrapHost {
 
 Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {});
 
-/** @missingRailsArgs new — CONVERGEABLE activesupport-logger-new-takes-shift-age-and-size */
 Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, async function () {
   TopLevel.Trails!.logger ??=
     this.config.logger ??
@@ -58,7 +57,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
       try {
         let logger =
           this.config.logFileSize != null
-            ? new Logger(await this.config.defaultLogFile())
+            ? new Logger(await this.config.defaultLogFile(), 1, this.config.logFileSize)
             : new Logger(await this.config.defaultLogFile());
         logger.formatter = this.config.logFormatter;
         logger = TaggedLogging.new(logger);

@@ -190,7 +190,7 @@ describe("read/write/expire fragment", () => {
 
   it("forwards options to exist?, delete and delete_matched", async () => {
     const store = HostConfig.cacheStore as MemoryStore;
-    const exist = vi.spyOn(store, "exist");
+    const exist = vi.spyOn(store, "isExist");
     const del = vi.spyOn(store, "delete");
     const deleteMatched = vi.spyOn(store, "deleteMatched");
     await fragmentExist.call(host, "n", { namespace: "ns" });

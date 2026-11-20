@@ -1,7 +1,7 @@
 import "./test_helper.js";
-import { TestCase } from "@blazetrails/activesupport/test-case";
+import { ActiveSupport } from "@blazetrails/activesupport";
 
-export class <%= this.className().split("::").join("") %>Test extends TestCase {
+export class <%= this.className().split("::").join("") %>Test extends ActiveSupport.TestCase! {
   // test("the truth", () => {
   //   assert(true);
   // });

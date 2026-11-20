@@ -46,6 +46,7 @@ export const ActiveSupport = {
   Testing: { name: "ActiveSupport::Testing" },
 } as AutoloadModule & {
   Cache: { name: string } & Partial<typeof import("./cache.js")> & {
+      formatVersion: number;
       MemoryStore?: typeof import("./cache/memory-store.js").MemoryStore;
       FileStore?: typeof import("./cache/file-store.js").FileStore;
       RedisCacheStore?: typeof import("./cache/redis-cache-store.js").RedisCacheStore;
@@ -75,7 +76,7 @@ export const ActiveSupport = {
   cacheFormatVersion(): number;
   setCacheFormatVersion(value: number): void;
   toTimePreservesTimezone(): boolean | string;
-  setToTimePreservesTimezone(value: boolean | string | null): void;
+  setToTimePreservesTimezone(value: boolean | string | null | undefined): void;
   fsAdapter: string | null;
   cryptoAdapter: string | null;
   asyncContextAdapter: string | null;

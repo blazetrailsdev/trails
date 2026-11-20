@@ -18,7 +18,14 @@ import { ActionMailbox } from "@blazetrails/actionmailbox";
 import { ActionCable } from "@blazetrails/actioncable";
 import type { Base as CableServer } from "@blazetrails/actioncable/server/base";
 import { days, Logger } from "@blazetrails/activesupport";
-import { env, getFs, Pathname, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  env,
+  getFs,
+  Pathname,
+  RuntimeError,
+  setEnv,
+} from "@blazetrails/ruby-compat";
 import { Application } from "../../lib/application.js";
 import { LOAD_DEFAULTS_VERSION } from "../../lib/application/configuration.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
@@ -446,5 +453,19 @@ describe("ConfigurationTest", () => {
     application.config.actionMailbox.storageService = "email";
     await application.initializeBang();
     expect(ActionMailbox.storageService).toBe("email");
+  });
+  it("valid beginning of week is setup correctly", async () => {
+    const application = await app("development");
+    application.config.beginningOfWeek = ":wednesday";
+    await application.initializeBang();
+
+    expect(Trails.application!.config.beginningOfWeek).toBe(":wednesday");
+  });
+
+  it("raises when an invalid beginning of week is defined in the config", async () => {
+    const application = await app("development");
+    application.config.beginningOfWeek = ":invalid" as typeof application.config.beginningOfWeek;
+
+    await assertRaises([ArgumentError], {}, () => application.initializeBang());
   });
 });

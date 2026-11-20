@@ -21,7 +21,7 @@ export interface CacheStore {
   read(key: unknown, options?: CacheOptions): Promise<unknown>;
   write(key: unknown, value: unknown, options?: CacheOptions): Promise<boolean>;
   delete(key: unknown, options?: CacheOptions): Promise<boolean>;
-  exist(key: unknown, options?: CacheOptions): Promise<boolean>;
+  isExist(key: unknown, options?: CacheOptions): Promise<boolean>;
   fetch(key: string, options: CacheOptions, fallback: () => unknown): Promise<unknown>;
   fetch(key: string, fallback: () => unknown): Promise<unknown>;
   clear(): Promise<void>;
@@ -42,7 +42,7 @@ export type { CacheLogger } from "./store.js";
 export { MemoryStore } from "./memory-store.js";
 export { NullStore } from "./null-store.js";
 export { FileStore } from "./file-store.js";
-export { expandCacheKey, formatVersion, setFormatVersion, lookupStore } from "../cache.js";
+export { expandCacheKey, lookupStore } from "../cache.js";
 export { coder, Coder } from "./coder.js";
 export type { CoderSerializer, CoderCompressor } from "./coder.js";
 export { Entry } from "./entry.js";

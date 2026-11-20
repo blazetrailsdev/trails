@@ -8,22 +8,13 @@ import "./cache/file-store.js";
 import { camelize } from "./inflector.js";
 import type { CacheStore } from "./cache/index.js";
 import { ActiveSupport } from "./namespaces.js";
-import {
-  Store,
-  ArgumentError,
-  NotImplementedError,
-  WriteOptions,
-  formatVersion,
-  setFormatVersion,
-} from "./cache/store.js";
+import { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
 import { DeserializationError } from "./cache/deserialization-error.js";
 
 export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
 export type { CacheLogger, StoreOptions } from "./cache/store.js";
 export { DeserializationError } from "./cache/deserialization-error.js";
 export { Entry } from "./cache/entry.js";
-
-export { formatVersion, setFormatVersion } from "./cache/store.js";
 
 export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheStore {
   if (typeof store === "string" && store.startsWith(":")) {
@@ -97,8 +88,6 @@ Object.assign(ActiveSupport.Cache, {
   NotImplementedError,
   WriteOptions,
   DeserializationError,
-  formatVersion,
-  setFormatVersion,
   lookupStore,
   expandCacheKey,
 });

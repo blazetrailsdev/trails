@@ -24,6 +24,7 @@ Engine.register(Blog, ${JSON.stringify(engineRoot)});
 
 export class BootFileMap extends Application {}
 Application.register(BootFileMap, import.meta.dirname);
+BootFileMap.config.loadDefaults("8.0");
 `,
       );
       write(

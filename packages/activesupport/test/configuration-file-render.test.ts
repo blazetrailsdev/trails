@@ -25,6 +25,11 @@ describe("ConfigurationFile render", () => {
     expect(ConfigurationFile.parse(path)).toEqual({ pool: 6 });
   });
 
+  it("keeps the newline after a whole-line statement tag, as ERB.new does", () => {
+    const path = writeYaml("a: |\n  <% if (true) { %>\n  x\n  <% } %>\nb: 2\n");
+    expect(ConfigurationFile.parse(path)).toEqual({ a: "\nx\n", b: 2 });
+  });
+
   it("evaluates against the given context", () => {
     const path = writeYaml("adapter: <%= adapter %>\ndatabase: <%= name %>_test\n");
     expect(
