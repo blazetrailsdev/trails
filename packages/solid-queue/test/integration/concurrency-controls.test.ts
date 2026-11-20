@@ -302,8 +302,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     });
     const job = (await Job.last()) as Job;
 
-    await sleep(0.2);
-    expect(await job.isClaimed()).toBeTruthy();
+    await waitFor({ timeout: 2 }, async () => (await job.reload()).isClaimed());
 
     const terminating = sleep(0.1).then(() => run.terminate());
     await sleep(Number(SolidQueue.shutdownTimeout) + 0.6);
