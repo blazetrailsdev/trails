@@ -1,8 +1,8 @@
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { Extended, Included } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/actioncable/channel/test-case.js";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
-import { Thread, include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 import { withProductionDebouncer } from "../test-helper.js";
 import type { Broadcasts } from "../../lib/app/channels/turbo/streams/broadcasts.js";
 import { StreamsChannel } from "../../lib/app/channels/turbo/streams-channel.js";
@@ -27,13 +27,6 @@ const channel = StreamsChannel as typeof StreamsChannel & Extended<typeof Broadc
 describe("Turbo::StreamsChannelTest", () => {
   beforeAll(async () => {
     await Message.loadSchema();
-  });
-
-  beforeEach(() => {
-    Turbo.currentRequestId = null;
-    for (const key of Thread.current().keys()) {
-      if (key.startsWith("turbo-")) Thread.current().set(key, null);
-    }
   });
 
   it("verified stream name", () => {

@@ -28,7 +28,6 @@ describe("Turbo::ActionHelperTest", () => {
   });
 
   beforeEach(() => {
-    Turbo.currentRequestId = null;
     tc = new ActionHelperTest() as unknown as ActionHelperHost;
   });
 
