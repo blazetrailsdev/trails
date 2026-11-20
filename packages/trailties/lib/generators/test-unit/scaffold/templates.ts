@@ -150,11 +150,13 @@ const systemTest: Template = function () {
   const indexUrl = `${camelize(`${plural}_url`, false)}`;
   const showUrl = `${camelize(`${singular}_url`, false)}`;
   const root = "../".repeat(this.classPath().length + 1);
+  const modelClassName = this.className().split("::").pop();
   return `import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApplicationSystemTestCase } from "${root}application-system-test-case${this.ext()}";
+import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
 
 export class ${testClassName} extends ApplicationSystemTestCase {
-  declare "@${singular}": unknown;
+  declare "@${singular}": ${modelClassName};
 
   static {
     this.setup(async function (this: ${testClassName}) {
@@ -189,7 +191,7 @@ ${Object.entries(this.attributesHash())
   .map(([attr, value]) =>
     this.isBoolean(attr)
       ? `    if (${value}) await page.getByLabel("${humanize(attr)}").check();\n`
-      : `    await page.getByLabel("${humanize(attr)}").fill(${value});\n`,
+      : `    await page.getByLabel("${humanize(attr)}").fill(${value} ?? "");\n`,
   )
   .join("")}    await page.getByText("Create ${humanName}").click();
 
@@ -207,8 +209,8 @@ ${Object.entries(this.attributesHash())
     this.isBoolean(attr)
       ? `    if (${value}) await page.getByLabel("${humanize(attr)}").check();\n`
       : this.isDatetime(attr) || this.isTime(attr)
-        ? `    await page.getByLabel("${humanize(attr)}").fill(String(${value}));\n`
-        : `    await page.getByLabel("${humanize(attr)}").fill(${value});\n`,
+        ? `    await page.getByLabel("${humanize(attr)}").fill(String(${value} ?? ""));\n`
+        : `    await page.getByLabel("${humanize(attr)}").fill(${value} ?? "");\n`,
   )
   .join("")}    await page.getByText("Update ${humanName}").click();
 
