@@ -85,5 +85,6 @@ describe("ConstantLookupTest", () => {
     expect(test.findModule("DoesntExist::Nadda::Nope::NotHere")).toBeNull();
   });
 
+  // BLOCKED: constant-lookup-test-sync-autoload-of-raising-fixture
   it.skip("does not shallow ordinary exceptions");
 });

@@ -571,6 +571,7 @@ describe("TimeTravelTest", () => {
     }
   });
 
+  // BLOCKED: date-time-now-and-date-today-allocate-receiver-subclass
   it.skip("time helper travel with time subclass");
 
   it("time helper freeze time", () => {
