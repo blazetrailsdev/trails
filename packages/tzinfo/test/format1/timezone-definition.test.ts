@@ -21,10 +21,6 @@ function newModule(): Host {
   return m as unknown as Host;
 }
 
-function timezone(m: Host, identifier: string, block: (tz: TimezoneDefiner) => void): void {
-  m.timezone(identifier, (tz) => block(tz as TimezoneDefiner));
-}
-
 describe("TCTimezoneDefinition", () => {
   it("timezone definer class", () => {
     const m = newModule();
@@ -35,7 +31,7 @@ describe("TCTimezoneDefinition", () => {
     const m = newModule();
     let blockCalled = 0;
 
-    timezone(m, "Test/Data/Zone", (tz) => {
+    m.timezone("Test/Data/Zone", (tz: TimezoneDefiner) => {
       blockCalled += 1;
       expect(tz).toBeInstanceOf(TimezoneDefiner);
       tz.offset("o0", -75, 0, "LMT");
@@ -65,7 +61,7 @@ describe("TCTimezoneDefinition", () => {
     const m = newModule();
     let blockCalled = 0;
 
-    timezone(m, "Test/Data/Zone", (tz) => {
+    m.timezone("Test/Data/Zone", (tz: TimezoneDefiner) => {
       blockCalled += 1;
       expect(tz).toBeInstanceOf(TimezoneDefiner);
       tz.offset("o0", -75, 0, "LMT");
@@ -82,7 +78,7 @@ describe("TCTimezoneDefinition", () => {
   it("data frozen identifier", () => {
     const m = newModule();
 
-    timezone(m, "Test/Data/Zone", (tz) => tz.offset("o0", 0, 0, "UTC"));
+    m.timezone("Test/Data/Zone", (tz: TimezoneDefiner) => tz.offset("o0", 0, 0, "UTC"));
 
     const ti = m.get()!;
     expect(Object.isFrozen(ti.identifier)).toBeTruthy();
@@ -111,7 +107,7 @@ describe("TCTimezoneDefinition", () => {
     const m = newModule();
     let blockCalled = 0;
 
-    timezone(m, "Test/Data/Zone", (tz) => {
+    m.timezone("Test/Data/Zone", (tz: TimezoneDefiner) => {
       blockCalled += 1;
       expect(tz).toBeInstanceOf(TimezoneDefiner);
       tz.offset("o0", -75, 0, "LMT");
@@ -121,7 +117,7 @@ describe("TCTimezoneDefinition", () => {
 
     expect(blockCalled).toBe(1);
 
-    timezone(m, "Test/Data/Zone2", (tz) => {
+    m.timezone("Test/Data/Zone2", (tz: TimezoneDefiner) => {
       blockCalled += 1;
       expect(tz).toBeInstanceOf(TimezoneDefiner);
       tz.offset("o0", 3525, 0, "LMT");
@@ -158,7 +154,7 @@ describe("TCTimezoneDefinition", () => {
     const m = newModule();
     let blockCalled = 0;
 
-    timezone(m, "Test/Data/Zone", (tz) => {
+    m.timezone("Test/Data/Zone", (tz: TimezoneDefiner) => {
       blockCalled += 1;
       expect(tz).toBeInstanceOf(TimezoneDefiner);
       tz.offset("o0", -75, 0, "LMT");
@@ -181,7 +177,7 @@ describe("TCTimezoneDefinition", () => {
     m.linkedTimezone("Test/Linked/Zone1", "Test/Linked_To/Zone1");
     let blockCalled = 0;
 
-    timezone(m, "Test/Data/Zone2", (tz) => {
+    m.timezone("Test/Data/Zone2", (tz: TimezoneDefiner) => {
       blockCalled += 1;
       expect(tz).toBeInstanceOf(TimezoneDefiner);
       tz.offset("o0", -75, 0, "LMT");
@@ -207,7 +203,7 @@ describe("TCTimezoneDefinition", () => {
     const identifier = StringDeduper.global.dedupe("Test/One");
 
     const m = newModule();
-    timezone(m, "Test/One", (tz) => {
+    m.timezone("Test/One", (tz: TimezoneDefiner) => {
       tz.offset("o0", -75, 0, "LMT");
     });
 
@@ -230,7 +226,7 @@ describe("TCTimezoneDefinition", () => {
   it("global string deduper used", () => {
     const m = newModule();
     let blockCalled = 0;
-    timezone(m, "Test/Data/Zone", (tz) => {
+    m.timezone("Test/Data/Zone", (tz: TimezoneDefiner) => {
       blockCalled += 1;
       expect(tz).toBeInstanceOf(TimezoneDefiner);
       expect((tz as unknown as { stringDeduper: unknown }).stringDeduper).toBe(
