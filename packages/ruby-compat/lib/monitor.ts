@@ -128,8 +128,7 @@ export function enter(this: object): Promise<void> | void {
 /**
  * `monitor_try_enter` (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:60`).
  *
- * @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#try_enter`
- * (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:60`).
+ * @noRailsEquivalent PERMANENT
  */
 export function tryEnter(this: object): boolean {
   const data = monData(this);
