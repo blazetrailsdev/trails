@@ -78,12 +78,18 @@ batches of 1,000 (configurable) and hands each record to your function, or, with
 no function, returns an async iterator:
 
 ```ts
-await User.where({ locked: false }).findEach({ batchSize: 500 }, async (customer: any) => {
-  console.log(customer.id);
+import { Base } from "@blazetrails/activerecord";
+
+class Customer extends Base {
+  declare locked: boolean;
+}
+
+await Customer.where({ locked: false }).findEach({ batchSize: 500 }, async (user: Customer) => {
+  console.log(user.id);
 });
 
-for await (const customer of User.all().findEach({ start: 2000 })) {
-  console.log(customer.id);
+for await (const user of Customer.all().findEach({ start: 2000 })) {
+  console.log(user.id);
 }
 ```
 
@@ -205,9 +211,9 @@ with `lock`, inside a transaction:
 
 ```ts
 await User.transaction(async () => {
-  const customer = await User.lock().find(1);
-  customer.ordersCount += 1;
-  await customer.save();
+  const user = await User.lock().find(1);
+  user.ordersCount += 1;
+  await user.save();
 });
 ```
 

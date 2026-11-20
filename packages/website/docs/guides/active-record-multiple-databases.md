@@ -28,8 +28,6 @@ configuration. With several, it is an object keyed by name. `primary` is the
 default; any other name is your choice. A replica is marked `replica: true`,
 which also keeps the database tasks from creating or migrating it.
 
-<!-- typecheck:skip -->
-
 ```ts
 export default {
   production: {

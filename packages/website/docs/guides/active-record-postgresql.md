@@ -66,8 +66,12 @@ export class CreateBooks extends Migration.Current {
 Query an array column with PostgreSQL's array operators:
 
 ```ts
-const tagged = await Post.where("'fantasy' = ANY (tags)").toArray();
-const both = await Post.where("tags @> ARRAY[?]::varchar[]", ["fantasy", "fiction"]).toArray();
+import { Base } from "@blazetrails/activerecord";
+
+class Book extends Base {}
+
+const tagged = await Book.where("'fantasy' = ANY (tags)").toArray();
+const both = await Book.where("tags @> ARRAY[?]::varchar[]", ["fantasy", "fiction"]).toArray();
 ```
 
 ### Hstore
@@ -106,7 +110,11 @@ export class CreateEvents extends Migration.Current {
 ```
 
 ```ts
-const events = await Post.where("payload->>'kind' = ?", "user_renamed").toArray();
+import { Base } from "@blazetrails/activerecord";
+
+class Event extends Base {}
+
+const events = await Event.where("payload->>'kind' = ?", "user_renamed").toArray();
 ```
 
 ### Range Types
@@ -257,7 +265,11 @@ export class AddSearchIndex extends Migration.Current {
 ```
 
 ```ts
-const hits = await Post.where(
+import { Base } from "@blazetrails/activerecord";
+
+class Document extends Base {}
+
+const hits = await Document.where(
   "to_tsvector('english', title || ' ' || body) @@ to_tsquery(?)",
   "cat & dog",
 ).toArray();
