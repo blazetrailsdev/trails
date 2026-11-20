@@ -54,6 +54,17 @@ export const DEFAULT_ERROR_HANDLER: ErrorHandler = ({ method, returning, excepti
 
 const SCAN_BATCH_SIZE = 1000;
 
+const CONNECTION_ERROR_CODES = [
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EPIPE",
+  "ENOTFOUND",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "EAI_AGAIN",
+];
+
 /** @noRailsEquivalent PERMANENT */
 function _parseInfo(info: string): Record<string, string> {
   return Object.fromEntries(
@@ -319,7 +330,10 @@ export class RedisCacheStore extends Store implements CacheStore {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm from — PERMANENT
+   */
   protected async writeSerializedEntry(
     key: Buffer,
     payload: unknown,
@@ -505,7 +519,7 @@ export class RedisCacheStore extends Store implements CacheStore {
         error instanceof MaxRetriesPerRequestError ||
         (error instanceof Error &&
           (error.name === "TimeoutError" ||
-            typeof (error as { code?: unknown }).code === "string" ||
+            CONNECTION_ERROR_CODES.includes((error as { code?: unknown }).code as string) ||
             error.message === "Connection is closed."))
       ) {
         this._errorHandler?.({ method, exception: error, returning });
