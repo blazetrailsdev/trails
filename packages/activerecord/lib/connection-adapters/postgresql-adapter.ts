@@ -878,7 +878,7 @@ export class PostgreSQLAdapter
   }
   async getDatabaseVersion(): Promise<number> {
     return await this.withRawConnection({}, async (conn) => {
-      const version = await this._serverVersion(conn as PGConnection);
+      const version = (conn as PGConnection).serverVersion();
       if (version === 0) {
         throw new ConnectionFailed("Could not determine PostgreSQL version");
       }
@@ -1526,12 +1526,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   /** @internal */
   override returningColumnValues(result: Result): unknown[] | null {
     return pgReturningColumnValues(result);
-  }
-
-  /** @internal */
-  async _serverVersion(client: PGConnection): Promise<number> {
-    const result = await client.query("SHOW server_version_num");
-    return parseInt(String(result.getvalue(0, 0) ?? "0"), 10);
   }
 
   checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;

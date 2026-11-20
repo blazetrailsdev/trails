@@ -39,6 +39,7 @@ export class Connection {
   notifies: NodePg.Notification[] = [];
   notifyWaiter: ((error?: unknown) => void) | null = null;
   parameterStatuses: Record<string, string> = {};
+  noticeReceiver: ((result: Result) => void) | null = null;
 
   static conndefaultsHash = conndefaultsHash;
   static escapeString = escapeString;
@@ -109,11 +110,34 @@ export class Connection {
     await this.query(`SET client_encoding TO '${this.escapeString(encoding)}'`);
   }
 
-  setNoticeReceiver(block: (result: Result) => void): void {
+  setNoticeReceiver(
+    block: ((result: Result) => void) | null = null,
+  ): ((result: Result) => void) | null {
+    const oldProc = this.noticeReceiver;
     this.client.removeAllListeners("notice");
-    this.client.on("notice", (notice) => {
-      block(engine!.emptyResult(notice));
-    });
+    if (block != null) {
+      this.client.on("notice", (notice) => {
+        block(engine!.emptyResult(notice));
+      });
+    }
+    this.noticeReceiver = block;
+    return oldProc;
+  }
+
+  serverVersion(): number {
+    if (this.status() === PG.CONNECTION_BAD) return 0;
+    const value = this.parameterStatuses["server_version"];
+    if (value == null) return 0;
+    const parts = /^(\d+)(?:\.(\d+)(?:\.(\d+))?)?/.exec(value);
+    if (parts == null) return 0;
+    const vmaj = Number(parts[1]);
+    if (parts[3] != null) return (100 * vmaj + Number(parts[2])) * 100 + Number(parts[3]);
+    if (parts[2] != null) {
+      return vmaj >= 10
+        ? 100 * 100 * vmaj + Number(parts[2])
+        : (100 * vmaj + Number(parts[2])) * 100;
+    }
+    return 100 * 100 * vmaj;
   }
 
   connect(): Promise<unknown> {
