@@ -1,4 +1,5 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite3-expo-sqlite-engine MOVED-BY-SHORT-NAME: capabilities, open. */
+import { SQLite3 } from "./namespaces.js";
+import "./constants.js";
 import { createRequire } from "node:module";
 import {
   type ColumnInfo,
@@ -9,7 +10,6 @@ import {
   type SqliteDriver,
   type SqliteDriverCapabilities,
   type SqliteOpenConfig,
-  SQLite3Constants,
   type SqliteStatement,
 } from "./driver.js";
 import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
@@ -406,7 +406,7 @@ export const expoSqliteDriver: SqliteDriver = {
         "expo-sqlite is not available. This driver requires an Expo / React Native runtime.",
       );
     }
-    if (((config.flags ?? 0) & SQLite3Constants.Open.SHAREDCACHE) !== 0) {
+    if (((config.flags ?? 0) & SQLite3.Constants.Open.SHAREDCACHE) !== 0) {
       throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver");
     }
     try {

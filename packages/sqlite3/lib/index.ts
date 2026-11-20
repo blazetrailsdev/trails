@@ -1,4 +1,6 @@
 export * from "./driver.js";
+export * from "./constants.js";
+export * from "./fork-safety.js";
 export * from "./database.js";
 export * from "./errors.js";
 export * from "./pragmas.js";

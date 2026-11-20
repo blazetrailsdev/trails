@@ -1,5 +1,6 @@
+import { SQLite3 } from "../lib/index.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { type SqliteConnection, SQLite3Constants } from "../lib/driver.js";
+import { type SqliteConnection } from "../lib/driver.js";
 import { File, getOs } from "@blazetrails/ruby-compat";
 import { isNodeSqliteAvailable, nodeSqliteDriver } from "../lib/node-sqlite.js";
 
@@ -279,7 +280,7 @@ describe.skipIf(!isNodeSqliteAvailable)(
           conns.push(
             await nodeSqliteDriver.open({
               database: "file::memory:?cache=shared",
-              flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.SHAREDCACHE,
+              flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.SHAREDCACHE,
             }),
           );
         }
@@ -302,7 +303,7 @@ describe.skipIf(!isNodeSqliteAvailable)(
         conns.push(
           await nodeSqliteDriver.open({
             database: "file::memory:#frag",
-            flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.SHAREDCACHE,
+            flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.SHAREDCACHE,
           }),
         );
       }

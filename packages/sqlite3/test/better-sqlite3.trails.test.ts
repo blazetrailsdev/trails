@@ -1,5 +1,6 @@
+import { SQLite3 } from "../lib/index.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { type ColumnInfo, type SqliteConnection, SQLite3Constants } from "../lib/driver.js";
+import { type ColumnInfo, type SqliteConnection } from "../lib/driver.js";
 import { File, getOs } from "@blazetrails/ruby-compat";
 import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 import { CantOpenException } from "../lib/errors.js";
@@ -287,7 +288,7 @@ describe("SqliteDriver — better-sqlite3 binds unsupplied placeholders as NULL"
         conns.push(
           await betterSqlite3Driver.open({
             database: "file::memory:?cache=shared",
-            flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.SHAREDCACHE,
+            flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.SHAREDCACHE,
           }),
         );
       }

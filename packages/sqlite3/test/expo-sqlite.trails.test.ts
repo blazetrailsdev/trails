@@ -1,5 +1,6 @@
+import { SQLite3 } from "../lib/index.js";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { type SqliteConnection, SQLite3Constants } from "../lib/driver.js";
+import { type SqliteConnection } from "../lib/driver.js";
 import { isExpoSqliteAvailable, expoSqliteDriver } from "../lib/expo-sqlite.js";
 
 it("expo-sqlite module import does not crash", () => {
@@ -200,7 +201,7 @@ describe.skipIf(!isExpoSqliteAvailable)(
           conns.push(
             await expoSqliteDriver.open({
               database: "file::memory:?cache=shared",
-              flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.SHAREDCACHE,
+              flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.SHAREDCACHE,
             }),
           );
         }

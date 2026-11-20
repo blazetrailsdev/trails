@@ -1,5 +1,6 @@
+import { SQLite3 } from "../lib/index.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { type ColumnInfo, type SqliteConnection, SQLite3Constants } from "../lib/driver.js";
+import { type ColumnInfo, type SqliteConnection } from "../lib/driver.js";
 import { File, getOs } from "@blazetrails/ruby-compat";
 import {
   libsqlDriver,
@@ -434,7 +435,7 @@ describe("SqliteDriver — libsql binds unsupplied placeholders as NULL", () => 
         conns.push(
           await libsqlDriver.open({
             database: "file::memory:?cache=shared",
-            flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.SHAREDCACHE,
+            flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.SHAREDCACHE,
           }),
         );
       }
@@ -457,7 +458,7 @@ describe("SqliteDriver — libsql binds unsupplied placeholders as NULL", () => 
       conns.push(
         await libsqlDriver.open({
           database: "file::memory:#frag",
-          flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.SHAREDCACHE,
+          flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.SHAREDCACHE,
         }),
       );
     }
