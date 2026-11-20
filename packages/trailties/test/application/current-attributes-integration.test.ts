@@ -134,7 +134,7 @@ describe("CurrentAttributesIntegrationTest", { timeout: 120_000 }, () => {
   });
 
   it("resets after execution", async () => {
-    const Current = TopLevel.Current as unknown as CurrentClass;
+    const { Current } = TopLevel as unknown as { Current: CurrentClass };
     const { Customer } = TopLevel as unknown as { Customer: new (name: string) => object };
 
     expect(Current.customer).toBeNull();
