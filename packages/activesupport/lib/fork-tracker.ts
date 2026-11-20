@@ -1,4 +1,4 @@
-import { prepend, Process, rbCallSuper } from "@blazetrails/ruby-compat";
+import { aryDelete, prepend, Process, rbCallSuper } from "@blazetrails/ruby-compat";
 
 export const ForkTracker = {
   CoreExt: {
@@ -32,9 +32,7 @@ export const ForkTracker = {
   },
 
   unregister(callback: () => unknown): unknown {
-    const index = ForkTracker._callbacks.indexOf(callback);
-    if (index === -1) return null;
-    return ForkTracker._callbacks.splice(index, 1)[0];
+    return aryDelete(ForkTracker._callbacks, callback) ?? null;
   },
 };
 

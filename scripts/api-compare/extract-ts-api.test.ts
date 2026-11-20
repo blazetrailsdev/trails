@@ -2417,6 +2417,8 @@ describe("body call capture", () => {
           s.trim();
           s.trimEnd();
           s.endsWith("x") ? s.slice(0, -1) : s;
+          s.replaceAll("%n", s);
+          s.replace(/^-/, "");
         }
         unported(xs: unknown[], h: Record<string, number>, n: number, s: string, k: string) {
           xs.filter((x) => x !== 1);
@@ -2460,6 +2462,8 @@ describe("body call capture", () => {
       "trim",
       "trimEnd",
       "chomp",
+      "gsub",
+      "sub",
     ]) {
       expect(calls("ported")).toContain(`@${form}`);
     }

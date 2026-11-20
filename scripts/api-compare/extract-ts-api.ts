@@ -8909,6 +8909,13 @@ function nativeValueForms(n: ts.Node): string[] {
     case "trim":
     case "trimEnd":
       return args.length === 0 ? [method] : [];
+    case "replaceAll":
+      return args.length === 2 ? ["gsub"] : [];
+    case "replace": {
+      if (args.length !== 2) return [];
+      if (!ts.isRegularExpressionLiteral(first)) return ["sub", "gsub"];
+      return /\/[a-z]*g[a-z]*$/.test(first.text) ? ["gsub"] : ["sub"];
+    }
     case "filter": {
       const [param] = callbackParams(first) ?? [];
       if (param === undefined || !isNotNullTest(callbackResult(first), param)) return [];
