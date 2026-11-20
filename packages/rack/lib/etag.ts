@@ -1,6 +1,6 @@
 import type { RackHeaders } from "./index.js";
 import { ETAG, CACHE_CONTROL } from "./constants.js";
-import { Digest, rbCheckArrayType, rbProcCall } from "@blazetrails/ruby-compat";
+import { Digest, rbCheckArrayType, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { Rack } from "./namespaces.js";
 
@@ -28,13 +28,8 @@ export class ETag {
 
     let digest: string | null = null;
 
-    let ary: unknown[] | null;
-    if (
-      this.etagStatus(status) &&
-      (ary = rbCheckArrayType(body)) !== null &&
-      !this.skipCaching(headers)
-    ) {
-      body = ary;
+    if (this.etagStatus(status) && rbObjRespondTo(body, "toAry") && !this.skipCaching(headers)) {
+      body = rbCheckArrayType(body);
       digest = this.digestBody(body as string[]);
       if (digest) headers[ETAG] = `W/"${digest}"`;
 
