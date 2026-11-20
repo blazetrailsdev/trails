@@ -6,7 +6,7 @@ export function tryCall<T extends object>(
   ...args: unknown[]
 ): unknown {
   if (obj == null) return undefined;
-  const val = (obj as any)[method];
+  const val = (obj as Record<string, unknown>)[method];
   if (typeof val === "function") return val.apply(obj, args);
   if (val !== undefined && args.length === 0) return val;
   if (args.length === 0 && typeof obj === "object" && method in obj) return val;

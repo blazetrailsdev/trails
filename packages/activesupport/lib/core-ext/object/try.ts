@@ -8,12 +8,12 @@ export interface Tryable {
 export const Tryable = {
   try(obj: unknown, ...args: unknown[]): unknown {
     if (obj == null) return null;
-    const block = args.at(-1);
+    const block = args.at(-1) as ((this: unknown, self?: unknown) => unknown) | undefined;
     if (args.length === 1 && rbBlockGivenP(block)) {
       if (block.length === 0) {
-        return (block as unknown as () => unknown).call(obj);
+        return Reflect.apply(block, obj, []);
       } else {
-        return (block as unknown as (self: unknown) => unknown)(obj);
+        return block(obj);
       }
     } else if (rbObjRespondTo(obj, args[0] as string)) {
       return rbFSend(obj, ...(args as [string, ...unknown[]]));
@@ -23,12 +23,12 @@ export const Tryable = {
 
   tryBang(obj: unknown, ...args: unknown[]): unknown {
     if (obj == null) return null;
-    const block = args.at(-1);
+    const block = args.at(-1) as ((this: unknown, self?: unknown) => unknown) | undefined;
     if (args.length === 1 && rbBlockGivenP(block)) {
       if (block.length === 0) {
-        return (block as unknown as () => unknown).call(obj);
+        return Reflect.apply(block, obj, []);
       } else {
-        return (block as unknown as (self: unknown) => unknown)(obj);
+        return block(obj);
       }
     } else {
       return rbFSend(obj, ...(args as [string, ...unknown[]]));
