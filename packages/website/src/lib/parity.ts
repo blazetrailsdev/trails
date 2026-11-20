@@ -223,7 +223,7 @@ function statsLines(data: ParityData, fig: PackageFigures | undefined, files: Fi
   const ported = files === null ? DASH : String(files.filter((f) => f.tsFile !== null).length);
   const unported = files === null ? DASH : String(files.filter((f) => f.tsFile === null).length);
   return [
-    "| | |",
+    "| Measure | Value |",
     "| --- | --- |",
     `| Rails counterpart | ${counterpart} |`,
     `| API methods matched | ${ratio(fig?.api ?? null)} |`,
@@ -321,7 +321,10 @@ function skipLines(data: ParityData, entry: PackageSummary | undefined | null): 
     (data.summary?.claudeSections ?? []).map((s) => [`${s.file}#${s.anchor}`, s.heading]),
   );
   for (const [key, tests] of groups) {
-    const title = key === "" ? "No section cited" : escapeCell(headings.get(key) ?? key);
+    const title =
+      key === ""
+        ? "No section cited"
+        : escapeCell(headings.get(key) ?? key).replace(/`([^`]+)`/g, "<code>$1</code>");
     const items = tests.map((t) => {
       const url = `${GITHUB_REPO}/blob/${data.buildRef}/${t.file}#L${t.line}`;
       return `- [${escapeCell(t.testName ?? `${t.file}:${t.line}`)}](${url})`;

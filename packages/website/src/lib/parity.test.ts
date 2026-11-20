@@ -112,7 +112,7 @@ describe("loadParity", () => {
           },
         ],
         claudeSections: [
-          section("CLAUDE.md", "Cited rule", "cited"),
+          section("CLAUDE.md", "Cited `rule`", "cited"),
           section("CLAUDE.md", "Uncited rule", "uncited"),
           section("packages/arel/CLAUDE.md", "Own rule", "own"),
           section("packages/activerecord/CLAUDE.md", "Moved rule", "moved"),
@@ -134,7 +134,7 @@ describe("loadParity", () => {
     expect(arel.railsVersion).toBe("v8.0.2");
     const page = packagePage(data, "arel");
     expect(page).toContain("| Measured at | abcdef0123 |");
-    expect(page).toContain("### Cited rule");
+    expect(page).toContain("### Cited `rule`");
     expect(page).toContain("### Own rule");
     expect(page).not.toContain("Uncited rule");
     expect(page).not.toContain("Moved to");
@@ -159,7 +159,7 @@ describe("loadParity", () => {
     expect(page).not.toContain("unported_only");
     expect(page).toContain("| `@noRailsEquivalent` | 2 | 1 | 0 |");
     expect(page).not.toContain("`@perf`");
-    expect(page).toContain("<summary>Cited rule (1)</summary>");
+    expect(page).toContain("<summary>Cited <code>rule</code> (1)</summary>");
     expect(page).toContain(
       "[skipped one](https://github.com/blazetrailsdev/trails/blob/fedcba/packages/arel/test/a.test.ts#L7)",
     );
