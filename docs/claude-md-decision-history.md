@@ -320,7 +320,7 @@ between them somewhere was the alternative.
 ## A record is built with `new Klass` only
 
 A static `new` beside the constructor was tried on trails#8659 and rejected by
-The operator. Both variants were built on that PR: one where the bare `new`
+the operator. Both variants were built on that PR: one where the bare `new`
 skipped the abstract check and the STI dispatch, and one where the constructor
 re-entered the static method through a marker and ran twice.
 
