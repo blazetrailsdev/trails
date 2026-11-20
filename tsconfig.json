@@ -1,15 +1,6 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable",
-      "DOM.AsyncIterable",
-      "WebWorker.ImportScripts",
-      "ScriptHost",
-      "ESNext.Temporal"
-    ],
     "module": "Node16",
     "moduleResolution": "Node16",
     "declaration": true,
