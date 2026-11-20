@@ -118,12 +118,12 @@ export function setMultipleFileFieldIncludeHidden(value: boolean): void {
   multipleFileFieldIncludeHidden = value;
 }
 
-export function formFor(
+export async function formFor(
   this: FormHelperHost,
   record: unknown,
   options: Record<string, unknown> = {},
   block?: (builder: FormBuilder) => unknown,
-): SafeBuffer | Promise<SafeBuffer> {
+): Promise<SafeBuffer> {
   if (block === undefined) throw new ArgumentError("Missing block");
 
   let model: unknown;
@@ -164,7 +164,7 @@ export function formFor(
     ? options.allowMethodNamesOutsideObject
     : false;
 
-  return formWith.call(this, options, block);
+  return await formWith.call(this, options, block);
 }
 
 /** @internal */
@@ -192,25 +192,11 @@ export function applyFormForOptionsBang(
   });
 }
 
-export function formWith(
-  this: FormHelperHost,
-  options: FormWithOptions,
-  block: (builder: FormBuilder) => PromiseLike<unknown>,
-): Promise<SafeBuffer>;
-export function formWith(
-  this: FormHelperHost,
-  options?: FormWithOptions,
-  block?: (builder: FormBuilder) => unknown,
-): SafeBuffer;
-/**
- * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
- * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
- */
-export function formWith(
+export async function formWith(
   this: FormHelperHost,
   { scope = null, url = null, format = null, ...rest }: FormWithOptions = {},
   block?: (builder: FormBuilder) => unknown,
-): SafeBuffer | Promise<SafeBuffer> {
+): Promise<SafeBuffer> {
   let model = "model" in rest ? rest.model : false;
   delete rest.model;
   if (model == null) {
@@ -238,28 +224,16 @@ export function formWith(
 
   if (block !== undefined) {
     const builder = instantiateBuilder.call(this, scope, model, options);
-    const output = capture.call(this, block as (...args: unknown[]) => unknown, builder);
-    if (output instanceof Promise) {
-      return output.then((output) => {
-        if (options["multipart"] == null || options["multipart"] === false) {
-          options["multipart"] = builder.isMultipart();
-        }
-        return formTagWithBody.call(
-          this,
-          htmlOptionsForFormWith.call(this, url, model, options),
-          output,
-        );
-      });
-    }
+    const output = await capture.call(this, block as (...args: unknown[]) => unknown, builder);
     if (options["multipart"] == null || options["multipart"] === false) {
       options["multipart"] = builder.isMultipart();
     }
 
     const htmlOptions = htmlOptionsForFormWith.call(this, url, model, options);
-    return formTagWithBody.call(this, htmlOptions, output);
+    return await formTagWithBody.call(this, htmlOptions, output);
   } else {
     const htmlOptions = htmlOptionsForFormWith.call(this, url, model, options);
-    return formTagHtml.call(this, htmlOptions);
+    return await formTagHtml.call(this, htmlOptions);
   }
 }
 

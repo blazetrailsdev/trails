@@ -40,7 +40,9 @@ export interface UrlHelperHost {
   _backUrl(): string;
   _filteredReferrer(): string | null;
   isProtectAgainstForgery?(): boolean;
-  formAuthenticityToken?(options: { formOptions: Record<string, unknown> }): string;
+  formAuthenticityToken?(options: {
+    formOptions: Record<string, unknown>;
+  }): string | Promise<string>;
   requestForgeryProtectionToken?: unknown;
 }
 
@@ -130,13 +132,13 @@ export function linkTo(
   return this.contentTag("a", rtest(name) ? name : url, htmlOptions, undefined, block);
 }
 
-export function buttonTo(
+export async function buttonTo(
   this: UrlForHost,
   name: unknown = null,
   options: unknown = null,
   htmlOptions: HtmlOptions | null = null,
   block?: Block,
-): SafeBuffer {
+): Promise<SafeBuffer> {
   if (block) [htmlOptions, options] = [options as HtmlOptions | null, name];
   if (!rtest(htmlOptions)) htmlOptions = {};
   htmlOptions = stringifyKeys(htmlOptions);
@@ -167,7 +169,7 @@ export function buttonTo(
   let requestTokenTag: SafeBuffer | string;
   if (formMethod === "post") {
     const requestMethod = method === "" ? "post" : method;
-    requestTokenTag = tokenTag.call(this, authenticityToken, {
+    requestTokenTag = await tokenTag.call(this, authenticityToken, {
       formOptions: { action: url, method: requestMethod },
     });
   } else {
@@ -442,11 +444,11 @@ export function isMethodNotGetMethod(method: unknown): boolean {
 }
 
 /** @internal */
-export function tokenTag(
+export async function tokenTag(
   this: UrlHelperHost & TagHelperHost,
   token: unknown = null,
   { formOptions = {} }: { formOptions?: Record<string, unknown> } = {},
-): SafeBuffer | string {
+): Promise<SafeBuffer | string> {
   if (
     token !== false &&
     rbObjRespondTo(this, "isProtectAgainstForgery") &&
@@ -454,7 +456,9 @@ export function tokenTag(
   ) {
     token =
       token === true || token == null
-        ? this.formAuthenticityToken!({ formOptions: { ...formOptions, authenticityToken: token } })
+        ? await this.formAuthenticityToken!({
+            formOptions: { ...formOptions, authenticityToken: token },
+          })
         : token;
     return tag.call(this, "input", {
       type: "hidden",

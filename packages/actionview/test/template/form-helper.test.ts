@@ -316,8 +316,8 @@ describe("FormHelperTest", () => {
   let rendered: unknown;
   let urlForOptions: Record<string, unknown>;
 
-  function formFor(...args: Parameters<Base["formFor"]>): unknown {
-    return (rendered = view.formFor(...args));
+  async function formFor(...args: Parameters<Base["formFor"]>): Promise<unknown> {
+    return (rendered = await view.formFor(...args));
   }
 
   function concat(string: unknown): unknown {
@@ -540,9 +540,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("label with locales and nested attributes", () => {
-    I18n.withLocale("label", () => {
-      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+  it("label with locales and nested attributes", async () => {
+    await I18n.withLocale("label", async () => {
+      await formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
         f.fieldsFor("comments", null, null, (cf) => concat(cf.label("body"))),
       );
 
@@ -558,9 +558,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("label with locales fallback and nested attributes", () => {
-    I18n.withLocale("label", () => {
-      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+  it("label with locales fallback and nested attributes", async () => {
+    await I18n.withLocale("label", async () => {
+      await formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
         f.fieldsFor("tags", null, null, (cf) => concat(cf.label("value"))),
       );
 
@@ -576,10 +576,10 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("label with non active record object", () => {
+  it("label with non active record object", async () => {
     const Person = Struct.new("name");
 
-    formFor(
+    await formFor(
       new Person("ok"),
       { as: "person", url: "/an", html: { id: "create-person" } },
       (f: FormBuilder) => f.label("name"),
@@ -791,9 +791,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("text field placeholder with locales and nested attributes", () => {
-    I18n.withLocale("placeholder", () => {
-      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+  it("text field placeholder with locales and nested attributes", async () => {
+    await I18n.withLocale("placeholder", async () => {
+      await formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
         f.fieldsFor("comments", null, null, (cf) =>
           concat(cf.textField("body", { placeholder: true })),
         ),
@@ -812,9 +812,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("text field placeholder with locales fallback and nested attributes", () => {
-    I18n.withLocale("placeholder", () => {
-      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+  it("text field placeholder with locales fallback and nested attributes", async () => {
+    await I18n.withLocale("placeholder", async () => {
+      await formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
         f.fieldsFor("tags", null, null, (cf) =>
           concat(cf.textField("value", { placeholder: true })),
         ),
@@ -1334,9 +1334,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("textarea placeholder with locales and nested attributes", () => {
-    I18n.withLocale("placeholder", () => {
-      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+  it("textarea placeholder with locales and nested attributes", async () => {
+    await I18n.withLocale("placeholder", async () => {
+      await formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
         f.fieldsFor("comments", null, null, (cf) =>
           concat(cf.textarea("body", { placeholder: true })),
         ),
@@ -1355,9 +1355,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("textarea placeholder with locales fallback and nested attributes", () => {
-    I18n.withLocale("placeholder", () => {
-      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+  it("textarea placeholder with locales fallback and nested attributes", async () => {
+    await I18n.withLocale("placeholder", async () => {
+      await formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
         f.fieldsFor("tags", null, null, (cf) =>
           concat(cf.textarea("value", { placeholder: true })),
         ),
@@ -2050,26 +2050,26 @@ describe("FormHelperTest", () => {
     `<input id="post_comments_attributes_${i}_id" name="post[comments_attributes][${i}][id]" type="hidden" value="${value}" autocomplete="off" />`;
 
   it("form for requires block", async () => {
-    const error = await assertRaises([ArgumentError], {}, () => {
-      formFor(post, { html: { id: "create-post" } });
+    const error = await assertRaises([ArgumentError], {}, async () => {
+      await formFor(post, { html: { id: "create-post" } });
     });
     assertEqual("Missing block", error.message);
   });
 
   it("form for requires arguments", async () => {
-    let error = await assertRaises([ArgumentError], {}, () => {
-      formFor(null, { html: { id: "create-post" } }, () => {});
+    let error = await assertRaises([ArgumentError], {}, async () => {
+      await formFor(null, { html: { id: "create-post" } }, () => {});
     });
     assertEqual("First argument in form cannot contain nil or be empty", error.message);
 
-    error = await assertRaises([ArgumentError], {}, () => {
-      formFor([null, null], { html: { id: "create-post" } }, () => {});
+    error = await assertRaises([ArgumentError], {}, async () => {
+      await formFor([null, null], { html: { id: "create-post" } }, () => {});
     });
     assertEqual("First argument in form cannot contain nil or be empty", error.message);
   });
 
-  it("form for text area alias", () => {
-    formFor(post, { html: { id: "create-post" } }, (f) => {
+  it("form for text area alias", async () => {
+    await formFor(post, { html: { id: "create-post" } }, (f) => {
       concat(f.textArea("body"));
     });
 
@@ -2085,8 +2085,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with file field generate multipart", () => {
-    formFor(post, { html: { id: "create-post" } }, (f) => {
+  it("form for with file field generate multipart", async () => {
+    await formFor(post, { html: { id: "create-post" } }, (f) => {
       concat(f.fileField("file"));
     });
 
@@ -2101,20 +2101,20 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for false url", () => {
-    formFor(new Post(), { url: false }, () => {});
+  it("form for false url", async () => {
+    await formFor(new Post(), { url: false }, () => {});
 
     assertDomEqual(wholeForm(null, "new_post", "new_post"), rendered);
   });
 
-  it("form for false action", () => {
-    formFor(new Post(), { html: { action: false } }, () => {});
+  it("form for false action", async () => {
+    await formFor(new Post(), { html: { action: false } }, () => {});
 
     assertDomEqual(wholeForm(null, "new_post", "new_post"), rendered);
   });
 
-  it("form for field id", () => {
-    formFor(new Post(), {}, (form) => {
+  it("form for field id", async () => {
+    await formFor(new Post(), {}, (form) => {
       concat(form.label("title"));
       concat(form.textField("title", { aria: { describedby: form.fieldId("title", "error") } }));
       concat(tag().span("is blank", { id: form.fieldId("title", "error") }));
@@ -2134,8 +2134,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for field id with index", () => {
-    formFor(new Post(), { index: 1 }, (form) => {
+  it("form for field id with index", async () => {
+    await formFor(new Post(), { index: 1 }, (form) => {
       concat(form.textField("title", { aria: { describedby: form.fieldId("title", "error") } }));
       concat(tag().span("is blank", { id: form.fieldId("title", "error") }));
     });
@@ -2153,8 +2153,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for field name with blank as", () => {
-    formFor(new Post(), { as: "" }, (form) => {
+  it("form for field name with blank as", async () => {
+    await formFor(new Post(), { as: "" }, (form) => {
       concat(form.textField("title", { name: form.fieldName("title") }));
     });
 
@@ -2169,8 +2169,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for field id with namespace", () => {
-    formFor(new Post(), { namespace: "special" }, (form) => {
+  it("form for field id with namespace", async () => {
+    await formFor(new Post(), { namespace: "special" }, (form) => {
       concat(form.label("title"));
       concat(form.textField("title", { aria: { describedby: form.fieldId("title", "error") } }));
       concat(tag().span("is blank", { id: form.fieldId("title", "error") }));
@@ -2190,8 +2190,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for field name with blank as and multiple", () => {
-    formFor(new Post(), { as: "" }, (form) => {
+  it("form for field name with blank as and multiple", async () => {
+    await formFor(new Post(), { as: "" }, (form) => {
       concat(form.textField("title", { name: form.fieldName("title", { multiple: true }) }));
     });
 
@@ -2206,12 +2206,12 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  function assertFieldNameForm(
+  async function assertFieldNameForm(
     options: Record<string, unknown>,
     fieldName: (form: FormBuilder) => string,
     expectedInput: string,
-  ): void {
-    formFor(new Post(), options, (form) => {
+  ): Promise<void> {
+    await formFor(new Post(), options, (form) => {
       concat(form.textField("title", { name: fieldName(form) }));
     });
 
@@ -2221,72 +2221,72 @@ describe("FormHelperTest", () => {
     );
   }
 
-  it("form for field name without method names or multiple or index", () => {
-    assertFieldNameForm(
+  it("form for field name without method names or multiple or index", async () => {
+    await assertFieldNameForm(
       {},
       (form) => form.fieldName("title"),
       '<input id="post_title" name="post[title]" type="text">',
     );
   });
 
-  it("form for field name without method names and multiple", () => {
-    assertFieldNameForm(
+  it("form for field name without method names and multiple", async () => {
+    await assertFieldNameForm(
       {},
       (form) => form.fieldName("title", { multiple: true }),
       '<input id="post_title" name="post[title][]" type="text">',
     );
   });
 
-  it("form for field name without method names and index", () => {
-    assertFieldNameForm(
+  it("form for field name without method names and index", async () => {
+    await assertFieldNameForm(
       { index: 1 },
       (form) => form.fieldName("title"),
       '<input id="post_1_title" name="post[1][title]" type="text">',
     );
   });
 
-  it("form for field name without method names and index and multiple", () => {
-    assertFieldNameForm(
+  it("form for field name without method names and index and multiple", async () => {
+    await assertFieldNameForm(
       { index: 1 },
       (form) => form.fieldName("title", { multiple: true }),
       '<input id="post_1_title" name="post[1][title][]" type="text">',
     );
   });
 
-  it("form for field name with method names", () => {
-    assertFieldNameForm(
+  it("form for field name with method names", async () => {
+    await assertFieldNameForm(
       {},
       (form) => form.fieldName("title", "subtitle"),
       '<input id="post_title" name="post[title][subtitle]" type="text">',
     );
   });
 
-  it("form for field name with method names and index", () => {
-    assertFieldNameForm(
+  it("form for field name with method names and index", async () => {
+    await assertFieldNameForm(
       { index: 1 },
       (form) => form.fieldName("title", "subtitle"),
       '<input id="post_1_title" name="post[1][title][subtitle]" type="text">',
     );
   });
 
-  it("form for field name with method names and multiple", () => {
-    assertFieldNameForm(
+  it("form for field name with method names and multiple", async () => {
+    await assertFieldNameForm(
       {},
       (form) => form.fieldName("title", "subtitle", { multiple: true }),
       '<input id="post_title" name="post[title][subtitle][]" type="text">',
     );
   });
 
-  it("form for field name with method names and multiple and index", () => {
-    assertFieldNameForm(
+  it("form for field name with method names and multiple and index", async () => {
+    await assertFieldNameForm(
       { index: 1 },
       (form) => form.fieldName("title", "subtitle", { multiple: true }),
       '<input id="post_1_title" name="post[1][title][subtitle][]" type="text">',
     );
   });
 
-  it("form for field id with namespace and index", () => {
-    formFor(new Post(), { namespace: "special", index: 1 }, (form) => {
+  it("form for field id with namespace and index", async () => {
+    await formFor(new Post(), { namespace: "special", index: 1 }, (form) => {
       concat(form.textField("title", { aria: { describedby: form.fieldId("title", "error") } }));
       concat(tag().span("is blank", { id: form.fieldId("title", "error") }));
     });
@@ -2304,14 +2304,14 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  function assertNestedAttributesField(
+  async function assertNestedAttributesField(
     call: (commentForm: FormBuilder) => unknown,
     expectedText: string,
-  ): void {
+  ): Promise<void> {
     const [post, comment, tag] = [new Post(), new Comment(), new Tag()];
     comment.relevances = [tag];
     post.comments = [comment];
-    formFor(post, {}, (form) => {
+    await formFor(post, {}, (form) => {
       return form.fieldsFor("comments", null, null, (commentForm) => {
         concat(call(commentForm));
       });
@@ -2323,29 +2323,29 @@ describe("FormHelperTest", () => {
     );
   }
 
-  it("form for with nested attributes field id", () => {
-    assertNestedAttributesField(
+  it("form for with nested attributes field id", async () => {
+    await assertNestedAttributesField(
       (f) => f.fieldId("relevances_attributes"),
       "post_comments_attributes_0_relevances_attributes",
     );
   });
 
-  it("form for with nested attributes field name", () => {
-    assertNestedAttributesField(
+  it("form for with nested attributes field name", async () => {
+    await assertNestedAttributesField(
       (f) => f.fieldName("relevances_attributes"),
       "post[comments_attributes][0][relevances_attributes]",
     );
   });
 
-  it("form for with nested attributes field name multiple", () => {
-    assertNestedAttributesField(
+  it("form for with nested attributes field name multiple", async () => {
+    await assertNestedAttributesField(
       (f) => f.fieldName("relevances_attributes", { multiple: true }),
       "post[comments_attributes][0][relevances_attributes][]",
     );
   });
 
-  it("button with method name", () => {
-    formFor(post, {}, (f) => {
+  it("button with method name", async () => {
+    await formFor(post, {}, (f) => {
       concat(f.button(":secret", { value: true }));
     });
 
@@ -2361,8 +2361,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("button with method name and attributes", () => {
-    formFor(post, {}, (f) => {
+  it("button with method name and attributes", async () => {
+    await formFor(post, {}, (f) => {
       concat(
         f.button(":secret", { value: true, id: "not_generated", name: "post[not_generated]" }),
       );
@@ -2380,8 +2380,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("button with method name and block", () => {
-    formFor(post, {}, (f) => {
+  it("button with method name and block", async () => {
+    await formFor(post, {}, (f) => {
       concat(f.button(":secret", { value: true }, () => "Update secret Post"));
     });
 
@@ -2397,8 +2397,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("button with get formmethod attribute", () => {
-    formFor(post, { as: "another_post" }, (f) => {
+  it("button with get formmethod attribute", async () => {
+    await formFor(post, { as: "another_post" }, (f) => {
       concat(f.button("GET", { formmethod: "get" }));
     });
 
@@ -2413,8 +2413,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("button with post formmethod attribute", () => {
-    formFor(post, { as: "another_post" }, (f) => {
+  it("button with post formmethod attribute", async () => {
+    await formFor(post, { as: "another_post" }, (f) => {
       concat(f.button("POST", { formmethod: "post" }));
     });
 
@@ -2429,8 +2429,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("button with other formmethod attribute", () => {
-    formFor(post, { as: "another_post" }, (f) => {
+  it("button with other formmethod attribute", async () => {
+    await formFor(post, { as: "another_post" }, (f) => {
       concat(f.button("Delete", { formmethod: "delete" }));
     });
 
@@ -2445,8 +2445,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("button with other formmethod attribute and name", () => {
-    formFor(post, { as: "another_post" }, (f) => {
+  it("button with other formmethod attribute and name", async () => {
+    await formFor(post, { as: "another_post" }, (f) => {
       concat(f.button("Delete", { formmethod: "delete", name: "existing" }));
     });
 
@@ -2461,8 +2461,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("button with other formmethod attribute and value", () => {
-    formFor(post, { as: "another_post" }, (f) => {
+  it("button with other formmethod attribute and value", async () => {
+    await formFor(post, { as: "another_post" }, (f) => {
       concat(f.button("Delete", { formmethod: "delete", value: "existing" }));
     });
 
@@ -2496,12 +2496,12 @@ describe("FormHelperTest", () => {
     }
   }
 
-  it("default form builder", () => {
+  it("default form builder", async () => {
     const base = Base as unknown as { defaultFormBuilder: unknown };
     const oldDefaultFormBuilder = base.defaultFormBuilder;
     base.defaultFormBuilder = LabelledFormBuilder;
     try {
-      formFor(post, {}, (f) => {
+      await formFor(post, {}, (f) => {
         concat(f.textField("title"));
         concat(f.textarea("body"));
         concat(f.checkbox("secret"));
@@ -2520,13 +2520,13 @@ describe("FormHelperTest", () => {
     }
   });
 
-  it("lazy loading default form builder", () => {
+  it("lazy loading default form builder", async () => {
     constSet(TopLevel, "FormHelperTest", { LabelledFormBuilder });
     const base = Base as unknown as { defaultFormBuilder: unknown };
     const oldDefaultFormBuilder = base.defaultFormBuilder;
     base.defaultFormBuilder = "FormHelperTest::LabelledFormBuilder";
     try {
-      formFor(post, {}, (f) => {
+      await formFor(post, {}, (f) => {
         concat(f.textField("title"));
       });
 
@@ -2554,8 +2554,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with labelled builder", () => {
-    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+  it("form for with labelled builder", async () => {
+    await formFor(post, { builder: LabelledFormBuilder }, (f) => {
       concat(f.textField("title"));
       concat(f.textarea("body"));
       concat(f.checkbox("secret"));
@@ -2586,10 +2586,10 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with labelled builder with nested fields for without options hash", () => {
+  it("form for with labelled builder with nested fields for without options hash", async () => {
     let klass: unknown = null;
 
-    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+    await formFor(post, { builder: LabelledFormBuilder }, (f) => {
       f.fieldsFor("comments", new Comment(), null, (nestedFields) => {
         klass = nestedFields.constructor;
         return "";
@@ -2599,10 +2599,10 @@ describe("FormHelperTest", () => {
     expect(klass).toBe(LabelledFormBuilder);
   });
 
-  it("form for with labelled builder with nested fields for with options hash", () => {
+  it("form for with labelled builder with nested fields for with options hash", async () => {
     let klass: unknown = null;
 
-    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+    await formFor(post, { builder: LabelledFormBuilder }, (f) => {
       f.fieldsFor("comments", new Comment(), { index: "foo" }, (nestedFields) => {
         klass = nestedFields.constructor;
         return "";
@@ -2612,10 +2612,10 @@ describe("FormHelperTest", () => {
     expect(klass).toBe(LabelledFormBuilder);
   });
 
-  it("form for with labelled builder path", () => {
+  it("form for with labelled builder path", async () => {
     let path: unknown = null;
 
-    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+    await formFor(post, { builder: LabelledFormBuilder }, (f) => {
       path = f.toPartialPath();
       return "";
     });
@@ -2625,10 +2625,10 @@ describe("FormHelperTest", () => {
 
   class LabelledFormBuilderSubclass extends LabelledFormBuilder {}
 
-  it("form for with labelled builder with nested fields for with custom builder", () => {
+  it("form for with labelled builder with nested fields for with custom builder", async () => {
     let klass: unknown = null;
 
-    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+    await formFor(post, { builder: LabelledFormBuilder }, (f) => {
       f.fieldsFor(
         "comments",
         new Comment(),
@@ -2643,8 +2643,12 @@ describe("FormHelperTest", () => {
     expect(klass).toBe(LabelledFormBuilderSubclass);
   });
 
-  it("form for with html options adds options to form tag", () => {
-    formFor(post, { html: { id: "some_form", class: "some_class", multipart: true } }, () => {});
+  it("form for with html options adds options to form tag", async () => {
+    await formFor(
+      post,
+      { html: { id: "some_form", class: "some_class", multipart: true } },
+      () => {},
+    );
     const expected = wholeForm("/posts/123", "some_form", "some_class", {
       method: "patch",
       multipart: "multipart/form-data",
@@ -2653,8 +2657,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with string url option", () => {
-    formFor(post, { url: "http://www.otherdomain.com" }, () => {});
+  it("form for with string url option", async () => {
+    await formFor(post, { url: "http://www.otherdomain.com" }, () => {});
 
     assertDomEqual(
       wholeForm("http://www.otherdomain.com", "edit_post_123", "edit_post", { method: "patch" }),
@@ -2662,41 +2666,41 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("form for with record url option", () => {
-    formFor(post, { url: post }, () => {});
+  it("form for with record url option", async () => {
+    await formFor(post, { url: post }, () => {});
 
     const expected = wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" });
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with existing object", () => {
-    formFor(post, {}, () => {});
+  it("form for with existing object", async () => {
+    await formFor(post, {}, () => {});
 
     const expected = wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" });
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with new object", () => {
+  it("form for with new object", async () => {
     const post = new Post();
     post.persisted = false;
     (post as unknown as { toKey(): null }).toKey = () => null;
 
-    formFor(post, {}, () => {});
+    await formFor(post, {}, () => {});
 
     const expected = wholeForm("/posts", "new_post", "new_post");
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with hash url option", () => {
-    formFor(post, { url: { controller: "controller", action: "action" } }, () => {});
+  it("form for with hash url option", async () => {
+    await formFor(post, { url: { controller: "controller", action: "action" } }, () => {});
 
     expect(urlForOptions["controller"]).toBe("controller");
     expect(urlForOptions["action"]).toBe("action");
   });
 
-  it("form for with existing object in list", () => {
+  it("form for with existing object in list", async () => {
     comment.save();
-    formFor([post, comment], {}, () => {});
+    await formFor([post, comment], {}, () => {});
 
     const expected = wholeForm(
       view.postCommentPath(post, comment) as string,
@@ -2707,16 +2711,16 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with new object in list", () => {
-    formFor([post, comment], {}, () => {});
+  it("form for with new object in list", async () => {
+    await formFor([post, comment], {}, () => {});
 
     const expected = wholeForm(view.postCommentsPath(post) as string, "new_comment", "new_comment");
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with existing object and namespace in list", () => {
+  it("form for with existing object and namespace in list", async () => {
     comment.save();
-    formFor([":admin", post, comment], {}, () => {});
+    await formFor([":admin", post, comment], {}, () => {});
 
     const expected = wholeForm(
       view.adminPostCommentPath(post, comment) as string,
@@ -2727,8 +2731,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with new object and namespace in list", () => {
-    formFor([":admin", post, comment], {}, () => {});
+  it("form for with new object and namespace in list", async () => {
+    await formFor([":admin", post, comment], {}, () => {});
 
     const expected = wholeForm(
       view.adminPostCommentsPath(post) as string,
@@ -2738,15 +2742,15 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with new cpk model", () => {
-    formFor(new Cpk.Book(), {}, () => {});
+  it("form for with new cpk model", async () => {
+    await formFor(new Cpk.Book(), {}, () => {});
 
     const expected = wholeForm("/cpk/books", "new_cpk_book", "new_cpk_book", { method: "post" });
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with persisted cpk model", () => {
-    formFor(new Cpk.Book({ id: [1, 2], title: "Some book" }), {}, () => {});
+  it("form for with persisted cpk model", async () => {
+    await formFor(new Cpk.Book({ id: [1, 2], title: "Some book" }), {}, () => {});
 
     const expected = wholeForm("/cpk/books/1-2", "edit_cpk_book_1_2", "edit_cpk_book", {
       method: "patch",
@@ -2754,21 +2758,21 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with existing object and custom url", () => {
-    formFor(post, { url: "/super_posts" }, () => {});
+  it("form for with existing object and custom url", async () => {
+    await formFor(post, { url: "/super_posts" }, () => {});
 
     const expected = wholeForm("/super_posts", "edit_post_123", "edit_post", { method: "patch" });
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with default method as patch", () => {
-    formFor(post, {}, () => {});
+  it("form for with default method as patch", async () => {
+    await formFor(post, {}, () => {});
     const expected = wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" });
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with data attributes", () => {
-    formFor(post, { data: { behavior: "stuff" }, remote: true }, () => {});
+  it("form for with data attributes", async () => {
+    await formFor(post, { data: { behavior: "stuff" }, remote: true }, () => {});
     expect(String(rendered)).toMatch(/data-behavior="stuff"/);
     expect(String(rendered)).toMatch(/data-remote="true"/);
   });
@@ -2778,7 +2782,7 @@ describe("FormHelperTest", () => {
     expect(String(output)).toBe("fields");
   });
 
-  it("form for only instantiates builder once", () => {
+  it("form for only instantiates builder once", async () => {
     let initializationCount = 0;
     const builderClass = class extends FormBuilder {
       constructor(...args: ConstructorParameters<typeof FormBuilder>) {
@@ -2787,7 +2791,7 @@ describe("FormHelperTest", () => {
       }
     };
 
-    formFor(post, { builder: builderClass }, () => {});
+    await formFor(post, { builder: builderClass }, () => {});
     expect(initializationCount, "form builder instantiated more than once").toBe(1);
   });
 
@@ -2805,9 +2809,9 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for", () => {
+  it("nested fields for", async () => {
     comment.body = "Hello World";
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor(comment, null, null, (c) => {
           concat(c.textField("body"));
@@ -2823,8 +2827,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for field id", () => {
-    formFor(post, {}, (form) => {
+  it("nested fields for field id", async () => {
+    await formFor(post, {}, (form) => {
       concat(
         form.fieldsFor("comment_attributes", comment, null, (c) => {
           concat(c.fieldId("body"));
@@ -2838,8 +2842,8 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for field id with index override", () => {
-    formFor(post, {}, (form) => {
+  it("nested fields for field id with index override", async () => {
+    await formFor(post, {}, (form) => {
       concat(
         form.fieldsFor("comment_attributes", comment, { index: 1 }, (c) => {
           concat(c.fieldId("body"));
@@ -2853,9 +2857,9 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("deep nested fields for", () => {
+  it("deep nested fields for", async () => {
     comment.save();
-    formFor("posts", {}, (f) => {
+    await formFor("posts", {}, (f) => {
       return f.fieldsFor("post[]", post, null, (f2) => {
         f2.textField("id");
         for (const comment of post.comments as Comment[]) {
@@ -2880,8 +2884,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with index and parent fields", () => {
-    formFor(post, { index: 1 }, (c) => {
+  it("nested fields for with index and parent fields", async () => {
+    await formFor(post, { index: 1 }, (c) => {
       concat(c.textField("title"));
       concat(
         c.fieldsFor("comment", comment, { index: 1 }, (r) => {
@@ -2899,8 +2903,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with index and nested fields for", () => {
-    rendered = formFor(post, { index: 1 }, (f) => {
+  it("form for with index and nested fields for", async () => {
+    rendered = await formFor(post, { index: 1 }, (f) => {
       concat(
         f.fieldsFor("comment", post, null, (c) => {
           concat(c.textField("title"));
@@ -2916,8 +2920,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with nested collections", () => {
-    formFor(post, { as: "post[]" }, (f) => {
+  it("nested fields for with nested collections", async () => {
+    await formFor(post, { as: "post[]" }, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("comment[]", comment, null, (c) => {
@@ -2941,8 +2945,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with index on both", () => {
-    formFor(post, { index: 1 }, (f) => {
+  it("nested fields for with index on both", async () => {
+    await formFor(post, { index: 1 }, (f) => {
       concat(
         f.fieldsFor("comment", post, { index: 5 }, (c) => {
           concat(c.textField("title"));
@@ -2958,8 +2962,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with auto index", () => {
-    formFor(post, { as: "post[]" }, (f) => {
+  it("nested fields for with auto index", async () => {
+    await formFor(post, { as: "post[]" }, (f) => {
       concat(
         f.fieldsFor("comment", post, null, (c) => {
           concat(c.textField("title"));
@@ -2979,8 +2983,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with index radio button", () => {
-    formFor(post, {}, (f) => {
+  it("nested fields for with index radio button", async () => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("comment", post, { index: 5 }, (c) => {
           concat(c.radioButton("title", "hello"));
@@ -2996,8 +3000,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with auto index on both", () => {
-    formFor(post, { as: "post[]" }, (f) => {
+  it("nested fields for with auto index on both", async () => {
+    await formFor(post, { as: "post[]" }, (f) => {
       concat(
         f.fieldsFor("comment[]", post, null, (c) => {
           concat(c.textField("title"));
@@ -3017,8 +3021,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with index and auto index", () => {
-    formFor(post, { as: "post[]" }, (f) => {
+  it("nested fields for with index and auto index", async () => {
+    await formFor(post, { as: "post[]" }, (f) => {
       concat(
         f.fieldsFor("comment", post, { index: 5 }, (c) => {
           concat(c.textField("title"));
@@ -3036,7 +3040,7 @@ describe("FormHelperTest", () => {
     );
     assertDomEqual(expected, rendered);
 
-    formFor(post, { as: "post", index: 1 }, (f) => {
+    await formFor(post, { as: "post", index: 1 }, (f) => {
       concat(
         f.fieldsFor("comment[]", post, null, (c) => {
           concat(c.textField("title"));
@@ -3056,10 +3060,10 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with a new record on a nested attributes one to one association", () => {
+  it("nested fields for with a new record on a nested attributes one to one association", async () => {
     post.author = new Author();
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, null, (af) => {
@@ -3077,8 +3081,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with explicitly passed object on a nested attributes one to one association", () => {
-    formFor(post, {}, (f) => {
+  it("nested fields for with explicitly passed object on a nested attributes one to one association", async () => {
+    await formFor(post, {}, (f) => {
       f.fieldsFor("author", new Author(123), null, (af) => {
         expect(af.object).not.toBeNull();
         expect((af.object as Author).id).toBe(123);
@@ -3086,10 +3090,10 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("nested fields for with an existing record on a nested attributes one to one association", () => {
+  it("nested fields for with an existing record on a nested attributes one to one association", async () => {
     post.author = new Author(321);
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, null, (af) => {
@@ -3104,10 +3108,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with an existing record on a nested attributes one to one association using erb and inline block", () => {
+  it("nested fields for with an existing record on a nested attributes one to one association using erb and inline block", async () => {
     post.author = new Author(321);
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, null, (af) => {
@@ -3122,10 +3126,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id", () => {
+  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id", async () => {
     post.author = new Author(321);
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, { includeId: false }, (af) => {
@@ -3140,10 +3144,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id inherited", () => {
+  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id inherited", async () => {
     post.author = new Author(321);
 
-    formFor(post, { includeId: false }, (f) => {
+    await formFor(post, { includeId: false }, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, null, (af) => {
@@ -3158,10 +3162,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id override", () => {
+  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id override", async () => {
     post.author = new Author(321);
 
-    formFor(post, { includeId: false }, (f) => {
+    await formFor(post, { includeId: false }, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, { includeId: true }, (af) => {
@@ -3176,10 +3180,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with existing records on a nested attributes one to one association with explicit hidden field placement", () => {
+  it("nested fields for with existing records on a nested attributes one to one association with explicit hidden field placement", async () => {
     post.author = new Author(321);
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, null, (af) => {
@@ -3195,10 +3199,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id", () => {
+  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id", async () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
     post.author = new Author(321);
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, null, (af) => {
@@ -3227,10 +3231,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id inherited", () => {
+  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id inherited", async () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
     post.author = new Author(321);
-    formFor(post, { includeId: false }, (f) => {
+    await formFor(post, { includeId: false }, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, null, (af) => {
@@ -3254,10 +3258,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id override", () => {
+  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id override", async () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
     post.author = new Author(321);
-    formFor(post, { includeId: false }, (f) => {
+    await formFor(post, { includeId: false }, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("author", null, { includeId: true }, (af) => {
@@ -3286,9 +3290,9 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with existing records on a nested attributes collection association using erb and inline block", () => {
+  it("nested fields for with existing records on a nested attributes collection association using erb and inline block", async () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       for (const comment of post.comments as Comment[]) {
         concat(
@@ -3312,9 +3316,9 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with existing records on a nested attributes collection association with explicit hidden field placement", () => {
+  it("nested fields for with existing records on a nested attributes collection association with explicit hidden field placement", async () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       for (const comment of post.comments as Comment[]) {
         concat(
@@ -3339,9 +3343,9 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with new records on a nested attributes collection association", () => {
+  it("nested fields for with new records on a nested attributes collection association", async () => {
     post.comments = [new Comment(), new Comment()];
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       for (const comment of post.comments as Comment[]) {
         concat(
@@ -3358,9 +3362,9 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with existing and new records on a nested attributes collection association", () => {
+  it("nested fields for with existing and new records on a nested attributes collection association", async () => {
     post.comments = [new Comment(321), new Comment()];
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       for (const comment of post.comments as Comment[]) {
         concat(
@@ -3383,8 +3387,8 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with an empty supplied attributes collection", () => {
-    formFor(post, {}, (f) => {
+  it("nested fields for with an empty supplied attributes collection", async () => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       f.fieldsFor("comments", [], null, (cf) => {
         concat(cf.textField("name"));
@@ -3397,10 +3401,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with existing records on a supplied nested attributes collection", () => {
+  it("nested fields for with existing records on a supplied nested attributes collection", async () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("comments", post.comments, null, (cf) => {
@@ -3422,7 +3426,7 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields label translation with more than 10 records", () => {
+  it("nested fields label translation with more than 10 records", async () => {
     post.comments = Array.from({ length: 11 }, (_, id) => new Comment(id + 1));
 
     const mock = new Mock();
@@ -3434,8 +3438,8 @@ describe("FormHelperTest", () => {
       );
     }
 
-    stub(I18n, "t", mock, [], () => {
-      formFor(post, {}, (f) => {
+    await stub(I18n, "t", mock, [], async () => {
+      await formFor(post, {}, (f) => {
         f.fieldsFor("comments", null, null, (cf) => {
           concat(cf.label("body"));
         });
@@ -3445,11 +3449,11 @@ describe("FormHelperTest", () => {
     assertMock(mock);
   });
 
-  it("nested fields for with existing records on a supplied nested attributes collection different from record one", () => {
+  it("nested fields for with existing records on a supplied nested attributes collection different from record one", async () => {
     const comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
     post.comments = [];
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("comments", comments, null, (cf) => {
@@ -3471,11 +3475,11 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for on a nested attributes collection association yields only builder", () => {
+  it("nested fields for on a nested attributes collection association yields only builder", async () => {
     post.comments = [new Comment(321), new Comment()];
     const yieldedComments: unknown[] = [];
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("comments", null, null, (cf) => {
@@ -3498,10 +3502,10 @@ describe("FormHelperTest", () => {
     expect(yieldedComments).toEqual(post.comments);
   });
 
-  it("nested fields for with child index option override on a nested attributes collection association", () => {
+  it("nested fields for with child index option override on a nested attributes collection association", async () => {
     post.comments = [];
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("comments", new Comment(321), { childIndex: "abc" }, (cf) => {
           concat(cf.textField("name"));
@@ -3519,10 +3523,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with child index as lambda option override on a nested attributes collection association", () => {
+  it("nested fields for with child index as lambda option override on a nested attributes collection association", async () => {
     post.comments = [];
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("comments", new Comment(321), { childIndex: () => "abc" }, (cf) => {
           concat(cf.textField("name"));
@@ -3540,10 +3544,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for index method with existing records on a nested attributes collection association", () => {
+  it("nested fields for index method with existing records on a nested attributes collection association", async () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       let expected = 0;
       for (const comment of post.comments as Comment[]) {
         f.fieldsFor("comments", comment, null, (cf) => {
@@ -3554,10 +3558,10 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("nested fields for index method with existing and new records on a nested attributes collection association", () => {
+  it("nested fields for index method with existing and new records on a nested attributes collection association", async () => {
     post.comments = [new Comment(321), new Comment()];
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       let expected = 0;
       for (const comment of post.comments as Comment[]) {
         f.fieldsFor("comments", comment, null, (cf) => {
@@ -3568,10 +3572,10 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("nested fields for index method with existing records on a supplied nested attributes collection", () => {
+  it("nested fields for index method with existing records on a supplied nested attributes collection", async () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       let expected = 0;
       f.fieldsFor("comments", post.comments, null, (cf) => {
         expect(cf.index).toBe(expected);
@@ -3580,20 +3584,20 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("nested fields for index method with child index option override on a nested attributes collection association", () => {
+  it("nested fields for index method with child index option override on a nested attributes collection association", async () => {
     post.comments = [];
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       f.fieldsFor("comments", new Comment(321), { childIndex: "abc" }, (cf) => {
         expect(cf.index).toBe("abc");
       });
     });
   });
 
-  it("nested fields for arel like", () => {
+  it("nested fields for arel like", async () => {
     post.comments = new ArelLike();
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       concat(
         f.fieldsFor("comments", post.comments, null, (cf) => {
@@ -3615,10 +3619,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with child index option override on a nested attributes collection association with proxy", () => {
+  it("nested fields for with child index option override on a nested attributes collection association with proxy", async () => {
     post.comments = new FakeAssociationProxy();
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("comments", new Comment(321), { childIndex: "abc" }, (cf) => {
           concat(cf.textField("name"));
@@ -3636,7 +3640,7 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields uses unique indices for different collection associations", () => {
+  it("nested fields uses unique indices for different collection associations", async () => {
     post.comments = [new Comment(321)];
     post.tags = [new Tag(123), new Tag(456)];
     const comments = post.comments as Comment[];
@@ -3645,7 +3649,7 @@ describe("FormHelperTest", () => {
     tags[0].relevances = [];
     tags[1].relevances = [];
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("comments", comments[0], null, (cf) => {
           concat(cf.textField("name"));
@@ -3697,10 +3701,10 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with hash like model", () => {
+  it("nested fields for with hash like model", async () => {
     const author = new HashBackedAuthor();
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("author", author, null, (af) => {
           concat(af.textField("name"));
@@ -3717,10 +3721,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with hash with indifferent access like model and options", () => {
+  it("nested fields for with hash with indifferent access like model and options", async () => {
     const author = new HashWithIndifferentAccessBackedAuthor();
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("author", author, {}, (af) => {
           concat(af.textField("name"));
@@ -3737,10 +3741,10 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("nested fields for with hash with indifferent access like model without options", () => {
+  it("nested fields for with hash with indifferent access like model without options", async () => {
     const author = new HashWithIndifferentAccessBackedAuthor();
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("author", author, null, (af) => {
           concat(af.textField("name"));
@@ -3898,8 +3902,8 @@ describe("FormHelperTest", () => {
     assertNotIncludes(publicInstanceMethods(FormBuilder), "formFor");
   });
 
-  it("form for and fields for", () => {
-    formFor(post, { as: "post", html: { id: "create-post" } }, (postForm) => {
+  it("form for and fields for", async () => {
+    await formFor(post, { as: "post", html: { id: "create-post" } }, (postForm) => {
       concat(postForm.textField("title"));
       concat(postForm.textarea("body"));
 
@@ -3925,8 +3929,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for and fields for with object", () => {
-    formFor(post, { as: "post", html: { id: "create-post" } }, (postForm) => {
+  it("form for and fields for with object", async () => {
+    await formFor(post, { as: "post", html: { id: "create-post" } }, (postForm) => {
       concat(postForm.textField("title"));
       concat(postForm.textarea("body"));
 
@@ -3951,8 +3955,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for and fields for with non nested association and without object", () => {
-    formFor(post, {}, (f) => {
+  it("form for and fields for with non nested association and without object", async () => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("category", null, null, (c) => {
           concat(c.textField("name"));
@@ -3967,9 +3971,9 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("nested fields for with existing records on a nested attributes collection association", () => {
+  it("nested fields for with existing records on a nested attributes collection association", async () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.textField("title"));
       for (const comment of post.comments as Comment[]) {
         concat(
@@ -3992,18 +3996,18 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  function withDefaultEnforceUtf8(value: boolean, block: () => void): void {
+  async function withDefaultEnforceUtf8(value: boolean, block: () => unknown): Promise<void> {
     const oldValue = defaultEnforceUtf8;
     setDefaultEnforceUtf8(value);
     try {
-      block();
+      await block();
     } finally {
       setDefaultEnforceUtf8(oldValue);
     }
   }
 
-  it("form for", () => {
-    formFor(post, { html: { id: "create-post" } }, (f) => {
+  it("form for", async () => {
+    await formFor(post, { html: { id: "create-post" } }, (f) => {
       concat(f.label("title", null, {}, () => "The Title"));
       concat(f.textField("title"));
       concat(f.textarea("body"));
@@ -4032,11 +4036,11 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for is not affected by form with generates ids", () => {
+  it("form for is not affected by form with generates ids", async () => {
     const oldValue = formWithGeneratesIds;
     setFormWithGeneratesIds(false);
     try {
-      formFor(post, { html: { id: "create-post" } }, (f) => {
+      await formFor(post, { html: { id: "create-post" } }, (f) => {
         concat(f.label("title", null, {}, () => "The Title"));
         concat(f.textField("title"));
         concat(f.textarea("body"));
@@ -4068,8 +4072,8 @@ describe("FormHelperTest", () => {
     }
   });
 
-  it("form for id", () => {
-    formFor(new Post(), {}, (form) => {
+  it("form for id", async () => {
+    await formFor(new Post(), {}, (form) => {
       concat(form.button({ form: form.id() }));
     });
 
@@ -4084,10 +4088,14 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with format", () => {
-    formFor(post, { format: "json", html: { id: "edit_post_123", class: "edit_post" } }, (f) => {
-      concat(f.label("title"));
-    });
+  it("form for with format", async () => {
+    await formFor(
+      post,
+      { format: "json", html: { id: "edit_post_123", class: "edit_post" } },
+      (f) => {
+        concat(f.label("title"));
+      },
+    );
 
     const expected = wholeForm(
       "/posts/123.json",
@@ -4100,8 +4108,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("new form for without format", () => {
-    formFor(post, { html: { id: "edit_post_123", class: "edit_post" } }, (f) => {
+  it("new form for without format", async () => {
+    await formFor(post, { html: { id: "edit_post_123", class: "edit_post" } }, (f) => {
       concat(f.label("title"));
     });
 
@@ -4116,8 +4124,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with symbol as", () => {
-    formFor(post, { as: "other_name", html: { id: "create-post" } }, (f) => {
+  it("form for with symbol as", async () => {
+    await formFor(post, { as: "other_name", html: { id: "create-post" } }, (f) => {
       concat(f.label("title", { class: "post_title" }));
       concat(f.textField("title"));
       concat(f.textarea("body"));
@@ -4142,8 +4150,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with method as part of html options", () => {
-    formFor(post, { url: "/", html: { id: "create-post", method: "delete" } }, (f) => {
+  it("form for with method as part of html options", async () => {
+    await formFor(post, { url: "/", html: { id: "create-post", method: "delete" } }, (f) => {
       concat(f.textField("title"));
       concat(f.textarea("body"));
       concat(f.checkbox("secret"));
@@ -4164,8 +4172,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with method", () => {
-    formFor(post, { url: "/", method: "delete", html: { id: "create-post" } }, (f) => {
+  it("form for with method", async () => {
+    await formFor(post, { url: "/", method: "delete", html: { id: "create-post" } }, (f) => {
       concat(f.textField("title"));
       concat(f.textarea("body"));
       concat(f.checkbox("secret"));
@@ -4186,10 +4194,14 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with search field", () => {
-    formFor(new Post(), { url: "/search", html: { id: "search-post", method: "get" } }, (f) => {
-      concat(f.searchField("title"));
-    });
+  it("form for with search field", async () => {
+    await formFor(
+      new Post(),
+      { url: "/search", html: { id: "search-post", method: "get" } },
+      (f) => {
+        concat(f.searchField("title"));
+      },
+    );
 
     const expected = wholeForm(
       "/search",
@@ -4202,12 +4214,16 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with remote", () => {
-    formFor(post, { url: "/", remote: true, html: { id: "create-post", method: "patch" } }, (f) => {
-      concat(f.textField("title"));
-      concat(f.textarea("body"));
-      concat(f.checkbox("secret"));
-    });
+  it("form for with remote", async () => {
+    await formFor(
+      post,
+      { url: "/", remote: true, html: { id: "create-post", method: "patch" } },
+      (f) => {
+        concat(f.textField("title"));
+        concat(f.textarea("body"));
+        concat(f.checkbox("secret"));
+      },
+    );
 
     const expected = wholeForm(
       "/",
@@ -4224,8 +4240,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for enforce utf8 true", () => {
-    formFor("post", { enforceUtf8: true }, (f) => {
+  it("form for enforce utf8 true", async () => {
+    await formFor("post", { enforceUtf8: true }, (f) => {
       concat(f.textField("title"));
     });
 
@@ -4240,8 +4256,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for enforce utf8 false", () => {
-    formFor("post", { enforceUtf8: false }, (f) => {
+  it("form for enforce utf8 false", async () => {
+    await formFor("post", { enforceUtf8: false }, (f) => {
       concat(f.textField("title"));
     });
 
@@ -4256,9 +4272,9 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for default enforce utf8 false", () => {
-    withDefaultEnforceUtf8(false, () => {
-      formFor("post", {}, (f) => {
+  it("form for default enforce utf8 false", async () => {
+    await withDefaultEnforceUtf8(false, async () => {
+      await formFor("post", {}, (f) => {
         concat(f.textField("title"));
       });
 
@@ -4274,9 +4290,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("form for default enforce utf8 true", () => {
-    withDefaultEnforceUtf8(true, () => {
-      formFor("post", {}, (f) => {
+  it("form for default enforce utf8 true", async () => {
+    await withDefaultEnforceUtf8(true, async () => {
+      await formFor("post", {}, (f) => {
         concat(f.textField("title"));
       });
 
@@ -4292,12 +4308,16 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("form for with remote in html", () => {
-    formFor(post, { url: "/", html: { remote: true, id: "create-post", method: "patch" } }, (f) => {
-      concat(f.textField("title"));
-      concat(f.textarea("body"));
-      concat(f.checkbox("secret"));
-    });
+  it("form for with remote in html", async () => {
+    await formFor(
+      post,
+      { url: "/", html: { remote: true, id: "create-post", method: "patch" } },
+      (f) => {
+        concat(f.textField("title"));
+        concat(f.textarea("body"));
+        concat(f.checkbox("secret"));
+      },
+    );
 
     const expected = wholeForm(
       "/",
@@ -4314,10 +4334,10 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with remote without html", () => {
+  it("form for with remote without html", async () => {
     post.persisted = false;
-    stub(post as Post & { toKey(): unknown }, "toKey", null, [], () => {
-      formFor(post, { remote: true }, (f) => {
+    await stub(post as Post & { toKey(): unknown }, "toKey", null, [], async () => {
+      await formFor(post, { remote: true }, (f) => {
         concat(f.textField("title"));
         concat(f.textarea("body"));
         concat(f.checkbox("secret"));
@@ -4339,8 +4359,8 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("form for without object", () => {
-    formFor("post", { html: { id: "create-post" } }, (f) => {
+  it("form for without object", async () => {
+    await formFor("post", { html: { id: "create-post" } }, (f) => {
       concat(f.textField("title"));
       concat(f.textarea("body"));
       concat(f.checkbox("secret"));
@@ -4361,8 +4381,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with index", () => {
-    formFor(post, { as: "post[]" }, (f) => {
+  it("form for with index", async () => {
+    await formFor(post, { as: "post[]" }, (f) => {
       concat(f.label("title"));
       concat(f.textField("title"));
       concat(f.textarea("body"));
@@ -4385,8 +4405,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with nil index option override", () => {
-    formFor(post, { as: "post[]", index: null }, (f) => {
+  it("form for with nil index option override", async () => {
+    await formFor(post, { as: "post[]", index: null }, (f) => {
       concat(f.textField("title"));
       concat(f.textarea("body"));
       concat(f.checkbox("secret"));
@@ -4407,8 +4427,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with namespace", () => {
-    formFor(post, { namespace: "namespace" }, (f) => {
+  it("form for with namespace", async () => {
+    await formFor(post, { namespace: "namespace" }, (f) => {
       concat(f.textField("title"));
       concat(f.textarea("body"));
       concat(f.checkbox("secret"));
@@ -4429,8 +4449,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with namespace with date select", () => {
-    formFor(post, { namespace: "namespace" }, (f) => {
+  it("form for with namespace with date select", async () => {
+    await formFor(post, { namespace: "namespace" }, (f) => {
       concat(f.dateSelect("written_on"));
     });
 
@@ -4443,8 +4463,8 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("form for with namespace with label", () => {
-    formFor(post, { namespace: "namespace" }, (f) => {
+  it("form for with namespace with label", async () => {
+    await formFor(post, { namespace: "namespace" }, (f) => {
       concat(f.label("title"));
       concat(f.textField("title"));
     });
@@ -4462,8 +4482,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with namespace and as option", () => {
-    formFor(post, { namespace: "namespace", as: "custom_name" }, (f) => {
+  it("form for with namespace and as option", async () => {
+    await formFor(post, { namespace: "namespace", as: "custom_name" }, (f) => {
       concat(f.textField("title"));
     });
 
@@ -4479,8 +4499,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("two form for with namespace", () => {
-    formFor(post, { namespace: "namespace_1" }, (f) => {
+  it("two form for with namespace", async () => {
+    await formFor(post, { namespace: "namespace_1" }, (f) => {
       concat(f.label("title"));
       concat(f.textField("title"));
     });
@@ -4497,7 +4517,7 @@ describe("FormHelperTest", () => {
 
     assertDomEqual(expected1, rendered);
 
-    formFor(post, { namespace: "namespace_2" }, (f) => {
+    await formFor(post, { namespace: "namespace_2" }, (f) => {
       concat(f.label("title"));
       concat(f.textField("title"));
     });
@@ -4515,9 +4535,9 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected2, rendered);
   });
 
-  it("fields for with namespace", () => {
+  it("fields for with namespace", async () => {
     comment.body = "Hello World";
-    formFor(post, { namespace: "namespace" }, (f) => {
+    await formFor(post, { namespace: "namespace" }, (f) => {
       concat(f.textField("title"));
       concat(f.textarea("body"));
       concat(
@@ -4541,8 +4561,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("fields for with file field generate multipart", () => {
-    formFor(post, {}, (f) => {
+  it("fields for with file field generate multipart", async () => {
+    await formFor(post, {}, (f) => {
       concat(
         f.fieldsFor("comment", post, {}, (c) => {
           concat(c.fileField("file"));
@@ -4561,8 +4581,8 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for label error wrapping block and non block versions", () => {
-    formFor(post, {}, (f) => {
+  it("form for label error wrapping block and non block versions", async () => {
+    await formFor(post, {}, (f) => {
       concat(f.label("author_name", "Name", { class: "label" }));
       concat(f.label("author_name", { class: "label" }, {}, () => "Name"));
     });
@@ -4580,10 +4600,10 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with collection radio buttons", () => {
+  it("form for with collection radio buttons", async () => {
     const post = new Post();
     Object.assign(post, { active: false });
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.collectionRadioButtons("active", [true, false], "toString", "toString"));
     });
 
@@ -4627,11 +4647,11 @@ describe("FormHelperTest", () => {
     );
   });
 
-  it("form for with collection radio buttons with custom builder block", () => {
+  it("form for with collection radio buttons with custom builder block", async () => {
     const post = new Post();
     Object.assign(post, { active: false });
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       const renderedRadioButtons = f.collectionRadioButtons(
         "active",
         [true, false],
@@ -4662,11 +4682,11 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with collection radio buttons with custom builder block does not leak the template", () => {
+  it("form for with collection radio buttons with custom builder block does not leak the template", async () => {
     const post = new Post();
     Object.assign(post, { active: false, id: 1 });
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       const renderedRadioButtons = f.collectionRadioButtons(
         "active",
         [true, false],
@@ -4699,11 +4719,11 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form with namespace and with collection radio buttons", () => {
+  it("form with namespace and with collection radio buttons", async () => {
     const post = new Post();
     Object.assign(post, { active: false });
 
-    formFor(post, { namespace: "foo" }, (f) => {
+    await formFor(post, { namespace: "foo" }, (f) => {
       concat(f.collectionRadioButtons("active", [true, false], "toString", "toString"));
     });
 
@@ -4723,11 +4743,11 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form with index and with collection radio buttons", () => {
+  it("form with index and with collection radio buttons", async () => {
     const post = new Post();
     Object.assign(post, { active: false });
 
-    formFor(post, { index: "1" }, (f) => {
+    await formFor(post, { index: "1" }, (f) => {
       concat(f.collectionRadioButtons("active", [true, false], "toString", "toString"));
     });
 
@@ -4747,11 +4767,11 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with collection checkboxes", () => {
+  it("form for with collection checkboxes", async () => {
     const post = new Post();
     Object.assign(post, { tag_ids: [1, 3] });
     const collection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.collectionCheckboxes("tag_ids", collection, "first", "last"));
     });
 
@@ -4773,11 +4793,11 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with collection checkboxes with custom builder block", () => {
+  it("form for with collection checkboxes with custom builder block", async () => {
     const post = new Post();
     Object.assign(post, { tag_ids: [1, 3] });
     const collection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       const renderedCheckboxes = f.collectionCheckboxes(
         "tag_ids",
         collection,
@@ -4811,12 +4831,12 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with collection checkboxes with custom builder block does not leak the template", () => {
+  it("form for with collection checkboxes with custom builder block does not leak the template", async () => {
     const post = new Post();
     Object.assign(post, { tag_ids: [1, 3], id: 1 });
     const collection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       const renderedCheckboxes = f.collectionCheckboxes(
         "tag_ids",
         collection,
@@ -4852,12 +4872,12 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form with namespace and with collection checkboxes", () => {
+  it("form with namespace and with collection checkboxes", async () => {
     const post = new Post();
     Object.assign(post, { tag_ids: [1] });
     const collection = [[1, "Tag 1"]];
 
-    formFor(post, { namespace: "foo" }, (f) => {
+    await formFor(post, { namespace: "foo" }, (f) => {
       concat(f.collectionCheckboxes("tag_ids", collection, "first", "last"));
     });
 
@@ -4875,12 +4895,12 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form with index and with collection checkboxes", () => {
+  it("form with index and with collection checkboxes", async () => {
     const post = new Post();
     Object.assign(post, { tag_ids: [1] });
     const collection = [[1, "Tag 1"]];
 
-    formFor(post, { index: "1" }, (f) => {
+    await formFor(post, { index: "1" }, (f) => {
       concat(f.collectionCheckboxes("tag_ids", collection, "first", "last"));
     });
 
@@ -4898,10 +4918,10 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with persisted to model", () => {
+  it("form for with persisted to model", async () => {
     const postForm = new RecordForm({ toModel: post });
 
-    formFor(postForm, {}, () => {});
+    await formFor(postForm, {}, () => {});
 
     const expected = wholeForm(
       "/posts/123",
@@ -4914,20 +4934,20 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with new record to model", () => {
+  it("form for with new record to model", async () => {
     const postForm = new RecordForm({ toModel: new Post() });
 
-    formFor(postForm, {}, () => {});
+    await formFor(postForm, {}, () => {});
 
     const expected = wholeForm("/posts", "new_post", "new_post", { method: "post" }, () => "");
 
     assertDomEqual(expected, rendered);
   });
 
-  it("form for with model using relative model naming", () => {
+  it("form for with model using relative model naming", async () => {
     const blogPost = new Blog.Post("And his name will be forty and four.", 44);
 
-    formFor(blogPost, {}, (f) => {
+    await formFor(blogPost, {}, (f) => {
       concat(f.textField("title"));
       concat(f.submit("Edit post"));
     });
@@ -4946,20 +4966,24 @@ describe("FormHelperTest", () => {
   });
 
   // PERMANENT-SKIP: CLAUDE.md, "Method visibility is compile-time only (`Module#private`, `basic_obj_respond_to`'s `pub`)" — a TS private method is callable at run time, so no NoMethodError is raised.
-  it.skip("form tags do not call private properties on form object", () => {
+  it.skip("form tags do not call private properties on form object", async () => {
     const obj = new (class {
       private privateProperty(): never {
         throw new Error("This method should not be called.");
       }
     })();
 
-    formFor(obj, { as: "other_name", url: "/", html: { id: "edit-other-name" } }, async (f) => {
-      await assertRaises([NoMethodError], {}, () => f.hiddenField("privateProperty"));
-    });
+    await formFor(
+      obj,
+      { as: "other_name", url: "/", html: { id: "edit-other-name" } },
+      async (f) => {
+        await assertRaises([NoMethodError], {}, () => f.hiddenField("privateProperty"));
+      },
+    );
   });
 
-  it("form for label error wrapping", () => {
-    formFor(post, {}, (f) => {
+  it("form for label error wrapping", async () => {
+    await formFor(post, {}, (f) => {
       concat(f.label("author_name", { class: "label" }));
       concat(f.textField("author_name"));
       concat(f.submit("Create post"));
@@ -4979,11 +5003,11 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("form for label error wrapping without conventional instance variable", () => {
+  it("form for label error wrapping without conventional instance variable", async () => {
     const post = view.post;
     delete (view as Partial<View>).post;
 
-    formFor(post, {}, (f) => {
+    await formFor(post, {}, (f) => {
       concat(f.label("author_name", { class: "label" }));
       concat(f.textField("author_name"));
       concat(f.submit("Create post"));
@@ -5003,11 +5027,11 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
-  it("submit with object as new record and locale strings", () => {
-    I18n.withLocale("submit", () => {
+  it("submit with object as new record and locale strings", async () => {
+    await I18n.withLocale("submit", async () => {
       post.persisted = false;
-      stub(post as Post & { toKey(): unknown }, "toKey", null, [], () => {
-        formFor(post, {}, (f) => {
+      await stub(post as Post & { toKey(): unknown }, "toKey", null, [], async () => {
+        await formFor(post, {}, (f) => {
           concat(f.submit());
         });
 
@@ -5025,9 +5049,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("submit with object as existing record and locale strings", () => {
-    I18n.withLocale("submit", () => {
-      formFor(post, {}, (f) => {
+  it("submit with object as existing record and locale strings", async () => {
+    await I18n.withLocale("submit", async () => {
+      await formFor(post, {}, (f) => {
         concat(f.submit());
       });
 
@@ -5044,9 +5068,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("submit without object and locale strings", () => {
-    I18n.withLocale("submit", () => {
-      formFor("post", {}, (f) => {
+  it("submit without object and locale strings", async () => {
+    await I18n.withLocale("submit", async () => {
+      await formFor("post", {}, (f) => {
         concat(f.submit({ class: "extra" }));
       });
 
@@ -5063,9 +5087,9 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("submit with object which is overwritten by as option", () => {
-    I18n.withLocale("submit", () => {
-      formFor(post, { as: "another_post" }, (f) => {
+  it("submit with object which is overwritten by as option", async () => {
+    await I18n.withLocale("submit", async () => {
+      await formFor(post, { as: "another_post" }, (f) => {
         concat(f.submit());
       });
 
@@ -5082,10 +5106,10 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("submit with object which is namespaced", () => {
+  it("submit with object which is namespaced", async () => {
     const blogPost = new Blog.Post("And his name will be forty and four.", 44);
-    I18n.withLocale("submit", () => {
-      formFor(blogPost, {}, (f) => {
+    await I18n.withLocale("submit", async () => {
+      await formFor(blogPost, {}, (f) => {
         concat(f.submit());
       });
 

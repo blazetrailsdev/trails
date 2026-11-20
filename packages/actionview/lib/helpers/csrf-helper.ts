@@ -4,11 +4,11 @@ import { tag, type TagHelperHost } from "./tag-helper.js";
 
 interface CsrfHelperHost extends TagHelperHost {
   isProtectAgainstForgery?(): boolean;
-  formAuthenticityToken?(): string;
+  formAuthenticityToken?(): string | Promise<string>;
   requestForgeryProtectionToken?: unknown;
 }
 
-export function csrfMetaTags(this: CsrfHelperHost): SafeBuffer | null {
+export async function csrfMetaTags(this: CsrfHelperHost): Promise<SafeBuffer | null> {
   if (rbObjRespondTo(this, "isProtectAgainstForgery") && this.isProtectAgainstForgery!()) {
     return htmlSafe(
       [
@@ -16,7 +16,10 @@ export function csrfMetaTags(this: CsrfHelperHost): SafeBuffer | null {
           name: "csrf-param",
           content: this.requestForgeryProtectionToken,
         }),
-        tag.call(this, "meta", { name: "csrf-token", content: this.formAuthenticityToken!() }),
+        tag.call(this, "meta", {
+          name: "csrf-token",
+          content: await this.formAuthenticityToken!(),
+        }),
       ].join("\n"),
     );
   }

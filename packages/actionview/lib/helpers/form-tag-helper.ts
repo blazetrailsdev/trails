@@ -60,37 +60,18 @@ export function setDefaultEnforceUtf8(value: boolean): void {
   defaultEnforceUtf8 = value;
 }
 
-export function formTag(
-  this: FormTagHelperHost,
-  urlForOptions: unknown,
-  options: Record<string, unknown>,
-  block: (...args: unknown[]) => PromiseLike<unknown>,
-): Promise<SafeBuffer>;
-export function formTag(
-  this: FormTagHelperHost,
-  urlForOptions?: unknown,
-  options?: Record<string, unknown>,
-  block?: ((...args: unknown[]) => unknown) | null,
-): SafeBuffer;
-/**
- * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
- * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
- */
-export function formTag(
+export async function formTag(
   this: FormTagHelperHost,
   urlForOptions: unknown = {},
   options: Record<string, unknown> = {},
   block?: ((...args: unknown[]) => unknown) | null,
-): SafeBuffer | Promise<SafeBuffer> {
+): Promise<SafeBuffer> {
   const htmlOptions = htmlOptionsForForm.call(this, urlForOptions, options);
   if (block != null) {
-    const content = this.capture(block);
-    if (content instanceof Promise) {
-      return content.then((content) => formTag.call(this, urlForOptions, options, () => content));
-    }
-    return formTagWithBody.call(this, htmlOptions, content);
+    const content = await this.capture(block);
+    return await formTagWithBody.call(this, htmlOptions, content);
   } else {
-    return formTagHtml.call(this, htmlOptions);
+    return await formTagHtml.call(this, htmlOptions);
   }
 }
 
@@ -551,10 +532,10 @@ export function htmlOptionsForForm(
 }
 
 /** @internal */
-export function extraTagsForForm(
+export async function extraTagsForForm(
   this: FormTagHelperHost,
   htmlOptions: Record<string, unknown>,
-): SafeBuffer | string {
+): Promise<SafeBuffer | string> {
   const authenticityToken = hashDelete(htmlOptions, "authenticityToken");
   const method = String(hashDelete(htmlOptions, "method") ?? "").toLowerCase();
 
@@ -567,14 +548,14 @@ export function extraTagsForForm(
     case "post":
     case "":
       htmlOptions["method"] = "post";
-      methodTagValue = tokenTag.call(this, authenticityToken, {
+      methodTagValue = await tokenTag.call(this, authenticityToken, {
         formOptions: { action: htmlOptions["action"], method: "post" },
       });
       break;
     default:
       htmlOptions["method"] = "post";
       methodTagValue = methodTag.call(this, method).plus(
-        tokenTag.call(this, authenticityToken, {
+        await tokenTag.call(this, authenticityToken, {
           formOptions: { action: htmlOptions["action"], method: method },
         }),
       );
@@ -589,22 +570,22 @@ export function extraTagsForForm(
 }
 
 /** @internal */
-export function formTagHtml(
+export async function formTagHtml(
   this: FormTagHelperHost,
   htmlOptions: Record<string, unknown>,
-): SafeBuffer {
-  const extraTags = extraTagsForForm.call(this, htmlOptions);
+): Promise<SafeBuffer> {
+  const extraTags = await extraTagsForForm.call(this, htmlOptions);
   const html = (tag.call(this, "form", htmlOptions, true) as SafeBuffer).plus(extraTags);
   return preventContentExfiltration(html);
 }
 
 /** @internal */
-export function formTagWithBody(
+export async function formTagWithBody(
   this: FormTagHelperHost,
   htmlOptions: Record<string, unknown>,
   content: unknown,
-): SafeBuffer {
-  const output = formTagHtml.call(this, htmlOptions);
+): Promise<SafeBuffer> {
+  const output = await formTagHtml.call(this, htmlOptions);
   if (content != null && content !== false) {
     output.concat(content instanceof SafeBuffer ? content : String(content));
   }

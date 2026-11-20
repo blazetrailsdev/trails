@@ -468,8 +468,8 @@ describe("ATestHelperTest", () => {
 
 const AssertionsTest = named(
   class AssertionsTest extends TestCase {
-    renderFromHelper(this: Tc) {
-      return this.formTag("/foo", {}, async () => {
+    async renderFromHelper(this: Tc) {
+      return await this.formTag("/foo", {}, async () => {
         this.safeConcat(await this.render({ plain: "<ul><li>foo</li></ul>" }));
       });
     }
@@ -492,8 +492,8 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it("do not memoize the document_root_element in view tests", () => {
-    tc().concat(tc().formTag("/foo"));
+  it("do not memoize the document_root_element in view tests", async () => {
+    tc().concat(await tc().formTag("/foo"));
 
     tc().assertSelect("form");
 
@@ -586,8 +586,8 @@ describe("HTMLParserTest", () => {
     assertEqual(developer.name, tc().documentRootElement().text);
   });
 
-  it("do not memoize the rendered.html in view tests", () => {
-    tc().concat(tc().formTag("/foo"));
+  it("do not memoize the rendered.html in view tests", async () => {
+    tc().concat(await tc().formTag("/foo"));
 
     assertEqual("/foo", tc().documentRootElement().atCss("form").get("action"));
 

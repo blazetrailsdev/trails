@@ -22,8 +22,8 @@ describe("FormHelperActiveRecordTest", () => {
   let developer: Developer;
   let rendered: unknown;
 
-  function formFor(...args: Parameters<Base["formFor"]>): unknown {
-    return (rendered = view.formFor(...args));
+  async function formFor(...args: Parameters<Base["formFor"]>): Promise<unknown> {
+    return (rendered = await view.formFor(...args));
   }
 
   function concat(string: unknown): unknown {
@@ -59,7 +59,7 @@ describe("FormHelperActiveRecordTest", () => {
     const first = await (
       developer as unknown as { projects: { first(): Promise<Project> } }
     ).projects.first();
-    formFor(developer, {}, (f: FormBuilder) =>
+    await formFor(developer, {}, (f: FormBuilder) =>
       concat(
         f.fieldsFor("projects", first, { childIndex: "abc" }, (cf) => concat(cf.textField("name"))),
       ),
