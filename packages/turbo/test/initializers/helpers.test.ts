@@ -6,13 +6,7 @@ import { StreamsHelper } from "../../lib/app/helpers/turbo/streams-helper.js";
 
 describe("Turbo::HelpersInInitializersTest", () => {
   it("AC::Base has the helpers in place when initializers run", () => {
-    expect(
-      (rbGvGet("$dummy_ac_base_ancestors_in_initializers") as object[]).includes(
-        TurboStreamsTagBuilder,
-      ),
-    ).toBe(true);
-    expect(
-      (rbGvGet("$dummy_ac_base_helpers_in_initializers") as object[]).includes(StreamsHelper),
-    ).toBe(true);
+    expect(rbGvGet("$dummy_ac_base_ancestors_in_initializers")).toInclude(TurboStreamsTagBuilder);
+    expect(rbGvGet("$dummy_ac_base_helpers_in_initializers")).toInclude(StreamsHelper);
   });
 });
