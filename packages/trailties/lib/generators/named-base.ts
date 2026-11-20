@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 
 import { ActiveRecord } from "@blazetrails/activerecord";
-import { rbObjRespondTo, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rbClearMethodCache, rbModName, TopLevel } from "@blazetrails/ruby-compat";
 import { Base as GeneratorBase, type GeneratorConfig } from "./base.js";
 import { Generators } from "../generators.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
@@ -169,6 +169,15 @@ export class NamedBase extends GeneratorBase {
 
   urlHelperPrefix(): string {
     return (this._urlHelperPrefix ??= [...this.classPath(), this.fileName].join("_"));
+  }
+
+  /** @internal */
+  protected applicationName(): string {
+    if (TopLevel.Trails !== undefined && TopLevel.Trails.application) {
+      return underscore(rbModName(TopLevel.Trails.application.constructor)!.split("::")[0]);
+    } else {
+      return "application";
+    }
   }
 
   /** @missingRailsArgs model_resource_name — PERMANENT */

@@ -595,8 +595,11 @@ export class AppGenerator extends AppBase {
     this.methodAdded("deleteAppHelpersIfApiOption");
     this.methodAdded("deleteAppViewsIfApiOption");
     this.methodAdded("deletePublicFilesIfApiOption");
+    this.methodAdded("deleteAssetsInitializerSkippingAssetPipeline");
+    this.methodAdded("deleteApplicationRecordSkippingActiveRecord");
     this.methodAdded("deleteActiveJobFolderIfSkippingActiveJob");
     this.methodAdded("deleteActionMailerFilesSkippingActionMailer");
+    this.methodAdded("deleteActionCableFilesSkippingActionCable");
     this.methodAdded("deleteNonApiInitializersIfApiOption");
     this.methodAdded("deleteApiInitializers");
     this.methodAdded("deleteNewFrameworkDefaults");
@@ -824,6 +827,26 @@ export class AppGenerator extends AppBase {
     }
   }
 
+  async deleteAssetsInitializerSkippingAssetPipeline(): Promise<void> {
+    if (this.skipAssetPipeline()) {
+      await this.removeFile("config/initializers/assets.ts");
+      await this.removeFile("app/assets/stylesheets/application.css");
+      if (!this.options.api) {
+        await this.createFile(
+          "app/assets/stylesheets/application.css",
+          "/* Application styles */\n",
+        );
+      }
+    }
+  }
+
+  /** @missingRailsArgs remove_file — PERMANENT */
+  async deleteApplicationRecordSkippingActiveRecord(): Promise<void> {
+    if (this.options.skipActiveRecord) {
+      await this.removeFile("app/models/application-record.ts");
+    }
+  }
+
   async deleteActiveJobFolderIfSkippingActiveJob(): Promise<void> {
     if (this.options.skipActiveJob) {
       await this.removeDir("app/jobs");
@@ -836,6 +859,12 @@ export class AppGenerator extends AppBase {
       await this.removeFile("app/views/layouts/mailer.text.tse");
       await this.removeDir("app/mailers");
       await this.removeDir("test/mailers");
+    }
+  }
+
+  async deleteActionCableFilesSkippingActionCable(): Promise<void> {
+    if (this.options.skipActionCable) {
+      await this.removeDir("app/javascript/channels");
     }
   }
 
@@ -891,7 +920,7 @@ export class ARGVScrubber {
   async prepareBang(): Promise<string[]> {
     this.handleVersionRequestBang(this.argv[0]);
     return this.handleInvalidCommandBang(this.argv[0], this.argv, () =>
-      this.handleRailsRcBang(this.argv.slice(1)),
+      this.handleTrailsRcBang(this.argv.slice(1)),
     );
   }
 
@@ -927,7 +956,7 @@ export class ARGVScrubber {
   }
 
   /** @internal */
-  private async handleRailsRcBang(argv: string[]): Promise<string[]> {
+  private async handleTrailsRcBang(argv: string[]): Promise<string[]> {
     if (argv.find((arg) => arg === "--no-rc") !== undefined) {
       return argv.filter((arg) => arg !== "--no-rc");
     } else {

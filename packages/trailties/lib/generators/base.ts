@@ -208,6 +208,10 @@ export abstract class Base extends (Group as unknown as (abstract new (
     return klass._desc;
   }
 
+  static hideBang(): void {
+    Generators.hideNamespace(this.namespace());
+  }
+
   static override namespace(name: string | null = null): string {
     if (name != null) return super.namespace(name);
     if (Object.hasOwn(this, "_namespace") && this._namespace != null) return this._namespace;

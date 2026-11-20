@@ -1,4 +1,4 @@
-import { dasherize, deepMergeBang, underscore } from "@blazetrails/activesupport";
+import { dasherize, deepMergeBang, mattrAccessor, underscore } from "@blazetrails/activesupport";
 import "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   Dir,
@@ -36,6 +36,7 @@ let _subclasses: GeneratorClass[] | undefined;
 let _hiddenNamespaces: string[] | undefined;
 let _commandType: string | undefined;
 let _lookupPaths: string[] | undefined;
+let _fileLookupPaths: string[] | undefined;
 let _aliases: Record<string, Record<string, unknown>> | undefined;
 let _options: Record<string, Record<string, unknown>> | undefined;
 let _fallbacks: Record<string, unknown> | undefined;
@@ -51,7 +52,7 @@ function urlToPath(url: URL): string {
 }
 
 export class Generators {
-  static namespace: { readonly name: string } | null = null;
+  declare static namespace: { readonly name: string } | null;
 
   static readonly DEFAULT_ALIASES: Record<string, Record<string, unknown>> = {
     trails: {
@@ -166,20 +167,12 @@ export class Generators {
 
   /** @internal */
   static async lookupBang(): Promise<void> {
-    const walk = async (dir: string, base: string, sub: string): Promise<void> => {
-      for (const entry of Dir.children(sub).slice().sort()) {
-        const full = getPath().join(sub, entry);
-        if (File.isDirectory(full)) {
-          await walk(dir, base, full);
-        } else if (/-generator\.[cm]?[tj]s$/.test(entry) && !/\.(test|d)\./.test(entry)) {
-          await requireGenerator(dir, base, full).catch(() => undefined);
-        }
-      }
-    };
     for (const dir of LOAD_PATH) {
-      for (const base of Generators.lookupPaths()) {
-        const root = File.join(dir, base);
-        if (File.isDirectory(root)) await walk(dir, base, root);
+      for (const path of await Dir.globAsync(File.join(dir, ...Generators.fileLookupPaths()))) {
+        const base = Generators.lookupPaths().find((b) =>
+          path.startsWith(File.join(dir, b) + "/"),
+        )!;
+        await requireGenerator(dir, base, path).catch(() => undefined);
       }
     }
   }
@@ -285,6 +278,8 @@ export class Generators {
     Generators.hiddenNamespaces().push(...namespaces);
   }
 
+  static hideNamespace = this.hideNamespaces;
+
   static async help(command: string = "generate"): Promise<void> {
     STDOUT.puts("Usage:");
     STDOUT.puts(`  bin/trails ${command} GENERATOR [args] [options]`);
@@ -368,6 +363,14 @@ export class Generators {
     return (_lookupPaths ??= ["trails/generators", "generators"]);
   }
 
+  private static fileLookupPaths(): string[] {
+    return (_fileLookupPaths ??= [
+      `{${Generators.lookupPaths().join(",")}}`,
+      "**",
+      `*-generator${EXTENSION}`,
+    ]);
+  }
+
   private static printList(base: string, namespaces: string[]): void {
     namespaces = namespaces.filter((n) => !Generators.hiddenNamespaces().includes(n));
     if (namespaces.length === 0) return;
@@ -393,5 +396,7 @@ async function requireGenerator(dir: string, base: string, path: string): Promis
     }
   }
 }
+
+mattrAccessor.call(Generators, "namespace");
 
 Trails.Generators = Generators;
