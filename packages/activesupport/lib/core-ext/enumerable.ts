@@ -40,18 +40,22 @@ export function minimum<T>(
   collection: Iterable<T> | Each<T>,
   key: string | ((item: T) => unknown) | null = null,
 ): unknown {
-  return min(key === null ? toA(collection) : map(collection, keyProc(key)));
+  return min(
+    key === null
+      ? toA(collection)
+      : map(collection, typeof key === "function" ? key : (element: T) => rbFSend(element, key)),
+  );
 }
 
 export function maximum<T>(
   collection: Iterable<T> | Each<T>,
   key: string | ((item: T) => unknown) | null = null,
 ): unknown {
-  return max(key === null ? toA(collection) : map(collection, keyProc(key)));
-}
-
-function keyProc<T>(key: string | ((item: T) => unknown)): (item: T) => unknown {
-  return typeof key === "function" ? key : (element: T) => rbFSend(element, key);
+  return max(
+    key === null
+      ? toA(collection)
+      : map(collection, typeof key === "function" ? key : (element: T) => rbFSend(element, key)),
+  );
 }
 
 export function indexBy<T, K extends string>(
