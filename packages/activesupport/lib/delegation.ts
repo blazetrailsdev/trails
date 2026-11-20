@@ -348,12 +348,14 @@ export namespace Delegation {
 
   const methodMissingLayers = new WeakSet<object>();
 
+  /** @noRailsEquivalent CONVERGEABLE delegate-missing-to-writer-arm-without-guard */
+  const resolvingWriters = new WeakSet<object>();
+
   /**
    * @inventedArm then — PERMANENT
    * @inventedArm if — PERMANENT
+   * @inventedArm try — CONVERGEABLE delegate-missing-to-writer-arm-without-guard
    */
-  const resolvingWriters = new WeakSet<object>();
-
   export function generateMethodMissing(
     owner: { prototype: object },
     target: string,
