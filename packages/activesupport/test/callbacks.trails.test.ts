@@ -1434,3 +1434,18 @@ describe("thenable around callback conditions (trails)", () => {
     expect(host.log).toEqual(["around-zero", "save"]);
   });
 });
+
+describe("CallbackChain#initialize config defaults", () => {
+  it("defaults scope to kind and terminator to default_terminator", () => {
+    const chain = new CallbackChain("save");
+    expect(chain.config.scope).toEqual(["kind"]);
+    const terminator = chain.config.terminator as (t: object, fn: () => unknown) => boolean;
+    expect(terminator({}, () => kernelThrow(":abort"))).toBe(true);
+    expect(terminator({}, () => null)).toBe(false);
+  });
+
+  it("an explicit terminator overrides the default", () => {
+    const terminator = () => false;
+    expect(new CallbackChain("save", { terminator }).config.terminator).toBe(terminator);
+  });
+});

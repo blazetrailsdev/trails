@@ -400,10 +400,10 @@ export class Before {
   /** @noRailsEquivalent PERMANENT */
   private _callFilter(env: Environment): Environment | Promise<Environment> {
     const { target, value, syncChain } = env;
-    const terminatorFn = this.haltedLambda;
+    const haltedLambda = this.haltedLambda;
     const resultLambda = () => this.userCallback(target, value);
 
-    if (terminatorFn === false) {
+    if (haltedLambda === false) {
       const r = resultLambda();
       if (!isThenable(r)) return env;
       if (syncChain !== undefined) {
@@ -415,41 +415,37 @@ export class Before {
       return Promise.resolve(r).then(() => env);
     }
 
-    if (terminatorFn) {
-      let cbResult: unknown;
-      const halt = terminatorFn(target, () => {
-        cbResult = resultLambda();
-        return cbResult;
-      });
-      if (isThenable(halt)) {
-        if (syncChain !== undefined) {
-          new Thread(() => halt);
-          throw new RuntimeError(
-            `Async callback on sync chain "${syncChain}" — before returned a Promise`,
-          );
-        }
-        return Promise.resolve(halt).then((h) => {
-          if (h) this.halt(env);
-          return env;
-        });
-      }
-      if (isThenable(cbResult)) {
-        new Thread(() => cbResult);
-        if (syncChain !== undefined) {
-          throw new RuntimeError(
-            `Async callback on sync chain "${syncChain}" — before returned a Promise`,
-          );
-        }
+    let cbResult: unknown;
+    const halt = haltedLambda!(target, () => {
+      cbResult = resultLambda();
+      return cbResult;
+    });
+    if (isThenable(halt)) {
+      if (syncChain !== undefined) {
+        new Thread(() => halt);
         throw new RuntimeError(
-          `Async before callback on chain "${this.name}" is unsupported with a custom terminator. ` +
-            `Custom terminators cannot evaluate Promise-returning callbacks. ` +
-            `Use the default terminator (halt via throw(:abort)) or make all before callbacks synchronous.`,
+          `Async callback on sync chain "${syncChain}" — before returned a Promise`,
         );
       }
-      if (halt) this.halt(env);
-      return env;
+      return Promise.resolve(halt).then((h) => {
+        if (h) this.halt(env);
+        return env;
+      });
     }
-
+    if (isThenable(cbResult)) {
+      new Thread(() => cbResult);
+      if (syncChain !== undefined) {
+        throw new RuntimeError(
+          `Async callback on sync chain "${syncChain}" — before returned a Promise`,
+        );
+      }
+      throw new RuntimeError(
+        `Async before callback on chain "${this.name}" is unsupported with a custom terminator. ` +
+          `Custom terminators cannot evaluate Promise-returning callbacks. ` +
+          `Use the default terminator (halt via throw(:abort)) or make all before callbacks synchronous.`,
+      );
+    }
+    if (halt) this.halt(env);
     return env;
   }
 
@@ -462,25 +458,6 @@ export class Before {
 
   apply(callbackSequence: CallbackSequence): CallbackSequence {
     return callbackSequence.before(this);
-  }
-
-  static build(callback: Callback, options: DefineCallbacksOptions): (target: object) => boolean {
-    const terminatorFn = options.terminator;
-    return (target: object) => {
-      if (!Value.check(callback, target)) return true;
-      const cb = callback.filter as BeforeCallback;
-      if (terminatorFn === false) {
-        cb.call(target, target);
-        return true;
-      }
-      if (terminatorFn) return !terminatorFn(target, () => cb.call(target, target));
-      let terminate = true;
-      kernelCatch(":abort", () => {
-        cb.call(target, target);
-        terminate = false;
-      });
-      return !terminate;
-    };
   }
 }
 
@@ -965,12 +942,12 @@ export class CallbackChain {
     target: object,
     resultLambda: () => unknown,
   ) => boolean | Promise<boolean> {
-    return (_target, resultLambda) => {
+    return (target, resultLambda) => {
       let terminate = true;
       const caught = kernelCatch(":abort", () => {
-        const r = resultLambda();
-        if (isThenable(r)) {
-          return Promise.resolve(r).then(() => {
+        const result = resultLambda();
+        if (isThenable(result)) {
+          return Promise.resolve(result).then(() => {
             terminate = false;
           });
         }
