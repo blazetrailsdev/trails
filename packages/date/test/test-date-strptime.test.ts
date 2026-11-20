@@ -1,3 +1,4 @@
+import { Temporal } from "../lib/temporal.js";
 /* eslint-disable vitest/no-conditional-expect */
 
 import { describe, it, expect } from "vitest";

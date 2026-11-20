@@ -1,3 +1,4 @@
+import { Temporal } from "./temporal.js";
 /** @noRailsEquivalent PERMANENT */
 export const TZDATA_VERSION = "2026e";
 
