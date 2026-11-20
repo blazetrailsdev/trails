@@ -160,7 +160,9 @@ describe("PGTextDecoder — timestamps match Time.new", () => {
     if (m[12]) year = -year + 1;
     const nsec = BigInt((m[7] ?? "").slice(0, 9).padEnd(9, "0"));
     const sec = nsec
-      ? new Rational(BigInt(m[6]) * 1_000_000_000n + nsec, 1_000_000_000n)
+      ? dbLocal
+        ? new Rational(BigInt(m[6]) * 1_000_000n + nsec / 1000n, 1_000_000n)
+        : new Rational(BigInt(m[6]) * 1_000_000_000n + nsec, 1_000_000_000n)
       : Number(m[6]);
     const args = [year, +m[2], +m[3], +m[4], +m[5], sec] as const;
     if (m[8]) {

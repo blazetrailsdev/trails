@@ -34,7 +34,13 @@ import type { TypeMapByOid } from "./type-map-by-oid.js";
 export interface PGNamespace {
   readonly name: string;
   Connection: typeof Connection;
-  connect(connParams?: Record<string, unknown>): Promise<Connection>;
+  connect: {
+    (connParams?: Record<string, unknown>): Promise<Connection>;
+    <R>(
+      connParams: Record<string, unknown>,
+      block: (conn: Connection) => R | Promise<R>,
+    ): Promise<R>;
+  };
   Constants: typeof Constants;
   ERROR_CLASSES: Record<string, typeof Error>;
   Error: typeof Error;

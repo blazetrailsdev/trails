@@ -31,4 +31,5 @@ export const Constants = {
 PG.Constants = Constants;
 Object.assign(PG, Constants);
 
-PG.connect = (connParams = {}) => PG.Connection.connect(connParams);
+PG.connect = ((...args: Parameters<typeof PG.Connection.new>) =>
+  PG.Connection.new(...args)) as typeof PG.connect;

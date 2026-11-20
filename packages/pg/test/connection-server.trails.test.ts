@@ -64,4 +64,27 @@ describe("PG::Connection against a server", () => {
     expect((second as Error).message).toBe("no connection to the server\n");
     expect(conn.status()).toBe(PG.CONNECTION_BAD);
   });
+
+  it("PG.connect yields the connection to its block and finishes it", async () => {
+    let yielded: Connection | null = null;
+    const value = await PG.connect(connParams, async (c) => {
+      yielded = c;
+      return (await c.exec("SELECT 'one'::text AS one")).getvalue(0, 0);
+    });
+    expect(value).toBe("one");
+    expect(yielded!.isFinished()).toBe(true);
+  });
+
+  it("escape_identifier doubles quotes and wraps an empty string", () => {
+    expect(conn.escapeIdentifier('a"b')).toBe('"a""b"');
+    expect(conn.escapeIdentifier("")).toBe('""');
+  });
+
+  it("escape_identifier raises ArgumentError on a null byte", () => {
+    expect(() => conn.escapeIdentifier("a\0b")).toThrow("string contains null byte");
+  });
+
+  it("escape_identifier raises PG::Error on an invalid multibyte character", () => {
+    expect(() => conn.escapeIdentifier("a\uD800")).toThrow(PG.Error);
+  });
 });
