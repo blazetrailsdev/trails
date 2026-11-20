@@ -59,6 +59,7 @@ describe("isSourceUnported package scoping", () => {
       "../i18n.rb",
       "backend.rb",
       "backend/base.rb",
+      "backend/cache_file.rb",
       "backend/cascade.rb",
       "backend/chain.rb",
       "backend/fallbacks.rb",
