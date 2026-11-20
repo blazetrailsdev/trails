@@ -65,6 +65,23 @@ describe("Dir", () => {
     ]);
   });
 
+  it("glob answers paths relative to base, and ** descends dot directories under FNM_DOTMATCH", () => {
+    // vendor/ruby/v3.3.11/dir.c:3227 and dir.c:2762, verified against ruby 3.3.11.
+    const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
+    mkdirSync(join(root, "a"));
+    mkdirSync(join(root, ".d"));
+    writeFileSync(join(root, "a", "x.rb"), "");
+    writeFileSync(join(root, ".d", "w.rb"), "");
+    writeFileSync(join(root, ".hidden.rb"), "");
+    expect(Dir.glob("**/*.rb", 0, { base: root })).toEqual(["a/x.rb"]);
+    expect(Dir.glob("**/*.rb", 0, { base: `${root}//` })).toEqual(["a/x.rb"]);
+    expect(Dir.glob("**/*.rb", File.FNM_DOTMATCH, { base: root })).toEqual([
+      ".d/w.rb",
+      ".hidden.rb",
+      "a/x.rb",
+    ]);
+  });
+
   it("globAsync matches what glob does when no flag is given", async () => {
     const root = fixture();
 

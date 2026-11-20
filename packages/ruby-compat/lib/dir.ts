@@ -139,8 +139,9 @@ function globHelper(
   const join = (name: string): string =>
     base.endsWith(File.SEPARATOR) ? `${base}${name}` : `${base}${File.SEPARATOR}${name}`;
   if (segment === "**" && rest.length > 0) {
+    const dotmatch = (flags & File.FNM_DOTMATCH) !== 0;
     for (const name of children(base)) {
-      if (name.startsWith(".")) continue;
+      if (name.startsWith(".") && !dotmatch) continue;
       if (segmentMatches(rest[0], name, flags))
         globHelper(join(name), rest.slice(1), found, true, flags);
       if (File.isDirectory(join(name))) globHelper(join(name), segments, found, true, flags);
