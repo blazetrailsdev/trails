@@ -73,5 +73,6 @@ export interface Base {
   wakeUp(): Promise<void>;
   interruptibleSleep(time: unknown): Promise<null>;
   isRegistered(): boolean;
+  register(): Promise<void>;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */

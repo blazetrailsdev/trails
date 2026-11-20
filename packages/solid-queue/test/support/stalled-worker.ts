@@ -22,10 +22,10 @@ export class StalledWorker extends Worker {
   }
 
   /** @internal */
-  async register(): Promise<void> {
+  override async register(): Promise<void> {
     await File.writeAsync(this.startupLog, `${Process.pid}\n`, { mode: "a" });
     await new Promise((resolve) => setTimeout(resolve, this.startupDelay * 1000));
-    await (Worker.prototype as unknown as { register(): Promise<void> }).register.call(this);
+    await super.register();
   }
 }
 constSet(TopLevel, "StalledWorker", StalledWorker);
