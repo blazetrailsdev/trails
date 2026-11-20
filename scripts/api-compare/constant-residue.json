@@ -850,12 +850,19 @@
       "error.ts::InvalidSecret": "BCrypt::Errors::InvalidSecret"
     }
   },
-  "builder": { "rows": 5, "excluded": [], "unwalked": ["xchar.ts::XChar"], "residue": {} },
+  "builder": {
+    "rows": 5,
+    "excluded": [],
+    "unwalked": ["xchar.ts::XChar"],
+    "residue": {}
+  },
   "chronic": {
     "rows": 61,
     "excluded": [],
     "unwalked": [],
-    "residue": { "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick" }
+    "residue": {
+      "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick"
+    }
   },
   "date": {
     "rows": 1,
@@ -868,21 +875,32 @@
       "time.ts::Timezone"
     ],
     "unwalked": [],
-    "residue": { "date.ts::DateInfinity": "Date::Infinity" }
+    "residue": {
+      "date.ts::DateInfinity": "Date::Infinity"
+    }
   },
   "did-you-mean": {
     "rows": 7,
     "excluded": [],
     "unwalked": [],
-    "residue": { "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker" }
+    "residue": {
+      "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker"
+    }
   },
   "et-orbi": {
     "rows": 1,
     "excluded": [],
     "unwalked": [],
-    "residue": { "time.ts::EoTime": "EtOrbi::EoTime" }
+    "residue": {
+      "time.ts::EoTime": "EtOrbi::EoTime"
+    }
   },
-  "fugit": { "rows": 13, "excluded": [], "unwalked": [], "residue": {} },
+  "fugit": {
+    "rows": 13,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {}
+  },
   "globalid": {
     "rows": 12,
     "excluded": ["global-id.ts::GlobalID", "signed-global-id.ts::SignedGlobalID"],
@@ -993,8 +1011,18 @@
       "yaml.ts::YAML": "Mail::YAML"
     }
   },
-  "marcel": { "rows": 2, "excluded": [], "unwalked": [], "residue": {} },
-  "mini-magick": { "rows": 10, "excluded": [], "unwalked": [], "residue": {} },
+  "marcel": {
+    "rows": 2,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {}
+  },
+  "mini-magick": {
+    "rows": 10,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {}
+  },
   "mini-mime": {
     "rows": 5,
     "excluded": [],
@@ -1103,7 +1131,12 @@
       "text-decoder/timestamp.ts::TimestampUtcToLocal": "PG::TextDecoder::TimestampUtcToLocal"
     }
   },
-  "raabro": { "rows": 3, "excluded": [], "unwalked": [], "residue": {} },
+  "raabro": {
+    "rows": 3,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {}
+  },
   "rack": {
     "rows": 61,
     "excluded": [],
@@ -1164,7 +1197,9 @@
     "rows": 8,
     "excluded": [],
     "unwalked": ["methods.ts::Methods", "utils.ts::Utils"],
-    "residue": { "test.ts::Test": "Rack::Test" }
+    "residue": {
+      "test.ts::Test": "Rack::Test"
+    }
   },
   "rackup": {
     "rows": 6,
@@ -1183,7 +1218,9 @@
       "file-utils-ext.ts::FileUtilsExt",
       "version.ts::Version"
     ],
-    "residue": { "win32.ts::Win32HomeError": "Rake::Win32::Win32HomeError" }
+    "residue": {
+      "win32.ts::Win32HomeError": "Rake::Win32::Win32HomeError"
+    }
   },
   "solid-cable": {
     "rows": 4,
@@ -1256,7 +1293,9 @@
     "rows": 1,
     "excluded": [],
     "unwalked": [],
-    "residue": { "engine.ts::Engine": "Stimulus::Engine" }
+    "residue": {
+      "engine.ts::Engine": "Stimulus::Engine"
+    }
   },
   "thor": {
     "rows": 42,
@@ -1469,7 +1508,7 @@
     }
   },
   "tzinfo": {
-    "rows": 41,
+    "rows": 49,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1488,6 +1527,14 @@
       "data-sources/timezone-info.ts::TimezoneInfo": "TZInfo::DataSources::TimezoneInfo",
       "data-sources/transitions-data-timezone-info.ts::TransitionsDataTimezoneInfo": "TZInfo::DataSources::TransitionsDataTimezoneInfo",
       "data-timezone.ts::DataTimezone": "TZInfo::DataTimezone",
+      "format1/country-definer.ts::CountryDefiner": "TZInfo::Format1::CountryDefiner",
+      "format1/country-index-definition.ts::ClassMethods": "TZInfo::Format1::CountryIndexDefinition::ClassMethods",
+      "format1/country-index-definition.ts::CountryIndexDefinition": "TZInfo::Format1::CountryIndexDefinition",
+      "format1/timezone-definer.ts::TimezoneDefiner": "TZInfo::Format1::TimezoneDefiner",
+      "format1/timezone-definition.ts::ClassMethods": "TZInfo::Format1::TimezoneDefinition::ClassMethods",
+      "format1/timezone-definition.ts::TimezoneDefinition": "TZInfo::Format1::TimezoneDefinition",
+      "format1/timezone-index-definition.ts::ClassMethods": "TZInfo::Format1::TimezoneIndexDefinition::ClassMethods",
+      "format1/timezone-index-definition.ts::TimezoneIndexDefinition": "TZInfo::Format1::TimezoneIndexDefinition",
       "format2/country-definer.ts::CountryDefiner": "TZInfo::Format2::CountryDefiner",
       "format2/country-index-definer.ts::CountryIndexDefiner": "TZInfo::Format2::CountryIndexDefiner",
       "format2/country-index-definition.ts::ClassMethods": "TZInfo::Format2::CountryIndexDefinition::ClassMethods",
@@ -1545,5 +1592,10 @@
       "tag-helpers.ts::TagHelpers": "ViteTrails::TagHelpers"
     }
   },
-  "zeitwerk": { "rows": 18, "excluded": [], "unwalked": [], "residue": {} }
+  "zeitwerk": {
+    "rows": 18,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {}
+  }
 }
