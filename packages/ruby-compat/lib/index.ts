@@ -414,6 +414,7 @@ export {
   isRubyTzUptodate,
   registerProcessAdapter,
   setEnv,
+  signo2signm,
   setExitCode,
   setSourceMapsSupport,
   stderr,

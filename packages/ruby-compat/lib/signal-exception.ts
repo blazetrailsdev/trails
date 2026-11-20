@@ -1,5 +1,4 @@
 import { Exception } from "./exception.js";
-import { signo2signm } from "./process-adapter.js";
 
 /**
  * Ruby's core `SignalException` (`vendor/ruby/v3.3.11/error.c:3318`
@@ -9,15 +8,7 @@ import { signo2signm } from "./process-adapter.js";
  * @noRailsEquivalent PERMANENT — Ruby core `SignalException`, which Rails
  * inherits rather than defines.
  */
-export class SignalException extends Exception {
-  /**
-   * `esignal_init` (`vendor/ruby/v3.3.11/signal.c:345`): a signal number is
-   * named `SIG` plus its `siglist` name.
-   */
-  constructor(sig?: string | number) {
-    super(typeof sig === "number" ? `SIG${signo2signm(sig)}` : sig);
-  }
-}
+export class SignalException extends Exception {}
 
 /**
  * Ruby's core `Interrupt` (`vendor/ruby/v3.3.11/error.c:3319`
