@@ -261,21 +261,20 @@ function missingLines(files: FileRow[] | null): string[] {
   const lines = ["## Missing methods", ""];
   if (files === null) return [...lines, DASH, ""];
   const withNames = files
-    .filter((f) => (f.missingMethods ?? []).length > 0)
+    .filter((f) => f.tsFile !== null && (f.missingMethods ?? []).length > 0)
     .sort((a, b) => b.missingMethods.length - a.missingMethods.length);
   if (withNames.length === 0) return [...lines, "None recorded for this package.", ""];
   lines.push(
     "The Rails methods `parity:api` finds no TypeScript counterpart for, by Ruby file.",
     "",
   );
-  for (const f of withNames) {
-    const names = f.missingMethods.map((m) => `\`${m}\``).join(", ");
-    lines.push(
-      ...details(`<code>${escapeCell(f.rubyFile)}</code>: ${f.missingMethods.length} missing`, [
-        names,
-      ]),
-    );
-  }
+  const blocks = withNames.flatMap((f) =>
+    details(`<code>${escapeCell(f.rubyFile)}</code>: ${f.missingMethods.length} missing`, [
+      f.missingMethods.map((m) => `\`${m}\``).join(", "),
+    ]),
+  );
+  if (withNames.length > 20) lines.push(...details(`All ${withNames.length} files`, blocks));
+  else lines.push(...blocks);
   return lines;
 }
 

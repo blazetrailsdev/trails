@@ -106,7 +106,7 @@ describe("loadParity", () => {
             tsPath: null,
             methodsMatched: 0,
             methodsMissing: 0,
-            missingMethods: [],
+            missingMethods: ["unported_only"],
             testsMatched: 0,
             testsTotal: 0,
           },
@@ -156,6 +156,7 @@ describe("loadParity", () => {
     );
     expect(page).toContain("<summary><code>big.rb</code>: 2 missing</summary>\n\n`a?`, `b!`");
     expect(page).toContain("- `gone.rb` (0 methods)");
+    expect(page).not.toContain("unported_only");
     expect(page).toContain("| `@noRailsEquivalent` | 2 | 1 | 0 |");
     expect(page).not.toContain("`@perf`");
     expect(page).toContain("<summary>Cited rule (1)</summary>");
