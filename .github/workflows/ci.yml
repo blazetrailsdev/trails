@@ -670,43 +670,6 @@ jobs:
         if: ${{ !cancelled() && steps.sync-association-writers-self-test.outcome == 'success' }}
         run: scripts/ci/check-sync-association-writers.sh
 
-      # RFC 0011 Phase 4 guardrail. AR work tracking moved to the tasks repo;
-      # `docs/activerecord/` is frozen so the two-source-of-truth split can't
-      # self-heal. Fail any PR that adds or modifies a file under that path,
-      # with a single allowlisted exception. PR-only: push/schedule have no PR
-      # base to diff against. Only `docs/activerecord/` is policed — other
-      # docs/ trees stay live until their own cutover.
-      - name: Docs ActiveRecord Freeze
-        id: docs-activerecord-freeze
-        # !cancelled() defeats the implicit success() that GitHub ANDs onto a
-        # step `if:`, so an earlier step's failure (e.g. prettier) can't skip
-        # this guard — preserving the independent reporting the three replaced
-        # parallel jobs had.
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          # The one tracker that stays under docs/activerecord/.
-          ALLOWLIST='docs/activerecord/parity-verification.md'
-          # Triple-dot: diff against the merge-base, not the base tip, so
-          # unrelated commits merged to main since this branch diverged don't
-          # show up. --diff-filter=ACMR ignores deletions (removing a tracker
-          # is allowed). Path-scope to docs/activerecord/ so nothing else is
-          # policed.
-          changed=$(git diff --name-only --diff-filter=ACMR \
-            "$BASE_SHA"..."$HEAD_SHA" -- docs/activerecord/ || true)
-          offending=$(printf '%s\n' "$changed" \
-            | grep -E '^docs/activerecord/' \
-            | grep -vxF "$ALLOWLIST" || true)
-          if [ -n "$offending" ]; then
-            echo "::error::AR work tracking lives in the tasks repo — add a story, not a doc. Offending files:"
-            printf '%s\n' "$offending"
-            exit 1
-          fi
-          echo "No new or modified docs/activerecord trackers."
-
       # Closing-story citations. `stale-story-references` judges a landed
       # story's citations, but a story lands only after the merge — so a PR that
       # closes a story is blind to the check that reds main seconds later
@@ -793,7 +756,6 @@ jobs:
       - name: Forbid Claude attribution in PR body
         id: pr-body-attribution
         # !cancelled() so a prior step's failure can't suppress this guard
-        # (see Docs ActiveRecord Freeze above).
         if: >-
           ${{ !cancelled() &&
           github.event_name == 'pull_request' &&
@@ -814,7 +776,6 @@ jobs:
       - name: Forbid Claude attribution in commit messages
         id: commit-attribution
         # !cancelled() so a prior step's failure can't suppress this guard
-        # (see Docs ActiveRecord Freeze above).
         if: >-
           ${{ !cancelled() &&
           github.event_name == 'pull_request' &&
@@ -2460,7 +2421,7 @@ jobs:
         # under packages/*/src. Read-only and artifact-free: `parity:api:build`
         # itself is opt-in and rewrites files, so without this step a
         # hand-authored bare tag would sit undetected. See the bullet in
-        # docs/infrastructure/api-build-stub-generation-plan.md.
+        # the tasks repo's archive/trails-docs/infrastructure/api-build-stub-generation-plan.md.
         run: node scripts/ci/bg-gates.mjs wait missing-call-reasons
       - name: Detached JSDoc tag blocks gate
         # Flags `@internal` / `@noRailsEquivalent` blocks separated from the

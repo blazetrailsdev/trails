@@ -559,8 +559,7 @@ What the schema-driven typing covers today, checked against the app above:
   with other scopes.
 
 The `trails-tsc` language-service plugin in the generated `tsconfig.json` covers
-`.tse` views only. Editor support for model virtualization is tracked in
-[docs/infrastructure/virtual-source-files-plan.md](docs/infrastructure/virtual-source-files-plan.md).
+`.tse` views only. Editor support for model virtualization is not built yet.
 
 Outside a trailties app, dump the schema from a live database with
 `ar db:schema:dump`, then point `trails-tsc --schema db/schema.ts` at it. See

@@ -50,17 +50,12 @@ export const LEGACY_SCRIPT_NAMES: readonly string[] = [
 ].map((parts) => parts.join(SEP));
 
 /**
- * The three intentional mentions, each a deprecation note or a historical
- * reference with no `parity:*` counterpart. Nothing else may name a legacy
+ * The two intentional mentions, each a deprecation note. Nothing else may name a legacy
  * spelling — this list is not where a new reference goes.
  */
 export const ALLOWED_PATHS: ReadonlyMap<string, string> = new Map([
   ["CLAUDE.md", "the deprecation notice that tells contributors to write parity:* instead"],
   ["scripts/parity/README.md", "the same notice, in the tooling's own README (line 5)"],
-  [
-    "docs/infrastructure/prism-codegen-spike.md",
-    "historical mentions of the wide call gate — RFC 0084 deleted that script and it has no parity:* counterpart",
-  ],
 ]);
 
 /**

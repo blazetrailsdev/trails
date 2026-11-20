@@ -129,7 +129,6 @@ describe("vendor:recite", () => {
       "vendor/sources.test.ts",
       "vendor/README.md",
       "vendor/sources.lock.json",
-      "docs/activerecord/rfc-0027-join-dependency-audit.md",
     ]) {
       expect(isExcluded(path), path).toBe(true);
     }

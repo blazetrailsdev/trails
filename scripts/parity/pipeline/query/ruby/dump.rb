@@ -74,8 +74,7 @@ frozen_time = if frozen_at
   Time.iso8601(frozen_at).utc
 else
   # Fixed default so direct invocations (e.g. during development) are still
-  # reproducible. The query parity orchestrator (added in PR5 of
-  # docs/query-parity-verification.md) always passes --frozen-at explicitly
+  # reproducible. The query parity orchestrator always passes --frozen-at explicitly
   # so both sides use the same timestamp in a parity run.
   Time.utc(2000, 1, 1)
 end

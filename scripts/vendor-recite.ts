@@ -18,7 +18,6 @@ export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
  */
 export const EXCLUDED: Readonly<Record<string, string>> = {
   "vendor/": "registry data, not citations",
-  "docs/activerecord/": "frozen by RFC 0011 Phase 4; CI rejects any edit there",
   "eslint/ruby-compat-needs-mri-citation.mjs": "matches and builds citations",
   "eslint/ruby-compat-needs-mri-citation.test.mjs": "fixtures for the citation rule's resolver",
   "scripts/api-compare/jsdoc-tag-line.test.ts": "fixtures for the tag-line parser",

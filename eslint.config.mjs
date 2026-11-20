@@ -639,7 +639,7 @@ export default defineConfig(
 
   // ── rails-file-structure-method-order (per-package rollout) ──
   // Method-order slice of the rails-file-structure rule family
-  // (docs/rails-file-structure-mirror-plan.md). Enforces that class
+  // (the tasks repo's `archive/trails-docs/infrastructure/rails-file-structure-mirror-plan.md`). Enforces that class
   // members + top-level functions match the Rails source order
   // documented in `eslint/rails-file-structure-method-order.json` (built
   // by `pnpm tsx scripts/build-rails-file-structure-manifest.ts`,

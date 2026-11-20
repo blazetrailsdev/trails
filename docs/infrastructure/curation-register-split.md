@@ -3,7 +3,7 @@
 Which deviation registers live in JSDoc at a declaration, and which stay JSON
 files under `scripts/`. RFC 0080 moved the per-declaration entries of
 `extra-surface-allow.json` into `@noRailsEquivalent` (the tag family is
-described in [api-build-stub-generation-plan.md](api-build-stub-generation-plan.md)).
+described in the tasks repo's `archive/trails-docs/infrastructure/api-build-stub-generation-plan.md`).
 This page records where every other register stands, so the "should this move
 to JSDoc too?" question is answered once.
 

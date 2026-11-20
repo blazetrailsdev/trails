@@ -78,12 +78,8 @@ describe("legacy compare-script name gate", () => {
     }
   });
 
-  it("allowlists exactly the three intentional mentions", () => {
-    expect([...ALLOWED_PATHS.keys()]).toEqual([
-      "CLAUDE.md",
-      "scripts/parity/README.md",
-      "docs/infrastructure/prism-codegen-spike.md",
-    ]);
+  it("allowlists exactly the two intentional mentions", () => {
+    expect([...ALLOWED_PATHS.keys()]).toEqual(["CLAUDE.md", "scripts/parity/README.md"]);
   });
 
   it("finds no reintroduced spelling in the tree", async () => {
