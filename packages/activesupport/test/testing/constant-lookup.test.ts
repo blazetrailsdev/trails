@@ -98,7 +98,7 @@ describe("ConstantLookupTest", () => {
       await assertRaises([NameError], {}, async () => {
         rbAutoloadStr(TopLevel, testName, fileName);
         await rbAutoloadLoad(TopLevel, testName);
-        ConstantLookupTest.determineConstantFromTestName(testName);
+        ConstantLookupTest.determineConstantFromTestName(testName, () => true);
       });
     } finally {
       autoloadDelete(TopLevel, testName);

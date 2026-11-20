@@ -95,7 +95,10 @@ describe("EncryptedConfigurationTest", () => {
   it("change configuration by key file", async () => {
     await credentials.write("something:\n  good: true\n");
     await credentials.change(async (configFile) => {
-      const config = Psych.load(await getFs().readFile(configFile, "utf8")) as Hash;
+      const config = Psych.load(await getFs().readFile(configFile, "utf8")) as Hash<
+        string,
+        unknown
+      >;
       await getFs().writeFile!(configFile, Psych.dump(config.merge({ new: "things" })));
     });
     await credentials.config();
