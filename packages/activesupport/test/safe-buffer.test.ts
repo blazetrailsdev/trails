@@ -1,5 +1,6 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { Range, camelized } from "@blazetrails/ruby-compat";
+import { Range, block, camelized } from "@blazetrails/ruby-compat";
+import { YAML, toYaml } from "@blazetrails/ruby-compat/yaml";
 import { titleize, underscore } from "../lib/inflector.js";
 import { SafeBuffer, htmlSafe, isHtmlSafe } from "../lib/core-ext/string/output-safety.js";
 import { htmlEscape } from "../lib/core-ext/tse/util.js";
@@ -61,9 +62,28 @@ describe("SafeBufferTest", () => {
     expect(newBuffer.constructor).toEqual(SafeBuffer);
   });
 
-  it.skip("Should be converted to_yaml");
-  it.skip("Should work in nested to_yaml conversion");
-  it.skip("Should work with primitive-like-strings in to_yaml conversion");
+  it("Should be converted to_yaml", () => {
+    const str = "hello!";
+    const buf = new SafeBuffer(str);
+    const yaml = toYaml(buf);
+
+    expect(yaml).toMatch(new RegExp(`^--- ${str}`, "m"));
+    expect(YAML.load(yaml)).toEqual("hello!");
+  });
+
+  it("Should work in nested to_yaml conversion", () => {
+    const str = "hello!";
+    const data = new Map([["str", new SafeBuffer(str)]]);
+    const yaml = YAML.dump(data);
+    expect([...(YAML.load(yaml) as Map<string, string>)]).toEqual([["str", str]]);
+  });
+
+  it("Should work with primitive-like-strings in to_yaml conversion", () => {
+    expect(YAML.load(toYaml(new SafeBuffer("true")))).toEqual("true");
+    expect(YAML.load(toYaml(new SafeBuffer("false")))).toEqual("false");
+    expect(YAML.load(toYaml(new SafeBuffer("1")))).toEqual("1");
+    expect(YAML.load(toYaml(new SafeBuffer("1.1")))).toEqual("1.1");
+  });
 
   it("Should work with underscore", () => {
     const str = underscore(htmlSafe("MyTest").toStr());
@@ -275,6 +295,32 @@ describe("SafeBufferTest", () => {
     assertNil(x.get(/a/, 1));
   });
 
-  it.skip("Should set back references");
-  it.skip("Should support Enumerator");
+  it("Should set back references", () => {
+    const swap = (m: string) => {
+      const [, $1, $2] = /([a-z]+)([0-9]+)/.exec(m)!;
+      return $2 + $1;
+    };
+    const a = htmlSafe("foo123");
+    const a2 = a.sub(/([a-z]+)([0-9]+)/, block(swap));
+    expect(a2.toString()).toEqual("123foo");
+    assertNotPredicate(a2, isHtmlSafe);
+    a.subBang(/([a-z]+)([0-9]+)/, block(swap));
+    expect(a.toString()).toEqual("123foo");
+    assertNotPredicate(a, isHtmlSafe);
+
+    const b = htmlSafe("foo123 bar456");
+    const b2 = b.gsub(/([a-z]+)([0-9]+)/, block(swap));
+    expect(b2.toString()).toEqual("123foo 456bar");
+    assertNotPredicate(b2, isHtmlSafe);
+    b.gsubBang(/([a-z]+)([0-9]+)/, block(swap));
+    expect(b.toString()).toEqual("123foo 456bar");
+    assertNotPredicate(b, isHtmlSafe);
+  });
+
+  it("Should support Enumerator", () => {
+    const a = htmlSafe("aaa")
+      .gsubBang(/a/)
+      .withIndex(null, (_m, i) => i);
+    expect(String(a)).toEqual("012");
+  });
 });

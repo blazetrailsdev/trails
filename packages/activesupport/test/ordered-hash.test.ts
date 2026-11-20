@@ -307,8 +307,25 @@ describe("OrderedHashTest", () => {
       ...(YAML.load(YAML.dump(orderedHash)) as OrderedHash<string, string>).values(),
     ]).toEqual(values);
   });
-  it.skip("each when yielding to block with splat");
-  it.skip("each pair when yielding to block with splat");
+  it("each when yielding to block with splat", () => {
+    const hashValues: unknown[][] = [];
+    const orderedHashValues: unknown[][] = [];
+
+    for (const v of hash) hashValues.push(v);
+    orderedHash.each((...v) => orderedHashValues.push(v));
+
+    expect(orderedHashValues.sort()).toEqual(hashValues.sort());
+  });
+
+  it("each pair when yielding to block with splat", () => {
+    const hashValues: unknown[][] = [];
+    const orderedHashValues: unknown[][] = [];
+
+    for (const v of hash) hashValues.push(v);
+    orderedHash.eachPair((...v) => orderedHashValues.push(v));
+
+    expect(orderedHashValues.sort()).toEqual(hashValues.sort());
+  });
   it("order after yaml serialization", () => {
     const deserializedOrderedHash = YAML.load(YAML.dump(orderedHash)) as OrderedHash<
       string,

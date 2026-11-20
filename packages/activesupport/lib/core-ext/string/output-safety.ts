@@ -4,6 +4,8 @@ import {
   NoMethodError,
   Range,
   rbBlockGivenP,
+  toEnum,
+  type Enumerator,
   rbObjClassname,
   rbStrRespondTo,
   rbStrSend,
@@ -341,10 +343,13 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     }
   }
 
+  gsubBang(pattern: unknown): Enumerator<string>;
+  gsubBang(pattern: unknown, replacement: unknown): this | null;
   /** @missingRailsArgs set_block_back_references — PERMANENT */
-  gsubBang(...args: [...unknown[], BlockFn] | unknown[]): this | null {
+  gsubBang(...args: [...unknown[], BlockFn] | unknown[]): this | null | Enumerator<string> {
     this._htmlSafe = false;
     const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as BlockFn) : null;
+    if (!block && args.length === 1) return toEnum(this, "gsubBang", ...args);
     const self = { string: this._value };
     const result = block
       ? strGsub(

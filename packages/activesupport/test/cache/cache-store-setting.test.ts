@@ -4,6 +4,8 @@ import { lookupStore } from "../../lib/cache.js";
 import { ArgumentError } from "../../lib/cache/store.js";
 import { MemoryStore } from "../../lib/cache/memory-store.js";
 import { FileStore } from "../../lib/cache/file-store.js";
+import { RedisCacheStore } from "../../lib/cache/redis-cache-store.js";
+import { OrderedOptions } from "../../lib/ordered-options.js";
 
 describe("CacheStoreSettingTest", () => {
   it("memory store gets created if no arguments passed to lookup store method", () => {
@@ -50,11 +52,20 @@ describe("CacheStoreSettingTest", () => {
     expect((store as FileStore).cachePath).toBe("/path/to/cache/directory");
   });
 
-  it.skip("redis cache store with single array object", () => {
-    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
+  it("redis cache store with single array object", () => {
+    const cacheStore = [":redis_cache_store", { namespace: "foo" }];
+
+    const store = lookupStore(cacheStore);
+    expect(store).toBeInstanceOf(RedisCacheStore);
+    expect((store as RedisCacheStore).options.namespace).toBe("foo");
   });
 
-  it.skip("redis cache store with ordered options", () => {
-    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
+  it("redis cache store with ordered options", () => {
+    const options = new OrderedOptions();
+    options.update({ namespace: "foo" });
+
+    const store = lookupStore(":redis_cache_store", options);
+    expect(store).toBeInstanceOf(RedisCacheStore);
+    expect((store as RedisCacheStore).options.namespace).toBe("foo");
   });
 });
