@@ -31,7 +31,6 @@ class TestRunnerTest extends TestCase {
       `test/${path}/${name.replaceAll("_", "-")}.test.ts`,
       `
         import "../test-helper.ts";
-        import { TestCase } from "@blazetrails/activesupport/test-case";
         import { describe, it, expect } from "vitest";
 
         describe("${camelize(name)}Test", () => {

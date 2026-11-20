@@ -53,7 +53,7 @@ describe("RenderingTest", { timeout: 120_000 }, () => {
 `,
     );
 
-    await t.appFile("app/views/pages/show.html.tse", "<%= params.id %>\n");
+    await t.appFile("app/views/pages/show.html.tse", "<%= params.get('id') %>\n");
 
     await t.app("development");
 
