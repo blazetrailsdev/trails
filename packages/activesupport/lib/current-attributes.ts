@@ -89,7 +89,6 @@ export class CurrentAttributes {
               get(this: CurrentAttributes) {
                 return hashAref(this.attributes, name);
               },
-              /** @missingRailsCall with — PERMANENT */
               set(this: CurrentAttributes, value: unknown) {
                 this.attributes[name] = value;
               },
@@ -106,7 +105,6 @@ export class CurrentAttributes {
         get(this: typeof CurrentAttributes) {
           return Reflect.get(this.instance(), name);
         },
-        /** @missingRailsCall with — PERMANENT */
         set(this: typeof CurrentAttributes, value: unknown) {
           Reflect.set(this.instance(), name, value);
         },
@@ -155,7 +153,6 @@ export class CurrentAttributes {
     this.instance().reset();
   }
 
-  /** @missingRailsCall with — PERMANENT */
   static set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
     return this.instance().set(attributes, block);
   }
@@ -203,7 +200,6 @@ export class CurrentAttributes {
     );
   }
 
-  /** @missingRailsCall with — PERMANENT */
   set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
     return objectWith(this, attributes, () => block());
   }
