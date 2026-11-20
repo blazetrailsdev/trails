@@ -363,6 +363,7 @@ export function aliasKey(key: string): string | undefined {
 function normalizeErb(s: string): string {
   return normalize(s)
     .replace(/erb/g, "tse")
+    .replace(/\birb\b/g, "tsrepl")
     .replace(/rubocop/g, "eslint")
     .replace(/capybara/g, "vitest")
     .replace(/(?<![a-z])rails/g, "trails");

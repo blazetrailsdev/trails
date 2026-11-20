@@ -168,7 +168,7 @@ describe("CurrentAttributesTest", () => {
 
   it("set auxiliary class based on current attributes via before callback", () => {
     Current.person = new Person(42, "David", "Central Time (US & Canada)");
-    expect(Session.previous).toBeUndefined();
+    expect(Session.previous).toBeNull();
     expect(Session.current).toBe(42);
 
     Current.reset();
@@ -262,7 +262,7 @@ describe("CurrentAttributesTest", () => {
   it("CurrentAttributes use fiber-local variables", () => {
     Session.current = 42;
     const inner = new Thread(() => Session.current).value();
-    expect(inner).toBeUndefined();
+    expect(inner).toBeNull();
   });
 
   it("CurrentAttributes can use thread-local variables", () => {

@@ -1,4 +1,5 @@
-import { STDOUT, env } from "@blazetrails/ruby-compat";
+import { STDERR, STDOUT, env } from "@blazetrails/ruby-compat";
+import type { UserConsoleLog } from "vitest";
 import type { Reporter, TestCase, TestModule, Vitest } from "vitest/node";
 import { TestUnitReporter, type Result } from "./reporter.js";
 
@@ -58,6 +59,10 @@ export default class VitestReporter implements Reporter {
   onInit(vitest: Vitest): void {
     vitest.config.includeTaskLocation = true;
     TestUnitReporter.appRoot ??= vitest.config.root;
+  }
+
+  onUserConsoleLog(log: UserConsoleLog): void {
+    (log.type === "stderr" ? STDERR : STDOUT).write(log.content);
   }
 
   onTestCaseResult(testCase: TestCase): void {

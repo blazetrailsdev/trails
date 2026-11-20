@@ -75,8 +75,8 @@ describe("BacktraceCleanerTest", () => {
     expect(cleaner.cleanFrame("(tsrepl):1")).toBe("(tsrepl):1");
     expect(
       cleaner.cleanFrame("/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'"),
-    ).toBeUndefined();
-    expect(cleaner.cleanFrame("bin/trails:4:in `<main>'")).toBeUndefined();
+    ).toBeNull();
+    expect(cleaner.cleanFrame("bin/trails:4:in `<main>'")).toBeNull();
   });
 
   test("#clean_frame should show relative paths", () => {
@@ -85,12 +85,12 @@ describe("BacktraceCleanerTest", () => {
     );
     expect(
       cleaner.cleanFrame("/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'"),
-    ).toBeUndefined();
-    expect(cleaner.cleanFrame("bin/trails:4:in `<main>'")).toBeUndefined();
+    ).toBeNull();
+    expect(cleaner.cleanFrame("bin/trails:4:in `<main>'")).toBeNull();
   });
 
   test("#clean_frame can filter for noise", () => {
-    expect(cleaner.cleanFrame("(tsrepl):1", "noise")).toBeUndefined();
+    expect(cleaner.cleanFrame("(tsrepl):1", "noise")).toBeNull();
     expect(
       cleaner.cleanFrame(
         "/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'",

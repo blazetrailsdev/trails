@@ -41,7 +41,7 @@ describe("ActiveSupport::Railtie executor hooks", () => {
       expect(current.account).toBe("signal");
     });
     await app.executor.wrap(async () => {
-      expect(current.account).toBeUndefined();
+      expect(current.account).toBeNull();
     });
   });
 

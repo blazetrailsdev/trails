@@ -1,5 +1,6 @@
 import {
   ArgumentError,
+  hashAref,
   methodMissingPrototype,
   rbFSend,
   rbObjRespondTo,
@@ -86,7 +87,7 @@ export class CurrentAttributes {
           batch.push((mod) =>
             Object.defineProperty(mod, name, {
               get(this: CurrentAttributes) {
-                return this.attributes[name];
+                return hashAref(this.attributes, name);
               },
               /** @missingRailsCall with — PERMANENT */
               set(this: CurrentAttributes, value: unknown) {
