@@ -48,6 +48,7 @@ export const ActiveSupport = {
   Cache: { name: string } & Partial<typeof import("./cache.js")> & {
       MemoryStore?: typeof import("./cache/memory-store.js").MemoryStore;
       FileStore?: typeof import("./cache/file-store.js").FileStore;
+      RedisCacheStore?: typeof import("./cache/redis-cache-store.js").RedisCacheStore;
       NullStore?: typeof import("./cache/null-store.js").NullStore;
       SolidCacheStore?: new (...args: any[]) => import("./cache/index.js").CacheStore;
     };

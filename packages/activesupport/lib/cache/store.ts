@@ -34,6 +34,20 @@ export function setFormatVersion(value: number): void {
 
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
+export const UNIVERSAL_OPTIONS: readonly string[] = Object.freeze([
+  "coder",
+  "compress",
+  "compressThreshold",
+  "compressor",
+  "expireIn",
+  "expiredIn",
+  "expiresIn",
+  "namespace",
+  "raceConditionTtl",
+  "serializer",
+  "skipNil",
+]);
+
 export const OPTION_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   expiresIn: Object.freeze(["expireIn", "expiredIn"]),
 });

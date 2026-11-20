@@ -133,20 +133,24 @@
   "devDependencies": {
     "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
-    "@blazetrails/rack": "workspace:*"
+    "@blazetrails/rack": "workspace:*",
+    "generic-pool": "^3.9.0",
+    "ioredis": "^6.0.0"
   },
   "dependencies": {
-    "@blazetrails/ruby-compat": "workspace:*",
-    "@blazetrails/i18n": "workspace:*",
-    "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/date": "workspace:*",
+    "@blazetrails/i18n": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/tzinfo": "workspace:*",
     "tinyglobby": "^0.2.16"
   },
   "peerDependencies": {
     "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
-    "@blazetrails/rack": "workspace:*"
+    "@blazetrails/rack": "workspace:*",
+    "generic-pool": ">=3.9.0",
+    "ioredis": ">=6.0.0"
   },
   "peerDependenciesMeta": {
     "@blazetrails/msgpack": {
@@ -156,6 +160,12 @@
       "optional": true
     },
     "@blazetrails/rack": {
+      "optional": true
+    },
+    "generic-pool": {
+      "optional": true
+    },
+    "ioredis": {
       "optional": true
     }
   },
