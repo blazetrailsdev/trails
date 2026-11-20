@@ -216,7 +216,6 @@ export class Monitor implements MonitorMixin {
   declare exit: typeof exit;
   declare isMonOwned: typeof isMonOwned;
   declare synchronize: typeof synchronize;
-  declare tryMonEnter: typeof tryEnter;
   declare monTryEnter: typeof tryEnter;
   declare monEnter: typeof enter;
   declare monExit: typeof exit;
@@ -229,7 +228,6 @@ Object.assign(Monitor.prototype, {
   exit,
   isMonOwned,
   synchronize,
-  tryMonEnter: tryEnter,
   monTryEnter: tryEnter,
   monEnter: enter,
   monExit: exit,
