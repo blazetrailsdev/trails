@@ -828,9 +828,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       try {
         await withPostgresqlApdaterDecodeDates(async () => {
-          const date = await connection.selectValue("select '2024-01-01'::date");
-          expect(date).toEqualRuby(new RubyDate(2024, 1, 1));
-          expect(date).toBeExactInstanceOf(RubyDate);
+          const date = (await connection.selectValue("select '2024-01-01'::date")) as RubyDate;
+          expect(date).toEqual(new RubyDate(2024, 1, 1));
+          expect(date.constructor).toBe(RubyDate);
         });
       } finally {
         await connection.disconnectBang();
