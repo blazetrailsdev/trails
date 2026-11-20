@@ -25,29 +25,29 @@ include(CsrfHelperTest, CsrfHelper);
 include(CsrfHelperTest, TagHelper);
 
 describe("CsrfHelperTest", () => {
-  it("csrf meta tags without request forgery protection", () => {
+  it("csrf meta tags without request forgery protection", async () => {
     const test = new CsrfHelperTest();
-    assertDomEqual("", test.csrfMetaTags());
+    assertDomEqual("", await test.csrfMetaTags());
   });
 
-  it("csrf meta tags with request forgery protection", () => {
+  it("csrf meta tags with request forgery protection", async () => {
     const test = new CsrfHelperTest();
     CsrfHelperTest.requestForgery = true;
     try {
       assertDomEqual(
         '<meta name="csrf-param" content="form_token" />\n<meta name="csrf-token" content="secret" />',
-        test.csrfMetaTags(),
+        await test.csrfMetaTags(),
       );
     } finally {
       CsrfHelperTest.requestForgery = false;
     }
   });
 
-  it("csrf meta tags without protect against forgery method", () => {
+  it("csrf meta tags without protect against forgery method", async () => {
     const test = new CsrfHelperTest();
     rbModUndefMethod(CsrfHelperTest, "isProtectAgainstForgery");
     try {
-      assertDomEqual("", test.csrfMetaTags());
+      assertDomEqual("", await test.csrfMetaTags());
     } finally {
       rbModDefineMethod(
         CsrfHelperTest,

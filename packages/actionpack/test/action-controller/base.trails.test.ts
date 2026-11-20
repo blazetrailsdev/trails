@@ -322,7 +322,7 @@ describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
   class PostsController extends ApplicationController {
     builder: unknown = null;
     async new(): Promise<void> {
-      this.viewContext().formWith({ model: new Post(), url: "/posts" }, (f) => {
+      await this.viewContext().formWith({ model: new Post(), url: "/posts" }, (f) => {
         this.builder = f;
       });
       await this.head(":ok");

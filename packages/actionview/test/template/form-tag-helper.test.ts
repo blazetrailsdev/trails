@@ -101,21 +101,24 @@ describe("FormTagHelperTest", () => {
     return out;
   }
 
-  function withDefaultEnforceUtf8(value: boolean, block: () => void): void {
+  async function withDefaultEnforceUtf8(value: boolean, block: () => unknown): Promise<void> {
     const oldValue = defaultEnforceUtf8;
     setDefaultEnforceUtf8(value);
     try {
-      block();
+      await block();
     } finally {
       setDefaultEnforceUtf8(oldValue);
     }
   }
 
-  function withPrependContentExfiltrationPrevention(value: boolean, block: () => void): void {
+  async function withPrependContentExfiltrationPrevention(
+    value: boolean,
+    block: () => unknown,
+  ): Promise<void> {
     const oldValue = prependContentExfiltrationPrevention;
     setPrependContentExfiltrationPrevention(value);
     try {
-      block();
+      await block();
     } finally {
       setPrependContentExfiltrationPrevention(oldValue);
     }
@@ -185,103 +188,103 @@ describe("FormTagHelperTest", () => {
     assertMatch(VALID_HTML_ID, labelElem["id"]);
   });
 
-  it("form tag", () => {
+  it("form tag", async () => {
     stubUrlFor();
-    const actual = view.formTag();
+    const actual = await view.formTag();
     const expected = wholeForm();
     assertDomEqual(expected, actual);
   });
 
-  it("form tag multipart", () => {
+  it("form tag multipart", async () => {
     stubUrlFor();
-    const actual = view.formTag({}, { multipart: true });
+    const actual = await view.formTag({}, { multipart: true });
     const expected = wholeForm("http://www.example.com", { enctype: true });
     assertDomEqual(expected, actual);
   });
 
-  it("form tag with method patch", () => {
+  it("form tag with method patch", async () => {
     stubUrlFor();
-    const actual = view.formTag({}, { method: "patch" });
+    const actual = await view.formTag({}, { method: "patch" });
     const expected = wholeForm("http://www.example.com", { method: "patch" });
     assertDomEqual(expected, actual);
   });
 
-  it("form tag with method put", () => {
+  it("form tag with method put", async () => {
     stubUrlFor();
-    const actual = view.formTag({}, { method: "put" });
+    const actual = await view.formTag({}, { method: "put" });
     const expected = wholeForm("http://www.example.com", { method: "put" });
     assertDomEqual(expected, actual);
   });
 
-  it("form tag with method delete", () => {
+  it("form tag with method delete", async () => {
     stubUrlFor();
-    const actual = view.formTag({}, { method: "delete" });
+    const actual = await view.formTag({}, { method: "delete" });
 
     const expected = wholeForm("http://www.example.com", { method: "delete" });
     assertDomEqual(expected, actual);
   });
 
-  it("form tag with remote", () => {
+  it("form tag with remote", async () => {
     stubUrlFor();
-    const actual = view.formTag({}, { remote: true });
+    const actual = await view.formTag({}, { remote: true });
 
     const expected = wholeForm("http://www.example.com", { remote: true });
     assertDomEqual(expected, actual);
   });
 
-  it("form tag with remote false", () => {
+  it("form tag with remote false", async () => {
     stubUrlFor();
-    const actual = view.formTag({}, { remote: false });
+    const actual = await view.formTag({}, { remote: false });
 
     const expected = wholeForm();
     assertDomEqual(expected, actual);
   });
 
-  it("form tag with false url for options", () => {
-    const actual = view.formTag(false);
+  it("form tag with false url for options", async () => {
+    const actual = await view.formTag(false);
 
     const expected = wholeForm(false);
     assertDomEqual(expected, actual);
   });
 
-  it("form tag with false action", () => {
+  it("form tag with false action", async () => {
     stubUrlFor();
-    const actual = view.formTag({}, { action: false });
+    const actual = await view.formTag({}, { action: false });
 
     const expected = wholeForm(false);
     assertDomEqual(expected, actual);
   });
 
-  it("form tag enforce utf8 true", () => {
+  it("form tag enforce utf8 true", async () => {
     stubUrlFor();
-    const actual = view.formTag({}, { enforceUtf8: true });
+    const actual = await view.formTag({}, { enforceUtf8: true });
     const expected = wholeForm("http://www.example.com", { enforceUtf8: true });
     assertDomEqual(expected, actual);
     assertPredicate(actual, isHtmlSafe);
   });
 
-  it("form tag enforce utf8 false", () => {
+  it("form tag enforce utf8 false", async () => {
     stubUrlFor();
-    const actual = view.formTag({}, { enforceUtf8: false });
+    const actual = await view.formTag({}, { enforceUtf8: false });
     const expected = wholeForm("http://www.example.com", { enforceUtf8: false });
     assertDomEqual(expected, actual);
     assertPredicate(actual, isHtmlSafe);
   });
 
-  it("form tag default enforce utf8 false", () => {
+  it("form tag default enforce utf8 false", async () => {
     stubUrlFor();
-    withDefaultEnforceUtf8(false, () => {
-      const actual = view.formTag({});
+    await withDefaultEnforceUtf8(false, async () => {
+      const actual = await view.formTag({});
       const expected = wholeForm("http://www.example.com", { enforceUtf8: false });
       assertDomEqual(expected, actual);
       assertPredicate(actual, isHtmlSafe);
     });
   });
 
-  it("form tag default enforce utf8 true", () => {
+  it("form tag default enforce utf8 true", async () => {
     stubUrlFor();
-    withDefaultEnforceUtf8(true, () => {
-      const actual = view.formTag({});
+    await withDefaultEnforceUtf8(true, async () => {
+      const actual = await view.formTag({});
       const expected = wholeForm("http://www.example.com", { enforceUtf8: true });
       assertDomEqual(expected, actual);
       assertPredicate(actual, isHtmlSafe);
@@ -1152,19 +1155,19 @@ describe("FormTagHelperTest", () => {
     assertEqual({ option: "random_option" }, options);
   });
 
-  it("content exfiltration prevention", () => {
-    withPrependContentExfiltrationPrevention(true, () => {
+  it("content exfiltration prevention", async () => {
+    await withPrependContentExfiltrationPrevention(true, async () => {
       stubUrlFor();
-      const actual = view.formTag();
+      const actual = await view.formTag();
       const expected = `<!-- '"\` --><!-- </textarea></xmp> --></option></form>${wholeForm()}`;
       assertDomEqual(expected, actual);
     });
   });
 
-  it("form with content exfiltration prevention is html safe", () => {
-    withPrependContentExfiltrationPrevention(true, () => {
+  it("form with content exfiltration prevention is html safe", async () => {
+    await withPrependContentExfiltrationPrevention(true, async () => {
       stubUrlFor();
-      assertEqual(true, isHtmlSafe(view.formTag()));
+      assertEqual(true, isHtmlSafe(await view.formTag()));
     });
   });
 });

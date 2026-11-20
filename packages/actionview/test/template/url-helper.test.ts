@@ -215,239 +215,245 @@ describe("UrlHelperTest", () => {
     ]);
   });
 
-  it("button to without protect against forgery method", () => {
+  it("button to without protect against forgery method", async () => {
     delete view.isProtectAgainstForgery;
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com"),
+      await view.buttonTo("Hello", "http://www.example.com"),
     );
   });
 
-  it("button to with authenticity token", () => {
+  it("button to with authenticity token", async () => {
     requestForgery = true;
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button><input name="form_token" type="hidden" value="token" autocomplete="off" /></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { authenticity_token: "token" }),
+      await view.buttonTo("Hello", "http://www.example.com", { authenticity_token: "token" }),
     );
   });
 
-  it("button to with authenticity token true", () => {
+  it("button to with authenticity token true", async () => {
     requestForgery = true;
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button><input name="form_token" type="hidden" value="secret" autocomplete="off" /></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { authenticity_token: true }),
+      await view.buttonTo("Hello", "http://www.example.com", { authenticity_token: true }),
     );
   });
 
-  it("button to with authenticity token false", () => {
+  it("button to with authenticity token false", async () => {
     requestForgery = true;
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { authenticity_token: false }),
+      await view.buttonTo("Hello", "http://www.example.com", { authenticity_token: false }),
     );
   });
 
-  it("button to with straight url", () => {
+  it("button to with straight url", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com"),
+      await view.buttonTo("Hello", "http://www.example.com"),
     );
   });
 
-  it("button to with path", () => {
+  it("button to with path", async () => {
     const routed = UrlHelperView.withViewPaths([]) as any;
     assertDomEqual(
       `<form method="post" action="/article/Hello" class="button_to"><button type="submit">Hello</button></form>`,
-      routed.buttonTo("Hello", routed.articlePath("Hello")),
+      await routed.buttonTo("Hello", routed.articlePath("Hello")),
     );
   });
 
-  it("button to with false url", () => {
+  it("button to with false url", async () => {
     assertDomEqual(
       `<form method="post" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", false),
+      await view.buttonTo("Hello", false),
     );
   });
 
-  it("button to with straight url and request forgery", () => {
+  it("button to with straight url and request forgery", async () => {
     requestForgery = true;
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button><input name="form_token" type="hidden" value="secret" autocomplete="off" /></form>`,
-      view.buttonTo("Hello", "http://www.example.com"),
+      await view.buttonTo("Hello", "http://www.example.com"),
     );
   });
 
-  it("button to with false url and block", () => {
+  it("button to with false url and block", async () => {
     assertDomEqual(
       `<form method="post" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo(false, null, null, () => "Hello"),
+      await view.buttonTo(false, null, null, () => "Hello"),
     );
   });
 
-  it("button to with new record model", () => {
+  it("button to with new record model", async () => {
     const session = new Session(null);
 
     assertDomEqual(
       `<form method="post" action="/sessions" class="button_to"><button type="submit">Create Session</button></form>`,
-      view.buttonTo("Create Session", session),
+      await view.buttonTo("Create Session", session),
     );
   });
 
-  it("button to with new record model and block", () => {
+  it("button to with new record model and block", async () => {
     const workshop = new Workshop(null);
 
     assertDomEqual(
       `<form method="post" action="/workshops" class="button_to"><button type="submit">Create</button></form>`,
-      view.buttonTo(workshop, null, null, () => "Create"),
+      await view.buttonTo(workshop, null, null, () => "Create"),
     );
   });
 
-  it("button to with nested new record model and block", () => {
+  it("button to with nested new record model and block", async () => {
     const workshop = new Workshop("1");
     const session = new Session(null);
 
     assertDomEqual(
       `<form method="post" action="/workshops/1/sessions" class="button_to"><button type="submit">Create</button></form>`,
-      view.buttonTo([workshop, session], null, null, () => "Create"),
+      await view.buttonTo([workshop, session], null, null, () => "Create"),
     );
   });
 
-  it("button to with persisted model", () => {
+  it("button to with persisted model", async () => {
     const workshop = new Workshop("1");
 
     assertDomEqual(
       `<form method="post" action="/workshops/1" class="button_to"><input type="hidden" name="_method" value="patch" autocomplete="off" /><button type="submit">Update</button></form>`,
-      view.buttonTo(workshop, null, null, () => "Update"),
+      await view.buttonTo(workshop, null, null, () => "Update"),
     );
   });
 
-  it("button to with persisted model and block", () => {
+  it("button to with persisted model and block", async () => {
     const workshop = new Workshop("1");
 
     assertDomEqual(
       `<form method="post" action="/workshops/1" class="button_to"><input type="hidden" name="_method" value="patch" autocomplete="off" /><button type="submit">Update</button></form>`,
-      view.buttonTo(workshop, null, null, () => "Update"),
+      await view.buttonTo(workshop, null, null, () => "Update"),
     );
   });
 
-  it("button to with nested persisted model and block", () => {
+  it("button to with nested persisted model and block", async () => {
     const workshop = new Workshop("1");
     const session = new Session("1");
 
     assertDomEqual(
       `<form method="post" action="/workshops/1/sessions/1" class="button_to"><input type="hidden" name="_method" value="patch" autocomplete="off" /><button type="submit">Update</button></form>`,
-      view.buttonTo([workshop, session], null, null, () => "Update"),
+      await view.buttonTo([workshop, session], null, null, () => "Update"),
     );
   });
 
-  it("button to with form class", () => {
+  it("button to with form class", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="custom-class"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { form_class: "custom-class" }),
+      await view.buttonTo("Hello", "http://www.example.com", { form_class: "custom-class" }),
     );
   });
 
-  it("button to with form class escapes", () => {
+  it("button to with form class escapes", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="&lt;script&gt;evil_js&lt;/script&gt;"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { form_class: "<script>evil_js</script>" }),
+      await view.buttonTo("Hello", "http://www.example.com", {
+        form_class: "<script>evil_js</script>",
+      }),
     );
   });
 
-  it("button to with query", () => {
+  it("button to with query", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com/q1=v1&amp;q2=v2" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com/q1=v1&q2=v2"),
+      await view.buttonTo("Hello", "http://www.example.com/q1=v1&q2=v2"),
     );
   });
 
-  it("button to with value", () => {
+  it("button to with value", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit" name="key" value="value">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { name: "key", value: "value" }),
+      await view.buttonTo("Hello", "http://www.example.com", { name: "key", value: "value" }),
     );
   });
 
-  it("button to with html safe URL", () => {
+  it("button to with html safe URL", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com/q1=v1&amp;q2=v2" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", raw("http://www.example.com/q1=v1&amp;q2=v2")),
+      await view.buttonTo("Hello", raw("http://www.example.com/q1=v1&amp;q2=v2")),
     );
   });
 
-  it("button to with query and no name", () => {
+  it("button to with query and no name", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com?q1=v1&amp;q2=v2" class="button_to"><button type="submit">http://www.example.com?q1=v1&amp;q2=v2</button></form>`,
-      view.buttonTo(null, "http://www.example.com?q1=v1&q2=v2"),
+      await view.buttonTo(null, "http://www.example.com?q1=v1&q2=v2"),
     );
   });
 
-  it("button to with javascript confirm", () => {
+  it("button to with javascript confirm", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button data-confirm="Are you sure?" type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { data: { confirm: "Are you sure?" } }),
+      await view.buttonTo("Hello", "http://www.example.com", {
+        data: { confirm: "Are you sure?" },
+      }),
     );
   });
 
-  it("button to with javascript disable with", () => {
+  it("button to with javascript disable with", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button data-disable-with="Greeting..." type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { data: { disable_with: "Greeting..." } }),
+      await view.buttonTo("Hello", "http://www.example.com", {
+        data: { disable_with: "Greeting..." },
+      }),
     );
   });
 
-  it("button to with remote and form options", () => {
+  it("button to with remote and form options", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="custom-class" data-remote="true" data-type="json"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", {
+      await view.buttonTo("Hello", "http://www.example.com", {
         remote: true,
         form: { class: "custom-class", "data-type": "json" },
       }),
     );
   });
 
-  it("button to with remote and javascript confirm", () => {
+  it("button to with remote and javascript confirm", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to" data-remote="true"><button data-confirm="Are you sure?" type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", {
+      await view.buttonTo("Hello", "http://www.example.com", {
         remote: true,
         data: { confirm: "Are you sure?" },
       }),
     );
   });
 
-  it("button to with remote and javascript disable with", () => {
+  it("button to with remote and javascript disable with", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to" data-remote="true"><button data-disable-with="Greeting..." type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", {
+      await view.buttonTo("Hello", "http://www.example.com", {
         remote: true,
         data: { disable_with: "Greeting..." },
       }),
     );
   });
 
-  it("button to with remote false", () => {
+  it("button to with remote false", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { remote: false }),
+      await view.buttonTo("Hello", "http://www.example.com", { remote: false }),
     );
   });
 
-  it("button to enabled disabled", () => {
+  it("button to enabled disabled", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { disabled: false }),
+      await view.buttonTo("Hello", "http://www.example.com", { disabled: false }),
     );
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button disabled="disabled" type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { disabled: true }),
+      await view.buttonTo("Hello", "http://www.example.com", { disabled: true }),
     );
   });
 
-  it("button to with block and hash url", () => {
+  it("button to with block and hash url", async () => {
     assertDomEqual(
       `<form action="/other" class="button_to" method="post"><button class="button" type="submit">Hello</button></form>`,
-      view.buttonTo(
+      await view.buttonTo(
         { controller: "foo", action: "other" },
         { class: "button" },
         null,
@@ -456,53 +462,57 @@ describe("UrlHelperTest", () => {
     );
   });
 
-  it("button to with content exfiltration prevention", () => {
+  it("button to with content exfiltration prevention", async () => {
     setPrependContentExfiltrationPrevention(true);
     try {
       assertDomEqual(
         `<!-- '"\` --><!-- </textarea></xmp> --></option></form><form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
-        view.buttonTo("Hello", "http://www.example.com"),
+        await view.buttonTo("Hello", "http://www.example.com"),
       );
     } finally {
       setPrependContentExfiltrationPrevention(false);
     }
   });
 
-  it("button to with method delete", () => {
+  it("button to with method delete", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><input type="hidden" name="_method" value="delete" autocomplete="off" /><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { method: "delete" }),
+      await view.buttonTo("Hello", "http://www.example.com", { method: "delete" }),
     );
   });
 
-  it("button to with method get", () => {
+  it("button to with method get", async () => {
     assertDomEqual(
       `<form method="get" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { method: "get" }),
+      await view.buttonTo("Hello", "http://www.example.com", { method: "get" }),
     );
   });
 
-  it("button to with block", () => {
+  it("button to with block", async () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit"><span>Hello</span></button></form>`,
-      view.buttonTo("http://www.example.com", null, null, () => view.contentTag("span", "Hello")),
+      await view.buttonTo("http://www.example.com", null, null, () =>
+        view.contentTag("span", "Hello"),
+      ),
     );
   });
 
-  it("button to with params", () => {
+  it("button to with params", async () => {
     assertDomEqual(
       `<form action="http://www.example.com" class="button_to" method="post"><button type="submit">Hello</button><input type="hidden" name="baz" value="quux" autocomplete="off" /><input type="hidden" name="foo" value="bar" autocomplete="off" /></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { params: { foo: "bar", baz: "quux" } }),
+      await view.buttonTo("Hello", "http://www.example.com", {
+        params: { foo: "bar", baz: "quux" },
+      }),
     );
   });
 
-  it("button to generates input when button to generates button tag false", () => {
+  it("button to generates input when button to generates button tag false", async () => {
     const oldValue = UrlHelper.buttonToGeneratesButtonTag;
     UrlHelper.setButtonToGeneratesButtonTag(false);
     try {
       assertDomEqual(
         `<form method="post" action="http://www.example.com" class="button_to"><input type="submit" value="Save"/></form>`,
-        view.buttonTo("Save", "http://www.example.com"),
+        await view.buttonTo("Save", "http://www.example.com"),
       );
     } finally {
       UrlHelper.setButtonToGeneratesButtonTag(oldValue);
@@ -529,30 +539,30 @@ describe("UrlHelperTest", () => {
     }
   }
 
-  it("button to with permitted strong params", () => {
+  it("button to with permitted strong params", async () => {
     assertDomEqual(
       `<form action="http://www.example.com" class="button_to" method="post"><button type="submit">Hello</button><input type="hidden" name="baz" value="quux" autocomplete="off" /><input type="hidden" name="foo" value="bar" autocomplete="off" /></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { params: new FakeParams() }),
+      await view.buttonTo("Hello", "http://www.example.com", { params: new FakeParams() }),
     );
   });
 
-  it("button to with unpermitted strong params", () => {
-    expect(() =>
+  it("button to with unpermitted strong params", async () => {
+    await expect(
       view.buttonTo("Hello", "http://www.example.com", { params: new FakeParams(false) }),
-    ).toThrow(ArgumentError);
+    ).rejects.toThrow(ArgumentError);
   });
 
-  it("button to with nested hash params", () => {
+  it("button to with nested hash params", async () => {
     assertDomEqual(
       `<form action="http://www.example.com" class="button_to" method="post"><button type="submit">Hello</button><input type="hidden" name="foo[bar]" value="baz" autocomplete="off" /></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { params: { foo: { bar: "baz" } } }),
+      await view.buttonTo("Hello", "http://www.example.com", { params: { foo: { bar: "baz" } } }),
     );
   });
 
-  it("button to with nested array params", () => {
+  it("button to with nested array params", async () => {
     assertDomEqual(
       `<form action="http://www.example.com" class="button_to" method="post"><button type="submit">Hello</button><input type="hidden" name="foo[]" value="bar" autocomplete="off" /></form>`,
-      view.buttonTo("Hello", "http://www.example.com", { params: { foo: ["bar"] } }),
+      await view.buttonTo("Hello", "http://www.example.com", { params: { foo: ["bar"] } }),
     );
   });
 

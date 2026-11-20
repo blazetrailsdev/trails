@@ -63,12 +63,12 @@ describe("FormHelper includes ModelNaming (form_helper.rb:119)", () => {
 describe("FormHelper attr_internal :default_form_builder (form_helper.rb:122)", () => {
   class SpecializedFormBuilder extends FormBuilder {}
 
-  it("hands a controller's default_form_builder to form_with", () => {
+  it("hands a controller's default_form_builder to form_with", async () => {
     const view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
     view.assignController({ defaultFormBuilder: () => SpecializedFormBuilder });
 
     let builder: unknown;
-    view.formWith({ url: "/posts" }, (f: unknown) => {
+    await view.formWith({ url: "/posts" }, (f: unknown) => {
       builder = f;
       return "";
     });
