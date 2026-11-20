@@ -6,8 +6,8 @@ const blocks = [
   {
     file: "app/models/article.ts",
     lang: "ts",
-    title: "Active Records make modeling easy.",
-    body: "Databases come to life with business logic encapsulated in rich objects. Modeling associations between tables, providing callbacks when saved, encrypting sensitive data seamlessly, and expressing SQL queries beautifully.",
+    title: "Models are typed classes.",
+    body: "A model class maps a table to typed attributes. Declare associations, validations, callbacks and encrypted columns the way Rails does, and build queries by chaining scopes that compile to SQL.",
     code: `import { ApplicationRecord } from "./application-record.js";
 import { Current } from "./current.js";
 
@@ -40,8 +40,8 @@ export class Article extends ApplicationRecord {
   {
     file: "app/controllers/articles-controller.ts",
     lang: "ts",
-    title: "Action Controllers handle all requests.",
-    body: "Controllers expose the domain model to the web, process incoming parameters, set caching headers, and render templates, responding with either HTML or JSON.",
+    title: "Controllers turn requests into responses.",
+    body: "An action reads params, loads records, and renders a view or JSON. Filters, strong parameters and HTTP caching come with it, under the names Rails uses.",
     code: `import { Article } from "../models/article.js";
 import { ApplicationController } from "./application-controller.js";
 
@@ -71,8 +71,8 @@ export class ArticlesController extends ApplicationController {
   {
     file: "app/views/articles/show.html.tse",
     lang: "erb",
-    title: "Action Views mix TypeScript and HTML.",
-    body: "Templates can use the full versatility of TypeScript, excessive code is extracted into helpers, and the domain model is used directly and interwoven with the HTML.",
+    title: "Views are typed templates.",
+    body: "TSE templates embed TypeScript in HTML, and the compiler checks every expression against the controller that renders them. Shared markup goes in partials, shared logic in helpers.",
     code: `<h1><%= this.article.title %></h1>
 
 <%= imageTag(this.article.coverImage.url()) %>
@@ -86,8 +86,8 @@ export class ArticlesController extends ApplicationController {
   {
     file: "config/routes.ts",
     lang: "ts",
-    title: "Action Dispatch routes URLs.",
-    body: "Configure how URLs connect to the controllers using the routing domain language. Routes expose the bundle of actions that go together as a resource: index, show, new, create, edit, update, destroy.",
+    title: "Routes map URLs to actions.",
+    body: "Draw routes with the familiar DSL. One resources line gives a model its seven RESTful actions, with path helpers to link to each of them.",
     code: `import { Trails } from "@blazetrails/trailties";
 
 Trails.application.routes().draw(function () {

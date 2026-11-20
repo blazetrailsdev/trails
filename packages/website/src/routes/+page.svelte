@@ -54,7 +54,7 @@
 
 
   const cards = [
-    { tag: "Learning", title: "Read the guides", body: "Learn what the frameworks can do and how they fit together.", href: guides },
+    { tag: "Learning", title: "Read the guides", body: "Walk through each framework, from models to mailers to WebSockets.", href: guides },
     { tag: "Source", title: "Browse on GitHub", body: "Read the code and the Rails source it mirrors.", href: repo },
     { tag: "Keeping up", title: "See what’s new", body: "The latest releases and updates on development.", href: `${repo}/commits/main` },
   ];
@@ -113,9 +113,9 @@
 
   <section class="band">
     <div class="card">
-      <h2>Everything you need.</h2>
-      <p class="intro"><strong>trails is a full-stack framework.</strong> It ships with all the tools needed to build amazing web apps on both the front and back end with strong conventions that keep your agents from producing a huge, unmaintainable mess.</p>
-      <p class="small">Rendering HTML templates, updating databases, sending and receiving emails, maintaining live pages via WebSockets, enqueuing jobs for asynchronous work, storing uploads in the cloud, providing solid security protections for common attacks. trails does it all and so much more.</p>
+      <h2>One framework, the whole stack.</h2>
+      <p class="intro"><strong>trails is a full-stack framework.</strong> Models, views, controllers, jobs, mail and real-time updates all come in the box, and shared conventions give your agents one obvious place for every piece of code.</p>
+      <p class="small">Query and migrate your database, render typed templates, send and receive email, push live updates over WebSockets, run background jobs, and store file uploads locally or in the cloud, all from one set of packages.</p>
     </div>
   </section>
 
@@ -141,7 +141,7 @@
   </section>
 
   <section class="start">
-    <h2>Let’s get started.</h2>
+    <h2>Start a trails app.</h2>
     <div class="cards">
       {#each cards as c}
         <a class="start-card" href={c.href}>
@@ -170,7 +170,7 @@
       <li><a href={repo}>Source</a></li>
       <li><a href="{repo}/blob/main/LICENSES.md">License</a></li>
     </ul>
-    <p>trails is an independent TypeScript re-implementation of Ruby on Rails. Rails is a trademark of David Heinemeier Hansson; trails is not affiliated with or endorsed by the Rails project.</p>
+    <p>trails is an independent TypeScript re-implementation of Ruby on Rails. The Rails trademarks are the intellectual property of David Heinemeier Hanson, and exclusively licensed to the Rails Foundation. Uses of ‘Rails’ and ‘Ruby on Rails’ in this website are for identification purposes only and do not imply an endorsement by or affiliation with Rails, the trademark owner, or the Rails Foundation.</p>
   </footer>
 </div>
 
