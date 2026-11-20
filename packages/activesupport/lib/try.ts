@@ -13,8 +13,3 @@ export function tryCall<T extends object>(
   if (rbObjRespondTo(obj, method)) return rbFSend(obj, method, ...args);
   return undefined;
 }
-
-export function tryWith<T, R>(obj: T | null | undefined, fn: (obj: T) => R): R | undefined {
-  if (obj == null) return undefined;
-  return fn(obj);
-}

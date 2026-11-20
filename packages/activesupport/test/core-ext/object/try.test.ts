@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { tryCall, tryWith } from "../../../lib/try.js";
+import { tryCall } from "../../../lib/try.js";
 import { assertNotRespondTo } from "../../../lib/testing/assertions.js";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { block, NoMethodError } from "@blazetrails/ruby-compat";
 import { Tryable, Delegator } from "../../../lib/core-ext/object/try.js";
 
 class PrivateKlass {
@@ -83,27 +83,44 @@ describe("ObjectTryTest", () => {
   });
 
   it("try only block", () => {
-    expect(tryWith(string, reverse)).toEqual(reverse(string));
+    expect(Tryable.try(string, block(reverse))).toEqual(reverse(string));
   });
 
   it("try only block bang", () => {
-    expect(tryWith(string, reverse)).toEqual(reverse(string));
+    expect(Tryable.tryBang(string, block(reverse))).toEqual(reverse(string));
   });
 
   it("try only block nil", () => {
     let ran = false;
-    tryWith(null, () => {
-      ran = true;
-    });
+    Tryable.try(
+      null,
+      block(() => {
+        ran = true;
+      }),
+    );
     expect(ran).toEqual(false);
   });
 
   it("try with instance eval block", () => {
-    expect(tryWith(string, (s) => reverse(s))).toEqual(reverse(string));
+    expect(
+      Tryable.try(
+        string,
+        block(function (this: string) {
+          return reverse(this);
+        }),
+      ),
+    ).toEqual(reverse(string));
   });
 
   it("try with instance eval block bang", () => {
-    expect(tryWith(string, (s) => reverse(s))).toEqual(reverse(string));
+    expect(
+      Tryable.tryBang(
+        string,
+        block(function (this: string) {
+          return reverse(this);
+        }),
+      ),
+    ).toEqual(reverse(string));
   });
 
   it("try with private method bang", () => {

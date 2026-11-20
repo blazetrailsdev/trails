@@ -1,4 +1,4 @@
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbBlockGivenP, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export interface Tryable {
   try(method: string, ...args: unknown[]): unknown;
@@ -8,12 +8,12 @@ export interface Tryable {
 export const Tryable = {
   try(obj: unknown, ...args: unknown[]): unknown {
     if (obj == null) return null;
-    const block = typeof args.at(-1) === "function" ? (args.at(-1) as () => unknown) : null;
-    if (args.length === 1 && block) {
+    const block = args.at(-1);
+    if (args.length === 1 && rbBlockGivenP(block)) {
       if (block.length === 0) {
-        return block.call(obj);
+        return (block as () => unknown).call(obj);
       } else {
-        return block(obj);
+        return (block as (self: unknown) => unknown)(obj);
       }
     } else if (rbObjRespondTo(obj, args[0] as string)) {
       return rbFSend(obj, ...(args as [string, ...unknown[]]));
@@ -23,12 +23,12 @@ export const Tryable = {
 
   tryBang(obj: unknown, ...args: unknown[]): unknown {
     if (obj == null) return null;
-    const block = typeof args.at(-1) === "function" ? (args.at(-1) as () => unknown) : null;
-    if (args.length === 1 && block) {
+    const block = args.at(-1);
+    if (args.length === 1 && rbBlockGivenP(block)) {
       if (block.length === 0) {
-        return block.call(obj);
+        return (block as () => unknown).call(obj);
       } else {
-        return block(obj);
+        return (block as (self: unknown) => unknown)(obj);
       }
     } else {
       return rbFSend(obj, ...(args as [string, ...unknown[]]));
