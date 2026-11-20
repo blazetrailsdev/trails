@@ -100,7 +100,10 @@ describe("EngineRakeTasksTest", () => {
 
   async function withinMountedAppRoot<T>(block: () => Promise<T>): Promise<T> {
     return Dir.chdir(rootDir.toString(), async () => {
-      ViteAssets.reloadWith({ root: rootDir.toString(), mode: "development" });
+      await ViteAssets.reloadWith({
+        root: rootDir.toString(),
+        mode: "development",
+      }).prewarmConfig();
       return block();
     });
   }
@@ -210,9 +213,10 @@ describe("EngineRakeTasksTest", () => {
 
   it("cli commands", { timeout: 60_000 }, async () => {
     await withinMountedAppRoot(async () => {
+      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().verifyInstall();
 
-      ViteAssets.reloadWith({ root: Dir.pwd() });
+      await ViteAssets.reloadWith({ root: Dir.pwd() }).prewarmConfig();
 
       await new CLI.Install().call();
       await ViteAssets.commands().verifyInstall();
@@ -225,7 +229,7 @@ describe("EngineRakeTasksTest", () => {
       expect(exec).toHaveBeenLastCalledWith("bin/vite upgrade_packages");
       await new CLI.UpgradePackages().call();
 
-      const { mode, ssrOutputDir } = await ViteAssets.config();
+      const { mode, ssrOutputDir } = ViteAssets.config();
       const run = vi
         .spyOn(ViteAssets.instance(), "run")
         .mockResolvedValue(["stdout", "stderr", { isSuccess: () => true }]);

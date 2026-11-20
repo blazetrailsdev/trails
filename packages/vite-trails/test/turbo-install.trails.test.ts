@@ -57,7 +57,10 @@ describe("turbo:install", () => {
 
   it("installs the node arm into a vite:install app", { timeout: 60_000 }, async () => {
     await Dir.chdir(rootDir.toString(), async () => {
-      ViteAssets.reloadWith({ root: rootDir.toString(), mode: "development" });
+      await ViteAssets.reloadWith({
+        root: rootDir.toString(),
+        mode: "development",
+      }).prewarmConfig();
       await new CLI.Install().call();
       await (await Task.get("turbo:install")).invoke();
     });

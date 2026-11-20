@@ -44,7 +44,7 @@ describe("DevServerProxyTest", () => {
   async function assertForwarded({ to = null }: { to?: string | null } = {}): Promise<void> {
     expect(lastResponse().isOk).toBe(true);
     const env = JSON.parse(lastResponse().body);
-    const config = await ViteAssets.config();
+    const config = ViteAssets.config();
 
     expect(env["HTTP_X_FORWARDED_HOST"]).toBe(config.host);
     expect(Number.parseInt(env["HTTP_X_FORWARDED_PORT"], 10)).toBe(config.port);
@@ -81,7 +81,7 @@ describe("DevServerProxyTest", () => {
 
     const env = JSON.parse(lastResponse().body);
 
-    expect(env["rack.backend"]).toBe((await ViteAssets.config()).origin());
+    expect(env["rack.backend"]).toBe(ViteAssets.config().origin());
   });
 
   it("vite client", async () => {

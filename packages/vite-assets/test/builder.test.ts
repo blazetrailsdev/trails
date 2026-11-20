@@ -14,7 +14,7 @@ const manifest = () =>
   ViteAssets.instance().manifest() as unknown as { lookup(name: string): Promise<unknown> };
 const lastBuild = () => builder().lastBuildMetadata();
 const lastBuildPath = (ssr: boolean) => (builder() as unknown as Exposed).lastBuildPath({ ssr });
-const viteEnv = async (vars?: Record<string, string>) => (await ViteAssets.config()).toEnv(vars);
+const viteEnv = async (vars?: Record<string, string>) => ViteAssets.config().toEnv(vars);
 const watchedFile = () => new Pathname(pathToTestApp()).join(WATCHED_FILE);
 
 async function hashedFiles(block: () => unknown): Promise<string[]> {
@@ -112,7 +112,7 @@ describe("BuilderTest", () => {
   });
 
   it("last build path", async () => {
-    const mode = await ViteAssets.mode();
+    const mode = ViteAssets.mode();
     expect(File.basename((await lastBuildPath(false)).toString())).toBe(`last-build-${mode}.json`);
     expect(File.basename((await lastBuildPath(true)).toString())).toBe(
       `last-ssr-build-${mode}.json`,
@@ -166,7 +166,7 @@ describe("BuilderTest", () => {
     try {
       setEnv("VITE_RUBY_MODE", "foo.bar");
       setEnv("VITE_RUBY_ROOT", "/baz");
-      await ViteAssets.reloadWith().config();
+      await ViteAssets.reloadWith().prewarmConfig();
 
       expect((await viteEnv())["VITE_RUBY_MODE"]).toBe("foo.bar");
       expect((await viteEnv())["VITE_RUBY_ROOT"]).toBe("/baz");

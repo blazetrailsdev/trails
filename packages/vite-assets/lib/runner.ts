@@ -15,7 +15,7 @@ export class Runner {
   /** @missingRailsCall within_root — PERMANENT */
   async run(argv: string[], { exec: isExec = false }: { exec?: boolean } = {}): Promise<unknown> {
     try {
-      const config = await this.config();
+      const config = this.config();
       const cmd = await this.commandFor(argv);
       if (isExec) return exec(...cmd);
 
@@ -30,7 +30,7 @@ export class Runner {
   }
 
   /** @internal */
-  private config(): Promise<Config> {
+  private config(): Config {
     return this._viteAssets.config();
   }
 
@@ -46,7 +46,7 @@ export class Runner {
 
   /** @internal */
   private async commandFor(args: string[]): Promise<[Record<string, string>, ...string[]]> {
-    const config = await this.config();
+    const config = this.config();
     const cmd: [Record<string, string>, ...string[]] = [config.toEnv(this.env())];
     const [execArgs, viteArgs] = partition(args, (arg) => arg.startsWith("--node-options"));
     cmd.push(...(await this.viteExecutable(...execArgs)));
@@ -57,7 +57,7 @@ export class Runner {
 
   /** @internal */
   private async viteExecutable(...execArgs: string[]): Promise<string[]> {
-    const config = await this.config();
+    const config = this.config();
     const binPath = config.viteBinPath;
     if (
       binPath != null &&

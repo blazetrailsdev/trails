@@ -16,8 +16,10 @@ export class Clobber extends Command {
     });
   }
 
-  override call({ mode }: { mode: string }): Promise<void> {
+  /** @inventedArm prewarmConfig — PERMANENT */
+  override async call({ mode }: { mode: string }): Promise<void> {
     ViteAssets.env()["VITE_RUBY_MODE"] = mode;
+    await ViteAssets.prewarmConfig();
     return ViteAssets.commands().clobber();
   }
 }

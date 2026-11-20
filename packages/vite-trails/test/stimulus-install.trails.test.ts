@@ -51,7 +51,10 @@ describe("stimulus:install", () => {
 
   it("installs the node arm into a vite:install app", { timeout: 60_000 }, async () => {
     await Dir.chdir(rootDir.toString(), async () => {
-      ViteAssets.reloadWith({ root: rootDir.toString(), mode: "development" });
+      await ViteAssets.reloadWith({
+        root: rootDir.toString(),
+        mode: "development",
+      }).prewarmConfig();
       await new CLI.Install().call();
       await (await Task.get("stimulus:install")).invoke();
     });
@@ -74,7 +77,10 @@ describe("stimulus:install", () => {
   it("installs the bun arm into a vite:install app", { timeout: 60_000 }, async () => {
     await File.writeAsync(rootDir.join("bun.config.js").toString(), "");
     await Dir.chdir(rootDir.toString(), async () => {
-      ViteAssets.reloadWith({ root: rootDir.toString(), mode: "development" });
+      await ViteAssets.reloadWith({
+        root: rootDir.toString(),
+        mode: "development",
+      }).prewarmConfig();
       await new CLI.Install().call();
       const { Tasks } = await import("@blazetrails/stimulus/tasks/stimulus-tasks.js");
       await Tasks.runStimulusInstallTemplate("stimulus-with-bun");

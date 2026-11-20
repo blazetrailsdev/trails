@@ -55,7 +55,7 @@ function refreshConfig(options: Record<string, unknown> = {}): Promise<unknown> 
     root: new URL("../../vite-assets/test/test_app", import.meta.url).pathname,
     mode: "production",
     ...options,
-  }).config();
+  }).prewarmConfig();
 }
 
 async function withDevServerRunning(block: () => unknown): Promise<void> {
@@ -297,7 +297,7 @@ describe("HelperTest", () => {
   it("vite client tag with skip proxy", async () => {
     assertNil(await tc.viteClientTag());
     await withSkipProxyDevServerRunning(async () => {
-      const origin = (await ViteAssets.config()).origin();
+      const origin = ViteAssets.config().origin();
 
       assertEqual(
         `<script src="${origin}/vite-dev/@vite/client" crossorigin="anonymous" type="module"></script>`,
@@ -308,7 +308,7 @@ describe("HelperTest", () => {
 
   it("vite asset path with skip proxy", async () => {
     await withSkipProxyDevServerRunning(async () => {
-      const origin = (await ViteAssets.config()).origin();
+      const origin = ViteAssets.config().origin();
 
       assertEqual(`${origin}/vite-dev/entrypoints/main.ts`, await tc.viteAssetPath("main.ts"));
       assertEqual(`${origin}/vite-dev/entrypoints/app.css`, await tc.viteAssetPath("app.css"));
@@ -318,7 +318,7 @@ describe("HelperTest", () => {
 
   it("vite javascript tag with skip proxy", async () => {
     await withSkipProxyDevServerRunning(async () => {
-      const origin = (await ViteAssets.config()).origin();
+      const origin = ViteAssets.config().origin();
 
       assertEqual(
         `<script src="${origin}/vite-dev/entrypoints/main.ts" crossorigin="" type="module"></script>`,
@@ -334,7 +334,7 @@ describe("HelperTest", () => {
 
   it("vite stylesheet tag with skip proxy", async () => {
     await withSkipProxyDevServerRunning(async () => {
-      const origin = (await ViteAssets.config()).origin();
+      const origin = ViteAssets.config().origin();
 
       assertSimilar(
         link({ href: `${origin}/vite-dev/entrypoints/app.css` }),
@@ -354,7 +354,7 @@ describe("HelperTest", () => {
 
   it("vite image tag with skip proxy", async () => {
     await withSkipProxyDevServerRunning(async () => {
-      const origin = (await ViteAssets.config()).origin();
+      const origin = ViteAssets.config().origin();
 
       assertEqual(
         `<img alt="Logo" src="${origin}/vite-dev/images/logo.png" />`,
@@ -375,7 +375,7 @@ describe("HelperTest", () => {
 
   it("vite react refresh tag with skip proxy", async () => {
     await withSkipProxyDevServerRunning(async () => {
-      const origin = (await ViteAssets.config()).origin();
+      const origin = ViteAssets.config().origin();
 
       assertEqual(
         `<script type="module">\n//<![CDATA[\n${REACT_PREAMBLE(origin)}\n//]]>\n</script>`,

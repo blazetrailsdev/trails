@@ -14,6 +14,7 @@ export class Engine extends TrailsEngine {
     TrailsEngine.register(this, decodeURIComponent(new URL(".", import.meta.url).pathname));
 
     this.initializer("vite_trails.proxy", async (app: Application) => {
+      await ViteAssets.prewarmConfig();
       if (await ViteAssets.isRunProxy())
         app.middleware.insertBefore(0, ViteAssets.DevServerProxy, { sslVerifyNone: true });
     });
@@ -51,7 +52,7 @@ export class Engine extends TrailsEngine {
     });
 
     this.initializer("vite_trails.set_source", async (app: Application) => {
-      const config = await ViteAssets.config();
+      const config = ViteAssets.config();
       const sourceDir = config.root.join(config.sourceCodeDir);
       app.config.javascriptPath = sourceDir
         .relativePathFrom(new Pathname(TopLevel.Trails!.root()!).join("app"))

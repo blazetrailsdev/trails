@@ -136,7 +136,7 @@ window.__vite_plugin_react_preamble_installed__ = true
   }
 
   /** @internal */
-  private config(): Promise<Config> {
+  private config(): Config {
     return this._viteAssets.config();
   }
 
@@ -152,7 +152,7 @@ window.__vite_plugin_react_preamble_installed__ = true
 
   /** @internal */
   private async isShouldBuild(): Promise<boolean> {
-    return (await this.config()).autoBuild && !(await this.isDevServerRunning());
+    return this.config().autoBuild && !(await this.isDevServerRunning());
   }
 
   /** @internal */
@@ -167,7 +167,7 @@ window.__vite_plugin_react_preamble_installed__ = true
 
   /** @internal */
   private async manifest(): Promise<Record<string, ManifestEntry>> {
-    if ((await this.config()).autoBuild) return this.refresh();
+    if (this.config().autoBuild) return this.refresh();
 
     return (this._manifest ??= await this.loadManifest());
   }
@@ -175,7 +175,7 @@ window.__vite_plugin_react_preamble_installed__ = true
   /** @internal */
   private async loadManifest(): Promise<Record<string, ManifestEntry>> {
     const manifest: Record<string, ManifestEntry> = {};
-    for (const path of await (await this.config()).manifestPaths()) {
+    for (const path of await this.config().manifestPaths()) {
       Object.assign(manifest, JSON.parse(await path.read()));
     }
     await this.resolveReferences(manifest);
@@ -184,16 +184,12 @@ window.__vite_plugin_react_preamble_installed__ = true
 
   /** @internal */
   private async prefixViteAsset(path: string): Promise<string> {
-    return File.join(
-      (await this.viteAssetOrigin()) ?? "/",
-      (await this.config()).publicOutputDir,
-      path,
-    );
+    return File.join((await this.viteAssetOrigin()) ?? "/", this.config().publicOutputDir, path);
   }
 
   /** @internal */
   private async prefixAssetWithHost(path: string): Promise<string> {
-    const config = await this.config();
+    const config = this.config();
     return File.join(
       (await this.viteAssetOrigin()) ?? config.assetHost ?? "/",
       config.publicOutputDir,
@@ -203,7 +199,7 @@ window.__vite_plugin_react_preamble_installed__ = true
 
   /** @internal */
   private async viteAssetOrigin(): Promise<string | null> {
-    const config = await this.config();
+    const config = this.config();
     return (await this.isDevServerRunning()) && config.skipProxy ? config.origin() : null;
   }
 
@@ -237,12 +233,12 @@ window.__vite_plugin_react_preamble_installed__ = true
     match = /^\/(.+)$/m.exec(name);
     if (match) return this.resolveAbsoluteEntry(match[1]);
 
-    return name.includes("/") ? name : File.join((await this.config()).entrypointsDir, name);
+    return name.includes("/") ? name : File.join(this.config().entrypointsDir, name);
   }
 
   /** @internal */
   private async resolveAbsoluteEntry(name: string): Promise<string> {
-    const config = await this.config();
+    const config = this.config();
     if (await this.isDevServerRunning()) {
       return File.join(FS_PREFIX, config.root, name);
     } else {
@@ -284,7 +280,7 @@ window.__vite_plugin_react_preamble_installed__ = true
     name: string,
     options: { type?: EntryType } = {},
   ): Promise<never> {
-    const config = await this.config();
+    const config = this.config();
     throw new MissingEntrypointError({
       fileName: await this.resolveEntryName(name, options),
       lastBuild: await this.builder().lastBuildMetadata(),

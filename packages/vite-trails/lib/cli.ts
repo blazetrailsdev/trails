@@ -15,7 +15,7 @@ import { ViteTrails } from "./vite-trails.js";
 type Path = Pathname | string;
 
 interface InstallHost {
-  config(): Promise<Config>;
+  config(): Config;
   root(): Promise<Pathname>;
   cp(source: Path, destination: Path): Promise<void>;
   appendUnlessPresent(path: Path, contents: string, options: { pattern: string }): Promise<void>;
@@ -49,7 +49,7 @@ const TRAILS_TEMPLATES = new Pathname(
 
 /** @missingRailsArgs join — PERMANENT */
 async function setupAppFiles(this: InstallHost): Promise<void> {
-  const config = await this.config();
+  const config = this.config();
   const root = await this.root();
   await this.cp(Install.TRAILS_TEMPLATES.join("config/trails-vite.json"), config.configPath);
   let dir: string | undefined;
@@ -92,14 +92,14 @@ async function setupContentSecurityPolicy(this: InstallHost, cspFile: Pathname):
     cspFile,
     "connectSrc",
     `    // Allow @vite/client to hot reload changes in development
-//    ...(Trails.env.isDevelopment() && { connectSrc: ["'self'", \`ws://\${(await ViteAssets.config()).hostWithPort}\`] }),
+//    ...(Trails.env.isDevelopment() && { connectSrc: ["'self'", \`ws://\${ViteAssets.config().hostWithPort}\`] }),
 `,
   );
   await this.injectLineAfter(
     cspFile,
     "scriptSrc",
     `    // Allow @vite/client to hot reload javascript changes in development
-//    ...(Trails.env.isDevelopment() && { scriptSrc: ["'self'", "'unsafe-eval'", \`http://\${(await ViteAssets.config()).hostWithPort}\`] }),
+//    ...(Trails.env.isDevelopment() && { scriptSrc: ["'self'", "'unsafe-eval'", \`http://\${ViteAssets.config().hostWithPort}\`] }),
 `,
   );
   await this.injectLineAfter(
@@ -113,7 +113,7 @@ async function setupContentSecurityPolicy(this: InstallHost, cspFile: Pathname):
 
 /** @missingRailsArgs inject_line_before — PERMANENT */
 async function installSampleFiles(this: InstallHost): Promise<void> {
-  const config = await this.config();
+  const config = this.config();
   if (
     !(await File.isExistAsync(config.resolvedEntrypointsDir().join("application.js").toString()))
   ) {

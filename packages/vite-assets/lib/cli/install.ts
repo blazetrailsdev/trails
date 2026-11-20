@@ -38,11 +38,13 @@ export class Install extends Command {
   declare private replaceFirstLine: typeof FileUtils.replaceFirstLine;
   declare private write: typeof FileUtils.write;
 
+  /** @inventedArm prewarmConfig — PERMANENT */
   override async call({
     packageManager = null,
   }: { packageManager?: string | null } = {}): Promise<void> {
     if (packageManager)
       setEnv("VITE_RUBY_PACKAGE_MANAGER", ENV["VITE_RUBY_PACKAGE_MANAGER"] || packageManager);
+    await ViteAssets.prewarmConfig();
 
     this.say("Creating binstub");
     await ViteAssets.commands().installBinstubs();
@@ -72,7 +74,7 @@ export class Install extends Command {
 
   /** @internal */
   protected async setupAppFiles(): Promise<void> {
-    const config = await this.config();
+    const config = this.config();
     await this.copyTemplate("config/vite.json", { to: config.configPath });
 
     const rackupFile = (await this.root()).join("config.ru");
@@ -88,12 +90,12 @@ export class Install extends Command {
   /** @internal */
   protected async installSampleFiles(): Promise<void> {
     await this.copyTemplate("entrypoints/application.js", {
-      to: (await this.config()).resolvedEntrypointsDir().join("application.js"),
+      to: this.config().resolvedEntrypointsDir().join("application.js"),
     });
   }
 
   /** @internal */
-  private config(): Promise<Config> {
+  private config(): Config {
     return ViteAssets.config();
   }
 
@@ -135,7 +137,8 @@ export class Install extends Command {
     await this.copyTemplate("config/vite.config.ts", { to: root.join("vite.config.ts") });
     await this.append(root.join("Procfile.dev"), "vite: bin/vite dev");
     await this.setupAppFiles();
-    ViteAssets.reloadWith({ configPath: (await this.config()).configPath });
+    ViteAssets.reloadWith({ configPath: this.config().configPath });
+    await ViteAssets.prewarmConfig();
   }
 
   /** @internal */
@@ -190,7 +193,7 @@ node_modules
 
   /** @internal */
   private async root(): Promise<Pathname> {
-    return (this._root ??= await this.silentWarnings(async () => (await this.config()).root));
+    return (this._root ??= await this.silentWarnings(async () => this.config().root));
   }
 
   /** @internal */
@@ -212,7 +215,7 @@ node_modules
 
   /** @internal */
   protected async installJsPackages(deps: string): Promise<void> {
-    const config = await this.config();
+    const config = this.config();
     await this.runWithCapture(`${config.packageManager} add -D ${deps}`, { stdinData: "\n" });
   }
 

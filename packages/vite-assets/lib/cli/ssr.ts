@@ -11,6 +11,7 @@ export class SSR extends Vite {
     this.executableOptions();
   }
 
+  /** @inventedArm prewarmConfig — PERMANENT */
   override async call({
     mode,
     inspect = false,
@@ -21,8 +22,9 @@ export class SSR extends Vite {
     traceDeprecation?: boolean | null;
   }): Promise<never> {
     ViteAssets.env()["VITE_RUBY_MODE"] = mode;
+    await ViteAssets.prewarmConfig();
 
-    const config = await ViteAssets.config();
+    const config = ViteAssets.config();
     let ssrEntrypoint: string | undefined;
     for (const ext of SSR.JS_EXTENSIONS) {
       const path = config.ssrOutputDir.join(`ssr.${ext}`).toString();

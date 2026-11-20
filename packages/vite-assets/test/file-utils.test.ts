@@ -42,7 +42,7 @@ describe("FilesTest", () => {
       .mockResolvedValue(undefined);
     try {
       await Dir.chdir(appRoot.toString(), async () => {
-        ViteAssets.reloadWith({ root: appRoot.toString() });
+        await ViteAssets.reloadWith({ root: appRoot.toString() }).prewarmConfig();
         await new CLI.Install().call();
       });
     } finally {
