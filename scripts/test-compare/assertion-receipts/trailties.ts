@@ -177,4 +177,67 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           "rails_plugin_test.rb:41-43 repeats the arm with the -b alias; Minitest.process_args is unported, so the port passes the parsed fullBacktrace option and the alias has no distinct input",
       },
     ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › devcontainer": [
+    {
+      kind: "assert_file",
+      value: "s:test/application_system_test_case.rb",
+      as: null,
+      reason:
+        'app_generator_test.rb:1330 opens application_system_test_case.rb for the Capybara lines below; the generated SystemTestCase drives Playwright (CLAUDE.md, "System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)")',
+    },
+    {
+      kind: "assert_match",
+      value: null,
+      as: null,
+      reason:
+        'app_generator_test.rb:1331 asserts the Capybara served_by line of application_system_test_case.rb; the generated SystemTestCase drives Playwright (CLAUDE.md, "System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)")',
+    },
+    {
+      kind: "assert_match",
+      value: null,
+      as: null,
+      reason:
+        'app_generator_test.rb:1332 asserts the Capybara driven_by :selenium line of application_system_test_case.rb; the generated SystemTestCase drives Playwright (CLAUDE.md, "System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)")',
+    },
+    {
+      kind: "assert_match",
+      value: null,
+      as: null,
+      reason:
+        'app_generator_test.rb:1333 asserts the Capybara browser: :remote line of application_system_test_case.rb; the generated SystemTestCase drives Playwright (CLAUDE.md, "System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)")',
+    },
+    {
+      kind: "assert_match",
+      value: null,
+      as: null,
+      reason:
+        'app_generator_test.rb:1334 asserts the Capybara url: line of application_system_test_case.rb; the generated SystemTestCase drives Playwright (CLAUDE.md, "System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)")',
+    },
+  ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › devcontainer no selenium when skipping system test":
+    [
+      {
+        kind: "assert_not_includes",
+        value: "s:CAPYBARA_SERVER_PORT",
+        as: null,
+        reason:
+          'app_generator_test.rb:1568 asserts the Capybara server port variable; the devcontainer exports the Vitest system-testing server port instead (CLAUDE.md, "System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)")',
+      },
+    ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › inclusion of ruby version": [
+    {
+      kind: "assert_match",
+      value: null,
+      as: null,
+      reason:
+        'app_generator_test.rb:1079 reads ENV["RBENV_VERSION"], a Ruby version manager; .ruby-version is .node-version (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
+    },
+    {
+      kind: "assert_match",
+      value: null,
+      as: null,
+      reason:
+        'app_generator_test.rb:1081 reads ENV["rvm_ruby_string"], a Ruby version manager; .ruby-version is .node-version (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
+    },
+  ],
 };

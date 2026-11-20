@@ -118,7 +118,7 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
 
     await t.appFile(
       "config/routes.ts",
-      routes(`this.get({ up: "trails/health#show" }, { as: "trailsHealthCheck" });`),
+      routes(`this.get({ up: "trails/health#show" }, { as: "trails_health_check" });`),
     );
 
     await t.get("/up", {}, { HTTPS: "on" });
@@ -139,8 +139,6 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
       "config/routes.ts",
       routes(`
         this.mount((env) => [200, {}, [env["PATH_INFO"]]], { at: "/blog" });
-        // The line below is required because mount sometimes
-        // fails when a resource route is added.
         this.resource("user");
       `),
     );
