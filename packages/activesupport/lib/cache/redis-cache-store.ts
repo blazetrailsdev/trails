@@ -16,7 +16,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "../namespaces.js";
 import { wrap } from "../core-ext/array/wrap.js";
-import { pluck } from "../enumerable-utils.js";
+import { pluck } from "../core-ext/enumerable.js";
 import { extractOptionsBang } from "../hash-utils.js";
 import { Digest } from "../digest.js";
 import { currentErrorReporter } from "../error-reporter.js";
