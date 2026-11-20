@@ -1,3 +1,4 @@
+import { SQLite3 } from "./namespaces.js";
 import { isSymbol, rbInspect, toI } from "@blazetrails/ruby-compat";
 
 import type { SqliteBinds } from "./driver.js";
@@ -688,3 +689,5 @@ export const Pragmas = {
   setWalCheckpoint,
   setWritableSchema,
 };
+
+SQLite3.Pragmas = Pragmas;

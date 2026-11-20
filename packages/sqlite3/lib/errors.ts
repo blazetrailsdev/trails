@@ -1,4 +1,5 @@
 import { SQLite3Constants } from "./driver.js";
+import { SQLite3 } from "./namespaces.js";
 
 export class Exception extends Error {
   code: number | null = null;
@@ -93,6 +94,34 @@ export class FormatException extends Exception {}
 export class RangeException extends Exception {}
 
 export class NotADatabaseException extends Exception {}
+
+SQLite3.AbortException = AbortException;
+SQLite3.AuthorizationException = AuthorizationException;
+SQLite3.BusyException = BusyException;
+SQLite3.CantOpenException = CantOpenException;
+SQLite3.ConstraintException = ConstraintException;
+SQLite3.CorruptException = CorruptException;
+SQLite3.EmptyException = EmptyException;
+SQLite3.Exception = Exception;
+SQLite3.FormatException = FormatException;
+SQLite3.FullException = FullException;
+SQLite3.InternalException = InternalException;
+SQLite3.InterruptException = InterruptException;
+SQLite3.IOException = IOException;
+SQLite3.LockedException = LockedException;
+SQLite3.MemoryException = MemoryException;
+SQLite3.MismatchException = MismatchException;
+SQLite3.MisuseException = MisuseException;
+SQLite3.NotADatabaseException = NotADatabaseException;
+SQLite3.NotFoundException = NotFoundException;
+SQLite3.PermissionException = PermissionException;
+SQLite3.ProtocolException = ProtocolException;
+SQLite3.RangeException = RangeException;
+SQLite3.ReadOnlyException = ReadOnlyException;
+SQLite3.SchemaChangedException = SchemaChangedException;
+SQLite3.SQLException = SQLException;
+SQLite3.TooBigException = TooBigException;
+SQLite3.UnsupportedException = UnsupportedException;
 
 for (const [name, klass] of Object.entries({
   Exception,
