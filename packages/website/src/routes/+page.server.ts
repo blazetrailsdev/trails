@@ -134,6 +134,49 @@ export class Check {
 const checkError =
   "app/models/check.ts(6,11): error TS2322: Type 'string | null' is not assignable to type 'number'.";
 
+const view = `<article>
+  <h1><%= this.post.title %></h1>
+  <p><%= this.post.titel %></p>
+</article>`;
+
+const viewError =
+  "app/views/posts/show.html.tse(3,20): error TS2551: Property 'titel' does not exist on type 'Post'.";
+
+function withError(
+  code: string,
+  lang: string,
+  line: number,
+  from: number,
+  to: number,
+  message: string,
+) {
+  return codeToHtml(code, {
+    lang,
+    theme: "github-dark",
+    decorations: [
+      {
+        start: { line: line - 1, character: from },
+        end: { line: line - 1, character: to },
+        properties: { class: "squiggle" },
+      },
+    ],
+    transformers: [
+      {
+        line(node, n) {
+          if (n === line) {
+            node.children.push({
+              type: "element",
+              tagName: "span",
+              properties: { class: "tip" },
+              children: [{ type: "text", value: message }],
+            });
+          }
+        },
+      },
+    ],
+  });
+}
+
 export async function load() {
   const parity = await loadParity();
   return {
@@ -142,31 +185,8 @@ export async function load() {
     hero: {
       rails: await codeToHtml(railsPost, { lang: "ruby", theme: "github-dark" }),
       trails: await codeToHtml(trailsPost, { lang: "ts", theme: "github-dark" }),
-      check: await codeToHtml(check, {
-        lang: "ts",
-        theme: "github-dark",
-        decorations: [
-          {
-            start: { line: 5, character: 10 },
-            end: { line: 5, character: 11 },
-            properties: { class: "squiggle" },
-          },
-        ],
-        transformers: [
-          {
-            line(node, line) {
-              if (line === 6) {
-                node.children.push({
-                  type: "element",
-                  tagName: "span",
-                  properties: { class: "tip" },
-                  children: [{ type: "text", value: checkError }],
-                });
-              }
-            },
-          },
-        ],
-      }),
+      check: await withError(check, "ts", 6, 10, 11, checkError),
+      view: await withError(view, "erb", 3, 20, 25, viewError),
     },
     blocks: await Promise.all(
       blocks.map(async ({ code, lang, ...rest }) => ({

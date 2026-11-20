@@ -46,6 +46,11 @@
     "solid-cable", "turbo", "stimulus", "vite-trails",
     "i18n", "thor",
   ];
+  const railsGems = new Set([
+    "activerecord", "activemodel", "actionpack", "actionview",
+    "actionmailer", "actionmailbox", "actiontext", "activejob",
+    "activestorage", "actioncable", "activesupport", "arel", "trailties",
+  ]);
 
 
   const cards = [
@@ -86,10 +91,13 @@
           <div class="pane"><div class="file">app/models/post.ts &middot; trails</div>{@html data.hero.trails}</div>
         </div>
       {:else if tab === "caught"}
-        <div class="pane"><div class="file">app/models/check.ts &middot; pnpm build</div>{@html data.hero.check}</div>
+        <div class="stack">
+          <div class="pane"><div class="file">app/models/check.ts &middot; pnpm build</div>{@html data.hero.check}</div>
+          <div class="pane"><div class="file">app/views/posts/show.html.tse &middot; pnpm build</div>{@html data.hero.view}</div>
+        </div>
       {:else}
         <div class="pane ai">
-          <img class="meme" src="{base}/claude-push-rails-to-typescript.jpg" width="343" height="604" alt="Patrick Star meme. Top panel: Claude: take Rails. Bottom panel: and push it to TypeScript. Make no mistakes." />
+          <img class="meme" src="{base}/push-rails-over-there.jpg" width="500" height="880" alt="Put It Somewhere Else Patrick meme. Top panel: What if we took Rails. Bottom panel: and pushed it over there." />
           <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, Anthropic's AI model, working from the vendored Rails source under human direction and review.</p>
         </div>
       {/if}
@@ -99,7 +107,7 @@
   <section class="company">
     <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
-    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the Rails API</small>{/if}</a></li>{/each}</ul>
+    <ul class="tiles">{#each tiles as t}<li><a href="{repo}/tree/main/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby"} API</small>{/if}</a></li>{/each}</ul>
     <p class="small"><strong>These are just a few of the packages.</strong> The gems Rails depends on are ported alongside them.</p>
   </section>
 
@@ -126,8 +134,8 @@
 
   <section class="band">
     <div class="card">
-      <h2>Optimized for seasoned Rails developers.</h2>
-      <p class="small"><strong>Bring the Rails you already know, and let agents write the types.</strong> Use the vocabulary you know to write Rails at the speed of agents. Deploy serverless to Lambda or Cloudflare. Use Active Record in a React Native app. Run the full stack in the browser. Dream big.</p>
+      <h2>Built for Rails developers, new and seasoned.</h2>
+      <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to Lambda or Cloudflare. Use Active Record in a React Native app. Run the full stack in the browser. Dream big.</p>
       <a class="cta" href="{base}/docs/guides/idioms">Blaze trails &rsaquo;</a>
     </div>
   </section>
@@ -213,6 +221,7 @@
   .tabs button { font: 600 15px var(--sans); color: #d9c6b0; background: none; border: 0; padding: 10px 18px; border-radius: 6px 6px 0 0; cursor: pointer; }
   .tabs button[aria-pressed="true"] { background: #3a2a1f; color: #fff; }
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2a1e16; }
+  .stack { display: grid; gap: 1px; background: #2a1e16; }
   .pane { background: #3a2a1f; min-height: 380px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
   .ai { display: flex; align-items: center; justify-content: center; gap: 48px; padding: 32px 40px; }
@@ -223,7 +232,9 @@
 
   .company { padding: 40px 24px 100px; }
   .tiles { display: grid; grid-template-columns: repeat(4, 220px); justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 48px 0; }
-  .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; text-decoration: none; }
+  .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; text-decoration: none; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+  .tiles a:hover, .tiles a:focus-visible { background: var(--orange); color: #fff; transform: translateY(-2px); box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); }
+  .tiles a:hover small, .tiles a:focus-visible small { color: rgb(255 255 255 / 0.85); }
   .tiles li:nth-last-child(2) { grid-column: 2; }
   .tiles small { font-size: 13px; font-weight: 500; color: #7a6450; }
 
