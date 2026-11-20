@@ -186,7 +186,7 @@ export async function load() {
       rails: await codeToHtml(railsPost, { lang: "ruby", theme: "github-dark" }),
       trails: await codeToHtml(trailsPost, { lang: "ts", theme: "github-dark" }),
       check: await withError(check, "ts", 6, 10, 11, checkError),
-      view: await withError(view, "erb", 3, 20, 25, viewError),
+      view: await withError(view, "erb", 3, 19, 24, viewError),
     },
     blocks: await Promise.all(
       blocks.map(async ({ code, lang, ...rest }) => ({
