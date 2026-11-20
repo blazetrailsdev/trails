@@ -33,11 +33,7 @@ export class Builder {
 
     const force = args.includes("--force");
     args = args.filter((arg) => arg !== "--force");
-    if (
-      force ||
-      lastBuild.isStale() ||
-      (await (await this.config()).manifestPaths()).length === 0
-    ) {
+    if (force || lastBuild.isStale() || (await this.config().manifestPaths()).length === 0) {
       const [stdout, stderr, status] = await this.buildWithVite(...args);
       await this.logBuildResult(stdout, stderr, status);
       await this.recordBuildMetadata(lastBuild, { errors: stderr, success: status.isSuccess() });
@@ -60,7 +56,7 @@ export class Builder {
   }
 
   /** @internal */
-  private config(): Promise<Config> {
+  private config(): Config {
     return this._viteAssets.config();
   }
 
@@ -76,13 +72,13 @@ export class Builder {
 
   /** @internal */
   private async recordBuildMetadata(build: Build, attrs: BuildAttrs): Promise<void> {
-    await FileUtils.mkpathAsync((await this.config()).buildCacheDir.toString());
+    await FileUtils.mkpathAsync(this.config().buildCacheDir.toString());
     await build.withResult(attrs).writeToCache();
   }
 
   /** @internal */
   private async lastBuildPath({ ssr }: { ssr: boolean }): Promise<Pathname> {
-    const config = await this.config();
+    const config = this.config();
     return config.buildCacheDir.join(`last${ssr ? "-ssr" : ""}-build-${config.mode}.json`);
   }
 
@@ -95,7 +91,7 @@ export class Builder {
       return this._lastDigest!;
     }
 
-    const config = await this.config();
+    const config = this.config();
     const root = File.expandPath(config.root.toString());
     const previousDigests = this._fileDigests;
     this._fileDigests = Object.create(null);
@@ -159,7 +155,7 @@ export class Builder {
     status: InstanceType<typeof Process.Status>,
   ): Promise<void> {
     if (status.isSuccess()) {
-      this.logger.info(`Build with Vite complete: ${(await this.config()).buildOutputDir()}`);
+      this.logger.info(`Build with Vite complete: ${this.config().buildOutputDir()}`);
       if (stderr !== "") this.logger.error(stderr);
     } else {
       this.logger.error(stderr);

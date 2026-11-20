@@ -46,6 +46,7 @@ describe("trails server in front of bin/vite dev", () => {
               root: root.toString(),
               mode: "development",
             });
+            await viteAssets.prewarmConfig();
             const app = () => [404, {}, ["not proxied"]];
             const proxy = new ViteAssets.DevServerProxy(app, { viteAssets, streaming: false });
             const [status, , body] = (await proxy.call(

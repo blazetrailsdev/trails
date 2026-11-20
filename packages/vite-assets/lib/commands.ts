@@ -39,7 +39,7 @@ export class Commands {
   }
 
   async clobber(): Promise<void> {
-    const config = await this.config();
+    const config = this.config();
     const dirs = [
       config.buildOutputDir(),
       config.ssrOutputDir,
@@ -57,7 +57,7 @@ export class Commands {
    * @inventedArm chmodAsync — PERMANENT
    */
   async installBinstubs(): Promise<void> {
-    const bin = (await this.config()).root.join("bin");
+    const bin = this.config().root.join("bin");
     const binstub = bin.join("vite").toString();
     await FileUtils.mkdirPAsync(bin.toString());
     await FileUtils.cpAsync(
@@ -77,7 +77,7 @@ export class Commands {
   }
 
   async verifyInstall(): Promise<void> {
-    const config = await this.config();
+    const config = this.config();
     if (!(await File.isExistAsync(config.root.join("bin/vite").toString()))) {
       warn(`
 vite binstub not found.
@@ -97,7 +97,7 @@ Make sure \`bundle exec vite install\` has run successfully before running depen
   }
 
   async printInfo(): Promise<void> {
-    const config = await this.config();
+    const config = this.config();
     await config.withinRoot(async () => {
       $stdout.puts(`bin/vite present?: ${await File.isExistAsync("bin/vite")}`);
 
@@ -139,7 +139,7 @@ Make sure \`bundle exec vite install\` has run successfully before running depen
   }
 
   /** @internal */
-  private config(): Promise<Config> {
+  private config(): Config {
     return this._viteAssets.config();
   }
 

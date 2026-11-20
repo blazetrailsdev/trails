@@ -6,6 +6,7 @@ DSL.namespace("vite", () => {
   DSL.task(
     "binstubs",
     block(async () => {
+      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().installBinstubs();
     }),
   );
@@ -14,6 +15,7 @@ DSL.namespace("vite", () => {
   DSL.task(
     { build: "vite:verify_install" },
     block(async () => {
+      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().buildFromTask();
     }),
   );
@@ -22,6 +24,7 @@ DSL.namespace("vite", () => {
   DSL.task(
     { build_ssr: "vite:verify_install" },
     block(async () => {
+      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().buildFromTask("--ssr");
     }),
   );
@@ -30,8 +33,9 @@ DSL.namespace("vite", () => {
   DSL.task(
     { build_all: "vite:verify_install" },
     block(async () => {
+      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().buildFromTask();
-      if ((await ViteAssets.config()).ssrBuildEnabled) {
+      if (ViteAssets.config().ssrBuildEnabled) {
         await ViteAssets.commands().buildFromTask("--ssr");
       }
     }),
@@ -41,6 +45,7 @@ DSL.namespace("vite", () => {
   DSL.task(
     { clobber: "vite:verify_install" },
     block(async () => {
+      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().clobber();
     }),
   );
@@ -49,6 +54,7 @@ DSL.namespace("vite", () => {
   DSL.task(
     "verify_install",
     block(async () => {
+      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().verifyInstall();
     }),
   );
@@ -57,12 +63,13 @@ DSL.namespace("vite", () => {
   DSL.task(
     "install_dependencies",
     block(async () => {
+      await ViteAssets.prewarmConfig();
       const installEnvArgs: Record<string, string> =
         ENV["VITE_RUBY_SKIP_INSTALL_DEV_DEPENDENCIES"] === "true"
           ? {}
           : { NODE_ENV: "development" };
 
-      const pkg = (await ViteAssets.config()).packageManager;
+      const pkg = ViteAssets.config().packageManager;
       let installCmd: string;
       switch (pkg) {
         case "npm":
@@ -80,6 +87,7 @@ DSL.namespace("vite", () => {
   DSL.task(
     "info",
     block(async () => {
+      await ViteAssets.prewarmConfig();
       await ViteAssets.commands().printInfo();
     }),
   );

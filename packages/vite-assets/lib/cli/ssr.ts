@@ -22,7 +22,7 @@ export class SSR extends Vite {
   }): Promise<never> {
     ViteAssets.env()["VITE_RUBY_MODE"] = mode;
 
-    const config = await ViteAssets.config();
+    const config = ViteAssets.config();
     let ssrEntrypoint: string | undefined;
     for (const ext of SSR.JS_EXTENSIONS) {
       const path = config.ssrOutputDir.join(`ssr.${ext}`).toString();

@@ -18,7 +18,7 @@ export class DevServerProxy extends Proxy {
   constructor(app: unknown = null, options: Record<string, unknown> = {}) {
     const viteAssets =
       (hashDelete(options, "viteAssets") as ViteAssets | null) ?? TopLevel.ViteAssets!.instance();
-    if (viteAssets.peekConfig().mode === "test" && !Object.hasOwn(options, "streaming"))
+    if (viteAssets.config().mode === "test" && !Object.hasOwn(options, "streaming"))
       options["streaming"] = false;
     super(app, options);
     this.viteAssets = viteAssets;
@@ -34,7 +34,7 @@ export class DevServerProxy extends Proxy {
   }
 
   /** @internal */
-  private config(): Promise<Config> {
+  private config(): Config {
     return this.viteAssets.config();
   }
 
@@ -67,7 +67,7 @@ export class DevServerProxy extends Proxy {
   /** @internal */
   private async forwardToViteDevServer(env: RackEnv): Promise<void> {
     this.rewriteUriForVite(env);
-    const config = await this.config();
+    const config = this.config();
     env["QUERY_STRING"] ??= "";
     env["rack.backend"] = kernelURI(config.origin());
     env["HTTP_HOST"] = env["HTTP_X_FORWARDED_HOST"] = config.host;
@@ -91,9 +91,7 @@ export class DevServerProxy extends Proxy {
   private async isFileInViteRoot(path: string): Promise<boolean> {
     return (
       path.includes(".") &&
-      (await (
-        await this.config()
-      )
+      (await this.config()
         .viteRootDir()
         .join(path.startsWith("/") ? path.slice(1) : path)
         .isFile())
@@ -103,8 +101,8 @@ export class DevServerProxy extends Proxy {
   /** @internal */
   private async viteUrlPrefix(): Promise<string> {
     return (this._viteUrlPrefix ??=
-      (await this.config()).publicOutputDir === ""
+      this.config().publicOutputDir === ""
         ? DevServerProxy.VITE_DEPENDENCY_PREFIX
-        : `/${(await this.config()).publicOutputDir}/`);
+        : `/${this.config().publicOutputDir}/`);
   }
 }

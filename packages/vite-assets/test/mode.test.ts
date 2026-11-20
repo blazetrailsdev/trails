@@ -8,8 +8,8 @@ describe("ModeTest", () => {
   });
 
   it("mode", async () => {
-    expect((await ViteAssets.config()).mode).toBe(railsEnvName());
-    expect(await ViteAssets.mode()).toBe((await ViteAssets.config()).mode);
+    expect(ViteAssets.config().mode).toBe(railsEnvName());
+    expect(ViteAssets.mode()).toBe(ViteAssets.config().mode);
   });
 
   it("mode with rails env", async () => {

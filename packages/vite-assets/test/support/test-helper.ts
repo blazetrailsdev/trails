@@ -18,7 +18,11 @@ export function pathToTestApp(): string {
 }
 
 export function refreshConfig(options: Record<string, unknown> = {}): Promise<Config> {
-  return ViteAssets.reloadWith({ root: pathToTestApp(), mode: railsEnv, ...options }).config();
+  return ViteAssets.reloadWith({
+    root: pathToTestApp(),
+    mode: railsEnv,
+    ...options,
+  }).prewarmConfig();
 }
 
 export async function withRailsEnv(env: string, block: (config: Config) => unknown): Promise<void> {
@@ -26,7 +30,7 @@ export async function withRailsEnv(env: string, block: (config: Config) => unkno
   try {
     railsEnv = env;
     await refreshConfig();
-    await block(await ViteAssets.config());
+    await block(ViteAssets.config());
   } finally {
     railsEnv = original;
     await refreshConfig();

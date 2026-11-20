@@ -66,6 +66,7 @@ export class Vite extends Command {
     block?: (args: string[]) => unknown,
   ): Promise<unknown> {
     ViteAssets.env()["VITE_RUBY_MODE"] = mode;
+    await ViteAssets.prewarmConfig();
     if (clobber) await ViteAssets.commands().clobber();
 
     const nodeOptionsArg = [

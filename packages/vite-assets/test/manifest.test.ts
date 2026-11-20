@@ -25,7 +25,7 @@ async function assertRaisesManifestMissingEntryError(
   block: () => Promise<unknown>,
   { autoBuild = false } = {},
 ): Promise<MissingEntrypointError> {
-  const config: Config = await ViteAssets.config();
+  const config: Config = ViteAssets.config();
   const spy = vi.spyOn(config, "autoBuild", "get").mockReturnValue(autoBuild);
   try {
     const error = await block().then(
@@ -84,7 +84,7 @@ describe("ManifestTest", () => {
     expect(await resolveEntryName("/app/assets/theme.css")).toBe("../assets/theme.css");
 
     await withDevServerRunning(async () => {
-      const root = (await ViteAssets.config()).root;
+      const root = ViteAssets.config().root;
       expect(await resolveEntryName("logo.svg")).toBe("entrypoints/logo.svg");
       expect(await resolveEntryName("images/logo.svg")).toBe("images/logo.svg");
       expect(await resolveEntryName("~/images/logo.svg")).toBe("images/logo.svg");
@@ -208,7 +208,7 @@ describe("ManifestTest", () => {
   it("lookup success with dev server running!", async () => {
     await refreshConfig({ mode: "development" });
     await withDevServerRunning(async () => {
-      const root = (await ViteAssets.config()).root;
+      const root = ViteAssets.config().root;
       const entry = { file: "/vite-dev/entrypoints/application.js" };
 
       expect(await lookupBang("application.js", { type: "javascript" })).toEqual(entry);
@@ -251,7 +251,7 @@ describe("ManifestTest", () => {
   it("lookup success with skip proxy and dev server running", async () => {
     await refreshConfig({ mode: "development", skipProxy: true });
     await withDevServerRunning(async () => {
-      const config = await ViteAssets.config();
+      const config = ViteAssets.config();
       const origin = config.origin();
       const root = config.root;
 
@@ -284,17 +284,13 @@ describe("ManifestTest", () => {
     expect(await viteClientSrc()).toBeNull();
 
     await withDevServerRunning(async () => {
-      expect(await viteClientSrc()).toBe(
-        `${(await ViteAssets.config()).origin()}/vite-dev/@vite/client`,
-      );
+      expect(await viteClientSrc()).toBe(`${ViteAssets.config().origin()}/vite-dev/@vite/client`);
     });
 
     await refreshConfig({ assetHost: "http://example.com", mode: "development", skipProxy: true });
 
     await withDevServerRunning(async () => {
-      expect(await viteClientSrc()).toBe(
-        `${(await ViteAssets.config()).origin()}/vite-dev/@vite/client`,
-      );
+      expect(await viteClientSrc()).toBe(`${ViteAssets.config().origin()}/vite-dev/@vite/client`);
     });
   });
 

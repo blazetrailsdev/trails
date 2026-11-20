@@ -17,7 +17,7 @@ async function assertRunCommand(argv: string[], { flags = [] as string[] } = {})
     string,
     ...string[],
   ];
-  expect(env).toEqual((await ViteAssets.config()).toEnv());
+  expect(env).toEqual(ViteAssets.config().toEnv());
   if (/node_modules\/.bin\/vite/.test(executable)) {
     expect(rest).toEqual([...argv, ...flags]);
   } else {

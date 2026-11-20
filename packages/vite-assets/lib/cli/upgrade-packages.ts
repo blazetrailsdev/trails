@@ -1,3 +1,4 @@
+import { ViteAssets } from "../vite-assets.js";
 import { Install } from "./install.js";
 
 export class UpgradePackages extends Install {
@@ -6,6 +7,7 @@ export class UpgradePackages extends Install {
   }
 
   override async call(): Promise<void> {
+    await ViteAssets.prewarmConfig();
     this.say("Upgrading npm packages");
     await this.installJsPackages(this.jsDependencies().join(" "));
   }

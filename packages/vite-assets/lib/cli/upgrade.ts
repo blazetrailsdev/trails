@@ -8,6 +8,7 @@ export class Upgrade extends Install {
   }
 
   override async call(): Promise<void> {
+    await ViteAssets.prewarmConfig();
     await this.upgradeRubyGems();
     this.upgradeNpmPackages();
   }
@@ -18,7 +19,7 @@ export class Upgrade extends Install {
 
     const libraries = (await ViteAssets.frameworkLibraries()).map(([, library]) => library.name);
 
-    const { packageManager } = await ViteAssets.config();
+    const { packageManager } = ViteAssets.config();
     let update: string;
     switch (packageManager) {
       case "npm":

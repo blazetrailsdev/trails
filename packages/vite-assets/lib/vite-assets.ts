@@ -92,8 +92,13 @@ export class ViteAssets {
     return (this._instance ??= new this());
   }
 
-  static config(): Promise<Config> {
+  static config(): Config {
     return this.instance().config();
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static prewarmConfig(): Promise<Config> {
+    return this.instance().prewarmConfig();
   }
 
   static configure(options: ConfigAttrs = {}): Promise<Config> {
@@ -120,8 +125,8 @@ export class ViteAssets {
     return this.instance().isRunProxy();
   }
 
-  static async mode(): Promise<string> {
-    return (await this.config()).mode;
+  static mode(): string {
+    return this.config().mode;
   }
 
   static bootstrap(): Promise<unknown> {
@@ -179,7 +184,7 @@ export class ViteAssets {
 
   async isDevServerRunning(): Promise<boolean> {
     if (!(await this.isDevMode())) return false;
-    const config = await this.config();
+    const config = this.config();
     if (config.devServerConnectionCheck) return this.isDevServerConnected();
 
     const meta = await this.devServerMeta();
@@ -202,7 +207,7 @@ export class ViteAssets {
 
   async isDevMode(): Promise<boolean> {
     try {
-      const config = await this.config();
+      const config = this.config();
       return config.mode === "development" || (config.mode === "test" && !ENV["CI"]);
     } catch (error) {
       this.logger.error(`Failed to check mode for Vite: ${(error as StandardError).message}`);
@@ -224,25 +229,19 @@ export class ViteAssets {
     return (this._commands ??= new Commands(this));
   }
 
-  async config(): Promise<Config> {
+  /** @missingRailsCall configure — PERMANENT */
+  config(): Config {
+    return this._config!;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async prewarmConfig(): Promise<Config> {
     if (this._config === undefined) {
       await this.configure();
       await this._config!.loadTsConfig();
     }
 
     return this._config!;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE vite-assets-config-resolves-synchronously
-   */
-  peekConfig(): Pick<Config, "mode"> {
-    return (
-      this._config ?? {
-        mode: String({ ...Config["configDefaults"](), ...this._configOptions }.mode),
-      }
-    );
   }
 
   async configure(options: ConfigAttrs = {}): Promise<Config> {
@@ -263,7 +262,7 @@ export class ViteAssets {
     }
 
     try {
-      const config = await this.config();
+      const config = this.config();
       const http = await getHttpAsync();
       const connection = await Timeout.timeout(config.devServerConnectTimeout, null, null, () =>
         http.connect!({ host: config.host, port: config.port }),
@@ -287,7 +286,7 @@ export class ViteAssets {
         return this._devServerMeta;
       }
 
-      const path = (await this.config()).devServerMetaPath();
+      const path = this.config().devServerMetaPath();
       return (this._devServerMeta = (await File.isExistAsync(path.toString()))
         ? JSON.parse(await path.read())
         : null);

@@ -7,13 +7,13 @@ const exposed = () =>
   ViteAssets.instance() as unknown as { devServerMeta(): Promise<Record<string, unknown>> };
 
 async function writeMetaFile(meta: Record<string, unknown>): Promise<void> {
-  const path = (await ViteAssets.config()).devServerMetaPath();
+  const path = ViteAssets.config().devServerMetaPath();
   await FileUtils.mkdirPAsync(File.dirname(path.toString()));
   await path.write(JSON.stringify(meta));
 }
 
 async function removeMetaFile(): Promise<void> {
-  const path = (await ViteAssets.config()).devServerMetaPath();
+  const path = ViteAssets.config().devServerMetaPath();
   if (await File.isExistAsync(path.toString())) await path.delete();
 }
 
@@ -52,7 +52,7 @@ describe("DevServerTest", () => {
       await writeMetaFile({
         url: "http://localhost:3535",
         host: "localhost",
-        port: (await ViteAssets.config()).port,
+        port: ViteAssets.config().port,
         https: false,
         pid: 1234,
       });
@@ -68,7 +68,7 @@ describe("DevServerTest", () => {
     try {
       await refreshConfig({ mode: "test" });
       await removeMetaFile();
-      const testPort = (await ViteAssets.config()).port;
+      const testPort = ViteAssets.config().port;
       await refreshConfig({ mode: "development", port: testPort });
       await writeMetaFile({ port: testPort });
 
@@ -78,7 +78,7 @@ describe("DevServerTest", () => {
         expect(await ViteAssets.instance().isDevServerRunning()).toBeFalsy();
       });
     } finally {
-      if ((await ViteAssets.config()).mode === "test") await removeMetaFile();
+      if (ViteAssets.config().mode === "test") await removeMetaFile();
       await refreshConfig({ mode: "development" });
       await removeMetaFile();
     }
@@ -87,7 +87,7 @@ describe("DevServerTest", () => {
   it("running with test meta file", async () => {
     await refreshConfig({ mode: "test" });
     try {
-      await writeMetaFile({ port: (await ViteAssets.config()).port });
+      await writeMetaFile({ port: ViteAssets.config().port });
 
       await withoutCi(async () => {
         expect(await ViteAssets.instance().isDevServerRunning()).toBeTruthy();
@@ -100,7 +100,7 @@ describe("DevServerTest", () => {
   it("not running when meta port does not match", async () => {
     await refreshConfig({ mode: "development" });
     try {
-      await writeMetaFile({ port: (await ViteAssets.config()).port + 1 });
+      await writeMetaFile({ port: ViteAssets.config().port + 1 });
 
       expect(await ViteAssets.instance().isDevServerRunning()).toBeFalsy();
     } finally {
@@ -111,7 +111,7 @@ describe("DevServerTest", () => {
   it("not running with invalid meta shape", async () => {
     await refreshConfig({ mode: "development" });
     try {
-      const path = (await ViteAssets.config()).devServerMetaPath();
+      const path = ViteAssets.config().devServerMetaPath();
       await FileUtils.mkdirPAsync(File.dirname(path.toString()));
       await path.write(JSON.stringify("not a metadata object"));
 

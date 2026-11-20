@@ -14,8 +14,8 @@ describe("UpgradeTest", () => {
 
     const configSpy = vi
       .spyOn(ViteAssets, "config")
-      .mockResolvedValue({ packageManager: "pnpm", root: new Pathname(Dir.pwd()) } as never);
-    const librariesSpy = vi.spyOn(ViteAssets, "frameworkLibraries").mockResolvedValue(libraries);
+      .mockReturnValue({ packageManager: "pnpm", root: new Pathname(Dir.pwd()) } as never);
+    const librariesSpy = vi.spyOn(ViteAssets, "frameworkLibraries").mockReturnValue(libraries);
     const captureSpy = vi.spyOn(IO, "capture").mockImplementation(async (...command) => {
       expect(command[0]).toEqual("pnpm update @blazetrails/vite-assets @blazetrails/vite-trails");
       return ["", "", status];
