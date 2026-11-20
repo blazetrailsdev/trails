@@ -256,7 +256,7 @@ export class Time {
     options: EncodeOptions | null = null,
   ): string {
     const digits =
-      Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
+      Encoding.timePrecision as Temporal.InstantToStringOptions["fractionalSecondDigits"];
 
     if (value instanceof RubyTime) {
       if (Encoding.useStandardJsonTimeFormat) return value.xmlschema(Encoding.timePrecision);
@@ -311,7 +311,7 @@ export class DateTime {
       }
     }
     const digits =
-      Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
+      Encoding.timePrecision as Temporal.InstantToStringOptions["fractionalSecondDigits"];
 
     if (Encoding.useStandardJsonTimeFormat) {
       return `${value.toString({ fractionalSecondDigits: digits })}+00:00`;

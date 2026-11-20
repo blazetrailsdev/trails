@@ -1,4 +1,5 @@
-export { Temporal } from "@js-temporal/polyfill";
+import Temporal = globalThis.Temporal;
+export { Temporal };
 import "./acts-like.js";
 export {
   ArgumentError,

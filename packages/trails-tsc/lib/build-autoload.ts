@@ -319,7 +319,7 @@ async function writeLoadFunction(trailsDir: string, root: string, file: string):
       'import { getPath as __getPath } from "@blazetrails/ruby-compat";',
       `const __importUrl = new URL(${JSON.stringify(original)}, import.meta.url).href;`,
       "const __importFilename = __getPath().fileURLToPath(__importUrl);",
-      'const __importMeta = { ...import.meta, url: __importUrl, filename: __importFilename, dirname: __importFilename.slice(0, __importFilename.lastIndexOf("/")) };',
+      `const __importMeta = { ...import.meta, url: __importUrl, filename: __importFilename, dirname: __importFilename.slice(0, __importFilename.lastIndexOf("/")), resolve: (specifier${typed ? ": string" : ""}) => (/^\\.{0,2}\\//.test(specifier) ? new URL(specifier, __importUrl).href : import.meta.resolve(specifier)) };`,
     );
   }
   const source = [

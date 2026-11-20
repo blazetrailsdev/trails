@@ -1,5 +1,3 @@
-import { Temporal } from "@js-temporal/polyfill";
-
 /** @noRailsEquivalent PERMANENT */
 export const TZDATA_VERSION = "2026e";
 

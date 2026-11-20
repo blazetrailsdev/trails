@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@js-temporal/polyfill";
 import {
   Date as RubyDate,
   DateTime as RubyDateTime,

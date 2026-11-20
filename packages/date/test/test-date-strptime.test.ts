@@ -1,6 +1,5 @@
 /* eslint-disable vitest/no-conditional-expect */
 
-import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect } from "vitest";
 import { Date, DateTime } from "../lib/date.js";
 import type { DateParts } from "../lib/date.js";

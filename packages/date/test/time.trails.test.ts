@@ -1,4 +1,3 @@
-import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Date as RbDate, DateTime } from "../lib/date.js";
 import { Time, Timezone, resetLocalTimeZoneId } from "../lib/time.js";
