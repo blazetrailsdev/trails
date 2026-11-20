@@ -169,7 +169,6 @@
     <ul>
       <li><a href={repo}>Source</a></li>
       <li><a href="{repo}/blob/main/LICENSES.md">License</a></li>
-      <li><a href="{repo}/security">Security</a></li>
     </ul>
     <p>trails is an independent TypeScript re-implementation of Ruby on Rails. Rails is a trademark of David Heinemeier Hansson; trails is not affiliated with or endorsed by the Rails project.</p>
   </footer>
