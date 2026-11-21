@@ -1,4 +1,4 @@
-import { NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjDup, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { include } from "@blazetrails/ruby-compat/include";
 import { Logger, type LogLevel } from "./logger.js";
 import { LoggerSilence } from "./logger-silence.js";
@@ -152,20 +152,12 @@ export class BroadcastLogger {
     this.dispatch((logger) => logger.append(s));
   }
 
-  dup(): this {
-    const copy = new (this.constructor as new () => this)();
-    copy.broadcasts = [];
-    copy.progname = this.progname;
-    copy._formatter = this.formatter;
+  initializeCopy(other: BroadcastLogger): void {
+    this.broadcasts = [];
+    this.progname = rbObjDup(other.progname);
+    this._formatter = rbObjDup(other.formatter);
 
-    copy.broadcastTo(
-      ...this.broadcasts.map(
-        (logger) =>
-          (logger as { dup?: () => Logger }).dup?.() ??
-          (Object.assign(Object.create(Object.getPrototypeOf(logger) as object), logger) as Logger),
-      ),
-    );
-    return copy;
+    this.broadcastTo(...other.broadcasts.map((logger) => rbObjDup(logger)));
   }
 
   private dispatch(block: (logger: Logger | BroadcastLogger) => void): boolean {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Logger } from "../lib/logger.js";
 import { BroadcastLogger } from "../lib/broadcast-logger.js";
-import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { rbInspect as inspect, rbObjDup } from "@blazetrails/ruby-compat";
 import {
   assertChanges,
   assertEmpty,
@@ -469,7 +469,7 @@ describe("BroadcastLoggerTest", () => {
     logger.level = Logger.WARN;
     const broadcastLogger = new BroadcastLogger(asLogger(logger));
 
-    const duplicate = (broadcastLogger as any).dup() as BroadcastLogger;
+    const duplicate = rbObjDup(broadcastLogger);
 
     expect(duplicate.broadcasts[0].level).toBe(Logger.WARN);
     assertNotSame(logger, duplicate.broadcasts[0]);

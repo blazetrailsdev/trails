@@ -102,7 +102,9 @@ describe("TimeWithZoneTest", () => {
 
   it("time", () => {
     const twz = maketwz();
-    expect(twz.time.toZonedDateTime().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 19, 0, 0));
+    expect((twz.time as RubyTime).toZonedDateTime().epochMilliseconds).toBe(
+      Date.UTC(1999, 11, 31, 19, 0, 0),
+    );
   });
 
   it("time zone", () => {

@@ -120,7 +120,9 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`), inherited by `OrderedHash < ::Hash`.
+   * Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`), inherited by `OrderedHash < ::Hash`.
+   *
+   * @noRailsEquivalent PERMANENT
    */
   eachValue(): MapIterator<V>;
   eachValue(block: (value: V) => void): this;
@@ -132,7 +134,9 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`), inherited by `OrderedHash < ::Hash`.
+   * Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`), inherited by `OrderedHash < ::Hash`.
+   *
+   * @noRailsEquivalent PERMANENT
    */
   eachKey(): MapIterator<K>;
   eachKey(block: (key: K) => void): this;
@@ -144,7 +148,9 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`), inherited by `OrderedHash < ::Hash`.
+   * Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`), inherited by `OrderedHash < ::Hash`.
+   *
+   * @noRailsEquivalent PERMANENT
    */
   eachPair(): MapIterator<[K, V]>;
   eachPair(block: (key: K, value: V) => void): this;
@@ -156,7 +162,9 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each`, defined as `rb_hash_each_pair` (`vendor/ruby/v3.3.11/hash.c:7219`).
+   * Ruby core `Hash#each`, defined as `rb_hash_each_pair` (`vendor/ruby/v3.3.11/hash.c:7219`).
+   *
+   * @noRailsEquivalent PERMANENT
    */
   each(): MapIterator<[K, V]>;
   each(block: (key: K, value: V) => void): this;
