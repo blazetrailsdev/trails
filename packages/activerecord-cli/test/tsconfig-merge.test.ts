@@ -162,6 +162,35 @@ describe("mergeTsconfig types", () => {
   });
 });
 
+describe("mergeTsconfig lib", () => {
+  const libOf = (compilerOptions: Record<string, unknown>) => {
+    const result = mergeTsconfig(JSON.stringify({ compilerOptions }));
+    return {
+      lib: (JSON.parse(result.content) as { compilerOptions: { lib: unknown } }).compilerOptions
+        .lib,
+      added: result.added,
+    };
+  };
+
+  it("adds lib with ESNext.Temporal when lib is absent", () => {
+    const { lib, added } = libOf({});
+    expect(lib).toEqual(["ES2022", "ESNext.Temporal"]);
+    expect(added).toContain("lib");
+  });
+
+  it("appends ESNext.Temporal to a lib array without it", () => {
+    const { lib, added } = libOf({ lib: ["ES2023", "DOM"] });
+    expect(lib).toEqual(["ES2023", "DOM", "ESNext.Temporal"]);
+    expect(added).toContain("lib");
+  });
+
+  it("leaves a lib array that already lists esnext.temporal alone", () => {
+    const { lib, added } = libOf({ lib: ["esnext", "esnext.temporal"] });
+    expect(lib).toEqual(["esnext", "esnext.temporal"]);
+    expect(added).not.toContain("lib");
+  });
+});
+
 describe("FRESH_TSCONFIG", () => {
   it("is valid JSON containing all AR-required options", () => {
     const cfg = JSON.parse(FRESH_TSCONFIG) as {
@@ -238,6 +267,7 @@ describe("ar init tsconfig integration", () => {
         {
           compilerOptions: {
             target: "ES2022",
+            lib: ["ES2022", "ESNext.Temporal"],
             module: "Node16",
             moduleResolution: "Node16",
             strict: true,
