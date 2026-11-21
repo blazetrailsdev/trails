@@ -88,6 +88,5 @@ if (adapterType === "postgres") {
     });
 } else {
   const { SQLite3Adapter } = await import("../../lib/connection-adapters/sqlite3-adapter.js");
-  newRawTestAdapter = () =>
-    new SQLite3Adapter(_primaryConfiguration as SQLite3Config) as unknown as DatabaseAdapter;
+  newRawTestAdapter = () => new SQLite3Adapter(_primaryConfiguration);
 }
