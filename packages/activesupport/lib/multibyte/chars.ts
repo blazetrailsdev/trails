@@ -37,6 +37,7 @@ export class Chars {
     return this.wrappedString;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   toStr(): string {
     return this.wrappedString;
   }
