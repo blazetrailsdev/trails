@@ -12,6 +12,8 @@ export function engineDatabase(
   const db = {
     quirkModeDisabled: false,
     handler: null as BusyHandler | null,
+    errcode: () => null,
+    errmsg: (e: unknown) => String(e),
     isClosed: () => !raw.open,
     isDiscarded: () => false,
     close: () => void raw.close(),

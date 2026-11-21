@@ -37,6 +37,8 @@ function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
   const engineDb: EngineDatabase = {
     isClosed: () => false,
     isDiscarded: () => false,
+    errcode: () => null,
+    errmsg: (e) => String(e),
     prepare: () => [engine, ""],
     execBatch: () => [],
     changes: () => 0,

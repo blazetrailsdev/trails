@@ -1,6 +1,7 @@
 import { rbModName } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
 import "./constants.js";
+import type { EngineErrors } from "./database.js";
 
 export class Exception extends Error {
   code: number | null = null;
@@ -187,55 +188,44 @@ export function status2klass(status: number): typeof Exception | null {
   }
 }
 
-const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
-
-/** @noRailsEquivalent CONVERGEABLE sqlite3-better-sqlite3-engine */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-node-sqlite-engine */
 function nativeStatus(error: unknown): number | null {
-  const { errcode, rawCode, code, message } = (error ?? {}) as Record<string, unknown>;
+  const { errcode, rawCode } = (error ?? {}) as Record<string, unknown>;
   if (typeof errcode === "number") return errcode & 0xff;
   if (typeof rawCode === "number") return rawCode & 0xff;
-  if (typeof code === "string" && code.startsWith("SQLITE_")) {
-    return ErrorCode[code.split("_")[1] as keyof typeof ErrorCode] ?? null;
-  }
-  if (code === "ERR_INTERNAL_SQLITE_ERROR") {
-    const errorCode = /Error code (\d+|[^]): /.exec(String(message))?.[1];
-    if (errorCode == null) return null;
-    return (/^\d+$/.test(errorCode) ? Number(errorCode) : errorCode.charCodeAt(0)) & 0xff;
-  }
-  if (error instanceof TypeError && message === MISSING_DIRECTORY) return ErrorCode.CANTOPEN;
   return null;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-better-sqlite3-engine */
-function sqlite3Errmsg(error: unknown): string {
-  const { code, message } = error as { code?: unknown; message: string };
-  if (code === "ERR_INTERNAL_SQLITE_ERROR") {
-    return message.replace(/^[^]*?Error code (?:\d+|[^]): /, "");
-  }
-  if (error instanceof TypeError && message === MISSING_DIRECTORY) {
-    return "unable to open database file";
-  }
-  return message;
-}
+/** @noRailsEquivalent CONVERGEABLE sqlite3-node-sqlite-engine */
+const nativeErrors: EngineErrors = {
+  errcode: nativeStatus,
+  errmsg: (error) => (error as { message: string }).message,
+};
 
-export function rbSqlite3Raise(error: unknown): never {
-  const status = nativeStatus(error);
+export function rbSqlite3Raise(error: unknown, db: EngineErrors = nativeErrors): never {
+  const errcode = db.errcode(error);
+  const status = errcode == null ? null : errcode & 0xff;
   const klass = status == null ? null : status2klass(status);
   if (klass == null) throw error;
 
-  const exception = new klass(sqlite3Errmsg(error));
+  const exception = new klass(db.errmsg(error));
   exception.code = status;
   exception.cause = error;
 
   throw exception;
 }
 
-export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null): never {
-  const status = nativeStatus(error);
+export function rbSqlite3RaiseWithSql(
+  error: unknown,
+  sql: string | null,
+  db: EngineErrors = nativeErrors,
+): never {
+  const errcode = db.errcode(error);
+  const status = errcode == null ? null : errcode & 0xff;
   const klass = status == null ? null : status2klass(status);
   if (klass == null) throw error;
 
-  const exception = new klass(sqlite3Errmsg(error));
+  const exception = new klass(db.errmsg(error));
   exception.code = status;
   exception.cause = error;
   if (sql != null) {

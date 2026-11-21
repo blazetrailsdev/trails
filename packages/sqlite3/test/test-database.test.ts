@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SQLite3 } from "../lib/index.js";
-import { engine } from "./support/engine-database.js";
+import { engine } from "../lib/engine/better-sqlite3.js";
 
 describe("TestDatabase", () => {
   let db: InstanceType<typeof SQLite3.Database>;

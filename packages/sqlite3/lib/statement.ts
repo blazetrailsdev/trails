@@ -1,6 +1,6 @@
 import { ArgumentError, Enumerable, Hash, include, rbBlockGivenP } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
-import { Exception } from "./errors.js";
+import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 import type { SqliteBindValue } from "./driver.js";
 import type { Database } from "./database.js";
 import type { ResultSet } from "./resultset.js";
@@ -125,13 +125,31 @@ export class Statement {
 
   bindParam(key: string | number, value: SqliteBindValue): void | Promise<void> {
     this.mustBeOpenBang();
-    return this.#st.bindParam(key, value);
+    const engine = this.#connection._engine;
+    let r: void | Promise<void>;
+    try {
+      r = this.#st.bindParam(key, value);
+    } catch (e) {
+      rbSqlite3Raise(e, engine);
+    }
+    return r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, engine)) : r;
   }
 
   resetBang(): this | Promise<this> {
     this.mustBeOpenBang();
-    const r = this.#st.resetBang();
-    return r instanceof Promise ? r.then(() => this) : this;
+    const engine = this.#connection._engine;
+    let r: void | Promise<void>;
+    try {
+      r = this.#st.resetBang();
+    } catch (e) {
+      rbSqlite3Raise(e, engine);
+    }
+    return r instanceof Promise
+      ? r.then(
+          () => this,
+          (e: unknown) => rbSqlite3Raise(e, engine),
+        )
+      : this;
   }
 
   step(): unknown[] | null | Promise<unknown[] | null> {
@@ -139,7 +157,14 @@ export class Statement {
       throw new Exception("cannot use a statement associated with a discarded database");
     }
     this.mustBeOpenBang();
-    return this.#st.step();
+    const engine = this.#connection._engine;
+    let r: unknown[] | null | Promise<unknown[] | null>;
+    try {
+      r = this.#st.step();
+    } catch (e) {
+      rbSqlite3Raise(e, engine);
+    }
+    return r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, engine)) : r;
   }
 
   isDone(): boolean {
@@ -164,7 +189,12 @@ export class Statement {
 
   /** @internal */
   private prepare(db: Database, sql: string): string {
-    const [st, remainder] = db._engine.prepare(sql);
+    let st: EngineStatement, remainder: string;
+    try {
+      [st, remainder] = db._engine.prepare(sql);
+    } catch (e) {
+      rbSqlite3RaiseWithSql(e, sql, db._engine);
+    }
     this.#st = st;
     return remainder;
   }
