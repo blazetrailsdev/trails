@@ -179,19 +179,25 @@ class ArityTesterModule {
 constSet(constGet(Object, "ModuleTest") as object, "ArityTesterModule", ArityTesterModule);
 
 class DecoratedReserved {
-  constructor(public case_: any) {}
+  "@case": any;
+  constructor(kase: any) {
+    this["@case"] = kase;
+  }
 
   get case() {
-    return this.case_;
+    return this["@case"];
   }
 }
 delegateMissingTo.call(DecoratedReserved, "case");
 
 class DecoratedMissingAllowNil {
-  constructor(public case_: any) {}
+  "@case": any;
+  constructor(kase: any) {
+    this["@case"] = kase;
+  }
 
   get case() {
-    return this.case_;
+    return this["@case"];
   }
 
   callName() {
@@ -206,10 +212,17 @@ class Maze {
 }
 
 class Cavern {
-  constructor(public maze: Maze) {}
+  "@maze": Maze;
+  constructor(maze: Maze) {
+    this["@maze"] = maze;
+  }
+
+  get maze() {
+    return this["@maze"];
+  }
 
   get target() {
-    return (this.maze.passages = "twisty");
+    return (this["@maze"].passages = "twisty");
   }
 }
 delegateMissingTo.call(Cavern, "target");
