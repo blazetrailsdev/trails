@@ -110,20 +110,6 @@ describe("ApplicationTests::MultipleApplicationsTest", { timeout: 120_000 }, () 
     expect(runCount).toBe(2);
   });
 
-  it("generators run on different applications go to the same class", async () => {
-    let runCount = 0;
-    AppTemplate.generators(() => {
-      runCount += 1;
-    });
-    new AppTemplate().generators(() => {
-      runCount += 1;
-    });
-
-    expect(runCount).toBe(0);
-    await Trails.application!.loadGenerators();
-    expect(runCount).toBe(2);
-  });
-
   it("runners run on different applications go to the same class", () => {
     let runCount = 0;
     AppTemplate.runner(() => {

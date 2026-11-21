@@ -281,7 +281,6 @@ export class Engine extends Trailtie {
   }
 
   async loadGenerators(app: Engine = this): Promise<this> {
-    await import("./generators.js");
     this.runGeneratorsBlocks(app);
     TopLevel.Trails!.Generators!.configureBang(app.config.generators());
     return this;
