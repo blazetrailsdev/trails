@@ -1,11 +1,5 @@
 import type { RackResponse } from "@blazetrails/rack";
-import {
-  publicInstanceMethods,
-  rbFSend,
-  constSet,
-  StringIO,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { publicInstanceMethods, rbFSend, StringIO } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import {
   BroadcastLogger,
@@ -44,7 +38,6 @@ import {
   SSL,
   Static,
   Session,
-  ActionDispatch,
   ActionController,
 } from "@blazetrails/actionpack";
 import { Engine } from "../lib/engine.js";
@@ -611,24 +604,6 @@ describe("Application::Configuration", () => {
     expect(c.sessionStore()).toBeNull();
   });
 
-  it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
-    class MyCustomStore extends Session.CookieStore {}
-    constSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
-    try {
-      const c = new Configuration("/app");
-      c.sessionStore(":my_custom_store");
-      expect(c.sessionStore()).toBe(MyCustomStore);
-    } finally {
-      rbModRemoveConst(ActionDispatch.Session, "MyCustomStore");
-    }
-  });
-
-  it("config.session_store with unknown store raises helpful error", () => {
-    const c = new Configuration("/app");
-    c.sessionStore(":nonexistent_store");
-    expect(() => c.sessionStore()).toThrow(/Unable to resolve session store :nonexistent_store/);
-  });
-
   it("config.debug_exception_response_format is :api by default if only_api is enabled", () => {
     const c = new Configuration("/app");
     expect(c.debugExceptionResponseFormat).toBe("default");
@@ -715,48 +690,6 @@ describe("Application::Configuration", () => {
     expect(() => c.loadDefaults("4.2")).toThrow('Unknown version "4.2"');
   });
 
-  it("config.autoload_lib adds lib to the expected paths (array ignore)", () => {
-    class AutoloadLibApp extends Application {}
-    Trails.application = AutoloadLibApp.instance();
-    onTestFinished(() => {
-      Trails.application = null;
-    });
-    const c = new Configuration("/app");
-    c.setRoot("/app");
-    c.autoloadLib({ ignore: ["tasks", "generators"] });
-
-    expect(c.autoloadPaths).toContain("/app/lib");
-    expect(c.eagerLoadPaths).toContain("/app/lib");
-  });
-
-  it("config.autoload_lib adds lib to the expected paths (empty array ignore)", () => {
-    class AutoloadLibApp extends Application {}
-    Trails.application = AutoloadLibApp.instance();
-    onTestFinished(() => {
-      Trails.application = null;
-    });
-    const c = new Configuration("/app");
-    c.setRoot("/app");
-    c.autoloadLib({ ignore: [] });
-
-    expect(c.autoloadPaths).toContain("/app/lib");
-    expect(c.eagerLoadPaths).toContain("/app/lib");
-  });
-
-  it("config.autoload_lib adds lib to the expected paths (scalar ignore)", () => {
-    class AutoloadLibApp extends Application {}
-    Trails.application = AutoloadLibApp.instance();
-    onTestFinished(() => {
-      Trails.application = null;
-    });
-    const c = new Configuration("/app");
-    c.setRoot("/app");
-    c.autoloadLib({ ignore: "tasks" });
-
-    expect(c.autoloadPaths).toContain("/app/lib");
-    expect(c.eagerLoadPaths).toContain("/app/lib");
-  });
-
   it("config.autoload_lib_once adds lib to the once paths and ignores through the once loader", () => {
     class AutoloadLibOnceApp extends Application {}
     const app = AutoloadLibOnceApp.instance();
@@ -773,33 +706,6 @@ describe("Application::Configuration", () => {
     expect(app.autoloaders.once.ignoredGlobPatterns.has("/app/lib/tasks")).toBe(true);
   });
 
-  it("setting priority for engines with config.railties_order", () => {
-    class BukkitsEngine extends Engine {}
-    class BlogEngine extends Engine {}
-    class OrderApp extends Application {}
-    const app = OrderApp.instance();
-    app.config.railtiesOrder = [BukkitsEngine, BlogEngine, ":all", ":main_app"];
-
-    expect(app.orderedRailties()).toEqual([
-      BukkitsEngine.instance(),
-      BlogEngine.instance(),
-      expect.any(Array),
-      app,
-    ]);
-  });
-
-  it("railties_order adds :all with lowest priority if not given", () => {
-    class Bukkits2Engine extends Engine {}
-    class OrderApp2 extends Application {}
-    const app = OrderApp2.instance();
-    app.config.railtiesOrder = [Bukkits2Engine];
-
-    const order = app.orderedRailties();
-    expect(order[0]).toBe(Bukkits2Engine.instance());
-    expect(order[order.length - 1]).toEqual(expect.any(Array));
-    expect(order.flat()).toContain(app);
-  });
-
   it("railtiesInitializers walks ordered_railties in reverse", () => {
     class RiApp extends Application {}
     const app = RiApp.instance();
@@ -812,15 +718,6 @@ describe("Application::Configuration", () => {
   it("paths() appends the application-only 'public' entry on top of EngineConfiguration", () => {
     const c = new Configuration("/app");
     expect(c.paths().get("public")).toBeDefined();
-  });
-
-  it("config.enable_reloading is !config.cache_classes", () => {
-    const c = new Configuration("/app");
-    c.cacheClasses = true;
-    expect(c.enableReloading).toBe(false);
-    c.enableReloading = true;
-    expect(c.cacheClasses).toBe(false);
-    expect(c.isReloadingEnabled()).toBe(true);
   });
 });
 

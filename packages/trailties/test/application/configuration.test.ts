@@ -1,4 +1,16 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+} from "vitest";
+import { constSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { ActionDispatch, Session } from "@blazetrails/actionpack";
+import { Configuration } from "../../lib/application/configuration.js";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -50,6 +62,77 @@ async function app(trailsEnv: string): Promise<Application> {
   await application.root();
   return application;
 }
+
+describe("Application::Configuration", () => {
+  it("config.enable_reloading is !config.cache_classes", () => {
+    const c = new Configuration("/app");
+    c.cacheClasses = true;
+    expect(c.enableReloading).toBe(false);
+    c.enableReloading = true;
+    expect(c.cacheClasses).toBe(false);
+    expect(c.isReloadingEnabled()).toBe(true);
+  });
+
+  it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
+    class MyCustomStore extends Session.CookieStore {}
+    constSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
+    try {
+      const c = new Configuration("/app");
+      c.sessionStore(":my_custom_store");
+      expect(c.sessionStore()).toBe(MyCustomStore);
+    } finally {
+      rbModRemoveConst(ActionDispatch.Session, "MyCustomStore");
+    }
+  });
+
+  it("config.session_store with unknown store raises helpful error", () => {
+    const c = new Configuration("/app");
+    c.sessionStore(":nonexistent_store");
+    expect(() => c.sessionStore()).toThrow(/Unable to resolve session store :nonexistent_store/);
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (array ignore)", () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
+    c.setRoot("/app");
+    c.autoloadLib({ ignore: ["tasks", "generators"] });
+
+    expect(c.autoloadPaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (empty array ignore)", () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
+    c.setRoot("/app");
+    c.autoloadLib({ ignore: [] });
+
+    expect(c.autoloadPaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (scalar ignore)", () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
+    c.setRoot("/app");
+    c.autoloadLib({ ignore: "tasks" });
+
+    expect(c.autoloadPaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+});
 
 describe("ConfigurationTest", () => {
   useInMemoryDatabaseUrl();

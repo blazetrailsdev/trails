@@ -13,6 +13,7 @@ import { constGet, Dir, File, getFs, include, TopLevel } from "@blazetrails/ruby
 import type { Bukkit, Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { Engine } from "../../lib/engine.js";
+import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 import { env, rbFSend, setEnv } from "@blazetrails/ruby-compat";
 import { MockRequest } from "@blazetrails/rack";
@@ -388,5 +389,32 @@ describe("RailtiesTest::EngineTest", () => {
 
     expect(wrapped).toEqual(["wrap"]);
     expect(loaded).toEqual(["wrapped-seeds"]);
+  });
+
+  it("setting priority for engines with config.railties_order", () => {
+    class BukkitsEngine extends Engine {}
+    class BlogEngine extends Engine {}
+    class OrderApp extends Application {}
+    const app = OrderApp.instance();
+    app.config.railtiesOrder = [BukkitsEngine, BlogEngine, ":all", ":main_app"];
+
+    expect(app.orderedRailties()).toEqual([
+      BukkitsEngine.instance(),
+      BlogEngine.instance(),
+      expect.any(Array),
+      app,
+    ]);
+  });
+
+  it("railties_order adds :all with lowest priority if not given", () => {
+    class Bukkits2Engine extends Engine {}
+    class OrderApp2 extends Application {}
+    const app = OrderApp2.instance();
+    app.config.railtiesOrder = [Bukkits2Engine];
+
+    const order = app.orderedRailties();
+    expect(order[0]).toBe(Bukkits2Engine.instance());
+    expect(order[order.length - 1]).toEqual(expect.any(Array));
+    expect(order.flat()).toContain(app);
   });
 });
