@@ -1,6 +1,6 @@
 import { File, Dir } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Application } from "../../lib/application.js";
 import "../../lib/test-unit/trailtie.js";
 import { copyRoutes } from "./generators-test-helper.js";
@@ -37,5 +37,27 @@ describe("ControllerGeneratorKebabViewsTest", () => {
     await t.assertFile("config/routes.ts", (routes) => {
       expect(routes).toMatch(/this\.get\("posts\/recentPosts"\)/);
     });
+  });
+
+  it("reports a test framework hook that does not resolve", async () => {
+    const output = await t.runGenerator(["Account", "--test-framework=nope"]);
+    expect(output).toMatch(/^ +error {2}nope \[not found\]$/m);
+    t.assertNoFile("test/controllers/account-controller.test.ts");
+  });
+
+  it("runs the test framework config.generators names when the generator loads", async () => {
+    vi.resetModules();
+    const { capture } = await import("@blazetrails/activesupport/testing/stream");
+    const { Generators } = await import("../../lib/generators.js");
+    Generators.options().trails.testFramework = "nope";
+    const { ControllerGenerator } =
+      await import("../../lib/generators/trails/controller/controller-generator.js");
+    const output = await capture("stdout", () =>
+      ControllerGenerator.start(["Account", "--skip-routes"], {
+        destinationRoot: t.destinationRoot,
+      }),
+    );
+    expect(output).toMatch(/^ +error {2}nope \[not found\]$/m);
+    t.assertNoFile("test/controllers/account-controller.test.ts");
   });
 });
