@@ -77,7 +77,7 @@ export class DefaultMiddlewareStack {
 
     if (config.publicFileServer.enabled) {
       const headers = config.publicFileServer.headers ?? {};
-      stack.use(Static, this.paths.get("public")?.toAry()[0], {
+      stack.use(Static, this.paths.get("public")!.first(), {
         index: config.publicFileServer.indexName,
         headers,
       });
