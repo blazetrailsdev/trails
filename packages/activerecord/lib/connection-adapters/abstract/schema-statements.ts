@@ -1332,7 +1332,7 @@ export class SchemaStatements {
     name = `idx_on_${wrap(column).join("_")}`;
 
     const shortLimit = this.maxIndexNameSize() - new TextEncoder().encode(hashedIdentifier).length;
-    const shortName = mbChars(name).limit(shortLimit).toS();
+    const shortName = mbChars(name).limit(shortLimit).toString();
 
     return `${shortName}${hashedIdentifier}`;
   }

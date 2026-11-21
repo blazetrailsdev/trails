@@ -11,7 +11,7 @@ describe("Chars method_missing in the prototype chain", () => {
     }
     const chars = new Sub("héllo");
     expect(chars.tag()).toBe("sub");
-    expect((chars as unknown as { upcase(): Chars }).upcase().toS()).toBe("HÉLLO");
+    expect((chars as unknown as { upcase(): Chars }).upcase().toString()).toBe("HÉLLO");
     expect(chars instanceof Sub).toBe(true);
     expect(Object.getPrototypeOf(chars)).toBe(Sub.prototype);
   });

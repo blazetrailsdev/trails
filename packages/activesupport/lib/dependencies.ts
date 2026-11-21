@@ -2,15 +2,15 @@ import type { AnyClass } from "./descendants-tracker.js";
 import { Interlock } from "./dependencies/interlock.js";
 
 export const Dependencies = {
-  interlock: new Interlock(),
+  interlock: undefined as unknown as Interlock,
 
-  autoloadPaths: [] as string[],
+  autoloadPaths: undefined as unknown as string[],
 
-  autoloadOncePaths: [] as string[],
+  autoloadOncePaths: undefined as unknown as string[],
 
-  _eagerLoadPaths: new Set<string>(),
+  _eagerLoadPaths: undefined as unknown as Set<string>,
 
-  _autoloadedTrackedClasses: new Set<AnyClass>(),
+  _autoloadedTrackedClasses: undefined as unknown as Set<AnyClass>,
 
   autoloader: null as { reload(): Promise<void>; eagerLoad(): Promise<void> } | null,
 
@@ -39,3 +39,9 @@ export const Dependencies = {
     return this._eagerLoadPaths.has(path);
   },
 };
+
+Dependencies.interlock = new Interlock();
+Dependencies.autoloadPaths = [];
+Dependencies.autoloadOncePaths = [];
+Dependencies._eagerLoadPaths = new Set();
+Dependencies._autoloadedTrackedClasses = new Set();
