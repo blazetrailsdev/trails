@@ -144,7 +144,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     config: SQLite3ConnectionParameters,
   ): Promise<SqliteConnection> {
     try {
-      return await this.resolveDriverFactory(config).open({
+      return await (
+        await this.resolveDriverFactory(config)
+      ).open({
         ...config,
         database: String(config.database),
         readOnly: config.readonly ?? false,
@@ -1229,12 +1231,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /** @internal */
-  protected static defaultSqliteDriver(): SqliteDriver | undefined {
-    return undefined;
-  }
-
-  /** @internal */
-  private static resolveDriverFactory(config: SQLite3Config): SqliteDriver {
+  private static async resolveDriverFactory(config: SQLite3Config): Promise<SqliteDriver> {
     const driverOpt = config.driver;
     if (driverOpt != null) {
       if (typeof driverOpt.name !== "string" || typeof driverOpt.open !== "function") {
@@ -1245,14 +1242,24 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       }
       return driverOpt;
     }
-    const def = this.defaultSqliteDriver();
-    if (!def) {
-      throw new LoadError(
-        "No SQLite driver configured. Use a concrete adapter subclass " +
-          "(e.g. BetterSQLite3Adapter) or pass a `driver` in the adapter config.",
-      );
+    switch (config.adapter ?? "sqlite3") {
+      case "sqlite3":
+        return (await import("@blazetrails/sqlite3/better-sqlite3")).betterSqlite3Driver;
+      case "node-sqlite":
+        return (await import("@blazetrails/sqlite3/node-sqlite")).nodeSqliteDriver;
+      case "expo-sqlite":
+        return (await import("@blazetrails/sqlite3/expo-sqlite")).expoSqliteDriver;
+      case "libsql":
+        return (await import("@blazetrails/sqlite3/libsql")).libsqlDriver;
+      case "libsql-remote":
+        return (await import("@blazetrails/sqlite3/libsql")).libsqlRemoteDriver;
+      case "libsql-replica":
+        return (await import("@blazetrails/sqlite3/libsql")).libsqlReplicaDriver;
+      default:
+        throw new LoadError(
+          `No SQLite driver is registered for the '${config.adapter}' adapter. Pass a \`driver\` in the adapter config.`,
+        );
     }
-    return def;
   }
 
   static override get TYPE_MAP(): TypeMap {

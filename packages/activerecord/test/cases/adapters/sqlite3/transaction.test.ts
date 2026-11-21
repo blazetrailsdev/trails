@@ -21,7 +21,7 @@ async function withConnection(
   block: (conn: SQLite3Adapter) => Promise<void>,
 ): Promise<void> {
   const database = inMemoryDb() ? ":memory:" : (ambientPoolConfiguration().database as string);
-  const conn = new NodeSQLiteAdapter({ ...options, database });
+  const conn = new NodeSQLiteAdapter({ adapter: "node-sqlite", ...options, database });
   try {
     await conn.connectBang();
     await block(conn);

@@ -111,6 +111,7 @@ export interface TrailsAdapterOptions {
 }
 
 export interface SQLite3Config extends TrailsAdapterOptions {
+  adapter?: string;
   database?: string;
   readonly?: boolean;
   flags?: number;

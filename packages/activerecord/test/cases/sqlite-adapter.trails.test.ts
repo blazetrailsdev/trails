@@ -52,12 +52,6 @@ describe("SQLite adapter driver binding", () => {
     await adapter.disconnectBang();
   });
 
-  it("the abstract base has no bundled driver and cannot open directly", async () => {
-    await expect(new SQLite3Adapter({ database: ":memory:" }).connectBang()).rejects.toThrow(
-      /No SQLite driver configured/,
-    );
-  });
-
   it("accepts an explicit SqliteDriver via config.driver", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: betterSqlite3Driver });
     expect(adapter).toBeInstanceOf(SQLite3Adapter);
@@ -628,7 +622,6 @@ describe("SQLite3Adapter connection parameters", () => {
     const conn = await BetterSQLite3Adapter.newClient(params);
     expect(conn.isOpen()).toBe(true);
     await conn.close();
-    await expect(SQLite3Adapter.newClient(params)).rejects.toThrow(/No SQLite driver configured/);
   });
 
   it("does not expand or mkdir a libsql remote URL as a local path", () => {
