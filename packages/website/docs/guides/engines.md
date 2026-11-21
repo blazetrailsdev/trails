@@ -156,12 +156,21 @@ from the engine's `db/migrate/` into the host's by hand and run
 
 An engine often needs a host model, such as the author of an article. Rather
 than naming a host class, the engine reads the class name from a setting on
-its namespace object, which the host fills in:
+its top-level namespace, exported from `lib/blorgh.ts`:
 
 ```ts
-import { Base } from "@blazetrails/activerecord";
+// lib/blorgh.ts
+export const Blorgh = { name: "Blorgh", authorClass: "User" };
+```
 
-const Blorgh = { name: "Blorgh", authorClass: "User" };
+The model imports the namespace and reads the setting:
+
+<!-- typecheck:skip -->
+
+```ts
+// app/models/blorgh/article.ts
+import { Base } from "@blazetrails/activerecord";
+import { Blorgh } from "../../../lib/blorgh.js";
 
 export class Article extends Base {
   static {
@@ -170,9 +179,17 @@ export class Article extends Base {
 }
 ```
 
-The setting is read when `Article` is defined, so the host sets
-`Blorgh.authorClass` in an initializer, which runs before the autoloader loads
-the engine's models.
+The setting is read when `Article` is defined, so the host sets it in an
+initializer, which runs before the autoloader loads the engine's models:
+
+<!-- typecheck:skip -->
+
+```ts
+// config/initializers/blorgh.ts
+import { Blorgh } from "blorgh";
+
+Blorgh.authorClass = "Person";
+```
 
 ### Configuring an Engine
 
