@@ -128,7 +128,7 @@ def assertion_method?(name)
   return false unless name
   name == "expect" || name == "expects" || name == "expect_any_instance_of" ||
     name.match?(/\A(assert|refute)(_|\z)/) ||
-    name.match?(/\A(must|wont)_/)
+    (name.match?(/\A(must|wont)_/) && !name.end_with?("?"))
 end
 
 # Depth cap for recursive helper expansion (see count_assertions). The twin of
