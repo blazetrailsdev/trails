@@ -1,7 +1,13 @@
 import { wrap } from "../core-ext/array/wrap.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import { Notifications } from "../notifications.js";
-import { ArgumentError, classModule, rbObjRespondTo, stderr } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  StandardError,
+  classModule,
+  rbObjRespondTo,
+  stderr,
+} from "@blazetrails/ruby-compat";
 import { ActiveSupport, TopLevel } from "../namespaces.js";
 import type { Reporting } from "./reporting.js";
 
@@ -13,12 +19,7 @@ export type DeprecationBehaviorCallable = (
   deprecator: Reporting,
 ) => void;
 
-export class DeprecationException extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "DeprecationException";
-  }
-}
+export class DeprecationException extends StandardError {}
 
 export const DEFAULT_BEHAVIORS: Readonly<Record<DeprecationBehavior, DeprecationBehaviorCallable>> =
   {
