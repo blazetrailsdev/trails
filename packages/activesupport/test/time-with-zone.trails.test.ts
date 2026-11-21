@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { TimeWithZone } from "../lib/time-with-zone.js";
 import { TimeZone } from "../lib/values/time-zone.js";
 import { Timezone } from "@blazetrails/tzinfo";
-import { Temporal, Time } from "@blazetrails/date";
+import { DateTime, Temporal, Time } from "@blazetrails/date";
 import { DATE_FORMATS } from "../lib/core-ext/time/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { rbEqual, rbObjClass, rbObjClassname } from "@blazetrails/ruby-compat";
@@ -116,7 +116,7 @@ describe("TimeWithZone method_missing", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
 
   class AllDayTime extends TimeWithZone {
-    override get time(): Time {
+    override get time(): Time | DateTime {
       const t = super.time;
       const allDay = () =>
         new Range(t.change({ hour: 0 }), t.change({ hour: 23, min: 59, sec: 59 }), true);

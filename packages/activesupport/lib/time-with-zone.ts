@@ -38,7 +38,13 @@ import {
   type ChangeOptions as TimeChangeOptions,
 } from "./core-ext/time/calculations.js";
 import { advance as timeAdvance } from "./time-ext.js";
-import { since as datetimeSince, subsec } from "./core-ext/date-time/calculations.js";
+import {
+  change as datetimeChange,
+  since as datetimeSince,
+  subsec,
+  utc as datetimeUtc,
+  utcOffset as datetimeUtcOffset,
+} from "./core-ext/date-time/calculations.js";
 import { deprecator } from "./deprecator.js";
 import { ActiveSupport } from "./namespaces.js";
 import { inTimeZone, type DateOrTime } from "./core-ext/date-and-time/zones.js";
@@ -182,6 +188,8 @@ export class TimeWithZone {
     }
   }
 
+  private _incorporateUtcOffset(time: Time, offset: number): Time;
+  private _incorporateUtcOffset(time: TimeLike, offset: number): TimeLike;
   private _incorporateUtcOffset(time: TimeLike, offset: number): TimeLike {
     if (time instanceof DateTime) {
       return time.plus(rational(offset, SECONDS_PER_DAY));
@@ -196,7 +204,7 @@ export class TimeWithZone {
     }
     for (;;) {
       try {
-        return period ?? this._timeZone.periodForLocal(this._time as Time);
+        return period ?? this._timeZone.periodForLocal(this._time);
       } catch (e) {
         if (!(e instanceof PeriodNotFound)) throw e;
         this._time = this._incorporateUtcOffset(this._time, 3600);
@@ -246,8 +254,8 @@ export class TimeWithZone {
     return this._timeZone;
   }
 
-  get time(): Time {
-    return (this._time ??= this._incorporateUtcOffset(this._utc!, this.utcOffset)) as Time;
+  get time(): Time | DateTime {
+    return (this._time ??= this._incorporateUtcOffset(this._utc!, this.utcOffset));
   }
 
   get zone(): string {
@@ -292,7 +300,7 @@ export class TimeWithZone {
     millisecond: number;
     nsec: number;
   } {
-    const t = this.time;
+    const t = this._transferTimeValuesToUtcConstructor(this.time);
     return {
       year: t.year,
       month: t.mon,
@@ -406,7 +414,18 @@ export class TimeWithZone {
     }
   }
 
-  toA(): [number, number, number, number, number, number, number, number, boolean, string] {
+  toA(): [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number | bigint,
+    number,
+    number,
+    boolean,
+    string,
+  ] {
     const time = this.time;
     return [
       time.sec,
@@ -601,17 +620,23 @@ export class TimeWithZone {
       );
     }
 
-    const newTime = timeChange.call(this.time, options);
+    const time = this.time;
+    const newTime =
+      time instanceof DateTime ? datetimeChange(time, options) : timeChange.call(time, options);
 
     let newZone: TimeZone | Timezone | null | false = null;
     if (options.zone != null && options.zone !== false) {
       newZone = findZone(options.zone);
     } else if (options.offset != null) {
-      newZone = findZone(newTime.utcOffset);
+      newZone = findZone(
+        newTime instanceof DateTime ? datetimeUtcOffset(newTime) : newTime.utcOffset,
+      );
     }
 
     newZone ||= this.timeZone;
-    const periods = newZone.periodsForLocal(newTime);
+    const periods = newZone.periodsForLocal(
+      newTime instanceof DateTime ? this._transferTimeValuesToUtcConstructor(newTime) : newTime,
+    );
     const period = this.period;
     const included = periods.some(
       (p) =>
@@ -831,14 +856,19 @@ export class TimeWithZone {
     return Object.freeze(this);
   }
 
-  marshalDump(): [Time, string, Time] {
+  marshalDump(): [Time, string, Time | DateTime] {
     return [this.utc(), this.timeZone.name, this.time];
   }
 
-  marshalLoad(variables: [Time, string, Time]): void {
+  marshalLoad(variables: [Time, string, Time | DateTime]): void {
+    const time = variables[2];
     Object.assign(
       this,
-      new TimeWithZone(variables[0].utc(), findZone(variables[1]) as TimeZone, variables[2].utc()),
+      new TimeWithZone(
+        variables[0].utc(),
+        findZone(variables[1]) as TimeZone,
+        time instanceof DateTime ? datetimeUtc(time) : time.utc(),
+      ),
     );
   }
 
