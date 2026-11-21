@@ -162,22 +162,27 @@ type FormBuilderHost = {
   objectifyOptions(options: Options): Options;
 };
 
-function richTextarea(
-  this: unknown,
-  objectName: unknown,
-  method: unknown,
-  options: Options = {},
-): Promise<unknown> {
-  return new (Tags as unknown as { ActionText: typeof ActionText }).ActionText(
-    objectName,
-    method,
-    this,
-    options,
-  ).render();
+export class FormHelper {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+
+  richTextarea(objectName: unknown, method: unknown, options: Options = {}): Promise<unknown> {
+    return new (Tags as unknown as { ActionText: typeof ActionText }).ActionText(
+      objectName,
+      method,
+      this,
+      options,
+    ).render();
+  }
+
+  declare richTextArea: FormHelper["richTextarea"];
 }
 
-export const FormHelper = { richTextarea, richTextArea: richTextarea };
-const formHelperMembers: Record<string, unknown> = { ...FormHelper };
+FormHelper.prototype.richTextArea = FormHelper.prototype.richTextarea;
+const formHelperMembers: Record<string, unknown> = {
+  richTextarea: FormHelper.prototype.richTextarea,
+  richTextArea: FormHelper.prototype.richTextArea,
+};
 for (const ref of ActionViewFormHelper._includers) {
   const proto = ref.deref() as Record<string, unknown> | undefined;
   if (!proto) {
@@ -192,14 +197,20 @@ for (const ref of ActionViewFormHelper._includers) {
 Object.assign(ActionViewFormHelper.prototype, formHelperMembers);
 rbClearMethodCache();
 
-function builderRichTextarea(
-  this: FormBuilderHost,
-  method: unknown,
-  options: Options = {},
-): Promise<unknown> {
-  return this._template.richTextarea(this.objectName, method, this.objectifyOptions(options));
+class FormBuilder {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+
+  richTextarea(this: FormBuilderHost, method: unknown, options: Options = {}): Promise<unknown> {
+    return this._template.richTextarea(this.objectName, method, this.objectifyOptions(options));
+  }
+
+  declare richTextArea: FormBuilder["richTextarea"];
 }
 
-export const FormBuilder = { richTextarea: builderRichTextarea, richTextArea: builderRichTextarea };
-Object.assign(ActionViewFormBuilder.prototype, FormBuilder);
+FormBuilder.prototype.richTextArea = FormBuilder.prototype.richTextarea;
+Object.assign(ActionViewFormBuilder.prototype, {
+  richTextarea: FormBuilder.prototype.richTextarea,
+  richTextArea: FormBuilder.prototype.richTextArea,
+});
 rbClearMethodCache();

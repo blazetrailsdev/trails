@@ -362,6 +362,30 @@ export async function walkedClassPaths(
   return entries;
 }
 
+/**
+ * The classes and modules a workspace dependency of `dir` defines: one this
+ * package's Ruby reopens (`class FormBuilder` in actiontext's
+ * `tag_helper.rb:92`) is seated by the package that defines it, not here.
+ */
+async function dependencyDefinitions(dir: string, ruby: Manifest): Promise<Set<string>> {
+  const manifest = JSON.parse(
+    await fs.readFile(path.join(ROOT_DIR, "packages", dir, "package.json"), "utf8"),
+  ) as { dependencies?: Record<string, string> };
+  const deps = new Set(
+    Object.keys(manifest.dependencies ?? {})
+      .filter((name) => name.startsWith("@blazetrails/"))
+      .map((name) => name.slice("@blazetrails/".length)),
+  );
+  const out = new Set<string>();
+  for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
+    if (!deps.has(PACKAGE_DIR_OVERRIDES[pkg] ?? pkg)) continue;
+    for (const kind of ["classes", "modules"] as const) {
+      for (const fqn of Object.keys(rubyPkg[kind] ?? {})) out.add(fqn);
+    }
+  }
+  return out;
+}
+
 export async function collectClassPaths(only?: string): Promise<Map<string, ClassPathEntry[]>> {
   const ruby = await readJson<Manifest>("rails-api.json");
   const ts = await readJson<Manifest>("ts-api.json");
@@ -375,6 +399,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const dir = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
     const srcRoot = path.join(ROOT_DIR, "packages", dir, "lib");
     const subDir = path.relative(srcRoot, packageSrcDir(pkg));
+    const reopenedFrom = await dependencyDefinitions(dir, ruby);
 
     const paired = new Map<string, ClassPathEntry>();
     const modules = new Set<string>();
@@ -391,6 +416,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       }
       for (const [fqn, info] of Object.entries(rubyPkg[kind] ?? {})) {
         if (!info.file || isRubyOnlyClass(fqn) || isSourceUnported(info.file, pkg)) continue;
+        if (reopenedFrom.has(fqn)) continue;
         const short = fqn.split("::").at(-1)!;
         const tsFile = rubyFileToTs(info.file, pkg);
         const rubyPath = renameTokens(fqn);
