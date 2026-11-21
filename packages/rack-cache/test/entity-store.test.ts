@@ -79,7 +79,7 @@ export function rackCacheEntityStoreImplementation(store: () => Heap): void {
     );
     const [key] = await store().write([pony]);
     expect(key).toBe("d0f30d8659b4d268c5c64385d9790024c2d78deb");
-    const data = (await store().open(key))![0];
+    const data = (await store().read(key))!;
     expect(data.length).toBe(pony.length);
     expect(data).toEqual(pony);
   });

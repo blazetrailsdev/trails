@@ -51,9 +51,19 @@ export class Heap extends EntityStore {
     return body && [...body];
   }
 
-  async read(key: string): Promise<string | null> {
+  async read(key: string): Promise<Part | null> {
     const body = Object.hasOwn(this._hash, key) ? this._hash[key] : null;
-    return body && body.join("");
+    if (body == null) return body;
+    if (!body.some((part) => part instanceof Uint8Array)) return body.join("");
+    const encoder = new TextEncoder();
+    const bytes = body.map((part) => (part instanceof Uint8Array ? part : encoder.encode(part)));
+    const buf = new Uint8Array(bytes.reduce((n, b) => n + b.length, 0));
+    let offset = 0;
+    for (const b of bytes) {
+      buf.set(b, offset);
+      offset += b.length;
+    }
+    return buf;
   }
 
   async write(body: Body, _ttl: number | null = null): Promise<[string, number]> {

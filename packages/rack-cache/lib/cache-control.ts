@@ -33,18 +33,14 @@ export class CacheControl extends Hash<string, string | boolean> {
     return null;
   }
 
-  sMaxage(): number | bigint | null {
-    return this.sharedMaxAge();
-  }
+  declare sMaxage: () => number | bigint | null;
 
   reverseMaxAge(): number | bigint | null {
     if (this.has("r-maxage")) return toI(this.get("r-maxage"));
     return null;
   }
 
-  rMaxage(): number | bigint | null {
-    return this.reverseMaxAge();
-  }
+  declare rMaxage: () => number | bigint | null;
 
   isMustRevalidate(): string | boolean | undefined {
     return this.get("must-revalidate");
@@ -78,3 +74,6 @@ export class CacheControl extends Hash<string, string | boolean> {
     return this;
   }
 }
+
+CacheControl.prototype.sMaxage = CacheControl.prototype.sharedMaxAge;
+CacheControl.prototype.rMaxage = CacheControl.prototype.reverseMaxAge;
