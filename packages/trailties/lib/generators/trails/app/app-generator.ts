@@ -279,7 +279,6 @@ export class AppBuilder {
     await this.keepFile("app/models/concerns");
   }
 
-  /** @inventedArm template — PERMANENT */
   async bin(): Promise<void> {
     const excludePattern = rbRegSUnion(
       [
