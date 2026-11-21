@@ -13,7 +13,6 @@ vi.mock("../../lib/command/actions.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../lib/command/actions.js")>()),
   requireApplicationBang: async () => {},
 }));
-vi.mock("@blazetrails/trails-tsc", () => ({ watchViews: async () => ({ close() {} }) }));
 const output = vi.hoisted(() => [] as string[]);
 
 const { ServerCommand } = await import("../../lib/commands/server.js");

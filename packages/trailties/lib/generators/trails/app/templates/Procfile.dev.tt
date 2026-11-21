@@ -1,0 +1,2 @@
+web: bin/trails server
+views: <%= this.packageManager %> exec trails-tsc-views dev --views app/views
