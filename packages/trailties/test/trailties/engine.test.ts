@@ -286,7 +286,7 @@ export class Post extends Base {}
 
 const fixtureRoot = new URL("../fixtures/initializer-engine", import.meta.url).pathname;
 
-describe("RailtiesTest::EngineTest", () => {
+describe("EngineTest", () => {
   let previousEnv: string | undefined;
 
   beforeEach(() => {

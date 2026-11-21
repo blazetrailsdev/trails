@@ -72,7 +72,7 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
 
 await lookupBang();
 
-describe("MultiDbsTest", { timeout: 30_000 }, () => {
+describe("RakeMultiDbsTest", { timeout: 30_000 }, () => {
   let tmpDir: string;
   let originalCwd: string;
   let logs: string[];

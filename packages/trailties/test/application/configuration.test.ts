@@ -63,7 +63,7 @@ async function app(trailsEnv: string): Promise<Application> {
   return application;
 }
 
-describe("Application::Configuration", () => {
+describe("ConfigurationTest", () => {
   it("config.enable_reloading is !config.cache_classes", () => {
     const c = new Configuration("/app");
     c.cacheClasses = true;

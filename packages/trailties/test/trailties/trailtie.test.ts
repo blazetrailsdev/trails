@@ -4,7 +4,7 @@ import { Trailtie, resetTrailtieRegistry } from "../../lib/trailtie.js";
 import { Configuration } from "../../lib/trailtie/configuration.js";
 import { sealAgainstInheritance } from "../../lib/trailtie/configurable.js";
 
-describe("Trailtie", () => {
+describe("RailtieTest", () => {
   let restoreRegistry: () => void;
 
   beforeEach(() => {

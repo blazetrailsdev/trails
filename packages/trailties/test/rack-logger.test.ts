@@ -30,7 +30,7 @@ const closeBody = (body: RackBody): void => {
   (body as unknown as { close: () => void }).close();
 };
 
-describe("Rack::Logger", () => {
+describe("LoggerTest", () => {
   it("notification", async () => {
     const events: Event[] = [];
     await Notifications.subscribed(

@@ -28,7 +28,7 @@ const blogApp = (): {
   credentials,
 });
 
-describe("the reloader drives the main autoloader", () => {
+describe("LoadingTest", () => {
   it("reload constants on development", async () => {
     const script = decodeURIComponent(
       new URL("../fixtures/reload-app/serve-edited-controller.mjs", import.meta.url).pathname,
@@ -45,7 +45,7 @@ describe("the reloader drives the main autoloader", () => {
   }, 60_000);
 });
 
-describe("ActiveRecord::Railtie active_record.add_watchable_files", () => {
+describe("LoadingTest", () => {
   useInMemoryDatabaseUrl();
 
   it("added files (like db/schema.rb) also trigger reloading", async () => {
