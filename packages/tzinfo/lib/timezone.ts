@@ -54,6 +54,7 @@ function toDate(at: Date | Temporal.Instant | Time): Date {
   return new Date(at.epochMilliseconds);
 }
 
+/** @noRailsEquivalent CONVERGEABLE tzinfo-timezone-reads-the-data-source */
 function toTime(time: Date | Temporal.Instant | Time): Time {
   if (time instanceof Time) return time;
   return Time.at(new Rational(toDate(time).getTime(), 1000)).getutc();
