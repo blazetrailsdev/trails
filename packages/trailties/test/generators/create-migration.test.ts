@@ -4,11 +4,11 @@ import { Basic } from "@blazetrails/thor/shell/basic";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ClassMethods } from "../../../lib/generators/migration.js";
+import { ClassMethods } from "../../lib/generators/migration.js";
 import {
   CreateMigration,
   type MigrationRenderer,
-} from "../../../lib/generators/actions/create-migration.js";
+} from "../../lib/generators/actions/create-migration.js";
 
 const DEFAULT = "db/migrate/create_articles.rb";
 
@@ -51,7 +51,7 @@ function makeMigration(
   return new CreateMigration(host, numbered, data, config);
 }
 
-describe("CreateMigration", () => {
+describe("CreateMigrationTest", () => {
   let s: Store;
   beforeEach(() => {
     s = install();
@@ -73,26 +73,26 @@ describe("CreateMigration", () => {
     return m;
   };
 
-  it("test_invoke", async () => {
+  it("invoke", async () => {
     const m = makeMigration(s);
     await m.invokeBang();
     expect(s.log.join("\n")).toMatch(/create {2}db\/migrate\/1_create_articles\.rb/);
     expect(fs.existsSync(m.destination)).toBe(true);
   });
 
-  it("test_invoke_pretended", async () => {
+  it("invoke pretended", async () => {
     const m = makeMigration(s, DEFAULT, {}, { pretend: true });
     await m.invokeBang();
     expect(s.log.join("\n")).toMatch(/create {2}db\/migrate\/1_create_articles\.rb/);
     expect(fs.existsSync(m.destination)).toBe(false);
   });
 
-  it("test_invoke_when_exists", async () => {
+  it("invoke when exists", async () => {
     const existing = await migrationExists();
     expect(makeMigration(s).existingMigration()).toBe(existing.destination);
   });
 
-  it("test_invoke_when_exists_identical", async () => {
+  it("invoke when exists identical", async () => {
     await migrationExists();
     const m = makeMigration(s);
     await m.invokeBang();
@@ -100,19 +100,19 @@ describe("CreateMigration", () => {
     expect(await m.isIdentical()).toBe(true);
   });
 
-  it("test_invoke_return_existing_file_when_exists_identical", async () => {
+  it("invoke return existing file when exists identical", async () => {
     const existing = await migrationExists();
     expect(await makeMigration(s).invokeBang()).toBe(existing.relativeExistingMigration());
   });
 
-  it("test_invoke_when_exists_not_identical", async () => {
+  it("invoke when exists not identical", async () => {
     await migrationExists();
     await expect(makeMigration(s, DEFAULT, {}, {}, "different").invokeBang()).rejects.toThrow(
       /Another migration is already named/,
     );
   });
 
-  it("test_invoke_forced_when_exists_not_identical", async () => {
+  it("invoke forced when exists not identical", async () => {
     const dest = "db/migrate/migration.rb";
     const existing = await migrationExists(dest);
     const m = makeMigration(s, dest, { force: true }, {}, "different");
@@ -124,7 +124,7 @@ describe("CreateMigration", () => {
     expect(fs.existsSync(existing.destination)).toBe(false);
   });
 
-  it("test_invoke_forced_pretended_when_exists_not_identical", async () => {
+  it("invoke forced pretended when exists not identical", async () => {
     await migrationExists();
     const m = makeMigration(s, DEFAULT, { force: true }, { pretend: true }, "different");
     await m.invokeBang();
@@ -134,7 +134,7 @@ describe("CreateMigration", () => {
     expect(fs.existsSync(m.destination)).toBe(false);
   });
 
-  it("test_invoke_skipped_when_exists_not_identical", async () => {
+  it("invoke skipped when exists not identical", async () => {
     await migrationExists();
     const m = makeMigration(s, DEFAULT, { skip: true }, {}, "different");
     await m.invokeBang();
@@ -142,21 +142,21 @@ describe("CreateMigration", () => {
     expect(fs.existsSync(m.destination)).toBe(false);
   });
 
-  it("test_revoke", async () => {
+  it("revoke", async () => {
     const existing = await migrationExists();
     await makeMigration(s).revokeBang();
     expect(s.log.join("\n")).toMatch(/remove {2}db\/migrate\/1_create_articles\.rb/);
     expect(fs.existsSync(existing.destination)).toBe(false);
   });
 
-  it("test_revoke_pretended", async () => {
+  it("revoke pretended", async () => {
     const existing = await migrationExists();
     await makeMigration(s, DEFAULT, {}, { pretend: true }).revokeBang();
     expect(s.log.join("\n")).toMatch(/remove {2}db\/migrate\/1_create_articles\.rb/);
     expect(fs.existsSync(existing.destination)).toBe(true);
   });
 
-  it("test_revoke_when_no_exists", async () => {
+  it("revoke when no exists", async () => {
     await makeMigration(s).revokeBang();
     expect(s.log.join("\n")).toMatch(/remove {2}db\/migrate\/1_create_articles\.rb/);
   });
