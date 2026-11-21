@@ -14,6 +14,10 @@ import type { Bukkit, Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { Engine } from "../../lib/engine.js";
 import { Trails } from "../../lib/trails.js";
+import { env, rbFSend, setEnv } from "@blazetrails/ruby-compat";
+import { MockRequest } from "@blazetrails/rack";
+import { MiddlewareStackProxy } from "../../lib/configuration.js";
+import { loaded } from "../fixtures/loaded.js";
 
 describe("EngineTest", () => {
   it("adds its fixtures path to fixture_paths", async () => {
@@ -277,4 +281,112 @@ export class Post extends Base {}
       expect(Bukkits.tableNamePrefix).toBe("ar_prefix_bukkits_");
     },
   );
+});
+
+const fixtureRoot = new URL("../fixtures/initializer-engine", import.meta.url).pathname;
+
+describe("RailtiesTest::EngineTest", () => {
+  let previousEnv: string | undefined;
+
+  beforeEach(() => {
+    previousEnv = env.TRAILS_ENV;
+    setEnv("TRAILS_ENV", "test");
+    loaded.length = 0;
+  });
+  afterEach(() => {
+    setEnv("TRAILS_ENV", previousEnv);
+  });
+
+  it("it provides routes as default endpoint", () => {
+    class DefaultEndpointEngine extends Engine {}
+    Engine.register(DefaultEndpointEngine, fixtureRoot);
+    const engine = DefaultEndpointEngine.instance();
+    expect(engine.endpoint()).toBe(engine.routes());
+  });
+
+  it("engine is a rack app and can have its own middleware stack", async () => {
+    class Upcaser {
+      constructor(private app: (env: never) => Promise<[number, object, string[]]>) {}
+      async call(env: never): Promise<[number, object, string[]]> {
+        const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+        response[2] = response[2].map((part: string) => part.toUpperCase());
+        return response;
+      }
+    }
+
+    class StackEngine extends Engine {}
+    Engine.register(StackEngine, fixtureRoot);
+    StackEngine.endpoint((async () => [200, {}, ["Hello World"]]) as never);
+    (StackEngine.config.middleware as MiddlewareStackProxy).use(Upcaser);
+
+    const response = await StackEngine.instance().call(MockRequest.envFor("/bukkits"));
+    expect(response[2]).toEqual(["HELLO WORLD"]);
+  });
+
+  it("initializers", async () => {
+    class InitializersEngine extends Engine {}
+    Engine.register(InitializersEngine, fixtureRoot);
+    const engine = InitializersEngine.instance();
+
+    await engine.initializers.find((i) => i.name === "load_config_initializers")!.run();
+
+    expect(loaded).toEqual(["a-foo", "b-bar"]);
+  });
+
+  it("initializers are executed after application configuration initializers", () => {
+    class OrderingEngine extends Engine {}
+    Engine.register(OrderingEngine, fixtureRoot);
+    OrderingEngine.initializer("dummy_initializer", () => {});
+    const names = OrderingEngine.instance()
+      .initializers.tsort()
+      .map((i) => i.name);
+
+    expect(names.lastIndexOf("load_config_initializers")).toBeLessThan(
+      names.indexOf("dummy_initializer"),
+    );
+  });
+
+  it("loading seed data", async () => {
+    class SeedEngine extends Engine {}
+    Engine.register(SeedEngine, fixtureRoot);
+    const engine = SeedEngine.instance();
+
+    await engine.loadSeed();
+
+    expect(loaded).toEqual(["seeds"]);
+  });
+
+  it("skips nonexistent seed data", async () => {
+    class NoSeedEngine extends Engine {}
+    Engine.register(NoSeedEngine, fixtureRoot);
+    const engine = NoSeedEngine.instance();
+    engine.config.setRoot("/nonexistent-engine-root");
+
+    await expect(engine.loadSeed()).resolves.toBeUndefined();
+    expect(loaded).toEqual([]);
+  });
+
+  it("loading seed data is wrapped by the executor", async () => {
+    class WrappedSeedEngine extends Engine {}
+    Engine.register(
+      WrappedSeedEngine,
+      new URL("../fixtures/seed-engine", import.meta.url).pathname,
+    );
+    const engine = WrappedSeedEngine.instance();
+    const wrapped: string[] = [];
+    const app = {
+      reloader: {
+        wrap(block: () => void | Promise<void>): void | Promise<void> {
+          wrapped.push("wrap");
+          return block();
+        },
+      },
+    };
+
+    engine.initializers.find((i) => i.name === "wrap_reloader_around_load_seed")!.run(app);
+    await engine.loadSeed();
+
+    expect(wrapped).toEqual(["wrap"]);
+    expect(loaded).toEqual(["wrapped-seeds"]);
+  });
 });

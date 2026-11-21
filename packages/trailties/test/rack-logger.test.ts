@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Logger } from "../../lib/rack/logger.js";
-import type { Tagger } from "../../lib/rack/logger.js";
+import { Logger } from "../lib/rack/logger.js";
+import type { Tagger } from "../lib/rack/logger.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent as Event } from "@blazetrails/activesupport";
 import type { RackApp, RackBody, RackResponse } from "@blazetrails/rack";

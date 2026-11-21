@@ -2,8 +2,8 @@ import { Dir, File } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { beforeEach, describe, expect, it } from "vitest";
-import { BenchmarkGenerator } from "../../../../lib/generators/trails/benchmark/benchmark-generator.js";
-import { TestCase } from "../../../../lib/generators/test-case.js";
+import { BenchmarkGenerator } from "../../lib/generators/trails/benchmark/benchmark-generator.js";
+import { TestCase } from "../../lib/generators/test-case.js";
 
 class BenchmarkGeneratorTest extends TestCase {}
 BenchmarkGeneratorTest.destination(Dir.mktmpdir());

@@ -2,15 +2,15 @@ import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Dir, File, type Hash } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
-import { TestCase } from "../../../../../../lib/generators/test-case.js";
+import { TestCase } from "../../lib/generators/test-case.js";
 import {
   assertComposeFile,
   assertDevcontainerJsonFile,
   copyDevcontainerFiles,
   copyDockerfile,
   copyMinimalDevcontainerComposeFile,
-} from "../../../../generators-test-helper.js";
-import { ChangeGenerator } from "../../../../../../lib/generators/trails/db/system/change/change-generator.js";
+} from "./generators-test-helper.js";
+import { ChangeGenerator } from "../../lib/generators/trails/db/system/change/change-generator.js";
 
 class ChangeGeneratorTest extends TestCase {}
 ChangeGeneratorTest.destination(File.join(Dir.mktmpdir(), "tmp"));

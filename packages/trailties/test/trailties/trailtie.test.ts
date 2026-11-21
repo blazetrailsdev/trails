@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
-import { Trailtie, resetTrailtieRegistry } from "../lib/trailtie.js";
-import { Configuration } from "../lib/trailtie/configuration.js";
-import { sealAgainstInheritance } from "../lib/trailtie/configurable.js";
+import { Trailtie, resetTrailtieRegistry } from "../../lib/trailtie.js";
+import { Configuration } from "../../lib/trailtie/configuration.js";
+import { sealAgainstInheritance } from "../../lib/trailtie/configurable.js";
 
 describe("Trailtie", () => {
   let restoreRegistry: () => void;

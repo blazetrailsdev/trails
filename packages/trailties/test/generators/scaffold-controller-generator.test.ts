@@ -11,11 +11,11 @@ import {
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { beforeAll, beforeEach, describe, it } from "vitest";
-import { ActiveModel } from "../../../../lib/generators/active-model.js";
-import { Application } from "../../../../lib/application.js";
-import "../../../../lib/test-unit/trailtie.js";
-import { copyRoutes } from "../../generators-test-helper.js";
-import { TestCase } from "../../../../lib/generators/test-case.js";
+import { ActiveModel } from "../../lib/generators/active-model.js";
+import { Application } from "../../lib/application.js";
+import "../../lib/test-unit/trailtie.js";
+import { copyRoutes } from "./generators-test-helper.js";
+import { TestCase } from "../../lib/generators/test-case.js";
 
 class ScaffoldControllerGeneratorApp extends Application {}
 class ScaffoldControllerGeneratorTest extends TestCase {}
@@ -27,7 +27,7 @@ let t: TestCase;
 beforeAll(async () => {
   await ScaffoldControllerGeneratorApp.instance().loadGenerators();
   const { ScaffoldControllerGenerator } =
-    await import("../../../../lib/generators/trails/scaffold-controller/scaffold-controller-generator.js");
+    await import("../../lib/generators/trails/scaffold-controller/scaffold-controller-generator.js");
   ScaffoldControllerGeneratorTest.tests(ScaffoldControllerGenerator);
 });
 

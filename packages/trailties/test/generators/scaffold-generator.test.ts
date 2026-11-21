@@ -1,12 +1,12 @@
 import { File, Dir } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Application } from "../../../../lib/application.js";
-import { Trails } from "../../../../lib/trails.js";
-import "../../../../lib/trailties/active-record.js";
-import "../../../../lib/test-unit/trailtie.js";
-import { copyRoutes, withDatabaseConfiguration } from "../../generators-test-helper.js";
-import { TestCase } from "../../../../lib/generators/test-case.js";
+import { Application } from "../../lib/application.js";
+import { Trails } from "../../lib/trails.js";
+import "../../lib/trailties/active-record.js";
+import "../../lib/test-unit/trailtie.js";
+import { copyRoutes, withDatabaseConfiguration } from "./generators-test-helper.js";
+import { TestCase } from "../../lib/generators/test-case.js";
 
 class ScaffoldGeneratorApp extends Application {}
 class ScaffoldGeneratorTest extends TestCase {}
@@ -24,7 +24,7 @@ let t: TestCase;
 beforeAll(async () => {
   await ScaffoldGeneratorApp.instance().loadGenerators();
   const { ScaffoldGenerator } =
-    await import("../../../../lib/generators/trails/scaffold/scaffold-generator.js");
+    await import("../../lib/generators/trails/scaffold/scaffold-generator.js");
   ScaffoldGeneratorTest.tests(ScaffoldGenerator);
 });
 
