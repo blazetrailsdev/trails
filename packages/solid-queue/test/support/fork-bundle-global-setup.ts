@@ -1,6 +1,10 @@
 import { type Plugin, build } from "vite";
+import type { TestProject } from "vitest/node";
 
 const root = `${import.meta.dirname}/../..`;
+
+const ADAPTER_URL_IMPORTS = 3;
+let adapterUrlImports = 0;
 
 const keepModuleUrls: Plugin = {
   name: "keep-module-urls",
@@ -8,12 +12,20 @@ const keepModuleUrls: Plugin = {
   transform(code, id) {
     if (!code.includes("import.meta.url")) return null;
     return code
-      .replace(/import\(new URL\(("[^"]+"), import\.meta\.url\)\.href\)/g, "import($1)")
+      .replace(/import\(new URL\(("[^"]+"), import\.meta\.url\)\.href\)/g, (_match, path) => {
+        adapterUrlImports++;
+        return `import(${path})`;
+      })
       .replaceAll("import.meta.url", JSON.stringify(`file://${id.split("?")[0]}`));
   },
 };
 
-export default async function setup() {
+export default async function setup(project: TestProject) {
+  const filters = (project.vitest as unknown as { filenamePattern?: string[] }).filenamePattern;
+  const { testFiles } = await project.globTestFiles(filters);
+  if (!testFiles.some((file) => file.includes("/packages/solid-queue/"))) return;
+
+  adapterUrlImports = 0;
   await build({
     configFile: false,
     root,
@@ -37,4 +49,9 @@ export default async function setup() {
       },
     },
   });
+  if (adapterUrlImports !== ADAPTER_URL_IMPORTS) {
+    throw new Error(
+      `fork bundle: expected ${ADAPTER_URL_IMPORTS} import(new URL(...)) rewrites, made ${adapterUrlImports}`,
+    );
+  }
 }
