@@ -1,4 +1,18 @@
-import { File, FileUtils, Dir, setEnv, env, getFs } from "@blazetrails/ruby-compat";
+import {
+  File,
+  FileUtils,
+  Dir,
+  setEnv,
+  env,
+  getFs,
+  include,
+  rbFBackquote,
+} from "@blazetrails/ruby-compat";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import type { Generation } from "../support/isolation/abstract-unit.js";
+import "../support/isolation/abstract-unit.js";
+import { EnvHelpers } from "../support/env-helpers.js";
 import { EncryptedConfiguration, InheritableOptions } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "../../lib/command.js";
@@ -188,5 +202,245 @@ describe("Trails::Command::CredentialsTest", () => {
     const encryptedContent = File.read("config/credentials.yml.enc");
     File.write("config/credentials.yml.enc", `${encryptedContent}ruin decryption`);
     expect(await diff("config/credentials.yml.enc")).toMatch(encryptedContent);
+  });
+});
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface CredentialsTest extends Generation, EnvHelpers {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class CredentialsTest extends TestCase {
+  runEditCommand({
+    visual = "cat",
+    editor = "cat",
+    environment,
+    ...options
+  }: { visual?: string; editor?: string; environment?: string; allowFailure?: boolean } = {}) {
+    return this.switchEnv("VISUAL", visual, () =>
+      this.switchEnv("EDITOR", editor, () => {
+        const args = environment ? ["--environment", environment] : [];
+        return this.trails("credentials:edit", args, options);
+      }),
+    );
+  }
+
+  runShowCommand({
+    environment,
+    ...options
+  }: { environment?: string; allowFailure?: boolean } = {}) {
+    const args = environment ? ["--environment", environment] : [];
+    return this.trails("credentials:show", args, options);
+  }
+
+  runDiffCommand(path: string | null = null, { enroll = false, disenroll = false } = {}) {
+    const args = [path, enroll ? "--enroll" : null, disenroll ? "--disenroll" : null].filter(
+      (arg) => arg != null,
+    );
+    return this.trails("credentials:diff", args);
+  }
+
+  async writeCredentials(content: string, options: { environment?: string } = {}) {
+    const visual = await this.appFile("tmp/write-content", `printf %s "$CONTENT" > "$1"\n`);
+    return this.switchEnv("CONTENT", content, () =>
+      this.runEditCommand({ visual: `sh ${visual}`, ...options }),
+    );
+  }
+
+  async assertCredentialsPaths(
+    contentPath: string,
+    keyPath: string,
+    { environment }: { environment?: string } = {},
+  ) {
+    const content = `foo: ${contentPath}`;
+    await this.removeFile(contentPath);
+    await this.removeFile(keyPath);
+
+    expect(await this.writeCredentials(content, { environment })).toMatch(`Editing ${contentPath}`);
+    await this.assertFile(contentPath);
+    await this.assertFile(keyPath);
+
+    expect(await this.runShowCommand({ environment })).toMatch(content);
+
+    if (/config\/credentials(?:\/.*)?\.yml\.enc$/.test(contentPath)) {
+      expect(await this.runDiffCommand(contentPath)).toMatch(content);
+    }
+  }
+
+  async readFile(relative: string) {
+    return File.readAsync(await this.appPath(relative));
+  }
+
+  async assertFile(relative: string) {
+    expect(await File.isExistAsync(await this.appPath(relative))).toBe(true);
+  }
+
+  async assertNoFile(relative: string) {
+    expect(await File.isExistAsync(await this.appPath(relative))).toBe(false);
+  }
+}
+include(CredentialsTest, Isolation);
+include(CredentialsTest, EnvHelpers);
+
+describe("Trails::Command::CredentialsTest", { timeout: 120_000 }, () => {
+  let t: CredentialsTest;
+
+  beforeEach(async () => {
+    t = new CredentialsTest("test");
+    await t.buildApp();
+  });
+
+  afterEach(() => t.teardownApp());
+
+  it("edit credentials", async () => {
+    for (let i = 0; i < 2; i++) {
+      expect(await t.runEditCommand()).toMatch(DEFAULT_CREDENTIALS_PATTERN);
+    }
+  });
+
+  it("edit command does not add master key to gitignore when already exist", async () => {
+    await t.runEditCommand();
+
+    const gitignore = await t.readFile(".gitignore");
+    expect(gitignore.match(/config\/master\.key/g)!.length).toBe(1);
+  });
+
+  it("edit command does not overwrite by default if credentials already exists", async () => {
+    await t.writeCredentials("foo: bar");
+    const output = await t.runEditCommand();
+
+    expect(output).toMatch(/foo: bar/);
+    expect(output).not.toMatch(DEFAULT_CREDENTIALS_PATTERN);
+  });
+
+  it("edit command does not add master key when `RAILS_MASTER_KEY` env specified", async () => {
+    const masterKey = await t.readFile("config/master.key");
+    await t.removeFile("config/master.key");
+    await t.appFile(".gitignore", "");
+
+    await t.switchEnv("TRAILS_MASTER_KEY", masterKey, async () => {
+      expect(await t.runEditCommand()).toMatch(DEFAULT_CREDENTIALS_PATTERN);
+      await t.assertNoFile("config/master.key");
+      expect(await t.readFile(".gitignore")).not.toMatch("config/master.key");
+    });
+  });
+
+  it("edit command omits secret_key_base from generated credentials for dev environment", async () => {
+    expect(await t.runEditCommand({ environment: "dev" })).not.toMatch(/^\s*secret_key_base: /m);
+    await t.assertFile("config/credentials/development.yml.enc");
+  });
+
+  it("edit command omits secret_key_base from generated credentials for test environment", async () => {
+    expect(await t.runEditCommand({ environment: "test" })).not.toMatch(/^\s*secret_key_base: /m);
+    await t.assertFile("config/credentials/test.yml.enc");
+  });
+
+  it("edit command does not raise when an initializer tries to access non-existent credentials", async () => {
+    await t.appFile(
+      "config/initializers/raise-when-loaded.ts",
+      `
+      import { Trails } from "@blazetrails/trailties";
+      ((await Trails.application!.credentials()) as never as Record<string, () => unknown>)["missingKey!"]();
+`,
+    );
+
+    expect(await t.runEditCommand({ environment: "qa" })).toMatch(DEFAULT_CREDENTIALS_PATTERN);
+  });
+
+  it("edit command does not display save confirmation message if interrupted", async () => {
+    expect(await t.runEditCommand()).toMatch(/file encrypted and saved/i);
+
+    const interruptCommandProcess = `sh -c 'kill -INT $PPID'`;
+    const output = await t.runEditCommand({ visual: interruptCommandProcess });
+
+    expect(output).not.toMatch(/file encrypted and saved/i);
+    expect(output).toMatch(/nothing saved/i);
+  });
+
+  it("show command raises error when require_master_key is specified and key does not exist", async () => {
+    await t.removeFile("config/master.key");
+    await t.addToConfig("this.config.requireMasterKey = true;");
+
+    expect(await t.runShowCommand({ allowFailure: true })).toMatch(
+      /Missing encryption key to decrypt file with/,
+    );
+  });
+
+  it("show command displays content specified by environment option", async () => {
+    await t.writeCredentials("foo: bar", { environment: "production" });
+
+    expect(await t.runShowCommand({ environment: "production" })).toMatch(/foo: bar/);
+  });
+
+  it("show command properly expands environment option", async () => {
+    await t.writeCredentials("foo: bar", { environment: "production" });
+
+    expect(await t.runShowCommand({ environment: "prod" })).toMatch(/foo: bar/);
+  });
+
+  it("running edit after enrolling in diffing sets diff driver", async () => {
+    await t.runDiffCommand(null, { enroll: true });
+
+    expect(await t.runEditCommand()).toMatch(/git diff driver/i);
+
+    const textconv = await rbFBackquote(
+      `cd ${await t.appPath()}; git config --get 'diff.trails_credentials.textconv'`,
+    );
+    expect(textconv.trim()).toBe("bin/trails credentials:diff");
+
+    expect(await t.runEditCommand()).not.toMatch(/git diff driver/i);
+  });
+
+  it("diff from git diff left file", async () => {
+    await t.runEditCommand({ environment: "development" });
+
+    expect(await t.runDiffCommand("config/credentials/development.yml.enc")).toMatch(
+      /access_key_id: 123/,
+    );
+  });
+
+  it("diff from git diff right file", async () => {
+    await t.runEditCommand({ environment: "development" });
+
+    const contentPath = await t.appPath("config", "credentials", "KnAM4a_development.yml.enc");
+    await File.writeAsync(contentPath, await t.readFile("config/credentials/development.yml.enc"));
+
+    expect(await t.runDiffCommand(contentPath)).toMatch(/access_key_id: 123/);
+  });
+
+  it("diff for custom environment", async () => {
+    await t.runEditCommand({ environment: "custom" });
+
+    expect(await t.runDiffCommand("config/credentials/custom.yml.enc")).toMatch(
+      /access_key_id: 123/,
+    );
+  });
+
+  it("diff for custom environment when key is not available", async () => {
+    await t.runEditCommand({ environment: "custom" });
+    await t.removeFile("config/credentials/custom.key");
+
+    const rawContent = await t.readFile("config/credentials/custom.yml.enc");
+    expect(await t.runDiffCommand("config/credentials/custom.yml.enc")).toMatch(rawContent);
+  });
+
+  it("respects config.credentials.content_path when set in config/application.rb", async () => {
+    const contentPath = "my_secrets/credentials.yml.enc";
+    await t.addToConfig(`this.config.credentials.contentPath = ${JSON.stringify(contentPath)};`);
+
+    await t.assertCredentialsPaths(contentPath, "config/master.key");
+
+    await t.assertCredentialsPaths(contentPath, "config/credentials/production.key", {
+      environment: "production",
+    });
+  });
+
+  it("respects config.credentials.key_path when set in config/application.rb", async () => {
+    const keyPath = "my_secrets/master.key";
+    await t.addToConfig(`this.config.credentials.keyPath = ${JSON.stringify(keyPath)};`);
+
+    await t.assertCredentialsPaths("config/credentials.yml.enc", keyPath);
+
+    await t.assertCredentialsPaths("config/credentials/production.yml.enc", keyPath, {
+      environment: "production",
+    });
   });
 });
