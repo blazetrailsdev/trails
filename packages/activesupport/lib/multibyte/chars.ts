@@ -37,6 +37,10 @@ export class Chars {
     return this.wrappedString;
   }
 
+  toS(): string {
+    return this.wrappedString;
+  }
+
   toStr(): string {
     return this.wrappedString;
   }
