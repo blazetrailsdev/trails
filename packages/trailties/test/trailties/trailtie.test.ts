@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { Trailtie, resetTrailtieRegistry } from "../../lib/trailtie.js";
 import { Configuration } from "../../lib/trailtie/configuration.js";
+import "../../lib/trailties/action-controller.js";
 import { sealAgainstInheritance } from "../../lib/trailtie/configurable.js";
 
 describe("RailtieTest", () => {
@@ -20,70 +21,78 @@ describe("RailtieTest", () => {
   });
 
   it("Railtie provides railtie_name", () => {
-    class MyTrailtie extends Trailtie {}
-    Trailtie.register(MyTrailtie);
-    expect(MyTrailtie.railtieName()).toBe("my_trailtie");
+    class FooBarBaz extends Trailtie {}
+    Trailtie.register(FooBarBaz);
+    expect(FooBarBaz.railtieName()).toBe("foo_bar_baz");
   });
 
   it("railtie_name can be set manually", () => {
-    class OtherTrailtie extends Trailtie {}
-    Trailtie.register(OtherTrailtie);
-    OtherTrailtie.railtieName("custom_name");
-    expect(OtherTrailtie.railtieName()).toBe("custom_name");
+    class Foo extends Trailtie {
+      static {
+        this.railtieName("bar");
+      }
+    }
+    Trailtie.register(Foo);
+    expect(Foo.railtieName()).toBe("bar");
   });
 
   it("config is available to railtie", () => {
-    class ConfigTrailtie extends Trailtie {}
-    Trailtie.register(ConfigTrailtie);
-    expect(ConfigTrailtie.config).toBeInstanceOf(Configuration);
-    expect(ConfigTrailtie.config).toBe(ConfigTrailtie.config);
+    class Foo extends Trailtie {}
+    Trailtie.register(Foo);
+    expect(
+      (Foo.config as unknown as { actionController: { foo?: unknown } }).actionController.foo,
+    ).toBeUndefined();
   });
 
   it("railtie can add to_prepare callbacks", () => {
-    class PrepTrailtie extends Trailtie {}
-    Trailtie.register(PrepTrailtie);
-    const before = PrepTrailtie.config.toPrepareBlocks.length;
-    const block = () => {};
-    PrepTrailtie.config.toPrepare(block);
-    expect(PrepTrailtie.config.toPrepareBlocks.length).toBe(before + 1);
-    expect(PrepTrailtie.config.toPrepareBlocks).toContain(block);
+    let toPrepare = false;
+    class Foo extends Trailtie {}
+    Trailtie.register(Foo);
+    Foo.config.toPrepare(() => {
+      toPrepare = true;
+    });
+    expect(toPrepare).toBeFalsy();
+    for (const block of Foo.config.toPrepareBlocks) block();
+    expect(toPrepare).toBeTruthy();
   });
 
   it("railtie can add initializers", async () => {
-    const calls: string[] = [];
-    class InitTrailtie extends Trailtie {}
-    Trailtie.register(InitTrailtie);
-    InitTrailtie.initializer("init.one", function () {
-      calls.push("one");
+    let ranBlock = false;
+    class MyTie extends Trailtie {}
+    Trailtie.register(MyTie);
+    MyTie.initializer("something_nice", function () {
+      ranBlock = true;
     });
-    await InitTrailtie.instance().runInitializers();
-    expect(calls).toEqual(["one"]);
+    expect(ranBlock).toBeFalsy();
+    await MyTie.instance().runInitializers();
+    expect(ranBlock).toBeTruthy();
   });
 
   it("rake_tasks block is executed when MyApp.load_tasks is called", async () => {
-    let ran = false;
-    class TaskTie extends Trailtie {}
-    Trailtie.register(TaskTie);
-    TaskTie.rakeTasks(() => {
-      ran = true;
+    let ranBlock = false;
+    class MyTie extends Trailtie {}
+    Trailtie.register(MyTie);
+    MyTie.rakeTasks(() => {
+      ranBlock = true;
     });
-    expect(ran).toBe(false);
-    await TaskTie.instance().runTasksBlocks({});
-    expect(ran).toBe(true);
+    expect(ranBlock).toBeFalsy();
+    await MyTie.instance().runTasksBlocks({});
+    expect(ranBlock).toBeTruthy();
   });
 
   it("rake_tasks block defined in superclass of railtie is also executed", async () => {
-    const ran: string[] = [];
+    const ranBlock: string[] = [];
     class ParentTie extends Trailtie {}
     Trailtie.register(ParentTie);
     ParentTie.rakeTasks(function () {
-      ran.push(this.railtieName);
+      ranBlock.push(this.railtieName);
     });
-    class ChildTie extends ParentTie {}
-    Trailtie.register(ChildTie);
-    ChildTie.railtieName("child_tie");
-    await ChildTie.instance().runTasksBlocks({});
-    expect(ran).toContain("child_tie");
+    class MyTie extends ParentTie {}
+    Trailtie.register(MyTie);
+    MyTie.railtieName("my_tie");
+    expect(ranBlock).toEqual([]);
+    await MyTie.instance().runTasksBlocks({});
+    expect(ranBlock).toContain("my_tie");
   });
 
   const RUNNERS = {
@@ -94,15 +103,16 @@ describe("RailtieTest", () => {
   } as const;
   for (const kind of ["generators", "console", "server", "runner"] as const) {
     it(`${kind} block is executed when MyApp.load_${kind} is called`, async () => {
-      let ran = false;
-      class T extends Trailtie {}
-      Trailtie.register(T);
-      T[kind](() => {
-        ran = true;
+      let ranBlock = false;
+      class MyTie extends Trailtie {}
+      Trailtie.register(MyTie);
+      MyTie[kind](() => {
+        ranBlock = true;
       });
-      const runner: (a: unknown) => unknown = T.instance()[RUNNERS[kind]];
-      await runner.call(T.instance(), {});
-      expect(ran).toBe(true);
+      expect(ranBlock).toBeFalsy();
+      const runner: (a: unknown) => unknown = MyTie.instance()[RUNNERS[kind]];
+      await runner.call(MyTie.instance(), {});
+      expect(ranBlock).toBeTruthy();
     });
   }
 

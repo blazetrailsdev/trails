@@ -148,6 +148,8 @@ describe("CodeStatisticsCalculatorTest", () => {
     );
     expect(calc.lines).toBe(6);
     expect(calc.codeLines).toBe(3);
+    expect(calc.classes).toBe(0);
+    expect(calc.methods).toBe(0);
   });
 
   it("skip CSS comments", () => {
@@ -159,6 +161,8 @@ describe("CodeStatisticsCalculatorTest", () => {
     );
     expect(calc.lines).toBe(5);
     expect(calc.codeLines).toBe(3);
+    expect(calc.classes).toBe(0);
+    expect(calc.methods).toBe(0);
   });
 
   it("skip SCSS comments", () => {
@@ -170,6 +174,8 @@ describe("CodeStatisticsCalculatorTest", () => {
     );
     expect(calc.lines).toBe(6);
     expect(calc.codeLines).toBe(3);
+    expect(calc.classes).toBe(0);
+    expect(calc.methods).toBe(0);
   });
 
   it("calculate number of CoffeeScript methods", () => {
@@ -223,6 +229,8 @@ describe("CodeStatisticsCalculatorTest", () => {
     );
     expect(calc.lines).toBe(4);
     expect(calc.codeLines).toBe(3);
+    expect(calc.classes).toBe(0);
+    expect(calc.methods).toBe(0);
   });
 
   it("calculate number of TypeScript methods", () => {

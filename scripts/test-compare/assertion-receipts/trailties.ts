@@ -225,51 +225,77 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         "app_generator_test.rb:865 asserts no .node-version and no node-gyp in the Dockerfile; a trails app is a Node app, so both are always written (packages/trailties/CLAUDE.md, A Gemfile is a package.json)",
     },
   ],
-  "trailties:generators/benchmark_generator_test.rb › Rails::Generators::BenchmarkGeneratorTest › generate benchmark":
+  "trailties:generators/benchmark_generator_test.rb › BenchmarkGeneratorTest › generate benchmark":
     [
       {
+        kind: "assert_file",
+        value: "s:Gemfile",
+        as: null,
+        reason:
+          'benchmark_generator_test.rb:18 asserts the Gemfile; benchmark-ips is not ported, so no package.json entry is written (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
+      },
+      {
         kind: "assert_match",
-        value: null,
+        value: 's:gem "benchmark-ips"',
         as: null,
         reason:
           'benchmark_generator_test.rb:19 asserts the `gem "benchmark-ips"` Gemfile entry; benchmark-ips is not ported (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
       },
+      {
+        kind: "assert_equal",
+        value:
+          's:# frozen_string_literal: true\n\nrequire_relative "../../config/environment"\n\n# Any benchmarking setup goes here...\n\n\n\nBenchmark.ips do |x|\n  x.report("before") { }\n  x.report("after") { }\n\n  x.compare!\nend\n',
+        as: "assert_equal",
+        reason:
+          "benchmark_generator_test.rb:23 asserts the generated Ruby script (`Benchmark.ips`, `require_relative`); the generator writes a TypeScript script, asserted whole by the port",
+      },
     ],
-  "trailties:generators/db_system_change_generator_test.rb › Rails::Generators::Db::System::ChangeGeneratorTest › change to postgresql":
+  "trailties:generators/benchmark_generator_test.rb › BenchmarkGeneratorTest › generate benchmark with reports":
+    [
+      {
+        kind: "assert_equal",
+        value:
+          's:# frozen_string_literal: true\n\nrequire_relative "../../config/environment"\n\n# Any benchmarking setup goes here...\n\n\n\nBenchmark.ips do |x|\n  x.report("with_patch") { }\n  x.report("without_patch") { }\n\n  x.compare!\nend\n',
+        as: "assert_equal",
+        reason:
+          "benchmark_generator_test.rb:56 asserts the generated Ruby script (`Benchmark.ips`, `require_relative`); the generator writes a TypeScript script, asserted whole by the port",
+      },
+    ],
+  "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change to postgresql":
     [
       {
         kind: "assert_match",
-        value: null,
+        value: "s:# Use pg as the database for Active Record",
         as: null,
         reason:
           'db_system_change_generator_test.rb:45 asserts the `# Use pg as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
       },
     ],
-  "trailties:generators/db_system_change_generator_test.rb › Rails::Generators::Db::System::ChangeGeneratorTest › change to mysql":
+  "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change to mysql":
     [
       {
         kind: "assert_match",
-        value: null,
+        value: "s:# Use mysql2 as the database for Active Record",
         as: null,
         reason:
           'db_system_change_generator_test.rb:88 asserts the `# Use mysql2 as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
       },
     ],
-  "trailties:generators/db_system_change_generator_test.rb › Rails::Generators::Db::System::ChangeGeneratorTest › change to sqlite3":
+  "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change to sqlite3":
     [
       {
         kind: "assert_match",
-        value: null,
+        value: "s:# Use sqlite3 as the database for Active Record",
         as: null,
         reason:
           'db_system_change_generator_test.rb:130 asserts the `# Use sqlite3 as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
       },
     ],
-  "trailties:generators/db_system_change_generator_test.rb › Rails::Generators::Db::System::ChangeGeneratorTest › change from versioned gem to other versioned gem":
+  "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change from versioned gem to other versioned gem":
     [
       {
         kind: "assert_match",
-        value: null,
+        value: "s:# Use mysql2 as the database for Active Record",
         as: null,
         reason:
           'db_system_change_generator_test.rb:199 asserts the `# Use mysql2 as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
