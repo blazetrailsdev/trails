@@ -1,3 +1,4 @@
+import { Mysql2 } from "@blazetrails/mysql2";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
@@ -280,7 +281,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
         connection.execute("SELECT SLEEP(2)"),
       );
       expect(error).toBeInstanceOf(QueryAborted);
-      expect((error.cause as { code?: string }).code).toBe("PROTOCOL_SEQUENCE_TIMEOUT");
+      expect((error.cause as object).constructor).toBe(Mysql2.Error.TimeoutError);
       expect(error.connectionPool).toBe(connection.pool);
     } finally {
       await connection.disconnectBang();

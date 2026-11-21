@@ -1,9 +1,6 @@
 import { encode, fetch, rtest, StandardError } from "@blazetrails/ruby-compat";
 import { Mysql2 } from "./mysql2.js";
 
-/** @noRailsEquivalent PERMANENT */
-export const DRIVER_ERRORS = new WeakSet<object>();
-
 export class Error extends StandardError {
   static readonly ENCODE_OPTS = Object.freeze({
     undef: ":replace",
@@ -51,14 +48,6 @@ export class Error extends StandardError {
   ): Error {
     const errorClass = fetch<typeof Error>(this.CODES, String(errorNumber), this);
     return new errorClass(msg, serverVersion, errorNumber, sqlState);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  static [Symbol.hasInstance](e: unknown): boolean {
-    return (
-      Function.prototype[Symbol.hasInstance].call(this, e) ||
-      (this === Error && typeof e === "object" && e !== null && DRIVER_ERRORS.has(e))
-    );
   }
 
   private cleanMessage(message: string): string {

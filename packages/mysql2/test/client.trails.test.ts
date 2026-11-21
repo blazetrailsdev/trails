@@ -64,9 +64,38 @@ describe("mysql2Client", () => {
   it("Mysql2.Error is an error the client raised, not any error with a code", async () => {
     const raised = Object.assign(new Error("gone"), { code: "ER_X" });
     const client = await clientOn({ query: () => Promise.reject(raised) });
-    await client.query("").catch(() => {});
-    expect(raised instanceof Mysql2.Error).toBe(true);
+    const error = await client.query("").catch((e: unknown) => e);
+    expect(error).toBe(raised);
+    expect(raised instanceof Mysql2.Error).toBe(false);
     expect(Object.assign(new Error(), { code: "ENOENT" }) instanceof Mysql2.Error).toBe(false);
+  });
+});
+
+describe("Mysql2::Client error boundary", () => {
+  it("raises TimeoutError and ConnectionError for the driver's timeout and connection codes", async () => {
+    const timeout = Object.assign(new Error("t"), { code: "PROTOCOL_SEQUENCE_TIMEOUT" });
+    const lost = Object.assign(new Error("l"), { code: "PROTOCOL_CONNECTION_LOST" });
+    const client = await clientOn({
+      query: vi
+        .fn()
+        .mockRejectedValueOnce(timeout)
+        .mockRejectedValueOnce(lost)
+        .mockRejectedValueOnce(timeout),
+    });
+    client.readTimeout = 5;
+    const t = await client.query("").catch((e: unknown) => e);
+    expect(t).toBeInstanceOf(Mysql2.Error.TimeoutError);
+    expect((t as InstanceType<typeof Mysql2.Error>).errorNumber).toBeNull();
+    const l = await client.query("").catch((e: unknown) => e);
+    expect(l).toBeInstanceOf(Mysql2.Error.ConnectionError);
+    expect((l as InstanceType<typeof Mysql2.Error>).errorNumber).toBe(2013);
+    expect((t as Error).message).toBe(
+      "Timeout waiting for a response from the last query. (waited 5 seconds)",
+    );
+    client.readTimeout = null;
+    expect(await client.query("").catch((e: unknown) => e)).toBeInstanceOf(
+      Mysql2.Error.ConnectionError,
+    );
   });
 });
 

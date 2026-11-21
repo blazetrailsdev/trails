@@ -10,7 +10,7 @@ import {
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
-import { include, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { include, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -240,11 +240,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     exception: unknown,
     { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
   ): unknown {
-    if (isMysql2DriverTimeout(exception)) {
+    if (exception instanceof Mysql2.Error.TimeoutError && !rtest(exception.errorNumber)) {
       return new AdapterTimeout(message, { sql, binds, connectionPool: this.pool });
-    } else if (isMysql2ConnectionError(exception)) {
-      if (/MySQL client is not connected/i.test((exception as Error).message)) {
-        return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
+    } else if (exception instanceof Mysql2.Error.ConnectionError) {
+      if (/MySQL client is not connected/i.test(exception.message)) {
+        return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
       } else {
         return new ConnectionFailed(message, { sql, binds, connectionPool: this.pool });
       }
@@ -316,39 +316,6 @@ function parseUriField(
   } catch {
     return undefined;
   }
-}
-
-/** @internal */
-function isMysql2DriverTimeout(e: unknown): boolean {
-  if (!(e instanceof Error)) return false;
-  const errno = (e as { errno?: number }).errno;
-  if (typeof errno === "number" && errno > 0) return false;
-  const code = (e as { code?: string }).code;
-  return code === "PROTOCOL_SEQUENCE_TIMEOUT" || code === "ETIMEDOUT";
-}
-
-/** @internal */
-function isMysql2ConnectionError(e: unknown): boolean {
-  if (!(e instanceof Error)) return false;
-  const errno = (e as { errno?: number }).errno;
-  if (typeof errno === "number" && errno > 0) return false;
-  const code = (e as { code?: string }).code;
-  if (/add new command when connection is in closed state/i.test(e.message)) {
-    return true;
-  }
-  return (
-    code === "PROTOCOL_CONNECTION_LOST" ||
-    code === "PROTOCOL_ENQUEUE_AFTER_QUIT" ||
-    code === "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR" ||
-    code === "PROTOCOL_ENQUEUE_HANDSHAKE_TWICE" ||
-    code === "POOL_CLOSED" ||
-    code === "ECONNRESET" ||
-    code === "ECONNREFUSED" ||
-    code === "ENOTFOUND" ||
-    code === "EHOSTUNREACH" ||
-    code === "ENETUNREACH" ||
-    code === "EPIPE"
-  );
 }
 
 (Mysql2Adapter.prototype as unknown as { castResult: typeof mysql2CastResult }).castResult =

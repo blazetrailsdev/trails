@@ -12,7 +12,7 @@ import {
   warn,
 } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
-import { DRIVER_ERRORS, Error as Mysql2Error } from "./error.js";
+import { Error as Mysql2Error } from "./error.js";
 import { Mysql2 } from "./mysql2.js";
 import { Result } from "./result.js";
 import { Statement } from "./statement.js";
@@ -40,40 +40,23 @@ export interface Mysql2Result<
 
 type Handshake = { _handshakePacket?: { serverVersion?: string } };
 
-function serverVersion(client: object | undefined): number {
-  const conn = client as (Handshake & { connection?: Handshake }) | undefined;
-  const version = ((conn?.connection ?? conn)?._handshakePacket?.serverVersion ?? "").replace(
-    /^5\.5\.5-/,
-    "",
-  );
-  const [major, minor, patch] = (/(\d+)\.(\d+)\.(\d+)/.exec(version) ?? [0, 0, 0, 0])
-    .slice(1)
-    .map(Number);
-  return major * 10000 + minor * 100 + patch;
-}
+const CR_SERVER_GONE_ERROR = 2006;
 
-/** @noRailsEquivalent PERMANENT */
-export function driverError(e: unknown, client?: object): never {
-  const { code, errno, fatal, sqlState } = (e ?? {}) as {
-    code?: unknown;
-    errno?: unknown;
-    fatal?: unknown;
-    sqlState?: string;
-  };
-  if (!(e instanceof globalThis.Error)) throw e;
-  if (typeof errno === "number" && errno > 0) {
-    const error = Mysql2Error.newWithArgs(
-      e.message,
-      serverVersion(client),
-      errno,
-      sqlState ?? null,
-    );
-    error.cause = e;
-    throw error;
-  }
-  if (typeof code === "string" || fatal === true) DRIVER_ERRORS.add(e);
-  throw e;
-}
+const CR_ERRNOS: Record<string, number> = {
+  ENOTFOUND: 2005,
+  ECONNREFUSED: 2003,
+  EHOSTUNREACH: 2003,
+  ENETUNREACH: 2003,
+  ETIMEDOUT: 2003,
+  ECONNRESET: 2013,
+  PROTOCOL_CONNECTION_LOST: 2013,
+  PROTOCOL_SEQUENCE_TIMEOUT: 2013,
+  EPIPE: CR_SERVER_GONE_ERROR,
+  PROTOCOL_ENQUEUE_AFTER_QUIT: CR_SERVER_GONE_ERROR,
+  PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR: CR_SERVER_GONE_ERROR,
+  PROTOCOL_ENQUEUE_HANDSHAKE_TWICE: CR_SERVER_GONE_ERROR,
+  POOL_CLOSED: CR_SERVER_GONE_ERROR,
+};
 
 const CLIENT_FLAGS: Record<string, number> = {
   LONG_PASSWORD: 0x00000001,
@@ -498,7 +481,7 @@ export class Client {
 
     const connection = (await mysql
       .createConnection(config as mysql.ConnectionOptions)
-      .catch(driverError)) as NpmConnection;
+      .catch((e: unknown) => this.raiseMysql2Error(e))) as NpmConnection;
     this.connection = connection;
 
     const protocol = connection.connection;
@@ -533,7 +516,7 @@ export class Client {
     return this.storeResult(
       await (this.connection.query as unknown as (options: object) => Promise<Native>)
         .call(this.connection, this.options(sql, opts))
-        .catch((e: unknown) => driverError(e, this.connection)),
+        .catch((e: unknown) => this.raiseMysql2Error(e)),
     );
   }
 
@@ -623,9 +606,44 @@ export class Client {
   }
 
   serverInfo(): { id: number; version: string | null } {
-    const handshake = (this.connection.connection as Handshake | undefined) ?? this.connection;
-    const version = handshake._handshakePacket?.serverVersion ?? null;
-    return { id: serverVersion(this.connection), version };
+    const handshake = (this.connection?.connection as Handshake | undefined) ?? this.connection;
+    const version = handshake?._handshakePacket?.serverVersion ?? null;
+    const [major, minor, patch] = (
+      /(\d+)\.(\d+)\.(\d+)/.exec((version ?? "").replace(/^5\.5\.5-/, "")) ?? [0, 0, 0, 0]
+    )
+      .slice(1)
+      .map(Number);
+    return { id: major * 10000 + minor * 100 + patch, version };
+  }
+
+  /** @internal */
+  raiseMysql2Error(e: unknown): never {
+    if (!(e instanceof globalThis.Error)) throw e;
+    const { code, errno, sqlState } = e as { code?: unknown; errno?: unknown; sqlState?: string };
+    if (code === "PROTOCOL_SEQUENCE_TIMEOUT" && this.readTimeout != null) {
+      const error = new Mysql2Error.TimeoutError(
+        `Timeout waiting for a response from the last query. (waited ${this.readTimeout} seconds)`,
+      );
+      error.cause = e;
+      throw error;
+    }
+    let errorNumber: number | undefined;
+    if (typeof errno === "number" && errno > 0) {
+      errorNumber = errno;
+    } else if (typeof code === "string" && Object.hasOwn(CR_ERRNOS, code)) {
+      errorNumber = CR_ERRNOS[code];
+    } else if (/add new command when connection is in closed state/i.test(e.message)) {
+      errorNumber = CR_SERVER_GONE_ERROR;
+    }
+    if (errorNumber === undefined) throw e;
+    const error = Mysql2Error.newWithArgs(
+      e.message,
+      this.serverInfo().id,
+      errorNumber,
+      sqlState ?? "HY000",
+    );
+    error.cause = e;
+    throw error;
   }
 
   setServerOption(value: number): Promise<true> {
@@ -648,7 +666,7 @@ export class Client {
           return true;
         },
       });
-    }).catch((e: unknown) => driverError(e, this.connection));
+    }).catch((e: unknown) => this.raiseMysql2Error(e));
   }
 }
 

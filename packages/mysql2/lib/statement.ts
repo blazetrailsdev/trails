@@ -1,5 +1,4 @@
 import { rbScanArgs } from "@blazetrails/ruby-compat";
-import { driverError } from "./client.js";
 import type { Client, Mysql2Result, QueryOptions } from "./client.js";
 import { Mysql2 } from "./mysql2.js";
 
@@ -28,7 +27,7 @@ export class Statement {
     const result = this.client.storeResult(
       await this.client
         .execute(this.client.options(this.sql, currentQueryOptions), args)
-        .catch((e: unknown) => driverError(e, this.client.connection)),
+        .catch((e: unknown) => this.client.raiseMysql2Error(e)),
     );
     this.affectedRows = result?.size ?? this.client.affectedRows;
     return result;
