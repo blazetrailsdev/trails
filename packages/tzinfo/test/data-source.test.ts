@@ -133,7 +133,10 @@ describe("TCDataSource", () => {
     await assertSubProcessReturns(["TZInfo::DataSources::RubyDataSource"], async (puts) => {
       const { rbModName } = await import("@blazetrails/ruby-compat");
       const { TZInfo } = await import("../lib/index.js");
-      const { loadPath } = await import("@blazetrails/tzinfo/data");
+      const tzinfoData = "@blazetrails/tzinfo/data";
+      const { loadPath } = (await import(tzinfoData)) as {
+        loadPath: Record<string, () => Promise<unknown>>;
+      };
       Object.assign(TZInfo.loadPath, loadPath);
       await TZInfo.DataSources.RubyDataSource.load();
 
