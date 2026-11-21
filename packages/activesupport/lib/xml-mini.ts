@@ -39,9 +39,6 @@ export const FileLike = {
 
 export interface XmlMiniBackend {
   parse(data: string | StringIO | null | undefined): Record<string, unknown>;
-
-  /** @internal */
-  _require?(): Promise<void>;
 }
 
 export type XmlMiniBackendName = XmlMiniBackend | string;
@@ -400,14 +397,11 @@ const XML_MINI_BACKENDS: Record<string, (() => Promise<unknown>) | string> = {
 /** @internal */
 export async function castBackendNameToModule(name: XmlMiniBackendName): Promise<XmlMiniBackend> {
   if (typeof name !== "string") {
-    await name._require?.();
     return name;
   } else {
     const backend = XML_MINI_BACKENDS[name.toLowerCase()];
     if (typeof backend === "function") {
-      const module = (await backend()) as XmlMiniBackend;
-      await module._require?.();
-      return module;
+      return (await backend()) as XmlMiniBackend;
     }
     throw new LoadError(
       backend ?? `cannot load such file -- active_support/xml_mini/${name.toLowerCase()}`,
