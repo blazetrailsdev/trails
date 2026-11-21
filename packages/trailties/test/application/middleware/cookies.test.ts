@@ -341,7 +341,7 @@ describe("CookiesTest", { timeout: 120_000 }, () => {
     await import(`${await t.appPath()}/config/environment.ts`);
 
     const encryptor = new MessageEncryptor(
-      t.app()!.keyGenerator().generateKey("salt", 32),
+      t.app()!.keyGenerator().generateKey("salt", 32) as Buffer,
       undefined,
       {
         cipher: "aes-256-gcm",
@@ -440,7 +440,7 @@ describe("CookiesTest", { timeout: 120_000 }, () => {
     await import(`${await t.appPath()}/config/environment.ts`);
 
     const encryptor = new MessageEncryptor(
-      t.app()!.keyGenerator().generateKey("salt", 32),
+      t.app()!.keyGenerator().generateKey("salt", 32) as Buffer,
       undefined,
       {
         cipher: "aes-256-gcm",
