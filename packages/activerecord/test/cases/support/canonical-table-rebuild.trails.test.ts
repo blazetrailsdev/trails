@@ -23,7 +23,7 @@ async function tableNames(adapter: AbstractAdapter): Promise<Set<string>> {
 describe("ensureCanonicalTables", () => {
   test("creates only the missing named tables, restoring canonical shape", async () => {
     const pool = newSqlitePool();
-    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
+    const adapter = await pool.checkout();
     try {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
@@ -41,7 +41,7 @@ describe("ensureCanonicalTables", () => {
 
   test("is a no-op when every named table already exists", async () => {
     const pool = newSqlitePool();
-    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
+    const adapter = await pool.checkout();
     try {
       await loadCanonicalSchema(adapter);
       await adapter.execute("DROP TABLE topics");
@@ -57,7 +57,7 @@ describe("ensureCanonicalTables", () => {
 
   test("throws on an unknown canonical table name", async () => {
     const pool = newSqlitePool();
-    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
+    const adapter = await pool.checkout();
     try {
       await loadCanonicalSchema(adapter);
       await expect(ensureCanonicalTables(adapter, ["topics", "not_a_real_table"])).rejects.toThrow(

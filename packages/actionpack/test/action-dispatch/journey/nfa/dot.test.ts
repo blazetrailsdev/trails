@@ -8,7 +8,7 @@ function makeHost(
   const host = {
     transitions: () => transitions,
     acceptingStates: () => acceptingStates,
-  } as DotHost;
+  };
   return Object.assign(host, { toDot: toDot.bind(host) });
 }
 

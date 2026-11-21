@@ -24,7 +24,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
   }
 
   render(context: ViewContext, options: RenderOptions): Rendered {
-    this.details = this.extractDetails(options as Record<string, unknown>);
+    this.details = this.extractDetails(options);
     const template = this.determineTemplate(options);
     this.prependFormats(template.format);
     return this.renderTemplate(
@@ -54,7 +54,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
     }
     if (hasKey(options, "file")) {
       if (File.isExist(hashAref(options, "file") as string)) {
-        return new RawFile(hashAref(options, "file") as string);
+        return new RawFile(hashAref(options, "file"));
       } else {
         if (File.isAbsolutePath(hashAref(options, "file") as string)) {
           throw new ArgumentError(`File ${hashAref(options, "file") as string} does not exist`);

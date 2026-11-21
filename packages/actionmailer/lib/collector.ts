@@ -27,7 +27,7 @@ export class Collector {
     const block = typeof args[args.length - 1] === "function" ? (args.pop() as Block) : undefined;
     const options = extractOptionsBang(args);
     if (args.length === 0) throw new ArgumentError("You have to supply at least one format");
-    for (const type of args) await rbFSend(this, type as string, { ...options }, block);
+    for (const type of args) await rbFSend(this, type, { ...options }, block);
     return args;
   }
 

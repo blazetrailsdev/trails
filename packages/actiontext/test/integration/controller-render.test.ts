@@ -24,7 +24,7 @@ describe("ActionText::ControllerRenderTest", () => {
   };
 
   beforeEach(() => {
-    t = new IntegrationTest(expect.getState().currentTestName!) as typeof t;
+    t = new IntegrationTest(expect.getState().currentTestName!);
     t.app = routes;
   });
 

@@ -193,7 +193,7 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("read_attribute_for_database", async () => {
-    const topic = new CanonicalTopic({ content: ["ok"] } as any) as any;
+    const topic = new CanonicalTopic({ content: ["ok"] }) as any;
     expect(topic.readAttributeForDatabase("content")).toBe("---\n- ok\n");
   });
 
@@ -246,7 +246,7 @@ describe("AttributeMethodsTest", () => {
         this.attribute("Title", "string");
       }
     }
-    const p = new Post({ Title: "test" } as any);
+    const p = new Post({ Title: "test" });
     expect((p as any).Title).toBe("test");
   });
 
@@ -430,7 +430,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
 
-    const topic = new klass({ user_defined_time: Temporal.Now.instant() } as any) as any;
+    const topic = new klass({ user_defined_time: Temporal.Now.instant() }) as any;
     expect(topic["user_defined_time?"]).toBeTruthy();
   });
   it("user-defined JSON attribute predicate", async () => {
@@ -442,10 +442,10 @@ describe("AttributeMethodsTest", () => {
       }
     }
 
-    let topic = new klass({ user_defined_json: { key: "value" } } as any) as any;
+    let topic = new klass({ user_defined_json: { key: "value" } }) as any;
     expect(topic["user_defined_json?"]).toBeTruthy();
 
-    topic = new klass({ user_defined_json: {} } as any) as any;
+    topic = new klass({ user_defined_json: {} }) as any;
     expect(topic["user_defined_json?"]).toBeFalsy();
   });
   it("undeclared attribute method does not affect respond_to? and method_missing", async () => {
@@ -455,7 +455,7 @@ describe("AttributeMethodsTest", () => {
     assertNotRespondTo(topic, "title_hello_world");
   });
   it("declared prefixed attribute method affects respond_to? and method_missing", async () => {
-    const topic = new target({ title: "Budget" } as any) as any;
+    const topic = new target({ title: "Budget" }) as any;
     for (const prefix of ["default_", "title_"]) {
       target.attributeMethodPrefix(prefix);
       const pattern = target.attributeMethodPatterns.at(-1)!;
@@ -478,7 +478,7 @@ describe("AttributeMethodsTest", () => {
       (target.prototype as any)[pattern.proxyTarget] = function (...args: unknown[]) {
         return args;
       };
-      const topic = new target({ title: "Budget" } as any) as any;
+      const topic = new target({ title: "Budget" }) as any;
 
       const meth = pattern.methodName("title");
       assertRespondTo(topic, meth);
@@ -498,7 +498,7 @@ describe("AttributeMethodsTest", () => {
       (target.prototype as any)[pattern.proxyTarget] = function (...args: unknown[]) {
         return args;
       };
-      const topic = new target({ title: "Budget" } as any) as any;
+      const topic = new target({ title: "Budget" }) as any;
 
       const meth = pattern.methodName("title");
       assertRespondTo(topic, meth);
@@ -1351,7 +1351,7 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("converted values are returned after assignment", async () => {
-    const developer = new Developer({ name: 1337, salary: "50000" } as any) as any;
+    const developer = new Developer({ name: 1337, salary: "50000" }) as any;
 
     expect(developer.readAttributeBeforeTypeCast("salary")).toBe("50000");
     expect(developer.readAttributeBeforeTypeCast("name")).toBe(1337);
@@ -1627,7 +1627,7 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("read_attribute_before_type_cast with aliased attribute", async () => {
-    const model = new NumericData({ new_bank_balance: "abcd" } as any) as any;
+    const model = new NumericData({ new_bank_balance: "abcd" }) as any;
     expect(model.readAttributeBeforeTypeCast("new_bank_balance")).toBe("abcd");
   });
 
@@ -1778,11 +1778,11 @@ describe("AttributeMethodsTest", () => {
     klass.tableName = CanonicalTopic.tableName;
     klass.attribute("user_defined_text", "text");
 
-    let topic = new klass({ user_defined_text: "text" } as any) as any;
+    let topic = new klass({ user_defined_text: "text" }) as any;
     expect(topic["user_defined_text?"]).toBeTruthy();
 
     for (const value of BooleanType.FALSE_VALUES) {
-      topic = new klass({ user_defined_text: value } as any) as any;
+      topic = new klass({ user_defined_text: value }) as any;
       expect(topic["user_defined_text?"]).toBeTruthy();
     }
   });

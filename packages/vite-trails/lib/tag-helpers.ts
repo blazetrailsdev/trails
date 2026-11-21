@@ -104,7 +104,7 @@ export const TagHelpers = {
   },
 
   async viteStylesheetTag(this: TagHelpersHost, ...names: unknown[]): Promise<SafeBuffer> {
-    const options = { ...extractOptionsBang(names) } as Options;
+    const options = { ...extractOptionsBang(names) };
     const stylePaths: string[] = [];
     for (const name of names)
       stylePaths.push(await this.viteAssetPath(name as string, { type: "stylesheet" }));

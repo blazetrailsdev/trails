@@ -78,7 +78,7 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     const asked: string[] = [];
     const { Shape, Ticket } = await buildHierarchy(asked);
 
-    loadSchema.call(Ticket as never);
+    loadSchema.call(Ticket);
 
     expect((Ticket as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);

@@ -58,7 +58,7 @@ export function localize(
   object: unknown,
   options: LocalizeOptions = {},
 ): string {
-  return I18n.localize(object, options as Parameters<typeof I18n.localize>[1]) as string;
+  return I18n.localize(object, options) as string;
 }
 
 export const l = localize;

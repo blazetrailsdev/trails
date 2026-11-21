@@ -12,9 +12,7 @@ describe("write-path prepared-statement binds", () => {
     const starting = RubyTime.utc(2024, 3, 5, 7, 8, 9, 123456);
     const ending = RubyTime.utc(2025, 3, 5, 7, 8, 9, 123456);
     const events: Record<string, unknown>[] = [];
-    const sub = Notifications.subscribe("sql.active_record", (e: Event) =>
-      events.push(e.payload as Record<string, unknown>),
-    );
+    const sub = Notifications.subscribe("sql.active_record", (e: Event) => events.push(e.payload));
 
     let task: Task;
     try {

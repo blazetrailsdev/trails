@@ -56,7 +56,7 @@ export function rbHash(value: unknown): number {
      by that same value, or two `==` objects land in different buckets — Ruby's
      `hash`/`eql?` contract (`vendor/ruby/v3.3.11/object.c:4375`). */
   if (typeof (value as { equals?: unknown }).equals === "function") {
-    return stringHash(`${(value as object).constructor.name}(${String(value)})`);
+    return stringHash(`${value.constructor.name}(${String(value)})`);
   }
   /* boundary: a JS Date reaches a ported `hash` the same way it reaches
      `rbEqual`, and Ruby hashes it by value. */
@@ -76,7 +76,7 @@ export function rbHash(value: unknown): number {
     }
     return h >>> 0;
   }
-  return rbObjHash(value as object);
+  return rbObjHash(value);
 }
 
 function stringHash(input: string): number {

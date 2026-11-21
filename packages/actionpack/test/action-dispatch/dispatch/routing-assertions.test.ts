@@ -14,13 +14,9 @@ import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
-import type {
-  MiddlewareFactory,
-  MiddlewareStack,
-  RackApp,
-} from "../../../lib/action-dispatch/middleware/stack.js";
+import type { MiddlewareStack, RackApp } from "../../../lib/action-dispatch/middleware/stack.js";
 import type { Request } from "../../../lib/action-dispatch/http/request.js";
-import type { MountableApp, RouteOptions } from "../../../lib/action-dispatch/routing/mapper.js";
+import type { MountableApp } from "../../../lib/action-dispatch/routing/mapper.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import {
   IntegrationTest,
@@ -125,18 +121,18 @@ function RoutingAssertionsSharedTests(klass: HostClass, t: () => Host): void {
         this.resources("books");
 
         this.scope("secure", { constraints: { protocol: "https://" } }, () => {
-          this.resources("books", { controller: "secure_books" } as RouteOptions);
+          this.resources("books", { controller: "secure_books" });
         });
 
         this.scope("block", { constraints: (req: Request) => req.ssl }, () => {
-          this.resources("books", { controller: "block_books" } as RouteOptions);
+          this.resources("books", { controller: "block_books" });
         });
 
         this.scope(
           "query",
           { constraints: (req: Request) => req.params["use_query"] === "true" },
           () => {
-            this.resources("books", { controller: "query_books" } as RouteOptions);
+            this.resources("books", { controller: "query_books" });
           },
         );
       });
@@ -146,18 +142,18 @@ function RoutingAssertionsSharedTests(klass: HostClass, t: () => Host): void {
         this.resources("articles");
 
         this.scope("secure", { constraints: { protocol: "https://" } }, () => {
-          this.resources("articles", { controller: "secure_articles" } as RouteOptions);
+          this.resources("articles", { controller: "secure_articles" });
         });
 
         this.scope("block", { constraints: (req: Request) => req.ssl }, () => {
-          this.resources("articles", { controller: "block_articles" } as RouteOptions);
+          this.resources("articles", { controller: "block_articles" });
         });
 
         this.scope(
           "query",
           { constraints: (req: Request) => req.params["use_query"] === "true" },
           () => {
-            this.resources("articles", { controller: "query_articles" } as RouteOptions);
+            this.resources("articles", { controller: "query_articles" });
           },
         );
 
@@ -413,7 +409,7 @@ function RoutingAssertionsSharedTests(klass: HostClass, t: () => Host): void {
   it("with routing", async () => {
     await t().withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
-        this.resources("articles", { path: "artikel" } as RouteOptions);
+        this.resources("articles", { path: "artikel" });
       });
 
       assertRouting("/artikel", { controller: "articles", action: "index" });
@@ -439,7 +435,7 @@ function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
 
   klass.withRouting((routes: RouteSet) => {
     routes.draw(function () {
-      this.resources("articles", { path: "artikel" } as RouteOptions);
+      this.resources("articles", { path: "artikel" });
     });
   });
 
@@ -453,7 +449,7 @@ function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
   it("with routing for entire test file can be overwritten for individual test", async () => {
     await t().withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
-        this.resources("articles", { path: "articolo" } as RouteOptions);
+        this.resources("articles", { path: "articolo" });
       });
 
       assertRouting("/articolo", { controller: "articles", action: "index" });
@@ -585,12 +581,9 @@ describe("WithRoutingResetTest", () => {
     let middlewareConfig: Record<string, unknown> | null = null;
 
     t().app = IntegrationTest.buildApp(null, (middlewareStack: MiddlewareStack) => {
-      middlewareStack.use(
-        middleware as unknown as MiddlewareFactory,
-        (config: Record<string, unknown>) => {
-          middlewareConfig = config;
-        },
-      );
+      middlewareStack.use(middleware, (config: Record<string, unknown>) => {
+        middlewareConfig = config;
+      });
     });
     t()
       .app.routes()

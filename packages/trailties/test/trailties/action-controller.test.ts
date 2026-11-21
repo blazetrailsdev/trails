@@ -103,7 +103,7 @@ describe("action_controller.set_helpers_path", () => {
 
   function receivingController(): AbstractController.HelpersClassMethods {
     class HelpersReceiver extends ActionController.Base {}
-    return HelpersReceiver as unknown as AbstractController.HelpersClassMethods;
+    return HelpersReceiver;
   }
 
   let loader: Loader | null = null;
@@ -118,9 +118,7 @@ describe("action_controller.set_helpers_path", () => {
   async function bootAndInstantiate(klass: AbstractController.HelpersClassMethods): Promise<void> {
     await autoload(app.config.helpersPaths);
     runLoadHooks("action_controller", klass);
-    await ActionController.Trailties.Helpers.inherited(
-      klass as ActionController.HelpersPathControllerClass,
-    );
+    await ActionController.Trailties.Helpers.inherited(klass);
   }
 
   it("test_all_helpers", async () => {

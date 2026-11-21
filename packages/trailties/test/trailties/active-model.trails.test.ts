@@ -4,14 +4,14 @@ import { Deprecators } from "@blazetrails/activesupport";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { _resetTrailsEnv } from "../../lib/trails.js";
 import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
-import { Trailtie, type ActiveModelConfig } from "../../lib/trailties/active-model.js";
+import { Trailtie } from "../../lib/trailties/active-model.js";
 
 describe("ActiveModel::Railtie class body", () => {
   afterEach(() => {
     ActiveModel.SecurePassword.minCost = false;
     ActiveModel.Error.i18nCustomizeFullMessage = false;
     _resetTrailsEnv();
-    Trailtie.config.set("activeModel", {} as ActiveModelConfig);
+    Trailtie.config.set("activeModel", {});
   });
 
   it("pushes ActiveModel onto the shared eager-load namespace list", () => {

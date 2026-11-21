@@ -3917,7 +3917,7 @@ export function collectRubyEntities(rubyPkg: PackageInfo): RubyEntity[] {
   const allRuby: RubyEntity[] = [];
 
   for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
-    allRuby.push({ fqn, info: info as unknown as ClassInfo });
+    allRuby.push({ fqn, info: info });
   }
 
   const classMethodModuleFqns = new Set<string>();
@@ -3926,7 +3926,7 @@ export function collectRubyEntities(rubyPkg: PackageInfo): RubyEntity[] {
     const parentFqn = fqn.replace(/::ClassMethods$/, "");
     const parentMod = rubyPkg.modules[parentFqn] as unknown as ClassInfo | undefined;
     if (parentMod) {
-      const mod = info as unknown as ClassInfo;
+      const mod = info;
       for (const m of mod.instanceMethods) {
         if (!parentMod.classMethods.some((pm: MethodInfo) => pm.name === m.name)) {
           parentMod.classMethods.push(m);
@@ -3937,7 +3937,7 @@ export function collectRubyEntities(rubyPkg: PackageInfo): RubyEntity[] {
   }
 
   for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
-    const mod = info as unknown as ClassInfo;
+    const mod = info;
     if (classMethodModuleFqns.has(fqn)) continue;
     if (
       mod.instanceMethods.length === 0 &&
@@ -5184,9 +5184,7 @@ export function main() {
     const allRuby = collectRubyEntities(rubyPkg);
     const denominator = rubyDefinitionBreakdown(allRuby, pkg, methodMatchesMode);
 
-    const inheritanceClassPerFile = primaryClassesPerFile(
-      rubyPkg.classes as unknown as Record<string, ClassInfo>,
-    );
+    const inheritanceClassPerFile = primaryClassesPerFile(rubyPkg.classes);
 
     // Build module FQN → short name mapping for include resolution.
     // Ruby `include Predications` uses the short name, but the module FQN
@@ -5207,11 +5205,11 @@ export function main() {
     const allClassesAndModules = [
       ...Object.entries(rubyPkg.classes).map(([fqn, info]) => ({
         fqn,
-        info: info as unknown as ClassInfo,
+        info: info,
       })),
       ...Object.entries(rubyPkg.modules).map(([fqn, info]) => ({
         fqn,
-        info: info as unknown as ClassInfo,
+        info: info,
       })),
     ];
     const fqnToFile = new Map<string, string>();

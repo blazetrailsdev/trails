@@ -10,7 +10,7 @@ function typeIncluding(defaults?: Record<string, number>): { cast(value: unknown
   class IncludingType extends ValueType {}
   include(IncludingType, Timezone);
   include(IncludingType, new AcceptsMultiparameterTime(defaults ? { defaults } : {}));
-  return new IncludingType() as unknown as { cast(value: unknown): unknown };
+  return new IncludingType();
 }
 
 describe("AcceptsMultiparameterTime defaults", () => {

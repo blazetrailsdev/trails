@@ -105,7 +105,7 @@ export function urlFor(this: Host, options: UrlForOptions = null): string {
     }) as string;
   } else if (isPlainObject(options)) {
     options = { ...(options as Record<string, unknown>) };
-    this.ensureOnlyPathOption(options as Record<string, unknown>);
+    this.ensureOnlyPathOption(options);
 
     return rbCallSuper(this, urlFor, options) as string;
   } else if (options instanceof TopLevel.ActionController!.Parameters) {
@@ -116,8 +116,8 @@ export function urlFor(this: Host, options: UrlForOptions = null): string {
     return this._backUrl();
   } else if (Array.isArray(options)) {
     const components = [...options];
-    options = extractOptionsBang(components) as Record<string, unknown>;
-    this.ensureOnlyPathOption(options as Record<string, unknown>);
+    options = extractOptionsBang(components);
+    this.ensureOnlyPathOption(options);
 
     if (
       (options as Record<string, unknown>)["onlyPath"] != null &&

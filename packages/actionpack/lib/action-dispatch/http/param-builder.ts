@@ -80,7 +80,7 @@ export class ParamBuilder {
       for (const [k, rawV] of pairs) {
         let v = rawV as ParamValue;
         if (this.paramsHashType(v)) {
-          v = new UploadedFile(v as never) as unknown as ParamValue;
+          v = new UploadedFile(v) as unknown as ParamValue;
         }
         this.storeNestedParam(params, k, v, 0, encodingTemplate);
       }

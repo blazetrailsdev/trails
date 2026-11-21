@@ -9,7 +9,6 @@ import {
   assertNoDifference,
 } from "@blazetrails/activesupport/testing/assertions";
 import { freezeTime, travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
-import type { Time } from "@blazetrails/date";
 import { Job, Pause, Queue, ReadyExecution, Semaphore, SolidQueueAdapter } from "../lib/index.js";
 import { JobResult } from "./support/job-result.js";
 import { loadAppSchema } from "./support/queue-schema.js";
@@ -103,31 +102,31 @@ describe("QueueTest", () => {
   });
 
   it("return latency in seconds on each queue", async () => {
-    travelTo(minutes(5).fromNow() as Time);
+    travelTo(minutes(5).fromNow());
 
     assertInDelta(minutes(5).toI(), await backgroundQueue.latency(), seconds(1).toI());
     expect(await defaultQueue.latency()).toBe(0);
 
     backgroundQueue = Queue.findByName("background");
     defaultQueue = Queue.findByName("default");
-    travelTo(minutes(10).fromNow() as Time);
+    travelTo(minutes(10).fromNow());
 
     assertInDelta(minutes(15).toI(), await backgroundQueue.latency(), seconds(1).toI());
     expect(await defaultQueue.latency()).toBe(0);
   });
 
   it("returns memoized latency after the first call", async () => {
-    travelTo(minutes(5).fromNow() as Time);
+    travelTo(minutes(5).fromNow());
 
     assertInDelta(minutes(5).toI(), await backgroundQueue.latency(), seconds(1).toI());
 
-    travelTo(minutes(10).fromNow() as Time);
+    travelTo(minutes(10).fromNow());
 
     assertInDelta(minutes(5).toI(), await backgroundQueue.latency(), seconds(1).toI());
   });
 
   it("return human latency on each queue", async () => {
-    travelTo(minutes(5).fromNow() as Time);
+    travelTo(minutes(5).fromNow());
 
     expect(await backgroundQueue.humanLatency()).toMatch(/5 minutes/);
     expect(await defaultQueue.humanLatency()).toMatch(/0 seconds/);

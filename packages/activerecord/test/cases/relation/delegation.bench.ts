@@ -11,6 +11,6 @@ describe("relation construction hot path", () => {
   });
 
   bench("new (per-model subclass carrier)", () => {
-    void new (PerModelRelation as unknown as new (m: unknown) => unknown)(Post);
+    void new PerModelRelation(Post);
   });
 });

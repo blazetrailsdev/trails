@@ -12,9 +12,7 @@ describe("sql.active_record type_casted_binds", () => {
     const conn = await Base.leaseConnection();
     const task = await Task.create({ starting: null, ending: null });
     const events: Record<string, unknown>[] = [];
-    const sub = Notifications.subscribe("sql.active_record", (e: Event) =>
-      events.push(e.payload as Record<string, unknown>),
-    );
+    const sub = Notifications.subscribe("sql.active_record", (e: Event) => events.push(e.payload));
 
     try {
       await conn.cache(async () => {

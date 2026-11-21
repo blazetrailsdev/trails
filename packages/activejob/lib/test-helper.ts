@@ -470,7 +470,7 @@ export function jobsWith(
 
 /** @internal */
 export function filterAsProc(filter: Filter): (job: Payload) => unknown {
-  if (rbObjIsProc(filter)) return filter as (job: Payload) => unknown;
+  if (rbObjIsProc(filter)) return filter;
 
   return (job) => kernelArray(filter).includes(fetch(job, "job"));
 }
@@ -536,7 +536,7 @@ export function prepareArgsForAssertion(args: Payload): Payload {
 export async function deserializeArgsForAssertion(job: Payload): Promise<Payload> {
   const newJob = rbObjDup(job);
   if (newJob["at"] != null && newJob["at"] !== false) {
-    newJob["at"] = Time.at(newJob["at"] as number);
+    newJob["at"] = Time.at(newJob["at"]);
   }
   if (newJob["args"] != null && newJob["args"] !== false) {
     newJob["args"] = await Arguments.deserialize(newJob["args"] as unknown[]);
@@ -552,7 +552,7 @@ export async function instantiateJob(
   const job = (payload["job"] as { deserialize(payload: Payload): DeserializableJob }).deserialize(
     payload,
   );
-  if (Object.hasOwn(payload, "at")) job.scheduledAt = Time.at(payload["at"] as number);
+  if (Object.hasOwn(payload, "at")) job.scheduledAt = Time.at(payload["at"]);
   if (!skipDeserializeArguments) await job.deserializeArgumentsIfNeeded();
   return job;
 }

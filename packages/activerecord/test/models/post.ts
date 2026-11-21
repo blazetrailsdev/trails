@@ -22,7 +22,7 @@ import type { SpecialCategory } from "./category.js";
 import type { SpecialComment } from "./comment.js";
 import type { Tag } from "./tag.js";
 import type { VerySpecialComment } from "./comment.js";
-import { ModelName, type ModelLike } from "@blazetrails/activemodel";
+import { ModelName } from "@blazetrails/activemodel";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import { Base } from "../../lib/base.js";
 import type { Column } from "../../lib/connection-adapters/column.js";
@@ -1137,7 +1137,7 @@ export class PostRecord extends Base {
   declare comments: AssociationProxy<Comment>;
 
   static get modelName(): ModelName {
-    return new ModelName(this as unknown as ModelLike, null, "Post");
+    return new ModelName(this, null, "Post");
   }
 
   static {

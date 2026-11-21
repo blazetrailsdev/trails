@@ -26,7 +26,7 @@ describe("SolidCache::ExpiryTest", () => {
 
   beforeEach(async () => {
     singleShardCluster = isDefaultDatabase() ? {} : { shards: [firstShardKey()] };
-    t = new ExpiryTest("expiry") as unknown as ActiveJobTestHelper;
+    t = new ExpiryTest("expiry");
     await t.beforeSetup();
   });
 

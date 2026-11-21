@@ -45,14 +45,14 @@ async function runDumpInProcess(
   const envBackup: Record<string, string | undefined> = {};
   for (const k of Object.keys(env)) envBackup[k] = process.env[k];
   Object.assign(process.env, env);
-  process.stdout.write = ((s: string | Uint8Array): boolean => {
+  process.stdout.write = (s: string | Uint8Array): boolean => {
     outChunks.push(s.toString());
     return true;
-  }) as typeof process.stdout.write;
-  process.stderr.write = ((s: string | Uint8Array): boolean => {
+  };
+  process.stderr.write = (s: string | Uint8Array): boolean => {
     errChunks.push(s.toString());
     return true;
-  }) as typeof process.stderr.write;
+  };
   let code: number;
   try {
     code = await run(args);

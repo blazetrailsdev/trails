@@ -146,7 +146,7 @@ describe("CollectionAwaitableWriters", () => {
   });
 
   it("constructor-form ids= does not swallow an unknown Ids key", () => {
-    expect(() => new Post({ title: "t", body: "b", widgetIds: [1] } as never)).toThrow(/widgetIds/);
+    expect(() => new Post({ title: "t", body: "b", widgetIds: [1] })).toThrow(/widgetIds/);
   });
 
   it("the awaitable writer replaces on a persisted owner", async () => {

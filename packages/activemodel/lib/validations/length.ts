@@ -79,7 +79,7 @@ export class LengthValidator extends EachValidator {
     for (const key of keys) {
       const value = this.options[key];
       if (
-        (Number.isInteger(value as number) && (value as number) >= 0) ||
+        (Number.isInteger(value) && (value as number) >= 0) ||
         value === Infinity ||
         value === -Infinity ||
         (typeof value === "string" && value.startsWith(":")) ||
@@ -94,7 +94,7 @@ export class LengthValidator extends EachValidator {
   async validateEach(record: ValidatableRecord, attribute: string, value: unknown): Promise<void> {
     const valueLength = rbObjRespondTo(value, "length")
       ? (value as { length: number }).length
-      : String(value == null ? "" : await (value as object).toString()).length;
+      : String(value == null ? "" : await value.toString()).length;
     const errorsOptions = except(this.options, ...RESERVED_OPTIONS);
 
     for (const [key, validityCheck] of Object.entries(CHECKS) as Array<

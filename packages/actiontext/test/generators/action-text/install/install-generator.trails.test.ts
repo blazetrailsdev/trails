@@ -76,7 +76,7 @@ describe("ActionText::Generators::InstallGenerator", () => {
 
   it("defines the action_text:install rake task", async () => {
     await import("../../../../lib/tasks/actiontext.rake.js");
-    const invoke = vi.spyOn(Trails.Command!, "invoke").mockResolvedValue(undefined as never);
+    const invoke = vi.spyOn(Trails.Command!, "invoke").mockResolvedValue(undefined);
     await (await Task.get("action_text:install")).execute();
     expect(invoke).toHaveBeenCalledWith("generate", ["action_text:install"]);
   });

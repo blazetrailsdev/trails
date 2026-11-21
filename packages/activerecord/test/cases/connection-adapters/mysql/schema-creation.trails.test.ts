@@ -226,7 +226,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
 
   it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
     const td = new MyTd(mysqlConn(), "t");
-    td.column("full_name", "virtual" as any, { as: "CONCAT(a, b)" } as any);
+    td.column("full_name", "virtual", { as: "CONCAT(a, b)" });
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
     const sql = await toSql(td);
@@ -353,11 +353,9 @@ describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
   it("raises when called with no column name", () => {
     const td = new MyTd(mysqlConn(), "t");
 
-    expect(() => (td.blob as () => unknown)()).toThrow("Missing column name(s) for blob");
-    expect(() => (td.tinytext as () => unknown)()).toThrow("Missing column name(s) for tinytext");
-    expect(() => (td.unsignedBigint as () => unknown)()).toThrow(
-      "Missing column name(s) for unsigned_bigint",
-    );
+    expect(() => td.blob()).toThrow("Missing column name(s) for blob");
+    expect(() => td.tinytext()).toThrow("Missing column name(s) for tinytext");
+    expect(() => td.unsignedBigint()).toThrow("Missing column name(s) for unsigned_bigint");
   });
 });
 

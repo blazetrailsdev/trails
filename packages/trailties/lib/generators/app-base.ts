@@ -74,7 +74,7 @@ export abstract class AppBase extends Base {
   private _userDefaultBranch?: string;
 
   static {
-    include(this as unknown as new (...args: unknown[]) => unknown, AppName);
+    include(this, AppName);
     this.addShebangOptionBang();
     this.argument("appPath", { type: "string" });
     this.noCommands(() => this.methodAdded("requiredRailties"));

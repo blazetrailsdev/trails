@@ -17,13 +17,13 @@ describe("CompositePrimaryKey#id= — Enumerable acceptance (trails-only)", () =
   it("raises TypeError for a String scalar (not Enumerable in Ruby)", () => {
     const book = new CpkBook();
     expect(() => {
-      book.id = "1" as unknown as number[];
+      book.id = "1";
     }).toThrow(new TypeError('Expected value matching ["author_id", "id"], got "1".'));
   });
 
   it("pads a short value with null like Ruby's zip", () => {
     const book = new CpkBook();
-    book.id = [1] as unknown as number[];
+    book.id = [1];
     expect(book.id).toEqual([1, null]);
   });
 });

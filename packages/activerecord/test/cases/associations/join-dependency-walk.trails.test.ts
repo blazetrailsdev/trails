@@ -64,7 +64,7 @@ describe("JoinDependency walk() deduplication", () => {
 
     const joins = jd1.joinConstraints([jd2], aliasTrackerFor(jd1), []);
     const tables = joins.map((j) => {
-      const t = (j as Nodes.OuterJoin).left;
+      const t = j.left;
       return (t as any).tableAlias ?? (t as any).name;
     });
     expect(joins).toHaveLength(2);
@@ -80,7 +80,7 @@ describe("JoinDependency walk() deduplication", () => {
     const joins = jd1.joinConstraints([jd2], aliasTrackerFor(jd1), []);
 
     const joinTables = joins.map((j) => {
-      const outerJoin = j as Nodes.OuterJoin;
+      const outerJoin = j;
       const table = outerJoin.left;
       return (table as any).tableAlias ?? (table as any).name;
     });
@@ -122,7 +122,7 @@ describe("JoinDependency walk() deduplication", () => {
     const joins = jd1.joinConstraints([jd2, jd3], aliasTrackerFor(jd1), []);
 
     const joinTables = joins.map((j) => {
-      const table = (j as Nodes.OuterJoin).left;
+      const table = j.left;
       return (table as any).tableAlias ?? (table as any).name;
     });
 
@@ -141,10 +141,10 @@ describe("JoinDependency walk() deduplication", () => {
 
     const joins = jd1.joinConstraints([jd2], aliasTrackerFor(jd1), []);
 
-    const likesJoin = joins.find((j) => {
-      const table = (j as Nodes.OuterJoin).left;
+    const likesJoin = joins.find((j): j is Nodes.OuterJoin => {
+      const table = j.left;
       return (table as any).name === "likes" || (table as any).tableAlias === "likes";
-    }) as Nodes.OuterJoin | undefined;
+    });
     expect(likesJoin).toBeDefined();
 
     const onNode = likesJoin!.right as Nodes.On;
@@ -165,12 +165,12 @@ describe("JoinDependency walk() deduplication", () => {
     }
     collectTableRefs(onNode.expr);
 
-    const jd1ReviewsJoin = joins.find((j) => {
-      const table = (j as Nodes.OuterJoin).left as Table | Nodes.TableAlias;
+    const jd1ReviewsJoin = joins.find((j): j is Nodes.OuterJoin => {
+      const table = j.left as Table | Nodes.TableAlias;
       const realName = table instanceof Nodes.TableAlias ? table.tableName : table.name;
       const alias = String(table.tableAlias ?? table.name);
       return realName === "comments" && alias !== "comments";
-    }) as Nodes.OuterJoin | undefined;
+    });
     expect(jd1ReviewsJoin).toBeDefined();
 
     const jd1ReviewsTable = jd1ReviewsJoin!.left as Table | Nodes.TableAlias;

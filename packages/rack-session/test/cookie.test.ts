@@ -569,7 +569,7 @@ describe("Rack::Session::Cookie", () => {
       session.set("message", `${session.get("message")}${String((counter += 1))}--`);
       const hash = rbObjDup(session);
       hash.delete("session_id");
-      return new Response(hash.get("message") as string).toA();
+      return new Response(hash.get("message")).toA();
     };
 
     const unsafeCoder = new (class {

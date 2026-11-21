@@ -346,11 +346,7 @@ export class Base {
           block,
         );
       } else {
-        return this.viewRenderer.renderPartial(
-          this,
-          { partial: options as RenderOptions["partial"], locals },
-          block,
-        );
+        return this.viewRenderer.renderPartial(this, { partial: options, locals }, block);
       }
     }
   }

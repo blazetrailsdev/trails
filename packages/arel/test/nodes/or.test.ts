@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "../../lib/index.js";
-import type { Node } from "../../lib/nodes/node.js";
 import { uniq } from "../support/uniq.js";
 
 describe("Arel", () => {
@@ -22,18 +21,12 @@ describe("Arel", () => {
 
     describe("equality", () => {
       it("is equal with equal ivars", () => {
-        const array = [
-          new Nodes.Or(["foo", "bar"] as unknown as [Node, Node]),
-          new Nodes.Or(["foo", "bar"] as unknown as [Node, Node]),
-        ];
+        const array = [new Nodes.Or(["foo", "bar"]), new Nodes.Or(["foo", "bar"])];
         expect(uniq(array).length).toBe(1);
       });
 
       it("is not equal with different ivars", () => {
-        const array = [
-          new Nodes.Or(["foo", "bar"] as unknown as [Node, Node]),
-          new Nodes.Or(["foo", "baz"] as unknown as [Node, Node]),
-        ];
+        const array = [new Nodes.Or(["foo", "bar"]), new Nodes.Or(["foo", "baz"])];
         expect(uniq(array).length).toBe(2);
       });
     });

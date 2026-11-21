@@ -21,7 +21,7 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
   });
 
   it("isConnected() reflects the raw pg.Client finished? state", () => {
-    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
 
     adapter._rawConnection = fakePgConnection({ _queryable: true, _ending: false, _ended: false });
     expect(adapter.isConnected()).toBe(true);
@@ -41,7 +41,7 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
   });
 
   it("resetBang runs ROLLBACK + DISCARD ALL + reconfigure under one lock", async () => {
-    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
 
     const order: string[] = [];
     let resolveDiscard!: () => void;

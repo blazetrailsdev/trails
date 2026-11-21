@@ -117,7 +117,7 @@ describe("mysql2Client cast", () => {
       ),
     });
     const result = (await raw.prepare("SELECT created_at FROM t WHERE id = ?").execute(1))!;
-    expect(() => result.toA()).toThrow(Mysql2.Error as never);
+    expect(() => result.toA()).toThrow(Mysql2.Error);
     expect(() => result.toA()).toThrow("Invalid date in field 'created_at': 2026-00-27 14:23:55");
   });
 
@@ -154,7 +154,7 @@ describe("mysql2Client cast", () => {
         ),
       });
       const result = (await raw.query("SELECT created_at FROM t"))!;
-      expect(() => result.toA()).toThrow(Mysql2.Error as never);
+      expect(() => result.toA()).toThrow(Mysql2.Error);
       expect(() => result.toA()).toThrow(`Invalid date in field 'created_at': ${value}`);
     }
   });

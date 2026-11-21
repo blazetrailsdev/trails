@@ -267,7 +267,7 @@ export const ClassMethods = {
   /** @internal */
   includeHelperModulesBang(this: BehaviorClass): void {
     if (this.helperClass) this.helper(this.helperClass);
-    include(this as never, this._helpers);
+    include(this, this._helpers);
   },
 } satisfies ThisType<BehaviorClass>;
 

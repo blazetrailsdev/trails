@@ -202,7 +202,7 @@ async function tableIndexes(
 
   const cache = klass.connectionPool().schemaCache;
   if (!cache || typeof cache.indexes !== "function") return [];
-  return (await cache.indexes(tableName)) as Index[];
+  return await cache.indexes(tableName);
 }
 
 /** @internal */

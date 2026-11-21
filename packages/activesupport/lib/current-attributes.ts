@@ -72,7 +72,7 @@ export class CurrentAttributes {
     const ctor = this as CurrentAttributesClass;
     const lastArg = args[args.length - 1];
     const hasOptions = typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg);
-    const options: AttributeDefinition = hasOptions ? (lastArg as AttributeDefinition) : {};
+    const options: AttributeDefinition = hasOptions ? lastArg : {};
     const names = (hasOptions ? args.slice(0, -1) : args) as string[];
     const defaultValue: unknown = "default" in options ? options.default : NOT_SET;
 

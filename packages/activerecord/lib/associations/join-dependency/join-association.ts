@@ -105,8 +105,7 @@ export class JoinAssociation extends JoinPart {
         const sources: Nodes.Node[] = [...arel.joinSources()] as Nodes.Node[];
         joins.push(...sources);
         const lastIdx = joins.length - 1;
-        joins[lastIdx] = (appendConstraints(joins[lastIdx], others) ??
-          joins[lastIdx]) as Nodes.Join;
+        joins[lastIdx] = appendConstraints(joins[lastIdx], others) ?? joins[lastIdx];
       }
 
       foreignTable = table;

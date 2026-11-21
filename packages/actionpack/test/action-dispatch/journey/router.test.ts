@@ -6,7 +6,7 @@ import { Request } from "../../../lib/action-dispatch/http/request.js";
 import type { RouterRequest } from "../../../lib/action-dispatch/journey/router.js";
 
 function trailsEnv(env: Record<string, unknown>, klass = Request): RouterRequest {
-  return new klass(rackEnv(env)) as unknown as RouterRequest;
+  return new klass(rackEnv(env));
 }
 
 function rackEnv(env: Record<string, unknown>): Record<string, unknown> {
@@ -90,7 +90,7 @@ describe("TestRouter", () => {
 
     const list: { path: { spec: unknown } }[] = [];
     routeSet.router.recognize(env, (r) => {
-      list.push(r as unknown as { path: { spec: unknown } });
+      list.push(r);
     });
     expect(list.length).toEqual(2);
 

@@ -49,7 +49,7 @@ export function rbStrSetbyte(
   const len = b.length;
   if (pos < -len || len <= pos) throw new IndexError(`index ${pos} out of string`);
   b[pos < 0 ? pos + len : pos] = num2long(value) & 0xff;
-  if (!(self instanceof Uint8Array)) self.string = strNew(b as number[]);
+  if (!(self instanceof Uint8Array)) self.string = strNew(b);
   return value;
 }
 

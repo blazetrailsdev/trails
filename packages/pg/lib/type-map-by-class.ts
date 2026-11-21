@@ -35,7 +35,7 @@ export class TypeMapByClass extends TypeMap {
     const klass = rbObjClass(paramValue);
     const obj = this.#klassToCoder.get(klass);
     if (obj != null) return obj;
-    const ancestors = rbModAncestors(klass as { prototype: object });
+    const ancestors = rbModAncestors(klass);
     for (let i = 1; i < ancestors.length; i++) {
       const coder = this.#klassToCoder.get(ancestors[i]);
       if (coder != null) return coder;

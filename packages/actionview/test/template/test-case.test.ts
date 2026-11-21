@@ -74,7 +74,7 @@ function sharedTestsSetup(this: Tc): void {
 function testCase(klass: TestCaseClass, setup?: (this: Tc) => void): () => Tc {
   let tc: Tc;
   beforeEach(async ({ task }) => {
-    tc = new klass(task.name) as unknown as Tc;
+    tc = new klass(task.name);
     setup?.call(tc);
     await tc.beforeSetup();
     tc.setup();
@@ -543,7 +543,7 @@ describe("RenderedViewContentTest", () => {
 
     await tc().render("developers/developer", { developer: developer });
 
-    assertKindOf(rbCString as never, tc().rendered);
+    assertKindOf(rbCString, tc().rendered);
     assertKindOf(String, tc().rendered.toString());
     assertEqual(developer.name, tc().rendered.toString());
     assertMatch(new RegExp(developer.name), tc().rendered.toString());
@@ -581,7 +581,7 @@ describe("HTMLParserTest", () => {
 
     await tc().render("developers/developer", { developer: developer });
 
-    assertKindOf(HTML5.DocumentFragment as never, tc().rendered.html());
+    assertKindOf(HTML5.DocumentFragment, tc().rendered.html());
     assertEqual(tc().rendered.toString(), tc().rendered.html().toString());
     assertEqual(developer.name, tc().documentRootElement().text);
   });

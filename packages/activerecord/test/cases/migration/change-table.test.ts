@@ -183,7 +183,7 @@ describe("Migration", () => {
           "primary_key",
           { primaryKey: true, first: true },
         ]);
-        await t.primaryKey("id", "primary_key", { first: true } as never);
+        await t.primaryKey("id", "primary_key", { first: true });
       });
     });
 

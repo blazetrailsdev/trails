@@ -172,7 +172,7 @@ export const TaggedLogging = {
       logger.formatter =
         typeof formatter === "function"
           ? (Object.create({ call: formatter }) as TaggedFormatter)
-          : (rbObjClone(formatter) as TaggedFormatter);
+          : rbObjClone(formatter);
     } else {
       logger.formatter = new SimpleFormatter();
     }

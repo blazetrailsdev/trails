@@ -55,7 +55,7 @@ describe("SystemTestCase driven by playwright", () => {
     const test = new PostsTest("testHeadingIsComments");
     const result = await test.run();
     expect(result.isPassed()).toBe(false);
-    const path = imagePath.call(test as never);
+    const path = imagePath.call(test);
     expect(path).toContain(`${inject("screenshotDirectory")}/failures_`);
     expect((await getFs().stat!(path)).size).toBeGreaterThan(0);
   }, 60_000);

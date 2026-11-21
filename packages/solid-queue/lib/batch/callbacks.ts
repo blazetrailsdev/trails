@@ -59,7 +59,7 @@ export class Callbacks {
   async enqueueCallbackJob(callbackName: CallbackName): Promise<void> {
     const callback = this[callbackName];
     if (callback != null) {
-      const activeJob = ActiveJobBase.deserialize<BatchedActiveJob>(callback as never);
+      const activeJob = ActiveJobBase.deserialize<BatchedActiveJob>(callback);
       activeJob.callbackBatchId = this.id;
       await activeJob.runCallbacks("enqueue", async () => {
         await SolidQueue.Job!.enqueue(

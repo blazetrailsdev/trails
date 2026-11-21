@@ -189,7 +189,7 @@ export function fixtures(
 ): Record<string, unknown> {
   const { usesTransaction, useTransactionalTests, useInstantiatedFixtures } = options ?? {};
 
-  const klass = describe(getCurrentSuite().suite as SuiteScope) as TestCaseClass;
+  const klass = describe(getCurrentSuite().suite) as TestCaseClass;
   declared.add(klass);
   klass.usesTransaction(
     ...(usesTransaction ?? []).map((name) => `test_${name.replace(/\s+/g, "_")}`),

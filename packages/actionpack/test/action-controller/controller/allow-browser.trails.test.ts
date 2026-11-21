@@ -42,7 +42,7 @@ describe("Metal.middlewareStack inheritance", () => {
   it("use on a subclass that never read its stack does not reach the superclass", () => {
     class ParentController extends Metal {}
     class ChildController extends ParentController {}
-    ChildController.use(((app: unknown) => app) as never);
+    ChildController.use((app: unknown) => app);
 
     expect(ChildController.middlewareStack.middlewares.length).toBe(1);
     expect(ParentController.middlewareStack.isAny()).toBe(false);

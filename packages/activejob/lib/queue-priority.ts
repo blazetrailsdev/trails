@@ -35,7 +35,7 @@ export class QueuePriority {
 
   get priority(): unknown {
     if (rbObjIsProc(this._priority)) {
-      this._priority = (this._priority as (this: QueuePriorityJob) => unknown).call(this);
+      this._priority = this._priority.call(this);
     }
     return this._priority;
   }

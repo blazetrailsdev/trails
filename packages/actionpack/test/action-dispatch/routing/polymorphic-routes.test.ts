@@ -59,7 +59,7 @@ function makeHost(): PolymorphicHost {
   return {
     _routes: { polymorphicMappings: new Map<string, PolymorphicMappingEntry>() },
     ...helpers,
-  } as unknown as PolymorphicHost;
+  };
 }
 
 describe("polymorphicUrl/Path", () => {

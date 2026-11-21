@@ -1,7 +1,7 @@
 import { cattrAccessor } from "@blazetrails/activesupport";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Mutex, Queue, StandardError, Thread, except } from "@blazetrails/ruby-compat";
-import { Redis as IORedis, type RedisOptions } from "ioredis";
+import { Redis as IORedis } from "ioredis";
 import type { StreamEventLoop } from "../connection/stream-event-loop.js";
 import { SubscriptionAdapter } from "../namespaces.js";
 import { Base } from "./base.js";
@@ -100,7 +100,7 @@ prepend(Redis, ChannelPrefix);
 cattrAccessor.call(Redis, "redisConnector", {
   default: (config: Record<string, unknown>) => {
     const options = except(config, "adapter", "channelPrefix");
-    const conn = new IORedis(options.url as string, options as RedisOptions);
+    const conn = new IORedis(options.url as string, options);
     const confirmations = new Queue<[string, string, unknown] | null>();
     new Thread(async () => {
       for (let event; (event = await confirmations.pop()) !== null; ) conn.emit(...event);

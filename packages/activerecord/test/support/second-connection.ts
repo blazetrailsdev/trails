@@ -1,4 +1,3 @@
-import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
 import { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
 import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/connection-handler.js";
@@ -26,7 +25,7 @@ export async function withSecondAdapter<T>(
     try {
       return await fn(adapter);
     } finally {
-      pool.checkin(adapter as unknown as DatabaseAdapter);
+      pool.checkin(adapter);
     }
   } finally {
     await pool.disconnect(false).catch(() => {});

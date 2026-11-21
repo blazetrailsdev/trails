@@ -9,7 +9,6 @@ import { EnqueueError } from "@blazetrails/activejob";
 import { AsyncAdapter } from "@blazetrails/activejob/queue-adapters/async-adapter";
 import { days, isPresent, Notifications, seconds } from "@blazetrails/activesupport";
 import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
-import type { Time } from "@blazetrails/date";
 import { groupBy, rbEqual, slice } from "@blazetrails/ruby-compat";
 import {
   BlockedExecution,
@@ -95,7 +94,7 @@ describe("InstrumentationTest", () => {
     }
 
     const events = await subscribed("dispatch_scheduled.solid_queue", async () => {
-      travelTo(days(2).fromNow() as Time);
+      travelTo(days(2).fromNow());
       const dispatcher = new Dispatcher({ pollingInterval: 0.1, batchSize: 10 });
       await dispatcher.start();
 
@@ -407,7 +406,7 @@ describe("InstrumentationTest", () => {
     for (let i = 0; i < 3; i++)
       await NonOverlappingUpdateResultJob.performLater(result, { name: "A" });
 
-    travelTo(days(3).fromNow() as Time);
+    travelTo(days(3).fromNow());
     await Semaphore.expired().deleteAll();
 
     const blockedExecutions = await BlockedExecution.last(2);
@@ -441,7 +440,7 @@ describe("InstrumentationTest", () => {
     for (let i = 0; i < 3; i++)
       await NonOverlappingUpdateResultJob.performLater(result, { name: "B" });
 
-    travelTo(days(3).fromNow() as Time);
+    travelTo(days(3).fromNow());
     await Semaphore.expired().deleteAll();
 
     const events = await subscribed("release_many_blocked.solid_queue", async () => {
@@ -571,7 +570,7 @@ describe("InstrumentationTest", () => {
     const resultNew = vi.fn(function () {
       throw error;
     });
-    ClaimedExecution.Result = resultNew as unknown as typeof Result;
+    ClaimedExecution.Result = resultNew;
 
     try {
       await AddToBufferJob.performLater("hey!");

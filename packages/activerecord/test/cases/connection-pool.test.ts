@@ -545,7 +545,7 @@ it("pool sets connection visitor", async () => {
 });
 
 it("anonymous class exception", async () => {
-  const makeAnon = (): typeof Base => class extends Base {} as unknown as typeof Base;
+  const makeAnon = (): typeof Base => class extends Base {};
   const Anon = makeAnon();
   await expect(Anon.establishConnection()).rejects.toThrow("Anonymous class is not allowed.");
 });
@@ -557,7 +557,7 @@ class ConnectionTestModel extends Base {
 it("connection notification is called", async () => {
   const payloads: Record<string, unknown>[] = [];
   const sub = Notifications.subscribe("!connection.active_record", (event) => {
-    payloads.push(event.payload as Record<string, unknown>);
+    payloads.push(event.payload);
   });
   try {
     const dbConfig = new HashConfig("test", "primary", ambientPoolConfiguration());
@@ -576,7 +576,7 @@ it("connection notification is called", async () => {
 it("connection notification is called for shard", async () => {
   const payloads: Record<string, unknown>[] = [];
   const sub = Notifications.subscribe("!connection.active_record", (event) => {
-    payloads.push(event.payload as Record<string, unknown>);
+    payloads.push(event.payload);
   });
   try {
     await ConnectionTestModel.connectsTo({

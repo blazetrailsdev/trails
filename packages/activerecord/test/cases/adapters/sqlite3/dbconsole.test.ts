@@ -4,14 +4,13 @@ import { setTrailsRoot, trailsRoot } from "@blazetrails/activesupport";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
-import type { DatabaseConfigOptions } from "../../../../lib/database-configurations/database-config.js";
 import { databaseCli } from "../../../../lib/active-record.js";
 
 describeIfSqlite("SQLite3DbConsoleTest", () => {
   const root = (path: string) => File.expandPath(path, trailsRoot() ?? undefined);
 
   const makeDbConfig = (config: Record<string, unknown>) =>
-    new HashConfig("test", "primary", config as DatabaseConfigOptions);
+    new HashConfig("test", "primary", config);
 
   const assertFindCmdAndExecCalledWith = (args: unknown[], block: () => unknown) => {
     const spy = vi.spyOn(SQLite3Adapter, "findCmdAndExec").mockReturnValue(undefined as never);

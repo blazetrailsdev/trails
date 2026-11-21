@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import { include } from "@blazetrails/activesupport";
 import { assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
-import { Runner, type Session } from "../../../lib/action-dispatch/testing/integration.js";
+import { Runner } from "../../../lib/action-dispatch/testing/integration.js";
 
 describe("RunnerTest", () => {
   class MyRunner {
@@ -19,7 +19,7 @@ describe("RunnerTest", () => {
     const runner = new MyRunner(
       new (class {
         x(): void {}
-      })() as unknown as Session,
+      })(),
     );
     assertRespondTo(runner, "hi");
     assertRespondTo(runner, "x");

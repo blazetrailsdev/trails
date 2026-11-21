@@ -75,9 +75,7 @@ export function threadMattrReader(
       });
     } else {
       if (!Object.isFrozen(_default)) {
-        _default = Object.freeze(
-          Array.isArray(_default) ? [..._default] : { ...(_default as object) },
-        );
+        _default = Object.freeze(Array.isArray(_default) ? [..._default] : { ..._default });
       }
       const defaultValue = _default;
       Object.defineProperty(this, `${sym}_default_value`, {

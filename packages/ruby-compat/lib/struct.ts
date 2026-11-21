@@ -131,7 +131,7 @@ export const Struct = {
 
       /** `rb_struct_initialize_m` (`vendor/ruby/v3.3.11/struct.c:742`). */
       constructor(...values: unknown[]) {
-        rbStructInitialize(this as unknown as StructInstance, values);
+        rbStructInitialize(this, values);
       }
 
       /**

@@ -80,7 +80,7 @@ export function translate(
       const first = alternatives![0];
       translation =
         first != null && first !== false
-          ? I18n.translate(null, { ...options, default: alternatives } as never)
+          ? I18n.translate(null, { ...options, default: alternatives })
           : first;
       break;
     }
@@ -100,7 +100,7 @@ export function translate(
 export const t = translate;
 
 export function localize(object: unknown, { ...options }: Record<string, unknown> = {}): unknown {
-  return I18n.localize(object, options as never);
+  return I18n.localize(object, options);
 }
 
 export const l = localize;

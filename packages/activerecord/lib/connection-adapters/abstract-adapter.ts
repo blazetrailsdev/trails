@@ -874,7 +874,7 @@ export class AbstractAdapter implements Quoting {
         return undefined;
       case "utc":
       case "local":
-        return config as string;
+        return config;
       default:
         throw new ArgumentError("default_timezone must be either 'utc' or 'local'");
     }
@@ -1123,7 +1123,7 @@ export class AbstractAdapter implements Quoting {
   stealBang(): void {
     if (this.isInUse()) {
       if (this._owner !== IsolatedExecutionState.context()) {
-        removeConnectionFromThreadCache(this.pool as ConnectionPool, this, this._owner);
+        removeConnectionFromThreadCache(this.pool, this, this._owner);
 
         this._owner = IsolatedExecutionState.context();
       }
@@ -1850,7 +1850,7 @@ export class AbstractAdapter implements Quoting {
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
     try {
-      return (await this.instrumenter.instrument(
+      return await this.instrumenter.instrument(
         "sql.active_record",
         {
           sql,
@@ -1863,7 +1863,7 @@ export class AbstractAdapter implements Quoting {
           row_count: 0,
         },
         block,
-      )) as T;
+      );
     } catch (ex) {
       if (ex instanceof StatementInvalid) {
         throw await ex.setQuery(sql, binds);

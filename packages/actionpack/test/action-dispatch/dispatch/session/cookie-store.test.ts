@@ -33,7 +33,6 @@ import { Session } from "../../../../lib/action-dispatch/request/session.js";
 import { CookieOverflow } from "../../../../lib/action-dispatch/middleware/cookies.js";
 import { CookieStore } from "../../../../lib/action-dispatch/middleware/session/cookie-store.js";
 import { ShowExceptions } from "../../../../lib/action-dispatch/middleware/show-exceptions.js";
-import type { MiddlewareFactory } from "../../../../lib/action-dispatch/middleware/stack.js";
 import type { RouteSet } from "../../../../lib/action-dispatch/routing/route-set.js";
 import {
   IntegrationTest,
@@ -176,8 +175,8 @@ class CookieStoreTest extends IntegrationTest {
 
   override get app(): RoutesApp {
     return (this._app ??= IntegrationTest.buildApp(null, (middleware) => {
-      middleware.use(CookieStore as MiddlewareFactory, this.cookieOptions());
-      middleware.delete(ShowExceptions as MiddlewareFactory);
+      middleware.use(CookieStore, this.cookieOptions());
+      middleware.delete(ShowExceptions);
     }));
   }
 

@@ -147,9 +147,9 @@ export class TransitionTable implements TransitionTableLike, DotHost {
         for (const v of inner.values()) seen.add(v);
       }
     };
-    collect(this._stringStates as never);
-    collect(this._stdparamStates as never);
-    collect(this._regexpStates as never);
+    collect(this._stringStates);
+    collect(this._stdparamStates);
+    collect(this._regexpStates);
     return [...seen];
   }
 
@@ -255,12 +255,12 @@ export class TransitionTable implements TransitionTableLike, DotHost {
   /** @internal */
   private statesHashFor(sym: Edge): Map<number, Map<Edge, number>> {
     if (typeof sym === "string") {
-      return this._stringStates as Map<number, Map<Edge, number>>;
+      return this._stringStates;
     } else if (sym instanceof RegExp) {
       if (isDefaultExp(sym)) {
-        return this._stdparamStates as Map<number, Map<Edge, number>>;
+        return this._stdparamStates;
       } else {
-        return this._regexpStates as Map<number, Map<Edge, number>>;
+        return this._regexpStates;
       }
     } else {
       throw new ArgumentError(`unknown symbol: ${rbObjClassname(sym)}`);

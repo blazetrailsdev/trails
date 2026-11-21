@@ -135,7 +135,7 @@ async function assertSelector(
     typeof locator === "object" &&
     Object.getPrototypeOf(locator) === Object.prototype
   ) {
-    options = locator as TurboCableStreamSourceOptions;
+    options = locator;
     locator = null;
   }
   const page = await host.page();

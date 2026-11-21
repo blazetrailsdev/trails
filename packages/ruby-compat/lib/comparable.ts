@@ -131,7 +131,7 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (typeof a === "number" || typeof a === "bigint") {
     /* `rb_int_cmp` (`vendor/ruby/v3.3.11/numeric.c:4696`) and `flo_cmp`
        (`vendor/ruby/v3.3.11/numeric.c:1700`) answer nil for a non-Numeric, and for NaN. */
-    if (Number.isNaN(a as number)) return null;
+    if (Number.isNaN(a)) return null;
     if (typeof b !== "number" && typeof b !== "bigint") {
       if (typeof a === "number" && !Number.isFinite(a)) {
         const i = kTemporalDateP(b)
@@ -160,7 +160,7 @@ export function cmp(a: unknown, b: unknown): number | null {
       }
       return null;
     }
-    if (Number.isNaN(b as number)) return null;
+    if (Number.isNaN(b)) return null;
     return a < b ? -1 : a > b ? 1 : 0;
   }
   if (typeof a === "string") {

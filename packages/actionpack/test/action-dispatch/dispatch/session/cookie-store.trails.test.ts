@@ -44,7 +44,7 @@ describe("CookieStore in a real stack", () => {
       "action_dispatch.signed_cookie_salt": "signed cookie",
       "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
       "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
-    } as unknown as RackEnv;
+    };
   }
 
   it("round-trips session data across two requests through the cookie", async () => {

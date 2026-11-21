@@ -33,7 +33,7 @@ export class IndifferentCoder {
       typeof (coderOrClassName as CoderLike | null)?.load === "function" &&
       typeof (coderOrClassName as CoderLike | null)?.dump === "function"
         ? (coderOrClassName as CoderLike)
-        : (new YAMLColumn(attrName, (coderOrClassName ?? Object) as never) as unknown as CoderLike);
+        : new YAMLColumn(attrName, (coderOrClassName ?? Object) as never);
   }
 
   dump(obj: unknown): unknown {
@@ -247,7 +247,7 @@ function dig(obj: unknown, key: string): unknown {
 function store(this: typeof Base, storeAttribute: string, options: StoreOptions = {}): void {
   const coder = buildColumnSerializer(storeAttribute, options.coder, Object, options.yaml);
   this.serialize(storeAttribute, {
-    coder: new IndifferentCoder(storeAttribute, coder as CoderLike | null) as any,
+    coder: new IndifferentCoder(storeAttribute, coder as CoderLike | null),
   });
 
   if (options.accessors !== undefined) {

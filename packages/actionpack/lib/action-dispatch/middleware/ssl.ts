@@ -91,13 +91,13 @@ export class SSL {
   private normalizeHstsOptions(options: SSLOptions["hsts"]): Required<HSTSOptions> {
     switch (options) {
       case false:
-        return { ...SSL.defaultHstsOptions(), expires: 0 } as Required<HSTSOptions>;
+        return { ...SSL.defaultHstsOptions(), expires: 0 };
       case null:
       case undefined:
       case true:
         return SSL.defaultHstsOptions();
       default:
-        return { ...SSL.defaultHstsOptions(), ...options } as Required<HSTSOptions>;
+        return { ...SSL.defaultHstsOptions(), ...options };
     }
   }
 

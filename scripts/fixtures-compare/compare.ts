@@ -366,7 +366,7 @@ function loadRailsYaml(file: string, basename: string): { ok: true; data: Fixtur
     ?? (parsed as Record<string, unknown>)._fixture;
   const ignored = new Set<string>(["_fixture"]);
   if (meta && typeof meta === "object" && "ignore" in meta) {
-    const ig = (meta as { ignore: unknown }).ignore;
+    const ig = (meta).ignore;
     if (typeof ig === "string") ignored.add(ig);
     else if (Array.isArray(ig)) for (const n of ig) if (typeof n === "string") ignored.add(n);
   }
@@ -612,9 +612,9 @@ function tableShape(table: TableSchema): {
   if (isWrappedSchema(table)) {
     const pk = table.primaryKey;
     const hasImplicitId = pk !== false && !Array.isArray(pk);
-    return { columns: columnsOf(table) as Record<string, unknown>, hasImplicitId };
+    return { columns: columnsOf(table), hasImplicitId };
   }
-  return { columns: table as Record<string, unknown>, hasImplicitId: true };
+  return { columns: table, hasImplicitId: true };
 }
 
 /**

@@ -51,7 +51,7 @@ export function javascriptTag(
   let content: unknown;
   if (block) {
     if (isPlainObject(contentOrOptionsWithBlock)) {
-      htmlOptions = contentOrOptionsWithBlock as Record<string, unknown>;
+      htmlOptions = contentOrOptionsWithBlock;
     }
     content = capture.call(this, block);
     if (content instanceof Promise) {

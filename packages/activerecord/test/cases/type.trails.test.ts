@@ -194,7 +194,7 @@ describe("attribute() resolves through the declaring model's adapter", () => {
     (
       AdapterScoped as unknown as { connectionDbConfig: () => { adapter: string } }
     ).connectionDbConfig = () => ({ adapter });
-    return AdapterScoped as unknown as typeof Base;
+    return AdapterScoped;
   }
 
   it("picks the mysql2 string registration for a mysql2 model", () => {

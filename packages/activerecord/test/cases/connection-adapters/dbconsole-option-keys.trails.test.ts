@@ -6,10 +6,9 @@ import { AbstractMysqlAdapter } from "../../../lib/connection-adapters/abstract-
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
-import type { DatabaseConfigOptions } from "../../../lib/database-configurations/database-config.js";
 
 const dbConfig = (hash: Record<string, unknown>): HashConfig =>
-  new HashConfig("test", "primary", hash as DatabaseConfigOptions);
+  new HashConfig("test", "primary", hash);
 
 let findCmdAndExec: ReturnType<typeof vi.fn>;
 

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { KeyValue, type Store } from "../../lib/backend/key-value.js";
+import { KeyValue } from "../../lib/backend/key-value.js";
 
 describe("I18nBackendFlattenTrailsTest", () => {
   let backend: KeyValue;
 
   beforeEach(() => {
-    backend = new KeyValue(new Map<string, string>() as Store);
+    backend = new KeyValue(new Map<string, string>());
   });
 
   it("store_link normalizes the locale through to_sym", () => {

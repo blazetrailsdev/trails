@@ -266,7 +266,7 @@ describe("CodeStatisticsTest", () => {
       ["Models", tmpPath],
       ["Model tests", path.join(tmpPath, "t")],
     );
-    const write = vi.spyOn(STDOUT, "write").mockReturnValue(0 as never);
+    const write = vi.spyOn(STDOUT, "write").mockReturnValue(0);
     stats.toString();
     const s = write.mock.calls.map((call) => String(call[0])).join("");
     write.mockRestore();

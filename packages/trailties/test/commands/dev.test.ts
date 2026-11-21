@@ -23,7 +23,7 @@ function appFile(path: string, contents: string): void {
 }
 
 async function runDevCacheCommand(): Promise<string> {
-  const write = vi.spyOn(stdout, "write").mockReturnValue(true as never);
+  const write = vi.spyOn(stdout, "write").mockReturnValue(true);
   await invoke("dev:cache");
   const output = write.mock.calls.map((args) => String(args[0])).join("");
   write.mockRestore();

@@ -48,7 +48,7 @@ export class ClassMethods {
       callback = block;
     } else {
       if (rbObjIsProc(callbackOrMethodName)) {
-        callback = callbackOrMethodName as Callback;
+        callback = callbackOrMethodName;
       } else if (rbObjIsKindOf(callbackOrMethodName, rbCSymbol)) {
         callback = function (this: unknown) {
           return rbFSend(this, callbackOrMethodName);

@@ -9,7 +9,6 @@ import {
 
 import {
   type ForeignKeyDefinition,
-  type ColumnOptions,
   type AddColumnOptions,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
@@ -138,7 +137,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (options["using"]) {
       sql += ` USING ${options["using"]}`;
     } else if (options["castAs"]) {
-      const castType = this.typeToSql(options["castAs"] as any, options as ColumnOptions);
+      const castType = this.typeToSql(options["castAs"] as any, options);
       sql += ` USING CAST(${quotedName} AS ${castType})`;
     }
 

@@ -503,14 +503,14 @@ export function applyJoinDependency<R>(
     eagerLoading &&
     this.hasLimitOrOffset &&
     !(
-      this.usingLimitableReflections(joinDependency.reflections as never) &&
+      this.usingLimitableReflections(joinDependency.reflections) &&
       this.usingLimitableReflections(
         this.constructJoinDependency(
           this.selectAssociationList(this.joinsValues).concat(
             this.selectAssociationList(this.leftOuterJoinsValues),
           ),
           null,
-        ).reflections as never,
+        ).reflections,
       )
     )
   ) {

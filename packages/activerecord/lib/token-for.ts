@@ -94,7 +94,7 @@ export class RelationMethods<T extends Base = Base> {
   async findByTokenForBang(this: Relation<T>, purpose: string, token: string): Promise<T> {
     const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
       token,
-      (id) => this.find(id) as Promise<Base>,
+      (id) => this.find(id),
     );
     if (!record) throw new InvalidSignature();
     return record as T;

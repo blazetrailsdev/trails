@@ -1,6 +1,5 @@
 import { Deprecation as ActiveSupportDeprecation } from "../deprecation.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
-import type { DeprecationBehaviorCallable } from "../deprecation.js";
 import { ArgumentError } from "../hash-utils.js";
 import { assert } from "./assertions.js";
 
@@ -61,9 +60,9 @@ export async function collectDeprecations<T>(
   }
   const oldBehavior = deprecator.behavior;
   const deprecations: string[] = [];
-  deprecator.behavior = ((message: string) => {
+  deprecator.behavior = (message: string) => {
     deprecations.push(message);
-  }) as DeprecationBehaviorCallable;
+  };
   try {
     const result = await block();
     return [result, deprecations];

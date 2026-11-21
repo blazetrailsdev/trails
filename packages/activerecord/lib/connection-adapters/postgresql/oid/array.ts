@@ -104,7 +104,7 @@ export class Array extends ValueType<unknown> {
   map(value: unknown, block: (value: unknown) => unknown): unknown {
     return globalThis.Array.isArray(value)
       ? value.map((element) => block(element))
-      : this.subtype.map!(value as never, block);
+      : this.subtype.map!(value, block);
   }
 
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {

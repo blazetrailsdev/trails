@@ -68,7 +68,7 @@ export class XMLConverter {
       return value;
     } else {
       throw new RuntimeError(
-        `can't typecast ${value == null ? "NilClass" : (value as object).constructor.name} - ${inspect(value)}`,
+        `can't typecast ${value == null ? "NilClass" : value.constructor.name} - ${inspect(value)}`,
       );
     }
   }

@@ -46,7 +46,7 @@ function makeHost(controllerPath: string, actionName: string): TranslationHost {
   return {
     actionName,
     constructor: { controllerPath: () => controllerPath },
-  } as unknown as TranslationHost;
+  };
 }
 
 describe("AbstractController::Translation — trails-only", () => {

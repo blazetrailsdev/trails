@@ -50,26 +50,26 @@ describe("Thor::Actions", () => {
 
   describe("#chmod", () => {
     it("executes the command given", async () => {
-      const chmodR = vi.spyOn(FileUtils, "chmodRAsync").mockResolvedValue(undefined as never);
+      const chmodR = vi.spyOn(FileUtils, "chmodRAsync").mockResolvedValue(undefined);
       await action("chmod", "foo", 0o755);
       expect(chmodR).toHaveBeenCalledWith(0o755, file());
     });
 
     it("does not execute the command if pretending", async () => {
-      const chmodR = vi.spyOn(FileUtils, "chmodRAsync").mockResolvedValue(undefined as never);
+      const chmodR = vi.spyOn(FileUtils, "chmodRAsync").mockResolvedValue(undefined);
       runner({ pretend: true });
       await action("chmod", "foo", 0o755);
       expect(chmodR).not.toHaveBeenCalled();
     });
 
     it("logs status", async () => {
-      const chmodR = vi.spyOn(FileUtils, "chmodRAsync").mockResolvedValue(undefined as never);
+      const chmodR = vi.spyOn(FileUtils, "chmodRAsync").mockResolvedValue(undefined);
       expect(await action("chmod", "foo", 0o755)).toEqual("       chmod  foo\n");
       expect(chmodR).toHaveBeenCalledWith(0o755, file());
     });
 
     it("does not log status if required", async () => {
-      const chmodR = vi.spyOn(FileUtils, "chmodRAsync").mockResolvedValue(undefined as never);
+      const chmodR = vi.spyOn(FileUtils, "chmodRAsync").mockResolvedValue(undefined);
       assertEmpty(await action("chmod", "foo", 0o755, { verbose: false }));
       expect(chmodR).toHaveBeenCalledWith(0o755, file());
     });
@@ -145,9 +145,7 @@ describe("Thor::Actions", () => {
 
   describe("#get", () => {
     function stubRequest(body: string) {
-      return vi
-        .spyOn(globalThis, "fetch")
-        .mockImplementation(async () => new Response(body) as never);
+      return vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(body));
     }
 
     it("copies file from source to the specified destination", async () => {

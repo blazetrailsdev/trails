@@ -11,7 +11,6 @@ import {
   assertNoDifference,
 } from "@blazetrails/activesupport/testing/assertions";
 import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
-import type { Time } from "@blazetrails/date";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import {
   Dispatcher,
@@ -208,14 +207,14 @@ describe("JobsLifecycleTest", { timeout: 15_000 }, () => {
 
     expect(await ScheduledExecution.count()).toBe(2);
 
-    travelTo(days(2).fromNow() as Time);
+    travelTo(days(2).fromNow());
 
     await waitForJobsToFinishFor(2);
 
     expect(JobBuffer.size()).toBe(1);
     expect(JobBuffer.lastValue()).toBe("I'm scheduled");
 
-    travelTo(days(5).fromNow() as Time);
+    travelTo(days(5).fromNow());
 
     await waitForJobsToFinishFor(2);
 
@@ -259,7 +258,7 @@ describe("JobsLifecycleTest", { timeout: 15_000 }, () => {
       },
     );
 
-    travelTo(days(3).fromNow() as Time);
+    travelTo(days(3).fromNow());
 
     await assertDifference(
       () => Job.count(),
@@ -278,7 +277,7 @@ describe("JobsLifecycleTest", { timeout: 15_000 }, () => {
 
     for (const job of jobs) await job.finishedBang();
 
-    travelTo(days(3).fromNow() as Time);
+    travelTo(days(3).fromNow());
 
     await Job.clearFinishedInBatches({ className: "AddToBufferJob" });
 

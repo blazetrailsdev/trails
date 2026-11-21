@@ -211,10 +211,7 @@ export class Options extends Arguments {
       const names = this.namesToSwitchNames([
         ...new Set(found.filter((o) => opts.includes(o))),
       ]).map((n) => `'${n}'`);
-      const className = rbModName(this.constructor as typeof Options)!
-        .split("::")
-        .at(-1)!
-        .toLowerCase();
+      const className = rbModName(this.constructor)!.split("::").at(-1)!.toLowerCase();
       throw new ExclusiveArgumentError(`Found exclusive ${className} ${names.join(", ")}`);
     }
   }
@@ -224,10 +221,7 @@ export class Options extends Arguments {
     const found = this.atLeastOnes.find((oneReqs) => !oneReqs.some((o) => opts.includes(o)));
     if (found) {
       const names = this.namesToSwitchNames(found).map((n) => `'${n}'`);
-      const className = rbModName(this.constructor as typeof Options)!
-        .split("::")
-        .at(-1)!
-        .toLowerCase();
+      const className = rbModName(this.constructor)!.split("::").at(-1)!.toLowerCase();
       throw new AtLeastOneRequiredArgumentError(
         `Not found at least one of required ${className} ${names.join(", ")}`,
       );

@@ -21,8 +21,7 @@ describe("the to_sql visitor", () => {
   const visitor = new Visitors.ToSql(fakeRecordConnection);
   const table = new Table("users");
   const attr = table.get("id");
-  const compile = (node: unknown): string =>
-    visitor.accept(node as Nodes.Node, new Collectors.SQLString()).value;
+  const compile = (node: unknown): string => visitor.accept(node, new Collectors.SQLString()).value;
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle column names on both sides", () => {
       const node = users.get("first_name").isDistinctFrom(users.get("last_name"));
@@ -185,7 +184,7 @@ describe("the to_sql visitor", () => {
 
   describe("Table", () => {
     it("should compile literal SQL", () => {
-      const test = new Table(sql("generate_series(4, 2)") as unknown as string);
+      const test = new Table(sql("generate_series(4, 2)"));
       expect(mustBeLike(compile(test))).toBe(mustBeLike("generate_series(4, 2)"));
     });
 

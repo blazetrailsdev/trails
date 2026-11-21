@@ -107,7 +107,7 @@ export class Trailtie extends BaseTrailtie {
 
       onLoad("action_controller", (base: AbstractController.RoutesHelpersControllerClass) => {
         const routes = app.routes();
-        include(base as unknown as new (...args: never[]) => unknown, routes.mountedHelpers());
+        include(base, routes.mountedHelpers());
         AbstractController.Trailties.RoutesHelpers.with(routes)(base);
 
         if (options.wrapParametersByDefault && rbObjRespondTo(base, "wrapParameters")) {

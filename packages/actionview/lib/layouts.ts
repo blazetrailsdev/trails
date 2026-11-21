@@ -70,7 +70,7 @@ export function layout(
   layout: LayoutOption,
   conditions: Record<string, string | string[]> = {},
 ): void {
-  if (Object.keys(conditions).length > 0) include(this as never, LayoutConditions);
+  if (Object.keys(conditions).length > 0) include(this, LayoutConditions);
 
   const normalized: Record<string, string[]> = {};
   for (const [k, v] of Object.entries(conditions)) normalized[k] = [v].flat().map(String);

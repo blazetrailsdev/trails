@@ -13,7 +13,7 @@ describe("ValidationsCallbacksStandaloneTest", () => {
       declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
       declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
     }
-    include(Dog as never, ValidationsCallbacks);
+    include(Dog, ValidationsCallbacks);
 
     expect(() =>
       Dog.beforeValidation(() => history.push("before_validation_marker")),

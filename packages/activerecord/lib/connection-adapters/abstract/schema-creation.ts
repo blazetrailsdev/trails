@@ -160,10 +160,7 @@ export class SchemaCreation {
     o.sqlType ??= this.typeToSql(o.type, o.options);
     let columnSql = `${this.conn.quoteColumnName(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
-      columnSql = await this.addColumnOptionsBang(
-        columnSql,
-        this.columnOptions(o) as ColumnOptions,
-      );
+      columnSql = await this.addColumnOptionsBang(columnSql, this.columnOptions(o));
     }
     return columnSql;
   }

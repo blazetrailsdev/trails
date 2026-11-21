@@ -100,7 +100,7 @@ describe("preprocessOrderArgs", () => {
   it("sends the direction to a node key and flattens the nested Hash arm in place", () => {
     const title = Topic.arelTable.get("title");
     const args: unknown[] = [new Map([[title, "DESC"]]), { topics: { id: "asc", title: "desc" } }];
-    preprocessOrderArgs.call(Topic.all() as never, args);
+    preprocessOrderArgs.call(Topic.all(), args);
     expect(args).toHaveLength(3);
     expect(args[0]).toBeInstanceOf(Nodes.Descending);
     expect((args[0] as Nodes.Descending).expr).toBe(title);

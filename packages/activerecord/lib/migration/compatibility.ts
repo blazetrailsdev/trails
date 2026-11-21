@@ -398,7 +398,7 @@ export class V5_2 extends V6_0 {
     options = {
       ...options,
       precision: rtest(options.precision) ? options.precision : null,
-    } as ColumnOptions;
+    };
     await super.addTimestamps(tableName, options);
   }
 

@@ -22,7 +22,7 @@ class RateLimitedController extends Base {
       to: 2,
       within: Duration.seconds(2),
       by(this: RateLimitedController) {
-        return this.params.get("rate_limit_key") as string | undefined;
+        return this.params.get("rate_limit_key");
       },
       async with(this: RateLimitedController) {
         await this.head(":forbidden");

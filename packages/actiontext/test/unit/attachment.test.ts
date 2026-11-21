@@ -127,7 +127,7 @@ describe("ActionText::AttachmentTest", () => {
     const attachment = await attachmentFromHtml(html);
     const attachable = attachment.attachable as ContentAttachment;
 
-    await Content.withRenderer(MessagesController.renderer as never, async () => {
+    await Content.withRenderer(MessagesController.renderer, async () => {
       expect(String(await attachable.toHtml()).trim()).toBe("<p>abc</p>");
     });
   });

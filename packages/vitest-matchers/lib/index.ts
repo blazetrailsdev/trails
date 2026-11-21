@@ -74,7 +74,7 @@ export const matchers = {
     return result(this, pass && isEmpty(received), received, "to be empty");
   },
   toBeExactInstanceOf(this: MatcherState, received: unknown, cls: unknown) {
-    const pass = received != null && (received as object).constructor === cls;
+    const pass = received != null && received.constructor === cls;
     return result(this, pass, received, `to be an instance of ${String(cls)}`);
   },
   toBeTypeOfAnd(

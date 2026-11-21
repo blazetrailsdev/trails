@@ -101,7 +101,7 @@ describe("PrimaryKeysTest", () => {
       null,
       { from: true, to: false },
       () => {
-        topic.id = null as unknown as number;
+        topic.id = null;
       },
     );
   });
@@ -174,7 +174,7 @@ describe("PrimaryKeysTest", () => {
 
   it("id column that is not primary key", async () => {
     await NonPrimaryKey.createBang({ id: 100 } as any);
-    const actual = await NonPrimaryKey.findBy({ id: 100 } as any);
+    const actual = await NonPrimaryKey.findBy({ id: 100 });
     expect(actual!.inspect()).toMatch(/<NonPrimaryKey id: 100/);
   });
 
@@ -531,7 +531,7 @@ describe("CompositePrimaryKeyTest", () => {
     const book = new CpkBook();
 
     const error = await assertRaises([TypeError], {}, () => {
-      book.id = 1 as unknown as number[];
+      book.id = 1;
     });
 
     expect(error.message).toBe('Expected value matching ["author_id", "id"], got 1.');
@@ -607,7 +607,7 @@ describe("CompositePrimaryKeyTest", () => {
     expect((withAuthorOnly as any).isPrimaryKeyValuesPresent()).toBeFalsy();
 
     const withNullId = new CpkBook();
-    withNullId.id = [null as unknown as number, 1];
+    withNullId.id = [null, 1];
     expect((withNullId as any).isPrimaryKeyValuesPresent()).toBeFalsy();
 
     const withTitleOnly = new CpkBook({ title: "Book A" });

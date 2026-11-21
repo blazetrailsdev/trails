@@ -265,7 +265,7 @@ describe("test_help wires a booted app into the test case classes", () => {
     expect(safeConstantize("Chat::Helpers")).toBeDefined();
 
     const connection = new Connection(new TestServer() as never, MockRequest.envFor("/cable"));
-    const subscriptions = new Subscriptions(connection as never);
+    const subscriptions = new Subscriptions(connection);
     for (const channel of ["ChatChannel", "Chat::AppearancesChannel"]) {
       const identifier = ActiveSupportJSON.encode({ channel });
       await subscriptions.executeCommand({ command: "subscribe", identifier });

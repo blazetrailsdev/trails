@@ -45,7 +45,7 @@ describe("SolidQueue::ProcessTest", () => {
     await Process.register({ kind: "Worker", pid: 42, name: "worker-42" });
     await Process.register({ kind: "Worker", pid: 43, name: "worker-43" });
 
-    travelTo(minutes(10).fromNow() as Time);
+    travelTo(minutes(10).fromNow());
 
     await Process.register({ kind: "Worker", pid: 44, name: "worker-44" });
 
@@ -63,7 +63,7 @@ describe("SolidQueue::ProcessTest", () => {
 
     await ReadyExecution.claim("*", 5, process.id);
 
-    travelTo(minutes(10).fromNow() as Time);
+    travelTo(minutes(10).fromNow());
 
     await assertDifference(
       () => FailedExecution.count(),
@@ -98,7 +98,7 @@ describe("SolidQueue::ProcessTest", () => {
 
     await ReadyExecution.claim("*", 5, process.id);
 
-    travelTo(minutes(10).fromNow() as Time);
+    travelTo(minutes(10).fromNow());
 
     await assertDifference(
       () => Process.count(),
@@ -162,7 +162,7 @@ describe("SolidQueue::ProcessTest", () => {
       new StatementInvalid("no connection"),
     );
 
-    travelTo(minutes(1).fromNow() as Time);
+    travelTo(minutes(1).fromNow());
     try {
       await expect(process.heartbeat()).rejects.toThrow(StatementInvalid);
     } finally {

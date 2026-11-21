@@ -112,7 +112,6 @@ import {
   ForeignKeyDefinition,
   type AddForeignKeyOptions,
   type ColumnType,
-  type ColumnOptions,
 } from "./abstract/schema-definitions.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { databaseCli } from "../active-record.js";
@@ -517,10 +516,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   ): Promise<unknown> {
     if (isInvalidAlterTableType(type, options ?? {})) {
       return this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
-        definition.column(columnName, type as ColumnType, (options ?? {}) as ColumnOptions);
+        definition.column(columnName, type, options ?? {});
       });
     }
-    return super.addColumn(tableName, columnName, type as ColumnType, options as ColumnOptions);
+    return super.addColumn(tableName, columnName, type, options);
   }
 
   /** @inventedArm clearDataSourceCacheBang — PERMANENT */
@@ -590,7 +589,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   ): Promise<void> {
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
-      definition.changeColumn(columnName, type as ColumnType, (options ?? {}) as ColumnOptions);
+      definition.changeColumn(columnName, type, options ?? {});
     });
   }
 
@@ -841,7 +840,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     let definition!: SQLite3TableDefinition;
     await this.createTable(to, { ...options, id: false }, async (td) => {
-      definition = td as SQLite3TableDefinition;
+      definition = td;
       if (Array.isArray(fromPrimaryKey)) definition.primaryKeys(fromPrimaryKey);
 
       for (const column of (await this.columns(from)) as Sqlite3Column[]) {

@@ -34,7 +34,6 @@ import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/me
 import {
   SERIALIZERS,
   SerializerWithFallback,
-  type Serializer as SerializerWithFallbackSerializer,
 } from "@blazetrails/activesupport/messages/serializer-with-fallback";
 import {
   InvalidMessage,
@@ -479,7 +478,7 @@ export class SignedKeyRotatingCookieJar extends AbstractCookieJar {
     const secret = keyGenerator
       .call(this.request)!
       .generateKey(signedCookieSalt.call(this.request)!);
-    this.verifier = new MessageVerifier(secret as string, {
+    this.verifier = new MessageVerifier(secret, {
       digest: this.signedCookieDigest(),
       serializer: NullSerializer,
     });
@@ -532,7 +531,7 @@ export class EncryptedKeyRotatingCookieJar extends AbstractCookieJar {
       const signSecret = keyGenerator
         .call(this.request)!
         .generateKey(encryptedSignedCookieSalt.call(this.request)!);
-      this.encryptor = new MessageEncryptor(secret as Buffer, signSecret as Buffer, {
+      this.encryptor = new MessageEncryptor(secret, signSecret, {
         cipher: "aes-256-cbc",
         serializer: NullSerializer,
       });
@@ -801,7 +800,7 @@ export function isReserialize(
 ): boolean {
   const configured = serializer.call(this);
   return (
-    [...SERIALIZERS.values()].includes(configured as SerializerWithFallbackSerializer) &&
+    [...SERIALIZERS.values()].includes(configured) &&
     configured !== SerializerWithFallback.get("marshal") &&
     !configured.dumped(dumped)
   );

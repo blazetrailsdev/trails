@@ -166,7 +166,7 @@ export abstract class Store {
     }
     this.coder =
       coder == null || (coder as unknown) === false
-        ? (SerializerWithFallback.get("passthrough") as CacheCoder)
+        ? SerializerWithFallback.get("passthrough")
         : coder;
     this.coderSupportsCompression = typeof this.coder.dumpCompressed === "function";
   }

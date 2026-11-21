@@ -183,9 +183,7 @@ export async function destroy<T>(this: any, superFn: () => Promise<T>): Promise<
 }
 
 export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
-  return this._runTouchCallbacks(
-    () => rbCallSuper(this, touch, ...names) as Promise<boolean>,
-  ) as Promise<boolean>;
+  return this._runTouchCallbacks(() => rbCallSuper(this, touch, ...names)) as Promise<boolean>;
 }
 
 export function incrementBang<T>(
@@ -195,8 +193,8 @@ export function incrementBang<T>(
   options: { touch?: unknown } = {},
 ): Promise<T> {
   return rtest(options.touch)
-    ? (this._runTouchCallbacks(
-        () => rbCallSuper(this, incrementBang, attribute, by, options) as Promise<T>,
+    ? (this._runTouchCallbacks(() =>
+        rbCallSuper(this, incrementBang, attribute, by, options),
       ) as Promise<T>)
     : (rbCallSuper(this, incrementBang, attribute, by, options) as Promise<T>);
 }

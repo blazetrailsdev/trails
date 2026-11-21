@@ -624,11 +624,7 @@ export class ReferenceDefinition {
       await connection.addIndex(tableName, this.columnNames(), this.indexOptions(tableName));
     }
     if (this.foreignKey) {
-      await connection.addForeignKey(
-        tableName,
-        this.foreignTableName(),
-        this.foreignKeyOptions() as AddForeignKeyOptions,
-      );
+      await connection.addForeignKey(tableName, this.foreignTableName(), this.foreignKeyOptions());
     }
   }
 
@@ -640,7 +636,7 @@ export class ReferenceDefinition {
       table.index(this.columnNames(), this.indexOptions(table.name));
     }
     if (this.foreignKey) {
-      table.foreignKey(this.foreignTableName(), this.foreignKeyOptions() as AddForeignKeyOptions);
+      table.foreignKey(this.foreignTableName(), this.foreignKeyOptions());
     }
   }
 
@@ -689,7 +685,7 @@ export class ReferenceDefinition {
       ...this.asOptions(this.foreignKey),
       column: this.columnName(),
       ...this.conditionalOptions(),
-    } as ReferenceForeignKeyOptions;
+    };
   }
 
   /** @internal */
@@ -863,7 +859,7 @@ export class TableDefinition {
   ): this {
     const { index, ...colOpts } = options;
     this.raiseOnDuplicateColumn(name);
-    this.columnsHash.set(name, this.newColumnDefinition(name, type, colOpts as ColumnOptions));
+    this.columnsHash.set(name, this.newColumnDefinition(name, type, colOpts));
     if (index) {
       const indexOpts: AddIndexOptions = typeof index === "object" ? index : {};
       this.index([name], indexOpts);
@@ -935,7 +931,7 @@ export class TableDefinition {
     if (this.isIntegerLikePrimaryKey(type, options)) {
       type = this.integerLikePrimaryKeyType(type, options);
     }
-    type = this.aliasedTypes(type, type) as ColumnType;
+    type = this.aliasedTypes(type, type);
     if (this.conn.supportsDatetimeWithPrecision()) {
       if (type === "datetime" && !("precision" in options)) {
         options = { ...options, precision: 6 };
@@ -955,7 +951,7 @@ export class TableDefinition {
     toTable = `${prefix ?? ""}${toTable}${suffix ?? ""}`;
     options = this.conn.foreignKeyOptions(this.name, toTable, {
       ...options,
-    }) as Partial<AddForeignKeyOptions>;
+    });
     return new ForeignKeyDefinition(this.name, toTable, options);
   }
 
@@ -963,10 +959,7 @@ export class TableDefinition {
     expression: string,
     options: { name?: string; validate?: boolean | null; [key: string]: unknown } = {},
   ): CheckConstraintDefinition {
-    options = this.conn.checkConstraintOptions(this.name, expression, options) as {
-      name?: string;
-      validate?: boolean;
-    };
+    options = this.conn.checkConstraintOptions(this.name, expression, options);
     return new CheckConstraintDefinition(this.name, expression, options);
   }
 
@@ -1036,7 +1029,7 @@ export class TableDefinition {
           if (names.length === 0) {
             throw new ArgumentError(`Missing column name(s) for ${columnType}`);
           }
-          names.forEach((name) => this.column(name as string, columnType as ColumnType, options));
+          names.forEach((name) => this.column(name as string, columnType, options));
           return names;
         };
     }
@@ -1066,7 +1059,7 @@ export class Table {
     type: ColumnType,
     options: Omit<ColumnOptions, "index"> & { index?: boolean | AddIndexOptions } = {},
   ): Promise<void> {
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
+    this.raiseOnIfExistOptions(options);
     const { index: indexOpt, ...colOpts } = options;
     await this._schema.addColumn(this.name, columnName, type, ...keywordSplat(colOpts));
     if (indexOpt) {
@@ -1270,8 +1263,7 @@ export class Table {
           if (names.length === 0) {
             throw new ArgumentError(`Missing column name(s) for ${columnType}`);
           }
-          for (const name of names)
-            await this.column(name as string, columnType as ColumnType, options);
+          for (const name of names) await this.column(name as string, columnType, options);
           return names;
         };
     }

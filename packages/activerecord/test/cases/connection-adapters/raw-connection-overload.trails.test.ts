@@ -141,7 +141,7 @@ describe("config-hash constructor retains foreignKeys in _config", () => {
   });
 
   it("Mysql2Adapter honors foreignKeys:false and defaults to true", () => {
-    const disabled = new Mysql2Adapter({ foreignKeys: false } as never);
+    const disabled = new Mysql2Adapter({ foreignKeys: false });
     expect(disabled.supportsForeignKeys()).toBe(true);
     expect(guards(disabled).isForeignKeysEnabled()).toBe(false);
     expect(guards(disabled).useForeignKeys()).toBe(false);

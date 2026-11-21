@@ -114,7 +114,7 @@ export class Cron {
 
     s = hashAref(this.SPECIALS, s) ?? s;
 
-    if (typeof s !== "string" || isSymbol(s as unknown)) return null;
+    if (typeof s !== "string" || isSymbol(s)) return null;
 
     const h = Cron.Parser.parse(strip(s)) as CronHash | null;
 

@@ -50,7 +50,7 @@ export class CreateOne {
   async upload(): Promise<void> {
     const attachable = this.attachable;
     if (attachable instanceof UploadedFile) {
-      await this.blob.uploadWithoutUnfurling(attachable.open() as unknown as BlobIo);
+      await this.blob.uploadWithoutUnfurling(attachable.open());
     } else if (attachable instanceof RackTestUploadedFile) {
       await this.blob.uploadWithoutUnfurling(
         (rbObjRespondTo(attachable, "open")
@@ -62,9 +62,9 @@ export class CreateOne {
         fetch<BlobIo>(attachable as Record<string, unknown>, "io"),
       );
     } else if (attachable instanceof File) {
-      await this.blob.uploadWithoutUnfurling(attachable as unknown as BlobIo);
+      await this.blob.uploadWithoutUnfurling(attachable);
     } else if (attachable instanceof Pathname) {
-      await this.blob.uploadWithoutUnfurling(attachable.open() as BlobIo);
+      await this.blob.uploadWithoutUnfurling(attachable.open());
     } else if (!(attachable instanceof ActiveStorage.Blob!) && typeof attachable !== "string") {
       throw new ArgumentError(
         `Could not upload: expected attachable, got ${rbInspect(attachable)}`,
@@ -129,7 +129,7 @@ export class CreateOne {
       return attachable;
     } else if (attachable instanceof UploadedFile) {
       return ActiveStorage.Blob!.buildAfterUnfurling({
-        io: attachable.open() as unknown as BlobIo,
+        io: attachable.open(),
         filename: attachable.originalFilename!,
         contentType: attachable.contentType,
         record: this.record,
@@ -157,14 +157,14 @@ export class CreateOne {
       return await ActiveStorage.Blob!.findSignedBang(attachable, { record: this.record });
     } else if (attachable instanceof File) {
       return ActiveStorage.Blob!.buildAfterUnfurling({
-        io: attachable as unknown as BlobIo,
+        io: attachable,
         filename: File.basename(attachable.path()!),
         record: this.record,
         serviceName: this.attachmentServiceName(),
       });
     } else if (attachable instanceof Pathname) {
       return ActiveStorage.Blob!.buildAfterUnfurling({
-        io: attachable.open() as BlobIo,
+        io: attachable.open(),
         filename: File.basename(attachable.toString()),
         record: this.record,
         serviceName: this.attachmentServiceName(),

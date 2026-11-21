@@ -113,7 +113,7 @@ export const SessionObject = {
   },
 
   prepareSession(this: Persisted, req: Request): Promise<RequestSession> {
-    return RequestSession.create(this as any, req, this.defaultOptions);
+    return RequestSession.create(this, req, this.defaultOptions);
   },
 
   isLoadedSession(this: unknown, session: unknown): boolean {

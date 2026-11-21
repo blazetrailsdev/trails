@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from "vitest";
 import { readFile, stat, unlink, writeFile } from "fs/promises";
 import { Lint, MockRequest, Mime, CONTENT_TYPE } from "@blazetrails/rack";
-import type { MockResponse, RackApp, RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
+import type { MockResponse, RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Gzip } from "@blazetrails/activesupport/gzip";
 import {
   assert,
@@ -15,7 +15,7 @@ import { FIXTURE_LOAD_PATH } from "../../support/abstract-unit.js";
 const DummyApp = async (_env: RackEnv | null): Promise<RackResponse> => [
   200,
   { [CONTENT_TYPE]: "text/plain" },
-  ["Hello, World!"] as unknown as RackBody,
+  ["Hello, World!"],
 ];
 
 const JAVASCRIPT_MIME_TYPE = Mime.MIME_TYPES[".js"];

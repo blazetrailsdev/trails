@@ -270,7 +270,7 @@ describe("PostgreSQLAdapter#sqlKey", () => {
   });
 
   it("setSchemaSearchPath re-scopes the key so no stale statement is reused", async () => {
-    vi.spyOn(adapter, "internalExecute").mockResolvedValue(undefined as never);
+    vi.spyOn(adapter, "internalExecute").mockResolvedValue(undefined);
 
     await adapter.setSchemaSearchPath("schema_a, public");
     const keyA = sqlKey("SELECT * FROM widgets");

@@ -109,10 +109,10 @@ export class DBConsole {
   /** @internal */
   private async adapterClass(): Promise<AdapterClass> {
     try {
-      return ConnectionAdapters.resolve((await this.dbConfig()).adapter) as unknown as AdapterClass;
+      return ConnectionAdapters.resolve((await this.dbConfig()).adapter);
     } catch (error) {
       if (!(error instanceof LoadError)) throw error;
-      return AbstractAdapter as unknown as AdapterClass;
+      return AbstractAdapter;
     }
   }
 

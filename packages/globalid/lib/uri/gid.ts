@@ -226,4 +226,4 @@ export class GID extends Generic {
   }
 }
 
-URI.registerScheme("GID", GID as never);
+URI.registerScheme("GID", GID);

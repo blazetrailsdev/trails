@@ -81,7 +81,7 @@ export class Previewer {
     to.binmode();
 
     await this.openTempfile(async (err) => {
-      await IO.popen(argv, { err: err as unknown as IO }, (out) => IO.copyStream(out, to));
+      await IO.popen(argv, { err: err }, (out) => IO.copyStream(out, to));
       err.rewind();
 
       if (!Process.lastStatus!.isSuccess()) {

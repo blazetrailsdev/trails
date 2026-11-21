@@ -606,9 +606,7 @@ export class PluginGenerator extends AppBase {
 
   /** @internal */
   protected getBuilderClass(): new (generator: never) => object {
-    return TopLevel.PluginBuilder !== undefined
-      ? TopLevel.PluginBuilder
-      : (PluginBuilder as unknown as new (generator: never) => object);
+    return TopLevel.PluginBuilder !== undefined ? TopLevel.PluginBuilder : PluginBuilder;
   }
 
   /** @internal */

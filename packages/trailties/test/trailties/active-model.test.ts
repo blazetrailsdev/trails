@@ -12,14 +12,14 @@ describe("RailtieTest", () => {
   beforeEach(() => {
     deprecators = new Deprecators();
     app = { deprecators };
-    Trailtie.config.set("activeModel", {} as ActiveModelConfig);
+    Trailtie.config.set("activeModel", {});
   });
 
   afterEach(() => {
     SecurePassword.minCost = false;
     ActiveModelError.i18nCustomizeFullMessage = false;
     _resetTrailsEnv();
-    Trailtie.config.set("activeModel", {} as ActiveModelConfig);
+    Trailtie.config.set("activeModel", {});
   });
 
   it("secure password min_cost is false in the development environment", async () => {

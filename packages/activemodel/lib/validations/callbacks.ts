@@ -7,7 +7,7 @@ import {
   type Extended,
 } from "@blazetrails/activesupport";
 import { isIntersect, rbCallSuper } from "@blazetrails/ruby-compat";
-import type { CallbackConditions, CallbackObject } from "../callbacks.js";
+import type { CallbackObject } from "../callbacks.js";
 
 export const ClassMethods = {
   beforeValidation<T extends ValidationCallbacksHost>(
@@ -17,7 +17,7 @@ export const ClassMethods = {
   ): void {
     setOptionsForCallback(options);
 
-    this.setCallback("validation", "before", fn, options as CallbackConditions);
+    this.setCallback("validation", "before", fn, options);
   },
 
   afterValidation<T extends ValidationCallbacksHost>(
@@ -30,7 +30,7 @@ export const ClassMethods = {
 
     setOptionsForCallback(options);
 
-    this.setCallback("validation", "after", fn, options as CallbackConditions);
+    this.setCallback("validation", "after", fn, options);
   },
 };
 

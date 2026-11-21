@@ -47,7 +47,7 @@ export class Cookie extends PersistedSecure {
       override decode(str: string | null): unknown {
         if (!isTruthy(str)) return null;
         try {
-          return RubyCompat.Marshal.load(super.decode(str!) as string);
+          return RubyCompat.Marshal.load(super.decode(str!));
         } catch (error) {
           if (!(error instanceof StandardError)) throw error;
           return null;

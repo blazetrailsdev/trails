@@ -33,7 +33,7 @@ describe("TemplateRenderer", () => {
   describe("renders a template by name", () => {
     it("renders a bare template", async () => {
       const fake = makeFakeTemplate("Hello world");
-      vi.spyOn(lc, "findTemplate").mockReturnValue(fake as never);
+      vi.spyOn(lc, "findTemplate").mockReturnValue(fake);
       const renderer = new TemplateRenderer(lc);
       const result = await renderer.render(ctx, { template: "posts/show" });
       expect(result.body).toBe("Hello world");
@@ -41,7 +41,7 @@ describe("TemplateRenderer", () => {
 
     it("renders a template with locals", async () => {
       const fake = makeFakeTemplate("Hello Alice");
-      vi.spyOn(lc, "findTemplate").mockReturnValue(fake as never);
+      vi.spyOn(lc, "findTemplate").mockReturnValue(fake);
       const renderer = new TemplateRenderer(lc);
       const result = await renderer.render(ctx, {
         template: "posts/show",
@@ -108,8 +108,8 @@ describe("TemplateRenderer", () => {
       const templateFake = makeFakeTemplate("content");
       const layoutFake = makeFakeTemplate("LAYOUT[content]");
       vi.spyOn(lc, "findTemplate")
-        .mockReturnValueOnce(templateFake as never)
-        .mockReturnValueOnce(layoutFake as never);
+        .mockReturnValueOnce(templateFake)
+        .mockReturnValueOnce(layoutFake);
       const renderer = new TemplateRenderer(lc);
       const result = await renderer.render(ctx, {
         template: "posts/show",
@@ -140,7 +140,7 @@ describe("Renderer (async chain)", () => {
 
   it("render() returns a Promise<string>", async () => {
     const fake = makeFakeTemplate("hello");
-    vi.spyOn(lc, "findTemplate").mockReturnValue(fake as never);
+    vi.spyOn(lc, "findTemplate").mockReturnValue(fake);
     const renderer = new Renderer(lc);
     const result = await renderer.render(ctx, { template: "posts/show" });
     expect(result).toBe("hello");

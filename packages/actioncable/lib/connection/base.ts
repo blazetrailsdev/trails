@@ -95,8 +95,8 @@ export class Base {
     this.workerPool = server.workerPool;
     this.logger = this.newTaggedLogger();
 
-    this._websocket = new WebSocket(env as never, this as never, this.eventLoop as never);
-    this.subscriptions = new Subscriptions(this as never);
+    this._websocket = new WebSocket(env, this, this.eventLoop);
+    this.subscriptions = new Subscriptions(this);
     this._messageBuffer = new MessageBuffer(this);
 
     this._internalSubscriptions = null;
@@ -200,7 +200,7 @@ export class Base {
       let environment: Env | undefined;
       if (TopLevel.Trails?.application != null)
         environment = { ...TopLevel.Trails.application.envConfig(), ...this.env };
-      this._request = new Request((environment || this.env) as never);
+      this._request = new Request(environment || this.env);
     }
     return this._request;
   }
@@ -230,7 +230,7 @@ export class Base {
       this.sendWelcomeMessage();
 
       this.messageBuffer.processBang();
-      return this.server.addConnection(this as never);
+      return this.server.addConnection(this);
     } catch (e) {
       if (!(e instanceof UnauthorizedError)) throw e;
       if (this.websocket.isAlive())
@@ -246,7 +246,7 @@ export class Base {
   private async handleClose(): Promise<unknown> {
     this.logger.info(this.finishedRequestMessage());
 
-    this.server.removeConnection(this as never);
+    this.server.removeConnection(this);
 
     await this.subscriptions.unsubscribeFromAll();
     this.unsubscribeFromInternalChannel();

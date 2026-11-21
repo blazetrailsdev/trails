@@ -20,7 +20,7 @@ export function correctError(errorClass: object, spellChecker: unknown): void {
   _spellCheckers = newMapping;
 
   if (typeof errorClass === "function" && rbClassInheritedP(errorClass, Correctable) !== true) {
-    prepend(errorClass as abstract new (...args: never) => object, Correctable);
+    prepend(errorClass, Correctable);
   }
 }
 

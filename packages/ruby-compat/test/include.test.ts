@@ -1596,8 +1596,8 @@ describe("Module#superMethod", () => {
     });
     include(SubA, mod);
     include(SubB, mod);
-    expect((new SubA() as A).who()).toBe("mA");
-    expect((new SubB() as B).who()).toBe("mB");
+    expect(new SubA().who()).toBe("mA");
+    expect(new SubB().who()).toBe("mB");
   });
 
   it("resumes above an extended object's link, next module first", () => {
@@ -2178,7 +2178,7 @@ describe("Module#prependFeatures", () => {
         return `module > ${mod.superMethod(this, "build")!()}`;
       });
     });
-    prepend({ prototype: Child } as never, mod);
+    prepend({ prototype: Child }, mod);
 
     expect(Child.build()).toBe("module > child");
     expect(new Child()).toBeInstanceOf(Parent);

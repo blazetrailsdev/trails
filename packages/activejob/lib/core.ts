@@ -190,7 +190,7 @@ export class Core {
    */
   set(options: SetOptions = {}): this {
     if (options.wait != null && options.wait !== false)
-      this.scheduledAt = seconds(toF(options.wait)).fromNow() as UtcTime;
+      this.scheduledAt = seconds(toF(options.wait)).fromNow();
     if (options.waitUntil != null && options.waitUntil !== false)
       this.scheduledAt = options.waitUntil as UtcTime;
     if (options.queue != null && options.queue !== false)

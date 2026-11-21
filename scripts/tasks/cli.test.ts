@@ -1407,8 +1407,8 @@ describe("commitAndPush (git mutation flow)", () => {
       seen.push(label);
       // The empty-commit guard diff-trees HEAD after every commit; a real
       // commit is never empty in these flows, so report a file.
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     return { exit, seen, lockDir };
   }
@@ -1420,8 +1420,8 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       heldAt[label] = existsSync(lockPath);
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     commitAndPush({
       message: "test",
@@ -1440,9 +1440,9 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      if (label === "status") return "M  rfcs/0024/stories/held.md" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "status") return "M  rfcs/0024/stories/held.md";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     __setLockWaitForTest(0);
     const holder = acquireTasksLock(lockDir, { waitMs: 0, pollMs: 1 });
@@ -1499,11 +1499,11 @@ describe("commitAndPush (git mutation flow)", () => {
     const added: string[][] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
       if (label === "add") added.push((args ?? []).slice(3));
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     commitAndPush({
       message: "claim: a, b, c",
@@ -1528,11 +1528,11 @@ describe("commitAndPush (git mutation flow)", () => {
     let diffTreeCalls = 0;
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
       // First commit comes out empty (clobbered); the retry commits for real.
-      if (label === "diff-tree") return (diffTreeCalls++ === 0 ? "" : "story.md") as never;
-      return "" as never;
+      if (label === "diff-tree") return diffTreeCalls++ === 0 ? "" : "story.md";
+      return "";
     });
     let mutatorCalls = 0;
     commitAndPush({
@@ -1556,10 +1556,10 @@ describe("commitAndPush (git mutation flow)", () => {
     const { seen, exit } = setup();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
       // Every commit comes out empty — deterministic clobber.
-      return "" as never;
+      return "";
     });
     expect(() =>
       commitAndPush({
@@ -1579,14 +1579,14 @@ describe("commitAndPush (git mutation flow)", () => {
     const { seen, exit } = setup();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
       // Includes --root so a parentless first commit can't read as empty.
       if (label === "diff-tree") {
         expect(args).toContain("--root");
         throw new Error("fatal: bad revision");
       }
-      return "" as never;
+      return "";
     });
     commitAndPush({
       message: "test",
@@ -1635,11 +1635,11 @@ describe("commitAndPush (git mutation flow)", () => {
     let addArg = "";
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       if (label === "add") addArg = args?.[3] ?? "";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     commitAndPush({
       message: "new: 0000-foo/r1",
@@ -1674,9 +1674,9 @@ describe("commitAndPush (git mutation flow)", () => {
     }
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "symbolic-ref") return "main";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     expect(() =>
       commitAndPush({
@@ -1735,11 +1735,11 @@ describe("commitAndPush (git mutation flow)", () => {
     const worktree = new Set<string>();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
+      if (label === "diff-tree") return "story.md";
       if (label === "clean") worktree.delete(args[args.length - 1]);
-      return "" as never;
+      return "";
     });
     // A mutator that writes its file then crashes (e.g. a prettier failure in
     // formatFiles) must not leave the partial write staged/untracked: the error
@@ -1794,12 +1794,12 @@ describe("commitAndPush (git mutation flow)", () => {
     const worktree = new Set<string>();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
+      if (label === "diff-tree") return "story.md";
       if (label === "clean") worktree.delete(args[args.length - 1]);
       if (label === "commit") throw pushError(MARKDOWNLINT_STDERR);
-      return "" as never;
+      return "";
     });
     expect(() =>
       commitAndPush({
@@ -1827,11 +1827,11 @@ describe("commitAndPush (git mutation flow)", () => {
     const { seen } = setup();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
+      if (label === "diff-tree") return "story.md";
       if (label === "commit") throw pushError("validate: story frontmatter is invalid");
-      return "" as never;
+      return "";
     });
     let thrown: unknown;
     try {
@@ -1853,9 +1853,9 @@ describe("commitAndPush (git mutation flow)", () => {
     setup();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "symbolic-ref") return "main";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     // The thrown Error propagates out of commitAndPush intact (the top-level
     // main() wrapper prints its .stack) rather than being swallowed into a bare
@@ -1883,13 +1883,13 @@ describe("commitAndPush (git mutation flow)", () => {
     let push = 0;
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
+      if (label === "diff-tree") return "story.md";
       if (label === "push" && push++ === 0) {
         throw pushError("! [rejected]        main -> main (non-fast-forward)");
       }
-      return "" as never;
+      return "";
     });
     let mutatorCalls = 0;
     commitAndPush({
@@ -1927,11 +1927,11 @@ describe("commitAndPush (git mutation flow)", () => {
     const { seen, exit } = setup();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
+      if (label === "diff-tree") return "story.md";
       if (label === "push") throw pushError("! [rejected] non-fast-forward");
-      return "" as never;
+      return "";
     });
     expect(() =>
       commitAndPush({
@@ -1957,13 +1957,13 @@ describe("commitAndPush (git mutation flow)", () => {
     let push = 0;
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
+      if (label === "diff-tree") return "story.md";
       if (label === "push" && push++ === 0) {
         throw pushError("! [rejected]        main -> main (fetch first)");
       }
-      return "" as never;
+      return "";
     });
     let mutatorCalls = 0;
     commitAndPush({
@@ -1984,13 +1984,13 @@ describe("commitAndPush (git mutation flow)", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
+      if (label === "diff-tree") return "story.md";
       if (label === "push") {
         throw pushError("fatal: Authentication failed for 'https://...'");
       }
-      return "" as never;
+      return "";
     });
     expect(() =>
       commitAndPush({
@@ -2015,10 +2015,10 @@ describe("commitAndPush (git mutation flow)", () => {
     setup();
     const fullArgs: string[][] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
-      if (args && args[2] === "symbolic-ref") return "main" as never;
+      if (args && args[2] === "symbolic-ref") return "main";
       fullArgs.push(args ?? []);
-      if (args && args.includes("diff-tree")) return "story.md" as never;
-      return "" as never;
+      if (args && args.includes("diff-tree")) return "story.md";
+      return "";
     });
     commitAndPush({
       message: "test",
@@ -2048,16 +2048,16 @@ describe("commitAndPush (git mutation flow)", () => {
     const restored: string[] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       if (label === "checkout") {
         const path = args[args.length - 1];
         if (path === "index.md") throw new Error("pathspec 'index.md' did not match");
         restored.push(path);
-        return "" as never;
+        return "";
       }
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     let mutatorCalls = 0;
     commitAndPush({
@@ -2092,10 +2092,10 @@ describe("commitAndPush (git mutation flow)", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "rfc-some-feature" as never;
+      if (label === "symbolic-ref") return "rfc-some-feature";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     let mutatorCalls = 0;
     expect(() =>
@@ -2132,8 +2132,8 @@ describe("commitAndPush (git mutation flow)", () => {
       // git() helper surfaces that as a throw, which the guard must swallow.
       if (label === "symbolic-ref") throw new Error("fatal: ref HEAD is not a symbolic ref");
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     expect(() =>
       commitAndPush({
@@ -2159,10 +2159,10 @@ describe("commitAndPush (git mutation flow)", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "rev-list") return "2" as never; // HEAD is 2 commits ahead
+      if (label === "rev-list") return "2"; // HEAD is 2 commits ahead
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     let mutatorCalls = 0;
     expect(() =>
@@ -2192,8 +2192,8 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "fetch") throw new Error("fatal: unable to access origin");
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     let mutatorCalls = 0;
     commitAndPush({
@@ -2218,9 +2218,9 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
-      if (label === "status") return " M rfcs/0001/stories/foo.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      if (label === "status") return " M rfcs/0001/stories/foo.md";
+      return "";
     });
     let mutatorCalls = 0;
     expect(() =>
@@ -2253,10 +2253,10 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
+      if (label === "diff-tree") return "story.md";
       // index.md changed both staged (`M  ...`) and unstaged (` M ...`).
-      if (label === "status") return "M  index.md\n M index.md" as never;
-      return "" as never;
+      if (label === "status") return "M  index.md\n M index.md";
+      return "";
     });
     let mutatorCalls = 0;
     commitAndPush({
@@ -2281,13 +2281,13 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
+      if (label === "diff-tree") return "story.md";
       if (label === "pull") {
         const e = new Error("Command failed") as Error & { stderr?: string };
         e.stderr = "CONFLICT (content): Merge conflict in rfcs/0001/stories/foo.md";
         throw e;
       }
-      return "" as never;
+      return "";
     });
     let mutatorCalls = 0;
     expect(() =>
@@ -2318,10 +2318,10 @@ describe("commitAndPush (git mutation flow)", () => {
     const { seen } = setup();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "rev-list") return "0" as never; // HEAD even with origin/main
+      if (label === "rev-list") return "0"; // HEAD even with origin/main
       seen.push(label);
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     let mutatorCalls = 0;
     commitAndPush({
@@ -2359,10 +2359,10 @@ describe("commitAndPush (git mutation flow)", () => {
       const dir = args && args.length >= 2 ? args[1] : "";
       if (label === "rev-list") {
         seenWithDir.push({ label, dir });
-        return "1" as never; // the worktree carries a stray commit
+        return "1"; // the worktree carries a stray commit
       }
       if (label === "fetch") seenWithDir.push({ label, dir });
-      return "" as never;
+      return "";
     });
     expect(() =>
       commitAndPush({
@@ -2388,8 +2388,8 @@ describe("commitAndPush (git mutation flow)", () => {
     const fullArgs: string[][] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
       fullArgs.push(args ?? []);
-      if (args && args.includes("diff-tree")) return "story.md" as never;
-      return "" as never;
+      if (args && args.includes("diff-tree")) return "story.md";
+      return "";
     });
     commitAndPush({
       message: "test",
@@ -2409,8 +2409,8 @@ describe("commitAndPush (git mutation flow)", () => {
     const fullArgs: string[][] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
       fullArgs.push(args ?? []);
-      if (args && args.includes("diff-tree")) return "story.md" as never;
-      return "" as never;
+      if (args && args.includes("diff-tree")) return "story.md";
+      return "";
     });
     commitAndPush({
       message: "refine: story-x",
@@ -2517,7 +2517,7 @@ describe("checkPrNotOpen (done merge-state guard)", () => {
   }
 
   it("succeeds silently when PR is merged", () => {
-    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ state: "MERGED" }) as never);
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ state: "MERGED" }));
     expect(() => checkPrNotOpen(123)).not.toThrow();
     expect(execFileSyncMock).toHaveBeenCalledWith(
       "gh",
@@ -2527,13 +2527,13 @@ describe("checkPrNotOpen (done merge-state guard)", () => {
   });
 
   it("succeeds silently when PR is closed (spike / moot-audit)", () => {
-    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ state: "CLOSED" }) as never);
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ state: "CLOSED" }));
     expect(() => checkPrNotOpen(42)).not.toThrow();
   });
 
   it("exits 1 when PR is open (work unfinished)", () => {
     setupExit();
-    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ state: "OPEN" }) as never);
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ state: "OPEN" }));
     expect(() => checkPrNotOpen(42)).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/still open/i));
   });
@@ -2551,7 +2551,7 @@ describe("checkPrNotOpen (done merge-state guard)", () => {
 
   it("exits 1 when gh returns JSON without a state field (API regression)", () => {
     setupExit();
-    execFileSyncMock.mockReturnValueOnce(JSON.stringify({}) as never);
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({}));
     expect(() => checkPrNotOpen(42)).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(
       expect.stringMatching(/could not read PR #42 state/),
@@ -2596,9 +2596,7 @@ describe("checkCheckboxesDone (done unchecked-checkbox guard)", () => {
 
 describe("prLocDelta (est-loc vs actual feedback)", () => {
   it("formats a positive delta when actual exceeds the estimate", () => {
-    execFileSyncMock.mockReturnValueOnce(
-      JSON.stringify({ additions: 200, deletions: 50 }) as never,
-    );
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ additions: 200, deletions: 50 }));
     expect(prLocDelta(7, 150)).toBe("est-loc 150 vs actual 250 (+100)");
     expect(execFileSyncMock).toHaveBeenCalledWith(
       "gh",
@@ -2608,7 +2606,7 @@ describe("prLocDelta (est-loc vs actual feedback)", () => {
   });
 
   it("formats a negative delta when actual is under the estimate", () => {
-    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ additions: 40, deletions: 10 }) as never);
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ additions: 40, deletions: 10 }));
     expect(prLocDelta(7, 150)).toBe("est-loc 150 vs actual 50 (-100)");
   });
 
@@ -2625,7 +2623,7 @@ describe("prLocDelta (est-loc vs actual feedback)", () => {
   });
 
   it("returns null when gh output lacks numeric fields", () => {
-    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ additions: "x" }) as never);
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ additions: "x" }));
     expect(prLocDelta(7, 150)).toBeNull();
   });
 });
@@ -2715,9 +2713,9 @@ describe("newStory status default", () => {
     // (which CI takes, where TASKS_DIR is not a symlink).
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "symbolic-ref") return "main";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     return dir;
   }
@@ -2787,9 +2785,9 @@ describe("mutator refusals release the shared lock (no process.exit leak)", () =
     // post-pull existsSync re-check must throw rather than clobber it.
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       if (label === "pull") writeFileSync(storyFile, "concurrent\n");
-      return "" as never;
+      return "";
     });
     expect(() => newStory("0005-gaps", "s", { allowEmpty: true }, dir)).toThrow(/exit 4/);
     expect(console.error).toHaveBeenCalledWith(
@@ -2805,9 +2803,9 @@ describe("mutator refusals release the shared lock (no process.exit leak)", () =
     const rfcDir = join(dir, "rfcs", "0000-my-rfc");
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       if (label === "pull") mkdirSync(rfcDir, { recursive: true });
-      return "" as never;
+      return "";
     });
     expect(() => newRfc("my-rfc", {}, dir)).toThrow(/exit 4/);
     expect(console.error).toHaveBeenCalledWith(
@@ -2827,9 +2825,9 @@ describe("mutator refusals release the shared lock (no process.exit leak)", () =
     // finalize-rfc.mjs against a vanished dir.
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
+      if (label === "symbolic-ref") return "main";
       if (label === "pull") rmSync(placeholder, { recursive: true, force: true });
-      return "" as never;
+      return "";
     });
     expect(() => finalize("0000-foo", false, dir)).toThrow(/exit 4/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/no longer exists/));
@@ -3030,9 +3028,9 @@ describe("newStory cluster validation", () => {
   it("accepts a cluster declared in the RFC README and proceeds to commitAndPush", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "symbolic-ref") return "main";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
     makeRfcDir(dir, "0005-gaps", ["scaffold", "conversion"]);
@@ -3084,9 +3082,9 @@ describe("newStory packages validation", () => {
   it("writes packages declared by the parent RFC into the story frontmatter", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "symbolic-ref") return "main";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
     makeRfcDir(dir, "0005-gaps", ["activerecord", "arel"]);
@@ -3124,9 +3122,9 @@ describe("newStory --status / --body-file (one-call authoring)", () => {
     // assert the on-disk content a single `new` call produces.
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "symbolic-ref") return "main";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     const dir = makeRepo();
     const bodyFile = join(dir, "body.md");
@@ -3189,9 +3187,9 @@ describe("newStory --status / --body-file (one-call authoring)", () => {
   it("accepts a --body-file with real prose under the skeleton", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "symbolic-ref") return "main";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     const dir = makeRepo();
     const bodyFile = join(dir, "real.md");
@@ -3206,9 +3204,9 @@ describe("newStory --status / --body-file (one-call authoring)", () => {
   it("scaffolds an empty-skeleton story when --allow-empty is passed", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "symbolic-ref") return "main";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     const dir = makeRepo();
     newStory("0005-gaps", "my-story", { allowEmpty: true }, dir);
@@ -3473,9 +3471,9 @@ describe("newRfc", () => {
   it("writes a placeholder README under 0000-<slug> and commits", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
-      if (label === "symbolic-ref") return "main" as never;
-      if (label === "diff-tree") return "story.md" as never;
-      return "" as never;
+      if (label === "symbolic-ref") return "main";
+      if (label === "diff-tree") return "story.md";
+      return "";
     });
     const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
     mkdirSync(join(dir, ".git"));
@@ -3772,8 +3770,8 @@ describe("assertCleanWorktree releases the lock it refuses under", () => {
     return dir;
   }
   function statusReturns(porcelain: string) {
-    execFileSyncMock.mockImplementation(
-      (_file, args) => (args && args[2] === "status" ? porcelain : "") as never,
+    execFileSyncMock.mockImplementation((_file, args) =>
+      args && args[2] === "status" ? porcelain : "",
     );
   }
 
@@ -3982,10 +3980,10 @@ describe("readIndexedFile (body comes from the index's own source)", () => {
   it("reads the body out of the origin/main commit the index was built from", () => {
     const sha = "c".repeat(40);
     const seen: string[][] = [];
-    execFileSyncMock.mockImplementation(((_file: string, args: string[]) => {
+    execFileSyncMock.mockImplementation((_file: string, args: string[]) => {
       seen.push(args);
-      return "---\ntitle: x\n---\n" as never;
-    }) as never);
+      return "---\ntitle: x\n---\n";
+    });
     expect(readIndexedFile({ index: emptyIdx, sha }, "rfcs/0025-x/stories/y.md")).toContain(
       "title: x",
     );
@@ -3993,9 +3991,9 @@ describe("readIndexedFile (body comes from the index's own source)", () => {
   });
 
   it("returns null when the path is absent from that commit", () => {
-    execFileSyncMock.mockImplementation((() => {
+    execFileSyncMock.mockImplementation(() => {
       throw new Error("path does not exist");
-    }) as never);
+    });
     expect(readIndexedFile({ index: emptyIdx, sha: "d".repeat(40) }, "gone.md")).toBeNull();
   });
 

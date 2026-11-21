@@ -8,7 +8,6 @@ import {
   AutoFilteredParameters,
   type AutoFilteredParametersApp,
 } from "../../../lib/encryption/auto-filtered-parameters.js";
-import type { SchemeOptions } from "../../../lib/encryption/scheme.js";
 
 describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   fixtures({});
@@ -53,7 +52,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       primaryKey: "the primary key",
       deterministicKey: "the deterministic key",
       keyDerivationSalt: "the salt",
-      previous: [{ keyProvider: previousKeyProvider } as SchemeOptions],
+      previous: [{ keyProvider: previousKeyProvider }],
     });
 
     const config = Encryption.config;

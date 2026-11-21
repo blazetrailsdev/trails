@@ -284,13 +284,14 @@ describe("ActionView::Template (smoke)", () => {
 
     it("runs the compiled method with the view as `this`", async () => {
       const view = new (Base.withEmptyTemplateCache())(null, {}, null);
-      let seen: unknown;
+      const seen: unknown[] = [];
       (view as unknown as Record<string, unknown>).whoAmI = function (this: Base) {
-        seen = this as unknown;
+        seen.push(this);
         return "ok";
       };
       expect(await render("<%= whoAmI() %>", {}, ctx({ view }))).toBe("ok");
-      expect(seen).toBe(view);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toBe(view);
     });
 
     it("memoizes the compiled method on the view's compiledMethodContainer", async () => {

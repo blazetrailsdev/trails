@@ -60,7 +60,7 @@ function groupclass(): Klass {
 }
 
 function subclass(parent: Klass): Klass {
-  return class extends parent {} as Klass;
+  return class extends parent {};
 }
 
 describe("Thor::Base", () => {

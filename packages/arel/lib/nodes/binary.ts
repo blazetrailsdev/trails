@@ -167,20 +167,29 @@ export class Except extends Binary {
   }
 }
 
-type Includable = new (...args: unknown[]) => object;
 const fetchAttributeModule = FetchAttribute as unknown as Record<
   string,
   (...args: unknown[]) => unknown
 >;
-include(Between as unknown as Includable, fetchAttributeModule);
-include(NotEqual as unknown as Includable, fetchAttributeModule);
-include(GreaterThan as unknown as Includable, fetchAttributeModule);
-include(GreaterThanOrEqual as unknown as Includable, fetchAttributeModule);
-include(LessThan as unknown as Includable, fetchAttributeModule);
-include(LessThanOrEqual as unknown as Includable, fetchAttributeModule);
-include(IsDistinctFrom as unknown as Includable, fetchAttributeModule);
-include(IsNotDistinctFrom as unknown as Includable, fetchAttributeModule);
-include(NotIn as unknown as Includable, fetchAttributeModule);
+type Includable = new (...args: unknown[]) => object;
+const between = Between as unknown as Includable;
+include(between, fetchAttributeModule);
+const greaterThan = GreaterThan as unknown as Includable;
+include(greaterThan, fetchAttributeModule);
+const greaterThanOrEqual = GreaterThanOrEqual as unknown as Includable;
+include(greaterThanOrEqual, fetchAttributeModule);
+const lessThan = LessThan as unknown as Includable;
+include(lessThan, fetchAttributeModule);
+const lessThanOrEqual = LessThanOrEqual as unknown as Includable;
+include(lessThanOrEqual, fetchAttributeModule);
+const isDistinctFrom = IsDistinctFrom as unknown as Includable;
+include(isDistinctFrom, fetchAttributeModule);
+const isNotDistinctFrom = IsNotDistinctFrom as unknown as Includable;
+include(isNotDistinctFrom, fetchAttributeModule);
+const notEqual = NotEqual as unknown as Includable;
+include(notEqual, fetchAttributeModule);
+const notIn = NotIn as unknown as Includable;
+include(notIn, fetchAttributeModule);
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 export interface Binary<L = NodeOrValue, R = NodeOrValue> extends _AliasPredication {

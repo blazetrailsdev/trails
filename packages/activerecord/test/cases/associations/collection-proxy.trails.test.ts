@@ -515,7 +515,7 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
     const result = await proxy.delete(tag);
     expect(result).toHaveLength(1);
     expect((result as Tag[])[0]).toBe(tag);
-    const count = await Tagging.where({ taggable_id: post.id as number }).count();
+    const count = await Tagging.where({ taggable_id: post.id }).count();
     expect(count).toBe(1);
     expect(proxy.target).toHaveLength(1);
     expect(proxy.target[0].id).toBe(tag.id);
@@ -535,11 +535,11 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
     await expect((proxy.delete as (...r: unknown[]) => Promise<unknown>)([tag.id])).rejects.toThrow(
       /Tag.*expected/,
     );
-    expect(await Tagging.where({ taggable_id: post.id as number }).count()).toBe(1);
+    expect(await Tagging.where({ taggable_id: post.id }).count()).toBe(1);
 
     const removed = await proxy.delete(tag.id as number);
     expect(removed).toBeDefined();
-    expect(await Tagging.where({ taggable_id: post.id as number }).count()).toBe(0);
+    expect(await Tagging.where({ taggable_id: post.id }).count()).toBe(0);
   });
 });
 

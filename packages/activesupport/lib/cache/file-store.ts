@@ -120,7 +120,7 @@ export class FileStore extends Store implements CacheStore {
 
   inspect(): string {
     return `#<${this.constructor.name} cache_path=${this._cachePath}, options=${inspectOptions(
-      this.options as Record<string, unknown>,
+      this.options,
     )}>`;
   }
 

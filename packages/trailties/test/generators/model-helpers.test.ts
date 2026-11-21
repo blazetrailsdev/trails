@@ -2,15 +2,16 @@ import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ModelHelpers } from "../../lib/generators/model-helpers.js";
 import { Error } from "../../lib/generators/base.js";
-import {
-  ModelGenerator,
-  type ModelGeneratorOptions,
-} from "../../lib/generators/trails/model/model-generator.js";
+import { ModelGenerator } from "../../lib/generators/trails/model/model-generator.js";
 
 const build = (name: string, forcePlural?: boolean) =>
-  new ModelGenerator([name], { forcePlural } as ModelGeneratorOptions, {
-    destinationRoot: "/nonexistent",
-  });
+  new ModelGenerator(
+    [name],
+    { forcePlural },
+    {
+      destinationRoot: "/nonexistent",
+    },
+  );
 
 describe("normalizeModelName", () => {
   beforeEach(() => {

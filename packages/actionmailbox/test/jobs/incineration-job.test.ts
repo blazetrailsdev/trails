@@ -20,7 +20,7 @@ describe("ActionMailbox::IncinerationJobTest", () => {
 
   beforeEach(async () => {
     const test = new IncinerationJobTest("incinerationJob");
-    t = test as unknown as ActiveJobTestHelper;
+    t = test;
     helper = test as unknown as TestHelper;
     await t.beforeSetup();
     inboundEmail = (await helper.createInboundEmailFromFixture("welcome.eml"))!;

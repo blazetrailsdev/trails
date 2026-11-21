@@ -216,7 +216,7 @@ describe("RelationScopingTest", () => {
     await Developer.annotate("scoped").scoping(async () => {
       let developer: Developer | null = null;
       await self().assertQueriesMatch(/\/\* scoped \*\//, {}, async () => {
-        developer = (await Developer.where("name = 'David'").first()) as Developer;
+        developer = await Developer.where("name = 'David'").first();
       });
       expect(developer!.name).toBe("David");
     });
@@ -228,7 +228,7 @@ describe("RelationScopingTest", () => {
       .scoping(async () => {
         let developer: Developer | null = null;
         const log = await self().captureSql({}, async () => {
-          developer = (await Developer.where("name = 'David'").first()) as Developer;
+          developer = await Developer.where("name = 'David'").first();
         });
 
         expect(isEmpty(log)).toBeFalsy();
@@ -241,10 +241,10 @@ describe("RelationScopingTest", () => {
   it("find with annotation unscope", async () => {
     let developer: Developer | null = null;
     const log = await self().captureSql({}, async () => {
-      developer = (await Developer.annotate("unscope")
+      developer = await Developer.annotate("unscope")
         .where("name = 'David'")
         .unscope(":annotate")
-        .first()) as Developer;
+        .first();
     });
 
     expect(isEmpty(log)).toBeFalsy();
@@ -608,7 +608,7 @@ describe("NestedRelationScopingTest", () => {
 
 describe("HasManyScopingTest", () => {
   it("should maintain default scope on associations", async () => {
-    const magician = (await BadReference.find(1)) as Base;
+    const magician: Base = await BadReference.find(1);
     const michael = (await Person.find(people("michael").id)) as Base;
     const refs = await (michael as any).badReferences.toArray();
     expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
@@ -661,7 +661,7 @@ describe("HasManyScopingTest", () => {
     const loaded = (await Person.where({ id: michael.id })
       .includes(":badReferences")
       .first()) as Base;
-    const magician = (await BadReference.find(1)) as Base;
+    const magician: Base = await BadReference.find(1);
     const refs = await (loaded as any).badReferences.toArray();
     expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
   });

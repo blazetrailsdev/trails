@@ -146,15 +146,13 @@ export function selectTag(
     if (includeBlank != null && includeBlank !== false) {
       optionTags = contentTag
         .call(this, "option", includeBlank, optionsForBlankOptionsTag)
-        .safeConcat(optionTags as string);
+        .safeConcat(optionTags);
     }
   }
 
   const prompt = hashDelete(options, "prompt");
   if (prompt != null && prompt !== false) {
-    optionTags = contentTag
-      .call(this, "option", prompt, { value: "" })
-      .safeConcat(optionTags as string);
+    optionTags = contentTag.call(this, "option", prompt, { value: "" }).safeConcat(optionTags);
   }
 
   return contentTag.call(

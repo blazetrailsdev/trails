@@ -43,7 +43,7 @@ export class TestServer {
   private _eventLoop?: StreamEventLoop;
   private _workerPool?: Worker;
 
-  constructor({ subscriptionAdapter = SuccessAdapter as AdapterClass } = {}) {
+  constructor({ subscriptionAdapter = SuccessAdapter } = {}) {
     this.logger = TaggedLogging.new(new Logger(new StringIO()));
     this.config = new FakeConfiguration({ subscriptionAdapter });
     this.mutex = new Monitor();

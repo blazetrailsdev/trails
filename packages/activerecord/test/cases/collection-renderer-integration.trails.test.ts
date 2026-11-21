@@ -47,7 +47,7 @@ describe("CollectionRenderer over an ActiveRecord::Relation", () => {
       .where({ id: [1, 2] })
       .order("id");
     const body = await new Renderer(lc).renderPartial(
-      new (Base.withEmptyTemplateCache())(lc, {}, null) as never,
+      new (Base.withEmptyTemplateCache())(lc, {}, null),
       {
         partial: "posts/post",
         collection: relation as never,
@@ -65,7 +65,7 @@ describe("CollectionRenderer over an ActiveRecord::Relation", () => {
     const relation = Post.preload("comments")
       .where({ id: [1, 2] })
       .order("id");
-    await new Renderer(lc).renderPartial(buildView(lc) as never, {
+    await new Renderer(lc).renderPartial(buildView(lc), {
       partial: "posts/post",
       collection: relation as never,
       cached: (item: unknown) => {

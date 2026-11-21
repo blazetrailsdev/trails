@@ -1,7 +1,7 @@
 import { extractOptionsBang, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
-import { URL as UrlHelpers, type UrlOptions } from "../http/url.js";
+import { URL as UrlHelpers } from "../http/url.js";
 import { Utils } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
@@ -201,7 +201,7 @@ export class OptionRedirect extends Redirect {
       }
     }
 
-    return UrlHelpers.urlFor(urlOptions as UrlOptions);
+    return UrlHelpers.urlFor(urlOptions);
   }
 
   override inspect(): string {

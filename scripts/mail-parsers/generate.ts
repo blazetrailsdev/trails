@@ -306,7 +306,7 @@ function generate(p: Parser): string {
     `    ${p.kind === "class" ? "static " : ""}parse(data: string | Uint8Array | null): ${STRUCT_MEMBER_TYPES[p.structs[0][0]] === undefined ? "any" : `InstanceType<typeof ${p.structs[0][0]}>`} {`,
     `      const self = ${p.name} as any;`,
     `      let ${["p", "pe", "eof", "stack", "cs", "top", ...[...t.locals].filter((x) => !["p", "pe", "eof", "stack", "cs", "top"].includes(x))].map((x) => `${x}: ${localType(x)}`).join(", ")};`,
-    "      data = (data == null ? data : b(data)) as Uint8Array;",
+    `      data = (data == null ? data : b(data))${body.some((l) => /^\s*if \(data == null\) throw /.test(l)) ? "" : " as Uint8Array"};`,
     ...body.filter((l) => !/^\s*data = data\.dup/.test(l) && !l.includes("forceEncoding")),
     `    }${p.kind === "class" ? "" : ","}`,
     ...(p.kind === "class"

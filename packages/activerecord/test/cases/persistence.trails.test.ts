@@ -323,10 +323,7 @@ describe("PersistenceTest (trails)", () => {
       }
     }
     constSet(TopLevel, "PostWithStringSequence", PostWithStringSequence);
-    DescendantsTracker.registerSubclass(
-      CanonicalPost as unknown as typeof Base,
-      PostWithStringSequence,
-    );
+    DescendantsTracker.registerSubclass(CanonicalPost, PostWithStringSequence);
 
     let insertSql: string | null = null;
     let insertBinds: unknown[] = [];

@@ -305,7 +305,7 @@ export function inlinedHookTags(
 ): Map<string, TaggedConstructor[]> {
   const byHook = new Map<string, TaggedConstructor[]>();
   for (const [name, pkg] of Object.entries(ts.packages)) {
-    for (const [owner, klass] of Object.entries(pkg.classes) as unknown as [string, ClassInfo][]) {
+    for (const [owner, klass] of Object.entries(pkg.classes)) {
       for (const member of klass.instanceMethods) {
         for (const tag of member.inlinedFrom ?? []) {
           const key = `${tag.module}#${tag.hook}`;

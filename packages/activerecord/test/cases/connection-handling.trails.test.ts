@@ -35,9 +35,9 @@ describe("directly bound adapter", () => {
     const bound = adapterDouble();
     await establishConnectionTo(Boundish, bound);
 
-    const leased = await leaseConnection.call(Boundish as unknown as typeof Base);
-    const direct = await connection.call(Boundish as unknown as typeof Base);
-    const scoped = await withConnection.call(Boundish as unknown as typeof Base, (conn) => conn);
+    const leased = await leaseConnection.call(Boundish);
+    const direct = await connection.call(Boundish);
+    const scoped = await withConnection.call(Boundish, (conn) => conn);
 
     expect(direct).toBe(bound);
     expect(leased).toBe(bound);

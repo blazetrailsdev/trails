@@ -243,7 +243,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
   });
 
   it("completes the displacing write through setAttributes before save", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
+    const pirate = await Pirate.create({ catchphrase: "Aye" });
     const displaced = await Ship.create({
       name: "Nights Dirty Lightning",
       pirate_id: (pirate as unknown as { id: number }).id,
@@ -262,7 +262,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
   it("sequences one existing collection record's assignment before the next", async () => {
     Pirate.acceptsNestedAttributesFor("parrots");
 
-    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
+    const pirate = await Pirate.create({ catchphrase: "Aye" });
     const parrots = (
       pirate as unknown as {
         parrots: {
@@ -308,7 +308,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
 
   it("finishes a displacing nested assignment before assigning the next key", async () => {
     Pirate.acceptsNestedAttributesFor("parrots");
-    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
+    const pirate = await Pirate.create({ catchphrase: "Aye" });
     await Ship.create({
       name: "Nights Dirty Lightning",
       pirate_id: (pirate as unknown as { id: number }).id,
@@ -342,7 +342,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
 
   it("finishes a displacing nested assignment before the next key on update", async () => {
     Pirate.acceptsNestedAttributesFor("parrots");
-    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
+    const pirate = await Pirate.create({ catchphrase: "Aye" });
     await Ship.create({
       name: "Nights Dirty Lightning",
       pirate_id: (pirate as unknown as { id: number }).id,
@@ -432,7 +432,7 @@ describe("nested attributes existing record lookup (trails-only)", () => {
     expect(reloaded.association("parrots").isLoaded()).toBe(false);
 
     await nested(reloaded).setParrotsAttributes([
-      { id: readAttr(parrot as Base, "id"), name: "Polly Two" },
+      { id: readAttr(parrot, "id"), name: "Polly Two" },
     ]);
 
     const target = (reloaded.association("parrots") as unknown as { target: Base[] }).target;

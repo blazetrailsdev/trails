@@ -288,7 +288,7 @@ describe("MiddlewareStackTest", () => {
 
     await Notifications.subscribed(subscriber, "process_middleware.action_dispatch", async () => {
       const app = stack.build(async () => [200, {}, [""]]);
-      await assertNothingRaised(() => rbFSend(app, "call", {} as RackEnv) as Promise<RackResponse>);
+      await assertNothingRaised(() => rbFSend(app, "call", {}) as Promise<RackResponse>);
     });
 
     expect(events.length).toBe(2);
@@ -302,7 +302,7 @@ describe("MiddlewareStackTest", () => {
   it("build creates a callable app", async () => {
     const stack = new MiddlewareStack();
     const app = stack.build(async () => [200, {}, ["OK"]]);
-    const [status] = await (rbFSend(app, "call", {} as RackEnv) as Promise<RackResponse>);
+    const [status] = await (rbFSend(app, "call", {}) as Promise<RackResponse>);
     expect(status).toBe(200);
   });
 

@@ -96,9 +96,9 @@ export class Listener extends SubscriberMap {
       for (;;) {
         let instance: { completeBang(): unknown } | null = null;
         try {
-          instance = (await this.interruptible(() =>
+          instance = await this.interruptible(() =>
             TopLevel.Trails!.application!.executor.runBang(),
-          )) as { completeBang(): unknown } | null;
+          );
           await this.withPollingVolume(() => this.broadcastMessages());
         } finally {
           if (instance) await instance.completeBang();

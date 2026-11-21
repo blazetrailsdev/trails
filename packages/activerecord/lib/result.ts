@@ -22,7 +22,7 @@ import { defaultValue } from "./type.js";
 export type ColumnType = { deserialize(value: unknown): unknown };
 export type ColumnTypes = Record<string | number, ColumnType>;
 
-const EMPTY_COLUMN_TYPES: ColumnTypes = Object.freeze({}) as ColumnTypes;
+const EMPTY_COLUMN_TYPES: ColumnTypes = Object.freeze({});
 
 export class IndexedRow {
   private readonly columnIndexes: Record<string, number> | Hash<string, number>;

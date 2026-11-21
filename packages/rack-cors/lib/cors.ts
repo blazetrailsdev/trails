@@ -125,7 +125,7 @@ export class Cors {
               .map((kv) => `  ${kv.join(": ")}`)
               .join("\n"),
         );
-        return [200, headers as RackResponse[1], []];
+        return [200, headers, []];
       } else {
         addHeaders = this.processCors(env, path);
       }

@@ -129,7 +129,7 @@ function writerMethod(
         for (const [key, value] of mapping) {
           if (!(value in Object(part))) {
             throw new NoMethodError(
-              `undefined method '${value}' for ${part == null ? "nil" : `an instance of ${(part as object).constructor.name}`}`,
+              `undefined method '${value}' for ${part == null ? "nil" : `an instance of ${part.constructor.name}`}`,
             );
           }
           const method = (part as Record<string, unknown>)[value];

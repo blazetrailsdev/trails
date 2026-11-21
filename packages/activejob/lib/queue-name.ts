@@ -57,7 +57,7 @@ export class QueueName {
   get queueName(): unknown {
     if (rbObjIsProc(this._queueName)) {
       this._queueName = (rbObjClass(this) as unknown as QueueNameClass).queueNameFromPart(
-        (this._queueName as (this: QueueNameJob) => unknown).call(this),
+        this._queueName.call(this),
       );
     }
     return this._queueName;

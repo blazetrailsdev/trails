@@ -442,7 +442,7 @@ async function processControllerResponse(
       if (!this.request.cookieJar().isCommitted()) {
         this.request.cookieJar().write(this.response as CookieResponse);
         cookies.update(this.request.cookieJar().toHash());
-        cookies.update(this.response.cookies as Record<string, string>);
+        cookies.update(this.response.cookies);
       }
     }
     this.response.toA();
@@ -800,7 +800,7 @@ export class TestSession extends SecureSessionHash {
     for (const k of keys) {
       if (value == null) return undefined;
       if (typeof value !== "object") {
-        throw new TypeError(`${(value as object).constructor.name} does not have #dig method`);
+        throw new TypeError(`${value.constructor.name} does not have #dig method`);
       }
       value = (value as Record<string, unknown>)[k as string];
     }

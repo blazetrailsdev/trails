@@ -1546,7 +1546,7 @@ export interface AbstractMysqlAdapter {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-include(AbstractMysqlAdapter as unknown as new (...args: unknown[]) => unknown, SchemaStatements);
+include(AbstractMysqlAdapter, SchemaStatements);
 AbstractMysqlAdapter.prototype.defaultInsertValue = mysqlDefaultInsertValue;
 AbstractMysqlAdapter.prototype.dataSourceSql = mysqlDataSourceSql;
 AbstractMysqlAdapter.prototype.newColumnFromField = newColumnFromField;

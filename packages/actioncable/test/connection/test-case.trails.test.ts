@@ -17,7 +17,7 @@ describe("ActionCable::Connection::TestCase", () => {
   it("connect never runs Connection::Base#initialize", async () => {
     class CountingConnectionTest extends TestCase {}
     CountingConnectionTest.tests(CountingConnection);
-    const tc = new CountingConnectionTest("testNothing" as never);
+    const tc = new CountingConnectionTest("testNothing");
 
     const connection = await tc.connect("/cable?a=1", { headers: { "X-Foo": "bar" } });
     expect(constructed).toBe(0);

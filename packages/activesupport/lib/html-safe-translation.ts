@@ -25,7 +25,7 @@ export const HtmlSafeTranslation = {
       const translation = I18n.translate(key, {
         ...htmlSafeOptions,
         exceptionHandler,
-      } as Parameters<typeof I18n.translate>[1]);
+      });
 
       if (exception) {
         return translation;
@@ -33,7 +33,7 @@ export const HtmlSafeTranslation = {
         return htmlSafeTranslation(translation);
       }
     } else {
-      return I18n.translate(key, options as Parameters<typeof I18n.translate>[1]);
+      return I18n.translate(key, options);
     }
   },
 

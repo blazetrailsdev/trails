@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { ActionController, Mapper, type RouteSet } from "@blazetrails/actionpack";
+import { ActionController, Mapper } from "@blazetrails/actionpack";
 import { TestCase } from "@blazetrails/actionpack/testing";
 import { include } from "@blazetrails/activesupport";
 import { assert, assertNil } from "@blazetrails/activesupport/testing/assertions";
@@ -26,7 +26,7 @@ describe("InfoControllerTest", () => {
   beforeEach(async ({ task }) => {
     Trails.application = InfoControllerTestApp.instance();
     Trails.application.config.secretKeyBase = "secret_key_base".repeat(4);
-    const routes = Trails.application.routes() as unknown as RouteSet;
+    const routes = Trails.application.routes();
     routes.clearBang();
     routes.draw(function () {
       this.namespace("test", () => {
@@ -99,7 +99,7 @@ describe("InfoControllerTest", () => {
     const was = Mapper.routeSourceLocations;
     Mapper.routeSourceLocations = true;
     try {
-      const routes = Trails.application!.routes() as unknown as RouteSet;
+      const routes = Trails.application!.routes();
       let sourceLine = 0;
       routes.draw(function () {
         this.namespace("test", () => {

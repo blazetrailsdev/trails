@@ -151,7 +151,7 @@ export class ClaimedExecution extends Execution {
     } catch (error) {
       if (!(error instanceof StandardError)) throw error;
       if (await this.isStillClaimed()) {
-        throw excSetupMessage(new FinalizationError(this, { cause: error as Error }), error);
+        throw excSetupMessage(new FinalizationError(this, { cause: error }), error);
       }
 
       throw error;
@@ -167,10 +167,10 @@ export class ClaimedExecution extends Execution {
       await ActiveJobBase.execute({
         ...(job.arguments as object),
         provider_job_id: job.id,
-      } as unknown as Parameters<typeof ActiveJobBase.execute>[0]);
+      });
       return new ClaimedExecution.Result(true, null);
     } catch (e) {
-      return new ClaimedExecution.Result(false, e as Error);
+      return new ClaimedExecution.Result(false, e);
     }
   }
 

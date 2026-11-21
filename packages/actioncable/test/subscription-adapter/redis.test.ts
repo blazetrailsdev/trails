@@ -86,7 +86,7 @@ async function testReconnections(host: RedisAdapterTestHost): Promise<void> {
 
 function redisConn(host: RedisAdapterTestHost): IORedis {
   const config = except(host.cableConfig(), "adapter");
-  return (host.redisConn ??= new IORedis(config.url as string, config as RedisOptions));
+  return (host.redisConn ??= new IORedis(config.url as string, config));
 }
 
 async function dropPubsubConnections(host: RedisAdapterTestHost): Promise<void> {

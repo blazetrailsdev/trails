@@ -10,7 +10,7 @@ const file1 = path.join(fixtureDir, "file1.txt");
 
 describe("Rack::Multipart::Generator", () => {
   it("raises ArgumentError if params is not a Hash", () => {
-    expect(() => new Generator("foo=bar" as never)).toThrow("value must be a Hash");
+    expect(() => new Generator("foo=bar")).toThrow("value must be a Hash");
   });
 
   it("returns nil if no UploadedFiles were used", () => {

@@ -85,7 +85,7 @@ async function stubRequest(env: Record<string, unknown> = {}): Promise<Request> 
 
 function urlFor(options: Record<string, unknown> = {}): string {
   options = Object.assign({ host: "www.example.com" }, options);
-  return URL.urlFor(options as never);
+  return URL.urlFor(options);
 }
 
 describe("RequestUrlFor", () => {

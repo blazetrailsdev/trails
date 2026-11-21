@@ -1,7 +1,7 @@
 import { ActiveSupportJSON, Logger, TaggedLogging } from "@blazetrails/activesupport";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { SuccessAdapter } from "./test-adapter.js";
-import { TestServer, type AdapterClass } from "./test-server.js";
+import { TestServer } from "./test-server.js";
 import { User } from "./user.js";
 
 interface Coder {
@@ -32,10 +32,7 @@ export class TestConnection {
 
   constructor(
     user = new User("lifo"),
-    {
-      coder = ActiveSupportJSON as Coder,
-      subscriptionAdapter = SuccessAdapter as AdapterClass,
-    } = {},
+    { coder = ActiveSupportJSON, subscriptionAdapter = SuccessAdapter } = {},
   ) {
     this._coder = coder;
     this.identifiers = ["currentUser"];

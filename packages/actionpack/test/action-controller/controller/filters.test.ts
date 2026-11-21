@@ -45,7 +45,7 @@ interface Ivars {
 }
 
 function ivars(controller: object): Ivars {
-  return controller as Ivars;
+  return controller;
 }
 let tc: TestCase;
 

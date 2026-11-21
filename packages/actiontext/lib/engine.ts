@@ -151,7 +151,7 @@ export class Engine extends TrailsEngine {
     this.initializer("action_text.system_test_helper", async () => {
       await rbFRequire(ActionText.loadPath, "action_text/system_test_helper");
       onLoad("action_dispatch_system_test_case", function (this: object) {
-        include(this as never, ActionText.SystemTestHelper!);
+        include(this, ActionText.SystemTestHelper!);
       });
     });
 

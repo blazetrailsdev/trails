@@ -298,10 +298,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
       ...assignedKeys.filter((key) => !skipAssign.includes(key)),
     );
     if (Object.keys(attributes).length > 0) {
-      assertAssignedSynchronously(
-        record._assignAttributes(attributes) as Promise<void> | undefined,
-        "initializeAttributes",
-      );
+      assertAssignedSynchronously(record._assignAttributes(attributes), "initializeAttributes");
     }
     this.setInverseInstance(record);
   }

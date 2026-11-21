@@ -141,10 +141,7 @@ export class MySQLDatabaseTasks {
   private async establishConnection(
     config: Record<string, unknown> = this.dbConfig.configurationHash,
   ): Promise<ConnectionPool> {
-    return await Base.establishConnection({ ...config } as {
-      adapter?: string;
-      [key: string]: unknown;
-    });
+    return await Base.establishConnection({ ...config });
   }
 
   /** @internal */

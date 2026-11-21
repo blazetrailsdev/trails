@@ -204,7 +204,7 @@ export class ExplainProxy<T extends Base> {
   }
 
   average(columnName: string | ArelNode): Promise<string> {
-    return this.execExplain(() => this._relation.average(columnName as never));
+    return this.execExplain(() => this._relation.average(columnName));
   }
 
   count(columnName?: string | ArelNode): Promise<string> {
@@ -224,7 +224,7 @@ export class ExplainProxy<T extends Base> {
   }
 
   minimum(columnName: string | ArelNode): Promise<string> {
-    return this.execExplain(() => this._relation.minimum(columnName as never));
+    return this.execExplain(() => this._relation.minimum(columnName));
   }
 
   pluck(...columnNames: (string | ArelNode)[]): Promise<string> {
@@ -422,7 +422,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     } = {},
   ) {
     if (table) {
-      predicateBuilder ||= model.predicateBuilder.with(new TableMetadata(model, table as Table));
+      predicateBuilder ||= model.predicateBuilder.with(new TableMetadata(model, table));
     } else {
       table = model.arelTable;
       predicateBuilder ||= model.predicateBuilder;
@@ -1206,7 +1206,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       eagerLoading &&
       this.hasLimitOrOffset &&
       !(
-        this.usingLimitableReflections(jd.reflections as never) &&
+        this.usingLimitableReflections(jd.reflections) &&
         this.usingLimitableReflections(
           QueryMethods.constructJoinDependency.call(
             this,
@@ -1216,7 +1216,7 @@ export class Relation<T extends Base, G extends boolean = false> {
                 _qm.selectAssociationList.call(this, this.leftOuterJoinsValues, null),
               ) as AssociationSpec[],
             null,
-          ).reflections as never,
+          ).reflections,
         )
       )
     ) {
@@ -1228,11 +1228,11 @@ export class Relation<T extends Base, G extends boolean = false> {
             tuples !== undefined
               ? tuples.map((tuple) => tuple[i])
               : this._limitedDistinctRelation(jd, column).arel();
-          rel = rel.where(this.table.get(column).in(ids as never));
+          rel = rel.where(this.table.get(column).in(ids));
         });
       } else {
         const ids = limitedIds ?? this._limitedDistinctRelation(jd, basePk).arel();
-        rel = rel.where(this.table.get(basePk).in(ids as never));
+        rel = rel.where(this.table.get(basePk).in(ids));
       }
       rel.limitValue = null;
       rel.offsetValue = null;
@@ -1246,7 +1246,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
     return (
-      this.usingLimitableReflections(jd.reflections as never) &&
+      this.usingLimitableReflections(jd.reflections) &&
       this.usingLimitableReflections(
         QueryMethods.constructJoinDependency.call(
           this,
@@ -1256,7 +1256,7 @@ export class Relation<T extends Base, G extends boolean = false> {
               _qm.selectAssociationList.call(this, this.leftOuterJoinsValues, null),
             ) as AssociationSpec[],
           null,
-        ).reflections as never,
+        ).reflections,
       )
     );
   }
@@ -1447,7 +1447,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
     if (rtest(touch)) {
       let names: CounterCacheTouchOption | undefined;
-      if (touch !== true) names = touch as CounterCacheTouchOption;
+      if (touch !== true) names = touch;
       names = wrap(names) as Array<string | { time?: RubyTime }>;
       const options = extractOptionsBang(names) as TouchAllOptions;
       const touchUpdates = await this.model.touchAttributesWithTime(
@@ -1871,10 +1871,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   private _incrementAttribute(attribute: any, value = 1): any {
     const bind = this.predicateBuilder.buildBindAttribute(attribute.name, Math.abs(value));
-    const expr = this.table.coalesce(
-      new Nodes.UnqualifiedColumn(attribute),
-      0 as unknown as Nodes.Node,
-    ) as Nodes.Node;
+    const expr = this.table.coalesce(new Nodes.UnqualifiedColumn(attribute), 0) as Nodes.Node;
     return value < 0 ? new Nodes.Subtraction(expr, bind) : new Nodes.Addition(expr, bind);
   }
 

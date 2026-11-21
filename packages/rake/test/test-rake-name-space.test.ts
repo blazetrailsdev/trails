@@ -7,7 +7,7 @@ import { TestTaskManager as TM } from "./support/task-manager.js";
 describe("TestRakeNameSpace", () => {
   it("namespace creation", () => {
     const mgr = new TM();
-    const ns = new NameSpace(mgr as never, [] as never);
+    const ns = new NameSpace(mgr, [] as never);
     expect(ns).not.toBeNull();
   });
 
@@ -45,7 +45,7 @@ describe("TestRakeNameSpace", () => {
     let scope = new LinkedList("b");
     scope = scope.conj("a");
 
-    const ns = new NameSpace(mgr as never, scope as never);
+    const ns = new NameSpace(mgr, scope as never);
 
     expect(ns.scope).toEqual(scope);
 

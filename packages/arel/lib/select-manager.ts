@@ -98,7 +98,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
       locking = sql(locking);
     }
 
-    this.ast.lock = new Lock(locking as Node);
+    this.ast.lock = new Lock(locking);
     return this;
   }
 
@@ -273,7 +273,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     } else {
       nodeClass = With;
     }
-    this.ast.with = new nodeClass((subqueries as unknown[]).flat(Infinity) as Node[]);
+    this.ast.with = new nodeClass((subqueries as unknown[]).flat(Infinity));
 
     return this;
   }

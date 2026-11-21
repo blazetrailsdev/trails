@@ -7,7 +7,7 @@ import { describeIfSupports, itIfSupports } from "../support/supports.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 async function conn(): Promise<AbstractAdapter> {
-  return (await Base.leaseConnection()) as unknown as AbstractAdapter;
+  return await Base.leaseConnection();
 }
 
 async function createView(name: string, sql: string): Promise<void> {

@@ -41,7 +41,7 @@ describe("HashWithIndifferentAccessTest", () => {
     for (const [k, v] of entries) h.set(k, v);
     return h;
   };
-  const wia = (h: unknown) => new HashWithIndifferentAccess<unknown>(h as never);
+  const wia = (h: unknown) => new HashWithIndifferentAccess<unknown>(h);
   const strings = () => ({ a: 1, b: 2 });
   const nestedStrings = () => ({ a: { b: { c: 3 } } });
   const symbols = () => ({ ":a": 1, ":b": 2 });
@@ -1203,7 +1203,7 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("new with to hash conversion", () => {
-    const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion({ ":a": 1 }) as never);
+    const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion({ ":a": 1 }));
     expect(hash.isKey("a")).toBeTruthy();
     expect(hash.get(":a")).toEqual(1);
   });
@@ -1240,7 +1240,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const normalHash = new Hash<unknown, unknown>(3);
     normalHash.set(":a", 1);
 
-    const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion(normalHash) as never);
+    const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion(normalHash));
     expect(hash.get(":a")).toEqual(1);
     expect(hash.get(":b")).toEqual(3);
   });
@@ -1249,7 +1249,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const normalHash = new Hash<unknown, unknown>(() => 1 + 2);
     normalHash.set(":a", 1);
 
-    const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion(normalHash) as never);
+    const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion(normalHash));
     expect(hash.get(":a")).toEqual(1);
     expect(hash.get(":b")).toEqual(3);
   });
@@ -1334,7 +1334,7 @@ describe("HashWithIndifferentAccessTest", () => {
       }
     })();
 
-    const hashWia = new HashWithIndifferentAccess<unknown>(nonHash as never);
+    const hashWia = new HashWithIndifferentAccess<unknown>(nonHash);
     expect(hashWia.get(":foo")).toEqual(":bar");
     expect(hashWia.get(":missing")).toEqual(":baz");
   });
@@ -1352,7 +1352,7 @@ describe("HashWithIndifferentAccessTest", () => {
       }
     })();
 
-    const hashWia = new HashWithIndifferentAccess<unknown>(nonHash as never);
+    const hashWia = new HashWithIndifferentAccess<unknown>(nonHash);
     expect(hashWia.get(":foo")).toEqual(":bar");
     expect(hashWia.get(":missing")).toEqual(":baz");
   });

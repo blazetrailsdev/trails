@@ -520,18 +520,14 @@ export class SchemaStatements {
       (await this.foreignKeyExists(
         fromTable,
         toTable,
-        slice(options as Record<string, unknown>, "column") as ForeignKeyLookupOptions,
+        slice(options as Record<string, unknown>, "column"),
       ))
     ) {
       return;
     }
-    options = this.foreignKeyOptions(
-      fromTable,
-      toTable,
-      options as Record<string, unknown>,
-    ) as AddForeignKeyOptions;
+    options = this.foreignKeyOptions(fromTable, toTable, options as Record<string, unknown>);
     const at = this.createAlterTable(fromTable);
-    at.addForeignKey(toTable, options as Partial<AddForeignKeyOptions>);
+    at.addForeignKey(toTable, options);
     await this.execute(await this.schemaCreation.accept(at));
   }
 
@@ -577,10 +573,7 @@ export class SchemaStatements {
       return;
 
     const ifNotExists = options.ifNotExists;
-    options = this.checkConstraintOptions(tableName, expression, options) as {
-      name?: string;
-      validate?: boolean;
-    };
+    options = this.checkConstraintOptions(tableName, expression, options);
     if (ifNotExists && (await this.checkConstraintExists(tableName, options))) return;
 
     const at = this.createAlterTable(tableName);
@@ -1073,10 +1066,7 @@ export class SchemaStatements {
     options: Record<string, unknown> = {},
   ): Record<string, unknown> {
     const dup = { ...options };
-    dup.name ??= this.checkConstraintName(tableName, { expression, ...dup } as {
-      name?: string;
-      expression?: string;
-    });
+    dup.name ??= this.checkConstraintName(tableName, { expression, ...dup });
     return dup;
   }
 

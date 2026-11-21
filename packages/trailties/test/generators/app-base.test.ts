@@ -201,7 +201,7 @@ describe("AppBase run tasks", () => {
     registerChildProcessAdapter("run-install-test", {
       spawnSync: vi.fn(),
       system,
-    } as unknown as ChildProcessAdapter);
+    });
     childProcessAdapterConfig.adapter = "run-install-test";
     try {
       const generator = (options: Record<string, unknown>) =>

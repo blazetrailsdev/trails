@@ -166,7 +166,7 @@ describe("TranslationHelperTest", () => {
 
   it("uses custom exception handler when specified", () => {
     const oldExceptionHandler = I18n.exceptionHandler();
-    I18n.setExceptionHandler(CustomExceptionHandler as never);
+    I18n.setExceptionHandler(CustomExceptionHandler);
     try {
       expect(translate(":translations.missing", { raise: false })).toBe(
         "from CustomExceptionHandler",
@@ -178,7 +178,7 @@ describe("TranslationHelperTest", () => {
 
   it("uses custom exception handler when specified for html", () => {
     const oldExceptionHandler = I18n.exceptionHandler();
-    I18n.setExceptionHandler(CustomExceptionHandler as never);
+    I18n.setExceptionHandler(CustomExceptionHandler);
     try {
       expect(translate(":translations.missing_html", { raise: false })).toBe(
         "from CustomExceptionHandler",

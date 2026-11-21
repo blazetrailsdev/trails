@@ -37,7 +37,7 @@ export class Time extends ActiveModelTime {
 
   protected override castValue(value: unknown): TimeWithZone | RubyTime | null {
     const cast = super.castValue(value);
-    return cast instanceof Value ? (cast.__getobj__() as TimeWithZone | RubyTime) : cast;
+    return cast instanceof Value ? cast.__getobj__() : cast;
   }
 }
 

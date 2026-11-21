@@ -305,7 +305,7 @@ export class Errors<TBase extends object = object> {
   inspect(): string {
     const inspection = rbInspect(this._errors);
 
-    return `#<${rbModName(this.constructor as typeof Errors) ?? ""} ${inspection}>`;
+    return `#<${rbModName(this.constructor) ?? ""} ${inspection}>`;
   }
 }
 

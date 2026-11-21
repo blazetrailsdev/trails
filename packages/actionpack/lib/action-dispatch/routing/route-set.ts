@@ -340,7 +340,7 @@ export const MountedHelpers = class {
       mountedHelpersIncluders.add(new WeakRef((base as { prototype: object }).prototype));
       for (const key of Object.getOwnPropertyNames(MountedHelpers.prototype)) {
         if (key.startsWith("_") && Object.hasOwn(MountedHelpers.prototype, key.slice(1))) {
-          rbDeclareIvar(base as { prototype: object }, `@${key}`, `_${key}`);
+          rbDeclareIvar(base, `@${key}`, `_${key}`);
         }
       }
     }
@@ -486,7 +486,7 @@ export class OptimizedUrlHelper extends UrlHelper {
 
       options["scriptName"] = scriptName;
 
-      return urlStrategy(options as UrlOptions);
+      return urlStrategy(options);
     } else {
       return super.call(t, methodName, args, innerOptions, urlStrategy);
     }
@@ -915,7 +915,7 @@ export class RouteSet {
       return this._defaultEnv;
     }
     const urlOptions = Object.freeze({ ...this.defaultUrlOptions });
-    const uri = URI.parse(URL.fullUrlFor({ host: "example.org", ...urlOptions } as UrlOptions));
+    const uri = URI.parse(URL.fullUrlFor({ host: "example.org", ...urlOptions }));
 
     this._defaultEnv = Object.freeze({
       "action_dispatch.routes": this,
@@ -1090,12 +1090,7 @@ export class RouteSet {
 
     Object.defineProperty(MountedHelpers.prototype, `_${name}`, {
       value: function (this: UrlForHost & { _routesContext(): UrlForHost }): RoutesProxy {
-        return new RoutesProxy(
-          routes,
-          this._routesContext(),
-          helpers as unknown as Record<string, unknown>,
-          scriptNamer,
-        );
+        return new RoutesProxy(routes, this._routesContext(), helpers, scriptNamer);
       },
       writable: true,
       configurable: true,
@@ -1283,7 +1278,7 @@ export class RouteSet {
     methodName: string | null = null,
     reserved: readonly string[] = RouteSet.RESERVED_OPTIONS,
   ): string {
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options may be a Hash, which merge converts through to_hash
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required, @typescript-eslint/no-unnecessary-type-assertion -- options may be a Hash, which merge converts through to_hash; TS 7 narrows through this cast, which typescript-eslint's TS 6 checker reads as unnecessary
     options = merge(this.defaultUrlOptions, options) as Record<string, unknown>;
 
     let user: unknown = null;
@@ -1350,7 +1345,7 @@ export class RouteSet {
     options["user"] = user;
     options["password"] = password;
 
-    return urlStrategy(options as UrlOptions);
+    return urlStrategy(options);
   }
 
   urlOptions(): Record<string, unknown> {

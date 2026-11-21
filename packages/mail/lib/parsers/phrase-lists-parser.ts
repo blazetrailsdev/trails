@@ -31,7 +31,7 @@ export class PhraseListsParser {
     static parse(data: string | Uint8Array | null): InstanceType<typeof PhraseListsStruct> {
       const self = PhraseListsParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, phraseLists: any, phraseS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number;
-      data = (data == null ? data : b(data)) as Uint8Array;
+      data = (data == null ? data : b(data));
       if (data == null) throw new Field.NilParseError(PhraseList);
       phraseLists = new PhraseListsStruct([]);
       phraseS = null;

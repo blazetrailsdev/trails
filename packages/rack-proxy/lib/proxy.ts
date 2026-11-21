@@ -360,7 +360,7 @@ export class Proxy {
       let backend = env["rack.backend"] as Backend | string | false | null | undefined;
       delete env["rack.backend"];
       if (backend == null || backend === false) backend = this.backend as Backend | null;
-      if (typeof backend === "string") backend = kernelURI(backend) as Backend;
+      if (typeof backend === "string") backend = kernelURI(backend);
       if (backend == null) {
         if (!(this.allowDynamicBackend != null && this.allowDynamicBackend !== false)) {
           if (rbObjRespondTo(this.logger, "append")) {
@@ -371,7 +371,7 @@ export class Proxy {
           }
           return [502, {}, []];
         }
-        backend = sourceRequest as Backend;
+        backend = sourceRequest;
       }
       if (!this.isBackendAllowed(backend)) {
         if (rbObjRespondTo(this.logger, "append")) {

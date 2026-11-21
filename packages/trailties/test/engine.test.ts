@@ -237,7 +237,7 @@ describe("Engine", () => {
       class StackEngine extends Engine {}
       Engine.register(StackEngine, fixtureRoot);
       StackEngine.endpoint((async () => [200, {}, ["Hello World"]]) as never);
-      (StackEngine.config.middleware as MiddlewareStackProxy).use(Upcaser as never);
+      (StackEngine.config.middleware as MiddlewareStackProxy).use(Upcaser);
 
       const response = await StackEngine.instance().call(MockRequest.envFor("/bukkits"));
       expect(response[2]).toEqual(["HELLO WORLD"]);

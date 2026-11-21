@@ -19,7 +19,7 @@ describe("ActiveStorage::AnalyzeJobTest", () => {
 
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
-    t = new AnalyzeJobTest("ignoresMissingBlob") as unknown as TestHelper;
+    t = new AnalyzeJobTest("ignoresMissingBlob");
     await t.beforeSetup();
     blob = await createBlob();
   });

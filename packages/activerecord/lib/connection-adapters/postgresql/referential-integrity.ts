@@ -31,7 +31,7 @@ export async function disableReferentialIntegrity(
       { requiresNew: true },
     );
   } catch (e) {
-    if (e instanceof ActiveRecordError) originalException = e as Error;
+    if (e instanceof ActiveRecordError) originalException = e;
     else throw e;
   }
 

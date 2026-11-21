@@ -304,7 +304,7 @@ export class Error {
   }
 
   inspect(): string {
-    return `#<${rbModName(this.constructor as typeof Error) ?? ""} attribute=${toS(this.attribute)}, type=${toS(this.type)}, options=${rbInspect(this.options)}>`;
+    return `#<${rbModName(this.constructor) ?? ""} attribute=${toS(this.attribute)}, type=${toS(this.type)}, options=${rbInspect(this.options)}>`;
   }
 }
 

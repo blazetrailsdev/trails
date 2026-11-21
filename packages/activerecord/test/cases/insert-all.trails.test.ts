@@ -32,7 +32,7 @@ describe("InsertAll verify_attributes", () => {
   fixtures([]);
 
   it("accepts rows that differ only in explicitly-given timestamp columns", async () => {
-    await withRecordTimestamps(Ship as unknown as typeof Base, true, async () => {
+    await withRecordTimestamps(Ship, true, async () => {
       const now = RubyTime.now();
       await expect(
         Ship.insertAll([
@@ -47,7 +47,7 @@ describe("InsertAll verify_attributes", () => {
   });
 
   it("still rejects rows that differ in a non-timestamp column", async () => {
-    await withRecordTimestamps(Ship as unknown as typeof Base, true, async () => {
+    await withRecordTimestamps(Ship, true, async () => {
       await expect(
         Ship.insertAll([{ name: "RSS Boaty McBoatface" }, { treasures_count: 3 }]),
       ).rejects.toThrow(/All objects being inserted must have the same keys/);
@@ -67,7 +67,7 @@ describe("InsertAll build_insert_sql raw alias syntax", () => {
       ? /INSERT INTO .* AS `ships_values` ON DUPLICATE KEY UPDATE updated_at=\(CASE WHEN \(`ships`\.`name`<=>`ships_values`\.`name`\) THEN `ships`\.updated_at .*`name`=`ships_values`\.`name`/
       : /ON DUPLICATE KEY UPDATE updated_at=\(CASE WHEN \(`name`<=>VALUES\(`name`\)\).*`name`=VALUES\(`name`\)/;
 
-    await withRecordTimestamps(Ship as unknown as typeof Base, true, async () => {
+    await withRecordTimestamps(Ship, true, async () => {
       await self().assertQueriesMatch(expected, { count: 1 }, async () => {
         await Ship.upsertAll([{ id: 1, name: "RSS Boaty McBoatface" }]);
       });

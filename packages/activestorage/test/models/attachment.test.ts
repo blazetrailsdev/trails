@@ -73,7 +73,7 @@ describe("ActiveStorage::AttachmentTest", () => {
 
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
-    t = new AttachmentTest("attachment") as unknown as TestHelper;
+    t = new AttachmentTest("attachment");
     await t.beforeSetup();
     user = await User.createBang({ name: "Josh" });
   });

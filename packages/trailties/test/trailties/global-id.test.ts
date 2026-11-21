@@ -25,7 +25,7 @@ import { Verifier } from "@blazetrails/globalid";
 const SECRET_KEY_BASE = "x".repeat(30);
 
 function blogApp(secretKeyBase: string | null = SECRET_KEY_BASE): TrailtieApp {
-  const options: Record<string, unknown> = { globalId: {} as GlobalIdConfig };
+  const options: Record<string, unknown> = { globalId: {} };
   return {
     railtieName: "blog_app_application",
     deprecators: new Deprecators(),

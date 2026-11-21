@@ -69,7 +69,7 @@ beforeAll(() => {
 class ResourcesTest extends TestCase {
   async withRestfulRouting(...args: unknown[]): Promise<void> {
     const block = args.pop() as () => unknown;
-    const options = extractOptionsBang(args) as Options;
+    const options: Options = extractOptionsBang(args);
     const collectionMethods = hashDelete(options, "collection") as Options | undefined;
     const memberMethods = hashDelete(options, "member") as Options | undefined;
     const pathPrefix = hashDelete(options, "pathPrefix") as string | undefined;

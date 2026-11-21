@@ -271,7 +271,7 @@ describe("SendFileTest", () => {
     });
     assertNotNil(response);
 
-    assertKindOf(Uint8Array, response!.body as unknown as Uint8Array);
+    assertKindOf(Uint8Array, response!.body);
     assertEqual(
       tc.fileData(),
       Buffer.from(response!.body as unknown as Uint8Array).toString("latin1"),

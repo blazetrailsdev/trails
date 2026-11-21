@@ -535,7 +535,7 @@ describe("BatchLifecycleTest", { timeout: 20_000 }, () => {
       () => Batch.clearFinishedInBatches(),
     );
 
-    travelTo(days(3).fromNow() as Time);
+    travelTo(days(3).fromNow());
 
     await assertDifference(
       () => Batch.count(),

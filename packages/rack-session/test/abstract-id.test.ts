@@ -6,8 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { PersistedRequest } from "../lib/index.js";
 import { ID } from "../lib/index.js";
 
-const request = (env: Record<string, unknown> = {}): PersistedRequest =>
-  new Request(env) as unknown as PersistedRequest;
+const request = (env: Record<string, unknown> = {}): PersistedRequest => new Request(env);
 
 describe("Rack::Session::Abstract::ID", () => {
   it("use securerandom", async () => {

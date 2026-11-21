@@ -6,9 +6,12 @@ export class PoolManager {
   private _roleToShardMapping: Record<string, Record<string, PoolConfig>>;
 
   constructor() {
-    this._roleToShardMapping = new Proxy({} as Record<string, Record<string, PoolConfig>>, {
-      get: (h, k) => (h[k as string] ??= {}),
-    });
+    this._roleToShardMapping = new Proxy<Record<string, Record<string, PoolConfig>>>(
+      {},
+      {
+        get: (h, k) => (h[k as string] ??= {}),
+      },
+    );
   }
 
   /** @missingRailsName roleToShardMapping — PERMANENT */

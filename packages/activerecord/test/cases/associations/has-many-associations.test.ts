@@ -250,10 +250,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("sti subselect count", async () => {
     const tag = (await HmTag.first()) as HmTag;
-    const len = await (HmPost as any)
-      .taggedWith(tag.id as number)
-      .limit(10)
-      .size();
+    const len = await (HmPost as any).taggedWith(tag.id).limit(10).size();
     expect(len).toBeGreaterThan(0);
   });
 

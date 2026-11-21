@@ -1,5 +1,4 @@
 import { isBlank } from "@blazetrails/activesupport";
-import type { RackEnv } from "@blazetrails/rack";
 import { hashAref, hashAset, rbEqual } from "@blazetrails/ruby-compat";
 
 import { Request } from "../action-dispatch/http/request.js";
@@ -97,7 +96,7 @@ export class Renderer {
   }
 
   async render(...args: unknown[]): Promise<unknown> {
-    const request = new Request(this.envForRequest() as RackEnv);
+    const request = new Request(this.envForRequest());
     request.routes = this.controller._routes;
 
     const instance = new this.controller();

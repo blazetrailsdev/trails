@@ -81,7 +81,8 @@ describe("helperMethod", () => {
     helperMethod.call(cls, "name=");
 
     const controller = new Named();
-    const view = extend({ controller } as { controller: object; name?: string }, cls._helpers);
+    const host: { controller: object; name?: string } = { controller };
+    const view = extend(host, cls._helpers);
     view.name = "jamis";
     expect(controller.name).toBe("jamis");
     expect(view.name).toBe("jamis");

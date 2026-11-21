@@ -193,6 +193,6 @@ describe("ActionCable::Connection::SubscriptionsTest", () => {
     });
     connection = new Connection(server as never, env);
 
-    subscriptions = new Subscriptions(connection as never);
+    subscriptions = new Subscriptions(connection);
   }
 });

@@ -81,7 +81,7 @@ export class FakeApp {
     if (path === "/redirected") {
       const additionalInfo =
         method === "GET"
-          ? `, session ${rbInspect(session as Record<string, unknown>)} with options ${rbInspect(env["rack.session.options"] as Record<string, unknown>)}`
+          ? `, session ${rbInspect(session)} with options ${rbInspect(env["rack.session.options"])}`
           : ` using ${method.toLowerCase()} with ${rbInspect(params as Record<string, unknown>)}`;
       return [200, {}, [`You've been redirected${additionalInfo}`]];
     }

@@ -32,7 +32,7 @@ export const ReceivedParser = extend(
     parse(data: string | Uint8Array | null): InstanceType<typeof ReceivedStruct> {
       const self = ReceivedParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, received: any, receivedTokensS: number | null = null, dateS: number | null = null, timeS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number;
-      data = (data == null ? data : b(data)) as Uint8Array;
+      data = (data == null ? data : b(data));
       if (data == null) throw new Field.NilParseError(ReceivedElement);
       received = new ReceivedStruct();
       receivedTokensS = dateS = timeS = null;

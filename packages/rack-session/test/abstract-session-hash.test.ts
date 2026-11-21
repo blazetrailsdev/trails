@@ -15,7 +15,7 @@ describe("Rack::Session::Abstract::SessionHash", () => {
       sessionExists: () => true,
     } as unknown as Persisted;
     klass = SessionHash;
-    hash = new klass(store, null as unknown as PersistedRequest);
+    hash = new klass(store, null);
   });
 
   it(".find finds entry in request", async () => {
@@ -25,14 +25,14 @@ describe("Rack::Session::Abstract::SessionHash", () => {
 
   it(".set sets session in request", async () => {
     const req = new Request({});
-    klass.set(req as unknown as PersistedRequest, {});
+    klass.set(req, {});
     expect(req.env["rack.session"]).toEqual({});
   });
 
   it(".set_options sets session options in request", async () => {
     const req = new Request({});
     const h = {};
-    klass.setOptions(req as unknown as PersistedRequest, h);
+    klass.setOptions(req, h);
     const opts = req.env["rack.session.options"];
     expect(opts).toEqual(h);
     expect(opts).not.toBe(h);

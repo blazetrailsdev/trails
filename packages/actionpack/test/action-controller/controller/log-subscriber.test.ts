@@ -179,7 +179,7 @@ class ACLogSubscriberTest extends TestCase {
   }
 
   setLogger(logger: MockLogger | null): void {
-    Base.logger = logger as unknown as typeof Base.logger;
+    Base.logger = logger;
   }
 
   logs(): string[] {

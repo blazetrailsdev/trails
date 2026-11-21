@@ -47,7 +47,7 @@ describe("SerializeCastValueTest", () => {
     static {
       include(this, SerializeCastValue);
 
-      const zuper = { serializeCastValue: this.prototype.serializeCastValue as Serializer };
+      const zuper = { serializeCastValue: this.prototype.serializeCastValue };
       this.prototype.serializeCastValue = function (value) {
         return `serialize_cast_value(${zuper.serializeCastValue.call(this, value)})`;
       };

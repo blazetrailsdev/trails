@@ -52,7 +52,7 @@ export class DocumentFragment extends XmlNode {
       this.errors = wrapperDoc.errors;
       children = wrapperDoc.xpath("/root/node()");
     }
-    children.each((child) => this.addChildNodeAndReparentAttrs(child as unknown as XmlNode));
+    children.each((child) => this.addChildNodeAndReparentAttrs(child));
   }
 
   get name(): string {

@@ -42,7 +42,6 @@ import { PublicExceptions } from "../../lib/action-dispatch/middleware/public-ex
 import { ShowExceptions } from "../../lib/action-dispatch/middleware/show-exceptions.js";
 import {
   MiddlewareStack,
-  type MiddlewareFactory,
   type RackApp,
   type RackAppObject,
 } from "../../lib/action-dispatch/middleware/stack.js";
@@ -141,17 +140,14 @@ function buildApp(
   block?: (middleware: MiddlewareStack) => void,
 ): RoutedRackApp {
   return new RoutedRackApp(routes ?? new RouteSet(), (middleware) => {
-    middleware.use(
-      ShowExceptions as MiddlewareFactory,
-      new PublicExceptions(`${FIXTURE_LOAD_PATH}/public`),
-    );
-    middleware.use(DebugExceptions as MiddlewareFactory);
-    middleware.use(ActionableExceptions as MiddlewareFactory);
-    middleware.use(Callbacks as MiddlewareFactory);
-    middleware.use(Cookies as MiddlewareFactory);
-    middleware.use(Flash as unknown as MiddlewareFactory);
-    middleware.use(MethodOverride as unknown as MiddlewareFactory);
-    middleware.use(Head as unknown as MiddlewareFactory);
+    middleware.use(ShowExceptions, new PublicExceptions(`${FIXTURE_LOAD_PATH}/public`));
+    middleware.use(DebugExceptions);
+    middleware.use(ActionableExceptions);
+    middleware.use(Callbacks);
+    middleware.use(Cookies);
+    middleware.use(Flash);
+    middleware.use(MethodOverride);
+    middleware.use(Head);
     if (block) block(middleware);
   });
 }

@@ -142,9 +142,9 @@ describe("ReloaderTest", () => {
       completed = true;
     });
 
-    await callAndReturnBody((async () => {
+    await callAndReturnBody(async () => {
       throw new Error("error");
-    }) as unknown as RackApp).catch(() => null);
+    }).catch(() => null);
 
     assert(completed);
   });
@@ -157,7 +157,7 @@ describe("ReloaderTest", () => {
   }
 
   function middleware(innerApp: RackApp, r: typeof ActiveSupportReloader = reloader()): Lint {
-    return new Lint(new Reloader(new Lint(innerApp) as never, r as never) as never);
+    return new Lint(new Reloader(new Lint(innerApp) as never, r) as never);
   }
 
   let _reloader: typeof ActiveSupportReloader | undefined;

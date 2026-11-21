@@ -44,9 +44,7 @@ export class Argument {
   }
 
   protected initialize(name: string | null, options: ArgumentOptions = {}): void {
-    const className = rbModName(this.constructor as typeof Argument)!
-      .split("::")
-      .at(-1)!;
+    const className = rbModName(this.constructor)!.split("::").at(-1)!;
 
     const type = options.type;
 

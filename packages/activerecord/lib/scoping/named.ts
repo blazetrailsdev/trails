@@ -53,7 +53,7 @@ export function scope<T extends typeof Base>(
     });
   } else {
     rbModDefineMethod({ prototype: modelClass }, name, function (this: any, ...args: any[]) {
-      let scope = (body as { call(...args: any[]): any }).call(...args) || this.all();
+      let scope = body.call(...args) || this.all();
       if (extension) scope = scope.extending(extension);
       return scope;
     });

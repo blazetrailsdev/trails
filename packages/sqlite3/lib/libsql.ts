@@ -23,7 +23,7 @@ import "./constants.generated.js";
 function bindArgs(binds?: SqliteBinds): unknown[] {
   if (binds === undefined) return [];
   if (Array.isArray(binds)) return binds as unknown[];
-  return [binds as object];
+  return [binds];
 }
 
 /** @internal */

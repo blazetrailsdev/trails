@@ -4,7 +4,7 @@ import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-a
 import { UrlConfig } from "../../../lib/database-configurations/url-config.js";
 
 function clientOptions(config: Record<string, unknown>): Record<string, unknown> {
-  const adapter = new PostgreSQLAdapter(config as never);
+  const adapter = new PostgreSQLAdapter(config);
   return (adapter as unknown as { _connectionParameters: Record<string, unknown> })
     ._connectionParameters;
 }

@@ -763,7 +763,7 @@ describe("inspect wrapper class name", () => {
   });
 
   it("defaults an unordered reverseOrder to a composite primary key descending", () => {
-    const clauses = reverseSqlOrder.call(CpkOrder.all() as any, []);
+    const clauses = reverseSqlOrder.call(CpkOrder.all(), []);
     expect(clauses).toHaveLength(1);
     const ordering = clauses[0] as InstanceType<typeof Nodes.Descending>;
     expect(ordering).toBeInstanceOf(Nodes.Descending);
@@ -815,12 +815,12 @@ describe("apply_join_dependency limitable reflections (trails)", () => {
 
 describe("relation.rb:68 mixin ancestry", () => {
   const modules: [string, Record<string, unknown>][] = [
-    ["FinderMethods", FinderMethods as unknown as Record<string, unknown>],
-    ["Calculations", Calculations as unknown as Record<string, unknown>],
-    ["SpawnMethods", SpawnMethods as unknown as Record<string, unknown>],
-    ["QueryMethods", QueryMethods as unknown as Record<string, unknown>],
-    ["Batches", Batches as unknown as Record<string, unknown>],
-    ["Explain", Explain as unknown as Record<string, unknown>],
+    ["FinderMethods", FinderMethods],
+    ["Calculations", Calculations],
+    ["SpawnMethods", SpawnMethods],
+    ["QueryMethods", QueryMethods],
+    ["Batches", Batches],
+    ["Explain", Explain],
     ["Delegation", Delegation as unknown as Record<string, unknown>],
   ];
 

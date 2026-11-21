@@ -23,7 +23,7 @@ describe("ActiveStorage::TransformJobTest", { timeout: 30_000 }, () => {
 
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
-    t = new TransformJobTest("createsVariant") as unknown as TestHelper;
+    t = new TransformJobTest("createsVariant");
     await t.beforeSetup();
     blob = await createFileBlob();
   });

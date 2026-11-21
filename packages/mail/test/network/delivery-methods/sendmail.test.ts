@@ -109,7 +109,7 @@ describe("Mail::Sendmail", () => {
 
   it("raises on nonzero exitstatus", async () => {
     const popen = IO.popen.bind(IO);
-    const spy = vi.spyOn(IO, "popen").mockImplementation((() => popen(["false"])) as never);
+    const spy = vi.spyOn(IO, "popen").mockImplementation(() => popen(["false"]));
     await expect(new Sendmail({}).deliverBang(buildMail())).rejects.toThrow(
       'Delivery failed with exitstatus 1: ["/usr/sbin/sendmail", "-i", "-f", "roger@test.lindsaar.net", "--", "marcel@test.lindsaar.net", "bob@test.lindsaar.net"]',
     );

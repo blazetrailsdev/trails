@@ -34,9 +34,7 @@ async function captureUpdate(
   return {
     sql: update.sql,
     binds: update.binds.map((b) =>
-      b !== null && typeof b === "object" && "valueForDatabase" in b
-        ? (b as { valueForDatabase: unknown }).valueForDatabase
-        : b,
+      b !== null && typeof b === "object" && "valueForDatabase" in b ? b.valueForDatabase : b,
     ),
   };
 }

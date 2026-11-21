@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetConstants, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { GlobalID } from "../lib/global-id.js";
-import { Locator, BlockLocator, _resetLocators, type LocatorModel } from "../lib/locator.js";
+import { Locator, BlockLocator, _resetLocators } from "../lib/locator.js";
 
 const TEST_APP = "bcx";
 
@@ -77,7 +77,7 @@ describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
 
   it("parseAllowed filters by class allowlist", () => {
     const gids = ["gid://bcx/Person/1", "gid://bcx/PersonChild/2"];
-    const allowed = Locator.parseAllowed(gids, PersonChild as unknown as LocatorModel);
+    const allowed = Locator.parseAllowed(gids, PersonChild);
     expect(allowed).toHaveLength(1);
     expect(allowed[0].modelName).toBe("PersonChild");
   });

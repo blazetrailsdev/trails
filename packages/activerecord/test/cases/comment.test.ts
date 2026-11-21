@@ -29,7 +29,7 @@ describe("CommentTest", () => {
     await adapter.createTable("blank_comments", { comment: " ", force: true }, (t) => {
       t.string("space_comment", { comment: " " });
       t.string("empty_comment", { comment: "" });
-      t.string("nil_comment", { comment: null as any });
+      t.string("nil_comment", { comment: null });
       t.string("absent_comment");
       t.index(["space_comment"], { comment: " " });
       t.index(["empty_comment"], { comment: "" });
@@ -107,7 +107,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "remove comment from column", async () => {
-    await adapter.changeColumn("commenteds", "obvious", "string", { comment: null as any });
+    await adapter.changeColumn("commenteds", "obvious", "string", { comment: null });
     const cols = await (adapter as any).columns("commenteds");
     const col = cols.find((c: any) => c.name === "obvious")!;
     expect(col.type).toBe("string");
@@ -136,7 +136,7 @@ describe("CommentTest", () => {
         comment: "Whoa, content describes itself!",
       });
       await adapter.changeColumn("commenteds", "content", "string");
-      await adapter.changeColumn("commenteds", "obvious", "string", { comment: null as any });
+      await adapter.changeColumn("commenteds", "obvious", "string", { comment: null });
       await adapter.addIndex("commenteds", "obvious", {
         name: "idx_obvious",
         comment: "We need to see obvious comments",

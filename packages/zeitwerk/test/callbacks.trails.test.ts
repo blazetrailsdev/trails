@@ -69,10 +69,10 @@ describe("Zeitwerk::Loader::Callbacks and EagerLoad", () => {
 
   it("eagerLoadNamespace raises for what is not a class or module", async () => {
     await withSetup(loader, [["x.ts", "export const X = 1"]], {}, async () => {
-      await expect(loader.eagerLoadNamespace(null as never)).rejects.toThrow(
+      await expect(loader.eagerLoadNamespace(null)).rejects.toThrow(
         "nil is not a class or module object",
       );
-      await expect(loader.eagerLoadNamespace((() => {}) as never)).rejects.toThrow(ZeitwerkError);
+      await expect(loader.eagerLoadNamespace(() => {})).rejects.toThrow(ZeitwerkError);
     });
   });
 

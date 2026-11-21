@@ -107,7 +107,7 @@ export class VariantWithRecord {
     this._record = await Base.connectedTo({ role: writingRole() }, async () => {
       return (await this.blob.variantRecords.createOrFindByBang(
         { variation_digest: this.variation.digest },
-        ((record: VariantRecord) => record.image.attach(image)) as never,
+        (record: VariantRecord) => record.image.attach(image),
       )) as VariantRecord;
     });
   }

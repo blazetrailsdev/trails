@@ -10,7 +10,7 @@ describeIfSqlite("SQLite3::TableDefinition", () => {
   let conn: TableDefinitionConn & SchemaCreationConn;
 
   beforeAll(async () => {
-    conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn & SchemaCreationConn;
+    conn = await Base.leaseConnection();
   });
 
   it("forces type: integer for references", () => {
@@ -35,13 +35,13 @@ describeIfSqlite("SQLite3::TableDefinition", () => {
 
   it("resolves virtual type to the actual type option", () => {
     const td = new TableDefinition(conn, "articles");
-    const col = td.newColumnDefinition("full_name", "virtual" as any, { type: "string" } as any);
+    const col = td.newColumnDefinition("full_name", "virtual", { type: "string" });
     expect(col.type).toBe("string");
   });
 
   it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
     const td = new TableDefinition(conn, "articles");
-    td.column("full_name", "virtual" as any, { as: "a || b" } as any);
+    td.column("full_name", "virtual", { as: "a || b" });
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
     const sql = await new SchemaCreation((td as any).conn).accept(td);
@@ -53,7 +53,7 @@ describeIfSqlite("SQLite3::TableDefinition", () => {
   it("emits GENERATED ALWAYS AS ... STORED via visitor", async () => {
     const td = new TableDefinition(conn, "items");
     td.column("x", "integer");
-    td.column("expr", "integer", { as: "x + 1", stored: true } as any);
+    td.column("expr", "integer", { as: "x + 1", stored: true });
     const sql = await new SchemaCreation((td as any).conn).accept(td);
     expect(sql).toContain("GENERATED ALWAYS AS (x + 1) STORED");
   });

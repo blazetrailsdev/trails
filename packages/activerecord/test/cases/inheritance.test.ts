@@ -90,9 +90,9 @@ describe("InheritanceTest", () => {
 
   it("class with blank sti name", async () => {
     let company = await Company.first();
-    company = company!.dup() as typeof company;
-    await company!.update({ type: "  " });
-    company = await Company.find(company!.id);
+    company = company!.dup();
+    await company.update({ type: "  " });
+    company = await Company.find(company.id);
     expect((company as any).type).toBe("  ");
   });
 
@@ -595,7 +595,7 @@ describe("InheritanceComputeTypeTest", () => {
 
   it("sti type from attributes disabled in non sti class", async () => {
     const phone = new ShopProductType({ name: "Phone" });
-    const product = new ShopProduct({ type: phone } as Record<string, unknown>);
+    const product = new ShopProduct({ type: phone });
     assert(await product.save());
   });
 

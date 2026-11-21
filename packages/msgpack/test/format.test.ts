@@ -258,6 +258,6 @@ describe("MessagePack", () => {
   }
 
   function packUnpack(obj: unknown): unknown {
-    return MessagePack.unpack(rbFSend(obj, "toMsgpack") as Uint8Array);
+    return MessagePack.unpack(rbFSend(obj, "toMsgpack"));
   }
 });

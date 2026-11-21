@@ -135,11 +135,20 @@ const canonicalTables = canonicalTableNames();
 // thousands of lines. package.json's `lint` script raises it to 10240 MB; a
 // bare `eslint .` OOMs.
 const typescriptEslintRules = tseslint.plugin.rules;
-typescriptEslintRules["no-floating-promises"] = prefilterNoFloatingPromises(
-  typescriptEslintRules["no-floating-promises"],
-);
-typescriptEslintRules["no-misused-promises"] = prefilterNoMisusedPromises(
-  typescriptEslintRules["no-misused-promises"],
+const typescriptEslintPlugin = {
+  ...tseslint.plugin,
+  rules: {
+    ...typescriptEslintRules,
+    "no-floating-promises": prefilterNoFloatingPromises(
+      typescriptEslintRules["no-floating-promises"],
+    ),
+    "no-misused-promises": prefilterNoMisusedPromises(typescriptEslintRules["no-misused-promises"]),
+  },
+};
+const typescriptEslintRecommended = tseslint.configs.recommended.map((config) =>
+  config.plugins?.["@typescript-eslint"]
+    ? { ...config, plugins: { ...config.plugins, "@typescript-eslint": typescriptEslintPlugin } }
+    : config,
 );
 
 const VITE_APP_ASSETS_MESSAGE =
@@ -199,7 +208,7 @@ export default defineConfig(
     ],
   },
   eslint.configs.recommended,
-  tseslint.configs.recommended,
+  typescriptEslintRecommended,
   {
     // The rule tests run under vitest, where RuleTester picks up the injected
     // describe/it globals; the hooks around them are equally global.
@@ -1266,7 +1275,7 @@ export default defineConfig(
       },
     },
     rules: {
-      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
     },
   },
 

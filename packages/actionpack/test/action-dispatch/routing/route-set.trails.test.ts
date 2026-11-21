@@ -73,7 +73,7 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
       PATH_INFO: "/posts",
       HTTP_HOST: "example.org",
       "rack.url_scheme": "http",
-    } as never);
+    });
     expect(status).toBe(404);
     expect(headers[X_CASCADE]).toBe("pass");
   });

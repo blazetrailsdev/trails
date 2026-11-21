@@ -120,7 +120,7 @@ export class Node extends XmlNode {
     for (const child of [...(this._node as Parse5Parent).childNodes]) {
       defaultTreeAdapter.detachNode(child);
     }
-    defaultTreeAdapter.insertText(this._node as Parse5Parent, String(string));
+    defaultTreeAdapter.insertText(this._node, String(string));
   }
 
   get text(): string {
@@ -129,7 +129,7 @@ export class Node extends XmlNode {
 
   get children(): Node[] {
     if (!("childNodes" in this._node)) return [];
-    return childNodes(this._node as Parse5Parent, this.document);
+    return childNodes(this._node, this.document);
   }
 
   set children(nodeOrTags: Node | DocumentFragment | NodeSet | string) {
@@ -599,7 +599,7 @@ function _cloneNode<T extends object>(node: T, level: number): T {
         : [];
   }
   if ("content" in node && node.content && level > 0)
-    copy.content = _cloneNode(node.content as object, level);
+    copy.content = _cloneNode(node.content, level);
   return copy as T;
 }
 

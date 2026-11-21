@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { PersistedRequest } from "../lib/index.js";
 import { Persisted, SecureSessionHash, SessionId } from "../lib/index.js";
 
 describe("Rack::Session::Abstract::PersistedSecure::SecureSessionHash", () => {
@@ -14,10 +13,7 @@ describe("Rack::Session::Abstract::PersistedSecure::SecureSessionHash", () => {
   }
 
   beforeEach(async () => {
-    hash = new SecureSessionHash(
-      store(new SessionId("id"), { foo: ":bar", baz: ":qux" }),
-      null as unknown as PersistedRequest,
-    );
+    hash = new SecureSessionHash(store(new SessionId("id"), { foo: ":bar", baz: ":qux" }), null);
   });
 
   it("returns keys", async () => {
@@ -38,12 +34,12 @@ describe("Rack::Session::Abstract::PersistedSecure::SecureSessionHash", () => {
     });
 
     it("returns nil value for missing 'session_id' key", async () => {
-      hash = new SecureSessionHash(store(null, {}), null as unknown as PersistedRequest);
+      hash = new SecureSessionHash(store(null, {}), null);
       expect(hash.get("session_id")).toBeNull();
     });
 
     it("returns value for non SessionId 'session_id' key", async () => {
-      hash = new SecureSessionHash(store("id", {}), null as unknown as PersistedRequest);
+      hash = new SecureSessionHash(store("id", {}), null);
       expect(hash.get("session_id")).toBe("id");
     });
   });

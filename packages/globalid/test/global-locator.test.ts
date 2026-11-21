@@ -63,10 +63,10 @@ function registerConstants(registry: Record<string, LocatorModel>): void {
 }
 
 const REGISTRY: Record<string, LocatorModel> = {
-  Person: Person as unknown as LocatorModel,
-  PersonChild: PersonChild as unknown as LocatorModel,
-  PersonUuid: PersonUuid as unknown as LocatorModel,
-  CompositePrimaryKeyModel: CompositePrimaryKeyModel as unknown as LocatorModel,
+  Person: Person,
+  PersonChild: PersonChild,
+  PersonUuid: PersonUuid,
+  CompositePrimaryKeyModel: CompositePrimaryKeyModel,
 };
 
 describe("GlobalLocatorTest", () => {
@@ -139,10 +139,7 @@ describe("GlobalLocatorTest", () => {
 
   it("by GID with only: restriction by multiple types", async () => {
     const found = (await Locator.locate(personGid, {
-      only: [
-        CompositePrimaryKeyModel as unknown as LocatorModel,
-        Person as unknown as LocatorModel,
-      ],
+      only: [CompositePrimaryKeyModel, Person],
     })) as Person;
     expect(found).toBeInstanceOf(Person);
     expect(found.id).toBe(personGid.modelId);
@@ -165,7 +162,7 @@ describe("GlobalLocatorTest", () => {
 
   it("by GID with only: restriction by multiple types w/module", async () => {
     const found = (await Locator.locate(personGid, {
-      only: [String as unknown as LocatorModel, Identification as unknown as LocatorModel],
+      only: [String, Identification],
     })) as Person;
     expect(found).toBeInstanceOf(Person);
     expect(found.id).toBe(personGid.modelId);
@@ -272,10 +269,7 @@ describe("GlobalLocatorTest", () => {
   it("by SGID with only: restriction by multiple types", async () => {
     const found = (await Locator.locateSigned(personSgid, {
       verifier,
-      only: [
-        CompositePrimaryKeyModel as unknown as LocatorModel,
-        Person as unknown as LocatorModel,
-      ],
+      only: [CompositePrimaryKeyModel, Person],
     })) as Person;
     expect(found).toBeInstanceOf(Person);
     expect(found.id).toBe(personSgid.modelId);
@@ -301,7 +295,7 @@ describe("GlobalLocatorTest", () => {
   it("by SGID with only: restriction by multiple types w/module", async () => {
     const found = (await Locator.locateSigned(personSgid, {
       verifier,
-      only: [String as unknown as LocatorModel, Identification as unknown as LocatorModel],
+      only: [String, Identification],
     })) as Person;
     expect(found).toBeInstanceOf(Person);
     expect(found.id).toBe(personSgid.modelId);
@@ -592,7 +586,7 @@ class PersonScoped extends Person {
     if (!PersonScoped._findAllowed) {
       return (Array.isArray(id) ? [] : null) as unknown as PersonScoped;
     }
-    return super.find(id) as Promise<PersonScoped | PersonScoped[]>;
+    return super.find(id);
   }
 }
 

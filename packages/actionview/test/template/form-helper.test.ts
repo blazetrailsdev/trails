@@ -110,7 +110,7 @@ class PostDelegate extends Post {
   }
 
   get modelName(): ModelName {
-    return new ModelName(this.constructor as never);
+    return new ModelName(this.constructor);
   }
 }
 
@@ -426,7 +426,7 @@ describe("FormHelperTest", () => {
       },
     });
     view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null) as View;
-    include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
+    include(view.constructor, Routes.urlHelpers());
     const urlFor = view.urlFor;
     view.urlFor = function (this: Base, object: unknown): string {
       urlForOptions = object as Record<string, unknown>;
@@ -2034,7 +2034,7 @@ describe("FormHelperTest", () => {
   });
 
   function tag(): { span(content: unknown, options: Record<string, unknown>): unknown } {
-    return view.tag() as unknown as ReturnType<typeof tag>;
+    return view.tag();
   }
 
   const editPost = (block: () => string) =>

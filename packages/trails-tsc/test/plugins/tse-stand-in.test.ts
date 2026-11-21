@@ -143,7 +143,7 @@ const partial =
 const layout =
   (path: string, block: (name?: string) => unknown = yieldBlock) =>
   (view: Base) =>
-    view.render({ layout: path }, {}, block as () => unknown);
+    view.render({ layout: path }, {}, block);
 
 const ACTIONPACK_SCENARIOS: Record<string, (view: Base) => unknown> = {
   "bad-customers/_bad_customer": partial("bad-customers/bad_customer", {

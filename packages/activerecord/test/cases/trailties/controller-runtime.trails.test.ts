@@ -31,8 +31,8 @@ class FakeController {
   declare cleanupViewRuntime: <T>(block: () => T) => T;
   declare appendInfoToPayload: (payload: Record<string, unknown>) => void;
 }
-include(FakeController as never, FakeInstrumentation);
-include(FakeController as never, ControllerRuntime);
+include(FakeController, FakeInstrumentation);
+include(FakeController, ControllerRuntime);
 
 describe("ControllerRuntimeTest", () => {
   beforeEach(() => RuntimeRegistry.reset());
@@ -219,9 +219,9 @@ describe("ControllerRuntimeTest", () => {
     it("is idempotent across a parent and its subclass", () => {
       class Parent extends FakeController {}
       class Child extends Parent {}
-      include(Parent as never, ControllerRuntime);
-      include(Child as never, ControllerRuntime);
-      include(Child as never, ControllerRuntime);
+      include(Parent, ControllerRuntime);
+      include(Child, ControllerRuntime);
+      include(Child, ControllerRuntime);
 
       const controller = new Child();
       controller.processAction("index");

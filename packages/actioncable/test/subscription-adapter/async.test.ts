@@ -9,7 +9,7 @@ describe("AsyncAdapterTest", () => {
   const host = {
     async setup() {
       await host.txAdapter.shutdown();
-      host.txAdapter = host.rxAdapter as never;
+      host.txAdapter = host.rxAdapter;
     },
 
     cableConfig() {

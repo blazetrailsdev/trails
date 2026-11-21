@@ -96,7 +96,7 @@ function normalizeBindValue(value: unknown): unknown {
   if (typeof value === "object") {
     const keys = Object.keys(value);
     if ("value" in value && keys.length > 0 && keys.every((k) => k === "value" || k === "format")) {
-      return normalizeBindValue((value as { value: unknown }).value);
+      return normalizeBindValue(value.value);
     }
     try {
       return JSON.stringify(value);

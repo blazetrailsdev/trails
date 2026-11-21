@@ -262,7 +262,7 @@ export function mailTo(
   htmlOptions: HtmlOptions | null = {},
   block?: Block,
 ): SafeBuffer {
-  if (isPlainObject(name)) [htmlOptions, name] = [name as HtmlOptions, null];
+  if (isPlainObject(name)) [htmlOptions, name] = [name, null];
   htmlOptions = stringifyKeys(htmlOptions ?? {});
 
   const extrasList = ["cc", "bcc", "body", "subject", "reply_to"]
@@ -301,8 +301,7 @@ export function isCurrentPage(
 
   if (!rtest(options)) options = optionsAsKwargs;
   if (!rtest(checkParameters)) {
-    checkParameters =
-      isPlainObject(options) && hashDelete(options as HtmlOptions, "checkParameters");
+    checkParameters = isPlainObject(options) && hashDelete(options, "checkParameters");
   }
 
   let urlString = RFC2396_PARSER.unescape(this.urlFor(options));
@@ -328,7 +327,7 @@ export function smsTo(
   htmlOptions: HtmlOptions | null = {},
   block?: Block,
 ): SafeBuffer {
-  if (isPlainObject(name)) [htmlOptions, name] = [name as HtmlOptions, null];
+  if (isPlainObject(name)) [htmlOptions, name] = [name, null];
   htmlOptions = stringifyKeys(htmlOptions ?? {});
 
   let countryCode: unknown = presence(hashDelete(htmlOptions, "country_code"));
@@ -350,7 +349,7 @@ export function phoneTo(
   htmlOptions: HtmlOptions | null = {},
   block?: Block,
 ): SafeBuffer {
-  if (isPlainObject(name)) [htmlOptions, name] = [name as HtmlOptions, null];
+  if (isPlainObject(name)) [htmlOptions, name] = [name, null];
   htmlOptions = stringifyKeys(htmlOptions ?? {});
 
   let countryCode: unknown = presence(hashDelete(htmlOptions, "country_code"));
@@ -400,7 +399,7 @@ export function urlTarget(this: UrlForHost, name: unknown, options: unknown): st
 /** @internal */
 export function isLinkToRemoteOptions(options: unknown): unknown {
   if (isPlainObject(options)) {
-    return hashDelete(options as HtmlOptions, "remote");
+    return hashDelete(options, "remote");
   }
   return null;
 }

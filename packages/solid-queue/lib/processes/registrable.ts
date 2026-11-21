@@ -1,7 +1,6 @@
 import { RecordNotFound } from "@blazetrails/activerecord";
 import { compact, included, isPresent } from "@blazetrails/activesupport";
 import { TimerTask, classModule, rbModAttrReader, rbModAttrWriter } from "@blazetrails/ruby-compat";
-import type { Time } from "@blazetrails/date";
 import type { Process } from "../process.js";
 import { SolidQueue } from "../solid-queue.js";
 import type { ClassMethods as CallbacksClassMethods } from "./callbacks.js";
@@ -102,7 +101,7 @@ export class Registrable {
   isPresumedDead(this: RegistrableHost): boolean {
     return (
       this.process != null &&
-      this.process.last_heartbeat_at.compare(SolidQueue.processAliveThreshold.ago() as Time)! <= 0
+      this.process.last_heartbeat_at.compare(SolidQueue.processAliveThreshold.ago())! <= 0
     );
   }
 

@@ -8,7 +8,7 @@ import {
 import { registerSubclass } from "@blazetrails/activesupport";
 import { block, hashAset } from "@blazetrails/ruby-compat";
 import type { Column } from "./connection-adapters/column.js";
-import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
+import { lookup as typeLookup, adapterNameFrom } from "./type.js";
 import {
   isSchemaLoaded,
   reloadSchemaFromCache as modelSchemaReloadSchemaFromCache,
@@ -137,7 +137,7 @@ export function resolveTypeName(
 ): ValueType {
   return typeLookup(name, {
     ...options,
-    adapter: adapterNameFrom(this as unknown as AdapterNameSource),
+    adapter: adapterNameFrom(this),
   });
 }
 

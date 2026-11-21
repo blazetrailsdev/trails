@@ -15,7 +15,7 @@ async function mysqlPoolConfig(config: Record<string, unknown>): Promise<Record<
 }
 
 function pgClientOptions(config: Record<string, unknown>): Record<string, unknown> {
-  const adapter = new PostgreSQLAdapter(config as never);
+  const adapter = new PostgreSQLAdapter(config);
   return (adapter as unknown as { _connectionParameters: Record<string, unknown> })
     ._connectionParameters;
 }
@@ -61,7 +61,7 @@ describe.each([
 
 describe("retained config", () => {
   it.each([
-    ["Mysql2Adapter", (c: Record<string, unknown>) => new Mysql2Adapter({ ...c } as never)],
+    ["Mysql2Adapter", (c: Record<string, unknown>) => new Mysql2Adapter({ ...c })],
     ["PostgreSQLAdapter", (c: Record<string, unknown>) => new PostgreSQLAdapter(c as never)],
   ])("%s keeps username in the config the driver mapping read from", (_name, build) => {
     const adapter = build({ ...BASE, username: "rails" });

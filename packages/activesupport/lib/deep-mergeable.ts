@@ -18,7 +18,7 @@ export const DeepMergeable = {
     return this.mergeBang(other, (key, thisVal, otherVal) => {
       if (
         thisVal != null &&
-        isModuleIncluded((thisVal as object).constructor as { prototype: object }, DeepMergeable) &&
+        isModuleIncluded(thisVal.constructor, DeepMergeable) &&
         (thisVal as DeepMergeableHost).isDeepMerge(otherVal)
       ) {
         return (thisVal as DeepMergeableHost).deepMerge(otherVal, block);

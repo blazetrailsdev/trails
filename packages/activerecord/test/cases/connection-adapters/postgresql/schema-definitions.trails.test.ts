@@ -22,7 +22,7 @@ import type { TableDefinitionConn } from "../../../../lib/connection-adapters/ab
 let leased: TableDefinitionConn;
 
 beforeAll(async () => {
-  leased = (await Base.leaseConnection()) as unknown as TableDefinitionConn;
+  leased = await Base.leaseConnection();
 });
 
 describe("ExclusionConstraintDefinition", () => {
@@ -140,7 +140,7 @@ describe("UniqueConstraintDefinition", () => {
 
   it("definedFor ignores keys not stored in options (Rails slice semantics)", () => {
     const defn = new UniqueConstraintDefinition("t", "col", { name: "u" });
-    expect(defn.definedFor({ unknownKey: "value" } as never)).toBe(true);
+    expect(defn.definedFor({ unknownKey: "value" })).toBe(true);
   });
 });
 
@@ -386,7 +386,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
 
   it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
     const td = new TableDefinition(leased, "articles");
-    td.column("full_name", "virtual" as any, { as: "a || b", stored: true } as any);
+    td.column("full_name", "virtual", { as: "a || b", stored: true });
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
     const sql = await toSql(td);

@@ -52,7 +52,7 @@ describe("loadSchemaFromAdapter", () => {
     class Post extends Base {
       static override tableName = "posts";
     }
-    Model = Post as typeof Base;
+    Model = Post;
   });
 
   it("registers schema-sourced attribute definitions from cached columns", async () => {
@@ -104,7 +104,7 @@ describe("loadSchemaFromAdapter", () => {
     const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
     await establishConnectionTo(Post, adapter as never);
 
-    await loadSchemaFromAdapter.call(Post as typeof Base);
+    await loadSchemaFromAdapter.call(Post);
 
     expect(Object.keys((Post as typeof Base).columnsHash())).toContain("guid");
   });
@@ -129,7 +129,7 @@ describe("loadSchemaFromAdapter", () => {
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     });
-    await establishConnectionTo(Model, adapter as never);
+    await establishConnectionTo(Model, adapter);
 
     await Promise.all([Model.loadSchema(), Model.loadSchema()]);
     expect(warms).toBe(1);
@@ -151,7 +151,7 @@ describe("loadSchemaFromAdapter", () => {
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     });
-    await establishConnectionTo(Model, adapter as never);
+    await establishConnectionTo(Model, adapter);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -171,7 +171,7 @@ describe("loadSchemaFromAdapter", () => {
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     });
-    await establishConnectionTo(Model, adapter as never);
+    await establishConnectionTo(Model, adapter);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -192,7 +192,7 @@ describe("loadSchemaFromAdapter", () => {
       schemaCache: cache,
       lookupCastTypeFromColumn: () => defaultValue(),
     });
-    await establishConnectionTo(Model, adapter as never);
+    await establishConnectionTo(Model, adapter);
 
     await loadSchemaFromAdapter.call(Model);
 
@@ -360,7 +360,7 @@ describe("a schema cache loaded from a dump", () => {
         throw new ConnectionNotEstablished("connection refused");
       },
     });
-    await establishConnectionTo(Post, adapter as never);
+    await establishConnectionTo(Post, adapter);
     Post.connectionPool().schemaReflection.loadedCache = dumpLoadedCache();
 
     await expect(Post.loadSchema()).rejects.toThrow(ConnectionNotEstablished);
@@ -377,7 +377,7 @@ describe("a schema cache loaded from a dump", () => {
         this.typeMap = { lookup: () => new UuidType() };
       },
     });
-    await establishConnectionTo(Post, adapter as never);
+    await establishConnectionTo(Post, adapter);
     Post.connectionPool().schemaReflection.loadedCache = dumpLoadedCache();
 
     await Post.loadSchema();

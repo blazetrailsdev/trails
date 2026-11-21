@@ -189,7 +189,7 @@ export class QueryParser {
     block?: (k: string, v: string | null) => void,
   ): void {
     if (rbBlockGivenP(unescaper)) {
-      block = unescaper as (k: string, v: string | null) => void;
+      block = unescaper;
       unescaper = null;
     }
     try {

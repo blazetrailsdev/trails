@@ -614,8 +614,8 @@ describe("ToSentenceTest", () => {
   });
 
   it("one non string element", () => {
-    expect(String(toSentence([1 as unknown as string]))).toBe("1");
-    expect(toSentence([1, 2] as unknown as string[])).toBe("1 and 2");
+    expect(String(toSentence([1]))).toBe("1");
+    expect(toSentence([1, 2])).toBe("1 and 2");
   });
 
   it("does not modify given hash", () => {

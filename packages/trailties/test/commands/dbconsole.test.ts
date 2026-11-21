@@ -56,7 +56,7 @@ describe("Trails::DBConsoleTest", () => {
     const dbconsole = new DBConsole({});
     let hashConfig: HashConfig | null = null;
     vi.spyOn(dbconsole, "dbConfig").mockImplementation(
-      async () => (hashConfig ??= new HashConfig("test", "primary", config)) as never,
+      async () => (hashConfig ??= new HashConfig("test", "primary", config)),
     );
     aborted = false;
     output = "";

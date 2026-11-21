@@ -4,7 +4,6 @@ import { Decryption } from "../../../lib/encryption/errors.js";
 import { rbInspect } from "@blazetrails/ruby-compat";
 import type { EncryptorLike } from "../../../lib/encryption/encryptor.js";
 import { encrypts } from "../../../lib/encryption/encryptable-record.js";
-import type { SchemeOptions } from "../../../lib/encryption/scheme.js";
 import { Base } from "../../../lib/index.js";
 import { Encryption } from "./helper.js";
 import { fixtures } from "../../support/use-fixtures.js";
@@ -76,8 +75,8 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
   it("config.previous schemes are merged into the attribute type's previousTypes", async () => {
     Encryption.config.supportUnencryptedData = false;
     Encryption.config.previous = [
-      { encryptor: new TestEncryptor({ legacy1: "legacy_cipher_1" }) } as SchemeOptions,
-      { encryptor: new TestEncryptor({ legacy2: "legacy_cipher_2" }) } as SchemeOptions,
+      { encryptor: new TestEncryptor({ legacy1: "legacy_cipher_1" }) },
+      { encryptor: new TestEncryptor({ legacy2: "legacy_cipher_2" }) },
     ];
 
     const modelClass = class extends Base {
@@ -106,8 +105,8 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
       {
         encryptor: new TestEncryptor({ legacy_det: "cipher_det" }),
         deterministic: true,
-      } as SchemeOptions,
-      { encryptor: new TestEncryptor({ legacy_non: "cipher_non" }) } as SchemeOptions,
+      },
+      { encryptor: new TestEncryptor({ legacy_non: "cipher_non" }) },
     ];
 
     const modelClass = class extends Base {

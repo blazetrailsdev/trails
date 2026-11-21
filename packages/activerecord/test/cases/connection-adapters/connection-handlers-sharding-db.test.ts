@@ -295,7 +295,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     let error: any;
     expect(() => {
       try {
-        Base.connectedTo({} as any, () => {});
+        Base.connectedTo({}, () => {});
       } catch (e) {
         error = e;
         throw e;

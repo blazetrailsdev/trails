@@ -246,7 +246,7 @@ export class Utilities {
     } else if (value instanceof Uint8Array) {
       return value.every((c) => c === 0x20 || (c >= 0x09 && c <= 0x0d));
     } else {
-      return rbObjRespondTo(value, "isEmpty") ? isEmpty(value as object) : value === false;
+      return rbObjRespondTo(value, "isEmpty") ? isEmpty(value) : value === false;
     }
   }
 
@@ -321,7 +321,7 @@ export class Utilities {
   }
 
   static isHasConstant(klass: object, string: string): boolean {
-    return constDefined(klass as { readonly name: string }, string, false);
+    return constDefined(klass, string, false);
   }
 
   static getConstant(klass: object, string: string): unknown {

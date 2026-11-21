@@ -28,9 +28,12 @@ describe("SQLite3Adapter busy handler", () => {
   it("yields the event loop while it waits, so the lock holder can commit", async () => {
     await writer.execute("BEGIN IMMEDIATE");
     await writer.execute("INSERT INTO t VALUES (1)");
-    setTimeout(() => void writer.execute("COMMIT"), 20);
+    const commit = new Promise((resolve) => setTimeout(resolve, 20)).then(() =>
+      writer.execute("COMMIT"),
+    );
 
     await waiter.execute("INSERT INTO t VALUES (2)");
+    await commit;
 
     const rows = (await waiter.execute("SELECT COUNT(*) AS n FROM t"))!;
     expect(Number(rows[0].n)).toBe(2);
@@ -76,7 +79,9 @@ describe("SQLite3Adapter busy handler", () => {
     await writer.execute("BEGIN IMMEDIATE");
     let turns = 0;
     const ticker = setInterval(() => turns++, 1);
-    setTimeout(() => void writer.execute("COMMIT"), 20);
+    const commit = new Promise((resolve) => setTimeout(resolve, 20)).then(() =>
+      writer.execute("COMMIT"),
+    );
 
     await waiter.performQuery(
       waiter._rawConnection!,
@@ -88,6 +93,7 @@ describe("SQLite3Adapter busy handler", () => {
       { prepare: false, batch: true },
     );
     clearInterval(ticker);
+    await commit;
 
     expect(turns).toBeGreaterThan(0);
     const rows = (await waiter.execute("SELECT COUNT(*) AS n FROM t"))!;
@@ -133,11 +139,14 @@ describe("SQLite3Adapter busy handler", () => {
     const holder = new SQLite3Adapter({ database, pragmas: { journal_mode: "delete" } });
     await holder.execute("CREATE TABLE p (id INTEGER)");
     await holder.execute("BEGIN EXCLUSIVE");
-    setTimeout(() => void holder.execute("COMMIT"), 20);
+    const commit = new Promise((resolve) => setTimeout(resolve, 20)).then(() =>
+      holder.execute("COMMIT"),
+    );
 
     const late = new SQLite3Adapter({ database, timeout: 1000 });
     try {
       await late.execute("SELECT 1");
+      await commit;
     } finally {
       await late.disconnectBang();
       await holder.dropTable("p");
@@ -158,9 +167,12 @@ describe("SQLite3Adapter busy handler", () => {
     await waiter.execute("SELECT 1");
     waiter._sharedLockHeld = true;
     await writer.execute("BEGIN IMMEDIATE");
-    setTimeout(() => void writer.execute("COMMIT"), 20);
+    const commit = new Promise((resolve) => setTimeout(resolve, 20)).then(() =>
+      writer.execute("COMMIT"),
+    );
 
     await waiter.execute("INSERT INTO t VALUES (2)");
+    await commit;
 
     const rows = (await waiter.execute("SELECT COUNT(*) AS n FROM t"))!;
     expect(Number(rows[0].n)).toBe(1);

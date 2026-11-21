@@ -100,9 +100,9 @@ describe("Metal.middlewareStack", () => {
   it("a subclass reads a copy of its superclass's stack, and writes stay local", () => {
     const middleware = (app: unknown) => app;
     class ParentController extends Metal {}
-    ParentController.use(middleware as never);
+    ParentController.use(middleware);
     class ChildController extends ParentController {}
-    ChildController.use(middleware as never);
+    ChildController.use(middleware);
 
     expect(Metal.middlewareStack.isAny()).toBe(false);
     expect(ParentController.middleware().middlewares.length).toBe(1);

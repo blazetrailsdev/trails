@@ -2,7 +2,7 @@ import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-ada
 import { Base } from "../../lib/index.js";
 
 export async function ambientConnection(): Promise<AbstractAdapter> {
-  return (await Base.leaseConnection()) as unknown as AbstractAdapter;
+  return await Base.leaseConnection();
 }
 
 export async function withRocketTables(

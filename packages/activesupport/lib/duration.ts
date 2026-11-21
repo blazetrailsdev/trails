@@ -448,9 +448,9 @@ export class Duration {
 
   compareTo(other: Duration | number | unknown): number | null {
     if (other instanceof Duration) {
-      return cmp(this.value, other.value) as number;
+      return cmp(this.value, other.value);
     } else if (rbObjIsKindOf(other, rbCNumeric)) {
-      return cmp(this.value, other) as number;
+      return cmp(this.value, other);
     }
     return null;
   }

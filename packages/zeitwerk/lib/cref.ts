@@ -38,19 +38,19 @@ export class Cref {
   }
 
   isAutoload(): string | null {
-    if (constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false)) return null;
+    if (constDefined(_seat(this.mod), this.cname, false)) return null;
     return rbAutoloadP(this.mod, this.cname);
   }
 
   autoload(abspath: string): void {
-    if (constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false)) return;
+    if (constDefined(_seat(this.mod), this.cname, false)) return;
     rbAutoloadStr(this.mod, this.cname, abspath);
   }
 
   /** @inventedArm if — PERMANENT */
   isDefined(): boolean {
     if (this.isAutoload() != null) return true;
-    return constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false);
+    return constDefined(_seat(this.mod), this.cname, false);
   }
 
   set<T>(value: T): T {

@@ -39,4 +39,4 @@ class EmptyScope extends LinkedList.EmptyLinkedList {
 }
 
 Scope.EmptyScope = EmptyScope;
-Scope.EMPTY = new EmptyScope() as never;
+Scope.EMPTY = new EmptyScope();

@@ -95,7 +95,7 @@ describe("PostgreSQLAdapter#castResult", () => {
     });
 
     const result = await castResult.call(
-      adapter as never,
+      adapter,
       new PG.Result({
         fields: [{ name: "user_defined_column", dataTypeID: 987_654, dataTypeModifier: -1 }],
         rows: [],
@@ -123,7 +123,7 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
   });
 
   function warmIntegerArrayType(): void {
-    adapter.typeMap.registerType(1007, new OidArray(new IntegerType()) as never);
+    adapter.typeMap.registerType(1007, new OidArray(new IntegerType()));
     adapter.typeMap.aliasType("integer[]", 1007);
   }
 

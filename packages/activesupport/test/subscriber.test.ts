@@ -145,14 +145,14 @@ describe("SubscriberTest", () => {
       computedDuration = finish - start;
     };
 
-    await Notifications.subscribed(callback as never, "publish_event.test", () => {
+    await Notifications.subscribed(callback, "publish_event.test", () => {
       Notifications.publishEvent(event);
     });
 
     expect(computedDuration).toBeCloseTo(event.duration / 1_000.0, 1);
 
     await Notifications.subscribed(
-      callback as never,
+      callback,
       "publish_event.test",
       () => {
         Notifications.publishEvent(event);

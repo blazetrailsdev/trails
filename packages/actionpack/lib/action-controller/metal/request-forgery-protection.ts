@@ -32,7 +32,6 @@ import { ActionControllerError } from "./exceptions.js";
 import type {
   afterAction,
   beforeAction,
-  CallbackOptions,
   skipBeforeAction,
 } from "../../abstract-controller/callbacks.js";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
@@ -315,7 +314,7 @@ export function protectFromForgery(
       : new SessionStore(),
   );
 
-  this.beforeAction(":verifyAuthenticityToken", options as CallbackOptions);
+  this.beforeAction(":verifyAuthenticityToken", options);
   this.appendAfterAction(":verifySameOriginRequest");
 }
 
@@ -326,7 +325,7 @@ export function skipForgeryProtection(
   this.skipBeforeAction(":verifyAuthenticityToken", {
     raise: false,
     ...options,
-  } as CallbackOptions);
+  });
 }
 
 /** @internal */

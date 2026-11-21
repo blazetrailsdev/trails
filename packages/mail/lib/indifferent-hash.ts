@@ -124,9 +124,7 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
   /** @internal */
   protected convertValue(value: unknown): unknown {
     if (value != null && value.constructor === Hash) {
-      return (this.constructor as typeof IndifferentHash).newFromHashCopyingDefault(
-        value as Hash<string, unknown>,
-      );
+      return (this.constructor as typeof IndifferentHash).newFromHashCopyingDefault(value);
     } else if (value != null && value.constructor === Object) {
       return new (this.constructor as typeof IndifferentHash)(value);
     } else if (Array.isArray(value)) {

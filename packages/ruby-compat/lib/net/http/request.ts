@@ -523,7 +523,7 @@ export class HTTPRequest {
         } else if (rbObjRespondTo(value, "size") && chunkedP) {
           await this.flushBuffer(out, buf, chunkedP);
           if (chunkedP) await out.write(`${value.size().toString(16)}\r\n`);
-          await IO.copyStreamAsync(value, out as { write(data: Uint8Array): unknown });
+          await IO.copyStreamAsync(value, out);
           if (chunkedP) await out.write("\r\n");
         } else {
           await this.flushBuffer(out, buf, chunkedP);

@@ -101,7 +101,7 @@ describe("I18n.normalizeKeys on a Symbol key", () => {
   it("drops the leading colon of a Symbol key, scope and locale", () => {
     expect(normalizeKeys(null, ":errors.format", null)).toEqual(["errors", "format"]);
     expect(normalizeKeys(null, "format", ":errors")).toEqual(["errors", "format"]);
-    expect(normalizeKeys(":en" as never, "format", null)).toEqual(["en", "format"]);
+    expect(normalizeKeys(":en", "format", null)).toEqual(["en", "format"]);
   });
 
   it("drops the leading colon of each Symbol in an Array key", () => {

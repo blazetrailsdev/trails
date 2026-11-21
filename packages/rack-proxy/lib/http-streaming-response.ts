@@ -177,8 +177,8 @@ export class HttpStreamingResponse {
         http.verifyMode = this.verifyMode as number | null;
         http.readTimeout = this.readTimeout as number | null;
         if (this.sslVersion != null) http.sslVersion = this.sslVersion as NetHTTP["sslVersion"];
-        if (this.cert != null) http.cert = this.cert as NetHTTP["cert"];
-        if (this.key != null) http.key = this.key as NetHTTP["key"];
+        if (this.cert != null) http.cert = this.cert;
+        if (this.key != null) http.key = this.key;
         if (this.logger != null)
           http.setDebugOutput(this.logger as Parameters<NetHTTP["setDebugOutput"]>[0]);
       }

@@ -137,7 +137,7 @@ describe("FinderTest", () => {
     await expected.touch();
     expect(rid(await Topic.first())).toBe(rid(expected));
     expect(rid(await Topic.limit(5).first())).toBe(rid(expected));
-    expect(rid(await Topic.order(null as never).first())).toBe(rid(expected));
+    expect(rid(await Topic.order(null).first())).toBe(rid(expected));
   });
 
   it("model class responds to first bang", async () => {
@@ -159,7 +159,7 @@ describe("FinderTest", () => {
     await expected.touch();
     expect(rid(await Topic.second())).toBe(rid(expected));
     expect(rid(await Topic.limit(5).second())).toBe(rid(expected));
-    expect(rid(await Topic.order(null as never).second())).toBe(rid(expected));
+    expect(rid(await Topic.order(null).second())).toBe(rid(expected));
   });
 
   it("model class responds to second bang", async () => {
@@ -181,7 +181,7 @@ describe("FinderTest", () => {
     await expected.touch();
     expect(rid(await Topic.third())).toBe(rid(expected));
     expect(rid(await Topic.limit(5).third())).toBe(rid(expected));
-    expect(rid(await Topic.order(null as never).third())).toBe(rid(expected));
+    expect(rid(await Topic.order(null).third())).toBe(rid(expected));
   });
 
   it("model class responds to third bang", async () => {
@@ -203,7 +203,7 @@ describe("FinderTest", () => {
     await expected.touch();
     expect(rid(await Topic.fourth())).toBe(rid(expected));
     expect(rid(await Topic.limit(5).fourth())).toBe(rid(expected));
-    expect(rid(await Topic.order(null as never).fourth())).toBe(rid(expected));
+    expect(rid(await Topic.order(null).fourth())).toBe(rid(expected));
   });
 
   it("model class responds to fourth bang", async () => {
@@ -225,7 +225,7 @@ describe("FinderTest", () => {
     await expected.touch();
     expect(rid(await Topic.fifth())).toBe(rid(expected));
     expect(rid(await Topic.limit(5).fifth())).toBe(rid(expected));
-    expect(rid(await Topic.order(null as never).fifth())).toBe(rid(expected));
+    expect(rid(await Topic.order(null).fifth())).toBe(rid(expected));
   });
 
   it("model class responds to fifth bang", async () => {
@@ -570,7 +570,7 @@ describe("FinderTest", () => {
     let found = (await Topic.select("title").find([4, 2, 5])) as unknown[];
     expect(found.map(rid)).toEqual([4, 2, 5]);
 
-    found = (await Topic.select("title").order("id").find([4, 2, 5])) as unknown[];
+    found = await Topic.select("title").order("id").find([4, 2, 5]);
     expect(found.map(rid)).toEqual([2, 4, 5]);
   });
 
@@ -604,7 +604,7 @@ describe("FinderTest", () => {
     expect((records[1] as { title: string }).title).toBe("The Second Topic of the day");
     expect((records[2] as { title: string }).title).toBe("The Fifth Topic of the day");
 
-    records = (await Topic.find(4, 2, 5)) as unknown[];
+    records = await Topic.find(4, 2, 5);
     expect((records[0] as { title: string }).title).toBe("The Fourth Topic of the day");
     expect((records[1] as { title: string }).title).toBe("The Second Topic of the day");
     expect((records[2] as { title: string }).title).toBe("The Fifth Topic of the day");
@@ -614,7 +614,7 @@ describe("FinderTest", () => {
     expect((records[1] as { title: string }).title).toBe("The Second Topic of the day");
     expect((records[2] as { title: string }).title).toBe("The Fifth Topic of the day");
 
-    records = (await Topic.find("4", "2", "5")) as unknown[];
+    records = await Topic.find("4", "2", "5");
     expect((records[0] as { title: string }).title).toBe("The Fourth Topic of the day");
     expect((records[1] as { title: string }).title).toBe("The Second Topic of the day");
     expect((records[2] as { title: string }).title).toBe("The Fifth Topic of the day");
@@ -626,7 +626,7 @@ describe("FinderTest", () => {
     expect((records[1] as { title: string }).title).toBe("The First Topic");
     expect((records[2] as { title: string }).title).toBe("The Fifth Topic of the day");
 
-    records = (await Topic.order("id").find([5, 3, 1])) as unknown[];
+    records = await Topic.order("id").find([5, 3, 1]);
     expect((records[0] as { title: string }).title).toBe("The First Topic");
     expect((records[1] as { title: string }).title).toBe("The Third Topic of the day");
     expect((records[2] as { title: string }).title).toBe("The Fifth Topic of the day");
@@ -703,7 +703,7 @@ describe("FinderTest", () => {
 
   it("find by with large number", async () => {
     await assertQueriesCount(0, async () => {
-      expect(await Topic.findBy({ id: "9999999999999999999999999999999" as never })).toBeNull();
+      expect(await Topic.findBy({ id: "9999999999999999999999999999999" })).toBeNull();
     });
   });
 
@@ -786,10 +786,10 @@ describe("FinderTest", () => {
   it("find by association subquery", async () => {
     const firm = companies("first_firm");
     expect(rid((await (firm as any).account) as unknown)).toBe(
-      rid(await Account.findBy({ firm: CanonicalFirm.where({ id: rid(firm) }) as never })),
+      rid(await Account.findBy({ firm: CanonicalFirm.where({ id: rid(firm) }) })),
     );
     expect(rid((await (firm as any).account) as unknown)).toBe(
-      rid(await Account.findBy({ firm_id: CanonicalFirm.where({ id: rid(firm) }) as never })),
+      rid(await Account.findBy({ firm_id: CanonicalFirm.where({ id: rid(firm) }) })),
     );
   });
 
@@ -886,7 +886,7 @@ describe("FinderTest", () => {
         },
       );
     } finally {
-      ClothingItem.implicitOrderColumn = null as never;
+      ClothingItem.implicitOrderColumn = null;
     }
   });
 
@@ -908,7 +908,7 @@ describe("FinderTest", () => {
         },
       );
     } finally {
-      ClothingItem.implicitOrderColumn = null as never;
+      ClothingItem.implicitOrderColumn = null;
     }
   });
 

@@ -150,7 +150,7 @@ export class WhereClause {
     const attrs = extractBang(columns, (node) => node instanceof Arel.Attribute);
     const nonAttrs = extractBang(
       columns,
-      (node) => node != null && isModuleIncluded((node as object).constructor, Predications),
+      (node) => node != null && isModuleIncluded(node.constructor, Predications),
     );
 
     return this.predicates.filter(
@@ -269,7 +269,7 @@ function extractNodeValue(node: unknown): unknown {
     const val = node.value;
     if (val instanceof ModelAttribute) return val.value();
     if (val && typeof val === "object" && "value" in val) {
-      return (val as { value: unknown }).value;
+      return val.value;
     }
     return val;
   }

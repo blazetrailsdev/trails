@@ -27,7 +27,7 @@ export class ConnectionUrlResolver {
     Object.entries(config).map(([key, value]) => {
       if (typeof value === "string") config[key] = this.uriParser.unescape(value);
     });
-    return config as DatabaseConfigOptions;
+    return config;
   }
 
   /** @internal */

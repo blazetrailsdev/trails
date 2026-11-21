@@ -137,7 +137,7 @@ export class MemoryStore extends Store implements CacheStore {
 
   inspect(): string {
     return `#<${this.constructor.name} entries=${this.data.size}, size=${this.cacheSize}, options=${inspectOptions(
-      this.options as Record<string, unknown>,
+      this.options,
     )}>`;
   }
 

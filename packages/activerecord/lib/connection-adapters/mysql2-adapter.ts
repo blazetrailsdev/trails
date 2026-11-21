@@ -294,7 +294,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   lastInsertedId(result: Result): unknown {
-    return mysql2LastInsertedId.call(this as never, result);
+    return mysql2LastInsertedId.call(this, result);
   }
 
   /** @internal */

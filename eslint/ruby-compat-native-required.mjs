@@ -33,7 +33,7 @@
  * receiver or the semantic difference; there is no exclude file.
  */
 import { readFileSync } from "node:fs";
-import ts from "typescript-5";
+import ts from "typescript-6";
 
 export const NATIVE_REQUIRED = JSON.parse(
   readFileSync(new URL("./ruby-compat-native-required.json", import.meta.url), "utf8"),

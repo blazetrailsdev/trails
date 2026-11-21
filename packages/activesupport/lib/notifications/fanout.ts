@@ -467,7 +467,7 @@ export class Evented<D = Delegate> {
   }
 
   groupClass(): GroupClass {
-    return EventedGroup as GroupClass;
+    return EventedGroup;
   }
 
   publish(name: string, ...args: unknown[]): void {
@@ -501,7 +501,7 @@ export class Evented<D = Delegate> {
 
 export class Timed extends Evented<TimedCallback> {
   override groupClass(): GroupClass {
-    return TimedGroup as GroupClass;
+    return TimedGroup;
   }
 
   override publish(name: string, ...args: unknown[]): void {
@@ -511,13 +511,13 @@ export class Timed extends Evented<TimedCallback> {
 
 export class MonotonicTimed extends Timed {
   override groupClass(): GroupClass {
-    return MonotonicTimedGroup as GroupClass;
+    return MonotonicTimedGroup;
   }
 }
 
 export class EventObject extends Evented<EventObjectCallback> {
   override groupClass(): GroupClass {
-    return EventObjectGroup as GroupClass;
+    return EventObjectGroup;
   }
 
   override publishEvent(event: Event): void {
@@ -540,9 +540,9 @@ export class Subscribers {
       return new Evented(pattern, listener);
     }
 
-    const procish = (
-      typeof listener === "function" ? listener : (listener.call as (...args: never[]) => void)
-    ) as (...args: never[]) => void;
+    const procish = (typeof listener === "function" ? listener : listener.call) as (
+      ...args: never[]
+    ) => void;
     const delegate = typeof listener === "function" ? procish : procish.bind(listener);
 
     if (procish.length === 1) {

@@ -1,7 +1,7 @@
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Executor as ActionDispatchExecutor } from "@blazetrails/actionpack";
-import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackResponse } from "@blazetrails/rack";
 import { Base } from "@blazetrails/activerecord";
 import { Trailtie } from "../../lib/trailties/active-record.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
@@ -55,7 +55,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
       return [200, {}, []] as unknown as RackResponse;
     }, app.executor);
 
-    const [, , body] = await middleware.call({} as RackEnv);
+    const [, , body] = await middleware.call({});
 
     expect(sessionActiveInRequest).toBe(true);
     expect(rows).toEqual([{ one: 1 }]);
@@ -77,7 +77,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
       return [200, {}, []] as unknown as RackResponse;
     }, app.executor);
 
-    const [, , body] = await middleware.call({} as RackEnv);
+    const [, , body] = await middleware.call({});
     expect(enabledInRequest).toBe(true);
 
     (body as unknown as { close(): void }).close();
@@ -108,7 +108,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
       rbFSend(stackApp, "call", {
         REQUEST_METHOD: "GET",
         PATH_INFO: "/",
-      } as unknown as RackEnv) as Promise<RackResponse>
+      }) as Promise<RackResponse>
     ).finally(() => {
       Trails.logger = logger;
     });
@@ -126,7 +126,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
       throw new Error("lol borked");
     }, app.executor);
 
-    await expect(middleware.call({} as RackEnv)).rejects.toThrow("lol borked");
+    await expect(middleware.call({})).rejects.toThrow("lol borked");
     expect(() => Base.asynchronousQueriesSession()).toThrow(SESSION_ERROR);
   });
 });

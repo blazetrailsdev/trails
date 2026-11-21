@@ -34,7 +34,7 @@ export class MatchData {
     const spans = this.#names.length
       ? [indices[0], ...this.#names.map((name) => named[name])]
       : Array.from(indices);
-    this.#spans = spans as ([number, number] | undefined)[];
+    this.#spans = spans;
   }
 
   #text(n: number): string | null {

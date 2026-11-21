@@ -295,8 +295,8 @@ export class TableDefinition extends AbstractTableDefinition {
     options = (this.conn as unknown as PgConstraintOptionsConn).exclusionConstraintOptions(
       this.name,
       expression,
-      options as Record<string, unknown>,
-    ) as ExclusionConstraintOptions;
+      options,
+    );
     return new ExclusionConstraintDefinition(this.name, expression, options);
   }
 
@@ -307,8 +307,8 @@ export class TableDefinition extends AbstractTableDefinition {
     options = (this.conn as unknown as PgConstraintOptionsConn).uniqueConstraintOptions(
       this.name,
       columnName,
-      options as Record<string, unknown>,
-    ) as UniqueConstraintOptions;
+      options,
+    );
     return new UniqueConstraintDefinition(this.name, columnName, options);
   }
 
@@ -317,7 +317,7 @@ export class TableDefinition extends AbstractTableDefinition {
     type: ColumnType,
     options: ColumnOptions = {},
   ): ColumnDefinition {
-    if ((type as string) === "virtual") {
+    if (type === "virtual") {
       type = options.type as ColumnType;
     }
     return super.newColumnDefinition(name, type, options);

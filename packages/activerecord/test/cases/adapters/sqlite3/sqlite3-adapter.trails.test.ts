@@ -181,7 +181,7 @@ describe("SQLite3Adapter pragmas option", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     adapter = new SQLite3Adapter({
       database: ":memory:",
-      pragmas: { "bad-name!": 1 } as Record<string, number>,
+      pragmas: { "bad-name!": 1 },
     });
     await adapter.connectBang();
     expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: bad-name!");
@@ -191,7 +191,7 @@ describe("SQLite3Adapter pragmas option", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     adapter = new SQLite3Adapter({
       database: ":memory:",
-      pragmas: { boolean_pragma: 1 } as Record<string, number>,
+      pragmas: { boolean_pragma: 1 },
     });
     await adapter.connectBang();
     expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: boolean_pragma");

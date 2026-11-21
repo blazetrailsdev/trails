@@ -15,7 +15,6 @@ import {
 } from "../../../../lib/action-dispatch/testing/integration.js";
 import { RoutedRackApp } from "../../../support/abstract-unit.js";
 import { CacheStore } from "../../../../lib/action-dispatch/middleware/session/cache-store.js";
-import type { MiddlewareFactory } from "../../../../lib/action-dispatch/middleware/stack.js";
 
 function makeStore(opts: { exists?: boolean; data?: Record<string, unknown> } = {}): SessionStore {
   const exists = opts.exists ?? true;
@@ -227,11 +226,11 @@ describe("Request", () => {
       override get app(): RoutesApp {
         return (this._app ??= new RoutedRackApp(Router, (middleware) => {
           this.cache = new MemoryStore();
-          middleware.use(CacheStore as MiddlewareFactory, {
+          middleware.use(CacheStore, {
             key: "_session_id",
             cache: this.cache,
           });
-          middleware.use(Lint as unknown as MiddlewareFactory);
+          middleware.use(Lint);
         }));
       }
 

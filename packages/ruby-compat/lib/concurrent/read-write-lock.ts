@@ -58,7 +58,7 @@ export class ReadWriteLock {
       throw error;
     }
     if (result && typeof (result as unknown as PromiseLike<unknown>).then === "function") {
-      return Promise.resolve(result).finally(() => this.release(release)) as Promise<Awaited<T>>;
+      return Promise.resolve(result).finally(() => this.release(release));
     }
     this.release(release);
     return result;

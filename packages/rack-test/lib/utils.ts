@@ -19,7 +19,7 @@ function buildNestedQuery(value: unknown, prefix: string | null = null): string 
   } else if (value == null) {
     return prefix ?? "";
   } else {
-    return `${prefix ?? ""}=${escape(value as { toString(): string })}`;
+    return `${prefix ?? ""}=${escape(value)}`;
   }
 }
 

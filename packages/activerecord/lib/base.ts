@@ -550,7 +550,7 @@ export class Base extends Model {
     try {
       await promise;
     } finally {
-      if (!ModelSchema.isSchemaLoaded.call(this as never) && state._schemaLoadPromise === promise) {
+      if (!ModelSchema.isSchemaLoaded.call(this) && state._schemaLoadPromise === promise) {
         state._schemaLoadPromise = undefined;
       }
     }
@@ -1476,7 +1476,7 @@ export class Base extends Model {
         .deleteAll();
     }
     return this.all()
-      .where({ [pk]: id as unknown })
+      .where({ [pk]: id })
       .deleteAll();
   }
 
@@ -1525,7 +1525,7 @@ export class Base extends Model {
   declare storeAccessorFor: (storeAttribute: string) => typeof import("./store.js").HashAccessor;
 
   attributeNames(): string[] {
-    return _attributeNames.call(this as any);
+    return _attributeNames.call(this);
   }
 
   static override isAttributeMethod(attribute: string): boolean {
@@ -1538,7 +1538,7 @@ export class Base extends Model {
 
   /** @internal */
   static _hasAttribute(attrName: string): boolean {
-    return AttributeMethodsClassMethods._hasAttribute.call(this as never, attrName);
+    return AttributeMethodsClassMethods._hasAttribute.call(this, attrName);
   }
 
   static get columnDefaults(): Record<string, unknown> {
@@ -2497,7 +2497,7 @@ for (const [name, fn] of [
 {
   Object.defineProperty(Base.prototype, "attributes", {
     get(this: Base): Record<string, unknown> {
-      return _attributes.call(this as unknown as ThisParameterType<typeof _attributes>);
+      return _attributes.call(this);
     },
     set(this: Base, attrs: Record<string, unknown>) {
       assertAssignedSynchronously(this.setAttributes(attrs), "attributes=");

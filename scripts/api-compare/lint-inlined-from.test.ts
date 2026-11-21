@@ -3,16 +3,15 @@ import type { ApiManifest, ClassInfo, InlinedFrom, MethodInfo } from "@blazetrai
 import type { InlinedFromPair } from "./inlined-bodies.js";
 import { MISSING_TAG_PACKAGES, fixCitations, inlinedFromFindings } from "./lint-inlined-from.js";
 
-const def = (name: string, vendorFile: string, line: number, endLine: number): MethodInfo =>
-  ({
-    name,
-    visibility: "public",
-    params: [],
-    calls: ["super"],
-    vendorFile,
-    line,
-    endLine,
-  }) as MethodInfo;
+const def = (name: string, vendorFile: string, line: number, endLine: number): MethodInfo => ({
+  name,
+  visibility: "public",
+  params: [],
+  calls: ["super"],
+  vendorFile,
+  line,
+  endLine,
+});
 
 function entity(
   file: string,
@@ -61,7 +60,7 @@ const ruby = {
         ),
         "ActiveRecord::Spanless": entity(
           "spanless.rb",
-          [{ name: "initialize", visibility: "public", params: [] } as MethodInfo],
+          [{ name: "initialize", visibility: "public", params: [] }],
           { includes: ["Core"] },
         ),
         "ActiveRecord::Session": entity(

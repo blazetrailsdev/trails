@@ -8,7 +8,6 @@ import { TSE } from "../../lib/template/handlers/tse.js";
 import { Raw } from "../../lib/template/handlers/raw.js";
 import { FixtureResolver } from "../../lib/testing/resolvers.js";
 import type { Body } from "../../lib/renderer/streaming-template-renderer.js";
-import type { ViewContext } from "../../lib/renderer/abstract-renderer.js";
 
 const FIXTURES = {
   "layouts/yield.html.tse": '<title><%= _layoutFor("title") %></title>\n<%= yield %>\n',
@@ -61,7 +60,7 @@ function setupFiberedBase() {
   });
 
   const renderBody = (options: Record<string, unknown>) =>
-    state.view.viewRenderer.renderBody(state.view as unknown as ViewContext, options);
+    state.view.viewRenderer.renderBody(state.view, options);
 
   const bufferedRender = async (options: Record<string, unknown>): Promise<string> => {
     const body = await renderBody(options);

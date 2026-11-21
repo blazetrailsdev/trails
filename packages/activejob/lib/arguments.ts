@@ -139,9 +139,7 @@ function serializeArgument(argument: unknown): unknown {
     const symbolKeys = eachKey(argument as AnyHash)
       .filter((key) => isSymbol(key))
       .map((key) => symbolToS(key));
-    const ajHashKey = rbHashSRuby2KeywordsHashP(argument as object)
-      ? RUBY2_KEYWORDS_KEY
-      : SYMBOL_KEYS_KEY;
+    const ajHashKey = rbHashSRuby2KeywordsHashP(argument) ? RUBY2_KEYWORDS_KEY : SYMBOL_KEYS_KEY;
     const result = serializeHash(argument as AnyHash);
     result[ajHashKey] = symbolKeys;
     return result;

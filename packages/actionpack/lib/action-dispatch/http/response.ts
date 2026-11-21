@@ -767,7 +767,7 @@ export class Response {
     { defaultHeaders }: { defaultHeaders?: Record<string, string> } = {},
   ): Promise<T> {
     headers = this.mergeDefaultHeaders(headers, defaultHeaders ?? this.defaultHeaders);
-    return this.new(status, headers, body) as Promise<T>;
+    return this.new(status, headers, body);
   }
 }
 

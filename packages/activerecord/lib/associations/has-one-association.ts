@@ -71,7 +71,7 @@ export class HasOneAssociation extends SingularAssociation {
             primaryKeyColumn = queryConstraintsList.call(klass)!;
             id = primaryKeyColumn.map((col) => rbFSend(target, col));
           } else {
-            primaryKeyColumn = klass.primaryKey as string;
+            primaryKeyColumn = klass.primaryKey;
             id = rbFSend(target, primaryKeyColumn);
           }
 

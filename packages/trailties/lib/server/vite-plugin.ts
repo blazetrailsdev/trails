@@ -1,6 +1,6 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { Handler } from "@blazetrails/rackup";
-import type { HttpRequest, HttpResponse, HttpSocket } from "@blazetrails/ruby-compat";
+import type { HttpRequest, HttpSocket } from "@blazetrails/ruby-compat";
 import type { RackApp, RackMiddleware } from "@blazetrails/rack";
 
 export interface TrailsPluginOptions {
@@ -40,7 +40,7 @@ export function trailsPlugin(options: TrailsPluginOptions): Plugin {
       return () => {
         server.middlewares.use(async (req, res, next) => {
           try {
-            await handler.service(req as unknown as HttpRequest, res as unknown as HttpResponse);
+            await handler.service(req, res);
           } catch (err: unknown) {
             next(err);
           }

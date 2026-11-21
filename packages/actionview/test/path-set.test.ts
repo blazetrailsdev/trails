@@ -9,7 +9,7 @@ function resolver(results: Record<string, unknown[]> = {}): PathSetResolver & {
 } {
   return {
     findAll: vi.fn((path, prefix) => results[`${prefix}|${String(path)}`] ?? []),
-  } as never;
+  };
 }
 
 const REQ = new Requested({

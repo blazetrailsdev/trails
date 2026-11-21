@@ -8,7 +8,6 @@ import { isPresent, minutes } from "@blazetrails/activesupport";
 import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { performAllLater } from "@blazetrails/activejob";
-import type { Time } from "@blazetrails/date";
 import { constGet, constSet, rbModName } from "@blazetrails/ruby-compat";
 import { randomUUID } from "node:crypto";
 import {
@@ -92,7 +91,7 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
   it("a job that outlived its lock does not release the lock a later job acquired", async () => {
     const a = await claim(await NonOverlappingJob.performLater("A"));
 
-    travelTo(minutes(2).fromNow() as Time);
+    travelTo(minutes(2).fromNow());
     await Semaphore.expired().deleteAll();
 
     const b = await claim(await NonOverlappingJob.performLater("B"));
@@ -108,7 +107,7 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
   it("a job that outlived its lock does not leave the key over its limit", async () => {
     const a = await claim(await NonOverlappingJob.performLater("A"));
 
-    travelTo(minutes(2).fromNow() as Time);
+    travelTo(minutes(2).fromNow());
     await Semaphore.expired().deleteAll();
 
     const b = await claim(await NonOverlappingJob.performLater("B"));
@@ -240,7 +239,7 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
     await a.failedWith(new ExpectedTestError());
     const firstSemaphoreId = (await (await a.job).reload()).acquiredSemaphoreId();
 
-    travelTo(minutes(2).fromNow() as Time);
+    travelTo(minutes(2).fromNow());
     await Semaphore.expired().deleteAll();
 
     await ((await (await a.job).failedExecution) as FailedExecution).retry();

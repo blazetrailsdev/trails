@@ -330,7 +330,7 @@ export function makeBookThatWillFailToEncryptName() {
   } as unknown as typeof BookThatWillFailToEncryptNameRecord;
 }
 
-export function makeEncryptedTrafficLight() {
+export function makeEncryptedTrafficLight(): typeof EncryptedTrafficLightRecord {
   return class EncryptedTrafficLight extends Base {
     static {
       this._tableName = "traffic_lights";
@@ -343,7 +343,7 @@ export function makeEncryptedTrafficLight() {
       this.serialize("long_state", { type: Array });
       this.encrypts("state");
     }
-  } as unknown as typeof EncryptedTrafficLightRecord;
+  };
 }
 
 export function makeEncryptedTrafficLightWithStoreState() {
@@ -362,13 +362,13 @@ export function makeEncryptedTrafficLightWithStoreState() {
   } as unknown as typeof EncryptedTrafficLightWithStoreStateRecord;
 }
 
-export function makeEncryptedBookWithBinaryMessagePackSerialized() {
+export function makeEncryptedBookWithBinaryMessagePackSerialized(): typeof EncryptedBookWithBinaryMessagePackSerializedRecord {
   return class EncryptedBookWithBinaryMessagePackSerialized extends Base {
     static {
       this._tableName = "encrypted_books";
       this.encrypts("logo", { messageSerializer: new MessagePackMessageSerializer() });
     }
-  } as unknown as typeof EncryptedBookWithBinaryMessagePackSerializedRecord;
+  };
 }
 
 export function makeMsgPackTextBook() {

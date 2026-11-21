@@ -51,7 +51,7 @@ describe("ActionView::Railtie view reloader (trails)", () => {
     Trailtie.config.set("actionView", {
       applyStylesheetMediaDefault: true,
       annotateRenderedViewWithFilenames: false,
-    } as ActionViewConfig);
+    });
   });
 
   function bootApp(
@@ -132,7 +132,7 @@ describe("ActionView::Railtie asset tag wiring (trails)", () => {
     Trailtie.config.set("actionView", {
       applyStylesheetMediaDefault: true,
       annotateRenderedViewWithFilenames: false,
-    } as ActionViewConfig);
+    });
   });
 
   it("after_initialize applies apply_stylesheet_media_default so stylesheet_link_tag emits media=screen", () => {
@@ -299,7 +299,7 @@ describe("action_view.caching", () => {
     Trailtie.config.set("actionView", {
       applyStylesheetMediaDefault: true,
       annotateRenderedViewWithFilenames: false,
-    } as ActionViewConfig);
+    });
   });
 
   it("leaves Resolver.caching alone when cache_template_loading is set", async () => {

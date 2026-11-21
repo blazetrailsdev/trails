@@ -47,7 +47,7 @@ describe("FormHelperActiveRecordTest", () => {
     ).projects.push(project);
     await developer.save();
     view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
-    include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
+    include(view.constructor, Routes.urlHelpers());
   });
 
   afterEach(async () => {

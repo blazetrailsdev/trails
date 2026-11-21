@@ -49,7 +49,7 @@ describe("ActionCable::Server::Base", () => {
 
   it("restart closes connections, halts the pool and shuts pubsub down", async () => {
     const { server, log, FakeConnection } = setup();
-    server.addConnection(new FakeConnection(server, {}) as never);
+    server.addConnection(new FakeConnection(server, {}));
     const pool = server.workerPool;
     const halt = pool.halt.bind(pool);
     pool.halt = () => {

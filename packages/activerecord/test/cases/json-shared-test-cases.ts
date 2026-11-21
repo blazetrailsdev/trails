@@ -173,7 +173,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     expect(x.resolution).toBe("320×480");
 
     const payload = yamlStringify(x.serializableHash());
-    const y = new (klass())(yamlParse(payload) as Record<string, unknown>) as JsonRecord;
+    const y = new (klass())(yamlParse(payload)) as JsonRecord;
     expect(y.resolution).toBe("320×480");
   });
 

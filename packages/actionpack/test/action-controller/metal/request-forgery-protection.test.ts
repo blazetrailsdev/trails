@@ -335,7 +335,7 @@ describe("isVerifiedRequest", () => {
         params: withParam(masked),
         formAuthenticityParam,
         isValidAuthenticityToken,
-      } as CsrfController),
+      }),
     ).toBe(true);
     expect(
       await isVerifiedRequest.call({
@@ -343,7 +343,7 @@ describe("isVerifiedRequest", () => {
         params: withParam("bogus"),
         formAuthenticityParam,
         isValidAuthenticityToken,
-      } as CsrfController),
+      }),
     ).toBe(false);
   });
 });
@@ -451,7 +451,7 @@ describe("P20b/P20c smoke", () => {
   });
 
   it("Exception raises InvalidAuthenticityToken with its warningMessage", () => {
-    const strategy = new Exception({} as never);
+    const strategy = new Exception({});
     expect(() => strategy.handleUnverifiedRequest()).toThrow(InvalidAuthenticityToken);
 
     strategy.warningMessage = "HTTP Origin header didn't match request.base_url";
@@ -499,11 +499,10 @@ describe("P20b/P20c smoke", () => {
 });
 
 describe("normalizeActionPath / normalizeRelativeActionPath", () => {
-  const at = (path: string): CsrfController =>
-    ({
-      ...methods,
-      request: { ...verbs, method: "POST", baseUrl: "https://example.com", cookieJar, path },
-    }) as CsrfController;
+  const at = (path: string): CsrfController => ({
+    ...methods,
+    request: { ...verbs, method: "POST", baseUrl: "https://example.com", cookieJar, path },
+  });
 
   it("strips trailing slash from absolute paths", () => {
     expect(normalizeActionPath.call(at("/current"), "/foo/bar/")).toBe("/foo/bar");

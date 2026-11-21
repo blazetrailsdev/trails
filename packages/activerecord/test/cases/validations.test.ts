@@ -116,7 +116,7 @@ describe("ValidationsTest", () => {
   it("exception on create bang with block", async () => {
     await expect(
       WrongReply.createBang({ title: "OK" }, (r: WrongReply) => {
-        r.content = null as unknown as string;
+        r.content = null;
       }),
     ).rejects.toThrow(RecordInvalid);
   });
@@ -124,7 +124,7 @@ describe("ValidationsTest", () => {
   it("exception on create bang many with block", async () => {
     await expect(
       WrongReply.createBang([{ title: "OK" }, { title: "Wrong Create" }], (r: WrongReply) => {
-        r.content = null as unknown as string;
+        r.content = null;
       }),
     ).rejects.toThrow(RecordInvalid);
   });

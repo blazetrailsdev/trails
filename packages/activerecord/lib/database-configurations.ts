@@ -130,11 +130,7 @@ export class DatabaseConfigurations {
       return this.resolveSymbolConnection(config);
     }
     if (isHash(config) || typeof config === "string") {
-      return this.buildDbConfigFromRawConfig(
-        this.defaultEnv(),
-        "primary",
-        config as DatabaseConfigOptions | string,
-      );
+      return this.buildDbConfigFromRawConfig(this.defaultEnv(), "primary", config);
     }
     throw new TypeError(
       `Invalid type for configuration. Expected Symbol, String, or Hash. Got ${rbInspect(config)}`,
@@ -156,11 +152,7 @@ export class DatabaseConfigurations {
     const dbConfigs: (HashConfig | null)[] = Object.entries(configs).flatMap(([envName, config]) =>
       isHash(config) && Object.values(config).every(isHash)
         ? this.walkConfigs(String(envName), config as Record<string, DatabaseConfigOptions>)
-        : this.buildDbConfigFromRawConfig(
-            String(envName),
-            "primary",
-            config as string | DatabaseConfigOptions,
-          ),
+        : this.buildDbConfigFromRawConfig(String(envName), "primary", config),
     );
 
     if (!dbConfigs.find((c) => c?.forCurrentEnv)) {

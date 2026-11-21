@@ -13,7 +13,7 @@ describe("TestUnconnectedAdapter", () => {
   fixtures({}, { useTransactionalTests: false });
 
   beforeEach(async () => {
-    underlying = (await Base.leaseConnection()) as unknown as { active(): Promise<boolean> };
+    underlying = await Base.leaseConnection();
     connectionName = await Base.removeConnection();
   });
 

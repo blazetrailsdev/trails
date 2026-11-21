@@ -50,7 +50,7 @@ export class JSONGemEncoder {
         result[toS(k)] = this.jsonify(v);
       }
       return result;
-    } else if (isPlainObject(value as object)) {
+    } else if (isPlainObject(value)) {
       return this._jsonifyPlainObject(value as Record<string, unknown>);
     } else if (Array.isArray(value)) {
       return this._jsonifyArray(value);

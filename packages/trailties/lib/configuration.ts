@@ -104,12 +104,8 @@ export class Generators {
   }
 
   constructor() {
-    this.aliases = new Hash<unknown, Record<string, unknown>>((h, k) =>
-      hashAset(h, k, {}),
-    ) as GeneratorsConfigHash;
-    this.options = new Hash<unknown, Record<string, unknown>>((h, k) =>
-      hashAset(h, k, {}),
-    ) as GeneratorsConfigHash;
+    this.aliases = new Hash<unknown, Record<string, unknown>>((h, k) => hashAset(h, k, {}));
+    this.options = new Hash<unknown, Record<string, unknown>>((h, k) => hashAset(h, k, {}));
     this.fallbacks = {};
     this.templates = [];
     this.colorizeLogging = true;

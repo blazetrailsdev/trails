@@ -278,33 +278,36 @@ export function thenableHash(
 ): SerializableHash {
   let memo: Record<string, unknown> | undefined;
   const built = () => (memo ??= sync());
-  const proxy = new Proxy({} as Record<string, unknown>, {
-    get(_t, key) {
-      if (key === "then")
-        return (onF?: ((v: unknown) => unknown) | null, onR?: ((e: unknown) => unknown) | null) =>
-          async().then(onF, onR);
-      if (key === "catch") return (onR?: ((e: unknown) => unknown) | null) => async().catch(onR);
-      if (key === "finally") return (onF?: (() => void) | null) => async().finally(onF);
-      return built()[key as string];
+  const proxy = new Proxy(
+    {},
+    {
+      get(_t, key) {
+        if (key === "then")
+          return (onF?: ((v: unknown) => unknown) | null, onR?: ((e: unknown) => unknown) | null) =>
+            async().then(onF, onR);
+        if (key === "catch") return (onR?: ((e: unknown) => unknown) | null) => async().catch(onR);
+        if (key === "finally") return (onF?: (() => void) | null) => async().finally(onF);
+        return built()[key as string];
+      },
+      has(_t, key) {
+        if (key === "then" || key === "catch" || key === "finally") return false;
+        return key in built();
+      },
+      ownKeys() {
+        return Reflect.ownKeys(built());
+      },
+      getOwnPropertyDescriptor(_t, key) {
+        const obj = built();
+        if (!Object.hasOwn(obj, key)) return undefined;
+        const desc = Object.getOwnPropertyDescriptor(obj, key)!;
+        desc.configurable = true;
+        return desc;
+      },
+      getPrototypeOf() {
+        return Object.prototype;
+      },
     },
-    has(_t, key) {
-      if (key === "then" || key === "catch" || key === "finally") return false;
-      return key in built();
-    },
-    ownKeys() {
-      return Reflect.ownKeys(built());
-    },
-    getOwnPropertyDescriptor(_t, key) {
-      const obj = built();
-      if (!Object.hasOwn(obj, key)) return undefined;
-      const desc = Object.getOwnPropertyDescriptor(obj, key)!;
-      desc.configurable = true;
-      return desc;
-    },
-    getPrototypeOf() {
-      return Object.prototype;
-    },
-  });
+  );
   return proxy as SerializableHash;
 }
 

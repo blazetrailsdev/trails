@@ -67,7 +67,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
     ActiveStorage.variableContentTypes = ["image/png", "image/jpeg"];
-    t = new OneAttachedTest("oneAttached") as unknown as TestHelper;
+    t = new OneAttachedTest("oneAttached");
     await t.beforeSetup();
     user = await User.createBang({ name: "Josh" });
   });

@@ -131,7 +131,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
   }
 
   static {
-    include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
+    include(this, ThorActions.Actions);
 
     this.classOption("skipNamespace", {
       type: "boolean",
@@ -242,7 +242,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
         }
       }
     }
-    return ThorActions.ClassMethods.sourcePaths.call(this as never);
+    return ThorActions.ClassMethods.sourcePaths.call(this);
   }
 
   static baseRoot(): string {
@@ -359,7 +359,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
   static classOption(name: string, options: ClassOptionConfig = {}): Option {
     if (!("desc" in options))
       options.desc = `Indicates when to generate ${humanize(_underscore(name)).toLowerCase()}`;
-    options.aliases = this.defaultAliasesForOption(name, options) as OptionOptions["aliases"];
+    options.aliases = this.defaultAliasesForOption(name, options);
     options.default = this.defaultValueForOption(name, options);
     return super.classOption(name, options);
   }

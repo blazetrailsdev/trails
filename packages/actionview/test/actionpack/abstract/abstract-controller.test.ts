@@ -82,7 +82,7 @@ class Me2 extends RenderingController {
   }
 
   async indexToString(): Promise<void> {
-    this.setResponseBody((await this.renderToString("index")) as string);
+    this.setResponseBody(await this.renderToString("index"));
   }
 
   actionWithIvars(): unknown {
@@ -95,11 +95,11 @@ class Me2 extends RenderingController {
   }
 
   async renderingToBody(): Promise<void> {
-    this.setResponseBody((await this.renderToBody({ template: "naked-render" })) as string);
+    this.setResponseBody(await this.renderToBody({ template: "naked-render" }));
   }
 
   async renderingToString(): Promise<void> {
-    this.setResponseBody((await this.renderToString({ template: "naked-render" })) as string);
+    this.setResponseBody(await this.renderToString({ template: "naked-render" }));
   }
 }
 

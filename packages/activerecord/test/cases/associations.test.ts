@@ -377,40 +377,39 @@ describe("PreloaderTest", () => {
 
   beforeAll(async () => {
     const authorMod = await import("../models/author.js");
-    Author = authorMod.Author as never;
-    AuthorFavorite = authorMod.AuthorFavorite as never;
-    AuthorAddress = authorMod.AuthorAddress as never;
+    Author = authorMod.Author;
+    AuthorFavorite = authorMod.AuthorFavorite;
+    AuthorAddress = authorMod.AuthorAddress;
     const postMod = await import("../models/post.js");
-    Post = postMod.Post as never;
-    CategoryPost = postMod.CategoryPost as never;
-    Comment = (await import("../models/comment.js")).Comment as never;
-    Book = (await import("../models/book.js")).Book as never;
+    Post = postMod.Post;
+    CategoryPost = postMod.CategoryPost;
+    Comment = (await import("../models/comment.js")).Comment;
+    Book = (await import("../models/book.js")).Book;
     const catMod = await import("../models/category.js");
-    Category = catMod.Category as never;
-    SpecialCategory = catMod.SpecialCategory as never;
-    Tag = (await import("../models/tag.js")).Tag as never;
-    Tagging = (await import("../models/tagging.js")).Tagging as never;
-    Essay = (await import("../models/essay.js")).Essay as never;
-    Invoice = (await import("../models/invoice.js")).Invoice as never;
+    Category = catMod.Category;
+    SpecialCategory = catMod.SpecialCategory;
+    Tag = (await import("../models/tag.js")).Tag;
+    Tagging = (await import("../models/tagging.js")).Tagging;
+    Essay = (await import("../models/essay.js")).Essay;
+    Invoice = (await import("../models/invoice.js")).Invoice;
     const liMod = await import("../models/line-item.js");
-    LineItem = liMod.LineItem as never;
-    LineItemDiscountApplication = liMod.LineItemDiscountApplication as never;
+    LineItem = liMod.LineItem;
+    LineItemDiscountApplication = liMod.LineItemDiscountApplication;
     const slMod = await import("../models/shipping-line.js");
-    ShippingLine = slMod.ShippingLine as never;
-    ShippingLineDiscountApplication = slMod.ShippingLineDiscountApplication as never;
-    Discount = (await import("../models/discount.js")).Discount as never;
-    ShardedBlogPL = (await import("../models/sharded/blog.js")).ShardedBlog as never;
-    ShardedBlogPostPL = (await import("../models/sharded/blog-post.js")).ShardedBlogPost as never;
-    ShardedCommentPL = (await import("../models/sharded/comment.js")).ShardedComment as never;
-    ShardedTagPL = (await import("../models/sharded/tag.js")).ShardedTag as never;
-    ShardedBlogPostTagPL = (await import("../models/sharded/blog-post-tag.js"))
-      .ShardedBlogPostTag as never;
+    ShippingLine = slMod.ShippingLine;
+    ShippingLineDiscountApplication = slMod.ShippingLineDiscountApplication;
+    Discount = (await import("../models/discount.js")).Discount;
+    ShardedBlogPL = (await import("../models/sharded/blog.js")).ShardedBlog;
+    ShardedBlogPostPL = (await import("../models/sharded/blog-post.js")).ShardedBlogPost;
+    ShardedCommentPL = (await import("../models/sharded/comment.js")).ShardedComment;
+    ShardedTagPL = (await import("../models/sharded/tag.js")).ShardedTag;
+    ShardedBlogPostTagPL = (await import("../models/sharded/blog-post-tag.js")).ShardedBlogPostTag;
     const cpkMod = await import("../models/cpk.js");
-    CpkOrderPL = cpkMod.CpkOrder as never;
-    CpkOrderAgreementPL = cpkMod.CpkOrderAgreement as never;
-    Dog = (await import("../models/dog.js")).Dog as never;
-    EssaySpecial = (await import("../models/essay.js")).EssaySpecial as never;
-    PostesquePL = Postesque as never;
+    CpkOrderPL = cpkMod.CpkOrder;
+    CpkOrderAgreementPL = cpkMod.CpkOrderAgreement;
+    Dog = (await import("../models/dog.js")).Dog;
+    EssaySpecial = (await import("../models/essay.js")).EssaySpecial;
+    PostesquePL = Postesque;
   });
 
   beforeEach(() => {
@@ -1605,48 +1604,47 @@ describe("AssociationsTest", () => {
   let Post: typeof Base;
 
   beforeAll(async () => {
-    ShardedBlog = (await import("../models/sharded/blog.js")).ShardedBlog as never;
-    ShardedBlogPost = (await import("../models/sharded/blog-post.js")).ShardedBlogPost as never;
+    ShardedBlog = (await import("../models/sharded/blog.js")).ShardedBlog;
+    ShardedBlogPost = (await import("../models/sharded/blog-post.js")).ShardedBlogPost;
     ShardedBlogPostWithRevision = (await import("../models/sharded/blog-post-with-revision.js"))
-      .ShardedBlogPostWithRevision as never;
+      .ShardedBlogPostWithRevision;
     if (!reflectOnAssociation(ShardedBlogPostWithRevision, "commentsWithoutQueryConstraints")) {
       (ShardedBlogPostWithRevision as any).hasMany("commentsWithoutQueryConstraints", {
         primaryKey: ["blog_id", "id"],
         className: "Sharded::Comment",
       });
     }
-    ShardedComment = (await import("../models/sharded/comment.js")).ShardedComment as never;
-    ShardedTag = (await import("../models/sharded/tag.js")).ShardedTag as never;
-    ShardedBlogPostTag = (await import("../models/sharded/blog-post-tag.js"))
-      .ShardedBlogPostTag as never;
+    ShardedComment = (await import("../models/sharded/comment.js")).ShardedComment;
+    ShardedTag = (await import("../models/sharded/tag.js")).ShardedTag;
+    ShardedBlogPostTag = (await import("../models/sharded/blog-post-tag.js")).ShardedBlogPostTag;
     const authorMod = await import("../models/author.js");
-    Author = authorMod.Author as never;
-    AuthorFavorite = authorMod.AuthorFavorite as never;
+    Author = authorMod.Author;
+    AuthorFavorite = authorMod.AuthorFavorite;
     const companyMod = await import("../models/company.js");
-    Company = companyMod.Company as never;
-    Firm = companyMod.Firm as never;
-    Client = companyMod.Client as never;
-    Tag = (await import("../models/tag.js")).Tag as never;
-    Tagging = (await import("../models/tagging.js")).Tagging as never;
-    Developer = (await import("../models/developer.js")).Developer as never;
-    Project = (await import("../models/project.js")).Project as never;
-    Account = (await import("../models/account.js")).Account as never;
-    Liquid = (await import("../models/liquid.js")).Liquid as never;
-    Molecule = (await import("../models/molecule.js")).Molecule as never;
-    Electron = (await import("../models/electron.js")).Electron as never;
+    Company = companyMod.Company;
+    Firm = companyMod.Firm;
+    Client = companyMod.Client;
+    Tag = (await import("../models/tag.js")).Tag;
+    Tagging = (await import("../models/tagging.js")).Tagging;
+    Developer = (await import("../models/developer.js")).Developer;
+    Project = (await import("../models/project.js")).Project;
+    Account = (await import("../models/account.js")).Account;
+    Liquid = (await import("../models/liquid.js")).Liquid;
+    Molecule = (await import("../models/molecule.js")).Molecule;
+    Electron = (await import("../models/electron.js")).Electron;
     const shipMod = await import("../models/ship.js");
-    Ship = shipMod.Ship as never;
-    ShipPart = (await import("../models/ship-part.js")).ShipPart as never;
+    Ship = shipMod.Ship;
+    ShipPart = (await import("../models/ship-part.js")).ShipPart;
     const cpkMod = await import("../models/cpk.js");
-    CpkOrder = cpkMod.CpkOrder as never;
-    CpkBook = cpkMod.CpkBook as never;
-    CpkOrderAgreement = cpkMod.CpkOrderAgreement as never;
-    CpkOrderWithPrimaryKeyAssociatedBook = cpkMod.CpkOrderWithPrimaryKeyAssociatedBook as never;
-    CpkCar = cpkMod.CpkCar as never;
-    CpkCarReview = cpkMod.CpkCarReview as never;
-    Person = (await import("../models/person.js")).Person as never;
-    Reader = (await import("../models/reader.js")).Reader as never;
-    Post = (await import("../models/post.js")).Post as never;
+    CpkOrder = cpkMod.CpkOrder;
+    CpkBook = cpkMod.CpkBook;
+    CpkOrderAgreement = cpkMod.CpkOrderAgreement;
+    CpkOrderWithPrimaryKeyAssociatedBook = cpkMod.CpkOrderWithPrimaryKeyAssociatedBook;
+    CpkCar = cpkMod.CpkCar;
+    CpkCarReview = cpkMod.CpkCarReview;
+    Person = (await import("../models/person.js")).Person;
+    Reader = (await import("../models/reader.js")).Reader;
+    Post = (await import("../models/post.js")).Post;
   });
 
   beforeEach(() => {

@@ -649,7 +649,7 @@ function _callableToSourceString(callable: unknown): string {
   }
   if (!body.includes("\n")) return body;
 
-  return rbAnyToS(callable as object);
+  return rbAnyToS(callable);
 }
 
 let _assertions = 0;

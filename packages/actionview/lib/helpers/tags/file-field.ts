@@ -16,7 +16,7 @@ export class FileField extends TextField {
       includeHidden != null &&
       includeHidden !== false
     ) {
-      return this.hiddenFieldForMultipleFile(options).plus(super.render() as SafeBuffer);
+      return this.hiddenFieldForMultipleFile(options).plus(super.render());
     } else {
       return super.render();
     }

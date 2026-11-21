@@ -58,7 +58,7 @@ function encode(value: unknown): unknown {
   }
 
   const encoded: Record<string, unknown> = {};
-  for (const key of Object.keys(value as Record<string, unknown>)) {
+  for (const key of Object.keys(value)) {
     encoded[key] = encode((value as Record<string, unknown>)[key]);
   }
   return encoded;

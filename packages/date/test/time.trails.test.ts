@@ -966,7 +966,7 @@ describe("Time.at with a boxed Float", () => {
 
 describe("Time.at num_exact_fail", () => {
   it("names the operand's class", () => {
-    expect(() => Time.at(null as never)).toThrow("can't convert NilClass into an exact number");
+    expect(() => Time.at(null)).toThrow("can't convert NilClass into an exact number");
   });
 });
 

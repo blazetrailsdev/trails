@@ -80,7 +80,7 @@ export class DelegateCache {
     const cache = new Map<FamilyCtor, FamilyCtor>();
     _relationDelegateCache.set(this, cache);
     for (const klass of delegatedClasses()) {
-      const delegate = class extends (klass as new (...args: never[]) => object) {} as FamilyCtor;
+      const delegate = class extends klass {} as FamilyCtor;
       include(delegate, ClassSpecificRelation);
       DelegateCache.includeRelationMethods.call(this, delegate);
       const mangledName = rbModName(klass)!.replaceAll("::", "_");

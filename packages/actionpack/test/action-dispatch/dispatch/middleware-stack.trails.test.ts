@@ -102,7 +102,7 @@ describe("MiddlewareStack#delete on a class that is not a MiddlewareFactory", ()
   it("deletes it by name", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
-    stack.use(NoRackConstructor as never);
+    stack.use(NoRackConstructor);
     expect(stack.delete(NoRackConstructor)).not.toBeNull();
     expect(stack.size).toBe(1);
   });

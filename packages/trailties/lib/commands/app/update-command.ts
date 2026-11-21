@@ -22,7 +22,7 @@ export class UpdateCommand extends Base {
 
   static {
     const klass = this as unknown as ThorClass;
-    include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
+    include(this, ThorActions.Actions);
     this.addRuntimeOptionsBang();
 
     klass.desc(
@@ -55,7 +55,7 @@ export class UpdateCommand extends Base {
     options: Record<string, unknown> = {},
     config: Record<string, unknown> = {},
   ) {
-    super(args as string[], options as never, config);
+    super(args, options, config);
   }
 
   async perform(): Promise<void> {

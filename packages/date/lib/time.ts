@@ -667,7 +667,7 @@ export class Time extends rbCTime {
       hour as number | string | null,
       min as number | string | null,
       sec as number | string | Rational | null,
-      zone as string | number | Rational | Timezone | object | null,
+      zone,
       options,
     );
   }
@@ -2124,7 +2124,7 @@ export class Time extends rbCTime {
     } else if (offset == null) {
       time = time.getlocal();
     } else {
-      time = time.getlocal(offset as number);
+      time = time.getlocal(offset);
     }
     if (zone != null) {
       let z: unknown;

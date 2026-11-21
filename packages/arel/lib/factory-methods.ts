@@ -54,7 +54,7 @@ export const FactoryMethods: FactoryMethodsModule = {
   },
 
   createStringJoin(to: string | ArelNode): StringJoin {
-    return this.createJoin(to, null, Nodes.StringJoin) as StringJoin;
+    return this.createJoin(to, null, Nodes.StringJoin);
   },
 
   createAnd(clauses: (ArelNode | string)[]): And {

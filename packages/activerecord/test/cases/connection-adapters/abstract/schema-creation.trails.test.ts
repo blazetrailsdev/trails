@@ -16,7 +16,7 @@ import type { SchemaCreationConn } from "../../../../lib/connection-adapters/abs
 let conn: TableDefinitionConn & SchemaCreationConn;
 
 beforeAll(async () => {
-  conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn & SchemaCreationConn;
+  conn = await Base.leaseConnection();
 });
 
 describe("SchemaCreation#typeToSql virtual / nil pass-through", () => {
@@ -157,13 +157,7 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
   });
 
   it("emits a String column set verbatim without delegating", async () => {
-    const idx = new IndexDefinition(
-      "posts",
-      "index_posts_on_expr",
-      false,
-      "lower(title)" as any,
-      {},
-    );
+    const idx = new IndexDefinition("posts", "index_posts_on_expr", false, "lower(title)", {});
     const sql = await (new SchemaCreation(host as any) as any).visitCreateIndexDefinition(
       new CreateIndexDefinition(idx),
     );

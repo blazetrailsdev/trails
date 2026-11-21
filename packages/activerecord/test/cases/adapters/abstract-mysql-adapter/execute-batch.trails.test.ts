@@ -31,7 +31,7 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
       const testAdapter = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         multipleStatements: false,
-      } as never);
+      });
       try {
         await testAdapter.executeBatch(["SELECT 1 AS v", "SELECT 2 AS v"], "Batch");
         await expect(testAdapter.execute("SELECT 1;\nSELECT 2")).rejects.toThrow(/SQL syntax/);
@@ -44,7 +44,7 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
       const testAdapter = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         flags: ["-MULTI_STATEMENTS"],
-      } as never);
+      });
       const rawExecute = vi.spyOn(testAdapter as never, "rawExecute");
       let calls: unknown[][];
       try {

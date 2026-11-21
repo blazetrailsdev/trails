@@ -60,18 +60,18 @@ function hasOneAttached(
       enumerable: true,
     });
   });
-  mixin.defineMethod(`set${camelize(name)}`, async function (
-    this: AttachedRecord,
-    attachable: unknown,
-  ) {
-    if (attachable == null || attachable === "") {
-      this.attachmentChanges[name] = new DeleteOne(name, this);
-    } else {
-      const change = new CreateOne(name, this, attachable);
-      await change.unfurl();
-      this.attachmentChanges[name] = change;
-    }
-  } as never);
+  mixin.defineMethod(
+    `set${camelize(name)}`,
+    async function (this: AttachedRecord, attachable: unknown) {
+      if (attachable == null || attachable === "") {
+        this.attachmentChanges[name] = new DeleteOne(name, this);
+      } else {
+        const change = new CreateOne(name, this, attachable);
+        await change.unfurl();
+        this.attachmentChanges[name] = change;
+      }
+    },
+  );
 
   this.hasOne(
     `${name}Attachment`,
@@ -150,23 +150,23 @@ function hasManyAttached(
       enumerable: true,
     });
   });
-  mixin.defineMethod(`set${camelize(name)}`, async function (
-    this: AttachedRecord,
-    attachables: unknown,
-  ) {
-    attachables = compactBlank(rbFArray(attachables));
-    const pendingUploads = tryCall(this.attachmentChanges[name], "pendingUploads") as
-      | CreateOneOfMany[]
-      | undefined;
+  mixin.defineMethod(
+    `set${camelize(name)}`,
+    async function (this: AttachedRecord, attachables: unknown) {
+      attachables = compactBlank(rbFArray(attachables));
+      const pendingUploads = tryCall(this.attachmentChanges[name], "pendingUploads") as
+        | CreateOneOfMany[]
+        | undefined;
 
-    if ((attachables as unknown[]).length === 0) {
-      this.attachmentChanges[name] = new DeleteMany(name, this);
-    } else {
-      const change = new CreateMany(name, this, attachables, { pendingUploads: pendingUploads });
-      await change.unfurl();
-      this.attachmentChanges[name] = change;
-    }
-  } as never);
+      if ((attachables as unknown[]).length === 0) {
+        this.attachmentChanges[name] = new DeleteMany(name, this);
+      } else {
+        const change = new CreateMany(name, this, attachables, { pendingUploads: pendingUploads });
+        await change.unfurl();
+        this.attachmentChanges[name] = change;
+      }
+    },
+  );
 
   this.hasMany(
     `${name}Attachments`,
@@ -240,7 +240,7 @@ function validateServiceConfiguration(
         throw new ArgumentError(
           `Cannot configure service ${rbInspect(serviceName)} for ${rbModName(modelClass as object)}#${associationName}`,
         );
-      }) as never,
+      }),
     );
   } else {
     validateGlobalServiceConfiguration(modelClass as typeof Base);

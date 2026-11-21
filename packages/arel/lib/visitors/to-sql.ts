@@ -156,7 +156,7 @@ export class ToSql extends Visitor {
           value instanceof Nodes.BindParam ||
           value instanceof ModelAttribute
         ) {
-          this.visit(value as Node, collector);
+          this.visit(value, collector);
         } else {
           collector.append(this.quote(value));
         }
@@ -366,13 +366,13 @@ export class ToSql extends Visitor {
       collector.append(" OVER ()");
       return collector;
     } else if (o.right instanceof Nodes.SqlLiteral) {
-      return this.infixValue(o as { left: Node; right: Node }, collector, " OVER ");
+      return this.infixValue(o, collector, " OVER ");
     } else if (typeof o.right === "string") {
       this.visit(o.left, collector);
       collector.append(` OVER ${this.quoteColumnName(o.right)}`);
       return collector;
     } else {
-      return this.infixValue(o as { left: Node; right: Node }, collector, " OVER ");
+      return this.infixValue(o, collector, " OVER ");
     }
   }
 
@@ -389,7 +389,7 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesLock(o: Nodes.Lock, collector: SQLString): SQLString {
-    this.visit(o.expr as Node, collector);
+    this.visit(o.expr, collector);
     return collector;
   }
 
@@ -612,7 +612,7 @@ export class ToSql extends Visitor {
     collector.append("FULL OUTER JOIN ");
     this.visit(o.left, collector);
     collector.append(" ");
-    this.visit(o.right as Node, collector);
+    this.visit(o.right, collector);
     return collector;
   }
 
@@ -620,7 +620,7 @@ export class ToSql extends Visitor {
     collector.append("LEFT OUTER JOIN ");
     this.visit(o.left, collector);
     collector.append(" ");
-    this.visit(o.right as Node, collector);
+    this.visit(o.right, collector);
     return collector;
   }
 
@@ -628,7 +628,7 @@ export class ToSql extends Visitor {
     collector.append("RIGHT OUTER JOIN ");
     this.visit(o.left, collector);
     collector.append(" ");
-    this.visit(o.right as Node, collector);
+    this.visit(o.right, collector);
     return collector;
   }
 
@@ -819,7 +819,7 @@ export class ToSql extends Visitor {
 
   protected visitArelNodesElse(o: Nodes.Else, collector: SQLString): SQLString {
     collector.append("ELSE ");
-    this.visit(o.expr as Nodes.NodeOrValue, collector);
+    this.visit(o.expr, collector);
     return collector;
   }
 

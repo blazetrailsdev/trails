@@ -36,7 +36,7 @@ function body(calls: string[], extra: Partial<MethodInfo> = {}): MethodInfo {
     calls,
     callArgs: calls.map((c) => site(c)),
     ...extra,
-  } as MethodInfo;
+  };
 }
 
 function entity(
@@ -53,7 +53,7 @@ function entity(
     extends: [],
     instanceMethods: methods,
     classMethods: [],
-  } as ClassInfo;
+  };
 }
 
 const api = body(["assign_attributes", "super"]);

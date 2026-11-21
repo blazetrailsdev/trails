@@ -114,7 +114,7 @@ export class Events {
 
     body = new EventedBodyProxy(body, request, response, this.handlers, () => {
       this.onFinish(request, response);
-    }) as unknown as RackBody;
+    });
     return [response.status, response.headers, body];
   }
 

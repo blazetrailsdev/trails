@@ -9,7 +9,7 @@ import { Ast, type Node } from "../journey/nodes/node.js";
 import { Pattern } from "../journey/path/pattern.js";
 import { Route as JourneyRoute, type VerbMatcher } from "../journey/route.js";
 import * as ActiveSupport from "@blazetrails/activesupport";
-import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   camelize,
   callerLocations,
@@ -347,8 +347,7 @@ export class Constraints extends Endpoint {
 
   static readonly SERVE: ConstraintsStrategy = (app, req) =>
     (app as { serve(req: ConstraintsRequest): unknown }).serve(req);
-  static readonly CALL: ConstraintsStrategy = (app, req) =>
-    rbProcCall(app as RackApp | { call: RackApp }, req.env);
+  static readonly CALL: ConstraintsStrategy = (app, req) => rbProcCall(app, req.env);
 
   private readonly _strategy: ConstraintsStrategy;
   private readonly _app: unknown;
@@ -1257,7 +1256,7 @@ export class Mapper {
 
   scope(...args: Array<string | string[] | ScopeOptions | MapperCallback>): void {
     const cb = args.pop() as MapperCallback;
-    const options: ScopeOptions = { ...extractOptionsBang(args) } as ScopeOptions;
+    const options: ScopeOptions = { ...extractOptionsBang(args) };
     const scope: ScopeFrameHash = {};
 
     if (args.length > 0) options.path = (args as Array<string | string[]>).flat(Infinity).join("/");
@@ -1277,7 +1276,7 @@ export class Mapper {
         ),
       );
 
-      options.defaults = { ...defaults, ...((options.defaults as object | undefined) ?? {}) };
+      options.defaults = { ...defaults, ...(options.defaults ?? {}) };
     } else {
       block = options.constraints;
       options.constraints = {};
@@ -1494,9 +1493,9 @@ export class Mapper {
     if ("defaults" in options) {
       const defaults = options.defaults as Record<string, string>;
       delete options.defaults;
-      this.defaults(defaults, () => this.mapMatch(paths, options as RouteOptions));
+      this.defaults(defaults, () => this.mapMatch(paths, options));
     } else {
-      this.mapMatch(paths, options as RouteOptions);
+      this.mapMatch(paths, options);
     }
   }
 
@@ -1518,7 +1517,7 @@ export class Mapper {
   ): this {
     const options = extractOptionsBang(args as MapMethodArg[]);
     options[args.length === 0 ? ":via" : "via"] = method;
-    this.match(...(args as [string]), options as RouteOptions, block!);
+    this.match(...(args as [string]), options, block!);
     return this;
   }
 
@@ -1912,7 +1911,7 @@ export class Mapper {
       formatted,
       optionsConstraints,
       anchor,
-      options as Record<string, unknown>,
+      options,
     );
     this._set.addRoute(mapping, as);
   }
@@ -2011,7 +2010,7 @@ export class Mapper {
 
   /** @internal */
   mergeOptionsScope<T extends Record<string, unknown>>(parent: T | undefined, child: T): T {
-    return { ...(parent || {}), ...child } as T;
+    return { ...(parent || {}), ...child };
   }
 
   /** @internal */

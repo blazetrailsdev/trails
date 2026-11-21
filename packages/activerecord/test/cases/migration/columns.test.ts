@@ -524,7 +524,7 @@ describe("Migration", () => {
       try {
         const e = await assertRaises([ArgumentError], {}, () =>
           self.connection.createTable("my_table", { force: true }, (t) => {
-            (t.timestamp as () => unknown)();
+            t.timestamp();
           }),
         );
         expect(e.message).toBe("Missing column name(s) for timestamp");

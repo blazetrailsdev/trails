@@ -380,7 +380,7 @@ export function rbAryBsearchIndex<T>(ary: readonly T[], block: (val: T) => unkno
       smaller = false;
     } else {
       throw new TypeError(
-        `wrong argument type ${(v as object).constructor.name} (must be numeric, true, false or nil)`,
+        `wrong argument type ${v.constructor.name} (must be numeric, true, false or nil)`,
       );
     }
     if (smaller) {

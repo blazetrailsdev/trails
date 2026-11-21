@@ -55,7 +55,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     } else if (typeof constructor === "function") {
       this.setDefaultProc(constructor as DefaultProc<string, V>);
     } else {
-      this.setDefault(constructor as V);
+      this.setDefault(constructor);
     }
   }
 

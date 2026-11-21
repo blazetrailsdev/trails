@@ -1,13 +1,7 @@
 import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { b } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  Response,
-  type MockResponse,
-  type RackApp,
-  type RackEnv,
-  type Request,
-} from "@blazetrails/rack";
+import { Response, type MockResponse, type RackEnv, type Request } from "@blazetrails/rack";
 import { FAKE_APP } from "./fixtures/fake-app.js";
 import { Error as RackTestError, MockSession, Session } from "../lib/index.js";
 import { mustBe, wontBe } from "./support/assertions.js";
@@ -245,7 +239,7 @@ describe("Rack::Test::Session#request", () => {
   it("supports a Rack::Response", async () => {
     const app = (_env: RackEnv) => new Response("", 200, {});
 
-    const session = new Session(new MockSession(app as unknown as RackApp));
+    const session = new Session(new MockSession(app));
     mustBe(await session.request("/"), "isOk");
   });
 
@@ -275,7 +269,7 @@ describe("Rack::Test::Session#request", () => {
       body,
     ];
 
-    const session = new Session(new MockSession(app as unknown as RackApp));
+    const session = new Session(new MockSession(app));
     expect(body.isClosed()).toBe(false);
     await session.request("/");
     expect(body.isClosed()).toBe(true);
@@ -289,7 +283,7 @@ describe("Rack::Test::Session#request", () => {
       (body = new CloseableBody()),
     ];
 
-    const session = new Session(new MockSession(app as unknown as RackApp));
+    const session = new Session(new MockSession(app));
     await session.request("/");
     expect(session.lastResponse().body).toBe("Hello, World!");
     expect(body!.isClosed()).toBe(true);

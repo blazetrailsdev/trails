@@ -8,7 +8,7 @@ import { Thor, type ThorClass } from "../lib/thor.js";
 describe("Thor", () => {
   let _shell: Basic | undefined;
   function shell(): Basic {
-    return (_shell ??= new (Base.shell as unknown as new () => Basic)());
+    return (_shell ??= new Base.shell());
   }
 
   describe("#sort - default", () => {

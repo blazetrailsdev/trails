@@ -24,7 +24,7 @@ export class NullStore extends Store implements CacheStore {
   override async deleteMatched(_matcher: string | RegExp, _options?: CacheOptions): Promise<void> {}
 
   inspect(): string {
-    return `#<${rbModName(this.constructor)} options=${inspectOptions(this.options as Record<string, unknown>)}>`;
+    return `#<${rbModName(this.constructor)} options=${inspectOptions(this.options)}>`;
   }
 
   protected async readEntry(key: string, _options: Record<string, unknown>): Promise<Entry | null> {

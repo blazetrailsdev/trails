@@ -81,11 +81,11 @@ export class Trails {
   declare static ActionMethods: typeof ActionMethods;
 
   static get application(): RegisteredApplication {
-    if (_application) return _application as RegisteredApplication;
+    if (_application) return _application;
     const klass = Application.appClass;
     if (!klass) return null as RegisteredApplication;
     _application = klass.instance();
-    return _application as RegisteredApplication;
+    return _application;
   }
   static set application(app: Application | null) {
     _application = app;

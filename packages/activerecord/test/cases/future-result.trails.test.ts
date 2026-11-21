@@ -385,11 +385,7 @@ describe("QueryCache#select_all", () => {
     const result = new Result(["id"], [[1]]);
     const store = new Store();
     store.enabled = true;
-    const pending = new FutureResult.SelectAll(deferredPool(result) as never, [
-      "SELECT 1",
-      null,
-      [],
-    ]);
+    const pending = new FutureResult.SelectAll(deferredPool(result), ["SELECT 1", null, []]);
     const superSelectAll = () => pending;
 
     const returned = overSuper(cacheHost(store), superSelectAll).selectAll("SELECT 1", null, [], {

@@ -83,9 +83,7 @@ describe("DupTest", () => {
 
     const duped = dbtopic!.dup();
 
-    clearTimestampAttributes.call(
-      topic as unknown as ThisParameterType<typeof clearTimestampAttributes>,
-    );
+    clearTimestampAttributes.call(topic);
 
     expect(topic.changes).toEqual(duped.changes);
   });

@@ -34,8 +34,8 @@ describe("constructing a model whose table has not reflected", () => {
   it("a scope attribute naming an association does not raise, and applies once the schema lands", async () => {
     expect(Post.columnsHash()["author_id"]).toBeUndefined();
     const author = new Author();
-    expect(() => new Post({ author } as never)).toThrow(MissingAttributeError);
-    const relation = Post.createWith({ author } as never);
+    expect(() => new Post({ author })).toThrow(MissingAttributeError);
+    const relation = Post.createWith({ author });
     expect(() => relation.new()).not.toThrow();
 
     await Post.loadSchema();

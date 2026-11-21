@@ -166,7 +166,7 @@ describe("Net::HTTP", () => {
   });
 
   it("update_uri strips the host port and converts the URI class for ssl", () => {
-    const req = new Net.HTTP.Post(URI.parse("http://example.com:8080/p?q=1") as never);
+    const req = new Net.HTTP.Post(URI.parse("http://example.com:8080/p?q=1"));
     req.updateUri("example.com", 443, true);
     expect(req.uri).toBeInstanceOf(HTTPS);
     expect(req.uri!.toString()).toBe("https://example.com/p?q=1");

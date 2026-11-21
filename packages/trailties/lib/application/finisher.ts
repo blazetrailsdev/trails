@@ -316,7 +316,5 @@ async function defineController(klass: object): Promise<void> {
   for (const path of await Trails.application!.helpersPaths()) {
     if (roots.includes(path)) await main.eagerLoadDir(path);
   }
-  await ActionController.Trailties.Helpers.inherited(
-    klass as ActionController.HelpersPathControllerClass,
-  );
+  await ActionController.Trailties.Helpers.inherited(klass);
 }

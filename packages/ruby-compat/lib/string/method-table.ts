@@ -363,7 +363,7 @@ export interface StringInstance {
 export function stringSuperclass<M extends keyof StringInstance>(
   ...methods: M[]
 ): new (orig?: unknown) => Pick<StringInstance, M> {
-  const klass = class extends (rbCString as new () => object) {
+  const klass = class extends rbCString {
     /** `String#initialize` (`vendor/ruby/v3.3.11/string.c:1832` `rb_str_init`). */
     constructor(orig: unknown = "") {
       super();

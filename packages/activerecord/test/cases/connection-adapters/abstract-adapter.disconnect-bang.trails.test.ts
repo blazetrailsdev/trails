@@ -39,6 +39,6 @@ describe("AbstractAdapter#disconnect!", () => {
 
     await adapter.disconnectBang();
 
-    expect(adapter.currentConnection()).toBe(adapter as AbstractAdapter);
+    expect(adapter.currentConnection()).toBe(adapter);
   });
 });

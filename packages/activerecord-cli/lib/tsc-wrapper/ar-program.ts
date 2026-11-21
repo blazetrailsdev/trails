@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/trails-tsc";
 import { createFileSystemLayer } from "typescript/unstable/fs";
 import { computeLineStarts } from "typescript/unstable/ast/scanner";
-import type { Diagnostic, DiagnosticCategory, Program } from "typescript/unstable/sync";
+import type { Diagnostic, Program } from "typescript/unstable/sync";
 import { tsApi } from "../type-virtualization/ts-api.js";
 import { collectBaseDescendants } from "../type-virtualization/transitive-extends-walker.js";
 import { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-plugin.js";
@@ -319,8 +319,8 @@ export function createArSolutionBuilder(
     },
   });
   return {
-    build: () => builder.build() as number,
-    clean: () => builder.clean() as number,
+    build: () => builder.build(),
+    clean: () => builder.clean(),
   };
 }
 
@@ -330,10 +330,10 @@ function fromTs5Diagnostic(d: Ts5Diagnostic): Diagnostic {
     pos: d.start ?? 0,
     end: (d.start ?? 0) + (d.length ?? 0),
     code: d.code,
-    category: d.category as number as DiagnosticCategory,
+    category: d.category,
     text: chain ? chain.messageText : (d.messageText as string),
     messageChain: chain?.next?.map(fromTs5MessageChain),
-    relatedInformation: d.relatedInformation?.map((ri) => fromTs5Diagnostic(ri as Ts5Diagnostic)),
+    relatedInformation: d.relatedInformation?.map((ri) => fromTs5Diagnostic(ri)),
   };
   if (!d.file || d.start == null) return out;
   const start = d.file.getLineAndCharacterOfPosition(d.start);
@@ -351,7 +351,7 @@ function fromTs5MessageChain(chain: Ts5MessageChain): Diagnostic {
     pos: 0,
     end: 0,
     code: chain.code,
-    category: chain.category as number as DiagnosticCategory,
+    category: chain.category,
     text: chain.messageText,
     messageChain: chain.next?.map(fromTs5MessageChain),
   };

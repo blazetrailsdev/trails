@@ -57,7 +57,7 @@ export class PostgreSQL extends ToSql {
     collector: SQLString,
   ): SQLString {
     collector.append("( ");
-    this.visit(o.expr as Nodes.Node | Nodes.Node[], collector);
+    this.visit(o.expr, collector);
     collector.append(" )");
     return collector;
   }

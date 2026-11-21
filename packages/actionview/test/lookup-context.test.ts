@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import { DetailsKey, LookupContext } from "../lib/lookup-context.js";
-import type { RenderableTemplate, RenderOptions } from "../lib/renderer/abstract-renderer.js";
+import type { RenderOptions } from "../lib/renderer/abstract-renderer.js";
 import { MissingTemplate } from "../lib/template/error.js";
 import { Resolver } from "../lib/template/resolver.js";
 import { FixtureResolver } from "../lib/testing/resolvers.js";
@@ -180,7 +180,7 @@ describe("Base#render (trails)", () => {
         locals: [],
         virtualPath: "posts/index",
         format: ":html",
-      }) as unknown as RenderableTemplate,
+      }),
     });
     expect(out).toBe("form!");
   });

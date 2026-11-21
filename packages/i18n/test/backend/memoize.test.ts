@@ -18,7 +18,6 @@ import {
   reloadBang,
   setBackend,
 } from "../../lib/i18n.js";
-import type { TranslationData } from "../../lib/utils.js";
 import * as TestCase from "../support/test-case.js";
 
 interface Spy {
@@ -80,7 +79,7 @@ describe("I18nBackendMemoizeTest", () => {
   it("resets available locales on store translations", () => {
     availableLocales();
     spy().spyCalls = 0;
-    backend().storeTranslations("copa", { ca: ":bana" } as unknown as TranslationData);
+    backend().storeTranslations("copa", { ca: ":bana" });
     expect(availableLocales()).toEqual(availableLocales());
     expect(availableLocales().includes("copa")).toBeTruthy();
     expect(spy().spyCalls).toBe(1);

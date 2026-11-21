@@ -95,7 +95,7 @@ export class HasManyAssociation extends CollectionAssociation {
               (primaryKeyColumn as string[]).map((col) => rbFSend(assoc, col)),
             );
           } else {
-            primaryKeyColumn = associationClass.primaryKey as string;
+            primaryKeyColumn = associationClass.primaryKey;
             ids = this.target.map((assoc) => rbFSend(assoc, primaryKeyColumn));
           }
 

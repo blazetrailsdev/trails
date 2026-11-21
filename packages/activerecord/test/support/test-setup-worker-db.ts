@@ -55,7 +55,11 @@ async function acquireAdvisorySlotPg(): Promise<number> {
       );
       if (res.rows[0]?.locked) {
         g.__arAdvisorySlotPg = slot;
-        process.on("exit", () => void client.end());
+        process.on("exit", () => {
+          client.end().catch((error: unknown) => {
+            throw error;
+          });
+        });
         return slot;
       }
     }
@@ -91,7 +95,11 @@ async function acquireAdvisorySlotMysql(): Promise<number> {
       ]);
       if ((rows[0] as { acquired: number }).acquired === 1) {
         g.__arAdvisorySlotMysql = slot;
-        process.on("exit", () => void conn.end());
+        process.on("exit", () => {
+          conn.end().catch((error: unknown) => {
+            throw error;
+          });
+        });
         return slot;
       }
     }

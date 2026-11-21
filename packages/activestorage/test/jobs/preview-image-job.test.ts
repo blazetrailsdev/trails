@@ -21,7 +21,7 @@ describe("ActiveStorage::PreviewImageJobTest", () => {
 
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
-    t = new PreviewImageJobTest("previewImageJob") as unknown as TestHelper;
+    t = new PreviewImageJobTest("previewImageJob");
     await t.beforeSetup();
     blob = await createFileBlob({ filename: "report.pdf", contentType: "application/pdf" });
   });

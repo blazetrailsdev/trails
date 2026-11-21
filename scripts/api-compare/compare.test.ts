@@ -139,7 +139,7 @@ function makeManifest(
 
 describe("resolvePortedWithArgsSigs", () => {
   const sig = (n: number): ParamInfo[] =>
-    Array.from({ length: n }, (_, i) => ({ name: `a${i}`, kind: "required" }) as ParamInfo);
+    Array.from({ length: n }, (_, i) => ({ name: `a${i}`, kind: "required" }));
   const byFileName = new Map([
     ["arel/nodes.ts", new Map([["first", [sig(0)]]])],
     ["relation.ts", new Map([["first", [sig(1)]]])],
@@ -4732,7 +4732,7 @@ describe("misplacedClusterVerdict", () => {
 
 describe("resolvePortedWithArgsSigs (Rails-private prefix)", () => {
   const sig = (n: number): ParamInfo[] =>
-    Array.from({ length: n }, (_, i) => ({ name: `a${i}`, kind: "required" }) as ParamInfo);
+    Array.from({ length: n }, (_, i) => ({ name: `a${i}`, kind: "required" }));
 
   it("resolves a name against the `_`-prefixed port of a Rails-private method", () => {
     const byFileName = new Map([["connection-pool.ts", new Map([["_connectionLease", [sig(1)]]])]]);

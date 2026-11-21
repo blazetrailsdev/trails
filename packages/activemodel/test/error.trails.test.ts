@@ -91,11 +91,11 @@ describe("Error and Errors surface", () => {
 
   it("inspect renders the receiver's class name", () => {
     class LocalError extends ModelError {}
-    const error = new ModelError({} as never, ":name", ":blank");
+    const error = new ModelError({}, ":name", ":blank");
     expect(new NestedError({}, error).inspect()).toBe(
       "#<ActiveModel::NestedError attribute=name, type=blank, options={}>",
     );
-    expect(new LocalError({} as never, "name", ":blank").inspect()).toBe(
+    expect(new LocalError({}, "name", ":blank").inspect()).toBe(
       "#<LocalError attribute=name, type=blank, options={}>",
     );
     class LocalErrors extends Errors {}

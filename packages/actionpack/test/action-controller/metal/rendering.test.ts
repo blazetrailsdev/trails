@@ -252,7 +252,7 @@ describe("Metal wiring", () => {
       request: { shouldApplyVaryHeader: () => false },
       response: { headers: new Map<string, string>() },
       performed: false,
-      responseBody: null as unknown,
+      responseBody: null,
       setResponseBody(this: { responseBody: unknown }, responseBody: unknown) {
         this.responseBody = responseBody;
       },
@@ -269,7 +269,7 @@ describe("Metal wiring", () => {
 
   test("renderToString collapses iterable results into a string", () => {
     const host = including({
-      responseBody: null as unknown,
+      responseBody: null,
       renderToBody: () => ["a", "b", "c"],
       ...normalizeRender,
     });
@@ -278,7 +278,7 @@ describe("Metal wiring", () => {
 
   test("renderToString passes non-iterable results through unchanged", () => {
     const host = including({
-      responseBody: null as unknown,
+      responseBody: null,
       renderToBody: () => 42,
       ...normalizeRender,
     });

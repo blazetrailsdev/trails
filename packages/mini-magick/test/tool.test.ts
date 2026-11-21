@@ -93,10 +93,7 @@ describe("MiniMagick::Tool", () => {
 
   describe("#<<", () => {
     it("adds argument to the args list", () => {
-      subject
-        .append("foo")
-        .append("bar")
-        .append(123 as unknown as string);
+      subject.append("foo").append("bar").append(123);
       expect(subject.args).toEqual(["foo", "bar", "123"]);
     });
   });

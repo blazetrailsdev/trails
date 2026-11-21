@@ -550,8 +550,7 @@ describe("TagHelperTest", () => {
 
   it("token list and class names only html escape once", () => {
     for (const helperMethod of [tokenList, classNames]) {
-      const helper = (...args: unknown[]) =>
-        (helperMethod as (...a: unknown[]) => SafeBuffer)(...args);
+      const helper = (...args: unknown[]) => helperMethod(...args);
 
       const tokens = [
         "click->controller#action1",

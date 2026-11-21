@@ -376,7 +376,7 @@ describe("SolidQueue::JobTest", () => {
 
     const scheduledJob = (await Job.last()) as Job;
 
-    travelTo(minutes(10).fromNow() as Time);
+    travelTo(minutes(10).fromNow());
 
     expect(await ScheduledExecution.dispatchNextBatch(10)).toBe(0);
     expect(await Job.findBy({ id: scheduledJob.id })).toBeNull();
@@ -421,7 +421,7 @@ describe("SolidQueue::JobTest", () => {
     const [, blockedJob] = await Job.last(2);
     const semaphore = (await Semaphore.last()) as Semaphore;
 
-    travelTo(minutes(10).fromNow() as Time);
+    travelTo(minutes(10).fromNow());
 
     await assertNoChanges(
       () => semaphore.value,
@@ -470,7 +470,7 @@ describe("SolidQueue::JobTest", () => {
     expect(await readyJob.isReady()).toBeTruthy();
     expect(await blockedJob.isBlocked()).toBeTruthy();
 
-    travelTo(minutes(10).fromNow() as Time);
+    travelTo(minutes(10).fromNow());
 
     await assertChanges(
       async () => (await semaphore.reload()).expires_at.toI(),

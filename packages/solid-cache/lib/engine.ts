@@ -69,9 +69,7 @@ export class Engine extends TrailsEngine {
           options.encryptionContextProperties = config.encryptionContextProperties;
         }
 
-        SolidCache.configuration = new Configuration(
-          options as ConstructorParameters<typeof Configuration>[0],
-        );
+        SolidCache.configuration = new Configuration(options);
 
         if (config.keyHashStage != null && config.keyHashStage !== false) {
           deprecator().warn("config.solid_cache.key_hash_stage is deprecated and has no effect.");

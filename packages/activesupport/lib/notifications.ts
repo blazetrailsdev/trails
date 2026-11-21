@@ -57,7 +57,7 @@ export class Notifications {
     pattern: string | RegExp | null | undefined,
     callback: NotificationCallback | EventedListener,
   ): NotificationSubscriber {
-    const sub = this.notifier.subscribe(pattern ?? null, callback as FanoutListener, false);
+    const sub = this.notifier.subscribe(pattern ?? null, callback, false);
     return sub;
   }
 
@@ -83,7 +83,7 @@ export class Notifications {
       pattern = null;
       callback = patternOrCallback;
     }
-    const sub = this.notifier.subscribe(pattern, callback as FanoutListener, true);
+    const sub = this.notifier.subscribe(pattern, callback, true);
     return sub;
   }
 
@@ -118,11 +118,7 @@ export class Notifications {
       block = blockOrOptions as () => T | Promise<T>;
       options = maybeOptions ?? {};
     }
-    const subscriber = this.notifier.subscribe(
-      pattern,
-      callback as FanoutListener,
-      options.monotonic ?? false,
-    );
+    const subscriber = this.notifier.subscribe(pattern, callback, options.monotonic ?? false);
     try {
       return await block();
     } finally {

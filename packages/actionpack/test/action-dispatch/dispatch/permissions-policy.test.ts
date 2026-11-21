@@ -18,7 +18,6 @@ import {
 } from "@blazetrails/rack";
 import { Base } from "../../../lib/action-controller/base.js";
 import { FEATURE_POLICY } from "../../../lib/action-dispatch/constants.js";
-import type { MiddlewareFactory } from "../../../lib/action-dispatch/middleware/stack.js";
 import {
   Middleware,
   PermissionsPolicy,
@@ -181,10 +180,10 @@ describe("PermissionsPolicyIntegrationTest", () => {
   }
 
   const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
-    middleware.use(PolicyConfigMiddleware as MiddlewareFactory);
-    middleware.use(Lint as MiddlewareFactory);
-    middleware.use(Middleware as MiddlewareFactory);
-    middleware.use(Lint as MiddlewareFactory);
+    middleware.use(PolicyConfigMiddleware);
+    middleware.use(Lint);
+    middleware.use(Middleware);
+    middleware.use(Lint);
   });
 
   let t: IntegrationTest;
@@ -282,10 +281,10 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
   }
 
   const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
-    middleware.use(PolicyConfigMiddleware as MiddlewareFactory);
-    middleware.use(Lint as MiddlewareFactory);
-    middleware.use(Middleware as MiddlewareFactory);
-    middleware.use(Lint as MiddlewareFactory);
+    middleware.use(PolicyConfigMiddleware);
+    middleware.use(Lint);
+    middleware.use(Middleware);
+    middleware.use(Lint);
   });
 
   constSetPath("PermissionsPolicyWithHelpersIntegrationTest::PolicyController", PolicyController);

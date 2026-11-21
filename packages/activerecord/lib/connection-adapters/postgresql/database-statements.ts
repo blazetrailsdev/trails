@@ -358,11 +358,7 @@ export async function castResult(this: CastResultHost, result: PG.Result): Promi
     const fmod = result.fmod(i);
     types[fname] = types[i] = await this.getOidType(ftype, fmod, fname);
   });
-  const arResult = new Result(
-    fields,
-    result.values(),
-    Object.freeze(types) as Record<string, ValueType>,
-  );
+  const arResult = new Result(fields, result.values(), Object.freeze(types));
   result.clear();
   return arResult;
 }
@@ -467,7 +463,7 @@ export function handleWarnings(this: HandleWarningsHost, sql: unknown): void {
     if (this.isWarningIgnored(warning as unknown as { message: string })) continue;
 
     warning.sql = sql;
-    dbWarningsAction()!.call(this, warning as unknown as SQLWarning);
+    dbWarningsAction()!.call(this, warning);
   }
 }
 

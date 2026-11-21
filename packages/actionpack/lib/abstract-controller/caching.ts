@@ -107,7 +107,7 @@ export async function cache<T>(
   optionsOrBlock: CacheOptions | (() => T),
   maybeBlock?: () => T,
 ): Promise<T> {
-  const block = typeof optionsOrBlock === "function" ? (optionsOrBlock as () => T) : maybeBlock!;
+  const block = typeof optionsOrBlock === "function" ? optionsOrBlock : maybeBlock!;
   const options = typeof optionsOrBlock === "function" ? ({} as CacheOptions) : optionsOrBlock;
 
   if (this.isCacheConfigured()) {

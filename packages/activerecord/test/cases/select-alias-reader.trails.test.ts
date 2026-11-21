@@ -64,7 +64,7 @@ describe("select alias dynamic reader (trails)", () => {
     const [record] = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order(
       "id",
     )) as (Comment & { bumped_id: unknown })[];
-    const copy = record.clone() as Comment & { bumped_id: unknown };
+    const copy = record.clone();
     expect(copy.bumped_id).toEqual(record.bumped_id);
     expect(copy).toBeInstanceOf(Comment);
   });

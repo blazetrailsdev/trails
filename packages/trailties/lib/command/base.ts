@@ -144,7 +144,7 @@ export class Base extends Thor {
   static banner(command: ThorCommand | null = null, ..._rest: unknown[]): string {
     if (command != null) {
       return command
-        .formattedUsage(this as unknown as ThorClass)
+        .formattedUsage(this)
         .replace(new RegExp(`^${this.namespace()}:([\\w-]+)`, "gm"), (_, name: string) =>
           this.executable(name),
         );
