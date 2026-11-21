@@ -40,10 +40,6 @@ export interface Mysql2Result<
 
 type Handshake = { _handshakePacket?: { serverVersion?: string } };
 
-function serverVersion(client: Client): number {
-  return client.serverInfo().id;
-}
-
 const CR_SERVER_GONE_ERROR = 2006;
 
 const CR_ERRNOS: Record<string, number> = {
@@ -54,6 +50,7 @@ const CR_ERRNOS: Record<string, number> = {
   ETIMEDOUT: 2003,
   ECONNRESET: 2013,
   PROTOCOL_CONNECTION_LOST: 2013,
+  PROTOCOL_SEQUENCE_TIMEOUT: 2013,
   EPIPE: CR_SERVER_GONE_ERROR,
   PROTOCOL_ENQUEUE_AFTER_QUIT: CR_SERVER_GONE_ERROR,
   PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR: CR_SERVER_GONE_ERROR,
@@ -626,7 +623,7 @@ export class Client {
   raiseMysql2Error(e: unknown): never {
     if (!(e instanceof globalThis.Error)) throw e;
     const { code, errno, sqlState } = e as { code?: unknown; errno?: unknown; sqlState?: string };
-    if (code === "PROTOCOL_SEQUENCE_TIMEOUT") {
+    if (code === "PROTOCOL_SEQUENCE_TIMEOUT" && this.readTimeout != null) {
       throw new Mysql2Error.TimeoutError(
         `Timeout waiting for a response from the last query. (waited ${this.readTimeout} seconds)`,
       );
@@ -642,7 +639,7 @@ export class Client {
     if (errorNumber === undefined) throw e;
     const error = Mysql2Error.newWithArgs(
       e.message,
-      serverVersion(this),
+      this.serverInfo().id,
       errorNumber,
       sqlState ?? "HY000",
     );

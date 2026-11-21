@@ -76,14 +76,26 @@ describe("Mysql2::Client error boundary", () => {
     const timeout = Object.assign(new Error("t"), { code: "PROTOCOL_SEQUENCE_TIMEOUT" });
     const lost = Object.assign(new Error("l"), { code: "PROTOCOL_CONNECTION_LOST" });
     const client = await clientOn({
-      query: vi.fn().mockRejectedValueOnce(timeout).mockRejectedValueOnce(lost),
+      query: vi
+        .fn()
+        .mockRejectedValueOnce(timeout)
+        .mockRejectedValueOnce(lost)
+        .mockRejectedValueOnce(timeout),
     });
+    client.readTimeout = 5;
     const t = await client.query("").catch((e: unknown) => e);
     expect(t).toBeInstanceOf(Mysql2.Error.TimeoutError);
     expect((t as InstanceType<typeof Mysql2.Error>).errorNumber).toBeNull();
     const l = await client.query("").catch((e: unknown) => e);
     expect(l).toBeInstanceOf(Mysql2.Error.ConnectionError);
     expect((l as InstanceType<typeof Mysql2.Error>).errorNumber).toBe(2013);
+    expect((t as Error).message).toBe(
+      "Timeout waiting for a response from the last query. (waited 5 seconds)",
+    );
+    client.readTimeout = null;
+    expect(await client.query("").catch((e: unknown) => e)).toBeInstanceOf(
+      Mysql2.Error.ConnectionError,
+    );
   });
 });
 
