@@ -338,10 +338,9 @@ export class Timestamp implements Comparable {
     return result;
   }
 
-  isBetween = isBetween;
-  equals = equals;
-
-  eql = equals;
+  declare isBetween: typeof isBetween;
+  declare equals: typeof equals;
+  declare eql: typeof equals;
 
   hash(): number {
     return rbHash([this.value, this.subSecond, this.utcOffset != null]);
@@ -405,3 +404,7 @@ export class Timestamp implements Comparable {
     }
   }
 }
+
+Timestamp.prototype.isBetween = isBetween;
+Timestamp.prototype.equals = equals;
+Timestamp.prototype.eql = equals;

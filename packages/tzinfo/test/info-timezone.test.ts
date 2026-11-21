@@ -10,7 +10,7 @@ describe("TCInfoTimezone", () => {
   it("info", () => {
     const i = new TimezoneInfo("Test/Identifier");
     const tz = new InfoTimezone(i);
-    expect(tz.info).toBe(i);
+    expect((tz as unknown as { info: TimezoneInfo }).info).toBe(i);
   });
 
   it("inspect", () => {
