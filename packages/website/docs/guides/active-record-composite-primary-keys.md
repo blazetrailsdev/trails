@@ -119,6 +119,25 @@ On a composite-keyed model, `where({ id: … })` means the `id` column, not the
 whole primary key. Query by the full key with the tuple form above, or with
 `find`.
 
+### Query Constraints
+
+A table with a single-column primary key can still be queried by several
+columns. `queryConstraints` names the columns Active Record uses to identify a
+row when it updates, deletes or reloads it, without changing the schema. In a
+sharded table it keeps every write scoped to the shard key:
+
+```ts
+import { Base } from "@blazetrails/activerecord";
+
+class Comment extends Base {
+  static {
+    this.queryConstraints("blog_id", "id");
+  }
+}
+```
+
+`comment.save()` then issues `UPDATE ... WHERE blog_id = ? AND id = ?`.
+
 ## Associations between Models with Composite Primary Keys
 
 Associations pick up a composite primary key on the other side, but the

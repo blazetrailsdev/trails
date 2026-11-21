@@ -24,15 +24,15 @@ ratified deviations from Rails are on its [package page](/packages/).
 
 ## Models
 
-| Rails guide                   | Trails guide                                                                                                                                              | Packages                                                                     |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Active Record Basics          | [Active Record Basics](./active-record-basics.md)                                                                                                         | [activerecord](/packages/activerecord)                                       |
-| Active Record Migrations      | [Active Record Migrations](./active-record-migrations.md)                                                                                                 | [activerecord](/packages/activerecord)                                       |
-| Active Record Validations     | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-validations.md)) | [activerecord](/packages/activerecord), [activemodel](/packages/activemodel) |
-| Active Record Callbacks       | [Active Record Callbacks](./active-record-callbacks.md)                                                                                                   | [activerecord](/packages/activerecord), [activemodel](/packages/activemodel) |
-| Active Record Associations    | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-association-basics.md))        | [activerecord](/packages/activerecord)                                       |
-| Active Record Query Interface | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-querying.md))    | [activerecord](/packages/activerecord), [arel](/packages/arel)               |
-| Active Model Basics           | [Active Model Basics](./active-model-basics.md)                                                                                                           | [activemodel](/packages/activemodel)                                         |
+| Rails guide                   | Trails guide                                                                                                                                           | Packages                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Active Record Basics          | [Active Record Basics](./active-record-basics.md)                                                                                                      | [activerecord](/packages/activerecord)                                       |
+| Active Record Migrations      | [Active Record Migrations](./active-record-migrations.md)                                                                                              | [activerecord](/packages/activerecord)                                       |
+| Active Record Validations     | [Active Record Validations](./active-record-validations.md)                                                                                            | [activerecord](/packages/activerecord), [activemodel](/packages/activemodel) |
+| Active Record Callbacks       | [Active Record Callbacks](./active-record-callbacks.md)                                                                                                | [activerecord](/packages/activerecord), [activemodel](/packages/activemodel) |
+| Active Record Associations    | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-association-basics.md))     | [activerecord](/packages/activerecord)                                       |
+| Active Record Query Interface | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-record-querying.md)) | [activerecord](/packages/activerecord), [arel](/packages/arel)               |
+| Active Model Basics           | [Active Model Basics](./active-model-basics.md)                                                                                                        | [activemodel](/packages/activemodel)                                         |
 
 ## Views
 
@@ -53,15 +53,15 @@ ratified deviations from Rails are on its [package page](/packages/).
 
 ## Other Components
 
-| Rails guide                    | Trails guide                                                                                                                                                   | Packages                                                                                 |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Active Support Core Extensions | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-support-core-extensions.md)) | [activesupport](/packages/activesupport)                                                 |
-| Action Mailer Basics           | [Action Mailer Basics](./action-mailer-basics.md)                                                                                                              | [actionmailer](/packages/actionmailer), [mail](/packages/mail)                           |
-| Action Mailbox Basics          | [Action Mailbox Basics](./action-mailbox-basics.md)                                                                                                            | [actionmailbox](/packages/actionmailbox)                                                 |
-| Action Text Overview           | [Action Text Overview](./action-text-overview.md)                                                                                                              | [actiontext](/packages/actiontext)                                                       |
-| Active Job Basics              | [Active Job Basics](./active-job-basics.md)                                                                                                                    | [activejob](/packages/activejob), [solid-queue](/packages/solid-queue)                   |
-| Active Storage Overview        | Not yet written ([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0247-website-refresh/stories/website-guide-active-storage-overview.md))        | [activestorage](/packages/activestorage), [image-processing](/packages/image-processing) |
-| Action Cable Overview          | [Action Cable Overview](./action-cable-overview.md)                                                                                                            | [actioncable](/packages/actioncable), [solid-cable](/packages/solid-cable)               |
+| Rails guide                    | Trails guide                                                          | Packages                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Active Support Core Extensions | [Active Support Core Extensions](./active-support-core-extensions.md) | [activesupport](/packages/activesupport)                                                 |
+| Action Mailer Basics           | [Action Mailer Basics](./action-mailer-basics.md)                     | [actionmailer](/packages/actionmailer), [mail](/packages/mail)                           |
+| Action Mailbox Basics          | [Action Mailbox Basics](./action-mailbox-basics.md)                   | [actionmailbox](/packages/actionmailbox)                                                 |
+| Action Text Overview           | [Action Text Overview](./action-text-overview.md)                     | [actiontext](/packages/actiontext)                                                       |
+| Active Job Basics              | [Active Job Basics](./active-job-basics.md)                           | [activejob](/packages/activejob), [solid-queue](/packages/solid-queue)                   |
+| Active Storage Overview        | [Active Storage Overview](./active-storage-overview.md)               | [activestorage](/packages/activestorage), [image-processing](/packages/image-processing) |
+| Action Cable Overview          | [Action Cable Overview](./action-cable-overview.md)                   | [actioncable](/packages/actioncable), [solid-cable](/packages/solid-cable)               |
 
 ## Digging Deeper
 

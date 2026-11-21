@@ -233,6 +233,7 @@ export class ClassMethods {
     }
   }
 
+  static queryConstraints = queryConstraints;
   static queryConstraintsList = queryConstraintsList;
 }
 
