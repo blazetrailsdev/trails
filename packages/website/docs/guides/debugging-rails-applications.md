@@ -94,8 +94,9 @@ Trails.logger?.info("Processing the request...");
 Trails.logger?.error("Something went wrong");
 ```
 
-Passing a function instead of a string defers building the message until the
-logger knows it will write it, which saves the work when the level drops it.
+A function passed as the second argument, `debug(null, () => message)`, is
+called only when the logger will write the line, which saves building a message
+the level drops.
 
 ### Verbose Query Logs
 
@@ -132,8 +133,8 @@ class Blog extends Application {
 
 Logging is cheap but not free: each line is formatted and written, and a
 `debug` message built with string interpolation is built even when the level
-drops it. In production keep the level at `info` or above, and use the
-function form for expensive messages.
+drops it. In production keep the level at `info` or above, and pass a
+function for expensive messages.
 
 ## SQL Query Comments
 

@@ -147,15 +147,10 @@ and from the engine the host's are reached through the `main_app` mounted helper
 
 ### Engine Setup
 
-The engine's migrations are copied into the host with a rake task, so they run
-with the host's own:
-
-<!-- typecheck:skip -->
-
-```sh
-pnpm trails blorgh:install:migrations
-pnpm trails db:migrate
-```
+Rails copies an engine's migrations into the host with
+`railties:install:migrations`. That task is not ported yet, so copy the files
+from the engine's `db/migrate/` into the host's by hand and run
+`pnpm trails db:migrate`; see the [trailties package page](/packages/trailties).
 
 ### Using a Class Provided by the Application
 
