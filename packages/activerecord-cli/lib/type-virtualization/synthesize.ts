@@ -246,7 +246,10 @@ function renderSchemaColumnDeclares(
     const keyLike = isForeignKeyColumn(col, value) || isDefaultTypedPrimaryKey(value);
     const tsType = keyLike
       ? `${AR_IMPORT}.PrimaryKeyValue`
-      : renderSchemaValueType(value, opts.timeZoneAwareAttributes);
+      : renderSchemaValueType(
+          value,
+          info.skipTimeZoneConversionForAttributes.has(col) ? false : opts.timeZoneAwareAttributes,
+        );
     const writerType = keyLike ? tsType : writerTsTypeFor(trailsType, tsType);
     out.push(attributeLine(renderDeclaredMemberName(col), tsType, col, writerType));
   }
@@ -392,7 +395,11 @@ function renderCall(
 ): RenderedLine[] {
   switch (call.kind) {
     case "attribute":
-      return renderAttribute(call, attributesNullable, timeZoneAware);
+      return renderAttribute(
+        call,
+        attributesNullable,
+        info.skipTimeZoneConversionForAttributes.has(call.name) ? false : timeZoneAware,
+      );
     case "hasMany":
     case "hasAndBelongsToMany":
       return renderCollectionAssoc(info, call, aliases, targets, isKnownTarget);

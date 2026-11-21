@@ -93,6 +93,26 @@ describe("virtualize — deltas", () => {
     expect(naive.text).toMatch(/get created_at\(\): import\("@blazetrails\/date"\)\.Time;/);
   });
 
+  test("skipTimeZoneConversionForAttributes types a skipped column as naive Time", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static skipTimeZoneConversionForAttributes = ["published_at"];\n' +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          created_at: { type: "datetime", null: false },
+          published_at: { type: "datetime", null: false },
+        },
+      },
+      timeZoneAwareAttributes: true,
+    });
+    expect(text).toMatch(
+      /get created_at\(\): import\("@blazetrails\/activesupport"\)\.TimeWithZone;/,
+    );
+    expect(text).toMatch(/get published_at\(\): import\("@blazetrails\/date"\)\.Time;/);
+  });
+
   test("schemaColumnsByTable skips user-authored declares", () => {
     const src =
       "export class Post extends Base {\n" +

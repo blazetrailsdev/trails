@@ -111,6 +111,11 @@ describe("Templates are precompiled", () => {
 
   it("precompiles a file under a handler the application registers", async () => {
     const root = fixture("precompiled-handlers");
+    Template.registerTemplateHandler("shout", {
+      call(_template: unknown, source: string) {
+        return `return htmlSafe(${JSON.stringify(source.toUpperCase())});`;
+      },
+    });
     try {
       const { files } = await buildViews({ cwd: root });
       expect(files).toEqual(["greetings/loud.html.shout"]);

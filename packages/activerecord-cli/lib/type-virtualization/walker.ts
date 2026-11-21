@@ -72,6 +72,7 @@ export interface ClassInfo {
   dynamicTableName: boolean;
   skipSchemaColumns: Set<string>;
   serializedColumns: Set<string>;
+  skipTimeZoneConversionForAttributes: Set<string>;
   tableName?: string;
 }
 
@@ -180,6 +181,7 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
     dynamicTableName: false,
     skipSchemaColumns: parseSkipColumns(cls, sourceFile),
     serializedColumns: new Set(),
+    skipTimeZoneConversionForAttributes: new Set(),
   };
 
   if (info.skip) return info;
@@ -279,6 +281,11 @@ function readStaticValue(name: string, value: ts.Expression, info: ClassInfo): v
     const literal = ts.isStringLiteralLikeNode(value);
     info.tableName = literal ? value.text : undefined;
     info.dynamicTableName = !literal;
+  }
+  if (name === "skipTimeZoneConversionForAttributes" && ts.isArrayLiteralExpression(value)) {
+    for (const el of value.elements) {
+      if (ts.isStringLiteralLikeNode(el)) info.skipTimeZoneConversionForAttributes.add(el.text);
+    }
   }
   if (name === "abstractClass" && value.kind === ts.SyntaxKind.TrueKeyword) info.abstract = true;
 }
