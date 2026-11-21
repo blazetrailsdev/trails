@@ -1063,9 +1063,16 @@ importers:
 
   packages/mysql2:
     dependencies:
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
       mysql2:
         specifier: ^3.18.2
         version: 3.19.0(@types/node@25.3.5)

@@ -1,8 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Result } from "../../../lib/result.js";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
-import { mysql2Client } from "../../../lib/mysql2/client.js";
-import type { Mysql2Result } from "../../../lib/mysql2/client.js";
+import mysql from "mysql2/promise";
+import { Mysql2, type Client } from "@blazetrails/mysql2";
+import type { Mysql2Result } from "@blazetrails/mysql2";
+
+async function clientOn(connection: object): Promise<Client> {
+  const createConnection = vi
+    .spyOn(mysql, "createConnection")
+    .mockResolvedValue(connection as never);
+  try {
+    return await Mysql2.Client.new({});
+  } finally {
+    createConnection.mockRestore();
+  }
+}
 
 describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () => {
   afterEach(() => {
@@ -27,17 +39,17 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
     return Promise.resolve([[hashRow], DUP_FIELDS]);
   }
 
-  function makeAdapter(): Mysql2Adapter {
+  async function makeAdapter(): Promise<Mysql2Adapter> {
     const adapter = new Mysql2Adapter({ host: "localhost" } as never);
     const fakeConn = { query: driverQuery, end: () => Promise.resolve() };
-    (adapter as unknown as { _rawConnection: unknown })._rawConnection = mysql2Client(fakeConn);
+    (adapter as unknown as { _rawConnection: unknown })._rawConnection = await clientOn(fakeConn);
     (adapter as unknown as { _verified: boolean })._verified = true;
     adapter._rawConnection!.queryOptions.as = "array";
     return adapter;
   }
 
   it("preserves duplicate column names via positional array-mode rows", async () => {
-    const adapter = makeAdapter();
+    const adapter = await makeAdapter();
 
     const rawResult = (await adapter.internalExecute("SELECT 1 AS a, 2 AS a", "SQL", [], {
       materializeTransactions: false,

@@ -1,6 +1,18 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
-import { mysql2Client } from "../../../lib/mysql2/client.js";
+import mysql from "mysql2/promise";
+import { Mysql2, type Client } from "@blazetrails/mysql2";
+
+async function clientOn(connection: object): Promise<Client> {
+  const createConnection = vi
+    .spyOn(mysql, "createConnection")
+    .mockResolvedValue(connection as never);
+  try {
+    return await Mysql2.Client.new({});
+  } finally {
+    createConnection.mockRestore();
+  }
+}
 
 describe("Mysql2Adapter base _rawConnection field", () => {
   afterEach(() => {
@@ -15,7 +27,7 @@ describe("Mysql2Adapter base _rawConnection field", () => {
       connection: { _handshakePacket: { serverVersion: "8.0.28" } },
       query: () => Promise.resolve([[]]),
     };
-    vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(mysql2Client(fakeConn));
+    vi.spyOn(mysql, "createConnection").mockResolvedValue(fakeConn as never);
     return { end };
   }
 
@@ -59,7 +71,7 @@ describe("Mysql2Adapter base _rawConnection field", () => {
 
   it("discardBang during an in-flight reconnect abandons the client the connect installs", async () => {
     const end = vi.fn(() => Promise.resolve());
-    const fakeConn = { end, query: () => Promise.resolve([[]]) };
+    const client = await clientOn({ end, query: () => Promise.resolve([[]]) });
     let resolve!: (conn: never) => void;
     const spy = vi
       .spyOn(Mysql2Adapter, "newClient")
@@ -71,7 +83,7 @@ describe("Mysql2Adapter base _rawConnection field", () => {
     expect(spy).toHaveBeenCalledTimes(1);
 
     const discarded = adapter.discardBang();
-    resolve(mysql2Client(fakeConn) as never);
+    resolve(client as never);
     await reconnect;
     await discarded;
 

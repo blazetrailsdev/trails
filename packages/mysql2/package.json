@@ -19,6 +19,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
   "peerDependencies": {
@@ -38,5 +39,9 @@
       "ref": "0.5.6",
       "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
     }
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "25.3.5",
+    "mysql2": "^3.18.2"
+  }
 }

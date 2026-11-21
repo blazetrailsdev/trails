@@ -1,6 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
-import { mysql2Client } from "../../../lib/mysql2/client.js";
+import mysql from "mysql2/promise";
+import { Mysql2, type Client } from "@blazetrails/mysql2";
+
+async function clientOn(connection: object): Promise<Client> {
+  const createConnection = vi
+    .spyOn(mysql, "createConnection")
+    .mockResolvedValue(connection as never);
+  try {
+    return await Mysql2.Client.new({});
+  } finally {
+    createConnection.mockRestore();
+  }
+}
 
 class FakeConnection {
   connection = { _handshakePacket: { serverVersion: "8.0.28" } };
@@ -17,7 +29,7 @@ class FakeConnection {
 
 describe("Mysql2Adapter#verify! with a connection handed to the constructor", () => {
   it("seats the unconfigured connection with usable query_options", async () => {
-    const adapter = new Mysql2Adapter(mysql2Client(new FakeConnection()), null, {}, {});
+    const adapter = new Mysql2Adapter(await clientOn(new FakeConnection()), null, {}, {});
 
     await adapter.verifyBang();
 

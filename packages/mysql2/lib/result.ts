@@ -1,3 +1,11 @@
+import { Mysql2 } from "./mysql2.js";
+
+declare module "./mysql2.js" {
+  interface Mysql2Namespace {
+    Result: typeof Result;
+  }
+}
+
 export class Result {
   readonly fields: string[];
   private rows: Array<unknown[] | Record<string, unknown>>;
@@ -24,3 +32,5 @@ export class Result {
     this.rows = [];
   }
 }
+
+Mysql2.Result = Result;

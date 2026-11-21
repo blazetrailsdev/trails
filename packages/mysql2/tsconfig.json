@@ -3,8 +3,16 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "lib"
+    "rootDir": "lib",
+    "types": ["node"]
   },
   "include": ["lib"],
-  "references": [{ "path": "../ruby-compat" }, { "path": "../date" }]
+  "references": [
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../date"
+    }
+  ]
 }

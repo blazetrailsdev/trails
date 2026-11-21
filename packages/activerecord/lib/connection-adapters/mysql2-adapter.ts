@@ -31,7 +31,7 @@ import {
   performQuery as mysql2PerformQuery,
   DatabaseStatements as Mysql2DatabaseStatements,
 } from "./mysql2/database-statements.js";
-import { Mysql2, type Mysql2Client, type Mysql2Result } from "../mysql2/client.js";
+import { Mysql2, type Client as Mysql2Client, type Mysql2Result } from "@blazetrails/mysql2";
 import { defaultTimezone } from "../active-record.js";
 
 let mysql2TypeMap: TypeMap | null = null;
@@ -144,26 +144,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   override isConnected(): boolean {
-    const conn = this._rawConnection as
-      | (mysql.Connection & {
-          connection: { _closing?: boolean; stream?: { destroyed?: boolean } };
-        })
-      | null;
-    return !(
-      conn == null ||
-      conn.connection._closing === true ||
-      conn.connection.stream?.destroyed === true
-    );
+    return !(this._rawConnection == null || this._rawConnection.isClosed());
   }
 
   override async active(): Promise<boolean> {
     if (this.isConnected()) {
       return await this.lock.synchronize(async () => {
-        const ping = await this._rawConnection?.ping().then(
-          () => true,
-          () => false,
-        );
-        if (ping) {
+        if (await this._rawConnection?.ping()) {
           this.verifiedBang();
           return true;
         }
@@ -178,7 +165,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
-      await this._rawConnection?.end();
+      await this._rawConnection?.close();
       this._rawConnection = null;
     });
   }
@@ -212,7 +199,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /** @internal */
   override async reconnect(): Promise<void> {
     return this.lock.synchronize(async () => {
-      await this._rawConnection?.end();
+      await this._rawConnection?.close();
       this._rawConnection = null;
       await this.connect();
     });
@@ -245,9 +232,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   override async getFullVersion(): Promise<string | null> {
-    type Handshake = { _handshakePacket?: { serverVersion?: string } };
-    const conn = (await this.anyRawConnection()) as (Handshake & { connection?: Handshake }) | null;
-    return (conn?.connection ?? conn)?._handshakePacket?.serverVersion ?? null;
+    return ((await this.anyRawConnection()) as Mysql2Client).serverInfo().version;
   }
 
   /** @internal */

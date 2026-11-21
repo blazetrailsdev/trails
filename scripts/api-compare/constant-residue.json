@@ -1011,13 +1011,16 @@
     }
   },
   "mysql2": {
-    "rows": 3,
+    "rows": 6,
     "excluded": [],
     "unwalked": [],
     "residue": {
+      "client.ts::Client": "Mysql2::Client",
       "error.ts::Error": "Mysql2::Error",
       "error.ts::Error.ConnectionError": "Mysql2::Error::ConnectionError",
-      "error.ts::Error.TimeoutError": "Mysql2::Error::TimeoutError"
+      "error.ts::Error.TimeoutError": "Mysql2::Error::TimeoutError",
+      "result.ts::Result": "Mysql2::Result",
+      "statement.ts::Statement": "Mysql2::Statement"
     }
   },
   "net-smtp": {

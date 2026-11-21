@@ -8,7 +8,7 @@ import { asJson, BigDecimal } from "@blazetrails/activesupport";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import { Base } from "../../../../lib/base.js";
 import { ReadOnlyError, RecordNotUnique } from "../../../../lib/errors.js";
-import type { Mysql2Result } from "../../../../lib/mysql2/client.js";
+import type { Mysql2Result } from "@blazetrails/mysql2";
 
 describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   let adapter: Mysql2Adapter;
