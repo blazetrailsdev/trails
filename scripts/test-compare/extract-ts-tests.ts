@@ -32,6 +32,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "rack-cors",
     "rack-proxy",
     "rack-session",
+    "rack-cache",
     "rack-test",
     "rackup",
     "bcrypt",

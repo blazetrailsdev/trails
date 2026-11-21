@@ -1856,6 +1856,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "rack-cors": "packages/rack-cors/test/",
   "rack-proxy": "packages/rack-proxy/test/",
   "rack-session": "packages/rack-session/test/",
+  "rack-cache": "packages/rack-cache/test/",
   "rack-test": "packages/rack-test/test/",
   rackup: "packages/rackup/test/",
   bcrypt: "packages/bcrypt/test/",

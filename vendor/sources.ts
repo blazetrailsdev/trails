@@ -349,9 +349,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/rack/cache",
         libEntryFile: "lib/rack/cache.rb",
         testPath: "test",
-        compareApi: false,
-        apiExcludedReason:
-          "extract-ts-api.ts refuses a package with no dist (packages/rack-cache — NotBuilt); enroll-rack-cache-in-compare-tooling creates it.",
       },
     ],
   },
