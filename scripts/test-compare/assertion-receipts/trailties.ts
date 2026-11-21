@@ -350,4 +350,21 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           "rails_plugin_test.rb:41-43 repeats the arm with the -b alias; Minitest.process_args is unported, so the port passes the parsed fullBacktrace option and the alias has no distinct input",
       },
     ],
+  "trailties:railties/engine_test.rb › EngineTest › setting priority for engines with config.railties_order":
+    [
+      {
+        kind: "assert_predicate",
+        value: null,
+        as: null,
+        reason:
+          'engine_test.rb:1527 asserts `/assets/foo.js` is not found; the asset pipeline it exercises is propshaft, which is not ported (CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)")',
+      },
+      {
+        kind: "assert_predicate",
+        value: null,
+        as: null,
+        reason:
+          'engine_test.rb:1530 asserts `/assets/bar.js` is not found; the asset pipeline it exercises is propshaft, which is not ported (CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)")',
+      },
+    ],
 };

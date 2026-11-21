@@ -17,12 +17,13 @@ import {
   getFs,
   include,
   NoMethodError,
+  rbModName,
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import type { Bukkit, Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
+import { Methods } from "@blazetrails/rack-test";
 import { Engine } from "../../lib/engine.js";
-import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 import { env, rbFSend, setEnv } from "@blazetrails/ruby-compat";
 import { MockRequest } from "@blazetrails/rack";
@@ -51,11 +52,15 @@ describe("EngineTest", () => {
   });
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-interface RailtiesEngineTest extends Generation {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface RailtiesEngineTest extends Generation {
+  get(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
+  lastResponse(): { status: number; body: string };
+}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class RailtiesEngineTest extends TestCase {}
 include(RailtiesEngineTest, Isolation);
+include(RailtiesEngineTest, Methods);
 registerSpecType(/^EngineTest$/, RailtiesEngineTest);
 
 const globals = TopLevel as Record<string, unknown>;
@@ -392,6 +397,127 @@ export class BukkitsEngine extends Engine {
     await t.bootTrails();
     expect(await Trails.application!.loadSeed()).toBeUndefined();
   });
+
+  it("setting priority for engines with config.railties_order", { timeout: 240_000 }, async () => {
+    const blog = await t.engine("blog", async (plugin) => {
+      await plugin.write("lib/blog.ts", engineSource("blog", "Blog"));
+    });
+
+    await plugin.write(
+      "lib/bukkits.ts",
+      `
+import { Engine } from "@blazetrails/trailties";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+export const Bukkits = { name: "Bukkits" };
+constSet(TopLevel, "Bukkits", Bukkits);
+export class BukkitsEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.isolateNamespace(Bukkits);
+  }
+}
+`,
+    );
+
+    await t.controller(
+      "main",
+      `
+import { ActionController } from "@blazetrails/actionpack";
+export class MainController extends ActionController.Base {
+  async foo() {
+    await this.render({ inline: '<%= await render({ partial: "application/foo" }) %>' });
+  }
+
+  async bar() {
+    await this.render({ inline: '<%= await render({ partial: "application/bar" }) %>' });
+  }
+}
+`,
+    );
+
+    await t.appFile(
+      "config/routes.ts",
+      `
+import { Trails } from "@blazetrails/trailties";
+Trails.application!.routes().draw(function () {
+  this.get("/foo", { to: "main#foo" });
+  this.get("/bar", { to: "main#bar" });
+});
+`,
+    );
+
+    await plugin.write("app/views/application/_foo.html.tse", "Bukkit's foo partial\n");
+    await t.appFile("app/views/application/_foo.html.tse", "App's foo partial\n");
+    await blog.write("app/views/application/_bar.html.tse", "Blog's bar partial\n");
+    await t.appFile("app/views/application/_bar.html.tse", "App's bar partial\n");
+
+    const application = await t.appPath("config", "application.ts");
+    await t.appFile(
+      "config/application.ts",
+      `import { BlogEngine } from ${JSON.stringify(`${blog.path}/lib/blog.ts`)};\n` +
+        (await getFs().readFile(application, "utf-8")),
+    );
+    await t.addToConfig(`this.config.railtiesOrder = [":all", ":main_app", BlogEngine];`);
+
+    await t.bootTrails();
+
+    await t.get("/foo");
+    expect(t.lastResponse().body.trim()).toBe("Bukkit's foo partial");
+
+    await t.get("/bar");
+    expect(t.lastResponse().body.trim()).toBe("App's bar partial");
+
+    expect(
+      Trails.application!.orderedRailties()
+        .flat(Infinity)
+        .map((r) => rbModName((r as object).constructor))
+        .slice(-3),
+    ).toEqual(["BukkitsEngine", "AppTemplate", "BlogEngine"]);
+  });
+
+  it(
+    "railties_order adds :all with lowest priority if not given",
+    { timeout: 240_000 },
+    async () => {
+      await t.controller(
+        "main",
+        `
+import { ActionController } from "@blazetrails/actionpack";
+export class MainController extends ActionController.Base {
+  async foo() {
+    await this.render({ inline: '<%= await render({ partial: "application/foo" }) %>' });
+  }
+}
+`,
+      );
+
+      await t.appFile(
+        "config/routes.ts",
+        `
+import { Trails } from "@blazetrails/trailties";
+Trails.application!.routes().draw(function () {
+  this.get("/foo", { to: "main#foo" });
+});
+`,
+      );
+
+      await plugin.write("app/views/application/_foo.html.tse", "Bukkit's foo partial\n");
+      await t.appFile("app/views/application/_foo.html.tse", "App's foo partial\n");
+
+      const application = await t.appPath("config", "application.ts");
+      await t.appFile(
+        "config/application.ts",
+        `import { BukkitsEngine } from ${JSON.stringify(`${plugin.path}/lib/bukkits.ts`)};\n` +
+          (await getFs().readFile(application, "utf-8")),
+      );
+      await t.addToConfig(`this.config.railtiesOrder = [BukkitsEngine];`);
+
+      await t.bootTrails();
+
+      await t.get("/foo");
+      expect(t.lastResponse().body.trim()).toBe("Bukkit's foo partial");
+    },
+  );
 });
 
 const fixtureRoot = new URL("../fixtures/initializer-engine", import.meta.url).pathname;
@@ -432,32 +558,5 @@ describe("EngineTest", () => {
 
     const response = await StackEngine.instance().call(MockRequest.envFor("/bukkits"));
     expect(response[2]).toEqual(["HELLO WORLD"]);
-  });
-
-  it("setting priority for engines with config.railties_order", () => {
-    class BukkitsEngine extends Engine {}
-    class BlogEngine extends Engine {}
-    class OrderApp extends Application {}
-    const app = OrderApp.instance();
-    app.config.railtiesOrder = [BukkitsEngine, BlogEngine, ":all", ":main_app"];
-
-    expect(app.orderedRailties()).toEqual([
-      BukkitsEngine.instance(),
-      BlogEngine.instance(),
-      expect.any(Array),
-      app,
-    ]);
-  });
-
-  it("railties_order adds :all with lowest priority if not given", () => {
-    class Bukkits2Engine extends Engine {}
-    class OrderApp2 extends Application {}
-    const app = OrderApp2.instance();
-    app.config.railtiesOrder = [Bukkits2Engine];
-
-    const order = app.orderedRailties();
-    expect(order[0]).toBe(Bukkits2Engine.instance());
-    expect(order[order.length - 1]).toEqual(expect.any(Array));
-    expect(order.flat()).toContain(app);
   });
 });
