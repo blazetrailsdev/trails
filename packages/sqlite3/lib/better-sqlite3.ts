@@ -17,6 +17,7 @@ import {
   type SyncSqliteStatement,
 } from "./driver.js";
 import "./constants.generated.js";
+import { errors } from "./engine/better-sqlite3.js";
 
 /** @internal */
 function bindArgs(binds?: SqliteBinds): unknown[] {
@@ -56,7 +57,7 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
       if (binds !== undefined && !Array.isArray(binds)) return call(args);
       return withNullBinds(this.stmt.source, args, call);
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -157,7 +158,7 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
     try {
       return new BetterSqlite3Statement(this.raw.prepare(sql));
     } catch (e) {
-      rbSqlite3RaiseWithSql(e, sql);
+      rbSqlite3RaiseWithSql(e, sql, errors);
     }
   }
 
@@ -174,7 +175,7 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
     try {
       this.raw.exec(sql);
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -223,7 +224,7 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
     try {
       return this.raw.pragma(source, opts);
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -232,7 +233,7 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
       this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
       return (this.#changesStmt.get() as { v: number }).v;
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -241,7 +242,7 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
       this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
       return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -252,7 +253,7 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
     try {
       this.raw.close();
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 }
@@ -282,7 +283,7 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     }
     return new Database(config.database, opts);
   } catch (e) {
-    rbSqlite3Raise(e);
+    rbSqlite3Raise(e, errors);
   }
 }
 

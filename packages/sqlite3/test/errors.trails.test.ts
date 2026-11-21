@@ -13,6 +13,7 @@ import {
   status2klass,
 } from "../lib/errors.js";
 import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
+import { errors } from "../lib/engine/better-sqlite3.js";
 
 const raised = (fn: () => never): unknown => {
   try {
@@ -66,12 +67,14 @@ describe("rbSqlite3Raise", () => {
 describe("rbSqlite3RaiseWithSql", () => {
   it("sets sql, including an empty string, and appends it to the message", () => {
     const native = Object.assign(new Error("no such table: nope"), { code: "SQLITE_ERROR" });
-    const error = raised(() => rbSqlite3RaiseWithSql(native, "SELECT * FROM nope")) as Exception;
+    const error = raised(() =>
+      rbSqlite3RaiseWithSql(native, "SELECT * FROM nope", errors),
+    ) as Exception;
     expect(error).toBeInstanceOf(SQLException);
     expect(error.sqlOffset).toBe(-1);
     expect(error.message).toBe("no such table: nope:\nSELECT * FROM nope");
 
-    const empty = raised(() => rbSqlite3RaiseWithSql(native, "")) as Exception;
+    const empty = raised(() => rbSqlite3RaiseWithSql(native, "", errors)) as Exception;
     expect(empty.sql).toBe("");
   });
 });

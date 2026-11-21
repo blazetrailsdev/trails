@@ -6,10 +6,16 @@ import { Pragmas } from "./pragmas.js";
 import { ForkSafety } from "./fork-safety.js";
 import { Statement, type EngineStatement } from "./statement.js";
 import { HashResultSet, ResultSet } from "./resultset.js";
+import { rbSqlite3Raise } from "./errors.js";
 
 export type BusyHandler = (count: number) => unknown;
 
-export interface EngineDatabase {
+export interface EngineErrors {
+  errcode(error: unknown): number | null;
+  errmsg(error: unknown): string;
+}
+
+export interface EngineDatabase extends EngineErrors {
   isClosed(): boolean;
   isDiscarded(): boolean;
   prepare(sql: string): [EngineStatement, string];
@@ -179,8 +185,18 @@ export class Database {
   }
 
   close(): this | Promise<this> {
-    const r = this._engine.close();
-    return r instanceof Promise ? r.then(() => this) : this;
+    let r: void | Promise<void>;
+    try {
+      r = this._engine.close();
+    } catch (e) {
+      rbSqlite3Raise(e, this._engine);
+    }
+    return r instanceof Promise
+      ? r.then(
+          () => this,
+          (e: unknown) => rbSqlite3Raise(e, this._engine),
+        )
+      : this;
   }
 
   isClosed(): boolean {
@@ -206,7 +222,11 @@ export class Database {
 
   /** @internal */
   private openV2(file: string, mode: number, zvfs: string | null): void {
-    this._engine = this.#openEngine(file, mode, zvfs);
+    try {
+      this._engine = this.#openEngine(file, mode, zvfs);
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   /** @internal */
@@ -216,7 +236,13 @@ export class Database {
 
   /** @internal */
   private execBatch(sql: string, resultsAsHash: boolean | null): unknown[] | Promise<unknown[]> {
-    return this._engine.execBatch(sql, resultsAsHash);
+    let r: unknown[] | Promise<unknown[]>;
+    try {
+      r = this._engine.execBatch(sql, resultsAsHash);
+    } catch (e) {
+      rbSqlite3Raise(e, this._engine);
+    }
+    return r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, this._engine)) : r;
   }
 }
 

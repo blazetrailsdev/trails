@@ -1,6 +1,6 @@
 import { ArgumentError, Enumerable, Hash, include, rbBlockGivenP } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
-import { Exception } from "./errors.js";
+import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 import type { SqliteBindValue } from "./driver.js";
 import type { Database } from "./database.js";
 import type { ResultSet } from "./resultset.js";
@@ -125,12 +125,12 @@ export class Statement {
 
   bindParam(key: string | number, value: SqliteBindValue): void | Promise<void> {
     this.mustBeOpenBang();
-    return this.#st.bindParam(key, value);
+    return this.check(() => this.#st.bindParam(key, value));
   }
 
   resetBang(): this | Promise<this> {
     this.mustBeOpenBang();
-    const r = this.#st.resetBang();
+    const r = this.check(() => this.#st.resetBang());
     return r instanceof Promise ? r.then(() => this) : this;
   }
 
@@ -139,7 +139,7 @@ export class Statement {
       throw new Exception("cannot use a statement associated with a discarded database");
     }
     this.mustBeOpenBang();
-    return this.#st.step();
+    return this.check(() => this.#st.step());
   }
 
   isDone(): boolean {
@@ -164,9 +164,29 @@ export class Statement {
 
   /** @internal */
   private prepare(db: Database, sql: string): string {
-    const [st, remainder] = db._engine.prepare(sql);
+    let st: EngineStatement, remainder: string;
+    try {
+      [st, remainder] = db._engine.prepare(sql);
+    } catch (e) {
+      rbSqlite3RaiseWithSql(e, sql, db._engine);
+    }
     this.#st = st;
     return remainder;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  private check<T>(primitive: () => T): T {
+    const engine = this.#connection._engine;
+    let r: T;
+    try {
+      r = primitive();
+    } catch (e) {
+      rbSqlite3Raise(e, engine);
+    }
+    return (r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, engine)) : r) as T;
   }
 
   /** @internal */
