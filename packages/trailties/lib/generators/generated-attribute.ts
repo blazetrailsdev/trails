@@ -78,7 +78,9 @@ export class GeneratedAttribute {
     return (
       DEFAULT_TYPES.has(type) ||
       Base == null ||
-      Base.connectionPool().activeConnection?.isValidType(type) === true
+      Base.connectionHandler
+        .retrieveConnectionPool(Base.connectionSpecificationName)
+        ?.activeConnection?.isValidType(type) === true
     );
   }
   static validIndexType = (t: string | undefined): boolean => INDEX_OPTIONS.includes(t ?? "");
