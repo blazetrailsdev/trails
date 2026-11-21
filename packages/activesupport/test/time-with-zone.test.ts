@@ -391,7 +391,7 @@ describe("TimeWithZoneTest", () => {
 
   it("minus() with a Date returns seconds", () => {
     const twz = eastern.local(2024, 1, 15, 12, 0, 0);
-    const date = twz.utc().toZonedDateTime().toInstant();
+    const date = twz.utc();
     expect(twz.minus(date)).toBe(0);
   });
 
@@ -503,7 +503,7 @@ describe("TimeWithZoneTest", () => {
   it("minus() preserves nanosecond precision for Temporal.Instant operands", () => {
     const baseNs = 1_700_000_000_000_000_000n;
     const a = new TimeWithZone(Temporal.Instant.fromEpochNanoseconds(baseNs), eastern);
-    const b = Temporal.Instant.fromEpochNanoseconds(baseNs - 500n);
+    const b = new TimeWithZone(Temporal.Instant.fromEpochNanoseconds(baseNs - 500n), eastern);
     expect(a.minus(b)).toBeCloseTo(5e-7, 12);
   });
 

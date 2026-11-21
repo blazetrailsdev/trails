@@ -554,9 +554,9 @@ class IWriteMyOwnXML {
   toXml(options: XmlMini.ToXmlOptions): void {
     options.indent ??= 2;
     const xml = (options.builder ??= new XmlMini.IndentedXmlStringBuilder("", options.indent));
-    if (!options.skipInstruct) xml.instruct();
+    if (!options.skipInstruct) xml.instructBang();
     xml.openTag("level_one");
-    xml.tag("second_level", "content");
+    xml.tagBang("second_level", "content");
     xml.closeTag("level_one");
   }
 }
@@ -668,7 +668,7 @@ function hashToXmlTests(engine: string): void {
 
     it("one level with yielding", () => {
       const xml = toXml({ name: "David", street: "Paulina" }, xmlOptions, (x) => {
-        x.tag("creator", "Rails");
+        x.tagBang("creator", "Rails");
       });
 
       expect(xml.slice(0, 8)).toBe("<person>");

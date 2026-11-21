@@ -64,7 +64,7 @@ type ArefArgs =
   | [index: number]
   | [start: number, length: number]
   | [range: Range<number>]
-  | [regexp: RegExp, capture?: number]
+  | [regexp: RegExp, capture?: number | string]
   | [match: string];
 
 function strAref(str: string, args: ArefArgs): string | null {
@@ -72,7 +72,8 @@ function strAref(str: string, args: ArefArgs): string | null {
   if (first instanceof RegExp) {
     const match = new RegExp(first.source, first.flags.replace(/[gy]/g, "")).exec(str);
     if (!match) return null;
-    return match[second ?? 0] ?? null;
+    if (typeof second === "string") return match.groups?.[second] ?? null;
+    return match.at(second ?? 0) ?? null;
   }
   if (typeof first === "string") return str.includes(first) ? first : null;
   if (first instanceof Range) {
@@ -91,19 +92,61 @@ function strAref(str: string, args: ArefArgs): string | null {
     if (start < 0 || start >= str.length) return null;
     return str[start];
   }
-  if (start < 0 || start > str.length || second < 0) return null;
-  return str.slice(start, start + second);
+  if (start < 0 || start > str.length || (second as number) < 0) return null;
+  return str.slice(start, start + (second as number));
+}
+
+function nameToBackrefNumber(re: RegExp, name: string): number {
+  const src = re.source;
+  let num = 0;
+  let inClass = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (c === "\\") {
+      i++;
+    } else if (inClass) {
+      if (c === "]") inClass = false;
+    } else if (c === "[") {
+      inClass = true;
+    } else if (c === "(") {
+      if (src[i + 1] !== "?") {
+        num++;
+      } else if (src[i + 2] === "<" && src[i + 3] !== "=" && src[i + 3] !== "!") {
+        num++;
+        if (src.startsWith(`${name}>`, i + 3)) return num;
+      }
+    }
+  }
+  return 0;
 }
 
 function strRange(str: string, args: ArefArgs): [number, number] {
   const [first, second] = args;
   if (first instanceof RegExp) {
-    const match = new RegExp(first.source, first.flags.replace(/[gyd]/g, "") + "d").exec(str)!;
-    const nth = second ?? 0;
-    const range = match.indices![nth];
+    const match = new RegExp(first.source, first.flags.replace(/[gyd]/g, "") + "d").exec(str);
+    if (match === null) throw new IndexError("regexp not matched");
+    const regs = match.indices!;
+    let nth: number;
+    if (typeof second === "string") {
+      if (regs.groups === undefined || !globalThis.Object.hasOwn(regs.groups, second)) {
+        throw new IndexError(`undefined group name reference: ${second}`);
+      }
+      nth = nameToBackrefNumber(first, second);
+    } else {
+      nth = second ?? 0;
+    }
+    if (nth >= regs.length || (nth < 0 && -nth >= regs.length)) {
+      throw new IndexError(`index ${nth} out of regexp`);
+    }
+    if (nth < 0) {
+      nth += regs.length;
+    }
+
+    const range = regs[nth];
     if (range === undefined) throw new IndexError(`regexp group ${nth} not matched`);
     const [start, end] = range;
-    return [start, end - start];
+    const len = end - start;
+    return [start, len];
   }
   if (typeof first === "string") return [str.indexOf(first), first.length];
   if (first instanceof Range) {
@@ -117,7 +160,7 @@ function strRange(str: string, args: ArefArgs): [number, number] {
   }
   let start = first;
   if (start < 0) start += str.length;
-  return [start, second === undefined ? 1 : second];
+  return [start, second === undefined ? 1 : (second as number)];
 }
 
 type BlockFn = (...params: unknown[]) => unknown;
@@ -242,9 +285,9 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     return this;
   }
 
-  set(arg1: number | Range<number>, arg2: unknown, arg3?: unknown): unknown {
+  set(arg1: number | Range<number> | RegExp | string, arg2: unknown, arg3?: unknown): unknown {
     if (arg3 !== undefined) {
-      const [start, length] = strRange(this._value, [arg1 as number, arg2 as number]);
+      const [start, length] = strRange(this._value, [arg1, arg2] as ArefArgs);
       const str = toStr(this.implicitHtmlEscapeInterpolatedArgument(arg3));
       this._value = this._value.slice(0, start) + str + this._value.slice(start + length);
       return arg3;

@@ -89,27 +89,30 @@ function daysInMonth(year: number, month: number): number {
 
 const PRECISIONS: Record<number, string> = { 0: "%FT%T" };
 
-const NS_PER_SECOND = 1_000_000_000n;
-
 function signOf(diff: bigint): number {
   return diff < 0n ? -1 : diff > 0n ? 1 : 0;
 }
 
-function nsDiffToSeconds(diffNs: bigint): number {
-  const wholeSeconds = diffNs / NS_PER_SECOND;
-  const remainderNs = diffNs % NS_PER_SECOND;
-  return Number(wholeSeconds) + Number(remainderNs) / 1e9;
-}
-
 const SECONDS_PER_DAY = 86400;
 
-type TimeLike =
-  | Time
-  | DateTime
+type TimeLike = Time | DateTime;
+
+type TemporalTime =
   | Temporal.Instant
   | Temporal.PlainDateTime
   | Temporal.PlainDate
   | Temporal.ZonedDateTime;
+
+/** @noRailsEquivalent PERMANENT */
+function _timeFromTemporal(time: TimeLike | TemporalTime): TimeLike {
+  if (time instanceof Temporal.Instant) {
+    return Time.at(new Rational(time.epochNanoseconds, 1_000_000_000n), { in: "UTC" });
+  }
+  if (time instanceof Temporal.PlainDate) return new DateTime(time.toPlainDateTime());
+  if (time instanceof Temporal.PlainDateTime) return new DateTime(time);
+  if (time instanceof Temporal.ZonedDateTime) return new DateTime(time.toPlainDateTime());
+  return time;
+}
 
 export class TimeWithZone {
   private _utc!: Time | null;
@@ -122,14 +125,16 @@ export class TimeWithZone {
   private _toTimeWithSystemOffset?: Time;
 
   constructor(
-    utcTime: TimeLike | null,
+    utcTime: TimeLike | TemporalTime | null,
     timeZone: TimeZone | Timezone,
-    localTime: TimeLike | null = null,
+    localTime: TimeLike | TemporalTime | null = null,
     period: TimezonePeriod | null = null,
   ) {
-    this._utc = utcTime ? this._transferTimeValuesToUtcConstructor(utcTime) : null;
+    this._utc = utcTime
+      ? this._transferTimeValuesToUtcConstructor(_timeFromTemporal(utcTime))
+      : null;
     this._timeZone = timeZone;
-    this._time = localTime;
+    this._time = localTime && _timeFromTemporal(localTime);
     this._period = this._utc
       ? (period ?? undefined)
       : this._getPeriodAndEnsureValidLocalTime(period);
@@ -177,11 +182,9 @@ export class TimeWithZone {
     }
   }
 
-  private _incorporateUtcOffset(time: Time | Temporal.PlainDate, offset: number): Time {
-    if (time instanceof Temporal.PlainDate) {
-      return this._transferTimeValuesToUtcConstructor(
-        new DateTime(time.toPlainDateTime()).plus(rational(offset, SECONDS_PER_DAY)),
-      );
+  private _incorporateUtcOffset(time: TimeLike, offset: number): TimeLike {
+    if (time instanceof DateTime) {
+      return time.plus(rational(offset, SECONDS_PER_DAY));
     }
     return time.plus(offset);
   }
@@ -193,7 +196,7 @@ export class TimeWithZone {
     }
     for (;;) {
       try {
-        return period ?? this._timeZone.periodForLocal(this._time);
+        return period ?? this._timeZone.periodForLocal(this._time as Time);
       } catch (e) {
         if (!(e instanceof PeriodNotFound)) throw e;
         this._time = this._incorporateUtcOffset(this._time, 3600);
@@ -201,38 +204,15 @@ export class TimeWithZone {
     }
   }
 
-  private _transferTimeValuesToUtcConstructor(time: TimeLike): Time {
-    if (time instanceof Time && time.isUtc()) return time;
-    if (time instanceof DateTime) {
-      return Time.utc(
-        Number(time.year),
-        time.month,
-        time.day,
-        time.hour,
-        time.min,
-        subsec(time).add(time.sec),
-      );
-    }
-    const values =
-      time instanceof Time
-        ? time.toZonedDateTime().toPlainDateTime()
-        : time instanceof Temporal.Instant
-          ? time.toZonedDateTimeISO("UTC").toPlainDateTime()
-          : time instanceof Temporal.PlainDate
-            ? time.toPlainDateTime()
-            : time instanceof Temporal.ZonedDateTime
-              ? time.toPlainDateTime()
-              : time;
+  private _transferTimeValuesToUtcConstructor(time: Time | DateTime): Time {
+    if (time instanceof Time && time.constructor === Time && time.isUtc()) return time;
     return Time.utc(
-      values.year,
-      values.month,
-      values.day,
-      values.hour,
-      values.minute,
-      new Rational(
-        values.millisecond * 1_000_000 + values.microsecond * 1_000 + values.nanosecond,
-        1_000_000_000,
-      ).add(values.second),
+      Number(time.year),
+      time.month,
+      time.day,
+      time.hour,
+      time.min,
+      rational(time.sec, 1).add(time instanceof DateTime ? subsec(time) : time.subsec),
     );
   }
 
@@ -267,8 +247,7 @@ export class TimeWithZone {
   }
 
   get time(): Time {
-    this._time ??= this._incorporateUtcOffset(this._utc!, this.utcOffset);
-    return this._transferTimeValuesToUtcConstructor(this._time);
+    return (this._time ??= this._incorporateUtcOffset(this._utc!, this.utcOffset)) as Time;
   }
 
   get zone(): string {
@@ -386,7 +365,7 @@ export class TimeWithZone {
   }
 
   utc(): Time {
-    return (this._utc ??= this._incorporateUtcOffset(this._time as Time, -this.utcOffset));
+    return (this._utc ??= this._incorporateUtcOffset(this._time!, -this.utcOffset) as Time);
   }
 
   getutc(): Time {
@@ -581,52 +560,16 @@ export class TimeWithZone {
   }
 
   minus(interval: number | Duration): TimeWithZone;
-  minus(
-    other:
-      | TimeWithZone
-      | Date
-      | Temporal.Instant
-      | Time
-      | DateTime
-      | Temporal.PlainDateTime
-      | Temporal.ZonedDateTime,
-  ): number;
-  minus(
-    arg:
-      | number
-      | Duration
-      | TimeWithZone
-      | Date
-      | Temporal.Instant
-      | Time
-      | DateTime
-      | Temporal.PlainDateTime
-      | Temporal.ZonedDateTime,
-  ): TimeWithZone | number {
-    if (arg instanceof Time || arg instanceof DateTime) {
-      return this.getutc().minus(arg.getutc()) as number;
+  minus(other: TimeWithZone | Time | DateTime): number;
+  minus(other: number | Duration | TimeWithZone | Time | DateTime): TimeWithZone | number {
+    if (actsLike.call(other, "time")) {
+      return this.getutc().minus((other as TimeWithZone | Time | DateTime).getutc()) as number;
+    } else if (this.durationOfVariableLength(other)) {
+      return this.methodMissing("minus", other) as TimeWithZone;
+    } else {
+      const result = this.utc().minus(other as number);
+      return inTimeZone.call(result as DateOrTime, this.timeZone) as TimeWithZone;
     }
-    if (arg instanceof Temporal.PlainDateTime || arg instanceof Temporal.ZonedDateTime) {
-      const otherNs =
-        arg instanceof Temporal.PlainDateTime
-          ? arg.toZonedDateTime("UTC").epochNanoseconds
-          : arg.epochNanoseconds;
-      return nsDiffToSeconds(this._zoned.epochNanoseconds - otherNs);
-    }
-    if (arg instanceof TimeWithZone) {
-      return nsDiffToSeconds(this._zoned.epochNanoseconds - arg._zoned.epochNanoseconds);
-    }
-    // boundary: minus accepts Date for backwards compat with Rails' `t1 - t2`
-    if (arg instanceof Date) {
-      return (this._epochMs - arg.getTime()) / 1000;
-    }
-    if (arg instanceof Temporal.Instant) {
-      return nsDiffToSeconds(this._zoned.epochNanoseconds - arg.epochNanoseconds);
-    }
-    if (arg instanceof Duration) {
-      return this.plus(arg.negate());
-    }
-    return this.plus(-arg);
   }
 
   since(other: Parameters<TimeWithZone["plus"]>[0]): TimeWithZone {

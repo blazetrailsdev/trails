@@ -666,7 +666,7 @@ describe("HashToXmlTest", () => {
 
   it("one level with yielding", () => {
     const xml = toXml({ name: "David", street: "Paulina" }, xmlOptions, (x) => {
-      x.tag("creator", "Rails");
+      x.tagBang("creator", "Rails");
     });
 
     expect(xml.slice(0, 8)).toBe("<person>");

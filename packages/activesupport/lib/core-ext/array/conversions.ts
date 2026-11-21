@@ -91,7 +91,7 @@ export function toXml(
   const builder = options.builder;
   const skipInstruct = options.skipInstruct;
   delete options.skipInstruct;
-  if (!skipInstruct) builder.instruct();
+  if (!skipInstruct) builder.instructBang();
 
   const root = XmlMini.renameKey(String(options.root), options);
   const children = options.children ?? singularize(root);
@@ -99,7 +99,7 @@ export function toXml(
   const attributes: Record<string, string> = options.skipTypes ? {} : { type: "array" };
 
   if (self.length === 0) {
-    builder.tag(root, null, attributes);
+    builder.tagBang(root, null, attributes);
   } else {
     builder.openTag(root, attributes);
     for (const value of self) {
