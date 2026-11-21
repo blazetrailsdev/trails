@@ -103,7 +103,7 @@ constSet(TopLevel, "ForkSupervisorTest", ForkSupervisorTest);
 
 describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
-  let previousPidfile: unknown;
+  let previousPidfile: string | null;
   let pidfile: string;
   let previousForkBootTimeout: typeof SolidQueue.forkBootTimeout;
   let startupLog: string;

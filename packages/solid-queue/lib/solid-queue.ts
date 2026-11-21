@@ -127,7 +127,7 @@ export const SolidQueue = {
   shutdownTimeout: Duration;
   forkBootTimeout: Duration;
   silencePolling: boolean;
-  supervisorPidfile: unknown;
+  supervisorPidfile: string | null;
   supervisor: boolean;
   preserveFinishedJobs: boolean;
   clearFinishedJobsAfter: Duration;
