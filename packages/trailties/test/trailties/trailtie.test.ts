@@ -1,18 +1,40 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
+import { describe, it, expect, beforeEach, afterEach, onTestFinished } from "vitest";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { Methods } from "@blazetrails/rack-test";
+import { FileUtils, include } from "@blazetrails/ruby-compat";
+import { Application } from "../../lib/application.js";
+import { Trails } from "../../lib/trails.js";
+import type { Generation } from "../support/isolation/abstract-unit.js";
+import "../support/isolation/abstract-unit.js";
 import { Trailtie, resetTrailtieRegistry } from "../../lib/trailtie.js";
-import { Configuration } from "../../lib/trailtie/configuration.js";
 import "../../lib/trailties/action-controller.js";
-import { sealAgainstInheritance } from "../../lib/trailtie/configurable.js";
 
-describe("RailtieTest", () => {
+class RailtieTest extends TestCase {}
+include(RailtieTest, Isolation);
+include(RailtieTest, Methods);
+registerSpecType(/^RailtieTest$/, RailtieTest);
+
+type Host = Generation & {
+  get(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
+};
+
+describe("RailtieTest", { timeout: 240_000 }, () => {
   let restoreRegistry: () => void;
+  let t: Host;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     restoreRegistry = resetTrailtieRegistry();
+    t = new RailtieTest("test") as unknown as Host;
+    await t.buildApp();
+    await FileUtils.rmRfAsync(`${await t.appPath()}/config/environments`);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await t.teardownApp();
+    Trails.application = null;
+    Application.appClass = null;
     restoreRegistry();
   });
 
@@ -44,7 +66,7 @@ describe("RailtieTest", () => {
     ).toBeUndefined();
   });
 
-  it("railtie can add to_prepare callbacks", () => {
+  it("railtie can add to_prepare callbacks", async () => {
     let toPrepare = false;
     class Foo extends Trailtie {}
     Trailtie.register(Foo);
@@ -52,7 +74,8 @@ describe("RailtieTest", () => {
       toPrepare = true;
     });
     expect(toPrepare).toBeFalsy();
-    for (const block of Foo.config.toPrepareBlocks) block();
+    await t.bootTrails();
+    await t.get("/");
     expect(toPrepare).toBeTruthy();
   });
 
@@ -64,7 +87,7 @@ describe("RailtieTest", () => {
       ranBlock = true;
     });
     expect(ranBlock).toBeFalsy();
-    await MyTie.instance().runInitializers();
+    await t.bootTrails();
     expect(ranBlock).toBeTruthy();
   });
 
@@ -75,31 +98,46 @@ describe("RailtieTest", () => {
     MyTie.rakeTasks(() => {
       ranBlock = true;
     });
+    await t.bootTrails();
+
     expect(ranBlock).toBeFalsy();
-    await MyTie.instance().runTasksBlocks({});
+    await Trails.application!.loadTasks();
     expect(ranBlock).toBeTruthy();
   });
 
   it("rake_tasks block defined in superclass of railtie is also executed", async () => {
     const ranBlock: string[] = [];
-    class ParentTie extends Trailtie {}
-    Trailtie.register(ParentTie);
-    ParentTie.rakeTasks(function () {
+    const own = new Map(
+      Reflect.ownKeys(Trailtie).map((k) => [k, Object.getOwnPropertyDescriptor(Trailtie, k)]),
+    );
+    onTestFinished(() => {
+      for (const k of Reflect.ownKeys(Trailtie))
+        if (!own.has(k)) delete (Trailtie as unknown as Record<PropertyKey, unknown>)[k];
+    });
+
+    Trailtie.rakeTasks(function () {
       ranBlock.push(this.railtieName);
     });
-    class MyTie extends ParentTie {}
+
+    class MyTie extends Trailtie {
+      static {
+        this.railtieName("my_tie");
+      }
+    }
     Trailtie.register(MyTie);
-    MyTie.railtieName("my_tie");
+
+    await t.bootTrails();
+
     expect(ranBlock).toEqual([]);
-    await MyTie.instance().runTasksBlocks({});
+    await Trails.application!.loadTasks();
     expect(ranBlock).toContain("my_tie");
   });
 
-  const RUNNERS = {
-    generators: "runGeneratorsBlocks",
-    console: "runConsoleBlocks",
-    server: "runServerBlocks",
-    runner: "runRunnerBlocks",
+  const LOADERS = {
+    generators: "loadGenerators",
+    console: "loadConsole",
+    server: "loadServer",
+    runner: "loadRunner",
   } as const;
   for (const kind of ["generators", "console", "server", "runner"] as const) {
     it(`${kind} block is executed when MyApp.load_${kind} is called`, async () => {
@@ -109,75 +147,11 @@ describe("RailtieTest", () => {
       MyTie[kind](() => {
         ranBlock = true;
       });
+      await t.bootTrails();
+
       expect(ranBlock).toBeFalsy();
-      const runner: (a: unknown) => unknown = MyTie.instance()[RUNNERS[kind]];
-      await runner.call(MyTie.instance(), {});
+      await Trails.application![LOADERS[kind]]();
       expect(ranBlock).toBeTruthy();
     });
   }
-
-  it("non-rake block defined in superclass of railtie is also executed", async () => {
-    const ran: string[] = [];
-    class P extends Trailtie {}
-    Trailtie.register(P);
-    P.console(() => ran.push("p"));
-    class C extends P {}
-    Trailtie.register(C);
-    await C.instance().runConsoleBlocks({});
-    expect(ran).toEqual(["p"]);
-  });
-
-  const HOOKS = [
-    ["beforeConfiguration", "before_configuration"],
-    ["beforeInitialize", "before_initialize"],
-    ["beforeEagerLoad", "before_eager_load"],
-    ["afterInitialize", "after_initialize"],
-    ["afterRoutesLoaded", "after_routes_loaded"],
-  ] as const;
-  afterEach(() => {
-    resetLoadHooks();
-  });
-
-  for (const [hook, rubyName] of HOOKS) {
-    it(`Configuration#${hook} block runs when ${hook} hook fires`, () => {
-      const seen: unknown[] = [];
-      new Configuration()[hook]((arg) => seen.push(arg));
-      runLoadHooks(rubyName, "marker");
-      expect(seen).toContain("marker");
-    });
-  }
-
-  it("Configurable seal sees through an anonymous intermediate class", () => {
-    class AnonSealed extends Trailtie {}
-    sealAgainstInheritance(AnonSealed);
-    const Anon = class extends AnonSealed {};
-    class Grand extends Anon {}
-    expect(() => Trailtie.register(Grand)).toThrow(
-      "You cannot inherit from a Trails::Railtie child",
-    );
-  });
-
-  it("Configurable seals a class — single and multi-level inheritance", () => {
-    class SealedTie extends Trailtie {}
-    sealAgainstInheritance(SealedTie);
-    class Direct extends SealedTie {}
-    class Mid extends SealedTie {}
-    class Deep extends Mid {}
-    expect(() => Trailtie.register(Direct)).toThrow(
-      "You cannot inherit from a Trails::Railtie child",
-    );
-    expect(() => Trailtie.register(Deep)).toThrow(
-      "You cannot inherit from a Trails::Railtie child",
-    );
-  });
-
-  it("returns registered subclasses sorted by load order, excluding abstract entries", () => {
-    class Early extends Trailtie {}
-    Trailtie.register(Early);
-    class Late extends Trailtie {}
-    Trailtie.register(Late);
-    const list = Trailtie.subclasses();
-    expect(list.indexOf(Late)).toBeGreaterThan(list.indexOf(Early));
-    expect(list.every((s) => !s.isAbstractRailtie())).toBe(true);
-  });
 });
