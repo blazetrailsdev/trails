@@ -4,13 +4,16 @@ import type { BusyHandler, EngineDatabase, EngineOpenV2 } from "../../lib/databa
 import type { EngineStatement } from "../../lib/statement.js";
 import type { SqliteBindValue } from "../../lib/driver.js";
 
-export function engineDatabase(
-  file = ":memory:",
-): EngineDatabase & { quirkModeDisabled: boolean; handler: BusyHandler | null } {
+export function engineDatabase(file = ":memory:"): EngineDatabase & {
+  quirkModeDisabled: boolean;
+  handler: BusyHandler | null;
+  loadExtensionToggles: boolean[];
+} {
   const raw = new BetterSqlite3(file);
   let changes = 0;
   const db = {
     quirkModeDisabled: false,
+    loadExtensionToggles: [] as boolean[],
     handler: null as BusyHandler | null,
     errcode: () => null,
     errmsg: (e: unknown) => String(e),
@@ -25,7 +28,9 @@ export function engineDatabase(
       db.handler = handler;
     },
     loadExtensionInternal: (file: string) => void raw.loadExtension(file),
-    enableLoadExtension: (_onoff: boolean) => {},
+    enableLoadExtension: (onoff: boolean) => {
+      db.loadExtensionToggles.push(onoff);
+    },
     execBatch(sql: string, resultsAsHash: boolean): unknown[] {
       const stmt = raw.prepare(sql);
       if (!stmt.reader) {
