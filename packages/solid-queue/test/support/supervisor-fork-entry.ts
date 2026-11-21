@@ -13,7 +13,7 @@ const { boot, root, supervisorPidfile, forkBootTimeout, configuration, options, 
   rbForkPayload() as {
     boot: string;
     root: string;
-    supervisorPidfile: unknown;
+    supervisorPidfile: string | null;
     forkBootTimeout: number;
     configuration: {
       configuredProcesses: { processClass: string; attributes: object }[];

@@ -46,9 +46,8 @@ TestCase.teardown(async function (this: SolidQueueTestCase) {
   SolidQueue.onThreadError = this._onThreadError;
   JobBuffer.clear();
 
-  const supervisorPidfile = SolidQueue.supervisorPidfile as string | null;
-  if (supervisorPidfile && (await File.isExistAsync(supervisorPidfile))) {
-    await File.deleteAsync(supervisorPidfile);
+  if (SolidQueue.supervisorPidfile && (await File.isExistAsync(SolidQueue.supervisorPidfile))) {
+    await File.deleteAsync(SolidQueue.supervisorPidfile);
   }
 
   if (!this.constructor.useTransactionalTests) {
