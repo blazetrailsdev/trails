@@ -178,6 +178,11 @@ describe("mergeTsconfig lib", () => {
     expect(added).toContain("lib");
   });
 
+  it("bases an absent lib on the existing target", () => {
+    const { lib } = libOf({ target: "ES2024" });
+    expect(lib).toEqual(["ES2024", "ESNext.Temporal"]);
+  });
+
   it("appends ESNext.Temporal to a lib array without it", () => {
     const { lib, added } = libOf({ lib: ["ES2023", "DOM"] });
     expect(lib).toEqual(["ES2023", "DOM", "ESNext.Temporal"]);

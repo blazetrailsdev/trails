@@ -89,7 +89,11 @@ export function mergeTsconfig(existingText: string): TsconfigMergeResult {
 
   const lib = cfg.compilerOptions["lib"];
   if (!Array.isArray(lib)) {
-    cfg.compilerOptions["lib"] = ["ES2022", "ESNext.Temporal"];
+    const target = cfg.compilerOptions["target"];
+    cfg.compilerOptions["lib"] = [
+      typeof target === "string" ? target : "ES2022",
+      "ESNext.Temporal",
+    ];
     added.push("lib");
   } else if (!lib.some((l) => typeof l === "string" && l.toLowerCase() === "esnext.temporal")) {
     lib.push("ESNext.Temporal");
