@@ -81,7 +81,10 @@ export default class VitestReporter implements Reporter {
     const codes = this.results.map((result) => result.resultCode);
     const count = (code: string) => codes.filter((resultCode) => resultCode === code).length;
     STDOUT.puts();
-    for (const error of errors) STDOUT.puts(error.message);
+    for (const error of errors) {
+      const missing = /Cannot find (?:module|package) '([^']+)'/.exec(error.message);
+      STDOUT.puts(missing ? `cannot load such file -- ${missing[1]}` : error.message);
+    }
     STDOUT.puts(
       `${codes.length} runs, ${count("F")} failures, ${count("E") + errors.length} errors, ${count("S")} skips`,
     );

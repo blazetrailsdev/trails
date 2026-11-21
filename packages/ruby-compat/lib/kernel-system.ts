@@ -1,6 +1,6 @@
 import { getChildProcess } from "./child-process-adapter.js";
 import { Errno, SystemCallError } from "./errno.js";
-import type { IO } from "./io.js";
+import { STDERR, type IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { getProcessAdapter } from "./process-adapter.js";
 import { Process, rbExecargNew, rbLastStatusSet } from "./process.js";
@@ -84,7 +84,9 @@ export async function rbFSystem(
  * command's standard output, with `$?` set, awaited where MRI blocks. A command
  * line with no shell metacharacter is exec'd directly (`rb_exec_fillarg`,
  * `vendor/ruby/v3.3.11/process.c:2640-2672`), so a missing command raises `Errno::ENOENT`;
- * any other runs through `/bin/sh -c`.
+ * any other runs through `/bin/sh -c`. Only stdout is piped; the child inherits
+ * fd 2 (`pipe_open`, `vendor/ruby/v3.3.11/io.c:7513`), so its stderr reaches
+ * the current `$stderr`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -95,8 +97,9 @@ export async function rbFBackquote(str: string): Promise<string> {
   }
 
   const [prog, env, args] = rbExecargNew([str]);
-  const [stdout, , data] = await adapter.capture3(prog, env, args, "");
+  const [stdout, stderr, data] = await adapter.capture3(prog, env, args, "");
   if (data.error !== undefined) throw data.error;
+  if (stderr !== "") STDERR.write(stderr);
   rbLastStatusSet(new Process.Status(data));
 
   return stdout as string;
