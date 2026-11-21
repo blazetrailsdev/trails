@@ -30,6 +30,7 @@ import { CRASS_UNPORTED_FILES } from "./crass.js";
 import { PG_UNPORTED_FILES } from "./pg.js";
 import { MYSQL2_UNPORTED_FILES } from "./mysql2.js";
 import { IMAGE_PROCESSING_UNPORTED_FILES } from "./image-processing.js";
+import { RACK_CACHE_UNPORTED_FILES } from "./rack-cache.js";
 import { RACKUP_UNPORTED_FILES } from "./rackup.js";
 import { RAILS_DOM_TESTING_UNPORTED_FILES } from "./rails-dom-testing.js";
 import { SOLID_QUEUE_UNPORTED_FILES } from "./solid-queue.js";
@@ -63,6 +64,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...PG_UNPORTED_FILES,
   ...MYSQL2_UNPORTED_FILES,
   ...IMAGE_PROCESSING_UNPORTED_FILES,
+  ...RACK_CACHE_UNPORTED_FILES,
   ...RACKUP_UNPORTED_FILES,
   ...RAILS_DOM_TESTING_UNPORTED_FILES,
   ...SOLID_QUEUE_UNPORTED_FILES,
