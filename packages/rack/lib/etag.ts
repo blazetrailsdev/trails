@@ -1,6 +1,6 @@
 import type { RackHeaders } from "./index.js";
 import { ETAG, CACHE_CONTROL } from "./constants.js";
-import { Digest, rbProcCall } from "@blazetrails/ruby-compat";
+import { Digest, rbCheckArrayType, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { Rack } from "./namespaces.js";
 
@@ -23,16 +23,17 @@ export class ETag {
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
-    const [status, headers, body] = response;
+    const [status, headers] = response;
+    let [, , body] = response;
 
     let digest: string | null = null;
 
-    if (this.etagStatus(status) && Array.isArray(body) && !this.skipCaching(headers)) {
+    if (this.etagStatus(status) && rbObjRespondTo(body, "toAry") && !this.skipCaching(headers)) {
+      body = rbCheckArrayType(body) as Array<string | Uint8Array>;
       digest = this.digestBody(body);
-      if (digest) {
-        headers[ETAG] = `W/"${digest}"`;
-        response[2] = body;
-      }
+      if (digest) headers[ETAG] = `W/"${digest}"`;
+
+      response[2] = body;
     }
 
     if (!headers[CACHE_CONTROL]) {
@@ -56,17 +57,19 @@ export class ETag {
     return ETAG in headers || "last-modified" in headers;
   }
 
-  /** @internal */
-  private digestBody(body: string[]): string | null {
-    const sha = Digest.SHA256.new();
-    let hasContent = false;
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE rack-body-parts-are-safebuffer-objects
+   */
+  private digestBody(body: Array<string | Uint8Array>): string | null {
+    let digest: ReturnType<typeof Digest.SHA256.new> | null = null;
+
     for (const part of body) {
-      if (part.length > 0) {
-        sha.update(part);
-        hasContent = true;
-      }
+      if (part.length > 0)
+        (digest ??= Digest.SHA256.new()).update(part instanceof Uint8Array ? part : String(part));
     }
-    return hasContent ? sha.hexdigest().substring(0, 32) : null;
+
+    return digest && digest.hexdigest().substring(0, 32);
   }
 }
 

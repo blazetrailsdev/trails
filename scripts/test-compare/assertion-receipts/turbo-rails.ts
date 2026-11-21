@@ -20,4 +20,14 @@ export const turboRails: Record<string, AssertionReceipt[]> = {
         'installer_test.rb:18 `assert_match %(pin "@hotwired/turbo-rails", to: "turbo.min.js"), File.read("config/importmap.rb")` — the importmap arm of turbo:install is not ported and a trails app has no config/importmap.rb (CLAUDE.md, "importmap-rails and propshaft are out of scope")',
     },
   ],
+  "turbo-rails:system/broadcasts_test.rb › BroadcastsTest › Does not render the layout twice when passed a component":
+    [
+      {
+        kind: "assert_selector",
+        value: "s:title",
+        as: "assert_equal",
+        reason:
+          'system/broadcasts_test.rb:36 `assert_selector("title", count: 1, visible: false, text: "Dummy")` — no finder or matcher DSL is ported, so the port polls the count of `title` elements containing "Dummy" and asserts it equals 1 (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
+      },
+    ],
 };

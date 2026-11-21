@@ -11,6 +11,7 @@ export class ContentLength {
     this.app = app;
   }
 
+  /** @inventedArm if — CONVERGEABLE rack-body-parts-are-safebuffer-objects */
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     const [status, headers] = response;
@@ -24,7 +25,8 @@ export class ContentLength {
     ) {
       response[2] = body = rbCheckArrayType(body) as Array<string | Uint8Array>;
       const totalSize = body.reduce(
-        (sum: number, chunk: string | Uint8Array) => sum + Buffer.byteLength(chunk),
+        (sum: number, chunk: string | Uint8Array) =>
+          sum + Buffer.byteLength(chunk instanceof Uint8Array ? chunk : String(chunk)),
         0,
       );
       headers[CONTENT_LENGTH] = String(totalSize);
