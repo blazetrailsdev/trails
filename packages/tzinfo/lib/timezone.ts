@@ -53,13 +53,8 @@ function toDate(at: Date | Temporal.Instant | Time): Date {
   return new Date(at.epochMilliseconds);
 }
 
-/** @noRailsEquivalent CONVERGEABLE tzinfo-timezone-reads-the-data-source */
-function toTime(time: Date | Temporal.Instant | Time): Time {
-  if (time instanceof Time) return time;
-  return Time.at(new Rational(toDate(time).getTime(), 1000)).getutc();
-}
-
-function ignoringOffset(time: Date | Temporal.Instant | Time): Date {
+function ignoringOffset(time: Date | Temporal.Instant | Time | DateTime): Date {
+  if (time instanceof DateTime) time = time.toTime();
   if (!(time instanceof Time)) return toDate(time);
   const date = new Date(
     Date.UTC(
@@ -570,16 +565,16 @@ export class Timezone {
     return `#<${rbModName(this.constructor)}: ${this.identifier}>`;
   }
 
-  abbr(time: Date | Temporal.Instant | Time = Time.now()): string {
-    return this.periodFor(toTime(time)).abbreviation;
+  abbr(time: Time = Time.now()): string {
+    return this.periodFor(time).abbreviation;
   }
 
-  observedUtcOffset(time: Date | Temporal.Instant | Time = Time.now()): number {
-    return this.periodFor(toTime(time)).observedUtcOffset;
+  observedUtcOffset(time: Time = Time.now()): number {
+    return this.periodFor(time).observedUtcOffset;
   }
 
-  isDst(time: Date | Temporal.Instant | Time = Time.now()): boolean {
-    return this.periodFor(toTime(time)).isDst();
+  isDst(time: Time = Time.now()): boolean {
+    return this.periodFor(time).isDst();
   }
 
   get canonicalIdentifier(): string {
@@ -593,7 +588,7 @@ export class Timezone {
 
   /** @missingRailsCall for — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
   periodForLocal(
-    time: Time,
+    time: Time | DateTime,
     dst: boolean | null = null,
     block?: (periods: TimezonePeriod[]) => TimezonePeriod,
   ): TimezonePeriod {

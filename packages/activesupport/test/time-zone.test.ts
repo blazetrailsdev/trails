@@ -975,21 +975,21 @@ describe("TimeZoneTest", () => {
 
   it("abbr", () => {
     const zone = TimeZone.find("America/Toronto")!;
-    expect(zone.abbr(Time.utc(2000, 4, 2, 6).toZonedDateTime().toInstant())).toEqual("EST");
-    expect(zone.abbr(Time.utc(2000, 4, 2, 7).toZonedDateTime().toInstant())).toEqual("EDT");
-    expect(zone.abbr(Time.utc(2000, 4, 2, 8).toZonedDateTime().toInstant())).toEqual("EDT");
-    expect(zone.abbr(Time.utc(2000, 10, 29, 5).toZonedDateTime().toInstant())).toEqual("EDT");
-    expect(zone.abbr(Time.utc(2000, 10, 29, 6).toZonedDateTime().toInstant())).toEqual("EST");
-    expect(zone.abbr(Time.utc(2000, 10, 29, 7).toZonedDateTime().toInstant())).toEqual("EST");
+    expect(zone.abbr(Time.utc(2000, 4, 2, 6))).toEqual("EST");
+    expect(zone.abbr(Time.utc(2000, 4, 2, 7))).toEqual("EDT");
+    expect(zone.abbr(Time.utc(2000, 4, 2, 8))).toEqual("EDT");
+    expect(zone.abbr(Time.utc(2000, 10, 29, 5))).toEqual("EDT");
+    expect(zone.abbr(Time.utc(2000, 10, 29, 6))).toEqual("EST");
+    expect(zone.abbr(Time.utc(2000, 10, 29, 7))).toEqual("EST");
   });
 
   it("dst", () => {
     const zone = TimeZone.find("America/Toronto")!;
-    expect(zone.isDst(Time.utc(2000, 4, 2, 6).toZonedDateTime().toInstant())).toEqual(false);
-    expect(zone.isDst(Time.utc(2000, 4, 2, 7).toZonedDateTime().toInstant())).toEqual(true);
-    expect(zone.isDst(Time.utc(2000, 4, 2, 8).toZonedDateTime().toInstant())).toEqual(true);
-    expect(zone.isDst(Time.utc(2000, 10, 29, 5).toZonedDateTime().toInstant())).toEqual(true);
-    expect(zone.isDst(Time.utc(2000, 10, 29, 6).toZonedDateTime().toInstant())).toEqual(false);
-    expect(zone.isDst(Time.utc(2000, 10, 29, 7).toZonedDateTime().toInstant())).toEqual(false);
+    expect(zone.isDst(Time.utc(2000, 4, 2, 6))).toEqual(false);
+    expect(zone.isDst(Time.utc(2000, 4, 2, 7))).toEqual(true);
+    expect(zone.isDst(Time.utc(2000, 4, 2, 8))).toEqual(true);
+    expect(zone.isDst(Time.utc(2000, 10, 29, 5))).toEqual(true);
+    expect(zone.isDst(Time.utc(2000, 10, 29, 6))).toEqual(false);
+    expect(zone.isDst(Time.utc(2000, 10, 29, 7))).toEqual(false);
   });
 });

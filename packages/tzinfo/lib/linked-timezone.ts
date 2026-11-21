@@ -1,4 +1,4 @@
-import type { Time } from "@blazetrails/date";
+import type { DateTime, Time } from "@blazetrails/date";
 import type { LinkedTimezoneInfo } from "./data-sources/linked-timezone-info.js";
 import { InfoTimezone } from "./info-timezone.js";
 import { Timezone } from "./timezone.js";
@@ -18,7 +18,7 @@ export class LinkedTimezone extends InfoTimezone {
     return this.linkedTimezone.periodFor(time);
   }
 
-  override periodsForLocal(localTime: Time): TimezonePeriod[] {
+  override periodsForLocal(localTime: Time | DateTime): TimezonePeriod[] {
     return this.linkedTimezone.periodsForLocal(localTime);
   }
 

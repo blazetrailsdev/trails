@@ -614,7 +614,6 @@ export class TimeWithZone {
     }
   }
 
-  /** @inventedArm if — CONVERGEABLE tzinfo-periods-for-local-accepts-datetime */
   change(options: ChangeOptions): TimeWithZone {
     if (options.zone != null && options.zone !== false && options.offset != null) {
       throw new ArgumentError(
@@ -636,9 +635,7 @@ export class TimeWithZone {
     }
 
     newZone ||= this.timeZone;
-    const periods = newZone.periodsForLocal(
-      newTime instanceof DateTime ? this._transferTimeValuesToUtcConstructor(newTime) : newTime,
-    );
+    const periods = newZone.periodsForLocal(newTime);
     const period = this.period;
     const included = periods.some(
       (p) =>

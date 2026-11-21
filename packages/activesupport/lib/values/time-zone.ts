@@ -12,7 +12,7 @@
 import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
-import { Date as RubyDate, Time } from "@blazetrails/date";
+import { Date as RubyDate, type DateTime, Time } from "@blazetrails/date";
 import {
   InvalidTimezoneIdentifier,
   PeriodNotFound,
@@ -516,10 +516,6 @@ export class TimeZone {
     return this._utcOffset ?? this.tzinfo.currentPeriod().baseUtcOffset;
   }
 
-  utcOffsetAt(date: Date | Temporal.Instant): number {
-    return this.tzinfo.observedUtcOffset(date);
-  }
-
   formattedOffset(colon = true, alternateUtcString: string | null = null): string {
     if (this.utcOffset === 0 && alternateUtcString != null) return alternateUtcString;
     return TimeZone.secondsToUtcOffset(this.utcOffset, colon);
@@ -552,19 +548,19 @@ export class TimeZone {
     return this.tzinfo.periodForUtc(time);
   }
 
-  periodForLocal(time: Time, dst: boolean | null = true): TimezonePeriod {
+  periodForLocal(time: Time | DateTime, dst: boolean | null = true): TimezonePeriod {
     return this.tzinfo.periodForLocal(time, dst, (periods) => periods[periods.length - 1]);
   }
 
-  periodsForLocal(time: Time): TimezonePeriod[] {
+  periodsForLocal(time: Time | DateTime): TimezonePeriod[] {
     return this.tzinfo.periodsForLocal(time);
   }
 
-  abbr(time: Date | Temporal.Instant): string {
+  abbr(time: Time): string {
     return this.tzinfo.abbr(time);
   }
 
-  isDst(time: Date | Temporal.Instant | Time): boolean {
+  isDst(time: Time): boolean {
     return this.tzinfo.isDst(time);
   }
 
