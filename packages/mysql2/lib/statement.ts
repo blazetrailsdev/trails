@@ -27,7 +27,7 @@ export class Statement {
     const result = this.client.storeResult(
       await this.client
         .execute(this.client.options(this.sql, currentQueryOptions), args)
-        .catch((e: unknown) => this.client["raiseMysql2Error"](e)),
+        .catch((e: unknown) => this.client.raiseMysql2Error(e)),
     );
     this.affectedRows = result?.size ?? this.client.affectedRows;
     return result;

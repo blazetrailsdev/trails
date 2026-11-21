@@ -44,12 +44,22 @@ function serverVersion(client: Client): number {
   return client.serverInfo().id;
 }
 
-const TIMEOUT_CODES = ["PROTOCOL_SEQUENCE_TIMEOUT", "ETIMEDOUT"];
-const CONNECTION_CODES = [
-  ...["PROTOCOL_CONNECTION_LOST", "PROTOCOL_ENQUEUE_AFTER_QUIT"],
-  ...["PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR", "PROTOCOL_ENQUEUE_HANDSHAKE_TWICE", "POOL_CLOSED"],
-  ...["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "EHOSTUNREACH", "ENETUNREACH", "EPIPE"],
-];
+const CR_SERVER_GONE_ERROR = 2006;
+
+const CR_ERRNOS: Record<string, number> = {
+  ENOTFOUND: 2005,
+  ECONNREFUSED: 2003,
+  EHOSTUNREACH: 2003,
+  ENETUNREACH: 2003,
+  ETIMEDOUT: 2003,
+  ECONNRESET: 2013,
+  PROTOCOL_CONNECTION_LOST: 2013,
+  EPIPE: CR_SERVER_GONE_ERROR,
+  PROTOCOL_ENQUEUE_AFTER_QUIT: CR_SERVER_GONE_ERROR,
+  PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR: CR_SERVER_GONE_ERROR,
+  PROTOCOL_ENQUEUE_HANDSHAKE_TWICE: CR_SERVER_GONE_ERROR,
+  POOL_CLOSED: CR_SERVER_GONE_ERROR,
+};
 
 const CLIENT_FLAGS: Record<string, number> = {
   LONG_PASSWORD: 0x00000001,
@@ -609,23 +619,33 @@ export class Client {
     return { id: major * 10000 + minor * 100 + patch, version };
   }
 
-  /** @internal */
-  private raiseMysql2Error(e: unknown): never {
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
+  raiseMysql2Error(e: unknown): never {
     if (!(e instanceof globalThis.Error)) throw e;
     const { code, errno, sqlState } = e as { code?: unknown; errno?: unknown; sqlState?: string };
-    let error: Mysql2Error;
-    if (typeof errno === "number" && errno > 0) {
-      error = Mysql2Error.newWithArgs(e.message, serverVersion(this), errno, sqlState ?? null);
-    } else if (typeof code === "string" && TIMEOUT_CODES.includes(code)) {
-      error = new Mysql2Error.TimeoutError(e.message);
-    } else if (
-      (typeof code === "string" && CONNECTION_CODES.includes(code)) ||
-      /add new command when connection is in closed state/i.test(e.message)
-    ) {
-      error = new Mysql2Error.ConnectionError(e.message);
-    } else {
-      error = new Mysql2Error(e.message);
+    if (code === "PROTOCOL_SEQUENCE_TIMEOUT") {
+      throw new Mysql2Error.TimeoutError(
+        `Timeout waiting for a response from the last query. (waited ${this.readTimeout} seconds)`,
+      );
     }
+    let errorNumber: number | undefined;
+    if (typeof errno === "number" && errno > 0) {
+      errorNumber = errno;
+    } else if (typeof code === "string" && Object.hasOwn(CR_ERRNOS, code)) {
+      errorNumber = CR_ERRNOS[code];
+    } else if (/add new command when connection is in closed state/i.test(e.message)) {
+      errorNumber = CR_SERVER_GONE_ERROR;
+    }
+    if (errorNumber === undefined) throw e;
+    const error = Mysql2Error.newWithArgs(
+      e.message,
+      serverVersion(this),
+      errorNumber,
+      sqlState ?? "HY000",
+    );
     error.cause = e;
     throw error;
   }

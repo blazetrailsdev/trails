@@ -65,8 +65,7 @@ describe("mysql2Client", () => {
     const raised = Object.assign(new Error("gone"), { code: "ER_X" });
     const client = await clientOn({ query: () => Promise.reject(raised) });
     const error = await client.query("").catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(Mysql2.Error);
-    expect((error as Error).cause).toBe(raised);
+    expect(error).toBe(raised);
     expect(raised instanceof Mysql2.Error).toBe(false);
     expect(Object.assign(new Error(), { code: "ENOENT" }) instanceof Mysql2.Error).toBe(false);
   });
@@ -82,9 +81,9 @@ describe("Mysql2::Client error boundary", () => {
     const t = await client.query("").catch((e: unknown) => e);
     expect(t).toBeInstanceOf(Mysql2.Error.TimeoutError);
     expect((t as InstanceType<typeof Mysql2.Error>).errorNumber).toBeNull();
-    expect(await client.query("").catch((e: unknown) => e)).toBeInstanceOf(
-      Mysql2.Error.ConnectionError,
-    );
+    const l = await client.query("").catch((e: unknown) => e);
+    expect(l).toBeInstanceOf(Mysql2.Error.ConnectionError);
+    expect((l as InstanceType<typeof Mysql2.Error>).errorNumber).toBe(2013);
   });
 });
 
