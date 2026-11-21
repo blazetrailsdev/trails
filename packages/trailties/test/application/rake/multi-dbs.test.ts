@@ -7,6 +7,7 @@ import { Base } from "@blazetrails/activerecord";
 import {
   constGet,
   Dir,
+  env,
   File,
   FileUtils,
   include,
@@ -141,7 +142,8 @@ export class TwoMigration extends Migration.Current {}
     await dbPrepare();
   });
 
-  it("db:prepare runs seeds once", async () => {
+  it.skipIf(env.ARCONN !== "postgresql")("db:prepare runs seeds once", async () => {
+    await t.usePostgresql({ multiDb: true });
     await t.bootTrails();
     const Dog = () =>
       constGet(TopLevel, "Dog") as {
