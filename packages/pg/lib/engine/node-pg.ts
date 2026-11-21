@@ -9,9 +9,6 @@ import {
 import { Result } from "../result.js";
 import type { Connection } from "../connection.js";
 
-const OID_BYTEA = 17;
-const OID_BYTEA_ARRAY = 1001;
-
 export type Protocol = pg.Connection & {
   connect(portOrPath: string | number, host?: string): void;
   cancel(processID: number, secretKey: number): void;
@@ -111,9 +108,6 @@ export function listen(conn: Connection, client: Client): void {
 function types(conn: Connection): { getTypeParser(oid: number, format?: string): unknown } {
   return {
     getTypeParser(oid: number, format?: string): unknown {
-      if ((oid === OID_BYTEA || oid === OID_BYTEA_ARRAY) && format !== "binary") {
-        return (value: unknown) => value;
-      }
       const coder = format !== "binary" && conn.typeMapForResults._lookupOid(0, oid);
       if (coder) return (value: string) => coder.decode(value);
       return (value: unknown) => value;
@@ -194,16 +188,6 @@ function result(raw: pg.QueryResult | pg.QueryResult[]): Result {
   return new Result(Array.isArray(raw) ? raw[raw.length - 1] : raw);
 }
 
-const STRING_OIDS = new Set([
-  114, 600, 718, 1017, 1082, 1114, 1115, 1182, 1183, 1184, 1185, 1186, 1187, 1270, 3802,
-]);
-
-function pgTypeParser(oid: number, format?: string): unknown {
-  if (format === "binary") return pg.types.getTypeParser(oid, "binary");
-  if (STRING_OIDS.has(oid)) return (v: unknown) => v;
-  return pg.types.getTypeParser(oid, "text");
-}
-
 /** @noRailsEquivalent PERMANENT */
 export function _clientConfig(connParams: Record<string, unknown>): pg.ClientConfig {
   const seconds = (value: unknown): number | undefined =>
@@ -229,6 +213,5 @@ export function _clientConfig(connParams: Record<string, unknown>): pg.ClientCon
     keepAliveInitialDelayMillis: seconds(connParams.keepalivesIdle),
     ...(connParams.replication == null ? {} : { replication: connParams.replication }),
     ssl,
-    types: { getTypeParser: pgTypeParser as pg.CustomTypesConfig["getTypeParser"] },
   };
 }
