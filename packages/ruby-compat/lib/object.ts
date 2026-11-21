@@ -198,6 +198,7 @@ export interface TopLevelConstants {
   Object?: ObjectConstructor;
   Psych?: typeof import("./psych.js").Psych;
   URI?: typeof import("./uri/common.js").URI;
+  TSREPL?: typeof import("./repl-adapter.js").TSREPL;
 }
 
 /** @noRailsEquivalent PERMANENT */

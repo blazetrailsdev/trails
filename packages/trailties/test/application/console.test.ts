@@ -6,6 +6,7 @@ import {
   STDIN,
   TopLevel,
   constSet,
+  setEnv,
   getProcessAdapter,
   rbModRemoveConst,
   registerReplAdapter,
@@ -52,8 +53,17 @@ async function assertOutput(expected: string, io: Primary, timeout = 10): Promis
 }
 
 let started: Promise<void> | null = null;
+const spawnedEnv: string[] = [];
 
-async function spawnConsole(options: string, { waitForPrompt = true } = {}): Promise<void> {
+async function spawnConsole(
+  options: string,
+  {
+    waitForPrompt = true,
+    env = {},
+  }: { waitForPrompt?: boolean; env?: Record<string, string> } = {},
+): Promise<void> {
+  for (const [key, value] of Object.entries(env)) setEnv(key, value);
+  spawnedEnv.push(...Object.keys(env));
   started = Console.start(
     Trails.application as never,
     new ConsoleCommand([], options.split(" ")).options,
@@ -110,6 +120,7 @@ describe("FullStackConsoleTest", () => {
     await started;
     replAdapterConfig.adapter = previousAdapter!;
     Trails.application = null;
+    for (const key of spawnedEnv.splice(0)) setEnv(key, undefined);
     rbModRemoveConst(TopLevel, "ApplicationController");
     vi.restoreAllMocks();
   });
@@ -139,5 +150,26 @@ describe("FullStackConsoleTest", () => {
     await spawnConsole("-e development");
 
     await writePrompt("(await app()).fooPath()", "/foo");
+  });
+
+  it("console disables IRB auto completion in non local", async () => {
+    const options = "-e production -- --verbose";
+    await spawnConsole(options);
+
+    await writePrompt("TSREPL.conf.USE_AUTOCOMPLETE", "false");
+  });
+
+  it("console accepts override on IRB auto completion flag", async () => {
+    const options = "-e production -- --verbose";
+    await spawnConsole(options, { env: { TSREPL_USE_AUTOCOMPLETE: "true" } });
+
+    await writePrompt("TSREPL.conf.USE_AUTOCOMPLETE", "true");
+  });
+
+  it("console doesnt disable IRB auto completion in local", async () => {
+    const options = "-e development -- --verbose";
+    await spawnConsole(options);
+
+    await writePrompt("TSREPL.conf.USE_AUTOCOMPLETE", "true");
   });
 });

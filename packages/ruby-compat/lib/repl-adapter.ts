@@ -442,3 +442,5 @@ export const TSREPL = {
     conf.AT_EXIT = [];
   },
 };
+
+TopLevel.TSREPL = TSREPL;
