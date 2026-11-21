@@ -1,75 +1,121 @@
-import { Dir, FileUtils, Open3, getProcessAdapter } from "@blazetrails/ruby-compat";
-import { Deprecators, EncryptedConfiguration, FileUpdateChecker } from "@blazetrails/activesupport";
-import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
-import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
-import { Trailtie } from "../../lib/trailties/active-record.js";
-import { Configuration } from "../../lib/application/configuration.js";
-import { Configuration as TrailtieConfiguration } from "../../lib/trailtie/configuration.js";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { Methods } from "@blazetrails/rack-test";
+import { include } from "@blazetrails/ruby-compat";
+import { Application } from "../../lib/application.js";
+import { Trails } from "../../lib/trails.js";
+import type { Generation, Rack } from "../support/isolation/abstract-unit.js";
+import "../support/isolation/abstract-unit.js";
 
-const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration> => {
-  const encrypted = new EncryptedConfiguration({
-    configPath: `${dir}/credentials.yml.enc`,
-    keyPath: `${dir}/master.key`,
-    envKey: "TRAILS_MASTER_KEY",
-    raiseIfMissingKey: false,
+class LoadingTest extends TestCase {}
+include(LoadingTest, Isolation);
+include(LoadingTest, Methods);
+registerSpecType(/^LoadingTest$/, LoadingTest);
+
+type Host = Generation &
+  Omit<Rack, "get"> & {
+    get(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
+    lastResponse(): { status: number; body: string };
+  };
+
+describe("LoadingTest", { timeout: 120_000 }, () => {
+  let t: Host;
+
+  beforeEach(async () => {
+    t = new LoadingTest("test") as unknown as Host;
+    await t.buildApp();
   });
-  await encrypted.config();
-  return encrypted;
-};
 
-const blogApp = (): {
-  config: Configuration;
-  deprecators: Deprecators;
-  credentials: typeof credentials;
-} => ({
-  deprecators: new Deprecators(),
-  config: Object.assign(new Configuration("/nonexistent-app"), { filterParameters: [] }),
-  credentials,
-});
+  afterEach(async () => {
+    await t.teardownApp();
+    Trails.application = null;
+    Application.appClass = null;
+  });
 
-describe("LoadingTest", () => {
   it("reload constants on development", async () => {
-    const script = decodeURIComponent(
-      new URL("../fixtures/reload-app/serve-edited-controller.mjs", import.meta.url).pathname,
-    );
-    const [stdout] = await Open3.capture3(getProcessAdapter().execPath!(), script);
-    expect(JSON.parse(String(stdout).trim().split("\n").at(-1)!)).toEqual({
-      before: 1,
-      after: 2,
-      tracked: true,
-      newClass: true,
-      newParent: true,
-      oldClassExcluded: true,
-    });
-  }, 60_000);
-});
+    await t.addToConfig("this.config.enableReloading = true;");
 
-describe("LoadingTest", () => {
-  useInMemoryDatabaseUrl();
+    await t.appFile(
+      "config/routes.ts",
+      `
+import { Trails } from "@blazetrails/trailties";
+import { constGet, TopLevel } from "@blazetrails/ruby-compat";
+Trails.application!.routes().draw(function () {
+  this.get("/c", {
+    to: async () => [200, { "Content-Type": "text/plain" }, [String((constGet(TopLevel, "User") as { counter(): number }).counter())]],
+  });
+});
+`,
+    );
+
+    await t.appFile(
+      "app/models/user.ts",
+      `
+export class User {
+  static counter() { return 1; }
+}
+`,
+    );
+
+    await t.bootTrails();
+
+    await t.get("/c");
+    expect(t.lastResponse().body).toBe("1");
+
+    await t.appFile(
+      "app/models/user.ts",
+      `
+export class User {
+  static counter() { return 2; }
+}
+`,
+    );
+
+    await t.get("/c");
+    expect(t.lastResponse().body).toBe("2");
+  });
 
   it("added files (like db/schema.rb) also trigger reloading", async () => {
-    const tmp = Dir.mktmpdir("add-watchable-files");
-    const watchableFiles = new TrailtieConfiguration().watchableFiles;
-    const before = watchableFiles.length;
-    try {
-      await runTrailtieInitializers(Trailtie, {
-        ...blogApp(),
-        config: Object.assign(new Configuration(tmp), { filterParameters: [] }),
-      });
-      expect(watchableFiles.slice(before)).toEqual([
-        `${tmp}/db/schema.ts`,
-        `${tmp}/db/structure.sql`,
-      ]);
+    await t.addToConfig("this.config.enableReloading = true;");
 
-      const checker = new FileUpdateChecker(watchableFiles.slice(before), {}, () => {});
-      expect(checker.isUpdated()).toBe(false);
-      FileUtils.mkdirP(`${tmp}/db`);
-      FileUtils.touch(`${tmp}/db/schema.ts`);
-      expect(checker.isUpdated()).toBe(true);
-    } finally {
-      watchableFiles.splice(before);
-      FileUtils.rmRf(tmp);
-    }
+    await t.appFile(
+      "config/routes.ts",
+      `
+import { Trails } from "@blazetrails/trailties";
+import { constGet, TopLevel } from "@blazetrails/ruby-compat";
+const globals = TopLevel as unknown as Record<string, number>;
+globals.counter ??= 0;
+Trails.application!.routes().draw(function () {
+  this.get("/c", {
+    to: async () => {
+      constGet(TopLevel, "User");
+      return [200, { "Content-Type": "text/plain" }, [String(globals.counter)]];
+    },
+  });
+});
+`,
+    );
+
+    await t.appFile(
+      "app/models/user.ts",
+      `
+import { TopLevel } from "@blazetrails/ruby-compat";
+const globals = TopLevel as unknown as Record<string, number>;
+globals.counter = (globals.counter ?? 0) + 1;
+export class User {}
+`,
+    );
+
+    await t.bootTrails();
+
+    await t.get("/c");
+    expect(t.lastResponse().body).toBe("1");
+
+    await t.appFile("db/schema.ts", "");
+
+    await t.get("/c");
+    expect(t.lastResponse().body).toBe("2");
   });
 });

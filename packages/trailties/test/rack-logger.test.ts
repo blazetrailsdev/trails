@@ -1,20 +1,39 @@
-import { describe, it, expect } from "vitest";
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveSupport::LogSubscriber::TestHelper`; the class/interface merge is how the mixin surfaces on the type side. */
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { LogSubscriber, Notifications, TaggedLogging } from "@blazetrails/activesupport";
+import {
+  setup as testHelperSetup,
+  teardown as testHelperTeardown,
+  TestHelper,
+  type MockLogger,
+} from "@blazetrails/activesupport/log-subscriber/test-helper";
+import {
+  assertDifference,
+  assertNoChanges,
+  assertNoDifference,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
+import type { Fanout } from "@blazetrails/activesupport/notifications/fanout";
+import { include, NotImplementedError, type Included } from "@blazetrails/ruby-compat";
+import type { RackApp, RackBody, RackResponse } from "@blazetrails/rack";
 import { Logger } from "../lib/rack/logger.js";
 import type { Tagger } from "../lib/rack/logger.js";
-import { Notifications } from "@blazetrails/activesupport";
-import type { NotificationEvent as Event } from "@blazetrails/activesupport";
-import type { RackApp, RackBody, RackResponse } from "@blazetrails/rack";
-
-const emptyBody = (): RackBody => ({
-  async *[Symbol.asyncIterator]() {},
-});
-
-const okApp: RackApp = async () => [200, {}, emptyBody()];
 
 class TestLogger extends Logger {
+  static NULL = { info() {} };
+
   private _testLogger: unknown;
 
-  constructor(logger: unknown, app: RackApp = okApp, taggers: Tagger[] | null = null) {
+  constructor(
+    logger: unknown = TestLogger.NULL,
+    { app = null, taggers = null }: { app?: RackApp | null; taggers?: Tagger[] | null } = {},
+    block?: () => void,
+  ) {
+    app ??= async () => {
+      block!();
+      return [200, {}, []];
+    };
     super(app, taggers);
     this._testLogger = logger;
   }
@@ -24,106 +43,169 @@ class TestLogger extends Logger {
   }
 }
 
-const NULL = { info() {} };
+class TestApp {
+  constructor(public response: RackResponse) {}
 
-const closeBody = (body: RackBody): void => {
+  async call(_env: unknown): Promise<RackResponse> {
+    return this.response;
+  }
+}
+
+class Subscriber {
+  constructor(
+    public starts: unknown[][] = [],
+    public finishes: unknown[][] = [],
+  ) {}
+
+  start(name: string, id: string, payload: unknown): void {
+    this.starts.push([name, id, payload]);
+  }
+
+  finish(name: string, id: string, payload: unknown): void {
+    this.finishes.push([name, id, payload]);
+  }
+}
+
+interface LoggerTest extends Included<typeof TestHelper> {}
+
+class LoggerTest {
+  declare logger: MockLogger;
+  declare notifier: Fanout;
+  subscriber!: Subscriber;
+  subscription: unknown;
+
+  static {
+    include(this, TestHelper);
+  }
+
+  setup(): void {
+    testHelperSetup.call(this as never);
+    this.subscriber = new Subscriber();
+    this.subscription = Notifications.notifier.subscribe(
+      "request.action_dispatch",
+      this.subscriber,
+    );
+  }
+
+  teardown(): void {
+    Notifications.notifier.unsubscribe(this.subscription);
+    testHelperTeardown.call(this as never);
+  }
+}
+
+const close = (body: RackBody): void => {
   (body as unknown as { close: () => void }).close();
 };
 
 describe("LoggerTest", () => {
+  let t: LoggerTest;
+
+  beforeEach(() => {
+    t = new LoggerTest();
+    t.setup();
+  });
+
+  afterEach(() => t.teardown());
+
   it("notification", async () => {
-    const events: Event[] = [];
-    await Notifications.subscribed(
-      (event: Event) => events.push(event),
-      "request.action_dispatch",
+    const logger = new TestLogger(undefined, {}, () => {});
+
+    await assertDifference(
+      () => t.subscriber.starts.length,
       async () => {
-        const middleware = new TestLogger(NULL);
-        const [, , body] = await middleware.call({ REQUEST_METHOD: "GET" });
-        closeBody(body);
+        await assertDifference(
+          () => t.subscriber.finishes.length,
+          async () => {
+            close((await logger.call({ REQUEST_METHOD: "GET" }))[2]);
+          },
+        );
       },
     );
-    expect(events).toHaveLength(1);
   });
 
   it("notification on raise", async () => {
-    const failingApp: RackApp = async () => {
-      throw new Error("boom");
-    };
-    const popped: number[] = [];
-    let captured: unknown;
-    const events: Event[] = [];
-    await Notifications.subscribed(
-      (event: Event) => events.push(event),
-      "request.action_dispatch",
+    const logger = new TestLogger(undefined, {}, () => {
+      throw new NotImplementedError();
+    });
+
+    await assertDifference(
+      () => t.subscriber.starts.length,
       async () => {
-        const middleware = new TestLogger(
-          {
-            info() {},
-            pushTags: (...tags: string[]) => tags,
-            popTags: (n = 1) => {
-              popped.push(n);
-              return [];
-            },
+        await assertDifference(
+          () => t.subscriber.finishes.length,
+          async () => {
+            await assertRaises([NotImplementedError], {}, () =>
+              logger.call({ REQUEST_METHOD: "GET" }),
+            );
           },
-          failingApp,
-          ["t"],
         );
-        try {
-          await middleware.call({ REQUEST_METHOD: "GET" });
-        } catch (e) {
-          captured = e;
-        }
       },
     );
-    expect((captured as Error).message).toBe("boom");
-    expect(events).toHaveLength(1);
-    expect(popped).toEqual([1]);
   });
 
   it("logger does not mutate app return", async () => {
-    const response = Object.freeze([200, {}, emptyBody()]) as RackResponse;
-    const middleware = new TestLogger(NULL, async () => response);
-    const out = await middleware.call({ REQUEST_METHOD: "GET" });
-    expect(out).not.toBe(response);
-    expect(out[0]).toBe(200);
+    const response = Object.freeze([]) as unknown as RackResponse;
+    const app = new TestApp(response);
+    const logger = new TestLogger(undefined, { app: app as unknown as RackApp });
+    await assertNoChanges(
+      () => response,
+      null,
+      {},
+      async () => {
+        await assertNothingRaised(() => logger.call({ REQUEST_METHOD: "GET" }));
+      },
+    );
   });
 
   it("logger is flushed after request finished", async () => {
-    const calls: string[] = [];
-    const middleware = new TestLogger({
-      info(_progname: unknown, block: () => string) {
-        calls.push(block());
-      },
+    const loggerMiddleware = new TestLogger(undefined, {}, () => {});
+
+    let flushCountInRequestEvent: number | null = null;
+    const blockSub = t.notifier.subscribe("request.action_dispatch", () => {
+      flushCountInRequestEvent = (LogSubscriber.logger as unknown as MockLogger).flushCount;
     });
-    const [, , body] = await middleware.call({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/x",
-    });
-    expect(calls[0]).toMatch(/^Started GET "\/x"/);
-    closeBody(body);
+    try {
+      let responseBody: RackBody | null = null;
+      await assertNoDifference(
+        () => (LogSubscriber.logger as unknown as MockLogger).flushCount,
+        async () => {
+          responseBody = (await loggerMiddleware.call({ REQUEST_METHOD: "GET" }))[2];
+        },
+      );
+
+      await assertDifference(
+        () => (LogSubscriber.logger as unknown as MockLogger).flushCount,
+        () => close(responseBody!),
+      );
+
+      const flushCount = (LogSubscriber.logger as unknown as MockLogger).flushCount;
+      expect(flushCount - flushCountInRequestEvent!, "flush_all! should happen after event").toBe(
+        1,
+      );
+    } finally {
+      t.notifier.unsubscribe(blockSub);
+    }
   });
 
   it("logger pushes tags", async () => {
-    const pushed: string[][] = [];
-    const popped: number[] = [];
-    const middleware = new TestLogger(
-      {
-        info() {},
-        pushTags(...tags: string[]) {
-          pushed.push(tags);
-          return tags;
-        },
-        popTags(n = 1) {
-          popped.push(n);
-          return [];
-        },
-      },
-      okApp,
-      ["tag1", (request) => request.requestMethod, ":remoteIp"],
-    );
-    const [, , body] = await middleware.call({ REQUEST_METHOD: "GET", REMOTE_ADDR: "127.0.0.1" });
-    expect(pushed).toEqual([["tag1", "GET", "127.0.0.1"]]);
-    closeBody(body);
-    expect(popped).toEqual([3]);
+    const logger = TaggedLogging.new(t.logger as never);
+    t.logger = logger;
+    t.setLogger(t.logger);
+
+    const taggers: Tagger[] = ["tag1", () => "tag2"];
+    const loggerMiddleware = new TestLogger(logger, { taggers }, () => {
+      expect(logger.formatter.currentTags).toEqual(["tag1", "tag2"]);
+    });
+    const blockSub = t.notifier.subscribe("request.action_dispatch", () => {
+      expect(logger.formatter.currentTags).toEqual(["tag1", "tag2"]);
+    });
+    try {
+      const responseBody = (await loggerMiddleware.call({ REQUEST_METHOD: "GET" }))[2];
+      expect(logger.formatter.currentTags).toEqual(["tag1", "tag2"]);
+      close(responseBody);
+      expect(logger.formatter.currentTags).toEqual([]);
+    } finally {
+      t.notifier.unsubscribe(blockSub);
+    }
   });
 });

@@ -1,12 +1,12 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { constSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { ActionDispatch, Session } from "@blazetrails/actionpack";
-import { Configuration } from "../../lib/application/configuration.js";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
 import {
+  assertNothingRaised,
   assertRaises,
   assertNil,
   assertNotNil,
@@ -117,13 +117,14 @@ describe("ConfigurationTest", () => {
     }
   });
 
-  it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
-    class MyCustomStore extends Session.CookieStore {}
-    constSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
+  it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", async () => {
     try {
-      const c = new Configuration("/app");
-      c.sessionStore(":my_custom_store");
-      expect(c.sessionStore()).toBe(MyCustomStore);
+      await assertNothingRaised(async () => {
+        const application = await app("development");
+        constSet(ActionDispatch.Session, "MyCustomStore", class extends Session.CookieStore {});
+        application.config.sessionStore(":my_custom_store");
+        application.config.sessionStore();
+      });
     } finally {
       rbModRemoveConst(ActionDispatch.Session, "MyCustomStore");
     }
