@@ -131,10 +131,12 @@ Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async
   }
 });
 
-Bootstrap.initializer<BootstrapHost>(
+/** @inventedArm credentials — PERMANENT */
+Bootstrap.initializer<BootstrapHost & { credentials(): Promise<unknown> }>(
   "setup_once_autoloader",
   { after: "set_eager_load_paths", before: "bootstrap_hook" },
   async function () {
+    await this.credentials();
     const autoloader = this.autoloaders.once;
     autoloader.manifestRoot ??= this.config.root;
 

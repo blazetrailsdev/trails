@@ -73,7 +73,6 @@ export interface FinisherHost {
   watchableArgs(): [string[], Record<string, string[]>];
   ensureGeneratorTemplatesAdded(): Promise<void>;
   buildMiddlewareStack(): void;
-  credentials(): Promise<unknown>;
 }
 
 export class Finisher extends Initializable {}
@@ -161,9 +160,7 @@ Finisher.initializer("eager_load!", async function (this: FinisherHost) {
   }
 });
 
-/** @inventedArm credentials — PERMANENT */
 Finisher.initializer("finisher_hook", async function (this: FinisherHost) {
-  await this.credentials();
   await runLoadHooks("after_initialize", this);
 });
 
