@@ -2,24 +2,30 @@ export default {
   development: {
     adapter: "postgresql",
     database: "<%= this.appName() %>_development",
-<% if (this.isDevcontainer()) { -%>
-    host: process.env.DB_HOST ?? "localhost",
-    username: process.env.DB_HOST ? "postgres" : undefined,
-    password: process.env.DB_HOST ? "postgres" : undefined,
-<% } else { -%>
     host: "localhost",
+<% if (this.isDevcontainer()) { -%>
+    ...(process.env.DB_HOST
+      ? {
+          host: process.env.DB_HOST,
+          username: "postgres",
+          password: "postgres",
+        }
+      : {}),
 <% } -%>
     port: <%= this.database.port %>,
   },
   test: {
     adapter: "postgresql",
     database: "<%= this.appName() %>_test",
-<% if (this.isDevcontainer()) { -%>
-    host: process.env.DB_HOST ?? "localhost",
-    username: process.env.DB_HOST ? "postgres" : undefined,
-    password: process.env.DB_HOST ? "postgres" : undefined,
-<% } else { -%>
     host: "localhost",
+<% if (this.isDevcontainer()) { -%>
+    ...(process.env.DB_HOST
+      ? {
+          host: process.env.DB_HOST,
+          username: "postgres",
+          password: "postgres",
+        }
+      : {}),
 <% } -%>
     port: <%= this.database.port %>,
   },

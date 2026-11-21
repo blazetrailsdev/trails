@@ -1,7 +1,7 @@
 import "./boot.ts";
 
-import { Bundler } from "@blazetrails/ruby-compat";
-import { Application, Trails } from "@blazetrails/trailties";
+import { Bundler, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Trails } from "@blazetrails/trailties";
 
 <%= this.trailsRequireStatement() %>
 
@@ -9,9 +9,12 @@ import { Application, Trails } from "@blazetrails/trailties";
 // you've limited to :test, :development, or :production.
 await Bundler.require(...Trails.groups());
 
-export class <%= this.appConstBase() %> extends Application {
+export const <%= this.appConstBase() %> = constSet(TopLevel, "<%= this.appConstBase() %>", {});
+
+export class Application extends Trails.Application {
   static {
-    Application.register(this, import.meta.dirname);
+    constSet(<%= this.appConstBase() %>, "Application", this);
+    Trails.Application.register(this, import.meta.dirname);
 
     // Initialize configuration defaults for originally generated trails version.
     this.config.loadDefaults("<%= this.build("configTargetVersion") %>");
@@ -44,6 +47,6 @@ export class <%= this.appConstBase() %> extends Application {
 
 declare module "@blazetrails/trailties" {
   interface ApplicationRegistry {
-    application: <%= this.appConstBase() %>;
+    application: Application;
   }
 }

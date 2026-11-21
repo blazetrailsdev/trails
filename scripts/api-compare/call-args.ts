@@ -252,8 +252,15 @@ function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string 
   const text = key.slice("str:".length);
   const bare = text.startsWith(":") ? text.slice(1) : text;
   if (IDENTIFIER_STRING.test(bare)) return `str:${snakeToCamel(bare)}`;
-  return `str:${text.replace(RUBY_FILE_EXTENSION, (ext) => RUBY_FILE_EXTENSIONS[ext])}`;
+  const path = text.replace(RUBY_FILE_EXTENSION, (ext) => RUBY_FILE_EXTENSIONS[ext]);
+  return `str:${FILE_PATH.test(path) ? path.replaceAll("_", "-") : path}`;
 }
+
+/**
+ * A file path, whose snake_case and kebab-case spellings compare equal
+ * (CLAUDE.md, "Casing is translated, never mirrored").
+ */
+const FILE_PATH = /^[\w-]+(?:\/[\w-]+)*\/[\w-]+\.(?:ts|tt|js|json|yml|yaml|html|tse)$/;
 
 /** Split a `kwargs{…}` body on its TOP-LEVEL commas — a value can itself be a
  *  `kwargs{…}`, whose commas are not separators. A `,` inside a `str:` payload

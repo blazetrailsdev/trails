@@ -199,7 +199,7 @@ describe("Trails::Command::MiddlewareTest", { timeout: 120_000 }, () => {
 
   it("ActionDispatch::HostAuthorization is included if hosts is set to IPAddr", async () => {
     await t.addToConfig(
-      `await import("@blazetrails/ruby-compat").then(({ IPAddr }) => { AppTemplate.config.hosts = new IPAddr("0.0.0.0/0") as never; });`,
+      `await import("@blazetrails/ruby-compat").then(({ IPAddr }) => { AppTemplate.Application.config.hosts = new IPAddr("0.0.0.0/0") as never; });`,
     );
     await t.bootBang();
 
@@ -298,23 +298,27 @@ describe("Trails::Command::MiddlewareTest", { timeout: 120_000 }, () => {
 
   it("can delete a middleware from the stack", async () => {
     await t.addToConfig(
-      `await import("@blazetrails/actionpack").then(({ Static }) => AppTemplate.config.middleware.delete(Static));`,
+      `await import("@blazetrails/actionpack").then(({ Static }) => AppTemplate.Application.config.middleware.delete(Static));`,
     );
     await t.bootBang();
     expect(t.middleware()).not.toContain("ActionDispatch::Static");
   });
 
   it("can delete a middleware from the stack even if insert_before is added after delete", async () => {
-    await t.addToConfig(rack("AppTemplate.config.middleware.delete(Runtime);"));
-    await t.addToConfig(rack("AppTemplate.config.middleware.insertBefore(Runtime, Config);"));
+    await t.addToConfig(rack("AppTemplate.Application.config.middleware.delete(Runtime);"));
+    await t.addToConfig(
+      rack("AppTemplate.Application.config.middleware.insertBefore(Runtime, Config);"),
+    );
     await t.bootBang();
     expect(t.middleware()).toContain("Rack::Config");
     expect(t.middleware().includes("Rack::Runtime")).toBeFalsy();
   });
 
   it("can delete a middleware from the stack even if insert_after is added after delete", async () => {
-    await t.addToConfig(rack("AppTemplate.config.middleware.delete(Runtime);"));
-    await t.addToConfig(rack("AppTemplate.config.middleware.insertAfter(Runtime, Config);"));
+    await t.addToConfig(rack("AppTemplate.Application.config.middleware.delete(Runtime);"));
+    await t.addToConfig(
+      rack("AppTemplate.Application.config.middleware.insertAfter(Runtime, Config);"),
+    );
     await t.bootBang();
     expect(t.middleware()).toContain("Rack::Config");
     expect(t.middleware().includes("Rack::Runtime")).toBeFalsy();
@@ -335,19 +339,21 @@ describe("Trails::Command::MiddlewareTest", { timeout: 120_000 }, () => {
 
   it("use middleware", async () => {
     await t.useFrameworks([]);
-    await t.addToConfig(rack("AppTemplate.config.middleware.use(Config);"));
+    await t.addToConfig(rack("AppTemplate.Application.config.middleware.use(Config);"));
     await t.bootBang();
     expect(t.middleware().at(-1)).toBe("Rack::Config");
   });
 
   it("insert middleware after", async () => {
-    await t.addToConfig(rack("AppTemplate.config.middleware.insertAfter(Sendfile, Config);"));
+    await t.addToConfig(
+      rack("AppTemplate.Application.config.middleware.insertAfter(Sendfile, Config);"),
+    );
     await t.bootBang();
     expect(t.middleware()[2]).toBe("Rack::Config");
   });
 
   it("unshift middleware", async () => {
-    await t.addToConfig(rack("AppTemplate.config.middleware.unshift(Config);"));
+    await t.addToConfig(rack("AppTemplate.Application.config.middleware.unshift(Config);"));
     await t.bootBang();
     expect(t.middleware()[0]).toBe("Rack::Config");
   });
@@ -367,7 +373,9 @@ describe("Trails::Command::MiddlewareTest", { timeout: 120_000 }, () => {
   });
 
   it("insert middleware before", async () => {
-    await t.addToConfig(rack("AppTemplate.config.middleware.insertBefore(Sendfile, Config);"));
+    await t.addToConfig(
+      rack("AppTemplate.Application.config.middleware.insertBefore(Sendfile, Config);"),
+    );
     await t.bootBang();
     expect(t.middleware()[1]).toBe("Rack::Config");
   });

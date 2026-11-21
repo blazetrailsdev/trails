@@ -267,6 +267,12 @@ export class Dir {
    * thread than the block's, which here is a call from outside the open
    * block's async context: a sibling promise, where a nested call shares it.
    *
+   * Node caches the working directory until the next `chdir`, where
+   * `rb_dir_getwd` reads the kernel's, so the block arm calls `chdir(".")`
+   * before it saves `old_path`: a renamed working directory then restores to
+   * its new path.
+   *
+   * @inventedArm chdir — PERMANENT
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.chdir`
    * (`vendor/ruby/v3.3.11/dir.c:1172`).
    */
@@ -290,6 +296,7 @@ export class Dir {
     }
 
     if (block != null) {
+      chdir(".");
       const oldPath = Dir.pwd();
       chdir(path);
       chdirBlocking++;

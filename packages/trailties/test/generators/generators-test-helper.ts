@@ -35,7 +35,7 @@ export async function copyApplicationSystemTestCase(this: TestCase): Promise<voi
   );
   const destination = File.join(this.destinationRoot, "test");
   FileUtils.mkdirP(destination);
-  File.write(File.join(destination, "application_system_test_case.ts"), content);
+  File.write(File.join(destination, "application-system-test-case.ts"), content);
 }
 
 export async function copyDockerfile(this: TestCase): Promise<void> {

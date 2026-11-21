@@ -70,7 +70,7 @@ beforeEach(() => {
   FileUtils.mkdirP(File.join(root, "config/environments"));
   File.write(
     File.join(root, "config/application.ts"),
-    "export class Application extends Application {\n  static {\n  }\n}\n",
+    "export class Application extends Trails.Application {\n  static {\n  }\n}\n",
   );
   File.write(
     File.join(root, "config/environments/development.ts"),
@@ -180,7 +180,9 @@ describe("ActionsTest", () => {
     await makeGen().environment(autoloadPaths);
     await assertFile(
       "config/application.ts",
-      new RegExp(` extends Application \\{\\n  static \\{\\n    ${escape(autoloadPaths)}\\n`),
+      new RegExp(
+        ` extends Trails\\.Application \\{\\n  static \\{\\n    ${escape(autoloadPaths)}\\n`,
+      ),
     );
   });
 
@@ -507,7 +509,7 @@ describe("ActionsTest", () => {
     await assertFile(
       "config/application.ts",
       new RegExp(
-        ` extends Application \\{\\n  static \\{\\n${escape(data.replace(/^ {6}/gm, "    "))}`,
+        ` extends Trails\\.Application \\{\\n  static \\{\\n${escape(data.replace(/^ {6}/gm, "    "))}`,
       ),
     );
   });

@@ -59,8 +59,8 @@ await Trails.application.loadServer();
 exports[`AppGenerator > snapshots emitted TypeScript sources > config/application.ts 1`] = `
 "import "./boot.ts";
 
-import { Bundler } from "@blazetrails/ruby-compat";
-import { Application, Trails } from "@blazetrails/trailties";
+import { Bundler, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Trails } from "@blazetrails/trailties";
 
 import "@blazetrails/trailties/all";
 
@@ -68,9 +68,12 @@ import "@blazetrails/trailties/all";
 // you've limited to :test, :development, or :production.
 await Bundler.require(...Trails.groups());
 
-export class MyApp extends Application {
+export const MyApp = constSet(TopLevel, "MyApp", {});
+
+export class Application extends Trails.Application {
   static {
-    Application.register(this, import.meta.dirname);
+    constSet(MyApp, "Application", this);
+    Trails.Application.register(this, import.meta.dirname);
 
     // Initialize configuration defaults for originally generated trails version.
     this.config.loadDefaults("8.0");
@@ -92,7 +95,7 @@ export class MyApp extends Application {
 
 declare module "@blazetrails/trailties" {
   interface ApplicationRegistry {
-    application: MyApp;
+    application: Application;
   }
 }
 "
