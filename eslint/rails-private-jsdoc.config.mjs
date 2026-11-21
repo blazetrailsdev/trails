@@ -52,6 +52,7 @@ export default [
       "packages/rack/lib/**/*.ts",
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",
+      "packages/mysql2/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
       "packages/trailties/lib/**/*.ts",
