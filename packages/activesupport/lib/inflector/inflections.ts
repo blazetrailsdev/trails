@@ -145,9 +145,11 @@ export class Inflections {
     this.acronymRegex = isEmpty(this.acronyms)
       ? /(?=a)b/
       : new RegExp([...this.acronyms.values()].join("|"));
-    this.acronymsCamelizeRegex = new RegExp(`^(?:${this.acronymRegex.source}(?=\\b|[A-Z_])|\\w)`);
+    this.acronymsCamelizeRegex = new RegExp(
+      `^(?:(?:${this.acronymRegex.source})(?=\\b|[A-Z_])|\\w)`,
+    );
     this.acronymsUnderscoreRegex = new RegExp(
-      `(?:(?<=([A-Za-z\\d]))|\\b)(${this.acronymRegex.source})(?=\\b|[^a-z])`,
+      `(?:(?<=([A-Za-z\\d]))|\\b)((?:${this.acronymRegex.source}))(?=\\b|[^a-z])`,
       "g",
     );
   }
