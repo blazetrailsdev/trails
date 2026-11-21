@@ -300,7 +300,8 @@ export class TimeWithZone {
     millisecond: number;
     nsec: number;
   } {
-    const t = this._transferTimeValuesToUtcConstructor(this.time);
+    const time = this.time;
+    const t = time instanceof DateTime ? this._transferTimeValuesToUtcConstructor(time) : time;
     return {
       year: t.year,
       month: t.mon,
@@ -613,6 +614,7 @@ export class TimeWithZone {
     }
   }
 
+  /** @inventedArm if — CONVERGEABLE tzinfo-periods-for-local-accepts-datetime */
   change(options: ChangeOptions): TimeWithZone {
     if (options.zone != null && options.zone !== false && options.offset != null) {
       throw new ArgumentError(
