@@ -1,5 +1,6 @@
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { Rational, rational, rbCallSuper, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
+import type { TestCase } from "../test-case.js";
 
 import { Duration } from "../duration.js";
 import { TimeWithZone } from "../time-with-zone.js";
@@ -68,13 +69,8 @@ interface TimeHelpersHost {
   _inBlock?: boolean;
 }
 
-/** @noRailsEquivalent CONVERGEABLE free-time-helper-calls-travel-on-the-test-case */
-const _freeReceiver: TimeHelpersHost = {};
-
-/** @inventedArm if — CONVERGEABLE free-time-helper-calls-travel-on-the-test-case */
 export function afterTeardown(this: object): unknown {
   travelBack.call(this);
-  if (this !== _freeReceiver) travelBack.call(_freeReceiver);
   return rbCallSuper(this, afterTeardown);
 }
 
@@ -229,17 +225,25 @@ export function freezeTime(
 
 /** @internal */
 function simpleStubs(this: object | void): SimpleStubs {
-  return (((this ?? _freeReceiver) as TimeHelpersHost)._simpleStubs ??= new SimpleStubs());
+  return (((this ?? _runningTestCase()) as TimeHelpersHost)._simpleStubs ??= new SimpleStubs());
 }
 
 /** @internal */
 function inBlock(this: object | void): boolean {
-  return ((this ?? _freeReceiver) as TimeHelpersHost)._inBlock ?? false;
+  return ((this ?? _runningTestCase()) as TimeHelpersHost)._inBlock ?? false;
 }
 
 /** @internal */
 function setInBlock(this: object | void, value: boolean): void {
-  ((this ?? _freeReceiver) as TimeHelpersHost)._inBlock = value;
+  ((this ?? _runningTestCase()) as TimeHelpersHost)._inBlock = value;
+}
+
+/** @noRailsEquivalent PERMANENT */
+function _runningTestCase(): TestCase {
+  const worker = (
+    globalThis as { __vitest_worker__?: { current?: { context: { testCase: TestCase } } } }
+  ).__vitest_worker__;
+  return worker!.current!.context.testCase;
 }
 
 function currentTime(): globalThis.Date {

@@ -274,6 +274,29 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
 }
 
 /**
+ * `rb_singleton_class` (`vendor/ruby/v3.3.11/class.c:2286`). An object
+ * receiver answers {@link rbObjSingletonClass}. A class receiver answers its
+ * metaclass (`make_metaclass`, `vendor/ruby/v3.3.11/class.c:757`): a JS class's
+ * singleton methods are its own statics, so the metaclass's method table, its
+ * `prototype`, is the class itself, and `prepend` onto it writes the statics.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbSingletonClass(obj: object): abstract new (...args: never) => object {
+  if (typeof obj !== "function") return rbObjSingletonClass(obj);
+  const cached = _metaclasses.get(obj);
+  if (cached) return cached;
+  const metaclass = function () {};
+  metaclass.prototype = obj;
+  Object.defineProperty(metaclass, FL_SINGLETON, { value: obj });
+  const klass = metaclass as unknown as abstract new (...args: never) => object;
+  _metaclasses.set(obj, klass);
+  return klass;
+}
+
+const _metaclasses = new WeakMap<object, abstract new (...args: never) => object>();
+
+/**
  * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`):
  * the singleton class when the object has one, where {@link rbObjClass}
  * skips it, and the class {@link rbObjClass} answers otherwise.

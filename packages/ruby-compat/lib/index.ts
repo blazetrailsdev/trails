@@ -118,6 +118,7 @@ export {
   nameErrMesgReceiver,
   rbObjRespondTo,
   rbObjSingletonClass,
+  rbSingletonClass,
   rbSetClassPathString,
   rbFSend,
   rbCheckFuncall,
