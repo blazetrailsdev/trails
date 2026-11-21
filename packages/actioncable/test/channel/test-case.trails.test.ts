@@ -16,7 +16,7 @@ describe("ActionCable::Channel::TestCase", () => {
     const before = Object.getOwnPropertyNames(StubbedChannel.prototype);
     class StubbedChannelTest extends TestCase {}
     StubbedChannelTest.tests(StubbedChannel);
-    const tc = new StubbedChannelTest("testNothing" as never);
+    const tc = new StubbedChannelTest("testNothing");
 
     const subscription = await tc.subscribe();
     expect(subscription.streams).toEqual(["room"]);

@@ -41,7 +41,7 @@ export function urlOptions(this: UrlForHost): Record<string, unknown> {
     }
     return Object.freeze(options);
   } else {
-    return this._urlOptions as Record<string, unknown>;
+    return this._urlOptions;
   }
 }
 

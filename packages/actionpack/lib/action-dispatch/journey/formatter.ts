@@ -75,7 +75,7 @@ export class Formatter {
     options = { ...options };
     delete options["pathParams"];
     if (isPlainObject(rawPathParams)) {
-      pathParams = rawPathParams as Record<string, unknown>;
+      pathParams = rawPathParams;
       options = { ...pathParams, ...options };
     }
     const constraints = { ...pathParameters, ...options };

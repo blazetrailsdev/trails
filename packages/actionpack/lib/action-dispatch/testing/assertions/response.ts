@@ -54,6 +54,7 @@ export function assertRedirectedTo(
 ): true {
   if (!isPlainObject(options)) [options, message] = [{}, options];
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS 7 narrows through this cast, which typescript-eslint's TS 6 checker reads as unnecessary
   const status = (options as { status?: number | string }).status ?? ":redirect";
   assertResponse.call(this, status, message);
   if (rbEqq(urlOptions, this.response.location)) return true;

@@ -117,7 +117,7 @@ describe("MessageDeliveryTest", () => {
     previousLogger = ActiveJobBase.logger;
     previousDeliveryMethod = Base.deliveryMethod;
 
-    ActiveJobBase.logger = null as never;
+    ActiveJobBase.logger = null;
     Base.deliveryMethod = "test";
 
     const adapter = t.queueAdapter() as {

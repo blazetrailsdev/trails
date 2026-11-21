@@ -161,7 +161,7 @@ export function helper(
     typeof last === "function" && !rbObjIsKindOf(last, Module)
       ? (args.pop() as (mod: Record<string, unknown>) => void)
       : null;
-  for (const mod of this.modulesForHelpers(args as HelperArgument[])) {
+  for (const mod of this.modulesForHelpers(args)) {
     if (isModuleIncluded(this._helpers, mod)) continue;
     include(this._helpersForModification(), mod);
   }
@@ -183,7 +183,7 @@ export function clearHelpers(this: HelpersClass): void {
 
 /** @inventedArm if — PERMANENT */
 export function _helpersForModification(this: HelpersClass): HelperMethodsModule {
-  if (!rbObjIvarDefined(this, "@_helpers") && !rbModSingletonP(this as never)) {
+  if (!rbObjIvarDefined(this, "@_helpers") && !rbModSingletonP(this)) {
     inherited.call(rbClassSuperclass(this)!, this);
   }
   if (rbObjIvarGet(this, "@_helpers") == null) {
@@ -249,7 +249,7 @@ export const Helpers = new Module((mod) => {
     Object.defineProperty(this, "_helpers", {
       configurable: true,
       get(this: HelpersClass) {
-        if (!rbObjIvarDefined(this, "@_helpers") && !rbModSingletonP(this as never)) {
+        if (!rbObjIvarDefined(this, "@_helpers") && !rbModSingletonP(this)) {
           inherited.call(rbClassSuperclass(this)!, this);
         }
         if (rbObjIvarGet(this, "@_helpers") != null) {

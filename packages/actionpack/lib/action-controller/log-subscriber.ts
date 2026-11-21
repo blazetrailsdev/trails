@@ -44,7 +44,7 @@ export class LogSubscriber extends BaseLogSubscriber {
         status?: number | null;
         exception?: [string, string] | null;
       };
-      const additions = Base.logProcessAction(payload as Record<string, unknown>);
+      const additions = Base.logProcessAction(payload);
       let status = payload.status;
 
       let exceptionClassName: string | undefined;

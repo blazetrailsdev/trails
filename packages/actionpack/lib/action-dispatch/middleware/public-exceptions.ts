@@ -24,7 +24,7 @@ export class PublicExceptions {
     const request = new Request(env);
     let contentType: MimeType | undefined;
     try {
-      contentType = request.formats[0] as MimeType | undefined;
+      contentType = request.formats[0];
     } catch (e) {
       if (!(e instanceof InvalidType)) throw e;
       contentType = Mime.get(":text");

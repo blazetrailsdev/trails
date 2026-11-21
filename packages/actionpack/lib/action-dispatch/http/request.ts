@@ -544,7 +544,7 @@ export class Request {
   async resetSession(): Promise<void> {
     await this.session.destroy();
     await this.resetCsrfToken();
-    resetFlashSession.call(this as never);
+    resetFlashSession.call(this);
   }
 
   set session(session: Session) {
@@ -582,7 +582,7 @@ export class Request {
   }
 
   async commitFlash(): Promise<void> {
-    await commitFlash.call(this as never);
+    await commitFlash.call(this);
   }
 
   commitCookieJarBang(): void {
@@ -850,10 +850,7 @@ Request.prototype.filteredPath = _filteredPath;
 Request.prototype.parameterFilter = _parameterFilter;
 Request.prototype.envFilter = _envFilter;
 Request.prototype.filteredQueryString = _filteredQueryString;
-Request.prototype.parameterFilterFor = _parameterFilterFor as (
-  this: Request,
-  filters: Array<string | RegExp>,
-) => ParameterFilter;
+Request.prototype.parameterFilterFor = _parameterFilterFor;
 
 /** @internal */
 export async function* emptyRackBody(): RackBody {}

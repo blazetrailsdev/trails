@@ -50,7 +50,7 @@ export class AnchoredRegexp extends Visitor {
   }
 
   protected override visitGROUP(node: Node): string {
-    return `(?:${this.visit((node as Group).left as Node) as string})?`;
+    return `(?:${this.visit(node.left as Node) as string})?`;
   }
 
   protected override visitLITERAL(node: Node): string {
@@ -281,7 +281,7 @@ function normalizeLeadingOptionalSpec(spec: Node): Node {
   if (parts.length < 2 || parts[0].type !== "SLASH") return spec;
   const second = parts[1];
   if (!second.isGroup()) return spec;
-  const innerParts = flattenCat((second as Group).left as Node);
+  const innerParts = flattenCat(second.left as Node);
   if (innerParts.length < 2 || innerParts[0].type !== "SLASH") return spec;
   const allOptional = parts.slice(1).every((p) => p.isGroup());
   const newParts = allOptional

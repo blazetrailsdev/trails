@@ -35,7 +35,7 @@ class ConnectionSimpleTest extends TestCase {}
 ConnectionSimpleTest.tests(SimpleConnection);
 constSet(TopLevel, "ConnectionSimpleTest", ConnectionSimpleTest);
 
-const cookiesOf = (t: TestCase): Cookies => t.cookies() as unknown as Cookies;
+const cookiesOf = (t: TestCase): Cookies => t.cookies();
 const connectionOf = <T>(t: TestCase): T => t.connection as unknown as T;
 
 describe("ConnectionSimpleTest", () => {
@@ -142,7 +142,7 @@ describe("ConnectionTest", () => {
       t.assertRejectConnection(() => "Intentionally doesn't connect."),
     );
 
-    assertMatch(/Expected to reject connection/, (error as Error).message);
+    assertMatch(/Expected to reject connection/, error.message);
   });
 });
 

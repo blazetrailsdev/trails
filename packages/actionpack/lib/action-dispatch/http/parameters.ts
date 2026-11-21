@@ -76,7 +76,7 @@ export class Parameters {
     for (const [key, value] of entries) {
       const sym =
         key !== null && typeof key === "object" && "symbol" in key
-          ? String((key as { symbol: unknown }).symbol)
+          ? String(key.symbol)
           : String(key);
       normalized[sym] = value;
     }

@@ -1,7 +1,7 @@
 import type { createServer, InlineConfig, ViteDevServer } from "vite";
 import { type RackMiddleware } from "@blazetrails/rack";
 import { Handler } from "@blazetrails/rackup";
-import type { HttpRequest, HttpResponse, HttpSocket } from "@blazetrails/ruby-compat";
+import type { HttpRequest, HttpSocket } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export const vite: {
@@ -68,7 +68,7 @@ export class Server {
               return () => {
                 server.middlewares.use(async (req, res, next) => {
                   try {
-                    await new node(vite.app!).service(req as HttpRequest, res as HttpResponse);
+                    await new node(vite.app!).service(req, res);
                   } catch (err: unknown) {
                     next(err);
                   }

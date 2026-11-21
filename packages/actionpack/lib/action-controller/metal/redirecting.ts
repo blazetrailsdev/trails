@@ -227,6 +227,7 @@ export const Redirecting = {
   redirectTo,
   redirectBack,
   redirectBackOrTo,
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS 7 narrows through this cast, which typescript-eslint's TS 6 checker reads as unnecessary
   _computeRedirectToLocation: _computeRedirectToLocation as OmitThisParameter<
     typeof _computeRedirectToLocation
   >,

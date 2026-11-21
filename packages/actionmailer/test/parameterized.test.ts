@@ -69,7 +69,7 @@ describe("ParameterizedTest", () => {
 
   beforeEach(() => {
     previousLogger = ActiveJobBase.logger;
-    ActiveJobBase.logger = null as never;
+    ActiveJobBase.logger = null;
 
     previousDeliveryMethod = Base.deliveryMethod;
     Base.deliveryMethod = "test";

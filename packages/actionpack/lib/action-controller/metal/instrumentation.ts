@@ -83,7 +83,7 @@ export async function processAction(
         payload.status = ExceptionWrapper.statusCodeForException(rbObjClassname(error));
         throw error;
       } finally {
-        this.appendInfoToPayload(payload as Record<string, unknown>);
+        this.appendInfoToPayload(payload);
       }
     },
   );

@@ -206,7 +206,7 @@ export function wrapParameters(
   let model: unknown = null;
 
   if (isPlainObject(nameOrModelOrOptions)) {
-    options = nameOrModelOrOptions as Record<string, unknown>;
+    options = nameOrModelOrOptions;
   } else if (nameOrModelOrOptions === false) {
     options = { ...options, format: [] };
   } else if (typeof nameOrModelOrOptions === "string") {

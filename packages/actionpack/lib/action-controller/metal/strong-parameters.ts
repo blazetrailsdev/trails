@@ -337,7 +337,7 @@ export class Parameters {
       isPlainObject(otherHash) ||
       (typeof otherHash === "object" &&
         otherHash !== null &&
-        isModuleIncluded(otherHash.constructor as { prototype: object }, DeepMergeable))
+        isModuleIncluded(otherHash.constructor, DeepMergeable))
     );
   }
 
@@ -752,7 +752,7 @@ export class Parameters {
   /** @internal */
   isSpecifyNumericKeys(filter: unknown): boolean {
     if (filter && typeof filter === "object" && !Array.isArray(filter)) {
-      return Object.keys(filter as Record<string, unknown>).some((k) => /^-?\d+$/.test(k));
+      return Object.keys(filter).some((k) => /^-?\d+$/.test(k));
     }
     return false;
   }
@@ -867,9 +867,9 @@ export class Parameters {
       filter !== null &&
       typeof filter === "object" &&
       !Array.isArray(filter) &&
-      Object.keys(filter as Record<string, unknown>).length === 0
+      Object.keys(filter).length === 0
     ) {
-      return this.permitHash(value, filter as Record<string, unknown>, {
+      return this.permitHash(value, filter, {
         onUnpermitted,
         explicitArrays,
       });
@@ -921,7 +921,7 @@ export class Parameters {
       filter !== null &&
       typeof filter === "object" &&
       !Array.isArray(filter) &&
-      Object.keys(filter as Record<string, unknown>).length === 0
+      Object.keys(filter).length === 0
     ) {
       return this.permitAnyInParameters(value);
     }

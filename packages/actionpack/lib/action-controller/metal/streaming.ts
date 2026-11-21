@@ -19,7 +19,7 @@ export async function _renderTemplate(
   delete options["stream"];
   if (stream != null && stream !== false) {
     if (this.headers.get("cache-control") == null) this.headers.set("cache-control", "no-cache");
-    return this.viewRenderer().renderBody(this.viewContext(), options as never);
+    return this.viewRenderer().renderBody(this.viewContext(), options);
   } else {
     return rbCallSuper(this, _renderTemplate, options);
   }

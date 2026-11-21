@@ -244,9 +244,9 @@ function buildTestRequest(
     Headers.fromHash(requestEnv).mergeBang(wrappedHeaders);
   }
 
-  const request = TestRequest.create(requestEnv as never) as TestRequest;
+  const request = TestRequest.create(requestEnv) as TestRequest;
   request.session = withIndifferentAccess(session);
-  request.setCookieJar(cookies.call(this) as never);
+  request.setCookieJar(cookies.call(this));
   return request;
 }
 

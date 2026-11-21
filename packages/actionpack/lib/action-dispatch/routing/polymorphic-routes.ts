@@ -83,7 +83,7 @@ export function polymorphicUrl(
     const merged = { ...(recordOrHashOrArray as Record<string, unknown>), ...options };
     const record = merged["id"] as PolymorphicArg;
     delete merged["id"];
-    return polymorphicUrl.call(this, record, merged as PolymorphicOptions);
+    return polymorphicUrl.call(this, record, merged);
   }
 
   const mapping = polymorphicMapping(this, recordOrHashOrArray);
@@ -106,7 +106,7 @@ export function polymorphicPath(
     const merged = { ...(recordOrHashOrArray as Record<string, unknown>), ...options };
     const record = merged["id"] as PolymorphicArg;
     delete merged["id"];
-    return polymorphicPath.call(this, record, merged as PolymorphicOptions);
+    return polymorphicPath.call(this, record, merged);
   }
 
   const mapping = polymorphicMapping(this, recordOrHashOrArray);

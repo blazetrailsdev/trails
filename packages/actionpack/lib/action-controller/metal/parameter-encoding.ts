@@ -19,7 +19,7 @@ export const ClassMethods = {
     Object.defineProperty(base, "_parameterEncodings", {
       configurable: true,
       get(this: Stored) {
-        if (!Object.hasOwn(this, parameterEncodings) && !rbModSingletonP(this as never)) {
+        if (!Object.hasOwn(this, parameterEncodings) && !rbModSingletonP(this)) {
           inherited.call(Object.getPrototypeOf(this), this as never);
         }
         return this[parameterEncodings];
