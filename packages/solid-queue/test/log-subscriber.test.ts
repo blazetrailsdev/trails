@@ -13,7 +13,7 @@ import {
 } from "@blazetrails/activesupport/log-subscriber/test-helper";
 import { Time } from "@blazetrails/date";
 import { regexpEscape } from "@blazetrails/ruby-compat";
-import { LogSubscriber, Process, SolidQueue } from "../lib/index.js";
+import { LogSubscriber, Process, SolidQueue, Worker } from "../lib/index.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import "./test-helper.js";
 
@@ -49,7 +49,11 @@ describe("LogSubscriberTest", () => {
     wait.call(t);
   }
 
-  function assertMatchLogged(level: ":debug" | ":error", action: string, attributes: string) {
+  function assertMatchLogged(
+    level: ":debug" | ":warn" | ":error",
+    action: string,
+    attributes: string,
+  ) {
     expect(t.logger.logged(level).length).toEqual(1);
     expect(t.logger.logged(level).at(-1)).toMatch(
       new RegExp(
@@ -125,6 +129,19 @@ describe("LogSubscriberTest", () => {
       ":error",
       "Error enqueuing recurring task",
       `task: :example_task, enqueue_error: "Everything is broken", at: "${time.iso8601()}"`,
+    );
+  });
+
+  it("fork boot timeout", () => {
+    const worker = new Worker();
+
+    attachLogSubscriber();
+    instrument("fork_boot_timeout.solid_queue", { process: worker, pid: 42 });
+
+    assertMatchLogged(
+      ":warn",
+      "Terminate Worker that failed to boot in time",
+      `pid: 42, hostname: "${worker.hostname}", name: "${worker.name}"`,
     );
   });
 

@@ -346,6 +346,18 @@ export class LogSubscriber extends BaseLogSubscriber {
     }
   }
 
+  forkBootTimeout(event: Event): void {
+    const process = event.payload.process as LoggedProcess;
+    this.warn(
+      this.formattedEvent(event, {
+        action: `Terminate ${process.kind} that failed to boot in time`,
+        ...slice(event.payload, "pid"),
+        hostname: process.hostname,
+        name: process.name,
+      }),
+    );
+  }
+
   /** @internal */
   private formattedEvent(
     event: Event,

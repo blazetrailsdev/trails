@@ -13,7 +13,7 @@ import {
   minutes,
   seconds,
 } from "@blazetrails/activesupport";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { Queue, StringIO, Timeout } from "@blazetrails/ruby-compat";
 import {
   ClaimedExecution,
   Job,
@@ -183,9 +183,9 @@ describe("WorkerTest", () => {
     ActiveSupport.errorReporter.subscribe(subscriber);
 
     try {
-      const result = vi.spyOn(ClaimedExecution, "Result").mockImplementation(() => {
-        throw new ExpectedTestError("everything is broken");
-      });
+      vi.spyOn(ClaimedExecution.prototype as never, "finished").mockRejectedValue(
+        new StatementInvalid("transient DB glitch") as never,
+      );
 
       await AddToBufferJob.performLater("hey!");
 
@@ -194,9 +194,11 @@ describe("WorkerTest", () => {
       await waitForJobsToFinishFor(1);
       await worker.wakeUp();
 
-      expect(result).toHaveBeenCalled();
-      expect(subscriber.errors.length).toBe(1);
-      expect(subscriber.messages()[0]).toBe("everything is broken");
+      const finalizationErrors = subscriber.errors
+        .map(([error]) => error)
+        .filter((error) => error instanceof ClaimedExecution.FinalizationError);
+      expect(finalizationErrors.length).toBe(1);
+      expect(finalizationErrors[0].message).toMatch(/transient DB glitch/);
     } finally {
       ActiveSupport.errorReporter.unsubscribe(subscriber);
       SolidQueue.onThreadError = originalOnThreadError;
@@ -396,34 +398,39 @@ describe("WorkerTest", () => {
   });
 
   it("sleeps `10.minutes` if at capacity", async () => {
-    for (let i = 0; i < 3; i++) await StoreResultJob.performLater(i, { pause: 1 });
+    for (let i = 0; i < 3; i++) await StoreResultJob.performLater(i, { pause: 5 });
 
-    const interruptibleSleep = vi
-      .spyOn(worker, "interruptibleSleep")
-      .mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve(null), 10)));
-    const handleThreadError = vi.spyOn(worker, "handleThreadError");
+    const delays = stubInterruptibleSleep(worker);
 
     await worker.start();
-    await sleep(1);
 
-    expect(interruptibleSleep).toHaveBeenCalledWith(minutes(10));
-    expect(interruptibleSleep).not.toHaveBeenCalledWith(worker.pollingInterval);
-    expect(handleThreadError).not.toHaveBeenCalled();
+    const firstDelay = await Timeout.timeout(1, null, null, () => delays.pop());
+
+    expect(firstDelay).toEqual(minutes(10));
   });
 
   it("sleeps `polling_interval` if worker not at capacity", async () => {
-    for (let i = 0; i < 2; i++) await StoreResultJob.performLater(i, { pause: 1 });
+    for (let i = 0; i < 2; i++) await StoreResultJob.performLater(i, { pause: 5 });
 
-    const interruptibleSleep = vi
-      .spyOn(worker, "interruptibleSleep")
-      .mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve(null), 10)));
-    const handleThreadError = vi.spyOn(worker, "handleThreadError");
+    const delays = stubInterruptibleSleep(worker);
 
     await worker.start();
-    await sleep(1);
 
-    expect(interruptibleSleep).toHaveBeenCalledWith(worker.pollingInterval);
-    expect(interruptibleSleep).not.toHaveBeenCalledWith(minutes(10));
-    expect(handleThreadError).not.toHaveBeenCalled();
+    const firstDelay = await Timeout.timeout(1, null, null, () => delays.pop());
+
+    expect(firstDelay).toEqual(worker.pollingInterval);
   });
+
+  function stubInterruptibleSleep(worker: Worker): Queue<unknown> {
+    const delays = new Queue<unknown>();
+
+    vi.spyOn(worker, "handleThreadError").mockImplementation(() => {});
+    vi.spyOn(worker, "interruptibleSleep").mockImplementation(async (delay) => {
+      delays.push(delay);
+      await sleep(0.01);
+      return null;
+    });
+
+    return delays;
+  }
 });

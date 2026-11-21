@@ -90,7 +90,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
     run = runSupervisor({ workers: [defaultWorker], dispatchers: [dispatcher] });
 
-    await waitForRegisteredProcesses(5, { timeout: 10 });
+    await waitForRegisteredProcesses(5, { timeout: 3 });
   });
 
   afterEach(async () => {
@@ -104,7 +104,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
   });
 
-  it("run several conflicting jobs over the same record sequentially", async () => {
+  it("run several conflicting jobs over the same record without overlapping", async () => {
     for (const name of new Range("A", "F").toA()) {
       await NonOverlappingUpdateResultJob.performLater(result, { name, pause: 0.2 });
     }

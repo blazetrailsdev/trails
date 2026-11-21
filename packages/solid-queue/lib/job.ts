@@ -65,6 +65,7 @@ export class Job extends Record {
   declare isClaimed: typeof Executable.prototype.isClaimed;
   declare isFailed: typeof Executable.prototype.isFailed;
   declare static finished: () => Relation<Job>;
+  declare static failed: () => Relation<Job>;
   declare static clearable: (options?: {
     finishedBefore?: unknown;
     className?: string | null;

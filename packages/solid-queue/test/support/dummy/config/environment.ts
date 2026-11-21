@@ -25,18 +25,14 @@ for (const railtie of [ActiveJobTrailtie, Engine]) {
   }
 }
 
-for (const job of [
-  "../../job-result.js",
-  "../../add-to-buffer-job.js",
-  "../../batch-completion-job.js",
-  "../../discardable-update-result-job.js",
-  "../../large-error-message-job.js",
-  "../../non-overlapping-update-result-job.js",
-  "../../provider-job-id-job.js",
-  "../../raising-job.js",
-  "../../stalled-worker.js",
-  "../../throttled-update-result-job.js",
-  "../../update-result-job.js",
-]) {
-  await import(job);
-}
+await import("../../job-result.js");
+await import("../../add-to-buffer-job.js");
+await import("../../batch-completion-job.js");
+await import("../../discardable-update-result-job.js");
+await import("../../large-error-message-job.js");
+await import("../../non-overlapping-update-result-job.js");
+await import("../../provider-job-id-job.js");
+await import("../../raising-job.js");
+await import("../../stalled-worker.js");
+await import("../../throttled-update-result-job.js");
+await import("../../update-result-job.js");

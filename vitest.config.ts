@@ -674,7 +674,10 @@ export default defineConfig({
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
           // instead of re-issuing the DDL per file. No-op on PG/MySQL runs.
-          globalSetup: ["./packages/activerecord/test/support/template-global-setup.ts"],
+          globalSetup: [
+            "./packages/activerecord/test/support/template-global-setup.ts",
+            "./packages/solid-queue/test/support/fork-bundle-global-setup.ts",
+          ],
           setupFiles: [
             "./packages/activerecord/test/support/test-setup-worker-db.ts",
             "./packages/vitest-matchers/lib/setup.ts",
