@@ -25,7 +25,7 @@ interface TmHandle {
 
 describe("withTransactionalFixtures", () => {
   let adapter: TestDatabaseAdapter;
-  const a = (): AdapterWithExec => adapter as unknown as AdapterWithExec;
+  const a = (): AdapterWithExec => adapter;
 
   beforeAll(async () => {
     adapter = await primaryAdapter();

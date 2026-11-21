@@ -104,7 +104,7 @@ describe("AssociationValidationTest", () => {
     expect(await r.isValid()).toBeFalsy();
     expect(r.errors.messagesFor("topic").length > 0).toBeTruthy();
 
-    r.topic = (await Topic.first()) as Topic;
+    r.topic = await Topic.first();
     expect(await r.isValid()).toBeTruthy();
   });
 

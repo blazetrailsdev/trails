@@ -65,7 +65,7 @@ export const TestHelper = {
   },
 
   async setup(this: TestHelper): Promise<void> {
-    this.connection = (await Base.leaseConnection()) as unknown as AbstractAdapter;
+    this.connection = await Base.leaseConnection();
     await this.connection.createTable("test_models", {}, (t) => {
       t.timestamps({ null: true });
     });

@@ -275,7 +275,7 @@ describe("QueryCacheTest", () => {
     const post = await Post.first();
     await Post.cache(async () => {
       const query = post!.categories.select("post_id");
-      assert((await (await Post.leaseConnection()).selectAll(query as never)) instanceof Result);
+      assert((await (await Post.leaseConnection()).selectAll(query)) instanceof Result);
     });
   });
 
@@ -342,8 +342,8 @@ describe("QueryCacheTest", () => {
   it("select all with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, async () => {
-        await (await Post.leaseConnection()).selectAll(Post.all() as never);
-        await (await Post.leaseConnection()).selectAll(Post.all() as never);
+        await (await Post.leaseConnection()).selectAll(Post.all());
+        await (await Post.leaseConnection()).selectAll(Post.all());
       });
     });
   });
@@ -351,8 +351,8 @@ describe("QueryCacheTest", () => {
   it("select one with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, async () => {
-        await (await Post.leaseConnection()).selectOne(Post.all() as never);
-        await (await Post.leaseConnection()).selectOne(Post.all() as never);
+        await (await Post.leaseConnection()).selectOne(Post.all());
+        await (await Post.leaseConnection()).selectOne(Post.all());
       });
     });
   });
@@ -360,8 +360,8 @@ describe("QueryCacheTest", () => {
   it("select value with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, async () => {
-        await (await Post.leaseConnection()).selectValue(Post.all() as never);
-        await (await Post.leaseConnection()).selectValue(Post.all() as never);
+        await (await Post.leaseConnection()).selectValue(Post.all());
+        await (await Post.leaseConnection()).selectValue(Post.all());
       });
     });
   });
@@ -369,8 +369,8 @@ describe("QueryCacheTest", () => {
   it("select values with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, async () => {
-        await (await Post.leaseConnection()).selectValues(Post.all() as never);
-        await (await Post.leaseConnection()).selectValues(Post.all() as never);
+        await (await Post.leaseConnection()).selectValues(Post.all());
+        await (await Post.leaseConnection()).selectValues(Post.all());
       });
     });
   });
@@ -378,8 +378,8 @@ describe("QueryCacheTest", () => {
   it("select rows with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, async () => {
-        await (await Post.leaseConnection()).selectRows(Post.all() as never);
-        await (await Post.leaseConnection()).selectRows(Post.all() as never);
+        await (await Post.leaseConnection()).selectRows(Post.all());
+        await (await Post.leaseConnection()).selectRows(Post.all());
       });
     });
   });
@@ -441,7 +441,7 @@ describe("QueryCacheTest", () => {
     }
 
     const savedLogger = Base.logger;
-    Base.logger = new Logger({ write: () => {} }) as never;
+    Base.logger = new Logger({ write: () => {} });
     const logger = new ShouldNotHaveExceptionsLogger();
     const sub = Notifications.subscribe("sql.active_record", (e) => logger.sql(e));
     try {

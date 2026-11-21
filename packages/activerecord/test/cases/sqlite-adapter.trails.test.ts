@@ -178,7 +178,7 @@ describe("SQLite adapter driver binding", () => {
           if (prop === "close") {
             return async () => {
               await closeGate;
-              (target.close as () => void)();
+              await target.close();
               closed = true;
             };
           }
@@ -226,7 +226,7 @@ describe("SQLite adapter driver binding", () => {
         get(target, prop) {
           if (prop === "close") {
             return async () => {
-              (target.close as () => void)();
+              await target.close();
               throw new Error("close failed");
             };
           }
@@ -286,7 +286,7 @@ describe("SQLite adapter driver binding", () => {
         new SQLite3Adapter({
           database: ":memory:",
           driver: asyncOnlyDriver,
-        }) as unknown as DatabaseAdapter,
+        }),
     );
     const dbConfig = new HashConfig("test", "primary", { adapter });
     const poolConfig = new PoolConfig(
@@ -320,7 +320,7 @@ describe("SQLite adapter driver binding", () => {
           if (prop === "close") {
             return async () => {
               await closeGate;
-              (target.close as () => void)();
+              await target.close();
               closed = true;
             };
           }
@@ -330,7 +330,7 @@ describe("SQLite adapter driver binding", () => {
       });
     });
     const adapter = await registerTestAdapter(
-      () => new SQLite3Adapter({ database: ":memory:", driver }) as unknown as DatabaseAdapter,
+      () => new SQLite3Adapter({ database: ":memory:", driver }),
     );
     const dbConfig = new HashConfig("test", "primary", { adapter });
     const poolConfig = new PoolConfig(
@@ -358,7 +358,7 @@ describe("SQLite adapter driver binding", () => {
         new SQLite3Adapter({
           database: ":memory:",
           driver: betterSqlite3Driver,
-        }) as unknown as DatabaseAdapter,
+        }),
     );
     const dbConfig = new HashConfig("test", "primary", { adapter });
     const poolConfig = new PoolConfig(
@@ -393,7 +393,7 @@ describe("SQLite adapter driver binding", () => {
           if (prop === "close") {
             return async () => {
               await gate;
-              (target.close as () => void)();
+              await target.close();
               closed = true;
             };
           }
@@ -423,13 +423,13 @@ describe("SQLite adapter driver binding", () => {
             const value = Reflect.get(target, prop, target);
             return typeof value === "function" ? value.bind(target) : value;
           },
-        }) as unknown as DatabaseAdapter,
+        }),
     );
     const pool = new ConnectionPool(poolConfig);
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE reload_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS reload_t", "SCHEMA");
-    pool.checkin(conn as unknown as DatabaseAdapter);
+    pool.checkin(conn);
 
     const draining = pool.clearReloadableConnections();
     expect(isClosed()).toBe(false);
@@ -441,14 +441,12 @@ describe("SQLite adapter driver binding", () => {
   it("pool flushBang drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     const pool = new ConnectionPool(
-      await makePoolConfig(
-        () => new SQLite3Adapter({ database: ":memory:", driver }) as unknown as DatabaseAdapter,
-      ),
+      await makePoolConfig(() => new SQLite3Adapter({ database: ":memory:", driver })),
     );
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE flush_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS flush_t", "SCHEMA");
-    pool.checkin(conn as unknown as DatabaseAdapter);
+    pool.checkin(conn);
 
     const draining = pool.flushBang();
     expect(isClosed()).toBe(false);
@@ -460,9 +458,7 @@ describe("SQLite adapter driver binding", () => {
   it("pool discardBang drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     const pool = new ConnectionPool(
-      await makePoolConfig(
-        () => new SQLite3Adapter({ database: ":memory:", driver }) as unknown as DatabaseAdapter,
-      ),
+      await makePoolConfig(() => new SQLite3Adapter({ database: ":memory:", driver })),
     );
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE discard_t (id INTEGER PRIMARY KEY)", "SCHEMA");
@@ -492,13 +488,13 @@ describe("SQLite adapter driver binding", () => {
               const value = Reflect.get(target, prop, target);
               return typeof value === "function" ? value.bind(target) : value;
             },
-          }) as unknown as DatabaseAdapter,
+          }),
       ),
     );
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE swap_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS swap_t", "SCHEMA");
-    pool.checkin(conn as unknown as DatabaseAdapter);
+    pool.checkin(conn);
 
     failCheckout = true;
     const rejection = expect(pool.checkout()).rejects.toThrow(/checkout boom/);
@@ -515,13 +511,13 @@ describe("SQLite adapter driver binding", () => {
           new SQLite3Adapter({
             database: ":memory:",
             driver: betterSqlite3Driver,
-          }) as unknown as DatabaseAdapter,
+          }),
       ),
     );
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE sync_seam_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS sync_seam_t", "SCHEMA");
-    pool.checkin(conn as unknown as DatabaseAdapter);
+    pool.checkin(conn);
     await expect(pool.flushBang()).resolves.toBeUndefined();
     await expect(pool.clearReloadableConnections()).resolves.toBeUndefined();
     await expect(pool.discardBang()).resolves.toBeUndefined();
@@ -552,7 +548,7 @@ describe("SQLite adapter driver binding", () => {
         const value = Reflect.get(target, prop, target);
         return typeof value === "function" ? value.bind(target) : value;
       },
-    }) as unknown as SqliteConnection;
+    });
   });
 
   it("configureConnection sends each pragma setter to the raw connection's execute", async () => {
@@ -570,7 +566,7 @@ describe("SQLite adapter driver binding", () => {
           const value = Reflect.get(target, prop, target);
           return typeof value === "function" ? value.bind(target) : value;
         },
-      }) as unknown as SqliteConnection;
+      });
     });
     const adapter = await new SQLite3Adapter({
       database: ":memory:",
@@ -615,7 +611,7 @@ describe("SQLite adapter driver binding", () => {
           const value = Reflect.get(target, prop, target);
           return typeof value === "function" ? value.bind(target) : value;
         },
-      }) as unknown as SqliteConnection;
+      });
     });
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: utf16Driver });
     expect(await adapter.encoding()).toBe("UTF-16le");

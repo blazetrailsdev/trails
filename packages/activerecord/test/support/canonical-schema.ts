@@ -175,7 +175,7 @@ export async function emitTableIndexes(
       unique: opts.unique,
       where: opts.where,
       name: opts.name,
-      order: opts.order as Record<string, string> | undefined,
+      order: opts.order,
       length: opts.length,
       nullsNotDistinct: opts.nullsNotDistinct,
       using: opts.using,

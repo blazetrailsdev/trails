@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Base } from "../../../lib/index.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import { CpkBook, CpkAuthor, CpkChapter } from "../../models/cpk.js";
 import { nodeAt, nodePaths, aliasTrackerFor } from "../../support/join-dependency-paths.js";
@@ -21,26 +20,16 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   }
 
   it("eagerLoad('chapters') builds a composite FK↔PK tuple JOIN node", () => {
-    const jd = new JoinDependency(
-      CpkBook as unknown as typeof Base,
-      CpkBook.arelTable,
-      "chapters",
-      Nodes.OuterJoin,
-    );
+    const jd = new JoinDependency(CpkBook, CpkBook.arelTable, "chapters", Nodes.OuterJoin);
     expect(nodePaths(jd)).toEqual(["chapters"]);
   });
 
   it("eagerLoad('order') builds a composite-FK belongsTo JOIN node", () => {
-    const jd = new JoinDependency(
-      CpkBook as unknown as typeof Base,
-      CpkBook.arelTable,
-      "order",
-      Nodes.OuterJoin,
-    );
+    const jd = new JoinDependency(CpkBook, CpkBook.arelTable, "order", Nodes.OuterJoin);
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     const node = nodeAt(jd, "order");
     expect(node).not.toBeNull();
-    const outerJoin = joins[0] as Nodes.OuterJoin;
+    const outerJoin = joins[0];
     const on = outerJoin.right as Nodes.On;
     const and = on.expr as Nodes.And;
     expect(and.children).toHaveLength(2);
@@ -94,7 +83,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   it("pluck of a nested-hash spec's inner composite-FK belongsTo joins both segments", async () => {
     await seedBooks();
     const jd = new JoinDependency(
-      CpkBook as unknown as typeof Base,
+      CpkBook,
       CpkBook.arelTable,
       { chapters: "book" },
       Nodes.OuterJoin,

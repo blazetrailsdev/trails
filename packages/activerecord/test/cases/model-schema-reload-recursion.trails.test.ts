@@ -62,7 +62,7 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     Ticket.columnNames();
     expect(own<unknown>(Ticket, "_columnNames")).toBeDefined();
 
-    reloadSchemaFromCache.call(Shape as never);
+    reloadSchemaFromCache.call(Shape);
 
     expect(own<unknown>(Ticket, "_columnNames")).toBeUndefined();
 
@@ -96,7 +96,7 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(true);
     const shapeLoadedBefore = own<boolean>(Shape, "_schemaLoaded");
 
-    reloadSchemaFromCache.call(Ticket as never);
+    reloadSchemaFromCache.call(Ticket);
 
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeUndefined();
     expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(false);
@@ -123,7 +123,7 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     Shape.yamlEncoder();
     expect(own<unknown>(Shape, "_yamlEncoder")).toBeDefined();
 
-    reloadSchemaFromCache.call(Shape as never, false);
+    reloadSchemaFromCache.call(Shape, false);
 
     expect(own<unknown>(Shape, "_yamlEncoder")).toBeUndefined();
     expect(own<boolean>(Shape, "_schemaLoaded")).toBe(false);

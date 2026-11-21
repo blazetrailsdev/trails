@@ -132,10 +132,10 @@ describe("STI subclass attribute() registration", () => {
         return col.sqlType === "uuid" ? new UuidT() : null;
       },
     });
-    await establishConnectionTo(Shape, adapter as never);
+    await establishConnectionTo(Shape, adapter);
 
-    await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Shape);
-    await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Circle);
+    await loadSchemaFromAdapter.call(Shape);
+    await loadSchemaFromAdapter.call(Circle);
 
     expect(Shape.typeForAttribute("guid").type()).toBe("uuid");
     expect(attributeNamesOf(Shape)).not.toContain("radius");

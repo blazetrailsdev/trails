@@ -15,7 +15,7 @@ Post.attribute("title", "string");
 Post.attribute("body", "text");
 
 function relation(): Relation<Post> {
-  return Post.all() as unknown as Relation<Post>;
+  return Post.all();
 }
 
 describe("Relation private build-arel helpers", () => {
@@ -148,9 +148,7 @@ describe("Relation private build-arel helpers", () => {
     });
 
     it("throws TypeError on unsupported value shape", () => {
-      expect(() => relation().arelColumnsFromHash({ comments: 42 as unknown as string })).toThrow(
-        TypeError,
-      );
+      expect(() => relation().arelColumnsFromHash({ comments: 42 })).toThrow(TypeError);
     });
   });
 

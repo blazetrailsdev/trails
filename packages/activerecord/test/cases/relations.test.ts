@@ -1920,8 +1920,8 @@ describe("RelationTest", () => {
       assertNotPredicate(results, (r) => r.length === 0);
       return results.shift();
     };
-    vi.spyOn(Relation.prototype as any, "findBy").mockImplementation(findByMock as any);
-    vi.spyOn(Relation.prototype as any, "findByBang").mockImplementation(findByMock as any);
+    vi.spyOn(Relation.prototype as any, "findBy").mockImplementation(findByMock);
+    vi.spyOn(Relation.prototype as any, "findByBang").mockImplementation(findByMock);
 
     expect((await relation.findOrCreateBy({ nick: "bob" }))!.equals(bob)).toBe(true);
 

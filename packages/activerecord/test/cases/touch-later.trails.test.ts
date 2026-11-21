@@ -27,7 +27,7 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
       return origWrite(attr, val);
     };
 
-    surreptitiouslyTouch.call(inv as never, ["updated_at"]);
+    surreptitiouslyTouch.call(inv, ["updated_at"]);
 
     expect(written).toEqual([["updated_at", touchTime]]);
     expect(inv.attributeChanged("updated_at")).toBe(false);
@@ -56,7 +56,7 @@ describe("touchDeferredAttributes delegates to timestampTouch with deferred time
     inv._deferTouchAttrs = ["updated_at"];
     inv._touchTime = fixedTime;
 
-    await touchDeferredAttributes.call(inv as never);
+    await touchDeferredAttributes.call(inv);
 
     expect(inv._deferTouchAttrs).toBeNull();
     expect(inv._touchTime).toBeNull();

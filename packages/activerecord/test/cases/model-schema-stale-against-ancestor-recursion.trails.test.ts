@@ -35,7 +35,7 @@ describe("loadSchema — subclass left stale by an ancestor invalidation", () =>
     }
     await establishConnectionTo(Topic, makeAdapter() as never);
 
-    reloadSchemaFromCache.call(Base as never);
+    reloadSchemaFromCache.call(Base);
 
     expect(() => loadSchema.call(Topic as never)).not.toThrow();
     expect(Topic.columnsHash()).toEqual({});

@@ -39,9 +39,7 @@ describe("SelectTest", () => {
     const expected = new RegExp(
       `^SELECT 1 AS ${q("a")}, foo\\(\\) AS ${q("b")}, ${q("bar")} AS ${q("c")} FROM`,
     );
-    expect(Post.select({ "1": ":a", "foo()": ":b", ":bar": ":c" } as never).toSql()).toMatch(
-      expected,
-    );
+    expect(Post.select({ "1": ":a", "foo()": ":b", ":bar": ":c" }).toSql()).toMatch(expected);
   });
 
   it("select with hash argument", async () => {
@@ -76,11 +74,9 @@ describe("SelectTest", () => {
 
   it("select with not exists field", async () => {
     const expected = new RegExp(`^SELECT ${q("foo")} AS ${q("post_title")} FROM`);
-    expect(Post.select({ [":foo"]: ":post_title" } as never).toSql()).toMatch(expected);
+    expect(Post.select({ [":foo"]: ":post_title" }).toSql()).toMatch(expected);
 
-    await expect(Post.select({ [":foo"]: ":post_title" } as never).take()).rejects.toThrow(
-      StatementInvalid,
-    );
+    await expect(Post.select({ [":foo"]: ":post_title" }).take()).rejects.toThrow(StatementInvalid);
   });
 
   it("select with hash with not exists field", async () => {

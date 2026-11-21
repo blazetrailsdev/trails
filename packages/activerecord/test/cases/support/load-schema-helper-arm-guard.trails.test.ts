@@ -102,7 +102,7 @@ describe("load_schema arm-probe guard", () => {
         get: (target, prop) => Reflect.get(target, prop, target),
       });
 
-      await loadSchema(passthrough as unknown as AbstractAdapter);
+      await loadSchema(passthrough);
       expect(await passthrough.tables()).toContain("topics");
     });
   });

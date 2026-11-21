@@ -113,7 +113,7 @@ describe("QueryLogsTest", () => {
   it("update is commented", async () => {
     QueryLogs.tags = ["application"];
     await self().assertQueriesMatch(/\/\*application:active_record\*\//, {}, async () => {
-      const dash = (await Dashboard.first()) as (Dashboard & { name: string }) | null;
+      const dash: (Dashboard & { name: string }) | null = await Dashboard.first();
       dash!.name = "New name";
       await dash!.save();
     });

@@ -390,7 +390,7 @@ describe("UpdateAllTest", () => {
 
     const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
     const expected = (await pplScope.pluck("lock_version")).map((v) => v + 1);
-    await pplScope.updateCounters({ touch: { time: now } } as any);
+    await pplScope.updateCounters({ touch: { time: now } });
 
     const updatedAts = await pplScope.pluck("updated_at");
     updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(epochMs(now)));

@@ -601,7 +601,7 @@ describe("UniquenessValidationTest", () => {
       conditions: function (this: any, record: any) {
         return this.where({ author_name: record.readAttribute("author_name") });
       },
-    } as any);
+    });
 
     const todays = new Topic({ title: "Highlights of the Day", author_name: "A" });
     expect(await todays.save()).toBeTruthy();

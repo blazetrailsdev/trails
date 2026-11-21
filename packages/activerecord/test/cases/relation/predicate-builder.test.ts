@@ -73,7 +73,7 @@ describe("PredicateBuilderTest", () => {
     Topic.predicateBuilder.registerHandler(RegexFilter, regexpHandler);
     try {
       const sql = RegexpReply.joins(":regexp_topic")
-        .references(new Nodes.SqlLiteral("regexp_topic") as any)
+        .references(new Nodes.SqlLiteral("regexp_topic"))
         .toSql();
       expect(sql).toMatch(
         new RegExp(`${regexpEscape(self().quoteTableName("regexp_topic.title"))} ~ 'rails'`, "i"),

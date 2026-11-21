@@ -198,7 +198,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     constSet(TopLevel, "Circle", Circle);
     DescendantsTracker.registerSubclass(Shape, Circle);
-    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Shape);
+    await resetColumnInformation.call(Shape);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
 
@@ -251,7 +251,7 @@ describe("sync loadSchema / columnsHash", () => {
     for (const key of memoKeys)
       (Circle as unknown as Record<string, unknown>)[key] = { stale: true };
 
-    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Shape);
+    await resetColumnInformation.call(Shape);
 
     for (const key of memoKeys) {
       expect((Circle as unknown as Record<string, unknown>)[key], key).toBeFalsy();
@@ -277,7 +277,7 @@ describe("sync loadSchema / columnsHash", () => {
     SpecialPost.columnsHash();
     expect((SpecialPost as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
 
-    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Post);
+    await resetColumnInformation.call(Post);
 
     expect((SpecialPost as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
     expect((SpecialPost as unknown as { _columnsHash: unknown })._columnsHash == null).toBe(true);
@@ -296,7 +296,7 @@ describe("sync loadSchema / columnsHash", () => {
     await establishConnectionTo(Shape, makeAdapter(cols) as never);
     Shape.columnsHash();
 
-    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Circle);
+    await resetColumnInformation.call(Circle);
 
     expect(Object.keys(Shape.columnsHash())).toContain("guid");
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
@@ -350,11 +350,11 @@ describe("sync loadSchema / columnsHash", () => {
     }
     const cols = { id: { sqlType: "integer", name: "id", default: null } };
     const built = makeResettableAdapter(cols);
-    await establishConnectionTo(Post, built.adapter as never);
+    await establishConnectionTo(Post, built.adapter);
     Post.columnsHash();
 
     built.calls.clear = 0;
-    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Post);
+    await resetColumnInformation.call(Post);
 
     expect(built.calls.clear).toBe(1);
     expect(built.isWarm()).toBe(false);

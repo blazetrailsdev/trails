@@ -28,7 +28,7 @@ describe("StatementCacheTest", () => {
     await Book.create({ name: "my other book" });
 
     const cache = StatementCache.create(await ClothingItem.leaseConnection(), (params) => {
-      return Book.where({ name: params.bind() }) as any;
+      return Book.where({ name: params.bind() });
     });
 
     let b = await cache.execute(["my book"], await ClothingItem.leaseConnection());
@@ -42,7 +42,7 @@ describe("StatementCacheTest", () => {
     const b2 = await Book.create({ name: "my other book" });
 
     const cache = StatementCache.create(await ClothingItem.leaseConnection(), (params) => {
-      return Book.where({ id: params.bind() }) as any;
+      return Book.where({ id: params.bind() });
     });
 
     let b = await cache.execute([b1.id], await ClothingItem.leaseConnection());
@@ -63,7 +63,7 @@ describe("StatementCacheTest", () => {
 
   it("statement cache with simple statement", async () => {
     const cache = StatementCache.create(await ClothingItem.leaseConnection(), () => {
-      return Book.where({ name: "my book" }).where("author_id > 3") as any;
+      return Book.where({ name: "my book" }).where("author_id > 3");
     });
 
     await Book.create({ name: "my book", author_id: 4 });
@@ -77,7 +77,7 @@ describe("StatementCacheTest", () => {
       return Liquid.joins({ ":molecules": ":electrons" }).where({
         "molecules.name": "dioxane",
         "electrons.name": "lepton",
-      }) as any;
+      });
     });
 
     const salty = await Liquid.create({ name: "salty" });
@@ -95,7 +95,7 @@ describe("StatementCacheTest", () => {
 
   it("statement cache values differ", async () => {
     const cache = StatementCache.create(await ClothingItem.leaseConnection(), () => {
-      return Book.where({ name: "my book" }) as any;
+      return Book.where({ name: "my book" });
     });
 
     for (let i = 0; i < 3; i++) await Book.create({ name: "my book" });

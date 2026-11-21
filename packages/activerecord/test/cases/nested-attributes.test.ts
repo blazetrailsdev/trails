@@ -462,7 +462,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 
   it("should modify an existing record if there is a matching composite id", async () => {
     const { pirate, ship } = await setup();
-    vi.spyOn(ship, "id", "get").mockReturnValue("ABC1X" as any);
+    vi.spyOn(ship, "id", "get").mockReturnValue("ABC1X");
     await (pirate as any).setShipAttributes({ id: ship.id, name: "Davy Jones Gold Dagger" });
     expect((pirate.association("ship") as any).target.name).toBe("Davy Jones Gold Dagger");
   });
@@ -694,7 +694,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 
   it("should modify an existing record if there is a matching composite id", async () => {
     const { ship, pirate } = await setup();
-    vi.spyOn(pirate, "id", "get").mockReturnValue("ABC1X" as any);
+    vi.spyOn(pirate, "id", "get").mockReturnValue("ABC1X");
     await (ship as any).setPirateAttributes({ id: pirate.id, catchphrase: "Arr" });
     expect((ship.association("pirate") as any).target.catchphrase).toBe("Arr");
   });
@@ -874,7 +874,7 @@ function collectionAssociationTests(
 
   it("should take a hash with string keys and assign the attributes to the associated models", async () => {
     const { pirate, child1, child2 } = await buildSetup();
-    await pirate.update({ [setter]: await alternateParams(child1, child2) } as any);
+    await pirate.update({ [setter]: await alternateParams(child1, child2) });
     expect([
       (await childClass.find(child1.id)).name,
       (await childClass.find(child2.id)).name,
@@ -1064,7 +1064,7 @@ function collectionAssociationTests(
     await pirate.update({
       catchphrase: "Arr",
       [setter]: { foo: { id: child1.id, name: "Grace OMalley" } },
-    } as any);
+    });
     expect((await childClass.find(child1.id)).name).toBe("Grace OMalley");
   });
 
@@ -1077,7 +1077,7 @@ function collectionAssociationTests(
       1,
       null,
       async () => {
-        await pirate.update({ [setter]: params } as any);
+        await pirate.update({ [setter]: params });
       },
     );
     const reloaded = await pirate.reload();

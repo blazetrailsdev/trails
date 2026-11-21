@@ -607,7 +607,7 @@ describe("WhereTest", () => {
     const author = authors("david") as any;
     const params = new ProtectedParams({ name: author.name });
     expect(() => Author.where(params as any)).toThrow(ForbiddenAttributesError);
-    const found = await Author.where(params.permitBang() as any).first();
+    const found = await Author.where(params.permitBang()).first();
     expect((found as any).id).toBe(author.id);
   });
 

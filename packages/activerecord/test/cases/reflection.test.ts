@@ -267,7 +267,7 @@ describe("ReflectionTest", () => {
   it("reflection klass for nested class name", async () => {
     const reflection = createReflection(
       "hasMany",
-      null as unknown as string,
+      null,
       null,
       { className: "MyApplication::Business::Company" },
       Customer,
@@ -460,13 +460,7 @@ describe("ReflectionTest", () => {
   });
   it("class for class name", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
-      createReflection(
-        "hasMany",
-        "clients",
-        null,
-        { className: Client as unknown as string },
-        Firm,
-      );
+      createReflection("hasMany", "clients", null, { className: Client }, Firm);
     });
     expect(error.message).toBe(
       "A class was passed to `:class_name` but we are expecting a string.",
@@ -478,7 +472,7 @@ describe("ReflectionTest", () => {
         "hasMany",
         "taggedPosts",
         null,
-        { through: "taggings", source: "taggable", sourceType: CanonicalPost as unknown as string },
+        { through: "taggings", source: "taggable", sourceType: CanonicalPost },
         Tag,
       );
     });

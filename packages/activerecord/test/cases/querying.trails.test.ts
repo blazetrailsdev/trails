@@ -256,13 +256,13 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
 describe("_loadFromSql — STI detection (Story J gap 2)", () => {
   it("dispatches to the correct STI subclass when inheritance column is present", () => {
     const rows = [{ id: 1, type: Reply.name, title: "Rex" }];
-    const records = _loadFromSql.call(Topic as typeof Base, resultFromRowHashes(rows));
+    const records = _loadFromSql.call(Topic, resultFromRowHashes(rows));
     expect(records[0]).toBeInstanceOf(Reply);
   });
 
   it("instantiates as the base class when inheritance column is absent from result set", () => {
     const rows = [{ id: 1, title: "Rex" }];
-    const records = _loadFromSql.call(Topic as typeof Base, resultFromRowHashes(rows));
+    const records = _loadFromSql.call(Topic, resultFromRowHashes(rows));
     expect(records[0]).toBeInstanceOf(Topic);
   });
 
@@ -273,7 +273,7 @@ describe("_loadFromSql — STI detection (Story J gap 2)", () => {
   it("instantiates STI rows from indexedRows without materializing a hash per row", () => {
     const resultSet = new Result(["id", "type", "title"], [[1, Reply.name, "Rex"]]);
     const toArray = vi.spyOn(resultSet, "toArray");
-    const records = _loadFromSql.call(Topic as typeof Base, resultSet);
+    const records = _loadFromSql.call(Topic, resultSet);
     expect(toArray).not.toHaveBeenCalled();
     expect(records[0]).toBeInstanceOf(Reply);
     expect(records[0].readAttribute("title")).toBe("Rex");
@@ -284,7 +284,7 @@ describe("_loadFromSql — STI detection (Story J gap 2)", () => {
   it("instantiates non-STI rows from indexedRows without materializing a hash per row", () => {
     const resultSet = new Result(["id", "title"], [[1, "Rex"]]);
     const toArray = vi.spyOn(resultSet, "toArray");
-    const records = _loadFromSql.call(Topic as typeof Base, resultSet);
+    const records = _loadFromSql.call(Topic, resultSet);
     expect(toArray).not.toHaveBeenCalled();
     expect(records[0]).toBeInstanceOf(Topic);
     expect(records[0].readAttribute("title")).toBe("Rex");
