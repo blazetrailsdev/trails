@@ -332,6 +332,7 @@ describe("empty-string describe titles", () => {
         for (const [s, z, i] of [
           [1193898300, "UTC", "2007-11-01T06:25:00Z"],
           ["2017-06-21 Europe/Paris", null, "2017-06-21T00:00:00+02:00"],
+          [0, null, "a#{b} #$c #@d #e"],
         ]) {
           it(\`returns \${rbInspect(i)}\`, () => {});
         }
@@ -339,6 +340,7 @@ describe("empty-string describe titles", () => {
     ).toEqual([
       ['returns "2007-11-01T06:25:00Z"', false],
       ['returns "2017-06-21T00:00:00+02:00"', false],
+      ['returns "a\\#{b} \\#$c \\#@d #e"', false],
     ]);
   });
 

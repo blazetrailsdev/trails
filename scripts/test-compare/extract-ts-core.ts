@@ -1233,7 +1233,9 @@ function evalBoundExpression(
     e.arguments.length === 1
   ) {
     const inner = evalBoundExpression(e.arguments[0], bindings);
-    return inner === null || !/^[ -~]*$/.test(inner) ? null : JSON.stringify(inner);
+    return inner === null || !/^[ -~]*$/.test(inner)
+      ? null
+      : JSON.stringify(inner).replace(/#(?=[{$@])/g, "\\#");
   }
   if (
     ts.isCallExpression(e) &&
