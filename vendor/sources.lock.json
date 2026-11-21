@@ -192,6 +192,10 @@
       "ref": "v2.0.6",
       "sha": "d5893c99bbcd842af86023f02a84fac1659b3031"
     },
+    "tzinfo-data": {
+      "ref": "v1.2026.5",
+      "sha": "8df8badc7bed5b6ad5b54440dd9985be8ef54121"
+    },
     "vite_ruby": {
       "ref": "vite_ruby@3.11.1",
       "sha": "77de9ea2b94044d72622f72d44d392953843a1d7"

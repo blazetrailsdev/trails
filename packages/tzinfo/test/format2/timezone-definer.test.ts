@@ -3,7 +3,7 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { TimezoneOffset, TimezoneTransition } from "../../lib/index.js";
 import { TimezoneDefiner } from "../../lib/format2/timezone-definer.js";
 import { StringDeduper } from "../../lib/string-deduper.js";
-import { assertRaises } from "../test-utils.js";
+import { assertRaises } from "../support/test-utils.js";
 
 describe("TCTimezoneDefiner", () => {
   let stringDeduper: StringDeduper;

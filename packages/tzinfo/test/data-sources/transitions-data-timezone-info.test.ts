@@ -7,7 +7,7 @@ import {
   TransitionsDataTimezoneInfo,
   TransitionsTimezonePeriod,
 } from "../../lib/index.js";
-import { assertRaises } from "../test-utils.js";
+import { assertRaises } from "../support/test-utils.js";
 
 function toI(...args: number[]): number {
   const [y, mo, d, h = 0, mi = 0, s = 0] = args;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { OffsetTimezonePeriod, TimezoneOffset, TimezonePeriod } from "../lib/index.js";
-import { assertRaises } from "./test-utils.js";
+import { assertRaises } from "./support/test-utils.js";
 
 describe("TCOffsetTimezonePeriod", () => {
   it("initialize", () => {

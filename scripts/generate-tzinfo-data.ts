@@ -5,14 +5,17 @@
  * `RubyDataSource.load` awaits. Each module opens its Ruby modules on the
  * `TZInfo` namespace and makes the same definer calls, in the same order.
  *
- * Run with `pnpm tsx scripts/generate-tzinfo-data.ts <src> <out> <location>`;
- * `<location>` is `TZInfo::Data::LOCATION`, the root of the load-path keys.
+ * Run with `pnpm tsx scripts/generate-tzinfo-data.ts <src> <out> <location> [js]`;
+ * `<location>` is `TZInfo::Data::LOCATION`, the root of the load-path keys,
+ * or `-` for none. `packages/tzinfo`'s `build:data` writes the vendored
+ * tzinfo-data gem to `dist/tzinfo-data` this way, as `@blazetrails/tzinfo/data`.
  * The checked-in fixtures are
  * `vendor/tzinfo/v2.0.6/test/tzinfo-data2` → `packages/tzinfo/test/tzinfo-data2`
  * (location `tzinfo-data2`), formatted with prettier after generation.
  */
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
+import { stripTypeScriptTypes } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const MIXINS: Record<string, [format: "Format1" | "Format2", mixin: string]> = {
@@ -117,8 +120,20 @@ async function rubyFiles(dir: string): Promise<string[]> {
     .sort();
 }
 
-/** Writes every module under `out`, answering the paths written. */
-export async function generate(src: string, out: string, location: string): Promise<string[]> {
+/**
+ * Writes every module under `out`, answering the paths written. A `null`
+ * location writes no `LOCATION`, as the tzinfo-data gem's own `data.rb` has
+ * none, and `"js"` writes type-stripped modules plus a `load-path.d.ts`.
+ */
+export async function generate(
+  src: string,
+  out: string,
+  location: string | null,
+  ext: "ts" | "js" = "ts",
+): Promise<string[]> {
+  const emit = async (target: string, ts: string) => {
+    await writeFile(target, ext === "js" ? stripTypeScriptTypes(ts) : ts);
+  };
   const dataDir = join(src, "tzinfo", "data");
   await rm(out, { recursive: true, force: true });
   const written: string[] = [];
@@ -126,16 +141,18 @@ export async function generate(src: string, out: string, location: string): Prom
   for (const file of await rubyFiles(dataDir)) {
     const rel = relative(src, file).replace(/\.rb$/, "");
     if (!/^tzinfo\/data\/(definitions\/|indexes\/|version$)/.test(rel)) continue;
-    const target = join(out, `${rel}.ts`);
+    const target = join(out, `${rel}.${ext}`);
     await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, translate(await readFile(file, "utf8")));
+    await emit(target, translate(await readFile(file, "utf8")));
     written.push(target);
     if (!rel.startsWith("tzinfo/data/version")) {
-      loadPath.push(`  ${JSON.stringify(`${location}/${rel}`)}: () => import("./${rel}.js"),`);
+      const key = location === null ? rel : `${location}/${rel}`;
+      loadPath.push(`  ${JSON.stringify(key)}: () => import("./${rel}.js"),`);
     }
   }
-  const data = join(out, "tzinfo", "data.ts");
-  await writeFile(
+  const data = join(out, "tzinfo", `data.${ext}`);
+  await mkdir(dirname(data), { recursive: true });
+  await emit(
     data,
     [
       'import { TopLevel } from "@blazetrails/ruby-compat";',
@@ -145,28 +162,38 @@ export async function generate(src: string, out: string, location: string): Prom
       "",
       "const TZInfo = TopLevel.TZInfo! as NonNullable<typeof TopLevel.TZInfo> & Namespace;",
       "const Data = (TZInfo.Data ??= {}) as Namespace;",
-      `Data.LOCATION = ${JSON.stringify(location)};`,
+      ...(location === null ? [] : [`Data.LOCATION = ${JSON.stringify(location)};`]),
       "",
     ].join("\n"),
   );
   written.push(data);
-  const loadPathFile = join(out, "load-path.ts");
-  await writeFile(
+  const loadPathFile = join(out, `load-path.${ext}`);
+  await emit(
     loadPathFile,
     `export const loadPath: Record<string, () => Promise<unknown>> = {\n${loadPath.join("\n")}\n};\n`,
   );
   written.push(loadPathFile);
+  if (ext === "js") {
+    const declarations = join(out, "load-path.d.ts");
+    await writeFile(
+      declarations,
+      "export declare const loadPath: Record<string, () => Promise<unknown>>;\n",
+    );
+    written.push(declarations);
+  }
   return written.sort();
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [src, out, location] = process.argv.slice(2);
-  if (!src || !out || !location) {
-    console.error("usage: generate-tzinfo-data.ts <src> <out> <location>");
+  const [src, out, location, ext] = process.argv.slice(2);
+  if (!src || !out || !location || (ext !== undefined && ext !== "js")) {
+    console.error("usage: generate-tzinfo-data.ts <src> <out> <location|-> [js]");
     process.exit(1);
   }
-  generate(src, out, location).catch((error: unknown) => {
-    console.error(error);
-    process.exit(1);
-  });
+  generate(src, out, location === "-" ? null : location, ext === "js" ? "js" : "ts").catch(
+    (error: unknown) => {
+      console.error(error);
+      process.exit(1);
+    },
+  );
 }

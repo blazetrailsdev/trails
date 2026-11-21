@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { TimezoneIndexDefiner } from "../../lib/format2/timezone-index-definer.js";
 import { StringDeduper } from "../../lib/string-deduper.js";
-import { assertArraySameItems } from "../test-utils.js";
+import { assertArraySameItems } from "../support/test-utils.js";
 
 describe("TCTimezoneIndexDefiner", () => {
   let stringDeduper: StringDeduper;

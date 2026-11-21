@@ -6,7 +6,7 @@ import {
   Timestamp,
   TimezoneOffset,
 } from "../../lib/index.js";
-import { assertRaises } from "../test-utils.js";
+import { assertRaises } from "../support/test-utils.js";
 
 const T2017 = Date.UTC(2017, 0, 1) / 1000;
 

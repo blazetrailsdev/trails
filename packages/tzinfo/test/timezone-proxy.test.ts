@@ -2,7 +2,7 @@ import { Time } from "@blazetrails/date";
 import { Marshal } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { InvalidTimezoneIdentifier, Timezone, TimezoneProxy } from "../lib/index.js";
-import { assertRaises } from "./test-utils.js";
+import { assertRaises } from "./support/test-utils.js";
 
 function assertRaisesInvalidTimezoneIdentifier(identifier: string, block: () => unknown) {
   const error = assertRaises(InvalidTimezoneIdentifier, block);

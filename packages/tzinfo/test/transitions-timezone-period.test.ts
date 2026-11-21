@@ -6,7 +6,7 @@ import {
   TimezoneTransition,
   TransitionsTimezonePeriod,
 } from "../lib/index.js";
-import { assertRaises } from "./test-utils.js";
+import { assertRaises } from "./support/test-utils.js";
 
 function fixtures() {
   const o1 = new TimezoneOffset(0, 3600, "TEST");

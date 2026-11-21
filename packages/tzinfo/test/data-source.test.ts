@@ -8,7 +8,7 @@ import {
   InvalidTimezoneIdentifier,
   TimezoneInfo,
 } from "../lib/index.js";
-import { assertRaises } from "./test-utils.js";
+import { assertRaises, assertSubProcessReturns } from "./support/test-utils.js";
 
 class InitDataSource extends DataSource {}
 
@@ -128,6 +128,25 @@ describe("TCDataSource", () => {
     const dataSource = DataSource.get();
     expect(dataSource).toBeInstanceOf(InitDataSource);
   });
+
+  it("get default ruby only", async () => {
+    await assertSubProcessReturns(["TZInfo::DataSources::RubyDataSource"], async (puts) => {
+      const { rbModName } = await import("@blazetrails/ruby-compat");
+      const { TZInfo } = await import("../lib/index.js");
+      const tzinfoData = "@blazetrails/tzinfo/data";
+      const { loadPath } = (await import(tzinfoData)) as {
+        loadPath: Record<string, () => Promise<unknown>>;
+      };
+      Object.assign(TZInfo.loadPath, loadPath);
+      await TZInfo.DataSources.RubyDataSource.load();
+
+      try {
+        puts(rbModName(TZInfo.DataSource.get().constructor));
+      } catch (e) {
+        puts(`Unexpected exception: ${e}`);
+      }
+    });
+  }, 60_000);
 
   it("set instance", () => {
     DataSource.set(new DummyDataSource());

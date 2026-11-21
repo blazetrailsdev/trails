@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { DataTimezone, DataTimezoneInfo, Timestamp } from "../../lib/index.js";
-import { assertRaises } from "../test-utils.js";
+import { assertRaises } from "../support/test-utils.js";
 
 describe("TCDataTimezoneInfo", () => {
   it("initialize nil identifier", () => {

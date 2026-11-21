@@ -467,4 +467,79 @@ describe("Ruby extractor class_eval heredoc loop expansion", () => {
     expect(cases).toEqual([]);
     expect(unexpandedLoops).toEqual([]);
   });
+
+  it("expands tzinfo's negative literals, upto, test_encodings and |(a, b)| rows", () => {
+    const { cases, unexpandedLoops } = extract(`
+  [-1, 0].each do |transition_at|
+    define_method "test_transition_at_#{transition_at}" do
+      assert_equal 1, 1
+    end
+  end
+  0.upto(1) do |n|
+    define_method("test_subsequent_rules_#{n}_args") do
+      assert_equal 1, 1
+    end
+  end
+  test_encodings('ISO-8859-1', 'UTF-8').each do |encoding|
+    define_method("test_get_with_#{encoding.to_method}_encoded_code") do
+      assert_equal 1, 1
+    end
+  end
+  [[:time, Time.utc(2016)], [:time_like, TimeLike.new(1)]].each do |(type, input)|
+    define_method("test_for_#{type}") do
+      assert_equal 1, 1
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual([
+      "transition at -1",
+      "transition at 0",
+      "subsequent rules 0 args",
+      "subsequent rules 1 args",
+      "get with iso 8859 1 encoded code",
+      "get with utf 8 encoded code",
+      "for time",
+      "for time like",
+    ]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("still reports a name that interpolates a computed cell", () => {
+    const { cases, unexpandedLoops } = extract(`
+  [['West1', -HOUR]].each do |(tz_string, offset)|
+    define_method "test_offset_#{offset}" do
+      assert_equal 1, 1
+    end
+  end
+`);
+    expect(cases).toEqual([]);
+    expect(unexpandedLoops).toHaveLength(1);
+  });
+});
+
+describe("Ruby extractor package test files", () => {
+  it("does not count tzinfo's ts_all suite runners", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tzinfo-test-files-"));
+    try {
+      for (const rel of [
+        "ts_all.rb",
+        "ts_all_zoneinfo.rb",
+        "test_utils.rb",
+        "tc_country.rb",
+        "data_sources/tc_country_info.rb",
+      ]) {
+        fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+        fs.writeFileSync(path.join(dir, rel), "require_relative 'tc_country'\n");
+      }
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        dir = ${JSON.stringify(dir)}
+        puts package_test_files("tzinfo", dir).map { |f| f.delete_prefix(dir + "/") }.sort.join("\\n")
+      `;
+      const files = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }).trim().split("\n");
+      expect(files).toEqual(["data_sources/tc_country_info.rb", "tc_country.rb"]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

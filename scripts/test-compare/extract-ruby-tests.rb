@@ -170,8 +170,15 @@ ADAPTER_SYMBOL_MAP = {
 # (activesupport/test/cache/serializer_with_fallback_test.rb:42-43).
 class LoopSymbolName < String; end
 
+LoopTestEncoding = Struct.new(:name) do
+  def to_method
+    name.downcase.gsub("-", "_")
+  end
+end
+
 LOOP_OPAQUE_HASH = Object.new.freeze
 
+LOOP_OPAQUE_CELL = Object.new.freeze
 LOOP_FALSY = { "nil" => Object.new.freeze, "false" => Object.new.freeze }.freeze
 
 def vendored_ruby_version
@@ -416,7 +423,7 @@ class TestExtractor
       iterator = inner[1]
     end
     if iterator
-      return if process_define_method_loop(iterator, block, node)
+      return if process_define_method_loop(iterator, block, node, inner)
       return if process_class_eval_loop(iterator, block, node)
       return if process_test_macro_loop(iterator, block, node)
     end
@@ -981,7 +988,7 @@ class TestExtractor
   # that is missing two thirds of its cases. Expand statically when the receiver
   # is a literal array and the generated name resolves; report the loop
   # otherwise. Returns true when the node was handled.
-  def process_define_method_loop(call, block, node)
+  def process_define_method_loop(call, block, node, inner = nil)
     return false unless block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
 
     defines = []
@@ -996,7 +1003,8 @@ class TestExtractor
     # whatever its receiver is: a receiver that isn't a literal array or hash (a
     # call chain at inflector_test.rb:68) is reported, not dropped.
     vars = block_var_names(block[1])
-    elements = loop_elements(call[1])
+    @define_method_loop = true
+    elements = ident_name(call[3]) == "upto" ? upto_elements(call[1], inner) : loop_elements(call[1])
     if vars.nil? || elements.nil?
       report_unexpanded_loop(node)
       return true
@@ -1024,6 +1032,8 @@ class TestExtractor
       end
     end
     true
+  ensure
+    @define_method_loop = false
   end
 
   # ---- class_eval heredoc loops ----
@@ -1187,11 +1197,28 @@ class TestExtractor
     return nil unless receiver.is_a?(Array)
     return array_literal_values(receiver[1]) if receiver[0] == :array
     return hash_literal_pairs(receiver) if %i[hash bare_assoc_hash].include?(receiver[0])
-    return zip_literal_pairs(receiver) if receiver[0] == :method_add_arg
+    return test_encodings_values(receiver) || zip_literal_pairs(receiver) if receiver[0] == :method_add_arg
 
     path = const_path(receiver)
     return nil unless path && path[:segments].length == 1
     @const_arrays[path[:segments].first]
+  end
+
+  def upto_elements(from, inner)
+    return nil unless from.is_a?(Array) && from[0] == :@int
+    return nil unless inner.is_a?(Array) && inner[0] == :method_add_arg
+    args = positional_args(inner[2])
+    return nil unless args && args.length == 1 && args[0].is_a?(Array) && args[0][0] == :@int
+    (Integer(from[1])..Integer(args[0][1])).map(&:to_s)
+  end
+
+  def test_encodings_values(receiver)
+    call = receiver[1]
+    return nil unless call.is_a?(Array) && call[0] == :fcall && ident_name(call[1]) == "test_encodings"
+    args = positional_args(receiver[2])
+    names = args && args.map { |arg| extract_string_content(arg) }
+    return nil if names.nil? || names.any?(&:nil?)
+    names.map { |name| LoopTestEncoding.new(name) }
   end
 
   # `[a, b].zip([c, d])`: Array#zip pairs each element with the one at the same
@@ -1215,6 +1242,7 @@ class TestExtractor
   # element, several destructure it, exactly as Ruby's block arity does.
   def loop_bindings(vars, value)
     return { vars.first => value } if vars.length == 1 && !vars.first.is_a?(Array)
+    return loop_bindings(vars.first, value) if vars.length == 1
     return nil unless value.is_a?(Array) && value.length >= vars.length
     vars.each_with_index.reduce({}) do |bound, (var, index)|
       next bound.merge(var => value[index]) unless var.is_a?(Array)
@@ -1469,10 +1497,14 @@ class TestExtractor
       node[1]
     when :@int, :@float
       node[1]
+    when :unary
+      operand = node[2]
+      @define_method_loop && node[1] == :-@ && operand.is_a?(Array) && %i[@int @float].include?(operand[0]) ? "-#{operand[1]}" : nil
     when :array
       # A table row (`["/", [:SLASH]]`) — resolved so a destructuring loop can
-      # bind each position.
-      array_literal_values(node[1])
+      return array_literal_values(node[1]) unless @define_method_loop
+      return [] if node[1].nil?
+      node[1].map { |cell| array_element_value(cell) || LOOP_OPAQUE_CELL }
     when :hash, :bare_assoc_hash
       # A hash VALUE (`{ controller: "content" }` at journey/router_test.rb:320)
       # resolves only when every key and value does, since the loop reads it
@@ -1591,10 +1623,16 @@ class TestExtractor
       return nil if taken.nil?
       eval_loop_expr(taken ? node[2] : node[3], bindings)
     when :call
+      var = node[1]
+      if var.is_a?(Array) && %i[var_ref vcall].include?(var[0]) && ident_name(node[3]) == "to_method"
+        bound = bindings[ident_name(var[1])]
+        return bound.is_a?(LoopTestEncoding) ? bound.to_method : nil
+      end
       receiver = eval_loop_expr(node[1], bindings)
       return nil if receiver.nil?
       case ident_name(node[3])
       when "name", "to_s", "to_sym" then receiver
+      when "downcase" then @define_method_loop ? receiver.downcase : nil
       when "inspect"
         receiver.is_a?(LoopSymbolName) ? receiver.to_sym.inspect : String.new(receiver).inspect
       end
@@ -2942,6 +2980,40 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
   test_files
 end
 
+UNEXPANDED_LOOP_REASONS = {
+  "tzinfo" => {
+    "data_sources/tc_posix_time_zone_parser.rb:61" =>
+      "its table is a constant (`ABBREVIATIONS_WITH_OFFSETS`) with computed cells (`-HOUR`)",
+    "data_sources/tc_posix_time_zone_parser.rb:69" =>
+      "its table is a constant (`ABBREVIATIONS_WITH_OFFSETS`) with computed cells (`-HOUR`)",
+    "data_sources/tc_posix_time_zone_parser.rb:104" =>
+      "the name interpolates a local the loop body assigns (`tz_string = abbrev_and_offset + dst_suffix`)",
+    "data_sources/tc_posix_time_zone_parser.rb:119" =>
+      "the name interpolates `append_time_to_rule(...)`, a helper the loop body calls",
+    "data_sources/tc_zoneinfo_data_source.rb:900" =>
+      "the name's ternary reads a nil element through `encoding.downcase.gsub`",
+    "data_sources/tc_zoneinfo_reader.rb:1376" =>
+      "the name's ternary reads a boolean cell (`isdst ? 'dst' : 'std'`)",
+    "tc_transition_rule.rb:375" =>
+      "an `each_with_index` over a bound row cell nests a Range loop (`(1..4).each`)",
+    "tc_transition_rule.rb:475" =>
+      "an `each_with_index` loop over a bound row cell (`days`) generates the names",
+    "tc_transition_rule.rb:510" =>
+      "the name's ternary compares a cell (`expected_day == 29`)",
+  },
+}.freeze
+
+def package_test_files(pkg_name, pkg_dir)
+  test_files = Dir.glob(File.join(pkg_dir, "**", "*_test.rb")) +
+               Dir.glob(File.join(pkg_dir, "**", "test_*.rb")) +
+               Dir.glob(File.join(pkg_dir, "**", "spec_*.rb")) +
+               Dir.glob(File.join(pkg_dir, "**", "behaviors", "*_behavior.rb")) +
+               Dir.glob(File.join(pkg_dir, "**", "*_spec.rb"))
+  test_files.uniq!
+
+  select_package_test_files!(pkg_name, pkg_dir, test_files)
+end
+
 GEM_BEHAVIOR_TEST_RENAMES = {
   "solid-cache" => { "ttl is not updated" => "ttl isnt updated" },
 }.freeze
@@ -2972,14 +3044,7 @@ def run
     # Shared test-behavior mixins define their `test` blocks in a module and
     # match none of the three name patterns above; process_module /
     # flush_collected_modules materialize them once the file is scanned.
-    test_files = Dir.glob(File.join(pkg_dir, "**", "*_test.rb")) +
-                 Dir.glob(File.join(pkg_dir, "**", "test_*.rb")) +
-                 Dir.glob(File.join(pkg_dir, "**", "spec_*.rb")) +
-                 Dir.glob(File.join(pkg_dir, "**", "behaviors", "*_behavior.rb")) +
-                 Dir.glob(File.join(pkg_dir, "**", "*_spec.rb"))
-    test_files.uniq!
-
-    select_package_test_files!(pkg_name, pkg_dir, test_files)
+    test_files = package_test_files(pkg_name, pkg_dir)
 
     # For ruby-compat, include only the specs for surface the package ports.
     # `pkg_dir` is ruby/spec's `spec/ruby`; vendor/sources.ts carries why the
@@ -3033,9 +3098,12 @@ def run
 
     generated = extractor.test_files.sum { |f| f[:testCases].count { |t| t[:style] == "define_method" } }
     puts "  #{pkg_name}: #{generated} tests from define_method loops" if generated.positive?
-    unless extractor.unexpanded_loops.empty?
-      puts "  #{pkg_name}: #{extractor.unexpanded_loops.length} define_method loops not statically expandable:"
-      extractor.unexpanded_loops.uniq.sort.each { |loc| puts "    #{loc}" }
+    listed = UNEXPANDED_LOOP_REASONS.fetch(pkg_name, {})
+    unlisted = extractor.unexpanded_loops.uniq.sort.reject { |loc| listed.key?(loc) }
+    puts "  #{pkg_name}: #{listed.length} define_method loops listed as not expandable" if listed.any?
+    unless unlisted.empty?
+      puts "  #{pkg_name}: #{unlisted.length} define_method loops not statically expandable:"
+      unlisted.each { |loc| puts "    #{loc}" }
     end
   end
 

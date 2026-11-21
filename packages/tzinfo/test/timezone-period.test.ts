@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Timestamp, TimezoneOffset, TimezonePeriod, TimezoneTransition } from "../lib/index.js";
-import { assertRaises } from "./test-utils.js";
+import { assertRaises } from "./support/test-utils.js";
 
 class TestTimezonePeriod extends TimezonePeriod {
   readonly #startTransition: TimezoneTransition | null;
