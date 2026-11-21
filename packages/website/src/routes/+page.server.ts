@@ -1,138 +1,54 @@
 import { codeToHtml } from "shiki";
 
-import { loadParity, percent, shortSha } from "$lib/parity";
+import * as fs from "fs/promises";
+import * as path from "path";
+
+import { GITHUB_REPO, loadParity, percent, shortSha } from "$lib/parity";
+
+const EXAMPLE = "examples/cloudflare-worker";
+const EXAMPLE_ROOT = `../../${EXAMPLE}`;
 
 const blocks = [
   {
-    file: "app/models/project.ts",
+    file: "app/models/post.ts",
     lang: "ts",
     title: "Models are typed classes.",
-    body: "A model class maps a table to typed attributes. Declare associations, validations, callbacks and encrypted columns the way Rails does, and build queries by chaining scopes that compile to SQL.",
-    code: `import { ApplicationRecord } from "./application-record.js";
-import { Task } from "./task.js";
-
-export class Project extends ApplicationRecord {
-  static {
-    this.belongsTo("owner", { className: "User" });
-    this.hasMany("tasks", { dependent: "destroy" });
-    this.hasOneAttached("logo");
-
-    this.validates("name", { presence: true, uniqueness: true });
-    this.enum("visibility", ["private", "shared"]);
-
-    this.scope("active", function () {
-      return this.where({ archivedAt: null });
-    });
-  }
-
-  async openTaskCount(): Promise<number> {
-    return Task.where({ projectId: this.id, done: false }).count();
-  }
-}`,
+    body: "A model class maps a table to typed attributes. Associations, validations, callbacks and scopes are declared the way Rails declares them, and queries chain into SQL.",
   },
   {
-    file: "app/controllers/tasks-controller.ts",
+    file: "app/controllers/posts-controller.ts",
     lang: "ts",
     title: "Controllers turn requests into responses.",
-    body: "An action reads params, loads records, and renders a view or JSON. Filters, strong parameters and HTTP caching come with it, under the names Rails uses.",
-    code: `import { Project } from "../models/project.js";
-import { Task } from "../models/task.js";
-import { ApplicationController } from "./application-controller.js";
-
-export class TasksController extends ApplicationController {
-  declare project: Project;
-  declare tasks: Task[];
-
-  async index(): Promise<void> {
-    this.project = await Project.find(this.params.expect("projectId"));
-    this.tasks = await Task.where({ projectId: this.project.id }).order("position");
-  }
-
-  async update(): Promise<void> {
-    const task = await Task.find(this.params.expect("id"));
-    await task.updateBang(this._taskParams());
-    await this.render({ json: task });
-  }
-
-  private _taskParams() {
-    return this.params.expect({ task: ["title", "done"] });
-  }
-}`,
+    body: "An action reads params, loads records, and renders a view or redirects. Strong parameters, filters and HTTP caching come with it, under the names Rails uses.",
   },
   {
-    file: "app/views/tasks/index.html.tse",
+    file: "app/views/posts/index.html.tse",
     lang: "erb",
     title: "Views are typed templates.",
-    body: "TSE (TypeScript Embedded) is trails' replacement for ERB (Embedded RuBy): the same <% %> and <%= %> tags, with TypeScript inside. The compiler checks every expression against the controller that renders them. Shared markup goes in partials, shared logic in helpers.",
-    code: `<h1><%= this.project.name %></h1>
-
-<ul>
-  <% for (const task of this.tasks) { %>
-    <li><%= render(task) %></li>
-  <% } %>
-</ul>
-
-<%= linkTo("New task", newProjectTaskPath(this.project)) %>`,
+    body: "TSE (TypeScript Embedded) is trails' replacement for ERB (Embedded RuBy): the same <% %> and <%= %> tags, with TypeScript inside. Form builders and helpers keep their Rails names.",
   },
   {
     file: "config/routes.ts",
     lang: "ts",
     title: "Routes map URLs to actions.",
-    body: "Draw routes with the familiar DSL. One resources line gives a model its seven RESTful actions, with path helpers to link to each of them.",
-    code: `import { Trails } from "@blazetrails/trailties";
-
-Trails.application.routes().draw(function () {
-  this.resources("projects", function () {
-    this.resources("tasks", { only: ["index", "new", "update"] });
-  });
-
-  this.root("projects#index");
-});`,
+    body: "Draw routes with the familiar DSL. A resources line maps a model's RESTful actions, narrowed here with only: to the two this app serves, plus a plain get for a health check.",
   },
 ];
 
-const railsPost = `class Post < ApplicationRecord
-  belongs_to :author, optional: true
-  has_many :comments, dependent: :destroy
+// Captured on 2026-11-21 by adding this action to a scratch copy of
+// examples/cloudflare-worker and running `tsc --noEmit -p tsconfig.json`.
+const check = `import { ApplicationController } from "./application-controller.ts";
+import { Post } from "../models/post.ts";
 
-  validates :title, presence: true
-
-  scope :published, -> { where(published: true) }
-end`;
-
-const trailsPost = `export class Post extends ApplicationRecord {
-  static {
-    this.belongsTo("author", { optional: true });
-    this.hasMany("comments", { dependent: "destroy" });
-
-    this.validates("title", { presence: true });
-
-    this.scope("published", function () {
-      return this.where({ published: true });
-    });
-  }
-}`;
-
-const check = `import { Post } from "./post.ts";
-
-export class Check {
-  static async run(): Promise<void> {
-    const post = await Post.find(1);
-    const n: number = post.title;
+export class PostsController extends ApplicationController {
+  async show(): Promise<void> {
+    const post = await Post.find(this.params.expect("id"));
+    await this.render({ plain: post.titel });
   }
 }`;
 
 const checkError =
-  "app/models/check.ts(6,11): error TS2322: Type 'string | null' is not assignable to type 'number'.";
-
-const view = `<%# TSE: TypeScript Embedded, trails' ERB. Same tags, typed. %>
-<article>
-  <h1><%= this.post.title %></h1>
-  <p><%= this.post.titel %></p>
-</article>`;
-
-const viewError =
-  "app/views/posts/show.html.tse(4,20): error TS2551: Property 'titel' does not exist on type 'Post'.";
+  "app/controllers/posts-controller.ts(7,37): error TS2551: Property 'titel' does not exist on type 'Post'. Did you mean 'title'?";
 
 function withError(
   code: string,
@@ -175,15 +91,16 @@ export async function load() {
     measuredAt: shortSha(parity.measuredAt),
     coverage: Object.fromEntries(parity.packages.map((p) => [p.name, percent(p.api)])),
     hero: {
-      rails: await codeToHtml(railsPost, { lang: "ruby", theme: "github-dark" }),
-      trails: await codeToHtml(trailsPost, { lang: "ts", theme: "github-dark" }),
-      check: await withError(check, "ts", 6, 10, 11, checkError),
-      view: await withError(view, "erb", 4, 19, 24, viewError),
+      check: await withError(check, "ts", 7, 36, 41, checkError),
     },
     blocks: await Promise.all(
-      blocks.map(async ({ code, lang, ...rest }) => ({
+      blocks.map(async ({ lang, ...rest }) => ({
         ...rest,
-        html: await codeToHtml(code, { lang, theme: "github-dark" }),
+        href: `${GITHUB_REPO}/blob/main/${EXAMPLE}/${rest.file}`,
+        html: await codeToHtml(
+          (await fs.readFile(path.join(EXAMPLE_ROOT, rest.file), "utf8")).trimEnd(),
+          { lang, theme: "github-dark" },
+        ),
       })),
     ),
   };

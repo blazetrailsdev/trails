@@ -5,7 +5,7 @@
   import { base } from "$app/paths";
 
   let { data } = $props();
-  let tab = $state("same");
+  let tab = $state("caught");
 
   const installs = {
     npm: "npm install -g @blazetrails/trails && trails new blog",
@@ -69,8 +69,9 @@
 
   <nav class="nav">
     <ul class="left">{#each navLeft as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
-    <a href="{base}/" class="mark" aria-label="BlazeTrails home">
-      <span class="wm"><span class="blaze">blaze</span>tra<span class="i">ı</span>ls</span>
+    <a href="{base}/" class="mark" title="BlazeTrails home">
+      <span class="wm" aria-hidden="true"><span class="blaze">blaze</span>tra<span class="i">ı</span>ls</span>
+      <span class="sr-only">blazetrails</span>
     </a>
     <ul class="right">{#each navRight as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
   </nav>
@@ -80,23 +81,18 @@
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
     <span class="pill">trails &mdash; pre-release &middot; measured at {data.measuredAt}</span>
     <div class="stage">
-      <div class="tabs">
-        <button aria-pressed={tab === "same"} onclick={() => (tab = "same")}>Same method</button>
-        <button aria-pressed={tab === "caught"} onclick={() => (tab = "caught")}>Caught by the compiler</button>
-        <button aria-pressed={tab === "ai"} onclick={() => (tab = "ai")}>AI disclaimer</button>
+      <div class="tabs" role="tablist" aria-label="Examples">
+        <button role="tab" aria-selected={tab === "caught"} onclick={() => (tab = "caught")}>Caught by the compiler</button>
+        <button role="tab" aria-selected={tab === "ai"} onclick={() => (tab = "ai")}>AI disclaimer</button>
       </div>
-      {#if tab === "same"}
-        <div class="split">
-          <div class="pane"><div class="file">app/models/post.rb &middot; Rails</div>{@html data.hero.rails}</div>
-          <div class="pane"><div class="file">app/models/post.ts &middot; trails</div>{@html data.hero.trails}</div>
-        </div>
-      {:else if tab === "caught"}
-        <div class="stack">
-          <div class="pane"><div class="file">app/models/check.ts &middot; pnpm build</div>{@html data.hero.check}</div>
-          <div class="pane"><div class="file">app/views/posts/show.html.tse &middot; pnpm build</div>{@html data.hero.view}</div>
+      {#if tab === "caught"}
+        <div class="pane" role="tabpanel">
+          <div class="file">app/controllers/posts-controller.ts &middot; scratch edit of examples/cloudflare-worker &middot; tsc --noEmit</div>
+          {@html data.hero.check}
+          <p class="note">A typo in an attribute name, caught before the app runs. The error is the compiler's real output for this action added to a scratch copy of the <a href="{repo}/tree/main/examples/cloudflare-worker">cloudflare-worker example</a>.</p>
         </div>
       {:else}
-        <div class="pane ai">
+        <div class="pane ai" role="tabpanel">
           <img class="meme" src="{base}/push-rails-over-there.jpg" width="500" height="880" alt="Put It Somewhere Else Patrick meme. Top panel: What if we took Rails. Bottom panel: and pushed it over there." />
           <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, working from the vendored Rails source under human direction and review, with code reviews from Copilot and Codex.</p>
         </div>
@@ -107,8 +103,9 @@
   <section class="company">
     <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
-    <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby"} API</small>{/if}</a></li>{/each}</ul>
+    <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby gem"} API</small>{/if}</a></li>{/each}</ul>
     <p class="small"><strong>And there are more packages besides these.</strong> The gems Rails depends on are ported alongside them.</p>
+    <p class="fine">Each percentage is the share of the upstream gem's public API names (classes, modules, methods and constants) that have a matching name in the trails package. &ldquo;Rails API&rdquo; marks a gem from the Rails repository; &ldquo;Ruby gem API&rdquo; marks one of the gems Rails depends on, such as rack, i18n or thor. &ldquo;Measured at {data.measuredAt}&rdquo; names the trails commit the figures were computed on.</p>
   </section>
 
   <section class="band">
@@ -123,7 +120,7 @@
     {#each data.blocks as b}
       <div class="block">
         <div class="code">
-          <div class="file">{b.file} &middot; placeholder</div>
+          <a class="file" href={b.href}>examples/cloudflare-worker/{b.file}</a>
           {@html b.html}
         </div>
         <h3>{b.title}</h3>
@@ -135,7 +132,8 @@
   <section class="band">
     <div class="card">
       <h2>Built for Rails developers, new and seasoned.</h2>
-      <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to Lambda or Cloudflare. Use Active Record in a React Native app. Run the full stack in the browser. Dream big.</p>
+      <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/main/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/main/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/main/examples/react-native-notes">React Native app</a>. On the roadmap: the full stack running in the browser.</p>
+      <p class="small"><code>{installs.npm}</code></p>
       <a class="cta" href="{base}/docs/guides/idioms">Blaze trails &rsaquo;</a>
     </div>
   </section>
@@ -217,11 +215,13 @@
   .lede strong { display: block; }
   .pill { display: inline-block; background: var(--mango); border-radius: 6px; padding: 6px 14px; font-size: 15px; font-weight: 600; margin-bottom: 56px; }
   .stage { max-width: 1170px; margin: 0 auto; background: #211710; border-radius: 10px; overflow: hidden; text-align: left; box-shadow: 0 30px 60px rgb(0 0 0 / 0.2); }
-  .tabs { display: flex; gap: 4px; padding: 10px 10px 0; background: #2a1e16; }
-  .tabs button { font: 600 15px var(--sans); color: #d9c6b0; background: none; border: 0; padding: 10px 18px; border-radius: 6px 6px 0 0; cursor: pointer; }
-  .tabs button[aria-pressed="true"] { background: #3a2a1f; color: #fff; }
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #2a1e16; }
-  .stack { display: grid; gap: 1px; background: #2a1e16; }
+  .tabs { display: flex; gap: 6px; padding: 12px 12px 0; background: #2a1e16; border-bottom: 1px solid #4a3628; }
+  .tabs button { font: 600 16px var(--sans); color: #e4d2bc; background: #2f2219; border: 1px solid #4a3628; border-bottom: 0; padding: 11px 22px; border-radius: 8px 8px 0 0; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
+  .tabs button:hover { background: #3a2a1f; color: #fff; }
+  .tabs button[aria-selected="true"] { background: #3a2a1f; color: #fff; box-shadow: inset 0 3px 0 var(--orange); margin-bottom: -1px; padding-bottom: 12px; }
+  .note { margin: 0; padding: 0 22px 22px; font-size: 15px; color: #d9c6b0; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .fine { font-size: 15px; line-height: 1.45; max-width: 760px; margin: 1.5rem auto 0; color: #7a6450; }
   .pane { background: #3a2a1f; min-height: 380px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
   .ai { display: flex; align-items: center; justify-content: center; gap: 48px; padding: 32px 40px; }
@@ -248,7 +248,8 @@
   .block { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; padding-bottom: 60px; }
   .code { display: flex; flex-direction: column; }
   .code { background: #3a2a1f; border-radius: 6px; overflow: hidden; text-align: left; }
-  .file { background: #2a1e16; color: #e4d2bc; font: 13px var(--mono); text-align: center; padding: 8px; }
+  .file { display: block; background: #2a1e16; color: #e4d2bc; font: 13px var(--mono); text-align: center; padding: 8px; text-decoration: none; }
+  a.file:hover { text-decoration: underline; }
   .code :global(pre) { flex: 1; margin: 0; padding: 20px; font: 13px/1.6 var(--mono); overflow-x: auto; background: #3a2a1f !important; }
   .block p { font-size: 21px; line-height: 26px; margin: 0 auto; max-width: 500px; }
 
@@ -281,7 +282,7 @@
     .nav ul { justify-content: center; flex-wrap: wrap; gap: 16px; }
     .tiles { grid-template-columns: repeat(2, 1fr); }
     .tiles li:nth-last-child(2) { grid-column: auto; }
-    .blocks, .cards, .split { grid-template-columns: 1fr; }
+    .blocks, .cards { grid-template-columns: 1fr; }
     .ai { flex-direction: column; }
     .card { padding: 40px 24px; }
   }
