@@ -430,11 +430,12 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        // The driver gem `Mysql2Adapter` calls into; its ports live in
-        // `packages/activerecord/lib/mysql2/`.
+        // The driver gem `Mysql2Adapter` calls into; ported in
+        // `packages/mysql2`.
         name: "mysql2",
         libPath: "lib/mysql2",
         libEntryFile: "lib/mysql2.rb",
+        testPath: "spec/mysql2",
       },
     ],
   },

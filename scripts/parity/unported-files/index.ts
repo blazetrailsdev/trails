@@ -28,6 +28,7 @@ import { RAILS_HTML_SANITIZER_UNPORTED_FILES } from "./rails-html-sanitizer.js";
 import { LOOFAH_UNPORTED_FILES } from "./loofah.js";
 import { CRASS_UNPORTED_FILES } from "./crass.js";
 import { PG_UNPORTED_FILES } from "./pg.js";
+import { MYSQL2_UNPORTED_FILES } from "./mysql2.js";
 import { IMAGE_PROCESSING_UNPORTED_FILES } from "./image-processing.js";
 import { RACKUP_UNPORTED_FILES } from "./rackup.js";
 import { RAILS_DOM_TESTING_UNPORTED_FILES } from "./rails-dom-testing.js";
@@ -60,6 +61,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...LOOFAH_UNPORTED_FILES,
   ...CRASS_UNPORTED_FILES,
   ...PG_UNPORTED_FILES,
+  ...MYSQL2_UNPORTED_FILES,
   ...IMAGE_PROCESSING_UNPORTED_FILES,
   ...RACKUP_UNPORTED_FILES,
   ...RAILS_DOM_TESTING_UNPORTED_FILES,

@@ -38,6 +38,9 @@
       "path": "../pg"
     },
     {
+      "path": "../mysql2"
+    },
+    {
       "path": "../actionview"
     },
     {

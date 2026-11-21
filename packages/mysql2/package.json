@@ -1,0 +1,42 @@
+{
+  "name": "@blazetrails/mysql2",
+  "version": "0.1.0",
+  "description": "The MySQL client, mirroring Ruby's mysql2 gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "peerDependencies": {
+    "mysql2": "^3.18.2"
+  },
+  "peerDependenciesMeta": {
+    "mysql2": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "mirrors": [
+    {
+      "source": "mysql2",
+      "ref": "0.5.6",
+      "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
+    }
+  ]
+}

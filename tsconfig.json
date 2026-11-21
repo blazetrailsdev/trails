@@ -32,6 +32,8 @@
     { "path": "packages/msgpack/tsconfig.test.json" },
     { "path": "packages/pg" },
     { "path": "packages/pg/tsconfig.test.json" },
+    { "path": "packages/mysql2" },
+    { "path": "packages/mysql2/tsconfig.test.json" },
     { "path": "packages/sqlite3" },
     { "path": "packages/sqlite3/tsconfig.test.json" },
     { "path": "packages/mail" },
