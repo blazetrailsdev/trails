@@ -74,7 +74,11 @@ Someone.FAILED_DELEGATE_LINE_2 = callerLocations(0, 1)[0].lineno + 1;
 delegate.call(Someone.prototype, "bar", { to: "place", allowNil: true });
 
 class Invoice {
-  constructor(public client: any) {}
+  client: any;
+
+  constructor(client: any) {
+    this.client = client;
+  }
 }
 delegate.call(Invoice.prototype, "street", "city", "name", { to: "client", prefix: true });
 delegate.call(Invoice.prototype, "street", "city", "name", { to: "client", prefix: "customer" });
@@ -89,7 +93,11 @@ delegate.call(Project.prototype, "name", { to: "person", allowNil: true });
 delegate.call(Project.prototype, "toF", { to: "description", allowNil: true });
 
 class Developer {
-  constructor(public client: any) {}
+  client: any;
+
+  constructor(client: any) {
+    this.client = client;
+  }
 }
 delegate.call(Developer.prototype, "name", { to: "client", prefix: undefined });
 
@@ -103,7 +111,11 @@ class Tester {
 delegate.call(Tester.prototype, "name", { to: "client", prefix: false });
 
 class Event {
-  constructor(public case_: any) {}
+  case_: any;
+
+  constructor(case_: any) {
+    this.case_ = case_;
+  }
 
   get case() {
     return this.case_;
@@ -179,7 +191,11 @@ class ArityTesterModule {
 constSet(constGet(Object, "ModuleTest") as object, "ArityTesterModule", ArityTesterModule);
 
 class DecoratedReserved {
-  constructor(public case_: any) {}
+  case_: any;
+
+  constructor(case_: any) {
+    this.case_ = case_;
+  }
 
   get case() {
     return this.case_;
@@ -188,7 +204,11 @@ class DecoratedReserved {
 delegateMissingTo.call(DecoratedReserved, "case");
 
 class DecoratedMissingAllowNil {
-  constructor(public case_: any) {}
+  case_: any;
+
+  constructor(case_: any) {
+    this.case_ = case_;
+  }
 
   get case() {
     return this.case_;
@@ -206,7 +226,11 @@ class Maze {
 }
 
 class Cavern {
-  constructor(public maze: Maze) {}
+  maze: Maze;
+
+  constructor(maze: Maze) {
+    this.maze = maze;
+  }
 
   get target() {
     return (this.maze.passages = "twisty");
@@ -410,7 +434,11 @@ describe("ModuleTest", () => {
 
   it("delegation doesnt mask nested no method error on nil receiver", () => {
     class Product {
-      constructor(public name: string) {}
+      name: string;
+
+      constructor(name: string) {
+        this.name = name;
+      }
       get manufacturer(): { name: string } {
         return (null as unknown as { unknownMethod(): { name: string } }).unknownMethod();
       }
@@ -437,7 +465,11 @@ describe("ModuleTest", () => {
       }
     }
     class HasBlock {
-      constructor(public block: Block) {}
+      block: Block;
+
+      constructor(block: Block) {
+        this.block = block;
+      }
     }
     delegate.call(HasBlock.prototype, "isHello", { to: "block" });
     const hasBlock = new HasBlock(new Block()) as HasBlock & Record<string, any>;

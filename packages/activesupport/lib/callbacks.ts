@@ -35,7 +35,7 @@ export interface CallbackOptions<T extends object = object> {
 }
 
 export interface DefineCallbacksOptions<T extends object = object> {
-  terminator?: ((target: T, fn: () => unknown) => boolean | Promise<boolean>) | false;
+  terminator?: (target: T, fn: () => unknown) => boolean | Promise<boolean>;
   skipAfterCallbacksIfTerminated?: boolean;
   scope?: string[];
   strict?: "sync";
@@ -339,7 +339,6 @@ export class Before {
   readonly userConditions: Array<(target: object, value: unknown) => boolean>;
   readonly haltedLambda:
     | ((target: object, fn: () => unknown) => boolean | Promise<boolean>)
-    | false
     | undefined;
   readonly filter: AnyCallback | string | symbol | CallbackObject;
   readonly name: string;
@@ -348,7 +347,7 @@ export class Before {
     userCallback: (target: object, value: unknown) => unknown,
     userConditions: Array<(target: object, value: unknown) => boolean>,
     chainConfig: {
-      terminator?: ((target: object, fn: () => unknown) => boolean | Promise<boolean>) | false;
+      terminator?: (target: object, fn: () => unknown) => boolean | Promise<boolean>;
     },
     filter: AnyCallback | string | symbol | CallbackObject = "",
     name: string = "",
@@ -402,18 +401,6 @@ export class Before {
     const { target, value, syncChain } = env;
     const haltedLambda = this.haltedLambda;
     const resultLambda = () => this.userCallback(target, value);
-
-    if (haltedLambda === false) {
-      const r = resultLambda();
-      if (!isThenable(r)) return env;
-      if (syncChain !== undefined) {
-        new Thread(() => r);
-        throw new RuntimeError(
-          `Async callback on sync chain "${syncChain}" — before returned a Promise`,
-        );
-      }
-      return Promise.resolve(r).then(() => env);
-    }
 
     let cbResult: unknown;
     const halt = haltedLambda!(target, () => {

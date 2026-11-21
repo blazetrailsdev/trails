@@ -569,15 +569,6 @@ describe("Callbacks", () => {
       expect(target.log).toEqual([]);
     });
 
-    it("does not swallow the abort sentinel when terminator is disabled", () => {
-      class Target extends Model {}
-      const target = new Target();
-      Target.defineCallbacks("save", { terminator: false });
-      Target.setCallback("save", "before", () => kernelThrow(":abort"));
-
-      expect(() => target.runCallbacks("save", () => {})).toThrow();
-    });
-
     it("does not swallow the abort sentinel for a custom terminator", () => {
       class Target extends Model {}
       const target = new Target();
@@ -587,21 +578,6 @@ describe("Callbacks", () => {
       Target.setCallback("save", "before", () => kernelThrow(":abort"));
 
       expect(() => target.runCallbacks("save", () => {})).toThrow();
-    });
-
-    it("does not halt when terminator is disabled", () => {
-      class Target extends Model {}
-      const target = new Target();
-      Target.defineCallbacks("save", { terminator: false });
-      Target.setCallback("save", "before", () => false);
-
-      const result = target.runCallbacks("save", () => {
-        target.log.push("block");
-        return true;
-      });
-
-      expect(result).toBe(true);
-      expect(target.log).toEqual(["block"]);
     });
 
     it("around callback can halt by not calling next", () => {
