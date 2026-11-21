@@ -30,37 +30,43 @@ interface XmlNode {
   isCdata(): boolean;
 }
 
-function toHash(node: XmlNode | { root: XmlNode }, hash: XmlHash = {}): XmlHash {
-  if ("root" in node) return toHash(node.root);
+export const Document = {
+  toHash(this: { root: XmlNode }): XmlHash {
+    return Node.toHash.call(this.root);
+  },
+};
 
-  const nodeHash: XmlHash = {};
+export const Node = {
+  toHash(this: XmlNode, hash: XmlHash = {}): XmlHash {
+    const nodeHash: XmlHash = {};
 
-  const existing = hash[node.name];
-  if (Array.isArray(existing)) {
-    existing.push(nodeHash);
-  } else if (existing != null) {
-    hash[node.name] = [existing, nodeHash];
-  } else {
-    hash[node.name] = nodeHash;
-  }
-
-  for (const c of node.children) {
-    if (c.isElement()) {
-      toHash(c, nodeHash);
-    } else if (c.isText() || c.isCdata()) {
-      nodeHash[CONTENT_ROOT] ??= "";
-      nodeHash[CONTENT_ROOT] += c.content;
+    const existing = hash[this.name];
+    if (Array.isArray(existing)) {
+      existing.push(nodeHash);
+    } else if (typeof existing === "object" && existing !== null) {
+      hash[this.name] = [existing, nodeHash];
+    } else if (existing == null) {
+      hash[this.name] = nodeHash;
     }
-  }
 
-  if (Object.keys(nodeHash).length > 1 && isBlank(nodeHash[CONTENT_ROOT])) {
-    delete nodeHash[CONTENT_ROOT];
-  }
+    for (const c of this.children) {
+      if (c.isElement()) {
+        Node.toHash.call(c, nodeHash);
+      } else if (c.isText() || c.isCdata()) {
+        nodeHash[CONTENT_ROOT] ??= "";
+        nodeHash[CONTENT_ROOT] += c.content;
+      }
+    }
 
-  for (const a of node.attributeNodes) nodeHash[a.nodeName] = a.value;
+    if (Object.keys(nodeHash).length > 1 && isBlank(nodeHash[CONTENT_ROOT])) {
+      delete nodeHash[CONTENT_ROOT];
+    }
 
-  return hash;
-}
+    for (const a of this.attributeNodes) nodeHash[a.nodeName] = a.value;
+
+    return hash;
+  },
+};
 
 export function parse(data: string | StringIO | null | undefined): XmlHash {
   if (!(data instanceof StringIO)) {
@@ -75,7 +81,7 @@ export function parse(data: string | StringIO | null | undefined): XmlHash {
       if (doc.errors.length > 0) {
         throw doc.errors[0];
       }
-      return toHash(doc);
+      return Document.toHash.call(doc);
     } finally {
       doc.dispose();
     }
