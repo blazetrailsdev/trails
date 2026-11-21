@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { File, getFs } from "@blazetrails/ruby-compat";
+import { File, getFs, rbModName } from "@blazetrails/ruby-compat";
 import { HealthController } from "../lib/health-controller.js";
 import { Trails } from "../lib/trails.js";
 
@@ -35,5 +35,20 @@ describe("Trails::HealthController", () => {
     const manifest = JSON.parse(await getFs().readFile(File.join(SRC, "../package.json"), "utf-8"));
     const entry = File.basename(manifest.exports["./commands"].default, ".js");
     expect(await reachesTrails(`${entry}.ts`)).toBe(true);
+  });
+});
+
+describe("Trails' autoloaded constants", () => {
+  it.each([
+    ["../lib/application-controller.js", "ApplicationController"],
+    ["../lib/health-controller.js", "HealthController"],
+    ["../lib/info.js", "Info"],
+    ["../lib/info-controller.js", "InfoController"],
+    ["../lib/mailers-controller.js", "MailersController"],
+    ["../lib/pwa-controller.js", "PwaController"],
+    ["../lib/welcome-controller.js", "WelcomeController"],
+  ])("%s answers Trails::%s", async (path, name) => {
+    const mod = (await import(path)) as Record<string, object>;
+    expect(rbModName(mod[name])).toBe(`Trails::${name}`);
   });
 });

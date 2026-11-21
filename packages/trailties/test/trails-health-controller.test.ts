@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { RouteSet } from "@blazetrails/actionpack";
 import { TestCase } from "@blazetrails/actionpack/testing";
 import { Trails } from "../lib/index.js";
+import "../lib/health-controller.js";
 
 describe("HealthControllerTest", () => {
   it("health controller renders green success page", async ({ task }) => {

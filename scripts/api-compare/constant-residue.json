@@ -1289,7 +1289,7 @@
     }
   },
   "trailties": {
-    "rows": 168,
+    "rows": 169,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "commands/build.ts::BuildCommand",
@@ -1452,6 +1452,7 @@
       "initializable.ts::Collection": "Trails::Initializable::Collection",
       "initializable.ts::Initializable": "Trails::Initializable",
       "initializable.ts::Initializer": "Trails::Initializable::Initializer",
+      "mailers-controller.ts::MailersController": "Trails::MailersController",
       "paths.ts::Path": "Trails::Paths::Path",
       "paths.ts::Root": "Trails::Paths::Root",
       "pwa-controller.ts::PwaController": "Trails::PwaController",

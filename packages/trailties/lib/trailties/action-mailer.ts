@@ -119,7 +119,6 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("action_mailer.base", { after: "make_routes_lazy" }, async () => {
-      await import("../mailers-controller.js");
       if (ActionDispatch.IntegrationTest !== undefined) {
         await ActionMailer.loadPath["action_mailer/test_helper"]();
         await ActionMailer.loadPath["action_mailer/test_case"]();

@@ -20,10 +20,11 @@ import type { InitializerGroup } from "./initializable.js";
 import type { ActionMethods } from "./generators/trails/app/app-generator.js";
 import { VERSION, gemVersion } from "./gem-version.js";
 import { version } from "./version.js";
-import { InfoController } from "./info-controller.js";
-import { WelcomeController } from "./welcome-controller.js";
-import { HealthController } from "./health-controller.js";
-import { PwaController } from "./pwa-controller.js";
+import type { Info } from "./info.js";
+import type { InfoController } from "./info-controller.js";
+import type { WelcomeController } from "./welcome-controller.js";
+import type { HealthController } from "./health-controller.js";
+import type { PwaController } from "./pwa-controller.js";
 import type { MailersController } from "./mailers-controller.js";
 import * as TrailsConfiguration from "./configuration.js";
 import * as Paths from "./paths.js";
@@ -44,6 +45,7 @@ let _backtraceCleaner: BacktraceCleaner | undefined;
 
 export class Trails {
   declare static HealthController: typeof HealthController;
+  declare static Info: typeof Info;
   declare static InfoController: typeof InfoController;
   declare static MailersController: typeof MailersController;
   declare static PwaController: typeof PwaController;
@@ -57,6 +59,18 @@ export class Trails {
   declare static Generators?: typeof Generators;
   declare static TestUnitRailtie?: typeof import("./test-unit/trailtie.js").TestUnitRailtie;
   declare static eagerLoadBang: () => Promise<void>;
+  declare static autoload: (constName: string, path?: string | null) => void;
+  declare static eagerAutoload: (block: () => void) => void;
+  declare static _autoloads?: Record<string, () => Promise<string>>;
+
+  static loadPath: Record<string, () => Promise<unknown>> = {
+    "trails/info": () => import("./info.js"),
+    "trails/info_controller": () => import("./info-controller.js"),
+    "trails/mailers_controller": () => import("./mailers-controller.js"),
+    "trails/welcome_controller": () => import("./welcome-controller.js"),
+    "trails/health_controller": () => import("./health-controller.js"),
+    "trails/pwa_controller": () => import("./pwa-controller.js"),
+  };
 
   private constructor() {
     throw new Error("Trails is a static-only namespace; do not instantiate.");
@@ -200,10 +214,16 @@ if (reopened !== undefined) {
   );
 }
 
-Trails.HealthController = HealthController;
-Trails.InfoController = InfoController;
-Trails.PwaController = PwaController;
-Trails.WelcomeController = WelcomeController;
+Trails.autoload("Info");
+Trails.autoload("InfoController");
+Trails.autoload("MailersController");
+Trails.autoload("WelcomeController");
+
+Trails.eagerAutoload(() => {
+  Trails.autoload("HealthController");
+  Trails.autoload("PwaController");
+});
+
 Trails.Configuration = TrailsConfiguration;
 Trails.Paths = Paths;
 Trails.SourceAnnotationExtractor = SourceAnnotationExtractor;

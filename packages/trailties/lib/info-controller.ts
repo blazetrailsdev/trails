@@ -1,7 +1,9 @@
+import "./constants.info-controller.generated.js";
 import { isBlank } from "@blazetrails/activesupport";
 import { DebugView, RoutesInspector, RouteWrapper, type RouteSet } from "@blazetrails/actionpack";
 import { RFC2396_PARSER } from "@blazetrails/ruby-compat";
 import { ApplicationController } from "./application-controller.js";
+import { Trails } from "./trails.js";
 import { Info } from "./info.js";
 import { Annotation, SourceAnnotationExtractor } from "./source-annotation-extractor.js";
 
@@ -87,3 +89,5 @@ export class InfoController extends ApplicationController {
 
 InfoController.prependViewPath(DebugView.RESCUES_TEMPLATE_PATHS);
 InfoController.beforeAction(":requireLocalBang");
+
+Trails.InfoController = InfoController;
