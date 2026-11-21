@@ -98,7 +98,7 @@ export class Preview {
     params: Record<string, unknown> | ActionController.Parameters = {},
   ): Promise<Message> {
     const preview = new this(params);
-    const message = rbFSend(preview, email) as Message;
+    const message = (await rbFSend(preview, email)) as Message;
     if (message instanceof MessageDelivery) await message.message();
     this.informPreviewInterceptors(message);
     return message;

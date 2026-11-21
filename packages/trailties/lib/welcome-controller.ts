@@ -1,4 +1,5 @@
 import { ApplicationController } from "./application-controller.js";
+import { Trails } from "./trails.js";
 
 export class WelcomeController extends ApplicationController {
   static override controllerPath(): string {
@@ -12,3 +13,5 @@ export class WelcomeController extends ApplicationController {
 
   index(): void {}
 }
+
+Trails.WelcomeController = WelcomeController;

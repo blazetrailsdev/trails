@@ -153,6 +153,13 @@ Finisher.initializer("eager_load!", async function (this: FinisherHost) {
     }
   }
 
+  /** @inventedArm for — PERMANENT */
+  for (const [constName, resolvePath] of Object.entries(Trails._autoloads ?? {})) {
+    if ((Trails as unknown as Record<string, unknown>)[constName] === undefined) {
+      await Trails.loadPath[await resolvePath()]();
+    }
+  }
+
   if (this.config.isReloadingEnabled()) {
     this.reloader.afterClassUnload(() => {
       return this.autoloaders.main.eagerLoad();

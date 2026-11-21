@@ -1,5 +1,6 @@
 import { ActionController } from "@blazetrails/actionpack";
 import { ApplicationController } from "./application-controller.js";
+import { Trails } from "./trails.js";
 
 type PWARenderOptions = ActionController.RenderOptions & { template?: string };
 
@@ -20,3 +21,5 @@ export class PwaController extends ApplicationController {
     await this.render({ template: "pwa/manifest", layout: false });
   }
 }
+
+Trails.PwaController = PwaController;
