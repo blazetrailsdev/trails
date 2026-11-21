@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveSupport::LogSubscriber::TestHelper`; the class/interface merge is how the mixin surfaces on the type side. */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { LogSubscriber, Notifications, TaggedLogging } from "@blazetrails/activesupport";
+import {
+  LogSubscriber,
+  Notifications,
+  TaggedLogging,
+  type Logger as ActiveSupportLogger,
+} from "@blazetrails/activesupport";
 import {
   setup as testHelperSetup,
   teardown as testHelperTeardown,
@@ -72,7 +77,7 @@ class LoggerTest {
   declare logger: MockLogger;
   declare notifier: Fanout;
   subscriber!: Subscriber;
-  subscription: unknown;
+  subscription!: ReturnType<typeof Notifications.notifier.subscribe>;
 
   static {
     include(this, TestHelper);
@@ -188,8 +193,8 @@ describe("LoggerTest", () => {
   });
 
   it("logger pushes tags", async () => {
-    const logger = TaggedLogging.new(t.logger as never);
-    t.logger = logger;
+    const logger = TaggedLogging.new(t.logger as unknown as ActiveSupportLogger);
+    t.logger = logger as unknown as MockLogger;
     t.setLogger(t.logger);
 
     const taggers: Tagger[] = ["tag1", () => "tag2"];

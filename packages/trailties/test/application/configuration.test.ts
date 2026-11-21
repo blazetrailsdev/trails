@@ -1,4 +1,13 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+} from "vitest";
 import { constSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { ActionDispatch, Session } from "@blazetrails/actionpack";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";

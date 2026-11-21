@@ -261,14 +261,14 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           "benchmark_generator_test.rb:56 asserts the generated Ruby script (`Benchmark.ips`, `require_relative`); the generator writes a TypeScript script, asserted whole by the port",
       },
     ],
-  "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change to postgresql":
+  "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change from versioned gem to other versioned gem":
     [
       {
         kind: "assert_match",
-        value: "s:# Use pg as the database for Active Record",
+        value: "s:# Use mysql2 as the database for Active Record",
         as: null,
         reason:
-          'db_system_change_generator_test.rb:45 asserts the `# Use pg as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
+          'db_system_change_generator_test.rb:199 asserts the `# Use mysql2 as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
       },
     ],
   "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change to mysql":
@@ -281,6 +281,16 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           'db_system_change_generator_test.rb:88 asserts the `# Use mysql2 as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
       },
     ],
+  "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change to postgresql":
+    [
+      {
+        kind: "assert_match",
+        value: "s:# Use pg as the database for Active Record",
+        as: null,
+        reason:
+          'db_system_change_generator_test.rb:45 asserts the `# Use pg as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
+      },
+    ],
   "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change to sqlite3":
     [
       {
@@ -289,16 +299,6 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         as: null,
         reason:
           'db_system_change_generator_test.rb:130 asserts the `# Use sqlite3 as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
-      },
-    ],
-  "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change from versioned gem to other versioned gem":
-    [
-      {
-        kind: "assert_match",
-        value: "s:# Use mysql2 as the database for Active Record",
-        as: null,
-        reason:
-          'db_system_change_generator_test.rb:199 asserts the `# Use mysql2 as the database for Active Record` Gemfile comment; package.json holds no comments (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
       },
     ],
   "trailties:generators/plugin_generator_test.rb › PluginGeneratorTest › invalid plugin name raises an error":

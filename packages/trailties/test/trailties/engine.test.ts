@@ -333,7 +333,7 @@ export class BukkitsEngine extends Engine {
 
       const initializers = Trails.application!.initializers.tsort();
       const dummyIndex = initializers.findIndex((i) => i.name === "dummy_initializer");
-      const configIndex = initializers.findLastIndex((i) => i.name === "load_config_initializers");
+      const configIndex = initializers.map((i) => i.name).lastIndexOf("load_config_initializers");
       const stackIndex = initializers.findIndex((i) => i.name === "build_middleware_stack");
 
       expect(configIndex < dummyIndex).toBeTruthy();
