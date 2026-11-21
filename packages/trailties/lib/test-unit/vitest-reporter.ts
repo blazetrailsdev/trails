@@ -72,6 +72,7 @@ export default class VitestReporter implements Reporter {
     this.reporter.record(result);
   }
 
+  /** @inventedArm exec — PERMANENT */
   onTestRunEnd(
     testModules: readonly TestModule[],
     unhandledErrors: readonly { message: string }[],
