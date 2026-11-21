@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { Shellwords, env as ENV, include, setEnv } from "@blazetrails/ruby-compat";
+import { Process, Shellwords, env as ENV, include, setEnv } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
@@ -180,5 +180,30 @@ describe.concurrent("TestRunnerTest", { timeout: 600_000 }, () => {
     const output = await t.runTestCommand("");
     for (const suite of suites) expect(output).toMatch(`Foo${camelize(suite)}Test`);
     expect(output).toMatch("10 runs, 0 failures");
+  });
+
+  it("raise error when specified file does not exist", async (t) => {
+    const error = await t.runTestCommand("test/not-exists.test.ts");
+    expect(error).toMatch(/cannot load such file.+test\/not-exists\.test\.ts/);
+  });
+
+  it("unrelated load error", async (t) => {
+    await t.appFile(
+      "test/models/account.test.ts",
+      `import "../test-helper.ts";
+import "does-not-exist";
+import { describe, it, expect } from "vitest";
+
+describe("AccountsTest", () => {
+  it("truth", () => {
+    expect(true).toBe(true);
+  });
+});
+`,
+    );
+
+    const output = await t.runTestCommand("test/models/account.test.ts");
+    expect(output).toMatch("does-not-exist");
+    expect(Process.lastStatus!.isSuccess()).toBe(false);
   });
 });
