@@ -109,7 +109,16 @@ export default defineConfig({
               link: "/guides/active-support-instrumentation",
             },
             { text: "Using Trails for API-only Applications", link: "/guides/api-app" },
+            {
+              text: "Debugging Trails Applications",
+              link: "/guides/debugging-rails-applications",
+            },
+            { text: "Configuring Trails Applications", link: "/guides/configuring" },
           ],
+        },
+        {
+          text: "Extending Trails",
+          items: [{ text: "Getting Started with Engines", link: "/guides/engines" }],
         },
         {
           text: "Rails Guides",

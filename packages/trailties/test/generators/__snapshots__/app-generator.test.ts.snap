@@ -270,7 +270,7 @@ Trails.application.configure(function () {
   // this.config.sslOptions = { redirect: { exclude: (request) => request.path === "/up" } };
 
   // Log to STDOUT with the current request id as a default log tag.
-  this.config.logTags = [":request_id"];
+  this.config.logTags = [":requestId"];
   this.config.logger = TaggedLogging.logger(STDOUT);
 
   // Change to "debug" to log everything (including potentially personally-identifiable information!)
