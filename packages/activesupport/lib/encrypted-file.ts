@@ -53,7 +53,6 @@ export class EncryptedFile {
   readonly raiseIfMissingKey: boolean;
 
   private keyFileContents: string | null = null;
-  private keyFileChecked = false;
   private resolvedContentPath: string | null = null;
   private memoEncryptor: MessageEncryptor | null = null;
 
@@ -162,12 +161,11 @@ export class EncryptedFile {
   }
 
   private async readKeyFile(): Promise<string | null> {
-    if (this.keyFileChecked) return this.keyFileContents;
-    this.keyFileChecked = true;
+    if (this.keyFileContents) return this.keyFileContents;
     const fs = getFs();
-    if (!(await fs.exists(this.keyPath))) return null;
-    this.keyFileContents = (await fs.readFile(this.keyPath, "utf8")).trim();
-    return this.keyFileContents;
+    return (this.keyFileContents = (await fs.exists(this.keyPath))
+      ? (await fs.readFile(this.keyPath, "utf8")).trim()
+      : null);
   }
 
   private handleMissingKey(): null {
