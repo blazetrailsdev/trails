@@ -9,6 +9,7 @@ import {
   isReplicaConfig,
   buildReplicaOptions,
 } from "../lib/libsql.js";
+import { Pragmas } from "../lib/pragmas.js";
 
 describe("SqliteDriver — libsql round-trip", () => {
   let driver: SqliteConnection;
@@ -388,6 +389,11 @@ describe.skipIf(!hasCredentials)("libsqlRemoteDriver — network round-trip (TUR
     const stmt = await conn.prepare("SELECT 1 AS n");
     const row = (await stmt.get()) as { n: number };
     expect(row.n).toBe(1);
+  });
+
+  it("accepts the busy_timeout pragma configureConnection sets", async () => {
+    await Pragmas.setBusyTimeout.call(conn, 0);
+    expect(await Pragmas.busyTimeout.call(conn)).toBe(0);
   });
 });
 

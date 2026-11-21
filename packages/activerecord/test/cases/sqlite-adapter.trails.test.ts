@@ -6,6 +6,9 @@ import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/connection-handler.js";
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";
 import { betterSqlite3Driver } from "@blazetrails/sqlite3/better-sqlite3";
+import { libsqlDriver } from "@blazetrails/sqlite3/libsql";
+import { isNodeSqliteAvailable, nodeSqliteDriver } from "@blazetrails/sqlite3/node-sqlite";
+import { Pragmas } from "@blazetrails/sqlite3";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import type { SqliteConnection, SqliteDriver } from "../../lib/sqlite-adapter.js";
 import { load, register } from "../../lib/connection-adapters.js";
@@ -102,6 +105,31 @@ describe("SQLite adapter driver binding", () => {
     }).connectBang();
     expect(adapter["_rawConnection"]!.busyHandlerTimeout).toBe(1234);
     expect(seen?.driverOptions).toEqual({ foo: "bar" });
+    await adapter.disconnectBang();
+  });
+
+  it.skipIf(!isNodeSqliteAvailable)(
+    "applies the busy timeout in configureConnection on node:sqlite",
+    async () => {
+      const adapter = await new SQLite3Adapter({
+        database: ":memory:",
+        driver: nodeSqliteDriver,
+        timeout: 1234,
+      }).connectBang();
+      expect(adapter["_rawConnection"]!.busyHandlerTimeout).toBe(1234);
+      expect(await Pragmas.busyTimeout.call(adapter["_rawConnection"]!)).toBe(0);
+      await adapter.disconnectBang();
+    },
+  );
+
+  it("applies the busy timeout in configureConnection on local libsql", async () => {
+    const adapter = await new SQLite3Adapter({
+      database: ":memory:",
+      driver: libsqlDriver,
+      timeout: 1234,
+    }).connectBang();
+    expect(adapter["_rawConnection"]!.busyHandlerTimeout).toBe(1234);
+    expect(await Pragmas.busyTimeout.call(adapter["_rawConnection"]!)).toBe(0);
     await adapter.disconnectBang();
   });
 
