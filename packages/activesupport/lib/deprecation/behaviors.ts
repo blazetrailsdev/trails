@@ -1,18 +1,16 @@
 import { wrap } from "../core-ext/array/wrap.js";
 import { currentErrorReporter } from "../error-reporter.js";
-import { ArgumentError } from "../hash-utils.js";
-import { underscore } from "../inflector.js";
 import { Notifications } from "../notifications.js";
-import { classModule, rbObjRespondTo, stderr } from "@blazetrails/ruby-compat";
+import { ArgumentError, classModule, rbObjRespondTo, stderr } from "@blazetrails/ruby-compat";
 import { ActiveSupport, TopLevel } from "../namespaces.js";
-import type { Deprecation } from "../deprecation.js";
+import type { Reporting } from "./reporting.js";
 
 export type DeprecationBehavior = "raise" | "stderr" | "log" | "silence" | "notify" | "report";
 
 export type DeprecationBehaviorCallable = (
   message: string,
   callstack: unknown[],
-  deprecator: Deprecation,
+  deprecator: Reporting,
 ) => void;
 
 export class DeprecationException extends Error {
@@ -43,7 +41,7 @@ export const DEFAULT_BEHAVIORS: Readonly<Record<DeprecationBehavior, Deprecation
 
     notify: (message, callstack, deprecator) => {
       Notifications.instrument(
-        `deprecation.${underscore(deprecator.gemName).replace(/\//g, "_")}`,
+        `deprecation.${ActiveSupport.Inflector.underscore(deprecator.gemName).replace(/\//g, "_")}`,
         {
           message,
           callstack,

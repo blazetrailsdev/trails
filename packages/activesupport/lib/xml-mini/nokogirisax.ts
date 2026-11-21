@@ -1,11 +1,20 @@
-import { SAX } from "@blazetrails/nokogiri";
 import { isBlank } from "../string-utils.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO, warn } from "@blazetrails/ruby-compat";
 import { RuntimeError } from "../rexml/document.js";
+
+let Nokogiri: typeof import("@blazetrails/nokogiri");
+try {
+  Nokogiri = await import("@blazetrails/nokogiri");
+} catch (e) {
+  warn(
+    "You don't have nokogiri installed in your application. Please add it to your Gemfile and run bundle install",
+  );
+  throw e;
+}
 
 type XmlHash = Record<string, unknown>;
 
-export class HashBuilder extends SAX.Document {
+export class HashBuilder extends Nokogiri.SAX.Document {
   static readonly CONTENT_KEY = "__content__";
   static readonly HASH_SIZE_KEY = "__hash_size__";
 
@@ -91,7 +100,7 @@ export function parse(data: string | StringIO | null | undefined): XmlHash {
     return {};
   } else {
     const document = new (documentClass())();
-    const parser = new SAX.Parser(document);
+    const parser = new Nokogiri.SAX.Parser(document);
     parser.parse(data);
     return document.hash;
   }

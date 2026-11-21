@@ -19,7 +19,7 @@ export class Disallowed {
   }
 
   /** @internal */
-  isDeprecationDisallowed(message?: string): boolean {
+  isDeprecationDisallowed(message: string | null | undefined): boolean {
     if (this.isExplicitlyAllowed(message)) return false;
     if (this.disallowedWarnings === ":all") return true;
     return (
@@ -33,7 +33,7 @@ export class Disallowed {
   }
 
   /** @internal */
-  isExplicitlyAllowed(message?: string): boolean {
+  isExplicitlyAllowed(message: string | null | undefined): boolean {
     const allowances = this._explicitlyAllowedWarnings.value;
     if (allowances == null) return false;
     if (allowances === ":all") return true;

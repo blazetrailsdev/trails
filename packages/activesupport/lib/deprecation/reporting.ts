@@ -1,6 +1,5 @@
 import { classModule } from "@blazetrails/ruby-compat";
 import type { ThreadLocalVar } from "../thread-local-var.js";
-import type { Deprecation } from "../deprecation.js";
 import type { AllowMatcher, Disallowed } from "./disallowed.js";
 import type { Behavior } from "./behaviors.js";
 
@@ -131,10 +130,9 @@ export class Reporting {
     callstack ??= callerLocations(2);
     const fullMessage = this.deprecationMessage(callstack, message);
     if (this.isDeprecationDisallowed(message)) {
-      for (const b of this.disallowedBehavior)
-        b(fullMessage, callstack, this as unknown as Deprecation);
+      for (const b of this.disallowedBehavior) b(fullMessage, callstack, this);
     } else {
-      for (const b of this.behavior) b(fullMessage, callstack, this as unknown as Deprecation);
+      for (const b of this.behavior) b(fullMessage, callstack, this);
     }
     return fullMessage;
   }
@@ -199,18 +197,18 @@ export class Reporting {
 
   silence<T>(block: () => T): T {
     this.beginSilence();
-    let result: T;
+    let result: unknown;
     try {
       result = block();
     } catch (error) {
       this.endSilence();
       throw error;
     }
-    if (result != null && typeof (result as unknown as PromiseLike<unknown>).then === "function") {
-      return Promise.resolve(result as unknown).finally(() => this.endSilence()) as T;
+    if (result != null && typeof (result as { then?: unknown }).then === "function") {
+      return Promise.resolve(result).finally(() => this.endSilence()) as T;
     }
     this.endSilence();
-    return result;
+    return result as T;
   }
 
   beginSilence(): void {

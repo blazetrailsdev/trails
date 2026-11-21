@@ -1,11 +1,15 @@
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO, warn } from "@blazetrails/ruby-compat";
 
 const CONTENT_ROOT = "__content__";
 
-function isModuleNotFound(e: unknown, pkg: string): boolean {
-  if (!(e instanceof Error)) return false;
-  const code = (e as NodeJS.ErrnoException).code;
-  return code === "ERR_MODULE_NOT_FOUND" && e.message.includes(pkg);
+let Nokogiri: typeof import("@blazetrails/nokogiri");
+try {
+  Nokogiri = await import("@blazetrails/nokogiri");
+} catch (e) {
+  warn(
+    "You don't have nokogiri installed in your application. Please add it to your Gemfile and run bundle install",
+  );
+  throw e;
 }
 
 type XmlHash = Record<string, unknown>;
@@ -23,36 +27,6 @@ interface XmlNode {
   isElement(): boolean;
   isText(): boolean;
   isCdata(): boolean;
-}
-
-interface XmlDocument {
-  readonly errors: ReadonlyArray<Error>;
-  readonly root: XmlNode;
-  dispose(): void;
-}
-
-interface NokogiriModule {
-  parseXml(data: string | StringIO): XmlDocument;
-}
-
-const NOKOGIRI_PACKAGE = "@blazetrails/nokogiri";
-
-let nokogiri: NokogiriModule | undefined;
-
-/** @internal */
-export async function _require(): Promise<void> {
-  if (nokogiri !== undefined) return;
-  try {
-    nokogiri = (await import(NOKOGIRI_PACKAGE)) as unknown as NokogiriModule;
-  } catch (e) {
-    if (isModuleNotFound(e, "@blazetrails/nokogiri")) {
-      throw new Error(
-        "@blazetrails/nokogiri is not installed. Add it as a dependency to use the Nokogiri XML backend.",
-        { cause: e },
-      );
-    }
-    throw e;
-  }
 }
 
 function nodeToHash(node: XmlNode): XmlHash {
@@ -101,7 +75,7 @@ export function parse(data: string | StringIO | null | undefined): XmlHash {
   if (data.isEof()) {
     return {};
   } else {
-    const doc = nokogiri!.parseXml(data);
+    const doc = Nokogiri.parseXml(data);
     try {
       if (doc.errors.length > 0) {
         throw doc.errors[0];

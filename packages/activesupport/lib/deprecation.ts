@@ -22,11 +22,11 @@ export class Deprecation {
 
   private static __instance?: Deprecation;
 
+  deprecateMethods = deprecateMethods;
+
   declare static Behavior: typeof Behavior;
   declare static Reporting: typeof Reporting;
   declare static Disallowed: typeof Disallowed;
-
-  deprecateMethods = deprecateMethods;
 
   deprecationHorizon: string;
 

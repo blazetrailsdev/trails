@@ -1,11 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { parse } from "../../lib/xml-mini/nokogirisax.js";
-import { parse as parseDom, _require as _requireDom } from "../../lib/xml-mini/nokogiri.js";
+import { parse as parseDom } from "../../lib/xml-mini/nokogiri.js";
 import { StringIO } from "@blazetrails/ruby-compat";
-
-beforeAll(async () => {
-  await _requireDom();
-});
 
 describe("NokogiriSAX parse readable input", () => {
   it("parses a readable input", async () => {
