@@ -125,13 +125,31 @@ export class Statement {
 
   bindParam(key: string | number, value: SqliteBindValue): void | Promise<void> {
     this.mustBeOpenBang();
-    return this.check(() => this.#st.bindParam(key, value));
+    const engine = this.#connection._engine;
+    let r: void | Promise<void>;
+    try {
+      r = this.#st.bindParam(key, value);
+    } catch (e) {
+      rbSqlite3Raise(e, engine);
+    }
+    return r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, engine)) : r;
   }
 
   resetBang(): this | Promise<this> {
     this.mustBeOpenBang();
-    const r = this.check(() => this.#st.resetBang());
-    return r instanceof Promise ? r.then(() => this) : this;
+    const engine = this.#connection._engine;
+    let r: void | Promise<void>;
+    try {
+      r = this.#st.resetBang();
+    } catch (e) {
+      rbSqlite3Raise(e, engine);
+    }
+    return r instanceof Promise
+      ? r.then(
+          () => this,
+          (e: unknown) => rbSqlite3Raise(e, engine),
+        )
+      : this;
   }
 
   step(): unknown[] | null | Promise<unknown[] | null> {
@@ -139,7 +157,14 @@ export class Statement {
       throw new Exception("cannot use a statement associated with a discarded database");
     }
     this.mustBeOpenBang();
-    return this.check(() => this.#st.step());
+    const engine = this.#connection._engine;
+    let r: unknown[] | null | Promise<unknown[] | null>;
+    try {
+      r = this.#st.step();
+    } catch (e) {
+      rbSqlite3Raise(e, engine);
+    }
+    return r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, engine)) : r;
   }
 
   isDone(): boolean {
@@ -172,21 +197,6 @@ export class Statement {
     }
     this.#st = st;
     return remainder;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  private check<T>(primitive: () => T): T {
-    const engine = this.#connection._engine;
-    let r: T;
-    try {
-      r = primitive();
-    } catch (e) {
-      rbSqlite3Raise(e, engine);
-    }
-    return (r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, engine)) : r) as T;
   }
 
   /** @internal */
