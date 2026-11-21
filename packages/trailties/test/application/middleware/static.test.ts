@@ -45,7 +45,7 @@ describe("MiddlewareStaticTest", { timeout: 120_000 }, () => {
     expect(
       Object.hasOwn(t.lastResponse().headers, "cache-control"),
       "Cache-Control should not be set",
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("headers for static files are configurable", async () => {
