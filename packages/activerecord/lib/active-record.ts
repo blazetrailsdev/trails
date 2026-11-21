@@ -21,7 +21,6 @@ type AnyClass = abstract new (...args: never[]) => object;
 
 type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWarning) => void);
 
-/** @noRailsEquivalent PERMANENT */
 const LIB = File.expandPath(decodeURIComponent(new URL(".", import.meta.url).pathname));
 if (!LOAD_PATH.includes(LIB)) LOAD_PATH.push(LIB);
 
