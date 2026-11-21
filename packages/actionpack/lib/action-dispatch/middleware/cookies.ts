@@ -520,7 +520,7 @@ export class EncryptedKeyRotatingCookieJar extends AbstractCookieJar {
       const secret = keyGenerator
         .call(this.request)!
         .generateKey(authenticatedEncryptedCookieSalt.call(this.request)!, keyLen);
-      this.encryptor = new MessageEncryptor(secret as Buffer, {
+      this.encryptor = new MessageEncryptor(secret as Buffer, undefined, {
         cipher: this.encryptedCookieCipher(),
         serializer: NullSerializer,
       });

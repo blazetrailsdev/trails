@@ -9,7 +9,7 @@ describe("MessageEncryptorMetadataTest", () => {
   const secret = Buffer.from(getCrypto().randomBytes(32));
 
   messageMetadataTests<MessageEncryptor>({
-    makeCodec: (serializer) => new MessageEncryptor(secret, { serializer }),
+    makeCodec: (serializer) => new MessageEncryptor(secret, undefined, { serializer }),
     encode: (data, encryptor, options) => encryptor.encryptAndSign(data, options),
     decode: (message, encryptor, options) => {
       try {

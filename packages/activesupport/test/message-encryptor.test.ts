@@ -120,7 +120,10 @@ describe("MessageEncryptorTest", () => {
   });
 
   it("supports URL-safe encoding when using authenticated encryption", () => {
-    const encryptor = new MessageEncryptor(secret, { url_safe: true, cipher: "aes-256-gcm" });
+    const encryptor = new MessageEncryptor(secret, undefined, {
+      url_safe: true,
+      cipher: "aes-256-gcm",
+    });
 
     const data = "x".repeat(10001);
     const message = encryptor.encryptAndSign(data);
@@ -130,7 +133,10 @@ describe("MessageEncryptorTest", () => {
   });
 
   it("supports URL-safe encoding when using unauthenticated encryption", () => {
-    const encryptor = new MessageEncryptor(secret, { url_safe: true, cipher: "aes-256-cbc" });
+    const encryptor = new MessageEncryptor(secret, undefined, {
+      url_safe: true,
+      cipher: "aes-256-cbc",
+    });
 
     const data = 1;
     const message = encryptor.encryptAndSign(data);
@@ -141,13 +147,13 @@ describe("MessageEncryptorTest", () => {
   });
 
   it("aead mode encryption", () => {
-    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm" });
+    const encryptor = new MessageEncryptor(secret, undefined, { cipher: "aes-256-gcm" });
     const message = encryptor.encryptAndSign(data);
     expect(encryptor.decryptAndVerify(message)).toEqual(data);
   });
 
   it("aead mode with hmac cbc cipher text", () => {
-    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm" });
+    const encryptor = new MessageEncryptor(secret, undefined, { cipher: "aes-256-gcm" });
 
     assertAeadNotDecrypted(
       encryptor,
@@ -156,7 +162,7 @@ describe("MessageEncryptorTest", () => {
   });
 
   it("messing with aead values causes failures", () => {
-    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm" });
+    const encryptor = new MessageEncryptor(secret, undefined, { cipher: "aes-256-gcm" });
     const [text, iv, authTag] = encryptor.encryptAndSign(data).split("--") as [
       string,
       string,
@@ -176,7 +182,7 @@ describe("MessageEncryptorTest", () => {
   });
 
   it("inspect does not show secrets", () => {
-    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm" });
+    const encryptor = new MessageEncryptor(secret, undefined, { cipher: "aes-256-gcm" });
     expect(encryptor.inspect()).toMatch(/^#<ActiveSupport::MessageEncryptor:0x[0-9a-f]+>$/);
   });
 
