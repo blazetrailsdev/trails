@@ -1,7 +1,7 @@
 import { describe, expect, it, test } from "vitest";
 import "@blazetrails/sqlite3/better-sqlite3";
 import { Base } from "../../../lib/base.js";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { recordBootLaidTables, resetTestTables } from "../../support/drop-all-tables.js";
 import { loadAdapterSpecificSchema, loadSchema } from "../../support/load-schema-helper.js";
@@ -42,7 +42,7 @@ describe("boot-laid table snapshot", () => {
 
 describe("LoadSchemaHelper", () => {
   test("load_schema", async () => {
-    const adapter = new BetterSQLite3Adapter({
+    const adapter = new SQLite3Adapter({
       database: ":memory:",
     }) as unknown as AbstractAdapter;
     try {
@@ -59,7 +59,7 @@ describe("LoadSchemaHelper", () => {
       expect(tables).not.toContain("chat_messages");
       expect(tables).toContain("defaults");
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).disconnectBang();
+      await (adapter as unknown as SQLite3Adapter).disconnectBang();
     }
   });
 });

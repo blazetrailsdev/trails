@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { File, getOs } from "@blazetrails/ruby-compat";
-import { libsqlDriver } from "@blazetrails/sqlite3/libsql";
-import { LibSQLAdapter } from "../../lib/connection-adapters/libsql-adapter.js";
-import { LibSQLRemoteAdapter } from "../../lib/connection-adapters/libsql-remote-adapter.js";
-import { LibSQLReplicaAdapter } from "../../lib/connection-adapters/libsql-replica-adapter.js";
+import type { SyncableSqliteConnection } from "@blazetrails/sqlite3/libsql";
+import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js";
 
 const tursoUrl = typeof process !== "undefined" ? process.env["TURSO_DATABASE_URL"] : undefined;
 const tursoToken = typeof process !== "undefined" ? process.env["TURSO_AUTH_TOKEN"] : undefined;
@@ -20,11 +18,11 @@ describe("LibSQLAdapter — local-file smoke", () => {
     }
   };
 
-  let adapter: LibSQLAdapter;
+  let adapter: SQLite3Adapter;
 
   beforeAll(async () => {
     removeFiles();
-    adapter = new LibSQLAdapter({ adapter: "libsql", database: dbPath });
+    adapter = new SQLite3Adapter({ adapter: "libsql", database: dbPath });
     await adapter.execute(
       "CREATE TABLE libsql_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
@@ -53,20 +51,20 @@ describe("LibSQLAdapter — local-file smoke", () => {
 
 describe("LibSQLRemoteAdapter#databaseExists", () => {
   it("answers from a connection, not from File.exist? on the database URL", async () => {
-    const adapter = new LibSQLRemoteAdapter({ database: "file::memory:", driver: libsqlDriver });
-    try {
-      expect(await adapter.databaseExists()).toBe(true);
-    } finally {
-      await adapter.disconnectBang();
-    }
+    const adapter = new SQLite3Adapter({
+      adapter: "libsql-remote",
+      database: "libsql://example.invalid",
+    });
+    adapter.connectBang = async () => adapter;
+    expect(await adapter.databaseExists()).toBe(true);
   });
 });
 
 describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke (TURSO_*)", () => {
-  let adapter: LibSQLRemoteAdapter;
+  let adapter: SQLite3Adapter;
 
   beforeAll(async () => {
-    adapter = await new LibSQLRemoteAdapter({
+    adapter = await new SQLite3Adapter({
       adapter: "libsql-remote",
       database: tursoUrl,
       driverOptions: { authToken: tursoToken },
@@ -101,13 +99,13 @@ describe.skipIf(!hasCredentials)(
       }
     };
 
-    let primary: LibSQLRemoteAdapter;
-    let replica: LibSQLReplicaAdapter;
+    let primary: SQLite3Adapter;
+    let replica: SQLite3Adapter;
     const table = `replica_smoke_${Date.now()}`;
 
     beforeAll(async () => {
       removeFiles();
-      primary = await new LibSQLRemoteAdapter({
+      primary = await new SQLite3Adapter({
         adapter: "libsql-remote",
         database: tursoUrl,
         driverOptions: { authToken: tursoToken },
@@ -116,7 +114,7 @@ describe.skipIf(!hasCredentials)(
       await primary.execute(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
       await primary.execute(`INSERT INTO ${table} (id, label) VALUES (1, 'remote')`);
 
-      replica = await new LibSQLReplicaAdapter({
+      replica = await new SQLite3Adapter({
         adapter: "libsql-replica",
         database: replicaPath,
         driverOptions: { syncUrl: tursoUrl, authToken: tursoToken },
@@ -131,12 +129,16 @@ describe.skipIf(!hasCredentials)(
     });
 
     it("reflects a remote write after syncReplica()", async () => {
-      await replica.syncReplica();
+      await replica.withRawConnection({ materializeTransactions: false }, (raw: unknown) =>
+        (raw as SyncableSqliteConnection).sync(),
+      );
       const rows = (await replica.execute(`SELECT label FROM ${table} WHERE id = 1`))!;
       expect((rows[0] as { label: string }).label).toBe("remote");
 
       await primary.execute(`INSERT INTO ${table} (id, label) VALUES (2, 'later')`);
-      await replica.syncReplica();
+      await replica.withRawConnection({ materializeTransactions: false }, (raw: unknown) =>
+        (raw as SyncableSqliteConnection).sync(),
+      );
       const after = (await replica.execute(`SELECT count(*) AS c FROM ${table}`))!;
       expect(Number((after[0] as { c: number }).c)).toBe(2);
     });
@@ -162,13 +164,13 @@ describe.skipIf(!hasCredentials)(
     };
     const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-    let primary: LibSQLRemoteAdapter;
-    let replica: LibSQLReplicaAdapter;
+    let primary: SQLite3Adapter;
+    let replica: SQLite3Adapter;
     const table = `autosync_${Date.now()}`;
 
     beforeAll(async () => {
       removeFiles();
-      primary = await new LibSQLRemoteAdapter({
+      primary = await new SQLite3Adapter({
         adapter: "libsql-remote",
         database: tursoUrl,
         driverOptions: { authToken: tursoToken },
@@ -176,7 +178,7 @@ describe.skipIf(!hasCredentials)(
       await primary.execute(`DROP TABLE IF EXISTS ${table}`);
       await primary.execute(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
 
-      replica = await new LibSQLReplicaAdapter({
+      replica = await new SQLite3Adapter({
         adapter: "libsql-replica",
         database: replicaPath,
         driverOptions: { syncUrl: tursoUrl, authToken: tursoToken, syncPeriod: 1 },

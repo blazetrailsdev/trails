@@ -3,7 +3,6 @@ import { it, expect } from "vitest";
 import { assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
-import { NodeSQLiteAdapter } from "../../../../lib/connection-adapters/node-sqlite-adapter.js";
 import { Rollback, TransactionIsolationError } from "../../../../lib/errors.js";
 import { inMemoryDb } from "../../../support/adapter-helper.js";
 import { ambientPoolConfiguration } from "../../../support/test-adapter.js";
@@ -21,7 +20,7 @@ async function withConnection(
   block: (conn: SQLite3Adapter) => Promise<void>,
 ): Promise<void> {
   const database = inMemoryDb() ? ":memory:" : (ambientPoolConfiguration().database as string);
-  const conn = new NodeSQLiteAdapter({ adapter: "node-sqlite", ...options, database });
+  const conn = new SQLite3Adapter({ adapter: "node-sqlite", ...options, database });
   try {
     await conn.connectBang();
     await block(conn);

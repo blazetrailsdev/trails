@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import "@blazetrails/sqlite3/better-sqlite3";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { loadCanonicalSchema } from "../../support/canonical-schema.js";
 
@@ -16,7 +16,7 @@ async function dumpSchema(adapter: AbstractAdapter): Promise<string> {
 
 describe("loadCanonicalSchema", () => {
   test("lays down real canonical DDL for hundreds of tables", async () => {
-    const adapter = new BetterSQLite3Adapter({
+    const adapter = new SQLite3Adapter({
       database: ":memory:",
     }) as unknown as AbstractAdapter;
     try {
@@ -27,7 +27,7 @@ describe("loadCanonicalSchema", () => {
       expect(dump).not.toContain("undefined undefined: undefined");
       expect(dump).toMatch(/table topics: CREATE TABLE "?topics"?/);
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).disconnectBang();
+      await (adapter as unknown as SQLite3Adapter).disconnectBang();
     }
   });
 });

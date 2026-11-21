@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../../lib/base.js";
 import { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
-import { BetterSQLite3Adapter } from "../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js";
 import { Mysql2Adapter } from "../../lib/connection-adapters/mysql2-adapter.js";
 import { ConnectionHandler } from "../../lib/connection-adapters/abstract/connection-handler.js";
 import { join } from "path";
@@ -50,19 +50,19 @@ describe("Base.establishConnection", () => {
   it("creates a SqliteAdapter from a :memory: URL", async () => {
     await Base.establishConnection("sqlite3::memory:");
     const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
-    expect(await pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
+    expect(await pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 
   it("creates a SqliteAdapter from a .sqlite3 file path", async () => {
     await Base.establishConnection(`sqlite3:${join(tmpdir(), "test.sqlite3")}`);
     const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
-    expect(await pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
+    expect(await pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 
   it("accepts a config object with adapter name", async () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
     const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
-    expect(await pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
+    expect(await pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 
   it("throws for an unrecognized URL scheme", async () => {
@@ -85,7 +85,7 @@ describe("Base.establishConnection", () => {
   it("accepts sqlite3 as an adapter name alias", async () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
     const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
-    expect(await pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
+    expect(await pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 
   it("accepts a postgres:// URL", async () => {
@@ -103,7 +103,7 @@ describe("Base.establishConnection", () => {
   it("parses sqlite:// URLs into file paths", async () => {
     await Base.establishConnection("sqlite3:///tmp/test.sqlite3");
     const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
-    expect(await pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
+    expect(await pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 });
 

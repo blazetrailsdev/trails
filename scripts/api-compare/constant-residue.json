@@ -401,12 +401,6 @@
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
-      "connection-adapters/better-sqlite3-adapter.ts::BetterSQLite3Adapter",
-      "connection-adapters/expo-sqlite-adapter.ts::ExpoSQLiteAdapter",
-      "connection-adapters/libsql-adapter.ts::LibSQLAdapter",
-      "connection-adapters/libsql-remote-adapter.ts::LibSQLRemoteAdapter",
-      "connection-adapters/libsql-replica-adapter.ts::LibSQLReplicaAdapter",
-      "connection-adapters/node-sqlite-adapter.ts::NodeSQLiteAdapter",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredIdsIn",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredIdsNotIn",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredPluck"

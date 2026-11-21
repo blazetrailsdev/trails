@@ -2,19 +2,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { BusyException } from "@blazetrails/sqlite3";
 
 describe("SQLite3Adapter busy handler", () => {
   let dir: string;
-  let writer: BetterSQLite3Adapter;
-  let waiter: BetterSQLite3Adapter;
+  let writer: SQLite3Adapter;
+  let waiter: SQLite3Adapter;
 
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "sqlite-busy-"));
     const database = join(dir, "busy.sqlite3");
-    writer = new BetterSQLite3Adapter({ database, timeout: 1000 });
-    waiter = new BetterSQLite3Adapter({ database, timeout: 1000 });
+    writer = new SQLite3Adapter({ database, timeout: 1000 });
+    waiter = new SQLite3Adapter({ database, timeout: 1000 });
     await writer.execute("CREATE TABLE t (id INTEGER)");
   });
 
@@ -57,7 +57,7 @@ describe("SQLite3Adapter busy handler", () => {
   });
 
   it("leaves the driver's busy timeout alone when no timeout is configured", async () => {
-    const unconfigured = new BetterSQLite3Adapter({ database: join(dir, "busy.sqlite3") });
+    const unconfigured = new SQLite3Adapter({ database: join(dir, "busy.sqlite3") });
     await unconfigured.execute("SELECT 1");
     const read = async () => (await unconfigured.execute("PRAGMA busy_timeout"))![0];
     const before = await read();
@@ -130,12 +130,12 @@ describe("SQLite3Adapter busy handler", () => {
 
   it("waits out a lock while it sets the configured pragmas", async () => {
     const database = join(dir, "pragma.sqlite3");
-    const holder = new BetterSQLite3Adapter({ database, pragmas: { journal_mode: "delete" } });
+    const holder = new SQLite3Adapter({ database, pragmas: { journal_mode: "delete" } });
     await holder.execute("CREATE TABLE p (id INTEGER)");
     await holder.execute("BEGIN EXCLUSIVE");
     setTimeout(() => void holder.execute("COMMIT"), 20);
 
-    const late = new BetterSQLite3Adapter({ database, timeout: 1000 });
+    const late = new SQLite3Adapter({ database, timeout: 1000 });
     try {
       await late.execute("SELECT 1");
     } finally {
@@ -176,7 +176,7 @@ describe("SQLite3Adapter busy handler", () => {
   });
 
   it("retries a retries config that many times, then raises", async () => {
-    const retrying = new BetterSQLite3Adapter({
+    const retrying = new SQLite3Adapter({
       database: join(dir, "busy.sqlite3"),
       retries: 2,
     });
@@ -197,7 +197,7 @@ describe("SQLite3Adapter busy handler", () => {
   });
 
   it("raises at once when no timeout is configured", async () => {
-    const unconfigured = new BetterSQLite3Adapter({ database: join(dir, "busy.sqlite3") });
+    const unconfigured = new SQLite3Adapter({ database: join(dir, "busy.sqlite3") });
     await unconfigured.execute("SELECT 1");
     await writer.execute("BEGIN IMMEDIATE");
     const started = Date.now();
@@ -210,7 +210,7 @@ describe("SQLite3Adapter busy handler", () => {
   });
 
   it("raises once the timeout has passed", async () => {
-    const impatient = new BetterSQLite3Adapter({
+    const impatient = new SQLite3Adapter({
       database: join(dir, "busy.sqlite3"),
       timeout: 30,
     });

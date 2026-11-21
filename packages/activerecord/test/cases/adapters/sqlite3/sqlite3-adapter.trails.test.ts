@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../../../lib/connection-adapters/better-sqlite3-adapter.js";
 import { newSqlitePool } from "../../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
 import { fixtures } from "../../../support/use-fixtures.js";
@@ -92,7 +91,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("applies a valid numeric pragma on connect", async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { cache_size: 500 } });
+    adapter = new SQLite3Adapter({ database: ":memory:", pragmas: { cache_size: 500 } });
     await adapter.connectBang();
     const result = (
       (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
@@ -101,7 +100,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("applies a valid string enum pragma", async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { synchronous: "FULL" } });
+    adapter = new SQLite3Adapter({ database: ":memory:", pragmas: { synchronous: "FULL" } });
     await adapter.connectBang();
     const result = (
       (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
@@ -110,7 +109,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("converts boolean true to 1 for pragma", async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: true } });
+    adapter = new SQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: true } });
     await adapter.connectBang();
     const result = (
       (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
@@ -119,7 +118,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("raises SQLite3::CantOpenException opening a missing database file readonly", async () => {
-    const missing = new BetterSQLite3Adapter({
+    const missing = new SQLite3Adapter({
       database: "tmp/missing-readonly-database.sqlite3",
       readonly: true,
     });
@@ -136,7 +135,7 @@ describe("SQLite3Adapter pragmas option", () => {
   it("new_client raises NoDatabaseError for Errno::ENOENT and re-raises anything else", async () => {
     const newClient = (error: Error) =>
       Promise.resolve().then(() =>
-        BetterSQLite3Adapter.newClient({
+        SQLite3Adapter.newClient({
           database: ":memory:",
           driver: {
             name: "raising",
@@ -157,7 +156,7 @@ describe("SQLite3Adapter pragmas option", () => {
     try {
       let error: unknown;
       try {
-        new BetterSQLite3Adapter({ database: "tmp/not-a-directory/db.sqlite3" });
+        new SQLite3Adapter({ database: "tmp/not-a-directory/db.sqlite3" });
       } catch (e) {
         error = e;
       }
@@ -170,7 +169,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("converts boolean false to 0 for pragma", async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: false } });
+    adapter = new SQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: false } });
     await adapter.connectBang();
     const result = (
       (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
@@ -180,7 +179,7 @@ describe("SQLite3Adapter pragmas option", () => {
 
   it("warns and skips an invalid pragma name", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    adapter = new BetterSQLite3Adapter({
+    adapter = new SQLite3Adapter({
       database: ":memory:",
       pragmas: { "bad-name!": 1 } as Record<string, number>,
     });
@@ -190,7 +189,7 @@ describe("SQLite3Adapter pragmas option", () => {
 
   it("warns on a pragma named after a set_*_pragma helper", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    adapter = new BetterSQLite3Adapter({
+    adapter = new SQLite3Adapter({
       database: ":memory:",
       pragmas: { boolean_pragma: 1 } as Record<string, number>,
     });
@@ -203,19 +202,19 @@ describe("SQLite3Adapter pragmas option", () => {
     const path = await import("path");
     const os = await import("os");
     const dbPath = path.join(os.tmpdir(), `sqlite-pragma-injection-${Date.now()}.db`);
-    const seed = new BetterSQLite3Adapter({ database: dbPath });
+    const seed = new SQLite3Adapter({ database: dbPath });
     await seed.connectBang();
     await seed.execute("CREATE TABLE sentinel (id integer)");
     await seed.disconnectBang();
     try {
-      adapter = new BetterSQLite3Adapter({
+      adapter = new SQLite3Adapter({
         database: dbPath,
         pragmas: { synchronous: "FULL; DROP TABLE sentinel" },
       });
       await expect(adapter.connectBang()).rejects.toThrow(
         'unrecognized synchronous "FULL; DROP TABLE sentinel"',
       );
-      const check = new BetterSQLite3Adapter({ database: dbPath });
+      const check = new SQLite3Adapter({ database: dbPath });
       await check.connectBang();
       const rows = ((await check.rawConnection())!.raw as import("better-sqlite3").Database)
         .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'sentinel'")
@@ -229,7 +228,7 @@ describe("SQLite3Adapter pragmas option", () => {
   });
 
   it("applies DEFAULT_PRAGMAS when no pragmas option is given", async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    adapter = new SQLite3Adapter({ database: ":memory:" });
     await adapter.connectBang();
     const result = (
       (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
@@ -240,7 +239,7 @@ describe("SQLite3Adapter pragmas option", () => {
 
 describe("SQLite3 databaseExists", () => {
   it("answers true for an in-memory adapter without connecting", async () => {
-    const a = new BetterSQLite3Adapter({ database: ":memory:" });
+    const a = new SQLite3Adapter({ database: ":memory:" });
     expect(await a.databaseExists()).toBe(true);
     await a.disconnectBang();
   });
@@ -250,7 +249,7 @@ describe("SQLite3 databaseExists", () => {
     const path = await import("path");
     const os = await import("os");
     const dbPath = path.join(os.tmpdir(), `sqlite-exists-instance-${Date.now()}.db`);
-    const a = new BetterSQLite3Adapter({ database: dbPath });
+    const a = new SQLite3Adapter({ database: dbPath });
     try {
       await a.connectBang();
       expect(await a.databaseExists()).toBe(true);

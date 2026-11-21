@@ -293,21 +293,20 @@ export class Post extends Base {
 
 ## Database adapters
 
-The adapter is picked by name in the connection config. Each adapter loads its
-own driver:
+The adapter is picked by name in the connection config. Every SQLite name
+registers `SQLite3Adapter`, which loads the engine the name selects:
 
-| `adapter:`                                  | Driver                        | Subpath export                                                            |
-| ------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------- |
-| `sqlite3`                                   | `better-sqlite3`              | `@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js` |
-| `node-sqlite`                               | Node's built-in `node:sqlite` | `.../connection-adapters/node-sqlite-adapter.js`                          |
-| `expo-sqlite`                               | `expo-sqlite` (React Native)  | `.../connection-adapters/expo-sqlite-adapter.js`                          |
-| `libsql`, `libsql-remote`, `libsql-replica` | `libsql`                      | `.../connection-adapters/libsql-adapter.js`                               |
-| `postgresql`                                | `pg`                          | `.../connection-adapters/postgresql-adapter.js`                           |
-| `mysql2`                                    | `mysql2`                      | `.../connection-adapters/mysql2-adapter.js`                               |
+| `adapter:`                                  | Driver                        | Subpath export                                                     |
+| ------------------------------------------- | ----------------------------- | ------------------------------------------------------------------ |
+| `sqlite3`                                   | `better-sqlite3`              | `@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js` |
+| `node-sqlite`                               | Node's built-in `node:sqlite` | `.../connection-adapters/sqlite3-adapter.js`                       |
+| `expo-sqlite`                               | `expo-sqlite` (React Native)  | `.../connection-adapters/sqlite3-adapter.js`                       |
+| `libsql`, `libsql-remote`, `libsql-replica` | `libsql`                      | `.../connection-adapters/sqlite3-adapter.js`                       |
+| `postgresql`                                | `pg`                          | `.../connection-adapters/postgresql-adapter.js`                    |
+| `mysql2`                                    | `mysql2`                      | `.../connection-adapters/mysql2-adapter.js`                        |
 
 A URL config maps the `sqlite:`, `postgres:` and `mysql:` schemes onto those
-names (`ActiveRecord.protocolAdapters`). There is also a raw
-`sqlite3-adapter.js` subpath. Register your own adapter with
+names (`ActiveRecord.protocolAdapters`). Register your own adapter with
 `ConnectionAdapters.register(name, className, path, loader)` (see
 [`lib/connection-adapters.ts`](lib/connection-adapters.ts)).
 

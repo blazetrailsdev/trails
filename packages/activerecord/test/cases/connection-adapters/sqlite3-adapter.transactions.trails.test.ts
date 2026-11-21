@@ -3,7 +3,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
 import { RecordNotUnique, TransactionIsolationError } from "../../../lib/errors.js";
 
 describe("SQLite3Adapter transaction control", () => {
@@ -12,7 +11,7 @@ describe("SQLite3Adapter transaction control", () => {
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-tx-"));
-    adapter = new BetterSQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
+    adapter = new SQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
     await adapter.execute(
       "CREATE TABLE gadgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
@@ -137,7 +136,7 @@ describe("SQLite3Adapter transaction control", () => {
 
   describe("cross-connection isolation", () => {
     it("writer changes are not visible to reader until committed", async () => {
-      const reader = new BetterSQLite3Adapter({
+      const reader = new SQLite3Adapter({
         database: path.join(tmpDir, "db.sqlite3"),
         readonly: true,
       });

@@ -1,13 +1,13 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../../lib/base.js";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 
-let adapter: BetterSQLite3Adapter;
+let adapter: SQLite3Adapter;
 
 describeIfSqlite("AbstractAdapter#isPreventingWrites with no connection descriptor", () => {
   beforeEach(() => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    adapter = new SQLite3Adapter({ database: ":memory:" });
   });
 
   afterEach(async () => {
@@ -23,7 +23,7 @@ describeIfSqlite("AbstractAdapter#isPreventingWrites with no connection descript
   });
 
   it("still reports preventing writes for a standalone replica", async () => {
-    const replica = new BetterSQLite3Adapter({ database: ":memory:", replica: true } as never);
+    const replica = new SQLite3Adapter({ database: ":memory:", replica: true } as never);
     try {
       expect(replica.connectionDescriptor).toBeUndefined();
       expect(replica.isPreventingWrites()).toBe(true);

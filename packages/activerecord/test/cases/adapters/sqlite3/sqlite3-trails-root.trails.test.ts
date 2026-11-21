@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { setTrailsRoot } from "@blazetrails/activesupport";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
-import { BetterSQLite3Adapter } from "../../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 
 describeIfSqlite("SQLite3 Trails.root path resolution", () => {
   afterEach(() => setTrailsRoot(null));
@@ -12,9 +12,9 @@ describeIfSqlite("SQLite3 Trails.root path resolution", () => {
   it("expands a relative database path against Trails.root when set", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "sqlite-trails-root-"));
     setTrailsRoot(root);
-    let conn: BetterSQLite3Adapter | undefined;
+    let conn: SQLite3Adapter | undefined;
     try {
-      conn = new BetterSQLite3Adapter({ database: path.join("db", "foo.sqlite3") });
+      conn = new SQLite3Adapter({ database: path.join("db", "foo.sqlite3") });
       await conn.connectBang();
 
       expect(fs.existsSync(path.join(root, "db", "foo.sqlite3"))).toBe(true);
@@ -28,9 +28,9 @@ describeIfSqlite("SQLite3 Trails.root path resolution", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "sqlite-trails-cwd-"));
     const original = process.cwd();
     process.chdir(root);
-    let conn: BetterSQLite3Adapter | undefined;
+    let conn: SQLite3Adapter | undefined;
     try {
-      conn = new BetterSQLite3Adapter({ database: path.join("db", "bar.sqlite3") });
+      conn = new SQLite3Adapter({ database: path.join("db", "bar.sqlite3") });
       await conn.connectBang();
 
       expect(fs.existsSync(path.join(root, "db", "bar.sqlite3"))).toBe(true);

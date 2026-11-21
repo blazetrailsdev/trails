@@ -47,9 +47,8 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
       },
     );
 
-    const { BetterSQLite3Adapter } =
-      await import("../../../lib/connection-adapters/better-sqlite3-adapter.js");
-    const adapter = new BetterSQLite3Adapter({ database: dbFile });
+    const { SQLite3Adapter } = await import("../../../lib/connection-adapters/sqlite3-adapter.js");
+    const adapter = new SQLite3Adapter({ database: dbFile });
     try {
       await adapter.execute(
         // eslint-disable-next-line blazetrails/require-table-teardown
@@ -146,9 +145,8 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
       },
     );
 
-    const { BetterSQLite3Adapter } =
-      await import("../../../lib/connection-adapters/better-sqlite3-adapter.js");
-    const adapter = new BetterSQLite3Adapter({ database: dbFile });
+    const { SQLite3Adapter } = await import("../../../lib/connection-adapters/sqlite3-adapter.js");
+    const adapter = new SQLite3Adapter({ database: dbFile });
     try {
       await adapter.execute(
         // eslint-disable-next-line blazetrails/require-table-teardown -- isolated per-test tmp DB, removed in afterEach

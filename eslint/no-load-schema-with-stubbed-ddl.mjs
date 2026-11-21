@@ -23,7 +23,7 @@
  *
  * It also carries the one interception shape the runtime guard cannot see at
  * all — a cover that defines the emitter in a *class body*, either as a
- * subclass override (`class Probe extends BetterSQLite3Adapter { override async
+ * subclass override (`class Probe extends SQLite3Adapter { override async
  * createTable() {} }`) or as a standalone fake. The guard walks the prototype
  * chain and finds that definition as the class's own, indistinguishable from
  * PostgreSQLAdapter overriding AbstractAdapter's; see `assertNotStubbed`'s
@@ -103,7 +103,7 @@ const COMPARISONS = new Set(["===", "==", "!==", "!="]);
 
 /**
  * True when `node` is a class-body definition of a stubbed DDL emitter — the
- * `class Probe extends BetterSQLite3Adapter { override async createTable() {} }`
+ * `class Probe extends SQLite3Adapter { override async createTable() {} }`
  * cover, its `createTable = async () => {}` field form, and the `get
  * schemaCreation()` accessor form. A standalone fake adapter class counts too:
  * it lays nothing either.

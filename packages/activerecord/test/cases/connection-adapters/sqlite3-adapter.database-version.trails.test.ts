@@ -1,6 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
-import type { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { Version } from "../../../lib/connection-adapters/abstract-adapter.js";
 
 describe("SQLite3Adapter database version", () => {
@@ -12,14 +11,14 @@ describe("SQLite3Adapter database version", () => {
   });
 
   it("getDatabaseVersion fetches the version off the connection", async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    adapter = new SQLite3Adapter({ database: ":memory:" });
     const version = await adapter.getDatabaseVersion();
     expect(version).toBeInstanceOf(Version);
     expect(version.compare("3.8.0")).toBeGreaterThanOrEqual(0);
   });
 
   it("a query issued from configureConnection runs on the connection being configured", async () => {
-    class QueryValueVersionAdapter extends BetterSQLite3Adapter {
+    class QueryValueVersionAdapter extends SQLite3Adapter {
       override async getDatabaseVersion(): Promise<Version> {
         return new Version(String(await this.queryValue("SELECT sqlite_version(*)", "SCHEMA")));
       }
@@ -37,7 +36,7 @@ describe("SQLite3Adapter database version", () => {
   }, 8000);
 
   it("databaseVersion answers through the pool memo", async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    adapter = new SQLite3Adapter({ database: ":memory:" });
     const version = await adapter.getDatabaseVersion();
     expect(String(await adapter.databaseVersion)).toBe(version.toString());
   });

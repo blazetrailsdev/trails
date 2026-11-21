@@ -1,4 +1,4 @@
-import "@blazetrails/activerecord/connection-adapters/node-sqlite-adapter.js";
+import "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
 
 const db = process.env.PGHOST

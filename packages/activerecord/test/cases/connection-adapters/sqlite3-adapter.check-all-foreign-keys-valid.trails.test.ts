@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { StatementInvalid } from "../../../lib/errors.js";
 
 describe("SQLite3Adapter#check_all_foreign_keys_valid!", () => {
-  let adapter: BetterSQLite3Adapter;
+  let adapter: SQLite3Adapter;
 
   beforeEach(async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    adapter = new SQLite3Adapter({ database: ":memory:" });
     await adapter.execute("PRAGMA foreign_keys = OFF");
     await adapter.execute("CREATE TABLE parents (id integer PRIMARY KEY)");
     await adapter.execute(

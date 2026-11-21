@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as fs from "fs/promises";
-import { BetterSQLite3Adapter } from "../packages/activerecord/lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../packages/activerecord/lib/connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../packages/activerecord/lib/connection-adapters/postgresql-adapter.js";
 import { AbstractMysqlAdapter } from "../packages/activerecord/lib/connection-adapters/abstract-mysql-adapter.js";
 import {
@@ -32,7 +32,7 @@ const PAIRS = [
     mixinClass: "SchemaStatements",
     adapterFile: `${ADAPTERS}abstract-adapter.ts`,
     adapterInterface: "AbstractAdapter",
-    witness: BetterSQLite3Adapter,
+    witness: SQLite3Adapter,
   },
   {
     label: "PostgreSQLAdapter / PostgreSQL::SchemaStatements",

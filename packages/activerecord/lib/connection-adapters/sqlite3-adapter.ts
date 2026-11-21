@@ -185,6 +185,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     classAttribute.call(this, "strictStringsByDefault", { default: false });
   }
 
+  /** @inventedArm if — PERMANENT */
   constructor(config: SQLite3Config) {
     super(config);
 
@@ -195,6 +196,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     } else if (database === ":memory:") {
       this._memoryDatabase = true;
     } else if (/^file:/.test(database)) {
+    } else if (/^(libsql|https?|wss?):/.test(database)) {
     } else {
       if (trailsRoot() != null) {
         this._config.database = File.expandPath(this._config.database as string, trailsRoot()!);
@@ -221,7 +223,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     };
   }
 
+  /** @inventedArm if — PERMANENT */
   override async databaseExists(): Promise<boolean> {
+    if (/^(libsql|https?|wss?):/.test(rbObjAsString(this._config.database))) {
+      return super.databaseExists();
+    }
     return (
       this._config.database === ":memory:" || File.isExist(rbObjAsString(this._config.database))
     );
