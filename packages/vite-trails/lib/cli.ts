@@ -47,7 +47,6 @@ const TRAILS_TEMPLATES = new Pathname(
   decodeURIComponent(new URL("../templates", import.meta.url).pathname),
 );
 
-/** @missingRailsArgs join — PERMANENT */
 async function setupAppFiles(this: InstallHost): Promise<void> {
   const config = this.config();
   const root = await this.root();

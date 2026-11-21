@@ -316,10 +316,7 @@ export class AppBuilder {
     });
   }
 
-  /**
-   * @missingRailsArgs template — PERMANENT
-   * @missingRailsArgs remove_file — PERMANENT
-   */
+  /** @missingRailsArgs template — PERMANENT */
   async configWhenUpdating(): Promise<void> {
     const root = this.destinationRoot;
     const actionCableConfigExist = await File.isExistAsync(File.join(root, "config/cable.ts"));
@@ -429,7 +426,6 @@ export class AppBuilder {
     await this.emptyDirectoryWithKeepFile("tmp/storage");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async test(): Promise<void> {
     await this.emptyDirectoryWithKeepFile("test/fixtures/files");
     await this.emptyDirectoryWithKeepFile("test/controllers");
@@ -442,7 +438,6 @@ export class AppBuilder {
     await this.template("test/global-setup.ts");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async systemTest(): Promise<void> {
     await this.emptyDirectoryWithKeepFile("test/system");
 
@@ -841,7 +836,6 @@ export class AppGenerator extends AppBase {
     }
   }
 
-  /** @missingRailsArgs remove_file — PERMANENT */
   async deleteApplicationRecordSkippingActiveRecord(): Promise<void> {
     if (this.options.skipActiveRecord) {
       await this.removeFile("app/models/application-record.ts");
@@ -869,7 +863,6 @@ export class AppGenerator extends AppBase {
     }
   }
 
-  /** @missingRailsArgs remove_file — PERMANENT */
   async deleteNonApiInitializersIfApiOption(): Promise<void> {
     if (this.options.api) {
       await this.removeFile("config/initializers/content-security-policy.ts");
