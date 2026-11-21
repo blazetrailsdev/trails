@@ -4,15 +4,25 @@ import type { Database } from "./database.js";
 import type { Statement } from "./statement.js";
 
 export class ResultSet {
-  // eslint-disable-next-line no-unused-private-class-members
-  #db: Database;
+  /** @internal */
+  private db: Database;
   #stmt: Statement;
 
   declare toA: () => Promise<unknown[]>;
 
   constructor(db: Database, stmt: Statement) {
-    this.#db = db;
+    this.db = db;
     this.#stmt = stmt;
+  }
+
+  reset(...bindParams: unknown[]): void | Promise<void> {
+    const r = this.#stmt.resetBang();
+    if (r instanceof Promise) return r.then(() => this.#stmt.bindParams(...bindParams));
+    return this.#stmt.bindParams(...bindParams);
+  }
+
+  isEof(): boolean {
+    return this.#stmt.isDone();
   }
 
   next(): unknown | Promise<unknown> {
@@ -22,6 +32,13 @@ export class ResultSet {
   async each(block: (node: unknown) => unknown): Promise<void> {
     let node: unknown;
     while ((node = await this.next()) != null) {
+      await block(node);
+    }
+  }
+
+  async eachHash(block: (node: Record<string, unknown>) => unknown): Promise<void> {
+    let node: Record<string, unknown> | null;
+    while ((node = await this.nextHash()) != null) {
       await block(node);
     }
   }

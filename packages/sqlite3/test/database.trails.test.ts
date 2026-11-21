@@ -77,10 +77,33 @@ describe("SQLite3::Database over a fake engine", () => {
     expect(db.busyHandler(() => true)).toBe(db);
     db.busyHandler();
     expect(fake.handler).toBeNull();
-    db.setBusyHandlerTimeout(0);
+    db.setBusyHandlerTimeout(50);
     expect(fake.handler!(0)).toBeTruthy();
+    const started = performance.now();
+    expect(fake.handler!(1)).toBe(0);
+    expect(performance.now() - started).toBeGreaterThanOrEqual(0.9);
+    db.setBusyHandlerTimeout(0);
+    fake.handler!(0);
     await new Promise((resolve) => setTimeout(resolve, 2));
     expect(fake.handler!(1)).toBe(false);
+  });
+
+  it("new tracks the database in ForkSafety", () => {
+    const db = new SQLite3.Database(":memory:", { engine: () => engineDatabase() });
+    expect(SQLite3.ForkSafety._databases.some((ref) => ref.deref() === db)).toBe(true);
+  });
+
+  it("ResultSet reset, eof? and each_hash run over the statement", async () => {
+    const db = new SQLite3.Database(":memory:", { engine: () => engineDatabase() });
+    const rs = (await db.query("select ? as n", [1])) as InstanceType<typeof SQLite3.ResultSet>;
+    const rows: unknown[] = [];
+    await rs.eachHash((row) => rows.push(row));
+    expect(rows).toEqual([{ n: 1 }]);
+    expect(rs.isEof()).toBe(true);
+    await rs.reset(2);
+    expect(rs.isEof()).toBe(false);
+    expect(await rs.toA()).toEqual([[2]]);
+    await rs.close();
   });
 
   it("quote doubles single quotes", () => {

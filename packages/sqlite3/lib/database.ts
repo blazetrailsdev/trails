@@ -1,8 +1,9 @@
-import { Encoding, RuntimeError, include, rbEnsure, rbFSleep } from "@blazetrails/ruby-compat";
+import { Encoding, RuntimeError, include, rbEnsure } from "@blazetrails/ruby-compat";
 import type { Included } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
 import { Constants } from "./constants.js";
 import { Pragmas } from "./pragmas.js";
+import { ForkSafety } from "./fork-safety.js";
 import { Statement, type EngineStatement } from "./statement.js";
 import { HashResultSet, ResultSet } from "./resultset.js";
 
@@ -12,7 +13,7 @@ export interface EngineDatabase {
   isClosed(): boolean;
   isDiscarded(): boolean;
   prepare(sql: string): [EngineStatement, string];
-  execBatch(sql: string, resultsAsHash: boolean): unknown[] | Promise<unknown[]>;
+  execBatch(sql: string, resultsAsHash: boolean | null): unknown[] | Promise<unknown[]>;
   changes(): number | Promise<number>;
   close(): void | Promise<void>;
   disableQuirkMode(): void;
@@ -27,6 +28,7 @@ export interface DatabaseOptions {
   flags?: number;
   strict?: boolean;
   resultsAsHash?: boolean;
+  /** @noRailsEquivalent PERMANENT */
   engine: EngineOpenV2;
 }
 
@@ -73,6 +75,8 @@ export class Database {
 
     this.resultsAsHash = options.resultsAsHash ?? null;
     this.#readonly = (mode & Constants.Open.READONLY) !== 0;
+
+    ForkSafety.track(this);
   }
 
   async encoding(): Promise<Encoding | null> {
@@ -114,12 +118,12 @@ export class Database {
 
   executeBatch2(sql: string, block?: (val: unknown) => unknown): unknown[] | Promise<unknown[]> {
     if (block) {
-      const result = this.execBatch(sql, this.resultsAsHash === true);
+      const result = this.execBatch(sql, this.resultsAsHash);
       return result instanceof Promise
         ? result.then((r) => r.map((val) => block(val)))
         : result.map((val) => block(val));
     } else {
-      return this.execBatch(sql, this.resultsAsHash === true);
+      return this.execBatch(sql, this.resultsAsHash);
     }
   }
 
@@ -168,7 +172,8 @@ export class Database {
       } else if (now > this.#timeoutDeadline) {
         return false;
       } else {
-        return rbFSleep(0.001);
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1);
+        return 0;
       }
     });
   }
@@ -210,7 +215,7 @@ export class Database {
   }
 
   /** @internal */
-  private execBatch(sql: string, resultsAsHash: boolean): unknown[] | Promise<unknown[]> {
+  private execBatch(sql: string, resultsAsHash: boolean | null): unknown[] | Promise<unknown[]> {
     return this._engine.execBatch(sql, resultsAsHash);
   }
 }

@@ -30,7 +30,8 @@ that stands where the gem's C struct does (`ext/sqlite3/database.c`): the privat
 
 `execute`, `query` and `get_first_value` (`database.rb:247,371,393`) are ported because `Pragmas`
 calls the first and last (`pragmas.rb`), with `ResultSet` / `HashResultSet` (`lib/resultset.ts`)
-and `Statement#execute` (`statement.rb:78`) beneath them.
+and `Statement#execute` (`statement.rb:78`) beneath them. `ResultSet#types` (`resultset.rb:74-76`)
+waits on `Statement#types`, which is `sqlite3-statement-types-and-column-decltype`'s.
 
 `busyHandler` hands its block to the engine; no npm client exposes `sqlite3_busy_handler`, which
 `sqlite3-busy-handler-has-no-client-counterpart` records.
@@ -42,6 +43,5 @@ of `Database`'s constructor (`database.rb:170-172`), and
 
 The constructor ports `database.rb:141-195` for the options trails passes. It leaves out
 `open16` and `utf16:` (`:145-146`: a JS string carries no encoding), `initialize_extensions`
-(`:181`), `@default_transaction_mode` (`:179`, read only by the unported `transaction`),
-`ForkSafety.track` (`:183`: JS has no `fork`), and the block arm (`:185-191`). A constructor
+(`:181`), `@default_transaction_mode` (`:179`, read only by the unported `transaction`), and the block arm (`:185-191`). A constructor
 creates no promise, and no trails caller passes a block.
