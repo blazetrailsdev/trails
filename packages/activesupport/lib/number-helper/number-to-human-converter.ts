@@ -2,7 +2,6 @@ import { ArgumentError, isSymbol, keys, sortBy, symbolToS } from "@blazetrails/r
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
-import { BigDecimal } from "@blazetrails/ruby-compat";
 import { kernelFloat } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import type { NumberToHumanOptions } from "../number-helper.js";
@@ -37,7 +36,7 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
   }
 
   protected convert(): string {
-    this.number = new RoundingHelper(this.options).round(this.number) as BigDecimal;
+    this.number = new RoundingHelper(this.options).round(this.number);
     this.number = kernelFloat(this.number);
 
     const options = this.options;

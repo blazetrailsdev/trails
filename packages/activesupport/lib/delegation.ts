@@ -115,7 +115,7 @@ export namespace Delegation {
 
     let receiver: string;
     if (typeof to !== "string") {
-      const name = rbModName(to as new () => unknown);
+      const name = rbModName(to);
       if (name == null || name === "") {
         throw new ArgumentError(`Can't delegate to anonymous class or module: ${String(to)}`);
       }

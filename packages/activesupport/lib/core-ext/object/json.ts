@@ -102,8 +102,7 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
-STRING_METHOD_TABLE.asJson = (self, options = null) =>
-  String.asJson(self.string, options as EncodeOptions | null);
+STRING_METHOD_TABLE.asJson = (self, options = null) => String.asJson(self.string, options);
 
 export class Numeric {
   static asJson(value: number | bigint, options: EncodeOptions | null = null): number | string {
@@ -372,7 +371,7 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   const own = (value as { asJson?: (o?: unknown) => unknown }).asJson;
   if (typeof own === "function") return own.call(value, options);
 
-  if (typeof value === "function") return Module.asJson(value as { name: string }, options);
+  if (typeof value === "function") return Module.asJson(value, options);
 
   if (
     value instanceof RubyTime ||
@@ -393,7 +392,7 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   if (value instanceof URL) return Generic.asJson(value, options);
   if (globalThis.Array.isArray(value)) return Array.asJson(value, options);
   if (value instanceof RangeValue) return Range.asJson(value, options);
-  if (value instanceof Map || isPlainObject(value as object)) return Hash.asJson(value, options);
+  if (value instanceof Map || isPlainObject(value)) return Hash.asJson(value, options);
   if (
     typeof (value as { [globalThis.Symbol.iterator]?: unknown })[globalThis.Symbol.iterator] ===
     "function"
@@ -401,5 +400,5 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
     return Enumerable.asJson(value as Iterable<unknown>, options);
   }
 
-  return Object.asJson(value as object, options);
+  return Object.asJson(value, options);
 }

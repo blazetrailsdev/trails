@@ -199,7 +199,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
   });
 
   it("uses a Live::Response", async () => {
-    const request = ControllerTestRequest.create({} as never);
+    const request = ControllerTestRequest.create({});
     expect(
       await (
         ProxyController as unknown as { makeResponseBang(r: unknown): unknown }

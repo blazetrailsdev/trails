@@ -37,7 +37,7 @@ describe("ActiveStorage::Service::MirrorServiceTest", () => {
   let t: TestHelper;
 
   beforeEach(async () => {
-    t = new MirrorServiceTest("mirror") as unknown as TestHelper;
+    t = new MirrorServiceTest("mirror");
     await t.beforeSetup();
   });
 

@@ -176,7 +176,7 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   ): unknown {
     return I18n.translate(key, {
       scope: "number",
-      default: this.defaultValue(key) as any,
+      default: this.defaultValue(key),
       ...i18nOptions,
     });
   }

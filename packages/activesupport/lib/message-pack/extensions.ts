@@ -335,7 +335,7 @@ export const Extensions = {
   },
 
   readHashWithIndifferentAccess(unpacker: Unpacker): HashWithIndifferentAccess {
-    return new HashWithIndifferentAccess(unpacker.read() as Record<string, unknown>);
+    return new HashWithIndifferentAccess(unpacker.read());
   },
 
   dumpClass(klass: ObjectClass): string {

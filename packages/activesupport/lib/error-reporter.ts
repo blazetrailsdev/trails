@@ -212,7 +212,7 @@ export class ErrorReporter {
     if (Object.isFrozen(error)) return;
     if (error?.stack != null) return;
 
-    Error.captureStackTrace?.(error as object, this.ensureBacktrace);
+    Error.captureStackTrace?.(error, this.ensureBacktrace);
   }
 }
 

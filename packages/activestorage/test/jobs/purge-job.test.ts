@@ -22,7 +22,7 @@ describe("ActiveStorage::PurgeJobTest", () => {
 
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
-    t = new PurgeJobTest("purges") as unknown as TestHelper;
+    t = new PurgeJobTest("purges");
     await t.beforeSetup();
     blob = await createBlob();
   });

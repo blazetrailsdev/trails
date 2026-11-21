@@ -30,7 +30,7 @@ describe("ActiveStorage::Attached::One", () => {
 
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
-    user = (await Member.createBang({ name: "Josh" })) as AvatarUser;
+    user = await Member.createBang({ name: "Josh" });
   });
 
   it("create awaits the attachment writer before saving", async () => {

@@ -23,7 +23,7 @@ export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheSto
     const rest = parameters;
     return new (retrieveStoreClass(store))(
       ...rest,
-      ...(Object.keys(options as object).length === 0 ? [] : [options]),
+      ...(Object.keys(options).length === 0 ? [] : [options]),
     );
   }
   if (Array.isArray(store)) {

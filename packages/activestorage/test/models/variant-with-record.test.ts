@@ -54,7 +54,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
     Current.urlOptions = { protocol: "https://", host: "example.com", port: null };
     wasTracking = ActiveStorage.trackVariants;
     ActiveStorage.trackVariants = true;
-    t = new VariantWithRecordTest("destroyDeletesFileFromService") as unknown as TestHelper;
+    t = new VariantWithRecordTest("destroyDeletesFileFromService");
     await t.beforeSetup();
   });
 

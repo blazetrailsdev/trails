@@ -13,7 +13,7 @@ import type { PurgeOne } from "./changes/purge-one.js";
 
 export const Changes = {
   name: "ActiveStorage::Attached::Changes",
-  loadPath: {} as Record<string, () => Promise<unknown>>,
+  loadPath: {},
 } as AutoloadModule & {
   CreateOne: typeof CreateOne;
   CreateMany: typeof CreateMany;

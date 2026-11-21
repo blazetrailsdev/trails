@@ -74,6 +74,6 @@ export class ActionableError extends Error {
       });
     }
     this._actions[name] = block;
-    ActionableError.register(this as unknown as typeof ActionableError);
+    ActionableError.register(this);
   }
 }

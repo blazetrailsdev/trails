@@ -43,13 +43,12 @@ export function benchmark<T>(
   maybeBlock?: () => T | Promise<T>,
 ): T | Promise<Awaited<T>> {
   const message = typeof messageOrBlock === "function" ? "Benchmarking" : messageOrBlock;
-  const block = (
+  const block =
     typeof messageOrBlock === "function"
       ? messageOrBlock
       : typeof optionsOrBlock === "function"
         ? optionsOrBlock
-        : maybeBlock!
-  ) as () => T | Promise<T>;
+        : maybeBlock!;
   const options: BenchmarkOptions =
     typeof optionsOrBlock === "function" || typeof optionsOrBlock === "undefined"
       ? {}
@@ -79,7 +78,7 @@ export function benchmark<T>(
 
     if (result! instanceof Promise) {
       return (result as Promise<Awaited<T>>).then((val) => {
-        result = val as T;
+        result = val;
         ms = monotonicNow() - start;
         return finish() as Awaited<T>;
       });

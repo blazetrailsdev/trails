@@ -3,7 +3,7 @@ const thenlessViewSet = new WeakSet<object>();
 
 /** @noRailsEquivalent PERMANENT */
 export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
-  if (thenlessViewSet.has(obj)) return obj as Omit<T, "then">;
+  if (thenlessViewSet.has(obj)) return obj;
 
   const cached = thenlessViews.get(obj);
   if (cached) return cached as Omit<T, "then">;
@@ -26,5 +26,5 @@ export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
 
   thenlessViews.set(obj, view);
   thenlessViewSet.add(view);
-  return view as Omit<T, "then">;
+  return view;
 }

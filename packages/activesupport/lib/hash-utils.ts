@@ -86,7 +86,7 @@ export function deepDup<T>(obj: T): T {
   }
   if (typeof obj === "object" && isPlainObject(obj)) {
     const result: AnyObject = {};
-    for (const key of Object.keys(obj as AnyObject)) {
+    for (const key of Object.keys(obj)) {
       result[key] = deepDup((obj as AnyObject)[key]);
     }
     return result as T;
@@ -103,7 +103,7 @@ export function deepDup<T>(obj: T): T {
 export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Pick<T, K> {
   const result = {} as Pick<T, K>;
   for (const key of keys) {
-    if (Object.hasOwn(obj, key as string)) {
+    if (Object.hasOwn(obj, key)) {
       result[key] = obj[key];
     }
   }
@@ -467,7 +467,7 @@ export function toParam(value: unknown): string | boolean | null {
       if (value.toString !== Object.prototype.toString) {
         return String(value);
       }
-      return toQuery(value as Record<string, unknown>);
+      return toQuery(value);
     }
   }
   if (isSymbol(value)) return symbolToS(value);

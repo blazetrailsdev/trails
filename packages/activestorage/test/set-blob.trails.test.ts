@@ -85,7 +85,7 @@ function beforeActionBlock(klass: object): (this: unknown) => void {
         block = fn;
       },
     }),
-    klass as never,
+    klass,
   );
   return block;
 }

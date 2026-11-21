@@ -50,9 +50,9 @@ export const Concern = {
       (base as ConcernHost)._dependencies!.push(this);
       return false;
     } else {
-      if (isModuleIncluded(base as AnyClass, this)) return false;
-      for (const dep of this._dependencies!) include(base as AnyClass, dep);
-      rbModAppendFeatures(base as AnyClass, this);
+      if (isModuleIncluded(base, this)) return false;
+      for (const dep of this._dependencies!) include(base, dep);
+      rbModAppendFeatures(base, this);
       if (Object.hasOwn(this, "ClassMethods")) {
         extend(base as AnyClass, this.ClassMethods!);
       }
@@ -67,11 +67,11 @@ export const Concern = {
       (base as ConcernHost)._dependencies!.unshift(this);
       return false;
     } else {
-      if (isModuleIncluded(base as AnyClass, this)) return false;
+      if (isModuleIncluded(base, this)) return false;
       for (const dep of this._dependencies!) prepend(base as AnyClass, dep);
       rbModPrependFeatures(base as AnyClass, this);
       if (Object.hasOwn(this, "ClassMethods")) {
-        prepend({ prototype: base } as unknown as AnyClass, this.ClassMethods!);
+        prepend({ prototype: base }, this.ClassMethods!);
       }
       if (Object.hasOwn(this, "_prependedBlock")) {
         this._prependedBlock!.call(base);

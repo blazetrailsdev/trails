@@ -312,7 +312,7 @@ export function minusWithCoercion(this: RubyTime, other: unknown): RubyTime | nu
 const compareWithoutCoercion = RubyTime.prototype.compare;
 
 export function compareWithCoercion(this: RubyTime, other: unknown): number | null {
-  if (other != null && (other as object).constructor === RubyTime) {
+  if (other != null && other.constructor === RubyTime) {
     return compareWithoutCoercion.call(this, other);
   } else if (other instanceof RubyTime || other instanceof TimeWithZone) {
     if (typeof (other as { comparableTime?: unknown }).comparableTime === "function") {
