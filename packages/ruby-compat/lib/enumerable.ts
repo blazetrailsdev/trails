@@ -1439,6 +1439,11 @@ export class Enumerable<T = unknown, E = unknown> {
     return sum(this, ...args);
   }
 
+  /** Mirrors: Ruby's Enumerable#to_a — `vendor/ruby/v3.3.11/enum.c:711` `enum_to_a`. */
+  toA<T, E = unknown>(this: Each<T, E>): Enumerated<E, T[]> {
+    return enumToA(this);
+  }
+
   /**
    * Mirrors: Ruby's Enumerable#to_h — `vendor/ruby/v3.3.11/enum.c:767` `enum_to_h`, each
    * pair set by `rb_hash_set_pair` (`vendor/ruby/v3.3.11/hash.c:3503`).

@@ -1224,7 +1224,7 @@
     }
   },
   "sqlite3": {
-    "rows": 32,
+    "rows": 33,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1259,7 +1259,8 @@
       "errors.ts::TooBigException": "SQLite3::TooBigException",
       "errors.ts::UnsupportedException": "SQLite3::UnsupportedException",
       "fork-safety.ts::ForkSafety": "SQLite3::ForkSafety",
-      "pragmas.ts::Pragmas": "SQLite3::Pragmas"
+      "pragmas.ts::Pragmas": "SQLite3::Pragmas",
+      "statement.ts::Statement": "SQLite3::Statement"
     }
   },
   "stimulus": {

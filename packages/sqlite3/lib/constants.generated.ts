@@ -5,6 +5,7 @@ import * as m2 from "./database.js";
 import * as m3 from "./errors.js";
 import * as m4 from "./fork-safety.js";
 import * as m5 from "./pragmas.js";
+import * as m6 from "./statement.js";
 
 defineConstants([
   [m3, "AbortException", "SQLite3::AbortException"],
@@ -37,6 +38,7 @@ defineConstants([
   [m3, "ReadOnlyException", "SQLite3::ReadOnlyException"],
   [m3, "SchemaChangedException", "SQLite3::SchemaChangedException"],
   [m3, "SQLException", "SQLite3::SQLException"],
+  [m6, "Statement", "SQLite3::Statement"],
   [m3, "TooBigException", "SQLite3::TooBigException"],
   [m3, "UnsupportedException", "SQLite3::UnsupportedException"],
 ]);
