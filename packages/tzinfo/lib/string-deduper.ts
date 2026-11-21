@@ -1,11 +1,13 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Concurrent, Hash } from "@blazetrails/ruby-compat";
+
+type StringHash = Hash<string, string> | InstanceType<typeof Concurrent.Map<string, string>>;
 
 /** @internal */
 export class StringDeduper {
   static global: StringDeduper | UnaryMinusGlobalStringDeduper;
 
   /** @internal */
-  private readonly strings: Hash<string, string>;
+  private readonly strings: StringHash;
 
   constructor() {
     this.strings = this.createHash((h, k) => {
@@ -21,10 +23,16 @@ export class StringDeduper {
   }
 
   /** @internal */
-  protected createHash(
-    block: (h: Hash<string, string>, k: string) => string,
-  ): Hash<string, string> {
+  protected createHash(block: (h: StringHash, k: string) => string): StringHash {
     return new Hash(block);
+  }
+}
+
+/** @internal */
+export class ConcurrentStringDeduper extends StringDeduper {
+  /** @internal */
+  protected override createHash(block: (h: StringHash, k: string) => string): StringHash {
+    return new Concurrent.Map(null, block);
   }
 }
 
