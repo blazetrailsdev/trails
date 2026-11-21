@@ -282,18 +282,19 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbSingletonClass(obj: object): { prototype: object } {
+export function rbSingletonClass(obj: object): abstract new (...args: never) => object {
   if (typeof obj !== "function") return rbObjSingletonClass(obj);
-  let metaclass = _metaclasses.get(obj);
-  if (metaclass) return metaclass;
-  metaclass = function () {};
+  const cached = _metaclasses.get(obj);
+  if (cached) return cached;
+  const metaclass = function () {};
   metaclass.prototype = obj;
   Object.defineProperty(metaclass, FL_SINGLETON, { value: obj });
-  _metaclasses.set(obj, metaclass);
-  return metaclass;
+  const klass = metaclass as unknown as abstract new (...args: never) => object;
+  _metaclasses.set(obj, klass);
+  return klass;
 }
 
-const _metaclasses = new WeakMap<object, { prototype: object }>();
+const _metaclasses = new WeakMap<object, abstract new (...args: never) => object>();
 
 /**
  * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`):
