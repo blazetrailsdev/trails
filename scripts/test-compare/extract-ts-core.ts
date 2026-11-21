@@ -1648,17 +1648,22 @@ export function pkgFromPath(relPath: string): string {
 /**
  * Whether the comment block directly above `node`'s line, read upward past
  * blank lines and one-line `it.skip(...)` siblings, carries `PERMANENT-SKIP:`.
- * A `BLOCKED:` line in the block parks the test as an open gap instead.
+ * A `BLOCKED:` line anywhere in the block parks the test as an open gap instead.
  */
 export function underPermanentSkip(sourceFile: ts.SourceFile, node: ts.Node): boolean {
-  const lines = sourceFile.text.split("\n");
+  const starts = sourceFile.getLineStarts();
+  const lineAt = (n: number) => sourceFile.text.slice(starts[n], starts[n + 1] ?? undefined).trim();
+  let permanent = false;
   let i = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line - 1;
   for (; i >= 0; i--) {
-    const line = lines[i].trim();
-    if (line === "" || /^(it|test)\.skip\(.*\);$/.test(line)) continue;
-    if (!/^(\/\/|\*|\/\*)/.test(line)) return false;
+    const line = lineAt(i);
+    if (line === "" || /^(it|test)\.skip\(.*\);$/.test(line)) {
+      if (permanent) break;
+      continue;
+    }
+    if (!/^(\/\/|\*|\/\*)/.test(line)) break;
     if (line.includes("BLOCKED:")) return false;
-    if (line.includes("PERMANENT-SKIP:")) return true;
+    if (line.includes("PERMANENT-SKIP:")) permanent = true;
   }
-  return false;
+  return permanent;
 }

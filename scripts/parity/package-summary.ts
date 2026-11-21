@@ -135,9 +135,9 @@ export interface FileRow {
   methodsMissing: number;
   /** The Ruby names api-compare reports missing from `tsFile`, in its order. */
   missingMethods: string[];
-  /** Matched tests that run, plus the permanent skips; a `BLOCKED:` or bare skip is an open gap. */
+  /** Matched tests that run, over `testsTotal`: parity:test's `implemented / portable`. */
   testsMatched: number;
-  /** Permanent skips and unported `tests:` rows, counted in `testsMatched` and `testsTotal`. */
+  /** parity:test's `P permanent`: permanent skips plus unported `tests:` rows, outside `testsTotal`. */
   testsPermanent: number;
   testsTotal: number;
 }
@@ -451,10 +451,9 @@ export function fileRows(api: ApiComparison | null, tests: TestComparison | null
     for (const f of r.files) {
       const key = `${packageDirOf(f.conventionTsPackage ?? r.package)} ${f.conventionTsFile}`;
       const t = byTsTest.get(key) ?? { matched: 0, permanent: 0, total: 0 };
-      const permanent = (f.matchedPermanent ?? 0) + (f.unportedTests ?? 0);
-      t.matched += f.matched - (f.matchedSkipped ?? 0) + permanent;
-      t.permanent += permanent;
-      t.total += f.rubyTestCount + (f.unportedTests ?? 0);
+      t.matched += f.matched - (f.matchedSkipped ?? 0);
+      t.permanent += (f.matchedPermanent ?? 0) + (f.unportedTests ?? 0);
+      t.total += f.rubyTestCount - (f.matchedPermanent ?? 0);
       byTsTest.set(key, t);
     }
   }

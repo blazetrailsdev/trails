@@ -32,6 +32,7 @@ describe("D", () => {
     expect(
       flags(`
 describe("D", () => {
+  // PERMANENT-SKIP: upstream
   // BLOCKED: some-story
   it.skip("a", () => {});
   it("runs", () => {

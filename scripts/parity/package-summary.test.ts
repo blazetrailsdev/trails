@@ -407,9 +407,9 @@ describe("package-summary", () => {
         methodsMatched: 5,
         methodsMissing: 1,
         missingMethods: ["save!"],
-        testsMatched: 7,
+        testsMatched: 5,
         testsPermanent: 2,
-        testsTotal: 11,
+        testsTotal: 9,
       },
       {
         package: "activerecord",
