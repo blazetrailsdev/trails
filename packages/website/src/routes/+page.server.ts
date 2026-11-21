@@ -35,8 +35,6 @@ const blocks = [
   },
 ];
 
-// Captured on 2026-11-21 by adding this action to a scratch copy of
-// examples/cloudflare-worker and running `tsc --noEmit -p tsconfig.json`.
 const check = `import { ApplicationController } from "./application-controller.ts";
 import { Post } from "../models/post.ts";
 
