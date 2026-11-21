@@ -100,6 +100,9 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
     expect(await db.executeBatch2("SELECT 1.0, 0.1 + 0.2, 7, NULL; -- trailing")).toEqual([
       ["1.0", "0.3", "7", null],
     ]);
+    expect(await db.executeBatch2("SELECT 1e20, 1.5e-5, 2.5")).toEqual([
+      ["1.0e+20", "1.5e-05", "2.5"],
+    ]);
   });
 
   it("does not restart a statement already part-way through its rows", async () => {
