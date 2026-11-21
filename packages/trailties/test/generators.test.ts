@@ -1,11 +1,20 @@
+import { I18n } from "@blazetrails/activesupport";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
-import { File, LOAD_PATH } from "@blazetrails/ruby-compat";
+import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { Base as ThorBase } from "@blazetrails/thor/shell";
+import { Basic } from "@blazetrails/thor/shell/basic";
+import { Color } from "@blazetrails/thor/shell/color";
+import { File, LOAD_PATH, SystemExit, getProcessAdapter } from "@blazetrails/ruby-compat";
+import { Base } from "../lib/generators/base.js";
+import { ModelGenerator } from "../lib/generators/trails/model/model-generator.js";
+import { ModelGenerator as TestUnitModelGenerator } from "../lib/generators/test-unit/model/model-generator.js";
 import { Application } from "../lib/application.js";
 import { Generators } from "../lib/generators.js";
 import { Trails } from "../lib/trails.js";
+import { noColorBang } from "../lib/command/behavior.js";
 
 const GENERATORS_PATH = nodePath.join(
   decodeURIComponent(new URL("../lib/", import.meta.url).pathname),
@@ -35,6 +44,19 @@ afterAll(() => {
   Trails.application = originalApplication;
 });
 
+async function invokeExiting(name: string): Promise<string> {
+  vi.spyOn(getProcessAdapter(), "exit").mockImplementation((code) => {
+    throw new SystemExit(code ?? 0);
+  });
+  try {
+    return await capture("stdout", () =>
+      expect(Generators.invoke(name, [])).rejects.toThrow(SystemExit),
+    );
+  } finally {
+    vi.restoreAllMocks();
+  }
+}
+
 async function help(): Promise<string> {
   return capture("stdout", () => Generators.printGenerators());
 }
@@ -54,19 +76,56 @@ describe("GeneratorsTest", () => {
 
   it("invoke when generator is not found", async () => {
     const name = "unknown";
-    let output = "";
-    await expect(
-      Generators.invoke(name, [], { destinationRoot: "/tmp" }).catch((e: Error) => {
-        output = e.message;
-        throw e;
-      }),
-    ).rejects.toThrow();
-    const notFound = `Could not find generator '${name}'.`;
-    const helpHint = "`bin/trails generate --help`";
-    const didYouMean = "Did you mean";
-    expect(output).toMatch(notFound);
-    expect(output).toMatch(helpHint);
-    expect(output).not.toMatch(didYouMean);
+    const output = await invokeExiting(name);
+    expect(output).toMatch(`Could not find generator '${name}'.`);
+    expect(output).toMatch("`bin/trails generate --help`");
+    expect(output).not.toMatch("Did you mean");
+  });
+
+  it("generator suggestions", async () => {
+    const name = "migrationz";
+    const output = await invokeExiting(name);
+    expect(output).toMatch("Did you mean?  migration");
+  });
+
+  it("generator suggestions except en locale", async () => {
+    const origAvailableLocales = I18n.availableLocales();
+    const origDefaultLocale = I18n.defaultLocale();
+    I18n.setAvailableLocales("ja");
+    I18n.setDefaultLocale("ja");
+    try {
+      const name = "tas";
+      const output = await invokeExiting(name);
+      expect(output).toMatch("Did you mean?  task");
+    } finally {
+      I18n.setAvailableLocales(origAvailableLocales);
+      I18n.setDefaultLocale(origDefaultLocale);
+    }
+  });
+
+  it("help when a generator with required arguments is invoked without arguments", async () => {
+    const output = await capture("stdout", () => Generators.invoke("model", []));
+    expect(output).toMatch(/Description:/);
+  });
+
+  it("should give higher preference to trails generators", async () => {
+    expect(fs.existsSync(File.join(fixturesLib, "generators", "model-generator.ts"))).toBeTruthy();
+    await assertCalledWith(ModelGenerator, "start", [["Account"], {}], {}, async () => {
+      const warnings = await capture("stderr", () => Generators.invoke("model", ["Account"]));
+      expect(warnings).toBeEmpty();
+    });
+  });
+
+  it("invoke with default values", async () => {
+    await assertCalledWith(ModelGenerator, "start", [["Account"], {}], {}, () =>
+      Generators.invoke("model", ["Account"]),
+    );
+  });
+
+  it("invoke with config values", async () => {
+    await assertCalledWith(ModelGenerator, "start", [["Account"], { behavior: "skip" }], {}, () =>
+      Generators.invoke("model", ["Account"], { behavior: "skip" }),
+    );
   });
 
   it("find by namespace", async () => {
@@ -85,6 +144,29 @@ describe("GeneratorsTest", () => {
     const klass = await Generators.findByNamespace("test_unit", null, "model");
     expect(klass).toBeTruthy();
     expect(klass!.namespace()).toEqual("test-unit:model");
+  });
+
+  it("find by namespace with generator on root", async () => {
+    const klass = await Generators.findByNamespace("fixjour");
+    expect(klass).toBeTruthy();
+    expect(klass!.namespace()).toBe("fixjour");
+  });
+
+  it("find by namespace without base or context looks into trails namespace", async () => {
+    expect(await Generators.findByNamespace("model")).toBeTruthy();
+  });
+
+  it("invoke with nested namespaces", async () => {
+    const start = vi.fn();
+    const modelGenerator = { start, arguments: () => [] } as never;
+    await assertCalledWith(
+      Generators,
+      "findByNamespace",
+      ["namespace", "my:awesome"],
+      { returns: modelGenerator },
+      () => Generators.invoke("my:awesome:namespace", ["Account"]),
+    );
+    expect(start).toHaveBeenCalledWith(["Account"], {});
   });
 
   it("fallbacks for generators on find by namespace", async () => {
@@ -123,6 +205,62 @@ describe("GeneratorsTest", () => {
     const output = await help();
     expect(output).not.toMatch(/app\W/);
     expect(output).not.toMatch(/[^:]plugin/);
+  });
+
+  it("trails generators with others information", async () => {
+    const output = await help();
+    expect(output).toMatch(/Fixjour:/);
+    expect(output).toMatch(/^ {2}fixjour$/m);
+  });
+
+  it("default banner should not show trails generator namespace", async () => {
+    const klass = (await Generators.findByNamespace("model")) as unknown as { banner(): string };
+    expect(klass.banner()).toMatch(/^bin\/trails generate model/);
+  });
+
+  it("no color sets proper shell", () => {
+    try {
+      noColorBang();
+      expect(ThorBase.shell).toBe(Basic);
+    } finally {
+      ThorBase.shell = Color;
+    }
+  });
+
+  it("fallbacks for generators on invoke", async () => {
+    Generators.fallbacks()["shoulda"] = "test_unit";
+    try {
+      await assertCalledWith(TestUnitModelGenerator, "start", [["Account"], {}], {}, () =>
+        Generators.invoke("shoulda:model", ["Account"]),
+      );
+    } finally {
+      delete Generators.fallbacks()["shoulda"];
+    }
+  });
+
+  it("nested fallbacks for generators", async () => {
+    Generators.fallbacks()["shoulda"] = "test_unit";
+    Generators.fallbacks()["super_shoulda"] = "shoulda";
+    try {
+      await assertCalledWith(TestUnitModelGenerator, "start", [["Account"], {}], {}, () =>
+        Generators.invoke("super_shoulda:model", ["Account"]),
+      );
+    } finally {
+      delete Generators.fallbacks()["shoulda"];
+      delete Generators.fallbacks()["super_shoulda"];
+    }
+  });
+
+  it("developer options are overwritten by user options", () => {
+    Generators.options()["with_options"] = { generate: false };
+
+    class WithOptionsGenerator extends Base {
+      static {
+        this.classOption("generate", { default: true, type: "boolean" });
+      }
+    }
+
+    expect(WithOptionsGenerator.classOptions()["generate"].default).toBe(false);
   });
 
   it("source paths for not namespaced generators", async () => {

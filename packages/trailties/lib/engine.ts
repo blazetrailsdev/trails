@@ -44,6 +44,9 @@ import type { MiddlewareStackProxy } from "./configuration.js";
 import { LazyRouteSet } from "./engine/lazy-route-set.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 
+/** @noRailsEquivalent PERMANENT */
+const generators = "./generators.js";
+
 type IsolatedNamespace = {
   name: string;
   railtieNamespace?: () => typeof Engine;
@@ -282,6 +285,7 @@ export class Engine extends Trailtie {
   }
 
   async loadGenerators(app: Engine = this): Promise<this> {
+    await import(generators);
     this.runGeneratorsBlocks(app);
     TopLevel.Trails!.Generators!.configureBang(app.config.generators());
     return this;

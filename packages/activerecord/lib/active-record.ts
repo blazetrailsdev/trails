@@ -1,6 +1,13 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ActiveSupport, any, Autoload, InheritableOptions } from "@blazetrails/activesupport";
-import { rbEqq, rbObjIvarGet, rbObjIvarSet, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import {
+  File,
+  LOAD_PATH,
+  rbEqq,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  ThreadPoolExecutor,
+} from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { ActiveRecord } from "./namespaces.js";
 import type { SQLWarning } from "./errors.js";
@@ -13,6 +20,9 @@ import type { SchemaFormat } from "./tasks/database-tasks.js";
 type AnyClass = abstract new (...args: never[]) => object;
 
 type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SQLWarning) => void);
+
+const LIB = File.expandPath(decodeURIComponent(new URL(".", import.meta.url).pathname));
+if (!LOAD_PATH.includes(LIB)) LOAD_PATH.push(LIB);
 
 rbObjIvarSet(ActiveRecord, "@disable_prepared_statements", false);
 rbObjIvarSet(ActiveRecord, "@lazily_load_schema_cache", false);

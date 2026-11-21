@@ -92,6 +92,24 @@ describe("MultipleApplicationsTest", { timeout: 120_000 }, () => {
     expect(application1.envConfig()).toBe(app.envConfig());
   });
 
+  it("rake tasks defined on different applications go to the same class", async () => {
+    let runCount = 0;
+
+    const application1 = new AppTemplate();
+    application1.rakeTasks(() => {
+      runCount += 1;
+    });
+
+    const application2 = new AppTemplate();
+    application2.rakeTasks(() => {
+      runCount += 1;
+    });
+
+    expect(runCount).toBe(0);
+    await Trails.application!.loadTasks();
+    expect(runCount).toBe(2);
+  });
+
   it("multiple applications can be initialized", () => {
     expect(() => new AppTemplate()).not.toThrow();
   });
@@ -107,6 +125,20 @@ describe("MultipleApplicationsTest", { timeout: 120_000 }, () => {
 
     expect(runCount).toBe(0);
     await Trails.application!.loadConsole();
+    expect(runCount).toBe(2);
+  });
+
+  it("generators run on different applications go to the same class", async () => {
+    let runCount = 0;
+    AppTemplate.generators(() => {
+      runCount += 1;
+    });
+    new AppTemplate().generators(() => {
+      runCount += 1;
+    });
+
+    expect(runCount).toBe(0);
+    await Trails.application!.loadGenerators();
     expect(runCount).toBe(2);
   });
 

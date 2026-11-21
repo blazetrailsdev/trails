@@ -16,7 +16,7 @@ import {
   block,
   rbFLoad,
   rbFRequireFile,
-  getPath,
+  File,
   rbObjRespondTo,
   STDERR,
   STDOUT,
@@ -185,18 +185,12 @@ export class Trailtie extends BaseTrailtie {
         );
       });
 
-      await rbFLoad(
-        new URL(import.meta.resolve("@blazetrails/activerecord/trailties/databases")).pathname,
-      );
+      await rbFLoad(`trailties/databases${File.extname(import.meta.filename)}`);
     });
 
     this.console(async (app) => {
       if ((app as Application).isSandbox()) {
-        await rbFRequireFile(
-          getPath().fileURLToPath!(
-            import.meta.resolve("@blazetrails/activerecord/trailties/console-sandbox"),
-          ),
-        );
+        await rbFRequireFile("trailties/console-sandbox");
       }
       if (!Logger.isLoggerOutputsTo(Trails.logger!, STDERR, STDOUT)) {
         const console = new Logger(STDERR);
