@@ -155,22 +155,24 @@ from the engine's `db/migrate/` into the host's by hand and run
 ### Using a Class Provided by the Application
 
 An engine often needs a host model, such as the author of an article. Rather
-than naming a host class, read the class name from a setting the host fills
-in, and resolve it when it is needed:
+than naming a host class, the engine reads the class name from a setting on
+its namespace object, which the host fills in:
 
 ```ts
 import { Base } from "@blazetrails/activerecord";
 
-export class Article extends Base {
-  static authorClass = "User";
+const Blorgh = { name: "Blorgh", authorClass: "User" };
 
+export class Article extends Base {
   static {
-    this.belongsTo("author", { className: Article.authorClass });
+    this.belongsTo("author", { className: Blorgh.authorClass });
   }
 }
 ```
 
-The host sets it in an initializer, before the engine's models load.
+The setting is read when `Article` is defined, so the host sets
+`Blorgh.authorClass` in an initializer, which runs before the autoloader loads
+the engine's models.
 
 ### Configuring an Engine
 

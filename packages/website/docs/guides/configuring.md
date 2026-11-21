@@ -253,10 +253,10 @@ For settings that differ by environment, `configFor` reads a file under
 `config/`, picks the current environment's section and merges in any `shared`
 section:
 
-<!-- typecheck:skip -->
-
 ```ts
-const payment = await Trails.application.configFor("payment");
+import { Trails } from "@blazetrails/trailties";
+
+const payment = (await Trails.application!.configFor("payment")) as { retries: number };
 payment.retries;
 ```
 

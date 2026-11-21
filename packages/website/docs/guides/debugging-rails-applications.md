@@ -124,7 +124,7 @@ import { Application } from "@blazetrails/trailties";
 
 class Blog extends Application {
   static {
-    this.config.logTags = [":request_id"];
+    this.config.logTags = [":requestId"];
   }
 }
 ```
