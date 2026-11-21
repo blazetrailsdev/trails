@@ -301,7 +301,7 @@ describe("Delegation.generateMethodMissing", () => {
   });
 
   it("replaces the layer when delegate_missing_to is called again", () => {
-    const obj = host({ first: { a: () => "first" }, second: { a: () => "second" } } as never);
+    const obj = host({ first: { a: () => "first" }, second: { a: () => "second" } });
     Delegation.generateMethodMissing(obj.constructor, "second");
     expect(obj.a()).toBe("second");
     expect(rbObjRespondTo(obj, "a")).toBe(true);

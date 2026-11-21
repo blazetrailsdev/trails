@@ -14,9 +14,6 @@ export class In extends Binary {
   }
 }
 
-include(
-  In as unknown as new (...args: unknown[]) => object,
-  FetchAttribute as unknown as Record<string, (...args: unknown[]) => unknown>,
-);
+include(In, FetchAttribute);
 
 constSet(Nodes, "In", In);

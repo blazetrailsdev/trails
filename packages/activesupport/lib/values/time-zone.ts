@@ -732,7 +732,7 @@ export class TimeZone {
     } else {
       const hash = parts as Record<string, number>;
       time = Time.new(
-        Number((Object.hasOwn(hash, "year") ? hash.year : now.year) as number | bigint),
+        Number(Object.hasOwn(hash, "year") ? hash.year : now.year),
         Object.hasOwn(hash, "mon") ? hash.mon : now.month,
         Object.hasOwn(hash, "mday")
           ? hash.mday

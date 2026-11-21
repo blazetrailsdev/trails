@@ -2,7 +2,6 @@ import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash, symbolizeKeys } from "@blazetrails/activesupport";
 import { rbInspect, rbModName, constSet, strCount } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
-import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { BindError } from "../errors.js";
 import { Fragments } from "./fragments.js";
@@ -84,12 +83,12 @@ export class BoundSqlLiteral extends NodeExpression {
     if (!arelNode(other)) {
       throw new ArgumentError("Expected Arel node");
     }
-    return new Fragments([this, other as Node]);
+    return new Fragments([this, other]);
   }
 
   inspect(): string {
     const namedBinds = this.namedBinds && symbolizeKeys(this.namedBinds);
-    return `#<${rbModName(this.constructor as typeof BoundSqlLiteral)} ${rbInspect(this.sqlWithPlaceholders)} ${rbInspect(namedBinds || this.positionalBinds)}>`;
+    return `#<${rbModName(this.constructor)} ${rbInspect(this.sqlWithPlaceholders)} ${rbInspect(namedBinds || this.positionalBinds)}>`;
   }
 }
 

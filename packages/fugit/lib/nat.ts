@@ -715,7 +715,7 @@ export class Slot {
   constructor(key: string, d0: unknown, d1: unknown = null, opts: unknown = null) {
     [d1, opts] = isSymbol(d1) ? [null, d1] : [d1, opts];
     [this.key, this._data0, this._data1] = [key, d0, d1];
-    this._opts = ((isSymbol(opts) ? { [opts.slice(1)]: true } : opts) ?? {}) as SlotOpts;
+    this._opts = (isSymbol(opts) ? { [opts.slice(1)]: true } : opts) ?? {};
   }
   data0(): unknown[] {
     return (this._data0Memo ||= rbFArray(this._data0));
@@ -868,7 +868,7 @@ export class SlotGroup {
       r.get(k)!.push(m);
       return r;
     }, new Hash<unknown[], unknown[]>());
-    return byHours.toA() as Hm[];
+    return byHours.toA();
   }
 
   /** @internal */

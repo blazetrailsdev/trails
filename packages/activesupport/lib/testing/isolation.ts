@@ -55,7 +55,7 @@ function dump(test: Test): string | Uint8Array {
       (error.stack ?? "").split("\n"),
     ];
   });
-  return Marshal.dump([test.assertions, failures]) as string | Uint8Array;
+  return Marshal.dump([test.assertions, failures]);
 }
 
 /** @noRailsEquivalent PERMANENT */

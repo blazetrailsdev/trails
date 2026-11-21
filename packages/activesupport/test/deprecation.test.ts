@@ -163,9 +163,9 @@ async function collectDisallowed<T>(
 ): Promise<[T, string[]]> {
   const originalDisallowedBehavior = deprecator.disallowedBehavior;
   const disallowed: string[] = [];
-  deprecator.disallowedBehavior = ((message: string) => {
+  deprecator.disallowedBehavior = (message: string) => {
     disallowed.push(message);
-  }) as DeprecationBehaviorCallable;
+  };
   try {
     const result = await block();
     return [result, disallowed];
@@ -481,7 +481,7 @@ describe("DeprecationTest", () => {
 
     const events: Record<string, unknown>[] = [];
     const sub = Notifications.subscribe("deprecation.my_gem_custom", (event) => {
-      events.push(event.payload as Record<string, unknown>);
+      events.push(event.payload);
     });
 
     try {

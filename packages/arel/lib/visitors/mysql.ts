@@ -82,7 +82,7 @@ export class MySQL extends ToSql {
     collector: SQLString,
   ): SQLString {
     const expr = o.expr as Nodes.Ascending | Nodes.Descending;
-    this.visit(expr.expr as Nodes.NodeOrValue, collector);
+    this.visit(expr.expr, collector);
     collector.append(" IS NOT NULL, ");
     this.visit(expr, collector);
     return collector;
@@ -90,7 +90,7 @@ export class MySQL extends ToSql {
 
   protected override visitArelNodesNullsLast(o: Nodes.NullsLast, collector: SQLString): SQLString {
     const expr = o.expr as Nodes.Ascending | Nodes.Descending;
-    this.visit(expr.expr as Nodes.NodeOrValue, collector);
+    this.visit(expr.expr, collector);
     collector.append(" IS NULL, ");
     this.visit(expr, collector);
     return collector;

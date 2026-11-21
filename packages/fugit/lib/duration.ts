@@ -92,7 +92,7 @@ export class Duration {
             ));
 
     return h != null && h !== false
-      ? (Object.create(this.prototype) as Duration).init(original, opts, h as DurationH)
+      ? (Object.create(this.prototype) as Duration).init(original, opts, h)
       : null;
   }
 

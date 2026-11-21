@@ -33,7 +33,7 @@ export class Fragments extends Node {
     if (!arelNode(other)) {
       throw new ArgumentError("Expected Arel node");
     }
-    return new Fragments([...this.values, other as Node]);
+    return new Fragments([...this.values, other]);
   }
 }
 

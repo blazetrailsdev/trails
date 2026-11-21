@@ -1185,7 +1185,7 @@ describe("the to_sql visitor", () => {
       const collector = new Collectors.SQLString();
       (
         v as unknown as { visitArelSelectManager(o: { ast: Nodes.Node }, c: unknown): void }
-      ).visitArelSelectManager({ ast: mgr.ast as unknown as Nodes.Node }, collector);
+      ).visitArelSelectManager({ ast: mgr.ast }, collector);
       expect(collector.value).toMatch(/^\(SELECT.*\)$/);
     });
 

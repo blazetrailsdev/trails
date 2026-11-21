@@ -721,7 +721,7 @@ describe("ExceptionsInsideAssertionsTest", () => {
 
   beforeEach(() => {
     out = [];
-    TestCase.setTaggedLogger(new Logger({ write: (s: string) => out.push(s) }) as never);
+    TestCase.setTaggedLogger(new Logger({ write: (s: string) => out.push(s) }));
   });
 
   async function runTestThatShouldPassAndLogAWarning(): Promise<void> {
@@ -884,7 +884,7 @@ describe("TestCaseTaggedLoggingTest", () => {
 
   beforeEach(() => {
     out = [];
-    TestCase.setTaggedLogger(new Logger({ write: (s: string) => out.push(s) }) as never);
+    TestCase.setTaggedLogger(new Logger({ write: (s: string) => out.push(s) }));
     new TestCase("logs tagged with current test case").beforeSetup();
   });
 

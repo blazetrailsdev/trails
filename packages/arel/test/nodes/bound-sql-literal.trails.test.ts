@@ -15,7 +15,7 @@ describe("BoundSqlLiteralTest", () => {
 
     it("throws when other is not an Arel node", () => {
       const bsl = new Nodes.BoundSqlLiteral("a = ?", [1], null);
-      expect(() => bsl.plus("not a node" as unknown as Nodes.Node)).toThrow(/Expected Arel node/);
+      expect(() => bsl.plus("not a node")).toThrow(/Expected Arel node/);
     });
   });
 

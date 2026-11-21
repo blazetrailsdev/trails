@@ -589,7 +589,7 @@ function rbFloat(val: unknown): number {
   if (val == null) throw new TypeError("can't convert nil into Float");
   const toF = (val as { toF?: () => number }).toF;
   if (typeof toF === "function") return toF.call(val);
-  throw new TypeError(`can't convert ${(val as object).constructor.name} into Float`);
+  throw new TypeError(`can't convert ${val.constructor.name} into Float`);
 }
 
 /** @internal */
@@ -6015,7 +6015,7 @@ export class DateTime extends DateWithoutParseStatics {
     this.#of = rof;
     if (fr2 instanceof Rational ? !fr2.isZero() : fr2 !== 0) {
       const [jd, df, sf] = addFrac(this.#getCJd(), this.#getCDf(), fr2);
-      return new new.target(SEAT, nth, jd, df, sf, rof, sg) as this;
+      return new new.target(SEAT, nth, jd, df, sf, rof, sg);
     }
   }
 

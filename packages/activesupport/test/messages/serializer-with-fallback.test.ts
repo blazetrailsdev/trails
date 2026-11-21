@@ -90,7 +90,7 @@ describe("MessagesSerializerWithFallbackTest", () => {
     const payloads: Record<string, unknown>[] = [];
     await Notifications.subscribed(
       (_name, _start, _finish, _id, payload) => {
-        payloads.push(payload as Record<string, unknown>);
+        payloads.push(payload);
       },
       "message_serializer_fallback.active_support",
       () => {

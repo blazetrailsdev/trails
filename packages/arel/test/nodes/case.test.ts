@@ -9,13 +9,13 @@ describe("NodesTest", () => {
   describe("Case", () => {
     describe("#initialize", () => {
       it("sets case expression from first argument", () => {
-        const node = new Nodes.Case("foo" as unknown as Nodes.Node);
+        const node = new Nodes.Case("foo");
 
         expect(node.case).toBe("foo");
       });
 
       it("sets default case from second argument", () => {
-        const node = new Nodes.Case(undefined, "bar" as unknown as Nodes.Node);
+        const node = new Nodes.Case(undefined, "bar");
 
         expect(node.default).toBe("bar");
       });
@@ -84,7 +84,7 @@ describe("NodesTest", () => {
 
     describe("#as", () => {
       it("allows aliasing", () => {
-        const node = new Nodes.Case("foo" as unknown as Nodes.Node);
+        const node = new Nodes.Case("foo");
         const as = node.as("bar");
 
         expect(as.left).toEqual(node);

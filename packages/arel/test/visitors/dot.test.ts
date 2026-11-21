@@ -76,7 +76,7 @@ describe("TestDot", () => {
   });
 
   it("ActiveModel Attribute", () => {
-    const node = ModelAttribute.withCastValue("LIMIT", 1, null as never);
+    const node = ModelAttribute.withCastValue("LIMIT", 1, null);
     expect(dot.accept(node as never, new Collectors.PlainString()).value).toMatch(
       '[label="<f0>ActiveModel::Attribute::WithCastValue"]',
     );

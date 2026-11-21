@@ -9,8 +9,7 @@ describe("PostgresTest", () => {
   const table = new Table("users");
   const attr = table.get("id");
 
-  const compile = (node: Nodes.Node): string =>
-    visitor.compile(node, new Collectors.SQLString()) as unknown as string;
+  const compile = (node: Nodes.Node): string => visitor.compile(node, new Collectors.SQLString());
 
   describe("locking", () => {
     it("defaults to FOR UPDATE", () => {

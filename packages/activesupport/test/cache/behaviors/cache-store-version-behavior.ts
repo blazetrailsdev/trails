@@ -82,7 +82,7 @@ export function cacheStoreVersionBehavior(host: CacheStoreVersionBehaviorHost): 
 
     const value = SecureRandom.hex();
 
-    await cache.write(m1v1 as never, value);
+    await cache.write(m1v1, value);
     expect(await cache.read(m1v1 as never)).toBe(value);
     expect(await cache.read(m1v2 as never)).toBeNull();
   });
@@ -122,7 +122,7 @@ export function cacheStoreVersionBehavior(host: CacheStoreVersionBehaviorHost): 
 
     const value = SecureRandom.hex();
 
-    await cache.write(m1v1 as never, value);
+    await cache.write(m1v1, value);
     expect(await cache.isExist(m1v1 as never)).toBeTruthy();
     expect(await cache.fetch(m1v2 as never)).toBeFalsy();
   });
@@ -162,6 +162,6 @@ export function cacheStoreVersionBehavior(host: CacheStoreVersionBehaviorHost): 
     const value = SecureRandom.hex();
 
     await cache.write(key, value, { version: 1 });
-    expect(await cache.read(key, { version: "1" as never })).toBe(value);
+    expect(await cache.read(key, { version: "1" })).toBe(value);
   });
 }

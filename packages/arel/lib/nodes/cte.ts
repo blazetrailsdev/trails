@@ -54,7 +54,7 @@ export class Cte extends Binary {
   }
 
   toTable(): Table {
-    return new Table(this.name as unknown as string);
+    return new Table(this.name);
   }
 }
 

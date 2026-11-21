@@ -91,7 +91,7 @@ function seconds(date: Date): number {
 }
 
 function rubyRange(r: { begin: unknown; end: unknown }): Temporal.PlainDate[] {
-  return [toDate(asDate(r.begin as Temporal.Instant)), toDate(asDate(r.end as Temporal.Instant))];
+  return [toDate(asDate(r.begin)), toDate(asDate(r.end))];
 }
 
 describe("DateExtBehaviorTest", () => {

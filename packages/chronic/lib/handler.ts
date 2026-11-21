@@ -8,7 +8,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Chronic } from "./namespaces.js";
 import type { Parser } from "./parser.js";
-import type { Span } from "./span.js";
 import type { Tag } from "./tag.js";
 import type { Token } from "./token.js";
 
@@ -79,7 +78,7 @@ export class Handler {
       STDOUT.puts(`Handler: ${String(this.handlerMethod)}`);
     }
 
-    return rbFSend(parser, this.handlerMethod, tokens, options) as Span | null;
+    return rbFSend(parser, this.handlerMethod, tokens, options);
   }
 
   equals(other: Handler): boolean {

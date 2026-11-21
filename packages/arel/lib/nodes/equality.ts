@@ -14,9 +14,6 @@ export class Equality extends Binary {
   }
 }
 
-include(
-  Equality as unknown as new (...args: unknown[]) => object,
-  FetchAttribute as unknown as Record<string, (...args: unknown[]) => unknown>,
-);
+include(Equality, FetchAttribute);
 
 constSet(Nodes, "Equality", Equality);

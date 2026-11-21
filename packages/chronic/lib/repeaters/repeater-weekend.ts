@@ -82,7 +82,7 @@ export class RepeaterWeekend extends Repeater {
     const start = weekend
       .next(pointer)
       .begin!.plus((amount - 1) * direction * RepeaterWeek.WEEK_SECONDS);
-    return new Span(start, start.plus(span.end!.minus(span.begin!) as number));
+    return new Span(start, start.plus(span.end!.minus(span.begin!)));
   }
 
   width(): number {

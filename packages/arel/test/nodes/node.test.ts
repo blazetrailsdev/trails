@@ -15,7 +15,7 @@ describe("TestNode", () => {
   it("all nodes are nodes", () => {
     for (const klass of Object.values(Nodes) as unknown[]) {
       if (typeof klass !== "function") continue;
-      if (Object.getOwnPropertyDescriptor(klass as object, "prototype")?.writable !== false) {
+      if (Object.getOwnPropertyDescriptor(klass, "prototype")?.writable !== false) {
         continue;
       }
       if (Nodes.SqlLiteral === klass) continue;

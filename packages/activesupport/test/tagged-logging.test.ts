@@ -200,7 +200,7 @@ describe("TaggedLoggingTest", () => {
   });
 
   it("push and pop tags directly", () => {
-    const pushed = logger.pushTags("A", ["B", "  ", ["C"]] as any);
+    const pushed = logger.pushTags("A", ["B", "  ", ["C"]]);
     expect(pushed).toEqual(["A", "B", "C"]);
     logger.info("a");
     const popped1 = logger.popTags();
@@ -356,7 +356,7 @@ describe("TagStack", () => {
 
   it("pushTags flattens deeply nested arrays", () => {
     const stack = new TagStack();
-    stack.pushTags(["A", [["B", ["C"]]] as any]);
+    stack.pushTags(["A", [["B", ["C"]]]]);
     expect(stack.tags).toEqual(["A", "B", "C"]);
   });
 

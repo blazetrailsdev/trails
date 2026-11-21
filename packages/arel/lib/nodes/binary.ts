@@ -167,20 +167,19 @@ export class Except extends Binary {
   }
 }
 
-type Includable = new (...args: unknown[]) => object;
 const fetchAttributeModule = FetchAttribute as unknown as Record<
   string,
   (...args: unknown[]) => unknown
 >;
-include(Between as unknown as Includable, fetchAttributeModule);
-include(NotEqual as unknown as Includable, fetchAttributeModule);
-include(GreaterThan as unknown as Includable, fetchAttributeModule);
-include(GreaterThanOrEqual as unknown as Includable, fetchAttributeModule);
-include(LessThan as unknown as Includable, fetchAttributeModule);
-include(LessThanOrEqual as unknown as Includable, fetchAttributeModule);
-include(IsDistinctFrom as unknown as Includable, fetchAttributeModule);
-include(IsNotDistinctFrom as unknown as Includable, fetchAttributeModule);
-include(NotIn as unknown as Includable, fetchAttributeModule);
+include(Between, fetchAttributeModule);
+include(NotEqual, fetchAttributeModule);
+include(GreaterThan, fetchAttributeModule);
+include(GreaterThanOrEqual, fetchAttributeModule);
+include(LessThan, fetchAttributeModule);
+include(LessThanOrEqual, fetchAttributeModule);
+include(IsDistinctFrom, fetchAttributeModule);
+include(IsNotDistinctFrom, fetchAttributeModule);
+include(NotIn, fetchAttributeModule);
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 export interface Binary<L = NodeOrValue, R = NodeOrValue> extends _AliasPredication {

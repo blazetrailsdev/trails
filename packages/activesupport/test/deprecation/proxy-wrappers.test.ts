@@ -51,7 +51,7 @@ describe("ProxyWrappersTest", () => {
     const proxy = new DeprecatedConstantProxy("OldWaffleModule", "WaffleModule", deprecator);
     const klass = class {};
     await assertDeprecated("OldWaffleModule", deprecator, () => {
-      include(klass, proxy as never);
+      include(klass, proxy);
     });
     assertPredicate(new klass() as unknown as typeof WaffleModule, (o) => o.isWaffle());
   });
@@ -64,7 +64,7 @@ describe("ProxyWrappersTest", () => {
       }
     };
     await assertDeprecated("OldWaffleModule", deprecator, () => {
-      prepend(klass, proxy as never);
+      prepend(klass, proxy);
     });
     assertPredicate(new klass(), (o) => o.isWaffle());
   });

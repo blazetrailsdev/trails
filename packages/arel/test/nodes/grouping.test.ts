@@ -1,24 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../support/connection.js";
 import { Nodes, Visitors } from "../../lib/index.js";
-import type { Node } from "../../lib/nodes/node.js";
 import { uniq } from "../support/uniq.js";
 
 describe("GroupingTest", () => {
   describe("equality", () => {
     it("is equal with equal ivars", () => {
-      const array = [
-        new Nodes.Grouping("foo" as unknown as Node),
-        new Nodes.Grouping("foo" as unknown as Node),
-      ];
+      const array = [new Nodes.Grouping("foo"), new Nodes.Grouping("foo")];
       expect(uniq(array).length).toBe(1);
     });
 
     it("is not equal with different ivars", () => {
-      const array = [
-        new Nodes.Grouping("foo" as unknown as Node),
-        new Nodes.Grouping("bar" as unknown as Node),
-      ];
+      const array = [new Nodes.Grouping("foo"), new Nodes.Grouping("bar")];
       expect(uniq(array).length).toBe(2);
     });
   });
