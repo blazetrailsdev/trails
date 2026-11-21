@@ -72,7 +72,8 @@ declare module "./metal.js" {
   interface Metal extends Included<(typeof Testing)["Functional"]> {}
 }
 
-Object.assign(Live, { originalNewControllerThread: Live.newControllerThread });
+export const originalNewControllerThread = Live.newControllerThread;
+Object.assign(Live, { originalNewControllerThread });
 
 export async function newControllerThread(
   this: LiveControllerHost,
@@ -81,7 +82,8 @@ export async function newControllerThread(
   await block();
 }
 
-Object.assign(Live, { originalCleanUpThreadLocals: Live.cleanUpThreadLocals });
+export const originalCleanUpThreadLocals = Live.cleanUpThreadLocals;
+Object.assign(Live, { originalCleanUpThreadLocals });
 
 export function cleanUpThreadLocals(this: LiveControllerHost, ..._args: unknown[]): void {}
 
