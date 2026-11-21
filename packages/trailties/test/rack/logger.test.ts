@@ -91,7 +91,7 @@ describe("Rack::Logger", () => {
   it("logger is flushed after request finished", async () => {
     const calls: string[] = [];
     const middleware = new TestLogger({
-      info(block: () => string) {
+      info(_progname: unknown, block: () => string) {
         calls.push(block());
       },
     });

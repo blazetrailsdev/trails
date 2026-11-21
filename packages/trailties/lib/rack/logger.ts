@@ -40,7 +40,7 @@ export class Logger {
     handle.start();
 
     try {
-      this.logger!.info(() => this.startedRequestMessage(request));
+      this.logger!.info(null, () => this.startedRequestMessage(request));
       const response = await (rbProcCall(this.app, env) as Promise<RackResponse>);
       const [status, headers, body] = response;
       const wrapped = new BodyProxy(body as AsyncIterable<unknown>, () =>
