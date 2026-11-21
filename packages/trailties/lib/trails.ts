@@ -20,6 +20,7 @@ import type { InitializerGroup } from "./initializable.js";
 import type { ActionMethods } from "./generators/trails/app/app-generator.js";
 import { VERSION, gemVersion } from "./gem-version.js";
 import { version } from "./version.js";
+import type { Info } from "./info.js";
 import type { InfoController } from "./info-controller.js";
 import type { WelcomeController } from "./welcome-controller.js";
 import { HealthController } from "./health-controller.js";
@@ -44,6 +45,7 @@ let _backtraceCleaner: BacktraceCleaner | undefined;
 
 export class Trails {
   declare static HealthController: typeof HealthController;
+  declare static Info: typeof Info;
   declare static InfoController: typeof InfoController;
   declare static MailersController: typeof MailersController;
   declare static PwaController: typeof PwaController;
@@ -62,6 +64,7 @@ export class Trails {
   declare static _autoloads?: Record<string, () => Promise<string>>;
 
   static loadPath: Record<string, () => Promise<unknown>> = {
+    "trails/info": () => import("./info.js"),
     "trails/info_controller": () => import("./info-controller.js"),
     "trails/mailers_controller": () => import("./mailers-controller.js"),
     "trails/welcome_controller": () => import("./welcome-controller.js"),
@@ -211,6 +214,7 @@ if (reopened !== undefined) {
   );
 }
 
+Trails.autoload("Info");
 Trails.autoload("InfoController");
 Trails.autoload("MailersController");
 Trails.autoload("WelcomeController");
