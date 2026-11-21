@@ -998,6 +998,7 @@ describe("CI runs every tooling test suite", () => {
         "packages/activerecord/lib/connection-adapters/sql-classification.ts",
         "packages/arel/lib/visitors/postgresql.ts",
         "packages/arel/lib/visitors/mysql.ts",
+        "packages/mysql2/lib/error.ts",
         "packages/activerecord-cli/test/__e2e__/postgres-happy-path.test.ts",
       ];
       const skips = [
