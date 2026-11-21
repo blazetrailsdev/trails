@@ -97,6 +97,7 @@ export class Connection {
   declare exec: Connection["asyncExec"];
 
   async finish(): Promise<void> {
+    if (this.isFinished()) throw new ConnectionBad("connection is closed", { connection: this });
     try {
       await this.client.end();
     } catch (error) {
@@ -143,7 +144,7 @@ export class Connection {
       : PG.CONNECTION_OK;
   }
 
-  async reset(): Promise<void> {
+  async reset(): Promise<this> {
     const client = this.client;
     const iopts = engine!._clientConfig(this.connParams);
     const conn = new (client.constructor as new (config: typeof iopts) => NodePg.Client)(iopts);
@@ -165,6 +166,7 @@ export class Connection {
         throw engine!.pgError(this, error, ConnectionBad);
       });
     this.client = conn;
+    return this;
   }
 
   transactionStatus(): number {
@@ -237,7 +239,7 @@ export class Connection {
 
   async waitForNotify(
     timeout: number | null = null,
-    block?: (relname: string, bePid: number, extra: string | undefined) => unknown,
+    block?: (relname: string, bePid: number, extra: string | null) => unknown,
   ): Promise<string | null> {
     if (this.notifies.length === 0) {
       await new Promise<void>((resolve, reject) => {
@@ -253,7 +255,7 @@ export class Connection {
     }
     const notification = this.notifies.shift();
     if (notification === undefined) return null;
-    block?.(notification.channel, notification.processId, notification.payload);
+    block?.(notification.channel, notification.processId, notification.payload || null);
     return notification.channel;
   }
 
