@@ -114,11 +114,20 @@ export default defineConfig({
               link: "/guides/debugging-rails-applications",
             },
             { text: "Configuring Trails Applications", link: "/guides/configuring" },
+            { text: "The Trails Command Line", link: "/guides/command-line" },
+            {
+              text: "Autoloading and Reloading",
+              link: "/guides/autoloading-and-reloading-constants",
+            },
           ],
         },
         {
           text: "Extending Trails",
           items: [{ text: "Getting Started with Engines", link: "/guides/engines" }],
+        },
+        {
+          text: "Going to Production",
+          items: [{ text: "Caching with Trails: An Overview", link: "/guides/caching-with-rails" }],
         },
         {
           text: "Rails Guides",
