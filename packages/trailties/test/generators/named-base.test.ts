@@ -154,6 +154,21 @@ describe("NamedBaseTest", () => {
 
   it("scaffold plural names with model name option", () => {
     const g = generator("Admin::Foo", { modelName: "User" });
+    expect(g.singularName()).toEqual("user");
+    expect(g.name).toEqual("User");
+    expect(g.filePath()).toEqual("user");
+    expect(g.className()).toEqual("User");
+    expect(g.fileName).toEqual("user");
+    expect(g.humanName()).toEqual("User");
+    expect(g.pluralName()).toEqual("users");
+    expect(g.i18nScope()).toEqual("user");
+    expect(g.tableName()).toEqual("users");
+    expect(g.controllerName).toEqual("Admin::Foos");
+    expect(g.controllerClassPath()).toEqual(["admin"]);
+    expect(g.controllerClassName()).toEqual("Admin::Foos");
+    expect(g.controllerFilePath()).toEqual("admin/foos");
+    expect(g.controllerFileName).toEqual("foos");
+    expect(g.controllerI18nScope()).toEqual("admin.foos");
     expect(g.singularRouteName()).toBe("admin_user");
     expect(g.pluralRouteName()).toBe("admin_users");
     expect(g.redirectResourceName()).toBe('["admin", this.user]');
