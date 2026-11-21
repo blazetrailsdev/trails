@@ -1421,9 +1421,6 @@ export function recordTsPortedWithArgs(
   owner: string,
 ): void {
   if (isTestHelperFile(file)) return;
-  // A member an interface resolves off another package's class
-  // (`interface SolidQueueConfig extends OrderedOptions`) is that package's
-  // signature, which this package-only population must not hold.
   if (m.declaredIn?.startsWith("../")) return;
   const pkgSigs = maps.paramsByNameInPkg.get(m.name) ?? [];
   pkgSigs.push(m.params);
