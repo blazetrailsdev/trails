@@ -966,7 +966,7 @@ async function templateScope(
     );
   }
   view.push(
-    "{ [name: `${string}Path`]: (...args: unknown[]) => string; [name: `${string}Url`]: (...args: unknown[]) => string }",
+    `{ ${(TopLevel.Trails?.application?.routes().namedRoutes.helperNames() ?? []).map((name) => `${name}(...args: unknown[]): string;`).join(" ")} }`,
     'Record<"alert" | "notice", unknown>',
   );
   const prefix = path.posix.dirname(rel);

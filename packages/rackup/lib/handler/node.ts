@@ -6,6 +6,7 @@ import {
   STDERR,
   StringIO,
   TCPSocket,
+  Queue,
   Thread,
   rbObjAsString,
   rbProcCall,
@@ -47,6 +48,65 @@ export interface Options {
 /** @noRailsEquivalent PERMANENT */
 const unhijacked = new Set<HttpSocket>();
 
+/** @perf 7us — PERMANENT */
+class _ThreadPool {
+  /** @noRailsEquivalent PERMANENT */
+  spawned = 0;
+  /** @noRailsEquivalent PERMANENT */
+  waiting = 0;
+  /** @noRailsEquivalent PERMANENT */
+  min: number;
+  /** @noRailsEquivalent PERMANENT */
+  max: number;
+  readonly #todo = new Queue<() => Promise<void>>();
+  readonly #name: string;
+  readonly #processors: Thread<Promise<void>>[] = [];
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(name: string, options: { minThreads: number; maxThreads: number }) {
+    this.#name = name;
+    this.min = options.minThreads;
+    this.max = options.maxThreads;
+    for (let i = 0; i < this.min; i++) this.#spawnThread();
+  }
+
+  /** @inventedArm for — PERMANENT */
+  #spawnThread(): void {
+    this.spawned += 1;
+    const processor = new Thread(
+      this,
+      this.spawned,
+      async (_pool: _ThreadPool, spawned: number) => {
+        Thread.current().name = `${this.#name} tp ${String(spawned).padStart(3, "0")}`;
+        const todo = this.#todo;
+        while (true) {
+          this.waiting += 1;
+          let work: (() => Promise<void>) | null;
+          try {
+            work = await todo.pop();
+          } finally {
+            this.waiting -= 1;
+          }
+          if (work == null) return;
+          try {
+            await work();
+          } finally {
+            const thread = Thread.current();
+            for (const key of thread.keys()) thread.set(key, null);
+          }
+        }
+      },
+    );
+    this.#processors.push(processor);
+  }
+
+  push(work: () => Promise<void>): this {
+    this.#todo.push(work);
+    if (this.waiting < this.#todo.length && this.spawned < this.max) this.#spawnThread();
+    return this;
+  }
+}
+
 /** @noRailsEquivalent PERMANENT */
 export class Node {
   /** @noRailsEquivalent PERMANENT */
@@ -56,8 +116,18 @@ export class Node {
   readonly app: RackApp | RackMiddleware;
 
   /** @noRailsEquivalent PERMANENT */
+  readonly threadPool = new _ThreadPool("trails", { minThreads: 0, maxThreads: 5 });
+
+  /** @noRailsEquivalent PERMANENT */
   constructor(app: RackApp | RackMiddleware) {
     this.app = app;
+  }
+
+  /** @perf 7us — PERMANENT */
+  _process(work: () => Promise<void>): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.threadPool.push(() => work().then(resolve, reject));
+    });
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -118,7 +188,7 @@ export class Node {
 
   /** @noRailsEquivalent PERMANENT */
   service(req: HttpRequest, res: HttpResponse): Promise<void> {
-    return new Thread(async (): Promise<void> => {
+    return this._process(async (): Promise<void> => {
       const env = await this.requestEnv(req, new StringIO(await readBody(req)));
       const socket = res.socket;
       let hijacked = false;
@@ -184,12 +254,12 @@ export class Node {
           `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
         );
       }
-    }).value();
+    });
   }
 
   /** @noRailsEquivalent PERMANENT */
   upgrade(req: HttpRequest, socket: HttpSocket, head: Uint8Array): Promise<void> {
-    return new Thread(async (): Promise<void> => {
+    return this._process(async (): Promise<void> => {
       let hijacked = false;
       let started = false;
       let io: TCPSocket | undefined;
@@ -300,7 +370,7 @@ export class Node {
         if (started) socket.destroy();
         else socket.end(responseHead(500, { "content-length": "0" }));
       }
-    }).value();
+    });
   }
 
   /** @internal */

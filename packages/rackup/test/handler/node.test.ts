@@ -312,6 +312,45 @@ describe("Rack::Handler::Node", () => {
     }
   }, 15000);
 
+  it("runs requests on long-lived pool threads, clearing each request's thread locals", async () => {
+    const seen: unknown[] = [];
+    const threads = new Set<Thread>();
+    await serving(
+      async () => {
+        const thread = Thread.current();
+        threads.add(thread);
+        seen.push(thread.get("request_id"));
+        thread.set("request_id", seen.length);
+        return [200, { "content-length": "2" }, ["ok"]];
+      },
+      async (url) => {
+        for (let i = 0; i < 3; i++) await (await fetch(url)).text();
+      },
+    );
+    expect(seen).toEqual([null, null, null]);
+    expect(threads.size).toBe(1);
+    expect([...threads][0]).not.toBe(Thread.main);
+  });
+
+  it("gives concurrent requests a pool thread each", async () => {
+    const threads: Thread[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await serving(
+      async () => {
+        threads.push(Thread.current());
+        if (threads.length === 2) release();
+        await gate;
+        return [200, { "content-length": "2" }, ["ok"]];
+      },
+      async (url) => {
+        await Promise.all([fetch(url).then((r) => r.text()), fetch(url).then((r) => r.text())]);
+      },
+    );
+    expect(threads).toHaveLength(2);
+    expect(threads[0]).not.toBe(threads[1]);
+  });
+
   it("answers 500 when the app raises on an ordinary request", async () => {
     const log = captureStderr();
     try {
