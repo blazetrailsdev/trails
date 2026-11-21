@@ -397,7 +397,7 @@
     }
   },
   "activerecord": {
-    "rows": 570,
+    "rows": 576,
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
