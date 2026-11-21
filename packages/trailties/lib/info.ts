@@ -1,3 +1,4 @@
+import "./constants.info.generated.js";
 import { htmlEscape } from "@blazetrails/activesupport";
 import { env } from "@blazetrails/ruby-compat";
 import { VERSION } from "./gem-version.js";

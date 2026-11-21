@@ -85,7 +85,17 @@ const LAZY_DIRS: Record<string, string[]> = {
   activestorage: ["blob.ts", "blob/", "fixture-set.ts", "variant-record.ts"],
   activesupport: ["executor/test-helper.ts"],
   actiontext: ["encrypted-rich-text.ts", "rich-text.ts"],
-  trailties: ["commands/", "command.ts", "generators/"],
+  trailties: [
+    "application-controller.ts",
+    "commands/",
+    "command.ts",
+    "generators/",
+    "info-controller.ts",
+    "info.ts",
+    "mailers-controller.ts",
+    "pwa-controller.ts",
+    "welcome-controller.ts",
+  ],
 };
 
 /** A package subpath export whose module, imported alone, must answer its classes' paths, so it carries its own table. */

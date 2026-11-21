@@ -1,3 +1,4 @@
+import "./constants.welcome-controller.generated.js";
 import { ApplicationController } from "./application-controller.js";
 import { Trails } from "./trails.js";
 

@@ -1289,16 +1289,18 @@
     }
   },
   "trailties": {
-    "rows": 163,
+    "rows": 169,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "commands/build.ts::BuildCommand",
+      "info.ts::PropertyList",
       "trailties/action-dispatch.ts::Trailtie",
       "trailties/active-support.ts::Trailtie",
       "trailties/i18n.ts::Trailtie"
     ],
     "unwalked": [],
     "residue": {
+      "application-controller.ts::ApplicationController": "Trails::ApplicationController",
       "application.ts::Application": "Trails::Application",
       "application/bootstrap.ts::Bootstrap": "Trails::Application::Bootstrap",
       "application/configuration.ts::Configuration": "Trails::Application::Configuration",
@@ -1445,11 +1447,15 @@
       "generators/tse/mailer/mailer-generator.ts::MailerGenerator": "TSE::Generators::MailerGenerator",
       "generators/tse/scaffold/scaffold-generator.ts::ScaffoldGenerator": "TSE::Generators::ScaffoldGenerator",
       "health-controller.ts::HealthController": "Trails::HealthController",
+      "info-controller.ts::InfoController": "Trails::InfoController",
+      "info.ts::Info": "Trails::Info",
       "initializable.ts::Collection": "Trails::Initializable::Collection",
       "initializable.ts::Initializable": "Trails::Initializable",
       "initializable.ts::Initializer": "Trails::Initializable::Initializer",
+      "mailers-controller.ts::MailersController": "Trails::MailersController",
       "paths.ts::Path": "Trails::Paths::Path",
       "paths.ts::Root": "Trails::Paths::Root",
+      "pwa-controller.ts::PwaController": "Trails::PwaController",
       "rack.ts::Rack": "Trails::Rack",
       "rack/logger.ts::Logger": "Trails::Rack::Logger",
       "rack/silence-request.ts::SilenceRequest": "Trails::Rack::SilenceRequest",
@@ -1461,6 +1467,7 @@
       "trailtie/configurable.ts::ClassMethods": "Trails::Trailtie::Configurable::ClassMethods",
       "trailtie/configurable.ts::Configurable": "Trails::Trailtie::Configurable",
       "trailtie/configuration.ts::Configuration": "Trails::Trailtie::Configuration",
+      "welcome-controller.ts::WelcomeController": "Trails::WelcomeController",
       "zeitwerk-checker.ts::ZeitwerkChecker": "Trails::ZeitwerkChecker"
     }
   },

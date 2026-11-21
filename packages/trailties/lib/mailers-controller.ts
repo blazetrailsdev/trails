@@ -1,3 +1,4 @@
+import "./constants.mailers-controller.generated.js";
 import { I18n, indexBy, toQuery } from "@blazetrails/activesupport";
 import { AbstractController, DebugView, Mime, MimeType } from "@blazetrails/actionpack";
 import { ActionMailer, Preview } from "@blazetrails/actionmailer";

@@ -1,6 +1,7 @@
 import "./constants.health-controller.generated.js";
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
 import { ActionController } from "@blazetrails/actionpack";
+import { Trails } from "./trails.js";
 
 export class HealthController extends ActionController.Base {
   static override controllerPath(): string {
@@ -32,3 +33,5 @@ HealthController.rescueFrom(Error, {
     return this.renderDown();
   },
 });
+
+Trails.HealthController = HealthController;

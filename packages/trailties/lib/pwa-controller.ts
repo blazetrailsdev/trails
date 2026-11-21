@@ -1,3 +1,4 @@
+import "./constants.pwa-controller.generated.js";
 import { ActionController } from "@blazetrails/actionpack";
 import { ApplicationController } from "./application-controller.js";
 import { Trails } from "./trails.js";

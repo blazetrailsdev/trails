@@ -1,3 +1,4 @@
+import "./constants.info-controller.generated.js";
 import { isBlank } from "@blazetrails/activesupport";
 import { DebugView, RoutesInspector, RouteWrapper, type RouteSet } from "@blazetrails/actionpack";
 import { RFC2396_PARSER } from "@blazetrails/ruby-compat";

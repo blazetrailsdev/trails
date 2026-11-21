@@ -23,7 +23,7 @@ import { version } from "./version.js";
 import type { Info } from "./info.js";
 import type { InfoController } from "./info-controller.js";
 import type { WelcomeController } from "./welcome-controller.js";
-import { HealthController } from "./health-controller.js";
+import type { HealthController } from "./health-controller.js";
 import type { PwaController } from "./pwa-controller.js";
 import type { MailersController } from "./mailers-controller.js";
 import * as TrailsConfiguration from "./configuration.js";
@@ -224,7 +224,6 @@ Trails.eagerAutoload(() => {
   Trails.autoload("PwaController");
 });
 
-Trails.HealthController = HealthController;
 Trails.Configuration = TrailsConfiguration;
 Trails.Paths = Paths;
 Trails.SourceAnnotationExtractor = SourceAnnotationExtractor;
