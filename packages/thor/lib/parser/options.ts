@@ -1,5 +1,6 @@
 import {
   aryDelete,
+  each,
   matchOperator,
   rbFSend,
   rbInspect,
@@ -91,10 +92,10 @@ export class Options extends Arguments {
     );
     this.disableRequiredCheck = disableRequiredCheck;
 
-    for (const [key, value] of Object.entries(defaults)) {
+    each(defaults, ([key, value]) => {
       this.assigns[rbObjAsString(key)] = value;
       aryDelete(this.nonAssignedRequired, hashOptions[key]);
-    }
+    });
 
     this.shorts = Object.create(null) as Record<string, string>;
     this.switches = Object.create(null) as Record<string, Option>;

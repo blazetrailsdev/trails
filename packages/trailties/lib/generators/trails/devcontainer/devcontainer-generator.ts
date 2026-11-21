@@ -118,7 +118,7 @@ export class DevcontainerGenerator extends Base {
     if (!this.options.systemTest) return;
 
     const systemTestCasePath = File.expandPath(
-      "test/application_system_test_case.ts",
+      "test/application-system-test-case.ts",
       this.destinationRoot,
     );
     if (!File.isExist(systemTestCasePath)) return;
@@ -164,7 +164,7 @@ export class DevcontainerGenerator extends Base {
     this._containerEnv = {};
 
     const options = this.options;
-    if (options.systemTest) this._containerEnv.TRAILS_SYSTEM_TESTING_SERVER_PORT = "45678";
+    if (options.systemTest) this._containerEnv.CAPYBARA_SERVER_PORT = "45678";
     if (options.systemTest) this._containerEnv.SELENIUM_HOST = "selenium";
     if (options.redis) this._containerEnv.REDIS_URL = "redis://redis:6379/1";
     if (options.kamal) this._containerEnv.KAMAL_REGISTRY_PASSWORD = "$KAMAL_REGISTRY_PASSWORD";
@@ -242,8 +242,8 @@ export class DevcontainerGenerator extends Base {
   }
 
   private systemTestConfiguration(): string {
-    return `    if (process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT) {
-      this.servedBy({ host: "trails-app", port: process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT });
+    return `    if (process.env.CAPYBARA_SERVER_PORT) {
+      this.servedBy({ host: "trails-app", port: process.env.CAPYBARA_SERVER_PORT });
       this.drivenBy("selenium", { using: "headless_chrome", screenSize: [1400, 1400], options: {
         browser: "remote",
         url: \`http://\${process.env.SELENIUM_HOST}:4444\`

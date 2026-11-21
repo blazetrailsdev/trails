@@ -134,6 +134,17 @@ describe("AppGeneratorTest", () => {
     await t.assertDirectory(".git");
   });
 
+  it("application name is detected if it exists and app folder renamed", async () => {
+    const appRoot = File.join(t.destinationRoot, "myapp");
+    const appMovedRoot = File.join(t.destinationRoot, "myapp_moved");
+
+    await t.runGenerator([appRoot]);
+    FileUtils.mv(appRoot, appMovedRoot);
+    await runAppUpdate.call(t, appMovedRoot);
+
+    await t.assertFile(`${appMovedRoot}/config/environment.ts`, /Trails\.initialize\(\)/);
+  });
+
   it("app update", async () => {
     await t.runGenerator();
 
@@ -333,6 +344,11 @@ describe("AppGeneratorTest", () => {
     );
   });
 
+  it("quiet option", async () => {
+    const output = await t.runGenerator([File.join(t.destinationRoot, "myapp"), "--quiet"]);
+    expect(output).toBe("");
+  });
+
   it("skip git", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-git", "--full"]);
     t.assertNoFile(".gitignore");
@@ -433,12 +449,12 @@ describe("AppGeneratorTest", () => {
   it("invalid application name is fixed", async () => {
     await t.runGenerator([File.join(t.destinationRoot, "things-43")]);
     await t.assertFile("things-43/config/environment.ts", /Trails\.initialize\(\)/);
-    await t.assertFile("things-43/config/application.ts", /^export class Things43 /m);
+    await t.assertFile("things-43/config/application.ts", /^export const Things43 = /m);
   });
 
   it("name option", async () => {
     await t.runGenerator([t.destinationRoot, "--name=my-app"]);
-    await t.assertFile("config/application.ts", /^export class MyApp /m);
+    await t.assertFile("config/application.ts", /^export const MyApp = /m);
   });
 
   it("template from absolute path", async () => {
@@ -495,6 +511,15 @@ describe("AppGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--css=sass", "--javascript=esbuild"]);
     await assertGem("cssbundling-rails");
     await assertNoGem("dartsass-rails");
+  });
+
+  it("css option with asset pipeline tailwind", async () => {
+    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--css=tailwind"]);
+
+    expect(railsCommands, "`css:install:tailwind` expected to be called, but wasn't.").toContain(
+      "css:install:tailwind",
+    );
+    await assertNodeFiles();
   });
 
   it("css option with cssbundling gem", async () => {
@@ -1577,8 +1602,8 @@ describe("AppGenerator", () => {
     await t.runGenerator([File.join(t.destinationRoot, "my-app")]);
 
     await t.assertFile("my-app/config/application.ts", (appConfig: string) => {
-      expect(appConfig).toContain(`import { Application, Trails } from "@blazetrails/trailties";`);
-      expect(appConfig).toContain("export class MyApp extends Application {");
+      expect(appConfig).toContain(`import { Trails } from "@blazetrails/trailties";`);
+      expect(appConfig).toContain("export class Application extends Trails.Application {");
       expect(appConfig).toContain("Application.register(this, import.meta.dirname);");
     });
     await t.assertFile("my-app/config/environment.ts", (environment: string) => {
@@ -1897,7 +1922,7 @@ describe("AppGeneratorTest", () => {
 
     await assertDevcontainerJsonFile.call(t, (content) => {
       expect(content.name).toBe("my_app");
-      expect(content.containerEnv.TRAILS_SYSTEM_TESTING_SERVER_PORT).toBe("45678");
+      expect(content.containerEnv.CAPYBARA_SERVER_PORT).toBe("45678");
       expect(content.containerEnv.KAMAL_REGISTRY_PASSWORD).toBe("$KAMAL_REGISTRY_PASSWORD");
       expect(content.containerEnv.SELENIUM_HOST).toBe("selenium");
       expect(Object.keys(content.features)).toContain(

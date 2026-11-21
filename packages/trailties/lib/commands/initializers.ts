@@ -50,8 +50,8 @@ export class InitializersCommand extends Base {
   async perform(): Promise<void> {
     await this.bootApplicationBang();
 
-    for (const initializer of Trails.application!.initializers.tsort()) {
+    Trails.application!.initializers.tsortEach((initializer) => {
       this.say(`${rbModName(initializer.contextClass as object)}.${initializer.name}`);
-    }
+    });
   }
 }

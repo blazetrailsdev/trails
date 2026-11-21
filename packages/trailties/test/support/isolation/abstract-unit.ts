@@ -375,7 +375,7 @@ export default { development: env("development"), test: env("test"), production:
       File.join(appPath, "config/application.ts"),
       "utf-8",
     );
-    const match = /(extends Application \{\s*static \{\s*)/.exec(environment);
+    const match = /(extends Trails\.Application \{\s*static \{\s*)/.exec(environment);
     if (match) {
       await puts(
         File.join(appPath, "config/application.ts"),

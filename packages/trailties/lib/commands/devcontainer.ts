@@ -39,7 +39,7 @@ export class DevcontainerCommand extends Base {
       redis:
         (constDefined(TopLevel, "ActionCable") && !constDefined(TopLevel, "SolidCable")) ||
         (constDefined(TopLevel, "ActiveJob") && !constDefined(TopLevel, "SolidQueue")),
-      systemTest: await File.isExistAsync("test/application_system_test_case.ts"),
+      systemTest: await File.isExistAsync("test/application-system-test-case.ts"),
       node: await File.isExistAsync(".node-version"),
       kamal: await File.isExistAsync("config/deploy.yml"),
     });

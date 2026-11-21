@@ -97,6 +97,10 @@ export class Collection extends Array<Initializer> {
     this.tsortEachNode(visit);
     return out;
   }
+
+  tsortEach(block: (initializer: Initializer) => void): void {
+    for (const initializer of this.tsort()) block(initializer);
+  }
 }
 
 /** @internal */

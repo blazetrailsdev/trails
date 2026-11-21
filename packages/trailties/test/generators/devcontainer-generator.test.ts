@@ -193,8 +193,8 @@ describe("DevcontainerGeneratorTest", () => {
 
     await t.assertFile("config/database.ts", (dbConfig) => {
       expect(dbConfig).toMatch(/host: process\.env\.DB_HOST/);
-      expect(dbConfig).toMatch(/username: .*"postgres"/);
-      expect(dbConfig).toMatch(/password: .*"postgres"/);
+      expect(dbConfig).toMatch(/username: "postgres"/);
+      expect(dbConfig).toMatch(/password: "postgres"/);
     });
 
     await assertComposeFile.call(t, (compose) => {
@@ -336,16 +336,14 @@ describe("DevcontainerGeneratorTest", () => {
     await t.runGenerator();
 
     await assertDevcontainerJsonFile.call(t, (devcontainerJson) => {
-      expect(devcontainerJson.containerEnv.TRAILS_SYSTEM_TESTING_SERVER_PORT).toBe("45678");
+      expect(devcontainerJson.containerEnv.CAPYBARA_SERVER_PORT).toBe("45678");
       expect(devcontainerJson.containerEnv.SELENIUM_HOST).toBe("selenium");
     });
 
-    await t.assertFile("test/application_system_test_case.ts", (systemTestCase) => {
+    await t.assertFile("test/application-system-test-case.ts", (systemTestCase) => {
+      expect(systemTestCase).toMatch(/^ {4}if \(process\.env\.CAPYBARA_SERVER_PORT\)/m);
       expect(systemTestCase).toMatch(
-        /^ {4}if \(process\.env\.TRAILS_SYSTEM_TESTING_SERVER_PORT\)/m,
-      );
-      expect(systemTestCase).toMatch(
-        /^ {6}this\.servedBy\(\{ host: "trails-app", port: process\.env\.TRAILS_SYSTEM_TESTING_SERVER_PORT \}\)/m,
+        /^ {6}this\.servedBy\(\{ host: "trails-app", port: process\.env\.CAPYBARA_SERVER_PORT \}\)/m,
       );
       expect(systemTestCase).toMatch(
         /^ {6}this\.drivenBy\("selenium", \{ using: "headless_chrome", screenSize: \[1400, 1400\], options: \{$/m,
@@ -361,7 +359,7 @@ describe("DevcontainerGeneratorTest", () => {
     await t.runGenerator(["--system-test"]);
 
     await testCommonConfig();
-    t.assertNoFile("test/application_system_test_case.ts");
+    t.assertNoFile("test/application-system-test-case.ts");
   });
 
   it("system test option skip", async () => {
@@ -377,7 +375,7 @@ describe("DevcontainerGeneratorTest", () => {
       expect(compose.get("services").keys()).not.toContain("selenium");
     });
     await assertDevcontainerJsonFile.call(t, (devcontainerJson) => {
-      expect(devcontainerJson.containerEnv.TRAILS_SYSTEM_TESTING_SERVER_PORT).toBeUndefined();
+      expect(devcontainerJson.containerEnv.CAPYBARA_SERVER_PORT).toBeUndefined();
     });
   });
 });

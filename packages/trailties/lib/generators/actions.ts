@@ -136,7 +136,7 @@ export async function environment(
   options: EnvironmentOptions = {},
   block?: () => string,
 ): Promise<void> {
-  const sentinel = " extends Application {\n  static {\n";
+  const sentinel = " extends Trails.Application {\n  static {\n";
   const envFileSentinel = "Trails.application.configure(function () {\n";
   if (block) data ??= block();
 
