@@ -24,7 +24,7 @@ function appFile(path: string, contents: string): void {
 }
 
 async function runNotesCommand(args: string[] = []): Promise<string> {
-  const write = vi.spyOn(stdout, "write").mockReturnValue(true as never);
+  const write = vi.spyOn(stdout, "write").mockReturnValue(true);
   await invoke("notes", args);
   const output = write.mock.calls.map((call) => String(call[0])).join("");
   write.mockRestore();

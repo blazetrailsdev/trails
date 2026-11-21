@@ -38,7 +38,7 @@ export class Trailtie extends BaseTrailtie {
   }
 
   static includeFallbacksModule(): void {
-    include(I18n.backend().constructor as new (...args: never[]) => object, I18n.Fallbacks);
+    include(I18n.backend().constructor, I18n.Fallbacks);
   }
 
   static initFallbacks(fallbacks: I18nConfig["fallbacks"]): void {

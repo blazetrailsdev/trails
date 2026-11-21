@@ -33,7 +33,7 @@ export class ChangeGenerator extends Base {
   static override readonly name = "Trails::Generators::Db::System::ChangeGenerator";
 
   static {
-    include(this as unknown as new (...args: unknown[]) => unknown, AppName);
+    include(this, AppName);
     this.classOption("to", { required: true, desc: "The database system to switch to." });
 
     this.noCommands(() => this.methodAdded("isDevcontainer"));

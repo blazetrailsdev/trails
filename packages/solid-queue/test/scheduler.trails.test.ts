@@ -19,7 +19,9 @@ describe.runIf(Record.connectionDbConfig().adapter === "sqlite3")(
       await RecurringTask.loadSchema();
       const holder = new SQLite3Adapter({ database: database!, timeout: 1000 });
       await holder.execute("BEGIN IMMEDIATE");
-      setTimeout(() => void holder.execute("COMMIT"), 50);
+      const commit = new Promise((resolve) => setTimeout(resolve, 50)).then(() =>
+        holder.execute("COMMIT"),
+      );
 
       const scheduler = new Scheduler({
         recurringTasks: new Map([
@@ -32,6 +34,7 @@ describe.runIf(Record.connectionDbConfig().adapter === "sqlite3")(
         expect(await Process.where({ kind: "Scheduler" }).count()).toBe(1);
       } finally {
         await scheduler.stop();
+        await commit;
         await holder.disconnectBang();
       }
     });

@@ -226,10 +226,7 @@ export class Arguments {
     const names = this.nonAssignedRequired
       .map((o) => (rbObjRespondTo(o, "switchName") ? (o as Option).switchName : o.humanName))
       .join("', '");
-    const className = rbModName(this.constructor as typeof Arguments)!
-      .split("::")
-      .at(-1)!
-      .toLowerCase();
+    const className = rbModName(this.constructor)!.split("::").at(-1)!.toLowerCase();
     throw new RequiredArgumentMissingError(
       `No value provided for required ${className} '${names}'`,
     );

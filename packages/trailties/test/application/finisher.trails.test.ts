@@ -402,7 +402,7 @@ describe("Finisher", () => {
     await _registerAutoloaded("Child", Stale);
     expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Stale]);
 
-    DescendantsTracker.clear([Stale as never]);
+    DescendantsTracker.clear([Stale]);
     await _registerAutoloaded("Child", Reloaded);
 
     expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Reloaded]);

@@ -49,13 +49,13 @@ describe("command USAGE files", () => {
   });
 
   it("credentials --help prints its USAGE", async () => {
-    const out = await helpOutput(CredentialsCommand as unknown as typeof Base, "credentials");
+    const out = await helpOutput(CredentialsCommand, "credentials");
     expect(out).toContain("Environment Specific Credentials:");
     expect(out).toContain(`${CredentialsCommand.executable("edit")} --environment development`);
   });
 
   it("encrypted --help prints its USAGE", async () => {
-    const out = await helpOutput(EncryptedCommand as unknown as typeof Base, "encrypted");
+    const out = await helpOutput(EncryptedCommand, "encrypted");
     expect(out).toContain("Encryption Keys:");
     expect(out).toContain(`${EncryptedCommand.executable("show")} config/encrypted_file.yml.enc`);
   });

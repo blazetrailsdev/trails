@@ -43,13 +43,8 @@ function remapOneDiagnostic(
   host: TrailsCompilerHost,
   originalSfCache: Map<string, ts.SourceFile>,
 ): ts.Diagnostic {
-  const remappedRelated = d.relatedInformation?.map(
-    (ri) =>
-      remapOneDiagnostic(
-        ri as ts.Diagnostic,
-        host,
-        originalSfCache,
-      ) as ts.DiagnosticRelatedInformation,
+  const remappedRelated = d.relatedInformation?.map((ri) =>
+    remapOneDiagnostic(ri, host, originalSfCache),
   );
 
   if (!d.file || d.start == null) {

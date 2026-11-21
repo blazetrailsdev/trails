@@ -310,7 +310,7 @@ describe("WorkerTest", () => {
 
   async function withActiveRecordLogger(logger: Logger | null, block: () => Promise<void>) {
     const oldLogger = ARBase.logger;
-    ARBase.logger = logger as typeof ARBase.logger;
+    ARBase.logger = logger;
     try {
       await block();
     } finally {

@@ -208,7 +208,7 @@ describe("SolidQueue::SemaphoreTest", () => {
       await NonOverlappingByKeyJob.set({ wait: minutes(1) }).performLater(key);
       jobs.push((await Job.last()) as Job);
     }
-    travelTo(minutes(2).fromNow() as Time);
+    travelTo(minutes(2).fromNow());
 
     const errors = await dispatchInTwoBatchesAtOnce();
 

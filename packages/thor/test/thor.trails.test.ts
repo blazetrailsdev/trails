@@ -83,7 +83,7 @@ describe("Thor", () => {
     });
 
     it("warns and registers nothing for a method with no usage or description", () => {
-      const write = vi.spyOn(STDOUT, "write").mockImplementation(() => 0 as never);
+      const write = vi.spyOn(STDOUT, "write").mockImplementation(() => 0);
       const klass = thor((k) => k.methodAdded("zoo"));
       expect(klass.commands()).toEqual({});
       expect(write.mock.calls.flat().join("")).toMatch(

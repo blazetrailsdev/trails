@@ -181,7 +181,7 @@ describe("trails server environment (trails)", () => {
 
     beforeEach(() => {
       vi.spyOn(Trails, "initialize").mockResolvedValue(app);
-      vi.spyOn(Trails, "application", "get").mockReturnValue(app as never);
+      vi.spyOn(Trails, "application", "get").mockReturnValue(app);
       vi.spyOn(app, "root").mockReturnValue(tmpDir);
     });
 

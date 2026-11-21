@@ -481,7 +481,7 @@ export class Configuration extends EngineConfiguration {
         getEnv("SECRET_KEY_BASE_DUMMY") != null
           ? this.generateLocalSecret()
           : (getEnv("SECRET_KEY_BASE") ??
-            (Trails.application!._credentials?.dig("secret_key_base") as string | undefined) ??
+            Trails.application!._credentials?.dig("secret_key_base") ??
             (Trails.env.isLocal() && this.generateLocalSecret()))) as string)
     );
   }

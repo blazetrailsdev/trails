@@ -70,9 +70,9 @@ export class Trailtie extends BaseTrailtie {
 
       onLoad("action_mailer", function (this: MailerClass) {
         const routes = app.routes();
-        include(this as never, AbstractController.UrlFor as never);
-        AbstractController.Trailties.RoutesHelpers.with(routes, false)(this as never);
-        include(this as never, routes.mountedHelpers() as never);
+        include(this, AbstractController.UrlFor);
+        AbstractController.Trailties.RoutesHelpers.with(routes, false)(this);
+        include(this, routes.mountedHelpers());
 
         this.registerInterceptors(options.delete("interceptors"));
         this.registerPreviewInterceptors(options.delete("previewInterceptors"));

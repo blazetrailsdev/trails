@@ -106,7 +106,7 @@ describe("Thor::Shell::Basic", () => {
     it("prints a message to the user and does not echo stdin if the echo option is set to false", async () => {
       const actual = await vi.importActual<typeof LineEditor>("../../lib/line-editor.js");
       readline.mockImplementationOnce(actual.readline);
-      const noecho = vi.spyOn($stdin, "noecho").mockResolvedValue("mysecretpass" as never);
+      const noecho = vi.spyOn($stdin, "noecho").mockResolvedValue("mysecretpass");
       const print = vi.spyOn($stdout, "write").mockReturnValue(true);
       expect(await shell().ask("What's your password?", { echo: false })).toEqual("mysecretpass");
       expect(print).toHaveBeenCalledWith("What's your password? ");

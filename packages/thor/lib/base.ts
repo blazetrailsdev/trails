@@ -736,8 +736,8 @@ export function fromSuperclass(
 
 (ThorBase as unknown as Record<symbol, unknown>)[included] = function (base: object): void {
   extend(base, ClassMethods);
-  include(base as { prototype: object }, Invocation);
-  include(base as { prototype: object }, Shell);
+  include(base, Invocation);
+  include(base, Shell);
 };
 
 export const Base = Object.defineProperties(Object.assign(ThorBase, { ClassMethods }), {

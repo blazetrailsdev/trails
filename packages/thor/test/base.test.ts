@@ -44,7 +44,7 @@ function raiseError(klass: unknown, message: unknown): ReturnType<typeof expect.
 }
 
 function shellNew(): Basic {
-  return new (Base.shell as unknown as new () => Basic)();
+  return new Base.shell();
 }
 
 describe("Thor::Base", () => {

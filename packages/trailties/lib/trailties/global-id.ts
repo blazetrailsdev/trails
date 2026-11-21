@@ -27,7 +27,7 @@ export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
 
-    this.config.set("globalId", {} as GlobalIdConfig);
+    this.config.set("globalId", {});
     this.config.eagerLoadNamespaces.push(GlobalID);
 
     this.initializer("global_id", (app) => {

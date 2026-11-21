@@ -107,7 +107,7 @@ describe("Bootstrap", () => {
       const written: string[] = [];
       const write = vi.spyOn(STDERR, "write").mockImplementation((...s: unknown[]) => {
         written.push(s.map(String).join(""));
-        return 0 as never;
+        return 0;
       });
       try {
         await app.runInitializers("all");
