@@ -151,6 +151,29 @@ function assertRoutes(...routeCommands: string[]): Promise<void> {
   return assertFile("config/routes.ts", ...routeRegexps);
 }
 
+async function withTrailsEnv<T>(
+  trailsEnv: string | undefined,
+  block: () => Promise<T>,
+): Promise<T> {
+  const previous = ENV.TRAILS_ENV;
+  setEnv("TRAILS_ENV", trailsEnv);
+  try {
+    return await block();
+  } finally {
+    setEnv("TRAILS_ENV", previous);
+  }
+}
+
+async function withFailingSystem(block: () => Promise<unknown>): Promise<void> {
+  const { system } = testAdapter;
+  testAdapter.system = async () => ({ pid: 1, status: 1, signal: null });
+  try {
+    await block();
+  } finally {
+    testAdapter.system = system;
+  }
+}
+
 describe("ActionsTest", () => {
   it("environment should include data in environment initializer block", async () => {
     const autoloadPaths = 'config.autoloadPaths.push("app/extras");';
@@ -455,6 +478,127 @@ describe("ActionsTest", () => {
     await assertFile(
       "package.json",
       /"devDependencies": \{\n {4}"rspec-rails": "\*",\n {4}"fakeweb": "\*"\n {2}\}\n/,
+    );
+  });
+
+  it("invoke other generator with shortcut", async () => {
+    await makeGen().invoke("model", ["my_model"]);
+    await assertFile("app/models/my-model.js", /MyModel/);
+  });
+
+  it("invoke other generator with full namespace", async () => {
+    await makeGen().invoke("trails:model", ["my_model"]);
+    await assertFile("app/models/my-model.js", /MyModel/);
+  });
+
+  it("create file should write data to file path", async () => {
+    await makeGen().createFile("lib/test-file.ts", "here's test data");
+    await assertFile("lib/test-file.ts", "here's test data");
+  });
+
+  it("create file should write block contents to file path", async () => {
+    await makeGen().createFile("lib/test-file.ts", () => "here's block data");
+    await assertFile("lib/test-file.ts", "here's block data");
+  });
+
+  it("environment with block should include block contents with multiline data in environment initializer block", async () => {
+    const data = '      this.config.encoding = "utf-8";\n      this.config.timeZone = "UTC";\n';
+    await makeGen().environment(null, {}, () => data);
+    await assertFile(
+      "config/application.ts",
+      new RegExp(
+        ` extends Application \\{\\n  static \\{\\n${escape(data.replace(/^ {6}/gm, "    "))}`,
+      ),
+    );
+  });
+
+  it("environment should include block contents with multiline data in environment initializer block with env option", async () => {
+    const data = '      this.config.encoding = "utf-8";\n      this.config.timeZone = "UTC";\n';
+    await makeGen().environment(null, { env: "development" }, () => data);
+    await assertFile(
+      "config/environments/development.ts",
+      new RegExp(
+        `Trails\\.application\\.configure\\(function \\(\\) \\{\\n${escape(data.replace(/^ {6}/gm, "  "))}`,
+      ),
+    );
+  });
+
+  it("rake with TRAILS_ENV set should run rake with the TRAILS_ENV environment", async () => {
+    await assertRuns("rake log:clear", { env: { TRAILS_ENV: "production" } }, () =>
+      withTrailsEnv("production", () => makeGen().rake("log:clear")),
+    );
+  });
+
+  it("rake with env option and TRAILS_ENV set should run rake with the env environment", async () => {
+    await assertRuns("rake log:clear", { env: { TRAILS_ENV: "production" } }, () =>
+      withTrailsEnv("staging", () => makeGen().rake("log:clear", { env: "production" })),
+    );
+  });
+
+  it("rake with abort_on_failure option should raise on failure", async () => {
+    await capture("stderr", () =>
+      withFailingSystem(() =>
+        assertRaises([SystemExit], {}, () => makeGen().rake("invalid", { abortOnFailure: true })),
+      ),
+    );
+  });
+
+  it("trails_command should run trails with the default environment", async () => {
+    await assertRuns("trails log:clear", { env: { TRAILS_ENV: "development" } }, () =>
+      withTrailsEnv(undefined, () => makeGen().trailsCommand("log:clear")),
+    );
+  });
+
+  it("trails_command with env option should run trails with the env environment", async () => {
+    await assertRuns("trails log:clear", { env: { TRAILS_ENV: "production" } }, () =>
+      makeGen().trailsCommand("log:clear", { env: "production" }),
+    );
+  });
+
+  it("trails_command with TRAILS_ENV set should run trails with the TRAILS_ENV environment", async () => {
+    await assertRuns("trails log:clear", { env: { TRAILS_ENV: "production" } }, () =>
+      withTrailsEnv("production", () => makeGen().trailsCommand("log:clear")),
+    );
+  });
+
+  it("trails_command with env option and TRAILS_ENV set should run trails with the env environment", async () => {
+    await assertRuns("trails log:clear", { env: { TRAILS_ENV: "production" } }, () =>
+      withTrailsEnv("staging", () => makeGen().trailsCommand("log:clear", { env: "production" })),
+    );
+  });
+
+  it("trails_command with sudo option should run trails with sudo", async () => {
+    await assertRuns("sudo trails log:clear", null, () =>
+      withTrailsEnv(undefined, () => makeGen().trailsCommand("log:clear", { sudo: true })),
+    );
+  });
+
+  it("trails_command with capture option should run trails with capture", async () => {
+    await assertRuns("trails log:clear", { capture: true }, () =>
+      withTrailsEnv(undefined, () => makeGen().trailsCommand("log:clear", { capture: true })),
+    );
+  });
+
+  it("trails_command with abort_on_failure option should raise on failure", async () => {
+    await capture("stderr", () =>
+      withFailingSystem(() =>
+        assertRaises([SystemExit], {}, () =>
+          makeGen().trailsCommand("invalid", { abortOnFailure: true }),
+        ),
+      ),
+    );
+  });
+
+  it("route should indent routing code", async () => {
+    const routeCommands = ['this.get("foo");', 'this.get("bar");', 'this.get("baz");'];
+    await makeGen().route(routeCommands.join("\n"));
+    await assertRoutes(...routeCommands);
+  });
+
+  it("route with namespace option array should deeply nest route", async () => {
+    await makeGen().route('this.get("foo");\nthis.get("bar");', { namespace: ["baz", "qux"] });
+    await assertRoutes(
+      'this.namespace("baz", () => {\n  this.namespace("qux", () => {\n    this.get("foo");\n    this.get("bar");\n  });\n});',
     );
   });
 });
