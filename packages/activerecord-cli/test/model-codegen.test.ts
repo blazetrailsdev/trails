@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { generateModels, unqualify } from "../lib/model-codegen.js";
 import type { IntrospectedTable } from "../lib/model-codegen.js";
 import { Base, ForeignKeyDefinition } from "@blazetrails/activerecord";

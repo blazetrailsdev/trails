@@ -18,7 +18,7 @@ import { actsLike } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { zone as timeZone, findZone } from "./time-zone-config.js";
-import { DateTime, Temporal } from "@blazetrails/date";
+import { DateTime } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";

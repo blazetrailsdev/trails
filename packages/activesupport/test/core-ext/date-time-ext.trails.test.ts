@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import "../../lib/core-ext/date-time/conversions.js";
 import "../../lib/core-ext/date/conversions.js";

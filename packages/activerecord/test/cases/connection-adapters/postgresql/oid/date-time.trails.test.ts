@@ -1,6 +1,6 @@
 import { DateTimeType } from "@blazetrails/activemodel";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 
 import "../../../../../lib/connection-adapters/postgresql-adapter.js";

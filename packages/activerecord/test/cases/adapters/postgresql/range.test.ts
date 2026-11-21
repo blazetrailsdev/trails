@@ -5,7 +5,7 @@ import { Base } from "../../../../lib/index.js";
 import { defaultTimezone } from "../../../../lib/active-record.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { inTimeZone } from "../../helper.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, setZone, zone, BigDecimal } from "@blazetrails/activesupport";
 import { fixtures } from "../../../support/use-fixtures.js";
 

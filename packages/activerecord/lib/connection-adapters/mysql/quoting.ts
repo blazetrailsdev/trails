@@ -13,7 +13,7 @@
  */
 
 import { typeCast as abstractTypeCast, type QuotingDispatchHost } from "../abstract/quoting.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Rational, toS } from "@blazetrails/ruby-compat";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";

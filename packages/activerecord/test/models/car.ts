@@ -11,7 +11,7 @@ import type { PriceEstimate } from "./price-estimate.js";
 import type { Tyre } from "./tyre.js";
 import type { Wheel } from "./wheel.js";
 import { Base } from "../../lib/base.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Car extends Base {

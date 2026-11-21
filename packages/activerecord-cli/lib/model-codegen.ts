@@ -1,6 +1,5 @@
 import { Base, type ForeignKeyDefinition } from "@blazetrails/activerecord";
 import { classify, pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
 
 export interface IntrospectedTable {
   name: string;

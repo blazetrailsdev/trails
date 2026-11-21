@@ -3,7 +3,7 @@ import { extend, constSet } from "@blazetrails/ruby-compat/include";
 import { ActiveSupport } from "../namespaces.js";
 import type { Serializer } from "./serializer.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
-import { DateTime, Temporal, Time } from "@blazetrails/date";
+import { DateTime, Time } from "@blazetrails/date";
 import {
   BigDecimal,
   Complex,

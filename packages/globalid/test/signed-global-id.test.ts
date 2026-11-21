@@ -7,7 +7,6 @@ import {
   assertEqual,
 } from "@blazetrails/activesupport/testing/assertions";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "../lib/signed-global-id.js";
 import { resetConstants, TopLevel, constSet } from "@blazetrails/ruby-compat";
 

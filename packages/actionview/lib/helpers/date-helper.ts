@@ -8,7 +8,7 @@ import {
   type SafeBuffer,
   type TimeWithZone,
 } from "@blazetrails/activesupport";
-import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
+import { Date as RubyDate, Time } from "@blazetrails/date";
 import {
   ArgumentError,
   StandardError,

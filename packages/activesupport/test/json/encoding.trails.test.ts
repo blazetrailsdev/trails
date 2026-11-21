@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 
 import { ActiveSupportJSON } from "../../lib/json.js";
-import { Temporal } from "@blazetrails/date";
 import { Encoding } from "../../lib/json/encoding.js";
 
 describe("JSON Encoding default time precision (trails)", () => {

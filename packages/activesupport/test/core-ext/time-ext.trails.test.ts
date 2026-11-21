@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { advance } from "../../lib/time-ext.js";
 import "../../lib/core-ext/time/calculations.js";
 import { rbFSend } from "@blazetrails/ruby-compat";

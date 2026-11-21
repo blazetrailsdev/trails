@@ -17,7 +17,7 @@
  *   which a JS driver cannot bind, so `typeCast` passes its `valueOf()`.
  */
 
-import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import { actsLike, BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
 import {

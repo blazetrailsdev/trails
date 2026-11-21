@@ -1,4 +1,3 @@
-import { Temporal } from "../lib/temporal.js";
 import { describe, it, expect, vi } from "vitest";
 import {
   ArgumentError,

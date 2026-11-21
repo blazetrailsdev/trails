@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 
 function epochMs(v: unknown): number {
   if (v instanceof RubyTime) return v.toF() * 1000;

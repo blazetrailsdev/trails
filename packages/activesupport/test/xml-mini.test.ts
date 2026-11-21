@@ -12,7 +12,7 @@ import {
   type XmlMiniBackend,
 } from "../lib/xml-mini.js";
 import { BigDecimal } from "../lib/core-ext/big-decimal/conversions.js";
-import { Temporal, Date as RubyDate } from "@blazetrails/date";
+import { Date as RubyDate } from "@blazetrails/date";
 import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import { utc as dateTimeUtc } from "../lib/core-ext/date-time/calculations.js";
 import { Duration } from "../lib/duration.js";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BigDecimal, FrozenError, IPAddr, Pathname, Range, URI } from "@blazetrails/ruby-compat";
 
-import { DateTime, Temporal, Time } from "@blazetrails/date";
+import { DateTime, Time } from "@blazetrails/date";
 
 import {
   Duration,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Temporal, Time as RubyTime, DateTime } from "@blazetrails/date";
+import { Time as RubyTime, DateTime } from "@blazetrails/date";
 import { Duration } from "../../lib/duration.js";
 import { Numeric } from "../../lib/core-ext/numeric/bytes.js";
 import { NumericWithFormat } from "../../lib/core-ext/numeric/conversions.js";

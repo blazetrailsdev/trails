@@ -1,4 +1,3 @@
-import { Temporal } from "../lib/temporal.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Time, resetLocalTimeZoneId } from "../lib/time.js";
 import { tzdataAbbreviation } from "../lib/tzdata-abbreviations.js";

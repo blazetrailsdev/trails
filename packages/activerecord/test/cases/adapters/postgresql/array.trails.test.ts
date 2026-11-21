@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 beforeAll(() => {

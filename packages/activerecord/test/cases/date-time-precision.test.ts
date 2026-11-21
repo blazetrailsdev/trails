@@ -1,6 +1,6 @@
 import type { TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, beforeEach, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../../lib/index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";

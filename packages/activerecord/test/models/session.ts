@@ -1,7 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
 import type { Section } from "./section.js";
 import type { Seminar } from "./seminar.js";
 import { Base } from "../../lib/base.js";

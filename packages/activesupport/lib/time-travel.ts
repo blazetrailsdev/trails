@@ -13,8 +13,6 @@
  *   `currentTimeInstant()`.
  */
 
-import { Temporal } from "@blazetrails/date";
-
 let _frozenInstant: Temporal.Instant | null = null;
 let _timeOffsetNs: bigint = 0n;
 

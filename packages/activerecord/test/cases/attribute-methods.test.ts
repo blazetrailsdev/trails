@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone, TimeZone, toFs, zone } from "@blazetrails/activesupport";
 import {
   assertEmpty,

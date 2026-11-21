@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Rational } from "@blazetrails/ruby-compat";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import * as DateExt from "../../lib/core-ext/date/calculations.js";
 import { setZone } from "../../lib/time-zone-config.js";
 import { Duration } from "../../lib/duration.js";

@@ -5,7 +5,7 @@ import type { Reply } from "./reply.js";
 import type { SillyUniqueReply } from "./reply.js";
 import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/base.js";

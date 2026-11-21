@@ -1,4 +1,4 @@
-import { Date, DateTime, Temporal, Time } from "@blazetrails/date";
+import { Date, DateTime, Time } from "@blazetrails/date";
 import { Rational, rational, rbCallSuper, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Duration } from "../duration.js";

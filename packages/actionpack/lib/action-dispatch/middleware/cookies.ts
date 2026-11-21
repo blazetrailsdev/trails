@@ -40,7 +40,6 @@ import {
   MessageEncryptor,
   NullSerializer,
 } from "@blazetrails/activesupport/message-encryptor";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { Duration } from "@blazetrails/activesupport/duration";
 import { Response, escape as rackEscape } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
@@ -519,7 +518,7 @@ export class EncryptedKeyRotatingCookieJar extends AbstractCookieJar {
       const secret = keyGenerator
         .call(this.request)!
         .generateKey(authenticatedEncryptedCookieSalt.call(this.request)!, keyLen);
-      this.encryptor = new MessageEncryptor(secret as Buffer, undefined, {
+      this.encryptor = new MessageEncryptor(secret, undefined, {
         cipher: this.encryptedCookieCipher(),
         serializer: NullSerializer,
       });

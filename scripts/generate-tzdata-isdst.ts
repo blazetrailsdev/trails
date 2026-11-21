@@ -21,7 +21,6 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { Temporal } from "../packages/date/lib/index.js";
 import { RUBY_ZONEINFO_PREAMBLE, tzdataVersion, zoneinfoEnv } from "./tzdata-zoneinfo.js";
 
 const execFileAsync = promisify(execFile);
@@ -222,7 +221,7 @@ export function serializeTable(zoneRecords: Record<string, ZoneRecords>): string
 
 /** The IANA release the tables were generated from, which `process.versions.tz` must match. */
 export function header(): string {
-  return `import { Temporal } from "./temporal.js";\n\n/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n`;
+  return `/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n`;
 }
 
 const READER = `

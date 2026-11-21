@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { MessagePack, UnserializableObjectError } from "../../lib/message-pack.js";
 import { env as ENV, setEnv, TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { DateTime, Temporal, Time } from "@blazetrails/date";
+import { DateTime, Time } from "@blazetrails/date";
 import {
   BigDecimal,
   Complex,

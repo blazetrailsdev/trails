@@ -1,4 +1,4 @@
-import { Time as RubyTime, Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import "../../lib/encryption.js";
 import { describe, it, expect } from "vitest";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";

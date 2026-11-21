@@ -1,5 +1,5 @@
 import { rbClearMethodCache, TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
-import { DateTime as RubyDateTime, Temporal, Time, cCivilToJd } from "@blazetrails/date";
+import { DateTime as RubyDateTime, Time, cCivilToJd } from "@blazetrails/date";
 import { DATE_FORMATS } from "../time/conversions.js";
 import { TimeZone } from "../../values/time-zone.js";
 import { isUtc, secondsSinceMidnight, utcOffset } from "./calculations.js";

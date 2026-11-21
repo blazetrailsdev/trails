@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { isBlank, isPresent, presence, TimeWithZone, TimeZone } from "../../../lib/index.js";
 import { assertNotPredicate, assertPredicate } from "../../../lib/testing/assertions.js";
 

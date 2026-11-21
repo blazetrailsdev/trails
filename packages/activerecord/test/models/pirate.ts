@@ -3,7 +3,7 @@ import { hashDelete, isEmpty, kernelThrow, constSet, TopLevel } from "@blazetrai
 import { isPresent } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import { CollectionProxy } from "../../lib/associations/collection-proxy.js";
-import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Time as RubyTime } from "@blazetrails/date";
 import type { Bird } from "./bird.js";
 import type { Bulb } from "./bulb.js";
 import type { FamousShip } from "./ship.js";

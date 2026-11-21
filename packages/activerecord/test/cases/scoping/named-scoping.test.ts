@@ -12,7 +12,6 @@ import "../../../lib/index.js";
 import { assertNoQueries, assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import { adapterType } from "../../support/test-adapter.js";
-import { Temporal } from "@blazetrails/date";
 import { Topic } from "../../models/topic.js";
 import { Reply } from "../../models/reply.js";
 import { Post, SpecialPost } from "../../models/post.js";

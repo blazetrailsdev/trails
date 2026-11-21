@@ -6,7 +6,6 @@ import {
   DateInfinity,
   DateNegativeInfinity,
 } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/date";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
 import { fakePgConnection } from "../../../support/fake-pg-connection.js";

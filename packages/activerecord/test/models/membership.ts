@@ -1,7 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../lib/relation.js";
-import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Time as RubyTime } from "@blazetrails/date";
 import type { Club } from "./club.js";
 import type { Member } from "./member.js";
 import { Base } from "../../lib/base.js";

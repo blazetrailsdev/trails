@@ -19,6 +19,7 @@ export const FRESH_TSCONFIG =
     {
       compilerOptions: {
         target: "ES2022",
+        lib: ["ES2022", "ESNext.Temporal"],
         module: "Node16",
         moduleResolution: "Node16",
         strict: true,
@@ -84,6 +85,19 @@ export function mergeTsconfig(existingText: string): TsconfigMergeResult {
     } else if (cfg.compilerOptions[key] !== required) {
       conflicts.push({ key, existing: cfg.compilerOptions[key], required });
     }
+  }
+
+  const lib = cfg.compilerOptions["lib"];
+  if (!Array.isArray(lib)) {
+    const target = cfg.compilerOptions["target"];
+    cfg.compilerOptions["lib"] = [
+      typeof target === "string" ? target : "ES2022",
+      "ESNext.Temporal",
+    ];
+    added.push("lib");
+  } else if (!lib.some((l) => typeof l === "string" && l.toLowerCase() === "esnext.temporal")) {
+    lib.push("ESNext.Temporal");
+    added.push("lib");
   }
 
   const types = cfg.compilerOptions["types"];

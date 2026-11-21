@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import mysql from "mysql2/promise";
 import { BigDecimal } from "@blazetrails/ruby-compat";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Mysql2, type Client } from "../lib/index.js";
 
 async function clientOn(connection: object): Promise<Client> {

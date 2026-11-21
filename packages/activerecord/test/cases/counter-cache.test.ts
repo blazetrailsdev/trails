@@ -1,4 +1,4 @@
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Topic } from "../models/topic.js";
 import { Bulb } from "../models/bulb.js";

@@ -1,4 +1,3 @@
-import type { Temporal } from "@blazetrails/date";
 import { Date, dNewByFrags } from "@blazetrails/date";
 import { hashAref } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";

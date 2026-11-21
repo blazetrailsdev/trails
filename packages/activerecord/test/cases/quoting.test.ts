@@ -1,7 +1,7 @@
 import { fixtures } from "../support/use-fixtures.js";
 import { quotingHost } from "../support/quoting-host.js";
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { minutes, BigDecimal, Chars, toFs } from "@blazetrails/activesupport";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import {

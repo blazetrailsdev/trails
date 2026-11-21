@@ -4,7 +4,7 @@ import { ActiveSupportJSON } from "../json.js";
 import { Encoding } from "../json/encoding.js";
 import { onLoad } from "../lazy-load-hooks.js";
 import { ActiveSupport } from "../namespaces.js";
-import { Temporal, Time } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import { Rational, fetch, hasKey, hashAref, rbStrStartWith } from "@blazetrails/ruby-compat";
 import type { MessageSerializer } from "./codec.js";
 import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";

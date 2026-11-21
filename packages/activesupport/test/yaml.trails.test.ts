@@ -6,7 +6,7 @@ import {
   constDefined,
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
-import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
+import { Date as RubyDate, DateTime, Time } from "@blazetrails/date";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { HashWithIndifferentAccess } from "../lib/hash-with-indifferent-access.js";
 

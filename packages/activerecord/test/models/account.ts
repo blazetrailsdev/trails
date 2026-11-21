@@ -3,7 +3,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Reply } from "./reply.js";
 import type { ScopeOn } from "../../lib/scoping/named.js";
 import type { Relation } from "../../lib/relation.js";
-import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Time as RubyTime } from "@blazetrails/date";
 import type { Company } from "./company.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../lib/base.js";

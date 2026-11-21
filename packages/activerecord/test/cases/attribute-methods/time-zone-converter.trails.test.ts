@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { TimeZoneConverter } from "../../../lib/attribute-methods/time-zone-conversion.js";
 import { DateTime } from "../../../lib/type/date-time.js";
 import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
-import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
 describe("TimeZoneConverterTest", () => {

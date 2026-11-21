@@ -3,7 +3,7 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RangeType } from "../../../../lib/connection-adapters/postgresql/oid/range.js";
 import { Range } from "../../../../lib/relation.js";
 import { Base } from "../../../../lib/index.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { setZone, BigDecimal } from "@blazetrails/activesupport";
 import { BigIntegerType, FloatType, IntegerType } from "@blazetrails/activemodel";
 import { Date as OidDate } from "../../../../lib/connection-adapters/postgresql/oid/date.js";

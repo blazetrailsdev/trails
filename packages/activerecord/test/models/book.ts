@@ -3,7 +3,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import type { Relation } from "../../lib/relation.js";
 import type { ScopeOn } from "../../lib/scoping/named.js";
-import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Time as RubyTime } from "@blazetrails/date";
 import type { Author } from "./author.js";
 import type { Citation } from "./citation.js";
 import type { Essay } from "./essay.js";

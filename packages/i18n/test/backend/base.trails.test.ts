@@ -1,7 +1,6 @@
 import * as TestCase from "../support/test-case.js";
 import { Hash, kernelCatch, UncaughtThrowError } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { Simple } from "../../lib/backend/simple.js";
 import { config, l } from "../../lib/i18n.js";
 import {

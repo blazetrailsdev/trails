@@ -1,6 +1,5 @@
 import { Logger, SimpleFormatter, type LoggerFormatter } from "./logger.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
-import type { Temporal } from "@blazetrails/date";
 import {
   ArgumentError,
   extend,

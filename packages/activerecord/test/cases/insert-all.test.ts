@@ -10,7 +10,7 @@ import {
   assertInDelta,
 } from "@blazetrails/activesupport/testing/assertions";
 import { adapterType } from "../support/test-adapter.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { StringIO } from "@blazetrails/ruby-compat";

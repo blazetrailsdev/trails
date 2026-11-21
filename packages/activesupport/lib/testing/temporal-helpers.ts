@@ -1,4 +1,3 @@
-import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 
 export function instant(iso: string): Temporal.Instant {

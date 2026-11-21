@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as Types from "@blazetrails/activemodel";
 import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../../lib/index.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import { loadSchemaFromAdapter } from "../../../lib/model-schema.js";

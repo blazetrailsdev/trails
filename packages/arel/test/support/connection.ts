@@ -2,7 +2,6 @@ import type { ArelConnection } from "../../lib/visitors/connection.js";
 import type { ArelEngine } from "../../lib/nodes/node.js";
 import { ToSql } from "../../lib/visitors/to-sql.js";
 import { defaultQuoter, mysqlDefaultQuoter, postgresqlDefaultQuoter } from "./default-quoter.js";
-import { Temporal } from "@blazetrails/date";
 
 /** @internal */
 export const testConnection: ArelConnection = defaultQuoter;

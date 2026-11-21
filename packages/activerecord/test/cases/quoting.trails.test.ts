@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Chars } from "@blazetrails/activesupport";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { quotingHost } from "../support/quoting-host.js";
 import {
   quoteTableNameForAssignment,

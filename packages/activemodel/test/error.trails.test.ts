@@ -3,7 +3,6 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { Duration } from "@blazetrails/activesupport";
 import { Error as ModelError } from "../lib/error.js";
 import { NestedError } from "../lib/nested-error.js";

@@ -1,5 +1,5 @@
 import { it, expect, describe, vi } from "vitest";
-import { Temporal, Time } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import mysql from "mysql2/promise";
 import { Mysql2, type Client } from "../lib/index.js";
 

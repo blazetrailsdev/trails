@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Date as RubyDate } from "@blazetrails/date";
 import {
   selectDate,

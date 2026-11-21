@@ -1,4 +1,4 @@
-import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
+import { Date as RubyDate, DateTime, Time } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 import { fetch } from "@blazetrails/ruby-compat";
 import { isBlank } from "../object/blank.js";

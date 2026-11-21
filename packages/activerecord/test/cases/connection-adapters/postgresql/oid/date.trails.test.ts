@@ -1,6 +1,5 @@
 import { DateType } from "@blazetrails/activemodel";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 
 import { Date as OidDate } from "../../../../../lib/connection-adapters/postgresql/oid/date.js";

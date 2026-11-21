@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Date as RubyDate, Temporal } from "@blazetrails/date";
+import { Date as RubyDate } from "@blazetrails/date";
 import { plainDate } from "@blazetrails/activesupport/testing/temporal-helpers";
 import * as Types from "../../lib/index.js";
 import { ValueType } from "../../lib/index.js";

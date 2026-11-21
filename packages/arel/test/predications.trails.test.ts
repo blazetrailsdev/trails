@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection, testConnection } from "./support/connection.js";
-import { Temporal } from "@blazetrails/date";
 import { Table, Nodes, Visitors } from "../lib/index.js";
 
 describe("PredicationsMixin in/notIn Enumerable arm", () => {

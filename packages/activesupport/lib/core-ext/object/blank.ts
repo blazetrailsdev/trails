@@ -1,4 +1,3 @@
-import { Temporal } from "@blazetrails/date";
 import {
   BINARY_METHOD_TABLE,
   OBJECT_METHOD_TABLE,

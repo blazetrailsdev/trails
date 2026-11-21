@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { ActiveSupportJSON } from "../../lib/json.js";
-import { DateTime, Temporal, Time } from "@blazetrails/date";
+import { DateTime, Time } from "@blazetrails/date";
 import { TimeWithZone } from "../../lib/time-with-zone.js";
 import { TimeZone } from "../../lib/values/time-zone.js";
 import { Encoding, type EncodeOptions } from "../../lib/json/encoding.js";

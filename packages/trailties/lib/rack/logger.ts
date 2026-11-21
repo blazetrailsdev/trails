@@ -9,7 +9,6 @@ import type {
   TaggedLogger,
 } from "@blazetrails/activesupport";
 import { Trails } from "../trails.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export type Tagger = string | ((request: Request) => string);
 

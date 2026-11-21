@@ -1,7 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
-import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Time as RubyTime } from "@blazetrails/date";
 import type { Engine } from "./engine.js";
 import type { Wheel } from "./wheel.js";
 import { Base } from "../../lib/base.js";

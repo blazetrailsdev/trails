@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { postgresqlTestConnection } from "../support/connection.js";
 import { Table, Nodes, Visitors, Collectors } from "../../lib/index.js";
-import { Temporal } from "@blazetrails/date";
 
 function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
   const collector = new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());

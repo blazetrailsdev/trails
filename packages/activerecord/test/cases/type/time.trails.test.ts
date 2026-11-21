@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
 import { Time, Value } from "../../../lib/type/time.js";
 import { setDefaultTimezone } from "../../../lib/active-record.js";

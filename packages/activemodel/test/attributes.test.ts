@@ -10,7 +10,7 @@ import {
   assertRaise,
   assertNil,
 } from "@blazetrails/activesupport/testing/assertions";
-import { Date as RubyDate, Temporal } from "@blazetrails/date";
+import { Date as RubyDate } from "@blazetrails/date";
 import {
   ArgumentError,
   FrozenError,

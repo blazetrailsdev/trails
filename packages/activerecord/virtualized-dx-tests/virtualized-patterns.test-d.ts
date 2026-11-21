@@ -151,7 +151,7 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(e.starts_at).toEqualTypeOf<
       import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time
     >();
-    expectTypeOf(e.starts_on).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainDate>();
+    expectTypeOf(e.starts_on).toEqualTypeOf<Temporal.PlainDate>();
     expectTypeOf(e.duration).toEqualTypeOf<
       import("@blazetrails/activesupport").TimeWithZone | import("@blazetrails/date").Time
     >();
