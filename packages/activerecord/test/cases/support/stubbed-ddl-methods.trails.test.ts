@@ -92,7 +92,7 @@ async function recordLayPath(): Promise<Set<string>> {
           if (!isPrivateFieldBrandCheck(error)) throw error;
           value = Reflect.get(target, prop, target);
         }
-        return typeof value === "function"
+        return typeof value === "function" && prop !== "constructor"
           ? (value as (...a: unknown[]) => unknown).bind(inner)
           : value;
       },

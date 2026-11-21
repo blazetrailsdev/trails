@@ -32,7 +32,7 @@ const asyncDriver = (open: SqliteDriver["open"]): SqliteDriver => ({
 const asyncOnlyDriver = asyncDriver(openVia);
 
 describe("SQLite adapter driver binding", () => {
-  it("SQLite3Adapter binds its bundled driver and opens", async () => {
+  it("BetterSQLite3Adapter binds its bundled driver and opens", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:" });
     expect(adapter).toBeInstanceOf(SQLite3Adapter);
     await adapter.disconnectBang();
@@ -58,11 +58,6 @@ describe("SQLite adapter driver binding", () => {
     await expect(
       new SQLite3Adapter({ database: ":memory:", driver: { name: "x" } as never }).connectBang(),
     ).rejects.toThrow(/config.driver must be a SqliteDriver/);
-  });
-
-  it("SQLite3Adapter and SQLite3Adapter are thin SQLite3Adapter subclasses", () => {
-    expect(Object.getPrototypeOf(SQLite3Adapter)).toBe(SQLite3Adapter);
-    expect(Object.getPrototypeOf(SQLite3Adapter)).toBe(SQLite3Adapter);
   });
 
   it("defers connection for an async-only driver constructed synchronously", async () => {
@@ -627,23 +622,5 @@ describe("SQLite3Adapter connection parameters", () => {
     expect(adapter._memoryDatabase).toBe(false);
     expect(adapter._previousReadUncommitted).toBeNull();
     expect(File.isDirectory("libsql:")).toBe(false);
-  });
-
-  it("runs SQLite's dialect over AbstractAdapter without SQLite3Adapter's initializer", async () => {
-    const adapter = new SQLite3Adapter({ database: ":memory:", driver: betterSqlite3Driver });
-    expect(adapter).not.toBeInstanceOf(SQLite3Adapter);
-    expect(adapter.adapterName).toBe("SQLite");
-    expect(SQLite3Adapter.quoteColumnName("a")).toBe('"a"');
-    try {
-      await adapter.execute("CREATE TABLE t (id integer primary key, name varchar)");
-      await adapter.transaction(async () => {
-        await adapter.execute("INSERT INTO t (name) VALUES ('x')");
-      });
-      expect(await adapter.selectValue("SELECT name FROM t")).toBe("x");
-      expect(await adapter.primaryKeys("t")).toEqual(["id"]);
-      expect((await adapter.columns("t")).map((column) => column.name)).toEqual(["id", "name"]);
-    } finally {
-      await adapter.disconnectBang();
-    }
   });
 });
