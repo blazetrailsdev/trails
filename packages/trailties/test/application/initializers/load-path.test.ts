@@ -46,7 +46,7 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
     );
 
     await t.addToConfig(`
-        const { Kernel, TopLevel } = await import("@blazetrails/ruby-compat");
+        const { Kernel } = await import("@blazetrails/ruby-compat");
         await Kernel.require("foo");
         if (!("Foo" in TopLevel)) throw new Error("Expected Foo to be defined");
 `);

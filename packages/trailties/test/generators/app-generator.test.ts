@@ -346,7 +346,7 @@ describe("AppGeneratorTest", () => {
 
   it("quiet option", async () => {
     const output = await t.runGenerator([File.join(t.destinationRoot, "myapp"), "--quiet"]);
-    expect(output).toBe("");
+    expect(output).toBeEmpty();
   });
 
   it("skip git", async () => {

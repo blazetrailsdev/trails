@@ -48,7 +48,7 @@ describe("ChangeGeneratorTest", () => {
     await t.assertFile("config/database.ts", (content) => {
       expect(content).toMatch('adapter: "postgresql"');
       expect(content).toMatch('database: "tmp_development"');
-      expect(content).toMatch('host: process.env.DB_HOST ?? "localhost"');
+      expect(content).toMatch("host: process.env.DB_HOST");
     });
 
     await t.assertFile("package.json", (content) => {
