@@ -89,16 +89,8 @@ function daysInMonth(year: number, month: number): number {
 
 const PRECISIONS: Record<number, string> = { 0: "%FT%T" };
 
-const NS_PER_SECOND = 1_000_000_000n;
-
 function signOf(diff: bigint): number {
   return diff < 0n ? -1 : diff > 0n ? 1 : 0;
-}
-
-function nsDiffToSeconds(diffNs: bigint): number {
-  const wholeSeconds = diffNs / NS_PER_SECOND;
-  const remainderNs = diffNs % NS_PER_SECOND;
-  return Number(wholeSeconds) + Number(remainderNs) / 1e9;
 }
 
 const SECONDS_PER_DAY = 86400;
@@ -213,6 +205,7 @@ export class TimeWithZone {
   }
 
   private _transferTimeValuesToUtcConstructor(time: Time | DateTime): Time {
+    if (time instanceof Time && time.constructor === Time && time.isUtc()) return time;
     return Time.utc(
       Number(time.year),
       time.month,
