@@ -1175,7 +1175,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("strict strings by default", async () => {
-    let conn = new NodeSQLiteAdapter({ database: ":memory:" });
+    let conn = new NodeSQLiteAdapter({ adapter: "node-sqlite", database: ":memory:" });
     await conn.createTable("testings");
 
     await assertNothingRaised(async () => {
@@ -1184,7 +1184,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
 
     await withStrictStringsByDefault(async () => {
-      conn = new NodeSQLiteAdapter({ database: ":memory:" });
+      conn = new NodeSQLiteAdapter({ adapter: "node-sqlite", database: ":memory:" });
       await conn.createTable("testings");
 
       const error: any = await assertRaises([StandardError], {}, async () => {
@@ -1221,7 +1221,11 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("strict strings by default and false in database yml", async () => {
-    let conn = new NodeSQLiteAdapter({ database: ":memory:", strict: false });
+    let conn = new NodeSQLiteAdapter({
+      adapter: "node-sqlite",
+      database: ":memory:",
+      strict: false,
+    });
     await conn.createTable("testings");
 
     await assertNothingRaised(async () => {
@@ -1230,7 +1234,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
 
     await withStrictStringsByDefault(async () => {
-      conn = new NodeSQLiteAdapter({ database: ":memory:", strict: false });
+      conn = new NodeSQLiteAdapter({ adapter: "node-sqlite", database: ":memory:", strict: false });
       await conn.createTable("testings");
 
       await assertNothingRaised(async () => {

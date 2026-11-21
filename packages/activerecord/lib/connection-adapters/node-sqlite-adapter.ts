@@ -1,14 +1,8 @@
 import { ConnectionAdapters } from "../namespaces.js";
 
-import type { SqliteDriver } from "../sqlite-adapter.js";
-import { nodeSqliteDriver } from "@blazetrails/sqlite3/node-sqlite";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
 /** @noRailsEquivalent CONVERGEABLE sqlite-adapter-names-select-the-engine-not-subclasses */
-export class NodeSQLiteAdapter extends SQLite3Adapter {
-  protected static override defaultSqliteDriver(): SqliteDriver {
-    return nodeSqliteDriver;
-  }
-}
+export class NodeSQLiteAdapter extends SQLite3Adapter {}
 
 ConnectionAdapters.NodeSQLiteAdapter = NodeSQLiteAdapter;

@@ -24,7 +24,7 @@ describe("LibSQLAdapter — local-file smoke", () => {
 
   beforeAll(async () => {
     removeFiles();
-    adapter = new LibSQLAdapter({ database: dbPath });
+    adapter = new LibSQLAdapter({ adapter: "libsql", database: dbPath });
     await adapter.execute(
       "CREATE TABLE libsql_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
@@ -67,6 +67,7 @@ describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke 
 
   beforeAll(async () => {
     adapter = await new LibSQLRemoteAdapter({
+      adapter: "libsql-remote",
       database: tursoUrl,
       driverOptions: { authToken: tursoToken },
     }).connectBang();
@@ -107,6 +108,7 @@ describe.skipIf(!hasCredentials)(
     beforeAll(async () => {
       removeFiles();
       primary = await new LibSQLRemoteAdapter({
+        adapter: "libsql-remote",
         database: tursoUrl,
         driverOptions: { authToken: tursoToken },
       }).connectBang();
@@ -115,6 +117,7 @@ describe.skipIf(!hasCredentials)(
       await primary.execute(`INSERT INTO ${table} (id, label) VALUES (1, 'remote')`);
 
       replica = await new LibSQLReplicaAdapter({
+        adapter: "libsql-replica",
         database: replicaPath,
         driverOptions: { syncUrl: tursoUrl, authToken: tursoToken },
       }).connectBang();
@@ -166,6 +169,7 @@ describe.skipIf(!hasCredentials)(
     beforeAll(async () => {
       removeFiles();
       primary = await new LibSQLRemoteAdapter({
+        adapter: "libsql-remote",
         database: tursoUrl,
         driverOptions: { authToken: tursoToken },
       }).connectBang();
@@ -173,6 +177,7 @@ describe.skipIf(!hasCredentials)(
       await primary.execute(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
 
       replica = await new LibSQLReplicaAdapter({
+        adapter: "libsql-replica",
         database: replicaPath,
         driverOptions: { syncUrl: tursoUrl, authToken: tursoToken, syncPeriod: 1 },
       }).connectBang();
