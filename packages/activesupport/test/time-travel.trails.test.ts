@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import type { TestContext } from "vitest";
+import { travelTo } from "../lib/testing/time-helpers.js";
 
 import { currentTimeInstant } from "../lib/time-travel.js";
 
@@ -18,5 +20,10 @@ describe("TimeTravelTest", () => {
 
     expect(pairs).toBeGreaterThan(0);
     expect(distinct).toBeGreaterThan(pairs / 2);
+  });
+
+  it("a free travelTo stubs on the running test case", (context: TestContext) => {
+    travelTo(new Date(2004, 10, 24));
+    expect((context.testCase as unknown as { _simpleStubs?: unknown })._simpleStubs).toBeDefined();
   });
 });
