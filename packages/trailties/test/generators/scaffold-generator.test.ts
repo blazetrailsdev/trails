@@ -100,6 +100,16 @@ describe("ScaffoldGeneratorTest", () => {
       );
     });
 
+    await t.assertFile("test/system/product-lines.test.ts", (test) => {
+      expect(test).toMatch(/class ProductLinesTest extends ApplicationSystemTestCase/);
+      expect(test).toMatch(/page\.goto\(t\.productLinesUrl\(\)\)/);
+      expect(test).toMatch(/getByLabel\("Title"\)\.fill\(t\["@product_line"\]\.title/);
+      expect(test).toMatch(
+        /if \(t\["@product_line"\]\.approved\) await page\.getByLabel\("Approved"\)\.check\(\)/,
+      );
+      expect(test).toMatch(/Product line was successfully updated/);
+    });
+
     t.assertNoFile("app/views/layouts/product-lines.html.tse");
 
     for (const view of ["index", "show"]) {
@@ -290,6 +300,11 @@ describe("ScaffoldGeneratorTest", () => {
     await t.assertFile(
       "test/controllers/admin/roles-controller.test.ts",
       /class RolesControllerTest extends IntegrationTest/,
+    );
+
+    await t.assertFile(
+      "test/system/admin/roles.test.ts",
+      /class RolesTest extends ApplicationSystemTestCase/,
     );
 
     await t.assertFile("app/views/admin/roles/index.html.tse", (content) => {
@@ -498,6 +513,11 @@ describe("ScaffoldGeneratorTest", () => {
       );
       expect(content).toMatch(/^\W{6}<div><%= linkTo\(photo\.filename, photo\) %>/m);
     });
+
+    await t.assertFile("test/system/messages.test.ts", (content) => {
+      expect(content).not.toMatch(/getByLabel\("Video"\)\.fill/);
+      expect(content).not.toMatch(/getByLabel\("Photos"\)\.fill/);
+    });
   });
 
   it("scaffold generator rich text", async () => {
@@ -513,6 +533,10 @@ describe("ScaffoldGeneratorTest", () => {
 
     await t.assertFile("app/views/messages/_form.html.tse", (content) => {
       expect(content).toMatch(/^\W{4}<%= form\.richTextarea\("content"\) %>/m);
+    });
+
+    await t.assertFile("test/system/messages.test.ts", (content) => {
+      expect(content).not.toMatch(/getByLabel\("Content"\)\.fill/);
     });
   });
 
@@ -571,6 +595,11 @@ describe("ScaffoldGeneratorTest", () => {
     await t.assertFile("test/controllers/users-controller.test.ts", (content) => {
       expect(content).toMatch(/password: "secret"/);
       expect(content).toMatch(/password_confirmation: "secret"/);
+    });
+
+    await t.assertFile("test/system/users.test.ts", (content) => {
+      expect(content).toMatch(/getByLabel\("Password"\)\.fill\("secret"/);
+      expect(content).toMatch(/getByLabel\("Password confirmation"\)\.fill\("secret"/);
     });
 
     await t.assertFile("test/fixtures/users.yml", (content) => {

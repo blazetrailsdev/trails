@@ -22,9 +22,19 @@ describe("BenchmarkGeneratorTest", () => {
     await t.runGenerator(["my_benchmark"]);
 
     await t.assertFile("script/benchmarks/my_benchmark.ts", (content) => {
-      expect(content).toContain("before: () => {}");
-      expect(content).toContain("after: () => {}");
-      expect(content).toContain("performance.now()");
+      expect(content).toBe(`// Any benchmarking setup goes here...
+
+const reports: Record<string, () => void> = {
+  before: () => {},
+  after: () => {},
+};
+
+for (const [name, fn] of Object.entries(reports)) {
+  const start = performance.now();
+  fn();
+  console.log(\`\${name}: \${(performance.now() - start).toFixed(3)}ms\`);
+}
+`);
     });
   });
 
@@ -38,8 +48,19 @@ describe("BenchmarkGeneratorTest", () => {
     await t.runGenerator(["my_benchmark", "with_patch", "without_patch"]);
 
     await t.assertFile("script/benchmarks/my_benchmark.ts", (content) => {
-      expect(content).toContain("with_patch: () => {}");
-      expect(content).toContain("without_patch: () => {}");
+      expect(content).toBe(`// Any benchmarking setup goes here...
+
+const reports: Record<string, () => void> = {
+  with_patch: () => {},
+  without_patch: () => {},
+};
+
+for (const [name, fn] of Object.entries(reports)) {
+  const start = performance.now();
+  fn();
+  console.log(\`\${name}: \${(performance.now() - start).toFixed(3)}ms\`);
+}
+`);
     });
   });
 });

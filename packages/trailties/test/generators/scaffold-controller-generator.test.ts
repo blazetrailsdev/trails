@@ -343,6 +343,11 @@ describe("ScaffoldControllerGeneratorTest", () => {
       assertMatch(/class UsersController extends ApplicationController/, content);
       assertNoMatch(/respondTo/, content);
 
+      assertMatch(
+        /this\.beforeAction\(":_setUser", \{ only: \["show", "update", "destroy"\] \}\)/,
+        content,
+      );
+
       await t.assertInstanceMethod("index", content, (m) => {
         assertMatch(/this\.users = await User\.all\(\)/, m);
         assertMatch(/this\.render\(\{ json: this\.users \}\)/, m);
@@ -368,9 +373,11 @@ describe("ScaffoldControllerGeneratorTest", () => {
       });
     });
 
-    for (const view of ["index", "edit", "show", "new", "_form"]) {
-      t.assertNoFile(`app/views/users/${view}.html.tse`);
-    }
+    t.assertNoFile("app/views/users/index.html.tse");
+    t.assertNoFile("app/views/users/edit.html.tse");
+    t.assertNoFile("app/views/users/show.html.tse");
+    t.assertNoFile("app/views/users/new.html.tse");
+    t.assertNoFile("app/views/users/_form.html.tse");
   });
 
   it("api controller tests", async () => {

@@ -52,7 +52,7 @@ describe("ChangeGeneratorTest", () => {
     });
 
     await t.assertFile("package.json", (content) => {
-      expect(JSON.parse(content).dependencies.pg).toBe("^8.19.0");
+      expect(content).toMatch(`"pg": "^8.19.0"`);
     });
 
     await t.assertFile("Dockerfile", (content) => {
@@ -102,7 +102,7 @@ describe("ChangeGeneratorTest", () => {
     });
 
     await t.assertFile("package.json", (content) => {
-      expect(JSON.parse(content).dependencies.mysql2).toBe("^3.18.2");
+      expect(content).toMatch(`"mysql2": "^3.18.2"`);
     });
 
     await t.assertFile("Dockerfile", (content) => {
@@ -145,7 +145,7 @@ describe("ChangeGeneratorTest", () => {
     });
 
     await t.assertFile("package.json", (content) => {
-      expect(JSON.parse(content).dependencies["better-sqlite3"]).toBe("^13.0.3");
+      expect(content).toMatch(`"better-sqlite3": "^13.0.3"`);
     });
 
     await t.assertFile("Dockerfile", (content) => {
@@ -200,7 +200,7 @@ describe("ChangeGeneratorTest", () => {
     });
 
     await t.assertFile("package.json", (content) => {
-      expect(JSON.parse(content).dependencies.mysql2).toBe("^3.18.2");
+      expect(content).toMatch(`"mysql2": "^3.18.2"`);
     });
   });
 
