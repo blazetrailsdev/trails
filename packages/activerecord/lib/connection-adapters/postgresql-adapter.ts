@@ -1354,7 +1354,7 @@ export class PostgreSQLAdapter
           : PG.TextDecoder.TimestampWithoutTimeZone;
 
       this.timestampDecoder = new decoderClass(undefined, { ...this.timestampDecoder.toH() });
-      this._rawConnection.typeMapForResults.addCoder(this.timestampDecoder);
+      (this._rawConnection.typeMapForResults as PG.TypeMapByOid).addCoder(this.timestampDecoder);
 
       this._mappedDefaultTimezone = defaultTimezone();
 

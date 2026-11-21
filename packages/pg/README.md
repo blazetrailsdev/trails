@@ -45,7 +45,9 @@ an unlisted SQLSTATE raises `ServerError`, as the gem does for one it lacks.
 `connection.ts` is `PG::Connection` (`ext/pg_connection.c`); node-pg is reached
 only through `engine/node-pg.ts`, which `PG.connect` loads by an awaited
 `import()`, so a missing `pg` npm package raises `LoadError` there and nowhere
-earlier. `type-map-by-oid.ts`, `type-map-by-class.ts`, `simple-encoder.ts`,
+earlier. `type-map-all-strings.ts` (`ext/pg_type_map_all_strings.c`, the
+map `pgconn_s_allocate` seats, `ext/pg_connection.c:262`), `type-map-by-oid.ts`,
+`type-map-by-class.ts`, `simple-encoder.ts`,
 `simple-decoder.ts` and `text-encoder/{integer,boolean}.ts` are the gem's type
 maps and coders `add_pg_encoders` / `add_pg_decoders` build. The text decoders
 still live in activerecord's `postgresql/pg-text-decoder.ts`.

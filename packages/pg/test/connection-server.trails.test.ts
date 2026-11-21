@@ -23,6 +23,16 @@ describe("PG::Connection against a server", () => {
     if (!conn.isFinished()) await conn.finish();
   });
 
+  it("type_map_for_results is TypeMapAllStrings until a map is assigned", async () => {
+    expect(conn.typeMapForResults).toBeInstanceOf(PG.TypeMapAllStrings);
+    expect((await conn.exec("SELECT 1, true")).values()).toEqual([["1", "t"]]);
+
+    const map = new PG.TypeMapByOid();
+    map.addCoder(new PG.TextDecoder.Integer(undefined, { name: "int4", oid: 23 }));
+    conn.typeMapForResults = map;
+    expect((await conn.exec("SELECT 1")).getvalue(0, 0)).toBe(1);
+  });
+
   it("server_version is libpq's PQserverVersion of the startup server_version", async () => {
     const num = (await conn.exec("SHOW server_version_num")).getvalue(0, 0);
     expect(conn.serverVersion()).toBe(Number(num));

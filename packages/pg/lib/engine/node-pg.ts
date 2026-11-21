@@ -7,6 +7,7 @@ import {
   UnableToSend,
 } from "../exceptions.js";
 import { Result } from "../result.js";
+import { TypeMapAllStrings } from "../type-map-all-strings.js";
 import type { Connection } from "../connection.js";
 
 const OID_BYTEA = 17;
@@ -116,6 +117,9 @@ function types(conn: Connection): { getTypeParser(oid: number, format?: string):
       }
       const coder = format !== "binary" && conn.typeMapForResults._lookupOid(0, oid);
       if (coder) return (value: string) => coder.decode(value);
+      if (format !== "binary" && conn.typeMapForResults instanceof TypeMapAllStrings) {
+        return (value: unknown) => value;
+      }
       return conn.client.getTypeParser(oid, format as "text");
     },
   };
