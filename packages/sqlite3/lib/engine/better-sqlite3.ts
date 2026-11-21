@@ -34,7 +34,10 @@ export const errors: EngineErrors = {
   },
 };
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm serialize — PERMANENT
+ */
 function open(file: string, mode: number): BetterSqlite3.Database {
   const { Open } = SQLite3.Constants;
   if ((mode & Open.SHAREDCACHE) !== 0) {
@@ -45,16 +48,15 @@ function open(file: string, mode: number): BetterSqlite3.Database {
     fileMustExist: (mode & Open.CREATE) === 0,
     timeout: 0,
   };
-  try {
-    if (opts.readonly && file === ":memory:") {
-      return new BetterSqlite3(new BetterSqlite3(":memory:").serialize(), opts);
+  if (opts.readonly && file === ":memory:") {
+    const seed = new BetterSqlite3(":memory:");
+    try {
+      return new BetterSqlite3(seed.serialize(), opts);
+    } finally {
+      seed.close();
     }
-    return new BetterSqlite3(file, opts);
-  } catch (e) {
-    const errcode = errors.errcode(e);
-    if (errcode == null) throw e;
-    throw Object.assign(new Error(errors.errmsg(e)), { errcode, cause: e });
   }
+  return new BetterSqlite3(file, opts);
 }
 
 /**
@@ -86,16 +88,23 @@ function prepareStatement(
   if (reader) stmt.raw(true);
   const positional: SqliteBindValue[] = [];
   const named: Record<string, SqliteBindValue> = {};
-  const placeholders = stmt.source.split("?").length - 1;
   let rows: Iterator<unknown[]> | null = null;
   let done = false;
   let closed = false;
-  const args = (): unknown[] =>
-    Object.keys(named).length !== 0
-      ? [...positional, named]
-      : Array.from({ length: Math.max(placeholders, positional.length) }, (_, i) =>
-          positional[i] === undefined ? null : positional[i],
-        );
+  const bound = <T>(call: (args: unknown[]) => T): T => {
+    const args: unknown[] = Array.from(positional, (v) => (v === undefined ? null : v));
+    if (Object.keys(named).length !== 0) return call([...args, named]);
+    for (;;) {
+      try {
+        return call(args);
+      } catch (e) {
+        if (!(e instanceof RangeError) || !e.message.startsWith("Too few parameter values")) {
+          throw e;
+        }
+        args.push(null);
+      }
+    }
+  };
   return {
     close: () => {
       rows?.return?.();
@@ -108,7 +117,8 @@ function prepareStatement(
         return;
       }
       const name = key.replace(/^[:@$]/, "");
-      if (![":", "@", "$"].some((prefix) => sql.includes(prefix + name))) {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (!new RegExp(`[:@$]${escaped}(?![\\w$])`).test(sql)) {
         throw new SQLite3.Exception("no such bind parameter");
       }
       named[name] = value;
@@ -121,19 +131,24 @@ function prepareStatement(
     step() {
       if (done) return null;
       if (!reader) {
-        setChanges(withBusyHandler(handler, () => stmt.run(...args()).changes));
+        setChanges(withBusyHandler(handler, () => bound((args) => stmt.run(...args)).changes));
         done = true;
         return null;
       }
-      const r = withBusyHandler(handler, () => {
-        try {
-          rows ??= stmt.iterate(...args()) as Iterator<unknown[]>;
-          return rows.next();
-        } catch (e) {
-          rows = null;
-          throw e;
-        }
-      });
+      const r =
+        rows !== null
+          ? rows.next()
+          : withBusyHandler(handler, () => {
+              const started = bound((args) => stmt.iterate(...args)) as Iterator<unknown[]>;
+              try {
+                const first = started.next();
+                rows = started;
+                return first;
+              } catch (e) {
+                started.return?.();
+                throw e;
+              }
+            });
       if (r.done) {
         done = true;
         return null;
@@ -147,7 +162,15 @@ function prepareStatement(
   };
 }
 
-export const engine: EngineOpenV2 = (file, mode) => {
+/** @internal */
+function columnText(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value !== "number") return String(value);
+  const text = String(Number(value.toPrecision(15)));
+  return /^-?\d+$/.test(text) ? `${text}.0` : text;
+}
+
+export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) => {
   const raw = open(file, mode);
   let changes = 0;
   let handler: BusyHandler | null = null;
@@ -168,9 +191,10 @@ export const engine: EngineOpenV2 = (file, mode) => {
       const results: unknown[] = [];
       let rest = sql.trim();
       while (rest !== "") {
-        const [tail] = statementTail(rest);
+        const [tail, empty] = statementTail(rest);
         const head = rest.slice(0, tail);
         rest = rest.slice(tail).trim();
+        if (empty) continue;
         const stmt = withBusyHandler(
           () => handler,
           () => raw.prepare(head),
@@ -181,14 +205,16 @@ export const engine: EngineOpenV2 = (file, mode) => {
             () => stmt.run().changes,
           );
         } else {
+          stmt.safeIntegers(true).raw(true);
+          const names = stmt.columns().map((c) => c.name);
           for (const row of withBusyHandler(
             () => handler,
-            () => stmt.all() as Record<string, unknown>[],
+            () => stmt.all() as unknown[][],
           )) {
-            const vals = Object.fromEntries(
-              Object.entries(row).map(([k, v]) => [k, v == null ? null : String(v)]),
+            const vals = row.map(columnText);
+            results.push(
+              resultsAsHash ? Object.fromEntries(names.map((name, i) => [name, vals[i]])) : vals,
             );
-            results.push(resultsAsHash ? vals : Object.values(vals));
           }
         }
       }
@@ -203,4 +229,4 @@ export const engine: EngineOpenV2 = (file, mode) => {
     },
   };
   return db;
-};
+}, errors);

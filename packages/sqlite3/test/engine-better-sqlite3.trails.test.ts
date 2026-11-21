@@ -80,4 +80,35 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
     await holder.close();
     await waiter.close();
   });
+
+  it("binds a named parameter by its exact name, and rejects a prefix of another", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    const stmt = db.prepare("SELECT :idx AS v");
+    expect(() => stmt.bindParam(":id", 1)).toThrow("no such bind parameter");
+    await stmt.bindParam(":idx", 2);
+    expect(await stmt.step()).toEqual([2]);
+    await stmt.close();
+  });
+
+  it("binds unsupplied placeholders as NULL, ignoring a ? inside a string literal", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    expect(await db.execute("SELECT '?', ?, ?")).toEqual([["?", null, null]]);
+  });
+
+  it("execute_batch2 answers sqlite3_exec's column text, and skips a comment-only tail", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    expect(await db.executeBatch2("SELECT 1.0, 0.1 + 0.2, 7, NULL; -- trailing")).toEqual([
+      ["1.0", "0.3", "7", null],
+    ]);
+  });
+
+  it("does not restart a statement already part-way through its rows", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    await db.executeBatch2("CREATE TABLE r (a); INSERT INTO r VALUES (1), (2), (3);");
+    const stmt = db.prepare("SELECT a FROM r ORDER BY a");
+    const rows: unknown[] = [];
+    for (let row = await stmt.step(); row !== null; row = await stmt.step()) rows.push(row);
+    expect(rows).toEqual([[1], [2], [3]]);
+    await stmt.close();
+  });
 });

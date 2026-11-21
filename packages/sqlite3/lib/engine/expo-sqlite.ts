@@ -150,7 +150,7 @@ function prepareStatement(
   };
 }
 
-export const engine: EngineOpenV2 = (file, mode) => {
+export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) => {
   if ((mode & SQLite3.Constants.Open.SHAREDCACHE) !== 0) {
     throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver");
   }
@@ -209,4 +209,4 @@ export const engine: EngineOpenV2 = (file, mode) => {
     },
   };
   return db;
-};
+}, errors);

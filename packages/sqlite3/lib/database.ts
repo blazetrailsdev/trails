@@ -26,7 +26,8 @@ export interface EngineDatabase extends EngineErrors {
   busyHandler(handler: BusyHandler | null): void;
 }
 
-export type EngineOpenV2 = (file: string, mode: number, zvfs: string | null) => EngineDatabase;
+export type EngineOpenV2 = ((file: string, mode: number, zvfs: string | null) => EngineDatabase) &
+  Partial<EngineErrors>;
 
 export interface DatabaseOptions {
   readonly?: boolean;
@@ -225,7 +226,8 @@ export class Database {
     try {
       this._engine = this.#openEngine(file, mode, zvfs);
     } catch (e) {
-      rbSqlite3Raise(e);
+      const { errcode, errmsg } = this.#openEngine;
+      rbSqlite3Raise(e, errcode && errmsg ? { errcode, errmsg } : undefined);
     }
   }
 
