@@ -50,7 +50,7 @@ const Rotations = new RotationConfiguration();
 
 const SameSite = () => ":lax";
 
-const Encryptor = new MessageEncryptor(Generator.generateKey(SessionSalt, 32) as never, {
+const Encryptor = new MessageEncryptor(Generator.generateKey(SessionSalt, 32) as never, undefined, {
   cipher: "aes-256-gcm",
   serializer: Marshal,
 });
@@ -247,7 +247,7 @@ describe("CookieStoreTest", () => {
   it("disregards tampered sessions", async ({ testCase }) => {
     const t = testCase as CookieStoreTest;
     await t.withTestRouteSet(async () => {
-      const encryptor = new MessageEncryptor("A".repeat(32), {
+      const encryptor = new MessageEncryptor("A".repeat(32), undefined, {
         cipher: "aes-256-gcm",
         serializer: Marshal,
       });

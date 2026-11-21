@@ -27,8 +27,8 @@ describe("MessageEncryptor default cipher", () => {
   });
 
   it("cannot decrypt an authenticated message with the unauthenticated cipher", () => {
-    const gcm = new MessageEncryptor(secret, { cipher: "aes-256-gcm" });
-    const cbc = new MessageEncryptor(secret, { cipher: "aes-256-cbc" });
+    const gcm = new MessageEncryptor(secret, undefined, { cipher: "aes-256-gcm" });
+    const cbc = new MessageEncryptor(secret, undefined, { cipher: "aes-256-cbc" });
     expect(() => cbc.decryptAndVerify(gcm.encryptAndSign(data))).toThrow(InvalidMessage);
   });
 });

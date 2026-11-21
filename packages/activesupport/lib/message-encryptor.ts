@@ -87,39 +87,30 @@ export class MessageEncryptor extends Codec {
   /** @inlinedFrom ActiveSupport::Messages::Rotator#initialize rails/v8.0.2/activesupport/lib/active_support/messages/rotator.rb:6-12 */
   constructor(
     secret: string | Buffer,
-    signSecret?: string | Buffer | MessageEncryptorOptions,
-    options?: MessageEncryptorOptions,
+    signSecret: string | Buffer | null = null,
+    options: MessageEncryptorOptions = {},
   ) {
-    let resolvedSignSecret: string | Buffer | undefined;
-    let opts: MessageEncryptorOptions;
-
-    if (signSecret && typeof signSecret === "object" && !Buffer.isBuffer(signSecret)) {
-      opts = signSecret;
-    } else {
-      resolvedSignSecret = signSecret;
-      opts = options ?? {};
-    }
-    const { onRotation = null, ...rest } = opts;
-    opts = rest;
+    const { onRotation = null, ...rest } = options;
+    options = rest;
 
     super({
-      serializer: opts.serializer,
-      urlSafe: opts.url_safe,
-      forceLegacyMetadataSerializer: opts.forceLegacyMetadataSerializer,
+      serializer: options.serializer,
+      urlSafe: options.url_safe,
+      forceLegacyMetadataSerializer: options.forceLegacyMetadataSerializer,
     });
 
     this.secret = typeof secret === "string" ? Buffer.from(secret) : secret;
-    this.cipher = opts.cipher ?? (this.constructor as typeof MessageEncryptor).defaultCipher();
+    this.cipher = options.cipher ?? (this.constructor as typeof MessageEncryptor).defaultCipher();
     this.aeadMode = this.newCipher().authenticated();
     this.verifier = !this.aeadMode
-      ? new MessageVerifier(resolvedSignSecret ?? secret, {
-          ...opts,
+      ? new MessageVerifier(signSecret ?? secret, {
+          ...options,
           serializer: NullSerializer,
         })
       : undefined;
 
-    this.args = resolvedSignSecret === undefined ? [secret] : [secret, resolvedSignSecret];
-    this.options = opts as Record<string, unknown>;
+    this.args = [secret, signSecret];
+    this.options = options as Record<string, unknown>;
     this.rotations = [];
     this._onRotation = onRotation;
   }

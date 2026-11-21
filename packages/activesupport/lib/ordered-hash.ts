@@ -35,14 +35,6 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return new OrderedHash(pairs);
   }
 
-  toObject(): Record<string, V> {
-    const obj: Record<string, V> = {};
-    for (const [k, v] of this) {
-      obj[String(k)] = v;
-    }
-    return obj;
-  }
-
   toArray(): [K, V][] {
     return [...this.entries()];
   }
@@ -86,13 +78,6 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return this;
   }
 
-  deleteIf(predicate: (key: K, value: V) => boolean): this {
-    for (const [k, v] of this) {
-      if (predicate(k, v)) this.delete(k);
-    }
-    return this;
-  }
-
   merge(other: OrderedHash<K, V>, block?: (key: K, v1: V, v2: V) => V): OrderedHash<K, V> {
     const result = new OrderedHash<K, V>(this);
     for (const [k, v] of other) {
@@ -105,7 +90,7 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return result;
   }
 
-  mergeInPlace(other: OrderedHash<K, V>, block?: (key: K, v1: V, v2: V) => V): this {
+  update(other: OrderedHash<K, V>, block?: (key: K, v1: V, v2: V) => V): this {
     for (const [k, v] of other) {
       if (block && this.has(k)) {
         this.set(k, block(k, this.get(k)!, v));
@@ -116,18 +101,11 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return this;
   }
 
-  update(other: OrderedHash<K, V>): this {
-    return this.mergeInPlace(other);
-  }
-
-  shift(): [K, V] | undefined {
-    const first = this[Symbol.iterator]().next().value;
-    if (!first) return undefined;
-    const [k, v] = first;
-    this.delete(k);
-    return [k, v];
-  }
-
+  /**
+   * Ruby core `Hash#invert` (`vendor/ruby/v3.3.11/hash.c:3900`), inherited by `OrderedHash < ::Hash`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   invert(): OrderedHash<V, K> {
     const result = new OrderedHash<V, K>();
     for (const [k, v] of this) {

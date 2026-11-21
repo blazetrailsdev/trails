@@ -144,10 +144,14 @@ export class EncryptedFile {
   /** @missingRailsArgs new — PERMANENT */
   private async encryptor(): Promise<MessageEncryptor> {
     if (this.memoEncryptor) return this.memoEncryptor;
-    this.memoEncryptor = new MessageEncryptor(Buffer.from((await this.key()) ?? "", "hex"), {
-      cipher: CIPHER,
-      serializer: "marshal",
-    });
+    this.memoEncryptor = new MessageEncryptor(
+      Buffer.from((await this.key()) ?? "", "hex"),
+      undefined,
+      {
+        cipher: CIPHER,
+        serializer: "marshal",
+      },
+    );
     return this.memoEncryptor;
   }
 

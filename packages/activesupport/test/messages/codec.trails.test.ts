@@ -43,7 +43,7 @@ describe("Messages::Codec (trails)", () => {
   });
 
   it.each(FORMATS)("MessageEncryptor round-trips a %s payload", (serializer) => {
-    const encryptor = new MessageEncryptor(SECRET, { serializer });
+    const encryptor = new MessageEncryptor(SECRET, undefined, { serializer });
     const value = { greeting: "héllo→😀", n: 42, list: [1, 2, 3] };
     expect(encryptor.decryptAndVerify(encryptor.encryptAndSign(value))).toEqual(value);
   });

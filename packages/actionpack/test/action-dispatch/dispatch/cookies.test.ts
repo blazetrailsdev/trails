@@ -745,7 +745,7 @@ describe("CookiesTest", () => {
       32,
     ) as Buffer;
 
-    const encryptor = new MessageEncryptor(secret, {
+    const encryptor = new MessageEncryptor(secret, undefined, {
       cipher: "aes-256-gcm",
       serializer: Marshal,
     });
@@ -758,7 +758,10 @@ describe("CookiesTest", () => {
     assertNotEqual("bar", cookies.get("foo"));
     assertEqual("bar", cookies.encrypted.get("foo"));
 
-    const jsonEncryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm", serializer: JSON });
+    const jsonEncryptor = new MessageEncryptor(secret, undefined, {
+      cipher: "aes-256-gcm",
+      serializer: JSON,
+    });
     assertNotNil(tc.response.cookies["foo"]);
     assertEqual("bar", jsonEncryptor.decryptAndVerify(tc.response.cookies["foo"]!));
   });
@@ -772,7 +775,10 @@ describe("CookiesTest", () => {
       32,
     ) as Buffer;
 
-    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm", serializer: JSON });
+    const encryptor = new MessageEncryptor(secret, undefined, {
+      cipher: "aes-256-gcm",
+      serializer: JSON,
+    });
     const jsonValue = encryptor.encryptAndSign("bar");
     tc.request.headers.set("Cookie", `foo=${escape(jsonValue)}`);
 
@@ -794,7 +800,7 @@ describe("CookiesTest", () => {
       32,
     ) as Buffer;
 
-    const encryptor = new MessageEncryptor(secret, {
+    const encryptor = new MessageEncryptor(secret, undefined, {
       cipher: "aes-256-gcm",
       serializer: Marshal,
     });
@@ -883,7 +889,7 @@ describe("CookiesTest", () => {
 
     const keyLen = MessageEncryptor.keyLen("aes-256-gcm");
 
-    const oldMessage = new MessageEncryptor(secret, {
+    const oldMessage = new MessageEncryptor(secret, undefined, {
       cipher: "aes-256-gcm",
       serializer: Marshal,
     }).encryptAndSign(45);
@@ -898,7 +904,7 @@ describe("CookiesTest", () => {
       tc.request.env["action_dispatch.authenticated_encrypted_cookie_salt"] as string,
       keyLen,
     ) as Buffer;
-    const encryptor = new MessageEncryptor(secret, {
+    const encryptor = new MessageEncryptor(secret, undefined, {
       cipher: "aes-256-gcm",
       serializer: Marshal,
     });
@@ -937,7 +943,10 @@ describe("CookiesTest", () => {
       salt,
       MessageEncryptor.keyLen("aes-256-gcm"),
     ) as Buffer;
-    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm", serializer: Marshal });
+    const encryptor = new MessageEncryptor(secret, undefined, {
+      cipher: "aes-256-gcm",
+      serializer: Marshal,
+    });
 
     assertEqual("bar", encryptor.decryptAndVerify(tc.response.cookies["foo"]!));
   });

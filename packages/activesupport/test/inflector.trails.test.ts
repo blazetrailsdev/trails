@@ -106,3 +106,14 @@ describe("Inflections#irregular emits inflections.rb's singular rules", () => {
     expect(singularize(inflect, "boxen")).toBe("ox");
   });
 });
+
+describe("acronym regexes group the joined acronyms as Ruby's interpolated Regexp does", () => {
+  it("binds the lookahead to every acronym, not only the last", () => {
+    const inflect = new Inflections();
+    inflect.acronym("API");
+    inflect.acronym("HTML");
+    expect("APIary".replace(inflect.acronymsCamelizeRegex, (m) => m.toLowerCase())).toBe("aPIary");
+    expect("HTMLParser".replace(inflect.acronymsUnderscoreRegex, "$2_")).toBe("HTML_Parser");
+    expect("APIary".replace(inflect.acronymsUnderscoreRegex, "$2_")).toBe("APIary");
+  });
+});

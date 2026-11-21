@@ -142,22 +142,16 @@ export class Inflections {
   }
 
   private defineAcronymRegexPatterns(): void {
-    if (isEmpty(this.acronyms)) {
-      this.acronymRegex = /(?=a)b/;
-      this.acronymsCamelizeRegex = /^\w/;
-      this.acronymsUnderscoreRegex = /(?=a)b/;
-    } else {
-      const escaped = Array.from(this.acronyms.values())
-        .sort((a, b) => b.length - a.length)
-        .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-      const acronymValues = escaped.join("|");
-      this.acronymRegex = new RegExp(acronymValues);
-      this.acronymsCamelizeRegex = new RegExp(`^(?:${acronymValues}(?=\\b|[A-Z_])|\\w)`);
-      this.acronymsUnderscoreRegex = new RegExp(
-        `(?:(?<=([A-Za-z\\d]))|\\b)(${acronymValues})(?=\\b|[^a-z])`,
-        "g",
-      );
-    }
+    this.acronymRegex = isEmpty(this.acronyms)
+      ? /(?=a)b/
+      : new RegExp([...this.acronyms.values()].join("|"));
+    this.acronymsCamelizeRegex = new RegExp(
+      `^(?:(?:${this.acronymRegex.source})(?=\\b|[A-Z_])|\\w)`,
+    );
+    this.acronymsUnderscoreRegex = new RegExp(
+      `(?:(?<=([A-Za-z\\d]))|\\b)((?:${this.acronymRegex.source}))(?=\\b|[^a-z])`,
+      "g",
+    );
   }
 
   /** @missingRailsCall prepend — PERMANENT */
