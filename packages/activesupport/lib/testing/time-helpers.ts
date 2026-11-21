@@ -1,7 +1,6 @@
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { Rational, rational, rbCallSuper, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
-import { getCurrentTest } from "vitest/suite";
-import type {} from "./autorun.js";
+import type { TestCase } from "../test-case.js";
 
 import { Duration } from "../duration.js";
 import { TimeWithZone } from "../time-with-zone.js";
@@ -226,18 +225,25 @@ export function freezeTime(
 
 /** @internal */
 function simpleStubs(this: object | void): SimpleStubs {
-  return (((this ?? getCurrentTest()!.context.testCase) as TimeHelpersHost)._simpleStubs ??=
-    new SimpleStubs());
+  return (((this ?? _runningTestCase()) as TimeHelpersHost)._simpleStubs ??= new SimpleStubs());
 }
 
 /** @internal */
 function inBlock(this: object | void): boolean {
-  return ((this ?? getCurrentTest()!.context.testCase) as TimeHelpersHost)._inBlock ?? false;
+  return ((this ?? _runningTestCase()) as TimeHelpersHost)._inBlock ?? false;
 }
 
 /** @internal */
 function setInBlock(this: object | void, value: boolean): void {
-  ((this ?? getCurrentTest()!.context.testCase) as TimeHelpersHost)._inBlock = value;
+  ((this ?? _runningTestCase()) as TimeHelpersHost)._inBlock = value;
+}
+
+/** @noRailsEquivalent PERMANENT */
+function _runningTestCase(): TestCase {
+  const worker = (
+    globalThis as { __vitest_worker__?: { current?: { context: { testCase: TestCase } } } }
+  ).__vitest_worker__;
+  return worker!.current!.context.testCase;
 }
 
 function currentTime(): globalThis.Date {
