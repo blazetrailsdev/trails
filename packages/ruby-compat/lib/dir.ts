@@ -290,6 +290,7 @@ export class Dir {
     }
 
     if (block != null) {
+      chdir(".");
       const oldPath = Dir.pwd();
       chdir(path);
       chdirBlocking++;

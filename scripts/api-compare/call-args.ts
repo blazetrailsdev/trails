@@ -260,7 +260,7 @@ function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string 
  * A file path, whose snake_case and kebab-case spellings compare equal
  * (CLAUDE.md, "Casing is translated, never mirrored").
  */
-const FILE_PATH = /^[\w.-]+(?:\/[\w.-]+)+$/;
+const FILE_PATH = /^[\w-]+(?:\/[\w-]+)*\/[\w-]+\.(?:ts|tt|js|json|yml|yaml|html|tse)$/;
 
 /** Split a `kwargs{…}` body on its TOP-LEVEL commas — a value can itself be a
  *  `kwargs{…}`, whose commas are not separators. A `,` inside a `str:` payload

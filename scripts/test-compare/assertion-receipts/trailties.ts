@@ -45,6 +45,23 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           "app_generator_test.rb:1012 asserts the cssbundling-rails Gemfile entry; cssbundling-rails is not ported (packages/trailties/CLAUDE.md, A Gemfile is a package.json) and css:install:postcss comes from @blazetrails/vite-trails",
       },
     ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › css option with asset pipeline tailwind":
+    [
+      {
+        kind: "assert_gem",
+        value: "s:tailwindcss-rails",
+        as: null,
+        reason:
+          "app_generator_test.rb:982 asserts the tailwindcss-rails Gemfile entry for an importmap app; every trails app is a Vite app, so css:install:tailwind adds @tailwindcss/vite at install time (CLAUDE.md, importmap-rails and propshaft are out of scope)",
+      },
+      {
+        kind: "assert_no_node_files",
+        value: null,
+        as: null,
+        reason:
+          "app_generator_test.rb:983 asserts an importmap app has no Node files; importmap is not offered and every trails app is a Vite app (CLAUDE.md, importmap-rails and propshaft are out of scope)",
+      },
+    ],
   "trailties:generators/app_generator_test.rb › AppGeneratorTest › devcontainer": [
     {
       kind: "assert_file",

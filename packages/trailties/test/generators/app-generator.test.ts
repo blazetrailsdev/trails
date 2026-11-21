@@ -519,7 +519,6 @@ describe("AppGeneratorTest", () => {
     expect(railsCommands, "`css:install:tailwind` expected to be called, but wasn't.").toContain(
       "css:install:tailwind",
     );
-    await assertNodeFiles();
   });
 
   it("css option with cssbundling gem", async () => {

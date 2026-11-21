@@ -246,7 +246,6 @@ function withFlock<T extends FlockableFs>(nodeFs: T): Partial<FsAdapter> {
 interface NodeProcess {
   versions?: { node?: string };
   cwd(): string;
-  chdir(dir: string): void;
   getBuiltinModule?(id: string): unknown;
 }
 
@@ -375,10 +374,7 @@ function tryAutoRegisterNode(): boolean {
       statSync: (p: string) => withExecutable(nodeFs.statSync(p)),
       fstatSync: (fd: number) => withExecutable(nodeFs.fstatSync!(fd)),
       lstatSync: (p: string) => withExecutable(nodeFs.lstatSync(p)),
-      cwd: () => {
-        proc.chdir(".");
-        return proc.cwd();
-      },
+      cwd: () => proc.cwd(),
       openAsync: (p: string, flags: string, mode?: number) =>
         new Promise<number>((resolve, reject) => {
           nodeCallbackFs.open(p, flags, mode, (error, fd) => {

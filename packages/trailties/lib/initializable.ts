@@ -98,10 +98,7 @@ export class Collection extends Array<Initializer> {
     return out;
   }
 
-  tsortEach(): Initializer[];
-  tsortEach(block: (initializer: Initializer) => void): void;
-  tsortEach(block?: (initializer: Initializer) => void): Initializer[] | void {
-    if (block == null) return this.tsort();
+  tsortEach(block: (initializer: Initializer) => void): void {
     for (const initializer of this.tsort()) block(initializer);
   }
 }
@@ -182,9 +179,11 @@ export class Initializable {
 
   async runInitializers(group: InitializerGroup = "default", ...args: unknown[]): Promise<void> {
     if (this._ran) return;
-    for (const init of this.initializers.tsortEach()) {
-      if (init.belongsTo(group)) await init.run(...args);
-    }
+    let ran: Promise<unknown> = Promise.resolve();
+    this.initializers.tsortEach((initializer) => {
+      ran = ran.then(() => (initializer.belongsTo(group) ? initializer.run(...args) : undefined));
+    });
+    await ran;
     this._ran = true;
   }
 }
