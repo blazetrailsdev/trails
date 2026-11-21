@@ -170,7 +170,6 @@ ADAPTER_SYMBOL_MAP = {
 # (activesupport/test/cache/serializer_with_fallback_test.rb:42-43).
 class LoopSymbolName < String; end
 
-# tzinfo's `TestUtils::TestEncoding` (`vendor/tzinfo/v2.0.6/test/test_utils.rb:102-116`).
 LoopTestEncoding = Struct.new(:name) do
   def to_method
     name.downcase.gsub("-", "_")
@@ -1205,9 +1204,6 @@ class TestExtractor
     @const_arrays[path[:segments].first]
   end
 
-  # `<int>.upto(<int>)`: Integer#upto yields each integer from the receiver to
-  # the argument (`vendor/ruby/v3.3.11/numeric.c:5602`), as
-  # `0.upto(5) do |n|` at tzinfo's format2/tc_timezone_definer.rb:119.
   def upto_elements(from, inner)
     return nil unless from.is_a?(Array) && from[0] == :@int
     return nil unless inner.is_a?(Array) && inner[0] == :method_add_arg
@@ -1216,9 +1212,6 @@ class TestExtractor
     (Integer(from[1])..Integer(args[0][1])).map(&:to_s)
   end
 
-  # tzinfo's `test_encodings('UTF-8', 'UTF-16')`, one `TestEncoding` per name
-  # (`vendor/tzinfo/v2.0.6/test/test_utils.rb:359-361`), read back through
-  # `to_method` (`:113-115`).
   def test_encodings_values(receiver)
     call = receiver[1]
     return nil unless call.is_a?(Array) && call[0] == :fcall && ident_name(call[1]) == "test_encodings"
@@ -1249,7 +1242,6 @@ class TestExtractor
   # element, several destructure it, exactly as Ruby's block arity does.
   def loop_bindings(vars, value)
     return { vars.first => value } if vars.length == 1 && !vars.first.is_a?(Array)
-    # `|(a, b)|` (tzinfo's tc_transition_rule.rb:22) destructures the element.
     return loop_bindings(vars.first, value) if vars.length == 1
     return nil unless value.is_a?(Array) && value.length >= vars.length
     vars.each_with_index.reduce({}) do |bound, (var, index)|
@@ -1506,17 +1498,10 @@ class TestExtractor
     when :@int, :@float
       node[1]
     when :unary
-      # `[-1, 0, 1]` (tzinfo's tc_transition_rule.rb:9): Ripper wraps a negative
-      # literal in `:-@`. Read in a define_method loop only, like opaque cells.
       operand = node[2]
       @define_method_loop && node[1] == :-@ && operand.is_a?(Array) && %i[@int @float].include?(operand[0]) ? "-#{operand[1]}" : nil
     when :array
       # A table row (`["/", [:SLASH]]`) — resolved so a destructuring loop can
-      # bind each position. In a define_method loop a computed cell (`-HOUR`,
-      # `Time.utc(...)` at tzinfo's tc_posix_time_zone_parser.rb:59,
-      # tc_timestamp.rb:1182) is opaque: the row still expands, and a name that
-      # interpolates the cell is reported. A `test`/`it` macro loop keeps the
-      # whole row unresolved, as its TS twins are matched by template name.
       return array_literal_values(node[1]) unless @define_method_loop
       return [] if node[1].nil?
       node[1].map { |cell| array_element_value(cell) || LOOP_OPAQUE_CELL }
@@ -2995,8 +2980,6 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
   test_files
 end
 
-# Loops whose generated names the extractor cannot evaluate, by package, each
-# with the reason. A listed loop is not printed as unexpanded.
 UNEXPANDED_LOOP_REASONS = {
   "tzinfo" => {
     "data_sources/tc_posix_time_zone_parser.rb:61" =>
@@ -3020,8 +3003,6 @@ UNEXPANDED_LOOP_REASONS = {
   },
 }.freeze
 
-# The test files of one package's test dir. tzinfo's `ts_all*.rb` suite runners
-# only `require` the `tc_*.rb` files and define no tests, so no glob takes them.
 def package_test_files(pkg_name, pkg_dir)
   test_files = Dir.glob(File.join(pkg_dir, "**", "*_test.rb")) +
                Dir.glob(File.join(pkg_dir, "**", "test_*.rb")) +

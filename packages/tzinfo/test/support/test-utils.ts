@@ -51,8 +51,7 @@ export class TimeLikeWithOffset extends TimeLike {
 }
 
 export abstract class TimeTypesHelper {
-  // eslint-disable-next-line unused-imports/no-unused-vars
-  static isSupports(feature: Feature): boolean {
+  static isSupports(_feature: Feature): boolean {
     return false;
   }
 
@@ -186,8 +185,7 @@ export abstract class TimeTypesBaseTimeLikeHelper extends TimeTypesHelper {
 }
 
 export class TimeTypesTimeLikeHelper extends TimeTypesBaseTimeLikeHelper {
-  // eslint-disable-next-line unused-imports/no-unused-vars
-  static override isSupports(feature: Feature): boolean {
+  static override isSupports(_feature: Feature): boolean {
     return false;
   }
 
@@ -240,20 +238,18 @@ export class TimeTypesTimeLikeWithOffsetHelper extends TimeTypesBaseTimeLikeHelp
   }
 }
 
-const TIME_TYPES_HELPERS = [
-  TimeTypesTimeHelper,
-  TimeTypesDateTimeHelper,
-  TimeTypesTimestampHelper,
-  TimeTypesTimeLikeHelper,
-  TimeTypesTimeLikeWithOffsetHelper,
-];
-
 export function timeTypesHelpers(
   ...args: [...requiredFeatures: Feature[], block: (helper: TimeTypesHelper) => void]
 ): void {
   const block = args.pop() as (helper: TimeTypesHelper) => void;
   const requiredFeatures = args as Feature[];
-  for (const helperClass of TIME_TYPES_HELPERS) {
+  for (const helperClass of [
+    TimeTypesTimeHelper,
+    TimeTypesDateTimeHelper,
+    TimeTypesTimestampHelper,
+    TimeTypesTimeLikeHelper,
+    TimeTypesTimeLikeWithOffsetHelper,
+  ]) {
     if (requiredFeatures.every((f) => helperClass.isSupports(f))) {
       block(new helperClass());
     }

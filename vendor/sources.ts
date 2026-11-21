@@ -956,7 +956,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/tzinfo/tzinfo-data.git",
-      // tzdb 2026e, the release @blazetrails/date's TZDATA_VERSION carries.
       ref: "v1.2026.5",
     },
     packages: [
