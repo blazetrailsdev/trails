@@ -54,12 +54,16 @@ export class MethodSet {
     this.canonicalMethods.clear();
 
     /** @perf 9x — PERMANENT */
+    const instanceMethods: Array<[string, PropertyDescriptor]> = [];
+    for (const [as, canonicalName] of this.methods) {
+      const instanceMethod = Object.getOwnPropertyDescriptor(this.cache, canonicalName);
+      if (instanceMethod === undefined) {
+        throw new NameError(`undefined method '${canonicalName}' for module`, canonicalName);
+      }
+      instanceMethods.push([as, instanceMethod]);
+    }
     const defineMethods = (target: object): void => {
-      for (const [as, canonicalName] of this.methods) {
-        const instanceMethod = Object.getOwnPropertyDescriptor(this.cache, canonicalName);
-        if (instanceMethod === undefined) {
-          throw new NameError(`undefined method '${canonicalName}' for module`, canonicalName);
-        }
+      for (const [as, instanceMethod] of instanceMethods) {
         Object.defineProperty(target, as, instanceMethod);
       }
     };
