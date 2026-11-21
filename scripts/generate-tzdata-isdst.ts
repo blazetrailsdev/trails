@@ -221,7 +221,7 @@ export function serializeTable(zoneRecords: Record<string, ZoneRecords>): string
 
 /** The IANA release the tables were generated from, which `process.versions.tz` must match. */
 export function header(): string {
-  return `import { Temporal } from "./temporal.js";\n\n/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n`;
+  return `/** @noRailsEquivalent PERMANENT */\nexport const TZDATA_VERSION = "${tzdataVersion()}";\n\n`;
 }
 
 const READER = `
