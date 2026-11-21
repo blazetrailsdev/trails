@@ -13,6 +13,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
@@ -25,5 +26,8 @@
       "ref": "v1.17.0",
       "sha": "5261d91b210735a5a79367ff9faebde2dea28788"
     }
-  ]
+  ],
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
+  }
 }

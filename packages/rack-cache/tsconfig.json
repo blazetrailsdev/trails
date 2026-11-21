@@ -6,5 +6,15 @@
     "rootDir": "lib"
   },
   "include": ["lib"],
-  "references": [{ "path": "../rack" }, { "path": "../ruby-compat" }]
+  "references": [
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../rack"
+    },
+    {
+      "path": "../ruby-compat"
+    }
+  ]
 }
