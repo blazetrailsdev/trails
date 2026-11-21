@@ -18,7 +18,10 @@ describe("CodeStatisticsCalculatorTest", () => {
     const p = path.join(tmpDir, "stats.rb");
     fs.writeFileSync(p, "      def foo\n        puts 'foo'\n        # bar\n      end\n");
     await calc.addByFilePath(p);
-    expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([4, 3, 0, 1]);
+    expect(calc.lines).toBe(4);
+    expect(calc.codeLines).toBe(3);
+    expect(calc.classes).toBe(0);
+    expect(calc.methods).toBe(1);
   });
 
   it("count number of methods in minitest file", async () => {
@@ -33,9 +36,15 @@ describe("CodeStatisticsCalculatorTest", () => {
 
   it("add statistics to another using #add", () => {
     calc.add(new CodeStatisticsCalculator(1, 2, 3, 4));
-    expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([1, 2, 3, 4]);
+    expect(calc.lines).toBe(1);
+    expect(calc.codeLines).toBe(2);
+    expect(calc.classes).toBe(3);
+    expect(calc.methods).toBe(4);
     calc.add(new CodeStatisticsCalculator(2, 3, 4, 5));
-    expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([3, 5, 7, 9]);
+    expect(calc.lines).toBe(3);
+    expect(calc.codeLines).toBe(5);
+    expect(calc.classes).toBe(7);
+    expect(calc.methods).toBe(9);
   });
 
   it("accumulate statistics using #add_by_io", () => {
@@ -46,7 +55,10 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "rb",
     );
-    expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([7, 7, 4, 6]);
+    expect(calc.lines).toBe(7);
+    expect(calc.codeLines).toBe(7);
+    expect(calc.classes).toBe(4);
+    expect(calc.methods).toBe(6);
   });
 
   it("calculate number of Ruby methods", () => {
@@ -66,7 +78,8 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "rb",
     );
-    expect([calc.lines, calc.codeLines]).toEqual([8, 5]);
+    expect(calc.lines).toBe(8);
+    expect(calc.codeLines).toBe(5);
   });
 
   it("calculate number of Ruby classes", () => {
@@ -86,7 +99,10 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "rb",
     );
-    expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([10, 0, 0, 0]);
+    expect(calc.lines).toBe(10);
+    expect(calc.codeLines).toBe(0);
+    expect(calc.classes).toBe(0);
+    expect(calc.methods).toBe(0);
   });
 
   it("calculate number of JS methods", () => {
@@ -106,7 +122,8 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "js",
     );
-    expect([calc.lines, calc.codeLines]).toEqual([7, 4]);
+    expect(calc.lines).toBe(7);
+    expect(calc.codeLines).toBe(4);
   });
 
   it("skip JS comments", () => {
@@ -116,7 +133,10 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "js",
     );
-    expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([8, 0, 0, 0]);
+    expect(calc.lines).toBe(8);
+    expect(calc.codeLines).toBe(0);
+    expect(calc.classes).toBe(0);
+    expect(calc.methods).toBe(0);
   });
 
   it("skip TSE comments", () => {
@@ -126,7 +146,8 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "tse",
     );
-    expect([calc.lines, calc.codeLines]).toEqual([6, 3]);
+    expect(calc.lines).toBe(6);
+    expect(calc.codeLines).toBe(3);
   });
 
   it("skip CSS comments", () => {
@@ -136,7 +157,8 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "css",
     );
-    expect([calc.lines, calc.codeLines]).toEqual([5, 3]);
+    expect(calc.lines).toBe(5);
+    expect(calc.codeLines).toBe(3);
   });
 
   it("skip SCSS comments", () => {
@@ -146,7 +168,8 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "scss",
     );
-    expect([calc.lines, calc.codeLines]).toEqual([6, 3]);
+    expect(calc.lines).toBe(6);
+    expect(calc.codeLines).toBe(3);
   });
 
   it("calculate number of CoffeeScript methods", () => {
@@ -166,7 +189,8 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "coffee",
     );
-    expect([calc.lines, calc.codeLines]).toEqual([11, 3]);
+    expect(calc.lines).toBe(11);
+    expect(calc.codeLines).toBe(3);
   });
 
   it("calculate number of CoffeeScript classes", () => {
@@ -186,7 +210,10 @@ describe("CodeStatisticsCalculatorTest", () => {
       ),
       "coffee",
     );
-    expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([10, 1, 0, 0]);
+    expect(calc.lines).toBe(10);
+    expect(calc.codeLines).toBe(1);
+    expect(calc.classes).toBe(0);
+    expect(calc.methods).toBe(0);
   });
 
   it("count rake tasks", () => {
@@ -194,7 +221,8 @@ describe("CodeStatisticsCalculatorTest", () => {
       new StringIO("      task :test_task do\n        puts 'foo'\n      end\n\n"),
       "rake",
     );
-    expect([calc.lines, calc.codeLines]).toEqual([4, 3]);
+    expect(calc.lines).toBe(4);
+    expect(calc.codeLines).toBe(3);
   });
 
   it("calculate number of TypeScript methods", () => {
