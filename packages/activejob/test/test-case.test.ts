@@ -30,7 +30,7 @@ void TestClassAttributeInheritanceJob;
 
 describe("ActiveJobTestCaseTest", () => {
   it("include helper", ({ testCase }: TestContext) => {
-    assertIncludes(rbModAncestors(testCase.constructor as typeof TestCase), ActiveJob.TestHelper);
+    assertIncludes(rbModAncestors(testCase.constructor), ActiveJob.TestHelper);
   });
 
   it("set test adapter", ({ testCase }: TestContext) => {

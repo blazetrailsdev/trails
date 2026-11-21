@@ -1001,7 +1001,7 @@ describe("CachedViewRenderTest", () => {
     assertInstanceOf(ReferenceError, exception.cause);
     assertEqual(
       "partial_name_local_variable",
-      (exception.cause as ReferenceError).message.replace(/ is not defined$/u, ""),
+      exception.cause.message.replace(/ is not defined$/u, ""),
     );
   });
 

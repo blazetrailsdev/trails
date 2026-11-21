@@ -16,7 +16,7 @@ export class TimeWithZoneSerializer extends ObjectSerializer {
 
   deserialize(hash: Record<string, unknown> | Map<string, unknown>): TimeWithZone | Time {
     return Time.iso8601(hashAref(hash, "value") as string).inTimeZone(
-      (hashAref(hash, "time_zone") as string | null) ?? zone(),
+      hashAref(hash, "time_zone") ?? zone(),
     );
   }
 

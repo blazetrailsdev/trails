@@ -52,9 +52,7 @@ RescueJob.rescueFrom(
   DeserializationError,
   block(function (this: RescueJob, e: Error) {
     JobBuffer.add("rescued from DeserializationError");
-    JobBuffer.add(
-      `DeserializationError original exception was ${rbModName(rbObjClass(e.cause as object))}`,
-    );
+    JobBuffer.add(`DeserializationError original exception was ${rbModName(rbObjClass(e.cause))}`);
   }),
 );
 

@@ -31,7 +31,7 @@ function newMockVendor(): SanitizerVendor & { newMockSanitizer: (name: string) =
         return `${injectedName}#sanitize / ${html} / ${JSON.stringify(options)}`;
       }
     }
-    return MockSanitizer as unknown as SanitizerClass;
+    return MockSanitizer;
   }
 
   const safeListClass = newMockSanitizer("safe_list_sanitizer");

@@ -579,7 +579,7 @@ describe("Errors<TBase> type parameter", () => {
   });
 
   it("unparameterized Errors annotation compiles (default = object)", () => {
-    const e: Errors = new Errors({} as object);
+    const e: Errors = new Errors({});
     e.add("name", (record, _opts) => {
       expectTypeOf(record).toEqualTypeOf<object | null>();
       return "invalid";

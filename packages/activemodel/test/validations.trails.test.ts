@@ -457,7 +457,7 @@ describe("ValidationsTest (trails)", () => {
     });
 
     it("rejects invalid types", async () => {
-      const m = new TypedModel({ age: null, email: "" } as any);
+      const m = new TypedModel({ age: null, email: "" });
       expect(await m.isValid()).toBe(false);
       expect(m.errors.messagesFor("age").length).toBeGreaterThan(0);
       expect(m.errors.messagesFor("email").length).toBeGreaterThan(0);

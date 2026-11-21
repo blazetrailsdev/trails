@@ -45,7 +45,7 @@ export async function arConsole(
   if (!models) return 1;
 
   type StartFn = NonNullable<StartOptions["startRepl"]>;
-  const startFn: StartFn = opts.startRepl ?? ((await import("repl")).start as unknown as StartFn);
+  const startFn: StartFn = opts.startRepl ?? (await import("repl")).start;
   const replContext = startFn({ prompt: "trails> ", useGlobal: true });
 
   Object.assign(replContext.context, { Base, ...models });

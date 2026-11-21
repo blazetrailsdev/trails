@@ -69,7 +69,7 @@ class LoggingTest extends TestCase {
     logSubscriberTestHelperSetup.call(this as never);
     JobBuffer.clear();
     this.oldLogger = Base.logger;
-    this.logger = TaggedLogging.new(new TestLogger()) as TaggedTestLogger;
+    this.logger = TaggedLogging.new(new TestLogger());
     this.setLogger(this.logger);
     LogSubscriber.attachTo("active_job");
   }

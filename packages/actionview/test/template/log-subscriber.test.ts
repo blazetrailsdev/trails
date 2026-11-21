@@ -74,7 +74,7 @@ class AVLogSubscriberTest extends TestCase {
   }
 
   setLogger(logger: MockLogger | null): void {
-    Base.logger = logger as unknown;
+    Base.logger = logger;
   }
 
   setCacheController(): void {
@@ -83,7 +83,7 @@ class AVLogSubscriberTest extends TestCase {
     };
     controller.performCaching = true;
     controller.cacheStore = new MemoryStore();
-    this.view.controller = controller as never;
+    this.view.controller = controller;
   }
 
   setViewCacheDependencies(): void {

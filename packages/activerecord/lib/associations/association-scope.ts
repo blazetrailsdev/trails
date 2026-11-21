@@ -228,7 +228,7 @@ export class AssociationScope {
 
   /** @internal */
   private join(table: unknown, constraint: unknown): Nodes.Join {
-    return new Nodes.LeadingJoin(table as never, new Nodes.On(constraint as never));
+    return new Nodes.LeadingJoin(table as never, new Nodes.On(constraint));
   }
 }
 

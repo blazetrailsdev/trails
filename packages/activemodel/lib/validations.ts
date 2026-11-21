@@ -294,7 +294,7 @@ export const ClassMethods = {
     this.setCallback(
       "validate",
       ...(filters as Array<string | ((record: object) => unknown)>),
-      options as CallbackConditions,
+      options,
       ...(block !== undefined ? [block as (record: object) => unknown] : []),
     );
   },

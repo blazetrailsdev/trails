@@ -99,7 +99,7 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
 function setTimeZoneWithoutConversion(value: unknown): unknown {
   if (value == null || value === false) return null;
   const utc = (timeZone() as TimeZone).localToUtc(value as RubyTime);
-  return utc == null ? null : inTimeZone.call(utc as DateOrTime);
+  return utc == null ? null : inTimeZone.call(utc);
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -135,7 +135,7 @@ function isCreateTimeZoneConversionAttribute(
   castType: ValueType,
 ): boolean {
   const enabledForColumn =
-    this.timeZoneAwareAttributes && !this.skipTimeZoneConversionForAttributes.includes(name as any);
+    this.timeZoneAwareAttributes && !this.skipTimeZoneConversionForAttributes.includes(name);
   return (
     enabledForColumn &&
     (this.timeZoneAwareTypes ?? ["datetime", "time"]).includes(castType.type() ?? "")

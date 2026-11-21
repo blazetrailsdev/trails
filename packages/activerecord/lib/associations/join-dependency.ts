@@ -292,10 +292,7 @@ export class JoinDependency {
     if (columnNames.length === 0) {
       columnTypes = {};
     } else {
-      columnTypes = resultSet.columnTypes as Record<
-        string,
-        { deserialize(value: unknown): unknown }
-      >;
+      columnTypes = resultSet.columnTypes;
       if (Object.keys(columnTypes).length !== 0) {
         const attributeTypes = this.joinRoot.attributeTypes();
         columnTypes = Object.fromEntries(

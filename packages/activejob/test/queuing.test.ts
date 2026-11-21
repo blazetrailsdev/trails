@@ -124,7 +124,7 @@ describe("QueuingTest", () => {
       expect(payload["enqueued_count"]).toBe(2);
     };
 
-    await Notifications.subscribed(subscriber as never, "enqueue_all.active_job", async () => {
+    await Notifications.subscribed(subscriber, "enqueue_all.active_job", async () => {
       await performAllLater(jobs);
     });
 

@@ -14,7 +14,7 @@ import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const tag = _tag.bind(view);
 const tagBuilder = _tagBuilder.bind(view);
-const submitTag = _submitTag.bind(view as any);
+const submitTag = _submitTag.bind(view);
 
 const hashOf = (entries: Record<string, unknown>): Hash<string, unknown> => {
   const hash = new Hash<string, unknown>();

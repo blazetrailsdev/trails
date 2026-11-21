@@ -21,9 +21,7 @@ describe("Template::Handlers", () => {
   });
 
   it("registerTemplateHandler throws when no extension is supplied", () => {
-    expect(() =>
-      (Template.registerTemplateHandler as unknown as (h: TemplateHandler) => void)(makeHandler()),
-    ).toThrow(/Extension is required/);
+    expect(() => Template.registerTemplateHandler(makeHandler())).toThrow(/Extension is required/);
   });
 
   it("registers and looks up handlers by extension", () => {

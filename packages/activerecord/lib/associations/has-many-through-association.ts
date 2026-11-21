@@ -91,7 +91,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   protected distribution(array: Base[]): Distribution {
-    return eachWithObject(array, new Hash(0) as Distribution, (record, distribution) => {
+    return eachWithObject(array, new Hash<Base, number>(0), (record, distribution) => {
       distribution.set(record, distribution.get(record)! + 1);
     });
   }
