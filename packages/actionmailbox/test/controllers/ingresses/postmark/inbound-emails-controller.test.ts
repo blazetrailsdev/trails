@@ -59,8 +59,7 @@ describe("ActionMailbox::Ingresses::Postmark::InboundEmailsControllerTest", () =
     expect(inboundEmail.message_id).toBe("0CB459E0-0336-41DA-BC88-E6E28C697DDB@37signals.com");
   });
 
-  // BLOCKED: ascii-8bit-param-encoding-answers-a-js-string-not-bytes
-  it.skip("receiving an inbound email from Postmark with non UTF-8 characters", async () => {
+  it("receiving an inbound email from Postmark with non UTF-8 characters", async () => {
     await assertDifference(
       () => InboundEmail.count(),
       +1,
@@ -68,7 +67,9 @@ describe("ActionMailbox::Ingresses::Postmark::InboundEmailsControllerTest", () =
       async () => {
         await t.post(trailsPostmarkInboundEmailsUrl(), {
           headers: { Authorization: credentials() },
-          params: { RawEmail: await t.fileFixture("../files/invalid_utf.eml").read() },
+          params: {
+            RawEmail: await File.binreadAsync(String(t.fileFixture("../files/invalid_utf.eml"))),
+          },
         });
       },
     );

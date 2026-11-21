@@ -1,5 +1,5 @@
 import type { Logger } from "@blazetrails/activesupport";
-import { Encoding, JSON } from "@blazetrails/ruby-compat";
+import { Encoding, JSON, rbStrPlus } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../action-mailbox.js";
 import { BaseController } from "../../base-controller.js";
 
@@ -20,11 +20,14 @@ export class InboundEmailsController extends BaseController {
   }
 
   /** @internal */
-  private mail(): string {
-    let rawEmail = this.params.require("email") as string;
+  private mail(): Uint8Array {
+    let rawEmail = this.params.require("email") as Uint8Array;
     if (this.params.isKey("envelope"))
       (this.envelope()["to"] as string[]).forEach((to) => {
-        rawEmail = `X-Original-To: ${to}\n${rawEmail}`;
+        rawEmail = rbStrPlus(
+          new TextEncoder().encode(`X-Original-To: ${to}\n`),
+          rawEmail,
+        ) as Uint8Array;
       });
     return rawEmail;
   }

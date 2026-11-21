@@ -1,6 +1,6 @@
 import { ActionController } from "@blazetrails/actionpack";
 import type { Logger } from "@blazetrails/activesupport";
-import { Encoding } from "@blazetrails/ruby-compat";
+import { Encoding, rbStrPlus } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../action-mailbox.js";
 import { BaseController } from "../../base-controller.js";
 
@@ -25,10 +25,15 @@ labeled "Include raw email content in JSON payload".
   }
 
   /** @internal */
-  private mail(): string {
-    let rawEmail = this.params.require("RawEmail") as string;
+  private mail(): Uint8Array {
+    let rawEmail = this.params.require("RawEmail") as Uint8Array;
     if (this.params.isKey("OriginalRecipient"))
-      rawEmail = `X-Original-To: ${this.params.require("OriginalRecipient") as string}\n${rawEmail}`;
+      rawEmail = rbStrPlus(
+        new TextEncoder().encode(
+          `X-Original-To: ${this.params.require("OriginalRecipient") as string}\n`,
+        ),
+        rawEmail,
+      ) as Uint8Array;
     return rawEmail;
   }
 }
