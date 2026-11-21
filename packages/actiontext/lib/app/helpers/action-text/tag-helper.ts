@@ -6,7 +6,10 @@ import {
   tryCall,
   type SafeBuffer,
 } from "@blazetrails/activesupport";
-import { FormBuilder, FormHelper } from "@blazetrails/actionview/helpers/form-helper.js";
+import {
+  FormBuilder as ActionViewFormBuilder,
+  FormHelper as ActionViewFormHelper,
+} from "@blazetrails/actionview/helpers/form-helper.js";
 import { Base } from "@blazetrails/actionview/helpers/tags/base.js";
 import { Placeholderable } from "@blazetrails/actionview/helpers/tags/placeholderable.js";
 import { Translator } from "@blazetrails/actionview/helpers/tags/translator.js";
@@ -159,45 +162,55 @@ type FormBuilderHost = {
   objectifyOptions(options: Options): Options;
 };
 
-const FormHelperRichTextarea = {
-  richTextarea(
-    this: unknown,
-    objectName: unknown,
-    method: unknown,
-    options: Options = {},
-  ): Promise<unknown> {
+export class FormHelper {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+
+  richTextarea(objectName: unknown, method: unknown, options: Options = {}): Promise<unknown> {
     return new (Tags as unknown as { ActionText: typeof ActionText }).ActionText(
       objectName,
       method,
       this,
       options,
     ).render();
-  },
-};
+  }
+
+  declare richTextArea: FormHelper["richTextarea"];
+}
+
+FormHelper.prototype.richTextArea = FormHelper.prototype.richTextarea;
 const formHelperMembers: Record<string, unknown> = {
-  ...FormHelperRichTextarea,
-  richTextArea: FormHelperRichTextarea.richTextarea,
+  richTextarea: FormHelper.prototype.richTextarea,
+  richTextArea: FormHelper.prototype.richTextArea,
 };
-for (const ref of FormHelper._includers) {
+for (const ref of ActionViewFormHelper._includers) {
   const proto = ref.deref() as Record<string, unknown> | undefined;
   if (!proto) {
-    FormHelper._includers.delete(ref);
+    ActionViewFormHelper._includers.delete(ref);
     continue;
   }
   for (const [name, method] of Object.entries(formHelperMembers)) {
-    const previous = Object.getOwnPropertyDescriptor(FormHelper.prototype, name)?.value;
+    const previous = Object.getOwnPropertyDescriptor(ActionViewFormHelper.prototype, name)?.value;
     if (!Object.hasOwn(proto, name) || proto[name] === previous) proto[name] = method;
   }
 }
-Object.assign(FormHelper.prototype, formHelperMembers);
+Object.assign(ActionViewFormHelper.prototype, formHelperMembers);
 rbClearMethodCache();
 
-const FormBuilderRichTextarea = {
+class FormBuilder {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+
   richTextarea(this: FormBuilderHost, method: unknown, options: Options = {}): Promise<unknown> {
     return this._template.richTextarea(this.objectName, method, this.objectifyOptions(options));
-  },
-};
-Object.assign(FormBuilder.prototype, FormBuilderRichTextarea, {
-  richTextArea: FormBuilderRichTextarea.richTextarea,
+  }
+
+  declare richTextArea: FormBuilder["richTextarea"];
+}
+
+FormBuilder.prototype.richTextArea = FormBuilder.prototype.richTextarea;
+Object.assign(ActionViewFormBuilder.prototype, {
+  richTextarea: FormBuilder.prototype.richTextarea,
+  richTextArea: FormBuilder.prototype.richTextArea,
 });
 rbClearMethodCache();
