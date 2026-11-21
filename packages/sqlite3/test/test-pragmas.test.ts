@@ -6,9 +6,9 @@ import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 import { Exception } from "../lib/errors.js";
 import { Pragmas } from "../lib/pragmas.js";
 
-const BIGENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
-
 describe("TestPragmas", () => {
+  const BIGENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
+
   let db: SyncSqliteConnection & { testStatements: string[] };
 
   beforeEach(async () => {
