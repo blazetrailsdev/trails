@@ -5547,3 +5547,69 @@ describe(
     });
   },
 );
+
+describe("Ruby extractor C extension scan", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  it("reads classes, methods and includes a C extension defines", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "c-ext-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "pg.c"),
+        `void init(void) {\n\trb_mPG = rb_define_module( "PG" );\n}\n`,
+      );
+      fs.writeFileSync(
+        path.join(dir, "pg_type_map.c"),
+        [
+          "static VALUE",
+          "pg_tmbo_add_coder( VALUE self, VALUE coder )",
+          "{ return self; }",
+          "void init(void) {",
+          '\trb_cTypeMapByOid = rb_define_class_under( rb_mPG, "TypeMapByOid", rb_cTypeMap );',
+          '\trb_cTypeMap = rb_define_class_under( rb_mPG, "TypeMap", rb_cObject );',
+          '\trb_mDefaultTypeMappable = rb_define_module_under( rb_cTypeMap, "DefaultTypeMappable");',
+          '\t/* dummy = rb_define_class_under( rb_mPG_TextDecoder, "Boolean", rb_cTypeMap ); */',
+          '\trb_define_method( rb_cTypeMapByOid, "add_coder", pg_tmbo_add_coder, 1 );',
+          '\trb_define_method( rb_cTypeMapByOid, "coders", pg_tmbo_coders, -1 );',
+          '\trb_define_singleton_method( rb_cTypeMapByOid, "build", pg_tmbo_build, 0 );',
+          '\trb_define_alias( rb_cTypeMapByOid, "add", "add_coder" );',
+          "\trb_include_module( rb_cTypeMapByOid, rb_mDefaultTypeMappable );",
+          "}",
+        ].join("\n"),
+      );
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_c_ext_dir(${JSON.stringify(dir)})
+        out = ex.classes.merge(ex.modules).transform_values do |i|
+          { file: i[:file], superclass: i[:superclass], includes: i[:includes],
+            instance: i[:instanceMethods].map { |m| [m[:name], m[:params].map { |p| p[:name] }, m[:line]] },
+            singleton: i[:classMethods].map { |m| m[:name] } }
+        end
+        puts JSON.generate(out)
+      `;
+      const out = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      expect(Object.keys(out).sort()).toEqual([
+        "PG",
+        "PG::TypeMap",
+        "PG::TypeMap::DefaultTypeMappable",
+        "PG::TypeMapByOid",
+      ]);
+      expect(out["PG::TypeMapByOid"]).toEqual({
+        file: "type_map_by_oid.rb",
+        superclass: "PG::TypeMap",
+        includes: ["PG::TypeMap::DefaultTypeMappable"],
+        instance: [
+          ["add_coder", ["coder"], 9],
+          ["coders", ["args"], 10],
+          ["add", [], 12],
+        ],
+        singleton: ["build"],
+      });
+      expect(out["PG::TypeMap::DefaultTypeMappable"].file).toBe("type_map.rb");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -685,31 +685,6 @@ export const GEM_EXT_CLASSES: readonly [string, string, string, string][] = [
     "MessagePack::UnknownExtTypeError",
     "msgpack/v1.8.0/ext/msgpack/unpacker_class.c:417",
   ],
-  ["pg", "type-map.ts::TypeMap", "PG::TypeMap", "pg/v1.5.9/ext/pg_type_map.c:193"],
-  [
-    "pg",
-    "type-map.ts::DefaultTypeMappable",
-    "PG::TypeMap::DefaultTypeMappable",
-    "pg/v1.5.9/ext/pg_type_map.c:196",
-  ],
-  [
-    "pg",
-    "type-map-all-strings.ts::TypeMapAllStrings",
-    "PG::TypeMapAllStrings",
-    "pg/v1.5.9/ext/pg_type_map_all_strings.c:125",
-  ],
-  [
-    "pg",
-    "type-map-by-class.ts::TypeMapByClass",
-    "PG::TypeMapByClass",
-    "pg/v1.5.9/ext/pg_type_map_by_class.c:264",
-  ],
-  [
-    "pg",
-    "type-map-by-oid.ts::TypeMapByOid",
-    "PG::TypeMapByOid",
-    "pg/v1.5.9/ext/pg_type_map_by_oid.c:378",
-  ],
 ];
 
 /** Reds a `GEM_EXT_CLASSES` row whose vendored site does not name its constant. */

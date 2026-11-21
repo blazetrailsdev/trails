@@ -2493,6 +2493,116 @@ class ApiExtractor
     }
   end
 
+  # A gem whose classes are defined in a C extension declares them with
+  # `rb_define_class_under` / `rb_define_module_under` and their methods with
+  # `rb_define_method` & co. (`vendor/ruby/v3.3.11/class.c`), in `ext/*.c`. The
+  # `**/*.rb` glob never sees them, so they are read here, from the calls
+  # themselves and from the `/* dummy = rb_define_class_under(...) */` comments
+  # a gem writes for RDoc where the class is built through a helper
+  # (`pg_define_coder`, `vendor/pg/v1.5.9/ext/pg_coder.c:466-474`).
+  #
+  # A constant first defined in C records under the file Ruby's naming
+  # convention gives its path below the gem's top namespace
+  # (`PG::TypeMapByOid` → `type_map_by_oid.rb`), unless `file_overrides` names
+  # the gem's own Ruby file for that C file; one nested under a class records
+  # in its owner's file. One already seen in a `.rb` file keeps that file, and
+  # takes the C superclass where its reopening names none. Methods record under their owner's file, with the C line
+  # as `vendorFile:line`.
+  C_BUILTIN_CONSTANTS = {
+    "rb_cObject" => "Object", "rb_eStandardError" => "StandardError",
+    "rb_mEnumerable" => "Enumerable", "rb_mKernel" => "Kernel",
+    "rb_mComparable" => "Comparable",
+  }.freeze
+
+  public def process_c_ext_dir(ext_dir, file_overrides = {})
+    files = Dir.glob(File.join(ext_dir, "*.c")).sort.map { |f| [f, File.read(f)] }
+    vars = C_BUILTIN_CONSTANTS.dup
+    decl = /(?:(\w+)\s*=\s*)?rb_define_(class|module)(_under)?\(\s*(?:(\w+)\s*,\s*)?"(\w+)"\s*(?:,\s*(\w+)\s*)?\)/
+    loop do
+      changed = false
+      files.each do |filepath, source|
+        source.each_line.with_index(1) do |text, line|
+          text.scan(decl) do |var, kind, under, owner_var, name, super_var|
+            next if under && !vars[owner_var]
+            fqn = under ? "#{vars[owner_var]}::#{name}" : name
+            if var && var != "dummy" && vars[var] != fqn
+              vars[var] = fqn
+              changed = true
+            end
+            next if kind == "class" && super_var && !vars[super_var]
+            superclass = super_var && vars[super_var] != "Object" ? vars[super_var] : nil
+            if (known = @classes[fqn] || @modules[fqn])
+              known[:superclass] ||= superclass if kind == "class"
+              next
+            end
+            owner = under && @classes[vars[owner_var]]
+            @current_file = file_overrides[File.basename(filepath)] || owner&.dig(:file) || c_conventional_file(fqn)
+            info = new_class_info(name, fqn)
+            if kind == "class"
+              info[:superclass] = superclass
+              @classes[fqn] = info
+            else
+              @modules[fqn] = info
+            end
+            changed = true
+          end
+        end
+      end
+      break unless changed
+    end
+
+    params_by_func = {}
+    files.each do |_, source|
+      source.scan(/^(?:static\s+)?VALUE\s*\n?\s*(\w+)\s*\(([^)]*)\)\s*\{/) do |func, list|
+        params_by_func[func] = list.split(",").map { |p| p.strip.split(/[\s*]+/).last }
+      end
+    end
+
+    files.each do |filepath, source|
+      vendor_file = filepath.delete_prefix("#{VENDOR_ROOT}/")
+      source.each_line.with_index(1) do |text, line|
+        text.scan(/rb_(define_method|define_private_method|define_protected_method|define_singleton_method|define_module_function|define_alias|define_attr|include_module|extend_object)\s*\(\s*(\w+)\s*,\s*(?:"([^"]+)"|(\w+))\s*(?:,\s*"?([\w=?!\[\]]+)"?\s*)?(?:,\s*(-?\d+)\s*)?/) do |call, owner_var, name, arg_var, func, argc|
+          target_fqn = vars[owner_var]
+          target = @classes[target_fqn] || @modules[target_fqn]
+          next unless target
+          entry = { file: target[:file], line: line, vendorFile: vendor_file }
+          case call
+          when "include_module"
+            target[:includes] << vars[arg_var] if vars[arg_var]
+          when "extend_object"
+            target[:extends] << vars[arg_var] if vars[arg_var]
+          when "define_alias"
+            target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], notes: "alias", alias_target: func)
+          when "define_attr"
+            target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], reader: true)
+          else
+            method_info = entry.merge(name: name, visibility: call.include?("private") ? "private" : call.include?("protected") ? "protected" : "public",
+                                      params: c_method_params(params_by_func[func], argc.to_i))
+            if call == "define_singleton_method" || call == "define_module_function"
+              target[:classMethods] << method_info
+            else
+              target[:instanceMethods] << method_info
+            end
+          end
+        end
+      end
+    end
+  end
+
+  def c_conventional_file(fqn)
+    segments = fqn.split("::").drop(1)
+    segments = [fqn] if segments.empty?
+    segments.map { |s| s.gsub(/([a-z\d])([A-Z])/, '\1_\2').gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2').downcase }.join("/") + ".rb"
+  end
+
+  # `argc` -1 / -2 take `(int argc, VALUE *argv, VALUE self)` / an Array, so
+  # the Ruby arity is a splat; a fixed `argc` names the C parameters after `self`.
+  def c_method_params(c_params, argc)
+    return [{ name: "args", kind: "rest" }] if argc.negative?
+    names = (c_params || []).drop(1)
+    (0...argc).map { |i| { name: names[i] || "arg#{i}", kind: "required" } }
+  end
+
   # Replay the deferred `CONST.each` loops now that every file in the package
   # has been seen, so the constant store is complete. Called from the driver
   # beside dedupe_define_methods! / resolve_aliases!.
@@ -5479,6 +5589,14 @@ end
 
 # ---- Main ----
 
+# Gems whose classes are defined in a C extension, read by
+# ApiExtractor#process_c_ext_dir. `files` names the gem's own Ruby file for a
+# C file whose classes it reopens: `PG::Error` and its subclasses are
+# `exceptions.rb`'s (`vendor/pg/v1.5.9/lib/pg/exceptions.rb:7-9`).
+C_EXT_DIRS = {
+  "pg" => { dir: "ext", files: { "pg_errors.c" => "exceptions.rb" } },
+}.freeze
+
 def run
   # Validate per-package paths (the JSON manifest may include paths the user
   # hasn't fetched yet, e.g. a fresh checkout that skipped pnpm vendor:fetch).
@@ -5533,6 +5651,11 @@ def run
       extractor.process_file(entry_file, File.dirname(entry_file))
     elsif File.file?(umbrella_file)
       extractor.scan_umbrella_file(umbrella_file, pkg_dir)
+    end
+
+    C_EXT_DIRS.fetch(pkg_name, nil)&.then do |ext|
+      gem_root = pkg_dir.sub(%r{/lib(?:/.*)?/?\z}, "")
+      extractor.process_c_ext_dir(File.join(gem_root, ext[:dir]), ext[:files])
     end
 
     # Replay `CONST.each` codegen loops whose constant lives in a file that

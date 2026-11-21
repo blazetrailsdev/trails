@@ -2,7 +2,6 @@ import { FrozenError, rbInspect, rbObjClassname, TypeError } from "@blazetrails/
 import type { Coder } from "./coder.js";
 import { PG } from "./namespaces.js";
 
-/** @noRailsEquivalent CONVERGEABLE pg-ruby-api-manifest-reads-ext-c-classes */
 export class TypeMap {
   static DefaultTypeMappable: typeof DefaultTypeMappable;
 
@@ -26,7 +25,6 @@ export class TypeMap {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE pg-ruby-api-manifest-reads-ext-c-classes */
 export const DefaultTypeMappable = {
   get defaultTypeMap(): TypeMap {
     return (this as unknown as { _defaultTypemap: TypeMap })._defaultTypemap;

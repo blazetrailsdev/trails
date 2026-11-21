@@ -36,7 +36,6 @@ function parseYear(val: string, str: { p: number }): number {
 const TZ_NEG = 1;
 const TZ_POS = 2;
 
-/** @noRailsEquivalent PERMANENT */
 export class Timestamp extends SimpleDecoder {
   /** @noRailsEquivalent PERMANENT */
   decode(string: string, _tuple: number | null = null, _field: number | null = null): unknown {

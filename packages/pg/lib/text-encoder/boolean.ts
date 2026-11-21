@@ -2,7 +2,6 @@ import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { SimpleEncoder } from "../simple-encoder.js";
 import { PG } from "../namespaces.js";
 
-/** @noRailsEquivalent PERMANENT */
 export class Boolean extends SimpleEncoder {
   /** @noRailsEquivalent PERMANENT */
   encode(value: unknown, _encoding: unknown = null): string | null {

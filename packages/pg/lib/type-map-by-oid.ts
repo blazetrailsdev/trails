@@ -6,7 +6,6 @@ import { DefaultTypeMappable, TypeMap } from "./type-map.js";
 
 type Decoder = NonNullable<ReturnType<TypeMap["_lookupOid"]>>;
 
-/** @noRailsEquivalent PERMANENT */
 export class TypeMapByOid extends TypeMap {
   /**
    * @internal
