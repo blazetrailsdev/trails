@@ -144,10 +144,10 @@ events yet, and its [package page](/packages/) records what is ported.
 ### Action Controller
 
 - `start_processing.action_controller` — an action is about to run. The
-  payload names the `controller`, `action`, `params`, `format`, `method` and
-  `path`.
-- `process_action.action_controller` — the action finished. Adds `status`,
-  `headers`, and the time spent rendering as `view_runtime`.
+  payload names the `controller`, `action`, `request`, `params`, `headers`,
+  `format`, `method` and `path`.
+- `process_action.action_controller` — the action finished. The same payload,
+  plus the response `status` and the time spent rendering as `view_runtime`.
 - `send_file.action_controller` and `send_stream.action_controller` — a file
   or a stream is being sent.
 - `halted_callback.action_controller` — a `before` callback rendered or

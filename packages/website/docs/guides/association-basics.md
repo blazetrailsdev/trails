@@ -326,6 +326,12 @@ class Author extends Base {
     this.hasMany("books", { inverseOf: "writer" });
   }
 }
+
+class Book extends Base {
+  static {
+    this.belongsTo("writer", { className: "Author", foreignKey: "author_id" });
+  }
+}
 ```
 
 ## Association References
