@@ -36,9 +36,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await adapter.execute("SELECT 1");
       const socket = (
         adapter._clientForTest() as unknown as {
-          connection?: { stream?: { destroy?: () => void } };
+          connection?: { connection?: { stream?: { destroy?: () => void } } };
         }
-      )?.connection?.stream;
+      )?.connection?.connection?.stream;
       expect(await adapter.active()).toBe(true);
       await adapter.discardBang();
       expect(await adapter.active()).toBe(false);
@@ -49,13 +49,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await adapter.execute("SELECT 1");
       const raw = adapter._clientForTest();
       expect(raw).not.toBeNull();
-      const endSpy = vi.spyOn(raw as { end: () => Promise<void> }, "end");
+      const endSpy = vi.spyOn(raw!, "close");
       const socket = (
         raw as unknown as {
-          stream?: { destroy?: () => void };
-          connection?: { stream?: { destroy?: () => void } };
+          connection?: { connection?: { stream?: { destroy?: () => void } } };
         }
-      )?.connection?.stream;
+      )?.connection?.connection?.stream;
       try {
         await adapter.discardBang();
         expect(endSpy).not.toHaveBeenCalled();

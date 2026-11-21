@@ -4,7 +4,7 @@ import { describeIfMysqlAdapter, Mysql2Adapter, ARUNIT_DATABASE } from "./test-h
 import { Base } from "../../../../lib/index.js";
 import { ReadOnlyError, QueryCanceled } from "../../../../lib/errors.js";
 import { fixtures } from "../../../support/use-fixtures.js";
-import type { Mysql2Result } from "../../../../lib/mysql2/client.js";
+import type { Mysql2Result } from "@blazetrails/mysql2";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   fixtures([]);

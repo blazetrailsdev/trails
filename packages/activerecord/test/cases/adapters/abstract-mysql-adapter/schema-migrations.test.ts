@@ -3,7 +3,7 @@ import { SchemaMigration } from "../../../../lib/schema-migration.js";
 import { InternalMetadata } from "../../../../lib/internal-metadata.js";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
-import type { Mysql2Result } from "../../../../lib/mysql2/client.js";
+import type { Mysql2Result } from "@blazetrails/mysql2";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

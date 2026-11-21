@@ -4,7 +4,7 @@ import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SQLWarning } from "../../../../lib/errors.js";
 import { Base } from "../../../../lib/base.js";
-import type { Mysql2Result } from "../../../../lib/mysql2/client.js";
+import type { Mysql2Result } from "@blazetrails/mysql2";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   const { self } = fixtures([]);

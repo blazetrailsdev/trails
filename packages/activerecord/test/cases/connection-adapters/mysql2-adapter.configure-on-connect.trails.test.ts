@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
-import { mysql2Client } from "../../../lib/mysql2/client.js";
+import mysql from "mysql2/promise";
 
 describe("Mysql2Adapter configure-on-fresh-connect", () => {
   afterEach(() => {
@@ -13,7 +13,7 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
       connection: { _handshakePacket: { serverVersion: version } },
       query: () => Promise.resolve([[]]),
     };
-    vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(mysql2Client(fakeConn));
+    vi.spyOn(mysql, "createConnection").mockResolvedValue(fakeConn as never);
   }
 
   it("runs the connect-once configure exactly once on the eager connectBang path", async () => {

@@ -6,10 +6,10 @@ import { anybits, rbCallSuper, rbObjIvarGet, rbObjIvarSet } from "@blazetrails/r
 import type { StatementPool } from "../statement-pool.js";
 import {
   Mysql2,
-  type Mysql2Client,
+  type Client as Mysql2Client,
   type Mysql2Result,
-  type Mysql2Statement,
-} from "../../mysql2/client.js";
+  type Statement as Mysql2Statement,
+} from "@blazetrails/mysql2";
 import { defaultTimezone } from "../../active-record.js";
 import { ExplainRegistry } from "../../explain-registry.js";
 
