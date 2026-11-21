@@ -337,6 +337,25 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rack-cache",
+    origin: {
+      type: "git",
+      url: "https://github.com/rack/rack-cache.git",
+      ref: "v1.17.0",
+    },
+    packages: [
+      {
+        name: "rack-cache",
+        libPath: "lib/rack/cache",
+        libEntryFile: "lib/rack/cache.rb",
+        testPath: "test",
+        compareApi: false,
+        apiExcludedReason:
+          "extract-ts-api.ts refuses a package with no dist (packages/rack-cache — NotBuilt); enroll-rack-cache-in-compare-tooling creates it.",
+      },
+    ],
+  },
+  {
     name: "rackup",
     origin: {
       type: "git",
