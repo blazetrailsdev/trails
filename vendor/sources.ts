@@ -341,21 +341,12 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rack/rack-cache.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:434 resolves rack-cache (1.17.0),
-      // inside vendor/rails/v8.0.2/Gemfile:18's `gem "rack-cache", "~> 1.2"`.
-      // Unlike rack-session / rack-test (actionpack.gemspec:40-41) it is NOT a
-      // gemspec dependency of actionpack or railties: only the Rails repo's
-      // Gemfile pulls it in, which is why RFC 0168 ships it as an optional
-      // peer. Git, not RubyGems: the published .gem ships no `test/`.
       ref: "v1.17.0",
     },
     packages: [
       {
         name: "rack-cache",
         libPath: "lib/rack/cache",
-        // As with rack-test, the file beside the module root is not a shim:
-        // `lib/rack/cache.rb:42-44` defines `Rack::Cache.new`, which is what
-        // `middleware.use ::Rack::Cache` reaches.
         libEntryFile: "lib/rack/cache.rb",
         testPath: "test",
         compareApi: false,
