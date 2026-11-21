@@ -1060,7 +1060,7 @@
     }
   },
   "pg": {
-    "rows": 9,
+    "rows": 14,
     "excluded": [
       "composite-decoder.ts::CompositeDecoder",
       "composite-encoder.ts::CompositeEncoder",
@@ -1080,12 +1080,7 @@
       "text-decoder/timestamp.ts::Timestamp",
       "text-encoder/array.ts::Array",
       "text-encoder/boolean.ts::Boolean",
-      "text-encoder/integer.ts::Integer",
-      "type-map-all-strings.ts::TypeMapAllStrings",
-      "type-map-by-class.ts::TypeMapByClass",
-      "type-map-by-oid.ts::TypeMapByOid",
-      "type-map.ts::DefaultTypeMappable",
-      "type-map.ts::TypeMap"
+      "text-encoder/integer.ts::Integer"
     ],
     "unwalked": [],
     "residue": {
@@ -1097,7 +1092,12 @@
       "text-decoder/date.ts::Date": "PG::TextDecoder::Date",
       "text-decoder/timestamp.ts::TimestampLocal": "PG::TextDecoder::TimestampLocal",
       "text-decoder/timestamp.ts::TimestampUtc": "PG::TextDecoder::TimestampUtc",
-      "text-decoder/timestamp.ts::TimestampUtcToLocal": "PG::TextDecoder::TimestampUtcToLocal"
+      "text-decoder/timestamp.ts::TimestampUtcToLocal": "PG::TextDecoder::TimestampUtcToLocal",
+      "type-map-all-strings.ts::TypeMapAllStrings": "PG::TypeMapAllStrings",
+      "type-map-by-class.ts::TypeMapByClass": "PG::TypeMapByClass",
+      "type-map-by-oid.ts::TypeMapByOid": "PG::TypeMapByOid",
+      "type-map.ts::DefaultTypeMappable": "PG::TypeMap::DefaultTypeMappable",
+      "type-map.ts::TypeMap": "PG::TypeMap"
     }
   },
   "raabro": { "rows": 3, "excluded": [], "unwalked": [], "residue": {} },
