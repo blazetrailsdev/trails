@@ -72,7 +72,7 @@ export class Response {
 
   isFresh(): boolean | null {
     const ttl = this.ttl;
-    return ttl != null && ttl > 0;
+    return ttl != null ? ttl > 0 : null;
   }
 
   isCacheable(): boolean | null {
@@ -129,11 +129,10 @@ export class Response {
   }
 
   get maxAge(): number | null {
-    const expires = this.expires;
     return (this.cacheControl.reverseMaxAge() ??
       this.cacheControl.sharedMaxAge() ??
       this.cacheControl.maxAge() ??
-      (expires && (expires.minus(this.date) as number))) as number | null;
+      (this.expires && (this.expires.minus(this.date) as number))) as number | null;
   }
 
   set maxAge(value: unknown) {
