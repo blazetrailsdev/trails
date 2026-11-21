@@ -14,11 +14,11 @@ interface MultipleApplicationsTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class MultipleApplicationsTest extends TestCase {}
 include(MultipleApplicationsTest, Isolation);
-registerSpecType(/^ApplicationTests::MultipleApplicationsTest$/, MultipleApplicationsTest);
+registerSpecType(/^MultipleApplicationsTest$/, MultipleApplicationsTest);
 
 type Config = Configuration & Record<string, unknown>;
 
-describe("ApplicationTests::MultipleApplicationsTest", { timeout: 120_000 }, () => {
+describe("MultipleApplicationsTest", { timeout: 120_000 }, () => {
   let t: MultipleApplicationsTest;
   let AppTemplate: typeof Application;
 
