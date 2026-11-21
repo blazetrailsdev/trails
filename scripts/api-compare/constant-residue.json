@@ -1087,6 +1087,7 @@
       "text-encoder/array.ts::Array",
       "text-encoder/boolean.ts::Boolean",
       "text-encoder/integer.ts::Integer",
+      "type-map-all-strings.ts::TypeMapAllStrings",
       "type-map-by-class.ts::TypeMapByClass",
       "type-map-by-oid.ts::TypeMapByOid"
     ],
