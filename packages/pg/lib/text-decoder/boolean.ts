@@ -2,7 +2,6 @@ import { TypeError } from "@blazetrails/ruby-compat";
 import { SimpleDecoder } from "../simple-decoder.js";
 import { PG } from "../namespaces.js";
 
-/** @noRailsEquivalent PERMANENT */
 export class Boolean extends SimpleDecoder {
   /** @noRailsEquivalent PERMANENT */
   decode(string: string, tuple: number | null = null, field: number | null = null): unknown {

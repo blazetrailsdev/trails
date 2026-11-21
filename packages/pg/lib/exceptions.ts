@@ -23,13 +23,10 @@ export class Error extends StandardError {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
 export class ServerError extends Error {}
 
-/** @noRailsEquivalent PERMANENT */
 export class UnableToSend extends Error {}
 
-/** @noRailsEquivalent PERMANENT */
 export class ConnectionBad extends Error {}
 
 /** @noRailsEquivalent PERMANENT */

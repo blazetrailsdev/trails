@@ -2493,6 +2493,109 @@ class ApiExtractor
     }
   end
 
+  C_BUILTIN_CONSTANTS = {
+    "rb_cObject" => "Object", "rb_eStandardError" => "StandardError",
+    "rb_mEnumerable" => "Enumerable", "rb_mKernel" => "Kernel",
+    "rb_mComparable" => "Comparable",
+  }.freeze
+
+  public def process_c_ext_dir(ext_dir, file_overrides = {})
+    files = Dir.glob(File.join(ext_dir, "*.c")).sort.map { |f| [f, File.read(f)] }
+    vars = C_BUILTIN_CONSTANTS.dup
+    decl = /(?:(\w+)\s*=\s*)?rb_define_(class|module)(_under)?\(\s*(?:(\w+)\s*,\s*)?"(\w+)"\s*(?:,\s*(\w+)\s*)?\)/
+    loop do
+      changed = false
+      files.each do |filepath, source|
+        source.each_line.with_index(1) do |text, line|
+          text.scan(decl) do |var, kind, under, owner_var, name, super_var|
+            next if under && !vars[owner_var]
+            fqn = under ? "#{vars[owner_var]}::#{name}" : name
+            if var && var != "dummy" && vars[var] != fqn
+              abort "#{filepath}:#{line}: #{var} reassigned from #{vars[var]} to #{fqn}" if vars[var] && !C_BUILTIN_CONSTANTS.key?(var)
+              vars[var] = fqn
+              changed = true
+            end
+            next if kind == "class" && super_var && !vars[super_var]
+            superclass = super_var && vars[super_var] != "Object" ? vars[super_var] : nil
+            if (known = @classes[fqn] || @modules[fqn])
+              known[:superclass] ||= superclass if kind == "class"
+              next
+            end
+            owner = under && @classes[vars[owner_var]]
+            @current_file = file_overrides[File.basename(filepath)] || owner&.dig(:file) || c_conventional_file(fqn)
+            info = new_class_info(name, fqn)
+            if kind == "class"
+              info[:superclass] = superclass
+              @classes[fqn] = info
+            else
+              @modules[fqn] = info
+            end
+            changed = true
+          end
+        end
+      end
+      break unless changed
+    end
+
+    params_by_func = {}
+    files.each do |_, source|
+      source.scan(/^(?:static\s+)?VALUE\s*\n?\s*(\w+)\s*\(([^)]*)\)\s*\{/) do |func, list|
+        params_by_func[func] = list.split(",").map { |p| p.strip.split(/[\s*]+/).last }
+      end
+    end
+
+    files.each do |filepath, source|
+      vendor_file = filepath.delete_prefix("#{VENDOR_ROOT}/")
+      source.each_line.with_index(1) do |text, line|
+        if (start = text =~ /\brb_(?:define|include|extend)_\w*\s*\(/) && text[start..].count("(") > text[start..].count(")")
+          abort "#{filepath}:#{line}: rb_define_ call spans lines"
+        end
+        text.scan(/rb_(define_method|define_private_method|define_protected_method|define_singleton_method|define_module_function|define_alias|define_attr|include_module|extend_object)\s*\(\s*(\w+)\s*,\s*(?:"([^"]+)"|(\w+))\s*(?:,\s*"?([\w=?!\[\]]+)"?\s*)?(?:,\s*(-?\d+)\s*)?/) do |call, owner_var, name, arg_var, func, argc|
+          target_fqn = vars[owner_var]
+          target = @classes[target_fqn] || @modules[target_fqn]
+          next unless target
+          entry = { file: target[:file], line: line, vendorFile: vendor_file }
+          case call
+          when "include_module"
+            target[:includes] << vars[arg_var] if vars[arg_var]
+          when "extend_object"
+            target[:extends] << vars[arg_var] if vars[arg_var]
+          when "define_alias"
+            target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], notes: "alias", alias_target: func)
+          when "define_attr"
+            read = func
+            write = argc
+            target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], reader: true) if read == "1"
+            target[:instanceMethods] << entry.merge(name: "#{name}=", visibility: "public", params: [{ name: "value", kind: "required" }]) if write == "1"
+          else
+            method_info = entry.merge(name: name, visibility: call.include?("private") ? "private" : call.include?("protected") ? "protected" : "public",
+                                      params: c_method_params(params_by_func[func], argc.to_i))
+            if call == "define_singleton_method"
+              target[:classMethods] << method_info
+            elsif call == "define_module_function"
+              target[:classMethods] << method_info
+              target[:instanceMethods] << method_info.merge(visibility: "private")
+            else
+              target[:instanceMethods] << method_info
+            end
+          end
+        end
+      end
+    end
+  end
+
+  def c_conventional_file(fqn)
+    segments = fqn.split("::").drop(1)
+    segments = [fqn] if segments.empty?
+    segments.map { |s| s.gsub(/([a-z\d])([A-Z])/, '\1_\2').gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2').downcase }.join("/") + ".rb"
+  end
+
+  def c_method_params(c_params, argc)
+    return [{ name: "args", kind: "rest" }] if argc.negative?
+    names = (c_params || []).drop(1)
+    (0...argc).map { |i| { name: names[i] || "arg#{i}", kind: "required" } }
+  end
+
   # Replay the deferred `CONST.each` loops now that every file in the package
   # has been seen, so the constant store is complete. Called from the driver
   # beside dedupe_define_methods! / resolve_aliases!.
@@ -5479,6 +5582,10 @@ end
 
 # ---- Main ----
 
+C_EXT_DIRS = {
+  "pg" => { dir: "ext", files: { "pg_errors.c" => "exceptions.rb" } },
+}.freeze
+
 def run
   # Validate per-package paths (the JSON manifest may include paths the user
   # hasn't fetched yet, e.g. a fresh checkout that skipped pnpm vendor:fetch).
@@ -5533,6 +5640,11 @@ def run
       extractor.process_file(entry_file, File.dirname(entry_file))
     elsif File.file?(umbrella_file)
       extractor.scan_umbrella_file(umbrella_file, pkg_dir)
+    end
+
+    C_EXT_DIRS.fetch(pkg_name, nil)&.then do |ext|
+      gem_root = pkg_dir.sub(%r{/lib(?:/.*)?/?\z}, "")
+      extractor.process_c_ext_dir(File.join(gem_root, ext[:dir]), ext[:files])
     end
 
     # Replay `CONST.each` codegen loops whose constant lives in a file that

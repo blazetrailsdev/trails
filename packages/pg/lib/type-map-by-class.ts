@@ -6,7 +6,6 @@ import { DefaultTypeMappable, TypeMap } from "./type-map.js";
 
 type Encoder = Coder & { encode(value: unknown, encoding?: unknown): string | null };
 
-/** @noRailsEquivalent PERMANENT */
 export class TypeMapByClass extends TypeMap {
   /**
    * @internal

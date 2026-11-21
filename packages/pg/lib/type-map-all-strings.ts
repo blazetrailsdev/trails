@@ -1,7 +1,6 @@
 import { PG } from "./namespaces.js";
 import { TypeMap } from "./type-map.js";
 
-/** @noRailsEquivalent CONVERGEABLE pg-ruby-api-manifest-reads-ext-c-classes */
 export class TypeMapAllStrings extends TypeMap {}
 
 /**
