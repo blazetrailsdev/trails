@@ -113,6 +113,29 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/get published_at\(\): import\("@blazetrails\/date"\)\.Time;/);
   });
 
+  test("skipTimeZoneConversionForAttributes is inherited from an abstract parent", () => {
+    const src =
+      "export class ApplicationRecord extends Base {\n" +
+      "  static abstractClass = true;\n" +
+      '  static skipTimeZoneConversionForAttributes = ["published_at"];\n' +
+      "}\n" +
+      "export class Post extends ApplicationRecord {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          created_at: { type: "datetime", null: false },
+          published_at: { type: "datetime", null: false },
+        },
+      },
+      timeZoneAwareAttributes: true,
+      baseNames: ["Base", "ApplicationRecord"],
+    });
+    expect(text).toMatch(
+      /get created_at\(\): import\("@blazetrails\/activesupport"\)\.TimeWithZone;/,
+    );
+    expect(text).toMatch(/get published_at\(\): import\("@blazetrails\/date"\)\.Time;/);
+  });
+
   test("schemaColumnsByTable skips user-authored declares", () => {
     const src =
       "export class Post extends Base {\n" +

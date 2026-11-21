@@ -107,6 +107,7 @@ export function synthesizeDeclares(
       opts.attributesNullable ?? false,
       isKnownTarget,
       opts.timeZoneAwareAttributes,
+      skipTimeZoneConversionForAttributes(info, opts),
     )) {
       if (!line.skipIfPresent || !memberPresent(info, line)) {
         emit(line);
@@ -236,6 +237,7 @@ function renderSchemaColumnDeclares(
       ),
     );
   }
+  const skipped = skipTimeZoneConversionForAttributes(info, opts);
   for (const [col, value] of entries) {
     if (synthesizedInstanceNames.has(col)) continue;
     if (info.existingMembers.has(col)) continue;
@@ -246,14 +248,21 @@ function renderSchemaColumnDeclares(
     const keyLike = isForeignKeyColumn(col, value) || isDefaultTypedPrimaryKey(value);
     const tsType = keyLike
       ? `${AR_IMPORT}.PrimaryKeyValue`
-      : renderSchemaValueType(
-          value,
-          info.skipTimeZoneConversionForAttributes.has(col) ? false : opts.timeZoneAwareAttributes,
-        );
+      : renderSchemaValueType(value, opts.timeZoneAwareAttributes && !skipped.has(col));
     const writerType = keyLike ? tsType : writerTsTypeFor(trailsType, tsType);
     out.push(attributeLine(renderDeclaredMemberName(col), tsType, col, writerType));
   }
   return out;
+}
+
+function skipTimeZoneConversionForAttributes(
+  info: ClassInfo,
+  opts: SynthesizeOptions,
+): ReadonlySet<string> {
+  for (const klass of [info, ...(opts.ancestors ?? [])]) {
+    if (klass.skipTimeZoneConversionForAttributes) return klass.skipTimeZoneConversionForAttributes;
+  }
+  return new Set();
 }
 
 function primaryKeyTsType(type: string): string {
@@ -392,14 +401,11 @@ function renderCall(
   attributesNullable: boolean,
   isKnownTarget: ((name: string) => boolean) | undefined,
   timeZoneAware: boolean | undefined,
+  skipped: ReadonlySet<string>,
 ): RenderedLine[] {
   switch (call.kind) {
     case "attribute":
-      return renderAttribute(
-        call,
-        attributesNullable,
-        info.skipTimeZoneConversionForAttributes.has(call.name) ? false : timeZoneAware,
-      );
+      return renderAttribute(call, attributesNullable, timeZoneAware && !skipped.has(call.name));
     case "hasMany":
     case "hasAndBelongsToMany":
       return renderCollectionAssoc(info, call, aliases, targets, isKnownTarget);
