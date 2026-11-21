@@ -171,15 +171,18 @@ const fetchAttributeModule = FetchAttribute as unknown as Record<
   string,
   (...args: unknown[]) => unknown
 >;
-include(Between, fetchAttributeModule);
-include(NotEqual, fetchAttributeModule);
-include(GreaterThan, fetchAttributeModule);
-include(GreaterThanOrEqual, fetchAttributeModule);
-include(LessThan, fetchAttributeModule);
-include(LessThanOrEqual, fetchAttributeModule);
-include(IsDistinctFrom, fetchAttributeModule);
-include(IsNotDistinctFrom, fetchAttributeModule);
-include(NotIn, fetchAttributeModule);
+const includers = [
+  Between,
+  NotEqual,
+  GreaterThan,
+  GreaterThanOrEqual,
+  LessThan,
+  LessThanOrEqual,
+  IsDistinctFrom,
+  IsNotDistinctFrom,
+  NotIn,
+] as unknown as (new (...args: unknown[]) => object)[];
+for (const includer of includers) include(includer, fetchAttributeModule);
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 export interface Binary<L = NodeOrValue, R = NodeOrValue> extends _AliasPredication {
