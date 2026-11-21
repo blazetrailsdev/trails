@@ -2547,17 +2547,21 @@ class ApiExtractor
     error_codes = {}
     errorcodes_def = File.join(ext_dir, "errorcodes.def")
     if File.file?(errorcodes_def)
-      vendor_file = errorcodes_def.delete_prefix("#{VENDOR_ROOT}/")
       klass = nil
       File.read(errorcodes_def).each_line.with_index(1) do |text, line|
         if (m = text.match(/define_error_class\(\s*"(\w+)"\s*,\s*(?:NULL|"(\w+)")\s*\)/))
-          superclass = m[2] ? error_codes.fetch(m[2]) : "PG::ServerError"
+          superclass = m[2] ? error_codes[m[2]] : "PG::ServerError"
+          abort "#{errorcodes_def}:#{line}: unknown parent #{m[2]}" unless superclass
           fqn = "PG::#{m[1]}"
           @current_file = file_overrides["pg_errors.c"] || c_conventional_file(fqn)
+          klass = fqn
+          if (known = @classes[fqn])
+            known[:superclass] ||= superclass
+            next
+          end
           info = new_class_info(m[1], fqn)
           info[:superclass] = superclass
-          @classes[fqn] ||= info
-          klass = fqn
+          @classes[fqn] = info
         elsif (m = text.match(/register_error_class\(\s*"(\w+)"\s*,\s*klass\s*\)/))
           error_codes[m[1]] = klass
         end
