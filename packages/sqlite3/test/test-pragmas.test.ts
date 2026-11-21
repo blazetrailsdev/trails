@@ -6,6 +6,8 @@ import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 import { Exception } from "../lib/errors.js";
 import { Pragmas } from "../lib/pragmas.js";
 
+const BIGENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
+
 describe("TestPragmas", () => {
   let db: SyncSqliteConnection & { testStatements: string[] };
 
@@ -66,5 +68,56 @@ describe("TestPragmas", () => {
       "PRAGMA optimize=3",
       "PRAGMA optimize=65554",
     ]);
+  });
+
+  it("encoding uppercase", async () => {
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+
+    Pragmas.setEncoding.call(db, "UTF-16");
+    const native = BIGENDIAN ? "UTF-16be" : "UTF-16le";
+    expect(await Pragmas.encoding.call(db)).toBe(native);
+
+    Pragmas.setEncoding.call(db, "UTF-16LE");
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-16le");
+
+    Pragmas.setEncoding.call(db, "UTF-16BE");
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-16be");
+
+    Pragmas.setEncoding.call(db, "UTF-8");
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+  });
+
+  it("encoding lowercase", async () => {
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+
+    Pragmas.setEncoding.call(db, "utf-16");
+    const native = BIGENDIAN ? "UTF-16be" : "UTF-16le";
+    expect(await Pragmas.encoding.call(db)).toBe(native);
+
+    Pragmas.setEncoding.call(db, "utf-16le");
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-16le");
+
+    Pragmas.setEncoding.call(db, "utf-16be");
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-16be");
+
+    Pragmas.setEncoding.call(db, "utf-8");
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+  });
+
+  it("encoding objects", async () => {
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+
+    Pragmas.setEncoding.call(db, "UTF-16");
+    const native = BIGENDIAN ? "UTF-16be" : "UTF-16le";
+    expect(await Pragmas.encoding.call(db)).toBe(native);
+
+    Pragmas.setEncoding.call(db, "UTF-16LE");
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-16le");
+
+    Pragmas.setEncoding.call(db, "UTF-16BE");
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-16be");
+
+    Pragmas.setEncoding.call(db, "UTF-8");
+    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
   });
 });
