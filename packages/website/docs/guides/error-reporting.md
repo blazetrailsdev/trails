@@ -26,9 +26,9 @@ that send an error on to a service, a log, or anywhere else. Code that catches
 an error hands it to the reporter, and the reporter hands it to each
 subscriber.
 
-The framework reports through it too. The executor that wraps each request,
-job and console command reports any error that escapes the work, so an
-unrescued error reaches your subscribers without you writing anything.
+The framework reports through it too. The executor middleware that wraps each
+request reports any error that escapes it, so an unrescued request error
+reaches your subscribers without you writing anything.
 
 ### Subscribing to the Reporter
 

@@ -242,8 +242,8 @@ array of the chosen ids.
 ```
 
 The upload arrives in `params` as an uploaded-file object. To store it
-attached to a record, use [Active Storage](./active-storage-overview.md),
-whose `fileField` accepts `directUpload: true`.
+attached to a record, use [Active Storage](./active-storage-overview.md);
+`fileField` accepts `directUpload: true` for its direct uploads.
 
 ### CSV File Upload Example
 
