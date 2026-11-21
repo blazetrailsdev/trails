@@ -39,26 +39,29 @@ export class Statement {
   }
 
   bindParams(...bindVars: unknown[]): void | Promise<void> {
-    const binds: [string | number, SqliteBindValue][] = [];
+    let pending: Promise<void> | undefined;
     let index = 1;
     for (const v of bindVars.flat(Infinity)) {
       if (v instanceof Hash || (v != null && Object.getPrototypeOf(v) === Object.prototype)) {
         const pairs = v instanceof Hash ? [...v.entries()] : Object.entries(v as object);
-        for (const [key, val] of pairs as [string, SqliteBindValue][]) binds.push([key, val]);
+        for (const [key, val] of pairs as [string, SqliteBindValue][]) {
+          if (pending) pending = pending.then(() => this.bindParam(key, val));
+          else {
+            const r = this.bindParam(key, val);
+            if (r instanceof Promise) pending = r;
+          }
+        }
       } else {
-        binds.push([index, v as SqliteBindValue]);
+        const i = index;
+        if (pending) pending = pending.then(() => this.bindParam(i, v as SqliteBindValue));
+        else {
+          const r = this.bindParam(i, v as SqliteBindValue);
+          if (r instanceof Promise) pending = r;
+        }
         index += 1;
       }
     }
-    for (let i = 0; i < binds.length; i++) {
-      const r = this.bindParam(...binds[i]);
-      if (r instanceof Promise) {
-        return (async () => {
-          await r;
-          for (const bind of binds.slice(i + 1)) await this.bindParam(...bind);
-        })();
-      }
-    }
+    return pending;
   }
 
   columns(): (string | null)[] | Promise<(string | null)[]> {
