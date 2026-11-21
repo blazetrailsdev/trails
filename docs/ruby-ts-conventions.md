@@ -218,7 +218,7 @@ have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
 - not called by activerecord
-  - `parse_ssl_mode`, `find_default_ca_path`, `query_info`, `info` (only in: `client.rb`)
+  - `query_info`, `info` (only in: `client.rb`)
 - not called by activerecord
   - `server_flags` (only in: `result.rb`)
 - not called by activerecord
