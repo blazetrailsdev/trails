@@ -23,7 +23,7 @@
   "rack-session": 18,
   "rack-test": 31,
   "rackup": 8,
-  "rails-dom-testing": 6,
+  "rails-dom-testing": 5,
   "ruby-compat": 842,
   "thor": 43,
   "zeitwerk": 33

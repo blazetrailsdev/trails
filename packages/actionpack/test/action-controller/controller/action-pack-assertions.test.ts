@@ -31,6 +31,20 @@ class ActionPackAssertionsController extends Base {
   async nothing() {
     await this.head(200);
   }
+  async helloXmlWorld() {
+    await this.render({ template: "test/hello_xml_world" });
+  }
+
+  async helloXmlWorldPdf() {
+    this.contentType = "application/pdf";
+    await this.render({ template: "test/hello_xml_world" });
+  }
+
+  async helloXmlWorldPdfHeader() {
+    this.response.headers.set("Content-Type", "application/pdf; charset=utf-8");
+    await this.render({ template: "test/hello_xml_world" });
+  }
+
   async redirectInternal() {
     await this.redirectTo("http://test.host/nothing");
   }
@@ -516,10 +530,20 @@ describe("ActionPackHeaderTest", () => {
     await tc.beforeSetup();
   });
 
-  // BLOCKED: action-pack-assertions-port-render-file-tests-and-park-the-builder-three
-  it.skip("rendering xml sets content type", () => {});
-  it.skip("rendering xml respects content type", () => {});
-  it.skip("rendering xml respects content type when set in the header", () => {});
+  it("rendering xml sets content type", async () => {
+    await tc.process("helloXmlWorld");
+    assertEqual("application/xml; charset=utf-8", tc.response.headers.get("Content-Type"));
+  });
+
+  it("rendering xml respects content type", async () => {
+    await tc.process("helloXmlWorldPdf");
+    assertEqual("application/pdf; charset=utf-8", tc.response.headers.get("Content-Type"));
+  });
+
+  it("rendering xml respects content type when set in the header", async () => {
+    await tc.process("helloXmlWorldPdfHeader");
+    assertEqual("application/pdf; charset=utf-8", tc.response.headers.get("Content-Type"));
+  });
 
   it("render text with custom content type", async () => {
     await tc.get("renderTextWithCustomContentType");

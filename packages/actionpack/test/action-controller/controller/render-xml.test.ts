@@ -122,8 +122,7 @@ describe("RenderXmlTest", () => {
     assertEqual("application/atomsvc+xml", tc.response.mediaType);
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("should use implicit content type", async () => {
+  it("should use implicit content type", async () => {
     await tc.get("implicitContentType", { format: "atom" });
     assertEqual(Mime.get("atom"), tc.response.mediaType);
   });

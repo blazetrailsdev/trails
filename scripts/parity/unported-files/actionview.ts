@@ -27,25 +27,13 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "newlines keep, so the backtrace line matches the template's.",
   },
   {
-    pattern: "template/handlers/builder.rb",
-    package: "actionview",
-    reason:
-      "`Template::Handlers::Builder#call` (builder.rb:8-14) compiles a `.builder` template " +
-      "into Ruby that drives `::Builder::XmlMarkup` from the `builder` gem, which is neither " +
-      "vendored nor available as a trails package, and trails takes no third-party runtime " +
-      "deps. A port would have no XmlMarkup to emit code against, so `Handlers.extended` " +
-      "(handlers.rb:12-18) registers the other four handlers and not `:builder`.",
-  },
-  {
     pattern: "helpers/atom_feed_helper.rb",
     testFile: "template/atom_feed_helper_test.rb",
     package: "actionview",
     reason:
-      "`AtomFeedHelper#atom_feed` (atom_feed_helper.rb:96-125) reads `xml` from the block's " +
-      "binding, where only a `.builder` template's compiled code sets it, and every " +
-      "`AtomBuilder` / `AtomFeedBuilder` method forwards to `::Builder::XmlMarkup`. The " +
-      "`:builder` handler is unported above for want of XmlMarkup, and every test in " +
-      "atom_feed_helper_test.rb renders a `.builder` template, so neither half has a caller.",
+      "`AtomFeedHelper#atom_feed` (atom_feed_helper.rb:96-125) and its `AtomBuilder` / " +
+      "`AtomFeedBuilder` (atom_feed_helper.rb:127-204) have no trails port yet; the `.builder` " +
+      "handler they render through is ported (`template/handlers/builder.ts`).",
   },
   {
     pattern: "/render_parser.rb",
