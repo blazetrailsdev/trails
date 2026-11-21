@@ -5,10 +5,14 @@ import type { TimezoneTransition } from "./timezone-transition.js";
 
 export class TimezoneProxy extends Timezone {
   /** @internal */
+  private readonly _identifier: string;
+
+  /** @internal */
   private _realTimezone: Timezone | null;
 
   constructor(identifier: string) {
-    super(identifier);
+    super();
+    this._identifier = identifier;
     this._realTimezone = null;
   }
 

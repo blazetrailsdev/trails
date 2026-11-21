@@ -12,6 +12,7 @@ import {
 import { assertRaises } from "./support/test-utils.js";
 
 class TestTimezone extends Timezone {
+  readonly #identifier: string;
   readonly periodForResult: TimezonePeriod;
   readonly periodsForLocalResult: TimezonePeriod[];
   readonly transitionsUpToResult: TimezoneTransition[];
@@ -21,14 +22,15 @@ class TestTimezone extends Timezone {
   from: Time | null = null;
 
   constructor(identifier: string, noLocalPeriods = false) {
-    super(identifier);
+    super();
+    this.#identifier = identifier;
     this.periodForResult = {} as TimezonePeriod;
     this.periodsForLocalResult = noLocalPeriods ? [] : [{} as TimezonePeriod, {} as TimezonePeriod];
     this.transitionsUpToResult = [{} as TimezoneTransition, {} as TimezoneTransition];
   }
 
   override get identifier(): string {
-    return this._identifier;
+    return this.#identifier;
   }
 
   override periodFor(time: Time): TimezonePeriod {

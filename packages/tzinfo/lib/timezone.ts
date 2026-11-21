@@ -15,20 +15,24 @@ import {
   tzdataAbbreviation,
   tzdataAbbreviationChanges,
   tzdataBaseOffsets,
-  tzdataIsdst,
   tzdataIsdstFlips,
   tzdataOffsetInstant,
 } from "@blazetrails/date";
-import { Rational, StandardError, TopLevel, rbModName } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Rational,
+  StandardError,
+  TopLevel,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { OffsetTimezonePeriod } from "./offset-timezone-period.js";
 import { TimezoneOffset } from "./timezone-offset.js";
 import type { TimezonePeriod } from "./timezone-period.js";
 import type { TimezoneProxy } from "./timezone-proxy.js";
 import { TransitionsTimezonePeriod } from "./transitions-timezone-period.js";
 import { TimezoneTransition } from "./timezone-transition.js";
-import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
 import { DataTimezoneInfo } from "./data-sources/data-timezone-info.js";
-import type { TimezoneInfo } from "./data-sources/timezone-info.js";
+import { Timestamp } from "./timestamp.js";
 
 export class AmbiguousTime extends Error {
   override name = "AmbiguousTime";
@@ -48,6 +52,11 @@ function toDate(at: Date | Temporal.Instant | Time): Date {
   if (at instanceof Date) return at;
   if (at instanceof Time) return new Date(at.toI() * 1000 + Math.floor(at.nsec / 1_000_000));
   return new Date(at.epochMilliseconds);
+}
+
+function toTime(time: Date | Temporal.Instant | Time): Time {
+  if (time instanceof Time) return time;
+  return Time.at(new Rational(toDate(time).getTime(), 1000)).getutc();
 }
 
 function ignoringOffset(time: Date | Temporal.Instant | Time): Date {
@@ -363,11 +372,97 @@ const TZDB_NAMES: readonly string[] = [
 
 const loadedTimezoneIdentifiers = new Set<string>();
 
+function abbrAt(ianaName: string, date: Date): string {
+  const fixed = fixedZoneAbbreviations.get(ianaName);
+  if (fixed !== undefined) return fixed;
+  const interval = zoneInterval(ianaName, date);
+  if (interval?.abbr !== undefined) return interval.abbr;
+  const result = new DateTimezone(ianaName).abbr(Time.at(new Rational(date.getTime(), 1000)));
+  getZoneInfo(ianaName, date);
+  if (fixedZoneInfos.get(ianaName) != null) fixedZoneAbbreviations.set(ianaName, result);
+  else if (interval) interval.abbr = result;
+  return result;
+}
+
 /** @perf 190x — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
 const _periodsCache = new Map<string, TimezonePeriod[]>();
 
 /** @perf 1.7x — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
 const _offsetPeriodsCache = new Map<string, OffsetTimezonePeriod>();
+
+/** @noRailsEquivalent CONVERGEABLE tzinfo-timezone-reads-the-data-source */
+class _IntlDataTimezoneInfo extends DataTimezoneInfo {
+  override periodFor(timestamp: Timestamp): TimezonePeriod {
+    const constant = _offsetPeriodsCache.get(this.identifier);
+    if (constant) return constant;
+    const at = timestamp.value;
+    let cached = _periodsCache.get(this.identifier);
+    if (!cached) _periodsCache.set(this.identifier, (cached = []));
+    for (const period of cached) {
+      const start = period.startTransition?.timestampValue ?? -Infinity;
+      const end = period.endTransition?.timestampValue ?? Infinity;
+      if (start <= at && at < end) return period;
+    }
+    const [initialBase, baseInstants, bases] = tzdataBaseOffsets(this.identifier) ?? [null, [], []];
+    const offsetAt = (seconds: number): TimezoneOffset => {
+      const d = new Date(seconds * 1000);
+      const observed = getZoneInfo(this.identifier, d).utcOffsetSeconds;
+      let i = 0;
+      while (i < baseInstants.length && baseInstants[i] <= seconds) i++;
+      const base = (i === 0 ? initialBase : bases[i - 1]) ?? observed;
+      return new TimezoneOffset(base, observed - base, abbrAt(this.identifier, d));
+    };
+    const flips = tzdataIsdstFlips(this.identifier);
+    let flipIndex = 0;
+    while (flipIndex < flips.length && flips[flipIndex] <= at) flipIndex++;
+    let baseIndex = 0;
+    while (baseIndex < baseInstants.length && baseInstants[baseIndex] <= at) baseIndex++;
+    const zoned = Temporal.Instant.fromEpochMilliseconds(at * 1000 + 1).toZonedDateTimeISO(
+      this.identifier,
+    );
+    const previous = zoned.getTimeZoneTransition("previous");
+    const next = zoned.getTimeZoneTransition("next");
+    const starts = [
+      flips[flipIndex - 1],
+      baseInstants[baseIndex - 1],
+      previous && previous.epochMilliseconds / 1000,
+    ];
+    const ends = [flips[flipIndex], baseInstants[baseIndex], next && next.epochMilliseconds / 1000];
+    const start = Math.max(...starts.filter((s): s is number => s != null));
+    const end = Math.min(...ends.filter((e): e is number => e != null));
+    const offset = offsetAt(at);
+    if (!Number.isFinite(start) && !Number.isFinite(end)) {
+      const period = new OffsetTimezonePeriod(offset);
+      _offsetPeriodsCache.set(this.identifier, period);
+      return period;
+    }
+    const period = new TransitionsTimezonePeriod(
+      Number.isFinite(start) ? new TimezoneTransition(offset, offsetAt(start - 1), start) : null,
+      Number.isFinite(end) ? new TimezoneTransition(offsetAt(end), offset, end) : null,
+    );
+    cached.push(period);
+    return period;
+  }
+
+  override periodsForLocal(localTimestamp: Timestamp): TimezonePeriod[] {
+    const localTimestampValue = localTimestamp.value;
+    const around = [
+      getZoneInfo(this.identifier, new Date((localTimestampValue - 86400) * 1000)).utcOffsetSeconds,
+      getZoneInfo(this.identifier, new Date((localTimestampValue + 86400) * 1000)).utcOffsetSeconds,
+    ];
+    const candidates = [...new Set(around)].sort((a, b) => b - a);
+    const periods: TimezonePeriod[] = [];
+    for (const offset of candidates) {
+      const utcTimestampValue = localTimestampValue - offset;
+      if (
+        getZoneInfo(this.identifier, new Date(utcTimestampValue * 1000)).utcOffsetSeconds === offset
+      ) {
+        periods.push(this.periodFor(Timestamp.utc(utcTimestampValue)));
+      }
+    }
+    return periods;
+  }
+}
 
 export class Timezone {
   /** @missingRailsCall get_timezone_info — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
@@ -387,7 +482,7 @@ export class Timezone {
       }
       loadedTimezoneIdentifiers.add(identifier);
     }
-    return new DataTimezoneInfo(identifier).createTimezone();
+    return new _IntlDataTimezoneInfo(identifier).createTimezone();
   }
 
   static getProxy(identifier: string): TimezoneProxy {
@@ -407,26 +502,27 @@ export class Timezone {
     return identifiers.map((identifier) => this.getProxy(identifier));
   }
 
-  /** @internal */
-  protected readonly _identifier: string;
-  readonly info: TimezoneInfo | null;
-
-  constructor(name: string, info: TimezoneInfo | null = null) {
-    this._identifier = name;
-    this.info = info;
-  }
+  constructor() {}
 
   get identifier(): string {
     return this.raiseUnknownTimezone();
   }
 
   // eslint-disable-next-line unused-imports/no-unused-vars
-  periodFor(time: Time): TimezonePeriod {
+  periodFor(time: Time | DateTime | Timestamp): TimezonePeriod {
     this.raiseUnknownTimezone();
   }
 
   // eslint-disable-next-line unused-imports/no-unused-vars
-  transitionsUpTo(to: Time, from: Time | null = null): TimezoneTransition[] {
+  periodsForLocal(localTime: Time | DateTime | Timestamp): TimezonePeriod[] {
+    this.raiseUnknownTimezone();
+  }
+
+  transitionsUpTo(
+    to: Time | DateTime | Timestamp,
+    // eslint-disable-next-line unused-imports/no-unused-vars
+    from: Time | DateTime | Timestamp | null = null,
+  ): TimezoneTransition[] {
     this.raiseUnknownTimezone();
   }
 
@@ -473,127 +569,28 @@ export class Timezone {
     return `#<${rbModName(this.constructor)}: ${this.identifier}>`;
   }
 
-  abbr(time: Date | Temporal.Instant): string {
-    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
-      return this.info.constantOffset.abbreviation;
-    const fixed = fixedZoneAbbreviations.get(this.identifier);
-    if (fixed !== undefined) return fixed;
-    const interval = zoneInterval(this.identifier, toDate(time));
-    if (interval?.abbr !== undefined) return interval.abbr;
-    const result = new DateTimezone(this.identifier).abbr(
-      Time.at(new Rational(toDate(time).getTime(), 1000)),
-    );
-    getZoneInfo(this.identifier, toDate(time));
-    if (fixedZoneInfos.get(this.identifier) != null)
-      fixedZoneAbbreviations.set(this.identifier, result);
-    else if (interval) interval.abbr = result;
-    return result;
+  abbr(time: Date | Temporal.Instant | Time): string {
+    return this.periodFor(toTime(time)).abbreviation;
   }
 
-  /**
-   * @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info
-   * @missingRailsCall period_for — CONVERGEABLE data-timezone-delegates-periods-to-info
-   */
-  observedUtcOffset(time: Date | Temporal.Instant): number {
-    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
-      return this.info.constantOffset.observedUtcOffset;
-    return getZoneInfo(this.identifier, toDate(time)).utcOffsetSeconds;
+  observedUtcOffset(time: Date | Temporal.Instant | Time): number {
+    return this.periodFor(toTime(time)).observedUtcOffset;
   }
 
-  /**
-   * @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info
-   * @missingRailsCall period_for — CONVERGEABLE data-timezone-delegates-periods-to-info
-   */
   isDst(time: Date | Temporal.Instant | Time): boolean {
-    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
-      return this.info.constantOffset.stdOffset !== 0;
-    return tzdataIsdst(this.identifier, Math.floor(toDate(time).getTime() / 1000));
+    return this.periodFor(toTime(time)).isDst();
   }
 
   get canonicalIdentifier(): string {
     return this.canonicalZone().identifier;
   }
 
-  /**
-   * @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info
-   * @missingRailsCall period_for — CONVERGEABLE data-timezone-delegates-periods-to-info
-   * @missingRailsCall for — CONVERGEABLE data-timezone-delegates-periods-to-info
-   */
-  periodForUtc(time: Time): TimezonePeriod {
-    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
-      return new OffsetTimezonePeriod(this.info.constantOffset);
-    const constant = _offsetPeriodsCache.get(this.identifier);
-    if (constant) return constant;
-    const at = Math.floor(toDate(time).getTime() / 1000);
-    let cached = _periodsCache.get(this.identifier);
-    if (!cached) _periodsCache.set(this.identifier, (cached = []));
-    for (const period of cached) {
-      const start = period.startTransition?.timestampValue ?? -Infinity;
-      const end = period.endTransition?.timestampValue ?? Infinity;
-      if (start <= at && at < end) return period;
-    }
-    const [initialBase, baseInstants, bases] = tzdataBaseOffsets(this.identifier) ?? [null, [], []];
-    const offsetAt = (seconds: number): TimezoneOffset => {
-      const d = new Date(seconds * 1000);
-      const observed = this.observedUtcOffset(d);
-      let i = 0;
-      while (i < baseInstants.length && baseInstants[i] <= seconds) i++;
-      const base = (i === 0 ? initialBase : bases[i - 1]) ?? observed;
-      return new TimezoneOffset(base, observed - base, this.abbr(d));
-    };
-    const flips = tzdataIsdstFlips(this.identifier);
-    let flipIndex = 0;
-    while (flipIndex < flips.length && flips[flipIndex] <= at) flipIndex++;
-    let baseIndex = 0;
-    while (baseIndex < baseInstants.length && baseInstants[baseIndex] <= at) baseIndex++;
-    const zoned = Temporal.Instant.fromEpochMilliseconds(at * 1000 + 1).toZonedDateTimeISO(
-      this.identifier,
-    );
-    const previous = zoned.getTimeZoneTransition("previous");
-    const next = zoned.getTimeZoneTransition("next");
-    const starts = [
-      flips[flipIndex - 1],
-      baseInstants[baseIndex - 1],
-      previous && previous.epochMilliseconds / 1000,
-    ];
-    const ends = [flips[flipIndex], baseInstants[baseIndex], next && next.epochMilliseconds / 1000];
-    const start = Math.max(...starts.filter((s): s is number => s != null));
-    const end = Math.min(...ends.filter((e): e is number => e != null));
-    const offset = offsetAt(at);
-    if (!Number.isFinite(start) && !Number.isFinite(end)) {
-      const period = new OffsetTimezonePeriod(offset);
-      _offsetPeriodsCache.set(this.identifier, period);
-      return period;
-    }
-    const period = new TransitionsTimezonePeriod(
-      Number.isFinite(start) ? new TimezoneTransition(offset, offsetAt(start - 1), start) : null,
-      Number.isFinite(end) ? new TimezoneTransition(offsetAt(end), offset, end) : null,
-    );
-    cached.push(period);
-    return period;
+  periodForUtc(utcTime: Time): TimezonePeriod {
+    if (utcTime == null) throw new ArgumentError("utc_time must be specified");
+    return this.periodFor(Timestamp.for(utcTime, "treatAsUtc") as Timestamp);
   }
 
-  /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
-  periodsForLocal(time: Time): TimezonePeriod[] {
-    if (this.info instanceof ConstantOffsetDataTimezoneInfo) return [this.periodForUtc(time)];
-    const localMs = ignoringOffset(time).getTime();
-    const DAY = 86_400_000;
-    const around = [
-      getZoneInfo(this.identifier, new Date(localMs - DAY)).utcOffsetSeconds,
-      getZoneInfo(this.identifier, new Date(localMs + DAY)).utcOffsetSeconds,
-    ];
-    const candidates = [...new Set(around)].sort((a, b) => b - a);
-    const periods: TimezonePeriod[] = [];
-    for (const offset of candidates) {
-      const utc = Time.at(new Rational(localMs - offset * 1000, 1000)).getutc();
-      if (getZoneInfo(this.identifier, toDate(utc)).utcOffsetSeconds === offset) {
-        periods.push(this.periodForUtc(utc));
-      }
-    }
-    return periods;
-  }
-
-  /** @missingRailsCall for — CONVERGEABLE data-timezone-delegates-periods-to-info */
+  /** @missingRailsCall for — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
   periodForLocal(
     time: Time,
     dst: boolean | null = null,
@@ -616,19 +613,16 @@ export class Timezone {
     );
   }
 
-  /** @missingRailsCall period_for — CONVERGEABLE data-timezone-delegates-periods-to-info */
   currentPeriod(): TimezonePeriod {
-    return this.periodForUtc(Time.now());
+    return this.periodFor(Time.now());
   }
 
-  /** @missingRailsCall for — CONVERGEABLE data-timezone-delegates-periods-to-info */
+  /** @missingRailsCall for — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
   utcToLocal(time: Time): Time {
-    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
-      return time.getlocal(this.info.constantOffset.observedUtcOffset);
     return time.getlocal(this.identifier);
   }
 
-  /** @missingRailsCall for — CONVERGEABLE data-timezone-delegates-periods-to-info */
+  /** @missingRailsCall for — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
   localToUtc(
     time: Time | DateTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
     dst: boolean | null = null,
