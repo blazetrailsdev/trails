@@ -6,7 +6,7 @@ import {
   STDIN,
   TopLevel,
   constSet,
-  env as ENV,
+  setEnv,
   getProcessAdapter,
   rbModRemoveConst,
   registerReplAdapter,
@@ -62,7 +62,7 @@ async function spawnConsole(
     env = {},
   }: { waitForPrompt?: boolean; env?: Record<string, string> } = {},
 ): Promise<void> {
-  Object.assign(ENV, env);
+  for (const [key, value] of Object.entries(env)) setEnv(key, value);
   spawnedEnv.push(...Object.keys(env));
   started = Console.start(
     Trails.application as never,
@@ -120,7 +120,7 @@ describe("FullStackConsoleTest", () => {
     await started;
     replAdapterConfig.adapter = previousAdapter!;
     Trails.application = null;
-    for (const key of spawnedEnv.splice(0)) delete ENV[key];
+    for (const key of spawnedEnv.splice(0)) setEnv(key, undefined);
     rbModRemoveConst(TopLevel, "ApplicationController");
     vi.restoreAllMocks();
   });
