@@ -1,6 +1,6 @@
 import "../constants.generated-attribute.generated.js";
 import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
-import { Base } from "@blazetrails/activerecord";
+import { ActiveRecord } from "@blazetrails/activerecord";
 import { Trails } from "../trails.js";
 import { Error } from "./base.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -71,15 +71,15 @@ export class GeneratedAttribute {
   }
 
   static isDangerousName(name: string): boolean {
-    return Base.isDangerousAttributeMethod(name);
+    return ActiveRecord.Base != null && ActiveRecord.Base.isDangerousAttributeMethod(name);
   }
 
   static validType(type: string): boolean {
     return (
       DEFAULT_TYPES.has(type) ||
-      Base == null ||
-      Base.connectionHandler
-        .retrieveConnectionPool(Base.connectionSpecificationName)
+      ActiveRecord.Base == null ||
+      ActiveRecord.Base.connectionHandler
+        .retrieveConnectionPool(ActiveRecord.Base.connectionSpecificationName)
         ?.activeConnection?.isValidType(type) === true
     );
   }
