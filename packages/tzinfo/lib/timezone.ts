@@ -636,7 +636,6 @@ export class Timezone {
     return utcTime.getlocal(period.observedUtcOffset);
   }
 
-  /** @missingRailsCall for — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
   localToUtc(
     time: Time | DateTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
     dst: boolean | null = null,
