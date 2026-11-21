@@ -16,6 +16,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
 import { Base } from "../../../lib/action-controller/base.js";
+import { API } from "../../../lib/action-controller/api.js";
 import { deprecator } from "../../../lib/action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 
@@ -141,6 +142,18 @@ class InnerModuleController extends Base {
 Object.defineProperty(InnerModuleController, "name", { value: "Admin::InnerModuleController" });
 const Admin = { InnerModuleController };
 
+class ApiOnlyController extends API {
+  declare newRouteUrl: () => string;
+
+  async nothing() {
+    await this.head(":ok");
+  }
+
+  async redirectToNewRoute() {
+    await this.redirectTo(this.newRouteUrl());
+  }
+}
+
 describe("ActionPackAssertionsControllerTest", () => {
   let tc: TestCase &
     Pick<ActionPackAssertionsController, "routeTwoUrl"> &
@@ -193,8 +206,19 @@ describe("ActionPackAssertionsControllerTest", () => {
     });
   });
 
-  // BLOCKED: api-redirect-to-override-and-head-response-are-invented
-  it.skip("with routing works with api only controllers", () => {});
+  it("with routing works with api only controllers", async () => {
+    tc.controller = new ApiOnlyController();
+
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("new_route", { to: "api_only#nothing" });
+        this.get("redirect_to_new_route", { to: "api_only#redirectToNewRoute" });
+      });
+
+      await tc.process("redirectToNewRoute");
+      assertRedirectedTo("http://test.host/new_route");
+    });
+  });
 
   it("assert redirect to named route failure", async () => {
     await tc.withRouting(async (set: RouteSet) => {

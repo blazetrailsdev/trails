@@ -176,7 +176,7 @@ describe("BaseTest", () => {
     assertEqual("contained_sub_empty", Submodule.ContainedSubEmptyController.controllerName());
   });
 
-  // BLOCKED: action-methods-does-not-subtract-internal-methods
+  // PERMANENT-SKIP: CLAUDE.md, "Method visibility is compile-time only": `authenticate` is private in Rails (`base_test.rb:31`) and `action_methods` reads `public_instance_methods`.
   it.skip("action methods", async () => {
     assertEqual(
       new Set([

@@ -7,7 +7,7 @@ import { Base } from "../../../lib/action-controller/base.js";
 describe("RouteHelperIntegrationTest", () => {
   class FooController extends ApplicationController {}
 
-  // BLOCKED: with-routes-helpers-answers-the-wired-class-itself
+  // BLOCKED: routes-helpers-with-records-subclass-include-in-ancestry
   it.skip("only includes one module with route helpers", () => {
     const urlHelpersModule = SharedTestRoutes.namedRoutes.urlHelpersModule;
     const pathHelpersModule = SharedTestRoutes.namedRoutes.pathHelpersModule;
