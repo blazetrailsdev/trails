@@ -418,6 +418,12 @@ export class Client {
 
     let mode: number | undefined;
     if (rtest(opts.sslMode)) mode = this.parseSslMode(opts.sslMode);
+    if (
+      (mode === Client.SSL_MODE_VERIFY_CA || mode === Client.SSL_MODE_VERIFY_IDENTITY) &&
+      !rtest(opts.sslca)
+    ) {
+      opts.sslca = this.findDefaultCaPath();
+    }
 
     const sslOptions = ["sslkey", "sslcert", "sslca", "sslcapath", "sslcipher"].map(
       (k) => (opts[k] ?? null) as string | null,
@@ -495,17 +501,6 @@ export class Client {
 
   static async new<T extends Client>(this: { prototype: T }, opts: object = {}): Promise<T> {
     const client = rbClassNewInstance(this, opts);
-    if (
-      (client.sslMode === Client.SSL_MODE_VERIFY_CA ||
-        client.sslMode === Client.SSL_MODE_VERIFY_IDENTITY) &&
-      client.ssl?.ca == null
-    ) {
-      const sslca = await client.findDefaultCaPath();
-      if (sslca !== undefined) {
-        const { key = null, cert = null, capath = null, cipher = null } = client.ssl ?? {};
-        client.sslSet(key, cert, sslca, capath, cipher);
-      }
-    }
     await client.connect(...client.connectArgs);
     return client;
   }
@@ -523,16 +518,13 @@ export class Client {
     return undefined;
   }
 
-  async findDefaultCaPath(): Promise<string | undefined> {
-    for (const f of [
+  findDefaultCaPath(): string | undefined {
+    return [
       "/etc/ssl/certs/ca-certificates.crt",
       "/etc/pki/tls/certs/ca-bundle.crt",
       "/etc/ssl/ca-bundle.pem",
       "/etc/ssl/cert.pem",
-    ]) {
-      if (await File.isExistAsync(f)) return f;
-    }
-    return undefined;
+    ].find((f) => File.isExist(f));
   }
 
   private setReconnect(value: boolean): boolean {
@@ -669,6 +661,15 @@ export class Client {
     return new Rational(Time.local(2010).utcOffset, 86400);
   }
 
+  /**
+   * @missingRailsCall write_timeout — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
+   * @missingRailsCall reconnect — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
+   * @missingRailsCall default_file — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
+   * @missingRailsCall default_group — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
+   * @missingRailsCall default_auth — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
+   * @missingRailsCall enable_cleartext_plugin — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
+   * @missingRailsCall ssl_mode — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
+   */
   private async connect(
     user: string | null,
     pass: string | null,
