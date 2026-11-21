@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { Thread, setEnv } from "@blazetrails/ruby-compat";
+import { Concurrent, Thread, setEnv } from "@blazetrails/ruby-compat";
 import { Notifications, getEnv, type NotificationEvent } from "@blazetrails/activesupport";
 import { asyncQueryExecutor, setAsyncQueryExecutor } from "../../../lib/active-record.js";
 import { Rollback } from "../../../lib/errors.js";
@@ -15,6 +15,7 @@ import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import "../../models/category.js";
 import "../../models/comment.js";
 
+type LogMethod = (...args: unknown[]) => Promise<unknown>;
 type Status = { executed?: boolean; async?: unknown };
 
 describe("LoadAsyncTest", () => {
@@ -164,7 +165,44 @@ describe("LoadAsyncTest", () => {
     expect(posts).not.toBeNull();
     expect([...new Set((await posts!).map((post) => post.title))]).toEqual(["In Transaction"]);
   });
-  it.skip("load async instrumentation is thread safe", () => {});
+  it.skipIf(inMemoryDb())("load async instrumentation is thread safe", async () => {
+    const connection = (await Base.leaseConnection()) as unknown as { log: LogMethod };
+    const latch1 = new Concurrent.CountDownLatch();
+    const latch2 = new Concurrent.CountDownLatch();
+    try {
+      const oldLog = connection.log.bind(connection);
+      connection.log = async (...args) => {
+        if (!args[4]) {
+          return oldLog(...args);
+        }
+
+        latch1.countDown();
+        await latch2.wait();
+        return oldLog(...args);
+      };
+
+      const promise = Post.asyncCount();
+      await latch1.wait();
+
+      let notificationCalled = false;
+      await Notifications.subscribed(
+        () => {
+          notificationCalled = true;
+        },
+        "sql.active_record",
+        async () => {
+          await Post.count();
+        },
+      );
+
+      expect(notificationCalled).toBe(true);
+      latch2.countDown();
+      await promise;
+    } finally {
+      latch2.countDown();
+      delete (connection as { log?: LogMethod }).log;
+    }
+  });
   it("eager loading query", async () => {
     const expectedRecords = await Post.where({ author_id: 1 }).eagerLoad("comments");
 

@@ -105,7 +105,7 @@ export class ThreadPoolExecutor {
     } else if (this._running < this.maxLength) {
       this._running += 1;
       this.scheduledTaskCount += 1;
-      queueMicrotask(() => this._runWorker(task));
+      this._runWorker(task);
     } else if (this.maxQueue === 0 || this._queue.length < this.maxQueue) {
       this._queue.push(task);
       this.scheduledTaskCount += 1;
@@ -188,9 +188,7 @@ export class ThreadPoolExecutor {
     new Thread(async () => {
       let task: (() => unknown) | undefined = first;
       while (task) {
-        await Promise.resolve()
-          .then(task)
-          .catch(() => null);
+        await (async () => task())().catch(() => null);
         this.completedTaskCount += 1;
         task = this._queue.shift() ?? (await this._nextTask());
       }

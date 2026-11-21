@@ -12,7 +12,7 @@ import {
   warn,
 } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
-import { DRIVER_ERRORS, Error as Mysql2Error } from "./error.js";
+import { Error as Mysql2Error } from "./error.js";
 import { Mysql2 } from "./mysql2.js";
 import { Result } from "./result.js";
 import { Statement } from "./statement.js";
@@ -40,40 +40,16 @@ export interface Mysql2Result<
 
 type Handshake = { _handshakePacket?: { serverVersion?: string } };
 
-function serverVersion(client: object | undefined): number {
-  const conn = client as (Handshake & { connection?: Handshake }) | undefined;
-  const version = ((conn?.connection ?? conn)?._handshakePacket?.serverVersion ?? "").replace(
-    /^5\.5\.5-/,
-    "",
-  );
-  const [major, minor, patch] = (/(\d+)\.(\d+)\.(\d+)/.exec(version) ?? [0, 0, 0, 0])
-    .slice(1)
-    .map(Number);
-  return major * 10000 + minor * 100 + patch;
+function serverVersion(client: Client): number {
+  return client.serverInfo().id;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function driverError(e: unknown, client?: object): never {
-  const { code, errno, fatal, sqlState } = (e ?? {}) as {
-    code?: unknown;
-    errno?: unknown;
-    fatal?: unknown;
-    sqlState?: string;
-  };
-  if (!(e instanceof globalThis.Error)) throw e;
-  if (typeof errno === "number" && errno > 0) {
-    const error = Mysql2Error.newWithArgs(
-      e.message,
-      serverVersion(client),
-      errno,
-      sqlState ?? null,
-    );
-    error.cause = e;
-    throw error;
-  }
-  if (typeof code === "string" || fatal === true) DRIVER_ERRORS.add(e);
-  throw e;
-}
+const TIMEOUT_CODES = ["PROTOCOL_SEQUENCE_TIMEOUT", "ETIMEDOUT"];
+const CONNECTION_CODES = [
+  ...["PROTOCOL_CONNECTION_LOST", "PROTOCOL_ENQUEUE_AFTER_QUIT"],
+  ...["PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR", "PROTOCOL_ENQUEUE_HANDSHAKE_TWICE", "POOL_CLOSED"],
+  ...["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "EHOSTUNREACH", "ENETUNREACH", "EPIPE"],
+];
 
 const CLIENT_FLAGS: Record<string, number> = {
   LONG_PASSWORD: 0x00000001,
@@ -498,7 +474,7 @@ export class Client {
 
     const connection = (await mysql
       .createConnection(config as mysql.ConnectionOptions)
-      .catch(driverError)) as NpmConnection;
+      .catch((e: unknown) => this.raiseMysql2Error(e))) as NpmConnection;
     this.connection = connection;
 
     const protocol = connection.connection;
@@ -533,7 +509,7 @@ export class Client {
     return this.storeResult(
       await (this.connection.query as unknown as (options: object) => Promise<Native>)
         .call(this.connection, this.options(sql, opts))
-        .catch((e: unknown) => driverError(e, this.connection)),
+        .catch((e: unknown) => this.raiseMysql2Error(e)),
     );
   }
 
@@ -623,9 +599,35 @@ export class Client {
   }
 
   serverInfo(): { id: number; version: string | null } {
-    const handshake = (this.connection.connection as Handshake | undefined) ?? this.connection;
-    const version = handshake._handshakePacket?.serverVersion ?? null;
-    return { id: serverVersion(this.connection), version };
+    const handshake = (this.connection?.connection as Handshake | undefined) ?? this.connection;
+    const version = handshake?._handshakePacket?.serverVersion ?? null;
+    const [major, minor, patch] = (
+      /(\d+)\.(\d+)\.(\d+)/.exec((version ?? "").replace(/^5\.5\.5-/, "")) ?? [0, 0, 0, 0]
+    )
+      .slice(1)
+      .map(Number);
+    return { id: major * 10000 + minor * 100 + patch, version };
+  }
+
+  /** @internal */
+  private raiseMysql2Error(e: unknown): never {
+    if (!(e instanceof globalThis.Error)) throw e;
+    const { code, errno, sqlState } = e as { code?: unknown; errno?: unknown; sqlState?: string };
+    let error: Mysql2Error;
+    if (typeof errno === "number" && errno > 0) {
+      error = Mysql2Error.newWithArgs(e.message, serverVersion(this), errno, sqlState ?? null);
+    } else if (typeof code === "string" && TIMEOUT_CODES.includes(code)) {
+      error = new Mysql2Error.TimeoutError(e.message);
+    } else if (
+      (typeof code === "string" && CONNECTION_CODES.includes(code)) ||
+      /add new command when connection is in closed state/i.test(e.message)
+    ) {
+      error = new Mysql2Error.ConnectionError(e.message);
+    } else {
+      error = new Mysql2Error(e.message);
+    }
+    error.cause = e;
+    throw error;
   }
 
   setServerOption(value: number): Promise<true> {
@@ -648,7 +650,7 @@ export class Client {
           return true;
         },
       });
-    }).catch((e: unknown) => driverError(e, this.connection));
+    }).catch((e: unknown) => this.raiseMysql2Error(e));
   }
 }
 

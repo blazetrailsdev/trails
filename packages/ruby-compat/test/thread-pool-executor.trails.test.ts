@@ -32,14 +32,14 @@ describe("ThreadPoolExecutor", () => {
     executor.post(task("b"));
     executor.post(task("c"));
     executor.post(task("d"));
-    expect(order).toEqual(["d"]);
+    expect(order).toEqual(["a", "b", "d"]);
 
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(order).toEqual(["d", "a", "b"]);
+    expect(order).toEqual(["a", "b", "d"]);
     release();
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(order).toEqual(["d", "a", "b", "c"]);
+    expect(order).toEqual(["a", "b", "d", "c"]);
     expect(peak).toBe(3);
   });
 
