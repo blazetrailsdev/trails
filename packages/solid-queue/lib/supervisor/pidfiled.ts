@@ -14,8 +14,8 @@ export class Pidfiled {
   /** @internal */
   async setupPidfile(this: PidfiledHost): Promise<void> {
     const path = SolidQueue.supervisorPidfile;
-    if (path != null && path !== false) {
-      const pidfile = new Pidfile(String(path));
+    if (path != null) {
+      const pidfile = new Pidfile(path);
       await pidfile.setup();
       this._pidfile = pidfile;
     }
