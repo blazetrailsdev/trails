@@ -1343,7 +1343,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
 
         expect(a._rawConnectionForTest()).not.toBe(raw);
-        expect((await a._rawConnectionForTest()!.query("SELECT 1 AS one")).getvalue(0, 0)).toBe(1);
+        expect((await a._rawConnectionForTest()!.query("SELECT 1 AS one")).getvalue(0, 0)).toBe(
+          "1",
+        );
       } finally {
         await a.disconnectBang();
       }

@@ -1192,6 +1192,8 @@ export class PostgreSQLAdapter
       this._rawConnection = await (this.constructor as typeof PostgreSQLAdapter).newClient(
         this._connectionParameters,
       );
+      this._mappedDefaultTimezone = null;
+      this.timestampDecoder = null;
     } catch (ex) {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
@@ -1354,7 +1356,7 @@ export class PostgreSQLAdapter
           : PG.TextDecoder.TimestampWithoutTimeZone;
 
       this.timestampDecoder = new decoderClass(undefined, { ...this.timestampDecoder.toH() });
-      this._rawConnection.typeMapForResults.addCoder(this.timestampDecoder);
+      (this._rawConnection.typeMapForResults as PG.TypeMapByOid).addCoder(this.timestampDecoder);
 
       this._mappedDefaultTimezone = defaultTimezone();
 

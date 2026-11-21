@@ -1,4 +1,5 @@
 import { it, expect, vi } from "vitest";
+import { defaultTimezone, setDefaultTimezone } from "../../../../lib/active-record.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 
 describeIfPg("PostgresqlConnectionTest (trails)", () => {
@@ -48,13 +49,30 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
     }
   });
 
+  it("reconnectBang after disconnectBang queries when default_timezone changed in between", async () => {
+    const previous = defaultTimezone();
+    const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
+    try {
+      setDefaultTimezone("local");
+      await a.connect();
+      await a.configureConnection();
+      await a.disconnectBang();
+      setDefaultTimezone("utc");
+      await a.reconnectBang();
+      expect(await a.selectValue("SELECT 1")).toBe(1);
+    } finally {
+      setDefaultTimezone(previous);
+      await a.disconnectBang();
+    }
+  });
+
   it("reconnect resets connection so queries work again", async () => {
     const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
     try {
       await a.reconnect();
       expect(await a.active()).toBe(true);
       const rows = Array.from(await a.execute("SELECT 1 AS n"));
-      expect(rows[0]?.n).toBe(1);
+      expect(rows[0]?.n).toBe("1");
     } finally {
       await a.disconnectBang();
     }
@@ -68,7 +86,7 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
       await a.reconnect();
       expect(await a.active()).toBe(true);
       const rows = Array.from(await a.execute("SELECT 2 AS n"));
-      expect(rows[0]?.n).toBe(2);
+      expect(rows[0]?.n).toBe("2");
     } finally {
       await a.disconnectBang();
     }

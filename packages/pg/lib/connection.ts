@@ -8,7 +8,8 @@ import { ConnectionBad, Error as PgError, UnableToSend } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { Result } from "./result.js";
 import type { TypeMapByClass } from "./type-map-by-class.js";
-import { TypeMapByOid } from "./type-map-by-oid.js";
+import { TypeMapAllStrings } from "./type-map-all-strings.js";
+import type { TypeMapByOid } from "./type-map-by-oid.js";
 import type * as NodePg from "./engine/node-pg.js";
 
 let engine: typeof NodePg | null = null;
@@ -34,7 +35,7 @@ export class Connection {
   bad = false;
   pendingResult: Promise<{ result: Result } | { error: unknown }> | null = null;
   pendingResultTaken = false;
-  typeMapForResults = new TypeMapByOid();
+  typeMapForResults: TypeMapAllStrings | TypeMapByOid = new TypeMapAllStrings();
   typeMapForQueries: TypeMapByClass | null = null;
   notifies: NodePg.Notification[] = [];
   notifyWaiter: ((error?: unknown) => void) | null = null;
