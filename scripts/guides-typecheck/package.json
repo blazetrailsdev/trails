@@ -25,6 +25,7 @@
     "@blazetrails/raabro": "workspace:*",
     "@blazetrails/zeitwerk": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rack-cache": "workspace:*",
     "@blazetrails/rack-cors": "workspace:*",
     "@blazetrails/rack-proxy": "workspace:*",
     "@blazetrails/rack-session": "workspace:*",
