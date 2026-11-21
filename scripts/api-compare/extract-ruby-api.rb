@@ -2575,7 +2575,10 @@ class ApiExtractor
         text.scan(/\bpg_define_coder\(\s*"(\w+)"\s*,\s*\w+\s*,\s*\w+\s*,\s*(\w+)\s*\)/) do |name, nsp_var|
           target = @classes["#{vars[nsp_var]}::#{name}"]
           next unless target
-          coder_method = nsp_var.include?("Encoder") ? "encode" : nsp_var.include?("Decoder") ? "decode" : nil
+          coder_method =
+            if %w[rb_mPG_BinaryEncoder rb_mPG_TextEncoder].include?(nsp_var) then "encode"
+            elsif %w[rb_mPG_BinaryDecoder rb_mPG_TextDecoder].include?(nsp_var) then "decode"
+            end
           next unless coder_method
           target[:instanceMethods] << { file: target[:file], line: line, vendorFile: vendor_file, name: coder_method,
                                         visibility: "public", params: c_method_params(nil, -1) }
