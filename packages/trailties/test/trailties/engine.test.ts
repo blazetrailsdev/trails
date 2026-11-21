@@ -9,7 +9,16 @@ import {
   NullInternalMetadata,
   NullSchemaMigration,
 } from "@blazetrails/activerecord";
-import { constGet, Dir, File, getFs, include, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  constGet,
+  Dir,
+  File,
+  FileUtils,
+  getFs,
+  include,
+  NoMethodError,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import type { Bukkit, Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { Engine } from "../../lib/engine.js";
@@ -47,7 +56,9 @@ interface RailtiesEngineTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class RailtiesEngineTest extends TestCase {}
 include(RailtiesEngineTest, Isolation);
-registerSpecType(/^RailtiesTest::EngineTest$/, RailtiesEngineTest);
+registerSpecType(/^EngineTest$/, RailtiesEngineTest);
+
+const globals = TopLevel as Record<string, unknown>;
 
 const engineSource = (name: string, mod: string, railtieName?: string): string => `
 import { Engine } from "@blazetrails/trailties";
@@ -63,7 +74,7 @@ import { Migration } from "@blazetrails/activerecord";
 export class ${klass} extends Migration.Current {${body}}
 `;
 
-describe("RailtiesTest::EngineTest", () => {
+describe("EngineTest", () => {
   let t: RailtiesEngineTest;
   let plugin: Bukkit;
 
@@ -282,6 +293,105 @@ export class Post extends Base {}
       expect(Bukkits.tableNamePrefix).toBe("ar_prefix_bukkits_");
     },
   );
+
+  it("initializers", { timeout: 240_000 }, async () => {
+    globals.pluginInitializer = false;
+    await plugin.write(
+      "config/initializers/foo.ts",
+      `import { TopLevel } from "@blazetrails/ruby-compat";
+(TopLevel as Record<string, unknown>).pluginInitializer = true;
+`,
+    );
+
+    await t.bootTrails();
+    expect(globals.pluginInitializer).toBeTruthy();
+  });
+
+  it(
+    "initializers are executed after application configuration initializers",
+    { timeout: 240_000 },
+    async () => {
+      await plugin.write(
+        "lib/bukkits.ts",
+        `
+import { Engine } from "@blazetrails/trailties";
+export class BukkitsEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.initializer("dummy_initializer", () => {});
+  }
+}
+`,
+      );
+
+      await t.bootTrails();
+
+      const initializers = Trails.application!.initializers.tsort();
+      const dummyIndex = initializers.findIndex((i) => i.name === "dummy_initializer");
+      const configIndex = initializers.findLastIndex((i) => i.name === "load_config_initializers");
+      const stackIndex = initializers.findIndex((i) => i.name === "build_middleware_stack");
+
+      expect(configIndex < dummyIndex).toBeTruthy();
+      expect(dummyIndex < stackIndex).toBeTruthy();
+    },
+  );
+
+  it("loading seed data", { timeout: 240_000 }, async () => {
+    await plugin.write(
+      "db/seeds.ts",
+      `import { BukkitsEngine } from "../lib/bukkits.js";
+(BukkitsEngine.config as unknown as Record<string, unknown>).bukkitsSeedsLoaded = true;
+`,
+    );
+
+    await t.appFile(
+      "db/seeds.ts",
+      `import { Trails } from "@blazetrails/trailties";
+(Trails.application!.config as unknown as Record<string, unknown>).appSeedsLoaded = true;
+`,
+    );
+
+    await t.bootTrails();
+
+    const { BukkitsEngine } = (await import(`${plugin.path}/lib/bukkits.ts`)) as {
+      BukkitsEngine: typeof Engine;
+    };
+    await Trails.application!.loadSeed();
+    expect(
+      (Trails.application!.config as unknown as Record<string, unknown>).appSeedsLoaded,
+    ).toBeTruthy();
+    expect(
+      () => (BukkitsEngine.config as unknown as Record<string, unknown>).bukkitsSeedsLoaded,
+    ).toThrow(NoMethodError);
+
+    await BukkitsEngine.instance().loadSeed();
+    expect(
+      (BukkitsEngine.config as unknown as Record<string, unknown>).bukkitsSeedsLoaded,
+    ).toBeTruthy();
+  });
+
+  it("loading seed data is wrapped by the executor", { timeout: 240_000 }, async () => {
+    await t.appFile(
+      "db/seeds.ts",
+      `import { Trails } from "@blazetrails/trailties";
+(Trails.application!.config as unknown as Record<string, unknown>).seedingWrappedByExecutor =
+  Trails.application!.executor.active();
+`,
+    );
+
+    await t.bootTrails();
+    await Trails.application!.loadSeed();
+
+    expect(
+      (Trails.application!.config as unknown as Record<string, unknown>).seedingWrappedByExecutor,
+    ).toBeTruthy();
+  });
+
+  it("skips nonexistent seed data", { timeout: 240_000 }, async () => {
+    await FileUtils.rmAsync(`${await t.appPath()}/db/seeds.ts`);
+    await t.bootTrails();
+    expect(await Trails.application!.loadSeed()).toBeUndefined();
+  });
 });
 
 const fixtureRoot = new URL("../fixtures/initializer-engine", import.meta.url).pathname;
@@ -322,73 +432,6 @@ describe("EngineTest", () => {
 
     const response = await StackEngine.instance().call(MockRequest.envFor("/bukkits"));
     expect(response[2]).toEqual(["HELLO WORLD"]);
-  });
-
-  it("initializers", async () => {
-    class InitializersEngine extends Engine {}
-    Engine.register(InitializersEngine, fixtureRoot);
-    const engine = InitializersEngine.instance();
-
-    await engine.initializers.find((i) => i.name === "load_config_initializers")!.run();
-
-    expect(loaded).toEqual(["a-foo", "b-bar"]);
-  });
-
-  it("initializers are executed after application configuration initializers", () => {
-    class OrderingEngine extends Engine {}
-    Engine.register(OrderingEngine, fixtureRoot);
-    OrderingEngine.initializer("dummy_initializer", () => {});
-    const names = OrderingEngine.instance()
-      .initializers.tsort()
-      .map((i) => i.name);
-
-    expect(names.lastIndexOf("load_config_initializers")).toBeLessThan(
-      names.indexOf("dummy_initializer"),
-    );
-  });
-
-  it("loading seed data", async () => {
-    class SeedEngine extends Engine {}
-    Engine.register(SeedEngine, fixtureRoot);
-    const engine = SeedEngine.instance();
-
-    await engine.loadSeed();
-
-    expect(loaded).toEqual(["seeds"]);
-  });
-
-  it("skips nonexistent seed data", async () => {
-    class NoSeedEngine extends Engine {}
-    Engine.register(NoSeedEngine, fixtureRoot);
-    const engine = NoSeedEngine.instance();
-    engine.config.setRoot("/nonexistent-engine-root");
-
-    await expect(engine.loadSeed()).resolves.toBeUndefined();
-    expect(loaded).toEqual([]);
-  });
-
-  it("loading seed data is wrapped by the executor", async () => {
-    class WrappedSeedEngine extends Engine {}
-    Engine.register(
-      WrappedSeedEngine,
-      new URL("../fixtures/seed-engine", import.meta.url).pathname,
-    );
-    const engine = WrappedSeedEngine.instance();
-    const wrapped: string[] = [];
-    const app = {
-      reloader: {
-        wrap(block: () => void | Promise<void>): void | Promise<void> {
-          wrapped.push("wrap");
-          return block();
-        },
-      },
-    };
-
-    engine.initializers.find((i) => i.name === "wrap_reloader_around_load_seed")!.run(app);
-    await engine.loadSeed();
-
-    expect(wrapped).toEqual(["wrap"]);
-    expect(loaded).toEqual(["wrapped-seeds"]);
   });
 
   it("setting priority for engines with config.railties_order", () => {
