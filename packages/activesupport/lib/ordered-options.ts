@@ -1,5 +1,5 @@
 import { presence } from "./core-ext/object/blank.js";
-import { KeyError, rbEqual, rbObjClassname } from "@blazetrails/ruby-compat";
+import { fetch, KeyError, rbEqual, rbObjClassname } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
   static name = "ActiveSupport::OrderedOptions";
@@ -70,6 +70,15 @@ export class OrderedOptions {
       throw new TypeError(`${rbObjClassname(obj)} does not have #dig method`);
     }
     return obj;
+  }
+
+  /**
+   * `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`), which `OrderedOptions < Hash`
+   * (`ordered_options.rb:32`) inherits: the stored value, else the block's or
+   * the default's, else `KeyError`. The default block is not consulted.
+   */
+  fetch(key: string, ...rest: [] | [unknown]): unknown {
+    return fetch(this.data, String(key), ...rest);
   }
 
   respondToMissing(name: string, includePrivate: boolean): boolean {

@@ -1421,6 +1421,7 @@ export function recordTsPortedWithArgs(
   owner: string,
 ): void {
   if (isTestHelperFile(file)) return;
+  if (m.declaredIn?.startsWith("../")) return;
   const pkgSigs = maps.paramsByNameInPkg.get(m.name) ?? [];
   pkgSigs.push(m.params);
   maps.paramsByNameInPkg.set(m.name, pkgSigs);

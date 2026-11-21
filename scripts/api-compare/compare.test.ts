@@ -4868,6 +4868,30 @@ describe("ported-with-args population", () => {
     expect(sigs("test-helpers/fixtures.ts", "fixtures")).toEqual([]);
   });
 
+  it("withholds a member an interface resolves off another package and keeps a sibling file's", () => {
+    const maps = newTsPortedWithArgsMaps();
+    recordTsPortedWithArgs(
+      maps,
+      {
+        ...method("fetch", "engine.ts"),
+        declaredIn: "../../activesupport/dist/ordered-options.d.ts",
+      },
+      "engine.ts",
+      "SolidQueueConfig",
+    );
+    recordTsPortedWithArgs(
+      maps,
+      { ...method("dig", "engine.ts"), declaredIn: "lib/options.ts" },
+      "engine.ts",
+      "SolidQueueConfig",
+    );
+    const sigs = (file: string, name: string) =>
+      resolvePortedWithArgsSigs(maps.paramsByFileNameInPkg, maps.paramsByNameInPkg, file, name);
+
+    expect(sigs("engine.ts", "fetch")).toEqual([]);
+    expect(sigs("engine.ts", "dig")).toHaveLength(1);
+  });
+
   it("pairs option keys by owner, so a sibling class masks neither side", () => {
     const maps = newTsPortedWithArgsMaps();
     const file = "schema-definitions.ts";

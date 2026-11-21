@@ -37,6 +37,7 @@ export class InvalidKeyError extends Error {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface EncryptedConfiguration {
   dig(key: string, ...identifiers: (string | number)[]): unknown;
+  fetch(key: string, ...rest: [] | [unknown]): unknown;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
