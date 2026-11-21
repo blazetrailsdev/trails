@@ -197,7 +197,7 @@ import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { PG } from "@blazetrails/pg";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
-import { databaseCli, defaultTimezone } from "../active-record.js";
+import { databaseCli } from "../active-record.js";
 import { dbWarningsAction } from "../active-record.js";
 
 type SessionVariables = Record<string, string | number | boolean | null | ":default">;
@@ -395,7 +395,7 @@ export class PostgreSQLAdapter
   _regtypeOids: Map<string, number> = new Map();
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning: unknown = true;
-  private _mappedDefaultTimezone: "utc" | "local" | null = null;
+  private _mappedDefaultTimezone: string | null = null;
   private timestampDecoder: PG.SimpleDecoder | null = null;
   private _schemaSearchPathMemo: string | null = null;
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
@@ -1192,8 +1192,6 @@ export class PostgreSQLAdapter
       this._rawConnection = await (this.constructor as typeof PostgreSQLAdapter).newClient(
         this._connectionParameters,
       );
-      this._mappedDefaultTimezone = null;
-      this.timestampDecoder = null;
     } catch (ex) {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
@@ -1347,18 +1345,18 @@ export class PostgreSQLAdapter
   async updateTypemapForDefaultTimezone(): Promise<true | undefined> {
     if (
       this._rawConnection != null &&
-      this._mappedDefaultTimezone !== defaultTimezone() &&
+      this._mappedDefaultTimezone !== this.defaultTimezone &&
       this.timestampDecoder != null
     ) {
       const decoderClass =
-        defaultTimezone() === "utc"
+        this.defaultTimezone === "utc"
           ? PG.TextDecoder.TimestampUtc
           : PG.TextDecoder.TimestampWithoutTimeZone;
 
       this.timestampDecoder = new decoderClass(undefined, { ...this.timestampDecoder.toH() });
       (this._rawConnection.typeMapForResults as PG.TypeMapByOid).addCoder(this.timestampDecoder);
 
-      this._mappedDefaultTimezone = defaultTimezone();
+      this._mappedDefaultTimezone = this.defaultTimezone;
 
       await this.reconfigureConnectionTimezone();
 

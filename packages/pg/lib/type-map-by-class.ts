@@ -1,11 +1,21 @@
-import { rbModAncestors, rbObjClass } from "@blazetrails/ruby-compat";
+import { include, rbModAncestors, rbObjClass } from "@blazetrails/ruby-compat";
 import type { Coder } from "./coder.js";
 import { PG } from "./namespaces.js";
+import { _pgTypemapAllStrings } from "./type-map-all-strings.js";
+import { DefaultTypeMappable, TypeMap } from "./type-map.js";
 
 type Encoder = Coder & { encode(value: unknown, encoding?: unknown): string | null };
 
 /** @noRailsEquivalent PERMANENT */
-export class TypeMapByClass {
+export class TypeMapByClass extends TypeMap {
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  _defaultTypemap: TypeMap = _pgTypemapAllStrings;
+  declare defaultTypeMap: DefaultTypeMappable["defaultTypeMap"];
+  declare withDefaultTypeMap: DefaultTypeMappable["withDefaultTypeMap"];
+
   readonly #klassToCoder = new Map<object, Encoder>();
 
   set(klass: object, coder: Encoder | null): Encoder | null {
@@ -21,7 +31,7 @@ export class TypeMapByClass {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  _lookupKlass(paramValue: unknown): Encoder | null {
+  _lookupKlass(paramValue: unknown): { encode(value: unknown): string | null } | null {
     const klass = rbObjClass(paramValue);
     const obj = this.#klassToCoder.get(klass);
     if (obj != null) return obj;
@@ -30,8 +40,10 @@ export class TypeMapByClass {
       const coder = this.#klassToCoder.get(ancestors[i]);
       if (coder != null) return coder;
     }
-    return null;
+    return this.defaultTypeMap._lookupKlass(paramValue);
   }
 }
+
+include(TypeMapByClass, DefaultTypeMappable);
 
 PG.TypeMapByClass = TypeMapByClass;

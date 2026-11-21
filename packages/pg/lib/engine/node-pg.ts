@@ -7,7 +7,6 @@ import {
   UnableToSend,
 } from "../exceptions.js";
 import { Result } from "../result.js";
-import { TypeMapAllStrings } from "../type-map-all-strings.js";
 import type { Connection } from "../connection.js";
 
 const OID_BYTEA = 17;
@@ -117,10 +116,7 @@ function types(conn: Connection): { getTypeParser(oid: number, format?: string):
       }
       const coder = format !== "binary" && conn.typeMapForResults._lookupOid(0, oid);
       if (coder) return (value: string) => coder.decode(value);
-      if (conn.typeMapForResults instanceof TypeMapAllStrings) {
-        return (value: unknown) => value;
-      }
-      return conn.client.getTypeParser(oid, format as "text");
+      return (value: unknown) => value;
     },
   };
 }
@@ -128,7 +124,7 @@ function types(conn: Connection): { getTypeParser(oid: number, format?: string):
 type BinaryParam = { value?: unknown; format?: unknown };
 
 function param(conn: Connection, value: unknown): unknown {
-  const coder = conn.typeMapForQueries?._lookupKlass(value);
+  const coder = conn.typeMapForQueries._lookupKlass(value);
   if (coder != null) return coder.encode(value);
   if (value instanceof Number) return value.valueOf();
   if (typeof value === "object" && value !== null && (value as BinaryParam).format === 1) {

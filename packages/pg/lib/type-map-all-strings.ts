@@ -1,14 +1,13 @@
 import { PG } from "./namespaces.js";
+import { TypeMap } from "./type-map.js";
 
 /** @noRailsEquivalent CONVERGEABLE pg-ruby-api-manifest-reads-ext-c-classes */
-export class TypeMapAllStrings {
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  _lookupOid(_format: number, _oid: number): null {
-    return null;
-  }
-}
+export class TypeMapAllStrings extends TypeMap {}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export const _pgTypemapAllStrings: TypeMapAllStrings = Object.freeze(new TypeMapAllStrings());
 
 PG.TypeMapAllStrings = TypeMapAllStrings;

@@ -5,10 +5,8 @@ import { Base, ColumnNotSerializableError, StatementInvalid } from "../../../../
 import { TimeZone, setZone, change as timeChange } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Array as OidArray } from "../../../../lib/connection-adapters/postgresql/oid/array.js";
-import { ValueType, StringType } from "@blazetrails/activemodel";
+import { StringType } from "@blazetrails/activemodel";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
-
-const textArray = new OidArray(new ValueType());
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -220,42 +218,30 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("select with strings", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
-      const rows = Array.from(await adapter.execute(`SELECT tags FROM pg_arrays`));
-      expect(rows[0].tags).toEqual(["1", "2", "3"]);
+      const x = (await PgArray.first())!;
+      expect(x.tags).toEqual(["1", "2", "3"]);
     });
 
     it("rewrite with strings", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
-      const rows = Array.from(await adapter.execute(`SELECT id FROM pg_arrays`));
-      const id = rows[0].id;
-      await adapter.execQuery(
-        `UPDATE pg_arrays SET tags = '{"1","2","3","4"}' WHERE id = $1`,
-        "SQL",
-        [id],
-      );
-      const updated = (
-        await adapter.execQuery(`SELECT tags FROM pg_arrays WHERE id = $1`, "SQL", [id])
-      ).toArray();
-      expect(updated[0].tags).toEqual(["1", "2", "3", "4"]);
+      const x = (await PgArray.first())!;
+      x.tags = ["1", "2", "3", "4"];
+      await x.saveBang();
+      expect((await x.reload()).tags).toEqual(["1", "2", "3", "4"]);
     });
 
     it("select with integers", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
-      const rows = Array.from(await adapter.execute(`SELECT ratings FROM pg_arrays`));
-      expect(rows[0].ratings).toEqual([1, 2, 3]);
+      const x = (await PgArray.first())!;
+      expect(x.ratings).toEqual([1, 2, 3]);
     });
 
     it("rewrite with integers", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
-      const rows = Array.from(await adapter.execute(`SELECT id FROM pg_arrays`));
-      const id = rows[0].id;
-      await adapter.execQuery(`UPDATE pg_arrays SET ratings = '{2,3,4}' WHERE id = $1`, "SQL", [
-        id,
-      ]);
-      const updated = (
-        await adapter.execQuery(`SELECT ratings FROM pg_arrays WHERE id = $1`, "SQL", [id])
-      ).toArray();
-      expect(updated[0].ratings).toEqual([2, 3, 4]);
+      const x = (await PgArray.first())!;
+      x.ratings = [2, "3", 4];
+      await x.saveBang();
+      expect((await x.reload()).ratings).toEqual([2, 3, 4]);
     });
 
     it("multi dimensional with strings", async () => {
@@ -361,11 +347,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("escaping", async () => {
       const unknown = 'foo\\",bar,baz,\\';
       const tags = [`hello_${unknown}`];
-      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
-        textArray.serialize(tags),
-      ]);
-      const rows = Array.from(await adapter.execute(`SELECT tags FROM pg_arrays`));
-      expect(rows[0].tags).toEqual(tags);
+      const ar = await PgArray.createBang({ tags });
+      await ar.reload();
+      expect(ar.tags).toEqual(tags);
     });
 
     it("string quoting rules match pg behavior", async () => {

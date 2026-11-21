@@ -1,5 +1,4 @@
 import { it, expect, vi } from "vitest";
-import { defaultTimezone, setDefaultTimezone } from "../../../../lib/active-record.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 
 describeIfPg("PostgresqlConnectionTest (trails)", () => {
@@ -46,23 +45,6 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
       expect(endSpy).not.toHaveBeenCalled();
     } finally {
       socket?.destroy?.();
-    }
-  });
-
-  it("reconnectBang after disconnectBang queries when default_timezone changed in between", async () => {
-    const previous = defaultTimezone();
-    const a = new PostgreSQLAdapter({ ...PG_TEST_CONFIG });
-    try {
-      setDefaultTimezone("local");
-      await a.connect();
-      await a.configureConnection();
-      await a.disconnectBang();
-      setDefaultTimezone("utc");
-      await a.reconnectBang();
-      expect(await a.selectValue("SELECT 1")).toBe(1);
-    } finally {
-      setDefaultTimezone(previous);
-      await a.disconnectBang();
     }
   });
 

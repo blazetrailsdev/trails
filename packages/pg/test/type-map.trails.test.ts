@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ArgumentError,
+  FrozenError,
   rbCFalseClass,
   rbCInteger,
   rbCNumeric,
@@ -52,5 +53,33 @@ describe("PG::TypeMapByOid", () => {
     expect(outer._lookupOid(0, 25)).toBe(coder);
     expect(outer._lookupOid(1, 25)).toBeNull();
     expect(() => inner.addCoder(new Upcase(null, { oid: 1, format: 2 }))).toThrow(ArgumentError);
+  });
+});
+
+describe("PG::TypeMap", () => {
+  it("defaults a DefaultTypeMappable map's default_type_map to the frozen all-strings map", () => {
+    const byOid = new PG.TypeMapByOid();
+    const byClass = new PG.TypeMapByClass();
+    expect(byOid).toBeInstanceOf(PG.TypeMap);
+    expect(new PG.TypeMapAllStrings()).toBeInstanceOf(PG.TypeMap);
+    expect(byOid.defaultTypeMap).toBeInstanceOf(PG.TypeMapAllStrings);
+    expect(byOid.defaultTypeMap).toBe(byClass.defaultTypeMap);
+    expect(Object.isFrozen(byOid.defaultTypeMap)).toBe(true);
+    expect(byOid._lookupOid(0, 20)).toBeNull();
+    expect(byClass._lookupKlass(3)).toBeNull();
+    const inner = new PG.TypeMapByOid();
+    expect(byOid.withDefaultTypeMap(inner)).toBe(byOid);
+    expect(byOid.defaultTypeMap).toBe(inner);
+  });
+});
+
+describe("PG::TypeMap::DefaultTypeMappable#default_type_map=", () => {
+  it("raises FrozenError on a frozen map and TypeError for a non-TypeMap", () => {
+    const map = new PG.TypeMapByOid();
+    expect(() => (map.defaultTypeMap = {} as never)).toThrow(
+      "wrong argument type Hash (expected PG::TypeMap)",
+    );
+    Object.freeze(map);
+    expect(() => map.withDefaultTypeMap(new PG.TypeMapByOid())).toThrow(FrozenError);
   });
 });

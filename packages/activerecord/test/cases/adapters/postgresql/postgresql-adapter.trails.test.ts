@@ -747,7 +747,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execQuery(`SELECT "val" FROM "ex_arr" WHERE $1 = ANY("val")`, "SQL", [2])
       ).toArray();
       expect(rows).toHaveLength(1);
-      expect(rows[0].val).toEqual([1, 2, 3]);
+      expect(rows[0].val).toBe("{1,2,3}");
     });
 
     it("uuid decoding", async () => {

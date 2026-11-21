@@ -8,6 +8,7 @@ export { Coder, CompositeCoder } from "./coder.js";
 export { Result } from "./result.js";
 export { SimpleDecoder } from "./simple-decoder.js";
 export { SimpleEncoder } from "./simple-encoder.js";
+export { TypeMap } from "./type-map.js";
 export { TypeMapAllStrings } from "./type-map-all-strings.js";
 export { TypeMapByClass } from "./type-map-by-class.js";
 export { TypeMapByOid } from "./type-map-by-oid.js";
