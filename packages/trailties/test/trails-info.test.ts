@@ -2,6 +2,16 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { Info, PropertyList } from "../lib/info.js";
 import { VERSION } from "../lib/gem-version.js";
 
+const properties = () => Info.properties;
+
+const isPropertyDefined = (propertyName: string): boolean =>
+  properties().names().includes(propertyName);
+
+const assertProperty = (propertyName: string, value: unknown): void => {
+  if (!isPropertyDefined(propertyName)) throw new Error(`Property "${propertyName}" not defined`);
+  expect(properties().valueFor(propertyName)).toEqual(value);
+};
+
 describe("InfoTest", () => {
   beforeEach(() => {
     Info.properties = new PropertyList();
@@ -14,28 +24,28 @@ describe("InfoTest", () => {
         throw new Error("boom");
       });
     }).not.toThrow();
-    expect(Info.properties.names()).not.toContain("Bogus");
+    expect(isPropertyDefined("Bogus")).toBeFalsy();
   });
 
   test("property with string", () => {
     Info.property("Hello", "World");
-    expect(Info.properties.valueFor("Hello")).toBe("World");
+    assertProperty("Hello", "World");
   });
 
   test("property with block", () => {
     Info.property("Goodbye", () => "World");
-    expect(Info.properties.valueFor("Goodbye")).toBe("World");
+    assertProperty("Goodbye", "World");
   });
 
   test("trails version", () => {
-    expect(Info.properties.valueFor("Trails version")).toBe(VERSION.STRING);
+    assertProperty("Trails version", VERSION.STRING);
   });
 
   test("html includes middleware", () => {
     Info.property("Middleware", ["Rack::Lock", "Rack::Static"]);
     const html = Info.toHtml();
     expect(html).toContain('<tr><td class="name">Middleware</td>');
-    for (const value of Info.properties.valueFor("Middleware") as string[]) {
+    for (const value of properties().valueFor("Middleware") as string[]) {
       expect(html).toContain(`<li>${value}</li>`);
     }
   });

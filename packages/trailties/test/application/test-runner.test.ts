@@ -204,6 +204,6 @@ describe("AccountsTest", () => {
 
     const output = await t.runTestCommand("test/models/account.test.ts");
     expect(output).toMatch("does-not-exist");
-    expect(Process.lastStatus!.isSuccess()).toBe(false);
+    expect(Process.lastStatus!.isSuccess()).toBeFalsy();
   });
 });
