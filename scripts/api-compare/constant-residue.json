@@ -1227,7 +1227,7 @@
     }
   },
   "sqlite3": {
-    "rows": 33,
+    "rows": 35,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1263,6 +1263,8 @@
       "errors.ts::UnsupportedException": "SQLite3::UnsupportedException",
       "fork-safety.ts::ForkSafety": "SQLite3::ForkSafety",
       "pragmas.ts::Pragmas": "SQLite3::Pragmas",
+      "resultset.ts::HashResultSet": "SQLite3::HashResultSet",
+      "resultset.ts::ResultSet": "SQLite3::ResultSet",
       "statement.ts::Statement": "SQLite3::Statement"
     }
   },

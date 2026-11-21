@@ -4,6 +4,7 @@ import type { Database } from "./database.js";
 import type { Pragmas } from "./pragmas.js";
 import type { Backup } from "./backup.js";
 import type { Statement } from "./statement.js";
+import type { HashResultSet, ResultSet } from "./resultset.js";
 import type { Constants } from "./constants.js";
 import type { ForkSafety } from "./fork-safety.js";
 
@@ -13,6 +14,8 @@ export type SQLite3Namespace = {
   Pragmas: typeof Pragmas;
   Backup: typeof Backup;
   Statement: typeof Statement;
+  ResultSet: typeof ResultSet;
+  HashResultSet: typeof HashResultSet;
   Constants: typeof Constants;
   ForkSafety: typeof ForkSafety;
 } & {

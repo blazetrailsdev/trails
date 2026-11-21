@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SQLite3 } from "../lib/index.js";
-import type { EngineDatabase, EngineStatement } from "../lib/statement.js";
+import type { EngineDatabase } from "../lib/database.js";
+import type { EngineStatement } from "../lib/statement.js";
 
 function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
   const binds: [string | number, unknown][] = [];
@@ -33,12 +34,18 @@ function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
     columnName: (index) => wrap(names[index] ?? null),
     setReadBigInts: () => undefined,
   };
-  const db: EngineDatabase = {
+  const engineDb: EngineDatabase = {
     isClosed: () => false,
     isDiscarded: () => false,
     prepare: () => [engine, ""],
+    execBatch: () => [],
+    changes: () => 0,
+    close: () => undefined,
+    disableQuirkMode: () => undefined,
+    busyHandler: () => undefined,
   };
-  return { db, binds };
+  const db = new SQLite3.Database(":memory:", { engine: () => engineDb });
+  return { db, binds, engineDb };
 }
 
 describe("SQLite3::Statement over a fake engine", () => {
@@ -73,11 +80,12 @@ describe("SQLite3::Statement over a fake engine", () => {
   it("done? survives close, and a discarded database refuses step", async () => {
     const fake = fakeDatabase([], [], false);
     let discarded = false;
-    const stmt = new SQLite3.Statement({ ...fake.db, isDiscarded: () => discarded }, "x");
+    fake.engineDb.isDiscarded = () => discarded;
+    const stmt = new SQLite3.Statement(fake.db, "x");
     await stmt.step();
     await stmt.close();
     expect(stmt.isDone()).toBe(true);
-    const live = new SQLite3.Statement({ ...fake.db, isDiscarded: () => discarded }, "x");
+    const live = new SQLite3.Statement(fake.db, "x");
     discarded = true;
     expect(() => live.step()).toThrow(
       "cannot use a statement associated with a discarded database",

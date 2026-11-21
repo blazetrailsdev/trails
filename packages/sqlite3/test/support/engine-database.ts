@@ -1,20 +1,46 @@
 import BetterSqlite3 from "better-sqlite3";
 import { SQLite3 } from "../../lib/index.js";
-import type { EngineDatabase, EngineStatement } from "../../lib/statement.js";
+import type { BusyHandler, EngineDatabase, EngineOpenV2 } from "../../lib/database.js";
+import type { EngineStatement } from "../../lib/statement.js";
 import type { SqliteBindValue } from "../../lib/driver.js";
 
-export function engineDatabase(): EngineDatabase & { close(): void } {
-  const raw = new BetterSqlite3(":memory:");
-  return {
+export function engineDatabase(
+  file = ":memory:",
+): EngineDatabase & { quirkModeDisabled: boolean; handler: BusyHandler | null } {
+  const raw = new BetterSqlite3(file);
+  let changes = 0;
+  const db = {
+    quirkModeDisabled: false,
+    handler: null as BusyHandler | null,
     isClosed: () => !raw.open,
     isDiscarded: () => false,
-    close: () => raw.close(),
+    close: () => void raw.close(),
+    changes: () => changes,
+    disableQuirkMode: () => {
+      db.quirkModeDisabled = true;
+    },
+    busyHandler: (handler: BusyHandler | null) => {
+      db.handler = handler;
+    },
+    execBatch(sql: string, resultsAsHash: boolean): unknown[] {
+      const stmt = raw.prepare(sql);
+      if (!stmt.reader) {
+        changes = stmt.run().changes;
+        return [];
+      }
+      return (stmt.all() as Record<string, unknown>[]).map((row) => {
+        const vals = Object.fromEntries(
+          Object.entries(row).map(([k, v]) => [k, v == null ? null : String(v)]),
+        );
+        return resultsAsHash ? vals : Object.values(vals);
+      });
+    },
     prepare(sql: string): [EngineStatement, string] {
       const stmt = raw.prepare(sql);
       const reader = stmt.reader;
       if (reader) stmt.raw(true);
-      let positional: SqliteBindValue[] = [];
-      let named: Record<string, SqliteBindValue> = {};
+      const positional: SqliteBindValue[] = [];
+      const named: Record<string, SqliteBindValue> = {};
       let rows: Iterator<unknown[]> | null = null;
       let done = false;
       let closed = false;
@@ -43,7 +69,7 @@ export function engineDatabase(): EngineDatabase & { close(): void } {
         step() {
           if (done) return null;
           if (!reader) {
-            stmt.run(...positional, named);
+            changes = stmt.run(...positional, named).changes;
             done = true;
             return null;
           }
@@ -60,9 +86,10 @@ export function engineDatabase(): EngineDatabase & { close(): void } {
         columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
         setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
       };
-      positional = [];
-      named = {};
       return [engine, ""];
     },
   };
+  return db;
 }
+
+export const engine: EngineOpenV2 = (file) => engineDatabase(file);

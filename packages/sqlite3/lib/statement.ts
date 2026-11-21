@@ -1,7 +1,9 @@
-import { ArgumentError, Enumerable, Hash, include } from "@blazetrails/ruby-compat";
+import { ArgumentError, Enumerable, Hash, include, rbBlockGivenP } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
 import { Exception } from "./errors.js";
 import type { SqliteBindValue } from "./driver.js";
+import type { Database } from "./database.js";
+import type { ResultSet } from "./resultset.js";
 
 export interface EngineStatement {
   close(): void | Promise<void>;
@@ -16,21 +18,16 @@ export interface EngineStatement {
   setReadBigInts(toggle: boolean): void;
 }
 
-export interface EngineDatabase {
-  isClosed(): boolean;
-  isDiscarded(): boolean;
-  prepare(sql: string): [EngineStatement, string];
-}
-
 export class Statement {
   #st!: EngineStatement;
-  #connection: EngineDatabase;
+  #connection: Database;
   #columns: (string | null)[] | null;
   readonly remainder: string;
 
   declare toA: () => unknown[][] | Promise<unknown[][]>;
+  declare first: () => unknown[] | null | Promise<unknown[] | null>;
 
-  constructor(db: EngineDatabase, sql: string) {
+  constructor(db: Database, sql: string) {
     if (db.isClosed()) throw new ArgumentError("prepare called on a closed database");
 
     this.#connection = db;
@@ -38,12 +35,31 @@ export class Statement {
     this.remainder = this.prepare(db, sql);
   }
 
+  async execute(...bindVars: unknown[]): Promise<ResultSet> {
+    const block = rbBlockGivenP(bindVars.at(-1))
+      ? (bindVars.pop() as (results: ResultSet) => unknown)
+      : undefined;
+    if (this.isActive() || this.isDone()) await this.resetBang();
+
+    if (bindVars.length !== 0) await this.bindParams(...bindVars);
+    const results = this.#connection.buildResultSet(this);
+
+    if ((await this.columnCount()) === 0) await this.step();
+
+    if (block) await block(results);
+    return results;
+  }
+
+  isActive(): boolean {
+    return !this.isDone();
+  }
+
   bindParams(...bindVars: unknown[]): void | Promise<void> {
     let pending: Promise<void> | undefined;
     let index = 1;
     for (const v of bindVars.flat(Infinity)) {
       if (v instanceof Hash || (v != null && Object.getPrototypeOf(v) === Object.prototype)) {
-        const pairs = v instanceof Hash ? [...v.entries()] : Object.entries(v as object);
+        const pairs = v instanceof Hash ? [...v.entries()] : Object.entries(v);
         for (const [key, val] of pairs as [string, SqliteBindValue][]) {
           if (pending) pending = pending.then(() => this.bindParam(key, val));
           else {
@@ -119,7 +135,7 @@ export class Statement {
   }
 
   step(): unknown[] | null | Promise<unknown[] | null> {
-    if (this.#connection.isDiscarded()) {
+    if (this.#connection._engine.isDiscarded()) {
       throw new Exception("cannot use a statement associated with a discarded database");
     }
     this.mustBeOpenBang();
@@ -147,8 +163,8 @@ export class Statement {
   }
 
   /** @internal */
-  private prepare(db: EngineDatabase, sql: string): string {
-    const [st, remainder] = db.prepare(sql);
+  private prepare(db: Database, sql: string): string {
+    const [st, remainder] = db._engine.prepare(sql);
     this.#st = st;
     return remainder;
   }
