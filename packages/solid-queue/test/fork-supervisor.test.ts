@@ -296,7 +296,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).toEqual(pid);
 
-    await waitForRegisteredProcesses(0);
+    await waitForRegisteredProcesses(0, { timeout: 10 });
 
     pid = run();
     await waitForRegisteredProcesses(4, { timeout: 10 });
