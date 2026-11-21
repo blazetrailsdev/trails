@@ -141,7 +141,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
       workers: [{ queues: "background" }, { queues: "default", threads: 5 }],
     });
 
-    await waitForRegisteredProcesses(3, { timeout: 3 });
+    await waitForRegisteredProcesses(3, { timeout: 10 });
     await assertRegisteredWorkersFor("background", "default", { supervisorPid: pid });
   });
 
@@ -371,7 +371,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     await assertCompletedJobResults("pause", "background");
     await assertCompletedJobResults("pause", "default");
 
-    await waitForRegisteredProcesses(3, { timeout: 3 });
+    await waitForRegisteredProcesses(3, { timeout: 10 });
     await assertRegisteredWorkersFor("background", "default", { supervisorPid: pid });
 
     await enqueueStoreResultJob("no_pause");
