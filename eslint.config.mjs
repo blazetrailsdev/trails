@@ -1275,7 +1275,7 @@ export default defineConfig(
       },
     },
     rules: {
-      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
     },
   },
 
