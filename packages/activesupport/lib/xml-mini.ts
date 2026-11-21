@@ -173,10 +173,14 @@ export async function withBackend<T>(
 }
 
 export interface XmlBuilder {
-  tag(name: string, content?: unknown, attributes?: Record<string, string>): void;
+  /** @noRailsEquivalent PERMANENT */
+  tagBang(name: string, content?: unknown, attributes?: Record<string, string>): void;
+  /** @noRailsEquivalent PERMANENT */
   openTag(name: string, attributes?: Record<string, string>): void;
+  /** @noRailsEquivalent PERMANENT */
   closeTag(name: string): void;
-  instruct(): void;
+  /** @noRailsEquivalent PERMANENT */
+  instructBang(): void;
   target(): string;
 }
 
@@ -280,7 +284,7 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
   let typeName = explicitType ?? inferTypeName(value);
   if (typeName === "datetime") typeName = "dateTime";
 
-  const renamed = renameKey(tagKey(key, options), options);
+  key = renameKey(tagKey(key, options), options);
   const attributes: Record<string, string> = {};
   if (!(options.skipTypes || typeName == null)) attributes.type = typeName;
   if (value == null) attributes.nil = "true";
@@ -288,15 +292,15 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
   if (encoding) attributes.encoding = encoding;
 
   const formatter = typeName ? FORMATTING[typeName] : undefined;
-  const content = value == null ? undefined : formatter ? formatter(value) : String(value);
-  builder.tag(renamed, content, attributes);
+  const formattedValue = value == null ? undefined : formatter ? formatter(value) : String(value);
+  builder.tagBang(key as string, formattedValue, attributes);
 }
 
 function emitArray(key: unknown, values: unknown[], options: ToTagOptions): void {
   const root = renameKey(tagKey(key, options), options);
   const attributes: Record<string, string> = options.skipTypes ? {} : { type: "array" };
   if (values.length === 0) {
-    options.builder.tag(root, undefined, attributes);
+    options.builder.tagBang(root, undefined, attributes);
     return;
   }
   options.builder.openTag(root, attributes);
@@ -417,10 +421,12 @@ function attributeString(attributes: Record<string, string>): string {
     .join("");
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class XmlStringBuilder implements XmlBuilder {
   private buffer = "";
 
-  tag(name: string, content?: unknown, attributes: Record<string, string> = {}): void {
+  /** @noRailsEquivalent PERMANENT */
+  tagBang(name: string, content?: unknown, attributes: Record<string, string> = {}): void {
     const attrs = attributeString(attributes);
     if (content == null) {
       this.buffer += `<${name}${attrs}/>`;
@@ -429,15 +435,18 @@ export class XmlStringBuilder implements XmlBuilder {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT */
   openTag(name: string, attributes: Record<string, string> = {}): void {
     this.buffer += `<${name}${attributeString(attributes)}>`;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   closeTag(name: string): void {
     this.buffer += `</${name}>`;
   }
 
-  instruct(): void {
+  /** @noRailsEquivalent PERMANENT */
+  instructBang(): void {
     this.buffer = `<?xml version="1.0" encoding="UTF-8"?>` + this.buffer;
   }
 
@@ -446,6 +455,7 @@ export class XmlStringBuilder implements XmlBuilder {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class IndentedXmlStringBuilder implements XmlBuilder {
   private buffer = "";
   private depth = 0;
@@ -463,7 +473,8 @@ export class IndentedXmlStringBuilder implements XmlBuilder {
     return this.indentWidth === 0 ? "" : "\n";
   }
 
-  tag(name: string, content?: unknown, attributes: Record<string, string> = {}): void {
+  /** @noRailsEquivalent PERMANENT */
+  tagBang(name: string, content?: unknown, attributes: Record<string, string> = {}): void {
     const attrs = attributeString(attributes);
     this.buffer +=
       content == null
@@ -471,17 +482,20 @@ export class IndentedXmlStringBuilder implements XmlBuilder {
         : `${this.indent()}<${name}${attrs}>${htmlEscape(String(content)).toString()}</${name}>${this.newline()}`;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   openTag(name: string, attributes: Record<string, string> = {}): void {
     this.buffer += `${this.indent()}<${name}${attributeString(attributes)}>${this.newline()}`;
     this.depth += 1;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   closeTag(name: string): void {
     this.depth -= 1;
     this.buffer += `${this.indent()}</${name}>${this.newline()}`;
   }
 
-  instruct(): void {
+  /** @noRailsEquivalent PERMANENT */
+  instructBang(): void {
     this.buffer =
       `${this.baseIndent}<?xml version="1.0" encoding="UTF-8"?>${this.newline()}` + this.buffer;
   }

@@ -20,3 +20,23 @@ describe("SafeBuffer as a String", () => {
     expect(rbHash(buffer)).toBe(rbHash("z"));
   });
 });
+
+describe("SafeBuffer#[]= with a regexp (rb_str_subpat_set)", () => {
+  it("replaces a numbered, negative or named group", () => {
+    const a = new SafeBuffer("abc");
+    a.set(/(b)/, -1, "y");
+    expect(a.toString()).toBe("ayc");
+    const b = new SafeBuffer("abc");
+    b.set(/(?<g>b)/, "g", "y");
+    expect(b.toString()).toBe("ayc");
+  });
+
+  it("raises IndexError in rb_str_subpat_set's order", () => {
+    const buffer = new SafeBuffer("abc");
+    expect(() => buffer.set(/x/, "y")).toThrow("regexp not matched");
+    expect(() => buffer.set(/(?<g>b)/, "h", "y")).toThrow("undefined group name reference: h");
+    expect(() => buffer.set(/(b)/, 2, "y")).toThrow("index 2 out of regexp");
+    expect(() => buffer.set(/(b)/, -2, "y")).toThrow("index -2 out of regexp");
+    expect(() => buffer.set(/(b)|(x)/, 2, "y")).toThrow("regexp group 2 not matched");
+  });
+});

@@ -165,7 +165,7 @@ export const TaggedLogging = {
   },
 
   new<L extends Logger | BroadcastLogger>(logger: L): L & TaggedLogger {
-    logger = (logger as { dup?: () => L }).dup?.() ?? rbObjClone(logger);
+    logger = rbObjClone(logger);
 
     if (logger.formatter) {
       const formatter = logger.formatter;

@@ -559,7 +559,7 @@ export function toXml(
   const builder = options.builder;
   const skipInstruct = options.skipInstruct;
   delete options.skipInstruct;
-  if (!skipInstruct) builder.instruct();
+  if (!skipInstruct) builder.instructBang();
 
   const root = XmlMini.renameKey(String(options.root), options);
 

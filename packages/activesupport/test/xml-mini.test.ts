@@ -226,19 +226,19 @@ describe("ToTagTest", () => {
   });
 
   it("#to_tag accepts a callable object and passes options with the builder", () => {
-    toTag("some_tag", (o: ToTagOptions) => o.builder.tag("br"), options);
+    toTag("some_tag", (o: ToTagOptions) => o.builder.tagBang("br"), options);
     assertXml("<br/>");
   });
 
   it("#to_tag accepts a callable object and passes options and tag name", () => {
-    toTag("tag", (o: ToTagOptions, t: string) => o.builder.tag("b", t), options);
+    toTag("tag", (o: ToTagOptions, t: string) => o.builder.tagBang("b", t), options);
     assertXml("<b>tag</b>");
   });
 
   it("#to_tag accepts an object responding to #to_xml and passes the options, where :root is key", () => {
     const obj = {
       toXml(o: ToTagOptions) {
-        o.builder.tag("yo", String(o.root));
+        o.builder.tagBang("yo", String(o.root));
       },
     };
     toTag("tag", obj, options);

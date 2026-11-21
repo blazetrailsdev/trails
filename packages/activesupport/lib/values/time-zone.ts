@@ -33,7 +33,7 @@ import {
 import type { DateParts } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { instantFrom } from "../temporal.js";
-import { currentTime, currentTimeInstant } from "../time-travel.js";
+import { currentTimeInstant } from "../time-travel.js";
 import { utcToLocalReturnsUtcOffsetTimes } from "../core-ext/date-and-time/compatibility.js";
 
 const MAPPING: Record<string, string> = {
@@ -513,13 +513,7 @@ export class TimeZone {
   }
 
   get utcOffset(): number {
-    if (this._utcOffset !== null) return this._utcOffset;
-    const now = currentTime();
-    const observed = this.tzinfo.observedUtcOffset(now);
-    if (!this.tzinfo.isDst(now)) return observed;
-    const jan = this.tzinfo.observedUtcOffset(new Date(Date.UTC(now.getUTCFullYear(), 0, 1)));
-    const jul = this.tzinfo.observedUtcOffset(new Date(Date.UTC(now.getUTCFullYear(), 6, 1)));
-    return observed - Math.abs(jul - jan);
+    return this._utcOffset ?? this.tzinfo.currentPeriod().baseUtcOffset;
   }
 
   utcOffsetAt(date: Date | Temporal.Instant): number {
