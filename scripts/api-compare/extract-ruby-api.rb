@@ -2493,21 +2493,6 @@ class ApiExtractor
     }
   end
 
-  # A gem whose classes are defined in a C extension declares them with
-  # `rb_define_class_under` / `rb_define_module_under` and their methods with
-  # `rb_define_method` & co. (`vendor/ruby/v3.3.11/class.c`), in `ext/*.c`. The
-  # `**/*.rb` glob never sees them, so they are read here, from the calls
-  # themselves and from the `/* dummy = rb_define_class_under(...) */` comments
-  # a gem writes for RDoc where the class is built through a helper
-  # (`pg_define_coder`, `vendor/pg/v1.5.9/ext/pg_coder.c:466-474`).
-  #
-  # A constant first defined in C records under the file Ruby's naming
-  # convention gives its path below the gem's top namespace
-  # (`PG::TypeMapByOid` → `type_map_by_oid.rb`), unless `file_overrides` names
-  # the gem's own Ruby file for that C file; one nested under a class records
-  # in its owner's file. One already seen in a `.rb` file keeps that file, and
-  # takes the C superclass where its reopening names none. Methods record under their owner's file, with the C line
-  # as `vendorFile:line`.
   C_BUILTIN_CONSTANTS = {
     "rb_cObject" => "Object", "rb_eStandardError" => "StandardError",
     "rb_mEnumerable" => "Enumerable", "rb_mKernel" => "Kernel",
@@ -2574,12 +2559,16 @@ class ApiExtractor
           when "define_alias"
             target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], notes: "alias", alias_target: func)
           when "define_attr"
-            target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], reader: true)
+            target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], reader: true) if func == "1"
+            target[:instanceMethods] << entry.merge(name: "#{name}=", visibility: "public", params: [{ name: "value", kind: "required" }]) if argc == "1"
           else
             method_info = entry.merge(name: name, visibility: call.include?("private") ? "private" : call.include?("protected") ? "protected" : "public",
                                       params: c_method_params(params_by_func[func], argc.to_i))
-            if call == "define_singleton_method" || call == "define_module_function"
+            if call == "define_singleton_method"
               target[:classMethods] << method_info
+            elsif call == "define_module_function"
+              target[:classMethods] << method_info
+              target[:instanceMethods] << method_info.merge(visibility: "private")
             else
               target[:instanceMethods] << method_info
             end
@@ -2595,8 +2584,6 @@ class ApiExtractor
     segments.map { |s| s.gsub(/([a-z\d])([A-Z])/, '\1_\2').gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2').downcase }.join("/") + ".rb"
   end
 
-  # `argc` -1 / -2 take `(int argc, VALUE *argv, VALUE self)` / an Array, so
-  # the Ruby arity is a splat; a fixed `argc` names the C parameters after `self`.
   def c_method_params(c_params, argc)
     return [{ name: "args", kind: "rest" }] if argc.negative?
     names = (c_params || []).drop(1)
@@ -5589,10 +5576,6 @@ end
 
 # ---- Main ----
 
-# Gems whose classes are defined in a C extension, read by
-# ApiExtractor#process_c_ext_dir. `files` names the gem's own Ruby file for a
-# C file whose classes it reopens: `PG::Error` and its subclasses are
-# `exceptions.rb`'s (`vendor/pg/v1.5.9/lib/pg/exceptions.rb:7-9`).
 C_EXT_DIRS = {
   "pg" => { dir: "ext", files: { "pg_errors.c" => "exceptions.rb" } },
 }.freeze
