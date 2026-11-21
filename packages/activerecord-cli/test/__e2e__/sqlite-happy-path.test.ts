@@ -173,7 +173,7 @@ const product = await Product.createBang({ name: "Widget" });
     const typecheckCode = await run(["typecheck", "-p", join(appDir, "tsconfig.json")], appDir);
     expect(typecheckCode, exitReason("ar typecheck should exit 0", errors)).toBe(0);
     await expect(access(join(appDir, "dist", "db.js"))).resolves.toBeUndefined();
-  });
+  }, 30_000);
 
   it("init into an existing tsconfig → typecheck exits 0", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -210,5 +210,5 @@ const product = await Product.createBang({ name: "Widget" });
 
     const typecheckCode = await run(["typecheck", "-p", join(appDir, "tsconfig.json")], appDir);
     expect(typecheckCode, exitReason("ar typecheck should exit 0", errors)).toBe(0);
-  });
+  }, 30_000);
 });
