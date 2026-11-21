@@ -78,13 +78,6 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return this;
   }
 
-  deleteIf(predicate: (key: K, value: V) => boolean): this {
-    for (const [k, v] of this) {
-      if (predicate(k, v)) this.delete(k);
-    }
-    return this;
-  }
-
   merge(other: OrderedHash<K, V>, block?: (key: K, v1: V, v2: V) => V): OrderedHash<K, V> {
     const result = new OrderedHash<K, V>(this);
     for (const [k, v] of other) {
@@ -108,6 +101,9 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return this;
   }
 
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#invert` (`vendor/ruby/v3.3.11/hash.c:3900`), inherited by `OrderedHash < ::Hash`.
+   */
   invert(): OrderedHash<V, K> {
     const result = new OrderedHash<V, K>();
     for (const [k, v] of this) {
