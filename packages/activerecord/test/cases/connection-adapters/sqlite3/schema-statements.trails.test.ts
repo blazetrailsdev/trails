@@ -20,7 +20,7 @@ const _extractValueFromDefault = (default_: string | null) =>
 const quoter = {
   quote: (value: unknown) => `'${String(value).replace(/'/g, "''")}'`,
   dataSourceSql: (name?: string, options?: { type?: string }) =>
-    dataSourceSql.call(quoter as never, name, options),
+    dataSourceSql.call(quoter, name, options),
 };
 
 describe("SQLite3::SchemaStatements", () => {

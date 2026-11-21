@@ -13,7 +13,7 @@ describe("Mysql2Adapter#connect", () => {
     const adapter = new Mysql2Adapter({ host: "localhost" });
     const pool = {};
     adapter.pool = pool as never;
-    vi.spyOn(adapter as never, "_ensureClient" as never).mockRejectedValue(error as never);
+    vi.spyOn(adapter as never, "_ensureClient" as never).mockRejectedValue(error);
 
     await expect(adapter.connect()).rejects.toBe(error);
     expect(error.connectionPool).toBe(pool);

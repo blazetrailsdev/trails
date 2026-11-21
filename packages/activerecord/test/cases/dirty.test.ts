@@ -582,9 +582,7 @@ describe("DirtyTest", () => {
         author_name: "Bill",
         content: { a: "a" },
       });
-      const topic = (await Topic.select("id", "author_name").find(
-        (full as any).id,
-      )) as unknown as Topic;
+      const topic = await Topic.select("id", "author_name").find((full as any).id);
       await topic.updateColumns({ author_name: "John" });
       const reloaded = await topic.reload();
       expect(reloaded.content).not.toBeNull();

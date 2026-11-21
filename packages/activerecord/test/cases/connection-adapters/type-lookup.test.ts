@@ -11,7 +11,7 @@ interface TypeLookupConnection {
 let adapter: TypeLookupConnection;
 
 beforeEach(async () => {
-  adapter = (await Base.leaseConnection()) as unknown as TypeLookupConnection;
+  adapter = await Base.leaseConnection();
 });
 
 function assertLookupType(expected: string, sqlType: string) {

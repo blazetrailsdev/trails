@@ -267,8 +267,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Encryption.config.deterministicKey = "12345";
     Encryption.config.previousSchemes = [];
     Encryption.config.previous = [
-      { downcase: true, deterministic: true } as SchemeOptions,
-      { downcase: false, deterministic: true } as SchemeOptions,
+      { downcase: true, deterministic: true },
+      { downcase: false, deterministic: true },
     ];
 
     await freshAdapter();
@@ -291,8 +291,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Encryption.config.deterministicKey = "12345";
     Encryption.config.previousSchemes = [];
     Encryption.config.previous = [
-      { downcase: true, deterministic: false } as SchemeOptions,
-      { downcase: false, deterministic: true } as SchemeOptions,
+      { downcase: true, deterministic: false },
+      { downcase: false, deterministic: true },
     ];
 
     const adp = await freshAdapter();
@@ -315,8 +315,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Encryption.config.deterministicKey = "12345";
     Encryption.config.previousSchemes = [];
     Encryption.config.previous = [
-      { downcase: true, deterministic: true } as SchemeOptions,
-      { downcase: false, deterministic: true } as SchemeOptions,
+      { downcase: true, deterministic: true },
+      { downcase: false, deterministic: true },
     ];
 
     await freshAdapter();
@@ -353,9 +353,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       const currentEncryptor = new TestEncryptor({ alice: "alice_cur_cipher" });
 
       Encryption.config.previousSchemes = [];
-      Encryption.config.previous = [
-        { encryptor: prevEncryptor, deterministic: true } as SchemeOptions,
-      ];
+      Encryption.config.previous = [{ encryptor: prevEncryptor, deterministic: true }];
 
       const adp = await freshAdapter();
       const Author = class extends Base {
@@ -412,8 +410,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     try {
       Encryption.config.previousSchemes = [];
       Encryption.config.previous = [
-        { downcase: true, deterministic: false } as SchemeOptions,
-        { downcase: false, deterministic: true } as SchemeOptions,
+        { downcase: true, deterministic: false },
+        { downcase: false, deterministic: true },
       ];
 
       const adp = await freshAdapter();

@@ -153,7 +153,7 @@ describe.skipIf(skip)("Migration", () => {
 
     it("with stdlib logger", async () => {
       const old = Base.logger;
-      Base.logger = new Logger() as unknown as typeof Base.logger;
+      Base.logger = new Logger();
       try {
         await expect(new CheckPending(async () => {}).call({})).resolves.not.toThrow();
       } finally {

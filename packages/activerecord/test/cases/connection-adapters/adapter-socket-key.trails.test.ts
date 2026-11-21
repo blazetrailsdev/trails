@@ -54,7 +54,7 @@ describe("Mysql2Adapter socket key through buildAdapterArg", () => {
       adapter: "mysql2",
       database: "d",
       socket: "/nonexistent/trails-socket-key.sock",
-    } as never);
+    });
     await expect(adapter.connect()).rejects.toThrow(
       "connect ENOENT /nonexistent/trails-socket-key.sock",
     );

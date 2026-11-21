@@ -317,7 +317,7 @@ describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
     await TestMysqlNotNullDefault.establishConnection({
       ...Base.connectionDbConfig().configurationHash,
       strict,
-    } as Parameters<typeof TestMysqlNotNullDefault.establishConnection>[0]);
+    });
     const adapter = await TestMysqlNotNullDefault.leaseConnection();
     try {
       await adapter.createTable("test_mysql_not_null_defaults", { force: true }, (t: any) => {

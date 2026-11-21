@@ -121,7 +121,7 @@ async function migrateRemovingMissingColumn(migrator: Migrator): Promise<void> {
 
 async function personColumnNames(): Promise<string[]> {
   await (Person as any).resetColumnInformation();
-  await loadSchemaFromAdapter.call(Person as any);
+  await loadSchemaFromAdapter.call(Person);
   return Person.columnNames();
 }
 
@@ -1257,7 +1257,7 @@ describe("MigrationTest", () => {
         await adapter.createTable("something", { force: true }, (t) => {
           t.column("number", "integer");
           t.column("name", "string");
-          t.column("foo", "bar" as any);
+          t.column("foo", "bar");
         });
         expect(await adapter.columnExists("something", "foo")).toBeTruthy();
         await assertNothingRaised(() => adapter.removeColumn("something", "foo", "bar"));
@@ -2058,7 +2058,7 @@ AND query LIKE '%${lockId}%'`;
 
     it("check pending with stdlib logger", async () => {
       const old = Base.logger;
-      Base.logger = new Logger() as unknown as typeof Base.logger;
+      Base.logger = new Logger();
       try {
         await assertNothingRaised(() => new CheckPending(async () => {}).call({}));
       } finally {

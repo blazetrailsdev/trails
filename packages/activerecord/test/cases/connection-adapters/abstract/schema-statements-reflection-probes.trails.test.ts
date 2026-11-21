@@ -11,7 +11,7 @@ describe("SchemaStatements reflection probes", () => {
   let connection: AbstractAdapter;
 
   beforeEach(async () => {
-    connection = (await Base.leaseConnection()) as unknown as AbstractAdapter;
+    connection = await Base.leaseConnection();
   });
 
   function statements(): SchemaStatements {

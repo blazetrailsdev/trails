@@ -926,7 +926,7 @@ describe("buildCreateTableDefinition routing", () => {
     const mysql = makeStatements({
       validPrimaryKeyOptions: () => ["limit", "unsigned", "autoIncrement"],
       createTableDefinition: (name: string, options: Record<string, unknown>) =>
-        new MysqlTableDefinition(mysql as any, name, { ...options } as any),
+        new MysqlTableDefinition(mysql as any, name, { ...options }),
     });
 
     expect(
@@ -974,7 +974,7 @@ describe("buildCreateTableDefinition routing", () => {
   it("builds the definition through the adapter's createTableDefinition", async () => {
     const marker = Symbol("dialect-td");
     const createTableDefinition = vi.fn((name: string, options: Record<string, unknown>) => {
-      const td: any = new TableDefinition(ss, name, { ...options } as any);
+      const td: any = new TableDefinition(ss, name, { ...options });
       td[marker] = true;
       return td;
     });

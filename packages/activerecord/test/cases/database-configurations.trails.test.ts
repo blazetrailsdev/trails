@@ -19,7 +19,7 @@ describe("currentEnv resolution", () => {
     vi.stubEnv("NODE_ENV", "staging");
     expect(DEFAULT_ENV()).toBe("staging");
 
-    vi.stubEnv("NODE_ENV", undefined as unknown as string);
+    vi.stubEnv("NODE_ENV", undefined);
     expect(DEFAULT_ENV()).toBe("default_env");
   });
 

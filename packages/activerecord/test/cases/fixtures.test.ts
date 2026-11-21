@@ -298,9 +298,7 @@ describe("FixturesTest", () => {
     "bulk insert",
     async () => {
       const subscriber = new InsertQuerySubscriber();
-      const subscription = Notifications.subscribe("sql.active_record", (e) =>
-        subscriber.call(e as never),
-      );
+      const subscription = Notifications.subscribe("sql.active_record", (e) => subscriber.call(e));
       try {
         await self().createFixtures("bulbs");
         expect(subscriber.events.length, "It takes one INSERT query to insert two fixtures").toBe(
@@ -316,9 +314,7 @@ describe("FixturesTest", () => {
     "bulk insert multiple table with a multi statement query",
     async () => {
       const subscriber = new InsertQuerySubscriber();
-      const subscription = Notifications.subscribe("sql.active_record", (e) =>
-        subscriber.call(e as never),
-      );
+      const subscription = Notifications.subscribe("sql.active_record", (e) => subscriber.call(e));
       try {
         await self().createFixtures("bulbs", "movies", "computers");
         const conn = await Base.leaseConnection();
@@ -521,9 +517,7 @@ describe("FixturesTest", () => {
     "insert fixtures set split the total sql into two chunks smaller than max allowed packet",
     async () => {
       const subscriber = new InsertQuerySubscriber();
-      const subscription = Notifications.subscribe("sql.active_record", (e) =>
-        subscriber.call(e as never),
-      );
+      const subscription = Notifications.subscribe("sql.active_record", (e) => subscriber.call(e));
       const conn = await Base.leaseConnection();
       const packetSize = 1024;
       const fixtures = {
@@ -549,9 +543,7 @@ describe("FixturesTest", () => {
     "insert fixtures set concat total sql into a single packet smaller than max allowed packet",
     async () => {
       const subscriber = new InsertQuerySubscriber();
-      const subscription = Notifications.subscribe("sql.active_record", (e) =>
-        subscriber.call(e as never),
-      );
+      const subscription = Notifications.subscribe("sql.active_record", (e) => subscriber.call(e));
       const conn = await Base.leaseConnection();
       const packetSize = 1024;
       const fixtures = {

@@ -33,7 +33,7 @@ describe("Migration", () => {
         expect.objectContaining({
           name: "NoMethodError",
           message: expect.stringContaining("undefined method 'nonExistingMethod'"),
-        }) as unknown as Error,
+        }),
       );
     });
 

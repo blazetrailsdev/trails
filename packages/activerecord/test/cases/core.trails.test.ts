@@ -425,10 +425,7 @@ describe("configurations is a single process-global registry", () => {
       }
     }
 
-    const resolved = resolveConfigForConnection.call(
-      OverridingModel as unknown as typeof Base,
-      ":global_registry_env",
-    );
+    const resolved = resolveConfigForConnection.call(OverridingModel, ":global_registry_env");
     expect(resolved!.database).toBe("db/global.sqlite3");
   });
 });
@@ -555,7 +552,7 @@ describe("populate_with_current_scope_attributes (scoping.rb:44-52)", () => {
 
   it("an association named by create_with is assigned to a new record", async () => {
     const david = await authors("david");
-    const relation = Post.createWith({ author: david } as never);
+    const relation = Post.createWith({ author: david });
     expect(relation.new().author_id).toBe(david.id);
     await relation.scoping(async () => {
       expect(new Post({}).author_id).toBe(david.id);
@@ -784,7 +781,7 @@ describe("Base's inherited chain is deferred to own-property memo guards", () =>
   it("resets locking_column and has_query_constraints? for a subclass", () => {
     class Middle extends Topic {}
     Middle.lockingColumn = "custom_lock_version";
-    queryConstraints.call(Middle as never, "author_name", "id");
+    queryConstraints.call(Middle, "author_name", "id");
     class Leaf extends Middle {}
 
     expect(Middle.lockingColumn).toBe("custom_lock_version");

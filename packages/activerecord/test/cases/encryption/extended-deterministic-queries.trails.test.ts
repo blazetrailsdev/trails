@@ -26,7 +26,10 @@ fixtures([], { useTransactionalTests: false });
 const TEST_KEY = Buffer.alloc(32, "x").toString("base64");
 const PREVIOUS_KEY = Buffer.alloc(32, "y").toString("base64");
 
-function buildSerializedBook({ previousSchemes = false, coder = JSON as unknown } = {}) {
+function buildSerializedBook({
+  previousSchemes = false,
+  coder = JSON,
+}: { previousSchemes?: boolean; coder?: unknown } = {}) {
   class EncryptedSerializedBook extends Base {
     static {
       this._tableName = "books";

@@ -5,7 +5,7 @@ import {
   DatabaseSelector,
   type MiddlewareRequest,
 } from "../../lib/middleware/database-selector.js";
-import { seconds, TopLevel, type Duration } from "@blazetrails/activesupport";
+import { seconds, TopLevel } from "@blazetrails/activesupport";
 import { Resolver, type ResolverContext } from "../../lib/middleware/database-selector/resolver.js";
 import { Session } from "../../lib/middleware/database-selector/resolver/session.js";
 import { Hash } from "@blazetrails/ruby-compat";
@@ -34,7 +34,7 @@ function isReading() {
   return Base.isConnectedTo({ role: "reading" });
 }
 function isPreventingWrites() {
-  return currentPreventingWrites.call(Base as any);
+  return currentPreventingWrites.call(Base);
 }
 function fiveSecondsAgo() {
   return Session.convertTimeToTimestamp(Time.now().minusWithDuration(seconds(5)) as Time);
@@ -255,7 +255,7 @@ describe("DatabaseSelectorTest", () => {
   it("the middleware chooses reading role with POST request if resolver tells it to", async () => {
     class ReadonlyResolver extends Resolver {
       static override call(ctx: ResolverContext, opts: Record<string, unknown>): ReadonlyResolver {
-        return new ReadonlyResolver(ctx, opts as { delay?: Duration });
+        return new ReadonlyResolver(ctx, opts);
       }
       override isReadingRequest(_request: MiddlewareRequest): boolean {
         return true;

@@ -365,16 +365,16 @@ describe("EnumTest", () => {
       }
     }
 
-    let validBook = new K({ status: "proposed" } as any);
+    let validBook = new K({ status: "proposed" });
     expect(await (validBook as any).isValid()).toBeTruthy();
 
-    validBook = new K({ status: "written" } as any);
+    validBook = new K({ status: "written" });
     expect(await (validBook as any).isValid()).toBeTruthy();
 
-    let invalidBook = new K({ status: null } as any);
+    let invalidBook = new K({ status: null });
     expect(await (invalidBook as any).isValid()).toBeFalsy();
 
-    invalidBook = new K({ status: "unknown" } as any);
+    invalidBook = new K({ status: "unknown" });
     expect(await (invalidBook as any).isValid()).toBeFalsy();
   });
 
@@ -386,16 +386,16 @@ describe("EnumTest", () => {
       }
     }
 
-    let validBook = new K({ status: "proposed" } as any);
+    let validBook = new K({ status: "proposed" });
     expect(await (validBook as any).isValid()).toBeTruthy();
 
-    validBook = new K({ status: "written" } as any);
+    validBook = new K({ status: "written" });
     expect(await (validBook as any).isValid()).toBeTruthy();
 
-    validBook = new K({ status: null } as any);
+    validBook = new K({ status: null });
     expect(await (validBook as any).isValid()).toBeTruthy();
 
-    const invalidBook = new K({ status: "unknown" } as any);
+    const invalidBook = new K({ status: "unknown" });
     expect(await (invalidBook as any).isValid()).toBeFalsy();
   });
 

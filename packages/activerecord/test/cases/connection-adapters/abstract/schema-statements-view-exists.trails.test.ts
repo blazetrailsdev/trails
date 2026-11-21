@@ -8,7 +8,7 @@ describe("SchemaStatements#viewExists", () => {
   fixtures({});
 
   async function conn(): Promise<AbstractAdapter> {
-    return (await Base.leaseConnection()) as unknown as AbstractAdapter;
+    return await Base.leaseConnection();
   }
 
   const viewName = "view_exists_probe_books";

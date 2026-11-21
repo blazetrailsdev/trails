@@ -16,7 +16,7 @@ describeIfSqlite("SQLite3::SchemaCreation", () => {
   let sc: SchemaCreation;
 
   beforeAll(async () => {
-    conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn & SchemaCreationConn;
+    conn = await Base.leaseConnection();
     sc = new SchemaCreation(conn);
   });
 
@@ -48,13 +48,13 @@ describeIfSqlite("SQLite3::SchemaCreation", () => {
 
   it("appends COLLATE clause when collation option is set", async () => {
     const td = new TableDefinition(conn, "articles");
-    td.column("title", "string", { collation: "BINARY" } as any);
+    td.column("title", "string", { collation: "BINARY" });
     expect(await sc.accept(td)).toContain('COLLATE "BINARY"');
   });
 
   it("appends GENERATED ALWAYS AS VIRTUAL for virtual columns", async () => {
     const td = new TableDefinition(conn, "articles");
-    td.column("full_name", "string", { as: "first_name || ' ' || last_name" } as any);
+    td.column("full_name", "string", { as: "first_name || ' ' || last_name" });
     const sql = await sc.accept(td);
     expect(sql).toContain("GENERATED ALWAYS AS");
     expect(sql).toContain("VIRTUAL");
@@ -62,7 +62,7 @@ describeIfSqlite("SQLite3::SchemaCreation", () => {
 
   it("appends STORED for stored virtual columns", async () => {
     const td = new TableDefinition(conn, "articles");
-    td.column("full_name", "string", { as: "first_name || ' ' || last_name", stored: true } as any);
+    td.column("full_name", "string", { as: "first_name || ' ' || last_name", stored: true });
     expect(await sc.accept(td)).toContain("STORED");
   });
 });
