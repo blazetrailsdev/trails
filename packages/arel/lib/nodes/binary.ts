@@ -174,8 +174,6 @@ const fetchAttributeModule = FetchAttribute as unknown as Record<
 type Includable = new (...args: unknown[]) => object;
 const between = Between as unknown as Includable;
 include(between, fetchAttributeModule);
-const notEqual = NotEqual as unknown as Includable;
-include(notEqual, fetchAttributeModule);
 const greaterThan = GreaterThan as unknown as Includable;
 include(greaterThan, fetchAttributeModule);
 const greaterThanOrEqual = GreaterThanOrEqual as unknown as Includable;
@@ -188,6 +186,8 @@ const isDistinctFrom = IsDistinctFrom as unknown as Includable;
 include(isDistinctFrom, fetchAttributeModule);
 const isNotDistinctFrom = IsNotDistinctFrom as unknown as Includable;
 include(isNotDistinctFrom, fetchAttributeModule);
+const notEqual = NotEqual as unknown as Includable;
+include(notEqual, fetchAttributeModule);
 const notIn = NotIn as unknown as Includable;
 include(notIn, fetchAttributeModule);
 
