@@ -174,7 +174,7 @@ export class Encryptor {
   /** @internal */
   private serializePayload(message: unknown): Uint8Array {
     const dumped = this.serializer.dump(message);
-    const serializedData = this.serializer === JSON ? b(dumped as string) : dumped;
+    const serializedData = this.serializer === JSON ? b(dumped) : dumped;
 
     if (this.options.padSize == null)
       return rbStrPlus(pack([0], "v"), serializedData) as Uint8Array;

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { preloadTranslationFiles, registerFileReader } from "../../lib/backend/base.js";
 import { CacheFile } from "../../lib/backend/cache-file.js";
-import { KeyValue, type Store } from "../../lib/backend/key-value.js";
+import { KeyValue } from "../../lib/backend/key-value.js";
 import { Simple } from "../../lib/backend/simple.js";
 import { config, setBackend, t } from "../../lib/i18n.js";
 import * as TestCase from "../support/test-case.js";
@@ -100,7 +100,7 @@ include(SimpleBackend, CacheFile);
 class KeyValueBackend extends KeyValue {
   writes: unknown[][] = [];
   constructor() {
-    super(new Map<string, string>() as Store);
+    super(new Map<string, string>());
   }
 }
 include(KeyValueBackend, CountWrites);
@@ -111,7 +111,7 @@ cacheFileTest(
   () => {
     const backend = new SimpleBackend();
     setBackend(backend);
-    return backend as unknown as Writes;
+    return backend;
   },
   () => {},
 );
@@ -120,7 +120,7 @@ cacheFileTest(
   () => {
     const backend = new KeyValueBackend();
     setBackend(backend);
-    return backend as unknown as Writes;
+    return backend;
   },
   (backend) => backend.loadTranslations(),
 );

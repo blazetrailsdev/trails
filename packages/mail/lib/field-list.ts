@@ -1,4 +1,4 @@
-import { lessThan, rbObjAsString, type Comparable } from "@blazetrails/ruby-compat";
+import { lessThan, rbObjAsString } from "@blazetrails/ruby-compat";
 import { Field } from "./field.js";
 
 export class FieldList extends Array<Field> {
@@ -46,7 +46,7 @@ export class FieldList extends Array<Field> {
     let [lo, hi] = [0, this.length];
     while (lo < hi) {
       const mid = Math.floor((lo + hi) / 2);
-      if (lessThan.call(field as Comparable, this[mid])) {
+      if (lessThan.call(field, this[mid])) {
         hi = mid;
       } else {
         lo = mid + 1;

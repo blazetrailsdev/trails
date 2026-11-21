@@ -160,6 +160,6 @@ export class Result {
   }
 }
 
-include(Result as new (...args: never[]) => unknown, Enumerable);
+include(Result, Enumerable);
 
 PG.Result = Result;

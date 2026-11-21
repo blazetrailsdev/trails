@@ -37,7 +37,7 @@ export class Builder {
   /** @internal */
   private pipelineOptions(): Options {
     const { instrumenter: _instrumenter, ...options } = this.options;
-    return options as Options;
+    return options;
   }
 }
 

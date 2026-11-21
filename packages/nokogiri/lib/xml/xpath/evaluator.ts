@@ -564,9 +564,7 @@ class Evaluator<N> {
       if (Array.isArray(left)) {
         return left.some((l) => this.compareAtoms(op, this.atomFor(l, right), right));
       }
-      return (right as N[]).some((r) =>
-        this.compareAtoms(op, left as string | number | boolean, this.atomFor(r, left)),
-      );
+      return (right as N[]).some((r) => this.compareAtoms(op, left, this.atomFor(r, left)));
     }
     return this.compareAtoms(op, left, right);
   }

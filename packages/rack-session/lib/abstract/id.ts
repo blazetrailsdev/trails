@@ -386,7 +386,7 @@ export class Persisted {
 
   /** @internal */
   makeRequest(env: RackEnv): PersistedRequest {
-    return new Request(env as Record<string, unknown>) as unknown as PersistedRequest;
+    return new Request(env as Record<string, unknown>);
   }
 
   /** @internal */

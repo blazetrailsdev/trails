@@ -349,7 +349,7 @@ function handleException(
       if (typeof handler === "string" && handler.startsWith(":")) {
         return (I18n as unknown as Record<string, (...args: unknown[]) => unknown>)[
           handler.slice(1)
-        ](exception, locale, key as TranslationKey, options);
+        ](exception, locale, key, options);
       }
       const callable = handler as Exclude<ExceptionHandlerLike, string>;
       return typeof callable === "function"

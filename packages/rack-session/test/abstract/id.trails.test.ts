@@ -97,7 +97,7 @@ describe("Rack::Session::Abstract::PersistedSecure", () => {
 
 describe("Rack::Session::Abstract::SessionHash", () => {
   function sessionHash(session: Record<string, unknown> = { foo: ":bar" }): SessionHash {
-    return new SessionHash(stubStore("id", session), null as unknown as PersistedRequest);
+    return new SessionHash(stubStore("id", session), null);
   }
 
   it("fetch answers a stored null rather than the default", async () => {
@@ -125,7 +125,7 @@ describe("Rack::Session::Abstract::SessionHash", () => {
         return null;
       },
     } as unknown as Persisted;
-    const hash = new SessionHash(store, null as unknown as PersistedRequest);
+    const hash = new SessionHash(store, null);
     expect(hash.id()).toBeNull();
     expect(hash.id()).toBeNull();
     expect(calls).toBe(1);
@@ -142,7 +142,7 @@ describe("Rack::Session::Abstract::Persisted", () => {
 
 describe("Rack::Session::Abstract::PersistedSecure::SecureSessionHash", () => {
   it("inspect names the subclass's own full constant path", async () => {
-    const hash = new SecureSessionHash(stubStore(), null as unknown as PersistedRequest);
+    const hash = new SecureSessionHash(stubStore(), null);
     expect(hash.inspect()).toMatch(
       /^#<Rack::Session::Abstract::PersistedSecure::SecureSessionHash:0x[0-9a-f]+ not yet loaded>$/,
     );

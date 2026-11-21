@@ -61,7 +61,7 @@ export class Body {
 
   initWith(coder: YAML.Coder): void {
     for (const [k, v] of Object.entries(coder)) rbObjIvarSet(this, `@${k}`, v);
-    this._parts = new PartsList(coder["parts"] as PartsListPart[]);
+    this._parts = new PartsList(coder["parts"]);
   }
 
   equals(other: unknown): boolean {

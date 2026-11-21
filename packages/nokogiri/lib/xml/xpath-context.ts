@@ -215,9 +215,9 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
     return node.parent ?? libXmlRoot(node.doc);
   },
   children(node) {
-    if (node instanceof LibXmlRoot) return node.doc.find("/node()") as LibXmlXPathNode[];
+    if (node instanceof LibXmlRoot) return node.doc.find("/node()");
     if (!(node instanceof Nokogiri.LibXml2!.XmlElement)) return [];
-    return node.find("node()") as LibXmlXPathNode[];
+    return node.find("node()");
   },
   attributes(node) {
     return node instanceof Nokogiri.LibXml2!.XmlElement ? node.attrs : [];
@@ -411,11 +411,10 @@ export class XPathContext {
   private static unwrap(node: ContextHost): [Tree<XPathNode>, XPathNode] {
     const host = node._node;
     if (host instanceof Nokogiri.LibXml2!.XmlDocument) {
-      return [LIBXML_TREE as Tree<XPathNode>, libXmlRoot(host)];
+      return [LIBXML_TREE, libXmlRoot(host)];
     }
-    if (host instanceof Nokogiri.LibXml2!.XmlTreeNode)
-      return [LIBXML_TREE as Tree<XPathNode>, host];
-    return [PARSE5_TREE as Tree<XPathNode>, host as Parse5Node];
+    if (host instanceof Nokogiri.LibXml2!.XmlTreeNode) return [LIBXML_TREE, host];
+    return [PARSE5_TREE, host as Parse5Node];
   }
 
   private static arityError(): never {

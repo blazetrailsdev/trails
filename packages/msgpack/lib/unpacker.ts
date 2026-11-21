@@ -128,7 +128,7 @@ export class Unpacker {
 
   constructor(io: unknown = null, options: object | null = null) {
     if (options == null && io != null && rbObjIsKindOf(io, Hash)) {
-      options = io as object;
+      options = io;
       io = null;
     } else if (options != null && !rbObjIsKindOf(options, Hash)) {
       throw new ArgumentError(`expected Hash but found ${rbObjClass(options).name}.`);

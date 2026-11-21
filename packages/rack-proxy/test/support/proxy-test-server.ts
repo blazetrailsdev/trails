@@ -125,7 +125,7 @@ export async function startServer({
   let server: Server;
   if (ssl) {
     const [cert, key] = caSigned ? caSignedCert() : selfSignedCert();
-    server = createHttpsServer({ cert: cert.toPem(), key: key.toPem() }) as unknown as Server;
+    server = createHttpsServer({ cert: cert.toPem(), key: key.toPem() });
   } else {
     server = createServer();
   }

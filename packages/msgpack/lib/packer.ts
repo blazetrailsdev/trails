@@ -60,7 +60,7 @@ export class Packer<Io = unknown> {
 
   constructor(io: unknown = null, options: object | null = null) {
     if (options == null && io != null && rbObjIsKindOf(io, Hash)) {
-      options = io as object;
+      options = io;
       io = null;
     }
 
@@ -99,7 +99,7 @@ export class Packer<Io = unknown> {
     return this.registerTypeInternal(
       type,
       klass,
-      block || ((obj: unknown) => rbFSend(obj, methodName as string)),
+      block || ((obj: unknown) => rbFSend(obj, methodName)),
     );
   }
 

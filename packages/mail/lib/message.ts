@@ -108,7 +108,7 @@ export class Message {
     if (rbObjRespondTo(first, "eachPair")) {
       this.initWithHash(first as Record<string, unknown>);
     } else {
-      this.initWithString(rbObjAsString(first ?? "") as string | Uint8Array);
+      this.initWithString(rbObjAsString(first ?? ""));
     }
 
     if (block !== undefined) {
@@ -1214,7 +1214,7 @@ export class Message {
   /** @internal */
   private addBoundary(): void {
     if (!(present(this.body().boundary) && present(this.boundary()))) {
-      if (!present(this.header().get("content-type") as unknown as ContentTypeField)) {
+      if (!present(this.header().get("content-type"))) {
         const charset = this.charset;
         this.header().set("content-type", "multipart/mixed");
         (this.header().get("content-type") as unknown as ContentTypeField)
@@ -1230,7 +1230,7 @@ export class Message {
 
   /** @internal */
   private addMultipartMixedHeader(): void {
-    if (!present(this.header().get("content-type") as unknown as ContentTypeField)) {
+    if (!present(this.header().get("content-type"))) {
       this.header().set("content-type", ContentTypeField.withBoundary("multipart/mixed").value);
       this.body().boundary = this.boundary();
     }

@@ -90,11 +90,11 @@ function registerConstants(registry: Record<string, LocatorModel>): void {
 }
 
 const FIXTURE_REGISTRY: Record<string, LocatorModel> = {
-  Person: Person as unknown as LocatorModel,
-  PersonUuid: PersonUuid as unknown as LocatorModel,
-  "Person::Child": PersonChild as unknown as LocatorModel,
-  PersonModel: PersonModel as unknown as LocatorModel,
-  CompositePrimaryKeyModel: CompositePrimaryKeyModel as unknown as LocatorModel,
+  Person: Person,
+  PersonUuid: PersonUuid,
+  "Person::Child": PersonChild,
+  PersonModel: PersonModel,
+  CompositePrimaryKeyModel: CompositePrimaryKeyModel,
 };
 
 const Forwardable = {};
@@ -238,7 +238,7 @@ describe("GlobalIDCreationTest", () => {
     assertEqual(
       PersonModel.find(personModelGid.modelId),
       await personModelGid.find({
-        only: [Number as unknown as LocatorModel, PersonModel as unknown as LocatorModel],
+        only: [Number, PersonModel],
       }),
     );
     expect(PersonChild.find(personNamespacedGid.modelId)).toEqual(
@@ -251,22 +251,22 @@ describe("GlobalIDCreationTest", () => {
   it("find with multiple class no match", async () => {
     assertNil(
       await personGid.find({
-        only: [Number as unknown as LocatorModel, Number as unknown as LocatorModel],
+        only: [Number, Number],
       }),
     );
     assertNil(
       await personUuidGid.find({
-        only: [Number as unknown as LocatorModel, String as unknown as LocatorModel],
+        only: [Number, String],
       }),
     );
     assertNil(
       await personModelGid.find({
-        only: [Array as unknown as LocatorModel, Map as unknown as LocatorModel],
+        only: [Array, Map],
       }),
     );
     assertNil(
       await personNamespacedGid.find({
-        only: [String as unknown as LocatorModel, Set as unknown as LocatorModel],
+        only: [String, Set],
       }),
     );
   });

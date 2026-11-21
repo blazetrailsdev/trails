@@ -1,7 +1,7 @@
 import * as TestCase from "../support/test-case.js";
 import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 import { Chain } from "../../lib/backend/chain.js";
-import { KeyValue, type Store } from "../../lib/backend/key-value.js";
+import { KeyValue } from "../../lib/backend/key-value.js";
 import { Simple } from "../../lib/backend/simple.js";
 import { config, t } from "../../lib/i18n.js";
 import { deepSymbolizeKeys, type TranslationData } from "../../lib/utils.js";
@@ -194,7 +194,7 @@ describe("I18nBackendChainWithKeyValueTest", () => {
   afterEach(TestCase.teardown);
 
   function setupBackend(subtrees = true): void {
-    const first = new KeyValue(new Map<string, string>() as Store, subtrees);
+    const first = new KeyValue(new Map<string, string>(), subtrees);
     first.storeTranslations("en", { plural_1: { one: "%{count}" } });
 
     const second = new Simple();

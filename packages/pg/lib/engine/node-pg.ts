@@ -66,10 +66,7 @@ export async function execute(
 }
 
 export function emptyResult(error: unknown = null): Result {
-  return new Result(
-    { command: "", rowCount: null, oid: 0, fields: [], rows: [] } as unknown as pg.QueryResult,
-    error as never,
-  );
+  return new Result({ command: "", rowCount: null, oid: 0, fields: [], rows: [] }, error as never);
 }
 
 export function listen(conn: Connection, client: Client): void {

@@ -394,7 +394,7 @@ export const Unicode = {
             "C*",
           ),
           "U*",
-        ) as number[],
+        ),
         "U*",
       );
     }
@@ -439,7 +439,7 @@ export const Unicode = {
               "C*",
             ),
             "U*",
-          ) as number[],
+          ),
           "U*",
         );
   },

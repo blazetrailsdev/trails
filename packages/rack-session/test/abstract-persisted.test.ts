@@ -6,8 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { PersistedRequest, PersistedSession } from "../lib/index.js";
 import { Persisted, SessionHash } from "../lib/index.js";
 
-const request = (env: Record<string, unknown> = {}): PersistedRequest =>
-  new Request(env) as unknown as PersistedRequest;
+const request = (env: Record<string, unknown> = {}): PersistedRequest => new Request(env);
 
 describe("Rack::Session::Abstract::Persisted", () => {
   let klass: typeof Persisted;

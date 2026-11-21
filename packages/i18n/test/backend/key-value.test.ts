@@ -1,11 +1,10 @@
 import { include } from "@blazetrails/ruby-compat";
 import * as TestCase from "../support/test-case.js";
 import { beforeEach, describe, expect, it, afterEach } from "vitest";
-import { KeyValue, type Store } from "../../lib/backend/key-value.js";
+import { KeyValue } from "../../lib/backend/key-value.js";
 import { Fallbacks } from "../../lib/backend/fallbacks.js";
 import { InvalidPluralizationData, MissingTranslationData } from "../../lib/exceptions.js";
-import { config, t, type TranslateKey } from "../../lib/i18n.js";
-import type { TranslateOptions } from "../../lib/backend/base.js";
+import { config, t } from "../../lib/i18n.js";
 import { deepSymbolizeKeys, type TranslationData } from "../../lib/utils.js";
 
 class FallbacksBackend extends KeyValue {}
@@ -21,7 +20,7 @@ describe("I18nBackendKeyValueTest", () => {
   afterEach(TestCase.teardown);
 
   function setupBackend(subtree = true, Backend: typeof KeyValue = KeyValue): void {
-    backend = new Backend(new Map<string, string>() as Store, subtree);
+    backend = new Backend(new Map<string, string>(), subtree);
     config().backend = backend;
     storeTranslations("en", { foo: { bar: "bar", baz: "baz" } });
   }
@@ -70,7 +69,7 @@ describe("I18nBackendKeyValueTest", () => {
     setupBackend();
     storeTranslations("en", { 1: "foo" });
     expect(t("1")).toBe("foo");
-    expect(t(1 as unknown as TranslateKey)).toBe("foo");
+    expect(t(1)).toBe("foo");
     expect(t("1")).toBe("foo");
   });
 
@@ -88,7 +87,7 @@ describe("I18nBackendKeyValueTest", () => {
 
   it("store_translations does not handle subtrees if desired", () => {
     setupBackend(false);
-    expect(() => t("foo", { raise: true } as TranslateOptions)).toThrow(MissingTranslationData);
+    expect(() => t("foo", { raise: true })).toThrow(MissingTranslationData);
   });
 
   it("initialized? checks that a store is available", async () => {

@@ -25,7 +25,7 @@ describe("I18nOverrideTest", () => {
   beforeEach(async () => {
     await TestCase.setup();
     config().enforceAvailableLocales = false;
-    dupI18n = { ...I18n } as unknown as I18nModule;
+    dupI18n = { ...I18n };
     config().backend = new Simple();
   });
   afterEach(TestCase.teardown);

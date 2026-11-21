@@ -26,7 +26,7 @@ export const YAML = {
       TestMailer,
       LoggerDelivery,
 
-      rbObjClass(Mail.deliveryMethod() as object),
+      rbObjClass(Mail.deliveryMethod()),
     ];
 
     return RubyYAML.safeLoad(yaml, { permittedClasses });

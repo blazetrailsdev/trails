@@ -106,7 +106,7 @@ export class XmlNode {
     const coerced = this.coerce(nodeOrTags);
     new NodeSet(this.document, this.children as unknown as Node[]).unlink();
     if (coerced instanceof NodeSet) {
-      coerced.each((n) => this.addChildNodeAndReparentAttrs(n as unknown as XmlNode));
+      coerced.each((n) => this.addChildNodeAndReparentAttrs(n));
     } else {
       this.addChildNodeAndReparentAttrs(coerced);
     }
