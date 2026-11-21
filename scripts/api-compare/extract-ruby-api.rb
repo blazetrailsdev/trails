@@ -2544,9 +2544,42 @@ class ApiExtractor
       end
     end
 
+    error_codes = {}
+    errorcodes_def = File.join(ext_dir, "errorcodes.def")
+    if File.file?(errorcodes_def)
+      vendor_file = errorcodes_def.delete_prefix("#{VENDOR_ROOT}/")
+      klass = nil
+      File.read(errorcodes_def).each_line.with_index(1) do |text, line|
+        if (m = text.match(/define_error_class\(\s*"(\w+)"\s*,\s*(?:NULL|"(\w+)")\s*\)/))
+          superclass = m[2] ? error_codes.fetch(m[2]) : "PG::ServerError"
+          fqn = "PG::#{m[1]}"
+          @current_file = file_overrides["pg_errors.c"] || c_conventional_file(fqn)
+          info = new_class_info(m[1], fqn)
+          info[:superclass] = superclass
+          @classes[fqn] ||= info
+          klass = fqn
+        elsif (m = text.match(/register_error_class\(\s*"(\w+)"\s*,\s*klass\s*\)/))
+          error_codes[m[1]] = klass
+        end
+      end
+    end
+
     files.each do |filepath, source|
       vendor_file = filepath.delete_prefix("#{VENDOR_ROOT}/")
       source.each_line.with_index(1) do |text, line|
+        text.scan(/rb_define_const\(\s*(\w+)\s*,\s*"(\w+)"/) do |owner_var, name|
+          owner = @classes[vars[owner_var]] || @modules[vars[owner_var]]
+          next unless owner
+          (@file_constants[owner[:file]] ||= {})[name] = { kind: "c", namespace: vars[owner_var] }
+        end
+        text.scan(/\bpg_define_coder\(\s*"(\w+)"\s*,\s*\w+\s*,\s*\w+\s*,\s*(\w+)\s*\)/) do |name, nsp_var|
+          target = @classes["#{vars[nsp_var]}::#{name}"]
+          next unless target
+          coder_method = nsp_var.include?("Encoder") ? "encode" : nsp_var.include?("Decoder") ? "decode" : nil
+          next unless coder_method
+          target[:instanceMethods] << { file: target[:file], line: line, vendorFile: vendor_file, name: coder_method,
+                                        visibility: "public", params: c_method_params(nil, -1) }
+        end
         if (start = text =~ /\brb_(?:define|include|extend)_\w*\s*\(/) && text[start..].count("(") > text[start..].count(")")
           abort "#{filepath}:#{line}: rb_define_ call spans lines"
         end

@@ -31,6 +31,7 @@ defineConstants([
   [m3, "Connection", "PG::Connection"],
   [m4, "ConnectionBad", "PG::ConnectionBad"],
   [m4, "Error", "PG::Error"],
+  [m4, "FeatureNotSupported", "PG::FeatureNotSupported"],
   [m5, "Result", "PG::Result"],
   [m4, "ServerError", "PG::ServerError"],
   [m6, "SimpleDecoder", "PG::SimpleDecoder"],

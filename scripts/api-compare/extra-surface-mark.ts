@@ -139,7 +139,7 @@ export type InternalMarks = Record<string, number>;
  * Gated packages whose `novel` is still a number to burn down rather than a
  * rule to hold, so the mark's value governs both dimensions.
  */
-export const COUNTED_PACKAGES = [] as const;
+export const COUNTED_PACKAGES = ["pg"] as const;
 
 /**
  * Gated packages whose `novel` is pinned at the constant 0 regardless of what

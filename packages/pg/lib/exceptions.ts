@@ -29,7 +29,6 @@ export class UnableToSend extends Error {}
 
 export class ConnectionBad extends Error {}
 
-/** @noRailsEquivalent PERMANENT */
 export class FeatureNotSupported extends ServerError {}
 
 export const ERROR_CLASSES: Record<string, typeof Error> = {

@@ -1074,8 +1074,8 @@
     }
   },
   "pg": {
-    "rows": 31,
-    "excluded": ["exceptions.ts::FeatureNotSupported", "pg.ts::Constants"],
+    "rows": 32,
+    "excluded": ["pg.ts::Constants"],
     "unwalked": [],
     "residue": {
       "coder.ts::Coder": "PG::Coder",
@@ -1085,6 +1085,7 @@
       "connection.ts::Connection": "PG::Connection",
       "exceptions.ts::ConnectionBad": "PG::ConnectionBad",
       "exceptions.ts::Error": "PG::Error",
+      "exceptions.ts::FeatureNotSupported": "PG::FeatureNotSupported",
       "exceptions.ts::ServerError": "PG::ServerError",
       "exceptions.ts::UnableToSend": "PG::UnableToSend",
       "result.ts::Result": "PG::Result",
