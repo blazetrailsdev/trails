@@ -66,6 +66,7 @@ type DeprecationBehaviorItem = DeprecationBehavior | ((...args: never[]) => void
 
 export type DeprecationBehaviorInput = DeprecationBehaviorItem | DeprecationBehaviorItem[] | null;
 
+/** @internal */
 function arityCoerce(behavior: unknown): DeprecationBehaviorCallable {
   if (!rbObjRespondTo(behavior, "call")) {
     const inspected = typeof behavior === "string" ? `:${behavior}` : String(behavior);
@@ -93,6 +94,7 @@ function arityCoerce(behavior: unknown): DeprecationBehaviorCallable {
   }
 }
 
+/** @internal */
 function arityOfCallable(callable: unknown): number {
   return typeof callable === "function"
     ? callable.length
@@ -103,6 +105,14 @@ function arityOfCallable(callable: unknown): number {
 export class Behavior {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
+
+  get debug(): boolean {
+    return this._debug;
+  }
+
+  set debug(debug: boolean) {
+    this._debug = debug;
+  }
 
   get behavior(): DeprecationBehaviorCallable[] {
     return (this._behavior ??= [DEFAULT_BEHAVIORS.stderr]);
@@ -132,7 +142,8 @@ export class Behavior {
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Behavior {
-  debug: boolean;
+  /** @internal */
+  _debug: boolean;
   /** @internal */
   _behavior?: DeprecationBehaviorCallable[];
   /** @internal */

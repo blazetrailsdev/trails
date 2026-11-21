@@ -117,6 +117,14 @@ export class Reporting {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
+  get gemName(): string {
+    return this._gemName;
+  }
+
+  set gemName(gemName: string) {
+    this._gemName = gemName;
+  }
+
   warn(message?: string, callstack?: CallerLocation[]): string | undefined {
     if (this.silenced) return;
 
@@ -238,7 +246,8 @@ export class Reporting {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Reporting extends Behavior, Disallowed {
   deprecationHorizon: string;
-  gemName: string;
+  /** @internal */
+  _gemName: string;
   /** @internal */
   _silenced: boolean;
   /** @internal */
