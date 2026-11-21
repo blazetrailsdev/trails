@@ -142,7 +142,7 @@ describe("PG::Connection", () => {
 
     expect(res).toBeFalsy();
     const elapsed = (finish - start) / 1000;
-    expect(elapsed).toBeGreaterThan(0.2);
+    expect(elapsed).toBeBetween(0.2, 99, "exclusive");
   });
 
   it("raises a rescue-able error if #finish is called twice", async () => {
