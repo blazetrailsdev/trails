@@ -6,6 +6,8 @@ import {
   kernelInteger,
   Rational,
   rbClassNewInstance,
+  rbInspect,
+  rbObjClassname,
   rbProgname,
   rtest,
   toI,
@@ -512,10 +514,10 @@ export class Client {
     const m = toS(mode).toUpperCase();
     const modes = Client as unknown as Record<string, number | undefined>;
     if (m.startsWith("SSL_MODE_")) {
-      if (/^SSL_MODE_\w+$/.test(m) && modes[m] !== undefined) return modes[m];
+      if (Object.hasOwn(Client, m)) return modes[m];
     } else {
       const x = "SSL_MODE_" + m;
-      if (/^SSL_MODE_\w+$/.test(x) && modes[x] !== undefined) return modes[x];
+      if (Object.hasOwn(Client, x)) return modes[x];
     }
     warn(`Unknown MySQL ssl_mode flag: ${toS(mode)}`);
     return undefined;
@@ -565,10 +567,10 @@ export class Client {
 
   private setCharsetName(value: string): string {
     if (typeof value !== "string") {
-      throw new TypeError(`wrong argument type ${typeof value} (expected String)`);
+      throw new TypeError(`wrong argument type ${rbObjClassname(value)} (expected String)`);
     }
     if (!MYSQL2_MYSQL_ENC_NAME_TO_RB.has(value)) {
-      throw new Mysql2Error(`Unsupported charset: '${JSON.stringify(value)}'`);
+      throw new Mysql2Error(`Unsupported charset: '${rbInspect(value)}'`);
     }
     this.charsetName = value;
     return value;
