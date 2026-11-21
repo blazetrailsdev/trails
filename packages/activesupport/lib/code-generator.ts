@@ -53,16 +53,22 @@ export class MethodSet {
     }
     this.canonicalMethods.clear();
 
+    /** @perf 9x — PERMANENT */
+    const instanceMethods: Array<[string, PropertyDescriptor]> = [];
     for (const [as, canonicalName] of this.methods) {
       const instanceMethod = Object.getOwnPropertyDescriptor(this.cache, canonicalName);
       if (instanceMethod === undefined) {
         throw new NameError(`undefined method '${canonicalName}' for module`, canonicalName);
       }
-      if (owner instanceof Module) {
-        owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
-      } else Object.defineProperty(owner.prototype, as, instanceMethod);
-      rbClearMethodCache();
+      instanceMethods.push([as, instanceMethod]);
     }
+    const defineMethods = (target: object): void => {
+      for (const [as, instanceMethod] of instanceMethods) {
+        Object.defineProperty(target, as, instanceMethod);
+      }
+    };
+    if (owner instanceof Module) owner.moduleEval((mod) => defineMethods(mod));
+    else defineMethods(owner.prototype);
     rbClearMethodCache();
   }
 }
