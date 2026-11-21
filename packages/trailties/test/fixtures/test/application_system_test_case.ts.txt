@@ -1,0 +1,6 @@
+
+export class ApplicationSystemTestCase extends SystemTestCase {
+  static {
+    this.drivenBy("playwright", { screenSize: [1400, 1400] });
+  }
+}

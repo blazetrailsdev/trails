@@ -1,6 +1,6 @@
 import "../constants.generated-attribute.generated.js";
 import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
-import { Base } from "@blazetrails/activerecord";
+import { ActiveRecord } from "@blazetrails/activerecord";
 import { Trails } from "../trails.js";
 import { Error } from "./base.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -71,10 +71,18 @@ export class GeneratedAttribute {
   }
 
   static isDangerousName(name: string): boolean {
-    return Base.isDangerousAttributeMethod(name);
+    return ActiveRecord.Base != null && ActiveRecord.Base.isDangerousAttributeMethod(name);
   }
 
-  static validType = (t: string): boolean => DEFAULT_TYPES.has(t);
+  static validType(type: string): boolean {
+    return (
+      DEFAULT_TYPES.has(type) ||
+      ActiveRecord.Base == null ||
+      ActiveRecord.Base.connectionHandler
+        .retrieveConnectionPool(ActiveRecord.Base.connectionSpecificationName)
+        ?.activeConnection?.isValidType(type) === true
+    );
+  }
   static validIndexType = (t: string | undefined): boolean => INDEX_OPTIONS.includes(t ?? "");
   static reference = (t: string): boolean => t === "references" || t === "belongs_to";
 

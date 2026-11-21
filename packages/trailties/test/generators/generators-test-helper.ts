@@ -29,6 +29,15 @@ export async function copyRoutes(this: TestCase): Promise<void> {
   File.write(File.join(destination, "routes.ts"), routes);
 }
 
+export async function copyApplicationSystemTestCase(this: TestCase): Promise<void> {
+  const content = await File.readAsync(
+    File.expandPath("../fixtures/test/application_system_test_case.ts.txt", import.meta.dirname),
+  );
+  const destination = File.join(this.destinationRoot, "test");
+  FileUtils.mkdirP(destination);
+  File.write(File.join(destination, "application_system_test_case.ts"), content);
+}
+
 export async function copyDockerfile(this: TestCase): Promise<void> {
   const dockerfile = File.expandPath("../fixtures/generators/Dockerfile.test", import.meta.dirname);
   const destination = File.join(this.destinationRoot);

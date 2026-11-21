@@ -152,7 +152,7 @@ describe("DevcontainerGeneratorTest", () => {
     fs.mkdirSync(path.join(tmpDir, "test"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "test/application_system_test_case.ts"),
-      '  drivenBy(":selenium", { using: ":headless_chrome" });\n',
+      '    this.drivenBy("playwright", { screenSize: [1400, 1400] });\n',
     );
     await run();
     expect(env().TRAILS_SYSTEM_TESTING_SERVER_PORT).toBe("45678");
