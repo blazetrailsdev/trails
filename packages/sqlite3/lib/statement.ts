@@ -5,6 +5,7 @@ import type { SqliteBindValue } from "./driver.js";
 
 export interface EngineStatement {
   close(): void | Promise<void>;
+  isClosed(): boolean;
   bindParam(key: string | number, value: SqliteBindValue): void | Promise<void>;
   resetBang(): void | Promise<void>;
   step(): unknown[] | null | Promise<unknown[] | null>;
@@ -17,11 +18,13 @@ export interface EngineStatement {
 
 export interface EngineDatabase {
   isClosed(): boolean;
+  isDiscarded(): boolean;
   prepare(sql: string): [EngineStatement, string];
 }
 
 export class Statement {
-  #st: EngineStatement | null = null;
+  #st!: EngineStatement;
+  #connection: EngineDatabase;
   #columns: (string | null)[] | null;
   readonly remainder: string;
 
@@ -30,27 +33,32 @@ export class Statement {
   constructor(db: EngineDatabase, sql: string) {
     if (db.isClosed()) throw new ArgumentError("prepare called on a closed database");
 
+    this.#connection = db;
     this.#columns = null;
     this.remainder = this.prepare(db, sql);
   }
 
   bindParams(...bindVars: unknown[]): void | Promise<void> {
-    const pending: Promise<void>[] = [];
+    const binds: [string | number, SqliteBindValue][] = [];
     let index = 1;
     for (const v of bindVars.flat(Infinity)) {
       if (v instanceof Hash || (v != null && Object.getPrototypeOf(v) === Object.prototype)) {
         const pairs = v instanceof Hash ? [...v.entries()] : Object.entries(v as object);
-        for (const [key, val] of pairs as [string, SqliteBindValue][]) {
-          const r = this.bindParam(key, val);
-          if (r instanceof Promise) pending.push(r);
-        }
+        for (const [key, val] of pairs as [string, SqliteBindValue][]) binds.push([key, val]);
       } else {
-        const r = this.bindParam(index, v as SqliteBindValue);
-        if (r instanceof Promise) pending.push(r);
+        binds.push([index, v as SqliteBindValue]);
         index += 1;
       }
     }
-    if (pending.length > 0) return Promise.all(pending).then(() => undefined);
+    for (let i = 0; i < binds.length; i++) {
+      const r = this.bindParam(...binds[i]);
+      if (r instanceof Promise) {
+        return (async () => {
+          await r;
+          for (const bind of binds.slice(i + 1)) await this.bindParam(...bind);
+        })();
+      }
+    }
   }
 
   columns(): (string | null)[] | Promise<(string | null)[]> {
@@ -88,50 +96,51 @@ export class Statement {
 
   close(): this | Promise<this> {
     this.mustBeOpenBang();
-    const st = this.#st!;
-    this.#st = null;
-    const r = st.close();
+    const r = this.#st.close();
     return r instanceof Promise ? r.then(() => this) : this;
   }
 
   isClosed(): boolean {
-    return !this.#st;
+    return this.#st.isClosed();
   }
 
   bindParam(key: string | number, value: SqliteBindValue): void | Promise<void> {
     this.mustBeOpenBang();
-    return this.#st!.bindParam(key, value);
+    return this.#st.bindParam(key, value);
   }
 
   resetBang(): this | Promise<this> {
     this.mustBeOpenBang();
-    const r = this.#st!.resetBang();
+    const r = this.#st.resetBang();
     return r instanceof Promise ? r.then(() => this) : this;
   }
 
   step(): unknown[] | null | Promise<unknown[] | null> {
+    if (this.#connection.isDiscarded()) {
+      throw new Exception("cannot use a statement associated with a discarded database");
+    }
     this.mustBeOpenBang();
-    return this.#st!.step();
+    return this.#st.step();
   }
 
   isDone(): boolean {
-    return this.#st?.isDone() ?? false;
+    return this.#st.isDone();
   }
 
   columnCount(): number | Promise<number> {
     this.mustBeOpenBang();
-    return this.#st!.columnCount();
+    return this.#st.columnCount();
   }
 
   columnName(index: number): string | null | Promise<string | null> {
     this.mustBeOpenBang();
-    return this.#st!.columnName(index);
+    return this.#st.columnName(index);
   }
 
   /** @noRailsEquivalent PERMANENT */
   setReadBigInts(toggle: boolean): void {
     this.mustBeOpenBang();
-    this.#st!.setReadBigInts(toggle);
+    this.#st.setReadBigInts(toggle);
   }
 
   /** @internal */
@@ -157,6 +166,6 @@ export class Statement {
   }
 }
 
-include(Statement as new (...args: never[]) => unknown, Enumerable);
+include(Statement, Enumerable);
 
 SQLite3.Statement = Statement;

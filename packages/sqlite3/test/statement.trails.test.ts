@@ -7,8 +7,13 @@ function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
   const wrap = <T>(v: T): T | Promise<T> => (async ? Promise.resolve(v) : v);
   let i = 0;
   let done = false;
+  let closed = false;
   const engine: EngineStatement = {
-    close: () => wrap(undefined),
+    close: () => {
+      closed = true;
+      return wrap(undefined);
+    },
+    isClosed: () => closed,
     bindParam: (key, value) => {
       binds.push([key, value]);
       return wrap(undefined);
@@ -28,7 +33,11 @@ function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
     columnName: (index) => wrap(names[index] ?? null),
     setReadBigInts: () => undefined,
   };
-  const db: EngineDatabase = { isClosed: () => false, prepare: () => [engine, ""] };
+  const db: EngineDatabase = {
+    isClosed: () => false,
+    isDiscarded: () => false,
+    prepare: () => [engine, ""],
+  };
   return { db, binds };
 }
 
@@ -61,11 +70,31 @@ describe("SQLite3::Statement over a fake engine", () => {
     expect(await new SQLite3.Statement(fakeDatabase(rows, [], true).db, "x").toA()).toEqual(rows);
   });
 
+  it("done? survives close, and a discarded database refuses step", async () => {
+    const fake = fakeDatabase([], [], false);
+    let discarded = false;
+    const stmt = new SQLite3.Statement({ ...fake.db, isDiscarded: () => discarded }, "x");
+    await stmt.step();
+    await stmt.close();
+    expect(stmt.isDone()).toBe(true);
+    const live = new SQLite3.Statement({ ...fake.db, isDiscarded: () => discarded }, "x");
+    discarded = true;
+    expect(() => live.step()).toThrow(
+      "cannot use a statement associated with a discarded database",
+    );
+  });
+
+  it("bindParams binds in order, awaiting each async bind", async () => {
+    const { db, binds } = fakeDatabase([], [], true);
+    const stmt = new SQLite3.Statement(db, "x");
+    await stmt.bindParams(1, 2, 3);
+    expect(binds.map(([k]) => k)).toEqual([1, 2, 3]);
+  });
+
   it("a closed statement raises from every C primitive but closed? and done?", async () => {
     const stmt = new SQLite3.Statement(fakeDatabase([], [], false).db, "x");
     await stmt.close();
     expect(stmt.isClosed()).toBe(true);
-    expect(stmt.isDone()).toBe(false);
     for (const call of [
       () => stmt.step(),
       () => stmt.resetBang(),

@@ -7,6 +7,7 @@ export function engineDatabase(): EngineDatabase & { close(): void } {
   const raw = new BetterSqlite3(":memory:");
   return {
     isClosed: () => !raw.open,
+    isDiscarded: () => false,
     close: () => raw.close(),
     prepare(sql: string): [EngineStatement, string] {
       const stmt = raw.prepare(sql);
@@ -16,15 +17,20 @@ export function engineDatabase(): EngineDatabase & { close(): void } {
       let named: Record<string, SqliteBindValue> = {};
       let rows: Iterator<unknown[]> | null = null;
       let done = false;
+      let closed = false;
       const engine: EngineStatement = {
-        close: () => void rows?.return?.(),
+        close: () => {
+          rows?.return?.();
+          closed = true;
+        },
+        isClosed: () => closed,
         bindParam(key, value) {
           if (typeof key === "number") {
             positional[key - 1] = value;
             return;
           }
           const name = key.replace(/^[:@$]/, "");
-          if (!new RegExp(`[:@$]${name}\\b`).test(sql)) {
+          if (![":", "@", "$"].some((prefix) => sql.includes(prefix + name))) {
             throw new SQLite3.Exception("no such bind parameter");
           }
           named[name] = value;
