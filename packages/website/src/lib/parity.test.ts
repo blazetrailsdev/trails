@@ -84,6 +84,7 @@ describe("loadParity", () => {
             methodsMissing: 1,
             missingMethods: ["lone"],
             testsMatched: 1,
+            testsPermanent: 0,
             testsTotal: 2,
           },
           {
@@ -96,6 +97,7 @@ describe("loadParity", () => {
             methodsMissing: 1,
             missingMethods: ["a?", "b!"],
             testsMatched: 1,
+            testsPermanent: 1,
             testsTotal: 2,
           },
           {
@@ -108,6 +110,7 @@ describe("loadParity", () => {
             methodsMissing: 0,
             missingMethods: ["unported_only"],
             testsMatched: 0,
+            testsPermanent: 0,
             testsTotal: 0,
           },
         ],
@@ -147,6 +150,9 @@ describe("loadParity", () => {
     expect(page).toContain("](https://github.com/blazetrailsdev/trails/blob/fedcba/docs/x.md)");
     expect(page).toContain("blob/fedcba/packages/arel/CLAUDE.md#own");
     expect(page).toContain("| API methods matched | 75% (6 of 8) |");
+    expect(page).toContain(
+      "| Rails tests matched | 50% (2 of 4) ([1 permanent](#permanently-skipped-tests)) |",
+    );
     expect(page).toContain("| Ruby files ported | 2 |");
     expect(page).toContain("| Ruby files unported | 1 |");
     expect(page.indexOf("| `big.rb` | [`big.ts`]")).toBeGreaterThan(0);

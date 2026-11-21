@@ -921,6 +921,7 @@ describe("Q encodings", () => {
   });
 });
 describe("decoding a string and detecting the encoding type", () => {
+  // PERMANENT-SKIP: upstream
   it.skip("should handle a very long string efficiently", () => {});
 });
 

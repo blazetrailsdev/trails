@@ -92,6 +92,12 @@ export interface TestCaseInfo {
   /** Whether the test is pending/skipped */
   pending?: boolean;
   /**
+   * Whether a pending test is parked under a `PERMANENT-SKIP:` comment: the
+   * comment block directly above it, or above the run of one-line skips it
+   * closes. TS extractor only.
+   */
+  permanent?: boolean;
+  /**
    * Whether the recorded `description` was recovered from a template literal
    * with interpolations (`` it(`${name} raises`) `` → `"<expr> raises"`) rather
    * than read off a static string. A recovered name is a placeholder, not the

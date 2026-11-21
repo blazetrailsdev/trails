@@ -11,6 +11,7 @@ import {
   compareKeysOf,
   githubAnchor,
   main,
+  permanentSkipsIn,
   railsCounterpartOf,
   summarize,
 } from "./package-summary.js";
@@ -180,6 +181,10 @@ beforeEach(async () => {
               conventionTsFile: "base.test.ts",
               rubyTestCount: 8,
               matched: 6,
+              // One PERMANENT-SKIP, one BLOCKED: skip, and one unported `tests:` row.
+              matchedSkipped: 2,
+              matchedPermanent: 1,
+              unportedTests: 1,
             },
             {
               rubyFile: "core_test.rb",
@@ -372,6 +377,16 @@ describe("package-summary", () => {
     ]);
   });
 
+  it("keys a PERMANENT-SKIP: upstream line under upstream", () => {
+    expect(
+      permanentSkipsIn(
+        "t.test.ts",
+        '// PERMANENT-SKIP: upstream\nit.todo("parses @reboot");\n',
+        [],
+      ),
+    ).toEqual({ upstream: [{ file: "t.test.ts", line: 1, testName: "parses @reboot" }] });
+  });
+
   it("fails on a citation no heading resolves", async () => {
     await write(
       "packages/activerecord/test/cases/c.test.ts",
@@ -394,7 +409,8 @@ describe("package-summary", () => {
         methodsMissing: 1,
         missingMethods: ["save!"],
         testsMatched: 7,
-        testsTotal: 10,
+        testsPermanent: 2,
+        testsTotal: 11,
       },
       {
         package: "activerecord",
@@ -407,6 +423,7 @@ describe("package-summary", () => {
         methodsMissing: 3,
         missingMethods: [],
         testsMatched: 0,
+        testsPermanent: 0,
         testsTotal: 4,
       },
       {
@@ -420,6 +437,7 @@ describe("package-summary", () => {
         methodsMissing: 0,
         missingMethods: [],
         testsMatched: 0,
+        testsPermanent: 0,
         testsTotal: 0,
       },
       {
@@ -433,6 +451,7 @@ describe("package-summary", () => {
         methodsMissing: 1,
         missingMethods: [],
         testsMatched: 2,
+        testsPermanent: 0,
         testsTotal: 3,
       },
     ]);

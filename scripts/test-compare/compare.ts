@@ -603,6 +603,10 @@ export interface ConventionFileResult {
   rubyTestCount: number;
   matched: number;
   matchedSkipped: number;
+  /** Of `matchedSkipped`, the skips parked under a `PERMANENT-SKIP:` line. */
+  matchedPermanent: number;
+  /** Rails tests a per-test `tests:` unported-files row accounts for, outside `rubyTestCount`. */
+  unportedTests: number;
   wrongDescribe: number;
   misplaced: number;
   missing: number;
@@ -633,6 +637,20 @@ export interface ClosureSideResult {
   percent: number;
 }
 
+/**
+ * The Rails tests a port can still implement: every counted test less the
+ * ones parked under a `PERMANENT-SKIP:` line. Unported `tests:` rows are
+ * already outside `total`.
+ */
+export function portableOf(total: number, matchedPermanent: number): number {
+  return total - matchedPermanent;
+}
+
+/** `P permanent`: the permanent skips plus the unported `tests:` rows. */
+export function permanentOf(matchedPermanent: number, unportedTests: number): string {
+  return `${matchedPermanent + unportedTests} permanent`;
+}
+
 export interface ArClosureResult {
   inClosure: ClosureSideResult;
   outOfClosure: ClosureSideResult;
@@ -646,6 +664,8 @@ interface ConventionPackageResult {
   totalRubyTests: number;
   totalMatched: number;
   totalMatchedSkipped: number;
+  totalMatchedPermanent: number;
+  totalUnportedTests: number;
   totalWrongDescribe: number;
   totalMisplaced: number;
   totalGateMismatch: number;
@@ -702,6 +722,7 @@ interface TsTestInfo {
   title: string; // describe path and name as written, " > "-joined (--extra)
   dynamic: boolean; // name recovered from a template literal — matches only on its collapsed form
   pending: boolean;
+  permanent?: boolean; // parked under a PERMANENT-SKIP: line
   gate?: TestGate; // adapter/feature gate emitted by the TS extractor
   assertionCount?: number; // raw assertion-call count from the TS extractor
   assertionKinds?: string[]; // raw assertion-kind tokens from the TS extractor
@@ -936,6 +957,7 @@ export function main(
           title: [...tc.ancestors, tc.description].join(" > "),
           dynamic: !!tc.dynamic,
           pending: !!tc.pending,
+          ...(tc.permanent ? { permanent: true } : {}),
           gate: tc.gate,
           assertionCount: tc.assertionCount,
           assertionKinds: tc.assertionKinds,
@@ -1022,6 +1044,8 @@ export function main(
     let totalRuby = 0;
     let totalMatched = 0;
     let totalMatchedSkipped = 0;
+    let totalMatchedPermanent = 0;
+    let totalUnportedTests = 0;
     let totalWrongDescribe = 0;
     let totalMisplaced = 0;
     let totalGateMismatch = 0;
@@ -1066,6 +1090,7 @@ export function main(
       const excludedCount = file.testCases.filter((tc) =>
         isTestCaseUnported(file.file, tc.description, tc.ancestors[0]),
       ).length;
+      totalUnportedTests += excludedCount;
 
       const rubyClassesByDesc = new Map<string, Set<string>>();
       for (const tc of file.testCases) {
@@ -1083,6 +1108,7 @@ export function main(
 
       let matched = 0;
       let matchedSkipped = 0;
+      let matchedPermanent = 0;
       let wrongDescribe = 0;
       let misplaced = 0;
       const missingTests: string[] = [];
@@ -1193,6 +1219,10 @@ export function main(
           if (tsTests[tsIdx].pending) {
             matchedSkipped++;
             totalMatchedSkipped++;
+            if (tsTests[tsIdx].permanent) {
+              matchedPermanent++;
+              totalMatchedPermanent++;
+            }
           }
           recordGate(tc, tsTests[tsIdx]);
           recordAssertion(tc, tsTests[tsIdx]);
@@ -1231,6 +1261,10 @@ export function main(
               if (tsTests[idx].pending) {
                 matchedSkipped++;
                 totalMatchedSkipped++;
+                if (tsTests[idx].permanent) {
+                  matchedPermanent++;
+                  totalMatchedPermanent++;
+                }
               }
               recordGate(tc, tsTests[idx]);
               recordAssertion(tc, tsTests[idx]);
@@ -1263,6 +1297,10 @@ export function main(
         if (first.pending) {
           matchedSkipped++;
           totalMatchedSkipped++;
+          if (first.permanent) {
+            matchedPermanent++;
+            totalMatchedPermanent++;
+          }
         }
         recordGate(tc, first);
         recordAssertion(tc, first);
@@ -1322,6 +1360,10 @@ export function main(
           if (tsTests[descIdx].pending) {
             matchedSkipped++;
             totalMatchedSkipped++;
+            if (tsTests[descIdx].permanent) {
+              matchedPermanent++;
+              totalMatchedPermanent++;
+            }
           }
           recordGate(tc, tsTests[descIdx]);
           recordAssertion(tc, tsTests[descIdx]);
@@ -1397,6 +1439,8 @@ export function main(
         rubyTestCount: file.testCases.length - excludedCount,
         matched,
         matchedSkipped,
+        matchedPermanent,
+        unportedTests: excludedCount,
         wrongDescribe,
         misplaced,
         missing: file.testCases.length - excludedCount - matched - misplaced,
@@ -1415,7 +1459,8 @@ export function main(
     fileResults.sort((a, b) => compareFileResults(a, b, sortExtra));
 
     const implemented = totalMatched - totalMatchedSkipped;
-    const percent = totalRuby > 0 ? Math.round((implemented / totalRuby) * 1000) / 10 : 0;
+    const portable = portableOf(totalRuby, totalMatchedPermanent);
+    const percent = portable > 0 ? Math.round((implemented / portable) * 1000) / 10 : 0;
 
     results.push({
       package: pkg,
@@ -1425,6 +1470,8 @@ export function main(
       totalRubyTests: totalRuby,
       totalMatched,
       totalMatchedSkipped,
+      totalMatchedPermanent,
+      totalUnportedTests,
       totalWrongDescribe,
       totalMisplaced,
       totalGateMismatch,
@@ -1507,6 +1554,8 @@ export function main(
   let grandRuby = 0;
   let grandMatched = 0;
   let grandMatchedSkipped = 0;
+  let grandMatchedPermanent = 0;
+  let grandUnportedTests = 0;
   let grandWrongDescribe = 0;
   let grandMisplaced = 0;
   let grandGateMismatch = 0;
@@ -1521,6 +1570,8 @@ export function main(
     grandRuby += pkg.totalRubyTests;
     grandMatched += pkg.totalMatched;
     grandMatchedSkipped += pkg.totalMatchedSkipped;
+    grandMatchedPermanent += pkg.totalMatchedPermanent;
+    grandUnportedTests += pkg.totalUnportedTests;
     grandWrongDescribe += pkg.totalWrongDescribe;
     grandMisplaced += pkg.totalMisplaced;
     grandGateMismatch += pkg.totalGateMismatch;
@@ -1557,7 +1608,7 @@ export function main(
     const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
     console.log(`\n${"=".repeat(90)}`);
     console.log(
-      `  ${pkg.package}  —  ${pkgImplemented}/${pkg.totalRubyTests} tests (${pkg.percent}%)${detailStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
+      `  ${pkg.package}  —  ${pkgImplemented}/${portableOf(pkg.totalRubyTests, pkg.totalMatchedPermanent)} tests (${permanentOf(pkg.totalMatchedPermanent, pkg.totalUnportedTests)}) (${pkg.percent}%)${detailStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
     );
     if (pkg.arClosure) {
       const { inClosure, outOfClosure } = pkg.arClosure;
@@ -1790,7 +1841,9 @@ export function main(
   }
 
   const grandImplemented = grandMatched - grandMatchedSkipped;
-  const grandPct = grandRuby > 0 ? Math.round((grandImplemented / grandRuby) * 1000) / 10 : 0;
+  const grandPortable = portableOf(grandRuby, grandMatchedPermanent);
+  const grandPct =
+    grandPortable > 0 ? Math.round((grandImplemented / grandPortable) * 1000) / 10 : 0;
   const grandDetails: string[] = [];
   if (grandMatchedSkipped > 0) grandDetails.push(`${grandMatchedSkipped} skipped`);
   if (grandWrongDescribe > 0) grandDetails.push(`${grandWrongDescribe} wrong describe`);
@@ -1816,7 +1869,7 @@ export function main(
   const grandDetailStr = grandDetails.length > 0 ? ` (${grandDetails.join(", ")})` : "";
   console.log(`\n${"=".repeat(90)}`);
   console.log(
-    `  Overall: ${grandImplemented}/${grandRuby} tests (${grandPct}%)${grandDetailStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
+    `  Overall: ${grandImplemented}/${grandPortable} tests (${permanentOf(grandMatchedPermanent, grandUnportedTests)}) (${grandPct}%)${grandDetailStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
   );
   console.log(`${"=".repeat(90)}\n`);
 

@@ -51,6 +51,8 @@ export interface PackageFigures {
   railsVersion: string | null;
   api: Ratio | null;
   tests: Ratio | null;
+  /** Of `tests`, the permanently skipped or unported Rails tests. */
+  testsPermanent: number;
 }
 
 export interface ParityData {
@@ -139,6 +141,7 @@ export async function loadParity(root = REPO_ROOT): Promise<ParityData> {
         (f) => f.testsMatched,
         (f) => f.testsTotal,
       ),
+      testsPermanent: files.reduce((n, f) => n + (f.testsPermanent ?? 0), 0),
     });
   }
   return { measuredAt: valid ? measuredAt || "local" : null, buildRef, summary: valid, packages };
@@ -205,6 +208,11 @@ function details(summary: string, body: string[]): string[] {
   return ["<details>", `<summary>${summary}</summary>`, "", ...body, "", "</details>", ""];
 }
 
+/** The permanent count beside a tests ratio, linked to the page's list of them. */
+function permanentNote(n: number): string {
+  return n === 0 ? "" : ` ([${n} permanent](#permanently-skipped-tests))`;
+}
+
 function fileGap(f: FileRow): number {
   return f.methodsMissing + (f.testsTotal - f.testsMatched);
 }
@@ -227,7 +235,7 @@ function statsLines(data: ParityData, fig: PackageFigures | undefined, files: Fi
     "| --- | --- |",
     `| Rails counterpart | ${counterpart} |`,
     `| API methods matched | ${ratio(fig?.api ?? null)} |`,
-    `| Rails tests matched | ${ratio(fig?.tests ?? null)} |`,
+    `| Rails tests matched | ${ratio(fig?.tests ?? null)}${permanentNote(fig?.testsPermanent ?? 0)} |`,
     `| Ruby files ported | ${ported} |`,
     `| Ruby files unported | ${unported} |`,
     `| Measured at | ${shortSha(data.measuredAt)} |`,
@@ -248,7 +256,9 @@ function gapLines(files: FileRow[] | null, ref: string): string[] {
     ...gaps.map(
       (f) =>
         `| ${link(f.rubyFile, f.rubyUrl)} | ${link(f.tsFile!, tsUrl(f, ref))} | ${f.methodsMissing} | ${
-          f.testsTotal === 0 ? DASH : `${f.testsMatched} / ${f.testsTotal}`
+          f.testsTotal === 0
+            ? DASH
+            : `${f.testsMatched} / ${f.testsTotal}${permanentNote(f.testsPermanent ?? 0)}`
         } |`,
     ),
   ];
