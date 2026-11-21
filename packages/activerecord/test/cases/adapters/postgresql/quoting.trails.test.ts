@@ -33,7 +33,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("quote array", async () => {
       const rows = Array.from(await adapter.execute("SELECT ARRAY[1,2,3]::integer[] AS val"));
-      expect(rows[0].val).toEqual([1, 2, 3]);
+      expect(rows[0].val).toBe("{1,2,3}");
     });
   });
 });

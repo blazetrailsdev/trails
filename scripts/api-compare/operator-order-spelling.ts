@@ -203,6 +203,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // middleware/stack.rb:93 `def [](i)` → middleware/stack.ts `get`, the
   // `Arel::Table#[]` spelling.
   "ActionDispatch::MiddlewareStack": { "[]": ["get"] },
+  // vendor/pg/v1.5.9/ext/pg_result.c:1744 `rb_define_method(rb_cPGresult, "[]", pgresult_aref, 1)`
+  // → pg/lib/result.ts `get`, the `Arel::Table#[]` spelling.
+  "PG::Result": { "[]": ["get"] },
   // relation/predicate_builder.rb:53 `def [](attr_name, value, operator = nil)`
   // → relation/predicate-builder.ts `get`, the `Arel::Table#[]` spelling.
   "ActiveRecord::PredicateBuilder": { "[]": ["get"] },

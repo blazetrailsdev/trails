@@ -28,6 +28,7 @@ import type { Integer as TextEncoderInteger } from "./text-encoder/integer.js";
 import type { Connection } from "./connection.js";
 import type { SimpleDecoder } from "./simple-decoder.js";
 import type { SimpleEncoder } from "./simple-encoder.js";
+import type { TypeMap } from "./type-map.js";
 import type { TypeMapAllStrings } from "./type-map-all-strings.js";
 import type { TypeMapByClass } from "./type-map-by-class.js";
 import type { TypeMapByOid } from "./type-map-by-oid.js";
@@ -54,6 +55,7 @@ export interface PGNamespace {
   SimpleEncoder: typeof SimpleEncoder;
   SimpleDecoder: typeof SimpleDecoder;
   Result: typeof Result;
+  TypeMap: typeof TypeMap;
   TypeMapAllStrings: typeof TypeMapAllStrings;
   TypeMapByClass: typeof TypeMapByClass;
   TypeMapByOid: typeof TypeMapByOid;
@@ -98,6 +100,7 @@ export declare namespace PG {
   export type Connection = import("./connection.js").Connection;
   export type Result = import("./result.js").Result;
   export type Error = import("./exceptions.js").Error;
+  export type TypeMap = import("./type-map.js").TypeMap;
   export type TypeMapAllStrings = import("./type-map-all-strings.js").TypeMapAllStrings;
   export type TypeMapByOid = import("./type-map-by-oid.js").TypeMapByOid;
   export type SimpleDecoder = import("./simple-decoder.js").SimpleDecoder;

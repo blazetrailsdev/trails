@@ -138,7 +138,7 @@ describe("PGConnection#typeMapForResults", () => {
     expect((getTypeParser(OID_INT8, "binary") as (v: string) => unknown)("3")).toBe(
       "from the client",
     );
-    expect((getTypeParser(25, "text") as (v: string) => unknown)("x")).toBe("from the client");
+    expect((getTypeParser(25, "text") as (v: string) => unknown)("x")).toBe("x");
   });
 });
 

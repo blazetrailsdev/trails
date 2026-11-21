@@ -2,6 +2,7 @@ import {
   ArgumentError,
   block as rbBlock,
   Enumerable,
+  IndexError,
   include,
   toEnum,
   type Enumerator,
@@ -109,6 +110,18 @@ export class Result {
   values(): unknown[][] {
     return ((this.#native.rows ?? []) as unknown[][]).map((row, i) =>
       row.map((_, j) => this.#typecastResultValue(i, j)),
+    );
+  }
+
+  get(index: number): Record<string, unknown> {
+    const tupleNum = index;
+    const numTuples = this.ntuples();
+    if (tupleNum < 0 || tupleNum >= numTuples) {
+      throw new IndexError(`Index ${tupleNum} is out of range`);
+    }
+    const fields = this.fields();
+    return Object.fromEntries(
+      fields.map((name, fieldNum) => [name, this.#typecastResultValue(tupleNum, fieldNum)]),
     );
   }
 

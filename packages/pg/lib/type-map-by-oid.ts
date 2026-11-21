@@ -1,14 +1,22 @@
-import { ArgumentError, rbObjClassname, TypeError } from "@blazetrails/ruby-compat";
+import { ArgumentError, include, rbObjClassname, TypeError } from "@blazetrails/ruby-compat";
 import { Coder } from "./coder.js";
 import { PG } from "./namespaces.js";
+import { _pgTypemapAllStrings } from "./type-map-all-strings.js";
+import { DefaultTypeMappable, TypeMap } from "./type-map.js";
 
 type Decoder = Coder & { decode(string: string, tuple?: number, field?: number): unknown };
 
 /** @noRailsEquivalent PERMANENT */
-export class TypeMapByOid {
-  readonly #format: [Map<number, Decoder>, Map<number, Decoder>] = [new Map(), new Map()];
+export class TypeMapByOid extends TypeMap {
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  _defaultTypemap: TypeMap = _pgTypemapAllStrings;
+  declare defaultTypeMap: DefaultTypeMappable["defaultTypeMap"];
+  declare withDefaultTypeMap: DefaultTypeMappable["withDefaultTypeMap"];
 
-  defaultTypeMap: TypeMapByOid | null = null;
+  readonly #format: [Map<number, Decoder>, Map<number, Decoder>] = [new Map(), new Map()];
 
   addCoder(coder: Decoder): this {
     if (!(coder instanceof Coder)) {
@@ -28,8 +36,13 @@ export class TypeMapByOid {
    * @noRailsEquivalent PERMANENT
    */
   _lookupOid(format: number, oid: number): Decoder | null {
-    return this.#format[format]?.get(oid) ?? this.defaultTypeMap?._lookupOid(format, oid) ?? null;
+    return (
+      this.#format[format]?.get(oid) ??
+      (this.defaultTypeMap._lookupOid(format, oid) as Decoder | null)
+    );
   }
 }
+
+include(TypeMapByOid, DefaultTypeMappable);
 
 PG.TypeMapByOid = TypeMapByOid;

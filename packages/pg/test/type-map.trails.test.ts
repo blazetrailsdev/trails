@@ -54,3 +54,20 @@ describe("PG::TypeMapByOid", () => {
     expect(() => inner.addCoder(new Upcase(null, { oid: 1, format: 2 }))).toThrow(ArgumentError);
   });
 });
+
+describe("PG::TypeMap", () => {
+  it("defaults a DefaultTypeMappable map's default_type_map to the frozen all-strings map", () => {
+    const byOid = new PG.TypeMapByOid();
+    const byClass = new PG.TypeMapByClass();
+    expect(byOid).toBeInstanceOf(PG.TypeMap);
+    expect(new PG.TypeMapAllStrings()).toBeInstanceOf(PG.TypeMap);
+    expect(byOid.defaultTypeMap).toBeInstanceOf(PG.TypeMapAllStrings);
+    expect(byOid.defaultTypeMap).toBe(byClass.defaultTypeMap);
+    expect(Object.isFrozen(byOid.defaultTypeMap)).toBe(true);
+    expect(byOid._lookupOid(0, 20)).toBeNull();
+    expect(byClass._lookupKlass(3)).toBeNull();
+    const inner = new PG.TypeMapByOid();
+    expect(byOid.withDefaultTypeMap(inner)).toBe(byOid);
+    expect(byOid.defaultTypeMap).toBe(inner);
+  });
+});
