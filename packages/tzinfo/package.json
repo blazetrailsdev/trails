@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "build": "tsc && pnpm build:data",
-    "build:data": "pnpm -w vendor:fetch --source tzinfo-data && pnpm -w tsx scripts/generate-tzinfo-data.ts vendor/tzinfo-data/v1.2026.5/lib packages/tzinfo/dist/tzinfo-data - js"
+    "build:data": "(test -d ../../vendor/tzinfo-data/v1.2026.5/.git || pnpm -w vendor:fetch --source tzinfo-data) && pnpm -w tsx scripts/generate-tzinfo-data.ts vendor/tzinfo-data/v1.2026.5/lib packages/tzinfo/dist/tzinfo-data - js"
   },
   "dependencies": {
     "@blazetrails/date": "workspace:*",

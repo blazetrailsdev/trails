@@ -134,10 +134,10 @@ describe("TCDataSource", () => {
       const { rbModName } = await import("@blazetrails/ruby-compat");
       const { TZInfo } = await import("../lib/index.js");
       const { loadPath } = await import("@blazetrails/tzinfo/data");
-      try {
-        Object.assign(TZInfo.loadPath, loadPath);
-        await TZInfo.DataSources.RubyDataSource.load();
+      Object.assign(TZInfo.loadPath, loadPath);
+      await TZInfo.DataSources.RubyDataSource.load();
 
+      try {
         puts(rbModName(TZInfo.DataSource.get().constructor));
       } catch (e) {
         puts(`Unexpected exception: ${e}`);
