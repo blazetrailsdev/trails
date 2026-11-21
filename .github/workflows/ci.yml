@@ -144,7 +144,7 @@ jobs:
           # connection-adapters/column.ts, and the red surfaced a push later
           # on main against an unrelated diff (#6989).
           UNIT_TESTS_PKGS_RE='^(packages/|scripts/|eslint/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch(\.test)?\.ts)$)'
-          GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|actionpack|actioncable|bcrypt|activesupport|arel|globalid|date|did-you-mean|trails-tsc|actionmailer|actionmailbox|actiontext|actionview|activejob|solid-queue|trailties|ruby-compat)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
+          GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|actionpack|actioncable|bcrypt|activesupport|arel|globalid|date|did-you-mean|trails-tsc|actionmailer|actionmailbox|actiontext|actionview|activejob|activestorage|solid-queue|trailties|ruby-compat)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
           GUIDES_EXCL_RE='(/(src|lib)/test-helpers(/|\.ts$)|^packages/[^/]+/test/|/test-fixtures?(/|\.ts$)|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
           WEBSITE_PKGS_RE='^packages/website/'
           # Files that make a scoped ESLint run unsound, so the whole tree is

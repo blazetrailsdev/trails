@@ -60,6 +60,7 @@ export default defineConfig({
           items: [
             { text: "Active Record Basics", link: "/guides/active-record-basics" },
             { text: "Active Record Migrations", link: "/guides/active-record-migrations" },
+            { text: "Active Record Validations", link: "/guides/active-record-validations" },
             { text: "Active Record Callbacks", link: "/guides/active-record-callbacks" },
             { text: "Active Record Query Interface", link: "/guides/active-record-querying" },
             { text: "Active Model Basics", link: "/guides/active-model-basics" },
@@ -87,11 +88,16 @@ export default defineConfig({
         {
           text: "Other Components",
           items: [
+            {
+              text: "Active Support Core Extensions",
+              link: "/guides/active-support-core-extensions",
+            },
             { text: "Action Mailer Basics", link: "/guides/action-mailer-basics" },
             { text: "Action Mailbox Basics", link: "/guides/action-mailbox-basics" },
             { text: "Action Text Overview", link: "/guides/action-text-overview" },
             { text: "Action Cable Overview", link: "/guides/action-cable-overview" },
             { text: "Active Job Basics", link: "/guides/active-job-basics" },
+            { text: "Active Storage Overview", link: "/guides/active-storage-overview" },
           ],
         },
         {
