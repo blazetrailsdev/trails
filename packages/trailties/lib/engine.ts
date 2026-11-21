@@ -44,6 +44,7 @@ import type { MiddlewareStackProxy } from "./configuration.js";
 import { LazyRouteSet } from "./engine/lazy-route-set.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 
+/** @noRailsEquivalent PERMANENT */
 const generators = "./generators.js";
 
 type IsolatedNamespace = {
