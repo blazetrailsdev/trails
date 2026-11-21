@@ -153,10 +153,10 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./connection-adapters/abstract-adapter.js"),
   "active_record/connection_adapters/mysql2_adapter": () =>
     import(new URL("./connection-adapters/mysql2-adapter.js", import.meta.url).href),
-  "active_record/connection_adapters/sqlite3_adapter": () =>
-    import(new URL("./connection-adapters/sqlite3-adapter.js", import.meta.url).href),
   "active_record/connection_adapters/postgresql_adapter": () =>
     import(new URL("./connection-adapters/postgresql-adapter.js", import.meta.url).href),
+  "active_record/connection_adapters/sqlite3_adapter": () =>
+    import(new URL("./connection-adapters/sqlite3-adapter.js", import.meta.url).href),
   "active_record/encryption": () => import("./encryption.js"),
   "active_record/connection_handling": () => import("./connection-handling.js"),
   "active_record/fixtures": () => import("./fixtures.js"),
