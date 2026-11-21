@@ -1,4 +1,3 @@
-<% if (!this.options.skipJavascript && this.options.javascript === "vite") { -%>
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 
@@ -31,15 +30,3 @@ function stop(code) {
 
 process.on("SIGINT", () => stop(0));
 process.on("SIGTERM", () => stop(0));
-<% } else { -%>
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-
-const { status } = spawnSync(
-  join(dirname(fileURLToPath(import.meta.url)), "trails"),
-  ["server", ...process.argv.slice(2)],
-  { stdio: "inherit" },
-);
-process.exit(status ?? 1);
-<% } -%>

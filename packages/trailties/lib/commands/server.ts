@@ -33,9 +33,6 @@ import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { DevCaching } from "../dev-caching.js";
 import { Trails } from "../trails.js";
-import * as TrailsTsc from "@blazetrails/trails-tsc";
-
-Trails.TrailsTsc = TrailsTsc;
 
 export interface ServerOptions extends RackupServerOptions {
   userSuppliedOptions?: string[];

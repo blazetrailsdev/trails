@@ -17,8 +17,6 @@ vi.mock("../../lib/command/actions.js", async (importOriginal) => ({
   requireApplicationBang: async () => {},
 }));
 
-vi.mock("@blazetrails/trails-tsc", () => ({ watchViews: async () => ({ close() {} }) }));
-
 const { ServerCommand } = await import("../../lib/commands/server.js");
 
 const run = (...args: string[]): Promise<void> => ServerCommand.perform("server", args, {});

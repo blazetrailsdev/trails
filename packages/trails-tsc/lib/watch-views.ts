@@ -21,9 +21,21 @@ export async function watchViews(opts: WatchViewsOptions = {}): Promise<WatchHan
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const debounceMs = opts.debounceMs ?? 50;
 
-  const runBuild = async (trigger?: string, kind: "initial" | "change" = "change") => {
+  const touched = new Map<string, number>();
+  const runBuild = async (
+    trigger?: string,
+    kind: "initial" | "change" = "change",
+    changed: readonly string[] = [],
+  ) => {
     try {
       const result = await buildViews(opts);
+      const now = new Date();
+      for (const name of changed) {
+        touched.set(name, Date.now() + Math.max(debounceMs, 500));
+        await fs.promises.utimes(path.join(viewsDir, name), now, now).catch((err: unknown) => {
+          if ((err as { code?: string }).code !== "ENOENT") throw err;
+        });
+      }
       opts.onRebuild?.({ kind, trigger, result });
     } catch (err) {
       opts.onError?.(err instanceof Error ? err : new Error(String(err)), trigger);
@@ -36,6 +48,7 @@ export async function watchViews(opts: WatchViewsOptions = {}): Promise<WatchHan
 
   let pending: NodeJS.Timeout | null = null;
   let lastTrigger: string | undefined;
+  let changed = new Set<string>();
 
   const tryWatch = (recursive: boolean): fs.FSWatcher =>
     fs.watch(viewsDir, { recursive }, (_event, filename) => onEvent(filename));
@@ -45,14 +58,23 @@ export async function watchViews(opts: WatchViewsOptions = {}): Promise<WatchHan
     } else {
       const name = typeof filename === "string" ? filename : String(filename);
       if (!name.endsWith(".tse")) return;
-      lastTrigger = name.split(path.sep).join("/");
+      const trigger = name.split(path.sep).join("/");
+      const until = touched.get(trigger);
+      if (until !== undefined) {
+        if (Date.now() <= until) return;
+        touched.delete(trigger);
+      }
+      lastTrigger = trigger;
+      changed.add(trigger);
     }
     if (pending !== null) clearTimeout(pending);
     pending = setTimeout(() => {
       pending = null;
       const trig = lastTrigger;
       lastTrigger = undefined;
-      building = building.then(() => runBuild(trig));
+      const names = [...changed];
+      changed = new Set();
+      building = building.then(() => runBuild(trig, "change", names));
     }, debounceMs);
   };
 

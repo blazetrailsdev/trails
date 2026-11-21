@@ -12,7 +12,6 @@ import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
 import type { Autoloaders } from "./autoloaders.js";
 import type { Generators } from "./generators.js";
-import type * as TrailsTsc from "@blazetrails/trails-tsc";
 import type { Configuration } from "./application/configuration.js";
 import type { Console } from "./commands/console.js";
 import type { Server } from "./commands/server.js";
@@ -58,7 +57,6 @@ export class Trails {
   declare static Generators?: typeof Generators;
   declare static TestUnitRailtie?: typeof import("./test-unit/trailtie.js").TestUnitRailtie;
   /** @noRailsEquivalent PERMANENT */
-  declare static TrailsTsc?: typeof TrailsTsc;
 
   declare static eagerLoadBang: () => Promise<void>;
 

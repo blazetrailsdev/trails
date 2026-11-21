@@ -40,6 +40,29 @@ describe("watchViews", () => {
     }
   }, 30_000);
 
+  it("touches a changed template after its module is emitted, once", async () => {
+    const cwd = mkScratch();
+    fs.mkdirSync(path.join(cwd, "app/views"), { recursive: true });
+    const source = path.join(cwd, "app/views/home.html.tse");
+    const events: string[] = [];
+    const handle = await watchViews({
+      cwd,
+      debounceMs: 5,
+      onRebuild: ({ kind }) => events.push(kind),
+    });
+    try {
+      await waitFor(() => events.includes("initial"));
+      fs.writeFileSync(source, "<%= name %>");
+      await waitFor(() => events.includes("change"));
+      const emitted = fs.statSync(path.join(cwd, ".trails/views/home.html.tse.ts")).mtimeMs;
+      expect(fs.statSync(source).mtimeMs).toBeGreaterThanOrEqual(emitted);
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      expect(events.filter((kind) => kind === "change")).toHaveLength(1);
+    } finally {
+      handle.close();
+    }
+  }, 30_000);
+
   it("creates the views dir if missing and surfaces build errors", async () => {
     const cwd = mkScratch();
     fs.symlinkSync(mkScratch(), path.join(cwd, ".trails"));

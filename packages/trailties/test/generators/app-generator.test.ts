@@ -1239,6 +1239,7 @@ describe("AppGenerator", () => {
       "bin/trails",
       "bin/setup",
       "bin/dev",
+      "Procfile.dev",
       "config/application.ts",
       "config/environment.ts",
       "config/routes.ts",
@@ -1407,6 +1408,11 @@ describe("AppGenerator", () => {
     await t.assertFile("my-app/bin/dev", (dev: string) => {
       expect(dev).toContain('readFileSync("Procfile.dev", "utf8")');
       expect(dev).toContain("spawn(command");
+    });
+    await t.assertFile("my-app/Procfile.dev", (procfile: string) => {
+      expect(procfile).toBe(
+        "web: bin/trails server\nviews: trails-tsc-views dev --views app/views\n",
+      );
     });
     await t.assertFile("my-app/README.md", (readme: string) => {
       expect(readme).not.toMatch(/^\| `trails /m);

@@ -279,6 +279,7 @@ export class AppBuilder {
     await this.keepFile("app/models/concerns");
   }
 
+  /** @inventedArm template — PERMANENT */
   async bin(): Promise<void> {
     const excludePattern = rbRegSUnion(
       [
@@ -293,6 +294,7 @@ export class AppBuilder {
       (content: string) => `${this.shebang()}\n` + content,
     );
     await this.chmod("bin", 0o755 & ~File.umask(), { verbose: false });
+    await this.template("Procfile.dev");
   }
   async binWhenUpdating(): Promise<void> {
     await this.bin();

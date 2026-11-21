@@ -1,9 +1,7 @@
 import { onLoad, TopLevel, type CacheStore, type Reloader } from "@blazetrails/activesupport";
-import { Trails } from "../trails.js";
 import { UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
-  DetailsKey,
   PartialRenderer,
   deprecator,
   Resolver,
@@ -24,8 +22,6 @@ import {
   ViewReloader,
 } from "@blazetrails/actionview";
 import { Nokogiri } from "@blazetrails/nokogiri";
-import { Dir } from "@blazetrails/ruby-compat";
-import type { Application } from "../application.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionViewConfig {
@@ -216,39 +212,7 @@ export class Trailtie extends BaseTrailtie {
         PartialRenderer.setCollectionCache(app.config.actionController.cacheStore as CacheStore);
       },
     );
-
-    this.server(watchViews);
   }
 }
 
 Object.defineProperty(Trailtie, "name", { value: "ActionView::Railtie" });
-
-/** @noRailsEquivalent PERMANENT */
-async function watchViews(app: unknown): Promise<void> {
-  const { config } = app as Application;
-  const actionView = config.actionView;
-  const enableCaching =
-    actionView.cacheTemplateLoading == null
-      ? !config.isReloadingEnabled()
-      : actionView.cacheTemplateLoading;
-  if (enableCaching) return;
-
-  const { watchViews: watchViewFiles } = Trails.TrailsTsc!;
-  let started = false;
-  let initialError: Error | null = null;
-  const handle = await watchViewFiles({
-    cwd: Dir.pwd(),
-    onRebuild: ({ kind }) => {
-      if (kind === "change") DetailsKey.clear();
-    },
-    onError: (err, trigger) => {
-      if (!started) initialError ??= err;
-      TopLevel.Trails!.logger!.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
-    },
-  });
-  started = true;
-  if (initialError !== null) {
-    handle.close();
-    throw initialError;
-  }
-}
