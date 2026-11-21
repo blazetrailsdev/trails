@@ -238,6 +238,24 @@ export const TYPED_NATIVE_FORM = {
 } as const;
 
 /**
+ * The native String forms the extractor marks a second time when the TS
+ * checker proves the receiver a JS string, keyed by the JS method. A JS string
+ * is never a package class, so `significantCallsForReceivers` (compare.ts)
+ * credits the Ruby call from these even where Ripper left the Ruby receiver
+ * unproven and a package class (`SafeBuffer`) declares a member of that name.
+ */
+export const TYPED_STRING_FORM = {
+  trim: "strip@typed",
+  trimEnd: "rstrip@typed",
+  trimStart: "lstrip@typed",
+  toUpperCase: "upcase@typed",
+  toLowerCase: "downcase@typed",
+  normalize: "unicode_normalize@typed",
+  chop: "chop@typed",
+  replaceAll: "tr@typed",
+} as const;
+
+/**
  * Prefix the TS extractor gives, in the ORDER stream only, to a call first made
  * inside a `moduleEval` / `classEval` callback. Its Ruby counterpart is either a
  * block, which Ripper walks in place, or a String (`module_eval <<-RUBY`,

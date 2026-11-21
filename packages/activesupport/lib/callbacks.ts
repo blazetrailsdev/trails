@@ -10,6 +10,7 @@ import {
   Thread,
   Struct,
   rbClearMethodCache,
+  capitalize,
 } from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
@@ -898,10 +899,12 @@ export class CallbackChain {
     if (type == null) {
       if (this._allCallbacks) return this._allCallbacks;
       const finalSequence = new CallbackSequence();
-      let callbackSequence = finalSequence;
-      for (let i = this.chain.length - 1; i >= 0; i--) {
-        callbackSequence = this.chain[i].compiled.apply(callbackSequence);
-      }
+      const callbackSequence = [...this.chain]
+        .reverse()
+        .reduce(
+          (callbackSequence, callback) => callback.compiled.apply(callbackSequence),
+          finalSequence,
+        );
       callbackSequence._callbackChain = this;
       this._allCallbacks = callbackSequence;
       return callbackSequence;
@@ -910,11 +913,13 @@ export class CallbackChain {
     const memo = this._singleCallbacks.get(type);
     if (memo) return memo;
     const finalSequence = new CallbackSequence();
-    let callbackSequence = finalSequence;
-    for (let i = this.chain.length - 1; i >= 0; i--) {
-      const callback = this.chain[i];
-      if (type === callback.kind) callbackSequence = callback.compiled.apply(callbackSequence);
-    }
+    const callbackSequence = [...this.chain]
+      .reverse()
+      .reduce(
+        (callbackSequence, callback) =>
+          type === callback.kind ? callback.compiled.apply(callbackSequence) : callbackSequence,
+        finalSequence,
+      );
     callbackSequence._callbackChain = this;
     this._singleCallbacks.set(type, callbackSequence);
     return callbackSequence;
@@ -1168,7 +1173,7 @@ export const ClassMethods = {
 
         if (!callback && options.raise) {
           throw new ArgumentError(
-            `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
+            `${capitalize(type, [])} ${name} callback ${String(filter)} has not been defined`,
           );
         }
 

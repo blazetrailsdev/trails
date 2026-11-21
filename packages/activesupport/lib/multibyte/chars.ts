@@ -96,8 +96,9 @@ export class Chars {
   /** @missingRailsName gsub — PERMANENT */
   titleize(): Chars {
     return this.chars(
-      this.wrappedString
-        .toLowerCase()
+      (this as unknown as { downcase(): Chars })
+        .downcase()
+        .toS()
         .replace(WORD_BOUNDARY_TITLEIZE, (_m, c: string) => c.toUpperCase()),
     );
   }

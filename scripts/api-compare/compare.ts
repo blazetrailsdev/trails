@@ -171,6 +171,7 @@ import {
   LENGTH_READ_UNCREDITED_RECEIVER_KINDS,
   NATIVE_FORM_PREFIX,
   NATIVE_FORM_ANALOGUES,
+  TYPED_STRING_FORM,
   TYPED_NATIVE_FORM,
   NEGATED_ALIASES,
   partitionNegatedCalls,
@@ -834,6 +835,7 @@ const TYPED_CREDITED_CALLS = new Set([
   "merge!",
   "update",
   "fetch",
+  ...Object.values(TYPED_STRING_FORM).map((form) => form.replace(/@typed$/, "")),
 ]);
 
 /**

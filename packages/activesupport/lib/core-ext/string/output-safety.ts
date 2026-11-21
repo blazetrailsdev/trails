@@ -165,6 +165,7 @@ function strRange(str: string, args: ArefArgs): [number, number] {
 
 type BlockFn = (...params: unknown[]) => unknown;
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJson") {
   static readonly UNSAFE_STRING_METHODS = [
     "capitalize",
@@ -466,6 +467,50 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
   private stringIntoSafeBuffer(newString: string, isHtmlSafe: boolean): SafeBuffer {
     return new SafeBuffer(newString, isHtmlSafe);
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface SafeBuffer {
+  capitalize(...args: unknown[]): string;
+  capitalizeBang(...args: unknown[]): this | null;
+  chomp(...args: unknown[]): string;
+  chompBang(...args: unknown[]): this | null;
+  chop(...args: unknown[]): string;
+  chopBang(...args: unknown[]): this | null;
+  delete(...args: unknown[]): string;
+  deleteBang(...args: unknown[]): this | null;
+  deletePrefix(...args: unknown[]): string;
+  deletePrefixBang(...args: unknown[]): this | null;
+  deleteSuffix(...args: unknown[]): string;
+  deleteSuffixBang(...args: unknown[]): this | null;
+  downcase(...args: unknown[]): string;
+  downcaseBang(...args: unknown[]): this | null;
+  lstrip(...args: unknown[]): string;
+  lstripBang(...args: unknown[]): this | null;
+  next(...args: unknown[]): string;
+  nextBang(...args: unknown[]): this | null;
+  reverse(...args: unknown[]): string;
+  reverseBang(...args: unknown[]): this | null;
+  rstrip(...args: unknown[]): string;
+  rstripBang(...args: unknown[]): this | null;
+  scrub(...args: unknown[]): string;
+  scrubBang(...args: unknown[]): this | null;
+  squeeze(...args: unknown[]): string;
+  squeezeBang(...args: unknown[]): this | null;
+  strip(...args: unknown[]): string;
+  stripBang(...args: unknown[]): this | null;
+  succ(...args: unknown[]): string;
+  succBang(...args: unknown[]): this | null;
+  swapcase(...args: unknown[]): string;
+  swapcaseBang(...args: unknown[]): this | null;
+  tr(...args: unknown[]): string;
+  trBang(...args: unknown[]): this | null;
+  trS(...args: unknown[]): string;
+  trSBang(...args: unknown[]): this | null;
+  unicodeNormalize(...args: unknown[]): string;
+  unicodeNormalizeBang(...args: unknown[]): this | null;
+  upcase(...args: unknown[]): string;
+  upcaseBang(...args: unknown[]): this | null;
 }
 
 for (const unsafeMethod of SafeBuffer.UNSAFE_STRING_METHODS) {

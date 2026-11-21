@@ -83,6 +83,7 @@ import {
   FOREIGN_READ_PREFIX,
   NATIVE_FORM_PREFIX,
   TYPED_NATIVE_FORM,
+  TYPED_STRING_FORM,
   NEGATED_CALL_PREFIX,
 } from "./enumerable-idioms.js";
 import {
@@ -8764,6 +8765,18 @@ function readCannotBeUndefined(expr: ts.Expression): boolean {
   return parts.every((t) => !(t.flags & loose));
 }
 
+/**
+ * Whether the TS checker proves `expr` a JS string, for the
+ * {@link TYPED_STRING_FORM} marks.
+ */
+function isCheckerProvenString(expr: ts.Expression): boolean {
+  const checker = currentChecker;
+  if (checker === undefined) return false;
+  const type = checker.getTypeAtLocation(expr);
+  const parts = type.isUnion() ? type.types : [type];
+  return parts.every((t) => (t.flags & ts.TypeFlags.StringLike) !== 0);
+}
+
 function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined {
   const checker = currentChecker;
   if (checker === undefined) return undefined;
@@ -8958,6 +8971,9 @@ function nativeValueForms(n: ts.Node): string[] {
         return typed ? ["drop", TYPED_NATIVE_FORM.drop] : ["drop"];
       }
       if (args.length !== 2 || first.getText() !== "0") return [];
+      if (second.getText() === "-1" && isCheckerProvenString(n.expression.expression)) {
+        return [TYPED_STRING_FORM.chop];
+      }
       return typed ? ["take", TYPED_NATIVE_FORM.take, TYPED_NATIVE_FORM.first] : ["take"];
     }
     case "at":
@@ -8968,11 +8984,20 @@ function nativeValueForms(n: ts.Node): string[] {
         : [];
     case "trim":
     case "trimEnd":
-      return args.length === 0 ? [method] : [];
+      if (args.length !== 0) return [];
+      return isCheckerProvenString(n.expression.expression)
+        ? [method, TYPED_STRING_FORM[method]]
+        : [method];
+    case "trimStart":
+    case "toUpperCase":
+    case "toLowerCase":
+    case "normalize":
+      return isCheckerProvenString(n.expression.expression) ? [TYPED_STRING_FORM[method]] : [];
     case "replaceAll":
-      return args.length === 2 && checkerProvenKind(n.expression.expression) === "sized"
-        ? ["gsub"]
-        : [];
+      if (args.length !== 2 || checkerProvenKind(n.expression.expression) !== "sized") return [];
+      return isCheckerProvenString(n.expression.expression) && isCheckerProvenString(first)
+        ? ["gsub", TYPED_STRING_FORM.replaceAll]
+        : ["gsub"];
     case "replace": {
       if (args.length !== 2 || checkerProvenKind(n.expression.expression) !== "sized") return [];
       if (ts.isStringLiteralLike(first)) return ["sub"];
