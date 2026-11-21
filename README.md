@@ -506,8 +506,6 @@ as a bind raises `TypeError: quote: JS Date is not accepted — use a Temporal
 type`. So write:
 
 ```ts
-import { Temporal } from "@blazetrails/date";
-
 Post.where("created_at > ?", Temporal.Instant.from("2020-01-01T00:00:00Z")).toSql();
 // SELECT "posts".* FROM "posts" WHERE (created_at > '2020-01-01 00:00:00')
 ```

@@ -114,7 +114,6 @@ post.update!(status: :archived)
 
 ```ts
 import { Base } from "@blazetrails/activerecord";
-import { Temporal } from "@blazetrails/date";
 
 class Post extends Base {
   static {
