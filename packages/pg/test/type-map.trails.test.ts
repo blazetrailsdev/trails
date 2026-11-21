@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ArgumentError,
+  FrozenError,
   rbCFalseClass,
   rbCInteger,
   rbCNumeric,
@@ -69,5 +70,16 @@ describe("PG::TypeMap", () => {
     const inner = new PG.TypeMapByOid();
     expect(byOid.withDefaultTypeMap(inner)).toBe(byOid);
     expect(byOid.defaultTypeMap).toBe(inner);
+  });
+});
+
+describe("PG::TypeMap::DefaultTypeMappable#default_type_map=", () => {
+  it("raises FrozenError on a frozen map and TypeError for a non-TypeMap", () => {
+    const map = new PG.TypeMapByOid();
+    expect(() => (map.defaultTypeMap = {} as never)).toThrow(
+      "wrong argument type Hash (expected PG::TypeMap)",
+    );
+    Object.freeze(map);
+    expect(() => map.withDefaultTypeMap(new PG.TypeMapByOid())).toThrow(FrozenError);
   });
 });

@@ -3,6 +3,7 @@ import {
   block as rbBlock,
   Enumerable,
   IndexError,
+  rbNum2Int,
   include,
   toEnum,
   type Enumerator,
@@ -114,7 +115,7 @@ export class Result {
   }
 
   get(index: number): Record<string, unknown> {
-    const tupleNum = index;
+    const tupleNum = rbNum2Int(index);
     const numTuples = this.ntuples();
     if (tupleNum < 0 || tupleNum >= numTuples) {
       throw new IndexError(`Index ${tupleNum} is out of range`);

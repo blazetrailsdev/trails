@@ -38,5 +38,7 @@ describe("PG::Result#[]", () => {
     expect(res.get(1)).toEqual({ foo: "bar2" });
     expect(() => res.get(2)).toThrow(IndexError);
     expect(() => res.get(-1)).toThrow("Index -1 is out of range");
+    expect(res.get(1.5)).toEqual({ foo: "bar2" });
+    expect(() => res.get(null as never)).toThrow("no implicit conversion from nil to integer");
   });
 });

@@ -80,7 +80,12 @@ export function kernelInteger(
   return rbToInteger(val);
 }
 
-function rbNum2Int(val: unknown): number {
+/**
+ * `NUM2INT` — `rb_num2int` (`vendor/ruby/v3.3.11/numeric.c:3241`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbNum2Int(val: unknown): number {
   if (typeof val === "number") {
     if (Number.isNaN(val)) throw new RangeError("float NaN out of range of integer");
     if (!Number.isFinite(val)) {

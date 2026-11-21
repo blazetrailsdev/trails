@@ -4,7 +4,7 @@ import { PG } from "./namespaces.js";
 import { _pgTypemapAllStrings } from "./type-map-all-strings.js";
 import { DefaultTypeMappable, TypeMap } from "./type-map.js";
 
-type Decoder = Coder & { decode(string: string, tuple?: number, field?: number): unknown };
+type Decoder = NonNullable<ReturnType<TypeMap["_lookupOid"]>>;
 
 /** @noRailsEquivalent PERMANENT */
 export class TypeMapByOid extends TypeMap {
@@ -36,10 +36,7 @@ export class TypeMapByOid extends TypeMap {
    * @noRailsEquivalent PERMANENT
    */
   _lookupOid(format: number, oid: number): Decoder | null {
-    return (
-      this.#format[format]?.get(oid) ??
-      (this.defaultTypeMap._lookupOid(format, oid) as Decoder | null)
-    );
+    return this.#format[format]?.get(oid) ?? this.defaultTypeMap._lookupOid(format, oid);
   }
 }
 

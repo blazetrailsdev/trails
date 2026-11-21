@@ -326,7 +326,7 @@ export { kernelHash } from "./kernel-hash.js";
 export { format, sprintf } from "./kernel-format.js";
 export { camelized, kebabCase } from "./object.js";
 export { rbWarningSAref, rbWarningSAset, warn } from "./kernel-warn.js";
-export { kernelInteger, rbCheckToInt } from "./kernel-integer.js";
+export { kernelInteger, rbCheckToInt, rbNum2Int } from "./kernel-integer.js";
 export { kernelRand, kernelSrand } from "./kernel-rand.js";
 export { rbFBackquote, rbFSystem } from "./kernel-system.js";
 export { IndexError } from "./index-error.js";
