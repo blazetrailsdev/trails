@@ -64,6 +64,7 @@
   "peerDependencies": {
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
+    "@blazetrails/mysql2": "workspace:*",
     "@blazetrails/pg": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "expo-sqlite": "^15.0.0 || ^16.0.0 || ^58.0.0",
@@ -75,6 +76,9 @@
       "optional": true
     },
     "@blazetrails/msgpack": {
+      "optional": true
+    },
+    "@blazetrails/mysql2": {
       "optional": true
     },
     "@blazetrails/pg": {
@@ -103,6 +107,7 @@
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
+    "@blazetrails/mysql2": "workspace:*",
     "@blazetrails/pg": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
@@ -113,11 +118,6 @@
     "node": ">=26"
   },
   "mirrors": [
-    {
-      "source": "mysql2",
-      "ref": "0.5.6",
-      "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
-    },
     {
       "source": "rails",
       "ref": "v8.0.2",

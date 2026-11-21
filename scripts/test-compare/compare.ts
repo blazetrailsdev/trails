@@ -200,7 +200,8 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     pkg === "thor" ||
     pkg === "bcrypt" ||
     pkg === "msgpack" ||
-    pkg === "pg"
+    pkg === "pg" ||
+    pkg === "mysql2"
   ) {
     // Specs are reported relative to `spec`, so each repeats the gem's
     // `lib/rack/test` root as a leading `rack/` (plus a further `test/` below
@@ -1860,6 +1861,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   bcrypt: "packages/bcrypt/test/",
   msgpack: "packages/msgpack/test/",
   pg: "packages/pg/test/",
+  mysql2: "packages/mysql2/test/",
   marcel: "packages/marcel/test/",
   "mini-mime": "packages/mini-mime/test/",
   "net-smtp": "packages/net-smtp/test/",

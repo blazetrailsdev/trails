@@ -1009,6 +1009,16 @@
       "unpacker.ts::UnpackError": "MessagePack::UnpackError"
     }
   },
+  "mysql2": {
+    "rows": 3,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "error.ts::Error": "Mysql2::Error",
+      "error.ts::Error.ConnectionError": "Mysql2::Error::ConnectionError",
+      "error.ts::Error.TimeoutError": "Mysql2::Error::TimeoutError"
+    }
+  },
   "net-smtp": {
     "rows": 15,
     "excluded": [],

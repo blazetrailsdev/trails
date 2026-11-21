@@ -512,6 +512,7 @@ describe("vendor/sources.ts", () => {
         "mini-magick",
         "mini-mime",
         "msgpack",
+        "mysql2",
         "net-smtp",
         "nokogiri",
         "pg",

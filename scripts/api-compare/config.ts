@@ -44,7 +44,6 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actionpackversion: "actionpack",
   "activerecord-test-support": "activerecord",
   "rails-dom-testing": "actionview",
-  mysql2: "activerecord",
   racc: "ruby-compat",
   "rails-html-sanitizer": "html-sanitizer",
   loofah: "html-sanitizer",
@@ -114,7 +113,6 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   abstractcontroller: "abstract-controller",
   actionpackversion: "action-pack",
   "rails-dom-testing": "rails-dom-testing",
-  mysql2: "mysql2",
   racc: "racc",
   loofah: "loofah",
   crass: "crass",
@@ -131,10 +129,23 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
  */
 export function overlappingSubDirs(pkg: string): string[] {
   const own = packageSrcDir(pkg);
-  return PACKAGES.filter((other) => other !== pkg)
-    .map(packageSrcDir)
-    .filter((dir) => dir.startsWith(own + path.sep));
+  return [
+    ...PACKAGES.filter((other) => other !== pkg)
+      .map(packageSrcDir)
+      .filter((dir) => dir.startsWith(own + path.sep)),
+    ...(UNSCORED_SUBDIRS[pkg] ?? []).map((sub) => path.join(own, sub)),
+  ];
 }
+
+/**
+ * Dirs inside a package's src that no package scores: a gem port's files
+ * still awaiting their move into the gem's own package (RFC 0254's
+ * `mysql2-client-result-statement-move-to-the-package` empties
+ * `activerecord/lib/mysql2`).
+ */
+export const UNSCORED_SUBDIRS: Record<string, string[]> = {
+  activerecord: ["mysql2"],
+};
 
 /** A package's extraction roots, as the freshness guards need them. */
 export interface PackageRoots {

@@ -1,4 +1,5 @@
 import { encode, fetch, rtest, StandardError } from "@blazetrails/ruby-compat";
+import { Mysql2 } from "./mysql2.js";
 
 /** @noRailsEquivalent PERMANENT */
 export const DRIVER_ERRORS = new WeakSet<object>();
@@ -108,3 +109,5 @@ Error.CODES = Object.freeze({
   2048: ConnectionError,
   2049: ConnectionError,
 });
+
+Mysql2.Error = Error;

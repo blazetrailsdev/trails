@@ -53,6 +53,7 @@
     "@blazetrails/mini-mime": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/pg": "workspace:*",
+    "@blazetrails/mysql2": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",

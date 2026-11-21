@@ -13,7 +13,7 @@ import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { quotedDate } from "../connection-adapters/abstract/quoting.js";
 import { defaultTimezone } from "../active-record.js";
-import { DRIVER_ERRORS, Error as Mysql2Error } from "./error.js";
+import { DRIVER_ERRORS, Error as Mysql2Error, Mysql2 } from "@blazetrails/mysql2";
 import { Result } from "./result.js";
 import { Statement } from "./statement.js";
 
@@ -672,19 +672,26 @@ export function parseConnectAttrs(connAttrs: Options | null | undefined): Record
   return hash;
 }
 
-export const Mysql2 = {
-  Error: Mysql2Error,
-  Client: {
-    new: (opts?: object) => initialize.call({} as Wrapper, opts as Options | undefined),
-    /** @internal */
-    localOffset(): Rational {
-      return new Rational(Time.local(2010).utcOffset, 86400);
-    },
-    defaultQueryOptions,
-    COMPRESS: CLIENT_FLAGS.COMPRESS,
-    FOUND_ROWS: CLIENT_FLAGS.FOUND_ROWS,
-    MULTI_STATEMENTS: CLIENT_FLAGS.MULTI_STATEMENTS,
-    OPTION_MULTI_STATEMENTS_ON: 0,
-    OPTION_MULTI_STATEMENTS_OFF: 1,
+declare module "@blazetrails/mysql2" {
+  interface Mysql2Namespace {
+    Client: typeof Client;
+  }
+}
+
+const Client = {
+  new: (opts?: object) => initialize.call({} as Wrapper, opts as Options | undefined),
+  /** @internal */
+  localOffset(): Rational {
+    return new Rational(Time.local(2010).utcOffset, 86400);
   },
+  defaultQueryOptions,
+  COMPRESS: CLIENT_FLAGS.COMPRESS,
+  FOUND_ROWS: CLIENT_FLAGS.FOUND_ROWS,
+  MULTI_STATEMENTS: CLIENT_FLAGS.MULTI_STATEMENTS,
+  OPTION_MULTI_STATEMENTS_ON: 0,
+  OPTION_MULTI_STATEMENTS_OFF: 1,
 };
+
+Mysql2.Client = Client;
+
+export { Mysql2 };
