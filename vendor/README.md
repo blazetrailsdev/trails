@@ -118,6 +118,22 @@ The Ruby half is ready — `extract-ruby-api.rb` reports 5 classes, 4 modules, 9
 public methods over this clone — so the blocker is only the missing TS
 workspace, which RFC 0137's `enroll-rack-test-in-compare-tooling` creates.
 
+## `vendor/rack-cache/` — the Rack::Cache anchor
+
+`rack-cache` is not a gemspec dependency of actionpack or railties; the Rails
+repo's own `Gemfile:18` asks for `gem "rack-cache", "~> 1.2"`, resolved to
+**1.17.0** by `vendor/rails/v8.0.2/Gemfile.lock:434`. Rails reaches it from
+`actionpack/lib/action_dispatch/http/rack_cache.rb` and
+`railties/lib/rails/application/default_middleware_stack.rb:37-40`, and those
+citations resolve against this clone. It is cloned from git rather than
+RubyGems because the `.gem` ships no `test/`. As with rack-test,
+`lib/rack/cache.rb` is not a shim (`Rack::Cache.new`, `:42-44`), so it is
+recovered through `libEntryFile`. `compareTests` is on (10 files, 226 tests,
+matching nothing yet). `compareApi` is off for rack-test's reason: the Ruby half
+is ready (23 classes, 5 modules, 158 public methods), but `extract-ts-api.ts`
+refuses a package with no `dist`. RFC 0168's
+`enroll-rack-cache-in-compare-tooling` creates the TS workspace and flips it on.
+
 ## `vendor/zeitwerk/` — the Zeitwerk anchor
 
 Railties asks for `zeitwerk ~> 2.6`

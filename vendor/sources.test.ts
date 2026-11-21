@@ -522,6 +522,7 @@ describe("vendor/sources.ts", () => {
         "rack-proxy",
         "rack-session",
         "rack-test",
+        "rack-cache",
         "rackup",
         "rails-html-sanitizer",
         "rails-dom-testing",
