@@ -70,6 +70,7 @@ class _ThreadPool {
     for (let i = 0; i < this.min; i++) this.#spawnThread();
   }
 
+  /** @inventedArm for — PERMANENT */
   #spawnThread(): void {
     this.spawned += 1;
     const processor = new Thread(
@@ -89,10 +90,6 @@ class _ThreadPool {
           if (work == null) return;
           try {
             await work();
-          } catch (e) {
-            STDERR.puts(
-              `Error reached top of thread-pool: ${e instanceof Error ? e.message : String(e)} (${e instanceof Error ? e.constructor.name : typeof e})`,
-            );
           } finally {
             const thread = Thread.current();
             for (const key of thread.keys()) thread.set(key, null);

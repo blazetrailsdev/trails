@@ -64,8 +64,8 @@ export class RouteInfo {
   }
 
   /** @internal */
-  private controllerClassMissing(): boolean {
-    return this.controllerName != null && this.controllerClass == null;
+  private controllerClassMissing(): unknown {
+    return this.controllerName && this.controllerClass == null;
   }
 
   /** @internal */
