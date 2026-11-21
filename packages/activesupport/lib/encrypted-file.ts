@@ -161,7 +161,7 @@ export class EncryptedFile {
   }
 
   private async readKeyFile(): Promise<string | null> {
-    if (this.keyFileContents) return this.keyFileContents;
+    if (this.keyFileContents != null) return this.keyFileContents;
     const fs = getFs();
     return (this.keyFileContents = (await fs.exists(this.keyPath))
       ? (await fs.readFile(this.keyPath, "utf8")).trim()
