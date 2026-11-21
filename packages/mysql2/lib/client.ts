@@ -553,7 +553,7 @@ export class Client {
       throw new Mysql2Error(`read_timeout must be a positive integer, you passed ${value}`);
     }
     this.readTimeout = value;
-    return true;
+    return this._mysqlClientOptions("readTimeout", value);
   }
 
   private setWriteTimeout(value: number): boolean {
