@@ -67,7 +67,7 @@ export function assertDom(
   }
 
   const matches = selector.select();
-  assertSizeMatch(matches.size, selector.tests, selector.cssSelector, selector.message);
+  assertSizeMatchBang(matches.size, selector.tests, selector.cssSelector, selector.message);
 
   if (block && !matches.isEmpty()) nestSelection.call(this, matches, block);
   return matches;
@@ -152,7 +152,7 @@ export function documentRootElement(): never {
   );
 }
 
-function assertSizeMatch(
+function assertSizeMatchBang(
   size: number,
   equals: EqualityTests,
   cssSelector: string,

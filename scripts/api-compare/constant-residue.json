@@ -264,8 +264,8 @@
     }
   },
   "actionview": {
-    "rows": 168,
-    "excluded": ["helpers/form-helper.ts::FormBuilder", "template/handlers/builder.ts::Builder"],
+    "rows": 169,
+    "excluded": ["helpers/form-helper.ts::FormBuilder"],
     "unwalked": [
       "cache-expiry.ts::CacheExpiry",
       "gem-version.ts::VERSION",

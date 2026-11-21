@@ -91,20 +91,21 @@ import * as m88 from "./template-path.js";
 import * as m89 from "./template.js";
 import * as m90 from "./template/error.js";
 import * as m91 from "./template/handlers.js";
-import * as m92 from "./template/handlers/html.js";
-import * as m93 from "./template/handlers/raw.js";
-import * as m94 from "./template/handlers/tse.js";
-import * as m95 from "./template/html.js";
-import * as m96 from "./template/inline.js";
-import * as m97 from "./template/raw-file.js";
-import * as m98 from "./template/renderable.js";
-import * as m99 from "./template/resolver.js";
-import * as m100 from "./template/sources.js";
-import * as m101 from "./template/sources/file.js";
-import * as m102 from "./template/text.js";
-import * as m103 from "./template/types.js";
-import * as m104 from "./unbound-template.js";
-import * as m105 from "./view-paths.js";
+import * as m92 from "./template/handlers/builder.js";
+import * as m93 from "./template/handlers/html.js";
+import * as m94 from "./template/handlers/raw.js";
+import * as m95 from "./template/handlers/tse.js";
+import * as m96 from "./template/html.js";
+import * as m97 from "./template/inline.js";
+import * as m98 from "./template/raw-file.js";
+import * as m99 from "./template/renderable.js";
+import * as m100 from "./template/resolver.js";
+import * as m101 from "./template/sources.js";
+import * as m102 from "./template/sources/file.js";
+import * as m103 from "./template/text.js";
+import * as m104 from "./template/types.js";
+import * as m105 from "./unbound-template.js";
+import * as m106 from "./view-paths.js";
 
 defineConstants([
   [m78, "AbstractRenderer", "ActionView::AbstractRenderer"],
@@ -131,7 +132,7 @@ defineConstants([
   [m7, "NullLogger", "ActionView::Digestor::NullLogger"],
   [m7, "Partial", "ActionView::Digestor::Partial"],
   [m90, "EncodingError", "ActionView::EncodingError"],
-  [m99, "FileSystemResolver", "ActionView::FileSystemResolver"],
+  [m100, "FileSystemResolver", "ActionView::FileSystemResolver"],
   [m10, "Helpers", "ActionView::Helpers"],
   [m11, "ActiveModelHelper", "ActionView::Helpers::ActiveModelHelper"],
   [m11, "ActiveModelInstanceTag", "ActionView::Helpers::ActiveModelInstanceTag"],
@@ -240,9 +241,9 @@ defineConstants([
   [m82, "Renderer", "ActionView::Renderer"],
   [m85, "Rendering", "ActionView::Rendering"],
   [m85, "ClassMethods", "ActionView::Rendering::ClassMethods"],
-  [m99, "Resolver", "ActionView::Resolver"],
-  [m99, "PathParser", "ActionView::Resolver::PathParser"],
-  [m99, "ParsedPath", "ActionView::Resolver::PathParser::ParsedPath"],
+  [m100, "Resolver", "ActionView::Resolver"],
+  [m100, "PathParser", "ActionView::Resolver::PathParser"],
+  [m100, "ParsedPath", "ActionView::Resolver::PathParser::ParsedPath"],
   [m86, "RoutingUrlFor", "ActionView::RoutingUrlFor"],
   [m1, "StreamingBuffer", "ActionView::StreamingBuffer"],
   [m8, "StreamingFlow", "ActionView::StreamingFlow"],
@@ -253,25 +254,26 @@ defineConstants([
   [m89, "Template", "ActionView::Template"],
   [m90, "TemplateError", "ActionView::Template::Error"],
   [m91, "Handlers", "ActionView::Template::Handlers"],
-  [m92, "Html", "ActionView::Template::Handlers::Html"],
-  [m93, "Raw", "ActionView::Template::Handlers::Raw"],
-  [m94, "TSE", "ActionView::Template::Handlers::TSE"],
-  [m94, "LocationParsingError", "ActionView::Template::Handlers::TSE::LocationParsingError"],
-  [m95, "HTML", "ActionView::Template::HTML"],
-  [m96, "Inline", "ActionView::Template::Inline"],
-  [m97, "RawFile", "ActionView::Template::RawFile"],
-  [m98, "Renderable", "ActionView::Template::Renderable"],
-  [m103, "SimpleType", "ActionView::Template::SimpleType"],
-  [m100, null, "ActionView::Template::Sources"],
-  [m101, "File", "ActionView::Template::Sources::File"],
-  [m102, "Text", "ActionView::Template::Text"],
+  [m92, "Builder", "ActionView::Template::Handlers::Builder"],
+  [m93, "Html", "ActionView::Template::Handlers::Html"],
+  [m94, "Raw", "ActionView::Template::Handlers::Raw"],
+  [m95, "TSE", "ActionView::Template::Handlers::TSE"],
+  [m95, "LocationParsingError", "ActionView::Template::Handlers::TSE::LocationParsingError"],
+  [m96, "HTML", "ActionView::Template::HTML"],
+  [m97, "Inline", "ActionView::Template::Inline"],
+  [m98, "RawFile", "ActionView::Template::RawFile"],
+  [m99, "Renderable", "ActionView::Template::Renderable"],
+  [m104, "SimpleType", "ActionView::Template::SimpleType"],
+  [m101, null, "ActionView::Template::Sources"],
+  [m102, "File", "ActionView::Template::Sources::File"],
+  [m103, "Text", "ActionView::Template::Text"],
   [m87, "TemplateDetails", "ActionView::TemplateDetails"],
   [m87, "Requested", "ActionView::TemplateDetails::Requested"],
   [m88, "TemplatePath", "ActionView::TemplatePath"],
   [m84, "TemplateRenderer", "ActionView::TemplateRenderer"],
-  [m104, "UnboundTemplate", "ActionView::UnboundTemplate"],
+  [m105, "UnboundTemplate", "ActionView::UnboundTemplate"],
   [m9, "VERSION", "ActionView::VERSION"],
-  [m105, "ViewPaths", "ActionView::ViewPaths"],
-  [m105, "ClassMethods", "ActionView::ViewPaths::ClassMethods"],
+  [m106, "ViewPaths", "ActionView::ViewPaths"],
+  [m106, "ClassMethods", "ActionView::ViewPaths::ClassMethods"],
   [m90, "WrongEncodingError", "ActionView::WrongEncodingError"],
 ]);

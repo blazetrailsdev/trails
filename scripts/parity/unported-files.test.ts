@@ -1,3 +1,4 @@
+import { PKG_SRC_DIRS } from "../test-compare/compare.js";
 import { readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
@@ -186,6 +187,22 @@ describe("UNPORTED_FILES schema", () => {
     expect(isTestFileUnported("railtie_test.rb", "globalid")).toBe(false);
     expect(isTestFileUnported("railtie_test.rb", "activemodel")).toBe(false);
     expect(isTestFileUnported("railties/railtie_test.rb", "trailties")).toBe(false);
+  });
+
+  it("matches an actionpack row under test-compare's actiondispatch key", () => {
+    const file = "dispatch/session/mem_cache_store_test.rb";
+    expect(isTestFileUnported(file, "actiondispatch")).toBe(true);
+    expect(isTestFileUnported(file, "actionpack")).toBe(true);
+    expect(isTestFileUnported(file, "actionview")).toBe(false);
+  });
+
+  it("matches an actionpack row under every test-compare key that reads actionpack's tests", () => {
+    const file = "dispatch/session/mem_cache_store_test.rb";
+    const keys = Object.entries(PKG_SRC_DIRS)
+      .filter(([, dir]) => dir.startsWith("packages/actionpack/"))
+      .map(([key]) => key);
+    expect(keys.length).toBeGreaterThan(0);
+    for (const key of keys) expect(isTestFileUnported(file, key)).toBe(true);
   });
 });
 

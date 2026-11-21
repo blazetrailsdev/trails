@@ -31,21 +31,6 @@ function trailsDirectUploadsUrl(): string {
   ).trailsDirectUploadsUrl({ host: "www.example.com" });
 }
 
-describe("ActiveStorage::S3DirectUploadsControllerTest", () => {
-  // PERMANENT-SKIP: RFC 0209 non-goal — S3, GCS and Azure services (repo-owner scope ruling, 2026-10-28).
-  it.skip("creating new direct upload", () => {});
-});
-
-describe("ActiveStorage::GCSDirectUploadsControllerTest", () => {
-  // PERMANENT-SKIP: RFC 0209 non-goal — S3, GCS and Azure services (repo-owner scope ruling, 2026-10-28).
-  it.skip("creating new direct upload", () => {});
-});
-
-describe("ActiveStorage::AzureStorageDirectUploadsControllerTest", () => {
-  // PERMANENT-SKIP: RFC 0209 non-goal — S3, GCS and Azure services (repo-owner scope ruling, 2026-10-28).
-  it.skip("creating new direct upload", () => {});
-});
-
 describe("ActiveStorage::DiskDirectUploadsControllerTest", () => {
   it("creating new direct upload", async () => {
     const checksum = OpenSSL.Digest.MD5.base64digest("Hello");

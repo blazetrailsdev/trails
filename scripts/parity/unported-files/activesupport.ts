@@ -101,6 +101,16 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   // owned by the RFC 0105 porting stories.
   // ---------------------------------------------------------------------------
   {
+    testFile: "cache/cache_store_setting_test.rb",
+    tests: [
+      "mem cache fragment cache store",
+      "mem cache fragment cache store with not dalli client",
+      "mem cache fragment cache store with multiple servers",
+      "mem cache fragment cache store with options",
+    ],
+    reason: SOLID_STACK_ONLY,
+  },
+  {
     testFile: "share_lock_test.rb",
     tests: ["killed thread loses lock"],
     reason:

@@ -47,7 +47,7 @@ Each of these was hit booting this app under workerd. Fixed in trails, worked ar
 
 | Breakpoint                                                                                                                                                  | Where it is handled                                                                                                                               |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `import.meta.url` is undefined, so `new URL("./locale/en.js", import.meta.url)` throws at module evaluation                                                 | `bundle.mjs` defines it; filed as `worker-bundle-import-meta-url-undefined-in-workerd`                                                            |
+| `import.meta.url` / `import.meta.dirname` are undefined, so `new URL("./locale/en.js", import.meta.url)` throws at module evaluation                        | `bundle.mjs` defines `import.meta.url` as the bundle's path; this is the supported recipe (see below)                                             |
 | CommonJS `pg` `require`s Node built-ins                                                                                                                     | `bundle.mjs`'s `createRequire` banner, as in the Lambda example                                                                                   |
 | workerd's `node:module` throws `ERR_METHOD_NOT_IMPLEMENTED` from `setSourceMapsSupport`                                                                     | fixed: ruby-compat's Node process adapter treats it as unsupported                                                                                |
 | `delegate` compiles a call-site wrapper with `new Function`; Workers forbid code generation from strings                                                    | fixed: activesupport's `Delegation` falls back to a closure on `EvalError`                                                                        |
@@ -62,3 +62,14 @@ Each of these was hit booting this app under workerd. Fixed in trails, worked ar
 
 D1 is not a target: it has no interactive transactions, which `transaction`, savepoints and
 transactional fixtures need. The bundle is about 1.8 MB gzipped, inside the Workers paid-plan limit.
+
+### Why `bundle.mjs` defines `import.meta.url`
+
+Framework packages find their own files (locale files, templates, an engine's
+root) relative to their module's URL, as Rails finds them from `__dir__` and
+`__FILE__`. A Worker is one bundled module with no URL of its own, so no
+fallback inside a package could name the right directory. The supported recipe
+is esbuild's `define` of `import.meta.url` as `file:///bundle/dist/worker.js`,
+the path `wrangler.jsonc`'s uploads mirror. `import.meta.dirname` stays
+undefined, so `Application.register` falls back to the cwd, `/bundle`, which is
+why `config.ts` is uploaded.

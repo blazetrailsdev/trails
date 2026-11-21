@@ -18,7 +18,7 @@ class WithoutLayoutController extends Base {
         "test/basic.html.tse": "Hello from basic.html.erb",
         "shared.html.tse": "Elastica",
         "locals.html.tse": "The secret is <%= secret %>",
-        "xml_template.xml.builder": "xml.html do\n  xml.p 'Hello'\nend",
+        "xml_template.xml.builder": "xml.html(() => {\n  xml.p('Hello');\n});",
         "with_raw.html.tse": "Hello <%=raw('<strong>this is raw</strong>') %>",
         "with_implicit_raw.html.tse":
           "Hello <%== '<strong>this is also raw</strong>' %> in an HTML template",
@@ -152,8 +152,7 @@ describe("TestWithoutLayout", () => {
     assertResponse("The secret is area51");
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("rendering a builder template", async () => {
+  it("rendering a builder template", async () => {
     await t.get(":builderTemplate", { params: { format: "xml" } });
     assertResponse("<html>\n  <p>Hello</p>\n</html>\n");
   });

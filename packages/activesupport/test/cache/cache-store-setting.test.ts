@@ -30,22 +30,6 @@ describe("CacheStoreSettingTest", () => {
     }).toThrow(ArgumentError);
   });
 
-  it.skip("mem cache fragment cache store", () => {
-    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
-  });
-
-  it.skip("mem cache fragment cache store with not dalli client", () => {
-    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
-  });
-
-  it.skip("mem cache fragment cache store with multiple servers", () => {
-    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
-  });
-
-  it.skip("mem cache fragment cache store with options", () => {
-    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
-  });
-
   it("object assigned fragment cache store", () => {
     const store = lookupStore(new FileStore("/path/to/cache/directory"));
     expect(store).toBeInstanceOf(FileStore);
