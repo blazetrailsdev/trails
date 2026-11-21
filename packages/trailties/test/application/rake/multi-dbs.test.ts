@@ -143,21 +143,30 @@ export class TwoMigration extends Migration.Current {}
 
   it("db:prepare runs seeds once", async () => {
     await t.bootTrails();
-    await t.trails("db:drop");
-    await generateModelsForAnimals();
-    await t.trails("generate", "model", "recipe", "title:string");
+    const Dog = () =>
+      constGet(TopLevel, "Dog") as {
+        count(): Promise<number>;
+        leaseConnection(): Promise<{ disconnectBang(): Promise<void> }>;
+      };
+    try {
+      await t.trails("db:drop");
+      await generateModelsForAnimals();
+      await t.trails("generate", "model", "recipe", "title:string");
 
-    await t.appFile(
-      "db/seeds.ts",
-      `import { constGet, TopLevel } from "@blazetrails/ruby-compat";
+      await t.appFile(
+        "db/seeds.ts",
+        `import { constGet, TopLevel } from "@blazetrails/ruby-compat";
 await (constGet(TopLevel, "Dog") as { createBang(): Promise<unknown> }).createBang();
 `,
-    );
+      );
 
-    await t.trails("db:prepare");
+      await t.trails("db:prepare");
 
-    const Dog = constGet(TopLevel, "Dog") as { count(): Promise<number> };
-    expect(await Dog.count()).toBe(1);
+      expect(await Dog().count()).toBe(1);
+    } finally {
+      await (await Dog().leaseConnection()).disconnectBang();
+      await t.trails("db:drop").catch(() => null);
+    }
   });
 
   it("db:migrate respects timestamp ordering across databases", async () => {

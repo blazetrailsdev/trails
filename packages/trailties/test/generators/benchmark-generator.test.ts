@@ -22,7 +22,9 @@ describe("BenchmarkGeneratorTest", () => {
     await t.runGenerator(["my_benchmark"]);
 
     await t.assertFile("script/benchmarks/my_benchmark.ts", (content) => {
-      expect(content).toBe(`// Any benchmarking setup goes here...
+      expect(content).toBe(`import "../../config/environment.ts";
+
+// Any benchmarking setup goes here...
 
 const reports: Record<string, () => void> = {
   before: () => {},
@@ -48,7 +50,9 @@ for (const [name, fn] of Object.entries(reports)) {
     await t.runGenerator(["my_benchmark", "with_patch", "without_patch"]);
 
     await t.assertFile("script/benchmarks/my_benchmark.ts", (content) => {
-      expect(content).toBe(`// Any benchmarking setup goes here...
+      expect(content).toBe(`import "../../config/environment.ts";
+
+// Any benchmarking setup goes here...
 
 const reports: Record<string, () => void> = {
   with_patch: () => {},

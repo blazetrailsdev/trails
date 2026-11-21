@@ -247,7 +247,7 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           's:# frozen_string_literal: true\n\nrequire_relative "../../config/environment"\n\n# Any benchmarking setup goes here...\n\n\n\nBenchmark.ips do |x|\n  x.report("before") { }\n  x.report("after") { }\n\n  x.compare!\nend\n',
         as: "assert_equal",
         reason:
-          "benchmark_generator_test.rb:23 asserts the generated Ruby script (`Benchmark.ips`, `require_relative`); the generator writes a TypeScript script, asserted whole by the port",
+          'benchmark_generator_test.rb:23 asserts a script body built on `Benchmark.ips`, the benchmark-ips gem\'s API; benchmark-ips is not ported, so the template times each report with `performance.now()` (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
       },
     ],
   "trailties:generators/benchmark_generator_test.rb › BenchmarkGeneratorTest › generate benchmark with reports":
@@ -258,7 +258,7 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           's:# frozen_string_literal: true\n\nrequire_relative "../../config/environment"\n\n# Any benchmarking setup goes here...\n\n\n\nBenchmark.ips do |x|\n  x.report("with_patch") { }\n  x.report("without_patch") { }\n\n  x.compare!\nend\n',
         as: "assert_equal",
         reason:
-          "benchmark_generator_test.rb:56 asserts the generated Ruby script (`Benchmark.ips`, `require_relative`); the generator writes a TypeScript script, asserted whole by the port",
+          'benchmark_generator_test.rb:56 asserts a script body built on `Benchmark.ips`, the benchmark-ips gem\'s API; benchmark-ips is not ported, so the template times each report with `performance.now()` (packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)")',
       },
     ],
   "trailties:generators/db_system_change_generator_test.rb › ChangeGeneratorTest › change from versioned gem to other versioned gem":
