@@ -55,10 +55,6 @@ async function testCommonConfig(): Promise<void> {
   });
 }
 
-function dependsOn(compose: any): string[] {
-  return plain(compose.get("services").get("trails-app")).depends_on ?? [];
-}
-
 describe("DevcontainerGeneratorTest", () => {
   it("creates devcontainer files", async () => {
     await t.runGenerator();
@@ -143,7 +139,9 @@ describe("DevcontainerGeneratorTest", () => {
       };
       expect(plain(compose.get("services").get("mariadb"))).toEqual(expectedMariadbConfig);
       expect(compose.get("volumes").keys()).toContain("mariadb-data");
-      expect(dependsOn(compose)).toContain("mariadb");
+      expect(compose.get("services").get("trails-app").get("depends_on") ?? []).toContain(
+        "mariadb",
+      );
     });
 
     await assertDevcontainerJsonFile.call(t, (devcontainerJson) => {
@@ -176,7 +174,7 @@ describe("DevcontainerGeneratorTest", () => {
       };
       expect(plain(compose.get("services").get("mysql"))).toEqual(expectedMysqlConfig);
       expect(compose.get("volumes").keys()).toContain("mysql-data");
-      expect(dependsOn(compose)).toContain("mysql");
+      expect(compose.get("services").get("trails-app").get("depends_on") ?? []).toContain("mysql");
     });
 
     await assertDevcontainerJsonFile.call(t, (devcontainerJson) => {
@@ -212,7 +210,9 @@ describe("DevcontainerGeneratorTest", () => {
       };
       expect(plain(compose.get("services").get("postgres"))).toEqual(expectedPostgresConfig);
       expect(compose.get("volumes").keys()).toContain("postgres-data");
-      expect(dependsOn(compose)).toContain("postgres");
+      expect(compose.get("services").get("trails-app").get("depends_on") ?? []).toContain(
+        "postgres",
+      );
     });
 
     await assertDevcontainerJsonFile.call(t, (devcontainerJson) => {
@@ -273,7 +273,7 @@ describe("DevcontainerGeneratorTest", () => {
     await t.runGenerator();
 
     await assertComposeFile.call(t, (compose) => {
-      expect(dependsOn(compose)).toContain("redis");
+      expect(compose.get("services").get("trails-app").get("depends_on") ?? []).toContain("redis");
       const expectedRedisConfig = {
         image: "redis:7.2",
         restart: "unless-stopped",
@@ -294,7 +294,9 @@ describe("DevcontainerGeneratorTest", () => {
 
     await testCommonConfig();
     await assertComposeFile.call(t, (compose) => {
-      expect(dependsOn(compose)).not.toContain("redis");
+      expect(compose.get("services").get("trails-app").get("depends_on") ?? []).not.toContain(
+        "redis",
+      );
       expect(compose.get("services").get("redis")).toBeUndefined();
       expect(compose.get("volumes")).toBeUndefined();
     });
@@ -369,7 +371,9 @@ describe("DevcontainerGeneratorTest", () => {
 
     await testCommonConfig();
     await assertComposeFile.call(t, (compose) => {
-      expect(dependsOn(compose)).not.toContain("selenium");
+      expect(compose.get("services").get("trails-app").get("depends_on") ?? []).not.toContain(
+        "selenium",
+      );
       expect(compose.get("services").keys()).not.toContain("selenium");
     });
     await assertDevcontainerJsonFile.call(t, (devcontainerJson) => {
