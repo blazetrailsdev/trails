@@ -1171,9 +1171,11 @@ describe("buildViews render typing", { timeout: 30_000 }, () => {
         moduleResolution: ts.ModuleResolutionKind.Bundler,
         module: ts.ModuleKind.ESNext,
         target: ts.ScriptTarget.ESNext,
+        paths: { "@blazetrails/*": [path.join(__dirname, "../../*/lib/index.ts")] },
       });
       const messages = ts
         .getPreEmitDiagnostics(program)
+        .filter((d) => d.file?.fileName.startsWith(cwd))
         .map(
           (d) =>
             `${path.basename(d.file?.fileName ?? "")}: ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`,
