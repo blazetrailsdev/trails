@@ -72,6 +72,10 @@ export class OrderedOptions {
     return obj;
   }
 
+  respondToMissing(name: string, includePrivate: boolean): boolean {
+    return true;
+  }
+
   isExtractableOptions(): boolean {
     return true;
   }

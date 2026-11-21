@@ -6,7 +6,11 @@ import {
   constSet,
   constDefined,
   rbModRemoveConst,
+  autoloadDelete,
+  rbAutoloadLoad,
+  rbAutoloadStr,
 } from "@blazetrails/ruby-compat";
+import { assertRaises } from "../../lib/testing/assertions.js";
 import { TestCase } from "../../lib/test-case.js";
 import { ClassMethods, ConstantLookup } from "../../lib/testing/constant-lookup.js";
 
@@ -85,6 +89,19 @@ describe("ConstantLookupTest", () => {
     expect(test.findModule("DoesntExist::Nadda::Nope::NotHere")).toBeNull();
   });
 
-  // BLOCKED: constant-lookup-test-sync-autoload-of-raising-fixture
-  it.skip("does not shallow ordinary exceptions");
+  it("does not shallow ordinary exceptions", async () => {
+    const testName = "RaisesNameError";
+    const fileName = new URL("../autoloading-fixtures/raises-no-method-error.ts", import.meta.url)
+      .pathname;
+    try {
+      await assertRaises([TypeError], {}, async () => {
+        rbAutoloadStr(TopLevel, testName, fileName);
+        await rbAutoloadLoad(TopLevel, testName);
+        ConstantLookupTest.determineConstantFromTestName(testName, () => true);
+      });
+    } finally {
+      autoloadDelete(TopLevel, testName);
+      if (constDefined(TopLevel, testName)) rbModRemoveConst(TopLevel, testName);
+    }
+  });
 });

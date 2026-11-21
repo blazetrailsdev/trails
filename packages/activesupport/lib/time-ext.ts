@@ -16,7 +16,7 @@ import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
-import { currentTime } from "./time-travel.js";
+import { currentTime, currentTimeInstant } from "./time-travel.js";
 import {
   allDay,
   allMonth,
@@ -423,12 +423,12 @@ export function onWeekend(date: Date): boolean {
 
 export function isPast(date: Date | Temporal.Instant): boolean {
   const instant = date instanceof Date ? instantFrom(date) : date;
-  return Temporal.Instant.compare(instant, Temporal.Now.instant()) < 0;
+  return Temporal.Instant.compare(instant, currentTimeInstant()) < 0;
 }
 
 export function isFuture(date: Date | Temporal.Instant): boolean {
   const instant = date instanceof Date ? instantFrom(date) : date;
-  return Temporal.Instant.compare(instant, Temporal.Now.instant()) > 0;
+  return Temporal.Instant.compare(instant, currentTimeInstant()) > 0;
 }
 
 export function secFraction(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number;

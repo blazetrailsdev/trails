@@ -1,4 +1,12 @@
-import { Fiber, Mutex, prepend, rbCallSuper, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import {
+  Fiber,
+  include,
+  Mutex,
+  prepend,
+  rbCallSuper,
+  Thread,
+  ThreadError,
+} from "@blazetrails/ruby-compat";
 import { Dependencies } from "../dependencies.js";
 import { Monitor, synchronize } from "./monitor.js";
 
@@ -38,6 +46,8 @@ export const LoadInterlockAwareMonitorMixin = {
 };
 
 export class LoadInterlockAwareMonitor extends Monitor {}
+
+include(LoadInterlockAwareMonitor, LoadInterlockAwareMonitorMixin);
 
 export class ThreadLoadInterlockAwareMonitor {
   private owner: Fiber | null;

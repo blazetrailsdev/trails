@@ -420,3 +420,22 @@ describe("Delegation.generate prefix: true", () => {
     ).toThrow("Can only automatically set the delegation prefix when delegating to a method.");
   });
 });
+
+describe("Delegation.generateMethodMissing writer", () => {
+  it("forwards an assignment to a target whose writer is a setter", () => {
+    class Box {
+      value: unknown = null;
+      set content(v: unknown) {
+        this.value = v;
+      }
+    }
+    class Wrapper {
+      constructor(public box: Box) {}
+    }
+    Delegation.generateMethodMissing(Wrapper, "box");
+    const wrapper = new Wrapper(new Box()) as Wrapper & { content: unknown };
+    wrapper.content = 42;
+    expect(wrapper.box.value).toBe(42);
+    expect(Object.hasOwn(wrapper, "content")).toBe(false);
+  });
+});
