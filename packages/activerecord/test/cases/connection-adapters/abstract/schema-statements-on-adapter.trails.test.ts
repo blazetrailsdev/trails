@@ -102,7 +102,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(await mysql.createDatabase("luca", { charset: "latin1" })).toBe(latin1);
     expect(await mysql.recreateDatabase("luca", { charset: "latin1" })).toBe(latin1);
 
-    const pg = new PostgreSQLAdapter({} as never);
+    const pg = new PostgreSQLAdapter({});
     Object.assign(pg, { execute: async (sql: string) => sql });
     const utf8 = `CREATE DATABASE "matt" ENCODING = 'utf8'`;
     expect(await pg.createDatabase("matt")).toBe(utf8);
@@ -110,7 +110,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
   });
 
   it("PostgreSQL begin_db_transaction and commit_db_transaction answer internal_execute's result", async () => {
-    const pg = new PostgreSQLAdapter({} as never);
+    const pg = new PostgreSQLAdapter({});
     Object.assign(pg, { internalExecute: async (sql: string) => sql });
     expect(await pg.beginDbTransaction()).toBe("BEGIN");
     expect(await pg.commitDbTransaction()).toBe("COMMIT");

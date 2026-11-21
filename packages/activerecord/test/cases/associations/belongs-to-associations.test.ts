@@ -1545,7 +1545,7 @@ describe("BelongsToAssociationsTest", () => {
       class SpecialAuthor extends Author {
         static {
           this.belongsTo("specialAuthorAddress", {
-            dependent: "nullify" as any,
+            dependent: "nullify",
             className: "AuthorAddress",
           });
         }
@@ -2003,7 +2003,7 @@ describe("BelongsToAssociationsTest", () => {
         class TempModel extends Base {
           static tableName = "accounts";
           static {
-            this.belongsTo(name as any);
+            this.belongsTo(name);
           }
         }
         void TempModel;

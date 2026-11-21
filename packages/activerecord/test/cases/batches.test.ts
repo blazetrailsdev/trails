@@ -1085,7 +1085,7 @@ describe("EachTest", () => {
   it(".find_each respects table alias", async () => {
     await assertQueriesCount(1, async () => {
       const tableAlias = Post.arelTable.alias("omg_posts");
-      const postRel = new Relation(Post, { table: tableAlias as any });
+      const postRel = new Relation(Post, { table: tableAlias });
       for await (const _post of postRel.findEach({})) {
       }
     });

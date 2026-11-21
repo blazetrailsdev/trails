@@ -274,7 +274,7 @@ describe("CustomPropertiesTest", () => {
 
     class Klass extends OverloadedType {
       static {
-        this.attribute("wibble", new CustomType() as any, { default: "default" });
+        this.attribute("wibble", new CustomType(), { default: "default" });
       }
     }
     const model = new Klass();

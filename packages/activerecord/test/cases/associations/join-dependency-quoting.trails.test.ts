@@ -58,7 +58,7 @@ describe("JoinDependency Arel node construction", () => {
     expect(node).not.toBeNull();
     expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
 
-    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node);
     const on = outerJoin.right as Nodes.On;
     expect(on).toBeInstanceOf(Nodes.On);
 
@@ -103,7 +103,7 @@ describe("JoinDependency Arel node construction", () => {
     const node = nodeAt(jd, "assets");
     expect(node).not.toBeNull();
 
-    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node);
     const on = outerJoin.right as Nodes.On;
     const and = on.expr as Nodes.And;
     expect(and).toBeInstanceOf(Nodes.And);
@@ -132,7 +132,7 @@ describe("JoinDependency Arel node construction", () => {
     expect(node).not.toBeNull();
     expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
 
-    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node);
     const on = outerJoin.right as Nodes.On;
     const and = on.expr as Nodes.And;
     expect(and).toBeInstanceOf(Nodes.And);
@@ -158,7 +158,7 @@ describe("JoinDependency Arel node construction", () => {
     expect(node).not.toBeNull();
     expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
 
-    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node);
     const on = outerJoin.right as Nodes.On;
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
@@ -177,7 +177,7 @@ describe("JoinDependency Arel node construction", () => {
     expect(node).not.toBeNull();
     expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
 
-    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const outerJoin = joinFor(joins, node);
     const on = outerJoin.right as Nodes.On;
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
@@ -236,10 +236,10 @@ describe("JoinDependency Arel node construction", () => {
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     expect(sqlNameOf(node1)).toBe("owners");
 
-    const table1 = (joinFor(joins, node1) as Nodes.OuterJoin).left;
+    const table1 = joinFor(joins, node1).left;
     expect((table1 as any).tableAlias).toBeNull();
     expect(sqlNameOf(node2)).toBe("assets_owners");
-    const table2 = (joinFor(joins, node2) as Nodes.OuterJoin).left;
+    const table2 = joinFor(joins, node2).left;
     expect((table2 as any).tableAlias).toBe("assets_owners");
   });
 

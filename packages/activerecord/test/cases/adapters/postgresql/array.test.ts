@@ -448,7 +448,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       await PgArrays.loadSchema();
-      const record = new PgArrays({ tags: "not-an-array" } as any);
+      const record = new PgArrays({ tags: "not-an-array" });
       expect(record.tags).toEqual([]);
       expect((record as any).attributeBeforeTypeCast("tags")).toBe("not-an-array");
       expect(await record.save()).toBeTruthy();
@@ -463,7 +463,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       await PgArrays.loadSchema();
-      const record = new PgArrays({ tags: "" } as any);
+      const record = new PgArrays({ tags: "" });
       expect(record.tags).toEqual([]);
       expect((record as any).attributeBeforeTypeCast("tags")).toBe("");
       expect(await record.save()).toBeTruthy();
@@ -478,7 +478,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       await PgArrays.loadSchema();
-      const record = new PgArrays({ tags: "{1,2,3}" } as any);
+      const record = new PgArrays({ tags: "{1,2,3}" });
       expect(record.tags).toEqual(["1", "2", "3"]);
       expect((record as any).attributeBeforeTypeCast("tags")).toBe("{1,2,3}");
       expect(await record.save()).toBeTruthy();

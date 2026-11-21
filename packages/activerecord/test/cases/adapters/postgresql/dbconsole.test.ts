@@ -3,7 +3,6 @@ import { env as ENV, setEnv } from "@blazetrails/ruby-compat";
 import { describeIfPg } from "../../../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "../../../../lib/connection-adapters/postgresql-adapter.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
-import type { DatabaseConfigOptions } from "../../../../lib/database-configurations/database-config.js";
 import { databaseCli } from "../../../../lib/active-record.js";
 
 describeIfPg("PostgresqlDbConsoleTest", () => {
@@ -28,7 +27,7 @@ describeIfPg("PostgresqlDbConsoleTest", () => {
   });
 
   const makeDbConfig = (config: Record<string, unknown>) =>
-    new HashConfig("test", "primary", config as DatabaseConfigOptions);
+    new HashConfig("test", "primary", config);
 
   const assertFindCmdAndExecCalledWith = (args: unknown[], block: () => unknown): void => {
     const spy = vi.spyOn(PostgreSQLAdapter, "findCmdAndExec").mockReturnValue(undefined as never);

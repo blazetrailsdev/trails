@@ -321,7 +321,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(error.message).toBe('Unable to parse MySQL version from ""');
 
       clearVersionCache(adapter);
-      spy.mockResolvedValueOnce(null as unknown as string);
+      spy.mockResolvedValueOnce(null);
       error = await assertRaises([DatabaseVersionError], {}, () => adapter.getDatabaseVersion());
       expect(error.message).toBe("Unable to parse MySQL version from nil");
     });

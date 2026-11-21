@@ -220,11 +220,11 @@ describe("EagerAssociationTest", () => {
       clubs("boring_club").id,
     );
 
-    member = (await Member.preload(":generalClub").first()) as any;
+    member = await Member.preload(":generalClub").first();
     expect(member?.id).toBe(members("groucho").id);
     expect((member as any).association("generalClub").target?.id).toBe(clubs("boring_club").id);
 
-    member = (await Member.eagerLoad(":generalClub").first()) as any;
+    member = await Member.eagerLoad(":generalClub").first();
     expect(member?.id).toBe(members("groucho").id);
     expect((member as any).association("generalClub").target?.id).toBe(clubs("boring_club").id);
   });

@@ -32,7 +32,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
     expect(sqlNameOf(node)).toBe("comments");
 
-    const targetTable = (joinFor(joins, node) as Nodes.OuterJoin).left as Table;
+    const targetTable = joinFor(joins, node).left as Table;
     expect(targetTable.name).toBe("comments");
     expect(targetTable.tableAlias).toBeNull();
 
@@ -57,7 +57,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     expect(sqlNameOf(node)).toBe("comments_with_foreign_keys_authors");
 
-    const targetTable = (joinFor(joins, node) as Nodes.OuterJoin).left as Nodes.TableAlias;
+    const targetTable = joinFor(joins, node).left as Nodes.TableAlias;
     expect(targetTable.tableName).toBe("comments");
     expect(String(targetTable.tableAlias ?? targetTable.name)).toBe(
       "comments_with_foreign_keys_authors",
@@ -144,7 +144,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     expect(node).not.toBeNull();
 
     expect(sqlNameOf(directNode)).toBe("posts");
-    const directTable = (joinFor(joins, directNode) as Nodes.OuterJoin).left as Table;
+    const directTable = joinFor(joins, directNode).left as Table;
     expect(directTable.name).toBe("posts");
     expect(directTable.tableAlias).toBeNull();
 
@@ -152,7 +152,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
     expect(effectiveNames.filter((n) => n === "posts").length).toBe(1);
     expect(effectiveNames.some((n) => n.includes("_join"))).toBe(false);
 
-    const targetTable = (joinFor(joins, node) as Nodes.OuterJoin).left as Table;
+    const targetTable = joinFor(joins, node).left as Table;
     expect(targetTable.name).toBe("comments");
     expect(targetTable.tableAlias).toBeNull();
   });

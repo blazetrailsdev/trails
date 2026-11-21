@@ -126,7 +126,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       loggerWas = Base.logger;
       log = [];
       verboseWas = Migration.verbose;
-      Base.logger = new Logger({ write: (s: string) => log.push(s) }) as any;
+      Base.logger = new Logger({ write: (s: string) => log.push(s) });
       Migration.verbose = false;
     });
 

@@ -2,12 +2,11 @@ import { it, expect, vi } from "vitest";
 import { describeIfMysqlAdapter } from "../../../support/describe-if-mysql-adapter.js";
 import { Mysql2Adapter } from "../../../../lib/connection-adapters/mysql2-adapter.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
-import type { DatabaseConfigOptions } from "../../../../lib/database-configurations/database-config.js";
 import { databaseCli } from "../../../../lib/active-record.js";
 
 describeIfMysqlAdapter("Mysql2DbConsoleTest", () => {
   const makeDbConfig = (config: Record<string, unknown>) =>
-    new HashConfig("test", "primary", config as DatabaseConfigOptions);
+    new HashConfig("test", "primary", config);
 
   const assertFindCmdAndExecCalledWith = (args: unknown[], block: () => unknown) => {
     const spy = vi.spyOn(Mysql2Adapter, "findCmdAndExec").mockReturnValue(undefined as never);

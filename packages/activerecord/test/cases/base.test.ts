@@ -483,7 +483,7 @@ describe("BasicsTest", async () => {
     const topic = new Topic({
       title: "initialized from attributes",
       written_on: "2003-12-12 23:23",
-    } as any) as any;
+    }) as any;
 
     expect(topic.title).toEqual("initialized from attributes");
   });
@@ -495,7 +495,7 @@ describe("BasicsTest", async () => {
         "written_on(4i)": "16",
         "written_on(5i)": "24",
         "written_on(6i)": "00",
-      } as never);
+      });
     });
 
     expect(ex.errors.length).toEqual(1);
@@ -718,7 +718,7 @@ describe("BasicsTest", async () => {
         "bonus_time(5i)": "35",
         "bonus_time(6i)": "50",
       };
-      const topic = new Topic(attributes as any) as any;
+      const topic = new Topic(attributes) as any;
       expect(topic.bonus_time).toEqual(RubyTime.utc(2000, 1, 1, 10, 35, 50));
     });
   });
@@ -778,8 +778,8 @@ describe("BasicsTest", async () => {
   });
 
   it("equality with blank ids", () => {
-    const one = new Subscriber({ id: "" } as any);
-    const two = new Subscriber({ id: "" } as any);
+    const one = new Subscriber({ id: "" });
+    const two = new Subscriber({ id: "" });
     expect(two.equals(one)).toEqual(true);
   });
 
@@ -1651,7 +1651,7 @@ describe("BasicsTest", async () => {
     const originalLogger = Base.logger;
     const log: string[] = [];
     try {
-      Base.logger = new Logger({ write: (s: string) => log.push(s) }) as any;
+      Base.logger = new Logger({ write: (s: string) => log.push(s) });
       (Base.logger as any).level = Logger.WARN;
       await Base.benchmark("Debug Topic Count", { level: "debug" }, () => Topic.count());
       await Base.benchmark("Warn Topic Count", { level: "warn" }, () => Topic.count());
@@ -1668,7 +1668,7 @@ describe("BasicsTest", async () => {
     const originalLogger = Base.logger;
     const log: string[] = [];
     try {
-      Base.logger = new Logger({ write: (s: string) => log.push(s) }) as any;
+      Base.logger = new Logger({ write: (s: string) => log.push(s) });
       (Base.logger as any).level = Logger.DEBUG;
       await Base.benchmark("Logging", { level: "debug", silence: false }, () => {
         Base.logger?.debug?.("Quiet");
@@ -1759,7 +1759,7 @@ describe("BasicsTest", async () => {
   });
 
   it("touch should raise error on a new object", async () => {
-    const company = new Company({ rating: 1, name: "37signals", firm_name: "37signals" } as any);
+    const company = new Company({ rating: 1, name: "37signals", firm_name: "37signals" });
     await assertRaises([ActiveRecordError], {}, () => company.touch("updated_at"));
   });
 
@@ -2073,7 +2073,7 @@ describe("BasicsTest", () => {
           ...Base.connectionDbConfig().configurationHash,
           defaultTimezone: "local",
         };
-        await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
+        await Base.establishConnection(newConfig);
         cleanupConnections.push(async () => {
           await Base.establishConnection(":arunit");
           await Default.resetColumnInformation();
@@ -2101,7 +2101,7 @@ describe("BasicsTest", () => {
         ...Base.connectionDbConfig().configurationHash,
         defaultTimezone: "utc",
       };
-      await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
+      await Base.establishConnection(newConfig);
       cleanupConnections.push(async () => {
         await Base.establishConnection(":arunit");
         await Default.resetColumnInformation();

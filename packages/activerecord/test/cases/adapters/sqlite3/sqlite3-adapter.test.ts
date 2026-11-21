@@ -676,7 +676,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     adapter = new SQLite3Adapter({
       database: ":memory:",
       insertReturning: false,
-    }) as unknown as SQLite3Adapter;
+    });
     await withExampleTable(undefined, undefined, async () => {
       const result = await adapter.execInsert(
         "insert into ex (number) VALUES ('foo')",
@@ -695,7 +695,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     adapter = new SQLite3Adapter({
       database: ":memory:",
       insertReturning: false,
-    }) as unknown as SQLite3Adapter;
+    });
     await withExampleTable(undefined, undefined, async () => {
       const result = await adapter.execInsert("insert into ex DEFAULT VALUES", null, [], "id");
       const expected = (await adapter.query("select max(id) from ex"))[0][0];

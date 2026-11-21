@@ -13,7 +13,7 @@ function makeSchemaThingModel(): ModelCtor {
       this.tableName = "schema_things";
     }
   }
-  return SchemaThing as unknown as ModelCtor;
+  return SchemaThing;
 }
 
 const TABLE_NAME = "schema_things";

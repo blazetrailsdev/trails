@@ -1332,11 +1332,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         const raw = a._rawConnectionForTest()!;
         const connect = vi.spyOn(pg.Client.prototype, "connect");
         try {
-          connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
+          connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
           await expect(raw.reset()).rejects.toBeInstanceOf(PG.ConnectionBad);
           expect(raw.status()).toBe(1);
 
-          connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
+          connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
           await a.reconnect();
         } finally {
           connect.mockRestore();

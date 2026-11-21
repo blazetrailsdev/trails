@@ -1032,7 +1032,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const student = await Student.create({ name: "Alberto Almagro" });
     await (student as any).lessonIds;
     const lesson = await Lesson.create({ name: "DSI" });
-    await student.lessons.push(lesson as any);
+    await student.lessons.push(lesson);
     expect(await (student as any).lessonIds).toContain(lesson.id);
   });
 
@@ -1138,7 +1138,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("association with validate false does not run associated validation callbacks on create", async () => {
     const richPerson = new RichPerson({});
     const treasure = new Treasure({});
-    await treasure.richPeople.push(richPerson as any);
+    await treasure.richPeople.push(richPerson);
     await treasure.isValid();
 
     expect(await treasure.richPeople.size()).toBe(1);

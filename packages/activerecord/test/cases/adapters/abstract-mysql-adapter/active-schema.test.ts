@@ -17,7 +17,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   describe("ActiveSchemaTest", () => {
     beforeEach(async () => {
       adapter = await leaseMysqlAdapter();
-      await defaultRowFormat.call(adapter as never);
+      await defaultRowFormat.call(adapter);
       const singletonClass = rbObjSingletonClass(adapter) as typeof Mysql2Adapter;
       singletonClass.prototype.execute = async function (sql: string, name: string | null = null) {
         return Notifications.instrumenter.instrument(

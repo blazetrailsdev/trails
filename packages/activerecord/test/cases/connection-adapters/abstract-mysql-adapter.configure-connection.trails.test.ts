@@ -3,8 +3,8 @@ import { AbstractMysqlAdapter } from "../../../lib/connection-adapters/abstract-
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
 
 async function configureSql(config: Record<string, unknown>): Promise<string> {
-  const adapter = new Mysql2Adapter({ host: "localhost", ...config } as never);
-  vi.spyOn(adapter, "checkVersion").mockResolvedValue(undefined as never);
+  const adapter = new Mysql2Adapter({ host: "localhost", ...config });
+  vi.spyOn(adapter, "checkVersion").mockResolvedValue(undefined);
   const rawExecute = vi.spyOn(adapter, "rawExecute").mockResolvedValue(undefined);
   await AbstractMysqlAdapter.prototype.configureConnection.call(adapter);
   await adapter.disconnectBang();

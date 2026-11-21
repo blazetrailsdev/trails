@@ -52,7 +52,7 @@ function makeThing5Model(): ModelCtor {
       this.tableName = "things";
     }
   }
-  return Thing5 as unknown as ModelCtor;
+  return Thing5;
 }
 
 function makeSongAlbumModels(): {
@@ -78,8 +78,8 @@ function makeSongAlbumModels(): {
   constSet(TopLevel, "Album", Album);
   DescendantsTracker.registerSubclass(Base, Album);
   return {
-    Song: Song as unknown as ModelCtor,
-    Album: Album as unknown as ModelCtor,
+    Song: Song,
+    Album: Album,
     cleanup: () => {
       rbModRemoveConst(TopLevel, "Song");
       rbModRemoveConst(TopLevel, "Album");

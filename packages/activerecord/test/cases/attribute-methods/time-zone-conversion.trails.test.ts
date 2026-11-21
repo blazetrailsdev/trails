@@ -110,7 +110,7 @@ describe("TimeZoneConversionTest", () => {
       }
       static override tableName = "posts";
     }
-    await establishConnectionTo(Post, adapter as never);
+    await establishConnectionTo(Post, adapter);
     await loadSchemaFromAdapter.call(Post);
     expect(Post.typeForAttribute("published_at")).toBeInstanceOf(TimeZoneConverter);
     expect(Post.typeForAttribute("title")).not.toBeInstanceOf(TimeZoneConverter);

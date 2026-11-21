@@ -121,7 +121,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this._tableName = "books";
         this.attribute("name", "string");
         this.attribute("author_id", "integer");
-        this.validates("name", { presence: true, on: "publish" } as any);
+        this.validates("name", { presence: true, on: "publish" });
       }
     }
     class WidgetOwner extends Base {
@@ -146,7 +146,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     const defaultValid = await owner.isValid();
     expect(defaultValid).toBe(true);
 
-    const publishValid = await owner.isValid("publish" as any);
+    const publishValid = await owner.isValid("publish");
     expect(publishValid).toBe(false);
   });
 
@@ -352,7 +352,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     const { Pirate, Bird } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const invalidBird = new Bird({ name: "" });
-    pirate.association("birds").setTarget([invalidBird] as any);
+    pirate.association("birds").setTarget([invalidBird]);
     const saved = await pirate.save();
     expect(saved).toBe(false);
   });
@@ -403,7 +403,7 @@ describe("TestAutosaveAssociationsInGeneral association_valid?", () => {
 
     const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
     const doomed = new DoomedBird({ name: "" });
-    pirate.association("birds").setTarget([doomed] as any);
+    pirate.association("birds").setTarget([doomed]);
 
     expect(await pirate.save()).toBe(true);
   });
@@ -425,7 +425,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociation marked_for_destruction?",
     const bird = new DoomedBird({ name: "polly", pirate_id: pirate.id });
     await bird.save();
     doomed = true;
-    pirate.association("birds").setTarget([bird] as any);
+    pirate.association("birds").setTarget([bird]);
 
     expect(await pirate.save()).toBe(true);
     expect(await CanonicalBird.where({ id: bird.id }).count()).toBe(0);
@@ -449,7 +449,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation marked_for_destruction?", 
     const ship = new DoomedShip({ name: "Black Pearl", pirate_id: pirate.id });
     await ship.save();
     doomed = true;
-    pirate.association("ship").setTarget(ship as any);
+    pirate.association("ship").setTarget(ship);
 
     await pirate.save();
     expect(await Ship.where({ id: ship.id }).count()).toBe(0);

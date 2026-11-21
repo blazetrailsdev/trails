@@ -90,7 +90,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("int4range column", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('[1,10]')`);
       const rows = Array.from(await adapter.execute(`SELECT int4_range FROM postgresql_ranges`));
-      const range = int4Range.castValue(rows[0].int4_range as string)!;
+      const range = int4Range.castValue(rows[0].int4_range)!;
       expect(range).toBeInstanceOf(Range);
       expect(range.begin).toBe(1);
       expect(range.end).toBe(11);
@@ -114,7 +114,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("int4range write", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('[1,10)')`);
       const rows = Array.from(await adapter.execute(`SELECT int4_range FROM postgresql_ranges`));
-      const range = int4Range.castValue(rows[0].int4_range as string)!;
+      const range = int4Range.castValue(rows[0].int4_range)!;
       expect(range.begin).toBe(1);
       expect(range.end).toBe(10);
     });
@@ -142,14 +142,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("int4range empty", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('empty')`);
       const rows = Array.from(await adapter.execute(`SELECT int4_range FROM postgresql_ranges`));
-      const range = int4Range.castValue(rows[0].int4_range as string);
+      const range = int4Range.castValue(rows[0].int4_range);
       expect(range).toBeNull();
     });
 
     it("int4range infinity", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('[,]')`);
       const rows = Array.from(await adapter.execute(`SELECT int4_range FROM postgresql_ranges`));
-      const range = int4Range.castValue(rows[0].int4_range as string)!;
+      const range = int4Range.castValue(rows[0].int4_range)!;
       expect(range.begin).toBe(-Infinity);
       expect(range.end).toBe(Infinity);
     });
@@ -157,7 +157,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("int8range column", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int8_range) VALUES ('[10,100]')`);
       const rows = Array.from(await adapter.execute(`SELECT int8_range FROM postgresql_ranges`));
-      const range = int8Range.castValue(rows[0].int8_range as string)!;
+      const range = int8Range.castValue(rows[0].int8_range)!;
       expect(range.begin).toBe(10);
     });
 
@@ -176,7 +176,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("numrange column", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (num_range) VALUES ('[0.1,0.2]')`);
       const rows = Array.from(await adapter.execute(`SELECT num_range FROM postgresql_ranges`));
-      const range = numRange.castValue(rows[0].num_range as string)!;
+      const range = numRange.castValue(rows[0].num_range)!;
       expect((range.begin as BigDecimal).toString("F")).toBe("0.1");
       expect((range.end as BigDecimal).toString("F")).toBe("0.2");
       expect(range.excludeEnd).toBe(false);
@@ -200,7 +200,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_ranges (ts_range) VALUES ('[2010-01-01 14:30,2011-01-01 14:30]')`,
       );
       const rows = Array.from(await adapter.execute(`SELECT ts_range FROM postgresql_ranges`));
-      const range = tsRange.castValue(rows[0].ts_range as string)!;
+      const range = tsRange.castValue(rows[0].ts_range)!;
       expect((range.begin as RubyTime).toS()).toContain("2010-01-01");
       expect((range.end as RubyTime).toS()).toContain("2011-01-01");
     });
@@ -224,7 +224,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_ranges (tstz_range) VALUES ('[2010-01-01 14:30+00,2011-01-01 14:30+00]')`,
       );
       const rows = Array.from(await adapter.execute(`SELECT tstz_range FROM postgresql_ranges`));
-      const range = tstzRange.castValue(rows[0].tstz_range as string)!;
+      const range = tstzRange.castValue(rows[0].tstz_range)!;
       expect((range.begin as RubyTime).toS()).toContain("2010-01-01");
     });
 
@@ -246,7 +246,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_ranges (date_range) VALUES ('[2012-01-02,2012-01-04]')`,
       );
       const rows = Array.from(await adapter.execute(`SELECT date_range FROM postgresql_ranges`));
-      const range = dateRange.castValue(rows[0].date_range as string)!;
+      const range = dateRange.castValue(rows[0].date_range)!;
       expect((range.begin as Temporal.PlainDate).toString()).toBe("2012-01-02");
     });
 
@@ -267,7 +267,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("custom range column", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (float_range) VALUES ('[0.5,0.7]')`);
       const rows = Array.from(await adapter.execute(`SELECT float_range FROM postgresql_ranges`));
-      const range = floatRange.castValue(rows[0].float_range as string)!;
+      const range = floatRange.castValue(rows[0].float_range)!;
       expect(range).toBeInstanceOf(Range);
       expect(range.begin).toBeCloseTo(0.5);
       expect(range.end).toBeCloseTo(0.7);
@@ -282,7 +282,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("custom range write", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (float_range) VALUES ('[0.5,0.7)')`);
       const rows = Array.from(await adapter.execute(`SELECT float_range FROM postgresql_ranges`));
-      const range = floatRange.castValue(rows[0].float_range as string)!;
+      const range = floatRange.castValue(rows[0].float_range)!;
       expect(range.begin).toBeCloseTo(0.5);
       expect(range.end).toBeCloseTo(0.7);
       expect(range.excludeEnd).toBe(true);
@@ -330,7 +330,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const rows = Array.from(
         await adapter.execute(`SELECT int4range(1,10) * int4range(5,15) as r`),
       );
-      const range = int4Range.castValue(rows[0].r as string)!;
+      const range = int4Range.castValue(rows[0].r)!;
       expect(range.begin).toBe(5);
       expect(range.end).toBe(10);
     });
@@ -339,7 +339,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const rows = Array.from(
         await adapter.execute(`SELECT int4range(1,10) + int4range(5,15) as r`),
       );
-      const range = int4Range.castValue(rows[0].r as string)!;
+      const range = int4Range.castValue(rows[0].r)!;
       expect(range.begin).toBe(1);
       expect(range.end).toBe(15);
     });
@@ -348,7 +348,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const rows = Array.from(
         await adapter.execute(`SELECT int4range(1,10) - int4range(5,15) as r`),
       );
-      const range = int4Range.castValue(rows[0].r as string)!;
+      const range = int4Range.castValue(rows[0].r)!;
       expect(range.begin).toBe(1);
       expect(range.end).toBe(5);
     });

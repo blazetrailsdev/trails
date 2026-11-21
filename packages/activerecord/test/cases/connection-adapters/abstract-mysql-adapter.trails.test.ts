@@ -162,7 +162,7 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     ];
     adapter.internalExecQuery = async (sql: string, name?: string | null) => {
       queries.push([sql, name]);
-      return new Result(["Type"], [[(field.Type as string) ?? "int(11)"]]);
+      return new Result(["Type"], [[field.Type ?? "int(11)"]]);
     };
     return { adapter, queries };
   }
@@ -342,7 +342,7 @@ describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () =>
     const col = makeTextColumn({ defaultFunction: "uuid()" });
     const adapter = await makeAdapter(col);
     const cd = await adapter.buildChangeColumnDefinition("users", "uid", "string");
-    const sql = await new SchemaCreation((await Base.leaseConnection()) as never).accept(cd);
+    const sql = await new SchemaCreation(await Base.leaseConnection()).accept(cd);
     expect(sql).toContain("DEFAULT uuid()");
     expect(sql).not.toContain("DEFAULT 'uuid()'");
   });
@@ -523,7 +523,7 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefaultDefinition (#1568)", () =
 
 describeIfMysqlAdapter("AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#1568)", () => {
   async function visit(cd: ChangeColumnDefaultDefinition): Promise<string> {
-    return new MysqlSchemaCreation((await Base.leaseConnection()) as never).accept(cd);
+    return new MysqlSchemaCreation(await Base.leaseConnection()).accept(cd);
   }
 
   async function buildFor(column: Column, defaultOrChanges: unknown) {
@@ -638,9 +638,9 @@ describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
         changeColumnCalls.push(args);
       },
     });
-    await expect(
-      adapter.changeColumnNull("users", "name", false as unknown as boolean, "x"),
-    ).rejects.toThrow("bad null arg");
+    await expect(adapter.changeColumnNull("users", "name", false, "x")).rejects.toThrow(
+      "bad null arg",
+    );
     expect(executed).toEqual([]);
     expect(changeColumnCalls).toEqual([]);
   });

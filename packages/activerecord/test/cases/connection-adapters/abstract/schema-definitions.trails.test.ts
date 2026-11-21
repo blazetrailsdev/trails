@@ -16,7 +16,7 @@ import type { SchemaCreationConn } from "../../../../lib/connection-adapters/abs
 let conn: TableDefinitionConn & SchemaCreationConn;
 
 beforeAll(async () => {
-  conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn & SchemaCreationConn;
+  conn = await Base.leaseConnection();
 });
 
 const originalFkPattern = SchemaDumper.fkIgnorePattern;
@@ -278,7 +278,7 @@ describe("TableDefinition column methods", () => {
   it("raises when called with no column name", () => {
     const td = new TableDefinition(conn, "posts");
 
-    expect(() => (td.timestamp as () => unknown)()).toThrow("Missing column name(s) for timestamp");
+    expect(() => td.timestamp()).toThrow("Missing column name(s) for timestamp");
     expect(() => (td.string as (o: object) => unknown)({ limit: 40 })).toThrow(
       "Missing column name(s) for string",
     );
@@ -336,7 +336,7 @@ describe("TableDefinition#create_column_definition", () => {
 
   it("excepts _usesLegacyReferenceIndexName from the checked keys", () => {
     expect(() =>
-      td().column("title", "string", { _usesLegacyReferenceIndexName: true } as never),
+      td().column("title", "string", { _usesLegacyReferenceIndexName: true }),
     ).not.toThrow();
   });
 });

@@ -100,7 +100,7 @@ const hostDefaults: Pick<
   | "rawExecute"
 > = {
   currentTransaction: () => TransactionManager.NULL_TRANSACTION,
-  withinNewTransaction: async (_options, block) => block() as never,
+  withinNewTransaction: async (_options, block) => block(),
   dirtyCurrentTransaction: () => {},
   castResult,
   affectedRows,
@@ -157,7 +157,7 @@ describe("DatabaseStatements", () => {
           try {
             const value = await block();
             calls.push("commit");
-            return value as never;
+            return value;
           } catch (e) {
             calls.push("rollback");
             throw e;
@@ -359,7 +359,7 @@ describe("DatabaseStatements", () => {
         },
         castResult: (raw: any) => new Result(raw.columns, raw.rows),
       } as unknown as DatabaseStatementsHost;
-      host.rawExecute = rawExecute.bind(host) as DatabaseStatementsHost["rawExecute"];
+      host.rawExecute = rawExecute.bind(host);
 
       const result = await rawExecQuery.call(host, "SELECT id FROM t", "SQL", []);
       expect(result.length).toBe(2);
@@ -399,7 +399,7 @@ describe("DatabaseStatements", () => {
         },
         castResult: (raw: any) => new Result(raw.columns, raw.rows),
       } as unknown as DatabaseStatementsHost;
-      host.rawExecute = rawExecute.bind(host) as DatabaseStatementsHost["rawExecute"];
+      host.rawExecute = rawExecute.bind(host);
 
       await rawExecQuery.call(host, "SELECT id FROM t", "SQL", [], {
         prepare: true,
@@ -1229,7 +1229,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
         {},
         { users: { id: { name: "id", isAutoIncrement: () => true }, name: { name: "name" } } },
       );
-      host.defaultInsertValue = mysqlDefaultInsertValue as (column: unknown) => unknown;
+      host.defaultInsertValue = mysqlDefaultInsertValue;
       const sql = await buildFixtureSql.call(host, [{ name: "A" }, { name: "B" }], "users");
       expect(sql).not.toContain("DEFAULT");
     });

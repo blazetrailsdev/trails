@@ -51,7 +51,7 @@ describe("per-instance @primary_key slot", () => {
           getCachedColumnsHash: () => undefined,
           getCachedDataSourceExists: () => undefined,
         },
-      }) as never,
+      }),
     );
     await ColdToy.leaseConnection();
     const spy = vi.spyOn(

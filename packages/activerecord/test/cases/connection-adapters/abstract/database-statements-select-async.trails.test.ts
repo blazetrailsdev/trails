@@ -9,7 +9,7 @@ describe("DatabaseStatements select async kwarg", () => {
   let connection: AbstractAdapter;
 
   beforeEach(async () => {
-    connection = (await Base.leaseConnection()) as unknown as AbstractAdapter;
+    connection = await Base.leaseConnection();
   });
 
   const spySelectAll = () => vi.spyOn(connection, "selectAll");
