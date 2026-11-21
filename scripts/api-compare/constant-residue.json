@@ -696,7 +696,7 @@
     }
   },
   "activesupport": {
-    "rows": 192,
+    "rows": 196,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -729,7 +729,6 @@
       "core-ext/object/json.ts::Time",
       "core-ext/object/json.ts::TrueClass",
       "core-ext/object/try.ts::Delegator",
-      "deprecation.ts::DeprecationException",
       "messages/serializer-with-fallback.ts::Thrown",
       "null-logger.ts::NullLogger",
       "rexml/document.ts::Attributes",
@@ -802,6 +801,8 @@
       "core-ext/tse/util.ts::Util": "TSE::Util",
       "delegation.ts::DelegationError": "ActiveSupport::DelegationError",
       "dependencies/autoload.ts::Autoload": "ActiveSupport::Autoload",
+      "deprecation/behaviors.ts::Behavior": "ActiveSupport::Deprecation::Behavior",
+      "deprecation/behaviors.ts::DeprecationException": "ActiveSupport::DeprecationException",
       "deprecation/proxy-wrappers.ts::DeprecatedConstantProxy": "ActiveSupport::Deprecation::DeprecatedConstantProxy",
       "deprecation/proxy-wrappers.ts::DeprecatedInstanceVariableProxy": "ActiveSupport::Deprecation::DeprecatedInstanceVariableProxy",
       "deprecation/proxy-wrappers.ts::DeprecatedObjectProxy": "ActiveSupport::Deprecation::DeprecatedObjectProxy",

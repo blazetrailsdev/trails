@@ -22,6 +22,10 @@ export class Deprecation {
 
   private static __instance?: Deprecation;
 
+  declare static Behavior: typeof Behavior;
+  declare static Reporting: typeof Reporting;
+  declare static Disallowed: typeof Disallowed;
+
   deprecateMethods = deprecateMethods;
 
   deprecationHorizon: string;
@@ -37,6 +41,10 @@ export class Deprecation {
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Deprecation extends Behavior, Reporting, Disallowed {}
+
+Deprecation.Behavior = Behavior;
+Deprecation.Reporting = Reporting;
+Deprecation.Disallowed = Disallowed;
 
 include(Deprecation, Behavior);
 include(Deprecation, Reporting);
