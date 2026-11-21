@@ -93,7 +93,7 @@ export class ISO8601Parser {
   private number(): number {
     const captured = this.scanner.get(1) as string;
     return PERIOD_OR_COMMA.test(captured)
-      ? parseFloat(captured.split(COMMA).join(PERIOD))
+      ? parseFloat(captured.replaceAll(COMMA, PERIOD))
       : parseInt(captured, 10);
   }
 

@@ -19,6 +19,12 @@ import type { EncodeOptions } from "../json/encoding.js";
 import { truncateBytes } from "../string-utils.js";
 import { Unicode } from "./unicode.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- CLAUDE.md, "Generated attribute readers are properties"
+export interface Chars {
+  downcase(): Chars;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- CLAUDE.md, "Generated attribute readers are properties"
 export class Chars {
   wrappedString: string;
 
@@ -96,8 +102,8 @@ export class Chars {
   /** @missingRailsName gsub — PERMANENT */
   titleize(): Chars {
     return this.chars(
-      this.wrappedString
-        .toLowerCase()
+      this.downcase()
+        .toS()
         .replace(WORD_BOUNDARY_TITLEIZE, (_m, c: string) => c.toUpperCase()),
     );
   }
