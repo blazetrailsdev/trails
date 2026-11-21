@@ -117,7 +117,7 @@ function types(conn: Connection): { getTypeParser(oid: number, format?: string):
       }
       const coder = format !== "binary" && conn.typeMapForResults._lookupOid(0, oid);
       if (coder) return (value: string) => coder.decode(value);
-      if (format !== "binary" && conn.typeMapForResults instanceof TypeMapAllStrings) {
+      if (conn.typeMapForResults instanceof TypeMapAllStrings) {
         return (value: unknown) => value;
       }
       return conn.client.getTypeParser(oid, format as "text");

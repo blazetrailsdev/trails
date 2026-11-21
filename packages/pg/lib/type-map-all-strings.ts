@@ -1,6 +1,6 @@
 import { PG } from "./namespaces.js";
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE pg-ruby-api-manifest-reads-ext-c-classes */
 export class TypeMapAllStrings {
   /**
    * @internal
