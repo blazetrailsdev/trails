@@ -21,20 +21,6 @@ export class Response {
   /** @internal */
   private _cacheControl: CacheControl | null = null;
 
-  static readonly CACHEABLE_RESPONSE_CODES: ReadonlySet<number> = new Set([
-    200, 203, 300, 301, 302, 404, 410,
-  ]);
-
-  static readonly NOT_MODIFIED_OMIT_HEADERS: ReadonlySet<string> = new Set([
-    "allow",
-    "content-encoding",
-    "content-language",
-    "content-length",
-    "content-md5",
-    "content-type",
-    "last-modified",
-  ]);
-
   constructor(status: number | string, headers: unknown, body: unknown) {
     this.status = toI(status) as number;
     this.headers = Headers(headers);
@@ -51,6 +37,10 @@ export class Response {
   toA(): [number, object, unknown] {
     return [this.status, this.headers.toHash(), this.body];
   }
+
+  static readonly CACHEABLE_RESPONSE_CODES: ReadonlySet<number> = new Set([
+    200, 203, 300, 301, 302, 404, 410,
+  ]);
 
   get cacheControl(): CacheControl {
     return (this._cacheControl ??= new CacheControl(this.headers.get("cache-control") ?? null));
@@ -78,8 +68,8 @@ export class Response {
   isCacheable(): boolean | null {
     if (!Response.CACHEABLE_RESPONSE_CODES.has(this.status)) return false;
     if (
-      (this.cacheControl.isNoStore() ?? false) !== false ||
-      (this.cacheControl.isPrivate() ?? false) !== false
+      (this.cacheControl.isNoStore() != null && this.cacheControl.isNoStore() !== false) ||
+      (this.cacheControl.isPrivate() != null && this.cacheControl.isPrivate() !== false)
     ) {
       return false;
     }
@@ -135,10 +125,6 @@ export class Response {
       (this.expires && (this.expires.minus(this.date) as number))) as number | null;
   }
 
-  set maxAge(value: unknown) {
-    this.cacheControl = this.cacheControl.merge({ "max-age": String(value) });
-  }
-
   get expires(): Time | null {
     try {
       const expires = this.headers.get("expires");
@@ -147,6 +133,10 @@ export class Response {
       if (!(e instanceof ArgumentError)) throw e;
       return null;
     }
+  }
+
+  set maxAge(value: unknown) {
+    this.cacheControl = this.cacheControl.merge({ "max-age": String(value) });
   }
 
   set sharedMaxAge(value: unknown) {
@@ -177,6 +167,16 @@ export class Response {
   get etag(): string | undefined {
     return this.headers.get("etag");
   }
+
+  static readonly NOT_MODIFIED_OMIT_HEADERS: ReadonlySet<string> = new Set([
+    "allow",
+    "content-encoding",
+    "content-language",
+    "content-length",
+    "content-md5",
+    "content-type",
+    "last-modified",
+  ]);
 
   notModifiedBang(): null {
     if (rbObjRespondTo(this.body, "close")) (this.body as { close(): void }).close();
