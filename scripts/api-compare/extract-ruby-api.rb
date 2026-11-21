@@ -2511,6 +2511,7 @@ class ApiExtractor
             next if under && !vars[owner_var]
             fqn = under ? "#{vars[owner_var]}::#{name}" : name
             if var && var != "dummy" && vars[var] != fqn
+              abort "#{filepath}:#{line}: #{var} reassigned from #{vars[var]} to #{fqn}" if vars[var] && !C_BUILTIN_CONSTANTS.key?(var)
               vars[var] = fqn
               changed = true
             end
@@ -2546,6 +2547,7 @@ class ApiExtractor
     files.each do |filepath, source|
       vendor_file = filepath.delete_prefix("#{VENDOR_ROOT}/")
       source.each_line.with_index(1) do |text, line|
+        abort "#{filepath}:#{line}: rb_define_ call spans lines" if text =~ /\brb_(?:define|include|extend)_\w*\s*\((?![^)]*\))/
         text.scan(/rb_(define_method|define_private_method|define_protected_method|define_singleton_method|define_module_function|define_alias|define_attr|include_module|extend_object)\s*\(\s*(\w+)\s*,\s*(?:"([^"]+)"|(\w+))\s*(?:,\s*"?([\w=?!\[\]]+)"?\s*)?(?:,\s*(-?\d+)\s*)?/) do |call, owner_var, name, arg_var, func, argc|
           target_fqn = vars[owner_var]
           target = @classes[target_fqn] || @modules[target_fqn]
@@ -2559,8 +2561,10 @@ class ApiExtractor
           when "define_alias"
             target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], notes: "alias", alias_target: func)
           when "define_attr"
-            target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], reader: true) if func == "1"
-            target[:instanceMethods] << entry.merge(name: "#{name}=", visibility: "public", params: [{ name: "value", kind: "required" }]) if argc == "1"
+            read = func
+            write = argc
+            target[:instanceMethods] << entry.merge(name: name, visibility: "public", params: [], reader: true) if read == "1"
+            target[:instanceMethods] << entry.merge(name: "#{name}=", visibility: "public", params: [{ name: "value", kind: "required" }]) if write == "1"
           else
             method_info = entry.merge(name: name, visibility: call.include?("private") ? "private" : call.include?("protected") ? "protected" : "public",
                                       params: c_method_params(params_by_func[func], argc.to_i))
