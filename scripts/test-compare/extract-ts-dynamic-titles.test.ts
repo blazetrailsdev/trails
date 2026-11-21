@@ -325,4 +325,33 @@ describe("empty-string describe titles", () => {
       ["Rack::Cors", "preflight requests", ""],
     ]);
   });
+
+  it("titles by rbInspect of a bound string", () => {
+    expect(
+      titles(`
+        for (const [s, z, i] of [
+          [1193898300, "UTC", "2007-11-01T06:25:00Z"],
+          ["2017-06-21 Europe/Paris", null, "2017-06-21T00:00:00+02:00"],
+        ]) {
+          it(\`returns \${rbInspect(i)}\`, () => {});
+        }
+      `),
+    ).toEqual([
+      ['returns "2007-11-01T06:25:00Z"', false],
+      ['returns "2017-06-21T00:00:00+02:00"', false],
+    ]);
+  });
+
+  it("leaves a position that is a literal in only some rows dynamic in every row", () => {
+    expect(
+      titles(`
+        for (const [k, v] of [
+          [[1193898300, "Europe/Paris"], [1, -5]],
+          ["2017-06-21 Europe/Paris", [3, -2]],
+        ]) {
+          it(\`computes for \${rbInspect(k)}\`, () => {});
+        }
+      `),
+    ).toEqual([["computes for <expr>", true]]);
+  });
 });

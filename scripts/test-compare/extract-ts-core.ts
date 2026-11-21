@@ -737,10 +737,24 @@ export function extractTestsFromSource(
       return false;
     }
 
+    // A tuple position that is a literal in some rows and not in others binds
+    // nothing in any row, as extract-ruby-tests.rb leaves a hash whose keys are
+    // not all literals as one dynamic title
+    // (`{ [ 1193898300, 'Europe/Paris' ] => ..., '2017-06-21 ...' => ... }`).
+    const mixed = new Set<number>();
+    if (!ts.isIdentifier(name)) {
+      names.forEach((_, i) => {
+        const kinds = new Set(elements.map((element) => typeof element.tuple?.[i] === "string"));
+        if (kinds.size > 1) mixed.add(i);
+      });
+    }
+
     const guards = continueGuards(node.statement);
     const bind = (element: IterableElement, run: () => void) => {
       const pairs: [string, BoundValue | null | undefined][] = [];
-      const values = ts.isIdentifier(name) ? [element.scalar] : (element.tuple ?? []);
+      const values = ts.isIdentifier(name)
+        ? [element.scalar]
+        : (element.tuple ?? []).map((v, i) => (mixed.has(i) ? null : v));
       names.forEach((n, i) => pairs.push([n, values[i]]));
       nestedNames.forEach((inner, i) => {
         const innerValues = element.nested?.[i] ?? [];
@@ -1158,7 +1172,7 @@ function resolveTemplateTitle(
   return out;
 }
 
-/** A `${...}` span's value: a bound loop variable, or `JSON.stringify` / `regexpEscape` of one. */
+/** A `${...}` span's value: a bound loop variable, or `JSON.stringify` / `rbInspect` / `regexpEscape` of one. */
 function evalBoundExpression(
   expr: ts.Expression,
   bindings: ReadonlyMap<string, BoundValue>,
@@ -1215,6 +1229,15 @@ function evalBoundExpression(
   ) {
     const inner = evalBoundExpression(e.arguments[0], bindings);
     return inner === null ? null : JSON.stringify(inner);
+  }
+  if (
+    ts.isCallExpression(e) &&
+    ts.isIdentifier(e.expression) &&
+    e.expression.text === "rbInspect" &&
+    e.arguments.length === 1
+  ) {
+    const inner = evalBoundExpression(e.arguments[0], bindings);
+    return inner === null || !/^[ -~]*$/.test(inner) ? null : JSON.stringify(inner);
   }
   if (
     ts.isCallExpression(e) &&
