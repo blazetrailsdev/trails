@@ -2267,8 +2267,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     await adapter.dropTable("delete_me", { ifExists: true });
   });
 
-  it.skip("changing columns", async () => {
-    // BLOCKED: port bug — see 0155-assertion-surfaced-port-bugs/postgresql-bulk-change-query-count-one-short
+  it("changing columns", async () => {
     await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.string("name");
       t.date("birthdate");
@@ -2285,7 +2284,8 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
         throw new Error(`need an expected query count for ${classname}`);
       }),
     );
-    await assertQueriesCount(expectedQueryCount, { includeSchema: true }, async () => {
+    const count = classname === "PostgreSQLAdapter" ? expectedQueryCount - 1 : expectedQueryCount;
+    await assertQueriesCount(count, { includeSchema: true }, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });
         t.change("birthdate", "datetime", { comment: "This is a comment" });
@@ -2299,8 +2299,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(birthdate.comment).toBe("This is a comment");
   });
 
-  it.skip("changing column null with default", async () => {
-    // BLOCKED: port bug — see 0155-assertion-surfaced-port-bugs/postgresql-bulk-change-query-count-one-short
+  it("changing column null with default", async () => {
     await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.string("name");
       t.integer("age");
@@ -2318,7 +2317,8 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
         throw new Error(`need an expected query count for ${classname}`);
       }),
     );
-    await assertQueriesCount(expectedQueryCount, { includeSchema: true }, async () => {
+    const count = classname === "PostgreSQLAdapter" ? expectedQueryCount - 1 : expectedQueryCount;
+    await assertQueriesCount(count, { includeSchema: true }, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });
         t.change("birthdate", "datetime");

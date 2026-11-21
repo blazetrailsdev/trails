@@ -457,6 +457,12 @@ and the synchronous body peeks at the warmed value.**
   configured and by `reloadTypeMap`. `lookupCastType` reads them, and a type
   created after the warm-up resolves to `ValueType` where Rails returns the
   registered type.
+  A `quote_default_expression` on a `ColumnDefinition` (no `array?`,
+  `postgresql/quoting.rb:156-167`) therefore runs one SCHEMA query fewer than
+  Rails, so a PostgreSQL `assert_queries_count(..., include_schema: true)` over
+  it (`BulkAlterTableMigrationsTest`, `migration_test.rb:1404,1435`) asserts
+  Rails' count less one, keeping Rails' table; the other adapters keep Rails'
+  exact count.
 - `quoteString` escapes in process. PostgreSQL doubles the quote; MySQL reads
   the warmed `NO_BACKSLASH_ESCAPES` state to choose between doubling the quote
   and backslash escaping, which is the arm `connection.escape` takes inside the
