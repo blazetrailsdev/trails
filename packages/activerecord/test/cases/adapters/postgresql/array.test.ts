@@ -218,13 +218,13 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("select with strings", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
-      const x = (await PgArray.first()) as any;
+      const x = (await PgArray.first())!;
       expect(x.tags).toEqual(["1", "2", "3"]);
     });
 
     it("rewrite with strings", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
-      const x = (await PgArray.first()) as any;
+      const x = (await PgArray.first())!;
       x.tags = ["1", "2", "3", "4"];
       await x.saveBang();
       expect((await x.reload()).tags).toEqual(["1", "2", "3", "4"]);
@@ -232,13 +232,13 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("select with integers", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
-      const x = (await PgArray.first()) as any;
+      const x = (await PgArray.first())!;
       expect(x.ratings).toEqual([1, 2, 3]);
     });
 
     it("rewrite with integers", async () => {
       await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
-      const x = (await PgArray.first()) as any;
+      const x = (await PgArray.first())!;
       x.ratings = [2, "3", 4];
       await x.saveBang();
       expect((await x.reload()).ratings).toEqual([2, 3, 4]);
@@ -347,7 +347,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("escaping", async () => {
       const unknown = 'foo\\",bar,baz,\\';
       const tags = [`hello_${unknown}`];
-      const ar = (await PgArray.createBang({ tags })) as any;
+      const ar = await PgArray.createBang({ tags });
       await ar.reload();
       expect(ar.tags).toEqual(tags);
     });
