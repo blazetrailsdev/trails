@@ -62,6 +62,7 @@ export default defineConfig({
             { text: "Active Record Migrations", link: "/guides/active-record-migrations" },
             { text: "Active Record Validations", link: "/guides/active-record-validations" },
             { text: "Active Record Callbacks", link: "/guides/active-record-callbacks" },
+            { text: "Active Record Associations", link: "/guides/association-basics" },
             { text: "Active Record Query Interface", link: "/guides/active-record-querying" },
             { text: "Active Model Basics", link: "/guides/active-model-basics" },
           ],
@@ -98,6 +99,16 @@ export default defineConfig({
             { text: "Action Cable Overview", link: "/guides/action-cable-overview" },
             { text: "Active Job Basics", link: "/guides/active-job-basics" },
             { text: "Active Storage Overview", link: "/guides/active-storage-overview" },
+          ],
+        },
+        {
+          text: "Digging Deeper",
+          items: [
+            {
+              text: "Active Support Instrumentation",
+              link: "/guides/active-support-instrumentation",
+            },
+            { text: "Using Trails for API-only Applications", link: "/guides/api-app" },
           ],
         },
         {
