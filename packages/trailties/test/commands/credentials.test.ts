@@ -1,3 +1,4 @@
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import {
   File,
   FileUtils,
@@ -338,7 +339,7 @@ describe("Trails::Command::CredentialsTest", { timeout: 120_000 }, () => {
     await t.removeFile("config/master.key");
     await t.addToConfig("this.config.requireMasterKey = true;");
 
-    await t.runEditCommand();
+    await assertNothingRaised(() => t.runEditCommand());
     await t.assertFile("config/master.key");
   });
 
