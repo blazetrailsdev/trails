@@ -47,7 +47,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { NoMethodError, rbObjClassname, Struct, Zlib } from "@blazetrails/ruby-compat";
-import { Temporal, Time } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import {

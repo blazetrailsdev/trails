@@ -1,5 +1,5 @@
 import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
-import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
 import { ordinalize } from "../../inflector.js";
 import { ArgumentError } from "../../time-zone-config.js";
 import { inTimeZone } from "../date-and-time/zones.js";

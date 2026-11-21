@@ -1,7 +1,6 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import type { Time } from "@blazetrails/date";
-import { Temporal } from "@blazetrails/date";
 import { describeIfMysqlAdapter } from "../abstract-mysql-adapter/test-helper.js";
 import { Base } from "../../../../lib/index.js";
 import { fixtures } from "../../../support/use-fixtures.js";

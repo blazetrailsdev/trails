@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { coder } from "../../lib/cache/coder.js";
-import { Temporal } from "@blazetrails/date";
 
 describe("cache coder fidelity", () => {
   function roundtrip(value: unknown): unknown {

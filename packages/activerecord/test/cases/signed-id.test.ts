@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";

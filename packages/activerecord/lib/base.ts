@@ -11,7 +11,6 @@ import {
   toS,
   rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
-import { Temporal } from "@blazetrails/date";
 import { NotImplementedError } from "./errors.js";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";

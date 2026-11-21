@@ -1,7 +1,6 @@
 import { TopLevel } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "@blazetrails/activesupport";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { GID } from "./uri/gid.js";
 import { GlobalID, type GlobalIDModel, type GlobalIDOptions } from "./global-id.js";
 

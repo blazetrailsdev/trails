@@ -1,6 +1,6 @@
 import { quotingHost } from "../../../support/quoting-host.js";
 import { describe, expect, it } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Value as TimeValue } from "../../../../lib/type/time.js";
 import {
   quote as quoteFn,

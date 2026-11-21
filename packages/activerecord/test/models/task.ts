@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
-import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../lib/base.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */

@@ -1,6 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
 import { describe, it, expect, vi } from "vitest";
 import { Base, transaction, Rollback } from "../../lib/index.js";
 import { Owner } from "../models/owner.js";

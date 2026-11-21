@@ -3,7 +3,7 @@ import { htmlEscape } from "./core-ext/tse/util.js";
 import { Base64, BigDecimal, toD } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { LoadError, StringIO } from "@blazetrails/ruby-compat";
-import { Temporal, Date as RubyDate, DateTime, Time as RubyTime } from "@blazetrails/date";
+import { Date as RubyDate, DateTime, Time as RubyTime } from "@blazetrails/date";
 import { Duration } from "./duration.js";
 import { utc as dateTimeUtc } from "./core-ext/date-time/calculations.js";
 import { ArgumentError } from "./hash-utils.js";

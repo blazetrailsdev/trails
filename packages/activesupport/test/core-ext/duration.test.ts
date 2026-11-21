@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Duration, Scalar, days } from "../../lib/duration.js";
 import {
   cmp,

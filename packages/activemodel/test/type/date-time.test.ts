@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal, Time as RubyTime, strftime } from "@blazetrails/date";
+import { Time as RubyTime, strftime } from "@blazetrails/date";
 import { TimeZone, setZoneDefault } from "@blazetrails/activesupport";
 import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";

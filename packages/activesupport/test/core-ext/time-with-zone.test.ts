@@ -5,7 +5,7 @@ import { TimeZone } from "../../lib/values/time-zone.js";
 import { Timezone, TimezonePeriod } from "@blazetrails/tzinfo";
 import { travelTo } from "../../lib/testing/time-helpers.js";
 import { instantFromDate } from "../../lib/testing/temporal-helpers.js";
-import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import {
   zone as timeZone,
   setZone,

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { NoMethodError, TypeError, rbObjClass, rbFSend } from "@blazetrails/ruby-compat";
-import { Temporal } from "@blazetrails/date";
 import { Node } from "../../lib/nodes/node.js";
 import { SqlLiteral } from "../../lib/nodes/sql-literal.js";
 import { Not } from "../../lib/nodes/unary.js";

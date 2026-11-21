@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Time, resetLocalTimeZoneId } from "@blazetrails/date";
 import {
   ArgumentError,
   Rational,

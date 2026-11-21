@@ -1,6 +1,6 @@
 import type { TimeZone } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import * as Types from "../../lib/index.js";
 import { TimeWithZone, useZone, zone } from "@blazetrails/activesupport";
 import { assertNil } from "@blazetrails/activesupport/testing/assertions";

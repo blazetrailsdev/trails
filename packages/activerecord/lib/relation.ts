@@ -1,4 +1,4 @@
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { _loadSerializedAttributes } from "./type/serialized.js";
 import { isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";

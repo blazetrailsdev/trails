@@ -2,7 +2,7 @@ import { NoMethodError } from "@blazetrails/ruby-compat";
 import { quotingHost } from "../../../support/quoting-host.js";
 import { NotImplementedError } from "../../../../lib/errors.js";
 import { describe, expect, it } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { BinaryData } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Value as TimeValue } from "../../../../lib/type/time.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Temporal, Time } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import { asJson } from "../../../lib/core-ext/object/json.js";
 
 describe("JsonCherryPickTest", () => {

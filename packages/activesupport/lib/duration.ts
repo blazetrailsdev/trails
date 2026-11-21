@@ -6,7 +6,7 @@
  *   `Temporal.Instant` for them. The default reference is `Time.current`.
  */
 
-import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
 import {
   cmp,
   equals as cmpEquals,

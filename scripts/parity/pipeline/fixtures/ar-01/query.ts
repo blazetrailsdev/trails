@@ -1,5 +1,4 @@
 import { weeks } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Book } from "./models.js";
 
 // Ruby `1.week.ago`. Built from `Date.now()`, not `Temporal.Now.instant()`:

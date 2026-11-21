@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { NoMethodError, rbFSend } from "@blazetrails/ruby-compat";
 import { inTimeZone } from "../../../lib/core-ext/date-and-time/zones.js";
 import { setZone, useZone } from "../../../lib/time-zone-config.js";

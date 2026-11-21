@@ -3,7 +3,6 @@ import { Logger, SimpleFormatter } from "../lib/logger.js";
 import { IsolatedExecutionState } from "../lib/isolated-execution-state.js";
 import { File, Fiber, Tempfile, Thread } from "@blazetrails/ruby-compat";
 import { BroadcastLogger } from "../lib/broadcast-logger.js";
-import { Temporal } from "@blazetrails/date";
 
 function makeBuffer() {
   const lines: string[] = [];

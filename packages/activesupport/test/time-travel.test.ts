@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 
-import { DateTime, Date as RubyDate, Temporal, Time } from "@blazetrails/date";
+import { DateTime, Date as RubyDate, Time } from "@blazetrails/date";
 import { TimeZone } from "../lib/values/time-zone.js";
 import type { TimeWithZone } from "../lib/time-with-zone.js";
 import { setZone, zone } from "../lib/time-zone-config.js";

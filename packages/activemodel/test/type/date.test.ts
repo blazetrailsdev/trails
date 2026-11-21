@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import * as Types from "../../lib/index.js";
 import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 

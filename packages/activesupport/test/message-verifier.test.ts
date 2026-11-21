@@ -8,7 +8,6 @@ import { base58 } from "../lib/core-ext/securerandom.js";
 import { InvalidSignature, MessageVerifier } from "../lib/message-verifier.js";
 import type { MessageSerializer } from "../lib/messages/codec.js";
 import { ArgumentError } from "../lib/messages/serializer-with-fallback.js";
-import { Temporal } from "@blazetrails/date";
 import { currentTimeInstant } from "../lib/time-travel.js";
 
 const JSONSerializer: MessageSerializer = {

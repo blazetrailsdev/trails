@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import * as DateTimeExt from "../../lib/core-ext/date-time/calculations.js";
 
 import { hours } from "../../lib/duration.js";

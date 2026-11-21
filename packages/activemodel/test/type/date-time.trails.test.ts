@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import { plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import * as Types from "../../lib/index.js";

@@ -1,10 +1,5 @@
 import { isStruct, type StructInstance } from "@blazetrails/ruby-compat";
-import {
-  Date as RubyDate,
-  DateTime as RubyDateTime,
-  Temporal,
-  Time as RubyTime,
-} from "@blazetrails/date";
+import { Date as RubyDate, DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
@@ -255,7 +250,7 @@ export class Time {
     options: EncodeOptions | null = null,
   ): string {
     const digits =
-      Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
+      Encoding.timePrecision as Temporal.PlainTimeToStringOptions["fractionalSecondDigits"];
 
     if (value instanceof RubyTime) {
       if (Encoding.useStandardJsonTimeFormat) return value.xmlschema(Encoding.timePrecision);
@@ -310,7 +305,7 @@ export class DateTime {
       }
     }
     const digits =
-      Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
+      Encoding.timePrecision as Temporal.PlainTimeToStringOptions["fractionalSecondDigits"];
 
     if (Encoding.useStandardJsonTimeFormat) {
       return `${value.toString({ fractionalSecondDigits: digits })}+00:00`;

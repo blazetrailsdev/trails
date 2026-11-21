@@ -1,5 +1,4 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 import { Date as OidDate } from "../../../../lib/connection-adapters/postgresql/oid/date.js";

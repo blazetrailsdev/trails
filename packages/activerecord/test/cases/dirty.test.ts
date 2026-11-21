@@ -6,7 +6,7 @@ import { Base } from "../../lib/index.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
 import { assertEmpty, assertInDelta } from "@blazetrails/activesupport/testing/assertions";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 
 import { itIfSupports } from "../support/supports.js";
 import { describeIfPostgresqlAdapter } from "../support/describe-if-postgresql-adapter.js";

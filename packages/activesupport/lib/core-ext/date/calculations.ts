@@ -1,4 +1,4 @@
-import { Temporal, Date as RubyDate, Time as RubyTime, type DateTime } from "@blazetrails/date";
+import { Date as RubyDate, Time as RubyTime, type DateTime } from "@blazetrails/date";
 import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";

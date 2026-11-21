@@ -31,7 +31,7 @@ import { DangerousAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
 import { _virtualAttributePrototypeCache } from "./persistence.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import {
   type InspectionMask,
   initializeGeneratedModules as _coreInitializeGeneratedModules,

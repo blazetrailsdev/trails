@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal, Time } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import { describeIfPg } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Topic } from "../../../models/topic.js";

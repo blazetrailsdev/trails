@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "../../lib/index.js";
 import { adapterType } from "../support/test-adapter.js";

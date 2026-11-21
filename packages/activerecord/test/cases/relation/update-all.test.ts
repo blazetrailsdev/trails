@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertNot,

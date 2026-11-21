@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { TypeError } from "@blazetrails/ruby-compat";
 import { Attribute as ModelAttribute, ValueType } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/date";
 import {
   Collectors,
   Table,

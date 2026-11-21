@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { TimeZone } from "@blazetrails/activesupport";
 import { RangeType } from "../../../../../lib/connection-adapters/postgresql/oid/range.js";
 import { Range } from "@blazetrails/ruby-compat";

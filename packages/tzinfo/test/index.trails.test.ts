@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Temporal, Time } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import { InvalidTimezoneIdentifier, Timezone } from "../lib/index.js";
 
 describe("Timezone offsets and abbreviations from the cached transition interval", () => {

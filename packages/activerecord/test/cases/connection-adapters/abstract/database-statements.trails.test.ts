@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql, Visitors } from "@blazetrails/arel";
 import { testConnection } from "@blazetrails/arel/test/support/connection.js";
-import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Hash, NotImplementedError, hashAset } from "@blazetrails/ruby-compat";
 import { Rollback, StatementInvalid } from "../../../../lib/errors.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal, Date, DateTime, Time } from "../lib/index.js";
+import { Date, DateTime, Time } from "../lib/index.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
 describe("TestDateConv", () => {

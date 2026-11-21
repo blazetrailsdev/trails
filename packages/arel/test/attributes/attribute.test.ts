@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { fakeRecordConnection } from "../support/connection.js";
 import { Table, star, Nodes, Visitors } from "../../lib/index.js";
 import { Attribute } from "../../lib/attributes/attribute.js";

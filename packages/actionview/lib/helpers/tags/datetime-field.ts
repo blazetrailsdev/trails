@@ -1,6 +1,6 @@
 import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
-import { DateTime, strftime as dateStrftime, type Temporal } from "@blazetrails/date";
+import { DateTime, strftime as dateStrftime } from "@blazetrails/date";
 import { NotImplementedError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { TextField } from "./text-field.js";

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertMatch, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import { toFs as dateTimeToFs } from "@blazetrails/activesupport/core-ext/date-time/conversions";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateTime } from "@blazetrails/date";
 import { Base } from "@blazetrails/activerecord";
 import { Application } from "../../lib/application.js";

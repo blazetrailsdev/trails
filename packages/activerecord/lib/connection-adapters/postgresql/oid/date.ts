@@ -1,6 +1,5 @@
 import "../../../constants.postgresql-oid-date.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
-import { Temporal } from "@blazetrails/date";
 import {
   DateType,
   DateInfinity,

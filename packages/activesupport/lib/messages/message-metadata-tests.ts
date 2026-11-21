@@ -3,7 +3,7 @@ import "../message-pack.js";
 
 import { Encoding } from "../json/encoding.js";
 import { NullSerializer } from "../message-encryptor.js";
-import { Temporal, Time } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import { Hash, b } from "@blazetrails/ruby-compat";
 import { TimeHelpers } from "../testing/time-helpers.js";
 import { currentTimeInstant } from "../time-travel.js";

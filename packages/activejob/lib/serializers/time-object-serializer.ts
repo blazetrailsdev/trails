@@ -1,4 +1,3 @@
-import type { Temporal } from "@blazetrails/date";
 import { DateTime } from "@blazetrails/date";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";

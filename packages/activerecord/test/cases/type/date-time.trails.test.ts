@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
 import { TimeZoneConverter } from "../../../lib/attribute-methods/time-zone-conversion.js";
 import { RangeType } from "../../../lib/connection-adapters/postgresql/oid/range.js";

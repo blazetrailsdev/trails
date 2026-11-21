@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
-import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Time as RubyTime } from "@blazetrails/date";
 import type { Comment } from "./comment.js";
 import type { Company } from "./company.js";
 import type { Computer } from "./computer.js";

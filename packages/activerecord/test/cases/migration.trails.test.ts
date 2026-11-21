@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { excBacktraceLocations, NoMethodError, StandardError } from "@blazetrails/ruby-compat";
-import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Migrator } from "../../lib/index.js";
 import type { MigrationProxy } from "../../lib/migration.js";

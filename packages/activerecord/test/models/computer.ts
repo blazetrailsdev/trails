@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
-import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Time as RubyTime } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../lib/base.js";

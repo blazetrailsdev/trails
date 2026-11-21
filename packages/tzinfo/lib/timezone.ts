@@ -9,7 +9,6 @@
 
 import {
   DateTime,
-  Temporal,
   Time,
   Timezone as DateTimezone,
   tzdataAbbreviation,
@@ -589,7 +588,7 @@ export class Timezone {
 
   periodForUtc(utcTime: Time): TimezonePeriod {
     if (utcTime == null) throw new ArgumentError("utc_time must be specified");
-    return this.periodFor(Timestamp.for(utcTime, "treatAsUtc") as Timestamp);
+    return this.periodFor(Timestamp.for(utcTime, "treatAsUtc"));
   }
 
   /** @missingRailsCall for — CONVERGEABLE tzinfo-timezone-reads-the-data-source */

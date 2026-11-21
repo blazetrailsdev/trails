@@ -1,6 +1,6 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Duration, TimeWithZone } from "@blazetrails/activesupport";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, withNativeDatabaseTypeOverrides } from "./test-helper.js";

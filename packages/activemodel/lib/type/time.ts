@@ -1,7 +1,6 @@
 import {
   ArgumentError,
   Date as RubyDate,
-  type Temporal,
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";

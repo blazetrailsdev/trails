@@ -7,7 +7,7 @@ import {
 } from "../lib/core-ext/date-and-time/compatibility.js";
 import { Duration } from "../lib/duration.js";
 import { TimeWithZone } from "../lib/time-with-zone.js";
-import { DateTime, Temporal, Time } from "@blazetrails/date";
+import { DateTime, Time } from "@blazetrails/date";
 import { travelTo, travelBack } from "../lib/testing/time-helpers.js";
 import { Rational, RuntimeError } from "@blazetrails/ruby-compat";
 import {

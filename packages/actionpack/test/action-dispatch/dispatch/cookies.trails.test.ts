@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { Response } from "@blazetrails/rack";
 import { CookieJar } from "../../../lib/action-dispatch/middleware/cookies.js";

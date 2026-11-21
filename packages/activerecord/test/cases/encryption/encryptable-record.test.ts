@@ -1,5 +1,5 @@
 import { OpenSSL, b } from "@blazetrails/ruby-compat";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import {
   freshAdapter,

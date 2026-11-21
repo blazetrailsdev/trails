@@ -12,7 +12,7 @@
 import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
-import { Temporal, Date as RubyDate, Time } from "@blazetrails/date";
+import { Date as RubyDate, Time } from "@blazetrails/date";
 import {
   InvalidTimezoneIdentifier,
   PeriodNotFound,

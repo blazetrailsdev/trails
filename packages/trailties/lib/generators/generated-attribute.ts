@@ -3,7 +3,6 @@ import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
 import { ActiveRecord } from "@blazetrails/activerecord";
 import { Trails } from "../trails.js";
 import { Error } from "./base.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export type AttrOptions = Record<string, unknown>;
 export type IndexType = "index" | "uniq" | undefined;

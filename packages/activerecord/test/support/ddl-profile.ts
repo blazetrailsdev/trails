@@ -1,5 +1,4 @@
 import { File, FileUtils } from "@blazetrails/ruby-compat";
-import { Temporal } from "@blazetrails/date";
 
 export type DdlOp =
   | "CREATE_TABLE"

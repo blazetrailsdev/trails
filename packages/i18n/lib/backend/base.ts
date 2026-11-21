@@ -37,7 +37,7 @@ import {
   File,
 } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
-import { Temporal, strftime } from "@blazetrails/date";
+import { strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
 import {
   Transliterator,

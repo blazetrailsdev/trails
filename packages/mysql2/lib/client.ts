@@ -11,7 +11,7 @@ import {
   toS,
   warn,
 } from "@blazetrails/ruby-compat";
-import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
+import { Date as RubyDate, DateTime, Time } from "@blazetrails/date";
 import { Error as Mysql2Error } from "./error.js";
 import { Mysql2 } from "./mysql2.js";
 import { Result } from "./result.js";

@@ -61,7 +61,7 @@ import {
   CpkPost,
 } from "../../models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "../../../lib/associations/errors.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { travelTo, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import {
   assert,

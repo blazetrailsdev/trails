@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";

@@ -1,6 +1,5 @@
 import { rbObjClone, constSet } from "@blazetrails/ruby-compat";
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import type { Temporal } from "@blazetrails/date";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Attributes, Nodes } from "../namespaces.js";
 import { Node } from "./node.js";

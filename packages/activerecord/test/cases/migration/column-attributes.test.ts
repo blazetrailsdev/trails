@@ -3,7 +3,7 @@ import { fixtures } from "../../support/use-fixtures.js";
    The test class spells `include ActiveRecord::Migration::TestHelper` (migration/helper.rb:10); the
    empty class/interface merge carries the mixed-in methods onto its type. */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, Duration } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/ruby-compat";

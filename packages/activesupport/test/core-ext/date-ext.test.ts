@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Date as RubyDate, DateTime as RubyDateTime, Temporal } from "@blazetrails/date";
+import { Date as RubyDate, DateTime as RubyDateTime } from "@blazetrails/date";
 import {
   endOfMonth,
   endOfYear,

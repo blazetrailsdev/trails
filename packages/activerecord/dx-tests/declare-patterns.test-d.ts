@@ -119,7 +119,6 @@ export function _enumOptionsTypecheck(): void {
   );
 }
 
-import { Temporal } from "@blazetrails/date";
 class Event extends Base {
   declare starts_at: Temporal.Instant | Temporal.PlainDateTime;
   declare starts_on: Temporal.PlainDate;

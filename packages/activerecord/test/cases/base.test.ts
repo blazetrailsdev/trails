@@ -26,7 +26,7 @@ import {
   assertNotRespondTo,
   assertDifference,
 } from "@blazetrails/activesupport/testing/assertions";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "../support/use-fixtures.js";
 import { IntegerType, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import * as Lint from "@blazetrails/activemodel/testing/lint";

@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { rbHash, rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { ValueType, IntegerType, FloatType, DecimalType, BigIntegerType } from "../../lib/index.js";
 

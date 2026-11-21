@@ -9,7 +9,6 @@ import {
   included,
   underscore,
 } from "@blazetrails/activesupport";
-import type { Temporal } from "@blazetrails/date";
 import { UnknownPrimaryKey } from "./errors.js";
 import { ArgumentError, toS } from "@blazetrails/ruby-compat";
 

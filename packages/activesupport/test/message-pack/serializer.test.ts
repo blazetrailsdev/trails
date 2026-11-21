@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { MessagePack, UnserializableObjectError } from "../../lib/message-pack.js";
-import { DateTime, Temporal, Time } from "@blazetrails/date";
+import { DateTime, Time } from "@blazetrails/date";
 import {
   BigDecimal,
   Complex,

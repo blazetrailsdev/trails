@@ -1,5 +1,5 @@
 import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
-import { DateTime, type Temporal, type Time } from "@blazetrails/date";
+import { DateTime, type Time } from "@blazetrails/date";
 import { preserveTimezone } from "../date-and-time/compatibility.js";
 import { getlocal, utcOffset } from "./calculations.js";
 
