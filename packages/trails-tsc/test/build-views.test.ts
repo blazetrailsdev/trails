@@ -1152,11 +1152,17 @@ describe("buildViews render typing", { timeout: 30_000 }, () => {
         "app/views/posts/index.html.tse",
         '<%= render({ partial: "posts/post", locals: { item: 1 } }) %>',
       );
+      write(
+        cwd,
+        "app/views/posts/show.html.tse",
+        '<%= render({ partial: "posts/post", locals: { post: { title: "x" } } }) %><%= render("posts/post", { post: { title: "x" } }) %><%= await render() %>',
+      );
       await buildViews({ cwd });
       const roots = [
         path.join(cwd, ".trails/template-registry-augmentation.d.ts"),
         path.join(cwd, ".trails/views/posts/index.html.tse.ts"),
         path.join(cwd, ".trails/views/posts/_post.html.tse.ts"),
+        path.join(cwd, ".trails/views/posts/show.html.tse.ts"),
       ];
       const program = ts.createProgram(roots, {
         strict: true,
