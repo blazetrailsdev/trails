@@ -35,14 +35,6 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return new OrderedHash(pairs);
   }
 
-  toObject(): Record<string, V> {
-    const obj: Record<string, V> = {};
-    for (const [k, v] of this) {
-      obj[String(k)] = v;
-    }
-    return obj;
-  }
-
   toArray(): [K, V][] {
     return [...this.entries()];
   }
@@ -105,7 +97,7 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return result;
   }
 
-  mergeInPlace(other: OrderedHash<K, V>, block?: (key: K, v1: V, v2: V) => V): this {
+  update(other: OrderedHash<K, V>, block?: (key: K, v1: V, v2: V) => V): this {
     for (const [k, v] of other) {
       if (block && this.has(k)) {
         this.set(k, block(k, this.get(k)!, v));
@@ -114,18 +106,6 @@ export class OrderedHash<K, V> extends Hash<K, V> {
       }
     }
     return this;
-  }
-
-  update(other: OrderedHash<K, V>): this {
-    return this.mergeInPlace(other);
-  }
-
-  shift(): [K, V] | undefined {
-    const first = this[Symbol.iterator]().next().value;
-    if (!first) return undefined;
-    const [k, v] = first;
-    this.delete(k);
-    return [k, v];
   }
 
   invert(): OrderedHash<V, K> {

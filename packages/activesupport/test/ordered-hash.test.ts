@@ -66,7 +66,7 @@ describe("OrderedHashTest", () => {
     const h = new OrderedHash<string, number>();
     h.set("x", 10);
     h.set("y", 20);
-    expect(h.toObject()).toEqual({ x: 10, y: 20 });
+    expect(Object.fromEntries(h)).toEqual({ x: 10, y: 20 });
   });
 
   it("to a", () => {
@@ -198,7 +198,7 @@ describe("OrderedHashTest", () => {
     const h = new OrderedHash<string, number>();
     h.set("a", 0);
     h.set("b", 0);
-    h.mergeInPlace(
+    h.update(
       new OrderedHash([
         ["a", 1],
         ["c", 7],
@@ -230,7 +230,7 @@ describe("OrderedHashTest", () => {
   it("json", () => {
     const h = new OrderedHash<string, number>();
     h.set("x", 42);
-    const json = JSON.stringify(h.toObject());
+    const json = JSON.stringify(Object.fromEntries(h));
     expect(json).toBe('{"x":42}');
   });
 
