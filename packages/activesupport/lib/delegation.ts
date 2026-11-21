@@ -415,7 +415,6 @@ export namespace Delegation {
         if (
           typeof prop === "symbol" ||
           prop.startsWith("_") ||
-          prop.startsWith("@") ||
           prop in obj ||
           prop === targetName
         ) {

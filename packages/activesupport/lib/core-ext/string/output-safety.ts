@@ -165,7 +165,7 @@ function strRange(str: string, args: ArefArgs): [number, number] {
 
 type BlockFn = (...params: unknown[]) => unknown;
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- CLAUDE.md, "Generated attribute readers are properties"
 export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJson") {
   static readonly UNSAFE_STRING_METHODS = [
     "capitalize",
@@ -469,7 +469,7 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- CLAUDE.md, "Generated attribute readers are properties"
 export interface SafeBuffer {
   capitalize(...args: unknown[]): string;
   capitalizeBang(...args: unknown[]): this | null;

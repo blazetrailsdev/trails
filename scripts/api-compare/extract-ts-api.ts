@@ -8777,6 +8777,15 @@ function isCheckerProvenString(expr: ts.Expression): boolean {
   return parts.every((t) => (t.flags & ts.TypeFlags.StringLike) !== 0);
 }
 
+/**
+ * Whether the TS checker proves `expr` a one-character string literal, the
+ * operand shape for which `replaceAll` is Ruby's `tr`.
+ */
+function isSingleCharString(expr: ts.Expression): boolean {
+  const type = currentChecker?.getTypeAtLocation(expr);
+  return type !== undefined && type.isStringLiteral() && [...type.value].length === 1;
+}
+
 function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined {
   const checker = currentChecker;
   if (checker === undefined) return undefined;
@@ -8995,7 +9004,9 @@ function nativeValueForms(n: ts.Node): string[] {
       return isCheckerProvenString(n.expression.expression) ? [TYPED_STRING_FORM[method]] : [];
     case "replaceAll":
       if (args.length !== 2 || checkerProvenKind(n.expression.expression) !== "sized") return [];
-      return isCheckerProvenString(n.expression.expression) && isCheckerProvenString(first)
+      return isCheckerProvenString(n.expression.expression) &&
+        isSingleCharString(first) &&
+        isSingleCharString(second)
         ? ["gsub", TYPED_STRING_FORM.replaceAll]
         : ["gsub"];
     case "replace": {
