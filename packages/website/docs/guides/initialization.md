@@ -168,10 +168,12 @@ one, then marks the application initialized.
 
 The initializers come from three places, run in this order:
 
-1. **Bootstrap**, which loads `config/environments/<env>.ts`, sets up the
-   logger and the cache, and prepares the autoloaders.
-2. **Every trailtie and engine**, in the order they were loaded, followed by
-   the application's own `config/initializers/*.ts` files.
+1. **Bootstrap**, which sets up the logger, the cache and the once
+   autoloader.
+2. **Every trailtie and engine**, in the order they were loaded. The
+   application is itself an engine, so this is where its
+   `config/environments/<env>.ts` (`load_environment_config`) and its
+   `config/initializers/*.ts` files run.
 3. **Finisher**, which sets up the main autoloader, builds the middleware
    stack, runs the `toPrepare` callbacks, eager loads when
    `config.eagerLoad` is on, and installs the routes reloader.

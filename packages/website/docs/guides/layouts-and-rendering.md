@@ -262,8 +262,8 @@ A view hands content to a named region of its layout:
 `contentFor` with a trailing function captures a larger fragment —
 `<% contentFor("sidebar", () => { %> ... <% }) %>` — and calling it twice
 appends. `isContentFor("sidebar")` tells a layout whether the view filled the
-region, so it can fall back to a default. `provide` sets a region once,
-replacing rather than appending.
+region, so it can fall back to a default. `provide` fills a region the
+same way; it differs from `contentFor` only when the response is streamed.
 
 ### Using Partials
 
