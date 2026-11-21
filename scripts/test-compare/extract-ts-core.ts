@@ -737,10 +737,6 @@ export function extractTestsFromSource(
       return false;
     }
 
-    // A tuple position that is a literal in some rows and not in others binds
-    // nothing in any row, as extract-ruby-tests.rb leaves a hash whose keys are
-    // not all literals as one dynamic title
-    // (`{ [ 1193898300, 'Europe/Paris' ] => ..., '2017-06-21 ...' => ... }`).
     const mixed = new Set<number>();
     if (!ts.isIdentifier(name)) {
       names.forEach((_, i) => {
