@@ -39,3 +39,9 @@ Where two blocked stories land: `better-sqlite3-driver-ignores-strict-false` is 
 of `Database`'s constructor (`database.rb:170-172`), and
 `libsql-remote-adapter-memory-placeholder-and-concurrency-override` is its first argument, the
 `file` handed to `open_v2`.
+
+The constructor ports `database.rb:141-195` for the options trails passes. It leaves out
+`open16` and `utf16:` (`:145-146`: a JS string carries no encoding), `initialize_extensions`
+(`:181`), `@default_transaction_mode` (`:179`, read only by the unported `transaction`),
+`ForkSafety.track` (`:183`: JS has no `fork`), and the block arm (`:185-191`). A constructor
+creates no promise, and no trails caller passes a block.
