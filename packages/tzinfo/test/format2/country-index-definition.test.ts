@@ -24,7 +24,7 @@ describe("TCCountryIndexDefinition", () => {
 
     const countries = m.countries;
     expect(countries).toEqual({});
-    expect(Object.isFrozen(countries)).toBe(true);
+    expect(Object.isFrozen(countries)).toBeTruthy();
   });
 
   it("none", () => {
@@ -36,7 +36,7 @@ describe("TCCountryIndexDefinition", () => {
 
     const countries = m.countries;
     expect(countries).toEqual({});
-    expect(Object.isFrozen(countries)).toBe(true);
+    expect(Object.isFrozen(countries)).toBeTruthy();
   });
 
   it("multiple", () => {
@@ -66,7 +66,7 @@ describe("TCCountryIndexDefinition", () => {
 
     const countries = m.countries;
     expect(Object.keys(countries)).toEqual(["ZZ", "AA", "TE", "FR"]);
-    expect(Object.isFrozen(countries)).toBe(true);
+    expect(Object.isFrozen(countries)).toBeTruthy();
 
     const countryZz = countries["ZZ"];
     expect(countryZz).toBeInstanceOf(CountryInfo);

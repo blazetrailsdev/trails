@@ -79,7 +79,7 @@ describe("TCTimezoneDefinition", () => {
     m.timezone("Test/Data/Zone", (tz) => tz.offset("o0", 0, 0, "UTC"));
 
     const ti = m.get()!;
-    expect(Object.isFrozen(ti.identifier)).toBe(true);
+    expect(Object.isFrozen(ti.identifier)).toBeTruthy();
   });
 
   it("linked", () => {
@@ -97,8 +97,8 @@ describe("TCTimezoneDefinition", () => {
     m.linkedTimezone("Test/Linked/Zone", "Test/Linked_To/Zone");
 
     const ti = m.get() as LinkedTimezoneInfo;
-    expect(Object.isFrozen(ti.identifier)).toBe(true);
-    expect(Object.isFrozen(ti.linkToIdentifier)).toBe(true);
+    expect(Object.isFrozen(ti.identifier)).toBeTruthy();
+    expect(Object.isFrozen(ti.linkToIdentifier)).toBeTruthy();
   });
 
   it("double data", () => {

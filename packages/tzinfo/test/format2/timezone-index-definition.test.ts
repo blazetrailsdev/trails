@@ -31,14 +31,14 @@ describe("TCTimezoneIndexDefinition", () => {
 
     const dataTimezones = m.dataTimezones;
     expect(dataTimezones).toEqual(["Another/Zone", "Test/One", "Test/Two"]);
-    expect(Object.isFrozen(dataTimezones)).toBe(true);
-    expect(dataTimezones.every((t) => Object.isFrozen(t))).toBe(true);
+    expect(Object.isFrozen(dataTimezones)).toBeTruthy();
+    expect(dataTimezones.every((t) => Object.isFrozen(t))).toBeTruthy();
     expect(m.dataTimezones).toBe(dataTimezones);
 
     const linkedTimezones = m.linkedTimezones;
     expect(linkedTimezones).toEqual(["And/Yet/Another", "Test/Three"]);
-    expect(Object.isFrozen(linkedTimezones)).toBe(true);
-    expect(linkedTimezones.every((t) => Object.isFrozen(t))).toBe(true);
+    expect(Object.isFrozen(linkedTimezones)).toBeTruthy();
+    expect(linkedTimezones.every((t) => Object.isFrozen(t))).toBeTruthy();
     expect(m.linkedTimezones).toBe(linkedTimezones);
   });
 
@@ -54,13 +54,13 @@ describe("TCTimezoneIndexDefinition", () => {
 
     const dataTimezones = m.dataTimezones;
     expect(dataTimezones).toEqual(["Test/A/One", "Test/A/Three", "Test/A/Two"]);
-    expect(Object.isFrozen(dataTimezones)).toBe(true);
-    expect(dataTimezones.every((t) => Object.isFrozen(t))).toBe(true);
+    expect(Object.isFrozen(dataTimezones)).toBeTruthy();
+    expect(dataTimezones.every((t) => Object.isFrozen(t))).toBeTruthy();
     expect(m.dataTimezones).toBe(dataTimezones);
 
     const linkedTimezones = m.linkedTimezones;
     expect(linkedTimezones).toEqual([]);
-    expect(Object.isFrozen(linkedTimezones)).toBe(true);
+    expect(Object.isFrozen(linkedTimezones)).toBeTruthy();
     expect(m.linkedTimezones).toBe(linkedTimezones);
   });
 
@@ -76,13 +76,13 @@ describe("TCTimezoneIndexDefinition", () => {
 
     const dataTimezones = m.dataTimezones;
     expect(dataTimezones).toEqual([]);
-    expect(Object.isFrozen(dataTimezones)).toBe(true);
+    expect(Object.isFrozen(dataTimezones)).toBeTruthy();
     expect(m.dataTimezones).toBe(dataTimezones);
 
     const linkedTimezones = m.linkedTimezones;
     expect(linkedTimezones).toEqual(["Test/B/One", "Test/B/Three", "Test/B/Two"]);
-    expect(Object.isFrozen(linkedTimezones)).toBe(true);
-    expect(linkedTimezones.every((t) => Object.isFrozen(t))).toBe(true);
+    expect(Object.isFrozen(linkedTimezones)).toBeTruthy();
+    expect(linkedTimezones.every((t) => Object.isFrozen(t))).toBeTruthy();
     expect(m.linkedTimezones).toBe(linkedTimezones);
   });
 
@@ -95,12 +95,12 @@ describe("TCTimezoneIndexDefinition", () => {
 
     const dataTimezones = m.dataTimezones;
     expect(dataTimezones).toEqual([]);
-    expect(Object.isFrozen(dataTimezones)).toBe(true);
+    expect(Object.isFrozen(dataTimezones)).toBeTruthy();
     expect(m.dataTimezones).toBe(dataTimezones);
 
     const linkedTimezones = m.linkedTimezones;
     expect(linkedTimezones).toEqual([]);
-    expect(Object.isFrozen(linkedTimezones)).toBe(true);
+    expect(Object.isFrozen(linkedTimezones)).toBeTruthy();
     expect(m.linkedTimezones).toBe(linkedTimezones);
   });
 
@@ -109,12 +109,12 @@ describe("TCTimezoneIndexDefinition", () => {
 
     const dataTimezones = m.dataTimezones;
     expect(dataTimezones).toEqual([]);
-    expect(Object.isFrozen(dataTimezones)).toBe(true);
+    expect(Object.isFrozen(dataTimezones)).toBeTruthy();
     expect(m.dataTimezones).toBe(dataTimezones);
 
     const linkedTimezones = m.linkedTimezones;
     expect(linkedTimezones).toEqual([]);
-    expect(Object.isFrozen(linkedTimezones)).toBe(true);
+    expect(Object.isFrozen(linkedTimezones)).toBeTruthy();
     expect(m.linkedTimezones).toBe(linkedTimezones);
   });
 
