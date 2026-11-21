@@ -1131,6 +1131,20 @@
       "urlmap.ts::URLMap": "Rack::URLMap"
     }
   },
+  "rack-cache": {
+    "rows": 7,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "cache-control.ts::CacheControl": "Rack::Cache::CacheControl",
+      "cache.ts::Cache": "Rack::Cache",
+      "entity-store.ts::EntityStore": "Rack::Cache::EntityStore",
+      "entity-store.ts::Heap": "Rack::Cache::EntityStore::Heap",
+      "entity-store.ts::Noop": "Rack::Cache::EntityStore::Noop",
+      "key.ts::Key": "Rack::Cache::Key",
+      "request.ts::Request": "Rack::Cache::Request"
+    }
+  },
   "rack-cors": {
     "rows": 5,
     "excluded": [],

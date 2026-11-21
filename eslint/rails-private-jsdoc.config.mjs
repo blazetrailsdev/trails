@@ -50,6 +50,7 @@ export default [
       "packages/activejob/lib/**/*.ts",
       "packages/activerecord/{lib,test}/**/*.ts",
       "packages/rack/lib/**/*.ts",
+      "packages/rack-cache/lib/**/*.ts",
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",
       "packages/mysql2/lib/**/*.ts",
