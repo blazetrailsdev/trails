@@ -3,7 +3,7 @@ import { ArgumentError, rational } from "@blazetrails/ruby-compat";
 import { CountryTimezone } from "../../lib/index.js";
 import { CountryDefiner } from "../../lib/format2/country-definer.js";
 import { StringDeduper } from "../../lib/string-deduper.js";
-import { assertRaises } from "../test-utils.js";
+import { assertRaises } from "../support/test-utils.js";
 
 describe("TCCountryDefiner", () => {
   let identifierDeduper: StringDeduper;

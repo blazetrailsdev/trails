@@ -952,6 +952,27 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "tzinfo-data",
+    origin: {
+      type: "git",
+      url: "https://github.com/tzinfo/tzinfo-data.git",
+      // tzdb 2026e, the release @blazetrails/date's TZDATA_VERSION carries.
+      ref: "v1.2026.5",
+    },
+    packages: [
+      {
+        name: "tzinfo-data",
+        libPath: "lib/tzinfo/data",
+        compareApi: false,
+        apiExcludedReason:
+          "data only: scripts/generate-tzinfo-data.ts turns its definitions into @blazetrails/tzinfo/data at build; the gem has no Ruby surface to port.",
+        compareTests: false,
+        testsExcludedReason:
+          "data only: the gem's tests check its tzdb build, which trails does not run.",
+      },
+    ],
+  },
+  {
     name: "solid_queue",
     origin: {
       type: "git",

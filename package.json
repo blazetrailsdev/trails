@@ -4,7 +4,7 @@
   "license": "SEE LICENSE IN LICENSES.md",
   "packageManager": "pnpm@12.3.4",
   "scripts": {
-    "build": "tsc --build && pnpm -C packages/actionpack build:templates && pnpm -C packages/trailties build:templates && pnpm -C packages/solid-cable build:templates && pnpm -C packages/solid-cache build:templates && pnpm -C packages/solid-queue build:templates && pnpm -C packages/actionmailbox build:templates && pnpm -C packages/actiontext build:templates && pnpm -C packages/turbo build:templates && pnpm -C packages/stimulus build:templates && pnpm -C packages/mail build:values",
+    "build": "tsc --build && pnpm -C packages/tzinfo build:data && pnpm -C packages/actionpack build:templates && pnpm -C packages/trailties build:templates && pnpm -C packages/solid-cable build:templates && pnpm -C packages/solid-cache build:templates && pnpm -C packages/solid-queue build:templates && pnpm -C packages/actionmailbox build:templates && pnpm -C packages/actiontext build:templates && pnpm -C packages/turbo build:templates && pnpm -C packages/stimulus build:templates && pnpm -C packages/mail build:values",
     "mail:parsers": "pnpm tsx scripts/mail-parsers/generate.ts",
     "tasks": "scripts/tasks/tasks.sh",
     "format": "prettier --write .",

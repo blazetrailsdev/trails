@@ -470,6 +470,10 @@ const alias = {
   "@blazetrails/mini-magick/": path.resolve(__dirname, "packages/mini-magick/lib") + "/",
   "@blazetrails/image-processing/": path.resolve(__dirname, "packages/image-processing/lib") + "/",
   "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/lib/chronic.ts"),
+  "@blazetrails/tzinfo/data": path.resolve(
+    __dirname,
+    "packages/tzinfo/dist/tzinfo-data/load-path.js",
+  ),
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/lib/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/lib/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/lib/raabro.ts"),

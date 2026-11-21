@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rbHash } from "@blazetrails/ruby-compat";
 import { Timestamp, TimezoneOffset, TimezoneTransition } from "../lib/index.js";
-import { assertEqualWithOffset } from "./test-utils.js";
+import { assertEqualWithOffset } from "./support/test-utils.js";
 
 type Args = [number, number, string];
 

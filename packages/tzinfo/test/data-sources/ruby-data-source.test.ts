@@ -9,7 +9,7 @@ import {
   TZInfo,
   TimezoneInfo,
 } from "../../lib/index.js";
-import { assertRaises, assertSubProcessReturns } from "../test-utils.js";
+import { assertRaises, assertSubProcessReturns } from "../support/test-utils.js";
 import { loadPath } from "../tzinfo-data2/load-path.js";
 
 const { RubyDataSource } = TZInfo.DataSources;

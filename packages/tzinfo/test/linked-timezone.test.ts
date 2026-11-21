@@ -9,7 +9,7 @@ import {
   type TimezonePeriod,
   type TimezoneTransition,
 } from "../lib/index.js";
-import { assertRaises } from "./test-utils.js";
+import { assertRaises } from "./support/test-utils.js";
 
 class TestTimezone extends Timezone {
   readonly periodForResult: TimezonePeriod;

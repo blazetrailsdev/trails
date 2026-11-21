@@ -10,13 +10,18 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./data": {
+      "types": "./dist/tzinfo-data/load-path.d.ts",
+      "default": "./dist/tzinfo-data/load-path.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && pnpm build:data",
+    "build:data": "pnpm -w vendor:fetch --source tzinfo-data && pnpm -w tsx scripts/generate-tzinfo-data.ts vendor/tzinfo-data/v1.2026.5/lib packages/tzinfo/dist/tzinfo-data - js"
   },
   "dependencies": {
     "@blazetrails/date": "workspace:*",

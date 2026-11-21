@@ -16,7 +16,7 @@ import {
   TimeLikeWithOffset,
   assertEqualWithOffset,
   assertRaises,
-} from "./test-utils.js";
+} from "./support/test-utils.js";
 
 const R = (n: number, d: number) => new Rational(n, d);
 

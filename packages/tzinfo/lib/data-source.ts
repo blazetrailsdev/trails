@@ -1,10 +1,12 @@
 import {
   ArgumentError,
   Encoding,
+  LoadError,
   StandardError,
   TopLevel,
   rbAryBsearch,
   rbModName,
+  rbRequireLoaded,
 } from "@blazetrails/ruby-compat";
 import { InvalidCountryCode } from "./country.js";
 import type { CountryInfo } from "./data-sources/country-info.js";
@@ -50,7 +52,6 @@ export class DataSource {
   /** @internal */
   private static createDefaultDataSource(): DataSource {
     const TZInfo = TopLevel.TZInfo! as unknown as {
-      Data?: unknown;
       DataSources: {
         RubyDataSource: new () => DataSource;
         ZoneinfoDataSource: new () => DataSource;
@@ -58,7 +59,13 @@ export class DataSource {
       };
     };
     let hasTzinfoData = false;
-    if (TZInfo.Data != null) hasTzinfoData = true;
+
+    try {
+      rbRequireLoaded("tzinfo/data");
+      hasTzinfoData = true;
+    } catch (e) {
+      if (!(e instanceof LoadError)) throw e;
+    }
 
     if (hasTzinfoData) return new TZInfo.DataSources.RubyDataSource();
 

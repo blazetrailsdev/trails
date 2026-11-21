@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { CountryInfo, CountryTimezone } from "../../lib/index.js";
-import { assertRaises } from "../test-utils.js";
+import { assertRaises } from "../support/test-utils.js";
 
 describe("TCCountryInfo", () => {
   it("initialize nil code", () => {
