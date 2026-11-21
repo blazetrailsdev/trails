@@ -34,10 +34,7 @@ export const errors: EngineErrors = {
   },
 };
 
-/**
- * @internal
- * @inventedArm serialize — PERMANENT
- */
+/** @internal */
 function open(file: string, mode: number): BetterSqlite3.Database {
   const { Open } = SQLite3.Constants;
   if ((mode & Open.SHAREDCACHE) !== 0) {
