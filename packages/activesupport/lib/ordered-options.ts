@@ -77,7 +77,7 @@ export class OrderedOptions {
    * (`ordered_options.rb:32`) inherits: the stored value, else the block's or
    * the default's, else `KeyError`. The default block is not consulted.
    */
-  fetch(key: string, ...rest: unknown[]): unknown {
+  fetch(key: string, ...rest: [] | [unknown]): unknown {
     return fetch(this.data, String(key), ...rest);
   }
 
