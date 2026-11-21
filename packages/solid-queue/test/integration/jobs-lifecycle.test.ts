@@ -17,6 +17,7 @@ import {
   Dispatcher,
   FailedExecution,
   Job,
+  Record,
   ScheduledExecution,
   SolidQueue,
   SolidQueueAdapter,
@@ -28,6 +29,7 @@ import { RaisingJob } from "../support/raising-job.js";
 import { ExpectedTestError } from "../support/expected-test-error.js";
 import { loadAppSchema } from "../support/queue-schema.js";
 import { silentOnThreadErrorFor, waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
+import { waitWhileWithTimeout } from "../support/processes-test-helper.js";
 import "../test-helper.js";
 
 async function deletingFinishedJobs(block: () => Promise<void>) {
@@ -92,16 +94,16 @@ describe("JobsLifecycleTest", { timeout: 15_000 }, () => {
   it("enqueue and run jobs that fail without retries", async () => {
     await RaisingJob.performLater(ExpectedTestError, "A");
     await RaisingJob.performLater(ExpectedTestError, "B");
-    const _jobs = await Job.last(2);
 
     await dispatcher.start();
     await worker.start();
 
-    await waitForJobsToFinishFor(3);
+    await waitWhileWithTimeout(3, async () => (await FailedExecution.count()) < 2);
 
     const message = "raised ExpectedTestError for the 1st time";
     expect(JobBuffer.values.sort()).toEqual([`A: ${message}`, `B: ${message}`]);
 
+    expect(await FailedExecution.count()).toBe(2);
     expect(await Job.finished().toArray()).toBeEmpty();
   });
 
@@ -146,6 +148,39 @@ describe("JobsLifecycleTest", { timeout: 15_000 }, () => {
 
     expect(await Job.finished().count()).toBe(4);
     expect(await FailedExecution.count()).toBe(1);
+  });
+
+  it("bulk retries reset the automatic retry attempts of failed jobs", async () => {
+    await RaisingJob.performLater(RaisingJob.DefaultError, "A", 5);
+    await RaisingJob.performLater(RaisingJob.DefaultError, "B", 5);
+
+    await dispatcher.start();
+    await worker.start();
+
+    await waitForJobsToFinishFor(3);
+
+    expect(await Job.finished().count()).toBe(4);
+    expect(await FailedExecution.count()).toBe(2);
+    const failedJobs = await Job.failed().toArray();
+    const finishedJobs = await Job.finished().toArray();
+
+    await Record.transaction(async () => {
+      await FailedExecution.retryAll(Job.all());
+
+      for (const job of failedJobs) {
+        expect((await job.reload()).arguments["executions"]).toBe(0);
+        expect(job.arguments["exception_executions"]).toEqual({});
+      }
+      for (const job of finishedJobs) {
+        const args = job.arguments;
+        expect((await job.reload()).arguments).toEqual(args);
+      }
+    });
+
+    await waitForJobsToFinishFor(3);
+
+    expect(await Job.finished().count()).toBe(8);
+    expect(await FailedExecution.count()).toBe(2);
   });
 
   it("enqueue and run jobs that fail and it's discarded", async () => {

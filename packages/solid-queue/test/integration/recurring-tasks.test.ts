@@ -13,8 +13,9 @@ import {
   runSupervisor,
   sleep,
   waitForRegisteredProcesses,
+  waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
-import { waitForJobsToBeEnqueued, waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
+import { waitForJobsToBeEnqueued } from "../support/jobs-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import "../test-helper.js";
@@ -69,10 +70,11 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
   });
 
   it("enqueue and process periodic tasks", async () => {
-    await waitForJobsToBeEnqueued(2, { timeout: 2.5 });
-    await waitForJobsToFinishFor(2.5);
-
-    await run.terminate();
+    await waitForJobsToBeEnqueued(2, { timeout: 5 });
+    await waitWhileWithTimeout(
+      5,
+      async () => (await JobResult.where({ status: "custom_status", value: "42" }).count()) < 2,
+    );
 
     await Record.uncached(async () => {
       expect((await Job.count()) >= 2).toBeTruthy();
@@ -80,13 +82,12 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
         expect((await job.recurringExecution)!.task_key).toBe("periodic_store_result");
         expect(job.class_name).toBe("StoreResultJob");
       }
-
-      expect((await JobResult.count()) >= 2).toBeTruthy();
-      for (const result of await JobResult.all().toArray()) {
-        expect(result.status).toBe("custom_status");
-        expect(result.value).toBe("42");
-      }
     });
+
+    const results = await Record.uncached(() =>
+      JobResult.where({ status: "custom_status", value: "42" }).toArray(),
+    );
+    expect(results.length).toBeGreaterThanOrEqual(2);
   });
 
   it("persist and delete configured tasks", async () => {

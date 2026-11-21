@@ -141,7 +141,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
       workers: [{ queues: "background" }, { queues: "default", threads: 5 }],
     });
 
-    await waitForRegisteredProcesses(3, { timeout: 20 });
+    await waitForRegisteredProcesses(3, { timeout: 3 });
     await assertRegisteredWorkersFor("background", "default", { supervisorPid: pid });
   });
 
@@ -371,7 +371,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     await assertCompletedJobResults("pause", "background");
     await assertCompletedJobResults("pause", "default");
 
-    await waitForRegisteredProcesses(3, { timeout: 10 });
+    await waitForRegisteredProcesses(3, { timeout: 3 });
     await assertRegisteredWorkersFor("background", "default", { supervisorPid: pid });
 
     await enqueueStoreResultJob("no_pause");
@@ -402,7 +402,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     await sleep(0.5);
     expect(await Process.isExists({ id: worker.id })).toBeTruthy();
 
-    await waitForRegisteredProcesses(4, { timeout: 10 });
+    await waitForRegisteredProcesses(4, { timeout: 5 });
 
     await assertStartedJobResult("killed_pause");
     await assertJobStatus(killedPause, "failed");

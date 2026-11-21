@@ -351,9 +351,9 @@ describe("SolidQueue::RecurringTaskTest", () => {
 
     expect(await recurringTaskWith({ class_name: "UnknownJob" }).isValid()).toBeFalsy();
 
-    expect(
-      await recurringTaskWith({ key: "task-id", schedule: "every minute" }).isValid(),
-    ).toBeFalsy();
+    const task = RecurringTask.fromConfiguration("task-id", { schedule: "every minute" });
+    expect(await task.isValid()).toBeFalsy();
+    expect(task.errors.get("base")).toContain("either command or class must be present");
   });
 
   it("task with custom queue and priority", async () => {

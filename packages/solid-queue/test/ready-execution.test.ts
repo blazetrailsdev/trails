@@ -17,6 +17,7 @@ import {
 import { ApplicationJob } from "./support/application-job.js";
 import { JobResult } from "./support/job-result.js";
 import { loadAppSchema } from "./support/queue-schema.js";
+import { NonOverlappingUpdateResultJob } from "./support/non-overlapping-update-result-job.js";
 import { ThrottledUpdateResultJob } from "./support/throttled-update-result-job.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 import { Pause } from "../lib/pause.js";
@@ -291,6 +292,55 @@ describe("SolidQueue::ReadyExecutionTest", () => {
     ]);
   });
 
+  it("queues matched by more than one entry in the list are selected once", async () => {
+    await (
+      AddToBufferJob.set({ queue: "queue_b1" }) as unknown as typeof AddToBufferJob
+    ).performLater(1);
+
+    expect(await ReadyExecution.aggregatedCountAcross(["queue_*", "queue_b*"])).toBe(1);
+    expect(await ReadyExecution.aggregatedCountAcross(["queue_b*", "queue_b1"])).toBe(1);
+  });
+
+  it("distinct_values_of returns all distinct queue names", async () => {
+    await AddToBufferJob.performLater("hey");
+
+    const names = await ReadyExecution.distinctValuesOf("queue_name");
+    expect(names).toContain("backend");
+    expect(names).toContain("background");
+    expect(names.length).toBe(2);
+  });
+
+  it("distinct_values_of honors a chained where", async () => {
+    await AddToBufferJob.performLater("hey");
+
+    let names = await (
+      ReadyExecution.where("queue_name LIKE ?", "back%") as unknown as typeof ReadyExecution
+    ).distinctValuesOf("queue_name");
+    expect(names).toContain("backend");
+    expect(names).toContain("background");
+    expect(names.length).toBe(2);
+
+    names = await (
+      ReadyExecution.where("queue_name LIKE ?", "backe%") as unknown as typeof ReadyExecution
+    ).distinctValuesOf("queue_name");
+    expect(names).toEqual(["backend"]);
+  });
+
+  it("distinct_values_of returns empty array for no matches", async () => {
+    const names = await (
+      ReadyExecution.where("queue_name LIKE ?", "nonexistent%") as unknown as typeof ReadyExecution
+    ).distinctValuesOf("queue_name");
+    expect(names).toEqual([]);
+  });
+
+  it("distinct_values_of returns empty array on empty table", async () => {
+    await ReadyExecution.deleteAll();
+    await Job.deleteAll();
+
+    const names = await ReadyExecution.distinctValuesOf("queue_name");
+    expect(names).toEqual([]);
+  });
+
   it("discard all", async () => {
     for (let i = 0; i < 3; i++) await AddToBufferJob.performLater(i);
 
@@ -347,5 +397,33 @@ describe("SolidQueue::ReadyExecutionTest", () => {
     expect((await Semaphore.findByBang({ key: throttledJobs[0].concurrency_key })).value).toEqual(
       0,
     );
+  });
+
+  it("discard in batches leaves newly unblocked jobs ready", async () => {
+    const blockedJobs: Job[] = [];
+    for (let i = 0; i < 2; i++) {
+      const result = await JobResult.createBang({});
+      await NonOverlappingUpdateResultJob.performLater(result, { name: "ready" });
+      await NonOverlappingUpdateResultJob.performLater(result, { name: "blocked" });
+      blockedJobs.push((await Job.last()) as Job);
+    }
+
+    await assertDifference(
+      () => Job.count(),
+      -2,
+      null,
+      () =>
+        (
+          ReadyExecution.queuedAs("default") as unknown as typeof ReadyExecution
+        ).discardAllInBatches({ batchSize: 1 }),
+    );
+
+    expect(await Job.where({ queue_name: "default" }).order("id").pluck("id")).toEqual(
+      blockedJobs.map((job) => job.id),
+    );
+    const ready = await Promise.all(blockedJobs.map(async (job) => (await job.reload()).isReady()));
+    expect(ready.every(Boolean)).toBeTruthy();
+    expect(await BlockedExecution.count()).toEqual(0);
+    expect(await Semaphore.order("id").pluck("value")).toEqual([0, 0]);
   });
 });

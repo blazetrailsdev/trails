@@ -263,7 +263,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     expect(await File.isExistAsync(pidfile)).toBeFalsy();
 
     const pid = run();
-    await waitForRegisteredProcesses(4, { timeout: 10 });
+    await waitForRegisteredProcesses(4);
 
     expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).toEqual(pid);
@@ -278,7 +278,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await File.writeAsync(pidfile, RbProcess.pid.toString());
 
     const [pid, , err] = await runWithCapturedIo();
-    await waitForRegisteredProcesses(4, { timeout: 10 });
+    await waitForRegisteredProcesses(4);
 
     expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).not.toEqual(pid);
@@ -289,7 +289,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
 
   it("delete previous pidfile if the owner is dead", async () => {
     let pid = run();
-    await waitForRegisteredProcesses(4, { timeout: 10 });
+    await waitForRegisteredProcesses(4);
 
     await terminateProcess(pid, { signal: "KILL" });
 
@@ -299,7 +299,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await waitForRegisteredProcesses(0);
 
     pid = run();
-    await waitForRegisteredProcesses(4, { timeout: 10 });
+    await waitForRegisteredProcesses(4);
 
     expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).toEqual(pid);
@@ -398,7 +398,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await process.delete();
 
     const pid = run({ workers: [{ queues: "background", pollingInterval: 10, processes: 2 }] });
-    await waitForRegisteredProcesses(3, { timeout: 10 });
+    await waitForRegisteredProcesses(3);
     await assertRegisteredSupervisor(pid);
 
     await terminateProcess(pid);
@@ -427,7 +427,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await process.delete();
 
     const pid = run({ workers: [{ queues: "background", pollingInterval: 10, processes: 2 }] });
-    await waitForRegisteredProcesses(3, { timeout: 10 });
+    await waitForRegisteredProcesses(3);
     await assertRegisteredSupervisor(pid);
 
     await terminateProcess(pid);
@@ -450,7 +450,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     expect(await Process.count()).toEqual(2);
 
     const pid = run({ loadConfigurationFrom: { workers: [{ queues: "background" }] } });
-    await waitForRegisteredProcesses(4, { timeout: 10 });
+    await waitForRegisteredProcesses(4);
 
     await terminateProcess(pid);
 

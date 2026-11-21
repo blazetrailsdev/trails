@@ -40,6 +40,7 @@ import {
 } from "../support/processes-test-helper.js";
 import { loadAppSchema } from "../support/queue-schema.js";
 import { RaisingJob } from "../support/raising-job.js";
+import { ProcessPrunedError } from "../../lib/processes/process-pruned-error.js";
 import { NonOverlappingUpdateResultJob } from "../support/non-overlapping-update-result-job.js";
 import "../test-helper.js";
 
@@ -292,6 +293,9 @@ describe("InstrumentationTest", () => {
       job_ids: jobs.map((job) => job.id),
       size: 3,
     });
+
+    const error = (events[0].at(-1) as { error: unknown }).error;
+    expect(error).toBeInstanceOf(ProcessPrunedError);
   });
 
   it("errors when deregistering processes are included in deregister_process events", async () => {

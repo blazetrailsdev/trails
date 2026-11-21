@@ -125,6 +125,9 @@ describe("SolidQueue::FailedExecutionTest", () => {
 
       expect(await FailedExecution.count()).toBe(1);
       expect(await ((await Job.last()) as Job).isFailed()).toBeTruthy();
+      expect(((await FailedExecution.last()) as FailedExecution).message()).toBe(
+        "Maximum call stack size exceeded",
+      );
     } finally {
       SolidQueue.onThreadError = currentProc;
     }

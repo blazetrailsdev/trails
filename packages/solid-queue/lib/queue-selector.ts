@@ -49,7 +49,7 @@ export class QueueSelector {
   private async eligibleQueues(): Promise<string[]> {
     if (this.isIncludeAllQueues()) return await this.allQueues();
     else {
-      return this.inRawOrder([...this.exactNames(), ...(await this.prefixedNames())]);
+      return this.inRawOrder([...new Set([...this.exactNames(), ...(await this.prefixedNames())])]);
     }
   }
 

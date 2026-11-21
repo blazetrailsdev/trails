@@ -1,71 +1,8 @@
 [
   {
     "package": "solid-queue",
-    "rubyFile": "integration/instrumentation_test.rb",
-    "path": "InstrumentationTest > pruning a process with claimed executions emits fail_many_claimed event",
-    "kind": "changed",
-    "from": "v1.1.3",
-    "to": "v1.7.2",
-    "story": "solid-queue-v1-7-2-remaining-drift"
-  },
-  {
-    "package": "solid-queue",
-    "rubyFile": "models/solid_queue/recurring_task_test.rb",
-    "path": "SolidQueue::RecurringTaskTest > valid and invalid job class and command",
-    "kind": "changed",
-    "from": "v1.1.3",
-    "to": "v1.7.2",
-    "story": "solid-queue-v1-7-2-remaining-drift"
-  },
-  {
-    "package": "solid-queue",
-    "rubyFile": "unit/worker_test.rb",
-    "path": "WorkerTest > errors on claimed executions are reported via Rails error subscriber regardless of on_thread_error setting",
-    "kind": "changed",
-    "from": "v1.1.3",
-    "to": "v1.7.2",
-    "story": "solid-queue-v1-7-2-remaining-drift"
-  },
-  {
-    "package": "solid-queue",
-    "rubyFile": "unit/worker_test.rb",
-    "path": "WorkerTest > sleeps `10.minutes` if at capacity",
-    "kind": "changed",
-    "from": "v1.1.3",
-    "to": "v1.7.2",
-    "story": "solid-queue-v1-7-2-remaining-drift"
-  },
-  {
-    "package": "solid-queue",
-    "rubyFile": "unit/worker_test.rb",
-    "path": "WorkerTest > sleeps `polling_interval` if worker not at capacity",
-    "kind": "changed",
-    "from": "v1.1.3",
-    "to": "v1.7.2",
-    "story": "solid-queue-v1-7-2-remaining-drift"
-  },
-  {
-    "package": "solid-queue",
-    "rubyFile": "integration/jobs_lifecycle_test.rb",
-    "path": "JobsLifecycleTest > enqueue and run jobs that fail without retries",
-    "kind": "changed",
-    "from": "v1.1.3",
-    "to": "v1.7.2",
-    "story": "solid-queue-v1-7-2-remaining-drift"
-  },
-  {
-    "package": "solid-queue",
     "rubyFile": "models/solid_queue/failed_execution_test.rb",
     "path": "SolidQueue::FailedExecutionTest > run job that fails with a SystemStackError (stack level too deep)",
-    "kind": "changed",
-    "from": "v1.1.3",
-    "to": "v1.7.2",
-    "story": "solid-queue-v1-7-2-remaining-drift"
-  },
-  {
-    "package": "solid-queue",
-    "rubyFile": "integration/recurring_tasks_test.rb",
-    "path": "RecurringTasksTest > enqueue and process periodic tasks",
     "kind": "changed",
     "from": "v1.1.3",
     "to": "v1.7.2",

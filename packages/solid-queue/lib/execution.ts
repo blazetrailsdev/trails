@@ -1,6 +1,6 @@
 import { type Base, type Relation } from "@blazetrails/activerecord";
 import { include } from "@blazetrails/activesupport";
-import { constSet, StandardError } from "@blazetrails/ruby-compat";
+import { constSet, Range, StandardError } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import { SolidQueue } from "./solid-queue.js";
 import {
@@ -48,7 +48,8 @@ export class Execution extends Record {
   static async discardAllInBatches({
     batchSize = 500,
   }: { batchSize?: number } = {}): Promise<void> {
-    let pending = await this.count();
+    const lastId = ((await this.maximum("id")) as number | null) ?? 0;
+    let pending = await this.where({ id: new Range(null, lastId) }).count();
     let discarded = 0;
 
     await SolidQueue.instrument(
@@ -57,7 +58,11 @@ export class Execution extends Record {
       async (payload) => {
         while (true) {
           await this.transaction(async () => {
-            const jobIds = await this.limit(batchSize).order("job_id").lock().pluck("job_id");
+            const jobIds = await this.where({ id: new Range(null, lastId) })
+              .limit(batchSize)
+              .order("job_id")
+              .lock()
+              .pluck("job_id");
             discarded = await this.discardJobs(jobIds);
 
             await this.where({ job_id: jobIds }).deleteAll();
