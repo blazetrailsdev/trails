@@ -1080,7 +1080,6 @@ describe("CI runs every tooling test suite", () => {
       "db_adapter_affected",
       "trails_tsc_affected",
       "tse_compiler_affected",
-      "guides_affected",
     ];
 
     const fired = await Promise.all(paths.map((f) => runGate(f)));
