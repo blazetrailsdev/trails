@@ -88,6 +88,19 @@ const LAZY_DIRS: Record<string, string[]> = {
   trailties: ["commands/", "command.ts", "generators/"],
 };
 
+/** A package subpath export whose module, imported alone, must answer its classes' paths, so it carries its own table. */
+const SUBPATH_EXPORT_TABLES: Record<string, string[]> = {
+  trailties: [
+    "autoloaders.ts",
+    "autoloaders/inflector.ts",
+    "engine.ts",
+    "health-controller.ts",
+    "trailtie.ts",
+    "trailtie/configuration.ts",
+    "zeitwerk-checker.ts",
+  ],
+};
+
 /**
  * Of several Ruby classes one file pairs with the same TS class, the one the
  * file's namespace seat (`Owner.Name = Name`) names.
@@ -285,8 +298,8 @@ async function placement(dir: string) {
     const separated = !reachable.has(file) && separateGraph.has(file);
     const lazy =
       lazyOk &&
-      !reachable.has(file) &&
-      (LAZY_DIRS[dir] ?? []).some((prefix) => file.startsWith(prefix));
+      (((LAZY_DIRS[dir] ?? []).some((prefix) => file.startsWith(prefix)) && !reachable.has(file)) ||
+        (SUBPATH_EXPORT_TABLES[dir] ?? []).includes(file));
     const ownTable =
       excluded.includes(rel) ||
       separated ||
@@ -764,8 +777,8 @@ async function lazyTablesOnDisk(dir: string): Promise<string[]> {
 
 /** A lazy file is outside the entry graph, so only its own import loads its table. */
 async function lazyFilesMissingTable(dir: string, entries: ClassPathEntry[]): Promise<string[]> {
-  const prefixes = LAZY_DIRS[dir];
-  if (prefixes === undefined) return [];
+  const prefixes = [...(LAZY_DIRS[dir] ?? []), ...(SUBPATH_EXPORT_TABLES[dir] ?? [])];
+  if (prefixes.length === 0) return [];
   const missing = new Set<string>();
   for (const { file, table } of entries) {
     if (!table || !prefixes.some((prefix) => file.startsWith(prefix))) continue;

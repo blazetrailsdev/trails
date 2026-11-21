@@ -1,3 +1,4 @@
+import "../constants.inflector.generated.js";
 import { camelize } from "@blazetrails/activesupport";
 
 const _overrides: Record<string, string> = {};

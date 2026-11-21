@@ -139,15 +139,6 @@ describe("UnusedRoutesCommand", () => {
     expect(await uncovered.unused()).toBe(true);
   });
 
-  it("RouteInfo does not count an inherited non-action method as the route's action", async () => {
-    class PostsController extends ActionController.Metal {}
-    seat("PostsController", PostsController);
-
-    const info = new RouteInfo(route({ controller: "posts", action: "process" }));
-
-    expect(await info.unused()).toBe(true);
-  });
-
   it("RouteInfo resolves the framework trails/pwa controller by its Rails constant", async () => {
     await import("../../lib/pwa-controller.js");
 

@@ -1,3 +1,4 @@
+import "./constants.autoloaders.generated.js";
 import { Loader } from "@blazetrails/zeitwerk";
 import { include } from "@blazetrails/activesupport";
 import { Enumerable, type Included } from "@blazetrails/ruby-compat";

@@ -6,8 +6,14 @@ import {
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { camelize, dasherize, safeConstantize, underscore } from "@blazetrails/activesupport";
-import { getPath } from "@blazetrails/ruby-compat";
+import {
+  camelize,
+  dasherize,
+  safeConstantize,
+  tryCall,
+  underscore,
+} from "@blazetrails/activesupport";
+import { getPath, publicInstanceMethods, toA } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
@@ -18,10 +24,7 @@ interface ViewPathRoot {
   path: string;
 }
 
-interface ControllerClass {
-  actionMethods(): ReadonlySet<string>;
-  viewPaths?: () => Iterable<unknown>;
-}
+type ControllerClass = abstract new (...args: never[]) => unknown;
 
 export class RouteInfo {
   /** @internal */
@@ -40,7 +43,7 @@ export class RouteInfo {
     ) as ControllerClass | undefined;
   }
 
-  async unused(): Promise<boolean> {
+  async unused(): Promise<unknown> {
     return (
       this.controllerClassMissing() || (this.actionMissing() && (await this.templateMissing()))
     );
@@ -66,20 +69,25 @@ export class RouteInfo {
   }
 
   /** @internal */
-  private async templateMissing(): Promise<boolean> {
-    if (this.controllerClass == null) return false;
-    const paths = this.controllerClass.viewPaths?.() ?? [];
-    for (const path of paths) {
-      const found = await glob(`${await this.viewPath(path as ViewPathRoot)}.*`, { cwd: "/" });
-      if (found.length > 0) return false;
-    }
-    return true;
+  private async templateMissing(): Promise<unknown> {
+    return (
+      this.controllerClass &&
+      (
+        await Promise.all(
+          toA((tryCall(this.controllerClass, "viewPaths") ?? []) as Iterable<unknown>).map(
+            async (path) => glob(`${await this.viewPath(path as ViewPathRoot)}.*`, { cwd: "/" }),
+          ),
+        )
+      ).flat().length === 0
+    );
   }
 
   /** @internal */
-  private actionMissing(): boolean {
-    if (this.controllerClass == null) return false;
-    return !this.controllerClass.actionMethods().has(String(this.actionName));
+  private actionMissing(): unknown {
+    return (
+      this.controllerClass &&
+      !publicInstanceMethods(this.controllerClass).includes(String(this.actionName))
+    );
   }
 }
 

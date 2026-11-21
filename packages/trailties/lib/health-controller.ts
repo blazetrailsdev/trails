@@ -1,3 +1,4 @@
+import "./constants.health-controller.generated.js";
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
 import { ActionController } from "@blazetrails/actionpack";
 

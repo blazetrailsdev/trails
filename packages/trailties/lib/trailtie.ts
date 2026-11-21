@@ -1,3 +1,4 @@
+import "./constants.trailtie.generated.js";
 import { moduleParents, underscore } from "@blazetrails/activesupport";
 import { DSL } from "@blazetrails/rake";
 import {

@@ -1,3 +1,4 @@
+import "./constants.engine.generated.js";
 import {
   Callbacks as ASCallbacks,
   include,
