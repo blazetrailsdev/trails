@@ -1261,9 +1261,6 @@ class TestExtractor
     true
   end
 
-  # A bare cell as a ternary's condition: Ruby truthiness over a bound
-  # `nil` / `false` cell or any other resolved cell, `true` included (tzinfo tc_zoneinfo_data_source.rb:900,
-  # tc_zoneinfo_reader.rb:1382).
   def eval_loop_cell_truthiness(node, bindings)
     name = ident_name(node[1])
     return nil unless bindings.key?(name)
