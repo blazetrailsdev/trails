@@ -1070,6 +1070,12 @@ function emitRoutesAugmentation(helperNames: readonly string[]): string {
     "  }",
     "}",
     "",
+    'declare module "@blazetrails/actionpack/system-testing" {',
+    "  interface SystemTestCase {",
+    ...body("    "),
+    "  }",
+    "}",
+    "",
   ].join("\n");
 }
 

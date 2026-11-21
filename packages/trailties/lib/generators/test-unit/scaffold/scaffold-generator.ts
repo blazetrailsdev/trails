@@ -25,7 +25,8 @@ export class ScaffoldGenerator extends Base {
   declare controllerFileName: string;
   /** @internal */
   declare _controllerClassPath: string[];
-  declare options: GeneratorOptions & ModelHelpersOptions & { api?: boolean; modelName?: string };
+  declare options: GeneratorOptions &
+    ModelHelpersOptions & { api?: boolean; modelName?: string; systemTests?: string | null };
   /** @internal */
 
   /**
@@ -89,6 +90,17 @@ export class ScaffoldGenerator extends Base {
       ),
       await this.insideTemplate(async () => TEMPLATES[templateFile].call(this)),
     );
+
+    if (!this.options.api && this.options.systemTests) {
+      await this.createFile(
+        File.join(
+          "test/system",
+          ...this.classPath(),
+          `${dasherize(pluralize(this.fileName))}.test${this.ext()}`,
+        ),
+        await this.insideTemplate(async () => TEMPLATES["system_test"].call(this)),
+      );
+    }
   }
 
   fixtureName(): string {

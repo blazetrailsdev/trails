@@ -276,10 +276,13 @@ export abstract class AppBase extends Base {
         this as unknown as { getBuilderClass(): new (generator: never) => object }
       ).getBuilderClass();
       include(builderClass, Trails.ActionMethods);
-      this._builder =
-        builderClass.prototype instanceof Trails.ActionMethods
-          ? new builderClass(this as never)
-          : (Reflect.construct(Trails.ActionMethods, [this], builderClass) as object);
+      const builder = new builderClass(this as never) as { generator?: unknown; options?: unknown };
+      /** @inventedArm if — PERMANENT */
+      if (!(builderClass.prototype instanceof Trails.ActionMethods)) {
+        builder.generator = this;
+        builder.options = this.options;
+      }
+      this._builder = builder;
     }
     return this._builder;
   }

@@ -382,6 +382,29 @@ describe("AppGenerator (trails-only)", () => {
     expect(File.isExist(File.join(tmpDir, "my-app", ".github", "workflows", "ci.yml"))).toBe(false);
   });
 
+  it("runs a standalone top-level AppBuilder's own constructor and class fields", async () => {
+    const seen: unknown[] = [];
+    TopLevel.AppBuilder = class {
+      marker = "field";
+      constructor(generator: unknown) {
+        seen.push(generator instanceof AppGenerator);
+      }
+      async cifiles(this: { marker: string }): Promise<void> {
+        seen.push(this.marker);
+      }
+    };
+    try {
+      await new AppGenerator(
+        ["my-app"],
+        { skipInstall: true, database: "sqlite" },
+        { destinationRoot: tmpDir },
+      ).invokeAll();
+    } finally {
+      delete TopLevel.AppBuilder;
+    }
+    expect(seen).toEqual([true, "field"]);
+  });
+
   it("includes ActionMethods into a top-level AppBuilder that does not subclass trails' AppBuilder", async () => {
     let kept: unknown = null;
     TopLevel.AppBuilder = class {
