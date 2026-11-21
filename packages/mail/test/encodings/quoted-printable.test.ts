@@ -44,7 +44,7 @@ describe("Mail::Encodings::QuotedPrintable", () => {
     expect(QuotedPrintable.decode("test =0D =F0=9F=8D=BF=\n")).toEqualRuby(result);
   });
 
-  for (const [, linebreak] of [
+  for (const [_crlf, linebreak] of [
     ["\r", "=0D"],
     ["\n", "=0A"],
     ["\r\n", "=0D=0A"],

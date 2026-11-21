@@ -2777,18 +2777,21 @@ class TestExtractor
 
   def extract_first_string(args)
     return nil unless args.is_a?(Array)
-    unescape_name_quotes(traverse_for_string(args))
+    unescape_name_quotes(traverse_for_string(args), double_quoted_literal?(args))
   end
 
   def extract_string_from_arg_paren(args)
     return nil unless args.is_a?(Array)
-    unescape_name_quotes(traverse_for_string(args))
+    unescape_name_quotes(traverse_for_string(args), double_quoted_literal?(args))
   end
 
-  def unescape_name_quotes(name)
-    return name unless name&.match?(/\\['"]/)
-    unescaped = name.gsub(/\\(['"])/, '\\1')
-    @interpolated_names[unescaped] = @interpolated_names.delete(name).gsub(/\\(['"])/, '\\1') if @interpolated_names&.key?(name)
+  # A single-quoted literal escapes only `\'` (and `\\`): its `\"` is two
+  # characters, as Ruby reads `'Mikel \"quotes\" Lindsaar'`.
+  def unescape_name_quotes(name, double_quoted = true)
+    quote = double_quoted ? /\\(['"])/ : /\\(')/
+    return name unless name&.match?(quote)
+    unescaped = name.gsub(quote, '\\1')
+    @interpolated_names[unescaped] = @interpolated_names.delete(name).gsub(quote, '\\1') if @interpolated_names&.key?(name)
     unescaped
   end
 

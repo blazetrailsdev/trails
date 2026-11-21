@@ -175,13 +175,12 @@ describe("mail encoding", () => {
       );
     });
 
-    const setters = {
-      To: "setTo",
-      From: "setFrom",
-      Cc: "setCc",
-      "Reply-To": "setReplyTo",
-    } as const;
-    for (const [field, setter] of Object.entries(setters)) {
+    for (const [field, setter] of [
+      ["To", "setTo"],
+      ["From", "setFrom"],
+      ["Cc", "setCc"],
+      ["Reply-To", "setReplyTo"],
+    ] as const) {
       // BLOCKED: mail-address-encoding-reads-tagged-bytes
       it.skip(`allows multiple unencoded strings in ${field}`, () => {
         const array = [
