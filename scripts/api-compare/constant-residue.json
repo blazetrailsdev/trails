@@ -1083,7 +1083,9 @@
       "text-encoder/integer.ts::Integer",
       "type-map-all-strings.ts::TypeMapAllStrings",
       "type-map-by-class.ts::TypeMapByClass",
-      "type-map-by-oid.ts::TypeMapByOid"
+      "type-map-by-oid.ts::TypeMapByOid",
+      "type-map.ts::DefaultTypeMappable",
+      "type-map.ts::TypeMap"
     ],
     "unwalked": [],
     "residue": {

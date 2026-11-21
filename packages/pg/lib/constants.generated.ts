@@ -5,6 +5,7 @@ import * as m2 from "./exceptions.js";
 import * as m3 from "./result.js";
 import * as m4 from "./text-decoder/date.js";
 import * as m5 from "./text-decoder/timestamp.js";
+import * as m6 from "./type-map.js";
 
 defineConstants([
   [m0, "Coder", "PG::Coder"],
@@ -16,4 +17,6 @@ defineConstants([
   [m5, "TimestampLocal", "PG::TextDecoder::TimestampLocal"],
   [m5, "TimestampUtc", "PG::TextDecoder::TimestampUtc"],
   [m5, "TimestampUtcToLocal", "PG::TextDecoder::TimestampUtcToLocal"],
+  [m6, "TypeMap", "TypeMap"],
+  [m6, "DefaultTypeMappable", "TypeMap::DefaultTypeMappable"],
 ]);
