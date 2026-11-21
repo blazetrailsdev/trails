@@ -1,3 +1,4 @@
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import {
   File,
   FileUtils,
@@ -333,6 +334,38 @@ describe("Trails::Command::CredentialsTest", { timeout: 120_000 }, () => {
     await t.assertFile("config/credentials/test.yml.enc");
   });
 
+  it("edit command can add master key when require_master_key is true", async () => {
+    await t.removeFile("config/credentials.yml.enc");
+    await t.removeFile("config/master.key");
+    await t.addToConfig("this.config.requireMasterKey = true;");
+
+    await assertNothingRaised(() => t.runEditCommand());
+    await t.assertFile("config/master.key");
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Templates are precompiled (`Template#compile`'s `module_eval`)" — an app's `lib/templates/**/*.tt` is never compiled to the `.tt.js` the generator loads.
+  it.skip("edit command can use custom template to generate credentials file", async () => {
+    await t.appFile(
+      "lib/templates/trails/credentials/credentials.yml.tt",
+      "provides_secret_key_base: <%= [secret_key_base] == [secret_key_base].compact %>\n",
+    );
+    await t.removeFile("config/credentials.yml.enc");
+
+    expect(await t.runEditCommand()).toMatch(/provides_secret_key_base: true/);
+  });
+
+  it("edit command preserves user's content even if it contains invalid YAML", async () => {
+    const writeInvalidYaml = await t.appFile(
+      "tmp/write-invalid-yaml",
+      `printf %s 'foo: bar: bad' > "$1"\n`,
+    );
+
+    expect(await t.runEditCommand({ visual: `sh ${writeInvalidYaml}` })).toMatch(
+      /WARNING: Invalid YAML/,
+    );
+    expect(await t.runEditCommand()).toMatch(/foo: bar: bad/);
+  });
+
   it("edit command does not raise when an initializer tries to access non-existent credentials", async () => {
     await t.appFile(
       "config/initializers/raise-when-loaded.ts",
@@ -438,6 +471,37 @@ describe("Trails::Command::CredentialsTest", { timeout: 120_000 }, () => {
     await t.addToConfig(`this.config.credentials.keyPath = ${JSON.stringify(keyPath)};`);
 
     await t.assertCredentialsPaths("config/credentials.yml.enc", keyPath);
+
+    await t.assertCredentialsPaths("config/credentials/production.yml.enc", keyPath, {
+      environment: "production",
+    });
+  });
+  it("respects config.credentials.content_path when set in config/environments/*.rb", async () => {
+    const contentPath = "my_secrets/credentials.yml.enc";
+    await t.addToEnvConfig(
+      "production",
+      `this.config.credentials.contentPath = ${JSON.stringify(contentPath)};`,
+    );
+
+    await t.withTrailsEnv("production", () =>
+      t.assertCredentialsPaths(contentPath, "config/master.key"),
+    );
+
+    await t.assertCredentialsPaths(contentPath, "config/credentials/production.key", {
+      environment: "production",
+    });
+  });
+
+  it("respects config.credentials.key_path when set in config/environments/*.rb", async () => {
+    const keyPath = "my_secrets/master.key";
+    await t.addToEnvConfig(
+      "production",
+      `this.config.credentials.keyPath = ${JSON.stringify(keyPath)};`,
+    );
+
+    await t.withTrailsEnv("production", () =>
+      t.assertCredentialsPaths("config/credentials.yml.enc", keyPath),
+    );
 
     await t.assertCredentialsPaths("config/credentials/production.yml.enc", keyPath, {
       environment: "production",

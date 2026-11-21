@@ -56,6 +56,22 @@ describe("Trails::CredentialsTest", { timeout: 120_000 }, () => {
     expect(await mystery()).toBe("revealed");
   });
 
+  it("reads credentials from customized path and key", async () => {
+    await t.writeCredentialsOverride("staging");
+    await t.addToEnvConfig(
+      "production",
+      `this.config.credentials.contentPath = \`\${this.config.root}/config/credentials/staging.yml.enc\`;`,
+    );
+    await t.addToEnvConfig(
+      "production",
+      `this.config.credentials.keyPath = \`\${this.config.root}/config/credentials/staging.key\`;`,
+    );
+
+    await t.app("production");
+
+    expect(await mystery()).toBe("revealed");
+  });
+
   it("reads credentials using environment variable key", async () => {
     await t.writeCredentialsOverride("production", { withKey: false });
 

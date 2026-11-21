@@ -1,3 +1,4 @@
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { File, FileUtils, Dir, setEnv, env, getFs, include } from "@blazetrails/ruby-compat";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
@@ -187,6 +188,14 @@ describe("Trails::Command::EncryptedTest", { timeout: 120_000 }, () => {
     await t.runEditCommand();
 
     expect(await t.readFile("config/master.key")).toBe(masterKey);
+  });
+
+  it("edit command can add master key when require_master_key is true", async () => {
+    await t.removeFile("config/master.key");
+    await t.addToConfig("this.config.requireMasterKey = true;");
+
+    await assertNothingRaised(() => t.runEditCommand());
+    await t.assertFile("config/master.key");
   });
 
   it("edit command does not add master key when `RAILS_MASTER_KEY` env specified", async () => {

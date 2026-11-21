@@ -23,6 +23,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
       autoloaders,
       config: { root, isReloadingEnabled: () => false },
       paths: () => new Root(root),
+      credentials: async () => null,
     };
     const initializer = klass._ownInitializers().find((i) => i.name === name)!;
     await initializer.bind(host).run();
