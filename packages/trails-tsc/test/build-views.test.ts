@@ -1137,3 +1137,55 @@ describe("runCli", { timeout: 30_000 }, () => {
     );
   });
 });
+
+describe("buildViews render typing", { timeout: 30_000 }, () => {
+  it("checks a template's render({ partial, locals }) against the partial's strict locals", async () => {
+    const cwd = fs.mkdtempSync(path.join(__dirname, ".scratch-render-"));
+    try {
+      write(
+        cwd,
+        "app/views/posts/_post.html.tse",
+        "<%# locals: (post:) %><%! types: { post: { title: string } } !%><li><%= post.title %></li>",
+      );
+      write(
+        cwd,
+        "app/views/posts/index.html.tse",
+        '<%= render({ partial: "posts/post", locals: { item: 1 } }) %><%= render("posts/post", { item: 1 }) %>',
+      );
+      write(
+        cwd,
+        "app/views/posts/show.html.tse",
+        '<%= render({ partial: "posts/post", locals: { post: { title: "x" } } }) %><%= render("posts/post", { post: { title: "x" } }) %><%= await render() %>',
+      );
+      await buildViews({ cwd });
+      const roots = [
+        path.join(cwd, ".trails/template-registry-augmentation.d.ts"),
+        path.join(cwd, ".trails/views/posts/index.html.tse.ts"),
+        path.join(cwd, ".trails/views/posts/_post.html.tse.ts"),
+        path.join(cwd, ".trails/views/posts/show.html.tse.ts"),
+      ];
+      const program = ts.createProgram(roots, {
+        strict: true,
+        noEmit: true,
+        skipLibCheck: true,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        paths: { "@blazetrails/*": [path.join(__dirname, "../../*/lib/index.ts")] },
+      });
+      const messages = ts
+        .getPreEmitDiagnostics(program)
+        .filter((d) => d.file?.fileName.startsWith(cwd))
+        .map(
+          (d) =>
+            `${path.basename(d.file?.fileName ?? "")}: ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`,
+        );
+      expect(messages).toEqual([
+        expect.stringMatching(/^index\.html\.tse\.ts: .*'item'/su),
+        expect.stringMatching(/^index\.html\.tse\.ts: .*'item'/su),
+      ]);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});
