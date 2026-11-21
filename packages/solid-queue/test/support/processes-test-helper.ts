@@ -1,13 +1,97 @@
 import { expect, vi } from "vitest";
 import { isPresent, TopLevel } from "@blazetrails/activesupport";
-import { SystemExit, Timeout, getProcessAdapter } from "@blazetrails/ruby-compat";
+import {
+  Errno,
+  IO,
+  Process as RbProcess,
+  SystemExit,
+  Thread,
+  Timeout,
+  getProcessAdapter,
+  rbFFork,
+  signo2signm,
+} from "@blazetrails/ruby-compat";
 import { Process } from "../../lib/process.js";
+import { SolidQueue } from "../../lib/solid-queue.js";
 import { Record as SolidQueueRecord } from "../../lib/record.js";
 import { Supervisor } from "../../lib/supervisor.js";
 
 export const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
 const dummyRoot = `${import.meta.dirname}/dummy`;
+
+type Status = InstanceType<typeof RbProcess.Status>;
+
+function forkSupervisor(
+  options: { [key: string]: unknown },
+  capturedIo: boolean,
+  pipes: IO[],
+  configuration: object | null = null,
+) {
+  return rbFFork(
+    `${import.meta.dirname}/supervisor-fork-entry.js`,
+    {
+      boot: `${dummyRoot}/config/environment.ts`,
+      root: dummyRoot,
+      supervisorPidfile: SolidQueue.supervisorPidfile,
+      forkBootTimeout: SolidQueue.forkBootTimeout.toF(),
+      configuration,
+      options: { skipRecurring: true, ...options },
+      capturedIo,
+    },
+    pipes as Parameters<typeof rbFFork>[2],
+  );
+}
+
+export function forkStalledSupervisor(configuration: object): number {
+  return forkSupervisor({}, false, [], configuration);
+}
+
+export function runSupervisorAsFork(options: { [key: string]: unknown } = {}): number {
+  return forkSupervisor(options, false, []);
+}
+
+export async function runSupervisorAsForkWithCapturedIo(
+  options: { [key: string]: unknown } = {},
+): Promise<[number, string, string]> {
+  const [outReader, outWriter] = IO.pipe();
+  const [errReader, errWriter] = IO.pipe();
+  const pid = forkSupervisor(options, true, [outWriter, errWriter]);
+  outWriter.close();
+  errWriter.close();
+  await waitForRegisteredProcesses(4, { timeout: 10 });
+  const [out, err] = [outReader, errReader].map((reader) => {
+    const bytes = reader.readNonblock(1 << 20, null, { exception: false });
+    return bytes instanceof Uint8Array ? new TextDecoder().decode(bytes) : "";
+  });
+
+  return [pid, out, err];
+}
+
+export function reapProcesses(): void {
+  try {
+    RbProcess.waitpid2(-1, RbProcess.WNOHANG);
+  } catch (error) {
+    if (!(error instanceof Errno.ECHILD)) throw error;
+  }
+}
+
+export function isProcessExists(pid: number): boolean {
+  reapProcesses();
+  try {
+    RbProcess.kill(0, pid);
+    return true;
+  } catch (error) {
+    if (error instanceof Errno.ESRCH) return false;
+    throw error;
+  }
+}
+
+async function waitpid2(pid: number): Promise<[number, Status]> {
+  let waited: [number, Status] | null;
+  while ((waited = RbProcess.waitpid2(-1, RbProcess.WNOHANG))?.[0] !== pid) await sleep(0.01);
+  return waited!;
+}
 
 export function runSupervisor(options: { [key: string]: unknown } = {}, block?: () => void) {
   vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
@@ -46,11 +130,28 @@ export function runSupervisor(options: { [key: string]: unknown } = {}, block?: 
   };
 }
 
+type Signal = "TERM" | "INT" | "QUIT" | "KILL";
+export function signalProcess(
+  pid: number,
+  signal: Signal,
+  options?: { wait?: number | null },
+): Thread;
 export function signalProcess(
   pid: ReturnType<typeof runSupervisor>,
-  signal: "TERM" | "INT" | "QUIT" | "KILL",
+  signal: Signal,
+  options?: { wait?: number | null },
+): Promise<void>;
+export function signalProcess(
+  pid: number | ReturnType<typeof runSupervisor>,
+  signal: Signal,
   { wait = null }: { wait?: number | null } = {},
-) {
+): Thread | Promise<void> {
+  if (typeof pid === "number") {
+    return new Thread(async () => {
+      if (wait != null) await sleep(wait);
+      RbProcess.kill(signal, pid);
+    });
+  }
   return (async () => {
     if (wait != null) await sleep(wait);
     const supervisor = pid.supervisor;
@@ -127,20 +228,48 @@ export function findProcessesRegisteredAs(kind: string) {
 }
 
 export async function terminateProcess(
-  pid: ReturnType<typeof runSupervisor>,
-  { timeout = 10, signal = "TERM" }: { timeout?: number; signal?: "TERM" | "INT" | "QUIT" } = {},
+  pid: number | ReturnType<typeof runSupervisor>,
+  {
+    timeout = 10,
+    signal = "TERM",
+  }: { timeout?: number; signal?: "TERM" | "INT" | "QUIT" | "KILL" } = {},
 ) {
-  await signalProcess(pid, signal);
-  await waitForProcessTerminationWithTimeout(pid, { timeout });
+  if (typeof pid === "number") signalProcess(pid, signal);
+  else await signalProcess(pid, signal);
+  await waitForProcessTerminationWithTimeout(pid, { timeout, signaled: signal });
 }
 
 export async function waitForProcessTerminationWithTimeout(
-  run: ReturnType<typeof runSupervisor>,
-  { timeout = 10, exitstatus = 0 }: { timeout?: number; exitstatus?: number | null } = {},
+  run: number | ReturnType<typeof runSupervisor>,
+  {
+    timeout = 10,
+    exitstatus = 0,
+    signaled = null,
+  }: { timeout?: number; exitstatus?: number | null; signaled?: string | null } = {},
 ) {
   try {
     await Timeout.timeout(timeout, null, null, async () => {
-      if (run.isExists) {
+      if (typeof run === "number") {
+        if (isProcessExists(run)) {
+          try {
+            const status = (await waitpid2(run))[1];
+            if (status.exitstatus() != null && exitstatus != null) {
+              expect(
+                status.exitstatus(),
+                `Expected pid ${run} to exit with status ${exitstatus}`,
+              ).toEqual(exitstatus);
+            }
+            if (status.termsig() != null) {
+              expect(
+                signo2signm(status.termsig()!),
+                `Expected pid ${run} to be terminated with signal ${signaled}`,
+              ).toEqual(signaled);
+            }
+          } catch (error) {
+            if (!(error instanceof Errno.ECHILD)) throw error;
+          }
+        }
+      } else if (run.isExists) {
         const error = await run.terminate().then(
           () => null,
           (e: unknown) => e,
@@ -155,7 +284,10 @@ export async function waitForProcessTerminationWithTimeout(
       }
     });
   } catch (error) {
-    if (error instanceof Timeout.Error) await signalProcess(run, "KILL");
+    if (error instanceof Timeout.Error) {
+      if (typeof run === "number") signalProcess(run, "KILL");
+      else await signalProcess(run, "KILL");
+    }
     throw error;
   }
 }

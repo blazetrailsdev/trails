@@ -34,6 +34,7 @@ for (const job of [
   "../../non-overlapping-update-result-job.js",
   "../../provider-job-id-job.js",
   "../../raising-job.js",
+  "../../stalled-worker.js",
   "../../throttled-update-result-job.js",
   "../../update-result-job.js",
 ]) {

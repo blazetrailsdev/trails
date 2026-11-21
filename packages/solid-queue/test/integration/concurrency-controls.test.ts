@@ -13,6 +13,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import {
   BlockedExecution,
+  ClaimedExecution,
   FailedExecution,
   Job,
   Record,
@@ -150,31 +151,30 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   it("run several jobs over the same record limiting concurrency", async () => {
-    let incr = 0;
     await assertNoDifference(
       async () => await BlockedExecution.count(),
       null,
       async () => {
-        for (const name of new Range("A", "C").toA()) {
-          await ThrottledUpdateResultJob.performLater(result, { name, pause: 0.5 + incr });
-          incr += 0.5;
-        }
+        await ThrottledUpdateResultJob.performLater(result, { name: "A", pause: 1.5 });
+        await ThrottledUpdateResultJob.performLater(result, { name: "B", pause: 1.5 });
+        await ThrottledUpdateResultJob.performLater(result, { name: "C", pause: 4 });
       },
     );
 
-    await sleep(0.01);
+    await waitFor({ timeout: 2 }, async () => (await ClaimedExecution.count()) >= 3);
+
     await assertDifference(
       async () => await BlockedExecution.count(),
       +5,
       null,
       async () => {
         for (const name of new Range("D", "H").toA()) {
-          await ThrottledUpdateResultJob.performLater(result, { name, pause: 0.05 });
+          await ThrottledUpdateResultJob.performLater(result, { name, pause: 0.01 });
         }
       },
     );
 
-    await waitForJobsToFinishFor(5);
+    await waitForJobsToFinishFor(15);
     await assertNoUnfinishedJobs();
 
     await assertStoredSequence(result, ["C"]);
