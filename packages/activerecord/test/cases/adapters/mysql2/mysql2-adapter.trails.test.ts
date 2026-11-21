@@ -1,3 +1,4 @@
+import { Mysql2 } from "@blazetrails/mysql2";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
@@ -107,7 +108,15 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       "ENETUNREACH",
       "EPIPE",
     ]) {
-      const driverErr = Object.assign(new Error("connection lost"), { code });
+      let driverErr: unknown;
+      try {
+        Mysql2.Client.prototype.raiseMysql2Error.call(
+          { serverInfo: () => ({ id: 0, version: null }), readTimeout: null } as never,
+          Object.assign(new Error("connection lost"), { code }),
+        );
+      } catch (e) {
+        driverErr = e;
+      }
       const translated = await adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(ConnectionFailed);
     }

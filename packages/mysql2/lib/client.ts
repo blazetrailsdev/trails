@@ -616,17 +616,16 @@ export class Client {
     return { id: major * 10000 + minor * 100 + patch, version };
   }
 
-  /**
-   * @internal
-   * @inventedArm if — PERMANENT
-   */
+  /** @internal */
   raiseMysql2Error(e: unknown): never {
     if (!(e instanceof globalThis.Error)) throw e;
     const { code, errno, sqlState } = e as { code?: unknown; errno?: unknown; sqlState?: string };
     if (code === "PROTOCOL_SEQUENCE_TIMEOUT" && this.readTimeout != null) {
-      throw new Mysql2Error.TimeoutError(
+      const error = new Mysql2Error.TimeoutError(
         `Timeout waiting for a response from the last query. (waited ${this.readTimeout} seconds)`,
       );
+      error.cause = e;
+      throw error;
     }
     let errorNumber: number | undefined;
     if (typeof errno === "number" && errno > 0) {
