@@ -1261,12 +1261,30 @@ class TestExtractor
     true
   end
 
+  # A bare cell as a ternary's condition: Ruby truthiness over a bound
+  # `nil` / `false` cell or any other resolved cell, `true` included (tzinfo tc_zoneinfo_data_source.rb:900,
+  # tc_zoneinfo_reader.rb:1382).
+  def eval_loop_cell_truthiness(node, bindings)
+    name = ident_name(node[1])
+    return nil unless bindings.key?(name)
+    bound = bindings[name]
+    return false if LOOP_FALSY.value?(bound)
+    return true if bound.is_a?(String)
+    nil
+  end
+
   LOOP_KIND_OF_CLASSES = { "Array" => Array, "Hash" => Hash, "String" => String, "Symbol" => LoopSymbolName }.freeze
 
   def eval_loop_condition(node, bindings)
     return eval_loop_kind_of(node, bindings) if node.is_a?(Array) && node[0] == :method_add_arg
+    return eval_loop_cell_truthiness(node, bindings) if @define_method_loop && node.is_a?(Array) && %i[var_ref vcall].include?(node[0])
     return nil unless node.is_a?(Array) && node[0] == :binary
     _, left, op, right = node
+    if @define_method_loop && op == :== && left.is_a?(Array) && %i[var_ref vcall].include?(left[0]) &&
+       right.is_a?(Array) && right[0] == :@int
+      bound = bindings[ident_name(left[1])]
+      return bound.is_a?(String) && bound.match?(/\A-?\d+\z/) ? Integer(bound) == Integer(right[1]) : nil
+    end
     return nil unless left.is_a?(Array) && left[0] == :call && %w[length size].include?(ident_name(left[3]))
     receiver = left[1]
     return nil unless receiver.is_a?(Array) && %i[var_ref vcall].include?(receiver[0])
@@ -1478,6 +1496,7 @@ class TestExtractor
     if node[0] == :var_ref && node[1].is_a?(Array) && node[1][0] == :@kw && LOOP_FALSY.key?(node[1][1])
       return LOOP_FALSY[node[1][1]]
     end
+    return "true" if @define_method_loop && node[0] == :var_ref && node[1].is_a?(Array) && node[1][0] == :@kw && node[1][1] == "true"
     case node[0]
     when :var_ref, :const_ref, :const_path_ref, :top_const_ref, :@const
       path = const_path(node)
@@ -2994,16 +3013,10 @@ UNEXPANDED_LOOP_REASONS = {
       "the name interpolates a local the loop body assigns (`tz_string = abbrev_and_offset + dst_suffix`)",
     "data_sources/tc_posix_time_zone_parser.rb:119" =>
       "the name interpolates `append_time_to_rule(...)`, a helper the loop body calls",
-    "data_sources/tc_zoneinfo_data_source.rb:900" =>
-      "the name's ternary reads a nil element through `encoding.downcase.gsub`",
-    "data_sources/tc_zoneinfo_reader.rb:1376" =>
-      "the name's ternary reads a boolean cell (`isdst ? 'dst' : 'std'`)",
     "tc_transition_rule.rb:375" =>
       "an `each_with_index` over a bound row cell nests a Range loop (`(1..4).each`)",
     "tc_transition_rule.rb:475" =>
       "an `each_with_index` loop over a bound row cell (`days`) generates the names",
-    "tc_transition_rule.rb:510" =>
-      "the name's ternary compares a cell (`expected_day == 29`)",
   },
 }.freeze
 

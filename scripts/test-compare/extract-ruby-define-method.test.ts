@@ -515,6 +515,35 @@ describe("Ruby extractor class_eval heredoc loop expansion", () => {
     expect(cases).toEqual([]);
     expect(unexpandedLoops).toHaveLength(1);
   });
+
+  it("expands tzinfo's ternaries over nil, boolean and == cells", () => {
+    const { cases, unexpandedLoops } = extract(`
+  ['UTF-8', nil].each do |encoding|
+    define_method("test_enc_#{encoding ? encoding.downcase.gsub('-', '_') : 'nil'}") do
+      assert_equal 1, 1
+    end
+  end
+  [[false, 'A'], [true, 'B']].each do |(isdst, abbreviation)|
+    define_method "test_#{isdst ? 'dst' : 'std'}_#{abbreviation}" do
+      assert_equal 1, 1
+    end
+  end
+  [[2020, 29], [2021, 28]].each do |(year, expected_day)|
+    define_method "test_#{expected_day == 29 ? '' : 'non_'}leap_year_#{year}" do
+      assert_equal 1, 1
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual([
+      "enc utf 8",
+      "enc nil",
+      "std A",
+      "dst B",
+      "leap year 2020",
+      "non leap year 2021",
+    ]);
+    expect(unexpandedLoops).toEqual([]);
+  });
 });
 
 describe("Ruby extractor package test files", () => {
