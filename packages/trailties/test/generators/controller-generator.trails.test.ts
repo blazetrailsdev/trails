@@ -38,4 +38,10 @@ describe("ControllerGeneratorKebabViewsTest", () => {
       expect(routes).toMatch(/this\.get\("posts\/recentPosts"\)/);
     });
   });
+
+  it("reports a test framework hook that does not resolve", async () => {
+    const output = await t.runGenerator(["Account", "--test-framework=nope"]);
+    expect(output).toMatch(/^ +error {2}nope \[not found\]$/m);
+    t.assertNoFile("test/controllers/account-controller.test.ts");
+  });
 });
