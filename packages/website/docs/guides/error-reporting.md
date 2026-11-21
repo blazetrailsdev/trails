@@ -139,7 +139,8 @@ second time.
 should survive. Normally it reports the error and answers `null`. When the
 reporter's `debugMode` is on it raises an `ErrorReporter.UnexpectedError`
 instead, so the problem is found before it ships. Rails turns `debugMode` on
-in development and test at boot; trails does not yet, so set
+in development and test at boot; trails does not yet
+([story](https://github.com/blazetrailsdev/tasks/blob/main/rfcs/0142-trailties-surfaced-deviations/stories/bootstrap-initialize-error-reporter.md)), so set
 `Trails.error.debugMode = true` yourself in those environments:
 
 ```ts
