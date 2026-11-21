@@ -782,7 +782,7 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason: "not called by activerecord",
-    names: ["parse_ssl_mode", "find_default_ca_path", "query_info", "info"],
+    names: ["query_info", "info"],
     rubyFiles: ["client.rb"],
     packages: ["mysql2"],
   },

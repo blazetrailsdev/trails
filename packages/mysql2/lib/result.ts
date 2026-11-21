@@ -19,6 +19,10 @@ export class Result {
     this.rows = rows;
   }
 
+  count(): number {
+    return this.rows.length;
+  }
+
   get size(): number {
     return this.rows.length;
   }
