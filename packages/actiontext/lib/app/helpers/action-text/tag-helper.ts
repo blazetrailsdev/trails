@@ -6,7 +6,10 @@ import {
   tryCall,
   type SafeBuffer,
 } from "@blazetrails/activesupport";
-import { FormBuilder, FormHelper } from "@blazetrails/actionview/helpers/form-helper.js";
+import {
+  FormBuilder as ActionViewFormBuilder,
+  FormHelper as ActionViewFormHelper,
+} from "@blazetrails/actionview/helpers/form-helper.js";
 import { Base } from "@blazetrails/actionview/helpers/tags/base.js";
 import { Placeholderable } from "@blazetrails/actionview/helpers/tags/placeholderable.js";
 import { Translator } from "@blazetrails/actionview/helpers/tags/translator.js";
@@ -159,45 +162,44 @@ type FormBuilderHost = {
   objectifyOptions(options: Options): Options;
 };
 
-const FormHelperRichTextarea = {
-  richTextarea(
-    this: unknown,
-    objectName: unknown,
-    method: unknown,
-    options: Options = {},
-  ): Promise<unknown> {
-    return new (Tags as unknown as { ActionText: typeof ActionText }).ActionText(
-      objectName,
-      method,
-      this,
-      options,
-    ).render();
-  },
-};
-const formHelperMembers: Record<string, unknown> = {
-  ...FormHelperRichTextarea,
-  richTextArea: FormHelperRichTextarea.richTextarea,
-};
-for (const ref of FormHelper._includers) {
+function richTextarea(
+  this: unknown,
+  objectName: unknown,
+  method: unknown,
+  options: Options = {},
+): Promise<unknown> {
+  return new (Tags as unknown as { ActionText: typeof ActionText }).ActionText(
+    objectName,
+    method,
+    this,
+    options,
+  ).render();
+}
+
+export const FormHelper = { richTextarea, richTextArea: richTextarea };
+const formHelperMembers: Record<string, unknown> = { ...FormHelper };
+for (const ref of ActionViewFormHelper._includers) {
   const proto = ref.deref() as Record<string, unknown> | undefined;
   if (!proto) {
-    FormHelper._includers.delete(ref);
+    ActionViewFormHelper._includers.delete(ref);
     continue;
   }
   for (const [name, method] of Object.entries(formHelperMembers)) {
-    const previous = Object.getOwnPropertyDescriptor(FormHelper.prototype, name)?.value;
+    const previous = Object.getOwnPropertyDescriptor(ActionViewFormHelper.prototype, name)?.value;
     if (!Object.hasOwn(proto, name) || proto[name] === previous) proto[name] = method;
   }
 }
-Object.assign(FormHelper.prototype, formHelperMembers);
+Object.assign(ActionViewFormHelper.prototype, formHelperMembers);
 rbClearMethodCache();
 
-const FormBuilderRichTextarea = {
-  richTextarea(this: FormBuilderHost, method: unknown, options: Options = {}): Promise<unknown> {
-    return this._template.richTextarea(this.objectName, method, this.objectifyOptions(options));
-  },
-};
-Object.assign(FormBuilder.prototype, FormBuilderRichTextarea, {
-  richTextArea: FormBuilderRichTextarea.richTextarea,
-});
+function builderRichTextarea(
+  this: FormBuilderHost,
+  method: unknown,
+  options: Options = {},
+): Promise<unknown> {
+  return this._template.richTextarea(this.objectName, method, this.objectifyOptions(options));
+}
+
+export const FormBuilder = { richTextarea: builderRichTextarea, richTextArea: builderRichTextarea };
+Object.assign(ActionViewFormBuilder.prototype, FormBuilder);
 rbClearMethodCache();
