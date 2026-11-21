@@ -218,6 +218,10 @@ have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
 - not called by activerecord
+  - `parse_ssl_mode`, `find_default_ca_path`, `query_info`, `info` (only in: `client.rb`)
+- not called by activerecord
+  - `server_flags` (only in: `result.rb`)
+- not called by activerecord
   - `version_string`, `make_shareable`, `warn`, `require_bigdecimal_without_warning` (only in: `../pg.rb`, `pg.rb`)
 - not called by activerecord
   - `quote_connstr`, `connect_hash_to_string`, `parse_connect_args`, `copy_data`, `transaction`, `conndefaults`, `conninfo_hash`, `ssl_attributes`, `check_socket`, `get_result`, `get_copy_data`, `setnonblocking`, `isnonblocking`, `put_copy_data`, `put_copy_end`, `encrypt_password`, `new`, `ping`, `async_send_api=`, `async_api=`, `async_get_result`, `async_get_copy_data`, `async_setnonblocking`, `async_isnonblocking`, `nonblocking?`, `async_put_copy_data`, `async_put_copy_end`, `async_encrypt_password`, `async_reset`, `async_cancel`, `isthreadsafe`, `async_connect`, `connect`, `open`, `setdb`, `setdblogin`, `async_ping` (only in: `connection.rb`)
