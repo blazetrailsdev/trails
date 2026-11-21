@@ -19,7 +19,7 @@ describe("TemplateRenderer raises", () => {
 
   it("raises ArgumentError for an absolute layout path", async () => {
     const lc = new LookupContext();
-    vi.spyOn(lc, "findTemplate").mockReturnValueOnce(fakeTemplate("content") as never);
+    vi.spyOn(lc, "findTemplate").mockReturnValueOnce(fakeTemplate("content"));
     const renderer = new TemplateRenderer(lc);
     const e = await (async () =>
       renderer.render(ctx, { template: "posts/show", layout: "/layouts/application" }))().catch(
@@ -31,7 +31,7 @@ describe("TemplateRenderer raises", () => {
 
   it("re-raises MissingTemplate when the layout does not exist in any format", async () => {
     const lc = new LookupContext();
-    vi.spyOn(lc, "findTemplate").mockReturnValueOnce(fakeTemplate("content") as never);
+    vi.spyOn(lc, "findTemplate").mockReturnValueOnce(fakeTemplate("content"));
     const renderer = new TemplateRenderer(lc);
     const e = await (async () =>
       renderer.render(ctx, { template: "posts/show", layout: "layouts/missing" }))().catch(
@@ -78,9 +78,9 @@ describe("TemplateRenderer _layout_for blocks", () => {
       render: vi.fn((_v, _l, _b, _o, block) => `[${String(block!())}]`),
     };
     const lc = new LookupContext();
-    vi.spyOn(lc, "findTemplate").mockReturnValue(template as never);
+    vi.spyOn(lc, "findTemplate").mockReturnValue(template);
     const renderer = new TemplateRenderer(lc);
-    vi.spyOn(renderer as never, "findLayout").mockReturnValue(layout as never);
+    vi.spyOn(renderer as never, "findLayout").mockReturnValue(layout);
 
     const result = await renderer.render(view, { template: "t", layout: "l" });
     expect(result.body).toBe("[<>]");

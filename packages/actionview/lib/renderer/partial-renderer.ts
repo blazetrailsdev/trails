@@ -48,7 +48,7 @@ export class PartialRenderer extends AbstractRenderer {
     super(lookupContext);
     this.options = options;
     this.locals = options.locals ?? {};
-    this.details = this.extractDetails(options as Record<string, unknown>);
+    this.details = this.extractDetails(options);
   }
 
   render(
@@ -119,7 +119,7 @@ export class PartialRenderer extends AbstractRenderer {
       prefixes,
       true,
       locals,
-      this.details as Record<string, never>,
+      this.details,
     ) as RenderableTemplate;
   }
 }

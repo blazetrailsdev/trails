@@ -9,7 +9,7 @@ export class Renderable {
   }
 
   get identifier(): string {
-    return this.renderable == null ? "NilClass" : (this.renderable as object).constructor.name;
+    return this.renderable == null ? "NilClass" : this.renderable.constructor.name;
   }
 
   render(

@@ -7,10 +7,7 @@ import { IntegrationTest, Session } from "../../../lib/action-dispatch/testing/i
 import { Base } from "../../../lib/action-controller/base.js";
 import { DebugExceptions } from "../../../lib/action-dispatch/middleware/debug-exceptions.js";
 import { ShowExceptions } from "../../../lib/action-dispatch/middleware/show-exceptions.js";
-import type {
-  MiddlewareFactory,
-  MiddlewareStack,
-} from "../../../lib/action-dispatch/middleware/stack.js";
+import type { MiddlewareStack } from "../../../lib/action-dispatch/middleware/stack.js";
 import { CookieStore } from "../../../lib/action-dispatch/middleware/session/cookie-store.js";
 import { include } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
@@ -42,9 +39,9 @@ class IntegrationTestWithSession extends IntegrationTest {
 }
 
 function useCookieStore(middleware: MiddlewareStack): void {
-  middleware.use(CookieStore as MiddlewareFactory, { key: "_session" });
-  middleware.delete(ShowExceptions as MiddlewareFactory);
-  middleware.delete(DebugExceptions as MiddlewareFactory);
+  middleware.use(CookieStore, { key: "_session" });
+  middleware.delete(ShowExceptions);
+  middleware.delete(DebugExceptions);
 }
 
 class PostsController extends Base {

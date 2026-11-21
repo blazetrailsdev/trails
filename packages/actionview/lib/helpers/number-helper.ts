@@ -82,11 +82,7 @@ export function delegateNumberHelperMethod(
 ): unknown {
   if (number == null) return null;
   const { raise: raiseOnInvalid, ...rest } = escapeUnsafeOptions({ ...options });
-  return wrapWithOutputSafetyHandling(
-    number,
-    !!raiseOnInvalid,
-    method(asArg(number), rest as Record<string, unknown>),
-  );
+  return wrapWithOutputSafetyHandling(number, !!raiseOnInvalid, method(asArg(number), rest));
 }
 
 /**

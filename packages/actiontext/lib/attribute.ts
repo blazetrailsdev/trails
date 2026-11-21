@@ -45,7 +45,7 @@ function hasRichText(
     const richText = (await this[associationName]) as RichText | null;
     await richText?.toPlainText();
     return isPresent(richText);
-  } as never);
+  });
 
   let writer: (this: RichTextHost, body: unknown) => Promise<void>;
   if (storeIfBlank) {
@@ -65,7 +65,7 @@ function hasRichText(
       }
     };
   }
-  mixin.defineMethod(`set${camelize(name)}`, writer as never);
+  mixin.defineMethod(`set${camelize(name)}`, writer);
 
   mixin.moduleEval((m) => {
     Object.defineProperty(m, name, {

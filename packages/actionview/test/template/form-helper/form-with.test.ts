@@ -436,7 +436,7 @@ describe("FormWithActsLikeFormForTest", () => {
 
       return (Object.getPrototypeOf(this) as Base).urlFor.call(this, object);
     } as typeof view.urlFor;
-    include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
+    include(view.constructor, Routes.urlHelpers());
 
     I18n.backend().storeTranslations("submit", {
       helpers: {
@@ -481,7 +481,7 @@ describe("FormWithActsLikeFormForTest", () => {
   }
 
   function tag(): { span(content: unknown, options: Record<string, unknown>): unknown } {
-    return view.tag() as unknown as ReturnType<typeof tag>;
+    return view.tag();
   }
 
   function post(): Post {

@@ -72,7 +72,7 @@ describe("FormOptionsHelperTest", () => {
     vi.spyOn(TimeZone, "all").mockImplementation(
       () => Object.values(fakeZones) as unknown as TimeZone[],
     );
-    fakeTimezones = TimeZone.all() as unknown as FakeZone[];
+    fakeTimezones = TimeZone.all();
   });
 
   afterEach(() => {

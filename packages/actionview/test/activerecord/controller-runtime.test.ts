@@ -83,7 +83,7 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
     }
 
     setLogger(logger: MockLogger | null): void {
-      ActionController.Base.logger = logger as unknown as typeof ActionController.Base.logger;
+      ActionController.Base.logger = logger;
     }
   }
 

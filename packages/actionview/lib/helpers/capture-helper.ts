@@ -72,7 +72,7 @@ export function contentFor(
   }
   if ((content != null && content !== false) || block) {
     if (block) {
-      if (content != null && content !== false) options = content as { flush?: boolean };
+      if (content != null && content !== false) options = content;
       content = capture.call(this, block);
       if (content instanceof Promise) {
         return content.then((content) => contentFor.call(this, name, content, options));

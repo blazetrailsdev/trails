@@ -49,7 +49,7 @@ function makeHost(overrides: Partial<UrlForHost> = {}): UrlForHost {
       return urlOptions.call(this);
     },
     ...rest,
-  } as UrlForHost;
+  };
   return host;
 }
 

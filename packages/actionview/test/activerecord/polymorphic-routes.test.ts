@@ -339,7 +339,7 @@ for (const [name, klass] of [
         const proxy = new ActionDispatch.Routing.RoutesProxy(
           testCase._routes,
           testCase,
-          testCase._routes.urlHelpers() as unknown as Record<string, unknown>,
+          testCase._routes.urlHelpers(),
         );
         await testCase.blogPost.save();
         testCase.assertUrl(`http://example.com/posts/${testCase.blogPost.id}`, [

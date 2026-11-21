@@ -62,18 +62,18 @@ class View extends UrlForSuper {}
 include(View, RoutingUrlFor);
 
 beforeEach(() => {
-  TopLevel.ActionController = { Parameters } as never;
+  TopLevel.ActionController = { Parameters };
   TopLevel.ActionDispatch = {
     Routing: {
       PolymorphicRoutes: { HelperMethodBuilder: { path: () => builder, url: () => builder } },
     },
   } as never;
   host = Object.assign(Object.create(View.prototype) as RoutingUrlFor, {
-    controller: null as unknown,
+    controller: null,
     seen: [] as unknown[],
     _backUrl,
     _filteredReferrer: () => "http://www.example.com",
-  }) as Host;
+  });
 });
 
 class Workshop {

@@ -16,9 +16,7 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
       this.get("/other", { to: "foo#other" });
     });
     class ApplicationController extends ActionController.Base {}
-    AbstractController.Trailties.RoutesHelpers.with(routes as never)(
-      ApplicationController as never,
-    );
+    AbstractController.Trailties.RoutesHelpers.with(routes)(ApplicationController);
     class FooController extends ApplicationController {
       async other(): Promise<void> {
         await this.render({ plain: "" });

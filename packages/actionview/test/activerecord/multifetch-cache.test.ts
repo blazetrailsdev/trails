@@ -81,7 +81,7 @@ describe("MultifetchCacheTest", () => {
   let tc: MultifetchCacheTest & Body;
 
   beforeEach(async ({ task }) => {
-    tc = new MultifetchCacheTest(task.name) as MultifetchCacheTest & Body;
+    tc = new MultifetchCacheTest(task.name);
     await tc.beforeSetup();
     tc.setup();
     await Topic.updateAll({ updated_at: new Date() });

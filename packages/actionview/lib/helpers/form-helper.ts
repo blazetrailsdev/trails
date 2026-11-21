@@ -259,11 +259,7 @@ export function fields(
   block?: (builder: FormBuilder) => unknown,
 ): SafeBuffer | null {
   if (isPlainObject(scope))
-    [scope, options, block] = [
-      null,
-      scope as Record<string, unknown>,
-      (typeof options === "function" ? options : block) as never,
-    ];
+    [scope, options, block] = [null, scope, typeof options === "function" ? options : block];
   if (typeof options === "function") [options, block] = [{}, options];
   let model: unknown = options["model"] ?? null;
   options = Object.assign(
@@ -833,11 +829,7 @@ export class FormBuilder {
     block?: (builder: FormBuilder) => unknown,
   ): unknown {
     if (isPlainObject(scope))
-      [scope, options, block] = [
-        null,
-        scope as Record<string, unknown>,
-        (typeof options === "function" ? options : block) as never,
-      ];
+      [scope, options, block] = [null, scope, typeof options === "function" ? options : block];
     if (typeof options === "function") [options, block] = [{}, options];
     const { model = null, ...rest }: { model?: unknown; [key: string]: unknown } = options;
     options = rest;
@@ -1045,7 +1037,7 @@ export class FormBuilder {
         contents.push(content);
       }
       const concatAll = (settled: unknown[]) => {
-        for (const content of settled) if (content != null) output.concat(content as SafeBuffer);
+        for (const content of settled) if (content != null) output.concat(content);
         return output;
       };
       if (contents.some((content) => content instanceof Promise)) {

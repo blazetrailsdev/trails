@@ -20,7 +20,7 @@ describe("ActionView::LogSubscriber", () => {
   let logger: MockLogger;
   const t = {
     setLogger(logger: MockLogger | null): void {
-      Base.logger = logger as unknown;
+      Base.logger = logger;
     },
   } as unknown as ThisParameterType<typeof testHelperSetup> & { logger: MockLogger };
 

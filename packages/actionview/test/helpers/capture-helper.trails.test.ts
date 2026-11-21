@@ -133,7 +133,7 @@ describe("capture's callers await an async block", () => {
     const view = makeView();
     (view as unknown as { post: object }).post = { category: null };
     const html = String(
-      await select.call(view as never, "post", "category", null, {}, {}, async () => {
+      await select.call(view, "post", "category", null, {}, {}, async () => {
         view.outputBuffer!.safeAppend(await view.render({ plain: '<option value="a">a</option>' }));
       }),
     );
@@ -147,7 +147,7 @@ describe("capture's callers await an async block", () => {
     (view as unknown as { post: object }).post = { tagIds: [] };
     const html = String(
       await collectionCheckboxes.call(
-        view as never,
+        view,
         "post",
         "tagIds",
         [{ id: 1, name: "one" }],

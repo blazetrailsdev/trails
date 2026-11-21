@@ -25,7 +25,7 @@ class FormCollectionsHelperTest extends TestCase {
 describe("FormCollectionsHelperTest", () => {
   let tc: Tc;
   beforeEach(async ({ task }) => {
-    tc = new FormCollectionsHelperTest(task.name) as unknown as Tc;
+    tc = new FormCollectionsHelperTest(task.name);
     await tc.beforeSetup();
     tc.setup();
   });

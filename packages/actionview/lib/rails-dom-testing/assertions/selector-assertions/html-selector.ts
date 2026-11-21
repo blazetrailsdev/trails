@@ -115,7 +115,7 @@ export class HTMLSelector {
     let comparisons: EqualityTests = {};
     const comparator = this.values.shift();
     if (comparator != null && Object.getPrototypeOf(comparator) === Object.prototype) {
-      comparisons = comparator as EqualityTests;
+      comparisons = comparator;
     } else if (typeof comparator === "string" || comparator instanceof RegExp) {
       comparisons.text = comparator;
     } else if (typeof comparator === "number" && Number.isInteger(comparator)) {

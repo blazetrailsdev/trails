@@ -272,9 +272,9 @@ describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
   });
 
   it("raises when a controller carries a config that cannot be copied", () => {
-    expect(
-      () => new (Base.withEmptyTemplateCache())(null, {}, { config: () => ({}) } as never),
-    ).toThrow(TypeError);
+    expect(() => new (Base.withEmptyTemplateCache())(null, {}, { config: () => ({}) })).toThrow(
+      TypeError,
+    );
   });
 });
 

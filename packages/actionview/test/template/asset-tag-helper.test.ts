@@ -1575,8 +1575,7 @@ describe("AssetUrlHelperEmptyModuleTest", () => {
   let module: AssetUrlHelperHost & Record<string, unknown>;
 
   beforeEach(() => {
-    module = { computeAssetPath, publicComputeAssetPath } as unknown as AssetUrlHelperHost &
-      Record<string, unknown>;
+    module = { computeAssetPath, publicComputeAssetPath };
   });
 
   it("asset path", () => {

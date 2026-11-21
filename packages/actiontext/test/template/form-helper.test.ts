@@ -23,7 +23,7 @@ describe("ActionText::FormHelperTest", () => {
   let tc: Tc;
 
   beforeEach(async ({ task }) => {
-    tc = new FormHelperTest(task.name) as unknown as Tc;
+    tc = new FormHelperTest(task.name);
     await tc.beforeSetup();
     tc.setup();
     I18n.backend().storeTranslations("placeholder", {

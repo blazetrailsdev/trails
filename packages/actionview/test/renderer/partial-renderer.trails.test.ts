@@ -25,7 +25,7 @@ describe("PartialRenderer render blocks", () => {
     lookupContext.appendViewPaths([resolver]);
     const base = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
     renderer = base.viewRenderer;
-    view = base as unknown as ViewContext;
+    view = base;
   });
 
   it("yields a partial to the caller's block through _layoutFor", async () => {
