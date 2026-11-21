@@ -59,8 +59,7 @@ describe("ActionMailbox::Ingresses::Sendgrid::InboundEmailsControllerTest", () =
     expect(inboundEmail.message_id).toBe("0CB459E0-0336-41DA-BC88-E6E28C697DDB@37signals.com");
   });
 
-  // BLOCKED: ascii-8bit-param-encoding-answers-a-js-string-not-bytes
-  it.skip("receiving an inbound email from Sendgrid with non UTF-8 characters", async () => {
+  it("receiving an inbound email from Sendgrid with non UTF-8 characters", async () => {
     await assertDifference(
       () => InboundEmail.count(),
       +1,
@@ -68,7 +67,9 @@ describe("ActionMailbox::Ingresses::Sendgrid::InboundEmailsControllerTest", () =
       async () => {
         await t.post(trailsSendgridInboundEmailsUrl(), {
           headers: { Authorization: credentials() },
-          params: { email: await t.fileFixture("../files/invalid_utf.eml").read() },
+          params: {
+            email: await File.binreadAsync(String(t.fileFixture("../files/invalid_utf.eml"))),
+          },
         });
       },
     );
