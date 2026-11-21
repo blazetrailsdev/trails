@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import mysql from "mysql2/promise";
+import { Mysql2 } from "@blazetrails/mysql2";
 import { Mysql2Adapter } from "../../../../lib/connection-adapters/mysql2-adapter.js";
 
 function adapterWith(raw: unknown): Mysql2Adapter {
@@ -8,10 +9,18 @@ function adapterWith(raw: unknown): Mysql2Adapter {
   return adapter;
 }
 
-function promiseConnection(base: object): unknown {
+async function promiseConnection(base: object): Promise<unknown> {
   const PromiseConnection = (mysql as unknown as { PromiseConnection: new (c: object) => unknown })
     .PromiseConnection;
-  return new PromiseConnection(Object.assign(Object.create({ on() {} }), base));
+  const connection = new PromiseConnection(Object.assign(Object.create({ on() {} }), base));
+  const createConnection = vi
+    .spyOn(mysql, "createConnection")
+    .mockResolvedValue(connection as never);
+  try {
+    return await Mysql2.Client.new({});
+  } finally {
+    createConnection.mockRestore();
+  }
 }
 
 describe("Mysql2Adapter#isConnected", () => {
@@ -19,16 +28,16 @@ describe("Mysql2Adapter#isConnected", () => {
     expect(adapterWith(null).isConnected()).toBe(false);
   });
 
-  it("is true for an open promise connection", () => {
-    expect(adapterWith(promiseConnection({ _closing: false })).isConnected()).toBe(true);
+  it("is true for an open promise connection", async () => {
+    expect(adapterWith(await promiseConnection({ _closing: false })).isConnected()).toBe(true);
   });
 
-  it("is false once the driver connection is closing", () => {
-    expect(adapterWith(promiseConnection({ _closing: true })).isConnected()).toBe(false);
+  it("is false once the driver connection is closing", async () => {
+    expect(adapterWith(await promiseConnection({ _closing: true })).isConnected()).toBe(false);
   });
 
-  it("is false once the driver stream is destroyed", () => {
-    const raw = promiseConnection({ _closing: false, stream: { destroyed: true } });
+  it("is false once the driver stream is destroyed", async () => {
+    const raw = await promiseConnection({ _closing: false, stream: { destroyed: true } });
     expect(adapterWith(raw).isConnected()).toBe(false);
   });
 });

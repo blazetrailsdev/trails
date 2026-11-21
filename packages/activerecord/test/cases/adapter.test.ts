@@ -186,12 +186,11 @@ async function activePredicate(conn: DatabaseAdapter): Promise<boolean> {
   }
   if (adapterType === "mysql") {
     const raw = (
-      conn as unknown as { _clientForTest(): { ping(): Promise<unknown> } | null }
+      conn as unknown as { _clientForTest(): { ping(): Promise<boolean> } | null }
     )._clientForTest();
     if (!raw) return false;
     try {
-      await raw.ping();
-      return true;
+      return await raw.ping();
     } catch {
       return false;
     }

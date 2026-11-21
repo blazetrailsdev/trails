@@ -1,6 +1,13 @@
 import { rbScanArgs } from "@blazetrails/ruby-compat";
 import { driverError } from "./client.js";
 import type { Client, Mysql2Result, QueryOptions } from "./client.js";
+import { Mysql2 } from "./mysql2.js";
+
+declare module "./mysql2.js" {
+  interface Mysql2Namespace {
+    Statement: typeof Statement;
+  }
+}
 
 export class Statement {
   affectedRows = 0;
@@ -32,3 +39,5 @@ export class Statement {
     this.client["unprepare"](this.client["options"](this.sql, this.client.queryOptions));
   }
 }
+
+Mysql2.Statement = Statement;
