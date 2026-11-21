@@ -1080,12 +1080,12 @@ describe("CI runs every tooling test suite", () => {
       "db_adapter_affected",
       "trails_tsc_affected",
       "tse_compiler_affected",
-      "guides_affected",
     ];
 
     const fired = await Promise.all(paths.map((f) => runGate(f)));
     const ungated = paths.filter((_f, i) => fired[i].unit_tests_affected !== "true");
     expect(ungated).toEqual([]);
+    expect(fired.every((f) => f.guides_affected === "true")).toBe(true);
 
     const fannedOut = paths.flatMap((f, i) =>
       dependentGates.filter((gate) => fired[i][gate] !== "false").map((gate) => `${f} -> ${gate}`),
