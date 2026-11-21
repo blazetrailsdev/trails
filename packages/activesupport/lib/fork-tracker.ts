@@ -1,4 +1,10 @@
-import { aryDelete, prepend, Process, rbCallSuper } from "@blazetrails/ruby-compat";
+import {
+  aryDelete,
+  prepend,
+  Process,
+  rbCallSuper,
+  rbSingletonClass,
+} from "@blazetrails/ruby-compat";
 
 export const ForkTracker = {
   CoreExt: {
@@ -23,7 +29,7 @@ export const ForkTracker = {
   },
 
   hookBang(): void {
-    prepend({ prototype: Process }, ForkTracker.CoreExt);
+    prepend(rbSingletonClass(Process), ForkTracker.CoreExt);
   },
 
   afterFork<T extends () => unknown>(block: T): T {
