@@ -122,12 +122,6 @@ pnpm trails console
 `--sandbox` wraps the session in a transaction that is rolled back on exit, so
 nothing you change in the console persists. `-e` picks the environment.
 
-#### The `app` and `helper` Objects
-
-Inside the console, `app` is an integration session that can make requests
-against the application and build URLs from route helpers, and `helper` gives
-access to the view helpers.
-
 ### `trails dbconsole`
 
 Opens the command-line client of the configured database (`sqlite3`, `psql` or
