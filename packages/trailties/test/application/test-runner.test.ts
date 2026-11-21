@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Process, Shellwords, env as ENV, include, setEnv } from "@blazetrails/ruby-compat";
@@ -183,7 +184,9 @@ describe.concurrent("TestRunnerTest", { timeout: 600_000 }, () => {
   });
 
   it("raise error when specified file does not exist", async (t) => {
-    const error = await t.runTestCommand("test/not-exists.test.ts");
+    const error = await capture(":stderr", () =>
+      t.runTestCommand("test/not-exists.test.ts", { stderr: true }),
+    );
     expect(error).toMatch(/cannot load such file.+test\/not-exists\.test\.ts/);
   });
 
@@ -203,7 +206,7 @@ describe("AccountsTest", () => {
     );
 
     const output = await t.runTestCommand("test/models/account.test.ts");
-    expect(output).toMatch("does-not-exist");
+    expect(output).toMatch("cannot load such file -- does-not-exist");
     expect(Process.lastStatus!.isSuccess()).toBeFalsy();
   });
 });

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
+import { CGI } from "@blazetrails/ruby-compat";
 import { Info, PropertyList } from "../lib/info.js";
 import { VERSION } from "../lib/gem-version.js";
 
@@ -46,7 +47,7 @@ describe("InfoTest", () => {
     const html = Info.toHtml();
     expect(html).toContain('<tr><td class="name">Middleware</td>');
     for (const value of properties().valueFor("Middleware") as string[]) {
-      expect(html).toContain(`<li>${value}</li>`);
+      expect(html).toContain(`<li>${CGI.escapeHTML(value)}</li>`);
     }
   });
 });
