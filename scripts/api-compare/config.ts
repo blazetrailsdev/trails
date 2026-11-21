@@ -227,6 +227,7 @@ export const MANIFEST_PACKAGES = [
   "rack-cors",
   "rack-proxy",
   "rack-session",
+  "rack-cache",
   "rack-test",
   "rackup",
   "globalid",

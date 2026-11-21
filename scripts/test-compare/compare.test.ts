@@ -287,6 +287,19 @@ describe("rubyToConventionTs", () => {
     );
   });
 
+  it("maps rack-cache's flat test/<name>_test.rb files onto kebab-case test files", () => {
+    expect(rubyToConventionTs("cache_control_test.rb", "rack-cache")).toBe("cache-control.test.ts");
+    expect(rubyToConventionTs("cache_test.rb", "rack-cache")).toBe("cache.test.ts");
+    expect(rubyToConventionTs("context_test.rb", "rack-cache")).toBe("context.test.ts");
+    expect(rubyToConventionTs("entity_store_test.rb", "rack-cache")).toBe("entity-store.test.ts");
+    expect(rubyToConventionTs("key_test.rb", "rack-cache")).toBe("key.test.ts");
+    expect(rubyToConventionTs("meta_store_test.rb", "rack-cache")).toBe("meta-store.test.ts");
+    expect(rubyToConventionTs("options_test.rb", "rack-cache")).toBe("options.test.ts");
+    expect(rubyToConventionTs("request_test.rb", "rack-cache")).toBe("request.test.ts");
+    expect(rubyToConventionTs("response_test.rb", "rack-cache")).toBe("response.test.ts");
+    expect(rubyToConventionTs("storage_test.rb", "rack-cache")).toBe("storage.test.ts");
+  });
+
   it("strips rack-session's leading session_ segment, which mirrors its lib/rack/session root", () => {
     expect(rubyToConventionTs("spec_session_pool.rb", "rack-session")).toBe("pool.test.ts");
     expect(rubyToConventionTs("spec_session_cookie.rb", "rack-session")).toBe("cookie.test.ts");
