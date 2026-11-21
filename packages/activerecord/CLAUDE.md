@@ -461,7 +461,8 @@ and the synchronous body peeks at the warmed value.**
   `postgresql/quoting.rb:156-167`) therefore runs one SCHEMA query fewer than
   Rails, so a PostgreSQL `assert_queries_count(..., include_schema: true)` over
   it (`BulkAlterTableMigrationsTest`, `migration_test.rb:1404,1435`) asserts
-  only that queries ran; the other adapters keep Rails' exact count.
+  Rails' count less one, keeping Rails' table; the other adapters keep Rails'
+  exact count.
 - `quoteString` escapes in process. PostgreSQL doubles the quote; MySQL reads
   the warmed `NO_BACKSLASH_ESCAPES` state to choose between doubling the quote
   and backslash escaping, which is the arm `connection.escape` takes inside the

@@ -2284,7 +2284,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
         throw new Error(`need an expected query count for ${classname}`);
       }),
     );
-    const count = classname === "PostgreSQLAdapter" ? null : expectedQueryCount;
+    const count = classname === "PostgreSQLAdapter" ? expectedQueryCount - 1 : expectedQueryCount;
     await assertQueriesCount(count, { includeSchema: true }, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });
@@ -2317,7 +2317,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
         throw new Error(`need an expected query count for ${classname}`);
       }),
     );
-    const count = classname === "PostgreSQLAdapter" ? null : expectedQueryCount;
+    const count = classname === "PostgreSQLAdapter" ? expectedQueryCount - 1 : expectedQueryCount;
     await assertQueriesCount(count, { includeSchema: true }, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });
