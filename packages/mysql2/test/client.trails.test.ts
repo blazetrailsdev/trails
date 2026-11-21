@@ -361,3 +361,41 @@ describe("Mysql2::Error", () => {
     expect((versioned as { serverVersion: number }).serverVersion).toBe(101106);
   });
 });
+
+describe("Mysql2::Client#initialize option writers", () => {
+  async function configFor(opts: object): Promise<{ config: Record<string, unknown> }> {
+    const query = vi.fn(async () => [[], []]);
+    const createConnection = vi
+      .spyOn(mysql, "createConnection")
+      .mockResolvedValue({ query } as never);
+    try {
+      await Mysql2.Client.new(opts);
+      return { config: createConnection.mock.calls[0][0] as Record<string, unknown> };
+    } finally {
+      createConnection.mockRestore();
+    }
+  }
+
+  it("maps :local_infile onto the LOCAL_FILES flag and :secure_auth onto insecureAuth", async () => {
+    expect((await configFor({ localInfile: true })).config.flags).toContain("LOCAL_FILES");
+    expect((await configFor({ localInfile: false })).config.flags).not.toContain("LOCAL_FILES");
+    expect((await configFor({ secureAuth: false })).config.insecureAuth).toBe(true);
+  });
+
+  it("maps :ssl_mode and :sslcipher onto the ssl option", async () => {
+    expect((await configFor({})).config.ssl).toBeUndefined();
+    expect((await configFor({})).config.charset).toBe("utf8");
+    expect((await configFor({ sslMode: "required", sslcipher: "AES" })).config.ssl).toEqual({
+      rejectUnauthorized: false,
+      ciphers: "AES",
+    });
+    expect((await configFor({ sslverify: true })).config.ssl).toEqual({ rejectUnauthorized: true });
+  });
+
+  it("parses ssl_mode with or without the SSL_MODE_ prefix", async () => {
+    const client = await clientOn({});
+    expect(client.parseSslMode("verify_ca")).toBe(Mysql2.Client.SSL_MODE_VERIFY_CA);
+    expect(client.parseSslMode("SSL_MODE_DISABLED")).toBe(Mysql2.Client.SSL_MODE_DISABLED);
+    expect(client.parseSslMode("bogus")).toBeUndefined();
+  });
+});
