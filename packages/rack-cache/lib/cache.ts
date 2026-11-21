@@ -6,5 +6,6 @@ export { EntityStore } from "./entity-store.js";
 export { Headers } from "./headers.js";
 export { Key } from "./key.js";
 export { Request } from "./request.js";
+export { Response } from "./response.js";
 
 Rack.Cache = Cache;

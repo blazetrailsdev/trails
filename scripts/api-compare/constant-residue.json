@@ -1132,7 +1132,7 @@
     }
   },
   "rack-cache": {
-    "rows": 7,
+    "rows": 8,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1142,7 +1142,8 @@
       "entity-store.ts::Heap": "Rack::Cache::EntityStore::Heap",
       "entity-store.ts::Noop": "Rack::Cache::EntityStore::Noop",
       "key.ts::Key": "Rack::Cache::Key",
-      "request.ts::Request": "Rack::Cache::Request"
+      "request.ts::Request": "Rack::Cache::Request",
+      "response.ts::Response": "Rack::Cache::Response"
     }
   },
   "rack-cors": {
