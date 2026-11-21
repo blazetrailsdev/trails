@@ -21,6 +21,7 @@ export interface EngineStatement {
   isDone(): boolean;
   columnCount(): number | Promise<number>;
   columnName(index: number): string | null | Promise<string | null>;
+  columnDecltype(index: number): string | null | Promise<string | null>;
   /** @noRailsEquivalent PERMANENT */
   setReadBigInts(toggle: boolean): void;
 }
@@ -29,6 +30,7 @@ export class Statement {
   #st!: EngineStatement;
   #connection: Database;
   #columns: (string | null)[] | null;
+  #types: (string | null)[] | null;
   remainder!: string;
 
   declare toA: () => unknown[][] | Promise<unknown[][]>;
@@ -45,6 +47,7 @@ export class Statement {
 
     this.#connection = db;
     this.#columns = null;
+    this.#types = null;
   }
 
   async execute(...bindVars: unknown[]): Promise<ResultSet> {
@@ -116,6 +119,15 @@ export class Statement {
       if (this.isDone()) return this;
       block(val!);
     }
+  }
+
+  types(): (string | null)[] | Promise<(string | null)[]> {
+    this.mustBeOpenBang();
+    if (!this.#types) {
+      const r = this.getMetadata();
+      if (r instanceof Promise) return r.then(() => this.#types!);
+    }
+    return this.#types!;
   }
 
   /** @internal */
@@ -193,6 +205,11 @@ export class Statement {
     return this.#st.columnName(index);
   }
 
+  columnDecltype(index: number): string | null | Promise<string | null> {
+    this.mustBeOpenBang();
+    return this.#st.columnDecltype(index);
+  }
+
   /** @noRailsEquivalent PERMANENT */
   setReadBigInts(toggle: boolean): void {
     this.mustBeOpenBang();
@@ -216,12 +233,16 @@ export class Statement {
     const count = this.columnCount();
     const build = (n: number): void | Promise<void> => {
       const names = Array.from({ length: n }, (_, column) => this.columnName(column));
-      if (names.some((name) => name instanceof Promise)) {
-        return Promise.all(names).then((resolved) => {
-          this.#columns = resolved;
+      const decltypes = Array.from({ length: n }, (_, column) => this.columnDecltype(column));
+      const downcase = (vals: (string | null)[]) => vals.map((val) => val?.toLowerCase() ?? null);
+      if ([...names, ...decltypes].some((val) => val instanceof Promise)) {
+        return Promise.all([Promise.all(names), Promise.all(decltypes)]).then(([n2, d]) => {
+          this.#columns = n2;
+          this.#types = downcase(d);
         });
       }
       this.#columns = names as (string | null)[];
+      this.#types = downcase(decltypes as (string | null)[]);
     };
     return count instanceof Promise ? count.then(build) : build(count);
   }

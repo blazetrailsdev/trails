@@ -24,6 +24,8 @@ export function engineDatabase(
     busyHandler: (handler: BusyHandler | null) => {
       db.handler = handler;
     },
+    loadExtensionInternal: (file: string) => void raw.loadExtension(file),
+    enableLoadExtension: (_onoff: boolean) => {},
     execBatch(sql: string, resultsAsHash: boolean): unknown[] {
       const stmt = raw.prepare(sql);
       if (!stmt.reader) {
@@ -38,7 +40,24 @@ export function engineDatabase(
       });
     },
     prepare(sql: string): [EngineStatement, string] {
-      const stmt = raw.prepare(sql);
+      let remainder = "";
+      let stmt: BetterSqlite3.Statement;
+      try {
+        stmt = raw.prepare(sql);
+      } catch (e) {
+        const tail = [...sql.matchAll(/;/g)].find((m) => {
+          try {
+            raw.prepare(sql.slice(0, m.index + 1));
+            return true;
+          } catch {
+            return false;
+          }
+        });
+        if (!tail) throw e;
+        remainder = sql.slice(tail.index + 1);
+        sql = sql.slice(0, tail.index + 1);
+        stmt = raw.prepare(sql);
+      }
       const reader = stmt.reader;
       if (reader) stmt.raw(true);
       const positional: SqliteBindValue[] = [];
@@ -86,9 +105,10 @@ export function engineDatabase(
         isDone: () => done,
         columnCount: () => (reader ? stmt.columns().length : 0),
         columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
+        columnDecltype: (index) => (reader ? (stmt.columns()[index]?.type ?? null) : null),
         setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
       };
-      return [engine, ""];
+      return [engine, remainder];
     },
   };
   return db;

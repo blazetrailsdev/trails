@@ -32,6 +32,7 @@ function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
     isDone: () => done,
     columnCount: () => wrap(names.length),
     columnName: (index) => wrap(names[index] ?? null),
+    columnDecltype: () => wrap(null),
     setReadBigInts: () => undefined,
   };
   const engineDb: EngineDatabase = {
@@ -45,6 +46,8 @@ function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
     close: () => undefined,
     disableQuirkMode: () => undefined,
     busyHandler: () => undefined,
+    loadExtensionInternal: () => undefined,
+    enableLoadExtension: () => undefined,
   };
   const db = new SQLite3.Database(":memory:", { engine: () => engineDb });
   return { db, binds, engineDb };
