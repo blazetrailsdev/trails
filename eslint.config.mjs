@@ -489,6 +489,7 @@ export default defineConfig(
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",
       "packages/mysql2/lib/**/*.ts",
+      "packages/pg/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
       "packages/trailties/lib/**/*.ts",
