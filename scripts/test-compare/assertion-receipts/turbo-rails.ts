@@ -11,6 +11,15 @@ export const turboRails: Record<string, AssertionReceipt[]> = {
           'frame_request_controller_test.rb:67 `assert_dom head, "script"` — the dummy layout\'s only script is `javascript_importmap_tags` (test/dummy/app/views/layouts/application.html.erb:9), and importmap-rails is out of scope (CLAUDE.md, "importmap-rails and propshaft are out of scope"), so the port has no script tag to assert',
       },
     ],
+  "turbo-rails:installer_test.rb › InstallerTest › installer": [
+    {
+      kind: "assert_match",
+      value: 's:pin "@hotwired/turbo-rails", to: "turbo.min.js"',
+      as: null,
+      reason:
+        'installer_test.rb:18 `assert_match %(pin "@hotwired/turbo-rails", to: "turbo.min.js"), File.read("config/importmap.rb")` — the importmap arm of turbo:install is not ported and a trails app has no config/importmap.rb (CLAUDE.md, "importmap-rails and propshaft are out of scope")',
+    },
+  ],
   "turbo-rails:system/broadcasts_test.rb › BroadcastsTest › Does not render the layout twice when passed a component":
     [
       {
@@ -21,13 +30,4 @@ export const turboRails: Record<string, AssertionReceipt[]> = {
           'system/broadcasts_test.rb:36 `assert_selector("title", count: 1, visible: false, text: "Dummy")` — no finder or matcher DSL is ported, so the port polls the count of `title` elements containing "Dummy" and asserts it equals 1 (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
       },
     ],
-  "turbo-rails:installer_test.rb › InstallerTest › installer": [
-    {
-      kind: "assert_match",
-      value: 's:pin "@hotwired/turbo-rails", to: "turbo.min.js"',
-      as: null,
-      reason:
-        'installer_test.rb:18 `assert_match %(pin "@hotwired/turbo-rails", to: "turbo.min.js"), File.read("config/importmap.rb")` — the importmap arm of turbo:install is not ported and a trails app has no config/importmap.rb (CLAUDE.md, "importmap-rails and propshaft are out of scope")',
-    },
-  ],
 };
