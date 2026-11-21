@@ -1,3 +1,4 @@
+import type { PP } from "@blazetrails/ruby-compat";
 import { presence } from "./core-ext/object/blank.js";
 import { fetch, KeyError, rbEqual, rbObjClassname } from "@blazetrails/ruby-compat";
 
@@ -235,6 +236,10 @@ export class InheritableOptions extends OrderedOptions {
   override toString(): string {
     const pairs = Object.entries(this.toH()).map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
     return `{${pairs.join(", ")}}`;
+  }
+
+  prettyPrint(pp: PP): void | Promise<void> {
+    return pp.ppHash(this.toH());
   }
 
   protected ownKey(key: string): boolean {
