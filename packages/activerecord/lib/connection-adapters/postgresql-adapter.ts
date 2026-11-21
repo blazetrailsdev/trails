@@ -585,6 +585,8 @@ export class PostgreSQLAdapter
         await this._rawConnection?.close();
       } catch {}
       this._rawConnection = null;
+      this._mappedDefaultTimezone = null;
+      this.timestampDecoder = null;
     });
   }
 
