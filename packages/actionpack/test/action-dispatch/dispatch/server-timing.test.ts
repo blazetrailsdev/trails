@@ -37,11 +37,7 @@ describe("ServerTimingTest", () => {
   let t: IntegrationTest;
 
   beforeEach(({ task }) => {
-    middlewares = [
-      Lint as MiddlewareFactory,
-      ServerTiming as MiddlewareFactory,
-      Lint as MiddlewareFactory,
-    ];
+    middlewares = [Lint, ServerTiming, Lint];
     headerName = SERVER_TIMING;
     t = new IntegrationTest(task.name);
   });
@@ -133,7 +129,7 @@ describe("ServerTimingTest", () => {
             .join(", ");
           return [status, headers, body];
         }
-      } as MiddlewareFactory,
+      },
     );
 
     withTestRouteSet();

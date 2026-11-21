@@ -7,7 +7,6 @@ import { Flash } from "../../../lib/action-dispatch/middleware/flash.js";
 import { Cookies } from "../../../lib/action-dispatch/middleware/cookies.js";
 import { CookieStore } from "../../../lib/action-dispatch/middleware/session/cookie-store.js";
 import { ShowExceptions } from "../../../lib/action-dispatch/middleware/show-exceptions.js";
-import type { MiddlewareFactory } from "../../../lib/action-dispatch/middleware/stack.js";
 import { IntegrationTest } from "../../../lib/action-dispatch/testing/integration.js";
 import "../../support/abstract-unit.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
@@ -369,9 +368,9 @@ async function withTestRouteSet(block: (tc: IntegrationTest) => Promise<void>): 
     this.get("/set_flash_optionally", { to: "flash_integration_test#setFlashOptionally" });
   });
   tc.app = IntegrationTest.buildApp(tc.routes, (middleware) => {
-    middleware.use(CookieStore as MiddlewareFactory, { key: SessionKey });
-    middleware.use(Flash as unknown as MiddlewareFactory);
-    middleware.delete(ShowExceptions as MiddlewareFactory);
+    middleware.use(CookieStore, { key: SessionKey });
+    middleware.use(Flash);
+    middleware.delete(ShowExceptions);
   });
   constSet(TopLevel, "FlashIntegrationTestController", FlashIntegrationTestController);
   await block(tc);

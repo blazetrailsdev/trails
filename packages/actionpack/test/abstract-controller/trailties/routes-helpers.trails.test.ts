@@ -28,7 +28,7 @@ describe("RoutesHelpers.with (trails)", () => {
       this.get("posts", { to: "posts#index", as: "posts" });
     });
     const cls = class {};
-    RoutesHelpers.with(routes)(cls as unknown as RoutesHelpersControllerClass);
+    RoutesHelpers.with(routes)(cls);
     Object.defineProperty(cls.prototype, "postsPath", {
       value: () => "mine",
       writable: true,
@@ -125,7 +125,7 @@ describe("RoutesHelpers.with (trails)", () => {
   it("splices nothing into the class's prototype chain", () => {
     const parent = class {};
     const cls = class extends parent {};
-    RoutesHelpers.with(new RouteSet())(cls as unknown as RoutesHelpersControllerClass);
+    RoutesHelpers.with(new RouteSet())(cls);
     expect(Object.getPrototypeOf(cls.prototype)).toBe(parent.prototype);
   });
 
@@ -148,16 +148,14 @@ describe("RoutesHelpers.with (trails)", () => {
         return null;
       }
     };
-    RoutesHelpers.with(routes)(cls as unknown as RoutesHelpersControllerClass);
+    RoutesHelpers.with(routes)(cls);
     expect((cls as unknown as { _routes: unknown })._routes).toBeNull();
     expect((class extends cls {} as unknown as { _routes: unknown })._routes).toBe(routes);
   });
 
   it("a helper sent by name to a subclass instance receives its arguments", () => {
     const cls = class {};
-    RoutesHelpers.with({ urlHelpers: () => ({ postPath: (id: unknown) => `/posts/${id}` }) })(
-      cls as unknown as RoutesHelpersControllerClass,
-    );
+    RoutesHelpers.with({ urlHelpers: () => ({ postPath: (id: unknown) => `/posts/${id}` }) })(cls);
     expect(rbFSend(new (class extends cls {})(), "postPath", 1)).toBe("/posts/1");
   });
 });

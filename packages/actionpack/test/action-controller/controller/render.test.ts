@@ -212,7 +212,7 @@ class TestController extends Base {
   }
 
   async dynamicRenderPermit(): Promise<void> {
-    await this.render((this.params.get("id") as Parameters).permit("file") as never);
+    await this.render((this.params.get("id") as Parameters).permit("file"));
   }
 
   async dynamicRenderWithFile(): Promise<void> {
@@ -240,7 +240,7 @@ class TestController extends Base {
 
     const record = new (Struct.new("updatedAt", "cacheKey"))(ts, "foo/123");
     const oldRecord = new (Struct.new("updatedAt", "cacheKey"))(
-      ts.minusWithCoercion(Duration.days(1)) as Time,
+      ts.minusWithCoercion(Duration.days(1)),
       "bar/123",
     );
 
@@ -373,7 +373,7 @@ class TestController extends Base {
   }
 
   async headWithIntegerStatus(): Promise<void> {
-    await this.head(toI(this.params.get("status") as string) as number);
+    await this.head(toI(this.params.get("status")) as number);
   }
 
   async headWithStringStatus(): Promise<void> {

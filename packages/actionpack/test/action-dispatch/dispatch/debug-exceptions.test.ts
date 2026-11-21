@@ -117,7 +117,7 @@ class Boomer {
         return [404, { [X_CASCADE]: "pass" }, this as never];
       case "/not_found": {
         const controller = new SimpleController();
-        throw new ActionNotFound(null, controller as never, "ello");
+        throw new ActionNotFound(null, controller, "ello");
       }
       case "/runtime_error":
         throw new RuntimeError();

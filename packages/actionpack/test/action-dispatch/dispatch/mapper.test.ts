@@ -222,9 +222,7 @@ describe("MapperTest", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     const frozen = Object.freeze({ foo: "bar" });
-    expect(() =>
-      m.scope({ defaults: frozen } as Parameters<Mapper["scope"]>[0], () => {}),
-    ).not.toThrow();
+    expect(() => m.scope({ defaults: frozen }, () => {})).not.toThrow();
   });
 });
 

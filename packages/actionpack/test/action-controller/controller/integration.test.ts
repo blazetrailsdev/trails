@@ -42,7 +42,7 @@ import {
   InvalidResponse,
   Launchy,
 } from "../../../lib/action-dispatch/testing/test-helpers/page-dump-helper.js";
-import type { MountableApp, RouteOptions } from "../../../lib/action-dispatch/routing/mapper.js";
+import type { MountableApp } from "../../../lib/action-dispatch/routing/mapper.js";
 import { CookieAssertions, SharedTestRoutes } from "../../support/abstract-unit.js";
 
 TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
@@ -229,7 +229,7 @@ describe("IntegrationTestTest", () => {
         throw new NoMethodError(`undefined method '${name}'`, name);
       },
     };
-    include(rbObjSingletonClass(test) as typeof IntegrationTest, mixin);
+    include(rbObjSingletonClass(test), mixin);
     expect(rbFSend(test, "foo")).toBe("pass");
   });
 });
@@ -379,7 +379,7 @@ class IntegrationProcessTest extends IntegrationTest {
             this.get("get/:action", { to, as: "get_action" });
           });
         });
-        include(rbObjSingletonClass(this) as typeof IntegrationProcessTest, set.urlHelpers());
+        include(rbObjSingletonClass(this), set.urlHelpers());
         return await block();
       });
     } finally {
@@ -431,7 +431,7 @@ describe("IntegrationProcessTest", () => {
         expect(t.cookies.toHash()).toEqual({});
         expect(t.body).toBe("<root></root>");
         expect(t.response.body).toBe("<root></root>");
-        assertInstanceOf(XML.Document as unknown as new () => unknown, t.htmlDocument);
+        assertInstanceOf(XML.Document, t.htmlDocument);
         expect(t.requestCount).toBe(1);
       });
     }
@@ -1238,7 +1238,7 @@ describe("IntegrationWithRoutingTest", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         this.namespace(klassNamespace, () => {
-          this.resources("foo", { path: "/with" } as RouteOptions);
+          this.resources("foo", { path: "/with" });
         });
       });
 
@@ -1250,7 +1250,7 @@ describe("IntegrationWithRoutingTest", () => {
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         this.namespace(klassNamespace, () => {
-          this.resources("foo", { path: "/routing" } as RouteOptions);
+          this.resources("foo", { path: "/routing" });
         });
       });
 

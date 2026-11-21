@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
-import type { RackApp } from "@blazetrails/rack";
 import { Handler } from "@blazetrails/rackup";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
@@ -115,7 +114,7 @@ describe("a ReadableStream response body served by Rackup::Handler::Node", () =>
       },
       destroy() {},
     };
-    const serving = new Handler.Node(app as unknown as RackApp).service(
+    const serving = new Handler.Node(app).service(
       req as unknown as HttpRequest,
       res as unknown as HttpResponse,
     );

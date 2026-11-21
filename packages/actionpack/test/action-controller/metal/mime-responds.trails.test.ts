@@ -126,7 +126,7 @@ describe("Collector#initialize", () => {
 describe("Base#respondTo", () => {
   async function controller(format: string): Promise<Base> {
     const base = new Base();
-    base.request = new Request({ HTTP_ACCEPT: format }) as unknown as Base["request"];
+    base.request = new Request({ HTTP_ACCEPT: format });
     base.setResponseBang(await Response.new());
     return base;
   }
@@ -189,7 +189,7 @@ describe("Collector#response", () => {
     const base = new Base();
     const request = new Request({ HTTP_ACCEPT: "text/html" });
     if (variant !== undefined) request.variant = variant;
-    base.request = request as unknown as Base["request"];
+    base.request = request;
     base.setResponseBang(await Response.new());
     return base;
   }

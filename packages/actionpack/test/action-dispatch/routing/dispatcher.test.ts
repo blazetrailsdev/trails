@@ -43,7 +43,7 @@ function makeControllerClass(
       action: string,
       req: Request,
     ): Promise<[number, Record<string, string>, string[]]> {
-      return body(action, req as unknown as RouterRequest);
+      return body(action, req);
     }
   };
 }

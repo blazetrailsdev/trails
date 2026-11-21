@@ -38,7 +38,6 @@ import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotat
 import { Flash } from "../../../lib/action-dispatch/middleware/flash.js";
 import { CookieStore } from "../../../lib/action-dispatch/middleware/session/cookie-store.js";
 import { ShowExceptions } from "../../../lib/action-dispatch/middleware/show-exceptions.js";
-import type { MiddlewareFactory } from "../../../lib/action-dispatch/middleware/stack.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { deprecator } from "../../../lib/action-dispatch/deprecator.js";
 import { IntegrationTest } from "../../../lib/action-dispatch/testing/integration.js";
@@ -5932,10 +5931,10 @@ describe("FlashRedirectTest", () => {
   });
 
   const APP = IntegrationTest.buildApp(Routes, (middleware) => {
-    middleware.use(KeyGeneratorMiddleware as unknown as MiddlewareFactory);
-    middleware.use(CookieStore as MiddlewareFactory, { key: SessionKey });
-    middleware.use(Flash as unknown as MiddlewareFactory);
-    middleware.delete(ShowExceptions as MiddlewareFactory);
+    middleware.use(KeyGeneratorMiddleware);
+    middleware.use(CookieStore, { key: SessionKey });
+    middleware.use(Flash);
+    middleware.delete(ShowExceptions);
   });
 
   class FlashRedirectTest extends IntegrationTest {

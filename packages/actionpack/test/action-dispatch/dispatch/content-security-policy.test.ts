@@ -39,7 +39,6 @@ import {
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 
-import type { MiddlewareFactory } from "../../../lib/action-dispatch/middleware/stack.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 
 describe("ContentSecurityPolicyTest", () => {
@@ -648,10 +647,10 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
   }
 
   const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
-    middleware.use(Lint as unknown as MiddlewareFactory);
-    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
-    middleware.use(Middleware as unknown as MiddlewareFactory);
-    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(Lint);
+    middleware.use(PolicyConfigMiddleware);
+    middleware.use(Middleware);
+    middleware.use(Lint);
   });
 
   let t: IntegrationTest;
@@ -807,10 +806,10 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
   }
 
   const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
-    middleware.use(Lint as unknown as MiddlewareFactory);
-    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
-    middleware.use(Middleware as unknown as MiddlewareFactory);
-    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(Lint);
+    middleware.use(PolicyConfigMiddleware);
+    middleware.use(Middleware);
+    middleware.use(Lint);
   });
 
   let t: IntegrationTest;
@@ -929,10 +928,10 @@ describe("DisabledContentSecurityPolicyIntegrationTest", () => {
   }
 
   const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
-    middleware.use(Lint as unknown as MiddlewareFactory);
-    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
-    middleware.use(Middleware as unknown as MiddlewareFactory);
-    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(Lint);
+    middleware.use(PolicyConfigMiddleware);
+    middleware.use(Middleware);
+    middleware.use(Lint);
   });
 
   let t: IntegrationTest;
@@ -994,10 +993,10 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
   }
 
   const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
-    middleware.use(Lint as unknown as MiddlewareFactory);
-    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
-    middleware.use(Middleware as unknown as MiddlewareFactory);
-    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(Lint);
+    middleware.use(PolicyConfigMiddleware);
+    middleware.use(Middleware);
+    middleware.use(Lint);
   });
 
   it("generate nonce only specified in nonce directives", async ({ task }) => {
@@ -1083,10 +1082,10 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
   }
 
   const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
-    middleware.use(Lint as unknown as MiddlewareFactory);
-    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
-    middleware.use(Middleware as unknown as MiddlewareFactory);
-    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(Lint);
+    middleware.use(PolicyConfigMiddleware);
+    middleware.use(Middleware);
+    middleware.use(Lint);
   });
 
   it("can call helper methods in csp", async ({ task }) => {

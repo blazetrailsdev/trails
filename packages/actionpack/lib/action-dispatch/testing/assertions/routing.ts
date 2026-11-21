@@ -350,13 +350,10 @@ export function createRoutes<T>(
 ): T {
   this.routes = new RouteSet(config ?? RouteSet.DEFAULT_CONFIG);
   if (this.controller != null) {
-    this.controller = rbObjClone(this.controller as object);
+    this.controller = rbObjClone(this.controller);
     const _routes = this.routes;
 
-    include(
-      rbObjSingletonClass(this.controller as object) as new () => object,
-      _routes.urlHelpers(),
-    );
+    include(rbObjSingletonClass(this.controller as object), _routes.urlHelpers());
 
     if (rbObjRespondTo(this.controller, "viewContextClass")) {
       const viewContextClass = class extends (

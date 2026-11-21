@@ -9,7 +9,6 @@ import { Metal } from "../../../lib/action-controller/metal.js";
 import { Flash } from "../../../lib/action-controller/metal/flash.js";
 import { CookieStore } from "../../../lib/action-dispatch/middleware/session/cookie-store.js";
 import { ShowExceptions } from "../../../lib/action-dispatch/middleware/show-exceptions.js";
-import type { MiddlewareFactory } from "../../../lib/action-dispatch/middleware/stack.js";
 import { IntegrationTest, Session } from "../../../lib/action-dispatch/testing/integration.js";
 import "../../support/abstract-unit.js";
 
@@ -51,8 +50,8 @@ describe("add_flash_types readers", () => {
       this.get("/notices", { to: "notices#index" });
     });
     t.app = IntegrationTest.buildApp(t.routes, (middleware) => {
-      middleware.use(CookieStore as MiddlewareFactory, { key: "_session" });
-      middleware.delete(ShowExceptions as MiddlewareFactory);
+      middleware.use(CookieStore, { key: "_session" });
+      middleware.delete(ShowExceptions);
     });
     constSet(TopLevel, "NoticesController", NoticesController);
 

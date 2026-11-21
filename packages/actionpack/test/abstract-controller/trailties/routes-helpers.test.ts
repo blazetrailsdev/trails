@@ -11,7 +11,7 @@ import {
 } from "../../../lib/abstract-controller/trailties/routes-helpers.js";
 
 function makeClass(): RoutesHelpersControllerClass {
-  return { prototype: {} } as RoutesHelpersControllerClass;
+  return { prototype: {} };
 }
 
 describe("withRoutesHelpers", () => {
@@ -98,7 +98,7 @@ describe("withRoutesHelpers", () => {
     };
     include(parent, UrlFor);
     const cls = class extends parent {};
-    RoutesHelpers.with(routes, false)(cls as unknown as RoutesHelpersControllerClass);
+    RoutesHelpers.with(routes, false)(cls);
     const sub = class extends cls {};
     const instance = new sub() as unknown as {
       _generatePathsByDefault(): boolean;
@@ -123,9 +123,7 @@ describe("withRoutesHelpers", () => {
     const parent = class {};
     include(parent, higher);
     const cls = class extends parent {};
-    RoutesHelpers.with({ urlHelpers: () => urlHelpers })(
-      cls as unknown as RoutesHelpersControllerClass,
-    );
+    RoutesHelpers.with({ urlHelpers: () => urlHelpers })(cls);
 
     expect((new (class extends cls {})() as unknown as { helper(): string }).helper()).toBe(
       "lower",
@@ -138,7 +136,7 @@ describe("withRoutesHelpers", () => {
       this.get("posts", { to: "posts#index", as: "posts" });
     });
     const cls = class {};
-    RoutesHelpers.with(routes)(cls as unknown as RoutesHelpersControllerClass);
+    RoutesHelpers.with(routes)(cls);
     const instance = new (class extends cls {})() as unknown as {
       postsPath?: unknown;
       commentsPath?: unknown;

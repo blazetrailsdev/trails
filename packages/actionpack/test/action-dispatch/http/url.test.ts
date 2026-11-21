@@ -142,11 +142,9 @@ describe("URL.fullUrlFor", () => {
   });
 
   it("invalid protocol option raises", () => {
-    expect(() =>
-      URL.fullUrlFor({ host: "example.com", protocol: "::" as unknown as string }),
-    ).toThrow(ArgumentError);
-    expect(() =>
-      URL.fullUrlFor({ host: "example.com", protocol: "::" as unknown as string }),
-    ).toThrow(/Invalid :protocol/);
+    expect(() => URL.fullUrlFor({ host: "example.com", protocol: "::" })).toThrow(ArgumentError);
+    expect(() => URL.fullUrlFor({ host: "example.com", protocol: "::" })).toThrow(
+      /Invalid :protocol/,
+    );
   });
 });

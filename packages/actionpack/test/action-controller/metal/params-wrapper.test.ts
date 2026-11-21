@@ -35,7 +35,7 @@ function makeHost(
     parameters: {},
     ...requestOverrides,
   };
-  return extend({ _wrapperOptions: merged, request }, ParamsWrapper) as ParamsWrapperHost;
+  return extend({ _wrapperOptions: merged, request }, ParamsWrapper);
 }
 
 describe("ParamsWrapper privates", () => {

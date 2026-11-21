@@ -123,9 +123,9 @@ describe("RoutesProxy", () => {
       this.get("/posts/:id", { to: "posts#show", as: "post" });
     });
     const proxy = new RoutesProxy(
-      routes as unknown as UrlForRoutes,
+      routes,
       { urlOptions: () => ({}) } as UrlForHost,
-      routes.urlHelpers() as unknown as Record<string, unknown>,
+      routes.urlHelpers(),
     ) as RoutesProxyInstance;
 
     expect(rbObjRespondTo(proxy, "postPath")).toBe(true);

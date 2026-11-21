@@ -493,7 +493,7 @@ describe("CollectionCacheTest", () => {
   let controller: CollectionCacheController;
 
   beforeEach(async ({ task }) => {
-    tc = new TestCase(task.name) as typeof tc;
+    tc = new TestCase(task.name);
     await tc.beforeSetup();
     controller = new CollectionCacheController();
     tc.controller = controller;

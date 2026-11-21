@@ -35,9 +35,9 @@ class BareController extends Metal {
   }
 
   async assignResponseBodyProc(): Promise<void> {
-    await this.setResponseBody(((stream: { close(): void }) => {
+    await this.setResponseBody((stream: { close(): void }) => {
       stream.close();
-    }) as unknown as string);
+    });
   }
 }
 Object.defineProperty(BareController, "name", { value: "BareMetalTest::BareController" });

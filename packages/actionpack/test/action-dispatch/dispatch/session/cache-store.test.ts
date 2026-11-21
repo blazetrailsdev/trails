@@ -13,7 +13,6 @@ import { Base } from "../../../../lib/action-controller/base.js";
 import { deprecator } from "../../../../lib/action-dispatch/deprecator.js";
 import { CacheStore } from "../../../../lib/action-dispatch/middleware/session/cache-store.js";
 import { ShowExceptions } from "../../../../lib/action-dispatch/middleware/show-exceptions.js";
-import type { MiddlewareFactory } from "../../../../lib/action-dispatch/middleware/stack.js";
 import type { RouteSet } from "../../../../lib/action-dispatch/routing/route-set.js";
 import {
   IntegrationTest,
@@ -55,8 +54,8 @@ class CacheStoreTest extends IntegrationTest {
   override get app(): RoutesApp {
     return (this._app ??= IntegrationTest.buildApp(null, (middleware) => {
       this._cache = new MemoryStore();
-      middleware.use(CacheStore as MiddlewareFactory, { key: "_session_id", cache: this._cache });
-      middleware.delete(ShowExceptions as MiddlewareFactory);
+      middleware.use(CacheStore, { key: "_session_id", cache: this._cache });
+      middleware.delete(ShowExceptions);
     }));
   }
 

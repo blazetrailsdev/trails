@@ -37,7 +37,7 @@ function req(opts: { pathInfo: string; requestMethod?: string }): RouterRequest 
     REQUEST_METHOD: opts.requestMethod ?? "GET",
     PATH_INFO: opts.pathInfo,
     SCRIPT_NAME: "",
-  }) as unknown as RouterRequest;
+  });
 }
 
 describe("ActionDispatch::Journey::Router", () => {

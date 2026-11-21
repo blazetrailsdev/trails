@@ -40,7 +40,7 @@ describe("ActionDispatch::SystemTesting::Driver", () => {
     const driver = new Driver("rack_test");
     driver.use();
     const app = async () => [200, {}, ["ok"]] as [number, Record<string, string>, string[]];
-    const registered = (await vite.drivers.rack_test(app as never)) as {
+    const registered = (await vite.drivers.rack_test(app)) as {
       options: Record<string, unknown>;
       session: unknown;
     };

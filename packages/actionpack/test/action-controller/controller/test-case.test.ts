@@ -988,7 +988,7 @@ describe("TestCaseTest", () => {
           } else if (error instanceof Assertion) {
             throw error;
           } else {
-            assert(false, `expected RuntimeError, got ${rbObjClassname(error as object)}`);
+            assert(false, `expected RuntimeError, got ${rbObjClassname(error)}`);
           }
         }
       });
