@@ -1150,7 +1150,7 @@ describe("buildViews render typing", { timeout: 30_000 }, () => {
       write(
         cwd,
         "app/views/posts/index.html.tse",
-        '<%= render({ partial: "posts/post", locals: { item: 1 } }) %>',
+        '<%= render({ partial: "posts/post", locals: { item: 1 } }) %><%= render("posts/post", { item: 1 }) %>',
       );
       write(
         cwd,
@@ -1178,7 +1178,10 @@ describe("buildViews render typing", { timeout: 30_000 }, () => {
           (d) =>
             `${path.basename(d.file?.fileName ?? "")}: ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`,
         );
-      expect(messages).toEqual([expect.stringMatching(/^index\.html\.tse\.ts: .*'item'/su)]);
+      expect(messages).toEqual([
+        expect.stringMatching(/^index\.html\.tse\.ts: .*'item'/su),
+        expect.stringMatching(/^index\.html\.tse\.ts: .*'item'/su),
+      ]);
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
