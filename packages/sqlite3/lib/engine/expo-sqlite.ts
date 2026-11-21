@@ -51,7 +51,8 @@ export const errors: EngineErrors = {
 async function open(file: string): Promise<ExpoDatabase> {
   let expoSqlite: ExpoModule;
   try {
-    expoSqlite = await import("expo-sqlite");
+    const specifier = "expo-sqlite";
+    expoSqlite = (await import(specifier)) as ExpoModule;
   } catch {
     throw new LoadError(
       "expo-sqlite is not available. This driver requires an Expo / React Native runtime.",
