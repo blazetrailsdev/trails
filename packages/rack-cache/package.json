@@ -1,0 +1,29 @@
+{
+  "name": "@blazetrails/rack-cache",
+  "version": "0.1.0",
+  "description": "HTTP caching for Rack, mirroring Ruby's rack-cache",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "mirrors": [
+    {
+      "source": "rack-cache",
+      "ref": "v1.17.0",
+      "sha": "5261d91b210735a5a79367ff9faebde2dea28788"
+    }
+  ]
+}

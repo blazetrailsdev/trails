@@ -786,7 +786,7 @@ describe("CI runs every tooling test suite", () => {
 
       const broken = yml
         .replace(
-          "run: pnpm vitest run packages/rack packages/rack-cors packages/rack-proxy packages/rack-session packages/rack-test packages/rackup\n",
+          "run: pnpm vitest run packages/rack packages/rack-cors packages/rack-proxy packages/rack-session packages/rack-test packages/rackup packages/rack-cache\n",
           "run: pnpm vitest run packages/rack packages/rack-cors packages/rack-proxy\n",
         )
         .replace(
@@ -798,7 +798,7 @@ describe("CI runs every tooling test suite", () => {
 
       const filterOnly = broken.replace(
         "run: pnpm vitest run packages/rack packages/rack-cors packages/rack-proxy\n",
-        "run: pnpm vitest run packages/rack packages/rack-cors packages/rack-proxy packages/rack-session packages/rack-test packages/rackup\n",
+        "run: pnpm vitest run packages/rack packages/rack-cors packages/rack-proxy packages/rack-session packages/rack-test packages/rackup packages/rack-cache\n",
       );
       expect(filterOnly).not.toEqual(broken);
       const halfFixed = await packageCoverage(filterOnly, dirs);
