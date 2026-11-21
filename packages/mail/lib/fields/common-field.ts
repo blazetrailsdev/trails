@@ -1,5 +1,7 @@
 import {
   binaryBytes,
+  forceEncoding,
+  rbObjEncoding,
   binaryString,
   rbObjAsString,
   casecmp,
@@ -94,7 +96,10 @@ export class CommonField {
     if (typeof value === "string") {
       return value.replace(FILENAME_RE, '$1="$2"');
     } else if (value instanceof Uint8Array) {
-      return binaryBytes(binaryString(value).replace(FILENAME_RE, '$1="$2"'));
+      return forceEncoding(
+        binaryBytes(binaryString(value).replace(FILENAME_RE, '$1="$2"')),
+        rbObjEncoding(value),
+      );
     } else {
       return value;
     }

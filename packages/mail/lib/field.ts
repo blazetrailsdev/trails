@@ -23,6 +23,7 @@ import {
   stringSplit,
   warn,
   binaryBytes,
+  rbObjEncoding,
   binaryString,
   fetch,
 } from "@blazetrails/ruby-compat";
@@ -352,7 +353,7 @@ export class Field implements Comparable {
   private parseField(name: string, value: unknown, charset: string | Encoding | null): CommonField {
     if (typeof value === "string") value = this.unfold(value);
     if (value instanceof Uint8Array) {
-      value = binaryBytes(this.unfold(binaryString(value)));
+      value = forceEncoding(binaryBytes(this.unfold(binaryString(value))), rbObjEncoding(value));
     }
 
     const klass = (this.constructor as typeof Field).fieldClassFor(name);

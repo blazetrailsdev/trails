@@ -136,7 +136,6 @@ describe("mail encoding", () => {
     });
   });
 
-  // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either"
   describe("specifying an email-wide encoding", () => {
     const latin1 = (s: string): Uint8Array =>
       forceEncoding(
@@ -144,7 +143,7 @@ describe("mail encoding", () => {
         "ISO8859-1",
       ) as Uint8Array;
 
-    it.skip("should allow you to send in unencoded strings to fields and encode them", () => {
+    it("should allow you to send in unencoded strings to fields and encode them", () => {
       const mail = Mail.new();
       mail.charset = "ISO-8859-1";
       mail.setSubject(latin1("This is \xE4 string"));
@@ -152,6 +151,7 @@ describe("mail encoding", () => {
       expect(result).toEqual("Subject: =?ISO-8859-1?Q?This_is_=E4_string?=\r\n");
     });
 
+    // BLOCKED: mail-address-encoding-reads-tagged-bytes
     it.skip("should allow you to send in unencoded strings to address fields and encode them", () => {
       const mail = Mail.new();
       mail.charset = "ISO-8859-1";
@@ -162,6 +162,7 @@ describe("mail encoding", () => {
       );
     });
 
+    // BLOCKED: mail-address-encoding-reads-tagged-bytes
     it.skip("should allow you to send in multiple unencoded strings to address fields and encode them", () => {
       const mail = Mail.new();
       mail.charset = "ISO-8859-1";
@@ -181,6 +182,7 @@ describe("mail encoding", () => {
       "Reply-To": "setReplyTo",
     } as const;
     for (const [field, setter] of Object.entries(setters)) {
+      // BLOCKED: mail-address-encoding-reads-tagged-bytes
       it.skip(`allows multiple unencoded strings in ${field}`, () => {
         const array = [
           "Mikel Linds\xE4r <mikel@test.lindsaar.net>",

@@ -197,7 +197,7 @@ for (const ref of ActionViewFormHelper._includers) {
 Object.assign(ActionViewFormHelper.prototype, formHelperMembers);
 rbClearMethodCache();
 
-class FormBuilder {
+export class FormBuilder {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
