@@ -25,18 +25,17 @@ export class Statement {
   async _execute(argv: unknown[]): Promise<Mysql2Result | null> {
     const [args, kwargs] = rbScanArgs<QueryOptions>(argv);
     const currentQueryOptions = { ...this.client.queryOptions, ...kwargs, cast: true };
-    const result = this.client["storeResult"](
-      await this.client["execute"](
-        this.client["options"](this.sql, currentQueryOptions),
-        args,
-      ).catch((e: unknown) => driverError(e, this.client["connection"])),
+    const result = this.client.storeResult(
+      await this.client
+        .execute(this.client.options(this.sql, currentQueryOptions), args)
+        .catch((e: unknown) => driverError(e, this.client.connection)),
     );
     this.affectedRows = result?.size ?? this.client.affectedRows;
     return result;
   }
 
   close(): void {
-    this.client["unprepare"](this.client["options"](this.sql, this.client.queryOptions));
+    this.client.unprepare(this.client.options(this.sql, this.client.queryOptions));
   }
 }
 

@@ -308,7 +308,8 @@ export class Client {
   private _warningCount = 0;
   private _automaticClose = true;
   private connectTimeout: number | undefined;
-  private connection!: NpmConnection;
+  /** @internal */
+  connection!: NpmConnection;
   private INVALID_DATE: Error | undefined;
 
   static defaultQueryOptions(): QueryOptions {
@@ -536,7 +537,8 @@ export class Client {
     );
   }
 
-  private options(sql: string, queryOptions: QueryOptions): Record<string, unknown> {
+  /** @internal */
+  options(sql: string, queryOptions: QueryOptions): Record<string, unknown> {
     this.INVALID_DATE = undefined;
     const typeCast = this.typeCast(queryOptions);
     const rowsAsArray = queryOptions.as === "array";
@@ -545,7 +547,8 @@ export class Client {
       : { sql, rowsAsArray, typeCast };
   }
 
-  private storeResult([rawResult, rawFields]: Native): Mysql2Result | null {
+  /** @internal */
+  storeResult([rawResult, rawFields]: Native): Mysql2Result | null {
     let result = rawResult as Array<unknown[] | Record<string, unknown>> | mysql.ResultSetHeader;
     let fields = rawFields;
     if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
@@ -569,13 +572,15 @@ export class Client {
     return null;
   }
 
-  private execute(options: Record<string, unknown>, values: unknown[]): Promise<Native> {
+  /** @internal */
+  execute(options: Record<string, unknown>, values: unknown[]): Promise<Native> {
     return (
       this.connection.execute as unknown as (o: object, v: unknown[]) => Promise<Native>
     ).call(this.connection, options, values.map(bind));
   }
 
-  private unprepare(options: Record<string, unknown>): void {
+  /** @internal */
+  unprepare(options: Record<string, unknown>): void {
     this.connection.unprepare(options as never);
   }
 
