@@ -20,9 +20,6 @@ export interface EngineDatabase {
   prepare(sql: string): [EngineStatement, string];
 }
 
-const isThenable = (v: unknown): v is Promise<unknown> =>
-  v != null && typeof (v as { then?: unknown }).then === "function";
-
 export class Statement {
   #st: EngineStatement | null = null;
   #columns: (string | null)[] | null;
@@ -45,11 +42,11 @@ export class Statement {
         const pairs = v instanceof Hash ? [...v.entries()] : Object.entries(v as object);
         for (const [key, val] of pairs as [string, SqliteBindValue][]) {
           const r = this.bindParam(key, val);
-          if (isThenable(r)) pending.push(r);
+          if (r instanceof Promise) pending.push(r);
         }
       } else {
         const r = this.bindParam(index, v as SqliteBindValue);
-        if (isThenable(r)) pending.push(r);
+        if (r instanceof Promise) pending.push(r);
         index += 1;
       }
     }
@@ -59,7 +56,7 @@ export class Statement {
   columns(): (string | null)[] | Promise<(string | null)[]> {
     if (!this.#columns) {
       const r = this.getMetadata();
-      if (isThenable(r)) return r.then(() => this.#columns!);
+      if (r instanceof Promise) return r.then(() => this.#columns!);
     }
     return this.#columns!;
   }
@@ -67,7 +64,7 @@ export class Statement {
   each(block: (row: unknown[]) => void): this | Promise<this> {
     for (;;) {
       const val = this.step();
-      if (isThenable(val)) {
+      if (val instanceof Promise) {
         return (async () => {
           let v = await val;
           for (;;) {
@@ -94,7 +91,7 @@ export class Statement {
     const st = this.#st!;
     this.#st = null;
     const r = st.close();
-    return isThenable(r) ? r.then(() => this) : this;
+    return r instanceof Promise ? r.then(() => this) : this;
   }
 
   isClosed(): boolean {
@@ -109,7 +106,7 @@ export class Statement {
   resetBang(): this | Promise<this> {
     this.mustBeOpenBang();
     const r = this.#st!.resetBang();
-    return isThenable(r) ? r.then(() => this) : this;
+    return r instanceof Promise ? r.then(() => this) : this;
   }
 
   step(): unknown[] | null | Promise<unknown[] | null> {
@@ -149,14 +146,14 @@ export class Statement {
     const count = this.columnCount();
     const build = (n: number): void | Promise<void> => {
       const names = Array.from({ length: n }, (_, column) => this.columnName(column));
-      if (names.some(isThenable)) {
+      if (names.some((name) => name instanceof Promise)) {
         return Promise.all(names).then((resolved) => {
           this.#columns = resolved;
         });
       }
       this.#columns = names as (string | null)[];
     };
-    return isThenable(count) ? count.then(build) : build(count);
+    return count instanceof Promise ? count.then(build) : build(count);
   }
 }
 
