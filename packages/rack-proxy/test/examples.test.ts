@@ -2,27 +2,22 @@ import { constDefined, constGet, constSet, TopLevel } from "@blazetrails/ruby-co
 import { describe, expect, it } from "vitest";
 
 import { Proxy } from "../lib/index.js";
-import * as exampleServiceProxy from "../examples/example-service-proxy.js";
-import * as forwardHost from "../examples/forward-host.js";
-import * as rackPhpProxy from "../examples/rack-php-proxy.js";
-import * as trustingProxy from "../examples/trusting-proxy.js";
 
 describe("ExamplesTest", () => {
   const EXAMPLES = {
-    "forward-host": ["ForwardHost", forwardHost],
-    "rack-php-proxy": ["RackPhpProxy", rackPhpProxy],
-    "trusting-proxy": ["TrustingProxy", trustingProxy],
-    "example-service-proxy": ["ExampleServiceProxy", exampleServiceProxy],
+    "forward-host": "ForwardHost",
+    "rack-php-proxy": "RackPhpProxy",
+    "trusting-proxy": "TrustingProxy",
+    "example-service-proxy": "ExampleServiceProxy",
   } as const;
 
-  it("examples are safe to load without rails", () => {
+  it("examples are safe to load without rails", async () => {
     expect(!("Trails" in TopLevel), "this test assumes Trails is not loaded").toBeTruthy();
 
-    for (const [file, [className, mod]] of Object.entries(EXAMPLES)) {
-      expect(
-        () => constSet(TopLevel, className, (mod as Record<string, unknown>)[className]),
-        `loading ${file} outside Trails must not raise`,
-      ).not.toThrow();
+    for (const [file, className] of Object.entries(EXAMPLES)) {
+      const load = import(`../examples/${file}.ts`) as Promise<Record<string, unknown>>;
+      await expect(load, `loading ${file} outside Trails must not raise`).resolves.not.toThrow();
+      constSet(TopLevel, className, (await load)[className]);
       expect(
         constDefined(TopLevel, className),
         `${className} should be defined after loading ${file}`,
