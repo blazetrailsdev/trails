@@ -165,10 +165,13 @@ describe("LoadAsyncTest", () => {
     expect(posts).not.toBeNull();
     expect([...new Set((await posts!).map((post) => post.title))]).toEqual(["In Transaction"]);
   });
-  it.skipIf(inMemoryDb())("load async instrumentation is thread safe", async () => {
+  it("load async instrumentation is thread safe", async (ctx) => {
+    ctx.skip(!(await Base.leaseConnection()).isAsyncEnabled());
+
     const connection = (await Base.leaseConnection()) as unknown as { log: LogMethod };
     const latch1 = new Concurrent.CountDownLatch();
     const latch2 = new Concurrent.CountDownLatch();
+    let promise: Promise<unknown> | undefined;
     try {
       const oldLog = connection.log.bind(connection);
       connection.log = async (...args) => {
@@ -181,7 +184,7 @@ describe("LoadAsyncTest", () => {
         return oldLog(...args);
       };
 
-      const promise = Post.asyncCount();
+      promise = Post.asyncCount();
       await latch1.wait();
 
       let notificationCalled = false;
@@ -196,12 +199,11 @@ describe("LoadAsyncTest", () => {
       );
 
       expect(notificationCalled).toBe(true);
-      latch2.countDown();
-      await promise;
     } finally {
       latch2.countDown();
       delete (connection as { log?: LogMethod }).log;
     }
+    await promise;
   });
   it("eager loading query", async () => {
     const expectedRecords = await Post.where({ author_id: 1 }).eagerLoad("comments");
