@@ -46,7 +46,7 @@ describe("LiveSmokeTest", () => {
   it("proxies to real http host", async () => {
     app().host = "example.com";
     await get("/");
-    expect(lastResponse.isOk).toBe(true);
+    expect(lastResponse.isOk).toBeTruthy();
     expect(lastResponse.body).toMatch(/Example Domain/);
   });
 
@@ -56,6 +56,6 @@ describe("LiveSmokeTest", () => {
     expect(
       lastResponse.isOk,
       "default VERIFY_PEER should accept a valid publicly-trusted cert",
-    ).toBe(true);
+    ).toBeTruthy();
   });
 });
