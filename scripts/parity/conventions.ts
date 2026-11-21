@@ -260,10 +260,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // Real ports that live under a different file name than the Ruby one, found
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.
-  //
-  // `Deprecation::Disallowed` is one of the modules `Deprecation` includes;
-  // trails carries `disallowedWarnings` / `disallowedBehavior` on Deprecation.
-  "activesupport:deprecation/disallowed.rb": "deprecation.ts",
   // `Array#extract_options!` is ported next to the other options-hash helpers.
   "activesupport:core_ext/array/extract_options.rb": "hash-utils.ts",
   "activesupport:core_ext/string/inflections.rb": "inflector.ts",

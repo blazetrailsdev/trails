@@ -1,8 +1,1 @@
-[
-  {
-    "package": "activesupport",
-    "name": "DeprecationException",
-    "rubyFile": "active_support/deprecation/behaviors.rb",
-    "reason": "active_support/deprecation/behaviors.rb (Deprecation#raise behavior) is unported."
-  }
-]
+[]
