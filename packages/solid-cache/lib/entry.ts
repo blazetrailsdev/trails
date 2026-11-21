@@ -1,4 +1,3 @@
-import { type Result } from "@blazetrails/activerecord";
 import { include, runLoadHooks } from "@blazetrails/activesupport";
 import { Encryption } from "./entry/encryption.js";
 import { Expiration, type ClassMethods as ExpirationClassMethods } from "./entry/expiration.js";
@@ -88,7 +87,7 @@ export class Entry extends Record {
 
         await this.withConnection(async (connection) => {
           const rows = (await connection.selectAll(query, "SolidCache::Entry Load")).castValues(
-            this.attributeTypes() as unknown as Parameters<Result["castValues"]>[0],
+            this.attributeTypes(),
           ) as [unknown, unknown][];
           for (const [key, value] of rows) results.set(key as Uint8Array, value);
         });

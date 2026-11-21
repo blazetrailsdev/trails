@@ -418,7 +418,7 @@ export class Configuration {
   /** @internal */
   private async loadConfigFrom(fileOrHash: unknown): Promise<Options> {
     if (isPlainObject(fileOrHash)) {
-      return { ...(fileOrHash as Options) };
+      return { ...fileOrHash };
     } else if (fileOrHash instanceof Pathname || typeof fileOrHash === "string") {
       return await this.loadConfigFromFile(new Pathname(String(fileOrHash)));
     } else if (fileOrHash == null) {

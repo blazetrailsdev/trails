@@ -217,7 +217,7 @@ describe("Object#to_s", () => {
       }
     }
     expect(toS(new Str("seat"))).toBe("seat");
-    class Sub extends (rbCString as unknown as new () => object) {
+    class Sub extends rbCString {
       toS(): this {
         return this;
       }
@@ -886,7 +886,7 @@ describe("rbModDefineMethod", () => {
       });
     define();
     define();
-    expect((new Child() as Parent).greet()).toBe("child:parent");
+    expect(new Child().greet()).toBe("child:parent");
   });
 
   it("defines an instance method on the class, which method_defined? sees without its ancestors", () => {
@@ -971,7 +971,7 @@ describe("rbModAttrReader / rbModAttrWriter / rbModMethodDefined", () => {
     class Sub extends Base {}
     rbModAttrReader(Sub, "title");
 
-    const sub = new Sub() as unknown as { title: unknown; written: unknown };
+    const sub = new Sub();
     sub.title = "x";
     expect(sub.written).toBe("x");
     expect(sub.title).toBeNull();

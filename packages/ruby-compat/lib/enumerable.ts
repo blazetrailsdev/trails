@@ -84,11 +84,9 @@ function rbBlockCall<T, E, R>(
   let each: unknown;
   try {
     if (typeof (obj as Partial<Each<T, E>>).each === "function") {
-      each = (obj as Each<T, E>).each(((...argv: T[]) =>
-        block(
-          argv.length === 0 ? (null as T) : argv.length === 1 ? argv[0] : (argv as T),
-          argv,
-        )) as (i: T) => void);
+      each = (obj as Each<T, E>).each((...argv: T[]) =>
+        block(argv.length === 0 ? (null as T) : argv.length === 1 ? argv[0] : (argv as T), argv),
+      );
     } else if (awaiting) {
       const it = (obj as Iterable<T>)[Symbol.iterator]();
       for (let step = it.next(); !step.done; step = it.next()) {
@@ -1455,7 +1453,7 @@ export class Enumerable<T = unknown, E = unknown> {
     block?: (...argv: unknown[]) => unknown,
   ): Record<string, unknown> {
     const hash: Record<string, unknown> = {};
-    (this.each as (block: (...argv: unknown[]) => void) => unknown)((...argv: unknown[]) => {
+    this.each((...argv: unknown[]) => {
       const arg = block ? block(...argv) : argv.length === 1 ? argv[0] : argv;
       if (!Array.isArray(arg)) {
         throw new RbTypeError(`wrong element type ${rbObjClassname(arg)} (expected array)`);

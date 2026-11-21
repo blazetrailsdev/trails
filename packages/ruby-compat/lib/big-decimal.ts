@@ -55,7 +55,7 @@ export class BigDecimal {
     const isFloat = typeof value === "number" || boxed instanceof Number;
     const isRational = !isFloat && typeof value === "object";
     const parsed = isRational
-      ? parseRational(value as RationalLike, ndigits)
+      ? parseRational(value, ndigits)
       : parse(value.valueOf() as string | number | bigint, ndigits);
     if (parsed === null) {
       if (typeof value === "string") {

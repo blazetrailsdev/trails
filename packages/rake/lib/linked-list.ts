@@ -75,7 +75,7 @@ class EmptyLinkedList extends LinkedList<never> {
   static parent: typeof LinkedList = LinkedList;
 
   constructor() {
-    super(undefined as never, undefined as never);
+    super(undefined, undefined);
   }
 
   override isEmpty(): boolean {

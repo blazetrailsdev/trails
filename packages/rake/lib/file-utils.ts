@@ -55,7 +55,7 @@ export const FileUtils = {
       const argv = cmd as Parameters<typeof rbFSystem>;
       const res = isPlainHash(cmd.at(-1))
         ? await rbFSystem(...argv)
-        : await rbFSystem(...argv, options as Parameters<typeof rbFSystem>[0]);
+        : await rbFSystem(...argv, options);
       let status: { exitstatus(): number | null } | null = Process.lastStatus;
       if (!rtest(res) && status == null) status = new PseudoStatus(1);
       return shellRunner(res, status!);

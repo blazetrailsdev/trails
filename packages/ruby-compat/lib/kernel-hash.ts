@@ -18,7 +18,7 @@ export function kernelHash(arg: unknown): object {
         hash instanceof Hash ||
         (hash != null && Object.getPrototypeOf(hash) === Object.prototype)
       ) {
-        return hash as object;
+        return hash;
       }
       if (hash != null) {
         throw new TypeError(

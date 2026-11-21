@@ -275,7 +275,7 @@ export class Module<I extends object = Record<never, never>> {
     const carrier = carrierOf(this) as Partial<I> & Record<string, unknown>;
     const before: Record<PropertyKey, PropertyDescriptor | undefined> =
       Object.getOwnPropertyDescriptors(carrier);
-    const result = block.call(this as Module, carrier);
+    const result = block.call(this, carrier);
     for (const [key, entry] of Object.entries(Object.getOwnPropertyDescriptors(carrier))) {
       if (entry.configurable && !("value" in entry) && (!entry.get || !entry.set)) {
         defineAccessorHalf(carrier, key, {});
@@ -1039,7 +1039,7 @@ export function isModuleIncluded(
   mod: ModuleObject | AnyClass | Module,
 ): boolean {
   if (isPlainHash(klass) && !Object.hasOwn(klass, "prototype")) {
-    return klass !== mod && rbModAncestors(klass as { prototype: object }).includes(mod);
+    return klass !== mod && rbModAncestors(klass).includes(mod);
   }
   return isModuleMethodTablePresent(klass as { prototype: object }, mod);
 }

@@ -51,7 +51,7 @@ async function mockReq(req: Partial<HttpRequest>): Promise<HttpRequest> {
     ...req,
   } as unknown as HttpRequest;
   setTimeout(() => {
-    for (const listener of listeners["end"] ?? []) (listener as () => void)();
+    for (const listener of listeners["end"] ?? []) listener();
   }, 0);
   return built;
 }
@@ -191,7 +191,7 @@ describe("Rack::Handler::Node", () => {
         return { done: true as const, value: undefined };
       },
     };
-    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
+    const app: RackApp = async () => [200, {}, body];
     const boom = new Error("headers already sent");
     const res = {
       writeHead() {
@@ -242,7 +242,7 @@ describe("Rack::Handler::Node", () => {
         release();
       },
     };
-    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
+    const app: RackApp = async () => [200, {}, body];
     const { res, written } = streamingRes();
     const serving = new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
     await vi.waitFor(() => expect(written).toEqual(["first"]));
@@ -261,7 +261,7 @@ describe("Rack::Handler::Node", () => {
         }
       },
     };
-    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
+    const app: RackApp = async () => [200, {}, body];
     const { res, written } = streamingRes();
     res.writable = false;
     const serving = new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
@@ -278,7 +278,7 @@ describe("Rack::Handler::Node", () => {
     const lines: string[] = [];
     const spy = vi.spyOn(stderr, "write").mockImplementation((chunk) => {
       lines.push(String(chunk));
-      return true as never;
+      return true;
     });
     return { lines, restore: () => spy.mockRestore() };
   }
@@ -386,7 +386,7 @@ describe("Rack::Handler::Node", () => {
               yield "first";
               throw new Error("mid-body");
             },
-          } as unknown as RackBody,
+          },
         ],
         async (url) => {
           try {

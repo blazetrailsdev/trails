@@ -378,11 +378,11 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
   eachSlice: (items, n: number, block?: ElementBlock) =>
     !block
       ? _enum(items, "eachSlice", [n], () => Math.ceil(items.length / n))
-      : _eachGroup(items, eachSlice(items, n) as unknown as Iterable<unknown>, block),
+      : _eachGroup(items, eachSlice(items, n), block),
   eachCons: (items, n: number, block?: ElementBlock) =>
     !block
       ? _enum(items, "eachCons", [n], () => Math.max(items.length - n + 1, 0))
-      : _eachGroup(items, eachCons(items, n) as unknown as Iterable<unknown>, block),
+      : _eachGroup(items, eachCons(items, n), block),
   cycle: async (items, ...args: unknown[]) => {
     const block = _isProc(args.at(-1)) ? (args.pop() as ElementBlock) : null;
     const n = (args[0] as number | null | undefined) ?? null;
@@ -486,7 +486,7 @@ const ARRAY_CALLS: Record<string, (items: Items, ...args: never[]) => unknown> =
     const rest = [...items];
     let memo = args.length ? args[0] : (rest.shift() ?? null);
     for (const fn of rest) {
-      memo = block ? await block(memo, fn as string) : rbFSend(memo, op as string, fn);
+      memo = block ? await block(memo, fn as string) : rbFSend(memo, op, fn);
     }
     return memo;
   },

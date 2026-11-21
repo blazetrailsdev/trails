@@ -217,15 +217,15 @@ export class Thread<R = unknown> {
       );
     };
     this.id = ++_threadIdCounter;
-    _threads.add(this as Thread);
+    _threads.add(this);
     this.status = "run";
     _locations.set(this, _creationFrame(new.target));
     try {
-      this.#value = currentSlot().run(this as Thread, () => block(...args));
+      this.#value = currentSlot().run(this, () => block(...args));
     } catch (error) {
       this.#error = { raised: error };
       this.status = "dead";
-      _threads.delete(this as Thread);
+      _threads.delete(this);
       report(error);
       if (this.abortOnException) this.#abort(error);
       return;
@@ -234,7 +234,7 @@ export class Thread<R = unknown> {
     if (value && typeof (value as PromiseLike<unknown>).then === "function") {
       const die = () => {
         this.status = "dead";
-        _threads.delete(this as Thread);
+        _threads.delete(this);
       };
       (value as PromiseLike<unknown>).then(die, (error) => {
         die();
@@ -243,7 +243,7 @@ export class Thread<R = unknown> {
       });
     } else {
       this.status = "dead";
-      _threads.delete(this as Thread);
+      _threads.delete(this);
     }
   }
 
@@ -393,7 +393,7 @@ export class Thread<R = unknown> {
     if (this.status === "dead") return this;
     this.toKill = true;
     this.status = "dead";
-    _threads.delete(this as Thread);
+    _threads.delete(this);
     this.#kill();
     return this;
   }

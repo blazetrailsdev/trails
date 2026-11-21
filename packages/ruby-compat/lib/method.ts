@@ -63,10 +63,7 @@ export class Method {
    * @noRailsEquivalent PERMANENT
    */
   owner(): object {
-    return (
-      methodOwner(Object(this.#receiver) as object, this.#name) ??
-      (rbObjClass(this.#receiver) as object)
-    );
+    return methodOwner(Object(this.#receiver) as object, this.#name) ?? rbObjClass(this.#receiver);
   }
 
   /**

@@ -127,7 +127,7 @@ export class Fiber<R = unknown> {
     let value: R;
     this.#running = true;
     try {
-      value = currentSlot().run(this as Fiber, this.#block);
+      value = currentSlot().run(this, this.#block);
     } catch (error) {
       this.#status = "terminated";
       this.#transfer = null;

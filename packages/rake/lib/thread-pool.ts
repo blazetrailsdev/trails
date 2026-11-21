@@ -28,7 +28,7 @@ export class ThreadPool {
     const promise = new RakePromise<T>(args, block);
     promise.recorder = (event, data) => this.stat(event, data);
 
-    this._queue.push(promise as RakePromise);
+    this._queue.push(promise);
     this.stat("queued", { item_id: rbObjId(promise) });
     this.startThread();
     return promise;

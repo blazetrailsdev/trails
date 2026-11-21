@@ -123,7 +123,7 @@ export function rbObjClass(obj: unknown): Klass {
   if (tag === "Temporal.PlainTime") return reopened(rbCTime) as Klass;
   if (isPlainHash(obj))
     return isModuleObject(obj) ? (Object.getPrototypeOf(rbCClass) as Klass) : Hash;
-  const klass = (obj as object).constructor as Klass | undefined;
+  const klass = obj.constructor as Klass | undefined;
   if (klass === Date) return reopened(rbCTime) as Klass;
   return typeof klass === "function" ? klass : Object;
 }
@@ -1047,7 +1047,7 @@ export function rbModMethodDefined(
   mid: string,
   inherit = true,
 ): boolean {
-  if ("prototype" in mod) return checkDefinition(mod as { prototype: object }, mid, inherit);
+  if ("prototype" in mod) return checkDefinition(mod, mid, inherit);
   if ("isMethodDefined" in mod) return mod.isMethodDefined(mid);
   const me = Object.getOwnPropertyDescriptor(mod, mid);
   if (me?.enumerable) return typeof me.value === "function" || me.get !== undefined;
@@ -1545,7 +1545,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (mid === "each" && typeof args[0] === "function") {
     const block = args[0] as AnyFunction;
     if (Array.isArray(recv) || recv instanceof Set || recv instanceof Map || isPlainHash(recv)) {
-      return aryEach(recv as object, block as (item: unknown) => unknown);
+      return aryEach(recv as object, block);
     }
   }
   if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
@@ -2143,7 +2143,7 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
     const str = (value as { toS(): unknown }).toS();
     if (str instanceof Uint8Array) return str;
     if (typeof str === "string") return str;
-    return str instanceof rbCString ? String(str) : rbAnyToS(value as object);
+    return str instanceof rbCString ? String(str) : rbAnyToS(value);
   }
   if (
     typeof value === "function" &&

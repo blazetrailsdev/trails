@@ -241,7 +241,7 @@ export function rbConstGet(klass: object, id: string, exclude = false, recurse =
     return (klass as Record<string, unknown>)[id];
   }
   if (recurse && typeof klass === "function") {
-    for (const tmp of rbModAncestors(klass as unknown as { prototype: object })) {
+    for (const tmp of rbModAncestors(klass)) {
       if (Object.hasOwn(tmp, id)) {
         rbConstWarnIfDeprecated(tmp, id);
         return (tmp as Record<string, unknown>)[id];
@@ -316,7 +316,7 @@ export function rbModConstants(mod: object, inherit: unknown = true): string[] {
   const tbl = new Set<string>();
   const ancestors =
     inherit !== null && inherit !== false && typeof mod === "function"
-      ? rbModAncestors(mod as unknown as { prototype: object })
+      ? rbModAncestors(mod)
       : [mod];
   for (const tmp of ancestors) {
     if (tmp === Object && mod !== Object) break;

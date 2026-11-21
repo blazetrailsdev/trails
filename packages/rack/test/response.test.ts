@@ -718,19 +718,19 @@ it("should specify to cache content", () => {
 
 describe("headers", () => {
   it("has_header?", () => {
-    const response = new Response([], 200, { foo: "1" } as any);
+    const response = new Response([], 200, { foo: "1" });
     expect(() => response.hasHeader(null as any)).toThrow(ArgumentError);
     expect(response.hasHeader("foo")).toBe(true);
   });
 
   it("get_header", () => {
-    const response = new Response([], 200, { foo: "1" } as any);
+    const response = new Response([], 200, { foo: "1" });
     expect(() => response.getHeader(null as any)).toThrow(ArgumentError);
     expect(response.getHeader("foo")).toBe("1");
   });
 
   it("set_header", () => {
-    const response = new Response([], 200, { foo: "1" } as any);
+    const response = new Response([], 200, { foo: "1" });
     expect(() => response.setHeader(null as any, "1")).toThrow(ArgumentError);
 
     expect(response.setHeader("foo", "2")).toBe("2");
@@ -742,7 +742,7 @@ describe("headers", () => {
   });
 
   it("add_header", () => {
-    const response = new Response([], 200, { foo: "1" } as any);
+    const response = new Response([], 200, { foo: "1" });
     expect(() => response.addHeader(null as any, "1")).toThrow(ArgumentError);
 
     expect(response.addHeader("foo", "2")).toEqual(["1", "2"]);
@@ -761,7 +761,7 @@ describe("headers", () => {
   });
 
   it("delete_header", () => {
-    const response = new Response([], 200, { foo: "1" } as any);
+    const response = new Response([], 200, { foo: "1" });
     expect(() => response.deleteHeader(null as any)).toThrow(ArgumentError);
 
     expect(response.deleteHeader("foo")).toBe("1");

@@ -61,7 +61,7 @@ export class Set<T> extends JsSet<T> {
       return this;
     } else {
       throw new NotImplementedError(
-        `${rbModName(this.constructor as typeof Set)}#compare_by_identity is not implemented`,
+        `${rbModName(this.constructor)}#compare_by_identity is not implemented`,
       );
     }
   }
