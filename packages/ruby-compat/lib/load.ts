@@ -86,12 +86,24 @@ export function loadedFileExports(fname: string): Record<string, unknown> | unde
  * record per URL, so each load imports the file under a URL no earlier load
  * used. A Ruby file binds its top-level constants in `rb_cObject`
  * (`rb_const_set`, `vendor/ruby/v3.3.11/variable.c:3674`); an ES module
- * exports them, and each constant-named export is seated there.
+ * exports them, and each constant-named export is seated there. A name that
+ * is neither absolute nor explicitly relative is searched for in `$LOAD_PATH`
+ * first (`rb_find_file`, `vendor/ruby/v3.3.11/file.c:6489-6533`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export async function rbFLoad(fname: string): Promise<true> {
-  const exports = await loadIseqEval(fname, true);
+  let path = fname;
+  if (!/^(\/|\.\.?\/|~)/.test(fname)) {
+    for (const str of LOAD_PATH) {
+      const tmp = File.expandPath(fname, str);
+      if (isCompiledFile(tmp) || (await File.isExistAsync(tmp))) {
+        path = tmp;
+        break;
+      }
+    }
+  }
+  const exports = await loadIseqEval(path, true);
   for (const [id, val] of Object.entries(exports)) {
     if (!/^[\p{Lu}\p{Lt}]/u.test(id)) continue;
     if (classDefined !== null && typeof val === "function") {

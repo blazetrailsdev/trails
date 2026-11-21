@@ -6,11 +6,13 @@ import {
   LOAD_PATH,
   LoadError,
   STDOUT,
+  exit,
   getPath,
   regexpEscape,
 } from "@blazetrails/ruby-compat";
 import type { Base, GeneratorConfig } from "./generators/base.js";
 import { noColorBang } from "./command/behavior.js";
+import { CorrectableNameError } from "./command.js";
 import { Trails } from "./trails.js";
 import type {
   AfterGenerateCallback,
@@ -230,15 +232,23 @@ export class Generators {
     const names = namespace.split(":");
     const name = names.pop()!;
     const klass = await Generators.findByNamespace(name, names.length ? names.join(":") : null);
-    if (!klass) {
-      throw new Error(
-        `Could not find generator '${namespace}'.\n` +
-          "Run `bin/trails generate --help` for more options.\n",
+    if (klass) {
+      if (args.length === 0 && klass.arguments().some((a) => a.isRequired())) args.push("--help");
+      await klass.start(args, config);
+      if (config.behavior === "invoke") await Generators.runAfterGenerateCallback();
+    } else {
+      const options = (await Generators.sortedGroups()).flatMap(([, namespaces]) => namespaces);
+      const error = new CorrectableNameError(
+        `Could not find generator '${namespace}'.`,
+        namespace,
+        options,
       );
+
+      STDOUT.puts(
+        `${error.detailedMessage()}\nRun \`bin/trails generate --help\` for more options.\n`,
+      );
+      exit(1);
     }
-    if (args.length === 0 && klass.arguments().some((a) => a.isRequired())) args.push("--help");
-    await klass.start(args, config);
-    if (config.behavior === "invoke") await Generators.runAfterGenerateCallback();
   }
 
   static addGeneratedFile(file: string): string {
