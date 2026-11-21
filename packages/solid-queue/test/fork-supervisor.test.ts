@@ -289,7 +289,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
 
   it("delete previous pidfile if the owner is dead", async () => {
     let pid = run();
-    await waitForRegisteredProcesses(4);
+    await waitForRegisteredProcesses(4, { timeout: 10 });
 
     await terminateProcess(pid, { signal: "KILL" });
 
@@ -299,7 +299,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await waitForRegisteredProcesses(0);
 
     pid = run();
-    await waitForRegisteredProcesses(4);
+    await waitForRegisteredProcesses(4, { timeout: 10 });
 
     expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).toEqual(pid);
