@@ -33,6 +33,10 @@ export default async function setup(): Promise<void> {
   await FileUtils.mkdirPAsync(File.join(appTemplatePath, "app/javascript"));
   await getFs().writeFile!(File.join(appTemplatePath, "app/javascript/application.js"), "\n");
 
+  const applicationPath = File.join(appTemplatePath, "config/application.ts");
+  const contents = await File.readAsync(applicationPath);
+  await getFs().writeFile!(applicationPath, contents.replace(/^await Bundler\.require.*\n/m, ""));
+
   await FileUtils.lnSfAsync(
     File.join(TRAILS_FRAMEWORK_ROOT, "packages/trailties/node_modules"),
     File.join(TRAILS_FRAMEWORK_ROOT, "tmp/node_modules"),

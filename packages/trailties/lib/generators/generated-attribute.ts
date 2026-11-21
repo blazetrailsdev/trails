@@ -74,7 +74,13 @@ export class GeneratedAttribute {
     return Base.isDangerousAttributeMethod(name);
   }
 
-  static validType = (t: string): boolean => DEFAULT_TYPES.has(t);
+  static validType(type: string): boolean {
+    return (
+      DEFAULT_TYPES.has(type) ||
+      Base == null ||
+      Base.connectionPool().activeConnection?.isValidType(type) === true
+    );
+  }
   static validIndexType = (t: string | undefined): boolean => INDEX_OPTIONS.includes(t ?? "");
   static reference = (t: string): boolean => t === "references" || t === "belongs_to";
 

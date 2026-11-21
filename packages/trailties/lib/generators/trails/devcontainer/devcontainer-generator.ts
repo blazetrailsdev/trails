@@ -123,7 +123,11 @@ export class DevcontainerGenerator extends Base {
     );
     if (!File.isExist(systemTestCasePath)) return;
 
-    await this.gsubFile(systemTestCasePath, /^\s*drivenBy\b.*/gm, this.systemTestConfiguration());
+    await this.gsubFile(
+      systemTestCasePath,
+      /^\s*this\.drivenBy\b.*/gm,
+      this.systemTestConfiguration(),
+    );
   }
 
   async updateDatabaseYml(): Promise<void> {
@@ -238,11 +242,14 @@ export class DevcontainerGenerator extends Base {
   }
 
   private systemTestConfiguration(): string {
-    return `  if (process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT) {
-    servedBy({ host: "trails-app", port: process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT });
-    drivenBy(":selenium", { using: ":headless_chrome", screenSize: [1400, 1400], options: { browser: ":remote", url: \`http://\${process.env.SELENIUM_HOST}:4444\` } });
-  } else {
-    drivenBy(":selenium", { using: ":headless_chrome", screenSize: [1400, 1400] });
-  }`;
+    return `    if (process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT) {
+      this.servedBy({ host: "trails-app", port: process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT });
+      this.drivenBy("selenium", { using: "headless_chrome", screenSize: [1400, 1400], options: {
+        browser: "remote",
+        url: \`http://\${process.env.SELENIUM_HOST}:4444\`
+      } });
+    } else {
+      this.drivenBy("selenium", { using: "headless_chrome", screenSize: [1400, 1400] });
+    }`;
   }
 }
