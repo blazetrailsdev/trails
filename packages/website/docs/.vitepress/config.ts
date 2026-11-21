@@ -84,6 +84,7 @@ export default defineConfig({
           items: [
             { text: "Action View Overview", link: "/guides/action-view-overview" },
             { text: "Action View Helpers", link: "/guides/action-view-helpers" },
+            { text: "Action View Form Helpers", link: "/guides/form-helpers" },
           ],
         },
         {
@@ -123,11 +124,20 @@ export default defineConfig({
         },
         {
           text: "Extending Trails",
-          items: [{ text: "Getting Started with Engines", link: "/guides/engines" }],
+          items: [
+            { text: "Getting Started with Engines", link: "/guides/engines" },
+            {
+              text: "Creating and Customizing Trails Generators & Templates",
+              link: "/guides/generators",
+            },
+          ],
         },
         {
           text: "Going to Production",
-          items: [{ text: "Caching with Trails: An Overview", link: "/guides/caching-with-rails" }],
+          items: [
+            { text: "Caching with Trails: An Overview", link: "/guides/caching-with-rails" },
+            { text: "Error Reporting in Trails Applications", link: "/guides/error-reporting" },
+          ],
         },
         {
           text: "Rails Guides",
