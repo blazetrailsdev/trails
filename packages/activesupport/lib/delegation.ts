@@ -348,9 +348,13 @@ export namespace Delegation {
 
   const methodMissingLayers = new WeakSet<object>();
 
+  /** @noRailsEquivalent CONVERGEABLE delegate-missing-to-writer-arm-without-guard */
+  const resolvingWriters = new WeakSet<object>();
+
   /**
    * @inventedArm then — PERMANENT
    * @inventedArm if — PERMANENT
+   * @inventedArm try — CONVERGEABLE delegate-missing-to-writer-arm-without-guard
    */
   export function generateMethodMissing(
     owner: { prototype: object },
@@ -386,7 +390,8 @@ export namespace Delegation {
           prop.startsWith("_") ||
           prop === "then" ||
           KERNEL_METHODS.has(prop) ||
-          Object.hasOwn(receiver, "constructor")
+          Object.hasOwn(receiver, "constructor") ||
+          resolvingWriters.has(receiver as object)
         ) {
           return Reflect.get(obj, prop, receiver);
         }
@@ -420,7 +425,15 @@ export namespace Delegation {
         ) {
           return Reflect.set(obj, prop, value, receiver);
         }
-        const __target = (receiver as Record<string, unknown>)[targetName];
+        resolvingWriters.add(receiver as object);
+        let __target: unknown;
+        try {
+          __target = (receiver as Record<string, unknown>)[targetName];
+        } catch {
+          __target = null;
+        } finally {
+          resolvingWriters.delete(receiver as object);
+        }
         if (__target == null || !rbObjRespondTo(__target, `${prop}=`)) {
           return Reflect.set(obj, prop, value, receiver);
         }
