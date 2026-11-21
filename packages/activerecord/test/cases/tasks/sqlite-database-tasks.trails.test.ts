@@ -76,10 +76,11 @@ describe("SQLiteDatabaseTasks", () => {
     const sourceConfig = new HashConfig("development", "primary", {
       adapter: "sqlite3",
       database: dbPath,
+      timeout: 5000,
     });
 
     const { SQLite3Adapter } = await import("../../../lib/connection-adapters/sqlite3-adapter.js");
-    const seedAdapter = new SQLite3Adapter({ database: dbPath });
+    const seedAdapter = new SQLite3Adapter({ database: dbPath, timeout: 5000 });
     try {
       await seedAdapter.execute(
         "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, updated_at TEXT)",
@@ -105,13 +106,14 @@ describe("SQLiteDatabaseTasks", () => {
       const targetConfig = new HashConfig("development", "primary", {
         adapter: "sqlite3",
         database: loadDbPath,
+        timeout: 5000,
       });
       fs.writeFileSync(loadDbPath, "");
       await DatabaseTasks.withTemporaryConnection(targetConfig, async () => {
         await new SQLiteDatabaseTasks(targetConfig, "/rails/root").structureLoad(dumpPath, null);
       });
 
-      const loadedAdapter = new SQLite3Adapter({ database: loadDbPath });
+      const loadedAdapter = new SQLite3Adapter({ database: loadDbPath, timeout: 5000 });
       try {
         const tables = (await loadedAdapter.execute(
           "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
@@ -129,7 +131,7 @@ describe("SQLiteDatabaseTasks", () => {
         await (loadedAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
       }
     } finally {
-      const cleanupAdapter = new SQLite3Adapter({ database: dbPath });
+      const cleanupAdapter = new SQLite3Adapter({ database: dbPath, timeout: 5000 });
       await cleanupAdapter.execute("DROP TABLE IF EXISTS widgets");
       await (cleanupAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
     }
