@@ -234,15 +234,14 @@ export class Statement {
     const build = (n: number): void | Promise<void> => {
       const names = Array.from({ length: n }, (_, column) => this.columnName(column));
       const decltypes = Array.from({ length: n }, (_, column) => this.columnDecltype(column));
-      const downcase = (vals: (string | null)[]) => vals.map((val) => val?.toLowerCase() ?? null);
       if ([...names, ...decltypes].some((val) => val instanceof Promise)) {
         return Promise.all([Promise.all(names), Promise.all(decltypes)]).then(([n2, d]) => {
           this.#columns = n2;
-          this.#types = downcase(d);
+          this.#types = d.map((val) => val?.toLowerCase() ?? null);
         });
       }
       this.#columns = names as (string | null)[];
-      this.#types = downcase(decltypes as (string | null)[]);
+      this.#types = (decltypes as (string | null)[]).map((val) => val?.toLowerCase() ?? null);
     };
     return count instanceof Promise ? count.then(build) : build(count);
   }

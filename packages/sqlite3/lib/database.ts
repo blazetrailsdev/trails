@@ -267,7 +267,6 @@ export class Database {
     this.loadExtensionInternal(extensionSpecifier as string);
   }
 
-  /** @internal */
   initializeExtensions(extensions: unknown): void {
     if (extensions == null) return;
     if (!Array.isArray(extensions)) throw new TypeError("extensions must be an Array");
