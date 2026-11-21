@@ -76,10 +76,11 @@ export function isSourceUnported(file: string, pkg?: string): boolean {
   return unportedSourceEntry(file, pkg) !== undefined;
 }
 
-/** The entry that makes {@link isSourceUnported} true, for its `reason`. */
-// test-compare keys actionpack's Rails tests by sub-framework
-// (`scripts/test-compare/compare.ts` PACKAGE_DIRS), while a row is scoped by
-// the trails package that holds the port.
+/**
+ * test-compare keys actionpack's Rails tests by sub-framework
+ * (`scripts/test-compare/compare.ts` PACKAGE_DIRS); a row is scoped by the
+ * trails package that holds the port.
+ */
 const PACKAGE_SCOPES: Record<string, readonly string[]> = {
   actionpack: [
     "actionpack",
@@ -95,6 +96,7 @@ function scopeMatches(scope: string | undefined, pkg: string | undefined): boole
   return (PACKAGE_SCOPES[scope] ?? [scope]).includes(pkg);
 }
 
+/** The entry that makes {@link isSourceUnported} true, for its `reason`. */
 export function unportedSourceEntry(file: string, pkg?: string): UnportedFile | undefined {
   return UNPORTED_FILES.find((e) => {
     if (!e.pattern) return false;
