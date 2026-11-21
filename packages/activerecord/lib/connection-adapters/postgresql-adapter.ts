@@ -585,8 +585,6 @@ export class PostgreSQLAdapter
         await this._rawConnection?.close();
       } catch {}
       this._rawConnection = null;
-      this._mappedDefaultTimezone = null;
-      this.timestampDecoder = null;
     });
   }
 
@@ -1194,6 +1192,8 @@ export class PostgreSQLAdapter
       this._rawConnection = await (this.constructor as typeof PostgreSQLAdapter).newClient(
         this._connectionParameters,
       );
+      this._mappedDefaultTimezone = null;
+      this.timestampDecoder = null;
     } catch (ex) {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
