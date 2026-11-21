@@ -16,7 +16,7 @@ export class DataTimezone extends InfoTimezone {
     return (this.info as DataTimezoneInfo).periodFor(timestamp);
   }
 
-  override periodsForLocal(localTime: Time | DateTime): TimezonePeriod[] {
+  override periodsForLocal(localTime: Time | DateTime | Timestamp): TimezonePeriod[] {
     if (localTime == null) throw new ArgumentError("local_time must be specified");
     return (this.info as DataTimezoneInfo).periodsForLocal(
       Timestamp.for(localTime, "ignore") as Timestamp,

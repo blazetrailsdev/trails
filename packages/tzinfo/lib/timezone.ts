@@ -26,7 +26,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { OffsetTimezonePeriod } from "./offset-timezone-period.js";
 import { TimezoneOffset } from "./timezone-offset.js";
-import type { TimezonePeriod } from "./timezone-period.js";
+import { TimezonePeriod } from "./timezone-period.js";
 import type { TimezoneProxy } from "./timezone-proxy.js";
 import { TransitionsTimezonePeriod } from "./transitions-timezone-period.js";
 import { TimezoneTransition } from "./timezone-transition.js";
@@ -53,8 +53,7 @@ function toDate(at: Date | Temporal.Instant | Time): Date {
   return new Date(at.epochMilliseconds);
 }
 
-function ignoringOffset(time: Date | Temporal.Instant | Time | DateTime): Date {
-  if (time instanceof DateTime) time = time.toTime();
+function ignoringOffset(time: Date | Temporal.Instant | Time): Date {
   if (!(time instanceof Time)) return toDate(time);
   const date = new Date(
     Date.UTC(
@@ -565,15 +564,15 @@ export class Timezone {
     return `#<${rbModName(this.constructor)}: ${this.identifier}>`;
   }
 
-  abbr(time: Time = Time.now()): string {
+  abbr(time: Time | DateTime | Timestamp = Time.now()): string {
     return this.periodFor(time).abbreviation;
   }
 
-  observedUtcOffset(time: Time = Time.now()): number {
+  observedUtcOffset(time: Time | DateTime | Timestamp = Time.now()): number {
     return this.periodFor(time).observedUtcOffset;
   }
 
-  isDst(time: Time = Time.now()): boolean {
+  isDst(time: Time | DateTime | Timestamp = Time.now()): boolean {
     return this.periodFor(time).isDst();
   }
 
@@ -586,27 +585,43 @@ export class Timezone {
     return this.periodFor(Timestamp.for(utcTime, "treatAsUtc"));
   }
 
-  /** @missingRailsCall for — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
   periodForLocal(
-    time: Time | DateTime,
+    localTime: Time | DateTime | Timestamp,
     dst: boolean | null = null,
-    block?: (periods: TimezonePeriod[]) => TimezonePeriod,
+    block?: (periods: TimezonePeriod[]) => TimezonePeriod | TimezonePeriod[] | null,
   ): TimezonePeriod {
-    const periods = this.periodsForLocal(time);
-    if (periods.length === 1) return periods[0];
-    if (periods.length === 0) {
+    if (localTime == null) throw new ArgumentError("local_time must be specified");
+    localTime = Timestamp.for(localTime, "ignore");
+    let results: TimezonePeriod | TimezonePeriod[] | null = this.periodsForLocal(localTime);
+
+    if (results.length === 0) {
       throw new PeriodNotFound(
-        `${ignoringOffset(time).toISOString().slice(0, 19)} is not valid for ${this.identifier}`,
+        `${localTime.strftime("%Y-%m-%d %H:%M:%S")} is an invalid local time.`,
       );
+    } else if (results.length < 2) {
+      return results[0];
+    } else {
+      if (dst != null) {
+        const matches = results.filter((period) => period.isDst() === dst);
+        if (matches.length !== 0) results = matches;
+      }
+
+      if (results.length < 2) {
+        return results[0];
+      } else {
+        if (block) results = block(results);
+
+        if (results instanceof TimezonePeriod) {
+          return results;
+        } else if (results != null && results.length === 1) {
+          return results[0];
+        } else {
+          throw new AmbiguousTime(
+            `${localTime.strftime("%Y-%m-%d %H:%M:%S")} is an ambiguous local time.`,
+          );
+        }
+      }
     }
-    if (dst !== null) {
-      const matching = periods.filter((period) => period.isDst() === dst);
-      if (matching.length === 1) return matching[0];
-    }
-    if (block) return block(periods);
-    throw new AmbiguousTime(
-      `${ignoringOffset(time).toISOString().slice(0, 19)} is an ambiguous local time for ${this.identifier}`,
-    );
   }
 
   currentPeriod(): TimezonePeriod {

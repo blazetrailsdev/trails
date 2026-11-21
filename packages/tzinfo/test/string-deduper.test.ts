@@ -8,7 +8,7 @@ import {
 function dedupeTests(sd: { dedupe(string: string): string }): void {
   const s1 = String(Math.random());
   const s2 = s1;
-  const s3 = s1;
+  const s3 = String(Math.random());
 
   const r1 = sd.dedupe(s1);
   expect(r1).toBe(s1);
@@ -18,6 +18,7 @@ function dedupeTests(sd: { dedupe(string: string): string }): void {
 
   const r3 = sd.dedupe(s3);
   expect(r3).toBe(s3);
+  expect(r3).not.toBe(r1);
 }
 
 describe("TCStringDeduper", () => {

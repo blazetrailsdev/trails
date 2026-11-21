@@ -142,7 +142,7 @@ describe("TimeZoneLocalPeriodsTest", () => {
       PeriodNotFound,
     );
     expect(() => zone().periodForLocal(Time.new(2024, 3, 10, 2, 30, 0, "-05:00"))).toThrow(
-      /2024-03-10T02:30:00 is not valid for/,
+      "2024-03-10 02:30:00 is an invalid local time.",
     );
   });
 
