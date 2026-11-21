@@ -52,7 +52,7 @@ export function parse(
         value: tok.value,
         srcLine: tok.srcLine,
         srcCol: tok.srcCol,
-      } as TseNode);
+      });
     }
   }
   return { nodes, localsSignature, typesAnnotation, formatAnnotation };

@@ -8,7 +8,7 @@ import {
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { GlobalID } from "@blazetrails/globalid";
 import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "@blazetrails/globalid";
-import { Trailtie, type GlobalIdConfig } from "../../lib/trailties/global-id.js";
+import { Trailtie } from "../../lib/trailties/global-id.js";
 import type { Configuration } from "../../lib/trailtie/configuration.js";
 
 interface TrailtieApp {
@@ -38,7 +38,7 @@ describe("GlobalID::Railtie verifier derivation", () => {
   });
 
   const blogApp = (): TrailtieApp => {
-    const options: Record<string, unknown> = { globalId: {} as GlobalIdConfig };
+    const options: Record<string, unknown> = { globalId: {} };
     return {
       railtieName: "blog_app_application",
       deprecators: new Deprecators(),
@@ -86,14 +86,14 @@ describe("GlobalID::Railtie against a real Application", () => {
     class BlogAppApplication extends Application {}
     const app = new BlogAppApplication();
     const previous = app.config.get("globalId");
-    app.config.set("globalId", { app: "boot-app" } as GlobalIdConfig);
+    app.config.set("globalId", { app: "boot-app" });
     try {
       await runTrailtieInitializers(Trailtie, {
         railtieName: "blog_app_application",
         deprecators: new Deprecators(),
         config: app.config,
         keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
-      } as TrailtieApp);
+      });
       expect(GlobalID.app).toBe("boot-app");
       expect(Object.hasOwn(app.config, "globalId")).toBe(false);
     } finally {
@@ -112,7 +112,7 @@ describe("GlobalID::Railtie Active Record identification", () => {
     const app: TrailtieApp = {
       railtieName: "blog_app_application",
       deprecators: new Deprecators(),
-      config: { get: () => ({}) as GlobalIdConfig, set: () => {} },
+      config: { get: () => ({}), set: () => {} },
       keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
     };
     class Person {

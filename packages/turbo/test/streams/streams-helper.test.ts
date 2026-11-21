@@ -52,7 +52,7 @@ describe("Turbo::StreamsHelperTest", () => {
   let tc: Tc;
 
   beforeEach(async ({ task }) => {
-    tc = new (StreamsHelperTest as any)(task.name) as unknown as Tc;
+    tc = new (StreamsHelperTest as any)(task.name);
     await tc.beforeSetup();
     tc.setup();
   });

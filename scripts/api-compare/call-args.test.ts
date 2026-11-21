@@ -1222,8 +1222,11 @@ describe("pairCallSites", () => {
 describe("compareCallArgs Symbol-discriminated arguments", () => {
   // i18n/backend/base.rb#localize — `format` branches on `Symbol === format`,
   // so extract-ruby-api.rb:201 marks the parameter symbolDiscriminated.
-  const param = (name: string, kind: ParamInfo["kind"], discriminated = false): ParamInfo =>
-    ({ name, kind, symbolDiscriminated: discriminated }) as ParamInfo;
+  const param = (name: string, kind: ParamInfo["kind"], discriminated = false): ParamInfo => ({
+    name,
+    kind,
+    symbolDiscriminated: discriminated,
+  });
 
   const localizeParams = [
     param("object", "required"),
@@ -1818,17 +1821,16 @@ describe("compareCallArgs Enumerable free functions", () => {
 });
 
 describe("inherited-constructor padding", () => {
-  const p = (name: string, kind: ParamInfo["kind"]): ParamInfo => ({ name, kind }) as ParamInfo;
-  const cls = (name: string, file: string, superclass?: string, ctor?: ParamInfo[]): ClassInfo =>
-    ({
-      name,
-      file,
-      ...(superclass ? { superclass } : {}),
-      includes: [],
-      extends: [],
-      instanceMethods: ctor ? [{ name: "constructor", params: ctor } as MethodInfo] : [],
-      classMethods: [],
-    }) as unknown as ClassInfo;
+  const p = (name: string, kind: ParamInfo["kind"]): ParamInfo => ({ name, kind });
+  const cls = (name: string, file: string, superclass?: string, ctor?: ParamInfo[]): ClassInfo => ({
+    name,
+    file,
+    ...(superclass ? { superclass } : {}),
+    includes: [],
+    extends: [],
+    instanceMethods: ctor ? [{ name: "constructor", params: ctor } as MethodInfo] : [],
+    classMethods: [],
+  });
   const entities = new Map<string, ClassInfo[]>([
     ["MoneyDecoder", [cls("MoneyDecoder", "oid/money.ts", "SimpleDecoder")]],
     ["SimpleDecoder", [cls("SimpleDecoder", "simple-decoder.ts", "Coder")]],

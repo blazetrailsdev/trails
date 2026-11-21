@@ -203,7 +203,7 @@ async function main(): Promise<void> {
     let binds: string[] = [];
     if (typeof rel.arel === "function") {
       const manager = rel.arel();
-      if (manager && typeof (manager as { ast: unknown }).ast !== "undefined") {
+      if (manager && typeof manager.ast !== "undefined") {
         // paramSql/binds are informational-only; wrap the entire extraction so any
         // unexpected visitor or bind-processing error falls back to sql / empty binds.
         try {
@@ -223,7 +223,7 @@ async function main(): Promise<void> {
             visitor as unknown as {
               compile(node: unknown, collector: unknown): [string, unknown[]];
             }
-          ).compile((manager as { ast: unknown }).ast, collector);
+          ).compile(manager.ast, collector);
           // Resolve QueryAttribute/BindParam wrappers to their DB value first.
           const resolvedBinds = bs.map((b) => {
             if (b != null && typeof b === "object" && "valueForDatabase" in b) {
@@ -255,7 +255,7 @@ async function main(): Promise<void> {
           const epochMsOf = (v: unknown): number | null => {
             if (v instanceof Date) return v.getTime();
             if (v != null && typeof v === "object" && "epochMilliseconds" in v) {
-              const ms = (v as { epochMilliseconds: unknown }).epochMilliseconds;
+              const ms = v.epochMilliseconds;
               if (typeof ms === "number") return ms;
             }
             if (

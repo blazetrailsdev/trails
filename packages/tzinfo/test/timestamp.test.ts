@@ -341,7 +341,7 @@ describe("TCTimestamp", () => {
   it("to time", () => {
     assertEqualWithOffset(Time.utc(2016, 10, 13, 0, 0, 1), new Timestamp(1476316801).toTime());
     assertEqualWithOffset(
-      Time.utc(2016, 10, 13, 0, 0, 1, R(100_000, 1) as never),
+      Time.utc(2016, 10, 13, 0, 0, 1, R(100_000, 1)),
       new Timestamp(1476316801, R(1, 10)).toTime(),
     );
     assertEqualWithOffset(
@@ -349,7 +349,7 @@ describe("TCTimestamp", () => {
       new Timestamp(1476316801, 0, 0).toTime(),
     );
     assertEqualWithOffset(
-      Time.new(2016, 10, 13, 0, 0, R(11, 10) as never, 0),
+      Time.new(2016, 10, 13, 0, 0, R(11, 10), 0),
       new Timestamp(1476316801, R(1, 10), 0).toTime(),
     );
     assertEqualWithOffset(
@@ -357,7 +357,7 @@ describe("TCTimestamp", () => {
       new Timestamp(1476316801, 0, "utc").toTime(),
     );
     assertEqualWithOffset(
-      Time.utc(2016, 10, 13, 0, 0, 1, R(100_000, 1) as never),
+      Time.utc(2016, 10, 13, 0, 0, 1, R(100_000, 1)),
       new Timestamp(1476316801, R(1, 10), "utc").toTime(),
     );
     assertEqualWithOffset(
@@ -365,7 +365,7 @@ describe("TCTimestamp", () => {
       new Timestamp(1476316801, 0, 3600).toTime(),
     );
     assertEqualWithOffset(
-      Time.new(2016, 10, 13, 1, 0, R(11, 10) as never, 3600),
+      Time.new(2016, 10, 13, 1, 0, R(11, 10), 3600),
       new Timestamp(1476316801, R(1, 10), 3600).toTime(),
     );
   });
@@ -445,7 +445,7 @@ describe("TCTimestamp", () => {
 
   it("strftime nil format", () => {
     const t = new Timestamp(1476316800, R(1, 10));
-    const error = assertRaises(ArgumentError, () => t.strftime(null as never));
+    const error = assertRaises(ArgumentError, () => t.strftime(null));
     expect(error.message).toEqual("format must be specified");
   });
 
@@ -1117,7 +1117,7 @@ describe("TCTimestamp", () => {
   });
 
   it("for time sub second", () => {
-    forTest([Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1) as never)], (t) => {
+    forTest([Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1))], (t) => {
       expect(t.value).toEqual(1476316801);
       expect(t.subSecond).toEqual(R(1, 10));
     });
@@ -1403,35 +1403,35 @@ describe("TCTimestamp", () => {
     const input = Time.utc(2016, 10, 13, 0, 0, 0);
     assertEqualWithOffset(
       Time.utc(2016, 10, 13, 0, 0, 1),
-      Timestamp.for(input, () => new Timestamp(1476316801)) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801)),
     );
     assertEqualWithOffset(
-      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1) as never),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10))) as Time,
+      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1)),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10))),
     );
     assertEqualWithOffset(
       Time.utc(2016, 10, 13, 0, 0, 1),
-      Timestamp.for(input, () => new Timestamp(1476316801, 0, "utc")) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801, 0, "utc")),
     );
     assertEqualWithOffset(
-      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1) as never),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), "utc")) as Time,
+      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1)),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), "utc")),
     );
     assertEqualWithOffset(
       Time.new(2016, 10, 13, 0, 0, 1, 0),
-      Timestamp.for(input, () => new Timestamp(1476316801, 0, 0)) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801, 0, 0)),
     );
     assertEqualWithOffset(
-      Time.new(2016, 10, 13, 0, 0, R(11, 10) as never, 0),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 0)) as Time,
+      Time.new(2016, 10, 13, 0, 0, R(11, 10), 0),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 0)),
     );
     assertEqualWithOffset(
       Time.new(2016, 10, 13, 1, 0, 1, 3600),
-      Timestamp.for(input, () => new Timestamp(1476316801, 0, 3600)) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801, 0, 3600)),
     );
     assertEqualWithOffset(
-      Time.new(2016, 10, 13, 1, 0, R(11, 10) as never, 3600),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 3600)) as Time,
+      Time.new(2016, 10, 13, 1, 0, R(11, 10), 3600),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 3600)),
     );
   });
 
@@ -1439,35 +1439,35 @@ describe("TCTimestamp", () => {
     const input = new TimeLike(1476316800, 0);
     assertEqualWithOffset(
       Time.utc(2016, 10, 13, 0, 0, 1),
-      Timestamp.for(input, () => new Timestamp(1476316801)) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801)),
     );
     assertEqualWithOffset(
-      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1) as never),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10))) as Time,
+      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1)),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10))),
     );
     assertEqualWithOffset(
       Time.utc(2016, 10, 13, 0, 0, 1),
-      Timestamp.for(input, () => new Timestamp(1476316801, 0, "utc")) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801, 0, "utc")),
     );
     assertEqualWithOffset(
-      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1) as never),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), "utc")) as Time,
+      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1)),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), "utc")),
     );
     assertEqualWithOffset(
       Time.new(2016, 10, 13, 0, 0, 1, 0),
-      Timestamp.for(input, () => new Timestamp(1476316801, 0, 0)) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801, 0, 0)),
     );
     assertEqualWithOffset(
-      Time.new(2016, 10, 13, 0, 0, R(11, 10) as never, 0),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 0)) as Time,
+      Time.new(2016, 10, 13, 0, 0, R(11, 10), 0),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 0)),
     );
     assertEqualWithOffset(
       Time.new(2016, 10, 13, 1, 0, 1, 3600),
-      Timestamp.for(input, () => new Timestamp(1476316801, 0, 3600)) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801, 0, 3600)),
     );
     assertEqualWithOffset(
-      Time.new(2016, 10, 13, 1, 0, R(11, 10) as never, 3600),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 3600)) as Time,
+      Time.new(2016, 10, 13, 1, 0, R(11, 10), 3600),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 3600)),
     );
   });
 
@@ -1475,94 +1475,79 @@ describe("TCTimestamp", () => {
     const input = new TimeLikeWithOffset(1476316800, 0, 3600);
     assertEqualWithOffset(
       Time.utc(2016, 10, 13, 0, 0, 1),
-      Timestamp.for(input, () => new Timestamp(1476316801)) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801)),
     );
     assertEqualWithOffset(
-      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1) as never),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10))) as Time,
+      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1)),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10))),
     );
     assertEqualWithOffset(
       Time.utc(2016, 10, 13, 0, 0, 1),
-      Timestamp.for(input, () => new Timestamp(1476316801, 0, "utc")) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801, 0, "utc")),
     );
     assertEqualWithOffset(
-      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1) as never),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), "utc")) as Time,
+      Time.utc(2016, 10, 13, 0, 0, 1, R(100000, 1)),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), "utc")),
     );
     assertEqualWithOffset(
       Time.new(2016, 10, 13, 0, 0, 1, 0),
-      Timestamp.for(input, () => new Timestamp(1476316801, 0, 0)) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801, 0, 0)),
     );
     assertEqualWithOffset(
-      Time.new(2016, 10, 13, 0, 0, R(11, 10) as never, 0),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 0)) as Time,
+      Time.new(2016, 10, 13, 0, 0, R(11, 10), 0),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 0)),
     );
     assertEqualWithOffset(
       Time.new(2016, 10, 13, 1, 0, 1, 3600),
-      Timestamp.for(input, () => new Timestamp(1476316801, 0, 3600)) as Time,
+      Timestamp.for(input, () => new Timestamp(1476316801, 0, 3600)),
     );
     assertEqualWithOffset(
-      Time.new(2016, 10, 13, 1, 0, R(11, 10) as never, 3600),
-      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 3600)) as Time,
+      Time.new(2016, 10, 13, 1, 0, R(11, 10), 3600),
+      Timestamp.for(input, () => new Timestamp(1476316801, R(1, 10), 3600)),
     );
   });
 
   it("for block result to datetime", () => {
     assertEqualWithOffset(
       new DateTime(2016, 10, 13, 0, 0, 1),
-      Timestamp.for(
-        new DateTime(2016, 10, 13, 0, 0, 0),
-        () => new Timestamp(1476316801),
-      ) as DateTime,
+      Timestamp.for(new DateTime(2016, 10, 13, 0, 0, 0), () => new Timestamp(1476316801)),
     );
     assertEqualWithOffset(
       new DateTime(2016, 10, 13, 0, 0, R(11, 10)),
-      Timestamp.for(
-        new DateTime(2016, 10, 13, 0, 0, 0),
-        () => new Timestamp(1476316801, R(1, 10)),
-      ) as DateTime,
+      Timestamp.for(new DateTime(2016, 10, 13, 0, 0, 0), () => new Timestamp(1476316801, R(1, 10))),
     );
     assertEqualWithOffset(
       new DateTime(2016, 10, 13, 0, 0, 1),
-      Timestamp.for(
-        new DateTime(2016, 10, 13, 0, 0, 0),
-        () => new Timestamp(1476316801, 0, "utc"),
-      ) as DateTime,
+      Timestamp.for(new DateTime(2016, 10, 13, 0, 0, 0), () => new Timestamp(1476316801, 0, "utc")),
     );
     assertEqualWithOffset(
       new DateTime(2016, 10, 13, 0, 0, R(11, 10)),
       Timestamp.for(
         new DateTime(2016, 10, 13, 0, 0, 0),
         () => new Timestamp(1476316801, R(1, 10), "utc"),
-      ) as DateTime,
+      ),
     );
     assertEqualWithOffset(
       new DateTime(2016, 10, 13, 0, 0, 1),
-      Timestamp.for(
-        new DateTime(2016, 10, 13, 0, 0, 0),
-        () => new Timestamp(1476316801, 0, 0),
-      ) as DateTime,
+      Timestamp.for(new DateTime(2016, 10, 13, 0, 0, 0), () => new Timestamp(1476316801, 0, 0)),
     );
     assertEqualWithOffset(
       new DateTime(2016, 10, 13, 0, 0, R(11, 10)),
       Timestamp.for(
         new DateTime(2016, 10, 13, 0, 0, 0),
         () => new Timestamp(1476316801, R(1, 10), 0),
-      ) as DateTime,
+      ),
     );
     assertEqualWithOffset(
       new DateTime(2016, 10, 13, 1, 0, 1, R(1, 24)),
-      Timestamp.for(
-        new DateTime(2016, 10, 13, 0, 0, 0),
-        () => new Timestamp(1476316801, 0, 3600),
-      ) as DateTime,
+      Timestamp.for(new DateTime(2016, 10, 13, 0, 0, 0), () => new Timestamp(1476316801, 0, 3600)),
     );
     assertEqualWithOffset(
       new DateTime(2016, 10, 13, 1, 0, R(11, 10), R(1, 24)),
       Timestamp.for(
         new DateTime(2016, 10, 13, 0, 0, 0),
         () => new Timestamp(1476316801, R(1, 10), 3600),
-      ) as DateTime,
+      ),
     );
   });
 
@@ -1586,11 +1571,11 @@ describe("TCTimestamp", () => {
 
   it("for block result to time subclass", () => {
     assertEqualWithOffset(
-      Time.new(2016, 10, 13, 1, 0, R(11, 10) as never, 3600),
+      Time.new(2016, 10, 13, 1, 0, R(11, 10), 3600),
       Timestamp.for(
         Time.utc(2016, 10, 13, 0, 0, 0),
         () => new TestTimestampSubclass(1476316801, R(1, 10), 3600),
-      ) as Time,
+      ),
     );
   });
 
@@ -1600,7 +1585,7 @@ describe("TCTimestamp", () => {
       Timestamp.for(
         new DateTime(2016, 10, 13, 0, 0, 0),
         () => new TestTimestampSubclass(1476316801, R(1, 10), 3600),
-      ) as DateTime,
+      ),
     );
   });
 

@@ -100,7 +100,8 @@ describe("Trailtie", () => {
       T[kind](() => {
         ran = true;
       });
-      await (T.instance()[RUNNERS[kind]] as (a: unknown) => unknown).call(T.instance(), {});
+      const runner: (a: unknown) => unknown = T.instance()[RUNNERS[kind]];
+      await runner.call(T.instance(), {});
       expect(ran).toBe(true);
     });
   }

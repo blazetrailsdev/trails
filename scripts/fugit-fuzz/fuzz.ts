@@ -317,7 +317,7 @@ function fugitValue(o: unknown): unknown {
     return ["Fugit::Duration", o.deflate().toPlainS(), h];
   }
   if (o instanceof EoTime) return ["EtOrbi::EoTime", ...eo(o)];
-  return [(o as object).constructor.name, String(o)];
+  return [o.constructor.name, String(o)];
 }
 
 function runTs(c: Case): unknown {
@@ -347,7 +347,7 @@ function runTs(c: Case): unknown {
           d.toLongS(),
           num(d.toSec()),
           guard(() => eo(d.add(new EoTime(c.from, c.zone)) as EoTime)),
-          guard(() => eo(new EoTime(c.from, c.zone).minus(d as never) as unknown as EoTime)),
+          guard(() => eo(new EoTime(c.from, c.zone).minus(d as never))),
         ];
       }
       case "eo": {

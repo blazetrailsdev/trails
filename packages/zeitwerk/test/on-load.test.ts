@@ -194,9 +194,9 @@ describe("TestOnLoad", () => {
   it("on_load :ANY for namespaces gets called with child constants available (implicit)", async () => {
     await withSetup(loader, childImplicit, {}, async () => {
       let ok = false;
-      loader.onLoad(((cpath: string) => {
+      loader.onLoad((cpath: string) => {
         if (cpath === "X") ok = new Cref(top.X, "A").isDefined();
-      }) as never);
+      });
 
       await loader.eagerLoad();
       expect(top.X).toBeTruthy();
@@ -207,9 +207,9 @@ describe("TestOnLoad", () => {
   it("on_load :ANY for namespaces gets called with child constants available (explicit)", async () => {
     await withSetup(loader, childExplicit, {}, async () => {
       let ok = false;
-      loader.onLoad(((cpath: string) => {
+      loader.onLoad((cpath: string) => {
         if (cpath === "X") ok = new Cref(top.X, "A").isDefined();
-      }) as never);
+      });
 
       await loader.eagerLoad();
       expect(top.X).toBeTruthy();

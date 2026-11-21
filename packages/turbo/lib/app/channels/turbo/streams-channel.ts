@@ -41,7 +41,7 @@ export class StreamsChannel extends Base {
   protected override subscribed(): unknown {
     const streamName = this.verifiedStreamNameFromParams();
     if (streamName != null && streamName !== false) {
-      return this.streamFrom(streamName as string);
+      return this.streamFrom(streamName);
     } else {
       return this.reject();
     }

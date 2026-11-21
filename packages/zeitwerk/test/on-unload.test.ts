@@ -35,7 +35,7 @@ describe("TestOnUnload", () => {
   it("on_unload blocks for cpaths get the expected arguments passed", async () => {
     await withSetup(X_FILES, async () => {
       let args: unknown[] = [];
-      loader.onUnload("X", ((...a: unknown[]) => (args = a)) as never);
+      loader.onUnload("X", (...a: unknown[]) => (args = a));
 
       expect(await x()).toBeTruthy();
       await loader.reload();
@@ -61,7 +61,7 @@ describe("TestOnUnload", () => {
   it("on_unload for :ANY is called with the expected arguments", async () => {
     await withSetup(X_FILES, async () => {
       const args: unknown[][] = [];
-      loader.onUnload(((...a: unknown[]) => args.push(a)) as never);
+      loader.onUnload((...a: unknown[]) => args.push(a));
 
       expect(await x()).toBeTruthy();
       await loader.reload();
@@ -90,7 +90,7 @@ describe("TestOnUnload", () => {
     ["on cpaths", "for cpaths", "on cpaths is", "on cpaths", "X"],
     ["for :ANY", "for :ANY", "for :ANY is is", "on :ANY", ":ANY"],
   ] as const) {
-    const onUnload = (block: () => unknown) => loader.onUnload(cpath, block as never);
+    const onUnload = (block: () => unknown) => loader.onUnload(cpath, block);
 
     it(`multiple on_unload ${order} are called in order of definition`, async () => {
       await withSetup(X_FILES, async () => {

@@ -15,7 +15,7 @@ import {
 async function enumerate(
   ...args: Parameters<typeof SourceAnnotationExtractor.enumerate>
 ): Promise<string> {
-  const write = vi.spyOn(STDOUT, "write").mockReturnValue(0 as never);
+  const write = vi.spyOn(STDOUT, "write").mockReturnValue(0);
   try {
     await SourceAnnotationExtractor.enumerate(...args);
     return write.mock.calls.map((call) => String(call[0])).join("");

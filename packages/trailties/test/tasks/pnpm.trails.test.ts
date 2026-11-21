@@ -32,7 +32,7 @@ describe("tasks/pnpm", () => {
         commands.push([cmd, ...(args ?? [])].join(" "));
         return { pid: 1, status: error ? 127 : 0, signal: null, error };
       },
-    } as never);
+    });
     previousAdapter = childProcessAdapterConfig.adapter;
     childProcessAdapterConfig.adapter = "pnpm-task-test";
   });
@@ -50,7 +50,7 @@ describe("tasks/pnpm", () => {
   });
 
   it("reports a missing pnpm", async () => {
-    error = new Errno.ENOENT("pnpm") as Error;
+    error = new Errno.ENOENT("pnpm");
     (error as { code?: string }).code = "ENOENT";
     const puts = vi.spyOn(STDERR, "puts").mockReturnValue(null);
 

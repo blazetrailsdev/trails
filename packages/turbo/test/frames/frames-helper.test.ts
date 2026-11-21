@@ -21,7 +21,7 @@ describe("Turbo::FramesHelperTest", () => {
   });
 
   beforeEach(async ({ task }) => {
-    tc = new (FramesHelperTest as any)(task.name) as unknown as Tc;
+    tc = new (FramesHelperTest as any)(task.name);
     await tc.beforeSetup();
     tc.setup();
   });

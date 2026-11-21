@@ -240,7 +240,7 @@ describe("RailtieTest (trails-only)", () => {
           }),
         });
         const stack = new MiddlewareStack();
-        stack.use(Callbacks as never);
+        stack.use(Callbacks);
         Trailtie.config.appMiddleware().mergeInto(stack);
         return { stack, fileWatcher };
       } finally {

@@ -2,13 +2,16 @@ import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ModelHelpers } from "../../lib/generators/model-helpers.js";
 import { ResourceGenerator } from "../../lib/generators/trails/resource/resource-generator.js";
-import type { ResourceGeneratorOptions } from "../../lib/generators/trails/resource/resource-generator.js";
 import { ScaffoldGenerator } from "../../lib/generators/test-unit/scaffold/scaffold-generator.js";
 
 const build = (name: string, modelName?: string) =>
-  new ResourceGenerator([name], { modelName } as ResourceGeneratorOptions, {
-    destinationRoot: "/nonexistent",
-  });
+  new ResourceGenerator(
+    [name],
+    { modelName },
+    {
+      destinationRoot: "/nonexistent",
+    },
+  );
 
 describe("applyResourceHelpers", () => {
   beforeEach(() => {

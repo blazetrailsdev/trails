@@ -64,10 +64,15 @@ function manifest(): ApiManifest {
   return { packages };
 }
 
-const skeletons = PAIRS.map(
-  ([pkg, rubyFile, rubyName, tsFile, tsName]) =>
-    ({ package: pkg, rubyFile, rubyName, tsFile, tsName, ruby: [], ts: [] }) as SkeletonRow,
-);
+const skeletons = PAIRS.map(([pkg, rubyFile, rubyName, tsFile, tsName]) => ({
+  package: pkg,
+  rubyFile,
+  rubyName,
+  tsFile,
+  tsName,
+  ruby: [],
+  ts: [],
+}));
 const rows = voidReturnRows(skeletons, USES, tsVoidReturns(manifest()));
 
 describe("voidReturnRows", () => {

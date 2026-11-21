@@ -294,7 +294,7 @@ describe("TestEagerLoad", () => {
     ];
     await withSetup(loader, files, {}, async () => {
       const loaded: string[] = [];
-      loader.onLoad(((cpath: string) => loaded.push(cpath)) as never);
+      loader.onLoad((cpath: string) => loaded.push(cpath));
 
       const stub = vi.spyOn(Dir, "childrenAsync").mockResolvedValue(["y.ts", "x.ts"]);
       await loader.eagerLoad();

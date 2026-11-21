@@ -27,7 +27,7 @@ describe("DevServerProxyTest", () => {
     session = undefined;
   });
 
-  const currentSession = () => (session ??= new Session(app() as unknown as RackApp));
+  const currentSession = () => (session ??= new Session(app()));
   const get = (uri: string) => currentSession().get(uri);
   const header = (name: string, value: string) => currentSession().header(name, value);
   const lastResponse = () => currentSession().lastResponse();

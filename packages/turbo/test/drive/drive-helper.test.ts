@@ -46,7 +46,7 @@ describe("Turbo::DriverHelperUnitTest", () => {
   let tc: Tc;
 
   beforeEach(async ({ task }) => {
-    tc = new (DriverHelperUnitTest as any)(task.name) as unknown as Tc;
+    tc = new (DriverHelperUnitTest as any)(task.name);
     await tc.beforeSetup();
     tc.setup();
   });

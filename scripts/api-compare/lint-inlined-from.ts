@@ -86,7 +86,7 @@ interface Entity {
 
 const entities = (ruby: ApiManifest, kind: "classes" | "modules"): Entity[] =>
   Object.entries(ruby.packages).flatMap(([name, pkg]) =>
-    (Object.entries(pkg[kind]) as unknown as [string, ClassInfo][]).map(([fqn, info]) => ({
+    Object.entries(pkg[kind]).map(([fqn, info]) => ({
       package: name,
       fqn,
       info,
@@ -250,7 +250,7 @@ export function inlinedFromFindings(
   const findings: InlinedFromFinding[] = [];
   const visited = new Set<string>();
   for (const [name, pkg] of Object.entries(ts.packages)) {
-    for (const [owner, klass] of Object.entries(pkg.classes) as unknown as [string, ClassInfo][]) {
+    for (const [owner, klass] of Object.entries(pkg.classes)) {
       const ctor = klass.instanceMethods.find((m) => m.name === "constructor");
       const tags = ctor?.inlinedFrom ?? [];
       const methods = klass.instanceMethods.filter(
@@ -275,9 +275,7 @@ export function inlinedFromFindings(
           rubyFileToTs(entity.info.file, name) === tsFile,
       );
       const classes = mirrored.filter((entity) => !modules.has(entity.fqn));
-      const declared = Object.values(pkg.classes).filter(
-        (other) => (other as unknown as ClassInfo).file === tsFile,
-      );
+      const declared = Object.values(pkg.classes).filter((other) => other.file === tsFile);
       const pairedWith = pairs.filter(
         (pair) =>
           pair.package === name && pair.tsFile === tsFile && pair.owner === (klass.name ?? owner),

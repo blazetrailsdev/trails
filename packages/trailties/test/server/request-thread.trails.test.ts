@@ -59,7 +59,11 @@ describe("request thread per Handler.Node#service (trails)", () => {
     const leases: object[] = [];
     const handler = new Handler.Node(gatedApp(leases));
     const http = await getHttpAsync();
-    const server = http.createServer((req, res) => void handler.service(req, res));
+    const server = http.createServer((req, res) => {
+      handler.service(req, res).catch((error: unknown) => {
+        throw error;
+      });
+    });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
     try {
       await twoConcurrentRequests(urlOf(server));

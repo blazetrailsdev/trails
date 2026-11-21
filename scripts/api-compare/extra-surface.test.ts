@@ -5287,8 +5287,7 @@ describe("buildReport — a RUBY_FILE_TS_OVERRIDES row onto a path-mirrored file
 });
 
 describe("thor scoring across lanes", () => {
-  const pkg = (classes: Record<string, ClassInfo>): PackageInfo =>
-    ({ classes, modules: {} }) as unknown as PackageInfo;
+  const pkg = (classes: Record<string, ClassInfo>): PackageInfo => ({ classes, modules: {} });
   const manifest = (packages: Record<string, PackageInfo>): ApiManifest =>
     ({ packages }) as unknown as ApiManifest;
   const thorRuby = pkg({ "Thor::Runner": rubyClass({ name: "Runner", file: "thor/runner.rb" }) });

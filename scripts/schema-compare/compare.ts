@@ -193,7 +193,7 @@ function typesAgree(railsType: string, tsType: string): boolean {
 type SpecOptions = Exclude<ColumnSpec, string>;
 
 function specOptions(spec: ColumnSpec): SpecOptions {
-  return typeof spec === "string" ? ({ type: spec } as SpecOptions) : spec;
+  return typeof spec === "string" ? { type: spec } : spec;
 }
 
 /**

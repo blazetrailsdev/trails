@@ -175,9 +175,7 @@ describe("Base.hookFor", () => {
         ran.push(`own:${this.name}`);
       }
     }
-    const find = vi
-      .spyOn(Generators, "findByNamespace")
-      .mockResolvedValue(HookedGenerator as unknown as GeneratorClass);
+    const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(HookedGenerator);
     let output: string;
     try {
       output = await capture("stdout", () =>
@@ -242,9 +240,7 @@ describe("Base.hookFor", () => {
         });
       }
     }
-    const find = vi
-      .spyOn(Generators, "findByNamespace")
-      .mockResolvedValue(HookedGenerator as unknown as GeneratorClass);
+    const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(HookedGenerator);
     try {
       await BlockGenerator.start(["Account", "-t", "test_unit"], { destinationRoot: "/tmp" });
     } finally {
@@ -263,9 +259,7 @@ describe("Base.hookFor", () => {
         });
       }
     }
-    const find = vi
-      .spyOn(Generators, "findByNamespace")
-      .mockResolvedValue(HookedGenerator as unknown as GeneratorClass);
+    const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(HookedGenerator);
     try {
       await ExecGenerator.start(["Account", "-t", "test_unit"], { destinationRoot: "/tmp" });
     } finally {
@@ -312,9 +306,7 @@ describe("Base.hookFor", () => {
         });
       }
     }
-    const find = vi
-      .spyOn(Generators, "findByNamespace")
-      .mockResolvedValue(ArgsHookedGenerator as unknown as GeneratorClass);
+    const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(ArgsHookedGenerator);
     try {
       await ResourceLikeGenerator.start(["Account"], { destinationRoot: "/tmp" });
     } finally {
@@ -333,9 +325,7 @@ describe("Base.hookFor", () => {
     }
     const find = vi
       .spyOn(Generators, "findByNamespace")
-      .mockImplementation(async (n) =>
-        n === "nope" ? null : (HookedGenerator as unknown as GeneratorClass),
-      );
+      .mockImplementation(async (n) => (n === "nope" ? null : HookedGenerator));
     try {
       await expect(
         Invoker.start(["Account", "-t", "x"], { destinationRoot: "/tmp" }),
@@ -361,9 +351,7 @@ describe("Base.hookFor", () => {
         this.hookFor("testFramework");
       }
     }
-    const find = vi
-      .spyOn(Generators, "findByNamespace")
-      .mockResolvedValue(FixtureGenerator as unknown as GeneratorClass);
+    const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(FixtureGenerator);
     try {
       await ModelLikeGenerator.start(["Account", "-t", "test_unit", "--fixture-replacement=fab"], {
         destinationRoot: "/tmp",
@@ -391,9 +379,7 @@ describe("Base.hookFor", () => {
         });
       }
     }
-    const find = vi
-      .spyOn(Generators, "findByNamespace")
-      .mockResolvedValue(OnceGenerator as unknown as GeneratorClass);
+    const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(OnceGenerator);
     try {
       await TwiceGenerator.start(["Account", "-t", "x"], { destinationRoot: "/tmp" });
     } finally {
@@ -418,13 +404,11 @@ describe("Base.hookFor", () => {
     class Caller extends Base {
       static {
         this.hookFor("orm", function (this: Base, _klass: GeneratorClass) {
-          return this.invoke(CommandsGenerator as unknown as GeneratorClass, "perform");
+          return this.invoke(CommandsGenerator, "perform");
         });
       }
     }
-    const find = vi
-      .spyOn(Generators, "findByNamespace")
-      .mockResolvedValue(CommandsGenerator as unknown as GeneratorClass);
+    const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(CommandsGenerator);
     try {
       await Caller.start(["Account", "--orm=x", "-t", "y"], { destinationRoot: "/tmp" });
     } finally {
@@ -458,9 +442,7 @@ describe("Base.hookFor", () => {
         });
       }
     }
-    const find = vi
-      .spyOn(Generators, "findByNamespace")
-      .mockResolvedValue(ChildGenerator as unknown as GeneratorClass);
+    const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(ChildGenerator);
     try {
       await ParentGenerator.start(["Account", "-t", "x"], { destinationRoot: "/tmp" });
       expect((parent as Record<string, unknown>).testFramework).toBe("x");
@@ -484,13 +466,11 @@ describe("Base.hookFor", () => {
     class Caller extends Base {
       static {
         this.hookFor("orm", function (this: Base, _klass: GeneratorClass) {
-          return this.invoke(Target as unknown as GeneratorClass, "hooks");
+          return this.invoke(Target, "hooks");
         });
       }
     }
-    const find = vi
-      .spyOn(Generators, "findByNamespace")
-      .mockResolvedValue(Target as unknown as GeneratorClass);
+    const find = vi.spyOn(Generators, "findByNamespace").mockResolvedValue(Target);
     try {
       await expect(
         Caller.start(["Account", "--orm=x"], { destinationRoot: "/tmp" }),

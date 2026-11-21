@@ -25,7 +25,7 @@ function method(name: string, calls: string[]): MethodInfo {
     params: name === "eval_code" || name === "evalCode" ? PARAMS : [],
     calls,
     callArgs: calls.map((call) => ({ name: call, args: [], flags: [] })),
-  } as MethodInfo;
+  };
 }
 
 function entity(fqn: string, file: string, instanceMethods: MethodInfo[]) {

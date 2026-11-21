@@ -29,7 +29,7 @@ function method(name: string, calls: string[], extra: Partial<MethodInfo> = {}):
     calls,
     callArgs: calls.map((call) => ({ name: call, args: [], flags: [] })),
     ...extra,
-  } as MethodInfo;
+  };
 }
 
 const PARAMS: MethodInfo["params"] = [{ name: "attributes", kind: "required" }];
