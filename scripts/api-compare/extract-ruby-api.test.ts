@@ -5573,6 +5573,7 @@ describe("Ruby extractor C extension scan", { timeout: RUBY_SUBPROCESS_TIMEOUT_M
           '\trb_define_method( rb_cTypeMapByOid, "coders", pg_tmbo_coders, -1 );',
           '\trb_define_singleton_method( rb_cTypeMapByOid, "build", pg_tmbo_build, 0 );',
           '\trb_define_alias( rb_cTypeMapByOid, "add", "add_coder" );',
+          '\t/* rb_define_method( rb_cTypeMapByOid, "documented", pg_tmbo_documented, 0 ); */',
           "\trb_include_module( rb_cTypeMapByOid, rb_mDefaultTypeMappable );",
           "}",
         ].join("\n"),
@@ -5604,6 +5605,7 @@ describe("Ruby extractor C extension scan", { timeout: RUBY_SUBPROCESS_TIMEOUT_M
           ["add_coder", ["coder"], 9],
           ["coders", ["args"], 10],
           ["add", [], 12],
+          ["documented", [], 13],
         ],
         singleton: ["build"],
       });

@@ -2547,7 +2547,9 @@ class ApiExtractor
     files.each do |filepath, source|
       vendor_file = filepath.delete_prefix("#{VENDOR_ROOT}/")
       source.each_line.with_index(1) do |text, line|
-        abort "#{filepath}:#{line}: rb_define_ call spans lines" if text =~ /\brb_(?:define|include|extend)_\w*\s*\((?![^)]*\))/
+        if (start = text =~ /\brb_(?:define|include|extend)_\w*\s*\(/) && text[start..].count("(") > text[start..].count(")")
+          abort "#{filepath}:#{line}: rb_define_ call spans lines"
+        end
         text.scan(/rb_(define_method|define_private_method|define_protected_method|define_singleton_method|define_module_function|define_alias|define_attr|include_module|extend_object)\s*\(\s*(\w+)\s*,\s*(?:"([^"]+)"|(\w+))\s*(?:,\s*"?([\w=?!\[\]]+)"?\s*)?(?:,\s*(-?\d+)\s*)?/) do |call, owner_var, name, arg_var, func, argc|
           target_fqn = vars[owner_var]
           target = @classes[target_fqn] || @modules[target_fqn]
