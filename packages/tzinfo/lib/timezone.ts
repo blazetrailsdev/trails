@@ -373,7 +373,8 @@ const TZDB_NAMES: readonly string[] = [
 
 const loadedTimezoneIdentifiers = new Set<string>();
 
-function abbrAt(ianaName: string, date: Date): string {
+/** @noRailsEquivalent CONVERGEABLE tzinfo-timezone-reads-the-data-source */
+function _abbrAt(ianaName: string, date: Date): string {
   const fixed = fixedZoneAbbreviations.get(ianaName);
   if (fixed !== undefined) return fixed;
   const interval = zoneInterval(ianaName, date);
@@ -411,7 +412,7 @@ class _IntlDataTimezoneInfo extends DataTimezoneInfo {
       let i = 0;
       while (i < baseInstants.length && baseInstants[i] <= seconds) i++;
       const base = (i === 0 ? initialBase : bases[i - 1]) ?? observed;
-      return new TimezoneOffset(base, observed - base, abbrAt(this.identifier, d));
+      return new TimezoneOffset(base, observed - base, _abbrAt(this.identifier, d));
     };
     const flips = tzdataIsdstFlips(this.identifier);
     let flipIndex = 0;
@@ -570,15 +571,15 @@ export class Timezone {
     return `#<${rbModName(this.constructor)}: ${this.identifier}>`;
   }
 
-  abbr(time: Date | Temporal.Instant | Time): string {
+  abbr(time: Date | Temporal.Instant | Time = Time.now()): string {
     return this.periodFor(toTime(time)).abbreviation;
   }
 
-  observedUtcOffset(time: Date | Temporal.Instant | Time): number {
+  observedUtcOffset(time: Date | Temporal.Instant | Time = Time.now()): number {
     return this.periodFor(toTime(time)).observedUtcOffset;
   }
 
-  isDst(time: Date | Temporal.Instant | Time): boolean {
+  isDst(time: Date | Temporal.Instant | Time = Time.now()): boolean {
     return this.periodFor(toTime(time)).isDst();
   }
 
@@ -618,9 +619,12 @@ export class Timezone {
     return this.periodFor(Time.now());
   }
 
-  /** @missingRailsCall for — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
-  utcToLocal(time: Time): Time {
-    return time.getlocal(this.identifier);
+  /** @inventedArm if — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
+  utcToLocal(utcTime: Time): Time {
+    if (utcTime == null) throw new ArgumentError("utc_time must be specified");
+    const period = this.periodForUtc(utcTime);
+    if (loadedTimezoneIdentifiers.has(this.identifier)) return utcTime.getlocal(this.identifier);
+    return utcTime.getlocal(period.observedUtcOffset);
   }
 
   /** @missingRailsCall for — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
