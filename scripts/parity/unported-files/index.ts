@@ -77,6 +77,24 @@ export function isSourceUnported(file: string, pkg?: string): boolean {
 }
 
 /** The entry that makes {@link isSourceUnported} true, for its `reason`. */
+// test-compare keys actionpack's Rails tests by sub-framework
+// (`scripts/test-compare/compare.ts` PACKAGE_DIRS), while a row is scoped by
+// the trails package that holds the port.
+const PACKAGE_SCOPES: Record<string, readonly string[]> = {
+  actionpack: [
+    "actionpack",
+    "actiondispatch",
+    "actioncontroller",
+    "abstractcontroller",
+    "actionpackversion",
+  ],
+};
+
+function scopeMatches(scope: string | undefined, pkg: string | undefined): boolean {
+  if (scope === undefined || pkg === undefined) return true;
+  return (PACKAGE_SCOPES[scope] ?? [scope]).includes(pkg);
+}
+
 export function unportedSourceEntry(file: string, pkg?: string): UnportedFile | undefined {
   return UNPORTED_FILES.find((e) => {
     if (!e.pattern) return false;
@@ -89,7 +107,7 @@ export function unportedSourceEntry(file: string, pkg?: string): UnportedFile | 
     if (!matched) return false;
     // `package` only exists on the pattern-bearing variant of the union.
     const scope = "package" in e ? e.package : undefined;
-    return scope === undefined || pkg === undefined || scope === pkg;
+    return scopeMatches(scope, pkg);
   });
 }
 
@@ -97,7 +115,7 @@ export function isTestFileUnported(testFile: string, pkg?: string): boolean {
   return UNPORTED_FILES.some((e) => {
     if (!e.testFile || e.tests) return false;
     const scope = "package" in e ? e.package : undefined;
-    if (scope !== undefined && pkg !== undefined && scope !== pkg) return false;
+    if (!scopeMatches(scope, pkg)) return false;
     const p = e.testFile;
     // A leading "/" anchors the pattern to a path boundary: match the exact
     // basename (`testFile === p.slice(1)`, for top-level files with no dir

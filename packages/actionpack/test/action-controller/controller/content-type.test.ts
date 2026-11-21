@@ -142,15 +142,13 @@ describe("ContentTypeTest", () => {
     assertEqual("utf-8", tc.response.charset);
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("default for builder", async () => {
+  it("default for builder", async () => {
     await tc.get("renderDefaultForBuilder");
     assertEqual(Mime.get("xml"), tc.response.mediaType);
     assertEqual("utf-8", tc.response.charset);
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("change for builder", async () => {
+  it("change for builder", async () => {
     await tc.get("renderChangeForBuilder");
     assertEqual(Mime.get("html"), tc.response.mediaType);
     assertEqual("utf-8", tc.response.charset);

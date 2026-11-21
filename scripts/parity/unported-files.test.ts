@@ -187,6 +187,13 @@ describe("UNPORTED_FILES schema", () => {
     expect(isTestFileUnported("railtie_test.rb", "activemodel")).toBe(false);
     expect(isTestFileUnported("railties/railtie_test.rb", "trailties")).toBe(false);
   });
+
+  it("matches an actionpack row under test-compare's actiondispatch key", () => {
+    const file = "dispatch/session/mem_cache_store_test.rb";
+    expect(isTestFileUnported(file, "actiondispatch")).toBe(true);
+    expect(isTestFileUnported(file, "actionpack")).toBe(true);
+    expect(isTestFileUnported(file, "actionview")).toBe(false);
+  });
 });
 
 /**

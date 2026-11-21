@@ -133,8 +133,8 @@ class MismatchFormatController extends ApplicationController {
     this.viewPaths([
       new FixtureResolver({
         "layouts/application.html.tse": "<html><%= yield %></html>",
-        "controller-layouts/mismatch-format/index.xml.builder": "xml.instruct!",
-        "controller-layouts/mismatch-format/implicit.builder": "xml.instruct!",
+        "controller-layouts/mismatch-format/index.xml.builder": "xml.instructBang();",
+        "controller-layouts/mismatch-format/implicit.builder": "xml.instructBang();",
         "controller-layouts/mismatch-format/explicit.js.tse": "alert('foo');",
       }),
     ]);
@@ -163,14 +163,12 @@ describe("MismatchFormatTest", () => {
     t = new MismatchFormatTest(task.name);
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("if XML is selected, an HTML template is not also selected", async () => {
+  it("if XML is selected, an HTML template is not also selected", async () => {
     await t.get(":index", { params: { format: "xml" } });
     assertResponse(MismatchFormatTest.XML_INSTRUCT);
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("if XML is implicitly selected, an HTML template is not also selected", async () => {
+  it("if XML is implicitly selected, an HTML template is not also selected", async () => {
     await t.get(":implicit");
     assertResponse(MismatchFormatTest.XML_INSTRUCT);
   });

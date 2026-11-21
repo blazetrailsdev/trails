@@ -344,8 +344,7 @@ describe("FunctionalFragmentCachingTest", () => {
     );
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("xml formatted fragment caching", async () => {
+  it("xml formatted fragment caching", async () => {
     const format = "xml";
     await tc.get("formattedFragmentCached", { format });
     tc.assertResponse(":success");
@@ -381,8 +380,7 @@ describe("FunctionalFragmentCachingTest", () => {
     );
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("fragment caching with html partials in xml", async () => {
+  it("fragment caching with html partials in xml", async () => {
     await tc.get("xmlFragmentCachedWithHtmlPartial", { format: "*/*" });
     tc.assertResponse(":success");
   });

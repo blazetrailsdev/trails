@@ -160,10 +160,11 @@ import { ApplicationController, Rack } from "../../../support/abstract-unit.js";
       this.viewPaths([
         new FixtureResolver({
           "render-action-with-application-layout/basic/hello-world.html.tse": "Hello World!",
-          "render-action-with-application-layout/basic/hello.html.builder": "xml.p 'Hello'",
+          "render-action-with-application-layout/basic/hello.html.builder": "xml.p('Hello');",
           "layouts/application.html.tse": "Hi <%= yield %> OK, Bye",
           "layouts/greetings.html.tse": "Greetings <%= yield %> Bye",
-          "layouts/builder.html.builder": "xml.html do\n  xml << yield\nend",
+          "layouts/builder.html.builder":
+            "await xml.html(async () => {\n  xml.append(await _());\n});",
         }),
       ]);
     }
@@ -256,8 +257,7 @@ import { ApplicationController, Rack } from "../../../support/abstract-unit.js";
       t = new TestLayout(task.name);
     });
 
-    // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-    it.skip("builder works with layouts", async () => {
+    it("builder works with layouts", async () => {
       await t.get(":withBuilderAndLayout");
       assertResponse("<html>\n<p>Hello</p>\n</html>\n");
     });

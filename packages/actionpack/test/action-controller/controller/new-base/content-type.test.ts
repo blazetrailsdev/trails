@@ -31,8 +31,8 @@ class ImpliedController extends Base {
       new FixtureResolver({
         "content-type/implied/i-am-html-tse.html.tse": "Hello world!",
         "content-type/implied/i-am-xml-tse.xml.tse": "<xml>Hello world!</xml>",
-        "content-type/implied/i-am-html-builder.html.builder": "xml.p 'Hello'",
-        "content-type/implied/i-am-xml-builder.xml.builder": "xml.awesome 'Hello'",
+        "content-type/implied/i-am-html-builder.html.builder": "xml.p('Hello')",
+        "content-type/implied/i-am-xml-builder.xml.builder": "xml.awesome('Hello')",
       }),
     ]);
   }
@@ -125,15 +125,13 @@ describe("ImpliedContentTypeTest", () => {
     assertHeader("Content-Type", "application/xml; charset=utf-8");
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("sets Content-Type as text/html when rendering *.html.builder", async () => {
+  it("sets Content-Type as text/html when rendering *.html.builder", async () => {
     await t.get("/content_type/implied/iAmHtmlBuilder");
 
     assertHeader("Content-Type", "text/html; charset=utf-8");
   });
 
-  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
-  it.skip("sets Content-Type as application/xml when rendering *.xml.builder", async () => {
+  it("sets Content-Type as application/xml when rendering *.xml.builder", async () => {
     await t.get("/content_type/implied/iAmXmlBuilder", { params: { format: "xml" } });
 
     assertHeader("Content-Type", "application/xml; charset=utf-8");
