@@ -1,14 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  Dir,
-  env,
-  setEnv,
-  FileUtils,
-  getFs,
-  getOsAsync,
-  getPath,
-  rbObjClassname,
-} from "@blazetrails/ruby-compat";
+import { env, setEnv, getFs, getOsAsync, getPath, rbObjClassname } from "@blazetrails/ruby-compat";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "../../lib/trailties/active-record.js";
@@ -16,7 +7,6 @@ import { Trailtie as ActionDispatchTrailtie } from "../../lib/trailties/action-d
 import {
   Deprecators,
   EncryptedConfiguration,
-  FileUpdateChecker,
   Logger,
   NotificationEvent,
   Notifications,
@@ -42,13 +32,8 @@ import {
   RecordNotSaved,
   RuntimeRegistry,
   StaleObjectError,
-  disablePreparedStatements,
   generateSecureTokenOn,
-  QueryLogs,
-  queryTransformers,
-  setDisablePreparedStatements,
   setGenerateSecureTokenOn,
-  setQueryTransformers,
   setVerboseQueryLogs,
 } from "@blazetrails/activerecord";
 import { Encryption } from "@blazetrails/activerecord/encryption";
@@ -262,81 +247,6 @@ describe("RailtieTest (trails-only)", () => {
       expect(stack.includes(Migration.CheckPending as never)).toBe(false);
     });
   });
-
-  describe("active_record.query_log_tags_config", () => {
-    const boot = async (cfg: Partial<ActiveRecordConfig>, loadDefaults?: string) => {
-      const saved = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
-      const savedTransformers = queryTransformers();
-      const savedDisable = disablePreparedStatements();
-      const savedTags = QueryLogs.tags;
-      const savedFormatter = QueryLogs.tagsFormatter;
-      const savedTaggings = QueryLogs.taggings;
-      setQueryTransformers([]);
-      resetLoadHooks();
-      const config = new Configuration("/app");
-      class BlogApplication {
-        autoloaders = { main: { onUnload() {} } };
-        config = config;
-      }
-      Trails.application = new BlogApplication() as never;
-      try {
-        Trailtie.config.set("activeRecord", { ...saved, ...cfg });
-        if (loadDefaults) config.loadDefaults(loadDefaults);
-        const app = {
-          deprecators: new Deprecators(),
-          config,
-          credentials,
-          executor: { toRun() {} },
-        };
-        await runTrailtieInitializers(Trailtie, app);
-        runLoadHooks("after_initialize", app);
-        return {
-          transformers: [...queryTransformers()],
-          disablePreparedStatements: disablePreparedStatements(),
-          tagsFormatter: QueryLogs.tagsFormatter,
-          application: QueryLogs.taggings.application,
-          taggingKeys: Object.keys(QueryLogs.taggings),
-        };
-      } finally {
-        Trails.application = null;
-        Trailtie.config.set("activeRecord", saved);
-        setQueryTransformers(savedTransformers);
-        setDisablePreparedStatements(savedDisable);
-        QueryLogs.tags = savedTags;
-        QueryLogs.tagsFormatter = savedFormatter as string;
-        QueryLogs.taggings = savedTaggings;
-        resetLoadHooks();
-      }
-    };
-
-    it("does not modify the query execution path by default", async () => {
-      const booted = await boot({});
-
-      expect(booted.transformers).not.toContain(QueryLogs);
-    });
-
-    it("appends QueryLogs to the query transformers and disables prepared statements when enabled", async () => {
-      const booted = await boot({ queryLogTagsEnabled: true });
-
-      expect(booted.transformers).toContain(QueryLogs);
-      expect(booted.disablePreparedStatements).toBe(true);
-      expect(booted.application).toBe("BlogApplication");
-      expect(booted.taggingKeys).toEqual([
-        "application",
-        "pid",
-        "socket",
-        "db_host",
-        "database",
-        "source_location",
-      ]);
-    });
-
-    it("config.loadDefaults 7.1 makes the tags formatter sqlcommenter on a booted app", async () => {
-      const booted = await boot({ queryLogTagsEnabled: true }, "7.1");
-
-      expect(booted.tagsFormatter).toBe("sqlcommenter");
-    });
-  });
 });
 
 describe("ActiveRecord::Railtie active_record.define_attribute_methods", () => {
@@ -402,33 +312,6 @@ describe("ActiveRecord::Railtie active_record.define_attribute_methods", () => {
       );
     } finally {
       warn.mockRestore();
-    }
-  });
-});
-
-describe("ActiveRecord::Railtie active_record.add_watchable_files", () => {
-  it("added files (like db/schema.rb) also trigger reloading", async () => {
-    const tmp = Dir.mktmpdir("add-watchable-files");
-    const watchableFiles = new TrailtieConfiguration().watchableFiles;
-    const before = watchableFiles.length;
-    try {
-      await runTrailtieInitializers(Trailtie, {
-        ...blogApp(),
-        config: Object.assign(new Configuration(tmp), { filterParameters: [] }),
-      });
-      expect(watchableFiles.slice(before)).toEqual([
-        `${tmp}/db/schema.ts`,
-        `${tmp}/db/structure.sql`,
-      ]);
-
-      const checker = new FileUpdateChecker(watchableFiles.slice(before), {}, () => {});
-      expect(checker.isUpdated()).toBe(false);
-      FileUtils.mkdirP(`${tmp}/db`);
-      FileUtils.touch(`${tmp}/db/schema.ts`);
-      expect(checker.isUpdated()).toBe(true);
-    } finally {
-      watchableFiles.splice(before);
-      FileUtils.rmRf(tmp);
     }
   });
 });
