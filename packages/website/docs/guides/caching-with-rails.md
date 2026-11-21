@@ -174,16 +174,16 @@ the key by hand when the helper changes.
 
 ## Solid Cache
 
-Solid Cache is a cache kept in a database table rather than in memory. It holds far more than a
-memory store can, survives restarts, and needs no extra service. trails ports
-the gem as [`@blazetrails/solid-cache`](/packages/solid-cache).
+Solid Cache is a cache kept in a database table rather than in memory. It
+holds far more than a memory store can, survives restarts, and needs no extra
+service. trails ports the gem as [`@blazetrails/solid-cache`](/packages/solid-cache).
 
 ### Configuring the Database
 
 `trails solid-cache:install` writes `config/cache.ts` and the schema for the
 cache table, and sets `config.cacheStore = ":solid_cache_store"` in the
-production environment. The config names the database the entries are stored in, one
-block per environment:
+production environment. The config names the database the entries are stored
+in, one block per environment:
 
 <!-- typecheck:skip -->
 
