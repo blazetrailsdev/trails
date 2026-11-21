@@ -32,9 +32,8 @@ describe("DatabaseTasksTruncateTablesTest", () => {
       database: dbPath,
     });
 
-    const { BetterSQLite3Adapter } =
-      await import("../../../lib/connection-adapters/better-sqlite3-adapter.js");
-    const seed = new BetterSQLite3Adapter({ database: dbPath });
+    const { SQLite3Adapter } = await import("../../../lib/connection-adapters/sqlite3-adapter.js");
+    const seed = new SQLite3Adapter({ database: dbPath });
     await seed.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
     await seed.execute("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
     await seed.execute("INSERT INTO widgets (name) VALUES ('gizmo')");
@@ -45,7 +44,7 @@ describe("DatabaseTasksTruncateTablesTest", () => {
     DatabaseTasks.registerTask(/sqlite/, class {});
     await DatabaseTasks.truncateTables(config);
 
-    const reader = new BetterSQLite3Adapter({ database: dbPath });
+    const reader = new SQLite3Adapter({ database: dbPath });
     try {
       expect(await reader.execute("SELECT * FROM widgets")).toEqual([]);
       expect(await reader.execute("SELECT * FROM schema_migrations")).toHaveLength(1);

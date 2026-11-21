@@ -293,6 +293,269 @@ export class Post extends Base {
 
 ## Database adapters
 
+The adapter is picked by name in the connection config. Every SQLite name
+registers `SQLite3Adapter`, which loads the engine the name selects:
+
+| `adapter:`                                  | Driver                                        | Subpath export                                                     |
+| ------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------ |
+| `sqlite3`                                   | `better-sqlite3`                              | `@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js` |
+| `node-sqlite`                               | Node's built-in `node:sqlite`                 | `.../connection-adapters/sqlite3-adapter.js`                       |
+| `expo-sqlite`                               | `expo-sqlite` (React Native)                  | `.../connection-adapters/sqlite3-adapter.js`                       |
+| `libsql`, `libsql-remote`, `libsql-replica` | `libsql`                                      | `.../connection-adapters/sqlite3-adapter.js`                       |
+| `postgresql`                                |
+| `mysql2`                                    | `mysql2`                                      |
+| `libsql`                                    | `libsql`, `libsql-remote`, `libsql-replica`   |
+| `expo-sqlite`                               | `expo-sqlite` (React Native)                  |
+| none                                        | `node-sqlite` (Node's built-in `node:sqlite`) |
+
+## Quickstart
+
+With no trailties and no CLI: connect, migrate, define a model, query. This
+script ran as shown, on Node 24 with `better-sqlite3`:
+
+```ts
+import { Base, Migration } from "@blazetrails/activerecord";
+
+await Base.establishConnection({ adapter: "sqlite3", database: "tmp/standalone.sqlite3" });
+
+class CreateArticles extends Migration {
+  async change(): Promise<void> {
+    await this.createTable("articles", { force: true }, (t) => {
+      t.string("title");
+      t.boolean("published", { default: false });
+      t.timestamps();
+    });
+  }
+}
+await new CreateArticles().migrate("up");
+
+class Article extends Base {
+  static {
+    this.validates("title", { presence: true });
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
+  }
+}
+
+const a = await Article.createBang({ title: "Hello", published: true });
+console.log(a.id, a.published); //                                          1 true
+console.log(await Article.published().count()); //                          1
+console.log((await Article.create({ title: "" })).errors.fullMessages); // [ "Title can't be blank" ]
+```
+
+```text
+==  CreateArticles: migrating =================================================
+-- createTable("articles", {:force=>true})
+   -> 0.0330s
+==  CreateArticles: migrated (0.0340s) ========================================
+```
+
+`Article` declares no attributes. Its columns are reflected from the table the
+first time the class queries or creates.
+
+For a project layout with migrations on disk, use
+[`ar`](../activerecord-cli/README.md) (standalone) or `trails new` (the full
+stack). Both are walked through, with their current gaps, in their READMEs and
+the [root quickstart](../../README.md#quickstart).
+
+## Rails patterns translate directly
+
+```ruby
+class Post < ApplicationRecord
+  belongs_to :author, optional: true
+  has_many :comments, dependent: :destroy
+  validates :title, presence: true
+  scope :published, -> { where(published: true) }
+  enum :status, { draft: 0, published: 1, archived: 2 }, prefix: true
+end
+
+Post.published.where("created_at > ?", 1.week.ago).order(created_at: :desc).limit(20)
+post = Post.create!(title: "Hello", author: current_user)
+post.update!(status: :archived)
+```
+
+```ts
+import { Base } from "@blazetrails/activerecord";
+import { Temporal } from "@blazetrails/date";
+
+class Post extends Base {
+  static {
+    this.belongsTo("author", { optional: true });
+    this.hasMany("comments", { dependent: "destroy" });
+    this.validates("title", { presence: true });
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
+    this.enum("status", { draft: 0, published: 1, archived: 2 }, { prefix: true });
+  }
+}
+
+const weekAgo = Temporal.Now.instant().subtract({ hours: 24 * 7 });
+await Post.published().where("created_at > ?", weekAgo).order({ created_at: "desc" }).limit(20);
+const post = await Post.createBang({ title: "Hello", author: currentUser });
+await post.updateBang({ status: "archived" });
+```
+
+Three things in that translation are easy to get wrong:
+
+- **A scope body is a `function`, not an arrow.** The relation is `this`, as
+  Rails `instance_exec`s the lambda, and the parameters are the scope's own
+  arguments. `(rel) => rel.where(...)` receives no relation and throws
+  `Cannot read properties of undefined (reading 'where')`.
+- **Time values are `Temporal`, not `Date`.** A JS `Date` bind raises
+  `TypeError: quote: JS Date is not accepted — use a Temporal type`.
+  `@blazetrails/date` re-exports `Temporal`.
+- **A table name or primary key is a static field.** Rails'
+  `self.table_name = "pull_requests"` / `self.primary_key = "number"` is
+  `static tableName = "pull_requests"` / `static primaryKey = "number"`. The
+  field runs the `table_name=` / `primary_key=` writer, so a subclass resolves
+  its own table. `_tableName` / `_primaryKey` are the writers' backing fields;
+  do not assign them.
+- **An enum value and a scope with the same name collide.** The enum's scope
+  replaces the earlier one, as in Rails. Hence `prefix: true` above.
+
+The generated [Ruby → TypeScript conventions](../../docs/ruby-ts-conventions.md)
+table is the authoritative naming reference (`save!` → `saveBang`, `valid?` →
+`isValid`, and the rest).
+
+### Association proxies
+
+`post.comments` is an `AssociationProxy<Comment>`. It is chainable like a
+relation, awaitable to its records, and iterable once loaded:
+
+```ts
+const post = await Post.find(1);
+await post.comments.where({ flagged: false }).order("created_at"); // a query
+const all = await post.comments; //                                   loads the target
+for (const c of post.comments) c.body; //                             sync, once loaded
+post.comments.map((c) => c.id);
+await post.comments.size();
+```
+
+`length` is Ruby's `length` method, not the JS array property, so use
+`await post.comments.size()` for a count.
+
+`post.comments.createBang({...})` reflects `Comment`'s columns first if nothing
+has loaded them yet. Before #8197 it raised `UnknownAttributeError` in that
+case.
+
+## Behavioral deviations from Rails
+
+Every ratified deviation is on the
+[activerecord package page](https://blazetrails.dev/docs/packages/activerecord), generated from
+[CLAUDE.md](CLAUDE.md) and the root `CLAUDE.md` sections this package cites.
+These are the ones people coming from Rails hit first.
+
+### 1. Bang and predicate spellings
+
+`!` and `?` are not legal in JS identifiers. A bang method takes a `Bang`
+suffix, and a predicate takes an `is` prefix (or `has`, where the conventions
+table says so):
+
+| Ruby         | trails            | Note                                                                |
+| ------------ | ----------------- | ------------------------------------------------------------------- |
+| `save!`      | `saveBang()`      | raises `RecordInvalid` on validation failure                        |
+| `create!`    | `createBang()`    |                                                                     |
+| `update!`    | `updateBang()`    |                                                                     |
+| `destroy!`   | `destroyBang()`   |                                                                     |
+| `valid?`     | `isValid()`       | async, see below                                                    |
+| `changed?`   | `isChanged`       | a zero-argument predicate can be a getter                           |
+| `published!` | `publishedBang()` | enum bang writer; persists (with a prefix, `statusPublishedBang()`) |
+
+### 2. Singular associations load asynchronously
+
+In Rails, reading an unloaded `belongs_to` / `has_one` fires a query
+synchronously. trails cannot, so the reader returns the loaded or preloaded
+record synchronously, and a `Promise` that runs the query when it is not
+loaded. `await post.author` therefore always works:
+
+```ts
+const post = await Post.find(1);
+const author = await post.author; // queries, or returns the loaded record
+post.author; //                     now the loaded Author
+
+const p = await Post.includes("author").find(1);
+p.author; //                        Author, preloaded
+```
+
+Under strict loading (off by default), reading an unloaded association raises
+`StrictLoadingViolationError`, as in Rails.
+
+### 3. `isValid()` is async
+
+`record.isValid()` returns `Promise<boolean>`. It runs the whole validator
+chain, including the database-backed `UniquenessValidator` and
+`validates_associated`, before it resolves. So `await record.isValid()` is
+`false` on a uniqueness collision before any save, matching Rails' `valid?`.
+`save()` and `saveBang()` run the same chain.
+
+### 4. Transactions are functions
+
+```ts
+import { transaction } from "@blazetrails/activerecord";
+
+await transaction(Post, async () => {
+  await post.saveBang();
+  await comment.saveBang();
+});
+```
+
+## Typed models: `trails-tsc`
+
+`trails-tsc` (shipped by `@blazetrails/activerecord-cli`) is a `tsc`
+replacement. It reads `db/schema.ts` and each model's `static {}` block, and
+rewrites the model in memory at type-check time, so a model needs no
+hand-written `declare` lines:
+
+```sh
+ar db:schema:dump                               # writes db/schema.ts from the live database
+trails-tsc --schema db/schema.ts --noEmit
+```
+
+Verified on 2026-09-28 (`main` at `c19bfc0aee`): attributes are typed from
+their columns (`post.title` is `string | null`), and an enum attribute is typed
+as its value names (`"archived" | "draft" | "published" | null`). `hasMany`
+members are `AssociationProxy<T>`. Scopes and enum predicates, bang writers and
+scopes are typed on the class and on `Relation<T>`, so a chain that mixes
+enum scopes and named scopes type-checks.
+
+Editor support (a tsserver plugin for model virtualization) is not built yet.
+The `declare`-pattern reference for hand-typed models is
+[`dx-tests/declare-patterns.test-d.ts`](dx-tests/declare-patterns.test-d.ts).
+
+### Adopting an existing database
+
+Point a connection at the database, then:
+
+```sh
+ar db:schema:dump                        # introspect into db/schema.ts
+ar models:dump --out app/models          # one class per table, belongsTo / hasMany from foreign keys
+```
+
+`ar models:dump` also takes `--only`, `--ignore`, `--strip-prefix` and
+`--strip-suffix`. A table with no primary key is skipped with a comment.
+Against the root quickstart's app it printed (excerpt):
+
+```ts
+// 4 models, 2 associations from 1 foreign key.
+// SKIPPED posts_tags: no primary key (likely a view)
+
+export class Comment extends Base {
+  static {
+    this.belongsTo("post");
+  }
+}
+
+export class Post extends Base {
+  static {
+    this.hasMany("comments");
+  }
+}
+```
+
+## Database adapters
+
 The adapter is picked by name in the connection config. Each adapter loads its
 own driver:
 
@@ -306,8 +569,7 @@ own driver:
 | `mysql2`                                    | `mysql2`                      | `.../connection-adapters/mysql2-adapter.js`                               |
 
 A URL config maps the `sqlite:`, `postgres:` and `mysql:` schemes onto those
-names (`ActiveRecord.protocolAdapters`). There is also a raw
-`sqlite3-adapter.js` subpath. Register your own adapter with
+names (`ActiveRecord.protocolAdapters`). Register your own adapter with
 `ConnectionAdapters.register(name, className, path, loader)` (see
 [`lib/connection-adapters.ts`](lib/connection-adapters.ts)).
 

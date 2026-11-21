@@ -2,7 +2,6 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../../../lib/connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../../../lib/errors.js";
 import { Result } from "../../../../lib/result.js";
 import { fixtures } from "../../../support/use-fixtures.js";
@@ -12,7 +11,7 @@ let adapter: SQLite3Adapter;
 fixtures([]);
 
 beforeEach(async () => {
-  adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+  adapter = new SQLite3Adapter({ database: ":memory:" });
   await adapter.execute(`CREATE TABLE "pq" ("id" INTEGER PRIMARY KEY, "nick" TEXT)`);
 });
 
@@ -185,7 +184,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("does not close the handle out from under a statement holding the lock", async () => {
-    const closing = new BetterSQLite3Adapter({ database: ":memory:" });
+    const closing = new SQLite3Adapter({ database: ":memory:" });
 
     await closing.execute(`CREATE TABLE "dc" ("id" INTEGER PRIMARY KEY)`);
     let release!: () => void;
@@ -207,7 +206,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("reports itself inactive once the disconnect a caller awaited has returned", async () => {
-    const closing = new BetterSQLite3Adapter({ database: ":memory:" });
+    const closing = new SQLite3Adapter({ database: ":memory:" });
 
     await closing.execute(`CREATE TABLE "dc2" ("id" INTEGER PRIMARY KEY)`);
     let release!: () => void;

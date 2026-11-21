@@ -13,7 +13,7 @@ import {
 import { Relation } from "../../lib/relation.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
-import { BetterSQLite3Adapter } from "../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js";
 import {
   connectedToStack,
   currentRole,
@@ -426,7 +426,7 @@ describe("ConnectionHandling", () => {
   it.skipIf(adapterType !== "sqlite")(
     "#adapterClass resolves to the SQLite3Adapter constructor",
     async () => {
-      expect(Base.adapterClass()).toBe(BetterSQLite3Adapter);
+      expect(Base.adapterClass()).toBe(SQLite3Adapter);
     },
   );
 
@@ -466,7 +466,7 @@ describe("ConnectionHandling", () => {
       const pool = WorkerModel.connectionPool();
       expect(pool.dbConfig.database).toBe("db/foo-2.sqlite3");
       const Klass = WorkerModel.adapterClass();
-      expect(Klass).toBe(BetterSQLite3Adapter);
+      expect(Klass).toBe(SQLite3Adapter);
     } finally {
       await WorkerModel.removeConnection();
       Base.configurations(priorConfigs);

@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../lib/connection-adapters/better-sqlite3-adapter.js";
-import { NodeSQLiteAdapter } from "../../lib/connection-adapters/node-sqlite-adapter.js";
-import { ExpoSQLiteAdapter } from "../../lib/connection-adapters/expo-sqlite-adapter.js";
-import { LibSQLRemoteAdapter } from "../../lib/connection-adapters/libsql-remote-adapter.js";
 import { File, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
 import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
@@ -36,14 +32,14 @@ const asyncDriver = (open: SqliteDriver["open"]): SqliteDriver => ({
 const asyncOnlyDriver = asyncDriver(openVia);
 
 describe("SQLite adapter driver binding", () => {
-  it("BetterSQLite3Adapter binds its bundled driver and opens", async () => {
-    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+  it("SQLite3Adapter binds its bundled driver and opens", async () => {
+    const adapter = new SQLite3Adapter({ database: ":memory:" });
     expect(adapter).toBeInstanceOf(SQLite3Adapter);
     await adapter.disconnectBang();
   });
 
   it("leaves the raw connection unopened until connectBang", async () => {
-    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const adapter = new SQLite3Adapter({ database: ":memory:" });
     expect(adapter.isConnected()).toBe(false);
     expect(await adapter.active()).toBe(false);
 
@@ -64,9 +60,9 @@ describe("SQLite adapter driver binding", () => {
     ).rejects.toThrow(/config.driver must be a SqliteDriver/);
   });
 
-  it("NodeSQLiteAdapter and ExpoSQLiteAdapter are thin SQLite3Adapter subclasses", () => {
-    expect(Object.getPrototypeOf(NodeSQLiteAdapter)).toBe(SQLite3Adapter);
-    expect(Object.getPrototypeOf(ExpoSQLiteAdapter)).toBe(SQLite3Adapter);
+  it("SQLite3Adapter and SQLite3Adapter are thin SQLite3Adapter subclasses", () => {
+    expect(Object.getPrototypeOf(SQLite3Adapter)).toBe(SQLite3Adapter);
+    expect(Object.getPrototypeOf(SQLite3Adapter)).toBe(SQLite3Adapter);
   });
 
   it("defers connection for an async-only driver constructed synchronously", async () => {
@@ -92,7 +88,7 @@ describe("SQLite adapter driver binding", () => {
   });
 
   it("openAsync also opens sync drivers (better-sqlite3)", async () => {
-    const adapter = await new BetterSQLite3Adapter({ database: ":memory:" }).connectBang();
+    const adapter = await new SQLite3Adapter({ database: ":memory:" }).connectBang();
     expect(await adapter.active()).toBe(true);
     await adapter.disconnectBang();
   });
@@ -611,7 +607,7 @@ describe("SQLite adapter driver binding", () => {
 
 describe("SQLite3Adapter connection parameters", () => {
   it("carry only the keys Rails' merge produces, and newClient resolves the driver by class", async () => {
-    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const adapter = new SQLite3Adapter({ database: ":memory:" });
     const params = adapter._connectionParameters;
     expect(params).not.toHaveProperty("driver");
     expect(params).toMatchObject({
@@ -619,13 +615,13 @@ describe("SQLite3Adapter connection parameters", () => {
       resultsAsHash: true,
       defaultTransactionMode: "immediate",
     });
-    const conn = await BetterSQLite3Adapter.newClient(params);
+    const conn = await SQLite3Adapter.newClient(params);
     expect(conn.isOpen()).toBe(true);
     await conn.close();
   });
 
   it("does not expand or mkdir a libsql remote URL as a local path", () => {
-    const adapter = new LibSQLRemoteAdapter({ database: "libsql://trails-remote-probe.invalid" });
+    const adapter = new SQLite3Adapter({ database: "libsql://trails-remote-probe.invalid" });
     expect(adapter._connectionParameters.database).toBe("libsql://trails-remote-probe.invalid");
     expect(adapter.supportsConcurrentConnections()).toBe(true);
     expect(adapter._memoryDatabase).toBe(false);
@@ -634,10 +630,10 @@ describe("SQLite3Adapter connection parameters", () => {
   });
 
   it("runs SQLite's dialect over AbstractAdapter without SQLite3Adapter's initializer", async () => {
-    const adapter = new LibSQLRemoteAdapter({ database: ":memory:", driver: betterSqlite3Driver });
+    const adapter = new SQLite3Adapter({ database: ":memory:", driver: betterSqlite3Driver });
     expect(adapter).not.toBeInstanceOf(SQLite3Adapter);
     expect(adapter.adapterName).toBe("SQLite");
-    expect(LibSQLRemoteAdapter.quoteColumnName("a")).toBe('"a"');
+    expect(SQLite3Adapter.quoteColumnName("a")).toBe('"a"');
     try {
       await adapter.execute("CREATE TABLE t (id integer primary key, name varchar)");
       await adapter.transaction(async () => {

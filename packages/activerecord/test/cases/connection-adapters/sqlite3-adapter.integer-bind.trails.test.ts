@@ -3,7 +3,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
 import { FloatType, DecimalType, IntegerType } from "@blazetrails/activemodel";
 import { QueryAttribute } from "../../../lib/relation/query-attribute.js";
 
@@ -13,7 +12,7 @@ describe("SQLite3Adapter integer bind serialization", () => {
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-intbind-"));
-    adapter = new BetterSQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
+    adapter = new SQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
     await adapter.connectBang();
   });
 

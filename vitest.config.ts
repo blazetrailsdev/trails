@@ -272,18 +272,6 @@ const alias = {
     __dirname,
     "packages/activerecord/lib/connection-adapters/sqlite3-adapter.ts",
   ),
-  "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js": path.resolve(
-    __dirname,
-    "packages/activerecord/lib/connection-adapters/better-sqlite3-adapter.ts",
-  ),
-  "@blazetrails/activerecord/connection-adapters/node-sqlite-adapter.js": path.resolve(
-    __dirname,
-    "packages/activerecord/lib/connection-adapters/node-sqlite-adapter.ts",
-  ),
-  "@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js": path.resolve(
-    __dirname,
-    "packages/activerecord/lib/connection-adapters/expo-sqlite-adapter.ts",
-  ),
   "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js": path.resolve(
     __dirname,
     "packages/activerecord/lib/connection-adapters/postgresql-adapter.ts",

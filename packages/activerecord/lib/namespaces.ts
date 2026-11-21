@@ -26,14 +26,8 @@ import type { Base } from "./base.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { Column as MySQLColumn } from "./connection-adapters/mysql/column.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import type { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
-import type { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
-import type { LibSQLAdapter } from "./connection-adapters/libsql-adapter.js";
-import type { LibSQLRemoteAdapter } from "./connection-adapters/libsql-remote-adapter.js";
-import type { LibSQLReplicaAdapter } from "./connection-adapters/libsql-replica-adapter.js";
 import type { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
-import type { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js";
 import type {
   InverseOfAssociationRecursiveError,
   HasManyThroughAssociationNotFoundError,
@@ -157,18 +151,10 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/connection_adapters": () => import("./connection-adapters.js"),
   "active_record/connection_adapters/abstract_adapter": () =>
     import("./connection-adapters/abstract-adapter.js"),
-  "active_record/connection_adapters/better_sqlite3_adapter": () =>
-    import(new URL("./connection-adapters/better-sqlite3-adapter.js", import.meta.url).href),
-  "active_record/connection_adapters/node_sqlite_adapter": () =>
-    import(new URL("./connection-adapters/node-sqlite-adapter.js", import.meta.url).href),
-  "active_record/connection_adapters/libsql_adapter": () =>
-    import(new URL("./connection-adapters/libsql-adapter.js", import.meta.url).href),
-  "active_record/connection_adapters/libsql_remote_adapter": () =>
-    import(new URL("./connection-adapters/libsql-remote-adapter.js", import.meta.url).href),
-  "active_record/connection_adapters/libsql_replica_adapter": () =>
-    import(new URL("./connection-adapters/libsql-replica-adapter.js", import.meta.url).href),
   "active_record/connection_adapters/mysql2_adapter": () =>
     import(new URL("./connection-adapters/mysql2-adapter.js", import.meta.url).href),
+  "active_record/connection_adapters/sqlite3_adapter": () =>
+    import(new URL("./connection-adapters/sqlite3-adapter.js", import.meta.url).href),
   "active_record/connection_adapters/postgresql_adapter": () =>
     import(new URL("./connection-adapters/postgresql-adapter.js", import.meta.url).href),
   "active_record/encryption": () => import("./encryption.js"),
@@ -538,14 +524,8 @@ export const ConnectionAdapters = {
     SchemaStatements: typeof import("./connection-adapters/sqlite3/schema-statements.js");
   };
   AbstractAdapter: typeof AbstractAdapter;
-  BetterSQLite3Adapter: typeof BetterSQLite3Adapter;
   SQLite3Adapter: typeof SQLite3Adapter;
-  ExpoSQLiteAdapter: typeof ExpoSQLiteAdapter;
-  LibSQLAdapter: typeof LibSQLAdapter;
-  LibSQLRemoteAdapter: typeof LibSQLRemoteAdapter;
-  LibSQLReplicaAdapter: typeof LibSQLReplicaAdapter;
   Mysql2Adapter: typeof Mysql2Adapter;
-  NodeSQLiteAdapter: typeof NodeSQLiteAdapter;
   PostgreSQLAdapter: typeof PostgreSQLAdapter;
   register: typeof register;
   load: typeof load;

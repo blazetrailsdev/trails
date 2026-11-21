@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import "@blazetrails/sqlite3/better-sqlite3";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { loadCanonicalSchema } from "../../support/canonical-schema.js";
 import { STUBBED_DDL_METHODS } from "../../support/stubbed-ddl-methods.js";
@@ -78,7 +78,7 @@ function isPrivateFieldBrandCheck(error: unknown): boolean {
 }
 
 async function recordLayPath(): Promise<Set<string>> {
-  const real = new BetterSQLite3Adapter({ database: ":memory:" }) as unknown as AbstractAdapter;
+  const real = new SQLite3Adapter({ database: ":memory:" }) as unknown as AbstractAdapter;
   const touched = new Set<string>();
   const recorder = (inner: AbstractAdapter): AbstractAdapter => {
     const self: AbstractAdapter = new Proxy(real, {
@@ -104,7 +104,7 @@ async function recordLayPath(): Promise<Set<string>> {
   try {
     await loadCanonicalSchema(proxy);
   } finally {
-    await (real as unknown as BetterSQLite3Adapter).disconnectBang();
+    await (real as unknown as SQLite3Adapter).disconnectBang();
   }
   return touched;
 }

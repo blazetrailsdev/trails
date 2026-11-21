@@ -1,7 +1,6 @@
 import { it, expect, afterEach } from "vitest";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../../../lib/connection-adapters/better-sqlite3-adapter.js";
 
 describeIfSqlite("SQLite3StatementPoolTest", () => {
   const openAdapters: SQLite3Adapter[] = [];
@@ -18,22 +17,20 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
   });
 
   it("reads statementLimit from the options hash", () => {
-    const adapter = track(new BetterSQLite3Adapter({ database: ":memory:", statementLimit: 7 }));
+    const adapter = track(new SQLite3Adapter({ database: ":memory:", statementLimit: 7 }));
     const pool = adapter.buildStatementPool();
     expect((pool as unknown as { _statementLimit: number })._statementLimit).toBe(7);
   });
 
   it("reads preparedStatements from the options hash", () => {
-    const adapter = track(
-      new BetterSQLite3Adapter({ database: ":memory:", preparedStatements: false }),
-    );
+    const adapter = track(new SQLite3Adapter({ database: ":memory:", preparedStatements: false }));
     expect(adapter.preparedStatements).toBe(false);
   });
 
   it("passes a non-boolean preparedStatements config through as Rails does", () => {
     expect(
       track(
-        new BetterSQLite3Adapter({
+        new SQLite3Adapter({
           database: ":memory:",
           preparedStatements: "false" as unknown as boolean,
         }),
@@ -41,20 +38,20 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
     ).toBe(false);
     expect(
       track(
-        new BetterSQLite3Adapter({
+        new SQLite3Adapter({
           database: ":memory:",
           preparedStatements: 0 as unknown as boolean,
         }),
       ).preparedStatements,
     ).toBe(true);
 
-    const adapter = track(new BetterSQLite3Adapter({ database: ":memory:" }));
+    const adapter = track(new SQLite3Adapter({ database: ":memory:" }));
     (adapter as unknown as { preparedStatements: unknown }).preparedStatements = "true";
     expect(adapter.preparedStatements).toBe(true);
   });
 
   it("clearCacheBang clears the pool without throwing on next query", async () => {
-    const adapter = track(new BetterSQLite3Adapter({ database: ":memory:" }));
+    const adapter = track(new SQLite3Adapter({ database: ":memory:" }));
     await adapter.execute(`CREATE TABLE t (id INTEGER)`);
     await adapter.execQuery("SELECT * FROM t WHERE id = ?", "SQL", [1]);
     await adapter.clearCacheBang();

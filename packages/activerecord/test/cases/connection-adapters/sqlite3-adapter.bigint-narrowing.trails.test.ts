@@ -3,7 +3,6 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
 
 describe("SQLite3Adapter bigint narrowing", () => {
   let adapter: SQLite3Adapter;
@@ -11,7 +10,7 @@ describe("SQLite3Adapter bigint narrowing", () => {
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "trails-sqlite-bignarrow-"));
-    adapter = new BetterSQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
+    adapter = new SQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
     await adapter.execute(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, wide BIGINT, narrow INTEGER)",
     );

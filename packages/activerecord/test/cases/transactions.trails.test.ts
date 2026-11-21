@@ -15,7 +15,6 @@ import { WrongReply } from "../models/reply.js";
 import { CpkBook } from "../models/cpk.js";
 import { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../lib/connection-adapters/better-sqlite3-adapter.js";
 import { establishConnectionTo } from "../support/adapter-double.js";
 
 type StartTransactionState = { level: number; attributes: unknown } | null;
@@ -42,7 +41,7 @@ interface AdapterTxView {
 const openAdapters: SQLite3Adapter[] = [];
 
 async function makeSQLiteTopic() {
-  const adp = new BetterSQLite3Adapter({ database: ":memory:" });
+  const adp = new SQLite3Adapter({ database: ":memory:" });
   openAdapters.push(adp);
   await adp.execute(
     "CREATE TABLE direct_topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",

@@ -1004,7 +1004,7 @@ describe("CI runs every tooling test suite", () => {
         "packages/activerecord/lib/relation.ts",
         "packages/activerecord/lib/associations.ts",
         "packages/activerecord/test/cases/base.test.ts",
-        "packages/activerecord/lib/connection-adapters/better-sqlite3-adapter.ts",
+        "packages/activerecord/lib/connection-adapters/sqlite3-adapter.ts",
         "packages/activerecord/test/cases/adapters/sqlite3/test-helper.ts",
         "packages/arel/lib/visitors/to-sql.ts",
       ];

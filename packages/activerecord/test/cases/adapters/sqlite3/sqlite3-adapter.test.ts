@@ -9,8 +9,6 @@ import { ARUnit2Model } from "../../../models/arunit2-model.js";
 import { inMemoryDb } from "../../../support/adapter-helper.js";
 import { itIfSupports } from "../../../support/supports.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../../../lib/connection-adapters/better-sqlite3-adapter.js";
-import { NodeSQLiteAdapter } from "../../../../lib/connection-adapters/node-sqlite-adapter.js";
 import { Notifications, indexBy } from "@blazetrails/activesupport";
 import type { Database } from "better-sqlite3";
 
@@ -42,9 +40,9 @@ beforeEach(async () => {
 
 async function withMemoryConnection(
   options: Record<string, unknown>,
-  fn: (conn: BetterSQLite3Adapter) => Promise<void>,
+  fn: (conn: SQLite3Adapter) => Promise<void>,
 ): Promise<void> {
-  const conn = new BetterSQLite3Adapter({ ...options, database: ":memory:" });
+  const conn = new SQLite3Adapter({ ...options, database: ":memory:" });
   try {
     await conn.connectBang();
     await fn(conn);
@@ -55,12 +53,12 @@ async function withMemoryConnection(
 
 async function withFileConnection(
   options: Record<string, unknown>,
-  fn: (conn: BetterSQLite3Adapter) => Promise<void>,
+  fn: (conn: SQLite3Adapter) => Promise<void>,
 ): Promise<void> {
   options = { ...options };
   const dbConfig = ARUnit2Model.connectionDbConfig();
   options["database"] ||= dbConfig.database;
-  const conn = new BetterSQLite3Adapter(options);
+  const conn = new SQLite3Adapter(options);
 
   try {
     await fn(conn);
@@ -69,7 +67,7 @@ async function withFileConnection(
   }
 }
 
-async function rawConnectionOf(conn: BetterSQLite3Adapter): Promise<Database> {
+async function rawConnectionOf(conn: SQLite3Adapter): Promise<Database> {
   return (await conn.rawConnection())!.raw as Database;
 }
 
@@ -133,15 +131,15 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "sqlite3-adapter-"));
     const dbPath = path.join(dir, "_not_exist/-cinco-dog.sqlite3");
     await assertNothingRaised(async () => {
-      const connection = new BetterSQLite3Adapter({ database: dbPath });
+      const connection = new SQLite3Adapter({ database: dbPath });
       await connection.dropTable("ex", { ifExists: true });
     });
-    expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBeTruthy();
+    expect(await SQLite3Adapter.databaseExists({ database: dbPath })).toBeTruthy();
     await fs.promises.rm(dir, { recursive: true, force: true });
   });
 
   it("database exists returns false when the database does not exist", async () => {
-    expect(await BetterSQLite3Adapter.databaseExists({ database: "non_extant_db" })).toBeFalsy();
+    expect(await SQLite3Adapter.databaseExists({ database: "non_extant_db" })).toBeFalsy();
   });
 
   it("database exists returns true when database exists", async () => {
@@ -149,10 +147,10 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const path = await import("path");
     const os = await import("os");
     const dbPath = path.join(os.tmpdir(), `sqlite-exists-${Date.now()}.db`);
-    const a = new BetterSQLite3Adapter({ database: dbPath });
+    const a = new SQLite3Adapter({ database: dbPath });
     try {
       await a.connectBang();
-      expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBeTruthy();
+      expect(await SQLite3Adapter.databaseExists({ database: dbPath })).toBeTruthy();
     } finally {
       await a.disconnectBang();
       fs.rmSync(dbPath, { force: true });
@@ -160,18 +158,18 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("database exists returns true for an in memory db", async () => {
-    expect(await BetterSQLite3Adapter.databaseExists({ database: ":memory:" })).toBeTruthy();
+    expect(await SQLite3Adapter.databaseExists({ database: ":memory:" })).toBeTruthy();
   });
 
   it("connect with url", async () => {
-    const a = new BetterSQLite3Adapter({ database: ":memory:" });
+    const a = new SQLite3Adapter({ database: ":memory:" });
     await a.connectBang();
     expect(a.isActive()).toBeTruthy();
     await a.disconnectBang();
   });
 
   it("connect memory with url", async () => {
-    const a = new BetterSQLite3Adapter({ database: ":memory:" });
+    const a = new SQLite3Adapter({ database: ":memory:" });
     await a.connectBang();
     expect(a.isActive()).toBeTruthy();
     await a.disconnectBang();
@@ -235,7 +233,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("connection no db", async () => {
     const os = await import("os");
     const path = await import("path");
-    const a = new BetterSQLite3Adapter({
+    const a = new SQLite3Adapter({
       database: path.join(os.tmpdir(), "nonexistent-path-12345", "no.db"),
       readonly: true,
     });
@@ -243,7 +241,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("bad timeout", async () => {
-    const a = new BetterSQLite3Adapter({ database: ":memory:", timeout: "usa" });
+    const a = new SQLite3Adapter({ database: ":memory:", timeout: "usa" });
     const exception: any = await assertRaises([StatementInvalid], {}, async () => {
       await a.connectBang();
     });
@@ -252,14 +250,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("nil timeout", async () => {
-    const a = new BetterSQLite3Adapter({ database: ":memory:", timeout: undefined });
+    const a = new SQLite3Adapter({ database: ":memory:", timeout: undefined });
     await a.connectBang();
     expect(a).toBeTruthy();
     await a.disconnectBang();
   });
 
   it("connect", async () => {
-    const a = new BetterSQLite3Adapter({ database: ":memory:" });
+    const a = new SQLite3Adapter({ database: ":memory:" });
     expect(a).toBeTruthy();
     await a.disconnectBang();
   });
@@ -675,7 +673,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("exec insert with returning disabled", async () => {
     const originalConn = adapter;
-    adapter = new BetterSQLite3Adapter({
+    adapter = new SQLite3Adapter({
       database: ":memory:",
       insertReturning: false,
     }) as unknown as SQLite3Adapter;
@@ -694,7 +692,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("exec insert default values with returning disabled", async () => {
     const originalConn = adapter;
-    adapter = new BetterSQLite3Adapter({
+    adapter = new SQLite3Adapter({
       database: ":memory:",
       insertReturning: false,
     }) as unknown as SQLite3Adapter;
@@ -1139,7 +1137,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("db is not readonly when readonly option is false", async () => {
-    const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: false });
+    const conn = new SQLite3Adapter({ database: ":memory:", readonly: false });
     await conn.connectBang();
 
     expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
@@ -1147,7 +1145,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("db is not readonly when readonly option is unspecified", async () => {
-    const conn = new BetterSQLite3Adapter({ database: ":memory:" });
+    const conn = new SQLite3Adapter({ database: ":memory:" });
     await conn.connectBang();
 
     expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
@@ -1155,7 +1153,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("db is readonly when readonly option is true", async () => {
-    const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
+    const conn = new SQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 
     expect((await rawConnectionOf(conn)).readonly).toBeTruthy();
@@ -1163,7 +1161,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("writes are not permitted to readonly databases", async () => {
-    const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
+    const conn = new SQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 
     const exception: any = await assertRaises([StatementInvalid], {}, async () => {
@@ -1175,7 +1173,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("strict strings by default", async () => {
-    let conn = new NodeSQLiteAdapter({ adapter: "node-sqlite", database: ":memory:" });
+    let conn = new SQLite3Adapter({ adapter: "node-sqlite", database: ":memory:" });
     await conn.createTable("testings");
 
     await assertNothingRaised(async () => {
@@ -1184,7 +1182,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
 
     await withStrictStringsByDefault(async () => {
-      conn = new NodeSQLiteAdapter({ adapter: "node-sqlite", database: ":memory:" });
+      conn = new SQLite3Adapter({ adapter: "node-sqlite", database: ":memory:" });
       await conn.createTable("testings");
 
       const error: any = await assertRaises([StandardError], {}, async () => {
@@ -1197,7 +1195,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("strict strings by default and true in database yml", async () => {
-    let conn = new BetterSQLite3Adapter({ database: ":memory:", strict: true });
+    let conn = new SQLite3Adapter({ database: ":memory:", strict: true });
     await conn.createTable("testings");
 
     let error: any = await assertRaises([StandardError], {}, async () => {
@@ -1208,7 +1206,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
 
     await withStrictStringsByDefault(async () => {
-      conn = new BetterSQLite3Adapter({ database: ":memory:", strict: true });
+      conn = new SQLite3Adapter({ database: ":memory:", strict: true });
       await conn.createTable("testings");
 
       error = await assertRaises([StandardError], {}, async () => {
@@ -1221,7 +1219,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("strict strings by default and false in database yml", async () => {
-    let conn = new NodeSQLiteAdapter({
+    let conn = new SQLite3Adapter({
       adapter: "node-sqlite",
       database: ":memory:",
       strict: false,
@@ -1234,7 +1232,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
 
     await withStrictStringsByDefault(async () => {
-      conn = new NodeSQLiteAdapter({ adapter: "node-sqlite", database: ":memory:", strict: false });
+      conn = new SQLite3Adapter({ adapter: "node-sqlite", database: ":memory:", strict: false });
       await conn.createTable("testings");
 
       await assertNothingRaised(async () => {

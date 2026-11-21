@@ -1,5 +1,5 @@
 import "../lib/hermes";
-import "@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js";
+import "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { Note, Notebook } from "../app/models";
 import { connect, serially } from "../lib/database";
 

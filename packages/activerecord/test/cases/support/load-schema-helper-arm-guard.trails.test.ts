@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import "@blazetrails/sqlite3/better-sqlite3";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { loadSchema } from "../../support/load-schema-helper.js";
 
-async function withAdapter(fn: (adapter: BetterSQLite3Adapter) => Promise<void>): Promise<void> {
-  const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+async function withAdapter(fn: (adapter: SQLite3Adapter) => Promise<void>): Promise<void> {
+  const adapter = new SQLite3Adapter({ database: ":memory:" });
   try {
     await fn(adapter);
   } finally {
@@ -82,7 +82,7 @@ describe("load_schema arm-probe guard", () => {
   });
 
   it("does not see a subclass that overrides createTable on its own prototype", async () => {
-    class Probe extends BetterSQLite3Adapter {
+    class Probe extends SQLite3Adapter {
       override async createTable(): Promise<void> {}
     }
 

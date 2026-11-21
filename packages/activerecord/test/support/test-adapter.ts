@@ -89,8 +89,7 @@ if (adapterType === "postgres") {
       flags: ["FOUND_ROWS"],
     }) as unknown as DatabaseAdapter;
 } else {
-  const { BetterSQLite3Adapter } =
-    await import("../../lib/connection-adapters/better-sqlite3-adapter.js");
+  const { SQLite3Adapter } = await import("../../lib/connection-adapters/sqlite3-adapter.js");
   newRawTestAdapter = () =>
-    new BetterSQLite3Adapter(_primaryConfiguration as SQLite3Config) as unknown as DatabaseAdapter;
+    new SQLite3Adapter(_primaryConfiguration as SQLite3Config) as unknown as DatabaseAdapter;
 }

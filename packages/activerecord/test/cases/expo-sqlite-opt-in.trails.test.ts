@@ -5,8 +5,8 @@ import "../../lib/connection-adapters.js";
 describe("the expo-sqlite adapter is opt-in", () => {
   it("stays a registered adapter name", () => {
     expect(ConnectionAdapters.adapters.get("expo-sqlite")).toEqual([
-      "ActiveRecord::ConnectionAdapters::ExpoSQLiteAdapter",
-      "active_record/connection_adapters/expo_sqlite_adapter",
+      "ActiveRecord::ConnectionAdapters::SQLite3Adapter",
+      "active_record/connection_adapters/sqlite3_adapter",
     ]);
   });
 
@@ -18,7 +18,6 @@ describe("the expo-sqlite adapter is opt-in", () => {
 
   it("leaves every other sqlite adapter autoloadable", () => {
     const paths = Object.keys(ConnectionAdapters.loadPath);
-    expect(paths).toContain("active_record/connection_adapters/better_sqlite3_adapter");
-    expect(paths).toContain("active_record/connection_adapters/node_sqlite_adapter");
+    expect(paths).toContain("active_record/connection_adapters/sqlite3_adapter");
   });
 });

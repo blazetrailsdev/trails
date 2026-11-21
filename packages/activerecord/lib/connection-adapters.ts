@@ -89,33 +89,33 @@ ActiveRecord.ConnectionAdapters = ConnectionAdapters;
 
 register(
   "sqlite3",
-  "ActiveRecord::ConnectionAdapters::BetterSQLite3Adapter",
-  "active_record/connection_adapters/better_sqlite3_adapter",
+  "ActiveRecord::ConnectionAdapters::SQLite3Adapter",
+  "active_record/connection_adapters/sqlite3_adapter",
 );
 register(
   "node-sqlite",
-  "ActiveRecord::ConnectionAdapters::NodeSQLiteAdapter",
-  "active_record/connection_adapters/node_sqlite_adapter",
+  "ActiveRecord::ConnectionAdapters::SQLite3Adapter",
+  "active_record/connection_adapters/sqlite3_adapter",
 );
 register(
   "expo-sqlite",
-  "ActiveRecord::ConnectionAdapters::ExpoSQLiteAdapter",
-  "active_record/connection_adapters/expo_sqlite_adapter",
+  "ActiveRecord::ConnectionAdapters::SQLite3Adapter",
+  "active_record/connection_adapters/sqlite3_adapter",
 );
 register(
   "libsql",
-  "ActiveRecord::ConnectionAdapters::LibSQLAdapter",
-  "active_record/connection_adapters/libsql_adapter",
+  "ActiveRecord::ConnectionAdapters::SQLite3Adapter",
+  "active_record/connection_adapters/sqlite3_adapter",
 );
 register(
   "libsql-remote",
-  "ActiveRecord::ConnectionAdapters::LibSQLRemoteAdapter",
-  "active_record/connection_adapters/libsql_remote_adapter",
+  "ActiveRecord::ConnectionAdapters::SQLite3Adapter",
+  "active_record/connection_adapters/sqlite3_adapter",
 );
 register(
   "libsql-replica",
-  "ActiveRecord::ConnectionAdapters::LibSQLReplicaAdapter",
-  "active_record/connection_adapters/libsql_replica_adapter",
+  "ActiveRecord::ConnectionAdapters::SQLite3Adapter",
+  "active_record/connection_adapters/sqlite3_adapter",
 );
 register(
   "mysql2",

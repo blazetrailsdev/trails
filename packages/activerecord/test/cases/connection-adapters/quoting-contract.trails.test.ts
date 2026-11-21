@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { Quoting } from "../../../lib/connection-adapters/abstract/quoting.js";
 import { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
-import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 
 type _AbstractAdapterIsQuoting = AbstractAdapter extends Quoting ? true : never;
 const _abstractAdapterIsQuoting: _AbstractAdapterIsQuoting = true;
@@ -12,7 +11,7 @@ void _abstractAdapterIsQuoting;
 
 describe("Quoting interface", () => {
   it("AbstractAdapter implements every Quoting method", async () => {
-    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const adapter = new SQLite3Adapter({ database: ":memory:" });
     try {
       const q: Quoting = adapter;
 
@@ -37,7 +36,7 @@ describe("Quoting interface", () => {
   });
 
   it("SQLite3Adapter dispatches quote/quotedTrue to its own dialect", async () => {
-    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const adapter = new SQLite3Adapter({ database: ":memory:" });
     try {
       expect(adapter.quotedTrue()).toBe("1");
       expect(adapter.quotedFalse()).toBe("0");

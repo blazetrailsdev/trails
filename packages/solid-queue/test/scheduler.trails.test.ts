@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
 import "./test-helper.js";
-import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { Process, Record, RecurringTask, Scheduler } from "../lib/index.js";
 import "./support/add-to-buffer-job.js";
 import { waitForRegisteredProcesses } from "./support/processes-test-helper.js";
@@ -17,7 +17,7 @@ describe.runIf(Record.connectionDbConfig().adapter === "sqlite3")(
     it("registers while another connection holds the write lock", async () => {
       const { database } = Record.connectionDbConfig();
       await RecurringTask.loadSchema();
-      const holder = new BetterSQLite3Adapter({ database: database!, timeout: 1000 });
+      const holder = new SQLite3Adapter({ database: database!, timeout: 1000 });
       await holder.execute("BEGIN IMMEDIATE");
       setTimeout(() => void holder.execute("COMMIT"), 50);
 

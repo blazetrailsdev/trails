@@ -78,9 +78,8 @@ describe("SQLiteDatabaseTasks", () => {
       database: dbPath,
     });
 
-    const { BetterSQLite3Adapter } =
-      await import("../../../lib/connection-adapters/better-sqlite3-adapter.js");
-    const seedAdapter = new BetterSQLite3Adapter({ database: dbPath });
+    const { SQLite3Adapter } = await import("../../../lib/connection-adapters/sqlite3-adapter.js");
+    const seedAdapter = new SQLite3Adapter({ database: dbPath });
     try {
       await seedAdapter.execute(
         "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, updated_at TEXT)",
@@ -112,7 +111,7 @@ describe("SQLiteDatabaseTasks", () => {
         await new SQLiteDatabaseTasks(targetConfig, "/rails/root").structureLoad(dumpPath, null);
       });
 
-      const loadedAdapter = new BetterSQLite3Adapter({ database: loadDbPath });
+      const loadedAdapter = new SQLite3Adapter({ database: loadDbPath });
       try {
         const tables = (await loadedAdapter.execute(
           "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
@@ -130,7 +129,7 @@ describe("SQLiteDatabaseTasks", () => {
         await (loadedAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
       }
     } finally {
-      const cleanupAdapter = new BetterSQLite3Adapter({ database: dbPath });
+      const cleanupAdapter = new SQLite3Adapter({ database: dbPath });
       await cleanupAdapter.execute("DROP TABLE IF EXISTS widgets");
       await (cleanupAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
     }

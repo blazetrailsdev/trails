@@ -19,7 +19,6 @@ import { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapt
 import { Column } from "../../../lib/connection-adapters/column.js";
 import { SqlTypeMetadata } from "../../../lib/connection-adapters/sql-type-metadata.js";
 import { Result } from "../../../lib/result.js";
-import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
@@ -361,7 +360,7 @@ describe("per-adapter visitor isolation", () => {
 
 describe("AbstractAdapter#defaultTimezone", () => {
   it("falls back to Base.defaultTimezone when the config sets none", async () => {
-    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const adapter = new SQLite3Adapter({ database: ":memory:" });
     const previous = defaultTimezone();
     try {
       setDefaultTimezone("local");
@@ -375,7 +374,7 @@ describe("AbstractAdapter#defaultTimezone", () => {
   });
 
   it("prefers the configured default_timezone over the global one", async () => {
-    const adapter = new BetterSQLite3Adapter({ database: ":memory:", defaultTimezone: "local" });
+    const adapter = new SQLite3Adapter({ database: ":memory:", defaultTimezone: "local" });
     const previous = defaultTimezone();
     try {
       setDefaultTimezone("utc");
@@ -389,7 +388,7 @@ describe("AbstractAdapter#defaultTimezone", () => {
   it("raises when the configured default_timezone is neither utc nor local", () => {
     expect(
       () =>
-        new BetterSQLite3Adapter({
+        new SQLite3Adapter({
           database: ":memory:",
           defaultTimezone: "gmt" as "utc",
         }),
@@ -397,7 +396,7 @@ describe("AbstractAdapter#defaultTimezone", () => {
   });
 
   it("contributes no extended type map key when the config sets no default_timezone", async () => {
-    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const adapter = new SQLite3Adapter({ database: ":memory:" });
     try {
       expect(adapter.extendedTypeMapKey()).toBeNull();
     } finally {
@@ -408,7 +407,7 @@ describe("AbstractAdapter#defaultTimezone", () => {
 
 describe("AbstractAdapter#adapterName", () => {
   it("returns the class's ADAPTER_NAME rather than the type-registry key", async () => {
-    const adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const adapter = new SQLite3Adapter({ database: ":memory:" });
     try {
       expect(adapter.adapterName).toBe("SQLite");
     } finally {

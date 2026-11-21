@@ -8,7 +8,7 @@ import { Post } from "../models/post.js";
 import { ActiveRecord } from "../../lib/namespaces.js";
 import { Base } from "../../lib/index.js";
 import { DatabaseConfigurations } from "../../lib/database-configurations.js";
-import { BetterSQLite3Adapter } from "../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "../support/adapter-double.js";
 import { compactBlank, DescendantsTracker, isBlank } from "@blazetrails/activesupport";
@@ -346,11 +346,11 @@ describe("connection checkout in cached find paths", () => {
 
 describe("connection checkout for directly-assigned adapters", () => {
   fixtures({}, { useTransactionalTests: false });
-  let adapter: BetterSQLite3Adapter;
+  let adapter: SQLite3Adapter;
   let DirectTopic: typeof Base;
 
   beforeEach(async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    adapter = new SQLite3Adapter({ database: ":memory:" });
     await adapter.execute(
       "CREATE TABLE direct_topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
     );
