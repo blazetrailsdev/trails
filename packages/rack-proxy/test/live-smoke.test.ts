@@ -24,7 +24,7 @@ describe("LiveSmokeTest", () => {
     const [status, headers, body] = (await app().call(MockRequest.envFor(path))) as unknown as [
       number,
       Headers,
-      unknown[],
+      unknown,
     ];
     const chunks: string[] = [];
     const push = (c: string | Uint8Array) =>
