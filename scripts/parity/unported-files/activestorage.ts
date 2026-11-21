@@ -7,6 +7,38 @@ const JAVASCRIPT_PACKAGE =
 
 export const ACTIVESTORAGE_UNPORTED_FILES: UnportedFile[] = [
   {
+    testFile: "controllers/direct_uploads_controller_test.rb",
+    tests: ["creating new direct upload"],
+    className: "ActiveStorage::S3DirectUploadsControllerTest",
+    reason: CLOUD_SERVICE,
+  },
+  {
+    testFile: "controllers/direct_uploads_controller_test.rb",
+    tests: ["creating new direct upload"],
+    className: "ActiveStorage::GCSDirectUploadsControllerTest",
+    reason: CLOUD_SERVICE,
+  },
+  {
+    testFile: "controllers/direct_uploads_controller_test.rb",
+    tests: ["creating new direct upload"],
+    className: "ActiveStorage::AzureStorageDirectUploadsControllerTest",
+    reason: CLOUD_SERVICE,
+  },
+  {
+    testFile: "controllers/blobs/redirect_controller_test.rb",
+    tests: [
+      "showing existing blob stored in s3",
+      "showing existing blob stored in azure",
+      "showing existing blob stored in gcs",
+    ],
+    reason: CLOUD_SERVICE,
+  },
+  {
+    testFile: "service/configurator_test.rb",
+    tests: ["azure service is deprecated"],
+    reason: CLOUD_SERVICE,
+  },
+  {
     pattern: "service/s3_service.rb",
     testFile: "service/s3_service_test.rb",
     package: "activestorage",
