@@ -26,6 +26,12 @@ describe("Mail::Encodings", () => {
       expect(Encodings.decodeEncode(encoded, "decode")).toEqual(input);
     });
 
+    it("should decode an encoded string", () => {
+      expect(Encodings.valueDecode("=?UTF-8?B?VGhpcyBpcyDjgYIgc3RyaW5n?=")).toEqual(
+        "This is あ string",
+      );
+    });
+
     it("should decode UTF-16 encoded string", () => {
       expect(Encodings.valueDecode("=?UTF-16?B?MEIwRDBGMEgwSg==?=")).toEqual("あいうえお");
     });
@@ -82,6 +88,13 @@ describe("Mail::Encodings", () => {
       expect(Encodings.valueDecode("=?ISO-FOOO?Q?Morten_R=F8verdatt=E9r?=")).toEqual(
         "Morten R�verdatt�r",
       );
+    });
+  });
+
+  describe("mixed Q and B encodings", () => {
+    it("should decode an encoded string", () => {
+      const string = "=?UTF-8?B?VGhpcyBpcyDjgYIgc3RyaW5n?= =?UTF-8?Q?_This_was_=E3=81=82_string?=";
+      expect(Encodings.valueDecode(string)).toEqual("This is あ string This was あ string");
     });
   });
 
@@ -908,5 +921,17 @@ describe("Q encodings", () => {
   });
 });
 describe("decoding a string and detecting the encoding type", () => {
+  // PERMANENT-SKIP: upstream
   it.skip("should handle a very long string efficiently", () => {});
+});
+
+describe("decoding a string and detecting the encoding type", () => {
+  it("should decode UTF-16 encoded string", () => {
+    expect(Encodings.valueDecode("=?UTF-16?Q?0B0D0F0H0J=?=")).toEqual("あいうえお");
+  });
+
+  it("should decode UTF-32 encoded string", () => {
+    const string = "=?UTF-32?Q?=00=000B=00=000D=00=000F=00=000H=00=000J=?=";
+    expect(Encodings.valueDecode(string)).toEqual("あいうえお");
+  });
 });

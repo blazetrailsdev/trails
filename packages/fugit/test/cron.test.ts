@@ -942,6 +942,7 @@ describe("Fugit::Cron", () => {
       expect(Cron.parse("nada")).toEqual(null);
     });
 
+    // PERMANENT-SKIP: upstream
     it.todo("parses @reboot");
 
     describe("success", () => {

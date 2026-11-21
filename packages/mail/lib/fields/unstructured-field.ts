@@ -92,7 +92,11 @@ export class UnstructuredField extends CommonField {
     } else {
       words = stringSplit(decodedString, /[ \t]/);
     }
-    if (binary) words = words.map((word) => binaryBytes(word as string));
+    if (binary) {
+      words = words.map((word) =>
+        forceEncoding(binaryBytes(word as string), rbObjEncoding(decoded)),
+      );
+    }
 
     const foldedLines: string[] = [];
     while (words.length !== 0) {

@@ -1,6 +1,16 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const mail: Record<string, AssertionReceipt[]> = {
+  "mail:mail/encoding_spec.rb › mail encoding › specifying an email-wide encoding › should allow you to send in unencoded strings to fields and encode them":
+    [
+      {
+        kind: "expect_to_eq",
+        value: null,
+        as: null,
+        reason:
+          "encoding_spec.rb:124 asserts `result.encoding`; a JS string has no encoding tag (CLAUDE.md, A String has no encoding tag either).",
+      },
+    ],
   "mail:mail/encodings_spec.rb › B encodings › should complain if there is no encoding passed for Ruby < 1.9":
     [
       {

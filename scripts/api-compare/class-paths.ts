@@ -916,7 +916,9 @@ async function topLevelRubyConstants(dir: string): Promise<Set<string>> {
  * top-level Ruby module, whose JS name is already its path (`Mime`; every
  * gem's, so `ActionView` reopened by `rails-html-sanitizer.rb:14`); one the
  * layout places at a module Ruby defines in another file and reopens here
- * (`module HelperMethods` in every `validations/*.rb`); and one the layout
+ * (`module HelperMethods` in every `validations/*.rb`), or at a class a
+ * workspace dependency defines and this package reopens (`class FormBuilder`,
+ * `actiontext/app/helpers/action_text/tag_helper.rb:92`); and one the layout
  * misplaces in the file that defines or assigns it (`DidYouMean::Correctable`,
  * `did_you_mean/core_ext/name_error.rb:1-2`; `Thor::Correctable`, `thor/error.rb:2`).
  */
@@ -940,6 +942,11 @@ async function rubyAnswered(dir: string): Promise<(key: string, fqn: string) => 
     for (const [fqn, info] of Object.entries(rubyPkg.modules ?? {})) {
       if (!info.file) continue;
       reopened.set(renameTokens(fqn), tsFile(info.file));
+      defined.add(`${tsFile(info.file)}::${renameTokens(fqn).split("::").at(-1)}`);
+    }
+    const reopenedFrom = await dependencyDefinitions(dir, ruby!);
+    for (const [fqn, info] of Object.entries(rubyPkg.classes ?? {})) {
+      if (!info.file || !fqn.includes("::") || !reopenedFrom.has(fqn)) continue;
       defined.add(`${tsFile(info.file)}::${renameTokens(fqn).split("::").at(-1)}`);
     }
     for (const [file, constants] of Object.entries(rubyPkg.fileConstants ?? {})) {

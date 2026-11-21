@@ -144,6 +144,17 @@ describe("Ruby extractor receiver expect", () => {
     expect(Object.keys(named)).toEqual(["doesn't confuse sendmail"]);
   });
 
+  it("keeps a backslashed double quote in a single-quoted name", () => {
+    const named = rubyTestCases(`
+      describe Foo do
+        it 'should handle |"Mikel \\"quotes\\" Lindsaar"|' do
+          expect(r).to eq 1
+        end
+      end
+    `);
+    expect(Object.keys(named)).toEqual(['should handle |"Mikel \\"quotes\\" Lindsaar"|']);
+  });
+
   it("reads an escaped quote in a double-quoted name as the quote", () => {
     const named = rubyTestCases(`
       describe Foo do

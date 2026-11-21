@@ -135,7 +135,10 @@ export interface FileRow {
   methodsMissing: number;
   /** The Ruby names api-compare reports missing from `tsFile`, in its order. */
   missingMethods: string[];
+  /** Matched tests that run, over `testsTotal`: parity:test's `implemented / portable`. */
   testsMatched: number;
+  /** parity:test's `P permanent`: permanent skips plus unported `tests:` rows, outside `testsTotal`. */
+  testsPermanent: number;
   testsTotal: number;
 }
 
@@ -268,6 +271,14 @@ export function tagSitesIn(
 }
 
 /**
+ * The `permanentSkips` key of a test upstream itself leaves empty or skipped
+ * (`PERMANENT-SKIP: upstream`): fugit's pending `it 'parses @reboot'`
+ * (`vendor/fugit/v1.11.1/spec/cron_spec.rb:1118`), mail's `skip "fails randomly"`
+ * (`vendor/mail/2.8.1/spec/mail/encodings_spec.rb:531`).
+ */
+export const UPSTREAM_SKIP = "upstream";
+
+/**
  * Every `PERMANENT-SKIP:` comment in a test file, keyed by the section it
  * cites (`""` when it cites none), with the name of the test it parks. A
  * comment runs over its `//` continuation lines, so a citation may wrap.
@@ -287,9 +298,13 @@ export function permanentSkipsIn(
     for (; j < lines.length && /^\s*(\/\/|\*)/.test(lines[j]); j++) {
       comment += " " + lines[j].replace(/^\s*(\/\/|\*)\s?/, "");
     }
-    const name = /^\s*(?:it|test|describe)(?:\.skip)?\(\s*(["'`])(.*?)\1/.exec(lines[j] ?? "");
+    const name = /^\s*(?:it|test|describe)(?:\.skip|\.todo)?\(\s*(["'`])(.*?)\1/.exec(
+      lines[j] ?? "",
+    );
     const skip = { file, line: i + 1, testName: name === null ? null : name[2] };
-    const anchor = citedSections(comment, sections, `${file}:${i + 1}`)[0] ?? "";
+    const anchor = /^PERMANENT-SKIP:\s*upstream\b/.test(comment)
+      ? UPSTREAM_SKIP
+      : (citedSections(comment, sections, `${file}:${i + 1}`)[0] ?? "");
     (out[anchor] ??= []).push(skip);
   }
   return out;
@@ -398,6 +413,9 @@ interface TestComparison {
       conventionTsPackage?: string;
       rubyTestCount: number;
       matched: number;
+      matchedSkipped?: number;
+      matchedPermanent?: number;
+      unportedTests?: number;
     }[];
   }[];
 }
@@ -428,13 +446,14 @@ export function tsPathOf(key: string, tsFile: string): string {
  * path; none, or no test-compare output, leaves `testsTotal` 0.
  */
 export function fileRows(api: ApiComparison | null, tests: TestComparison | null): FileRow[] {
-  const byTsTest = new Map<string, { matched: number; total: number }>();
+  const byTsTest = new Map<string, { matched: number; permanent: number; total: number }>();
   for (const r of tests?.results ?? []) {
     for (const f of r.files) {
       const key = `${packageDirOf(f.conventionTsPackage ?? r.package)} ${f.conventionTsFile}`;
-      const t = byTsTest.get(key) ?? { matched: 0, total: 0 };
-      t.matched += f.matched;
-      t.total += f.rubyTestCount;
+      const t = byTsTest.get(key) ?? { matched: 0, permanent: 0, total: 0 };
+      t.matched += f.matched - (f.matchedSkipped ?? 0);
+      t.permanent += (f.matchedPermanent ?? 0) + (f.unportedTests ?? 0);
+      t.total += f.rubyTestCount - (f.matchedPermanent ?? 0);
       byTsTest.set(key, t);
     }
   }
@@ -454,6 +473,7 @@ export function fileRows(api: ApiComparison | null, tests: TestComparison | null
         methodsMissing: f.missing,
         missingMethods: (f.missingMethods ?? []).map((m) => m.rubyName),
         testsMatched: t?.matched ?? 0,
+        testsPermanent: t?.permanent ?? 0,
         testsTotal: t?.total ?? 0,
       });
     }

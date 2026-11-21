@@ -33,6 +33,8 @@ function file(over: Partial<ConventionFileResult>): ConventionFileResult {
     rubyTestCount: 0,
     matched: 0,
     matchedSkipped: 0,
+    matchedPermanent: 0,
+    unportedTests: 0,
     wrongDescribe: 0,
     misplaced: 0,
     missing: 0,

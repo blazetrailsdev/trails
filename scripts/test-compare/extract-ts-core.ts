@@ -687,6 +687,7 @@ export function extractTestsFromSource(
       assertionKinds,
       assertionValues,
       pending,
+      ...(pending && underPermanentSkip(sourceFile, node) ? { permanent: true } : {}),
       ...(dynamic ? { dynamic: true } : {}),
       ...(finalGate ? { gate: finalGate } : {}),
     });
@@ -1642,4 +1643,27 @@ export function pkgFromPath(relPath: string): string {
     return parts[1];
   }
   return "unknown";
+}
+
+/**
+ * Whether the comment block directly above `node`'s line, read upward past
+ * blank lines and one-line `it.skip(...)` siblings, carries `PERMANENT-SKIP:`.
+ * A `BLOCKED:` line anywhere in the block parks the test as an open gap instead.
+ */
+export function underPermanentSkip(sourceFile: ts.SourceFile, node: ts.Node): boolean {
+  const starts = sourceFile.getLineStarts();
+  const lineAt = (n: number) => sourceFile.text.slice(starts[n], starts[n + 1] ?? undefined).trim();
+  let permanent = false;
+  let i = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line - 1;
+  for (; i >= 0; i--) {
+    const line = lineAt(i);
+    if (line === "" || /^(it|test)\.skip\(.*\);$/.test(line)) {
+      if (permanent) break;
+      continue;
+    }
+    if (!/^(\/\/|\*|\/\*)/.test(line)) break;
+    if (line.includes("BLOCKED:")) return false;
+    if (line.includes("PERMANENT-SKIP:")) permanent = true;
+  }
+  return permanent;
 }
