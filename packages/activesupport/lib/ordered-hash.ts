@@ -102,7 +102,9 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#invert` (`vendor/ruby/v3.3.11/hash.c:3900`), inherited by `OrderedHash < ::Hash`.
+   * Ruby core `Hash#invert` (`vendor/ruby/v3.3.11/hash.c:3900`), inherited by `OrderedHash < ::Hash`.
+   *
+   * @noRailsEquivalent PERMANENT
    */
   invert(): OrderedHash<V, K> {
     const result = new OrderedHash<V, K>();
