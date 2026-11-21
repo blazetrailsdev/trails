@@ -7,6 +7,7 @@ const CHECK_ALL_TABLES = 0x10000;
 
 export const Constants = {
   Open: {
+    READONLY: 0x00000001,
     READWRITE: 0x00000002,
     CREATE: 0x00000004,
     SHAREDCACHE: 0x00020000,

@@ -1,20 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../lib/index.js";
-import { engineDatabase } from "./support/engine-database.js";
+import { engine } from "./support/engine-database.js";
 
 describe("TestStatement", () => {
-  let db: ReturnType<typeof engineDatabase>;
+  let db: InstanceType<typeof SQLite3.Database>;
   let stmt: InstanceType<typeof SQLite3.Statement>;
 
   beforeEach(() => {
-    db = engineDatabase();
+    db = new SQLite3.Database(":memory:", { engine });
     stmt = new SQLite3.Statement(db, "select 'foo'");
   });
 
   afterEach(async () => {
     if (!stmt.isClosed()) await stmt.close();
-    db.close();
+    if (!db.isClosed()) await db.close();
   });
 
   it("new", async () => {
@@ -22,8 +22,8 @@ describe("TestStatement", () => {
   });
 
   it("new closed handle", async () => {
-    db = engineDatabase();
-    db.close();
+    db = new SQLite3.Database(":memory:", { engine });
+    await db.close();
     expect(() => new SQLite3.Statement(db, 'select "foo"')).toThrow(ArgumentError);
   });
 
