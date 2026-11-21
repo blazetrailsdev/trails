@@ -41,6 +41,7 @@ export class Result {
     block: (row: Record<string, unknown>) => R | false | null | undefined,
   ) => R[];
   declare map: <R>(block: (row: Record<string, unknown>) => R) => R[];
+  /** @noRailsEquivalent PERMANENT */
   declare [Symbol.iterator]: () => IterableIterator<Record<string, unknown>>;
 
   readonly #native: pg.QueryResult;
@@ -48,6 +49,7 @@ export class Result {
 
   readonly #error: DatabaseErrorFields | null;
 
+  /** @noRailsEquivalent PERMANENT */
   constructor(native: pg.QueryResult, error: DatabaseErrorFields | null = null) {
     this.#native = native;
     this.#error = error;

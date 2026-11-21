@@ -52,6 +52,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "Rake::EarlyTime": { "<=>": ["compareTo"] },
   "Rake::LateTime": { "<=>": ["compareTo"] },
   "TZInfo::Timestamp": { "<=>": ["compareTo"] },
+  // pg_result.c:1744 `rb_define_method(rb_cPGresult, "[]", pgresult_aref, 1)` →
+  // result.ts `Result#get`.
+  "PG::Result": { "[]": ["get"] },
   "Chronic::RepeaterTime::Tick": { "*": ["multiply"] },
   "EtOrbi::EoTime": {
     "==": ["equals"],
