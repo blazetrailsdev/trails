@@ -89,7 +89,7 @@
         <div class="pane" role="tabpanel">
           <div class="file">app/controllers/posts-controller.ts &middot; scratch edit of examples/cloudflare-worker &middot; tsc --noEmit</div>
           {@html data.hero.check}
-          <p class="note">A typo in an attribute name, caught before the app runs. The error is the compiler's real output for this action added to a scratch copy of the <a href="{repo}/tree/main/examples/cloudflare-worker">cloudflare-worker example</a>.</p>
+          <p class="note">A typo in an attribute name, caught before the app runs. The error is the compiler's real output for this action added to a scratch copy of the <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">cloudflare-worker example</a>.</p>
         </div>
       {:else}
         <div class="pane ai" role="tabpanel">
@@ -132,7 +132,7 @@
   <section class="band">
     <div class="card">
       <h2>Built for Rails developers, new and seasoned.</h2>
-      <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/main/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/main/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/main/examples/react-native-notes">React Native app</a>. On the roadmap: the full stack running in the browser.</p>
+      <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/{data.buildRef}/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/{data.buildRef}/examples/react-native-notes">React Native app</a>. On the roadmap: the full stack running in the browser.</p>
       <p class="small"><code>{installs.npm}</code></p>
       <a class="cta" href="{base}/docs/guides/idioms">Blaze trails &rsaquo;</a>
     </div>

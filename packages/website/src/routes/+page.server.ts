@@ -3,10 +3,10 @@ import { codeToHtml } from "shiki";
 import * as fs from "fs/promises";
 import * as path from "path";
 
-import { GITHUB_REPO, loadParity, percent, shortSha } from "$lib/parity";
+import { GITHUB_REPO, REPO_ROOT, loadParity, percent, shortSha } from "$lib/parity";
 
 const EXAMPLE = "examples/cloudflare-worker";
-const EXAMPLE_ROOT = `../../${EXAMPLE}`;
+const EXAMPLE_ROOT = path.join(REPO_ROOT, EXAMPLE);
 
 const blocks = [
   {
@@ -87,6 +87,7 @@ export async function load() {
   const parity = await loadParity();
   return {
     measuredAt: shortSha(parity.measuredAt),
+    buildRef: parity.buildRef,
     coverage: Object.fromEntries(parity.packages.map((p) => [p.name, percent(p.api)])),
     hero: {
       check: await withError(check, "ts", 7, 36, 41, checkError),
@@ -94,7 +95,7 @@ export async function load() {
     blocks: await Promise.all(
       blocks.map(async ({ lang, ...rest }) => ({
         ...rest,
-        href: `${GITHUB_REPO}/blob/main/${EXAMPLE}/${rest.file}`,
+        href: `${GITHUB_REPO}/blob/${parity.buildRef}/${EXAMPLE}/${rest.file}`,
         html: await codeToHtml(
           (await fs.readFile(path.join(EXAMPLE_ROOT, rest.file), "utf8")).trimEnd(),
           { lang, theme: "github-dark" },
