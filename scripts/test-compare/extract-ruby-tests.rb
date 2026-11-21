@@ -2785,8 +2785,6 @@ class TestExtractor
     unescape_name_quotes(traverse_for_string(args), double_quoted_literal?(args))
   end
 
-  # A single-quoted literal escapes only `\'` (and `\\`): its `\"` is two
-  # characters, as Ruby reads `'Mikel \"quotes\" Lindsaar'`.
   def unescape_name_quotes(name, double_quoted = true)
     quote = double_quoted ? /\\(['"])/ : /\\(')/
     return name unless name&.match?(quote)

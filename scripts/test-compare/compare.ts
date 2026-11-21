@@ -722,7 +722,7 @@ interface TsTestInfo {
   title: string; // describe path and name as written, " > "-joined (--extra)
   dynamic: boolean; // name recovered from a template literal — matches only on its collapsed form
   pending: boolean;
-  permanent?: boolean; // parked under a PERMANENT-SKIP: line
+  permanent?: boolean;
   gate?: TestGate; // adapter/feature gate emitted by the TS extractor
   assertionCount?: number; // raw assertion-call count from the TS extractor
   assertionKinds?: string[]; // raw assertion-kind tokens from the TS extractor

@@ -181,7 +181,6 @@ beforeEach(async () => {
               conventionTsFile: "base.test.ts",
               rubyTestCount: 8,
               matched: 6,
-              // One PERMANENT-SKIP, one BLOCKED: skip, and one unported `tests:` row.
               matchedSkipped: 2,
               matchedPermanent: 1,
               unportedTests: 1,

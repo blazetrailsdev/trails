@@ -936,7 +936,6 @@ async function rubyAnswered(dir: string): Promise<(key: string, fqn: string) => 
     }
     const reopenedFrom = await dependencyDefinitions(dir, ruby!);
     for (const [fqn, info] of Object.entries(rubyPkg.classes ?? {})) {
-      // A top-level class (`Array`) is a core-ext reopen, seated by ruby-compat.
       if (!info.file || !fqn.includes("::") || !reopenedFrom.has(fqn)) continue;
       defined.add(`${tsFile(info.file)}::${renameTokens(fqn).split("::").at(-1)}`);
     }
