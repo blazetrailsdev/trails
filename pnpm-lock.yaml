@@ -1146,6 +1146,15 @@ importers:
         specifier: 25.3.5
         version: 25.3.5
 
+  packages/rack-cache:
+    dependencies:
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/rack-cors:
     dependencies:
       '@blazetrails/rack':

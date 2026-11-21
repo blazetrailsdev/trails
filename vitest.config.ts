@@ -329,6 +329,8 @@ const alias = {
     "packages/activerecord-cli/lib/index.ts",
   ),
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/lib/index.ts"),
+  "@blazetrails/rack-cache/": path.resolve(__dirname, "packages/rack-cache/lib") + "/",
+  "@blazetrails/rack-cache": path.resolve(__dirname, "packages/rack-cache/lib/index.ts"),
   "@blazetrails/rack-cors/": path.resolve(__dirname, "packages/rack-cors/lib") + "/",
   "@blazetrails/rack-cors": path.resolve(__dirname, "packages/rack-cors/lib/index.ts"),
   "@blazetrails/rack-proxy/": path.resolve(__dirname, "packages/rack-proxy/lib") + "/",
