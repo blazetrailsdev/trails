@@ -107,7 +107,7 @@ export class Aes256Gcm {
     return OpenSSL.HMAC.digest(OpenSSL.Digest.SHA256.new(), this.secret, clearText).subarray(
       0,
       Encryption.cipher.ivLength(),
-    ) as Bytes;
+    );
   }
 }
 

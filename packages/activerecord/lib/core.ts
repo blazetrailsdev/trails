@@ -78,7 +78,7 @@ export interface Core {
 
 export const Core = {
   [included](base: object): void {
-    include(base as new () => object, SuperMethods);
+    include(base, SuperMethods);
     Object.defineProperty(base, inherited, { configurable: true, value: _inherited });
     classAttribute.call(base, "logger", { instanceWriter: false });
     classAttribute.call(base, "_destroyAssociationAsyncJob", {
@@ -248,7 +248,7 @@ export async function prettyPrint(
   pp: PP,
 ): Promise<void> {
   if (isCustomInspectMethodDefined.call(this)) return rbCallSuper(this, prettyPrint, pp) as void;
-  await pp.objectAddressGroup(this as object, async () => {
+  await pp.objectAddressGroup(this, async () => {
     if (this._attributes != null) {
       const attrNames = attributesForInspect.call(this).filter((name) => this._hasAttribute(name));
       await pp.seplist(
@@ -702,7 +702,7 @@ export function generatedAssociationMethods(this: CoreHost): Module {
         "GeneratedAssociationMethods",
         new Module(),
       );
-      include(this as unknown as new (...args: unknown[]) => unknown, mod);
+      include(this, mod);
 
       return mod;
     })())
@@ -813,7 +813,7 @@ export function inspectWithAttributes(this: Base, attributesToList: string[]): s
       }).join(", ")
     : "not initialized";
 
-  return `#<${rbModToS(this.constructor as new (...args: never) => unknown)} ${inspection}>`;
+  return `#<${rbModToS(this.constructor)} ${inspection}>`;
 }
 
 export function attributesForInspect(this: Base): string[] {

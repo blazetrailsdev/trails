@@ -22,7 +22,7 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   override belongsTo(...args: unknown[]): this {
-    return (this.references as (...a: unknown[]) => this)(...args);
+    return this.references(...args);
   }
 
   override newColumnDefinition(

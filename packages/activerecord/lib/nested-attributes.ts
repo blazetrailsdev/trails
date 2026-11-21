@@ -365,7 +365,7 @@ export function assignNestedAttributesForCollectionAssociation(
   } else {
     const keys = hashKeys(attributesCollection);
     if (keys.includes("id")) {
-      attrs = [attributesCollection as Record<string, unknown> | HashWithIndifferentAccess];
+      attrs = [attributesCollection];
     } else {
       attrs = keys.map(
         (k) =>

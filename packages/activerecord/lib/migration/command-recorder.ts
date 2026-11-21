@@ -354,12 +354,10 @@ export class CommandRecorder {
     await subRecorder.revert(block as () => Promise<void>);
 
     const invertionsProc = async (): Promise<void> => {
-      await subRecorder.replay(
-        this as unknown as { [key: string]: (...args: unknown[]) => Promise<void> },
-      );
+      await subRecorder.replay(this);
     };
 
-    return ["transaction", args, invertionsProc as unknown as MigrationBlock];
+    return ["transaction", args, invertionsProc];
   }
 
   /** @internal */

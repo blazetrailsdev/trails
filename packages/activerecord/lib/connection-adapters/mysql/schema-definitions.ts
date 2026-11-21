@@ -106,7 +106,7 @@ export class TableDefinition extends AbstractTableDefinition {
       if (!rtest(options.limit)) options.limit = 8;
       options.primaryKey = true;
     } else if ((match = /^unsigned_(?<type>.+)$/.exec(type))) {
-      type = match.groups!.type as ColumnType;
+      type = match.groups!.type;
       options.unsigned = true;
     }
 

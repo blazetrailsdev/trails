@@ -313,7 +313,7 @@ export function selectAll(
 ): Result | Promise<Result> | FutureResult | FutureResultComplete {
   arel = arelFromRelation(arel);
   const [sql, resolvedBinds, compiledPreparable, compiledAllowRetry] = toSqlAndBinds.call(
-    this as DatabaseStatementsHost,
+    this,
     arel,
     binds ?? [],
     opts?.preparable ?? null,

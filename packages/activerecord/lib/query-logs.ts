@@ -153,7 +153,7 @@ export class QueryLogs {
       return new GetKeyHandler(name);
     } else if (typeof handler === "function") {
       if (handler.length === 0) {
-        return new ZeroArityHandler(handler as () => TagValue);
+        return new ZeroArityHandler(handler);
       } else {
         return handler;
       }

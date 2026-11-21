@@ -1,4 +1,4 @@
-import type { RackApp, RackResponse } from "@blazetrails/rack";
+import type { RackApp } from "@blazetrails/rack";
 import { groupBy, filterMap, sortBy } from "@blazetrails/ruby-compat";
 import {
   getEnv,
@@ -883,9 +883,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
           await recorder.revert(block);
         });
         this._connectionOverride = recorder.delegate as DatabaseAdapter;
-        await recorder.replay(
-          this as unknown as Record<string, (...a: unknown[]) => Promise<void>>,
-        );
+        await recorder.replay(this);
       }
     }
   }
@@ -1092,7 +1090,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     if (
       name != null &&
       (typeof name === "object" || typeof name === "function") &&
-      typeof (name as { tableName?: unknown }).tableName === "string"
+      typeof name.tableName === "string"
     ) {
       return (name as { tableName: string }).tableName;
     }
@@ -2131,7 +2129,7 @@ export class CheckPending {
       }
     });
 
-    return rbProcCall(this.app, env) as Promise<RackResponse>;
+    return rbProcCall(this.app, env);
   }
 
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {

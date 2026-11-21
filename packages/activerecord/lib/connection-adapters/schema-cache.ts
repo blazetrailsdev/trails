@@ -348,9 +348,9 @@ export class SchemaCache {
       } else {
         file = forceEncoding(file, Encoding.UTF_8);
         if (rbObjRespondTo(YAML, "unsafeLoad")) {
-          return YAML.unsafeLoad(file as string) as SchemaCache;
+          return YAML.unsafeLoad(file) as SchemaCache;
         } else {
-          return YAML.load(file as string) as SchemaCache;
+          return YAML.load(file) as SchemaCache;
         }
       }
     });
@@ -705,7 +705,7 @@ export function deepDeduplicate<T>(value: T): T {
   if (
     value !== null &&
     typeof value === "object" &&
-    isModuleIncluded(value.constructor as { prototype: object }, Deduplicable)
+    isModuleIncluded(value.constructor, Deduplicable)
   ) {
     return (value as unknown as { negate(): T }).negate();
   }

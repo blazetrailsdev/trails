@@ -32,7 +32,7 @@ export class DatabaseSelector {
     options: Record<string, unknown> = {},
   ) {
     this.app = app;
-    this.resolverKlass = resolverKlass ?? (Resolver as unknown as ResolverClass);
+    this.resolverKlass = resolverKlass ?? Resolver;
     this.contextKlass = contextKlass ?? (Session as unknown as ContextClass);
     this.options = options;
   }

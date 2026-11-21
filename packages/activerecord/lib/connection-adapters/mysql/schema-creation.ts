@@ -76,17 +76,14 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override async visitAddColumnDefinition(o: AddColumnDefinition): Promise<string> {
     return this.addColumnPositionBang(
       await super.visitAddColumnDefinition(o),
-      this.columnOptions(o.column) as MysqlColumnOptions,
+      this.columnOptions(o.column),
     );
   }
 
   /** @internal */
   protected async visitChangeColumnDefinition(o: ChangeColumnDefinition): Promise<string> {
     const changeColumnSql = `CHANGE ${this.conn.quoteColumnName(o.name)} ${await this.accept(o.column)}`;
-    return this.addColumnPositionBang(
-      changeColumnSql,
-      this.columnOptions(o.column) as MysqlColumnOptions,
-    );
+    return this.addColumnPositionBang(changeColumnSql, this.columnOptions(o.column));
   }
 
   /** @internal */

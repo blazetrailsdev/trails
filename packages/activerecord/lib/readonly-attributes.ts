@@ -18,7 +18,7 @@ export const ReadonlyAttributes = {
 export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
   this._attrReadonly = [...new Set([...this._attrReadonly, ...attributes.map(String)])];
   if (raiseOnAssignToAttrReadonly()) {
-    include(this as unknown as new (...args: any[]) => any, HasReadonlyAttributes);
+    include(this, HasReadonlyAttributes);
   }
 }
 
@@ -36,7 +36,7 @@ export function writeAttribute(this: Base, attrName: string, value: unknown): vo
     throw new ReadonlyAttributeError(String(attrName));
   }
 
-  _writeAttributeSuper.call(this as never, attrName, value);
+  _writeAttributeSuper.call(this, attrName, value);
 }
 
 export function _writeAttribute(this: Base, attrName: string, value: unknown): void {

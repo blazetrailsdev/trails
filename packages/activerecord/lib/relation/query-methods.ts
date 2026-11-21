@@ -402,7 +402,7 @@ function _selectBang<R extends QueryMethodsHost>(this: R, ...fields: unknown[]):
 }
 
 function group<R extends QueryMethodsHost>(this: R, ...args: (string | ArelNode)[]): R {
-  checkIfMethodHasArgumentsBang.call(this, ":group", args as unknown[]);
+  checkIfMethodHasArgumentsBang.call(this, ":group", args);
   return (groupBang<R>).apply(this.spawn(), args);
 }
 
@@ -428,14 +428,14 @@ function regroupBang<R extends QueryMethodsHost>(
 }
 
 function order<R extends QueryMethodsHost>(this: R, ...args: OrderArg[]): R {
-  checkIfMethodHasArgumentsBang.call(this, ":order", args as unknown[], undefined, () => {
-    sanitizeOrderArguments.call(this, args as unknown[]);
+  checkIfMethodHasArgumentsBang.call(this, ":order", args, undefined, () => {
+    sanitizeOrderArguments.call(this, args);
   });
   return (orderBang<R>).apply(this.spawn(), args);
 }
 
 function orderBang<R extends QueryMethodsHost>(this: R, ...args: OrderArg[]): R {
-  if (args.length > 0) preprocessOrderArgs.call(this, args as unknown[]);
+  if (args.length > 0) preprocessOrderArgs.call(this, args);
   this.orderValues = union(this.orderValues, args as unknown[]) as typeof this.orderValues;
   return this;
 }
@@ -480,14 +480,14 @@ function inOrderOf<R extends QueryMethodsHost>(
 }
 
 function reorder<R extends QueryMethodsHost>(this: R, ...args: OrderArg[]): R {
-  checkIfMethodHasArgumentsBang.call(this, ":reorder", args as unknown[], undefined, () => {
-    sanitizeOrderArguments.call(this, args as unknown[]);
+  checkIfMethodHasArgumentsBang.call(this, ":reorder", args, undefined, () => {
+    sanitizeOrderArguments.call(this, args);
   });
   return (reorderBang<R>).apply(this.spawn(), args);
 }
 
 function reorderBang<R extends QueryMethodsHost>(this: R, ...args: OrderArg[]): R {
-  preprocessOrderArgs.call(this, args as unknown[]);
+  preprocessOrderArgs.call(this, args);
   args = uniq(args);
   this.reorderingValue = true;
   this.orderValues = args as typeof this.orderValues;
@@ -564,7 +564,7 @@ export const EXCEPT_ONLY_KEYS: readonly ExceptKey[] = [
 export type ExceptSkip = ExceptKey | (string & {});
 
 function unscope<R extends QueryMethodsHost>(this: R, ...args: UnscopeArg[]): R {
-  checkIfMethodHasArgumentsBang.call(this, ":unscope", args as unknown[]);
+  checkIfMethodHasArgumentsBang.call(this, ":unscope", args);
   return (unscopeBang<R>).apply(this.spawn(), args);
 }
 
@@ -602,7 +602,7 @@ function unscopeBang<R extends QueryMethodsHost>(this: R, ...args: UnscopeArg[])
 }
 
 function joins<R extends QueryMethodsHost>(this: R, ...args: JoinSpec[]): R {
-  checkIfMethodHasArgumentsBang.call(this, ":joins", args as unknown[]);
+  checkIfMethodHasArgumentsBang.call(this, ":joins", args);
   return (joinsBang<R>).apply(this.spawn(), args as (string | Nodes.Join)[]);
 }
 
@@ -1178,14 +1178,14 @@ function excludingBang<R extends QueryMethodsHost>(this: R, records: unknown[]):
     this.whereClause = this.whereClause.plus(
       new WhereClause([
         this.predicateBuilder
-          .build(this.predicateBuilder.table.arelTable.get(pk as string), literalRecords)
+          .build(this.predicateBuilder.table.arelTable.get(pk), literalRecords)
           .invert(),
       ]),
     );
     return this;
   }
 
-  const attribute = this.predicateBuilder.table.arelTable.get(pk as string);
+  const attribute = this.predicateBuilder.table.arelTable.get(pk);
   const literalIds = literalRecords.map((r) => (r instanceof ActiveRecord.Base ? r.id : r));
   const inlineSubquery = (
     this.predicateBuilder.build(
@@ -1499,7 +1499,7 @@ export function preprocessOrderArgs<R extends QueryMethodsHost>(
   this: R,
   orderArgs: unknown[],
 ): void {
-  this.model.disallowRawSqlBang(flattenedArgs(orderArgs) as (string | symbol | ArelNode)[], {
+  this.model.disallowRawSqlBang(flattenedArgs(orderArgs), {
     permit: this.model.adapterClass().columnNameWithOrderMatcher(),
   });
 
@@ -1574,7 +1574,7 @@ export function resolveArelAttributes<R extends QueryMethodsHost>(
   attrs: unknown[],
 ): unknown[] {
   return attrs.flatMap((attr) => {
-    if (attr != null && isModuleIncluded((attr as object).constructor, Predications)) {
+    if (attr != null && isModuleIncluded(attr.constructor, Predications)) {
       return [attr];
     } else if (isPlainObject(attr)) {
       return Object.entries(attr).flatMap(([table, columns]) => {
@@ -1787,9 +1787,7 @@ function escapeRegex(s: string): string {
 /** @internal */
 export function isTableNameMatches<R extends QueryMethodsHost>(this: R, from: unknown): boolean {
   const tableName = escapeRegex(this.table.name as string);
-  const quotedTableName = escapeRegex(
-    this.model.adapterClass().quoteTableName(this.table.name as string),
-  );
+  const quotedTableName = escapeRegex(this.model.adapterClass().quoteTableName(this.table.name));
   return new RegExp(`(?:^|(?<!FROM)\\s)(?:\\b${tableName}\\b|${quotedTableName})(?!\\.)`, "i").test(
     rbObjAsString(from),
   );
@@ -2172,7 +2170,7 @@ export function buildJoinBuckets(
 
   eachWithIndex(joins, (join, i) => {
     if (typeof join === "string" && !join.startsWith(":")) {
-      joins[i] = new Nodes.StringJoin(Arel.sql(join.trim())) as Nodes.Join;
+      joins[i] = new Nodes.StringJoin(Arel.sql(join.trim()));
     }
   });
 

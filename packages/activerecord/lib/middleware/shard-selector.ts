@@ -46,7 +46,7 @@ export class ShardSelector {
         () => block(),
         fetch<boolean | null>(this.options as Record<string, unknown>, "lock", true),
       ),
-    ) as Promise<T>;
+    );
   }
 }
 

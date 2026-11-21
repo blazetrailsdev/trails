@@ -46,9 +46,7 @@ export class EnvelopeEncryptionKeyProvider {
 
   /** @internal */
   private primaryKeyProvider(): KeyProvider {
-    this._primaryKeyProvider ??= new DerivedSecretKeyProvider(
-      Encryption.config.primaryKey as string,
-    );
+    this._primaryKeyProvider ??= new DerivedSecretKeyProvider(Encryption.config.primaryKey);
     return this._primaryKeyProvider;
   }
 

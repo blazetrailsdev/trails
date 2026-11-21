@@ -109,10 +109,7 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
   }
 
   override serializeCastValue(value: unknown): unknown {
-    return SerializeCastValue.serialize(
-      this.castType as unknown as Parameters<typeof SerializeCastValue.serialize>[0],
-      value,
-    );
+    return SerializeCastValue.serialize(this.castType, value);
   }
 
   equals(other: ValueType): boolean {

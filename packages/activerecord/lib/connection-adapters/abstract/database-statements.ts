@@ -422,7 +422,7 @@ export async function withinNewTransaction<T>(
   options: { isolation?: string | null; joinable?: boolean },
   block: (tx?: unknown) => Promise<T> | T,
 ): Promise<T> {
-  return this.transactionManager!.withinNewTransaction(options, block as never);
+  return this.transactionManager!.withinNewTransaction(options, block);
 }
 
 export function openTransactions(this: DatabaseStatementsHost): number {

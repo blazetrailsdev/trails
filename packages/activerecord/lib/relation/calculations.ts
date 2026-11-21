@@ -260,7 +260,7 @@ export async function count(
       return result != null && result !== false;
     }).length;
   } else {
-    return this.calculate("count", columnName as string) as Promise<number | Map<unknown, number>>;
+    return this.calculate("count", columnName) as Promise<number | Map<unknown, number>>;
   }
 }
 
@@ -275,7 +275,7 @@ export async function average(
   this: CalculationRelation,
   columnName: string | ArelNode,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.calculate("average", columnName as string);
+  return this.calculate("average", columnName);
 }
 
 export function asyncAverage(
@@ -289,7 +289,7 @@ export async function minimum(
   this: CalculationRelation,
   columnName: string | ArelNode,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.calculate("minimum", columnName as string);
+  return this.calculate("minimum", columnName);
 }
 
 export function asyncMinimum(
@@ -303,7 +303,7 @@ export async function maximum(
   this: CalculationRelation,
   columnName: string | ArelNode,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.calculate("maximum", columnName as string);
+  return this.calculate("maximum", columnName);
 }
 
 export function asyncMaximum(
@@ -362,7 +362,7 @@ export async function sum(
       | number
       | bigint;
   }
-  return this.calculate("sum", initialValueOrColumn as string) as Promise<
+  return this.calculate("sum", initialValueOrColumn) as Promise<
     number | bigint | Map<unknown, number | bigint>
   >;
 }
@@ -953,7 +953,7 @@ export async function executeGroupedCalculation(
     );
 
     relation.groupValues = groupNodes;
-    relation.selectValues = selectValues as (string | ArelNode)[];
+    relation.selectValues = selectValues;
 
     const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
     const calculatedData = await this.skipQueryCacheIfNecessary(() =>

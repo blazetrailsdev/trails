@@ -311,7 +311,7 @@ export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumM
   let enumMethodsModule = _enumMethodsModuleRegistry.get(this);
   enumMethodsModule ??= (() => {
     const mod = new EnumMethods(this);
-    include(this as unknown as new (...args: unknown[]) => unknown, mod);
+    include(this, mod);
     _enumMethodsModuleRegistry.set(this, mod);
     return mod;
   })();

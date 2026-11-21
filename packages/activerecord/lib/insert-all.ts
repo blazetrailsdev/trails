@@ -112,7 +112,7 @@ export class InsertAll {
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ): Promise<Result> {
-    const model = relation.model as ModelClass;
+    const model = relation.model;
     await model.loadSchema();
     return withConnection.call(model, async (c: any) =>
       new InsertAll(
@@ -133,7 +133,7 @@ export class InsertAll {
     facts: ResolvedConnectionFacts,
   ) {
     this._facts = facts;
-    this.model = relation.model as ModelClass;
+    this.model = relation.model;
     this.connection = connection;
     this.inserts = inserts.map((r) => ({ ...r }));
     this.updateOnly = options.updateOnly;
@@ -528,7 +528,7 @@ export class Builder implements InsertBuilder {
   conflictTarget(): string {
     const index = this._insertAll.uniqueBy;
     if (index instanceof IndexDefinition) {
-      const cols = this.formatColumns(index.columns as unknown as string | string[]);
+      const cols = this.formatColumns(index.columns);
       return index.where ? `(${cols}) WHERE ${index.where}` : `(${cols})`;
     }
     if (this._insertAll.updateDuplicates()) {

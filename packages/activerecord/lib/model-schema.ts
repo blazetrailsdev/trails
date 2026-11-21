@@ -401,7 +401,7 @@ async function rewarmDataSourceCache(host: SchemaKlass): Promise<void> {
   try {
     const pool = host.connectionPool();
     if (pool.schemaReflection.loadedCache == null) return;
-    cache = pool.schemaCache as typeof cache;
+    cache = pool.schemaCache;
   } catch {
     return;
   }
@@ -419,7 +419,7 @@ async function rewarmDataSourceCache(host: SchemaKlass): Promise<void> {
 export async function resetColumnInformation(this: SchemaKlass): Promise<void> {
   let connection: { clearCacheBang?: () => unknown } | null | undefined;
   try {
-    connection = this.connectionPool().activeConnection as typeof connection;
+    connection = this.connectionPool().activeConnection;
   } catch {}
   const rewarm = !_inSetTableName;
   const cleared = connection?.clearCacheBang?.();

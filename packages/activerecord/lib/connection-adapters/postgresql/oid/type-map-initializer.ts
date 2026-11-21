@@ -124,7 +124,7 @@ export class TypeMapInitializer {
   ): void {
     if (this.store.isKey(targetOid)) {
       this.register(oid, (_oid: number | string, ...args: unknown[]) =>
-        block(this.store.lookup(targetOid, ...args) as OidSubtype),
+        block(this.store.lookup(targetOid, ...args)),
       );
     }
   }

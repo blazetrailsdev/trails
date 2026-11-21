@@ -199,7 +199,7 @@ export class HashMerger {
   readonly hash: Record<string, unknown>;
 
   constructor(relation: Relation<Base>, hash: Record<string, unknown>) {
-    assertValidKeys(hash, ActiveRecord.Relation.VALUE_METHODS as string[]);
+    assertValidKeys(hash, ActiveRecord.Relation.VALUE_METHODS);
     this.relation = relation;
     this.hash = hash;
   }

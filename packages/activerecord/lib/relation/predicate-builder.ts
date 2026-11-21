@@ -148,6 +148,7 @@ export class PredicateBuilder {
   private groupingQueries(
     queries: (Nodes.Node | Nodes.SqlLiteral)[][] | (Nodes.Node | Nodes.SqlLiteral)[] | Nodes.Or,
   ): (Nodes.Node | Nodes.SqlLiteral)[] {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS 7 narrows through this cast, which typescript-eslint's TS 6 checker reads as unnecessary
     queries = queries as (Nodes.Node | Nodes.SqlLiteral)[][];
     if (queries.length === 1) return queries[0];
     queries = queries.map((query) =>
@@ -251,7 +252,7 @@ export class PredicateBuilder {
           converted.set(key, value);
         }
       },
-    ) as Map<unknown, unknown>;
+    );
   }
 
   private handlerFor(object: unknown): { call(attr: Arel.Attribute, value: any): Nodes.Node } {

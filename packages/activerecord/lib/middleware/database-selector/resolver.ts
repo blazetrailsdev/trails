@@ -79,7 +79,7 @@ export class Resolver {
         undefined,
         blk,
       ),
-    ) as Promise<T>;
+    );
   }
 
   private async readFromReplica<T>(blk: () => T | Promise<T>): Promise<T> {
@@ -89,7 +89,7 @@ export class Resolver {
         undefined,
         blk,
       ),
-    ) as Promise<T>;
+    );
   }
 
   private async writeToPrimary<T>(blk: () => T | Promise<T>): Promise<T> {

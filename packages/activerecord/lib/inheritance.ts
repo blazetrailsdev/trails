@@ -190,9 +190,7 @@ export const ClassMethods: ThisType<AbstractClassHost> & {
 
 /** @internal */
 export function findStiClass(this: typeof Base, typeName: string): typeof Base {
-  typeName = this.baseClass
-    .typeForAttribute(this.inheritanceColumn as string)
-    .cast(typeName) as string;
+  typeName = this.baseClass.typeForAttribute(this.inheritanceColumn).cast(typeName) as string;
 
   const subclass = this.stiClassFor(typeName);
 
