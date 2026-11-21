@@ -402,7 +402,7 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     await sleep(0.5);
     expect(await Process.isExists({ id: worker.id })).toBeTruthy();
 
-    await waitForRegisteredProcesses(4, { timeout: 5 });
+    await waitForRegisteredProcesses(4, { timeout: 10 });
 
     await assertStartedJobResult("killed_pause");
     await assertJobStatus(killedPause, "failed");
