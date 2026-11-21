@@ -22,19 +22,27 @@ export async function watchViews(opts: WatchViewsOptions = {}): Promise<WatchHan
   const debounceMs = opts.debounceMs ?? 50;
 
   const touched = new Map<string, number>();
+  const mtimeOf = async (name: string): Promise<number | null> => {
+    try {
+      return (await fs.promises.stat(path.join(viewsDir, name))).mtimeMs;
+    } catch (err) {
+      if ((err as { code?: string }).code === "ENOENT") return null;
+      throw err;
+    }
+  };
   const runBuild = async (
     trigger?: string,
     kind: "initial" | "change" = "change",
     changed: readonly string[] = [],
   ) => {
     try {
+      const before = await Promise.all(changed.map((name) => mtimeOf(name)));
       const result = await buildViews(opts);
       const now = new Date();
-      for (const name of changed) {
-        touched.set(name, Date.now() + Math.max(debounceMs, 500));
-        await fs.promises.utimes(path.join(viewsDir, name), now, now).catch((err: unknown) => {
-          if ((err as { code?: string }).code !== "ENOENT") throw err;
-        });
+      for (const [i, name] of changed.entries()) {
+        if (before[i] === null || (await mtimeOf(name)) !== before[i]) continue;
+        touched.set(name, now.getTime());
+        await fs.promises.utimes(path.join(viewsDir, name), now, now);
       }
       opts.onRebuild?.({ kind, trigger, result });
     } catch (err) {
@@ -51,17 +59,22 @@ export async function watchViews(opts: WatchViewsOptions = {}): Promise<WatchHan
   let changed = new Set<string>();
 
   const tryWatch = (recursive: boolean): fs.FSWatcher =>
-    fs.watch(viewsDir, { recursive }, (_event, filename) => onEvent(filename));
-  const onEvent = (filename: string | Buffer | null): void => {
+    fs.watch(viewsDir, { recursive }, (_event, filename) => {
+      onEvent(filename).catch((err: unknown) =>
+        opts.onError?.(err instanceof Error ? err : new Error(String(err))),
+      );
+    });
+  const onEvent = async (filename: string | Buffer | null): Promise<void> => {
     if (filename === null) {
       lastTrigger = undefined;
     } else {
       const name = typeof filename === "string" ? filename : String(filename);
       if (!name.endsWith(".tse")) return;
       const trigger = name.split(path.sep).join("/");
-      const until = touched.get(trigger);
-      if (until !== undefined) {
-        if (Date.now() <= until) return;
+      const touchedAt = touched.get(trigger);
+      if (touchedAt !== undefined) {
+        const mtime = await mtimeOf(trigger).catch(() => null);
+        if (mtime === touchedAt) return;
         touched.delete(trigger);
       }
       lastTrigger = trigger;

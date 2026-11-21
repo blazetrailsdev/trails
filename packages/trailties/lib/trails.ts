@@ -56,8 +56,6 @@ export class Trails {
   declare static Console?: typeof Console;
   declare static Generators?: typeof Generators;
   declare static TestUnitRailtie?: typeof import("./test-unit/trailtie.js").TestUnitRailtie;
-  /** @noRailsEquivalent PERMANENT */
-
   declare static eagerLoadBang: () => Promise<void>;
 
   private constructor() {

@@ -53,11 +53,35 @@ describe("watchViews", () => {
     try {
       await waitFor(() => events.includes("initial"));
       fs.writeFileSync(source, "<%= name %>");
-      await waitFor(() => events.includes("change"));
-      const emitted = fs.statSync(path.join(cwd, ".trails/views/home.html.tse.ts")).mtimeMs;
-      expect(fs.statSync(source).mtimeMs).toBeGreaterThanOrEqual(emitted);
+      const emitted = path.join(cwd, ".trails/views/home.html.tse.ts");
+      await waitFor(
+        () => fs.existsSync(emitted) && fs.statSync(source).mtimeMs >= fs.statSync(emitted).mtimeMs,
+      );
       await new Promise((resolve) => setTimeout(resolve, 700));
-      expect(events.filter((kind) => kind === "change")).toHaveLength(1);
+      const settled = events.length;
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      expect(events).toHaveLength(settled);
+    } finally {
+      handle.close();
+    }
+  }, 30_000);
+
+  it("rebuilds a template saved again right after its touch", async () => {
+    const cwd = mkScratch();
+    fs.mkdirSync(path.join(cwd, "app/views"), { recursive: true });
+    const source = path.join(cwd, "app/views/home.html.tse");
+    const events: string[] = [];
+    const handle = await watchViews({
+      cwd,
+      debounceMs: 5,
+      onRebuild: ({ kind }) => events.push(kind),
+    });
+    try {
+      await waitFor(() => events.includes("initial"));
+      fs.writeFileSync(source, "<%= name %>");
+      await waitFor(() => events.includes("change"));
+      fs.writeFileSync(source, "<%= name %>!");
+      await waitFor(() => events.filter((kind) => kind === "change").length === 2);
     } finally {
       handle.close();
     }

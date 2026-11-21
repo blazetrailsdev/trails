@@ -1411,7 +1411,7 @@ describe("AppGenerator", () => {
     });
     await t.assertFile("my-app/Procfile.dev", (procfile: string) => {
       expect(procfile).toBe(
-        "web: bin/trails server\nviews: trails-tsc-views dev --views app/views\n",
+        "web: bin/trails server\nviews: pnpm exec trails-tsc-views dev --views app/views\n",
       );
     });
     await t.assertFile("my-app/README.md", (readme: string) => {
