@@ -1,6 +1,7 @@
 import mysql from "mysql2/promise";
 import {
   BigDecimal,
+  File,
   hasKey,
   kernelInteger,
   Rational,
@@ -48,6 +49,7 @@ const CR_ERRNOS: Record<string, number> = {
   EHOSTUNREACH: 2003,
   ENETUNREACH: 2003,
   ETIMEDOUT: 2003,
+  ERR_SOCKET_BAD_PORT: 2003,
   ECONNRESET: 2013,
   PROTOCOL_CONNECTION_LOST: 2013,
   PROTOCOL_SEQUENCE_TIMEOUT: 2013,
@@ -87,6 +89,12 @@ const CLIENT_FLAGS: Record<string, number> = {
   SSL_VERIFY_SERVER_CERT: 0x40000000,
   REMEMBER_OPTIONS: 0x80000000,
 };
+
+const MYSQL2_MYSQL_ENC_NAME_TO_RB = new Set(
+  "ascii big5 binary cp1250 cp1251 cp1256 cp1257 cp850 cp852 cp866 cp932 eucjpms euckr gb18030 gb2312 gbk greek hebrew koi8r koi8u latin1 latin2 latin5 latin7 macce macroman sjis tis620 ucs2 ujis utf16 utf16le utf32 utf8 utf8mb3 utf8mb4".split(
+    " ",
+  ),
+);
 
 const COM_SET_OPTION = 0x1b;
 
@@ -281,6 +289,11 @@ export class Client {
   static readonly MULTI_STATEMENTS = CLIENT_FLAGS.MULTI_STATEMENTS;
   static readonly OPTION_MULTI_STATEMENTS_ON = 0;
   static readonly OPTION_MULTI_STATEMENTS_OFF = 1;
+  static readonly SSL_MODE_DISABLED = 1;
+  static readonly SSL_MODE_PREFERRED = 2;
+  static readonly SSL_MODE_REQUIRED = 3;
+  static readonly SSL_MODE_VERIFY_CA = 4;
+  static readonly SSL_MODE_VERIFY_IDENTITY = 5;
 
   private static _defaultQueryOptions: QueryOptions | undefined;
 
@@ -291,6 +304,26 @@ export class Client {
   private _warningCount = 0;
   private _automaticClose = true;
   private connectTimeout: number | undefined;
+  private writeTimeout: number | undefined;
+  private localInfile: boolean | undefined;
+  private reconnect: boolean | undefined;
+  private secureAuth: boolean | undefined;
+  private enableCleartextPlugin: boolean | undefined;
+  private defaultFile: string | undefined;
+  private defaultGroup: string | undefined;
+  private initCommand: string | undefined;
+  private defaultAuth: string | undefined;
+  private charsetName: string | undefined;
+  private ssl:
+    | {
+        key: string | null;
+        cert: string | null;
+        ca: string | null;
+        capath: string | null;
+        cipher: string | null;
+      }
+    | undefined;
+  private sslMode: number | undefined;
   /** @internal */
   connection!: NpmConnection;
   private INVALID_DATE: Error | undefined;
@@ -339,24 +372,67 @@ export class Client {
       // eslint-disable-next-line blazetrails/ruby-compat-native-required -- opts can hold { k: undefined } for an absent keyword, which hasKey reads as absent
       if (!hasKey(opts, key)) continue;
 
-      const self = this as unknown as Options;
       switch (key) {
         case "reconnect":
+          this.setReconnect(rtest(opts[key]));
+          break;
         case "localInfile":
+          this.setLocalInfile(rtest(opts[key]));
+          break;
         case "secureAuth":
+          this.setSecureAuth(rtest(opts[key]));
+          break;
         case "automaticClose":
+          this.automaticClose = rtest(opts[key]);
+          break;
         case "enableCleartextPlugin":
-          self[key] = rtest(opts[key]);
+          this.setEnableCleartextPlugin(rtest(opts[key]));
           break;
         case "connectTimeout":
-        case "readTimeout":
-        case "writeTimeout":
-          if (opts[key] != null) self[key] = Number(kernelInteger(opts[key]));
+          if (opts[key] != null) this.setConnectTimeout(Number(kernelInteger(opts[key])));
           break;
-        default:
-          self[key] = opts[key];
+        case "readTimeout":
+          if (opts[key] != null) this.setReadTimeout(Number(kernelInteger(opts[key])));
+          break;
+        case "writeTimeout":
+          if (opts[key] != null) this.setWriteTimeout(Number(kernelInteger(opts[key])));
+          break;
+        case "defaultFile":
+          this.setDefaultFile(opts[key] as string | null);
+          break;
+        case "defaultGroup":
+          this.setDefaultGroup(opts[key] as string | null);
+          break;
+        case "initCommand":
+          this.setInitCommand(opts[key] as string | null);
+          break;
+        case "defaultAuth":
+          this.setDefaultAuth(opts[key] as string | null);
+          break;
       }
     }
+
+    this.setCharsetName((rtest(opts.encoding) ? opts.encoding : "utf8") as string);
+
+    let mode: number | undefined;
+    if (rtest(opts.sslMode)) mode = this.parseSslMode(opts.sslMode);
+
+    const sslOptions = ["sslkey", "sslcert", "sslca", "sslcapath", "sslcipher"].map(
+      (k) => (opts[k] ?? null) as string | null,
+    );
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- opts can hold { k: undefined } for an absent keyword, which hasKey reads as absent
+    if (sslOptions.some((o) => rtest(o)) || hasKey(opts, "sslverify")) {
+      this.sslSet(
+        ...(sslOptions as [
+          string | null,
+          string | null,
+          string | null,
+          string | null,
+          string | null,
+        ]),
+      );
+    }
+    if (mode != null) this.setSslMode(mode);
 
     let flags: number;
     if (Array.isArray(opts.flags)) {
@@ -417,8 +493,144 @@ export class Client {
 
   static async new<T extends Client>(this: { prototype: T }, opts: object = {}): Promise<T> {
     const client = rbClassNewInstance(this, opts);
+    if (
+      (client.sslMode === Client.SSL_MODE_VERIFY_CA ||
+        client.sslMode === Client.SSL_MODE_VERIFY_IDENTITY) &&
+      client.ssl?.ca == null
+    ) {
+      const sslca = await client.findDefaultCaPath();
+      if (sslca !== undefined) {
+        const { key = null, cert = null, capath = null, cipher = null } = client.ssl ?? {};
+        client.sslSet(key, cert, sslca, capath, cipher);
+      }
+    }
     await client.connect(...client.connectArgs);
     return client;
+  }
+
+  parseSslMode(mode: unknown): number | undefined {
+    const m = toS(mode).toUpperCase();
+    const modes = Client as unknown as Record<string, number | undefined>;
+    if (m.startsWith("SSL_MODE_")) {
+      if (/^SSL_MODE_\w+$/.test(m) && modes[m] !== undefined) return modes[m];
+    } else {
+      const x = "SSL_MODE_" + m;
+      if (/^SSL_MODE_\w+$/.test(x) && modes[x] !== undefined) return modes[x];
+    }
+    warn(`Unknown MySQL ssl_mode flag: ${toS(mode)}`);
+    return undefined;
+  }
+
+  async findDefaultCaPath(): Promise<string | undefined> {
+    for (const f of [
+      "/etc/ssl/certs/ca-certificates.crt",
+      "/etc/pki/tls/certs/ca-bundle.crt",
+      "/etc/ssl/ca-bundle.pem",
+      "/etc/ssl/cert.pem",
+    ]) {
+      if (await File.isExistAsync(f)) return f;
+    }
+    return undefined;
+  }
+
+  private setReconnect(value: boolean): boolean {
+    return this._mysqlClientOptions("reconnect", value);
+  }
+
+  private setLocalInfile(value: boolean): boolean {
+    return this._mysqlClientOptions("localInfile", value);
+  }
+
+  private setConnectTimeout(value: number): boolean {
+    if (value < 0) {
+      throw new Mysql2Error(`connect_timeout must be a positive integer, you passed ${value}`);
+    }
+    return this._mysqlClientOptions("connectTimeout", value);
+  }
+
+  private setReadTimeout(value: number): boolean {
+    if (value < 0) {
+      throw new Mysql2Error(`read_timeout must be a positive integer, you passed ${value}`);
+    }
+    this.readTimeout = value;
+    return this._mysqlClientOptions("readTimeout", value);
+  }
+
+  private setWriteTimeout(value: number): boolean {
+    if (value < 0) {
+      throw new Mysql2Error(`write_timeout must be a positive integer, you passed ${value}`);
+    }
+    return this._mysqlClientOptions("writeTimeout", value);
+  }
+
+  private setCharsetName(value: string): string {
+    if (typeof value !== "string") {
+      throw new TypeError(`wrong argument type ${typeof value} (expected String)`);
+    }
+    if (!MYSQL2_MYSQL_ENC_NAME_TO_RB.has(value)) {
+      throw new Mysql2Error(`Unsupported charset: '${JSON.stringify(value)}'`);
+    }
+    this.charsetName = value;
+    return value;
+  }
+
+  private sslSet(
+    key: string | null,
+    cert: string | null,
+    ca: string | null,
+    capath: string | null,
+    cipher: string | null,
+  ): this {
+    this.ssl = { key, cert, ca, capath, cipher };
+    return this;
+  }
+
+  private setSslMode(setting: number): number {
+    const val = setting;
+    if (
+      val !== Client.SSL_MODE_DISABLED &&
+      val !== Client.SSL_MODE_PREFERRED &&
+      val !== Client.SSL_MODE_REQUIRED &&
+      val !== Client.SSL_MODE_VERIFY_CA &&
+      val !== Client.SSL_MODE_VERIFY_IDENTITY
+    ) {
+      throw new Mysql2Error(
+        `ssl_mode= takes DISABLED, PREFERRED, REQUIRED, VERIFY_CA, VERIFY_IDENTITY, you passed: ${val}`,
+      );
+    }
+    this.sslMode = val;
+    return 0;
+  }
+
+  private setSecureAuth(value: boolean): boolean {
+    return this._mysqlClientOptions("secureAuth", value);
+  }
+
+  private setDefaultFile(value: string | null): boolean {
+    return this._mysqlClientOptions("defaultFile", value);
+  }
+
+  private setDefaultGroup(value: string | null): boolean {
+    return this._mysqlClientOptions("defaultGroup", value);
+  }
+
+  private setInitCommand(value: string | null): boolean {
+    return this._mysqlClientOptions("initCommand", value);
+  }
+
+  private setDefaultAuth(value: string | null): boolean {
+    return this._mysqlClientOptions("defaultAuth", value);
+  }
+
+  private setEnableCleartextPlugin(value: boolean): boolean {
+    return this._mysqlClientOptions("enableCleartextPlugin", value);
+  }
+
+  private _mysqlClientOptions(opt: string, value: unknown): boolean {
+    if (value == null) return false;
+    (this as Options)[opt] =
+      typeof value === "number" || typeof value === "boolean" ? value : toS(value);
+    return true;
   }
 
   parseFlagsArray(flags: string[], initial = 0): number {
@@ -472,6 +684,30 @@ export class Client {
     const args = { user, password: pass, host, port, database, socketPath: socket };
     for (const [key, value] of Object.entries(args)) if (value != null) config[key] = value;
     if (this.connectTimeout != null) config.connectTimeout = this.connectTimeout * 1000;
+    if (this.charsetName != null) config.charset = this.charsetName;
+    if (this.secureAuth != null) config.insecureAuth = !this.secureAuth;
+    if (this.localInfile === true) flags |= CLIENT_FLAGS.LOCAL_FILES;
+    if (this.localInfile === false) flags &= ~CLIENT_FLAGS.LOCAL_FILES;
+    if (
+      this.ssl !== undefined ||
+      (this.sslMode != null &&
+        this.sslMode !== Client.SSL_MODE_DISABLED &&
+        this.sslMode !== Client.SSL_MODE_PREFERRED)
+    ) {
+      const { key, cert, ca, cipher } = this.ssl ?? {};
+      const ssl: Options = {
+        rejectUnauthorized:
+          (flags & CLIENT_FLAGS.SSL_VERIFY_SERVER_CERT) !== 0 ||
+          this.sslMode === Client.SSL_MODE_VERIFY_CA ||
+          this.sslMode === Client.SSL_MODE_VERIFY_IDENTITY,
+      };
+      if (this.sslMode === Client.SSL_MODE_VERIFY_CA) ssl.checkServerIdentity = () => undefined;
+      if (key != null) ssl.key = await File.readAsync(key);
+      if (cert != null) ssl.cert = await File.readAsync(cert);
+      if (ca != null) ssl.ca = await File.readAsync(ca);
+      if (cipher != null) ssl.ciphers = cipher;
+      config.ssl = ssl;
+    }
     config.connectAttributes = connAttrs;
     config.flags = Object.keys(CLIENT_FLAGS).filter(
       (name) => !CLIENT_ONLY_FLAGS.includes(name) && (flags & CLIENT_FLAGS[name]) !== 0,
@@ -479,10 +715,14 @@ export class Client {
     if ((flags & CLIENT_FLAGS.IGNORE_SPACE) === 0) (config.flags as string[]).push("-IGNORE_SPACE");
     if ((flags & CLIENT_FLAGS.COMPRESS) !== 0) config.compress = true;
 
-    const connection = (await mysql
-      .createConnection(config as mysql.ConnectionOptions)
-      .catch((e: unknown) => this.raiseMysql2Error(e))) as NpmConnection;
+    const connection = (await (async () =>
+      mysql.createConnection(config as mysql.ConnectionOptions))().catch((e: unknown) =>
+      this.raiseMysql2Error(e),
+    )) as NpmConnection;
     this.connection = connection;
+    if (this.initCommand != null) {
+      await connection.query(this.initCommand).catch((e: unknown) => this.raiseMysql2Error(e));
+    }
 
     const protocol = connection.connection;
     const handlePacket = protocol?.handlePacket;

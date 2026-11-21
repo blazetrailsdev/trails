@@ -1,4 +1,12 @@
-import { cmp, isEmpty, rbEqual, rbObjRespondTo, stderr, stdout } from "@blazetrails/ruby-compat";
+import {
+  cmp,
+  isEmpty,
+  rbEqual,
+  rbObjClass,
+  rbObjRespondTo,
+  stderr,
+  stdout,
+} from "@blazetrails/ruby-compat";
 import type { ExpectStatic } from "vitest";
 
 type MatcherState = ReturnType<ExpectStatic["getState"]>;
@@ -74,7 +82,7 @@ export const matchers = {
     return result(this, pass && isEmpty(received), received, "to be empty");
   },
   toBeExactInstanceOf(this: MatcherState, received: unknown, cls: unknown) {
-    const pass = received != null && received.constructor === cls;
+    const pass = (received != null && received.constructor === cls) || rbObjClass(received) === cls;
     return result(this, pass, received, `to be an instance of ${String(cls)}`);
   },
   toBeTypeOfAnd(

@@ -36,6 +36,7 @@ export type CanonicalKind =
   | "notInstanceOf"
   | "kindOf"
   | "respondTo"
+  | "hasKey"
   | "notRespondTo"
   | "operator"
   | "length"
@@ -231,6 +232,7 @@ const RSPEC_MAP: Record<string, CanonicalKind> = {
   expect_to_be_instance_of: "instanceOf",
   expect_to_be_kind_of: "kindOf",
   expect_to_respond_to: "respondTo",
+  expect_to_have_key: "hasKey",
   expect_not_to_respond_to: "notRespondTo",
 };
 
@@ -281,6 +283,7 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toBeWithinDelta: "inDelta",
   toBeEmpty: "empty",
   toRespondTo: "respondTo",
+  toHaveKey: "hasKey",
   toInclude: "includes",
   toHaveLength: "length",
   toBeGreaterThan: "operator",
