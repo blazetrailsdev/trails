@@ -55,7 +55,7 @@ describe("EncryptedConfigurationTest", () => {
 
       assert(creds.get("something").get("good"));
       assertNot(credentials.dig("something", "bad"));
-      assertNil(creds.get("nothing"));
+      assertNil(credentials.fetch("nothing", null));
     } finally {
       setEnv("TRAILS_MASTER_KEY", undefined);
     }
