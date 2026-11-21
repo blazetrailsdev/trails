@@ -85,6 +85,7 @@ export default defineConfig({
             { text: "Action View Overview", link: "/guides/action-view-overview" },
             { text: "Action View Helpers", link: "/guides/action-view-helpers" },
             { text: "Action View Form Helpers", link: "/guides/form-helpers" },
+            { text: "Layouts and Rendering", link: "/guides/layouts-and-rendering" },
           ],
         },
         {
@@ -120,6 +121,8 @@ export default defineConfig({
               text: "Autoloading and Reloading",
               link: "/guides/autoloading-and-reloading-constants",
             },
+            { text: "Internationalization (I18n) API", link: "/guides/i18n" },
+            { text: "The Trails Initialization Process", link: "/guides/initialization" },
           ],
         },
         {
