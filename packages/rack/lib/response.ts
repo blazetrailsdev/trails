@@ -256,6 +256,7 @@ export class Response {
   private _block: ((self: Response) => void) | null;
   private _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
+  /** @inventedArm if — CONVERGEABLE rack-body-parts-are-safebuffer-objects */
   constructor(body: any = null, status: number | string = 200, headers: RackHeaders = {}) {
     this.status = Number(toI(status));
 

@@ -4289,12 +4289,6 @@ function sameFileConstStrings(name: string, sourceFile: ts.SourceFile): string[]
   return undefined;
 }
 
-/**
- * `delegate.call(Klass.prototype, "m", …, { to: "target" })`, or
- * `delegate.call(PlainModule, …)` for a plain-object module, at a file's top level —
- * Ruby's `delegate :m, to: :target` in a class module's body
- * (`core_ext/module/delegation.rb:171`), which defines instance readers only.
- */
 /** The base parameter's name when `node` sits in a module literal's `[included](base)` method. */
 function includedHookBase(node: ts.Node): string | undefined {
   for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
@@ -4312,6 +4306,12 @@ function includedHookBase(node: ts.Node): string | undefined {
   return undefined;
 }
 
+/**
+ * `delegate.call(Klass.prototype, "m", …, { to: "target" })`, or
+ * `delegate.call(PlainModule, …)` for a plain-object module, at a file's top level —
+ * Ruby's `delegate :m, to: :target` in a class module's body
+ * (`core_ext/module/delegation.rb:171`), which defines instance readers only.
+ */
 function readPrototypeDelegateCall(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,

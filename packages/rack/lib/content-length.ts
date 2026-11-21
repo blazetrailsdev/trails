@@ -11,6 +11,7 @@ export class ContentLength {
     this.app = app;
   }
 
+  /** @inventedArm if — CONVERGEABLE rack-body-parts-are-safebuffer-objects */
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     const [status, headers] = response;

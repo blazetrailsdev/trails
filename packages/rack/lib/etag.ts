@@ -29,7 +29,7 @@ export class ETag {
     let digest: string | null = null;
 
     if (this.etagStatus(status) && rbObjRespondTo(body, "toAry") && !this.skipCaching(headers)) {
-      body = rbCheckArrayType(body) as string[];
+      body = rbCheckArrayType(body) as Array<string | Uint8Array>;
       digest = this.digestBody(body);
       if (digest) headers[ETAG] = `W/"${digest}"`;
 
@@ -57,12 +57,16 @@ export class ETag {
     return ETAG in headers || "last-modified" in headers;
   }
 
-  /** @internal */
-  private digestBody(body: string[]): string | null {
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE rack-body-parts-are-safebuffer-objects
+   */
+  private digestBody(body: Array<string | Uint8Array>): string | null {
     let digest: ReturnType<typeof Digest.SHA256.new> | null = null;
 
     for (const part of body) {
-      if (part.length > 0) (digest ??= Digest.SHA256.new()).update(String(part));
+      if (part.length > 0)
+        (digest ??= Digest.SHA256.new()).update(part instanceof Uint8Array ? part : String(part));
     }
 
     return digest && digest.hexdigest().substring(0, 32);
