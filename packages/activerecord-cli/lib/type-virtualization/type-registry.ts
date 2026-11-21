@@ -1,4 +1,4 @@
-const T = `import("@blazetrails/date").Temporal`;
+const T = `Temporal`;
 const IPADDR = `import("@blazetrails/ruby-compat").IPAddr`;
 const TWZ = `import("@blazetrails/activesupport").TimeWithZone`;
 const TIME = `import("@blazetrails/date").Time`;
