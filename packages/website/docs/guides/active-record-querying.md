@@ -84,12 +84,12 @@ class Customer extends Base {
   declare locked: boolean;
 }
 
-await Customer.where({ locked: false }).findEach({ batchSize: 500 }, async (user: Customer) => {
-  console.log(user.id);
+await Customer.where({ locked: false }).findEach({ batchSize: 500 }, async (customer: Customer) => {
+  console.log(customer.id);
 });
 
-for await (const user of Customer.all().findEach({ start: 2000 })) {
-  console.log(user.id);
+for await (const customer of Customer.all().findEach({ start: 2000 })) {
+  console.log(customer.id);
 }
 ```
 
