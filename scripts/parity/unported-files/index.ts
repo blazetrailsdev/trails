@@ -78,7 +78,7 @@ export function isSourceUnported(file: string, pkg?: string): boolean {
 
 /**
  * test-compare keys actionpack's Rails tests by sub-framework
- * (`scripts/test-compare/compare.ts` PACKAGE_DIRS); a row is scoped by the
+ * (`scripts/test-compare/compare.ts` `PKG_SRC_DIRS`); a row is scoped by the
  * trails package that holds the port.
  */
 const PACKAGE_SCOPES: Record<string, readonly string[]> = {
