@@ -122,6 +122,7 @@ bin/trails generate scaffold Post title:string body:text
       invoke    resource_route
       invoke    test_unit
       create      test/controllers/posts-controller.test.ts
+      create      test/system/posts.test.ts
       invoke    helper
       create      app/helpers/posts-helper.ts
       invoke      test_unit
