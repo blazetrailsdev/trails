@@ -473,6 +473,8 @@ const alias = {
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/lib/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/lib/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/lib/raabro.ts"),
+  "@blazetrails/listen/": path.resolve(__dirname, "packages/listen/lib") + "/",
+  "@blazetrails/listen": path.resolve(__dirname, "packages/listen/lib/index.ts"),
   "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/lib/zeitwerk.ts"),
   "@blazetrails/vite-assets/": path.resolve(__dirname, "packages/vite-assets/lib") + "/",
   "@blazetrails/vite-assets": path.resolve(__dirname, "packages/vite-assets/lib/index.ts"),
@@ -781,6 +783,7 @@ export default defineConfig({
             "packages/et-orbi/**",
             "packages/raabro/**",
             "packages/zeitwerk/**",
+            "packages/listen/**",
             "packages/vite-assets/**",
             "packages/vite-trails/**",
             "packages/stimulus/**",
@@ -889,6 +892,16 @@ export default defineConfig({
             "./packages/ruby-compat/test-setup/class-paths.ts",
             "./packages/nokogiri/test/support/setup-extension.ts",
           ],
+        },
+      },
+      {
+        resolve: otherResolve,
+        test: {
+          name: "listen",
+          globals: true,
+          include: ["packages/listen/test/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
         },
       },
       {

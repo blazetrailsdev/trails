@@ -1097,6 +1097,7 @@ jobs:
           packages/vite-trails
           packages/vitest-matchers
           packages/zeitwerk
+          packages/listen
       - if: needs.changes.outputs.unit_packages != ''
         env:
           AJ_ADAPTER: inline
@@ -1366,6 +1367,7 @@ jobs:
           packages/vite-trails
           packages/vitest-matchers
           packages/zeitwerk
+          packages/listen
           --coverage --coverage.all
       - name: Write coverage summary to run UI
         if: always()

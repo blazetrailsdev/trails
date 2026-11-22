@@ -603,6 +603,26 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "listen",
+    origin: {
+      type: "git",
+      url: "https://github.com/guard/listen.git",
+      ref: "v3.9.0",
+    },
+    packages: [
+      {
+        name: "listen",
+        libPath: "lib/listen",
+        libEntryFile: "lib/listen.rb",
+        testPath: "spec",
+        compareApi: false,
+        apiExcludedReason: "enrolled by listen-port-change-directory-file-and-enroll-parity",
+        compareTests: false,
+        testsExcludedReason: "enrolled by listen-port-change-directory-file-and-enroll-parity",
+      },
+    ],
+  },
+  {
     name: "zeitwerk",
     origin: {
       type: "git",

@@ -1057,6 +1057,12 @@ importers:
         specifier: ^0.7.1
         version: 0.7.1
 
+  packages/listen:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/mail:
     dependencies:
       '@blazetrails/date':

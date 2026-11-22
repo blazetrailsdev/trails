@@ -1,0 +1,28 @@
+{
+  "name": "@blazetrails/listen",
+  "version": "0.1.0",
+  "description": "File system change notifications, mirroring Ruby's listen",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "mirrors": [
+    {
+      "source": "listen",
+      "ref": "v3.9.0",
+      "sha": "7b7a2f586d4363ec6e2e82c72732df92a1476d6e"
+    }
+  ]
+}

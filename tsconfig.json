@@ -64,6 +64,8 @@
     { "path": "packages/rack-proxy/tsconfig.test.json" },
     { "path": "packages/rack-session" },
     { "path": "packages/rack-session/tsconfig.test.json" },
+    { "path": "packages/listen" },
+    { "path": "packages/listen/tsconfig.test.json" },
     { "path": "packages/rack-cache" },
     { "path": "packages/rack-cache/tsconfig.test.json" },
     { "path": "packages/rack-test" },
