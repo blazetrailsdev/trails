@@ -280,7 +280,7 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
     application.config.precompileFilterParameters = true;
     await application.initializeBang();
 
-    expect(Trails.application!.envConfig()["action_dispatch.parameter_filter"]).not.toHaveLength(0);
+    expect(Trails.application!.envConfig()["action_dispatch.parameter_filter"]).not.toBeEmpty();
 
     Trails.application!.config.filterParameters.push("baz.qux");
 
@@ -293,7 +293,7 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
     const application = await app("development");
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
 
-    expect(Trails.application!.config.precompileFilterParameters).toBe(true);
+    expect(Trails.application!.config.precompileFilterParameters).toBeTruthy();
   });
 
   it("config.precompile_filter_parameters is false by default for upgraded apps", async () => {
@@ -313,7 +313,7 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
     application.config.activeRecord.checkSchemaCacheDumpVersion = true;
     await application.initializeBang();
 
-    expect(SchemaReflection.checkSchemaCacheDumpVersion).toBe(true);
+    expect(SchemaReflection.checkSchemaCacheDumpVersion).toBeTruthy();
   });
 
   it("propagates check_schema_cache_dump_version=false to ActiveRecord::ConnectionAdapters::SchemaReflection", async () => {
@@ -321,7 +321,7 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
     application.config.activeRecord.checkSchemaCacheDumpVersion = false;
     await application.initializeBang();
 
-    expect(SchemaReflection.checkSchemaCacheDumpVersion).toBe(false);
+    expect(SchemaReflection.checkSchemaCacheDumpVersion).toBeFalsy();
   });
 
   it("propagates use_schema_cache_dump=true to ActiveRecord::ConnectionAdapters::SchemaReflection", async () => {
@@ -329,7 +329,7 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
     application.config.activeRecord.useSchemaCacheDump = true;
     await application.initializeBang();
 
-    expect(SchemaReflection.useSchemaCacheDump).toBe(true);
+    expect(SchemaReflection.useSchemaCacheDump).toBeTruthy();
   });
 
   it("propagates use_schema_cache_dump=false to ActiveRecord::ConnectionAdapters::SchemaReflection", async () => {
@@ -337,13 +337,13 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
     application.config.activeRecord.useSchemaCacheDump = false;
     await application.initializeBang();
 
-    expect(SchemaReflection.useSchemaCacheDump).toBe(false);
+    expect(SchemaReflection.useSchemaCacheDump).toBeFalsy();
   });
 
   it("By default logs tags are not set in development", async () => {
     await envHelpers.withTrailsEnv("development", async () => {
       await app("development");
-      expect(isBlank(Trails.application!.config.logTags)).toBe(true);
+      expect(isBlank(Trails.application!.config.logTags)).toBeTruthy();
     });
   });
 
@@ -356,12 +356,12 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
       prepared = true;
     });
 
-    expect(prepared).toBe(false);
+    expect(prepared).toBeFalsy();
 
     await application.initializeBang();
 
     await application.call(Rack.MockRequest.envFor("/"));
-    expect(prepared).toBe(true);
+    expect(prepared).toBeTruthy();
   });
 
   it("config.enable_reloading is !config.cache_classes", async () => {
