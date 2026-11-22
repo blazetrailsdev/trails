@@ -1408,7 +1408,15 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`
    * (`vendor/ruby/v3.3.11/io.c:4363`).
    */
-  gets(sep = "\n"): string | Uint8Array | null {
+  gets(
+    sep: string | { chomp?: boolean } = "\n",
+    opts: { chomp?: boolean } = {},
+  ): string | Uint8Array | null {
+    if (typeof sep === "object") {
+      opts = sep;
+      sep = "\n";
+    }
+    const chomp = opts.chomp != null && opts.chomp !== false;
     const rsptr = new TextEncoder().encode(sep);
     const bytes: number[] = [];
     let b: number | null;
@@ -1421,9 +1429,36 @@ export class IO {
         break;
     }
     if (bytes.length === 0) return null;
+    if (
+      chomp &&
+      bytes.length >= rsptr.length &&
+      rsptr.every((c, i) => bytes[bytes.length - rsptr.length + i] === c)
+    ) {
+      bytes.length -= rsptr.length;
+      if (sep === "\n" && bytes[bytes.length - 1] === 0x0d) bytes.length -= 1;
+    }
     const str = Uint8Array.from(bytes);
     if (this.enc2 === null) return ioEncStr(str, str.length, this.ioReadEncoding());
     return ioEncStr(str, str.length, this.enc2, this.ioReadEncoding());
+  }
+
+  /**
+   * `rb_io_readlines` (`vendor/ruby/v3.3.11/io.c:4518`) through `io_readlines`
+   * (`io.c:4527`): every remaining line, read as {@link gets} reads one.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#readlines`
+   * (`vendor/ruby/v3.3.11/io.c:4518`).
+   */
+  readlines(
+    sep: string | { chomp?: boolean } = "\n",
+    opts: { chomp?: boolean } = {},
+  ): (string | Uint8Array)[] {
+    const ary: (string | Uint8Array)[] = [];
+    let line: string | Uint8Array | null;
+    while ((line = this.gets(sep, opts)) !== null) {
+      ary.push(line);
+    }
+    return ary;
   }
 
   /**

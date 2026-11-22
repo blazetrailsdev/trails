@@ -122,6 +122,13 @@ it("supports uploading files in binary mode", () => {
   expect(new UploadedFile(multipartFile("file1.txt"), { binary: true }).isBinmode()).toBeTruthy();
 });
 
+it("delegates keyword arguments to the tempfile", () => {
+  const file = new UploadedFile(multipartFile("file1.txt")) as any;
+  expect(file.readlines({ chomp: true })).toEqual([b("contents")]);
+  file.rewind();
+  expect(file.gets({ chomp: true })).toEqual(b("contents"));
+});
+
 function multipartFile(name: string): string {
   return path.join(fixtureDir, name);
 }
