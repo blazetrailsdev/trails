@@ -210,8 +210,8 @@ export class Configuration extends EngineConfiguration {
 
         if (this.isRespondTo("activeStorage")) {
           const activeStorage = this.get("activeStorage") as { queues: Record<string, unknown> };
-          activeStorage.queues.analysis = ":active_storage_analysis";
-          activeStorage.queues.purge = ":active_storage_purge";
+          activeStorage.queues.analysis = "active_storage_analysis";
+          activeStorage.queues.purge = "active_storage_purge";
         }
 
         if (this.isRespondTo("activeRecord")) {

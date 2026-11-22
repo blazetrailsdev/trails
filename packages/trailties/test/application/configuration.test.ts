@@ -41,6 +41,24 @@ import {
   RuntimeError,
   setEnv,
 } from "@blazetrails/ruby-compat";
+import * as FormTagHelper from "@blazetrails/actionview/helpers/form-tag-helper";
+import * as UrlHelper from "@blazetrails/actionview/helpers/url-helper";
+import * as AssetTagHelper from "@blazetrails/actionview/helpers/asset-tag-helper";
+import "@blazetrails/activestorage/engine";
+import { ActiveStorage } from "@blazetrails/activestorage";
+import { Base as ActiveJobBase } from "@blazetrails/activejob";
+import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
+import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
+import { DestroyAssociationAsyncJob } from "@blazetrails/activerecord/destroy-association-async-job";
+import { CacheRequest } from "@blazetrails/actionpack";
+import {
+  ActiveSupport,
+  setUtcToLocalReturnsUtcOffsetTimes,
+  utcToLocalReturnsUtcOffsetTimes,
+} from "@blazetrails/activesupport";
+import { Trailtie as ActionMailerTrailtie } from "../../lib/trailties/action-mailer.js";
+import { Trailtie as ActiveJobTrailtie } from "../../lib/trailties/active-job.js";
+import { Trailtie as ActionDispatchTrailtie } from "../../lib/trailties/action-dispatch.js";
 import { Application } from "../../lib/application.js";
 import { LOAD_DEFAULTS_VERSION } from "../../lib/application/configuration.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
@@ -71,6 +89,13 @@ describe("ConfigurationTest", () => {
   const trailsEnv = env.TRAILS_ENV;
   const sanitizerVendor = SanitizeHelper.sanitizerVendor;
   const actionMailbox = { ...ActionMailboxEngine.config.actionMailbox };
+  const actionView = { ...ActionViewTrailtie.config.actionView };
+  const smtpSettings = ActionMailerBase.smtpSettings;
+  const actionDispatch = { ...ActionDispatchTrailtie.config.actionDispatch };
+  const activeJob = (ActiveJobTrailtie.config.activeJob as unknown as OrderedOptions).toH();
+  const actionMailer = (
+    ActionMailerTrailtie.config.actionMailer as unknown as OrderedOptions
+  ).toH();
   let trailsApplication: Application | null;
 
   beforeAll(() => {
@@ -99,6 +124,19 @@ describe("ConfigurationTest", () => {
       "action_mailbox_incineration",
     );
     ActionMailboxEngine.config.actionMailbox.queues!.set("routing", "action_mailbox_routing");
+    FormTagHelper.setDefaultEnforceUtf8(true);
+    UrlHelper.setButtonToGeneratesButtonTag(false);
+    Object.assign(ActionViewTrailtie.config.actionView, actionView);
+    ActiveJobBase.retryJitter = 0.0;
+    Object.assign(ActionDispatchTrailtie.config.actionDispatch, actionDispatch);
+    for (const [config, snapshot] of [
+      [ActiveJobTrailtie.config.activeJob, activeJob],
+      [ActionMailerTrailtie.config.actionMailer, actionMailer],
+    ] as const) {
+      (config as unknown as OrderedOptions).clear().update(snapshot);
+    }
+    setUtcToLocalReturnsUtcOffsetTimes(false);
+    ActionMailerBase.smtpSettings = smtpSettings;
     setEnv("TRAILS_ENV", trailsEnv);
     _resetTrailsEnv();
     await rm(appPath, { recursive: true, force: true });
@@ -581,5 +619,318 @@ describe("ConfigurationTest", () => {
     application.config.beginningOfWeek = ":invalid" as typeof application.config.beginningOfWeek;
 
     await assertRaises([ArgumentError], {}, () => application.initializeBang());
+  });
+  it("destroy association async job should be loaded in configs", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveRecordBase.destroyAssociationAsyncJob).toBe(DestroyAssociationAsyncJob);
+  });
+
+  it("ActiveRecord::Base.destroy_association_async_job can be configured via config.active_record.destroy_association_async_job", async () => {
+    class DummyDestroyAssociationAsyncJob {}
+    constSet(TopLevel, "DummyDestroyAssociationAsyncJob", DummyDestroyAssociationAsyncJob);
+    onTestFinished(() => rbModRemoveConst(TopLevel, "DummyDestroyAssociationAsyncJob"));
+    const application = await app("test");
+    application.config.activeRecord.destroyAssociationAsyncJob = "DummyDestroyAssociationAsyncJob";
+    await application.initializeBang();
+
+    expect(ActiveRecordBase.destroyAssociationAsyncJob).toBe(DummyDestroyAssociationAsyncJob);
+  });
+
+  it("destroy association async batch size is nil by default", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveRecordBase.destroyAssociationAsyncBatchSize).toBeNull();
+  });
+
+  it("destroy association async batch size can be set in configs", async () => {
+    const application = await app("development");
+    application.config.activeRecord.destroyAssociationAsyncBatchSize = 100;
+    await application.initializeBang();
+
+    expect(ActiveRecordBase.destroyAssociationAsyncBatchSize).toBe(100);
+  });
+
+  it("ActionView::Helpers::FormTagHelper.default_enforce_utf8 is false by default", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+    expect(FormTagHelper.defaultEnforceUtf8).toBe(false);
+  });
+
+  it("ActionView::Helpers::FormTagHelper.default_enforce_utf8 is true in an upgraded app", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("5.2");
+    await application.initializeBang();
+
+    expect(FormTagHelper.defaultEnforceUtf8).toBe(true);
+  });
+
+  it("ActionView::Helpers::FormTagHelper.default_enforce_utf8 can be configured via config.action_view.default_enforce_utf8", async () => {
+    const application = await app("development");
+    application.config.actionView.defaultEnforceUtf8 = true;
+    await application.initializeBang();
+
+    expect(FormTagHelper.defaultEnforceUtf8).toBe(true);
+  });
+
+  it("ActionView::Helpers::UrlHelper.button_to_generates_button_tag is true by default", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+    expect(UrlHelper.buttonToGeneratesButtonTag).toBe(true);
+  });
+
+  it("ActionView::Helpers::UrlHelper.button_to_generates_button_tag is false by default for upgraded apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.1");
+    await application.initializeBang();
+
+    expect(UrlHelper.buttonToGeneratesButtonTag).toBe(false);
+  });
+
+  it("ActionView::Helpers::UrlHelper.button_to_generates_button_tag can be configured via config.action_view.button_to_generates_button_tag", async () => {
+    const application = await app("development");
+    application.config.actionView.buttonToGeneratesButtonTag = true;
+    await application.initializeBang();
+
+    expect(UrlHelper.buttonToGeneratesButtonTag).toBe(true);
+  });
+
+  it("ActionView::Helpers::AssetTagHelper.image_loading is nil by default", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+    expect(AssetTagHelper.imageLoading).toBeNull();
+  });
+
+  it("ActionView::Helpers::AssetTagHelper.image_loading can be configured via config.action_view.image_loading", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    application.config.actionView.imageLoading = "lazy";
+    await application.initializeBang();
+
+    expect(AssetTagHelper.imageLoading).toBe("lazy");
+  });
+
+  it("ActionView::Helpers::AssetTagHelper.image_decoding is nil by default", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+    expect(AssetTagHelper.imageDecoding).toBeNull();
+  });
+
+  it("ActionView::Helpers::AssetTagHelper.image_decoding can be configured via config.action_view.image_decoding", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    application.config.actionView.imageDecoding = "async";
+    await application.initializeBang();
+
+    expect(AssetTagHelper.imageDecoding).toBe("async");
+  });
+
+  it("ActionView::Helpers::AssetTagHelper.preload_links_header is true by default", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+    expect(AssetTagHelper.preloadLinksHeader).toBe(true);
+  });
+
+  it("ActionView::Helpers::AssetTagHelper.preload_links_header is nil by default for upgraded apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.0");
+    await application.initializeBang();
+
+    expect(AssetTagHelper.preloadLinksHeader).toBeNull();
+  });
+
+  it("ActionView::Helpers::AssetTagHelper.preload_links_header can be configured via config.action_view.preload_links_header", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    application.config.actionView.preloadLinksHeader = false;
+    await application.initializeBang();
+
+    expect(AssetTagHelper.preloadLinksHeader).toBe(false);
+  });
+
+  it("ActionView::Helpers::AssetTagHelper.apply_stylesheet_media_default is true by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(AssetTagHelper.applyStylesheetMediaDefault).toBe(true);
+  });
+
+  it("ActionView::Helpers::AssetTagHelper.apply_stylesheet_media_default can be configured via config.action_view.apply_stylesheet_media_default", async () => {
+    const application = await app("development");
+    application.config.actionView.applyStylesheetMediaDefault = false;
+    await application.initializeBang();
+
+    expect(AssetTagHelper.applyStylesheetMediaDefault).toBe(false);
+  });
+
+  it("ActiveJob::Base.retry_jitter is 0.15 by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(ActiveJobBase.retryJitter).toBe(0.15);
+  });
+
+  it("ActiveJob::Base.retry_jitter is 0.0 by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveJobBase.retryJitter).toBe(0.0);
+  });
+
+  it("Rails.application.config.action_dispatch.cookies_same_site_protection is :lax by default", async () => {
+    const application = await app("production");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+
+    expect(Trails.application!.config.actionDispatch.cookiesSameSiteProtection).toBe(":lax");
+  });
+
+  it("Rails.application.config.action_dispatch.cookies_same_site_protection is :lax can be overridden", async () => {
+    const application = await app("production");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    application.config.actionDispatch.cookiesSameSiteProtection = ":strict";
+
+    expect(Trails.application!.config.actionDispatch.cookiesSameSiteProtection).toBe(":strict");
+  });
+
+  it("Rails.application.config.action_dispatch.cookies_same_site_protection is :lax in 6.1 defaults", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.1");
+
+    expect(Trails.application!.config.actionDispatch.cookiesSameSiteProtection).toBe(":lax");
+  });
+
+  it("Rails.application.config.action_dispatch.ssl_default_redirect_status is 308 in 6.1 defaults", async () => {
+    const application = await app("production");
+    application.config.loadDefaults("6.1");
+
+    expect(Trails.application!.config.actionDispatch.sslDefaultRedirectStatus).toBe(308);
+  });
+
+  it("Rails.application.config.action_dispatch.ssl_default_redirect_status can be configured in an initializer", async () => {
+    const application = await app("production");
+    application.config.loadDefaults("6.0");
+    application.config.actionDispatch.sslDefaultRedirectStatus = 308;
+
+    expect(Trails.application!.config.actionDispatch.sslDefaultRedirectStatus).toBe(308);
+  });
+
+  it("Rails.application.config.action_dispatch.strict_freshness is false by default for older applications", async () => {
+    await app("development");
+
+    expect(Trails.application!.config.actionDispatch.strictFreshness).toBe(false);
+  });
+
+  it("Rails.application.config.action_dispatch.strict_freshness can be configured in an initializer", async () => {
+    const application = await app("development");
+    application.config.actionDispatch.strictFreshness = true;
+    await application.initializeBang();
+
+    expect(CacheRequest.strictFreshness).toBe(true);
+  });
+
+  it("Rails.application.config.active_support.to_time_preserves_timezone can be configured in an initializer", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("7.2");
+    application.config.activeSupport.toTimePreservesTimezone = ":zone";
+    await application.initializeBang();
+
+    expect(ActiveSupport.toTimePreservesTimezone()).toBe(":zone");
+  });
+
+  it("Rails.application.config.action_mailer.smtp_settings have open_timeout and read_timeout defined as 5 in 7.0 defaults", async () => {
+    const application = await app("development");
+    application.config.actionMailer.smtpSettings = { domain: "example.com" };
+    application.config.loadDefaults("7.0");
+    await application.initializeBang();
+
+    const smtpSettings = { domain: "example.com", openTimeout: 5, readTimeout: 5 };
+
+    expect(ActionMailerBase.smtpSettings).toEqual(smtpSettings);
+    expect(Trails.configuration!.actionMailer.smtpSettings).toEqual(smtpSettings);
+  });
+
+  it("Rails.application.config.action_mailer.smtp_settings does not have open_timeout and read_timeout configured on other versions", async () => {
+    const application = await app("development");
+    application.config.actionMailer.smtpSettings = { domain: "example.com" };
+    await application.initializeBang();
+
+    const smtpSettings = { domain: "example.com" };
+
+    expect(ActionMailerBase.smtpSettings).toEqual(smtpSettings);
+  });
+
+  it("Rails.application.config.action_mailer.smtp_settings = nil fallback to ActionMailer::Base.smtp_settings", async () => {
+    const application = await app("development");
+    ActionMailerBase.smtpSettings = { domain: "example.com" };
+    application.config.loadDefaults("7.0");
+    await application.initializeBang();
+
+    const smtpSettings = { domain: "example.com", openTimeout: 5, readTimeout: 5 };
+
+    expect(ActionMailerBase.smtpSettings).toEqual(smtpSettings);
+    assertNil(Trails.configuration!.actionMailer.smtpSettings);
+  });
+
+  it("Rails.application.config.action_mailer.smtp_settings = nil and ActionMailer::Base.smtp_settings = nil do not configure smtp_timeout", async () => {
+    ActionMailerBase.smtpSettings = null;
+
+    const application = await app("development");
+    application.config.actionMailer.smtpSettings = null;
+    application.config.loadDefaults("7.0");
+    await application.initializeBang();
+
+    assertNil(Trails.configuration!.actionMailer.smtpSettings);
+    expect(ActionMailerBase.smtpSettings).toBeNull();
+  });
+
+  it("ActiveSupport.utc_to_local_returns_utc_offset_times is true in 6.1 defaults", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.1");
+    await application.initializeBang();
+
+    expect(utcToLocalReturnsUtcOffsetTimes()).toBe(true);
+  });
+
+  it("ActiveSupport.utc_to_local_returns_utc_offset_times is false in 6.0 defaults", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.0");
+    await application.initializeBang();
+
+    expect(utcToLocalReturnsUtcOffsetTimes()).toBe(false);
+  });
+
+  it("ActiveSupport.utc_to_local_returns_utc_offset_times can be configured in an initializer", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.0");
+    await application.initializeBang();
+    setUtcToLocalReturnsUtcOffsetTimes(true);
+
+    expect(utcToLocalReturnsUtcOffsetTimes()).toBe(true);
+  });
+
+  it("ActiveStorage.queues[:analysis] is :active_storage_analysis by default in 6.0", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.0");
+    await application.initializeBang();
+
+    expect(ActiveStorage.queues.analysis).toBe("active_storage_analysis");
+  });
+
+  it("ActiveStorage.queues[:analysis] is nil by default in 6.1", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.1");
+    await application.initializeBang();
+
+    assertNil(ActiveStorage.queues.analysis);
+  });
+
+  it("ActiveStorage.queues[:analysis] is nil without Rails 6 defaults", async () => {
+    await (await app("development")).initializeBang();
+
+    assertNil(ActiveStorage.queues.analysis);
   });
 });
