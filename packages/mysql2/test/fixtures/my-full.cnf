@@ -1,0 +1,6 @@
+[client]
+default-character-set=utf8mb4
+connect_timeout = 7
+compress
+!include my.cnf
+!includedir my.cnf.d

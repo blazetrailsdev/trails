@@ -16,7 +16,24 @@ export class Statement {
   constructor(
     private client: Client,
     private sql: string,
+    private stmt: {
+      statement: { columns: { name: string }[]; parameters: unknown[]; close(): unknown };
+    },
   ) {}
+
+  get paramCount(): number {
+    return this.stmt.statement.parameters.length;
+  }
+
+  get fieldCount(): number {
+    return this.stmt.statement.columns.length;
+  }
+
+  get fields(): string[] | null {
+    const fields = this.stmt.statement.columns;
+    if (fields.length === 0) return null;
+    return fields.map((field) => field.name);
+  }
 
   execute(...args: unknown[]): Promise<Mysql2Result | null> {
     return this._execute(args);
@@ -38,7 +55,8 @@ export class Statement {
 
   close(): void {
     this.closed = true;
-    this.client.unprepare(this.client.options(this.sql, this.client.queryOptions));
+    const options = this.client.options(this.sql, this.client.queryOptions);
+    if (this.client.unprepare(options) !== this.stmt.statement) this.stmt.statement.close();
   }
 }
 

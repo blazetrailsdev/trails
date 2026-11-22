@@ -108,6 +108,7 @@ describe("mysql2Client cast", () => {
     const raw = await clientOn({
       config: invalid,
       unprepare() {},
+      prepare: async () => ({ statement: { columns: [], parameters: [] } }),
       execute: async () => (
         invalid.typeCast!(
           { ...field("DATETIME", "2026-00-27 14:23:55"), name: "created_at" },
@@ -116,7 +117,7 @@ describe("mysql2Client cast", () => {
         [[[null]], [{ name: "created_at" }]]
       ),
     });
-    const result = (await raw.prepare("SELECT created_at FROM t WHERE id = ?").execute(1))!;
+    const result = (await (await raw.prepare("SELECT created_at FROM t WHERE id = ?")).execute(1))!;
     expect(() => result.toA()).toThrow(Mysql2.Error);
     expect(() => result.toA()).toThrow("Invalid date in field 'created_at': 2026-00-27 14:23:55");
   });

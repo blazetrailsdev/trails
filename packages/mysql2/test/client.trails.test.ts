@@ -42,7 +42,8 @@ describe("mysql2Client", () => {
 
   it("execute unboxes a Float carrier and formats temporals, and leaves the rest alone", async () => {
     const execute = vi.fn(async () => [{ affectedRows: 0 }, undefined]);
-    const client = await clientOn({ execute });
+    const prepare = vi.fn(async () => ({ statement: { columns: [], parameters: [] } }));
+    const client = await clientOn({ execute, prepare });
     const binds = [
       new Number(3),
       Time.utc(2020, 1, 2, 3, 4, 5, 6),
@@ -51,7 +52,7 @@ describe("mysql2Client", () => {
       1n,
       null,
     ];
-    await client.prepare("SELECT ?").execute(...binds);
+    await (await client.prepare("SELECT ?")).execute(...binds);
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ sql: "SELECT ?" }), [
       3,
       "2020-01-02 03:04:05.000006",
@@ -207,8 +208,9 @@ describe("Mysql2::Client#warning_count", () => {
 
   it("Statement#execute merges its keywords over query_options, and always casts", async () => {
     const execute = vi.fn(async (_options: object, _values: unknown[]) => [[[1]], [{ name: "a" }]]);
-    const client = await clientOn({ execute });
-    const stmt = client.prepare("SELECT ?");
+    const prepare = vi.fn(async () => ({ statement: { columns: [], parameters: [{}] } }));
+    const client = await clientOn({ execute, prepare });
+    const stmt = await client.prepare("SELECT ?");
     await stmt.execute(1);
     await stmt.execute(1, "x", { as: "array", cast: false, databaseTimezone: "utc" });
     expect(execute.mock.calls.map(([options, values]) => [options, values])).toMatchObject([
@@ -439,6 +441,85 @@ describe("Mysql2::Client#initialize option writers", () => {
     });
     expect(config.socketPath).toBeUndefined();
     expect((await configFor({ defaultFile })).config.database).toBeUndefined();
+  });
+
+  it(":default_file reads every client option over mysql_options, dashed or underscored, and follows !include", async () => {
+    const keyFile = new URL("./fixtures/my.cnf", import.meta.url).pathname;
+    const key = await File.readAsync(keyFile);
+    const defaultFile = new URL("./fixtures/my-ssl.tmp.cnf", import.meta.url).pathname;
+    await File.writeAsync(defaultFile, `[client]\nssl_key = ${keyFile}\n!include my-full.cnf\n`);
+    let config: Record<string, unknown>;
+    try {
+      ({ config } = await configFor({ defaultFile, encoding: "latin1" }));
+    } finally {
+      await File.deleteAsync(defaultFile);
+    }
+    expect(config).toMatchObject({
+      charset: "utf8mb4",
+      connectTimeout: 7000,
+      compress: true,
+      user: "cnfuser",
+      port: 3307,
+      ssl: { key, ciphers: "AES128-SHA" },
+    });
+  });
+
+  it(":default_file's ssl options are ignored under ssl_mode DISABLED", async () => {
+    const defaultFile = new URL("./fixtures/my-full.cnf", import.meta.url).pathname;
+    expect((await configFor({ defaultFile, sslMode: "disabled" })).config.ssl).toBeUndefined();
+  });
+
+  it("Statement#close closes its prepared handle exactly once, cached or not", async () => {
+    const cached = { columns: [], parameters: [], close: vi.fn() };
+    const uncached = { columns: [], parameters: [], close: vi.fn() };
+    let handle = cached;
+    const unprepare = vi.fn(() => {
+      if (handle !== cached) return undefined;
+      cached.close();
+      return cached;
+    });
+    const prepare = vi.fn(async () => ({ statement: handle }));
+    const client = await clientOn({ prepare, unprepare });
+    (await client.prepare("SELECT 1")).close();
+    expect(cached.close).toHaveBeenCalledOnce();
+    handle = uncached;
+    (await client.prepare("SELECT 2")).close();
+    expect(uncached.close).toHaveBeenCalledOnce();
+  });
+
+  it(":write_timeout fails a write that has not drained with CR_SERVER_LOST", async () => {
+    vi.useFakeTimers();
+    try {
+      const destroy = vi.fn();
+      const write = vi.fn((_chunk: unknown, _cb?: () => void) => true);
+      const stream = { write, destroy };
+      const client = await (async () => {
+        const createConnection = vi
+          .spyOn(mysql, "createConnection")
+          .mockResolvedValue({ connection: { stream } } as never);
+        try {
+          return await Mysql2.Client.new({ writeTimeout: 2 });
+        } finally {
+          createConnection.mockRestore();
+        }
+      })();
+      const drained = vi.fn();
+      stream.write("a", drained);
+      write.mock.calls[0][1]!();
+      expect(drained).toHaveBeenCalledOnce();
+      vi.advanceTimersByTime(2000);
+      expect(destroy).not.toHaveBeenCalled();
+      stream.write("b");
+      vi.advanceTimersByTime(2000);
+      expect(destroy).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "PROTOCOL_CONNECTION_LOST" }),
+      );
+      expect(() => client.raiseMysql2Error(destroy.mock.calls[0][0])).toThrow(
+        expect.objectContaining({ errorNumber: 2013 }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("refuses the mysql_clear_password plugin unless :enable_cleartext_plugin", async () => {

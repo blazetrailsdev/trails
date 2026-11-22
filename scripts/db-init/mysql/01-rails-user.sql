@@ -35,4 +35,6 @@ CREATE USER IF NOT EXISTS 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON `activerecord\_unittest%`.* TO 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON `ar\_cli\_e2e%`.* TO 'rails'@'localhost';
+GRANT SELECT ON performance_schema.* TO 'rails'@'%';
+GRANT SELECT ON performance_schema.* TO 'rails'@'localhost';
 FLUSH PRIVILEGES;

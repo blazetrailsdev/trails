@@ -2,33 +2,69 @@ import "@blazetrails/vitest-matchers";
 import { rbCFloat, rbCNilClass } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Time } from "@blazetrails/date";
-import type { Client } from "../lib/index.js";
+import { Mysql2, type Client } from "../lib/index.js";
 import { specHelper } from "./spec-helper.js";
 
 const testResult = async (client: Client) =>
-  (await client
-    .prepare("SELECT * FROM mysql2_test ORDER BY id DESC LIMIT 1")
-    .execute())!.toA()[0] as Record<string, unknown>;
+  (await (
+    await client.prepare("SELECT * FROM mysql2_test ORDER BY id DESC LIMIT 1")
+  ).execute())!.toA()[0] as Record<string, unknown>;
 describe("Mysql2::Statement", () => {
   const state = specHelper();
-  // BLOCKED: mysql2-client-prepare-prepares-on-the-server
-  it.skip("should create a statement", () => {});
-  it.skip("should raise an exception when server disconnects", () => {});
-  it.skip("should tell us the param count", () => {});
-  it.skip("should tell us the field count", () => {});
+  const performanceSchemaEnabled = async () =>
+    (await state.client.query("SHOW VARIABLES LIKE 'performance_schema'"))!
+      .toA()
+      .some((x) => (x as Record<string, unknown>)["Value"] === "ON");
+  const stmtCount = async () => {
+    if (await performanceSchemaEnabled()) {
+      const row = (await state.client.query(
+        "SELECT COUNT(1) AS count FROM performance_schema.prepared_statements_instances",
+      ))!.toA()[0] as Record<string, unknown>;
+      return Number(row["count"]);
+    }
+    const row = (await state.client.query(
+      "SHOW STATUS LIKE 'Prepared_stmt_count'",
+    ))!.toA()[0] as Record<string, unknown>;
+    return Number(row["Value"]);
+  };
+  it("should create a statement", async () => {
+    let statement: unknown = null;
+    await expect(async () => {
+      statement = await state.client.prepare("SELECT 1");
+    }).toChange(stmtCount, { by: 1 });
+    expect(statement).toBeExactInstanceOf(Mysql2.Statement);
+  });
+  it("should raise an exception when server disconnects", async () => {
+    await state.client.close();
+    await expect(state.client.prepare("SELECT 1")).rejects.toThrow(Mysql2.Error);
+  });
+  it("should tell us the param count", async () => {
+    const statement = await state.client.prepare("SELECT ?, ?");
+    expect(statement.paramCount).toBe(2);
+
+    const statement2 = await state.client.prepare("SELECT 1");
+    expect(statement2.paramCount).toBe(0);
+  });
+  it("should tell us the field count", async () => {
+    const statement = await state.client.prepare("SELECT ?, ?");
+    expect(statement.fieldCount).toBe(2);
+
+    const statement2 = await state.client.prepare("SELECT 1");
+    expect(statement2.fieldCount).toBe(1);
+  });
   it("should let us execute our statement", async () => {
-    const statement = state.client.prepare("SELECT 1");
+    const statement = await state.client.prepare("SELECT 1");
     expect(await statement.execute()).not.toBe(null);
   });
   // PERMANENT-SKIP: LocalJumpError has no counterpart; Result#each answers its rows without a block.
   it.skip("should raise an exception without a block", () => {});
   it("should tell us the result count", async () => {
-    const statement = state.client.prepare("SELECT 1");
+    const statement = await state.client.prepare("SELECT 1");
     const result = (await statement.execute())!;
     expect(result.count()).toBe(1);
   });
   it("should let us iterate over results", async () => {
-    const statement = state.client.prepare("SELECT 1");
+    const statement = await state.client.prepare("SELECT 1");
     const result = (await statement.execute())!;
     const rows: unknown[] = [];
     result.each((r) => rows.push(r));
@@ -65,19 +101,21 @@ describe("Mysql2::Statement", () => {
   });
   describe("#each", () => {
     it("should yield rows as hash's", async () => {
-      const result = (await state.client.prepare("SELECT 1").execute())!;
+      const result = (await (await state.client.prepare("SELECT 1")).execute())!;
       result.each((row) => {
         expect(row).toBeExactInstanceOf(Object);
       });
     });
     it("should yield rows as hash's with symbol keys if :symbolize_keys was set to true", async () => {
-      const result = (await state.client.prepare("SELECT 1").execute({ symbolizeKeys: true }))!;
+      const result = (await (
+        await state.client.prepare("SELECT 1")
+      ).execute({ symbolizeKeys: true }))!;
       result.each((row) => {
         expect(Object.keys(row)[0]).toBeExactInstanceOf(String);
       });
     });
     it("should be able to return results as an array", async () => {
-      const result = (await state.client.prepare("SELECT 1").execute({ as: "array" }))!;
+      const result = (await (await state.client.prepare("SELECT 1")).execute({ as: "array" }))!;
       result.each((row) => {
         expect(row).toBeInstanceOf(Array);
       });
@@ -90,10 +128,18 @@ describe("Mysql2::Statement", () => {
     it.skip("should throw an exception if we try to iterate twice when streaming is enabled", () => {});
   });
   describe("#fields", () => {
-    // BLOCKED: mysql2-client-prepare-prepares-on-the-server
-    it.skip("method should exist", () => {});
-    it.skip("should return an array of field names in proper order", () => {});
-    it.skip("should return nil for statement with no result fields", () => {});
+    it("method should exist", async () => {
+      const stmt = await state.client.prepare("SELECT 1");
+      expect(stmt).toRespondTo("fields");
+    });
+    it("should return an array of field names in proper order", async () => {
+      const stmt = await state.client.prepare("SELECT 'a', 'b', 'c'");
+      expect(stmt.fields).toEqual(["a", "b", "c"]);
+    });
+    it("should return nil for statement with no result fields", async () => {
+      const stmt = await state.client.prepare("INSERT INTO mysql2_test () VALUES ()");
+      expect(stmt.fields).toBe(null);
+    });
   });
   describe("row data type mapping", () => {
     it("should return nil for a NULL value", async () => {
@@ -234,38 +280,40 @@ describe("Mysql2::Statement", () => {
       await state.client.query("DROP TABLE lastIdTest");
     });
     it("should return number of rows affected by an insert", async () => {
-      const stmt = state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
+      const stmt = await state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
       await stmt.execute(1);
       expect(stmt.affectedRows).toBe(1);
     });
     it("should return number of rows affected by an update", async () => {
-      let stmt = state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
+      let stmt = await state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
       await stmt.execute(1);
       expect(stmt.affectedRows).toBe(1);
       await stmt.execute(2);
       expect(stmt.affectedRows).toBe(1);
 
-      stmt = state.client.prepare("UPDATE lastIdTest SET blah=? WHERE blah=?");
+      stmt = await state.client.prepare("UPDATE lastIdTest SET blah=? WHERE blah=?");
       await stmt.execute(0, 1);
       expect(stmt.affectedRows).toBe(1);
     });
     it("should return number of rows affected by a delete", async () => {
-      let stmt = state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
+      let stmt = await state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
       await stmt.execute(1);
       expect(stmt.affectedRows).toBe(1);
       await stmt.execute(2);
       expect(stmt.affectedRows).toBe(1);
 
-      stmt = state.client.prepare("DELETE FROM lastIdTest WHERE blah=?");
+      stmt = await state.client.prepare("DELETE FROM lastIdTest WHERE blah=?");
       await stmt.execute(1);
       expect(stmt.affectedRows).toBe(1);
     });
   });
   describe("close", () => {
-    // BLOCKED: mysql2-client-prepare-prepares-on-the-server
-    it.skip("should free server resources", () => {});
+    it("should free server resources", async () => {
+      const stmt = await state.client.prepare("SELECT 1");
+      await expect(() => stmt.close()).toChange(stmtCount, { by: -1 });
+    });
     it("should raise an error on subsequent execution", async () => {
-      const stmt = state.client.prepare("SELECT 1");
+      const stmt = await state.client.prepare("SELECT 1");
       stmt.close();
       await expect(stmt.execute()).rejects.toThrow(/Invalid statement handle/);
     });
