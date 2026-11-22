@@ -401,7 +401,7 @@ describe("package-summary", () => {
         package: "activerecord",
         rubyFile: "base.rb",
         rubyUrl:
-          "https://github.com/rails/rails/blob/v8.0.2/activerecord/lib/active_record/base.rb",
+          "https://github.com/rails/rails/blob/v8.0.5.2/activerecord/lib/active_record/base.rb",
         tsFile: "base.ts",
         tsPath: "packages/activerecord/lib/base.ts",
         methodsMatched: 5,
@@ -415,7 +415,7 @@ describe("package-summary", () => {
         package: "activerecord",
         rubyFile: "core.rb",
         rubyUrl:
-          "https://github.com/rails/rails/blob/v8.0.2/activerecord/lib/active_record/core.rb",
+          "https://github.com/rails/rails/blob/v8.0.5.2/activerecord/lib/active_record/core.rb",
         tsFile: null,
         tsPath: null,
         methodsMatched: 0,
@@ -429,7 +429,7 @@ describe("package-summary", () => {
         package: "activerecord",
         rubyFile: "lonely.rb",
         rubyUrl:
-          "https://github.com/rails/rails/blob/v8.0.2/activerecord/lib/active_record/lonely.rb",
+          "https://github.com/rails/rails/blob/v8.0.5.2/activerecord/lib/active_record/lonely.rb",
         tsFile: "lonely.ts",
         tsPath: "packages/activerecord/lib/lonely.ts",
         methodsMatched: 2,
@@ -443,7 +443,7 @@ describe("package-summary", () => {
         package: "actionpack",
         rubyFile: "routing.rb",
         rubyUrl:
-          "https://github.com/rails/rails/blob/v8.0.2/actionpack/lib/action_dispatch/routing.rb",
+          "https://github.com/rails/rails/blob/v8.0.5.2/actionpack/lib/action_dispatch/routing.rb",
         tsFile: "routing.ts",
         tsPath: "packages/actionpack/lib/action-dispatch/routing.ts",
         methodsMatched: 1,
