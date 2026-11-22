@@ -1,8 +1,8 @@
 import { Mysql2 } from "@blazetrails/mysql2";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  describeIfMysqlAdapter,
   leaseMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
@@ -123,7 +123,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   });
 });
 
-describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter (trails extensions)", () => {
   const { self } = fixtures([]);
 
   beforeEach(() => {

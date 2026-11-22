@@ -1,17 +1,17 @@
-import { it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   type ChildProcessAdapter,
   getChildProcessAsync,
   stdout,
   stderr,
 } from "@blazetrails/ruby-compat";
-import { describeIfMysqlAdapter } from "../../../support/describe-if-mysql-adapter.js";
 import { DatabaseTasks } from "../../../../lib/tasks/database-tasks.js";
 import "../../../../lib/tasks/mysql-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { DatabaseAlreadyExists } from "../../../../lib/errors.js";
 import { Base } from "../../../../lib/base.js";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 async function withStubbedConnection(
   connection: unknown,
@@ -59,7 +59,7 @@ function configuration(overrides: Record<string, unknown> = {}): HashConfig {
   });
 }
 
-describeIfMysqlAdapter("MysqlDBCreateTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MysqlDBCreateTest", () => {
   let connection: { createDatabase: ReturnType<typeof vi.fn> };
   let streams: ReturnType<typeof captureStreams>;
 
@@ -138,7 +138,7 @@ describeIfMysqlAdapter("MysqlDBCreateTest", () => {
   });
 });
 
-describeIfMysqlAdapter("MysqlDBCreateWithInvalidPermissionsTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MysqlDBCreateWithInvalidPermissionsTest", () => {
   beforeEach(() => {
     captureStreams();
   });
@@ -157,7 +157,7 @@ describeIfMysqlAdapter("MysqlDBCreateWithInvalidPermissionsTest", () => {
   });
 });
 
-describeIfMysqlAdapter("MySQLDBDropTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLDBDropTest", () => {
   let connection: { dropDatabase: ReturnType<typeof vi.fn> };
   let streams: ReturnType<typeof captureStreams>;
 
@@ -204,7 +204,7 @@ describeIfMysqlAdapter("MySQLDBDropTest", () => {
   });
 });
 
-describeIfMysqlAdapter("MySQLPurgeTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLPurgeTest", () => {
   let connection: { recreateDatabase: ReturnType<typeof vi.fn> };
   const purgeConfiguration = (overrides: Record<string, unknown> = {}): HashConfig =>
     new HashConfig("default_env", "primary", {
@@ -257,7 +257,7 @@ describeIfMysqlAdapter("MySQLPurgeTest", () => {
   });
 });
 
-describeIfMysqlAdapter("MysqlDBCharsetTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MysqlDBCharsetTest", () => {
   beforeEach(() => {});
 
   it("db retrieves charset", async () => {
@@ -271,7 +271,7 @@ describeIfMysqlAdapter("MysqlDBCharsetTest", () => {
   });
 });
 
-describeIfMysqlAdapter("MysqlDBCollationTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MysqlDBCollationTest", () => {
   beforeEach(() => {});
 
   it("db retrieves collation", async () => {
@@ -285,7 +285,7 @@ describeIfMysqlAdapter("MysqlDBCollationTest", () => {
   });
 });
 
-describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureDumpTest", () => {
   const filename = "awesome-file.sql";
   const configurationDb = new HashConfig("default_env", "primary", {
     adapter: "mysql2",
@@ -470,7 +470,7 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
   });
 });
 
-describeIfMysqlAdapter("MySQLStructureLoadTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureLoadTest", () => {
   const filename = "awesome-file.sql";
   const configuration = new HashConfig("default_env", "primary", {
     adapter: "mysql2",

@@ -1,12 +1,13 @@
-import { it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { asJson } from "@blazetrails/activesupport";
-import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../../support/supports.js";
 import { Base } from "../../../../lib/index.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Post } from "../../../models/post.js";
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   describeIfSupports("optimizer_hints", "OptimizerHintsTest", () => {
     const { self } = fixtures(["posts"]);
 

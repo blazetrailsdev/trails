@@ -1,8 +1,8 @@
 import { Mysql2 } from "@blazetrails/mysql2";
 import { fixtures } from "../../../support/use-fixtures.js";
-import { it, expect, beforeEach, afterEach, vi } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  describeIfMysqlAdapter,
   isMariaDb,
   leaseMysqlAdapter,
   Mysql2Adapter,
@@ -29,7 +29,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import * as Arel from "@blazetrails/arel";
 
-describeIfMysqlAdapter("Mysql2AdapterTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2AdapterTest", () => {
   const { self } = fixtures([]);
 
   beforeEach(() => {

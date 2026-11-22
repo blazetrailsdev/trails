@@ -1,6 +1,6 @@
-import { it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
-import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 
 class TestMysqlAdapter extends Mysql2Adapter {
   constructor() {
@@ -23,7 +23,7 @@ function assertLookupType(expected: string, lookup: string) {
   expect(castType.type()).toBe(expected);
 }
 
-describeIfMysqlAdapter("MysqlTypeLookupTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MysqlTypeLookupTest", () => {
   it("boolean types", () => {
     assertLookupType("boolean", "tinyint(1)");
     assertLookupType("boolean", "TINYINT(1)");

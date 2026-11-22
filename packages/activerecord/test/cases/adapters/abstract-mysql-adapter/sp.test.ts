@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { Topic } from "../../../models/topic.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   describe("StoredProcedureTest", () => {
     const { topics } = fixtures(["topics"]);
 

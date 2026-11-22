@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { describeIfMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Bulb } from "../../../models/bulb.js";
 import { Author } from "../../../models/author.js";
 import { Car } from "../../../models/car.js";
@@ -10,7 +10,7 @@ constSet(TopLevel, "Bulb", Bulb);
 constSet(TopLevel, "Author", Author);
 constSet(TopLevel, "Car", Car);
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   describe("CountDeletedRowsWithLockTest", () => {
     fixtures([]);
 

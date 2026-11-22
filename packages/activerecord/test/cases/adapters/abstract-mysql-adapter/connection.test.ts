@@ -9,17 +9,12 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { ARUnit2Model } from "../../../models/arunit2-model.js";
 import type { NotificationEvent } from "@blazetrails/activesupport";
-import {
-  describeIfMysqlAdapter,
-  isMariaDb,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-  MYSQL_TEST_URL,
-} from "./test-helper.js";
+import { isMariaDb, leaseMysqlAdapter, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { NoDatabaseError, DatabaseVersionError } from "../../../../lib/errors.js";
 import { Mysql2, type Mysql2Result } from "@blazetrails/mysql2";
 import { Base } from "../../../../lib/base.js";
 import { runWithoutConnection } from "../../../support/connection-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { ConnectionUrlResolver } from "../../../../lib/database-configurations/connection-url-resolver.js";
 
 function clearVersionCache(adapter: Mysql2Adapter): void {
@@ -28,7 +23,7 @@ function clearVersionCache(adapter: Mysql2Adapter): void {
   ).poolConfig.setServerVersion(null);
 }
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();

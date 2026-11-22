@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
-import { describeIfMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Post } from "../../../models/post.js";
 import { Topic } from "../../../models/topic.js";
 
-describeIfMysqlAdapter("AbstractMysqlAdapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("AbstractMysqlAdapter", () => {
   describe("BindParameterTest", () => {
     fixtures(["topics", "posts"]);
 

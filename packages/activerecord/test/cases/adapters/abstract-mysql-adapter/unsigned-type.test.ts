@@ -1,15 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
-import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { RangeError as ActiveRecordRangeError } from "../../../../lib/errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { deprecator } from "../../../../lib/deprecator.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   fixtures({}, { useTransactionalTests: false });
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
