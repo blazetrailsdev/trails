@@ -56,9 +56,7 @@ async function format(d: ts.Diagnostic, cwd: string): Promise<string> {
 describe("landing page samples", { timeout: 120_000 }, () => {
   it("compiles the feature-block example app cleanly", async () => {
     expect(await compile({})).toEqual([
-      // view-type-includes-engine-helpers
       "app/views/posts/show.html.tse(1,5): error TS2349: This expression is not callable.\n  Type 'never' has no call signatures.",
-      // attached-one-types-delegated-attachment-members
       "app/views/posts/show.html.tse(4,32): error TS2339: Property 'variant' does not exist on type 'One'.",
     ]);
   });
