@@ -282,14 +282,14 @@ describe("TestDatabase", () => {
           await db.transaction(null, async () => {
             const sqlForReadTest = "select * from foo";
             if (item.read) {
-              await reader.execute(sqlForReadTest);
+              await expect(reader.execute(sqlForReadTest)).resolves.not.toThrow();
             } else {
               await expect(reader.execute(sqlForReadTest)).rejects.toThrow(SQLite3.BusyException);
             }
 
             const sqlForWriteTest = "insert into foo values (2)";
             if (item.write) {
-              await reader.execute(sqlForWriteTest);
+              await expect(reader.execute(sqlForWriteTest)).resolves.not.toThrow();
             } else {
               await expect(reader.execute(sqlForWriteTest)).rejects.toThrow(SQLite3.BusyException);
             }
