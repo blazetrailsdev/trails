@@ -14,17 +14,20 @@ class ReadWriteHash {
 }
 
 describe("RackCacheMetaStoreTest", () => {
-  let store: RailsMetaStore;
+  let store: {
+    read(key: string): Promise<Record<string, string>>;
+    write(key: string, value: unknown): Promise<unknown>;
+  };
 
   beforeEach(() => {
-    store = new RailsMetaStore(new ReadWriteHash());
+    store = new RailsMetaStore(new ReadWriteHash()) as unknown as typeof store;
   });
 
   it("stuff is deep duped", async () => {
-    await store.write("foo", { bar: "original" } as never);
-    let hash = (await store.read("foo")) as unknown as Record<string, string>;
+    await store.write("foo", { bar: "original" });
+    let hash = await store.read("foo");
     hash.bar = "changed";
-    hash = (await store.read("foo")) as unknown as Record<string, string>;
+    hash = await store.read("foo");
     expect(hash.bar).toBe("original");
   });
 });

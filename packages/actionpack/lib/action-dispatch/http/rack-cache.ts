@@ -1,4 +1,4 @@
-import { EntityStore, MetaStore, type Response } from "@blazetrails/rack-cache";
+import { EntityStore, MetaStore } from "@blazetrails/rack-cache";
 import { Marshal, TopLevel } from "@blazetrails/ruby-compat";
 
 type Store = {
@@ -8,7 +8,7 @@ type Store = {
 };
 
 type Part = string | Uint8Array;
-type Entry = [Record<string, unknown>, Response["headers"]];
+type Entry = Awaited<ReturnType<InstanceType<typeof MetaStore.Heap>["read"]>>[number];
 type RackBody = Iterable<Part> | { each(block: (part: Part) => unknown): unknown };
 
 declare module "@blazetrails/rack-cache" {
