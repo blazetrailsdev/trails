@@ -3,7 +3,7 @@ import { rbCFloat, rbCNilClass } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Time } from "@blazetrails/date";
 import { Mysql2, type Client } from "../lib/index.js";
-import { specHelper } from "./spec-helper.js";
+import { lastIdTestLock, specHelper } from "./spec-helper.js";
 
 const testResult = async (client: Client) =>
   (await (
@@ -271,6 +271,7 @@ describe("Mysql2::Statement", () => {
     it.skip("should handle bigint ids", () => {});
   });
   describe("affected_rows", () => {
+    lastIdTestLock(state);
     beforeEach(async () => {
       await state.client.query(
         "CREATE TABLE IF NOT EXISTS lastIdTest (`id` BIGINT NOT NULL AUTO_INCREMENT, blah INT(11), PRIMARY KEY (`id`))",

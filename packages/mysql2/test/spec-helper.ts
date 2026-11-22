@@ -79,3 +79,16 @@ export function specHelper(): { client: Client } {
   });
   return state;
 }
+
+/** @noRailsEquivalent PERMANENT */
+export function lastIdTestLock(state: { client: Client }): void {
+  beforeEach(async () => {
+    const lock = (await state.client.query("SELECT GET_LOCK('lastIdTest', 60) AS l"))!.toA()[0] as {
+      l: unknown;
+    };
+    if (lock.l !== 1) throw new Error("could not acquire the lastIdTest lock");
+  });
+  afterEach(async () => {
+    if (!state.client.isClosed()) await state.client.query("SELECT RELEASE_LOCK('lastIdTest')");
+  });
+}
