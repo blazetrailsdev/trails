@@ -1,0 +1,667 @@
+{
+  "version": 1,
+  "method": "dry-run",
+  "date": "2026-11-22",
+  "source": "rails",
+  "from": {
+    "ref": "v8.0.2",
+    "sha": "3235827585d87661942c91bc81f64f56d710f0b2"
+  },
+  "to": {
+    "ref": "v8.0.5.2",
+    "sha": "235c597b100321b6bd2d62f8df63707f42b25b2d"
+  },
+  "trailsCommit": "c815af991f93b024341127e4b15d03374e1e10e9",
+  "packages": [
+    {
+      "package": "arel",
+      "filesChanged": 9,
+      "linesAdded": 31,
+      "linesRemoved": 9,
+      "pinsDrift": 20,
+      "pinsStale": 0,
+      "rubyFiles": 11,
+      "unpinnedChanged": 0,
+      "methodsBefore": "1052/1052",
+      "methodsAfter": "1052/1058",
+      "testsBefore": 730,
+      "testsAfter": 730,
+      "testsAdded": 0,
+      "testsRemoved": 0,
+      "testsChanged": 0,
+      "testsMoved": 0
+    },
+    {
+      "package": "activerecord",
+      "filesChanged": 56,
+      "linesAdded": 464,
+      "linesRemoved": 272,
+      "pinsDrift": 69,
+      "pinsStale": 0,
+      "rubyFiles": 35,
+      "unpinnedChanged": 0,
+      "methodsBefore": "6966/6966",
+      "methodsAfter": "6968/6979",
+      "testsBefore": 9141,
+      "testsAfter": 9183,
+      "testsAdded": 43,
+      "testsRemoved": 1,
+      "testsChanged": 10,
+      "testsMoved": 0
+    },
+    {
+      "package": "activerecord-test-support",
+      "filesChanged": 1,
+      "linesAdded": 1,
+      "linesRemoved": 1,
+      "pinsDrift": 0,
+      "pinsStale": 0,
+      "rubyFiles": 0,
+      "unpinnedChanged": 0,
+      "methodsBefore": "43/58",
+      "methodsAfter": "43/58",
+      "testsBefore": null,
+      "testsAfter": null,
+      "testsAdded": null,
+      "testsRemoved": null,
+      "testsChanged": null,
+      "testsMoved": null
+    },
+    {
+      "package": "activemodel",
+      "filesChanged": 5,
+      "linesAdded": 19,
+      "linesRemoved": 17,
+      "pinsDrift": 1,
+      "pinsStale": 0,
+      "rubyFiles": 1,
+      "unpinnedChanged": 0,
+      "methodsBefore": "821/821",
+      "methodsAfter": "821/821",
+      "testsBefore": 1041,
+      "testsAfter": 1043,
+      "testsAdded": 2,
+      "testsRemoved": 0,
+      "testsChanged": 0,
+      "testsMoved": 0
+    },
+    {
+      "package": "activesupport",
+      "filesChanged": 40,
+      "linesAdded": 286,
+      "linesRemoved": 213,
+      "pinsDrift": 33,
+      "pinsStale": 13,
+      "rubyFiles": 17,
+      "unpinnedChanged": 0,
+      "methodsBefore": "2313/2341",
+      "methodsAfter": "2300/2331",
+      "testsBefore": 4245,
+      "testsAfter": 4273,
+      "testsAdded": 31,
+      "testsRemoved": 3,
+      "testsChanged": 9,
+      "testsMoved": 0
+    },
+    {
+      "package": "actiondispatch",
+      "filesChanged": 18,
+      "linesAdded": 170,
+      "linesRemoved": 56,
+      "pinsDrift": 21,
+      "pinsStale": 1,
+      "rubyFiles": 14,
+      "unpinnedChanged": 0,
+      "methodsBefore": "1803/1809",
+      "methodsAfter": "1803/1816",
+      "testsBefore": 1670,
+      "testsAfter": 1687,
+      "testsAdded": 20,
+      "testsRemoved": 3,
+      "testsChanged": 2,
+      "testsMoved": 0
+    },
+    {
+      "package": "actioncontroller",
+      "filesChanged": 6,
+      "linesAdded": 85,
+      "linesRemoved": 25,
+      "pinsDrift": 9,
+      "pinsStale": 0,
+      "rubyFiles": 5,
+      "unpinnedChanged": 0,
+      "methodsBefore": "854/854",
+      "methodsAfter": "854/859",
+      "testsBefore": 1946,
+      "testsAfter": 1962,
+      "testsAdded": 18,
+      "testsRemoved": 2,
+      "testsChanged": 10,
+      "testsMoved": 0
+    },
+    {
+      "package": "abstractcontroller",
+      "filesChanged": 3,
+      "linesAdded": 3,
+      "linesRemoved": 14,
+      "pinsDrift": 0,
+      "pinsStale": 0,
+      "rubyFiles": 0,
+      "unpinnedChanged": 0,
+      "methodsBefore": "178/178",
+      "methodsAfter": "178/178",
+      "testsBefore": 52,
+      "testsAfter": 52,
+      "testsAdded": 0,
+      "testsRemoved": 0,
+      "testsChanged": 0,
+      "testsMoved": 0
+    },
+    {
+      "package": "actionpackversion",
+      "filesChanged": 1,
+      "linesAdded": 2,
+      "linesRemoved": 2,
+      "pinsDrift": 0,
+      "pinsStale": 0,
+      "rubyFiles": 0,
+      "unpinnedChanged": 0,
+      "methodsBefore": "2/2",
+      "methodsAfter": "2/2",
+      "testsBefore": null,
+      "testsAfter": null,
+      "testsAdded": null,
+      "testsRemoved": null,
+      "testsChanged": null,
+      "testsMoved": null
+    },
+    {
+      "package": "actionview",
+      "filesChanged": 24,
+      "linesAdded": 134,
+      "linesRemoved": 63,
+      "pinsDrift": 34,
+      "pinsStale": 2,
+      "rubyFiles": 21,
+      "unpinnedChanged": 0,
+      "methodsBefore": "3065/3065",
+      "methodsAfter": "3065/3069",
+      "testsBefore": 2579,
+      "testsAfter": 2613,
+      "testsAdded": 34,
+      "testsRemoved": 0,
+      "testsChanged": 1,
+      "testsMoved": 0
+    },
+    {
+      "package": "actioncable",
+      "filesChanged": 4,
+      "linesAdded": 18,
+      "linesRemoved": 5,
+      "pinsDrift": 4,
+      "pinsStale": 0,
+      "rubyFiles": 3,
+      "unpinnedChanged": 0,
+      "methodsBefore": "496/496",
+      "methodsAfter": "497/497",
+      "testsBefore": 216,
+      "testsAfter": 218,
+      "testsAdded": 2,
+      "testsRemoved": 0,
+      "testsChanged": 0,
+      "testsMoved": 0
+    },
+    {
+      "package": "activejob",
+      "filesChanged": 5,
+      "linesAdded": 17,
+      "linesRemoved": 12,
+      "pinsDrift": 4,
+      "pinsStale": 1,
+      "rubyFiles": 4,
+      "unpinnedChanged": 0,
+      "methodsBefore": "369/369",
+      "methodsAfter": "368/370",
+      "testsBefore": 416,
+      "testsAfter": 421,
+      "testsAdded": 5,
+      "testsRemoved": 0,
+      "testsChanged": 1,
+      "testsMoved": 0
+    },
+    {
+      "package": "actionmailer",
+      "filesChanged": 1,
+      "linesAdded": 2,
+      "linesRemoved": 2,
+      "pinsDrift": 0,
+      "pinsStale": 0,
+      "rubyFiles": 0,
+      "unpinnedChanged": 0,
+      "methodsBefore": "229/229",
+      "methodsAfter": "229/229",
+      "testsBefore": 255,
+      "testsAfter": 255,
+      "testsAdded": 0,
+      "testsRemoved": 0,
+      "testsChanged": 0,
+      "testsMoved": 0
+    },
+    {
+      "package": "activestorage",
+      "filesChanged": 16,
+      "linesAdded": 287,
+      "linesRemoved": 33,
+      "pinsDrift": 22,
+      "pinsStale": 0,
+      "rubyFiles": 11,
+      "unpinnedChanged": 0,
+      "methodsBefore": "631/631",
+      "methodsAfter": "631/655",
+      "testsBefore": 491,
+      "testsAfter": 568,
+      "testsAdded": 81,
+      "testsRemoved": 4,
+      "testsChanged": 4,
+      "testsMoved": 0
+    },
+    {
+      "package": "actionmailbox",
+      "filesChanged": 2,
+      "linesAdded": 3,
+      "linesRemoved": 3,
+      "pinsDrift": 5,
+      "pinsStale": 0,
+      "rubyFiles": 5,
+      "unpinnedChanged": 0,
+      "methodsBefore": "174/174",
+      "methodsAfter": "174/174",
+      "testsBefore": 105,
+      "testsAfter": 107,
+      "testsAdded": 2,
+      "testsRemoved": 0,
+      "testsChanged": 2,
+      "testsMoved": 0
+    },
+    {
+      "package": "actiontext",
+      "filesChanged": 2,
+      "linesAdded": 4,
+      "linesRemoved": 4,
+      "pinsDrift": 1,
+      "pinsStale": 0,
+      "rubyFiles": 1,
+      "unpinnedChanged": 0,
+      "methodsBefore": "245/245",
+      "methodsAfter": "245/245",
+      "testsBefore": 117,
+      "testsAfter": 117,
+      "testsAdded": 0,
+      "testsRemoved": 0,
+      "testsChanged": 2,
+      "testsMoved": 0
+    },
+    {
+      "package": "trailties",
+      "filesChanged": 27,
+      "linesAdded": 146,
+      "linesRemoved": 78,
+      "pinsDrift": 12,
+      "pinsStale": 2,
+      "rubyFiles": 9,
+      "unpinnedChanged": 0,
+      "methodsBefore": "1754/1761",
+      "methodsAfter": "1753/1769",
+      "testsBefore": 2417,
+      "testsAfter": 2438,
+      "testsAdded": 22,
+      "testsRemoved": 1,
+      "testsChanged": 5,
+      "testsMoved": 0
+    }
+  ],
+  "gates": [
+    {
+      "gate": "API comparison",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "Ruby defs: 843  —  own row 775 (91.9%)  |  excluded file 0  |  rowless file 0  |  global skip 0  |  scoped skip 0  |  operator 29  |  same-name collapse 39  |  predicate kind mismatches 0 / errors.rb                                               errors.ts                                     1      0         0      1 100% ✓ / Ruby defs: 6121  —  own row 5594 (91.4%)  |  excluded file 45  |  rowless",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "API comparison (privates)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "Ruby defs: 843  —  own row 775 (91.9%)  |  excluded file 0  |  rowless file 0  |  global skip 0  |  scoped skip 0  |  operator 29  |  same-name collapse 39  |  predicate kind mismatches 0 / errors.rb                                               errors.ts                                     1      0         0      1 100% ✓ / Ruby defs: 6121  —  own row 5594 (91.4%)  |  excluded file 45  |  rowless",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Extra-surface tag gates",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "nokogiri                  22     102      96     198      25       5      35 / 1     69      1  nokogiri         xml/parse-options.ts / 17     10      0  activerecord-test-support run-token.ts / 28      7      1  nokogiri         xml/node/save-options.ts",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Body-pins gate",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "green",
+      "summary": "body-pins gate: 235 DRIFTED pin(s) — the vendored Rails body changed. / ~ actiondispatch  middleware/cookies.rb:[]=  pinned 290459d2572e5308 → current bbff996b91d8d249 / ~ actiondispatch  middleware/cookies.rb:write  pinned 6cbaa01b199bdbd8 → current 9888fe155d60d788 / ~ actiondispatch  middleware/session/cookie_store.rb:initialize  pinned e05f3b83d640269b → current d93487786849c92b",
+      "ledgeredSummary": "body-pins gate: 254 ledger row(s) — drifted or removed by a ref bump, tracked in scripts/parity/bump-ledger/: / body-pins gate: OK (14386 pinned)"
+    },
+    {
+      "gate": "API comparison (calls)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "Ruby defs: 843  —  own row 775 (91.9%)  |  excluded file 0  |  rowless file 0  |  global skip 0  |  scoped skip 0  |  operator 29  |  same-name collapse 39  |  predicate kind mismatches 0 / errors.rb                                               errors.ts                                     1      0         0      1 100% ✓ / Ruby defs: 6121  —  own row 5594 (91.4%)  |  excluded file 45  |  rowless",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Call-mismatches ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "green",
+      "summary": "call-mismatches ratchet: skipped 0 row(s) on a bump-ledgered pair / call-mismatches ratchet: 28 NEW mismatch(es) not in the baseline.",
+      "ledgeredSummary": "call-mismatches ratchet: skipped 34 row(s) on a bump-ledgered pair / call-mismatches ratchet: OK (26 baselined, 8 unreviewed, 7 per-file mark(s) totalling 8 tight)"
+    },
+    {
+      "gate": "Call-argument ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "green",
+      "summary": "call-args ratchet: skipped 0 row(s) on a bump-ledgered pair / call-args naming gate: 7 failure(s) in the AR closure / NAMING_ENROLLED_PACKAGES. / call-args ratchet: 17 NEW call-argument mismatch(es).",
+      "ledgeredSummary": "call-args ratchet: skipped 49 row(s) on a bump-ledgered pair / call-args ratchet: OK (26 baselined shape row(s); naming gated in abstractcontroller, actioncable, actioncontroller, activemodel, activerecord, activerecord-test-support, activesupport, arel, bcrypt, builder, chronic, date, did-you-mean, et-orbi, fugit, globalid, i18n, marcel, mini-magick, raabro, rack, rack-session, rack-test, rails-d"
+    },
+    {
+      "gate": "Receipt audit (activerecord)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "receipt-audit: skipped 0 row(s) on a bump-ledgered pair",
+      "ledgeredSummary": "receipt-audit: skipped 0 row(s) on a bump-ledgered pair"
+    },
+    {
+      "gate": "Receipt audit (activemodel)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "receipt-audit: skipped 0 row(s) on a bump-ledgered pair",
+      "ledgeredSummary": "receipt-audit: skipped 0 row(s) on a bump-ledgered pair"
+    },
+    {
+      "gate": "Ruby-compat call ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "ruby-compat call ratchet: skipped 0 row(s) on a bump-ledgered pair / ruby-compat call ratchet: OK (62 enrolled package(s), 1 baselined row(s))",
+      "ledgeredSummary": "ruby-compat call ratchet: skipped 0 row(s) on a bump-ledgered pair / ruby-compat call ratchet: OK (62 enrolled package(s), 1 baselined row(s))"
+    },
+    {
+      "gate": "Arm-parity report",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "call-skeleton arms report: 1741 mismatched pair(s) across 699 file(s), 15221 pair(s) compared — report-only, nothing gates on this (RFC 0113) / short-circuit projection: 2243 mismatched pair(s) over the `or` / `and` tokens, which the arm verdicts above do not read / nokogiri                      19 / activerecord/associations/errors.ts                     12",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Missing-throw arm ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "red",
+      "summary": "arm-throw gate: skipped 0 row(s) on a bump-ledgered pair / arm-throw gate: 4 dimension(s) GREW past the committed mark. / in 10 (RFC 0113's stratified noise floor). Raise the same error class, with the",
+      "ledgeredSummary": "arm-throw gate: skipped 3 row(s) on a bump-ledgered pair / arm-throw gate: 2 dimension(s) GREW past the committed mark. / in 10 (RFC 0113's stratified noise floor). Raise the same error class, with the"
+    },
+    {
+      "gate": "Extra-surface ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "red",
+      "summary": "extra-surface gate: skipped 0 row(s) on a bump-ledgered pair",
+      "ledgeredSummary": "extra-surface gate: skipped 9 row(s) on a bump-ledgered pair"
+    },
+    {
+      "gate": "Parameter-name ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "green",
+      "summary": "param-name gate: skipped 0 row(s) on a bump-ledgered pair",
+      "ledgeredSummary": "param-name gate: skipped 3 row(s) on a bump-ledgered pair / param-name gate: OK (abstractcontroller 0/0; actioncable 0/0; actioncontroller 0/0; actiondispatch 0/0; actionview 0/0; activemodel 0/0; activerecord 0/0; activesupport 0/0; arel 0/0; bcrypt 0/0; builder 0/0; chronic 0/0; did-you-mean 0/0; et-orbi 0/0; raabro 0/0; zeitwerk 0/0; fugit 0/0; globalid 0/0; marcel 0/0; mini-magick 0/0; rack 0/"
+    },
+    {
+      "gate": "Block-parameter ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "green",
+      "summary": "block-param gate: skipped 0 row(s) on a bump-ledgered pair",
+      "ledgeredSummary": "block-param gate: skipped 7 row(s) on a bump-ledgered pair / block-param gate: OK (11 dropped block arm(s) under the mark)"
+    },
+    {
+      "gate": "Predicate-kind ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "predicate-kind gate: OK",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Inlined-from staleness gate",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "summary": "inlined-from gate: 1 finding(s). A stale citation is rewritten by `pnpm parity:api:inlined:fix`; every other one is fixed at the tagged member.",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Class-path table gate",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Ambiguous-parent ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "ambiguous-parent gate: OK",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Deprecation manifest up to date",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "eslint/rails-deprecated-methods.json is up to date.",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Dependency lint",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "2 ref mismatches (uses arel but different types):",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Test comparison (TS extract)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "nokogiri: 18 files, 195 tests",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Test comparison",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "green",
+      "summary": "test-compare: skipped 1 mismatch row(s) on a bump-ledgered test / activerecord  —  8981/9028 tests (82 permanent) (99.5%) (4 skipped, 1 gate-mismatch, 2 assertion-count-mismatch (see --assertions), 2 assertion-kind-mismatch (see --assertions), 4 assertion-value-mismatch (see --assertions), 9 extra (TS only))  |  361/361 files  |  0 misplaced / token_for_test.rb                             token-fo",
+      "ledgeredSummary": "test-compare: skipped 42 mismatch row(s) on a bump-ledgered test / token_for_test.rb                             token-for.test.ts                               18    0    0    0    0     0   18 ✓ / connection_adapters/type_lookup_test.rb       connection-adapters/type-lookup.test.ts         12    0    0    0    0     0   12 ✓ / secure_token_test.rb                          secure-token.test.ts   "
+    },
+    {
+      "gate": "Assertion-mismatch ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "red",
+      "summary": "assertion-mismatch ratchet: comparing against ed4d9858d2b8ef0477f8b9b557120dd0ce2a7827. / actioncontroller  assertion-count-mismatch: 7 (base 0, +7) / actioncontroller  assertion-kind-mismatch: 1 (base 0, +1) / actioncontroller  assertion-value-mismatch: 1 (base 0, +1)",
+      "ledgeredSummary": "assertion-mismatch ratchet: comparing against ed4d9858d2b8ef0477f8b9b557120dd0ce2a7827. / activesupport  assertion-value-mismatch: 1 (base 0, +1)"
+    },
+    {
+      "gate": "AR-closure test manifest guard",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "",
+      "ledgeredSummary": null
+    }
+  ],
+  "seed": [
+    {
+      "package": "actioncable",
+      "kind": "constant",
+      "rows": 1
+    },
+    {
+      "package": "actioncable",
+      "kind": "drift",
+      "rows": 4
+    },
+    {
+      "package": "actioncontroller",
+      "kind": "changed",
+      "rows": 8
+    },
+    {
+      "package": "actioncontroller",
+      "kind": "drift",
+      "rows": 9
+    },
+    {
+      "package": "actiondispatch",
+      "kind": "changed",
+      "rows": 2
+    },
+    {
+      "package": "actiondispatch",
+      "kind": "drift",
+      "rows": 21
+    },
+    {
+      "package": "actiondispatch",
+      "kind": "removed",
+      "rows": 1
+    },
+    {
+      "package": "actionmailbox",
+      "kind": "drift",
+      "rows": 5
+    },
+    {
+      "package": "actiontext",
+      "kind": "changed",
+      "rows": 2
+    },
+    {
+      "package": "actiontext",
+      "kind": "drift",
+      "rows": 1
+    },
+    {
+      "package": "actionview",
+      "kind": "changed",
+      "rows": 1
+    },
+    {
+      "package": "actionview",
+      "kind": "drift",
+      "rows": 34
+    },
+    {
+      "package": "actionview",
+      "kind": "removed",
+      "rows": 2
+    },
+    {
+      "package": "activejob",
+      "kind": "drift",
+      "rows": 4
+    },
+    {
+      "package": "activejob",
+      "kind": "removed",
+      "rows": 1
+    },
+    {
+      "package": "activemodel",
+      "kind": "drift",
+      "rows": 1
+    },
+    {
+      "package": "activerecord",
+      "kind": "changed",
+      "rows": 7
+    },
+    {
+      "package": "activerecord",
+      "kind": "drift",
+      "rows": 69
+    },
+    {
+      "package": "activerecord",
+      "kind": "signature",
+      "rows": 1
+    },
+    {
+      "package": "activestorage",
+      "kind": "changed",
+      "rows": 1
+    },
+    {
+      "package": "activestorage",
+      "kind": "drift",
+      "rows": 22
+    },
+    {
+      "package": "activesupport",
+      "kind": "changed",
+      "rows": 9
+    },
+    {
+      "package": "activesupport",
+      "kind": "drift",
+      "rows": 33
+    },
+    {
+      "package": "activesupport",
+      "kind": "removed",
+      "rows": 13
+    },
+    {
+      "package": "activesupport",
+      "kind": "signature",
+      "rows": 2
+    },
+    {
+      "package": "arel",
+      "kind": "drift",
+      "rows": 20
+    },
+    {
+      "package": "trailties",
+      "kind": "drift",
+      "rows": 12
+    },
+    {
+      "package": "trailties",
+      "kind": "removed",
+      "rows": 2
+    }
+  ]
+}
