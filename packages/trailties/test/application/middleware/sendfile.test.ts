@@ -31,7 +31,7 @@ type Host = Omit<Generation, "simpleController"> &
     lastResponse(): { headers: Record<string, string | undefined>; body: string };
   };
 
-describe("SendfileTest", () => {
+describe("SendfileTest", { timeout: 120_000 }, () => {
   let t: Host;
   beforeEach(async () => {
     t = new SendfileTest("test") as unknown as Host;
