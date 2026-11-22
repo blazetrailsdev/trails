@@ -1016,7 +1016,13 @@ export async function aryReject<T>(ary: readonly T[], block: (item: T) => unknow
  */
 export function each<R extends object>(
   recv: R,
-  block?: (item: R extends Iterable<infer T> ? T : [string, unknown]) => unknown,
+  block?: (
+    item: R extends Iterable<infer T>
+      ? T
+      : R extends { each(block: (item: infer U) => unknown): unknown }
+        ? U
+        : [string, unknown],
+  ) => unknown,
 ): R {
   if (!block) return recv;
   const yielder = block as (item: unknown) => unknown;

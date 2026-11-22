@@ -1,7 +1,9 @@
-import { Digest, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Digest, each, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 type Part = string | Uint8Array;
-type Body = Iterable<Part> & { close?: () => unknown };
+type Body = (Iterable<Part> | { each(block: (part: Part) => unknown): unknown }) & {
+  close?: () => unknown;
+};
 
 export class EntityStore {
   static Heap: typeof Heap;
@@ -14,11 +16,11 @@ export class EntityStore {
   protected slurp(body: Body, block: (part: Part) => unknown): [string, number] {
     const digest = Digest.SHA1.new();
     let size = 0;
-    for (const part of body) {
+    each(body, (part) => {
       size += this.bytesize(part);
       digest.update(part);
       block(part);
-    }
+    });
     if (rbObjRespondTo(body, "close")) body.close!();
     return [digest.hexdigest(), size];
   }
