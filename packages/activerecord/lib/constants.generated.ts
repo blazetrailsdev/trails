@@ -141,87 +141,86 @@ import * as m138 from "./migration/default-strategy.js";
 import * as m139 from "./migration/execution-strategy.js";
 import * as m140 from "./migration/pending-migration-connection.js";
 import * as m141 from "./model-schema.js";
-import * as m142 from "./namespaces.js";
-import * as m143 from "./nested-attributes.js";
-import * as m144 from "./no-touching.js";
-import * as m145 from "./normalization.js";
-import * as m146 from "./persistence.js";
-import * as m147 from "./query-cache.js";
-import * as m148 from "./query-logs-formatter.js";
-import * as m149 from "./query-logs.js";
-import * as m150 from "./querying.js";
-import * as m151 from "./readonly-attributes.js";
-import * as m152 from "./reflection.js";
-import * as m153 from "./relation.js";
-import * as m154 from "./relation/batches.js";
-import * as m155 from "./relation/batches/batch-enumerator.js";
-import * as m156 from "./relation/calculations.js";
-import * as m157 from "./relation/delegation.js";
-import * as m158 from "./relation/finder-methods.js";
-import * as m159 from "./relation/from-clause.js";
-import * as m160 from "./relation/merger.js";
-import * as m161 from "./relation/predicate-builder.js";
-import * as m162 from "./relation/predicate-builder/array-handler.js";
-import * as m163 from "./relation/predicate-builder/association-query-value.js";
-import * as m164 from "./relation/predicate-builder/basic-object-handler.js";
-import * as m165 from "./relation/predicate-builder/polymorphic-array-value.js";
-import * as m166 from "./relation/predicate-builder/range-handler.js";
-import * as m167 from "./relation/predicate-builder/relation-handler.js";
-import * as m168 from "./relation/query-attribute.js";
-import * as m169 from "./relation/query-methods.js";
-import * as m170 from "./relation/spawn-methods.js";
-import * as m171 from "./relation/where-clause.js";
-import * as m172 from "./result.js";
-import * as m173 from "./runtime-registry.js";
-import * as m174 from "./sanitization.js";
-import * as m175 from "./schema-dumper.js";
-import * as m176 from "./schema-migration.js";
-import * as m177 from "./schema.js";
-import * as m178 from "./scoping.js";
-import * as m179 from "./scoping/default.js";
-import * as m180 from "./scoping/named.js";
-import * as m181 from "./secure-password.js";
-import * as m182 from "./secure-token.js";
-import * as m183 from "./serialization.js";
-import * as m184 from "./signed-id.js";
-import * as m185 from "./statement-cache.js";
-import * as m186 from "./store.js";
-import * as m187 from "./suppressor.js";
-import * as m188 from "./table-metadata.js";
-import * as m189 from "./tasks/database-tasks.js";
-import * as m190 from "./tasks/mysql-database-tasks.js";
-import * as m191 from "./tasks/postgresql-database-tasks.js";
-import * as m192 from "./tasks/sqlite-database-tasks.js";
-import * as m193 from "./timestamp.js";
-import * as m194 from "./token-for.js";
-import * as m195 from "./touch-later.js";
-import * as m196 from "./trailties/controller-runtime.js";
-import * as m197 from "./trailties/job-runtime.js";
-import * as m198 from "./transaction.js";
-import * as m199 from "./transactions.js";
-import * as m200 from "./translation.js";
-import * as m201 from "./type-caster/connection.js";
-import * as m202 from "./type-caster/map.js";
-import * as m203 from "./type.js";
-import * as m204 from "./type/adapter-specific-registry.js";
-import * as m205 from "./type/date-time.js";
-import * as m206 from "./type/date.js";
-import * as m207 from "./type/decimal-without-scale.js";
-import * as m208 from "./type/hash-lookup-type-map.js";
-import * as m209 from "./type/internal/timezone.js";
-import * as m210 from "./type/json.js";
-import * as m211 from "./type/serialized.js";
-import * as m212 from "./type/text.js";
-import * as m213 from "./type/time.js";
-import * as m214 from "./type/type-map.js";
-import * as m215 from "./type/unsigned-integer.js";
-import * as m216 from "./validations.js";
-import * as m217 from "./validations/absence.js";
-import * as m218 from "./validations/associated.js";
-import * as m219 from "./validations/length.js";
-import * as m220 from "./validations/numericality.js";
-import * as m221 from "./validations/presence.js";
-import * as m222 from "./validations/uniqueness.js";
+import * as m142 from "./nested-attributes.js";
+import * as m143 from "./no-touching.js";
+import * as m144 from "./normalization.js";
+import * as m145 from "./persistence.js";
+import * as m146 from "./query-cache.js";
+import * as m147 from "./query-logs-formatter.js";
+import * as m148 from "./query-logs.js";
+import * as m149 from "./querying.js";
+import * as m150 from "./readonly-attributes.js";
+import * as m151 from "./reflection.js";
+import * as m152 from "./relation.js";
+import * as m153 from "./relation/batches.js";
+import * as m154 from "./relation/batches/batch-enumerator.js";
+import * as m155 from "./relation/calculations.js";
+import * as m156 from "./relation/delegation.js";
+import * as m157 from "./relation/finder-methods.js";
+import * as m158 from "./relation/from-clause.js";
+import * as m159 from "./relation/merger.js";
+import * as m160 from "./relation/predicate-builder.js";
+import * as m161 from "./relation/predicate-builder/array-handler.js";
+import * as m162 from "./relation/predicate-builder/association-query-value.js";
+import * as m163 from "./relation/predicate-builder/basic-object-handler.js";
+import * as m164 from "./relation/predicate-builder/polymorphic-array-value.js";
+import * as m165 from "./relation/predicate-builder/range-handler.js";
+import * as m166 from "./relation/predicate-builder/relation-handler.js";
+import * as m167 from "./relation/query-attribute.js";
+import * as m168 from "./relation/query-methods.js";
+import * as m169 from "./relation/spawn-methods.js";
+import * as m170 from "./relation/where-clause.js";
+import * as m171 from "./result.js";
+import * as m172 from "./runtime-registry.js";
+import * as m173 from "./sanitization.js";
+import * as m174 from "./schema-dumper.js";
+import * as m175 from "./schema-migration.js";
+import * as m176 from "./schema.js";
+import * as m177 from "./scoping.js";
+import * as m178 from "./scoping/default.js";
+import * as m179 from "./scoping/named.js";
+import * as m180 from "./secure-password.js";
+import * as m181 from "./secure-token.js";
+import * as m182 from "./serialization.js";
+import * as m183 from "./signed-id.js";
+import * as m184 from "./statement-cache.js";
+import * as m185 from "./store.js";
+import * as m186 from "./suppressor.js";
+import * as m187 from "./table-metadata.js";
+import * as m188 from "./tasks/database-tasks.js";
+import * as m189 from "./tasks/mysql-database-tasks.js";
+import * as m190 from "./tasks/postgresql-database-tasks.js";
+import * as m191 from "./tasks/sqlite-database-tasks.js";
+import * as m192 from "./timestamp.js";
+import * as m193 from "./token-for.js";
+import * as m194 from "./touch-later.js";
+import * as m195 from "./trailties/controller-runtime.js";
+import * as m196 from "./trailties/job-runtime.js";
+import * as m197 from "./transaction.js";
+import * as m198 from "./transactions.js";
+import * as m199 from "./translation.js";
+import * as m200 from "./type-caster/connection.js";
+import * as m201 from "./type-caster/map.js";
+import * as m202 from "./type.js";
+import * as m203 from "./type/adapter-specific-registry.js";
+import * as m204 from "./type/date-time.js";
+import * as m205 from "./type/date.js";
+import * as m206 from "./type/decimal-without-scale.js";
+import * as m207 from "./type/hash-lookup-type-map.js";
+import * as m208 from "./type/internal/timezone.js";
+import * as m209 from "./type/json.js";
+import * as m210 from "./type/serialized.js";
+import * as m211 from "./type/text.js";
+import * as m212 from "./type/time.js";
+import * as m213 from "./type/type-map.js";
+import * as m214 from "./type/unsigned-integer.js";
+import * as m215 from "./validations.js";
+import * as m216 from "./validations/absence.js";
+import * as m217 from "./validations/associated.js";
+import * as m218 from "./validations/length.js";
+import * as m219 from "./validations/numericality.js";
+import * as m220 from "./validations/presence.js";
+import * as m221 from "./validations/uniqueness.js";
 
 defineConstants([
   [m116, "ActiveRecordError", "ActiveRecord::ActiveRecordError"],
@@ -317,13 +316,12 @@ defineConstants([
   [m48, "Attributes", "ActiveRecord::Attributes"],
   [m49, "AutosaveAssociation", "ActiveRecord::AutosaveAssociation"],
   [m50, "Base", "ActiveRecord::Base"],
-  [m154, "Batches", "ActiveRecord::Batches"],
-  [m155, "BatchEnumerator", "ActiveRecord::Batches::BatchEnumerator"],
-  [m156, "Calculations", "ActiveRecord::Calculations"],
-  [m156, "ColumnAliasTracker", "ActiveRecord::Calculations::ColumnAliasTracker"],
+  [m153, "Batches", "ActiveRecord::Batches"],
+  [m154, "BatchEnumerator", "ActiveRecord::Batches::BatchEnumerator"],
+  [m155, "Calculations", "ActiveRecord::Calculations"],
+  [m155, "ColumnAliasTracker", "ActiveRecord::Calculations::ColumnAliasTracker"],
   [m51, "Callbacks", "ActiveRecord::Callbacks"],
   [m51, "ClassMethods", "ActiveRecord::Callbacks::ClassMethods"],
-  [m157, "ClassMethods", "ActiveRecord::ClassMethods"],
   [m52, "ColumnSerializer", "ActiveRecord::Coders::ColumnSerializer"],
   [m53, "JSON", "ActiveRecord::Coders::JSON"],
   [m54, "YAMLColumn", "ActiveRecord::Coders::YAMLColumn"],
@@ -453,10 +451,10 @@ defineConstants([
   [m116, "DatabaseConnectionError", "ActiveRecord::DatabaseConnectionError"],
   [m116, "DatabaseVersionError", "ActiveRecord::DatabaseVersionError"],
   [m116, "Deadlocked", "ActiveRecord::Deadlocked"],
-  [m157, "Delegation", "ActiveRecord::Delegation"],
-  [m157, "ClassSpecificRelation", "ActiveRecord::Delegation::ClassSpecificRelation"],
-  [m157, "DelegateCache", "ActiveRecord::Delegation::DelegateCache"],
-  [m157, "GeneratedRelationMethods", "ActiveRecord::Delegation::GeneratedRelationMethods"],
+  [m156, "Delegation", "ActiveRecord::Delegation"],
+  [m156, "ClassSpecificRelation", "ActiveRecord::Delegation::ClassSpecificRelation"],
+  [m156, "DelegateCache", "ActiveRecord::Delegation::DelegateCache"],
+  [m156, "GeneratedRelationMethods", "ActiveRecord::Delegation::GeneratedRelationMethods"],
   [m18, "DeleteRestrictionError", "ActiveRecord::DeleteRestrictionError"],
   [m89, "DisableJoinsAssociationRelation", "ActiveRecord::DisableJoinsAssociationRelation"],
   [m135, "DuplicateMigrationNameError", "ActiveRecord::DuplicateMigrationNameError"],
@@ -519,7 +517,7 @@ defineConstants([
   [m119, "Explain", "ActiveRecord::Explain"],
   [m117, "ExplainRegistry", "ActiveRecord::ExplainRegistry"],
   [m118, "ExplainSubscriber", "ActiveRecord::ExplainSubscriber"],
-  [m158, "FinderMethods", "ActiveRecord::FinderMethods"],
+  [m157, "FinderMethods", "ActiveRecord::FinderMethods"],
   [m120, "FutureResult", "ActiveRecord::FutureResult"],
   [m120, "Canceled", "ActiveRecord::FutureResult::Canceled"],
   [m120, "Complete", "ActiveRecord::FutureResult::Complete"],
@@ -642,136 +640,136 @@ defineConstants([
   [m141, "ModelSchema", "ActiveRecord::ModelSchema"],
   [m141, "ClassMethods", "ActiveRecord::ModelSchema::ClassMethods"],
   [m116, "MultiparameterAssignmentErrors", "ActiveRecord::MultiparameterAssignmentErrors"],
-  [m143, "NestedAttributes", "ActiveRecord::NestedAttributes"],
-  [m143, "TooManyRecords", "ActiveRecord::NestedAttributes::TooManyRecords"],
+  [m142, "NestedAttributes", "ActiveRecord::NestedAttributes"],
+  [m142, "TooManyRecords", "ActiveRecord::NestedAttributes::TooManyRecords"],
   [m116, "NoDatabaseError", "ActiveRecord::NoDatabaseError"],
   [m135, "NoEnvironmentInSchemaError", "ActiveRecord::NoEnvironmentInSchemaError"],
-  [m145, "Normalization", "ActiveRecord::Normalization"],
-  [m145, "ClassMethods", "ActiveRecord::Normalization::ClassMethods"],
-  [m145, "NormalizedValueType", "ActiveRecord::Normalization::NormalizedValueType"],
+  [m144, "Normalization", "ActiveRecord::Normalization"],
+  [m144, "ClassMethods", "ActiveRecord::Normalization::ClassMethods"],
+  [m144, "NormalizedValueType", "ActiveRecord::Normalization::NormalizedValueType"],
   [m116, "NotNullViolation", "ActiveRecord::NotNullViolation"],
-  [m144, "NoTouching", "ActiveRecord::NoTouching"],
+  [m143, "NoTouching", "ActiveRecord::NoTouching"],
   [m140, "PendingMigrationConnection", "ActiveRecord::PendingMigrationConnection"],
   [m135, "PendingMigrationError", "ActiveRecord::PendingMigrationError"],
-  [m146, "Persistence", "ActiveRecord::Persistence"],
-  [m146, "ClassMethods", "ActiveRecord::Persistence::ClassMethods"],
-  [m161, "PredicateBuilder", "ActiveRecord::PredicateBuilder"],
-  [m162, "ArrayHandler", "ActiveRecord::PredicateBuilder::ArrayHandler"],
-  [m162, "NullPredicate", "ActiveRecord::PredicateBuilder::ArrayHandler::NullPredicate"],
-  [m163, "AssociationQueryValue", "ActiveRecord::PredicateBuilder::AssociationQueryValue"],
-  [m164, "BasicObjectHandler", "ActiveRecord::PredicateBuilder::BasicObjectHandler"],
-  [m165, "PolymorphicArrayValue", "ActiveRecord::PredicateBuilder::PolymorphicArrayValue"],
-  [m166, "RangeHandler", "ActiveRecord::PredicateBuilder::RangeHandler"],
-  [m166, "RangeWithBinds", "ActiveRecord::PredicateBuilder::RangeHandler::RangeWithBinds"],
-  [m167, "RelationHandler", "ActiveRecord::PredicateBuilder::RelationHandler"],
+  [m145, "Persistence", "ActiveRecord::Persistence"],
+  [m145, "ClassMethods", "ActiveRecord::Persistence::ClassMethods"],
+  [m160, "PredicateBuilder", "ActiveRecord::PredicateBuilder"],
+  [m161, "ArrayHandler", "ActiveRecord::PredicateBuilder::ArrayHandler"],
+  [m161, "NullPredicate", "ActiveRecord::PredicateBuilder::ArrayHandler::NullPredicate"],
+  [m162, "AssociationQueryValue", "ActiveRecord::PredicateBuilder::AssociationQueryValue"],
+  [m163, "BasicObjectHandler", "ActiveRecord::PredicateBuilder::BasicObjectHandler"],
+  [m164, "PolymorphicArrayValue", "ActiveRecord::PredicateBuilder::PolymorphicArrayValue"],
+  [m165, "RangeHandler", "ActiveRecord::PredicateBuilder::RangeHandler"],
+  [m165, "RangeWithBinds", "ActiveRecord::PredicateBuilder::RangeHandler::RangeWithBinds"],
+  [m166, "RelationHandler", "ActiveRecord::PredicateBuilder::RelationHandler"],
   [m116, "PreparedStatementCacheExpired", "ActiveRecord::PreparedStatementCacheExpired"],
   [m116, "PreparedStatementInvalid", "ActiveRecord::PreparedStatementInvalid"],
   [m135, "ProtectedEnvironmentError", "ActiveRecord::ProtectedEnvironmentError"],
   [m116, "QueryAborted", "ActiveRecord::QueryAborted"],
-  [m147, "QueryCache", "ActiveRecord::QueryCache"],
-  [m147, "ClassMethods", "ActiveRecord::QueryCache::ClassMethods"],
+  [m146, "QueryCache", "ActiveRecord::QueryCache"],
+  [m146, "ClassMethods", "ActiveRecord::QueryCache::ClassMethods"],
   [m116, "QueryCanceled", "ActiveRecord::QueryCanceled"],
-  [m150, null, "ActiveRecord::Querying"],
-  [m149, "QueryLogs", "ActiveRecord::QueryLogs"],
-  [m149, "GetKeyHandler", "ActiveRecord::QueryLogs::GetKeyHandler"],
-  [m149, "IdentityHandler", "ActiveRecord::QueryLogs::IdentityHandler"],
-  [m148, "LegacyFormatter", "ActiveRecord::QueryLogs::LegacyFormatter"],
-  [m148, "SQLCommenter", "ActiveRecord::QueryLogs::SQLCommenter"],
-  [m149, "ZeroArityHandler", "ActiveRecord::QueryLogs::ZeroArityHandler"],
-  [m169, "QueryMethods", "ActiveRecord::QueryMethods"],
-  [m169, "CTEJoin", "ActiveRecord::QueryMethods::CTEJoin"],
-  [m169, "WhereChain", "ActiveRecord::QueryMethods::WhereChain"],
+  [m149, null, "ActiveRecord::Querying"],
+  [m148, "QueryLogs", "ActiveRecord::QueryLogs"],
+  [m148, "GetKeyHandler", "ActiveRecord::QueryLogs::GetKeyHandler"],
+  [m148, "IdentityHandler", "ActiveRecord::QueryLogs::IdentityHandler"],
+  [m147, "LegacyFormatter", "ActiveRecord::QueryLogs::LegacyFormatter"],
+  [m147, "SQLCommenter", "ActiveRecord::QueryLogs::SQLCommenter"],
+  [m148, "ZeroArityHandler", "ActiveRecord::QueryLogs::ZeroArityHandler"],
+  [m168, "QueryMethods", "ActiveRecord::QueryMethods"],
+  [m168, "CTEJoin", "ActiveRecord::QueryMethods::CTEJoin"],
+  [m168, "WhereChain", "ActiveRecord::QueryMethods::WhereChain"],
   [m116, "RangeError", "ActiveRecord::RangeError"],
-  [m151, "ReadonlyAttributeError", "ActiveRecord::ReadonlyAttributeError"],
-  [m151, "ReadonlyAttributes", "ActiveRecord::ReadonlyAttributes"],
-  [m151, "ClassMethods", "ActiveRecord::ReadonlyAttributes::ClassMethods"],
-  [m151, "HasReadonlyAttributes", "ActiveRecord::ReadonlyAttributes::HasReadonlyAttributes"],
+  [m150, "ReadonlyAttributeError", "ActiveRecord::ReadonlyAttributeError"],
+  [m150, "ReadonlyAttributes", "ActiveRecord::ReadonlyAttributes"],
+  [m150, "ClassMethods", "ActiveRecord::ReadonlyAttributes::ClassMethods"],
+  [m150, "HasReadonlyAttributes", "ActiveRecord::ReadonlyAttributes::HasReadonlyAttributes"],
   [m116, "ReadOnlyError", "ActiveRecord::ReadOnlyError"],
   [m116, "ReadOnlyRecord", "ActiveRecord::ReadOnlyRecord"],
-  [m216, "RecordInvalid", "ActiveRecord::RecordInvalid"],
+  [m215, "RecordInvalid", "ActiveRecord::RecordInvalid"],
   [m116, "RecordNotDestroyed", "ActiveRecord::RecordNotDestroyed"],
   [m116, "RecordNotFound", "ActiveRecord::RecordNotFound"],
   [m116, "RecordNotSaved", "ActiveRecord::RecordNotSaved"],
   [m116, "RecordNotUnique", "ActiveRecord::RecordNotUnique"],
-  [m152, "Reflection", "ActiveRecord::Reflection"],
-  [m152, "AbstractReflection", "ActiveRecord::Reflection::AbstractReflection"],
-  [m152, "AggregateReflection", "ActiveRecord::Reflection::AggregateReflection"],
-  [m152, "AssociationReflection", "ActiveRecord::Reflection::AssociationReflection"],
-  [m152, "BelongsToReflection", "ActiveRecord::Reflection::BelongsToReflection"],
-  [m152, "ClassMethods", "ActiveRecord::Reflection::ClassMethods"],
+  [m151, "Reflection", "ActiveRecord::Reflection"],
+  [m151, "AbstractReflection", "ActiveRecord::Reflection::AbstractReflection"],
+  [m151, "AggregateReflection", "ActiveRecord::Reflection::AggregateReflection"],
+  [m151, "AssociationReflection", "ActiveRecord::Reflection::AssociationReflection"],
+  [m151, "BelongsToReflection", "ActiveRecord::Reflection::BelongsToReflection"],
+  [m151, "ClassMethods", "ActiveRecord::Reflection::ClassMethods"],
   [
-    m152,
+    m151,
     "HasAndBelongsToManyReflection",
     "ActiveRecord::Reflection::HasAndBelongsToManyReflection",
   ],
-  [m152, "HasManyReflection", "ActiveRecord::Reflection::HasManyReflection"],
-  [m152, "HasOneReflection", "ActiveRecord::Reflection::HasOneReflection"],
-  [m152, "MacroReflection", "ActiveRecord::Reflection::MacroReflection"],
-  [m152, "PolymorphicReflection", "ActiveRecord::Reflection::PolymorphicReflection"],
-  [m152, "RuntimeReflection", "ActiveRecord::Reflection::RuntimeReflection"],
-  [m152, "ThroughReflection", "ActiveRecord::Reflection::ThroughReflection"],
-  [m153, "Relation", "ActiveRecord::Relation"],
-  [m153, "ExplainProxy", "ActiveRecord::Relation::ExplainProxy"],
-  [m159, "FromClause", "ActiveRecord::Relation::FromClause"],
-  [m160, "HashMerger", "ActiveRecord::Relation::HashMerger"],
-  [m160, "Merger", "ActiveRecord::Relation::Merger"],
-  [m168, "QueryAttribute", "ActiveRecord::Relation::QueryAttribute"],
-  [m153, "Relation.StrictLoadingScope", "ActiveRecord::Relation::StrictLoadingScope"],
-  [m171, "WhereClause", "ActiveRecord::Relation::WhereClause"],
-  [m172, "Result", "ActiveRecord::Result"],
-  [m172, "IndexedRow", "ActiveRecord::Result::IndexedRow"],
+  [m151, "HasManyReflection", "ActiveRecord::Reflection::HasManyReflection"],
+  [m151, "HasOneReflection", "ActiveRecord::Reflection::HasOneReflection"],
+  [m151, "MacroReflection", "ActiveRecord::Reflection::MacroReflection"],
+  [m151, "PolymorphicReflection", "ActiveRecord::Reflection::PolymorphicReflection"],
+  [m151, "RuntimeReflection", "ActiveRecord::Reflection::RuntimeReflection"],
+  [m151, "ThroughReflection", "ActiveRecord::Reflection::ThroughReflection"],
+  [m152, "Relation", "ActiveRecord::Relation"],
+  [m152, "ExplainProxy", "ActiveRecord::Relation::ExplainProxy"],
+  [m158, "FromClause", "ActiveRecord::Relation::FromClause"],
+  [m159, "HashMerger", "ActiveRecord::Relation::HashMerger"],
+  [m159, "Merger", "ActiveRecord::Relation::Merger"],
+  [m167, "QueryAttribute", "ActiveRecord::Relation::QueryAttribute"],
+  [m152, "Relation.StrictLoadingScope", "ActiveRecord::Relation::StrictLoadingScope"],
+  [m170, "WhereClause", "ActiveRecord::Relation::WhereClause"],
+  [m171, "Result", "ActiveRecord::Result"],
+  [m171, "IndexedRow", "ActiveRecord::Result::IndexedRow"],
   [m116, "Rollback", "ActiveRecord::Rollback"],
-  [m173, null, "ActiveRecord::RuntimeRegistry"],
-  [m174, null, "ActiveRecord::Sanitization"],
-  [m174, "ClassMethods", "ActiveRecord::Sanitization::ClassMethods"],
-  [m177, "Schema", "ActiveRecord::Schema"],
-  [m177, "Definition", "ActiveRecord::Schema::Definition"],
-  [m175, "SchemaDumper", "ActiveRecord::SchemaDumper"],
-  [m176, "SchemaMigration", "ActiveRecord::SchemaMigration"],
-  [m176, "NullSchemaMigration", "ActiveRecord::SchemaMigration::NullSchemaMigration"],
-  [m179, "Default", "ActiveRecord::Scoping::Default"],
-  [m179, "DefaultScope", "ActiveRecord::Scoping::DefaultScope"],
-  [m180, null, "ActiveRecord::Scoping::Named"],
-  [m180, "ClassMethods", "ActiveRecord::Scoping::Named::ClassMethods"],
-  [m178, "ScopeRegistry", "ActiveRecord::Scoping::ScopeRegistry"],
-  [m181, null, "ActiveRecord::SecurePassword"],
-  [m182, null, "ActiveRecord::SecureToken"],
-  [m182, "MinimumLengthError", "ActiveRecord::SecureToken::MinimumLengthError"],
-  [m183, null, "ActiveRecord::Serialization"],
+  [m172, null, "ActiveRecord::RuntimeRegistry"],
+  [m173, null, "ActiveRecord::Sanitization"],
+  [m173, "ClassMethods", "ActiveRecord::Sanitization::ClassMethods"],
+  [m176, "Schema", "ActiveRecord::Schema"],
+  [m176, "Definition", "ActiveRecord::Schema::Definition"],
+  [m174, "SchemaDumper", "ActiveRecord::SchemaDumper"],
+  [m175, "SchemaMigration", "ActiveRecord::SchemaMigration"],
+  [m175, "NullSchemaMigration", "ActiveRecord::SchemaMigration::NullSchemaMigration"],
+  [m178, "Default", "ActiveRecord::Scoping::Default"],
+  [m178, "DefaultScope", "ActiveRecord::Scoping::DefaultScope"],
+  [m179, null, "ActiveRecord::Scoping::Named"],
+  [m179, "ClassMethods", "ActiveRecord::Scoping::Named::ClassMethods"],
+  [m177, "ScopeRegistry", "ActiveRecord::Scoping::ScopeRegistry"],
+  [m180, null, "ActiveRecord::SecurePassword"],
+  [m181, null, "ActiveRecord::SecureToken"],
+  [m181, "MinimumLengthError", "ActiveRecord::SecureToken::MinimumLengthError"],
+  [m182, null, "ActiveRecord::Serialization"],
   [m116, "SerializationFailure", "ActiveRecord::SerializationFailure"],
   [m116, "SerializationTypeMismatch", "ActiveRecord::SerializationTypeMismatch"],
-  [m184, "SignedId", "ActiveRecord::SignedId"],
-  [m184, "ClassMethods", "ActiveRecord::SignedId::ClassMethods"],
-  [m184, "RelationMethods", "ActiveRecord::SignedId::RelationMethods"],
+  [m183, "SignedId", "ActiveRecord::SignedId"],
+  [m183, "ClassMethods", "ActiveRecord::SignedId::ClassMethods"],
+  [m183, "RelationMethods", "ActiveRecord::SignedId::RelationMethods"],
   [m116, "SoleRecordExceeded", "ActiveRecord::SoleRecordExceeded"],
-  [m170, "SpawnMethods", "ActiveRecord::SpawnMethods"],
+  [m169, "SpawnMethods", "ActiveRecord::SpawnMethods"],
   [m116, "SQLWarning", "ActiveRecord::SQLWarning"],
   [m116, "StaleObjectError", "ActiveRecord::StaleObjectError"],
-  [m185, "StatementCache", "ActiveRecord::StatementCache"],
-  [m185, "BindMap", "ActiveRecord::StatementCache::BindMap"],
-  [m185, "Params", "ActiveRecord::StatementCache::Params"],
-  [m185, "PartialQuery", "ActiveRecord::StatementCache::PartialQuery"],
-  [m185, "PartialQueryCollector", "ActiveRecord::StatementCache::PartialQueryCollector"],
-  [m185, "Query", "ActiveRecord::StatementCache::Query"],
-  [m185, "Substitute", "ActiveRecord::StatementCache::Substitute"],
+  [m184, "StatementCache", "ActiveRecord::StatementCache"],
+  [m184, "BindMap", "ActiveRecord::StatementCache::BindMap"],
+  [m184, "Params", "ActiveRecord::StatementCache::Params"],
+  [m184, "PartialQuery", "ActiveRecord::StatementCache::PartialQuery"],
+  [m184, "PartialQueryCollector", "ActiveRecord::StatementCache::PartialQueryCollector"],
+  [m184, "Query", "ActiveRecord::StatementCache::Query"],
+  [m184, "Substitute", "ActiveRecord::StatementCache::Substitute"],
   [m116, "StatementInvalid", "ActiveRecord::StatementInvalid"],
   [m116, "StatementTimeout", "ActiveRecord::StatementTimeout"],
-  [m186, null, "ActiveRecord::Store"],
-  [m186, "ClassMethods", "ActiveRecord::Store::ClassMethods"],
-  [m186, "HashAccessor", "ActiveRecord::Store::HashAccessor"],
-  [m186, "IndifferentCoder", "ActiveRecord::Store::IndifferentCoder"],
-  [m186, "IndifferentHashAccessor", "ActiveRecord::Store::IndifferentHashAccessor"],
-  [m186, "StringKeyedHashAccessor", "ActiveRecord::Store::StringKeyedHashAccessor"],
+  [m185, null, "ActiveRecord::Store"],
+  [m185, "ClassMethods", "ActiveRecord::Store::ClassMethods"],
+  [m185, "HashAccessor", "ActiveRecord::Store::HashAccessor"],
+  [m185, "IndifferentCoder", "ActiveRecord::Store::IndifferentCoder"],
+  [m185, "IndifferentHashAccessor", "ActiveRecord::Store::IndifferentHashAccessor"],
+  [m185, "StringKeyedHashAccessor", "ActiveRecord::Store::StringKeyedHashAccessor"],
   [m116, "StrictLoadingViolationError", "ActiveRecord::StrictLoadingViolationError"],
   [m116, "SubclassNotFound", "ActiveRecord::SubclassNotFound"],
-  [m187, null, "ActiveRecord::Suppressor"],
-  [m188, "TableMetadata", "ActiveRecord::TableMetadata"],
+  [m186, null, "ActiveRecord::Suppressor"],
+  [m187, "TableMetadata", "ActiveRecord::TableMetadata"],
   [m116, "TableNotSpecified", "ActiveRecord::TableNotSpecified"],
-  [m189, "DatabaseNotSupported", "ActiveRecord::Tasks::DatabaseNotSupported"],
-  [m189, "DatabaseTasks", "ActiveRecord::Tasks::DatabaseTasks"],
-  [m190, "MySQLDatabaseTasks", "ActiveRecord::Tasks::MySQLDatabaseTasks"],
-  [m191, "PostgreSQLDatabaseTasks", "ActiveRecord::Tasks::PostgreSQLDatabaseTasks"],
-  [m192, "SQLiteDatabaseTasks", "ActiveRecord::Tasks::SQLiteDatabaseTasks"],
+  [m188, "DatabaseNotSupported", "ActiveRecord::Tasks::DatabaseNotSupported"],
+  [m188, "DatabaseTasks", "ActiveRecord::Tasks::DatabaseTasks"],
+  [m189, "MySQLDatabaseTasks", "ActiveRecord::Tasks::MySQLDatabaseTasks"],
+  [m190, "PostgreSQLDatabaseTasks", "ActiveRecord::Tasks::PostgreSQLDatabaseTasks"],
+  [m191, "SQLiteDatabaseTasks", "ActiveRecord::Tasks::SQLiteDatabaseTasks"],
   [
     m18,
     "ThroughCantAssociateThroughHasOneOrManyReflection",
@@ -782,56 +780,50 @@ defineConstants([
     "ThroughNestedAssociationsAreReadonly",
     "ActiveRecord::ThroughNestedAssociationsAreReadonly",
   ],
-  [m193, "Timestamp", "ActiveRecord::Timestamp"],
-  [m194, "TokenFor", "ActiveRecord::TokenFor"],
-  [m194, "RelationMethods", "ActiveRecord::TokenFor::RelationMethods"],
-  [m194, "TokenDefinition", "ActiveRecord::TokenFor::TokenDefinition"],
-  [m195, "TouchLater", "ActiveRecord::TouchLater"],
-  [m196, "ControllerRuntime", "ActiveRecord::Trailties::ControllerRuntime"],
-  [m196, "ClassMethods", "ActiveRecord::Trailties::ControllerRuntime::ClassMethods"],
-  [m197, "JobRuntime", "ActiveRecord::Trailties::JobRuntime"],
-  [m198, "Transaction", "ActiveRecord::Transaction"],
+  [m192, "Timestamp", "ActiveRecord::Timestamp"],
+  [m193, "TokenFor", "ActiveRecord::TokenFor"],
+  [m193, "RelationMethods", "ActiveRecord::TokenFor::RelationMethods"],
+  [m193, "TokenDefinition", "ActiveRecord::TokenFor::TokenDefinition"],
+  [m194, "TouchLater", "ActiveRecord::TouchLater"],
+  [m195, "ControllerRuntime", "ActiveRecord::Trailties::ControllerRuntime"],
+  [m195, "ClassMethods", "ActiveRecord::Trailties::ControllerRuntime::ClassMethods"],
+  [m196, "JobRuntime", "ActiveRecord::Trailties::JobRuntime"],
+  [m197, "Transaction", "ActiveRecord::Transaction"],
   [m116, "TransactionIsolationError", "ActiveRecord::TransactionIsolationError"],
   [m116, "TransactionRollbackError", "ActiveRecord::TransactionRollbackError"],
-  [m199, "Transactions", "ActiveRecord::Transactions"],
-  [m200, "Translation", "ActiveRecord::Translation"],
-  [m203, null, "ActiveRecord::Type"],
-  [m204, "AdapterSpecificRegistry", "ActiveRecord::Type::AdapterSpecificRegistry"],
-  [m206, "Date", "ActiveRecord::Type::Date"],
-  [m205, "DateTime", "ActiveRecord::Type::DateTime"],
-  [m207, "DecimalWithoutScale", "ActiveRecord::Type::DecimalWithoutScale"],
-  [m204, "DecorationRegistration", "ActiveRecord::Type::DecorationRegistration"],
-  [m208, "HashLookupTypeMap", "ActiveRecord::Type::HashLookupTypeMap"],
-  [m209, "Timezone", "ActiveRecord::Type::Internal::Timezone"],
-  [m210, "Json", "ActiveRecord::Type::Json"],
-  [m204, "Registration", "ActiveRecord::Type::Registration"],
-  [m211, "Serialized", "ActiveRecord::Type::Serialized"],
-  [m212, "Text", "ActiveRecord::Type::Text"],
-  [m213, "Time", "ActiveRecord::Type::Time"],
-  [m213, "Value", "ActiveRecord::Type::Time::Value"],
-  [m214, "TypeMap", "ActiveRecord::Type::TypeMap"],
-  [m215, "UnsignedInteger", "ActiveRecord::Type::UnsignedInteger"],
-  [m142, "TypeCaster", "ActiveRecord::TypeCaster"],
-  [m201, "Connection", "ActiveRecord::TypeCaster::Connection"],
-  [m202, "Map", "ActiveRecord::TypeCaster::Map"],
-  [m204, "TypeConflictError", "ActiveRecord::TypeConflictError"],
+  [m198, "Transactions", "ActiveRecord::Transactions"],
+  [m199, "Translation", "ActiveRecord::Translation"],
+  [m202, null, "ActiveRecord::Type"],
+  [m203, "AdapterSpecificRegistry", "ActiveRecord::Type::AdapterSpecificRegistry"],
+  [m205, "Date", "ActiveRecord::Type::Date"],
+  [m204, "DateTime", "ActiveRecord::Type::DateTime"],
+  [m206, "DecimalWithoutScale", "ActiveRecord::Type::DecimalWithoutScale"],
+  [m203, "DecorationRegistration", "ActiveRecord::Type::DecorationRegistration"],
+  [m207, "HashLookupTypeMap", "ActiveRecord::Type::HashLookupTypeMap"],
+  [m208, "Timezone", "ActiveRecord::Type::Internal::Timezone"],
+  [m209, "Json", "ActiveRecord::Type::Json"],
+  [m203, "Registration", "ActiveRecord::Type::Registration"],
+  [m210, "Serialized", "ActiveRecord::Type::Serialized"],
+  [m211, "Text", "ActiveRecord::Type::Text"],
+  [m212, "Time", "ActiveRecord::Type::Time"],
+  [m212, "Value", "ActiveRecord::Type::Time::Value"],
+  [m213, "TypeMap", "ActiveRecord::Type::TypeMap"],
+  [m214, "UnsignedInteger", "ActiveRecord::Type::UnsignedInteger"],
+  [m200, "Connection", "ActiveRecord::TypeCaster::Connection"],
+  [m201, "Map", "ActiveRecord::TypeCaster::Map"],
+  [m203, "TypeConflictError", "ActiveRecord::TypeConflictError"],
   [m116, "UnknownAttributeReference", "ActiveRecord::UnknownAttributeReference"],
   [m135, "UnknownMigrationVersionError", "ActiveRecord::UnknownMigrationVersionError"],
   [m116, "UnknownPrimaryKey", "ActiveRecord::UnknownPrimaryKey"],
   [m116, "UnmodifiableRelation", "ActiveRecord::UnmodifiableRelation"],
-  [m216, "Validations", "ActiveRecord::Validations"],
-  [m217, "AbsenceValidator", "ActiveRecord::Validations::AbsenceValidator"],
-  [m218, "AssociatedValidator", "ActiveRecord::Validations::AssociatedValidator"],
-  [m217, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
-  [m218, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
-  [m219, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
-  [m220, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
-  [m221, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
-  [m222, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
-  [m219, "LengthValidator", "ActiveRecord::Validations::LengthValidator"],
-  [m220, "NumericalityValidator", "ActiveRecord::Validations::NumericalityValidator"],
-  [m221, "PresenceValidator", "ActiveRecord::Validations::PresenceValidator"],
-  [m222, "UniquenessValidator", "ActiveRecord::Validations::UniquenessValidator"],
+  [m215, "Validations", "ActiveRecord::Validations"],
+  [m216, "AbsenceValidator", "ActiveRecord::Validations::AbsenceValidator"],
+  [m217, "AssociatedValidator", "ActiveRecord::Validations::AssociatedValidator"],
+  [m216, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
+  [m218, "LengthValidator", "ActiveRecord::Validations::LengthValidator"],
+  [m219, "NumericalityValidator", "ActiveRecord::Validations::NumericalityValidator"],
+  [m220, "PresenceValidator", "ActiveRecord::Validations::PresenceValidator"],
+  [m221, "UniquenessValidator", "ActiveRecord::Validations::UniquenessValidator"],
   [m116, "ValueTooLong", "ActiveRecord::ValueTooLong"],
   [m121, "VERSION", "ActiveRecord::VERSION"],
   [m116, "WrappedDatabaseException", "ActiveRecord::WrappedDatabaseException"],

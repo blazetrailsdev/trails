@@ -17,11 +17,9 @@ import * as m14 from "./rack.js";
 import * as m15 from "./rack/logger.js";
 import * as m16 from "./rack/silence-request.js";
 import * as m17 from "./source-annotation-extractor.js";
-import * as m18 from "./trails.js";
-import * as m19 from "./trailtie/configurable.js";
+import * as m18 from "./trailtie/configurable.js";
 
 defineConstants([
-  [m18, "Trails", "Rails::Trails::Rails"],
   [m0, "Application", "Trails::Application"],
   [m1, "Bootstrap", "Trails::Application::Bootstrap"],
   [m2, "Configuration", "Trails::Application::Configuration"],
@@ -51,7 +49,7 @@ defineConstants([
   [m17, "Annotation", "Trails::SourceAnnotationExtractor::Annotation"],
   [m17, "ParserExtractor", "Trails::SourceAnnotationExtractor::ParserExtractor"],
   [m17, "PatternExtractor", "Trails::SourceAnnotationExtractor::PatternExtractor"],
-  [m19, "Configurable", "Trails::Trailtie::Configurable"],
-  [m19, "ClassMethods", "Trails::Trailtie::Configurable::ClassMethods"],
+  [m18, "Configurable", "Trails::Trailtie::Configurable"],
+  [m18, "ClassMethods", "Trails::Trailtie::Configurable::ClassMethods"],
   [m11, "VERSION", "Trails::VERSION"],
 ]);
