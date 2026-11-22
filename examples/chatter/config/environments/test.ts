@@ -40,6 +40,9 @@ Trails.application.configure(function () {
   // ActionMailer.Base.deliveries array.
   this.config.actionMailer.deliveryMethod = "test";
 
+  // Run jobs (mail delivery, link previews) in line so tests can assert on their effects.
+  this.config.activeJob.queueAdapter = "inline";
+
   // Set host to be used by links generated in mailer templates.
   this.config.actionMailer.defaultUrlOptions = { host: "example.com" };
 

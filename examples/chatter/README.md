@@ -4,6 +4,12 @@ A Hotwire chat app built on the full trails stack: Active Record models on MySQL
 controllers, `.tse` views, Turbo Streams over Action Cable for live updates, Active Storage for
 attachments, Active Job for link previews, and Action Mailer for passwordless sign-in.
 
+![A channel with a link preview, a reaction and a thread reply](docs/channel.png)
+
+| Sign in                                 | Direct message                               |
+| --------------------------------------- | -------------------------------------------- |
+| ![Magic-link sign-in](docs/sign-in.png) | ![A direct message](docs/direct-message.png) |
+
 ## Features
 
 - **Magic-link sign-in.** Enter an email address and Chatter emails a one-time link. There is no
@@ -50,6 +56,21 @@ bin/trails server       # http://localhost:3000
 `DB_HOST`, `DB_PORT`, `DB_USERNAME` and `DB_PASSWORD` override the connection
 (`config/database.ts`). In development, sign-in emails are written to `tmp/mails/<address>`
 instead of being sent. Open the link from there.
+
+## Tests
+
+The tests run against MySQL (`chatter_test`), like the app:
+
+```sh
+bin/trails db:prepare TRAILS_ENV=test
+pnpm test
+```
+
+- `test/models/`: `User` (normalization, magic-link tokens and their invalidation), `Room` (channel
+  validation, one direct room per pair, titles), and `Message` (body-or-attachment rule, attachments,
+  URL extraction, the reply counter cache, reaction grouping).
+- `test/integration/magic-link-sign-in.test.ts`: signs in end to end through the emailed link, checks
+  that the link works once, and rejects a tampered one.
 
 ## Deploying to Dokku
 

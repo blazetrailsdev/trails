@@ -25,6 +25,7 @@
     "app",
     "config",
     "db",
+    "test",
     "config.ts",
     "vite.config.ts",
     "Rakefile.ts",
