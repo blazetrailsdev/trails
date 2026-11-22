@@ -12,7 +12,6 @@ import type { MetaStore } from "./meta-store.js";
 import { Options } from "./options.js";
 import { Request } from "./request.js";
 import { Response } from "./response.js";
-import type { Storage } from "./storage.js";
 
 type Env = Record<string, unknown>;
 type EntityStore = Parameters<MetaStore["store"]>[2];
@@ -67,22 +66,19 @@ export class Context {
     this.initializeOptions(options);
     if (block !== undefined) block(this);
 
-    this._privateHeaderKeys = (this.privateHeaders as string[]).map(
+    this._privateHeaderKeys = this.privateHeaders.map(
       (name) => `HTTP_${name.toUpperCase().replaceAll("-", "_")}`,
     );
   }
 
   async metastore(): Promise<MetaStore> {
     const uri = this.options["rack-cache.metastore"];
-    return (await (this.storage as Storage).resolveMetastoreUri(uri, this._options)) as MetaStore;
+    return (await this.storage.resolveMetastoreUri(uri, this._options)) as MetaStore;
   }
 
   async entitystore(): Promise<EntityStore> {
     const uri = this.options["rack-cache.entitystore"];
-    return (await (this.storage as Storage).resolveEntitystoreUri(
-      uri,
-      this._options,
-    )) as EntityStore;
+    return (await this.storage.resolveEntitystoreUri(uri, this._options)) as EntityStore;
   }
 
   async call(env: Env): Promise<[number, Record<string, string>, unknown]> {
@@ -316,11 +312,11 @@ export class Context {
     } else {
       const mustRevalidate = response.cacheControl.isMustRevalidate();
       if (
-        (this.defaultTtl as number) > 0 &&
+        this.defaultTtl > 0 &&
         response.ttl == null &&
         (mustRevalidate == null || mustRevalidate === false)
       ) {
-        response.ttl = this.defaultTtl as number;
+        response.ttl = this.defaultTtl;
       }
     }
 
@@ -344,9 +340,7 @@ export class Context {
 
   /** @internal */
   private stripIgnoreHeaders(response: Response): unknown[] | undefined {
-    const strippedValues = (this.ignoreHeaders as string[]).map((name) =>
-      response.headers.delete(name),
-    );
+    const strippedValues = this.ignoreHeaders.map((name) => response.headers.delete(name));
     if (strippedValues.some((value) => value != null)) return this.record("ignore");
     return undefined;
   }
