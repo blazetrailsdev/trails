@@ -777,6 +777,12 @@ export interface ScopedSkipGroup {
   packages?: string[];
 }
 
+const PG_UNPORTED_REASON =
+  'not called by activerecord or actioncable (packages/pg/CLAUDE.md, "The pg port carries only what trails calls"). PERMANENT.';
+
+const PG_LIBRARY_VERSION_REASON =
+  '`PG.library_version` is `PQlibVersion()` and node-pg links no libpq (packages/pg/CLAUDE.md, "The pg port carries only what trails calls"). PERMANENT.';
+
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason: "not called by activerecord",
@@ -791,13 +797,21 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     packages: ["mysql2"],
   },
   {
-    reason: "not called by activerecord",
-    names: ["version_string", "make_shareable", "warn", "require_bigdecimal_without_warning"],
+    reason: PG_UNPORTED_REASON,
+    names: [
+      "version_string",
+      "make_shareable",
+      "warn",
+      "require_bigdecimal_without_warning",
+      "init_openssl",
+      "init_ssl",
+      "isthreadsafe",
+    ],
     rubyFiles: ["../pg.rb", "pg.rb"],
     packages: ["pg"],
   },
   {
-    reason: "not called by activerecord",
+    reason: PG_UNPORTED_REASON,
     names: [
       "quote_connstr",
       "connect_hash_to_string",
@@ -836,33 +850,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "setdb",
       "setdblogin",
       "async_ping",
-    ],
-    rubyFiles: ["connection.rb"],
-    packages: ["pg"],
-  },
-  {
-    reason: "not called by activerecord",
-    names: ["field_names_as"],
-    rubyFiles: ["result.rb"],
-    packages: ["pg"],
-  },
-  {
-    reason: "not called by activerecord",
-    names: ["==", "marshal_dump", "marshal_load", "inspect_short"],
-    rubyFiles: ["coder.rb"],
-    packages: ["pg"],
-  },
-  {
-    reason:
-      "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
-    names: ["dup", "inspect", "null_string", "null_string=", "type_map", "type_map="],
-    rubyFiles: ["coder.rb"],
-    packages: ["pg"],
-  },
-  {
-    reason:
-      "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
-    names: [
       "async_describe_portal",
       "async_describe_prepared",
       "async_exec_params",
@@ -988,25 +975,9 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     packages: ["pg"],
   },
   {
-    reason:
-      "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
-    names: ["init_openssl", "init_ssl", "isthreadsafe"],
-    rubyFiles: ["pg.rb", "../pg.rb"],
-    packages: ["pg"],
-  },
-  {
-    reason:
-      "`PG.library_version` is `PQlibVersion()` (vendor/pg/v1.5.9/ext/pg.c:246-250) and node-pg links no libpq, so " +
-      "`cancel_any_running_query`'s libpq-18 guard (postgresql/database_statements.rb:135) has no value to read " +
-      "(operator ruling 2026-11-22). PERMANENT.",
-    names: ["library_version"],
-    rubyFiles: ["pg.rb", "../pg.rb"],
-    packages: ["pg"],
-  },
-  {
-    reason:
-      "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
+    reason: PG_UNPORTED_REASON,
     names: [
+      "field_names_as",
       "autoclear?",
       "binary_tuples",
       "check",
@@ -1051,8 +1022,24 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     packages: ["pg"],
   },
   {
-    reason:
-      "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
+    reason: PG_UNPORTED_REASON,
+    names: [
+      "==",
+      "marshal_dump",
+      "marshal_load",
+      "inspect_short",
+      "dup",
+      "inspect",
+      "null_string",
+      "null_string=",
+      "type_map",
+      "type_map=",
+    ],
+    rubyFiles: ["coder.rb"],
+    packages: ["pg"],
+  },
+  {
+    reason: PG_UNPORTED_REASON,
     names: ["decode"],
     rubyFiles: [
       "text_decoder/copy_row.rb",
@@ -1064,8 +1051,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     packages: ["pg"],
   },
   {
-    reason:
-      "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
+    reason: PG_UNPORTED_REASON,
     names: ["encode"],
     rubyFiles: [
       "text_encoder/bytea.rb",
@@ -1080,15 +1066,13 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     packages: ["pg"],
   },
   {
-    reason:
-      "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
+    reason: PG_UNPORTED_REASON,
     names: ["coders"],
     rubyFiles: ["type_map_by_class.rb", "type_map_by_mri_type.rb"],
     packages: ["pg"],
   },
   {
-    reason:
-      "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
+    reason: PG_UNPORTED_REASON,
     names: [
       "build_column_map",
       "coders",
@@ -1100,8 +1084,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     packages: ["pg"],
   },
   {
-    reason:
-      "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
+    reason: PG_UNPORTED_REASON,
     names: [
       "fit_to_copy_get",
       "fit_to_query",
@@ -1111,6 +1094,12 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "typecast_result_value",
     ],
     rubyFiles: ["type_map_in_ruby.rb"],
+    packages: ["pg"],
+  },
+  {
+    reason: PG_LIBRARY_VERSION_REASON,
+    names: ["library_version"],
+    rubyFiles: ["pg.rb", "../pg.rb"],
     packages: ["pg"],
   },
   {
