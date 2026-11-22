@@ -79,7 +79,6 @@ export class OrderedOptions {
    * the default's, else `KeyError`. The default block is not consulted. A key
    * is a Symbol's name (`ordered_options.rb:37-43`), so a miss inspects it as
    * `:name`, which the Map arm's string inspect cannot.
-   * @inventedArm if — PERMANENT
    */
   fetch(key: string, ...rest: [] | [unknown]): unknown {
     if (rest.length === 0 && !this.data.has(String(key))) {
