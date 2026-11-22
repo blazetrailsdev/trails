@@ -4,8 +4,8 @@ import { isBlank } from "../../../lib/core-ext/object/blank.js";
 
 describe("PathnameBlankTest", () => {
   it("blank", () => {
-    expect(isBlank(new Pathname(""))).toBe(true);
-    expect(isBlank(new Pathname("test"))).toBe(false);
-    expect(isBlank(new Pathname(" "))).toBe(false);
+    expect(isBlank(new Pathname(""))).toBeTruthy();
+    expect(isBlank(new Pathname("test"))).toBeFalsy();
+    expect(isBlank(new Pathname(" "))).toBeFalsy();
   });
 });
