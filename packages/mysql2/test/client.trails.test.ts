@@ -208,7 +208,7 @@ describe("Mysql2::Client#warning_count", () => {
       rowOf([["a", "DATETIME"]], "2026-04-27 14:23:55"),
     );
     const client = await clientOn({ query: native });
-    const read = async (options: object) =>
+    const read = async (options: Parameters<Client["query"]>[1]) =>
       ((await client.query("SELECT 1", options))!.toA()[0] as Record<string, Time>)["a"];
     const unnamed = await read({ databaseTimezone: "utc" });
     const local = await read({ databaseTimezone: "utc", applicationTimezone: "local" });
@@ -620,7 +620,7 @@ describe("Mysql2::Client default_auth", () => {
     const seen: string[] = [];
     const handshake = {
       handshake: { authPluginName: "caching_sha2_password" },
-      sendCredentials(this: typeof handshake) {
+      sendCredentials(this: { handshake: { authPluginName: string } }) {
         seen.push(this.handshake.authPluginName);
       },
     };
