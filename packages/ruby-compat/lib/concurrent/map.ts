@@ -47,7 +47,7 @@ export const Concurrent = { name: "Concurrent" } as {
  * @noRailsEquivalent PERMANENT
  */
 export class Map<K, V> {
-  private readonly backend = new Hash<K, V>();
+  private backend = new Hash<K, V>();
   private readonly defaultProc?: (key: K) => V;
 
   /**
@@ -172,6 +172,48 @@ export class Map<K, V> {
   eachPair(block: (key: K, value: V) => unknown): this {
     for (const [k, v] of [...this.backend]) block(k, v);
     return this;
+  }
+
+  /**
+   * `NonConcurrentMapBackend#initialize_copy`: the copy gets its own backend
+   * (`vendor/ruby/v3.3.11/hash.c:2967` `rb_hash_replace`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  initializeCopy(other: Map<K, V>): this {
+    this.backend = new Hash<K, V>();
+    for (const [k, v] of other.backend) this.backend.set(k, v);
+    return this;
+  }
+
+  /**
+   * `NonConcurrentMapBackend#compute_if_present`: the block's value, given the
+   * stored one, replaces it; a `nil` result deletes the key, and an absent key
+   * is left alone (`vendor/ruby/v3.3.11/hash.c:2176` `rb_hash_fetch_m`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  computeIfPresent(key: K, block: (storedValue: V) => V | null): V | null {
+    if (!this.backend.has(key)) return null;
+    const newValue = block(this.backend.get(key)!);
+    if (newValue == null) {
+      this.backend.delete(key);
+      return null;
+    }
+    this.backend.set(key, newValue);
+    return newValue;
+  }
+
+  /**
+   * `NonConcurrentMapBackend#delete` (`vendor/ruby/v3.3.11/hash.c:2441` `rb_hash_delete_m`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  delete(key: K): V | null {
+    if (!this.backend.has(key)) return null;
+    const value = this.backend.get(key)!;
+    this.backend.delete(key);
+    return value;
   }
 
   /**

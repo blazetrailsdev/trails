@@ -25,7 +25,9 @@ export class TrimJob extends Base {
   private isTrim(): boolean {
     const expiresPerWrite = (1 / this.trimBatchSize()) * SolidCable.trimChance();
 
-    return Math.random() < expiresPerWrite - Math.floor(expiresPerWrite);
+    return (
+      !SolidCable.isAutotrim() || Math.random() < expiresPerWrite - Math.floor(expiresPerWrite)
+    );
   }
 }
 constSet(SolidCable, "TrimJob", TrimJob);

@@ -3,7 +3,7 @@ import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
 import { Base as Server } from "@blazetrails/actioncable/server/base";
 import type { SubscriptionAdapter } from "@blazetrails/actioncable/test/support/subscription-adapter/common";
 import { Logger } from "@blazetrails/activesupport";
-import { Queue, StringIO } from "@blazetrails/ruby-compat";
+import { Queue, StringIO, Timeout } from "@blazetrails/ruby-compat";
 import { Event } from "@blazetrails/ruby-compat/concurrent/event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Message, SolidCable } from "../../../lib/index.js";
@@ -61,7 +61,7 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
     await subscribeAsQueue("channel", undefined, async (queue) => {
       await txAdapter.broadcast("channel", "hello world");
 
-      expect(await queue.pop()).toBe("hello world");
+      expect(await nextMessageInQueue(queue)).toBe("hello world");
     });
   });
 
@@ -72,7 +72,7 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
 
       await txAdapter.broadcast("channel", "hello world");
 
-      expect(await queue.pop()).toBe("hello world");
+      expect(await nextMessageInQueue(queue)).toBe("hello world");
     });
 
     await txAdapter.broadcast("channel", "hello void");
@@ -102,7 +102,7 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
       await txAdapter.broadcast("channel", "apples");
 
       const received: unknown[] = [];
-      for (let i = 0; i < 2; i++) received.push(await queue.pop());
+      for (let i = 0; i < 2; i++) received.push(await nextMessageInQueue(queue));
       expect(received.sort()).toEqual(["apples", "bananas"]);
     });
   });
@@ -112,10 +112,10 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
       await subscribeAsQueue("channel", undefined, async (queue2) => {
         await txAdapter.broadcast("channel", "hello");
 
-        expect(await queue2.pop()).toBe("hello");
+        expect(await nextMessageInQueue(queue2)).toBe("hello");
       });
 
-      expect(await queue.pop()).toBe("hello");
+      expect(await nextMessageInQueue(queue)).toBe("hello");
     });
   });
 
@@ -125,8 +125,8 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
         await txAdapter.broadcast("channel", "apples");
         await txAdapter.broadcast("other channel", "oranges");
 
-        expect(await queue.pop()).toBe("apples");
-        expect(await queue2.pop()).toBe("oranges");
+        expect(await nextMessageInQueue(queue)).toBe("apples");
+        expect(await nextMessageInQueue(queue2)).toBe("oranges");
       });
     });
   });
@@ -136,7 +136,7 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
       await txAdapter.broadcast("other channel", "one");
       await txAdapter.broadcast("channel", "two");
 
-      expect(await queue.pop()).toBe("two");
+      expect(await nextMessageInQueue(queue)).toBe("two");
     });
   });
 
@@ -148,8 +148,8 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
         await txAdapter.broadcast(channel1, "apples");
         await txAdapter.broadcast(channel2, "oranges");
 
-        expect(await queue.pop()).toBe("apples");
-        expect(await queue2.pop()).toBe("oranges");
+        expect(await nextMessageInQueue(queue)).toBe("apples");
+        expect(await nextMessageInQueue(queue2)).toBe("oranges");
       });
     });
   });
@@ -160,7 +160,7 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
         subscribeAsQueue("channel", undefined, async (queue) => {
           await txAdapter.broadcast("channel", "hello world");
 
-          expect(await queue.pop()).toBe("hello world");
+          expect(await nextMessageInQueue(queue)).toBe("hello world");
         }),
       ).resolves.not.toThrow();
     });
@@ -209,6 +209,9 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
     } finally {
       ActiveRecordBase.logger = oldLogger;
     }
+  }
+  function nextMessageInQueue(queue: Queue): Promise<unknown> {
+    return Timeout.timeout(5, null, "Failed to get next item in queue", () => queue.pop());
   }
 });
 

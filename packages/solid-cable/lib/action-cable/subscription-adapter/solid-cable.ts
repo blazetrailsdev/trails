@@ -14,6 +14,7 @@ import {
   Thread,
   forceEncoding,
   rbFSleep,
+  rbObjDup,
   type Semaphore,
 } from "@blazetrails/ruby-compat";
 import type { PipeIO } from "@blazetrails/ruby-compat";
@@ -77,7 +78,7 @@ export class Listener extends SubscriberMap {
   private _eventLoop: StreamEventLoop;
   private _thread: Thread<Promise<void>>;
   private _lastId: number | null = null;
-  private _channels: Set<string> | null = null;
+  private _channels: InstanceType<typeof Concurrent.Map<string, number>> | null = null;
   private _critical: Semaphore;
   private _selfPipe: { reader: PipeIO; writer: PipeIO } | null = null;
 
@@ -88,7 +89,12 @@ export class Listener extends SubscriberMap {
 
     this._critical = new Concurrent.Semaphore(0);
 
-    this._thread = new Thread(() => this.listen());
+    this._thread = new Thread(() => {
+      Thread.current().name = "solid_cable_listener";
+      Thread.current().reportOnException = true;
+
+      return this.listen();
+    });
   }
 
   async listen(): Promise<void> {
@@ -129,8 +135,8 @@ export class Listener extends SubscriberMap {
     await this.thread.join();
   }
 
-  override addChannel(channel: string, onSuccess: (() => unknown) | null): void {
-    this.channels.add(channel);
+  override async addChannel(channel: string, onSuccess: (() => unknown) | null): Promise<void> {
+    this.channels.set(channel, await this.lastMessageId());
     if (onSuccess != null) this.eventLoop.post(null, onSuccess);
   }
 
@@ -159,24 +165,44 @@ export class Listener extends SubscriberMap {
 
   /** @internal */
   private async lastId(): Promise<number> {
-    return (this._lastId ??= (await Message.maximum("id")) ?? 0);
+    return (this._lastId ??= await this.lastMessageId());
   }
 
   /** @internal */
-  private get channels(): Set<string> {
-    return (this._channels ||= new Set());
+  private async lastMessageId(): Promise<number> {
+    return ((await Message.maximum("id")) as number | null) ?? 0;
+  }
+
+  /** @internal */
+  private get channels(): InstanceType<typeof Concurrent.Map<string, number>> {
+    return (this._channels ||= new Concurrent.Map<string, number>());
   }
 
   /** @internal */
   private async broadcastMessages(): Promise<void> {
+    const currentChannels = rbObjDup(this.channels);
+
     for (const message of await Message.broadcastable(
-      this.channels,
+      currentChannels.keys(),
       await this.lastId(),
     ).toArray()) {
-      this.broadcast(
+      let shouldBroadcastMessage = false;
+      this.channels.computeIfPresent(
         forceEncoding(message.channel, "UTF-8") as string,
-        forceEncoding(message.payload, "UTF-8"),
+        (channelLastId) => {
+          if (channelLastId >= message.id) return channelLastId;
+
+          shouldBroadcastMessage = true;
+          return message.id;
+        },
       );
+
+      if (shouldBroadcastMessage) {
+        this.broadcast(
+          forceEncoding(message.channel, "UTF-8") as string,
+          forceEncoding(message.payload, "UTF-8"),
+        );
+      }
       this.setLastId(message.id);
     }
   }

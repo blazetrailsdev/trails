@@ -1,12 +1,15 @@
 import { type Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
-import { constSet, Digest, Range, unpack1 } from "@blazetrails/ruby-compat";
+import { constSet, Digest, Range, toI, unpack1 } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import { SolidCable } from "./solid-cable.js";
 
 export class Message extends Record {
   declare static trimmable: () => Relation<Message>;
-  declare static broadcastable: (channels: Iterable<string>, lastId: number) => Relation<Message>;
+  declare static broadcastable: (
+    channels: Iterable<string>,
+    lastId: number | string | null,
+  ) => Relation<Message>;
   declare id: number;
   declare channel: Uint8Array;
   declare payload: Uint8Array;
@@ -19,11 +22,14 @@ export class Message extends Record {
     this.scope("trimmable", function () {
       return this.where({ created_at: new Range(null, SolidCable.messageRetention().ago(), true) });
     });
-    this.scope("broadcastable", function (channels: Iterable<string>, lastId: number) {
-      return this.where({ channel_hash: Message.channelHashesFor(channels) })
-        .where({ id: new Range(lastId + 1, null) })
-        .order("id");
-    });
+    this.scope(
+      "broadcastable",
+      function (channels: Iterable<string>, lastId: number | string | null) {
+        return this.where({ channel_hash: Message.channelHashesFor(channels) })
+          .where({ id: new Range((toI(lastId) as number) + 1, null) })
+          .order("id");
+      },
+    );
   }
 
   static async broadcast(channel: string, payload: unknown): Promise<unknown> {
