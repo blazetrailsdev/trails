@@ -16,7 +16,6 @@ export class LoggerDelivery {
     this.severity = this.deriveSeverity(settings.severity);
   }
 
-  /** @missingRailsArgs log — CONVERGEABLE logger-add-reads-trailing-block-marker */
   async deliverBang(mail: Message): Promise<boolean> {
     return this.logger.log(this.severity, null, null, () => new SmtpEnvelope(mail).message);
   }

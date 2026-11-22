@@ -22,7 +22,7 @@ describe("TestRakeTestThreadPool", () => {
   it("pool executes in two other threads for pool of size two", async () => {
     const pool = new ThreadPool(2);
     try {
-      const futures = Array.from({ length: 2 }, () =>
+      const threads = Array.from({ length: 2 }, () =>
         pool.future<Thread>(
           block(async () => {
             await sleep(0.1);
@@ -30,7 +30,7 @@ describe("TestRakeTestThreadPool", () => {
           }),
         ),
       );
-      const threads = await Promise.all(futures.map((f) => f.value()));
+      for (const future of threads) await future.value();
 
       expect(threads[0]).not.toBe(threads[1]);
       expect(threads[0]).not.toBe(Thread.current());

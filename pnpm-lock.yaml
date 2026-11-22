@@ -1674,6 +1674,9 @@ importers:
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../rack-test
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers

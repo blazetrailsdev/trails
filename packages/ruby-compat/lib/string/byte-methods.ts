@@ -5,7 +5,7 @@ import { rbBuiltinClassName } from "../object.js";
 import { Range } from "../range.js";
 import { TypeError } from "../type-error.js";
 import { bytes, isCharBoundary, strNew } from "./bytes.js";
-import { forceEncoding, rbObjEncoding } from "./force-encoding.js";
+import { rbEncAssociate, rbObjEncoding } from "./force-encoding.js";
 import {
   checkArity,
   num2long,
@@ -88,7 +88,9 @@ export function rbStrByteslice(str: string, ...args: unknown[]): string | null {
 
 /**
  * `String#byteslice` (`vendor/ruby/v3.3.11/string.c:6330` `rb_str_byteslice`) over an
- * ASCII-8BIT String, a `Uint8Array`, whose slice is a `Uint8Array`.
+ * ASCII-8BIT String, a `Uint8Array`, whose slice is a `Uint8Array`. The slice
+ * carries the receiver's encoding, as `str_byte_substr`'s `str_enc_copy_direct`
+ * (`vendor/ruby/v3.3.11/string.c:6239`) copies it.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#byteslice`
  * (`vendor/ruby/v3.3.11/string.c:6330`).
@@ -97,8 +99,7 @@ export function byteslice(str: Uint8Array, ...args: unknown[]): Uint8Array | nul
   const enc = rbObjEncoding(str);
   return strByteslice(str, args, (beg, end) => {
     const sub = str.slice(beg, end);
-    if (enc === Encoding.ASCII_8BIT || enc === Encoding.UTF_8) return sub;
-    return forceEncoding(sub, enc) as Uint8Array;
+    return enc === Encoding.ASCII_8BIT ? sub : rbEncAssociate(sub, enc);
   });
 }
 

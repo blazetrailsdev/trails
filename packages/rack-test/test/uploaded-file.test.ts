@@ -24,15 +24,15 @@ function localPaths(n: number): string[] {
   return paths;
 }
 
-async function gcStart(): Promise<void> {
-  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+async function gcStart(paths: string[]): Promise<void> {
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
   setFlagsFromString("--expose-gc");
   const gc = runInNewContext("gc") as () => void;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 50 && paths.every((f) => File.isExist(f)); i++) {
     await tick();
     gc();
+    await tick();
   }
-  await tick();
 }
 
 describe("Rack::Test::UploadedFile", () => {
@@ -89,7 +89,7 @@ describe("Rack::Test::UploadedFile", () => {
 
   it("removes local paths on garbage collection", async () => {
     const paths = RUBY_PLATFORM() === "java" ? localPaths(500) : localPaths(50);
-    await gcStart();
+    await gcStart(paths);
 
     expect(paths.every((f) => File.isExist(f))).toBe(false);
   });

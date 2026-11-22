@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type {} from "@blazetrails/vitest-matchers";
 import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
@@ -68,7 +69,8 @@ describe("ConfigTest", () => {
 
     expect(ViteAssets.config().publicOutputDir).toBe("from_ruby");
     expect(ViteAssets.config().toEnv()["EXAMPLE_PATH"]).toBe(
-      new URL("../../trailties", import.meta.url).pathname,
+      new URL("..", `file://${createRequire(import.meta.url).resolve("@blazetrails/trailties")}`)
+        .pathname,
     );
   });
 

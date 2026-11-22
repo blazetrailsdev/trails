@@ -163,7 +163,10 @@ export const Encodings = {
 
     address = (typeof address === "string" ? address : binaryString(address)).replace(
       /("[^"]*[^/]")/g,
-      (s) => Encodings.bValueEncode<string>(Utilities.unquote(tagged(s) as string), charset),
+      (s) => {
+        const encoded = Encodings.bValueEncode(tagged(Utilities.unquote(s)), charset);
+        return typeof encoded === "string" ? encoded : binaryString(encoded);
+      },
     );
 
     const tokens = stringSplit(address, /\s/).map(tagged);
