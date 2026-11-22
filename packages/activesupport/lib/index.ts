@@ -157,8 +157,6 @@ export {
   deepTransformKeys,
   deepCamelizeKeys,
   deepUnderscoreKeys,
-  extractOptionsBang,
-  isExtractableOptions,
   stringifyKeys,
   deepStringifyKeys,
   symbolizeKeys,
@@ -192,6 +190,7 @@ export {
   valuesAt,
   toXml,
 } from "./hash-utils.js";
+export { extractOptionsBang, isExtractableOptions } from "./core-ext/array/extract-options.js";
 
 export {
   fromXml,

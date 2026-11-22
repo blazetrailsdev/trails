@@ -7,13 +7,13 @@ export class MethodWrapper {
   static readonly [classModule] = true;
 
   deprecateMethods(
+    this: Deprecation,
     targetModule: Record<string, unknown>,
     ...methodNames: Array<string | Record<string, unknown>>
   ): Record<string, unknown> {
     const options = extractOptionsBang(methodNames as Array<string>);
     const names = methodNames as Array<string>;
-    const deprecator =
-      (options.deprecator as Deprecation | undefined) ?? (this as unknown as Deprecation);
+    const deprecator = (options.deprecator as Deprecation | undefined) ?? this;
     delete options.deprecator;
     const methodNamesWithOptions = [...names, ...Object.keys(options)];
 

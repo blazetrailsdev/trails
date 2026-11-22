@@ -1,4 +1,5 @@
-import { ArgumentError, extractOptionsBang } from "../../hash-utils.js";
+import { ArgumentError } from "../../hash-utils.js";
+import { extractOptionsBang } from "../array/extract-options.js";
 import { Deprecation } from "../../deprecation.js";
 import { deprecator as activeSupportDeprecator } from "../../deprecator.js";
 

@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { underscore } from "../../inflector.js";
 import { ActiveSupport } from "../../namespaces.js";
-import { extractOptionsBang } from "../../hash-utils.js";
+import { extractOptionsBang } from "../../core-ext/array/extract-options.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import type { Entry } from "../entry.js";
 import type { StoreOptions } from "../store.js";

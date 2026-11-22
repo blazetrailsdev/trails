@@ -11,7 +11,7 @@ import {
 import { Module, extend, rbObjIsKindOf, type Included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "./class-attribute.js";
 import { Concern } from "./concern.js";
-import { extractOptionsBang } from "./hash-utils.js";
+import { extractOptionsBang } from "./core-ext/array/extract-options.js";
 import { safeConstantize } from "./inflector.js";
 
 type ErrorHandler = ((this: never, error: never) => unknown) | string;

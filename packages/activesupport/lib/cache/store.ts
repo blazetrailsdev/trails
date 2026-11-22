@@ -18,7 +18,8 @@ import { SerializerWithFallback, type Serializer } from "./serializer-with-fallb
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
-import { extractOptionsBang, isPlainObject, toParam } from "../hash-utils.js";
+import { isPlainObject, toParam } from "../hash-utils.js";
+import { extractOptionsBang } from "../core-ext/array/extract-options.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import { cattrAccessor } from "../module-ext.js";
 import type { EventPayload } from "../notifications/instrumenter.js";

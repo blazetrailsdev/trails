@@ -126,8 +126,6 @@ export function deepUnderscoreKeys(obj: unknown): unknown {
   );
 }
 
-export { isExtractableOptions, extractOptionsBang } from "./core-ext/array/extract-options.js";
-
 export function stringifyKeys<T extends AnyObject>(obj: T): Record<string, unknown> {
   return transformKeys(obj, (k) => (isSymbol(k) ? symbolToS(k) : String(k)));
 }

@@ -12,14 +12,15 @@ export function isExtractableOptions(self: unknown): boolean {
 }
 
 export function extractOptionsBang<T>(args: T[]): AnyObject {
-  const last = args[args.length - 1];
+  const last: unknown = args[args.length - 1];
   const isHash =
     last !== null &&
     typeof last === "object" &&
-    ("isExtractableOptions" in last ||
-      (isExtractableOptions(last) && !rbObjIsKindOf(last, Module)));
+    !Array.isArray(last) &&
+    !rbObjIsKindOf(last, Module);
   if (args.length > 0 && isHash && isExtractableOptions(last)) {
-    return args.pop() as unknown as AnyObject;
+    args.pop();
+    return last as AnyObject;
   }
   return {};
 }

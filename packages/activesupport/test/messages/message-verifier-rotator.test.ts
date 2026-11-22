@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 
 import { MessageVerifier } from "../../lib/message-verifier.js";
-import { extractOptionsBang } from "../../lib/hash-utils.js";
+import { extractOptionsBang } from "../../lib/core-ext/array/extract-options.js";
 import {
   assertRotate,
   messageRotatorTests,
