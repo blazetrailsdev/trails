@@ -42,8 +42,8 @@
   "mirrors": [
     {
       "source": "thor",
-      "ref": "v1.3.2",
-      "sha": "33b9682da680cda9404f9961a62ec208832cbff3"
+      "ref": "v1.4.0",
+      "sha": "518ae0f49bb1c3dc2226607c07da74b591759ed0"
     }
   ]
 }

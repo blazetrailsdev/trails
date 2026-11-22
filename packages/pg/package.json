@@ -40,8 +40,8 @@
   "mirrors": [
     {
       "source": "pg",
-      "ref": "v1.5.9",
-      "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
+      "ref": "v1.6.2",
+      "sha": "c75ed8da19c356b52d83da2627295760780d3d36"
     }
   ]
 }

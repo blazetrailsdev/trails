@@ -259,7 +259,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       // both declared ranges (actionpack `>= 1.0.1`,
       // vendor/rails/actionpack/actionpack.gemspec:40; railties
       // `>= 2.0.0, < 3`, vendor/rails/Gemfile.lock:569).
-      ref: "v2.1.0",
+      ref: "v2.1.1",
     },
     // libPath points at `lib/rack/session/` (the Rack::Session module root)
     // for the same reason `rack` above points at `lib/rack`: bare `lib` would
@@ -460,7 +460,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/ged/ruby-pg.git",
-      ref: "v1.5.9",
+      ref: "v1.6.2",
     },
     packages: [
       {
@@ -477,7 +477,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       type: "git",
       url: "https://github.com/sparklemotion/sqlite3-ruby.git",
       // vendor/rails/Gemfile.lock:603 resolves sqlite3 (2.6.0).
-      ref: "v2.6.0",
+      ref: "v2.7.3",
     },
     packages: [
       {
@@ -537,7 +537,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/minimagick/minimagick.git",
       // vendor/rails/v8.0.2/Gemfile.lock:352 resolves mini_magick (5.2.0), which
       // image_processing (Active Storage's variant processor) depends on.
-      ref: "v5.2.0",
+      ref: "v5.3.1",
     },
     packages: [
       {
@@ -591,7 +591,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rails/thor.git",
-      ref: "v1.3.2",
+      ref: "v1.4.0",
     },
     packages: [
       {
@@ -670,7 +670,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       // The version scripts/parity/pipeline/schema/ruby/Gemfile.lock:32 pins.
       // Move this ref when that pin moves, so the `gem/path.rb:LINE` citations
       // in activesupport/lib/testing/assertions.ts stay checkable.
-      ref: "v5.27.0",
+      ref: "v6.0.0",
     },
     packages: [
       {
@@ -700,7 +700,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       type: "git",
       url: "https://github.com/rails/rails-dom-testing.git",
       // vendor/rails/v8.0.2/Gemfile.lock:447; a read-anchor only, like minitest.
-      ref: "v2.2.0",
+      ref: "v2.3.0",
     },
     packages: [
       {
@@ -755,7 +755,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       // The runtime nokogiri's generated CSS parser runs on
       // (vendor/nokogiri/v1.18.3/lib/nokogiri/css/parser.rb:4 names Racc 1.8.0);
       // a read-anchor for packages/ruby-compat/lib/racc.
-      ref: "v1.8.0",
+      ref: "v1.8.1",
     },
     packages: [
       {
@@ -1029,7 +1029,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rails/solid_cable.git",
-      ref: "v3.0.7",
+      ref: "v3.0.12",
     },
     packages: [
       {
