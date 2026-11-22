@@ -142,10 +142,44 @@ describe("ForkedProcessesLifecycleTest", { timeout: 60_000 }, () => {
     });
 
     await waitForRegisteredProcesses(3, { timeout: 10 });
-    await assertRegisteredWorkersFor("background", "default", { supervisorPid: pid });
+    const dump = async () =>
+      JSON.stringify(
+        (await Record.uncached(() => Process.all().toArray())).map((p) => [
+          p.id,
+          p.kind,
+          p.pid,
+          p.supervisor_id,
+          p.name,
+          String(p.last_heartbeat_at),
+          p.metadata.get("queues"),
+        ]),
+      );
+    const before = await dump();
+    try {
+      await assertRegisteredWorkersFor("background", "default", { supervisorPid: pid });
+    } catch (error) {
+      console.error("FLAKEDIAG", pid, before);
+      for (let i = 0; i < 6; i++) {
+        await sleep(0.5);
+        console.error("FLAKEDIAG", i, isProcessExists(pid), await dump());
+      }
+      throw error;
+    }
   });
 
   afterEach(async () => {
+    console.error(
+      "FLAKEDIAG-after",
+      pid,
+      JSON.stringify(
+        (await Record.uncached(() => Process.all().toArray())).map((p) => [
+          p.id,
+          p.kind,
+          p.pid,
+          p.supervisor_id,
+        ]),
+      ),
+    );
     if (isProcessExists(pid)) await terminateProcess(pid).catch(() => RbProcess.kill("KILL", pid));
     for (const process of await Record.uncached(() => Process.all().toArray())) {
       try {
