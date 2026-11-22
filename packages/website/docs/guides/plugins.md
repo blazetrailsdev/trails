@@ -50,7 +50,7 @@ From the plugin's directory, run its test suite:
 
 ```sh
 cd yaffle
-pnpm test
+bin/test
 ```
 
 A fresh plugin's suite passes, because there is nothing in it yet. Each step

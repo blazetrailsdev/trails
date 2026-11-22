@@ -94,8 +94,7 @@ await this.gemGroup("development", "test", async () => {
 
 ### addSource(source, options, block)
 
-Adds a package source. In a trails app that is a registry entry for the
-package manager.
+Adds a package source: a `registry=` line at the top of the app's `.npmrc`.
 
 ### environment / application(data, options, block)
 
