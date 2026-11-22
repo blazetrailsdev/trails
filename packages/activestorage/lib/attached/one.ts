@@ -13,8 +13,7 @@ import type { CreateOne } from "./changes/create-one.js";
 import { DetachOne } from "./changes/detach-one.js";
 import { PurgeOne } from "./changes/purge-one.js";
 
-type DelegatedAttachment = Omit<
-  Attachment,
+type OwnMember =
   | keyof Attached
   | "purge"
   | "purgeLater"
@@ -24,9 +23,9 @@ type DelegatedAttachment = Omit<
   | "isBlank"
   | "attach"
   | "isAttached"
-  | "loadedAttachment"
-> &
-  Pick<Blob, "url">;
+  | "loadedAttachment";
+
+type DelegatedAttachment = Omit<Attachment, OwnMember> & Omit<Blob, keyof Attachment | OwnMember>;
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface One extends DelegatedAttachment {}
