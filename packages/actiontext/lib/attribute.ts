@@ -112,7 +112,7 @@ function richTextAssociationNames(this: typeof Base): string[] {
 const ClassMethods = { hasRichText, withAllRichText, richTextAssociationNames };
 
 declare module "@blazetrails/activerecord/base.js" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- the engine's on_load(:active_record) include reaches Base's statics only through a namespace merged onto the class.
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Base {
     const hasRichText: typeof ClassMethods.hasRichText;
     const withAllRichText: typeof ClassMethods.withAllRichText;

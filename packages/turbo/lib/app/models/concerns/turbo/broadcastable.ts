@@ -129,7 +129,7 @@ export const ClassMethods = {
 };
 
 declare module "@blazetrails/activerecord/base.js" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- the engine's on_load(:active_record) include reaches Base's statics only through a namespace merged onto the class.
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Base {
     const broadcastsTo: typeof ClassMethods.broadcastsTo;
     const broadcasts: typeof ClassMethods.broadcasts;
