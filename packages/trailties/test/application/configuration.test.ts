@@ -716,13 +716,22 @@ describe("ConfigurationTest", () => {
   });
 
   it("rake_tasks block works at instance level", async () => {
-    const application = await app("development");
-    const config = application.config as unknown as { ranBlock: boolean };
-    config.ranBlock = false;
-    application.rakeTasks(() => {
-      config.ranBlock = true;
-    });
-    await application.initializeBang();
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.configure(function () {
+  this.config.ranBlock = false;
+
+  this.rakeTasks(() => {
+    this.config.ranBlock = true;
+  });
+});
+`,
+    );
+
+    await (await app("development")).initializeBang();
+    const config = Trails.configuration as unknown as { ranBlock: boolean };
     expect(config.ranBlock).toBeFalsy();
 
     await Trails.application!.loadTasks();
@@ -730,13 +739,22 @@ describe("ConfigurationTest", () => {
   });
 
   it("generators block works at instance level", async () => {
-    const application = await app("development");
-    const config = application.config as unknown as { ranBlock: boolean };
-    config.ranBlock = false;
-    application.generators(() => {
-      config.ranBlock = true;
-    });
-    await application.initializeBang();
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.configure(function () {
+  this.config.ranBlock = false;
+
+  this.generators(() => {
+    this.config.ranBlock = true;
+  });
+});
+`,
+    );
+
+    await (await app("development")).initializeBang();
+    const config = Trails.configuration as unknown as { ranBlock: boolean };
     expect(config.ranBlock).toBeFalsy();
 
     await Trails.application!.loadGenerators();
@@ -744,13 +762,22 @@ describe("ConfigurationTest", () => {
   });
 
   it("console block works at instance level", async () => {
-    const application = await app("development");
-    const config = application.config as unknown as { ranBlock: boolean };
-    config.ranBlock = false;
-    application.console(() => {
-      config.ranBlock = true;
-    });
-    await application.initializeBang();
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.configure(function () {
+  this.config.ranBlock = false;
+
+  this.console(() => {
+    this.config.ranBlock = true;
+  });
+});
+`,
+    );
+
+    await (await app("development")).initializeBang();
+    const config = Trails.configuration as unknown as { ranBlock: boolean };
     expect(config.ranBlock).toBeFalsy();
 
     await Trails.application!.loadConsole();
@@ -758,13 +785,22 @@ describe("ConfigurationTest", () => {
   });
 
   it("runner block works at instance level", async () => {
-    const application = await app("development");
-    const config = application.config as unknown as { ranBlock: boolean };
-    config.ranBlock = false;
-    application.runner(() => {
-      config.ranBlock = true;
-    });
-    await application.initializeBang();
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.configure(function () {
+  this.config.ranBlock = false;
+
+  this.runner(() => {
+    this.config.ranBlock = true;
+  });
+});
+`,
+    );
+
+    await (await app("development")).initializeBang();
+    const config = Trails.configuration as unknown as { ranBlock: boolean };
     expect(config.ranBlock).toBeFalsy();
 
     await Trails.application!.loadRunner();
@@ -1055,9 +1091,14 @@ describe("ConfigurationTest", () => {
   });
 
   it("debug_exception_response_format can be overridden", async () => {
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";\nTrails.application!.configure(function () {\n  this.config.debugExceptionResponseFormat = "default";\n});\n`,
+    );
+
     const application = await app("development");
     application.config.apiOnly = true;
-    application.config.debugExceptionResponseFormat = "default";
     await application.initializeBang();
 
     expect(Trails.configuration!.debugExceptionResponseFormat).toBe("default");
