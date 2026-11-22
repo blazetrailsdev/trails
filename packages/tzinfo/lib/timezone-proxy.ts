@@ -1,4 +1,5 @@
-import type { Time } from "@blazetrails/date";
+import type { DateTime, Time } from "@blazetrails/date";
+import type { Timestamp } from "./timestamp.js";
 import { Timezone } from "./timezone.js";
 import type { TimezonePeriod } from "./timezone-period.js";
 import type { TimezoneTransition } from "./timezone-transition.js";
@@ -24,7 +25,7 @@ export class TimezoneProxy extends Timezone {
     return this.realTimezone().periodForUtc(time);
   }
 
-  override periodsForLocal(localTime: Time): TimezonePeriod[] {
+  override periodsForLocal(localTime: Time | DateTime | Timestamp): TimezonePeriod[] {
     return this.realTimezone().periodsForLocal(localTime);
   }
 

@@ -15,7 +15,11 @@ import { CountryIndexDefinition as Format1CountryIndexDefinition } from "./forma
 import { TimezoneDefinition as Format1TimezoneDefinition } from "./format1/timezone-definition.js";
 import { TimezoneIndexDefinition as Format1TimezoneIndexDefinition } from "./format1/timezone-index-definition.js";
 import { RubyDataSource, TZInfoDataNotFound } from "./data-sources/ruby-data-source.js";
-import { StringDeduper, UnaryMinusGlobalStringDeduper } from "./string-deduper.js";
+import {
+  ConcurrentStringDeduper,
+  StringDeduper,
+  UnaryMinusGlobalStringDeduper,
+} from "./string-deduper.js";
 import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
 import { CountryInfo } from "./data-sources/country-info.js";
 import { DataTimezoneInfo } from "./data-sources/data-timezone-info.js";
@@ -95,6 +99,7 @@ export const TZInfo = {
   Country,
   CountryTimezone,
   StringDeduper,
+  ConcurrentStringDeduper,
   UnaryMinusGlobalStringDeduper,
   Format1: {
     CountryDefiner: Format1CountryDefiner,

@@ -1504,7 +1504,7 @@
     }
   },
   "tzinfo": {
-    "rows": 49,
+    "rows": 50,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1544,6 +1544,7 @@
       "info-timezone.ts::InfoTimezone": "TZInfo::InfoTimezone",
       "linked-timezone.ts::LinkedTimezone": "TZInfo::LinkedTimezone",
       "offset-timezone-period.ts::OffsetTimezonePeriod": "TZInfo::OffsetTimezonePeriod",
+      "string-deduper.ts::ConcurrentStringDeduper": "TZInfo::ConcurrentStringDeduper",
       "string-deduper.ts::StringDeduper": "TZInfo::StringDeduper",
       "string-deduper.ts::UnaryMinusGlobalStringDeduper": "TZInfo::UnaryMinusGlobalStringDeduper",
       "timestamp.ts::Timestamp": "TZInfo::Timestamp",

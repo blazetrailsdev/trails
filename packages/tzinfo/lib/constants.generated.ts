@@ -36,6 +36,7 @@ import * as m33 from "./transitions-timezone-period.js";
 
 defineConstants([
   [m32, "AmbiguousTime", "TZInfo::AmbiguousTime"],
+  [m26, "ConcurrentStringDeduper", "TZInfo::ConcurrentStringDeduper"],
   [m1, "Country", "TZInfo::Country"],
   [m0, "CountryTimezone", "TZInfo::CountryTimezone"],
   [m2, "DataSource", "TZInfo::DataSource"],
