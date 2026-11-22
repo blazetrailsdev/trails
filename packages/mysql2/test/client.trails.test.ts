@@ -2,7 +2,7 @@ import { it, expect, describe, vi } from "vitest";
 import { Time } from "@blazetrails/date";
 import mysqlCore from "mysql2";
 import mysql from "mysql2/promise";
-import { File, NameError } from "@blazetrails/ruby-compat";
+import { File, NameError, stderr } from "@blazetrails/ruby-compat";
 import { Mysql2, type Client } from "../lib/index.js";
 
 async function clientOn(connection: object): Promise<Client> {
@@ -295,15 +295,15 @@ describe("Mysql2::Client#warning_count", () => {
     expect((await rowOf({ castBooleans: true })).b).toBe(true);
     expect((await rowOf({})).b).toBe(1);
 
-    const stderr = vi.spyOn(globalThis.process.stderr, "write").mockImplementation(() => true);
+    const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
     try {
       const row = await rowOf({ cast: false, cacheRows: false });
       expect(row.t).toBeInstanceOf(Time);
-      expect(stderr.mock.calls.map(([m]) => String(m)).join("")).toMatch(
+      expect(write.mock.calls.map(([m]) => String(m)).join("")).toMatch(
         /:cache_rows is forced for prepared statements \(if not streaming\)\n:cast is forced for prepared statements/,
       );
     } finally {
-      stderr.mockRestore();
+      write.mockRestore();
     }
   });
 

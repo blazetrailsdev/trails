@@ -1,6 +1,6 @@
 import "@blazetrails/vitest-matchers";
-import { BigDecimal, rbCFloat, rbCNilClass } from "@blazetrails/ruby-compat";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { BigDecimal, rbCFloat, rbCNilClass, stderr } from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import { Mysql2, type Client } from "../lib/index.js";
 import { lastIdTestLock, specHelper } from "./spec-helper.js";
@@ -164,8 +164,19 @@ describe("Mysql2::Statement", () => {
     ))!.toA()[0] as Record<string, BigDecimal>;
     expect(test_result["decimal_test"].toF()).toBe(123.45);
   });
-  // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
-  it.skip("should warn but still work if cache_rows is set to false", () => {});
+  it("should warn but still work if cache_rows is set to false", async () => {
+    const statement = await state.client.prepare("SELECT 1");
+    const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
+    try {
+      const result = (await statement.execute({ cacheRows: false }))!.toA();
+      expect(write.mock.calls.map(([m]) => String(m)).join("")).toMatch(
+        /:cache_rows is forced for prepared statements/,
+      );
+      expect(result.length).toBe(1);
+    } finally {
+      write.mockRestore();
+    }
+  });
   describe("utf8_db", () => {
     // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either".
     it.skip("should be able to retrieve utf8 field names correctly", () => {});
@@ -173,7 +184,6 @@ describe("Mysql2::Statement", () => {
     it.skip("should be able to retrieve query with param in different encoding correctly", () => {});
   });
   describe("streaming result", () => {
-    // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
     it.skip("should be able to stream query result", () => {});
   });
   describe("#each", () => {
@@ -197,11 +207,17 @@ describe("Mysql2::Statement", () => {
         expect(row).toBeInstanceOf(Array);
       });
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should cache previously yielded results by default", () => {});
-    // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
+    it("should cache previously yielded results by default", async () => {
+      const result = (await (await state.client.prepare("SELECT 1")).execute())!;
+      expect(result.toA()[0]).toBe(result.toA()[0]);
+    });
     it.skip("should yield different value for #first if streaming", () => {});
-    it.skip("should yield the same value for #first if streaming is disabled", () => {});
+    it("should yield the same value for #first if streaming is disabled", async () => {
+      const result = (await (
+        await state.client.prepare("SELECT 1 UNION SELECT 2")
+      ).execute({ stream: false }))!;
+      expect(result.toA()[0]).toEqual(result.toA()[0]);
+    });
     it.skip("should throw an exception if we try to iterate twice when streaming is enabled", () => {});
   });
   describe("#fields", () => {

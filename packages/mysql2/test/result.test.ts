@@ -59,13 +59,23 @@ describe("Mysql2::Result", () => {
         expect(row).toBeInstanceOf(Array);
       });
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should cache previously yielded results by default", () => {});
-    // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
-    it.skip("should not cache previously yielded results if cache_rows is disabled", () => {});
-    it.skip("should be able to iterate a second time even if cache_rows is disabled", () => {});
+    it("should cache previously yielded results by default", async () => {
+      const result = (await state.client.query("SELECT 1"))!;
+      expect(result.toA()[0]).toBe(result.toA()[0]);
+    });
+    it("should not cache previously yielded results if cache_rows is disabled", async () => {
+      const result = (await state.client.query("SELECT 1", { cacheRows: false }))!;
+      expect(result.toA()[0]).not.toBe(result.toA()[0]);
+    });
+    it("should be able to iterate a second time even if cache_rows is disabled", async () => {
+      const result = (await state.client.query("SELECT 1 UNION SELECT 2", { cacheRows: false }))!;
+      expect(result.toA()).toEqual(result.toA());
+    });
     it.skip("should yield different value for #first if streaming", () => {});
-    it.skip("should yield the same value for #first if streaming is disabled", () => {});
+    it("should yield the same value for #first if streaming is disabled", async () => {
+      const result = (await state.client.query("SELECT 1 UNION SELECT 2", { stream: false }))!;
+      expect(result.toA()[0]).toEqual(result.toA()[0]);
+    });
     it.skip("should throw an exception if we try to iterate twice when streaming is enabled", () => {});
   });
   describe("#fields", () => {
@@ -90,7 +100,6 @@ describe("Mysql2::Result", () => {
     it.skip("should return json type on mysql 8.0", () => {});
   });
   describe("streaming", () => {
-    // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
     it.skip("should maintain a count while streaming", () => {});
     it.skip("should retain the count when mixing first and each", () => {});
     it.skip("should not yield nil at the end of streaming", () => {});
