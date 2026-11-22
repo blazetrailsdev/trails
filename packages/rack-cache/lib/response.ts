@@ -34,8 +34,8 @@ export class Response {
     this._cacheControl = null;
   }
 
-  toA(): [number, object, unknown] {
-    return [this.status, this.headers.toHash(), this.body];
+  toA(): [number, Record<string, string>, unknown] {
+    return [this.status, this.headers.toHash() as Record<string, string>, this.body];
   }
 
   static readonly CACHEABLE_RESPONSE_CODES: ReadonlySet<number> = new Set([

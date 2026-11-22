@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import { Headers } from "../lib/headers.js";
 import { Response, Raw } from "../lib/response.js";
 
 describe("Rack::Response::Raw", () => {
@@ -103,5 +104,14 @@ describe("Rack::Response#buffered_body!", () => {
     response.write("c");
     expect(closed).toBe(1);
     expect(response.body).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("Rack::Response", () => {
+  it("copies headers given as a Rack::Headers", () => {
+    const headers = new Headers();
+    headers.set("Content-Type", "text/plain");
+    const response = new Response([], 200, headers);
+    expect(response.headers["content-type"]).toBe("text/plain");
   });
 });
