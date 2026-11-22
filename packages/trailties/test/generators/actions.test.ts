@@ -483,6 +483,90 @@ describe("ActionsTest", () => {
     );
   });
 
+  it("gem should include options", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", () =>
+      makeGen().gem("rspec", { github: "dchelimsky/rspec", tag: "1.2.9.rc1" }),
+    );
+    await assertFile("package.json", /"rspec": "github:dchelimsky\/rspec#1\.2\.9\.rc1"/);
+  });
+
+  it("gem with non string options", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.gem("rspec", { require: false });
+      await gen.gem("rspec-rails", { group: ["development", "test"] });
+    });
+    await assertFile("package.json", /"dependencies": \{\n {4}"rspec": "\*"\n/);
+    await assertFile("package.json", /"devDependencies": \{\n {4}"rspec-rails": "\*"\n/);
+  });
+
+  it("gem falls back to inspect if string contains single quote", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", () => makeGen().gem("rspec", ">=2.0.0"));
+    await assertFile("package.json", /"rspec": ">=2\.0\.0"/);
+  });
+
+  it("gem works even if frozen string is passed as argument", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", () => makeGen().gem("frozen_gem", "1.0.0"));
+    await assertFile("package.json", /"frozen_gem": "1\.0\.0"/);
+  });
+
+  it("github should create an indented block", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.github("user/repo", {}, async () => {
+        await gen.gem("foo");
+        await gen.gem("bar");
+        await gen.gem("baz");
+      });
+    });
+    await assertFile(
+      "package.json",
+      /"foo": "github:user\/repo",\n {4}"bar": "github:user\/repo",\n {4}"baz": "github:user\/repo"\n/,
+    );
+  });
+
+  it("github should create an indented block with options", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.github("user/repo", { a: "correct", other: true }, () => gen.gem("foo"));
+    });
+    await assertFile("package.json", /"foo": "github:user\/repo"\n/);
+  });
+
+  it("github should create newline between blocks", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.github("user/repo", { a: "correct", other: true }, () => gen.gem("foo"));
+      await gen.github("user/repo2", { a: "correct", other: true }, () => gen.gem("bar"));
+    });
+    await assertFile(
+      "package.json",
+      /"foo": "github:user\/repo",\n {4}"bar": "github:user\/repo2"\n/,
+    );
+  });
+
+  it("github should create an indented block within a group", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.gemGroup("test", async () => {
+        await gen.github("user/repo", { a: "correct", other: true }, () => gen.gem("foo"));
+        await gen.github("user/repo2", { a: "correct", other: true }, () => gen.gem("bar"));
+      });
+    });
+    await assertFile(
+      "package.json",
+      /"devDependencies": \{\n {4}"foo": "github:user\/repo",\n {4}"bar": "github:user\/repo2"\n/,
+    );
+  });
+
   it("invoke other generator with shortcut", async () => {
     await makeGen().invoke("model", ["my_model"]);
     await assertFile("app/models/my-model.js", /MyModel/);

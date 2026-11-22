@@ -26,6 +26,7 @@ export interface ActionsHost {
   findInSourcePaths(file: string): Promise<string>;
   _indentation: number;
   _gemGroups: string[];
+  _githubRepos: string[];
   prependFile(path: string, ...args: unknown[]): unknown;
 }
 
@@ -61,6 +62,8 @@ export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): 
   log.call(this, "gemfile", message);
 
   const groups = [...this._gemGroups, ...[options.group ?? []].flat()];
+  const github = options.github != null ? String(options.github) : this._githubRepos.at(-1);
+  const ref = options.tag ?? options.branch ?? options.ref;
 
   await this.inRoot(async () => {
     const json = JSON.parse(await File.readAsync("package.json")) as Record<
@@ -73,7 +76,11 @@ export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): 
         : "dependencies";
     json[key] = {
       ...json[key],
-      [name]: options.git ? String(options.git) : _versions.join(" ") || "*",
+      [name]: options.git
+        ? String(options.git)
+        : github != null
+          ? `github:${github}${ref != null ? `#${String(ref)}` : ""}`
+          : _versions.join(" ") || "*",
     };
     await File.writeAsync("package.json", `${JSON.stringify(json, null, 2)}\n`);
   });
@@ -98,6 +105,30 @@ export async function gemGroup(
       );
     } finally {
       this._gemGroups.length -= names.length;
+    }
+  });
+}
+
+/** @missingRailsCall appendFileWithNewline — PERMANENT */
+export async function github(
+  this: ActionsHost,
+  repo: string,
+  options: Record<string, unknown> = {},
+  block?: (this: ActionsHost) => unknown,
+): Promise<void> {
+  const str = [quote(repo)];
+  if (Object.keys(options).length > 0) str.push(quote(options));
+  log.call(this, "github", `github ${str.join(", ")}`);
+
+  await this.inRoot(async () => {
+    this._githubRepos.push(repo);
+    try {
+      await withIndentation.call(
+        this,
+        block as (this: Pick<ActionsHost, "_indentation">) => unknown,
+      );
+    } finally {
+      this._githubRepos.pop();
     }
   });
 }
