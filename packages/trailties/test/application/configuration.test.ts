@@ -221,7 +221,13 @@ describe("ConfigurationTest", () => {
     for (const [config, snapshot] of [
       [ActiveJobTrailtie.config.activeJob, activeJob],
       [ActionMailerTrailtie.config.actionMailer, actionMailer],
-      [ActiveStorageEngine.config.activeStorage, activeStorage],
+      [
+        ActiveStorageEngine.config.activeStorage,
+        {
+          ...activeStorage,
+          serviceConfigurations: ActiveStorageEngine.config.activeStorage.serviceConfigurations,
+        },
+      ],
       [ActionTextEngine.config.actionText, actionText],
     ] as const) {
       (config as unknown as OrderedOptions).clear().update(snapshot);
