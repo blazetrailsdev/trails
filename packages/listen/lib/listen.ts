@@ -1,8 +1,10 @@
-import type { ListenerBlock } from "./listen/listener.js";
+import { TopLevel } from "@blazetrails/ruby-compat";
 
-import { Listener, type ListenerOptions } from "./listen/listener.js";
+import type { ListenerBlock } from "./listener.js";
 
-export { Listener, type ListenerBlock, type ListenerOptions } from "./listen/listener.js";
+import { Listener, type ListenerOptions } from "./listener.js";
+
+export { Listener, type ListenerBlock, type ListenerOptions } from "./listener.js";
 
 const listeners: WeakRef<Listener>[] = [];
 
@@ -22,3 +24,12 @@ export const Listen = {
     }
   },
 };
+TopLevel.Listen = Listen;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Listen?: typeof Listen;
+  }
+}
+
+import "./constants.generated.js";

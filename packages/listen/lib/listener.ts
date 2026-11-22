@@ -8,7 +8,6 @@ export interface ListenerOptions {
   relative?: boolean;
   forcePolling?: boolean;
   pollingFallbackMessage?: string | null;
-  latency?: number;
   ignore?: RegExp | RegExp[];
   ignoreBang?: RegExp | RegExp[];
   only?: RegExp | RegExp[];
@@ -73,19 +72,13 @@ export class Listener {
   /** @internal */
   _timer: ReturnType<typeof setTimeout> | null = null;
 
+  /** @missingRailsCall new — PERMANENT */
   constructor(...dirs: (string | ListenerOptions | ListenerBlock)[]) {
     const block = rbBlockGivenP(dirs.at(-1)) ? (dirs.pop() as ListenerBlock) : null;
     const last = dirs.at(-1);
     const options = last != null && typeof last === "object" ? (dirs.pop() as ListenerOptions) : {};
 
     this._options = { ...DEFAULTS, ...options };
-    for (const key of Object.keys(options)) {
-      if (!["latency", "ignore", "ignoreBang", "only"].includes(key) && !(key in DEFAULTS)) {
-        throw new ArgumentError(
-          `Unknown options: ${rbInspect({ [key]: options[key as keyof ListenerOptions] })}`,
-        );
-      }
-    }
     this._dirs = dirs as string[];
     this._block = block;
     const rules: ListenerOptions = {};
@@ -144,9 +137,11 @@ export class Listener {
 
   /** @internal */
   async _transition(newState: State): Promise<void> {
+    if (this._state === newState) return;
     if (!STATES[this._state].includes(newState)) {
+      const valid = STATES[this._state].join(", ");
       throw new ArgumentError(
-        `can't transition from ${rbInspect(`:${this._state}`)} to ${rbInspect(`:${newState}`)}`,
+        `Listener can't change state from '${this._state}' to '${newState}', only to: ${valid}`,
       );
     }
     this._state = newState;
@@ -200,7 +195,7 @@ export class Listener {
   /** @internal */
   _scheduleProcessChanges(): void {
     if (this._timer != null || this._changes.length === 0) return;
-    const latency = this._options.waitForDelay ?? this._options.latency ?? WAIT_FOR_DELAY;
+    const latency = this._options.waitForDelay ?? WAIT_FOR_DELAY;
     this._timer = setTimeout(() => {
       this._timer = null;
       if (this._state !== "processingEvents") return;
