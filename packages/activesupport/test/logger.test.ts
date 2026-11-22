@@ -185,7 +185,7 @@ describe("LoggerTest", () => {
     expect(output.string).toContain("THIS IS HERE");
   });
 
-  it("log at only impacts receiver", () => {
+  it("log at only impact receiver", () => {
     const logger2 = new Logger(makeBuffer());
     expect(logger2.level).toBe(Logger.DEBUG);
     expect(logger.level).toBe(Logger.DEBUG);
