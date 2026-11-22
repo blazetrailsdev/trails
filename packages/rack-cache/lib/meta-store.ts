@@ -256,7 +256,7 @@ export class Disk extends MetaStore {
 
   static async new(root?: string): Promise<Disk> {
     const store = rbClassNewInstance(this, root) as Disk;
-    await FileUtils.mkdirPAsync(root ?? store.root, { mode: 0o755 });
+    await FileUtils.mkdirPAsync(root ?? `/tmp/rack-cache/meta-${ARGV[0]}`, { mode: 0o755 });
     return store;
   }
 

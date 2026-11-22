@@ -456,16 +456,14 @@ export class Dir {
   }
 
   /**
-   * {@link Dir.mkdir} over the backend's async `mkdir`, or its `mkdirSync`,
+   * {@link Dir.mkdir} over the backend's async `mkdir`,
    * with `dir_s_mkdir`'s optional `permissions` argument.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.mkdir`
    * (`vendor/ruby/v3.3.11/dir.c:1494`).
    */
   static async mkdirAsync(dirname: string, permissions?: number): Promise<number> {
-    const fs = getFs();
-    if (fs.mkdir) await fs.mkdir(dirname, permissions == null ? {} : { mode: permissions });
-    else fs.mkdirSync(dirname);
+    await getFs().mkdir!(dirname, permissions == null ? {} : { mode: permissions });
     return 0;
   }
 

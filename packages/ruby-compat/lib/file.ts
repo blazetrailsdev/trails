@@ -624,11 +624,12 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.open`
    * (`vendor/ruby/v3.3.11/io.c:8148`).
    */
-  static async openAsync(
+  static async openAsync<F extends File>(
+    this: new (fileName: number, mode?: string | FileOpenOpt, opt?: FileOpenOpt) => F,
     fileName: string,
     mode?: string | FileOpenOpt,
     opt?: FileOpenOpt,
-  ): Promise<File>;
+  ): Promise<F>;
   static async openAsync<T>(
     fileName: string,
     mode: string | FileOpenOpt | undefined,

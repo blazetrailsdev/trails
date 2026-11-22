@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type {} from "@blazetrails/vitest-matchers";
 import { Time } from "@blazetrails/date";
 import { MockRequest } from "@blazetrails/rack";
-import { NotImplementedError, StringIO, each } from "@blazetrails/ruby-compat";
+import { File, NotImplementedError, StringIO } from "@blazetrails/ruby-compat";
 import { EntityStore, Heap as EntityHeap } from "../lib/entity-store.js";
 import { createTempDirectory, removeEntrySecure } from "./support/test-helper.js";
 import { MetaStore } from "../lib/meta-store.js";
@@ -32,12 +32,11 @@ export function rackCacheMetaStoreImplementation(
     return new Response(status, headers, body);
   }
 
-  async function slurp(body: Iterable<string>): Promise<string> {
+  async function slurp(body: Iterable<string> | File): Promise<string> {
     let buf = "";
-    await each(
-      body,
-      (part) => (buf += typeof part === "string" ? part : new TextDecoder().decode(part)),
-    );
+    for await (const part of body instanceof File ? body.eachAsync() : body) {
+      buf += typeof part === "string" ? part : new TextDecoder().decode(part);
+    }
     return buf;
   }
 

@@ -30,13 +30,16 @@ export class EntityStore {
   protected async slurp(body: RackBody, block: (part: Part) => unknown): Promise<[string, number]> {
     const digest = Digest.SHA1.new();
     let size = 0;
-    let yielded: Promise<unknown> = Promise.resolve();
-    await each(body, (part) => {
+    const yieldPart = (part: Part): unknown => {
       size += this.bytesize(part);
       digest.update(part);
-      yielded = yielded.then(() => block(part));
-    });
-    await yielded;
+      return block(part);
+    };
+    if (Symbol.iterator in body) {
+      for (const part of body) await yieldPart(part);
+    } else {
+      await each(body, yieldPart);
+    }
     if (rbObjRespondTo(body, "close")) await body.close!();
     return [digest.hexdigest(), size];
   }
@@ -135,24 +138,8 @@ export class Noop extends EntityStore {
 EntityStore.Noop = Noop;
 EntityStore.NOOP = Noop;
 
-export class Body extends File {
-  /** @missingRailsCall read — PERMANENT */
-  // @ts-expect-error TS2416
-  override async each(block: (part: Uint8Array) => unknown): Promise<this> {
-    let part: Uint8Array | null;
-    while ((part = await this.readAsync(8192)) != null) {
-      await block(part);
-    }
-    return this;
-  }
-
-  override toPath(): string | null {
-    return this.path();
-  }
-}
-
 export class Disk extends EntityStore {
-  static Body = Body;
+  static Body: typeof Body;
 
   readonly root: string;
 
@@ -182,7 +169,7 @@ export class Disk extends EntityStore {
 
   async open(key: string): Promise<Body | null> {
     try {
-      return (await Body.openAsync(this.bodyPath(key), "rb")) as unknown as Body;
+      return await Body.openAsync(this.bodyPath(key), "rb");
     } catch (error) {
       if (error instanceof Errno.ENOENT) return null;
       throw error;
@@ -236,6 +223,25 @@ export class Disk extends EntityStore {
     return this.new(path);
   }
 }
+
+export class Body extends File {
+  /**
+   * @missingRailsCall read — PERMANENT
+   * @noRailsEquivalent PERMANENT
+   */
+  override async *eachAsync(): AsyncGenerator<Uint8Array> {
+    let part: Uint8Array | null;
+    while ((part = await this.readAsync(8192)) != null) {
+      yield part;
+    }
+  }
+
+  override toPath(): string | null {
+    return this.path();
+  }
+}
+
+Disk.Body = Body;
 
 EntityStore.Disk = Disk;
 EntityStore.DISK = Disk;

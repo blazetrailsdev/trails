@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Dir, File, each, getFs, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Dir, File, getFs, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Disk, EntityStore, Heap, Noop } from "../lib/entity-store.js";
 import { createTempDirectory, removeEntrySecure } from "./support/test-helper.js";
 
@@ -68,9 +68,9 @@ export function rackCacheEntityStoreImplementation(store: () => Heap | Disk): vo
   it("returns a Rack compatible body from #open", async () => {
     const [key] = await store().write(["Some shells for her hair."]);
     const body = (await store().open(key))!;
-    expect(Symbol.iterator in body || rbObjRespondTo(body, "each")).toBeTruthy();
+    expect(rbObjRespondTo(body, "each")).toBeTruthy();
     let buf = "";
-    await each(body as Iterable<string>, (part) => (buf += text(part)));
+    for await (const part of body instanceof File ? body.eachAsync() : body) buf += text(part);
     expect(buf).toBe("Some shells for her hair.");
   });
 
