@@ -24,6 +24,7 @@ import {
   runLoadHooks,
 } from "@blazetrails/activesupport";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { dumpSchemaAfterMigration } from "@blazetrails/activerecord";
 import { Methods } from "@blazetrails/rack-test";
@@ -54,6 +55,7 @@ import {
   rbObjRespondTo,
   STDOUT,
   NameError,
+  Process,
   TopLevel,
   env,
   getFs,
@@ -2470,16 +2472,32 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
     );
   });
 
-  for (const env of ["development", "test", "production"]) {
-    it(`In ${env} mode, config.public_file_server.enabled is on by default`, async () => {
-      await restoreDefaultConfig();
+  it("In development mode, config.public_file_server.enabled is on by default", async () => {
+    await restoreDefaultConfig();
 
-      await t.withTrailsEnv(env, async () => {
-        await app(env);
-        expect((await app()).config.publicFileServer.enabled).toBeTruthy();
-      });
+    await t.withTrailsEnv("development", async () => {
+      await app("development");
+      expect((await app()).config.publicFileServer.enabled).toBeTruthy();
     });
-  }
+  });
+
+  it("In test mode, config.public_file_server.enabled is on by default", async () => {
+    await restoreDefaultConfig();
+
+    await t.withTrailsEnv("test", async () => {
+      await app("test");
+      expect((await app()).config.publicFileServer.enabled).toBeTruthy();
+    });
+  });
+
+  it("In production mode, config.public_file_server.enabled is on by default", async () => {
+    await restoreDefaultConfig();
+
+    await t.withTrailsEnv("production", async () => {
+      await app("production");
+      expect((await app()).config.publicFileServer.enabled).toBeTruthy();
+    });
+  });
 
   it("In production mode, STDOUT logging is the default", async () => {
     await restoreDefaultConfig();
@@ -2695,7 +2713,10 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
     await t.removeFile("config/master.key");
     await t.addToConfig("this.config.requireMasterKey = true;");
 
-    await app("development");
+    const error = await capture("stderr", () => app("development"));
+
+    expect(Process.lastStatus!.exitstatus()).toBe(1);
+    expect(error).toMatch(/Missing.*TRAILS_MASTER_KEY/);
   });
 
   it("protect from forgery is the default in a new app", async () => {
