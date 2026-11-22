@@ -311,7 +311,7 @@ describe("CookiesTest", { timeout: 120_000 }, () => {
     );
 
     await t.addToConfig(`
-        const { classAttribute, ActiveSupportJSON } = await import("@blazetrails/activesupport");
+        const { classAttribute } = await import("@blazetrails/activesupport");
         const { MessageEncryptor } = await import("@blazetrails/activesupport/message-encryptor");
         const { Marshal } = await import("@blazetrails/ruby-compat");
         const firstSecret = Trails.application!.keyGenerator().generateKey("first", 32);
@@ -411,7 +411,6 @@ describe("CookiesTest", { timeout: 120_000 }, () => {
     await t.addToConfig(`
         const { classAttribute, ActiveSupportJSON } = await import("@blazetrails/activesupport");
         const { MessageEncryptor } = await import("@blazetrails/activesupport/message-encryptor");
-        const { Marshal } = await import("@blazetrails/ruby-compat");
         const firstSecret = Trails.application!.keyGenerator().generateKey("first", 32);
         const secondSecret = Trails.application!.keyGenerator().generateKey("second", 32);
 
