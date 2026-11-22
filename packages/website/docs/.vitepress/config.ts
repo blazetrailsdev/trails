@@ -53,6 +53,7 @@ export default defineConfig({
               text: "Action Controller Advanced Topics",
               link: "/guides/action-controller-advanced-topics",
             },
+            { text: "Trails Routing from the Outside In", link: "/guides/routing" },
           ],
         },
         {
@@ -110,6 +111,7 @@ export default defineConfig({
               text: "Active Support Instrumentation",
               link: "/guides/active-support-instrumentation",
             },
+            { text: "Testing Trails Applications", link: "/guides/testing" },
             { text: "Using Trails for API-only Applications", link: "/guides/api-app" },
             {
               text: "Debugging Trails Applications",
@@ -143,6 +145,7 @@ export default defineConfig({
           items: [
             { text: "Caching with Trails: An Overview", link: "/guides/caching-with-rails" },
             { text: "Error Reporting in Trails Applications", link: "/guides/error-reporting" },
+            { text: "Securing Trails Applications", link: "/guides/security" },
           ],
         },
         {
