@@ -18,6 +18,10 @@
       "types": "./dist/testing.d.ts",
       "default": "./dist/testing.js"
     },
+    "./action-dispatch/http/rack-cache": {
+      "types": "./dist/action-dispatch/http/rack-cache.d.ts",
+      "default": "./dist/action-dispatch/http/rack-cache.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -29,11 +33,15 @@
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@blazetrails/rack-cache": "workspace:*",
     "playwright": ">=1.40.0",
     "vite": ">=7.0.0",
     "vitest": ">=3.0.0"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/rack-cache": {
+      "optional": true
+    },
     "playwright": {
       "optional": true
     },
@@ -63,6 +71,7 @@
     "node": ">=26"
   },
   "devDependencies": {
+    "@blazetrails/rack-cache": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
     "vite": "^7.0.0"

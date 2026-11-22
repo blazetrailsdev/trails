@@ -350,6 +350,10 @@ const alias = {
     __dirname,
     "packages/actionpack/lib/system-testing.ts",
   ),
+  "@blazetrails/actionpack/action-dispatch/http/rack-cache": path.resolve(
+    __dirname,
+    "packages/actionpack/lib/action-dispatch/http/rack-cache.ts",
+  ),
   "@blazetrails/actionpack/testing": path.resolve(__dirname, "packages/actionpack/lib/testing.ts"),
   "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/lib/index.ts"),
   "@blazetrails/globalid/wire": path.resolve(__dirname, "packages/globalid/lib/wire.ts"),
