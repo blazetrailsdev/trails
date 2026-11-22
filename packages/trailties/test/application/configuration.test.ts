@@ -10,7 +10,7 @@ import {
   vi,
 } from "vitest";
 import { constSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
-import { ActionController, ActionDispatch, Response, Session } from "@blazetrails/actionpack";
+import { ActionDispatch, Response, Session } from "@blazetrails/actionpack";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -48,9 +48,7 @@ import { days, Logger } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   constGet,
-  File,
   FileUtils,
-  include,
   rbInspect,
   rbObjRespondTo,
   STDOUT,
@@ -111,8 +109,7 @@ import { Application } from "../../lib/application.js";
 import { LOAD_DEFAULTS_VERSION } from "../../lib/application/configuration.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
 import { Inflector } from "../../lib/autoloaders/inflector.js";
-import type { Generation, Rack } from "../support/isolation/abstract-unit.js";
-import "../support/isolation/abstract-unit.js";
+import type { Rack as RackHelpers } from "../support/isolation/abstract-unit.js";
 import { EnvHelpers } from "../support/env-helpers.js";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 
@@ -2358,7 +2355,7 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface IsolatedConfigurationTest
-  extends Generation, Omit<Rack, "assert" | "assertEqual" | "assertMatch">, EnvHelpers {}
+  extends Generation, Omit<RackHelpers, "assert" | "assertEqual" | "assertMatch">, EnvHelpers {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class IsolatedConfigurationTest extends TestCase {}
 include(IsolatedConfigurationTest, Isolation);
