@@ -49,7 +49,7 @@ describe("PathsTest", { timeout: 120_000 }, () => {
   }
 
   function assertInLoadPath(...path: string[]): void {
-    expect(LOAD_PATH.some((p) => File.expandPath(p) === root(...path))).toBe(true);
+    expect(LOAD_PATH.some((p) => File.expandPath(p) === root(...path))).toBeTruthy();
   }
 
   function assertNotInLoadPath(...path: string[]): void {
@@ -76,9 +76,9 @@ describe("PathsTest", { timeout: 120_000 }, () => {
 
   it("booting up Rails yields a list of paths that are eager", async () => {
     const eagerLoad = paths.eagerLoad();
-    expect(eagerLoad).toContain(root("app/controllers"));
-    expect(eagerLoad).toContain(root("app/helpers"));
-    expect(eagerLoad).toContain(root("app/models"));
+    expect(eagerLoad).toContainEqual(root("app/controllers"));
+    expect(eagerLoad).toContainEqual(root("app/helpers"));
+    expect(eagerLoad).toContainEqual(root("app/models"));
   });
 
   it("environments has a glob equal to the current environment", async () => {
