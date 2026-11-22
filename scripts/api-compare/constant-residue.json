@@ -697,7 +697,7 @@
     }
   },
   "activesupport": {
-    "rows": 196,
+    "rows": 200,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -774,6 +774,7 @@
       "xml-mini.ts::XmlMini"
     ],
     "residue": {
+      "cache/strategy/local-cache-middleware.ts::Middleware": "ActiveSupport::Cache::Strategy::LocalCache::Middleware",
       "callbacks.ts::After": "ActiveSupport::Callbacks::Filters::After",
       "callbacks.ts::Around": "ActiveSupport::Callbacks::Filters::Around",
       "callbacks.ts::Before": "ActiveSupport::Callbacks::Filters::Before",

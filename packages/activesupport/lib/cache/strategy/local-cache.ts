@@ -8,6 +8,7 @@ import {
   slice,
 } from "@blazetrails/ruby-compat";
 import { underscore } from "../../inflector.js";
+import { ActiveSupport } from "../../namespaces.js";
 import { extractOptionsBang } from "../../hash-utils.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import type { Entry } from "../entry.js";
@@ -372,3 +373,10 @@ export const LocalCache = {
     });
   },
 };
+
+ActiveSupport.Cache.Strategy ??= { name: "ActiveSupport::Cache::Strategy" };
+ActiveSupport.Cache.Strategy.LocalCache = Object.assign(
+  LocalCache,
+  ActiveSupport.Cache.Strategy.LocalCache,
+  { LocalCacheRegistry, LocalStore },
+);

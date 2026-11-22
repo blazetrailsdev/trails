@@ -49,3 +49,6 @@ export class Middleware {
     }
   }
 }
+
+const Strategy = (ActiveSupport.Cache.Strategy ??= { name: "ActiveSupport::Cache::Strategy" });
+(Strategy.LocalCache ??= {} as NonNullable<typeof Strategy.LocalCache>).Middleware = Middleware;

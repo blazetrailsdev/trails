@@ -6,7 +6,7 @@ import {
   rbObjRespondTo,
   Pathname as RubyPathname,
 } from "@blazetrails/ruby-compat";
-import { Pathname } from "../pathname/blank.js";
+import * as pathnameBlank from "../pathname/blank.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { stripThenable } from "../../strip-thenable.js";
 
@@ -133,7 +133,7 @@ export function isBlank(value: unknown): boolean {
   )
     return Time.isBlank(value);
   if (value instanceof Set || value instanceof Map) return value.size === 0;
-  if (value instanceof RubyPathname) return Pathname.isBlank(value);
+  if (value instanceof RubyPathname) return pathnameBlank.isBlank(value);
   const blank = (value as { isBlank?: unknown }).isBlank;
   if (typeof blank === "function" && !isAsyncFunction(blank)) {
     const result: unknown = (blank as () => unknown).call(value);
