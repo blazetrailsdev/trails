@@ -119,7 +119,7 @@ describe("Mysql2::Result", () => {
     it("should return an array of frozen strings", async () => {
       const result = await state.client.query("SELECT 'a', 'b', 'c'");
       for (const f of result!.fields) {
-        expect(Object.isFrozen(f)).toBe(true);
+        expect(Object.isFrozen(f)).toBeTruthy();
       }
     });
   });
