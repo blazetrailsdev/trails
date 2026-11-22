@@ -62,6 +62,7 @@ export class Pool extends PersistedSecure {
     return sessionId;
   }
 
+  /** @missingRailsCall store — PERMANENT */
   override async deleteSession(
     _req: PersistedRequest,
     sessionId: SessionId,
