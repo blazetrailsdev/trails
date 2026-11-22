@@ -56,7 +56,8 @@ export class Pool extends PersistedSecure {
     sessionId: SessionId,
     newSession: Record<string, unknown>,
     _options: Record<string, unknown>,
-  ): Promise<SessionId> {
+  ): Promise<SessionId | false> {
+    if (!isTruthy(this.getSessionWithFallback(sessionId))) return false;
     this.pool[sessionId.privateId] = newSession;
     return sessionId;
   }
@@ -68,7 +69,12 @@ export class Pool extends PersistedSecure {
   ): Promise<SessionId | null> {
     delete this.pool[sessionId.publicId];
     delete this.pool[sessionId.privateId];
-    if (!isTruthy(hashAref(options, "drop"))) return this.generateSid({ useMutex: false });
+
+    if (!isTruthy(hashAref(options, "drop"))) {
+      const sid = this.generateSid({ useMutex: false });
+      this.pool[sid.privateId] = {};
+      return sid;
+    }
     return null;
   }
 

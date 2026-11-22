@@ -334,10 +334,7 @@ export class Connection {
     });
   }
 
-  /**
-   * @missingRailsArgs connect — PERMANENT
-   * @missingRailsArgs new — PERMANENT
-   */
+  /** @missingRailsArgs new — PERMANENT */
   async cancel(): Promise<string | null> {
     const { processID: bePid, secretKey: beKey, connection, host, port } = this.client;
     if (connection == null) throw new ConnectionBad("connection is closed", { connection: this });
