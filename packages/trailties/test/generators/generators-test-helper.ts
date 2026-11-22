@@ -125,6 +125,15 @@ export async function runAppUpdate(
   appRoot: string = this.destinationRoot,
   { flags = "--force" }: { flags?: string } = {},
 ): Promise<void> {
+  await linkFrameworkPackages(appRoot);
+  await Dir.chdir(appRoot, async () => {
+    await silenceStream(stdout, () =>
+      rbFSystem(`bin/trails app:update ${flags}`, { exception: true }),
+    );
+  });
+}
+
+export async function linkFrameworkPackages(appRoot: string): Promise<void> {
   await Dir.chdir(appRoot, async () => {
     const frameworkRoot = File.expandPath("../..", import.meta.dirname);
     await FileUtils.mkdirPAsync("node_modules/@blazetrails");
@@ -143,10 +152,6 @@ export async function runAppUpdate(
         ]),
       ],
       "node_modules/@blazetrails",
-    );
-
-    await silenceStream(stdout, () =>
-      rbFSystem(`bin/trails app:update ${flags}`, { exception: true }),
     );
   });
 }

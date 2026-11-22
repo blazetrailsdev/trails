@@ -8,7 +8,7 @@ import {
 import { Callbacks } from "./callbacks.js";
 import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
-import { objectWith } from "./core-ext/object/with.js";
+import { with as with_ } from "./core-ext/object/with.js";
 import { include, Module, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import type { TestHelper } from "./current-attributes/test-helper.js";
@@ -201,7 +201,7 @@ export class CurrentAttributes {
   }
 
   set<R>(attributes: Record<string, AttributeValue>, block: () => R): R {
-    return objectWith(this, attributes, () => block());
+    return with_(this, attributes, () => block());
   }
 
   reset(): void {

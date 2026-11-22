@@ -71,6 +71,9 @@ export class Trails {
     "trails/welcome_controller": () => import("./welcome-controller.js"),
     "trails/health_controller": () => import("./health-controller.js"),
     "trails/pwa_controller": () => import("./pwa-controller.js"),
+    "rack/cache": () => import("@blazetrails/rack-cache"),
+    "action_dispatch/http/rack_cache": () =>
+      import("@blazetrails/actionpack/action-dispatch/http/rack-cache"),
   };
 
   private constructor() {

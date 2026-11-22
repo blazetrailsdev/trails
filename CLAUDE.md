@@ -1467,7 +1467,7 @@ Two fallbacks exist, and both are last resorts:
   which is why the collector is a Proxy in the first place (§ "Ruby protocol
   methods with a different JS mechanism"). `Channel::Base#dispatch_action`'s
   `public_send action, data`
-  (`vendor/rails/v8.0.5.2/actioncable/lib/action_cable/channel/base.rb:280-286`)
+  (`vendor/rails/v8.0.5.2/actioncable/lib/action_cable/channel/base.rb:286-292`)
   dispatches a client-supplied string gated by `action_methods`, which is the
   USER subclass's public instance methods less `Base`'s (`:128-134`) — a set
   the framework cannot see. A gate on a set application code supplies is not a

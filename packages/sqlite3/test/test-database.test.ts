@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Pathname, TypeError } from "@blazetrails/ruby-compat";
+import { Pathname, Tempfile, TypeError } from "@blazetrails/ruby-compat";
 import type {} from "@blazetrails/vitest-matchers";
 import { SQLite3 } from "../lib/index.js";
 import { engine } from "../lib/engine/better-sqlite3.js";
@@ -255,5 +255,51 @@ describe("TestDatabase", () => {
       });
     } catch {}
     expect(thing!.isClosed()).toBeTruthy();
+  });
+
+  it("default transaction mode", async () => {
+    const tf = Tempfile.new("database_default_transaction_mode");
+    try {
+      const setup = new SQLite3.Database(tf.path()!, { engine });
+      await setup.execute("create table foo (score int)");
+      await setup.execute("insert into foo values (?)", 1);
+      await setup.close();
+
+      const testCases = [
+        { mode: null, read: true, write: true },
+        { mode: "deferred", read: true, write: true },
+        { mode: "immediate", read: true, write: false },
+        { mode: "exclusive", read: false, write: false },
+      ];
+
+      for (const item of testCases) {
+        let db: InstanceType<typeof SQLite3.Database> | null = null;
+        let db2: InstanceType<typeof SQLite3.Database> | null = null;
+        try {
+          db = new SQLite3.Database(tf.path()!, { engine, defaultTransactionMode: item.mode });
+          db2 = new SQLite3.Database(tf.path()!, { engine });
+          await db.transaction(null, async () => {
+            const sqlForReadTest = "select * from foo";
+            if (item.read) {
+              await expect(db2!.execute(sqlForReadTest)).resolves.not.toThrow();
+            } else {
+              await expect(db2!.execute(sqlForReadTest)).rejects.toThrow(SQLite3.BusyException);
+            }
+
+            const sqlForWriteTest = "insert into foo values (2)";
+            if (item.write) {
+              await expect(db2!.execute(sqlForWriteTest)).resolves.not.toThrow();
+            } else {
+              await expect(db2!.execute(sqlForWriteTest)).rejects.toThrow(SQLite3.BusyException);
+            }
+          });
+        } finally {
+          if (db && !db.isClosed()) await db.close();
+          if (db2 && !db2.isClosed()) await db2.close();
+        }
+      }
+    } finally {
+      tf.unlink();
+    }
   });
 });

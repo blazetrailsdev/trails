@@ -266,6 +266,12 @@ EntityStore.FILE = Disk;
 export class MemCacheBase extends EntityStore {
   cache!: DalliClient;
 
+  /** @noRailsEquivalent PERMANENT */
+  keyWithNamespace(key: string): string {
+    const namespace = this.cache.options.namespace;
+    return namespace == null ? key : `${String(namespace)}:${key}`;
+  }
+
   async open(key: string): Promise<Part[] | null> {
     const data = await (this as unknown as Dalli).read(key);
     return data != null ? [data] : null;
@@ -316,11 +322,11 @@ export class Dalli extends MemCacheBase {
   }
 
   async isExist(key: string): Promise<boolean> {
-    return (await this.cache.get(key)).value != null;
+    return (await this.cache.get(this.keyWithNamespace(key))).value != null;
   }
 
   async read(key: string): Promise<Part | null> {
-    let { value: data } = await this.cache.get(key);
+    let { value: data } = await this.cache.get(this.keyWithNamespace(key));
     if (data instanceof Uint8Array)
       data = new Uint8Array(data.buffer, data.byteOffset, data.length);
     return data;
@@ -330,12 +336,13 @@ export class Dalli extends MemCacheBase {
   async write(body: RackBody, ttl: number | null = null): Promise<[string, number] | null> {
     const buf = new StringIO(new Uint8Array(0));
     const [key, size] = await this.slurp(body, (part) => buf.write(part));
-    if (await this.cache.set(key, buf.string(), { expires: ttl })) return [key, size];
+    if (await this.cache.set(this.keyWithNamespace(key), buf.string(), { expires: ttl }))
+      return [key, size];
     return null;
   }
 
   async purge(key: string): Promise<null> {
-    await this.cache.delete(key);
+    await this.cache.delete(this.keyWithNamespace(key));
     return null;
   }
 }

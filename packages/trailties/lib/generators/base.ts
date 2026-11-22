@@ -19,6 +19,8 @@ import {
   constDefined,
   rbModName,
   rbClearMethodCache,
+  rbFBinding,
+  TSE,
 } from "@blazetrails/ruby-compat";
 import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
@@ -206,10 +208,13 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
     if (!Object.hasOwn(this, "_desc") || klass._desc == null) {
       const usagePath = await this.usagePath();
-      klass._desc =
-        usagePath != null
-          ? await getFs().readFile(usagePath, "utf-8")
-          : `Description:\n    Create ${humanize(this.baseName()!).toLowerCase()} files for ${this.generatorName()} generator.`;
+      if (usagePath != null) {
+        const erb = new TSE(await File.readAsync(usagePath));
+        erb.filename = usagePath;
+        klass._desc = await erb.result(rbFBinding(this));
+      } else {
+        klass._desc = `Description:\n    Create ${humanize(this.baseName()!).toLowerCase()} files for ${this.generatorName()} generator.`;
+      }
     }
     return klass._desc;
   }

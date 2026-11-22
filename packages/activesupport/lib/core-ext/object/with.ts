@@ -1,6 +1,6 @@
 import { NoMethodError } from "@blazetrails/ruby-compat";
 
-export function objectWith<T extends object, R>(
+function with_<T extends object, R>(
   obj: T,
   attributes: Partial<Record<Extract<keyof T, string>, unknown>>,
   fn: (obj: T) => R,
@@ -50,3 +50,5 @@ function publicSendWriter(target: Record<string, unknown>, key: string, value: u
   }
   target[key] = value;
 }
+
+export { with_ as with };

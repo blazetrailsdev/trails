@@ -14,10 +14,10 @@ type StoreClass = { resolve(uri: unknown, options?: Record<string, unknown>): un
 
 export class Storage {
   /** @internal */
-  private _metastores: Record<string, unknown>;
+  private _metastores: Record<string, Promise<unknown>>;
 
   /** @internal */
-  private _entitystores: Record<string, unknown>;
+  private _entitystores: Record<string, Promise<unknown>>;
 
   constructor() {
     this._metastores = {};
@@ -25,14 +25,24 @@ export class Storage {
   }
 
   async resolveMetastoreUri(uri: unknown, options: Record<string, unknown> = {}): Promise<unknown> {
-    return (this._metastores[String(uri)] ||= await this.createStore(MetaStore, uri, options));
+    return (this._metastores[String(uri)] ||= this.createStore(MetaStore, uri, options).catch(
+      (error: unknown) => {
+        delete this._metastores[String(uri)];
+        throw error;
+      },
+    ));
   }
 
   async resolveEntitystoreUri(
     uri: unknown,
     options: Record<string, unknown> = {},
   ): Promise<unknown> {
-    return (this._entitystores[String(uri)] ||= await this.createStore(EntityStore, uri, options));
+    return (this._entitystores[String(uri)] ||= this.createStore(EntityStore, uri, options).catch(
+      (error: unknown) => {
+        delete this._entitystores[String(uri)];
+        throw error;
+      },
+    ));
   }
 
   clear(): null {

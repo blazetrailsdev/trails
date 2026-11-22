@@ -21,7 +21,7 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
 
   it("raises the gem's class for a failed prepare, with the SQL", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    await expect(db.prepare("SELECT * FROM nope")).rejects.toThrow(SQLite3.SQLException);
+    expect(() => db.prepare("SELECT * FROM nope")).toThrow(SQLite3.SQLException);
     try {
       await db.prepare("SELECT * FROM nope");
     } catch (e) {
@@ -125,7 +125,7 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
 
   it("strict: true turns off double-quoted string literals", async () => {
     const db = new SQLite3.Database(":memory:", { engine, strict: true });
-    await expect(db.prepare('SELECT "nope"')).rejects.toThrow(SQLite3.SQLException);
+    expect(() => db.prepare('SELECT "nope"')).toThrow(SQLite3.SQLException);
     const quirky = new SQLite3.Database(":memory:", { engine });
     expect(await quirky.execute('SELECT "nope"')).toEqual([["nope"]]);
   });
@@ -142,11 +142,12 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
     await db.close();
   });
 
-  it("refuses to disable quirk mode once the handle is used", async () => {
+  it("disables quirk mode on a used handle", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    await db.executeBatch2("CREATE TABLE q (a)");
-    expect(() => db._engine.disableQuirkMode()).toThrow(
-      "disable_quirk_mode after the handle is used is not supported by the node:sqlite driver",
-    );
+    await db.executeBatch2("CREATE TABLE q (a); INSERT INTO q VALUES (1)");
+    db._engine.disableQuirkMode();
+    expect(await db.execute("SELECT a FROM q")).toEqual([[1]]);
+    await expect(db.execute('SELECT "nope"')).rejects.toThrow(SQLite3.SQLException);
+    await db.close();
   });
 });

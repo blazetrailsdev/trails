@@ -176,7 +176,7 @@ describe("Mysql2::Client", () => {
   it.skip("should set default program_name in connect_attrs", () => {});
   it.skip("should set custom connect_attrs", () => {});
   describe("#query", () => {
-    // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
+    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
     it.skip("should let you query again if iterating is finished when streaming", () => {});
     it.skip("should not let you query again if iterating is not finished when streaming", () => {});
     // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").

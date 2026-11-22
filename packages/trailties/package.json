@@ -154,6 +154,7 @@
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/et-orbi": "workspace:*",
     "@blazetrails/mail": "workspace:*",
+    "@blazetrails/rack-cache": "workspace:*",
     "@blazetrails/rack-cors": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
@@ -164,7 +165,8 @@
     "@blazetrails/actionmailbox": "workspace:*",
     "@blazetrails/actiontext": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
-    "typescript": "7.1.0-dev.20260920.1"
+    "typescript": "7.1.0-dev.20260920.1",
+    "@blazetrails/rack-cache": "workspace:*"
   },
   "peerDependenciesMeta": {
     "@blazetrails/actioncable": {
@@ -180,6 +182,9 @@
       "optional": true
     },
     "typescript": {
+      "optional": true
+    },
+    "@blazetrails/rack-cache": {
       "optional": true
     }
   },

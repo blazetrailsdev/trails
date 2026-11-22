@@ -19,7 +19,7 @@ class CacheTest extends TestCase {
     await this.controller(
       "expires",
       `
-        import { SecureRandom } from "@blazetrails/activesupport";
+        import { SecureRandom } from "@blazetrails/ruby-compat";
         import { ApplicationController } from "./application-controller.ts";
         let lastModified: Date | undefined;
         export class ExpiresController extends ApplicationController {
@@ -29,20 +29,20 @@ class CacheTest extends TestCase {
           }
 
           async expiresEtag() {
-            await this._renderConditionally({ etag: "1" });
+            await this.renderConditionally({ etag: "1" });
           }
 
           async expiresLastModified() {
             lastModified ??= new Date();
-            await this._renderConditionally({ lastModified });
+            await this.renderConditionally({ lastModified });
           }
 
           async keepsIfModifiedSince() {
             await this.render({ plain: this.request.headers.get("If-Modified-Since") });
           }
 
-          async _renderConditionally(headers: Record<string, unknown>) {
-            if (await this.isStale({ ...headers, public: !this.params.get("private") })) {
+          private async renderConditionally(headers: Record<string, unknown>) {
+            if (await this.isStale(undefined, { ...headers, public: !this.params.get("private") })) {
               await this.render({ plain: SecureRandom.hex(16) });
             }
           }
@@ -82,6 +82,20 @@ describe("CacheTest", { timeout: 120_000 }, () => {
     Application.appClass = null;
   });
 
+  it("cache keeps if modified since", async () => {
+    await t.simpleController();
+    const expected = "Wed, 30 May 1984 19:43:31 GMT";
+
+    await t.get(
+      "/expires/keepsIfModifiedSince",
+      {},
+      { HTTP_IF_MODIFIED_SINCE: expected, HTTPS: "on" },
+    );
+
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body, "cache should have kept If-Modified-Since").toBe(expected);
+  });
+
   it("cache is disabled in dev mode", async () => {
     await t.simpleController();
     await t.app("development");
@@ -93,6 +107,104 @@ describe("CacheTest", { timeout: 120_000 }, () => {
 
     await t.get("/expires/expiresHeader");
     expect(t.lastResponse().headers["x-rack-cache"]).toBeUndefined();
+    expect(t.lastResponse().body).not.toBe(body);
+  });
+
+  it("cache works with expires", async () => {
+    await t.simpleController();
+
+    await t.get("/expires/expiresHeader", {}, { HTTPS: "on" });
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("miss, store");
+    expect(t.lastResponse().headers["cache-control"]).toBe("max-age=10, public");
+
+    const body = t.lastResponse().body;
+
+    await t.get("/expires/expiresHeader", {}, { HTTPS: "on" });
+
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("fresh");
+
+    expect(t.lastResponse().body).toBe(body);
+  });
+
+  it("cache works with expires private", async () => {
+    await t.simpleController();
+
+    await t.get("/expires/expiresHeader", { private: true }, { HTTPS: "on" });
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("miss");
+    expect(t.lastResponse().headers["cache-control"]).toBe("private, max-age=10");
+
+    const body = t.lastResponse().body;
+
+    await t.get("/expires/expiresHeader", { private: true }, { HTTPS: "on" });
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("miss");
+    expect(t.lastResponse().body).not.toBe(body);
+  });
+
+  it("cache works with etags", async () => {
+    await t.simpleController();
+
+    await t.get("/expires/expiresEtag", {}, { HTTPS: "on" });
+    expect(t.lastResponse().headers["cache-control"]).toBe("public");
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("miss, store");
+
+    const etag = t.lastResponse().headers["etag"];
+
+    await t.get("/expires/expiresEtag", {}, { HTTP_IF_NONE_MATCH: etag, HTTPS: "on" });
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("stale, valid, store");
+    expect(t.lastResponse().status).toBe(304);
+    expect(t.lastResponse().body).toBe("");
+  });
+
+  it("cache works with etags private", async () => {
+    await t.simpleController();
+
+    await t.get("/expires/expiresEtag", { private: true }, { HTTPS: "on" });
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("miss");
+    expect(t.lastResponse().headers["cache-control"]).toBe("must-revalidate, private, max-age=0");
+
+    const body = t.lastResponse().body;
+    const etag = t.lastResponse().headers["etag"];
+
+    await t.get(
+      "/expires/expiresEtag",
+      { private: true },
+      { HTTP_IF_NONE_MATCH: etag, HTTPS: "on" },
+    );
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("miss");
+    expect(t.lastResponse().body).not.toBe(body);
+  });
+
+  it("cache works with last modified", async () => {
+    await t.simpleController();
+
+    await t.get("/expires/expiresLastModified", {}, { HTTPS: "on" });
+    expect(t.lastResponse().headers["cache-control"]).toBe("public");
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("miss, store");
+
+    const last = t.lastResponse().headers["last-modified"];
+
+    await t.get("/expires/expiresLastModified", {}, { HTTP_IF_MODIFIED_SINCE: last, HTTPS: "on" });
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("stale, valid, store");
+    expect(t.lastResponse().status).toBe(304);
+    expect(t.lastResponse().body).toBe("");
+  });
+
+  it("cache works with last modified private", async () => {
+    await t.simpleController();
+
+    await t.get("/expires/expiresLastModified", { private: true }, { HTTPS: "on" });
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("miss");
+    expect(t.lastResponse().headers["cache-control"]).toBe("must-revalidate, private, max-age=0");
+
+    const body = t.lastResponse().body;
+    const last = t.lastResponse().headers["last-modified"];
+
+    await t.get(
+      "/expires/expiresLastModified",
+      { private: true },
+      { HTTP_IF_MODIFIED_SINCE: last, HTTPS: "on" },
+    );
+    expect(t.lastResponse().headers["x-rack-cache"]).toBe("miss");
     expect(t.lastResponse().body).not.toBe(body);
   });
 });

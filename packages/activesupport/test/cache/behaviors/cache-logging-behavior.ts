@@ -2,7 +2,7 @@ import { beforeEach, expect, it } from "vitest";
 import { StringIO, regexpEscape } from "@blazetrails/ruby-compat";
 import { Logger } from "../../../lib/logger.js";
 import { Store, type StoreOptions } from "../../../lib/cache/store.js";
-import { objectWith } from "../../../lib/core-ext/object/with.js";
+import { with as with_ } from "../../../lib/core-ext/object/with.js";
 
 /** @internal */
 export interface CacheLoggingBehaviorHost {
@@ -105,11 +105,7 @@ export function cacheLoggingBehavior(host: CacheLoggingBehaviorHost): void {
 
   async function assertLogs(pattern: RegExp | string, block: () => unknown): Promise<void> {
     const io = new StringIO();
-    await objectWith(
-      Store,
-      { logger: new Logger(io, { level: "debug" }) },
-      async () => await block(),
-    );
+    await with_(Store, { logger: new Logger(io, { level: "debug" }) }, async () => await block());
     if (typeof pattern === "string") expect(io.string()).toContain(pattern);
     else expect(io.string()).toMatch(pattern);
   }

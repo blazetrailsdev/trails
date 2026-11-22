@@ -105,6 +105,7 @@ export interface Ratio {
 export interface PackageSummary {
   name: string;
   railsCounterpart: string | null;
+  vendorSource: string | null;
   compareKeys: string[];
   description: string | null;
   claudeMd: string | null;
@@ -346,17 +347,28 @@ function entriesOf(dir: string) {
   );
 }
 
+function counterpartEntryOf(dir: string) {
+  const own = entriesOf(dir);
+  return own.find((e) => e.p.name === dir) ?? own[0];
+}
+
+/** The `vendor/sources.ts` source holding the gem `dir` ports, keyed as in `sources.lock.json`. */
+export function vendorSourceOf(dir: string): string | null {
+  if ((TS_ONLY_PACKAGES as readonly string[]).includes(dir)) return null;
+  return counterpartEntryOf(dir)?.source ?? null;
+}
+
 /**
  * The gem `dir` ports: its own key's entry first. An entry api-compare skips
  * still names one, since the package is a port all the same; only
- * {@link TS_ONLY_PACKAGES} have none.
+ * {@link TS_ONLY_PACKAGES} have none. In a monorepo source (rails,
+ * vite_ruby) the gem is the directory holding `lib/`.
  */
 export function railsCounterpartOf(dir: string): string | null {
   if ((TS_ONLY_PACKAGES as readonly string[]).includes(dir)) return null;
-  const own = entriesOf(dir);
-  const pick = own.find((e) => e.p.name === dir) ?? own[0];
+  const pick = counterpartEntryOf(dir);
   if (pick === undefined) return null;
-  return pick.source === "rails" ? pick.p.libPath.split("/")[0] : pick.source;
+  return /^([^/]+)\/lib(\/|$)/.exec(pick.p.libPath)?.[1] ?? pick.source;
 }
 
 /**
@@ -575,6 +587,7 @@ export async function summarize(root = ROOT_DIR): Promise<Summary> {
     packages.push({
       name,
       railsCounterpart: railsCounterpartOf(name),
+      vendorSource: vendorSourceOf(name),
       compareKeys: compareKeysOf(name),
       description: withExclusion(
         withExclusion(pkgJson.description ?? null, apiExcludedReasonOf(name)),

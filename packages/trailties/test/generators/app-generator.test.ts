@@ -8,6 +8,7 @@ import {
   env,
   rbFBackquote,
 } from "@blazetrails/ruby-compat";
+import { buildTemplates } from "@blazetrails/trails-tsc";
 import { assertNoChanges, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { capture, quietly } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
@@ -1015,6 +1016,7 @@ describe("AppGeneratorTest", () => {
     resetDesc();
     const usage = File.join(templateRoot, "USAGE");
     await File.writeAsync(usage, "USAGE FROM FILE");
+    await buildTemplates([usage]);
     const stub = vi
       .spyOn(AppGenerator as unknown as { usagePath(): Promise<string | null> }, "usagePath")
       .mockResolvedValue(usage);

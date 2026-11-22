@@ -1,7 +1,8 @@
 import { rbScanArgs } from "@blazetrails/ruby-compat";
-import type { Client, Mysql2Result, QueryOptions } from "./client.js";
+import type { Client, Field, Mysql2Result, QueryOptions } from "./client.js";
 import { Error as Mysql2Error } from "./error.js";
 import { Mysql2 } from "./mysql2.js";
+import type { Result } from "./result.js";
 
 declare module "./mysql2.js" {
   interface Mysql2Namespace {
@@ -11,7 +12,9 @@ declare module "./mysql2.js" {
 
 export class Statement {
   affectedRows = 0;
-  private closed = false;
+  lastId = 0;
+  /** @internal */
+  closed = false;
 
   constructor(
     private client: Client,
@@ -43,12 +46,38 @@ export class Statement {
   async _execute(argv: unknown[]): Promise<Mysql2Result | null> {
     if (this.closed) throw new Mysql2Error("Invalid statement handle");
     const [args, kwargs] = rbScanArgs<QueryOptions>(argv);
-    const currentQueryOptions = { ...this.client.queryOptions, ...kwargs, cast: true };
-    const result = this.client.storeResult(
-      await this.client
-        .execute(this.client.options(this.sql, currentQueryOptions), args)
-        .catch((e: unknown) => this.client.raiseMysql2Error(e)),
-    );
+    const currentQueryOptions = { ...this.client.queryOptions, ...kwargs };
+    const options = {
+      ...this.client.options(this.sql, currentQueryOptions),
+      supportBigNumbers: true,
+      bigNumberStrings: true,
+      typeCast: (field: Field, next: () => unknown) => {
+        switch (field.type) {
+          case "SHORT":
+          case "LONG":
+          case "INT24":
+          case "YEAR":
+          case "FLOAT":
+          case "DOUBLE":
+          case "LONGLONG":
+          case "DECIMAL":
+          case "NEWDECIMAL": {
+            const value = next();
+            return value == null ? null : String(value);
+          }
+          case "JSON":
+            return field.string("binary");
+          default:
+            return field.string();
+        }
+      },
+    };
+    const native = await this.client
+      .execute(options, args)
+      .catch((e: unknown) => this.client.raiseMysql2Error(e));
+    const result = this.client.storeResult(native, currentQueryOptions);
+    this.lastId = (native[0] as { insertId?: number }).insertId ?? 0;
+    if (result) (result as Result).stmtWrapper = this;
     this.affectedRows = result?.size ?? this.client.affectedRows;
     return result;
   }

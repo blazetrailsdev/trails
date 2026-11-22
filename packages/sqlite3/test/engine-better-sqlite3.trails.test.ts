@@ -21,7 +21,7 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
 
   it("raises the gem's class for a failed prepare, with the SQL", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    await expect(db.prepare("SELECT * FROM nope")).rejects.toThrow(SQLite3.SQLException);
+    expect(() => db.prepare("SELECT * FROM nope")).toThrow(SQLite3.SQLException);
     try {
       await db.prepare("SELECT * FROM nope");
     } catch (e) {
@@ -129,5 +129,11 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
     const db = new SQLite3.Database(":memory:", { engine });
     expect(await db.execute("SELECT ?2, ?", ["a", "b", "c"])).toEqual([["b", "c"]]);
     expect(await db.execute("SELECT ?, ?1", ["a"])).toEqual([["a", "a"]]);
+  });
+
+  it("rejects a double-quoted string under strict, as the gem's disable_quirk_mode does", async () => {
+    const db = new SQLite3.Database(":memory:", { engine, strict: true });
+    await expect(db.execute('SELECT "nope"')).rejects.toThrow(SQLite3.SQLException);
+    await db.close();
   });
 });

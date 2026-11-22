@@ -28,6 +28,7 @@ export interface ActionsHost {
   _gemGroups: string[];
   _githubRepos: { repo: string; options: Record<string, unknown> }[];
   prependFile(path: string, ...args: unknown[]): unknown;
+  trailsCommand: OmitThisParameter<typeof trailsCommand>;
 }
 
 export interface GemOptions {
@@ -283,7 +284,7 @@ export function generate(
   const options = extractOptionsBang(args) as TrailsCommandOptions;
   options.abortOnFailure = !options.inline;
 
-  return trailsCommand.call(this, `generate ${what} ${args.join(" ")}`, options);
+  return this.trailsCommand(`generate ${what} ${args.join(" ")}`, options);
 }
 
 export interface RakeOptions {

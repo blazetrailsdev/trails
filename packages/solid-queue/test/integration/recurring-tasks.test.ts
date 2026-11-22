@@ -4,14 +4,24 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import { Job, Record, RecurringTask, Scheduler, SolidQueueAdapter } from "../../lib/index.js";
+import {
+  Job,
+  Record,
+  RecurringTask,
+  Scheduler,
+  SolidQueue,
+  SolidQueueAdapter,
+} from "../../lib/index.js";
 import { ApplicationJob } from "../support/application-job.js";
 import { JobResult } from "../support/job-result.js";
 import "../support/add-to-buffer-job.js";
 import { loadAppSchema } from "../support/queue-schema.js";
 import {
-  runSupervisor,
+  isProcessExists,
+  runSupervisorAsFork,
   sleep,
+  terminateProcess,
+  waitFor,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
@@ -37,6 +47,20 @@ async function assertRecurringTasks(expectedTasks: { [key: string]: TaskAttrs })
   });
 }
 
+async function runRecurringSupervisor(): Promise<number> {
+  const pid = runSupervisorAsFork({ skipRecurring: false });
+  await waitForRegisteredProcesses(5, { timeout: 3 });
+  await sleep(1);
+  return pid;
+}
+
+async function terminateGracefully(pid: number | null): Promise<void> {
+  if (pid == null || !isProcessExists(pid)) return;
+
+  await terminateProcess(pid);
+  await waitForRegisteredProcesses(0, { timeout: SolidQueue.shutdownTimeout.toF() });
+}
+
 class RecurringTasksTest extends TestCase {
   static {
     (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
@@ -44,8 +68,9 @@ class RecurringTasksTest extends TestCase {
 }
 constSet(TopLevel, "RecurringTasksTest", RecurringTasksTest);
 
+// BLOCKED: recurring-task-arguments-load-skips-deserialize
 describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
-  let run: ReturnType<typeof runSupervisor>;
+  let pid: number | null;
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
@@ -56,12 +81,11 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
   });
 
   beforeEach(async () => {
-    run = runSupervisor({ skipRecurring: false });
-    await waitForRegisteredProcesses(5, { timeout: 3 });
+    pid = await runRecurringSupervisor();
   });
 
   afterEach(async () => {
-    await run.terminate();
+    await terminateGracefully(pid);
     vi.restoreAllMocks();
   });
 
@@ -94,11 +118,7 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
     const configuredTask = {
       periodic_store_result: { class: "StoreResultJob", schedule: "every second" },
     };
-    await sleep(0.5);
-
     await assertRecurringTasks(configuredTask);
-    await run.terminate();
-
     const task = (await RecurringTask.findBy({ key: "periodic_store_result" }))!;
     await task.updateBang({
       class_name: "StoreResultJob",
@@ -106,10 +126,9 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
       arguments: [42],
     });
 
-    run = runSupervisor({ skipRecurring: false });
-    await waitForRegisteredProcesses(5, { timeout: 3 });
+    await terminateGracefully(pid);
 
-    await sleep(0.5);
+    pid = await runRecurringSupervisor();
 
     await assertRecurringTasks(configuredTask);
 
@@ -118,18 +137,26 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
     };
     const scheduler1 = new Scheduler({ recurringTasks: anotherTask });
     await scheduler1.start();
-    await waitForRegisteredProcesses(6, { timeout: 1 });
+    await waitForRegisteredProcesses(6, { timeout: 2 });
+    await waitFor(
+      undefined,
+      async () => (await RecurringTask.findBy({ key: "example_task" })) != null,
+    );
 
     await assertRecurringTasks(anotherTask);
 
     const updatedTask = { example_task: { class: "AddToBufferJob", schedule: "every minute" } };
     const scheduler2 = new Scheduler({ recurringTasks: updatedTask });
     await scheduler2.start();
-    await waitForRegisteredProcesses(7, { timeout: 1 });
+    await waitForRegisteredProcesses(7, { timeout: 2 });
+    await waitFor(
+      undefined,
+      async () =>
+        (await RecurringTask.findBy({ key: "example_task" }))?.schedule === "every minute",
+    );
 
     await assertRecurringTasks(updatedTask);
 
-    await run.terminate();
     await scheduler1.stop();
     await scheduler2.stop();
   });
