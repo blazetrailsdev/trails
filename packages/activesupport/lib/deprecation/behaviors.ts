@@ -65,41 +65,6 @@ type DeprecationBehaviorItem = DeprecationBehavior | ((...args: never[]) => void
 
 export type DeprecationBehaviorInput = DeprecationBehaviorItem | DeprecationBehaviorItem[] | null;
 
-/** @internal */
-function arityCoerce(behavior: unknown): DeprecationBehaviorCallable {
-  if (!rbObjRespondTo(behavior, "call")) {
-    const inspected = typeof behavior === "string" ? `:${behavior}` : String(behavior);
-    throw new ArgumentError(`${inspected} is not a valid deprecation behavior.`);
-  }
-
-  const call = (...args: unknown[]): void => {
-    if (typeof behavior === "function") behavior(...args);
-    else (behavior as { call(...a: unknown[]): void }).call(...args);
-  };
-
-  switch (arityOfCallable(behavior)) {
-    case 2:
-      return (message, callstack) => {
-        call(message, callstack);
-      };
-    case 0:
-    case 1:
-    case 3:
-      return typeof behavior === "function" ? (behavior as DeprecationBehaviorCallable) : call;
-    default:
-      return (message, callstack, deprecator) => {
-        call(message, callstack, deprecator.deprecationHorizon, deprecator.gemName);
-      };
-  }
-}
-
-/** @internal */
-function arityOfCallable(callable: unknown): number {
-  return typeof callable === "function"
-    ? callable.length
-    : (callable as { call: (...args: unknown[]) => unknown }).call.length;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Behavior {
   /** @noRailsEquivalent PERMANENT */
@@ -122,7 +87,7 @@ export class Behavior {
       (b) =>
         (typeof b === "string" && Object.hasOwn(DEFAULT_BEHAVIORS, b)
           ? DEFAULT_BEHAVIORS[b]
-          : undefined) ?? arityCoerce(b),
+          : undefined) ?? this.arityCoerce(b),
     );
   }
 
@@ -135,8 +100,43 @@ export class Behavior {
       (b) =>
         (typeof b === "string" && Object.hasOwn(DEFAULT_BEHAVIORS, b)
           ? DEFAULT_BEHAVIORS[b]
-          : undefined) ?? arityCoerce(b),
+          : undefined) ?? this.arityCoerce(b),
     );
+  }
+
+  /** @internal */
+  protected arityCoerce(behavior: unknown): DeprecationBehaviorCallable {
+    if (!rbObjRespondTo(behavior, "call")) {
+      const inspected = typeof behavior === "string" ? `:${behavior}` : String(behavior);
+      throw new ArgumentError(`${inspected} is not a valid deprecation behavior.`);
+    }
+
+    const call = (...args: unknown[]): void => {
+      if (typeof behavior === "function") behavior(...args);
+      else (behavior as { call(...a: unknown[]): void }).call(...args);
+    };
+
+    switch (this.arityOfCallable(behavior)) {
+      case 2:
+        return (message, callstack) => {
+          call(message, callstack);
+        };
+      case 0:
+      case 1:
+      case 3:
+        return typeof behavior === "function" ? (behavior as DeprecationBehaviorCallable) : call;
+      default:
+        return (message, callstack, deprecator) => {
+          call(message, callstack, deprecator.deprecationHorizon, deprecator.gemName);
+        };
+    }
+  }
+
+  /** @internal */
+  protected arityOfCallable(callable: unknown): number {
+    return typeof callable === "function"
+      ? callable.length
+      : (callable as { call: (...args: unknown[]) => unknown }).call.length;
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

@@ -1,5 +1,6 @@
 import { b, type Bytes } from "@blazetrails/ruby-compat";
 import { Metadata } from "./metadata.js";
+import { classAttribute } from "../class-attribute.js";
 import {
   ArgumentError,
   SerializerWithFallback,
@@ -20,7 +21,15 @@ export interface CodecOptions {
 }
 
 export class Codec extends Metadata {
-  static defaultSerializer: Format | MessageSerializer = "marshal";
+  declare static defaultSerializer: Format | MessageSerializer;
+
+  static {
+    classAttribute.call(this, "defaultSerializer", {
+      default: "marshal",
+      instanceAccessor: false,
+      instancePredicate: false,
+    });
+  }
 
   protected override readonly serializer: MessageSerializer;
   protected readonly urlSafe: boolean;

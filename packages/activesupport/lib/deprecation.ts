@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/ruby-compat";
-import { deprecateMethods } from "./deprecation/method-wrappers.js";
+import { MethodWrapper } from "./deprecation/method-wrappers.js";
 import { Behavior } from "./deprecation/behaviors.js";
 import { Reporting } from "./deprecation/reporting.js";
 import { Disallowed } from "./deprecation/disallowed.js";
@@ -22,8 +22,7 @@ export class Deprecation {
 
   private static __instance?: Deprecation;
 
-  deprecateMethods = deprecateMethods;
-
+  declare static MethodWrapper: typeof MethodWrapper;
   declare static Behavior: typeof Behavior;
   declare static Reporting: typeof Reporting;
   declare static Disallowed: typeof Disallowed;
@@ -40,12 +39,14 @@ export class Deprecation {
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Deprecation extends Behavior, Reporting, Disallowed {}
+export interface Deprecation extends MethodWrapper, Behavior, Reporting, Disallowed {}
 
+Deprecation.MethodWrapper = MethodWrapper;
 Deprecation.Behavior = Behavior;
 Deprecation.Reporting = Reporting;
 Deprecation.Disallowed = Disallowed;
 
+include(Deprecation, MethodWrapper);
 include(Deprecation, Behavior);
 include(Deprecation, Reporting);
 include(Deprecation, Disallowed);
