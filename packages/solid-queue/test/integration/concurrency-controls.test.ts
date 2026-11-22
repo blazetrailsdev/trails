@@ -42,13 +42,15 @@ import {
 } from "../support/processes-test-helper.js";
 import { destroyRecords } from "../test-helper.js";
 
-async function assertStoredSequence(result: JobResult, ...sequences: string[][]) {
-  const expected = sequences.map(
-    (sequence) => "seq: " + sequence.map((name) => `s${name}c${name}`).join(""),
+async function assertStoredSequence(result: JobResult, sequence: string[]) {
+  const expected = [...sequence]
+    .sort()
+    .map((name) => `s${name}c${name}`)
+    .join("");
+  const actual = await Record.uncached(async () =>
+    (await result.reload()).status!.split(" + ").sort().join(""),
   );
-  await Record.uncached(async () => {
-    expect(expected).toContain((await result.reload()).status);
-  });
+  expect(actual).toEqual(expected);
 }
 
 async function waitForSemaphoresToBeReleasedFor(timeout: number) {
@@ -83,7 +85,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   beforeEach(async () => {
-    result = await JobResult.createBang({ queue_name: "default", status: "seq: " });
+    result = await JobResult.createBang({ queue_name: "default", status: "" });
 
     const defaultWorker = { queues: "default", pollingInterval: 0.1, processes: 3, threads: 2 };
     const dispatcher = { pollingInterval: 0.1, batchSize: 200, concurrencyMaintenanceInterval: 1 };
@@ -235,12 +237,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
 
-    await assertStoredSequence(result, new Range("A", "K").toA(), [
-      "A",
-      "C",
-      "B",
-      ...new Range("D", "K").toA(),
-    ]);
+    await assertStoredSequence(result, new Range("A", "K").toA());
   });
 
   it("rely on dispatcher to unblock blocked executions with an expired semaphore", async () => {
@@ -280,12 +277,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
 
-    await assertStoredSequence(result, new Range("A", "K").toA(), [
-      "A",
-      "C",
-      "B",
-      ...new Range("D", "K").toA(),
-    ]);
+    await assertStoredSequence(result, new Range("A", "K").toA());
   });
 
   it("don't block claimed executions that get released", async () => {
@@ -349,7 +341,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   it("discard on conflict across different concurrency keys", async () => {
-    const anotherResult = await JobResult.createBang({ queue_name: "default", status: "seq: " });
+    const anotherResult = await JobResult.createBang({ queue_name: "default", status: "" });
     await DiscardableUpdateResultJob.performLater(result, { name: "1", pause: 2 });
     await DiscardableUpdateResultJob.performLater(anotherResult, { name: "2", pause: 2 });
     await sleep(0.1);

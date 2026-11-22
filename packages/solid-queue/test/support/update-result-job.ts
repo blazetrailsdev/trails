@@ -1,3 +1,4 @@
+import { isBlank } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationJob } from "./application-job.js";
 import type { JobResult } from "./job-result.js";
@@ -13,6 +14,7 @@ export class UpdateResultJob extends ApplicationJob {
       exception = null,
     }: { name: string; pause?: number | null; exception?: (new () => Error) | null },
   ): Promise<void> {
+    if (!isBlank(jobResult.status)) jobResult.status += " + ";
     jobResult.status += `s${name}`;
 
     if (pause != null) await sleep(pause);
