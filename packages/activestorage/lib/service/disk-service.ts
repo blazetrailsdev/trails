@@ -106,7 +106,7 @@ export class DiskService extends Service {
     });
   }
 
-  override urlForDirectUpload(
+  override async urlForDirectUpload(
     key: string,
     {
       expiresIn,
@@ -120,8 +120,8 @@ export class DiskService extends Service {
       checksum: string;
       customMetadata?: Record<string, unknown>;
     },
-  ): string {
-    return this.instrument("url", { key: key }, (payload) => {
+  ): Promise<string> {
+    return await this.instrument("url", { key: key }, async (payload) => {
       const verifiedTokenWithExpiration = ActiveStorage.verifier.generate(
         {
           key: key,
@@ -300,3 +300,5 @@ export class DiskService extends Service {
     return Current.urlOptions;
   }
 }
+
+Service.DiskService = DiskService;

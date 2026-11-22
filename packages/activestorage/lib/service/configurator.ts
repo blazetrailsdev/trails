@@ -1,19 +1,37 @@
-import { camelize } from "@blazetrails/activesupport";
-import { block, fetch, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
+import { camelize, dasherize, underscore } from "@blazetrails/activesupport";
+import {
+  block,
+  constDefined,
+  constGet,
+  fetch,
+  rbInspect,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import { Service } from "../service.js";
-import { DiskService } from "./disk-service.js";
-import { MirrorService } from "./mirror-service.js";
 
 type ServiceClass = { build(config: { configurator: Configurator; name: string }): Service };
 
-const services: Record<string, () => ServiceClass> = {
-  DiskService: () => DiskService,
-  MirrorService: () => MirrorService,
-};
+const loadErrors = new Map<string, unknown>();
 
 /** @internal */
 export class Configurator {
   readonly configurations: Record<string, Record<string, unknown>>;
+
+  /** @noRailsEquivalent PERMANENT */
+  static async load(configurations: Record<string, Record<string, unknown>>): Promise<void> {
+    for (const config of Object.values(configurations)) {
+      const className = String(config.service);
+      loadErrors.delete(className);
+      if (constDefined(Service, `${camelize(className)}Service`)) continue;
+      try {
+        const path = `./${dasherize(underscore(className))}-service.js`;
+        await import(path);
+      } catch (error) {
+        if ((error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND") throw error;
+        loadErrors.set(className, error);
+      }
+    }
+  }
 
   static build(
     serviceName: string,
@@ -54,10 +72,9 @@ export class Configurator {
 
   /** @internal */
   private resolve(className: string): ServiceClass {
-    const klass = services[`${camelize(className)}Service`];
-    if (klass === undefined)
+    if (loadErrors.has(className))
       throw new RuntimeError(`Missing service adapter for ${rbInspect(className)}`);
-    return klass();
+    return constGet(Service, `${camelize(className)}Service`) as ServiceClass;
   }
 }
 

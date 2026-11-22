@@ -127,3 +127,5 @@ export class MirrorService extends Service {
     }
   }
 }
+
+Service.MirrorService = MirrorService;

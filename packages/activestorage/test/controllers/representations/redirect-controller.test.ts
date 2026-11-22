@@ -196,42 +196,23 @@ describe("ActiveStorage::Representations::RedirectControllerWithOpenRedirectTest
     t = integrationTest(task.name);
   });
 
-  it.skipIf(!(SERVICE_CONFIGURATIONS as Record<string, unknown>).s3)(
-    "showing existing variant stored in s3",
-    async () => {
-      await withRaiseOnOpenRedirects("s3", async () => {
-        const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "s3" });
+  it.skipIf(!SERVICE_CONFIGURATIONS.s3)("showing existing variant stored in s3", async () => {
+    await withRaiseOnOpenRedirects("s3", async () => {
+      const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "s3" });
 
-        await getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit));
+      await getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit));
 
-        t.assertRedirectedTo(/racecar\.jpg/);
-      });
-    },
-  );
+      t.assertRedirectedTo(/racecar\.jpg/);
+    });
+  });
 
-  it.skipIf(!(SERVICE_CONFIGURATIONS as Record<string, unknown>).azure)(
-    "showing existing variant stored in azure",
-    async () => {
-      await withRaiseOnOpenRedirects("azure", async () => {
-        const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "azure" });
+  it.skipIf(!SERVICE_CONFIGURATIONS.gcs)("showing existing variant stored in gcs", async () => {
+    await withRaiseOnOpenRedirects("gcs", async () => {
+      const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "gcs" });
 
-        await getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit));
+      await getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit));
 
-        t.assertRedirectedTo(/racecar\.jpg/);
-      });
-    },
-  );
-
-  it.skipIf(!(SERVICE_CONFIGURATIONS as Record<string, unknown>).gcs)(
-    "showing existing variant stored in gcs",
-    async () => {
-      await withRaiseOnOpenRedirects("gcs", async () => {
-        const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "gcs" });
-
-        await getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit));
-
-        t.assertRedirectedTo(/racecar\.jpg/);
-      });
-    },
-  );
+      t.assertRedirectedTo(/racecar\.jpg/);
+    });
+  });
 });

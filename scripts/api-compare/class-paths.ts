@@ -82,7 +82,14 @@ const LAZY_DIRS: Record<string, string[]> = {
   actionmailer: ["test-case.ts", "test-helper.ts"],
   actionview: ["test-case.ts", "testing/resolvers.ts"],
   activejob: ["test-case.ts", "test-helper.ts"],
-  activestorage: ["blob.ts", "blob/", "fixture-set.ts", "variant-record.ts"],
+  activestorage: [
+    "blob.ts",
+    "blob/",
+    "fixture-set.ts",
+    "service/gcs-service.ts",
+    "service/s3-service.ts",
+    "variant-record.ts",
+  ],
   activesupport: ["executor/test-helper.ts"],
   actiontext: ["encrypted-rich-text.ts", "rich-text.ts"],
   trailties: [

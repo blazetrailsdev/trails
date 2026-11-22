@@ -1842,6 +1842,12 @@ read is a plain `TypeError` at the call site.
 
 Moved to [packages/activestorage/CLAUDE.md](packages/activestorage/CLAUDE.md#a-variants-method-names-are-camelcase-imageprocessingtransformer); unchanged, heading kept for citations.
 
+## A service URL is async (`Service#url`, `url_for_direct_upload`)
+
+Moved to [packages/activestorage/CLAUDE.md](packages/activestorage/CLAUDE.md#a-service-url-is-async-serviceurl-url_for_direct_upload).
+The one-line rule: `url` and `urlForDirectUpload` are async on every service,
+and every caller awaits; `headersForDirectUpload` stays sync.
+
 ## A translation lookup is synchronous; the load is an awaited step (`I18n.translate`)
 
 Moved to [packages/i18n/CLAUDE.md](packages/i18n/CLAUDE.md#a-translation-lookup-is-synchronous-the-load-is-an-awaited-step-i18ntranslate); unchanged, heading kept for citations.

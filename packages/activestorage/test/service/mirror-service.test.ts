@@ -111,7 +111,7 @@ describe("ActiveStorage::Service::MirrorServiceTest", () => {
     expect(await ctx.service.mirrors[2].download(key)).toEqual(encode("Surprise!"));
   });
 
-  it("URL generation in primary service", () => {
+  it("URL generation in primary service", async () => {
     const filename = new Filename("test.txt");
     const options = {
       expiresIn: minutes(2),
@@ -122,7 +122,9 @@ describe("ActiveStorage::Service::MirrorServiceTest", () => {
 
     freezeTime();
     try {
-      expect(ctx.service.url(ctx.key, options)).toBe(ctx.service.primary.url(ctx.key, options));
+      expect(await ctx.service.url(ctx.key, options)).toBe(
+        await ctx.service.primary.url(ctx.key, options),
+      );
     } finally {
       travelBack();
     }
