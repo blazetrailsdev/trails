@@ -129,7 +129,6 @@ export const ClassMethods = {
 };
 
 declare module "@blazetrails/activerecord/base.js" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Base {
     const broadcastsTo: typeof ClassMethods.broadcastsTo;
     const broadcasts: typeof ClassMethods.broadcasts;

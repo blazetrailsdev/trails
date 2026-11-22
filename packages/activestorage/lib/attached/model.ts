@@ -229,7 +229,6 @@ function hasManyAttached(
 export const ClassMethods = { hasOneAttached, hasManyAttached };
 
 declare module "@blazetrails/activerecord/base.js" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Base {
     const hasOneAttached: typeof ClassMethods.hasOneAttached;
     const hasManyAttached: typeof ClassMethods.hasManyAttached;
