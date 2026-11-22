@@ -202,4 +202,4 @@ export class AtomFeedBuilder extends AtomBuilder {
   }
 }
 
-export const AtomFeedHelper = defineModule({ atomFeed });
+export const AtomFeedHelper = defineModule({ atomFeed, AtomBuilder, AtomFeedBuilder });
