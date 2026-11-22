@@ -349,14 +349,15 @@ function entriesOf(dir: string) {
 /**
  * The gem `dir` ports: its own key's entry first. An entry api-compare skips
  * still names one, since the package is a port all the same; only
- * {@link TS_ONLY_PACKAGES} have none.
+ * {@link TS_ONLY_PACKAGES} have none. In a monorepo source (rails,
+ * vite_ruby) the gem is the directory holding `lib/`.
  */
 export function railsCounterpartOf(dir: string): string | null {
   if ((TS_ONLY_PACKAGES as readonly string[]).includes(dir)) return null;
   const own = entriesOf(dir);
   const pick = own.find((e) => e.p.name === dir) ?? own[0];
   if (pick === undefined) return null;
-  return pick.source === "rails" ? pick.p.libPath.split("/")[0] : pick.source;
+  return /^([^/]+)\/lib(\/|$)/.exec(pick.p.libPath)?.[1] ?? pick.source;
 }
 
 /**

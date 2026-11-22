@@ -272,6 +272,12 @@ describe("package-summary", () => {
     expect(compareKeysOf("tse-compiler")).toEqual(["erubi"]);
   });
 
+  it("pairs each package of a monorepo source with its own gem", () => {
+    expect(railsCounterpartOf("vite-trails")).toBe("vite_rails");
+    expect(railsCounterpartOf("vite-assets")).toBe("vite_ruby");
+    expect(railsCounterpartOf("activerecord")).toBe("activerecord");
+  });
+
   it("names a counterpart for every package but the trails-only ones", async () => {
     const dirs = (await fs.readdir(path.join(ROOT_DIR, "packages"), { withFileTypes: true }))
       .filter((d) => d.isDirectory())

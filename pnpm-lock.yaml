@@ -198,6 +198,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../../packages/ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../../packages/trailties
       '@blazetrails/turbo':
         specifier: workspace:*
         version: link:../../packages/turbo
