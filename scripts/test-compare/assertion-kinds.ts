@@ -225,6 +225,7 @@ const RSPEC_MAP: Record<string, CanonicalKind> = {
   expect_to_match: "match",
   expect_not_to_match: "noMatch",
   expect_to_raise_error: "raises",
+  expect_to_raise_exception: "raises",
   expect_not_to_raise_error: "nothingRaised",
   "expect_to_be_==": "equal",
   "expect_to_be_>": "operator",

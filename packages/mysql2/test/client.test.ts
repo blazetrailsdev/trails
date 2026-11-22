@@ -176,9 +176,26 @@ describe("Mysql2::Client", () => {
   it.skip("should set default program_name in connect_attrs", () => {});
   it.skip("should set custom connect_attrs", () => {});
   describe("#query", () => {
-    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
-    it.skip("should let you query again if iterating is finished when streaming", () => {});
-    it.skip("should not let you query again if iterating is not finished when streaming", () => {});
+    it("should let you query again if iterating is finished when streaming", async () => {
+      await (await state.client.query("SELECT 1 UNION SELECT 2", {
+        stream: true,
+        cacheRows: false,
+      }))!.toA();
+
+      await expect(
+        state.client.query("SELECT 1 UNION SELECT 2", { stream: true, cacheRows: false }),
+      ).resolves.not.toThrow();
+    });
+    it("should not let you query again if iterating is not finished when streaming", async () => {
+      await (await state.client.query("SELECT 1 UNION SELECT 2", {
+        stream: true,
+        cacheRows: false,
+      }))!.first();
+
+      await expect(
+        state.client.query("SELECT 1 UNION SELECT 2", { stream: true, cacheRows: false }),
+      ).rejects.toThrow(Mysql2.Error);
+    });
     // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
     it.skip("should only accept strings as the query parameter", () => {});
     it.skip("should not retain query options set on a query for subsequent queries, but should retain it in the result", () => {});

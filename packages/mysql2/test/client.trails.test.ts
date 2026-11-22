@@ -115,6 +115,7 @@ describe("Mysql2::Client#warning_count", () => {
       end: eof.length,
       isEOF: () => true,
       eofWarningCount: () => eof.readInt16LE(1),
+      eofStatusFlags: () => eof.readInt16LE(3),
     };
     (
       client as unknown as { connection: { connection: { handlePacket(p: object): void } } }
@@ -281,7 +282,7 @@ describe("Mysql2::Client#warning_count", () => {
       { name: "t", type: mysql.Types.DATETIME, encoding: "binary" },
       { name: "b", type: mysql.Types.TINY, columnLength: 1, encoding: "binary" },
     ];
-    const execute = vi.fn(async () => [[{ t: "2026-04-27 14:23:55", b: "1" }], fields]);
+    const execute = vi.fn(async () => [[{ t: "2026-04-27 14:23:55", b: 1 }], fields]);
     const prepare = vi.fn(async () => ({ statement: { columns: fields, parameters: [] } }));
     const client = await clientOn({ execute, prepare });
     const stmt = await client.prepare("SELECT 1");

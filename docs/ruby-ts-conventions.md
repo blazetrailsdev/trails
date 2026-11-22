@@ -219,8 +219,6 @@ a genuine gap:
 
 - not called by activerecord
   - `query_info`, `info` (only in: `client.rb`)
-- not called by activerecord
-  - `server_flags` (only in: `result.rb`)
 - not called by activerecord or actioncable (packages/pg/CLAUDE.md, "The pg port carries only what trails calls"). PERMANENT.
   - `version_string`, `make_shareable`, `warn`, `require_bigdecimal_without_warning`, `init_openssl`, `init_ssl`, `isthreadsafe` (only in: `../pg.rb`, `pg.rb`)
 - not called by activerecord or actioncable (packages/pg/CLAUDE.md, "The pg port carries only what trails calls"). PERMANENT.
