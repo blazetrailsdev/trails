@@ -1,3 +1,4 @@
+import type { Pathname } from "@blazetrails/ruby-compat";
 import "./constants.engine.generated.js";
 import {
   Callbacks as ASCallbacks,
@@ -423,11 +424,11 @@ export class Engine extends Trailtie {
 
 export interface EngineInitializerApp {
   config: { helpersPaths: string[] };
-  routes(): { drawPaths: string[] };
+  routes(): { drawPaths: Array<string | Pathname> };
   routesReloader(): {
     paths: string[];
     routeSets: RouteSetLike[];
-    externalRoutes: string[];
+    externalRoutes: Array<string | Pathname>;
   };
 }
 
@@ -486,7 +487,7 @@ Engine.initializer("add_routing_paths", async function (this: Engine, ...args: u
   const app = args[0] as EngineInitializerApp;
   const paths = this.paths();
   const routingPaths = paths.get("config/routes.ts")?.existent() ?? [];
-  const externalPaths = paths.get("config/routes")?.toAry() ?? [];
+  const externalPaths = this.paths().get("config/routes")!.paths();
   this.routes().drawPaths.push(...externalPaths);
   app.routes().drawPaths.push(...externalPaths);
 

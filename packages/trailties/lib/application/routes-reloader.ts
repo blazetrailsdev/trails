@@ -1,3 +1,4 @@
+import type { Pathname } from "@blazetrails/ruby-compat";
 import { FileUpdateChecker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
 import {
   compiledFilesIn,
@@ -14,13 +15,13 @@ export interface RouteSetLike {
   finalizeBang(): void;
   eagerLoadBang(): void;
   draw(block: DrawCallback): void;
-  drawPaths: string[];
+  drawPaths: Array<string | Pathname>;
 }
 
 export class RoutesReloader {
   paths: string[];
   routeSets: RouteSetLike[];
-  externalRoutes: string[];
+  externalRoutes: Array<string | Pathname>;
   eagerLoad: boolean;
   loaded: boolean;
   /** @internal */
@@ -102,7 +103,7 @@ export class RoutesReloader {
         for (const dir of routes.drawPaths) {
           const files = new Set([
             ...(await Dir.globAsync(`${dir}/**/*.ts`)),
-            ...compiledFilesIn(dir),
+            ...compiledFilesIn(`${dir}`),
           ]);
           for (const file of files) await loadIseqEval(file, true);
         }
