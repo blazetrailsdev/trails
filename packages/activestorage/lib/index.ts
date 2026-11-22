@@ -26,6 +26,8 @@ export { BaseJob } from "./base-job.js";
 export { Service } from "./service.js";
 export { Registry } from "./service/registry.js";
 export { Configurator } from "./service/configurator.js";
+export { DiskService } from "./service/disk-service.js";
+export { MirrorService } from "./service/mirror-service.js";
 export type { Blob } from "./blob.js";
 export { Attachment } from "./attachment.js";
 export { Attached } from "./attached.js";

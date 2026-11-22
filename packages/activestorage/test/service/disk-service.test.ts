@@ -76,8 +76,14 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
         filename: new Filename("avatar.png"),
         contentType: "image/png",
       })
-      .catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(ArgumentError);
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(() => {
+      throw error;
+    }).toThrow(ArgumentError);
+
     expect((error as Error).message).toBe(
       "Cannot generate URL for avatar.png using Disk service, please set ActiveStorage::Current.url_options.",
     );
