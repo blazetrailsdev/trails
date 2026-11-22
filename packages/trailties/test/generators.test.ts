@@ -301,7 +301,9 @@ describe("GeneratorsTest", () => {
     try {
       await capture("stdout", () => Generators.invoke("model", ["user"], { destinationRoot }));
 
-      expect(File.read(File.join(destinationRoot, "app/models/user.ts"))).toBe("empty");
+      const path = File.join(destinationRoot, "app/models/user.ts");
+      expect(File.isExist(path)).toBe(true);
+      expect(File.read(path)).toBe("empty");
     } finally {
       FileUtils.rmRf(File.dirname(template));
       FileUtils.rmRf(destinationRoot);
