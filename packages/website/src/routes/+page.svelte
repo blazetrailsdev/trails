@@ -205,7 +205,7 @@
   .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--ink); }
   .blaze { color: var(--orange); }
   .trails { position: relative; display: inline-block; padding-bottom: 0.16em; }
-  .trails::after { content: ""; position: absolute; left: 0.02em; right: 0.06em; bottom: 0; height: 0.12em; background: linear-gradient(var(--mango), var(--mango)) top / 100% 0.03em no-repeat, linear-gradient(var(--mango), var(--mango)) bottom / 100% 0.03em no-repeat, repeating-linear-gradient(90deg, var(--mango) 0 0.05em, transparent 0.05em 0.2em); }
+  .trails::after { content: ""; position: absolute; left: 0; right: 0.04em; bottom: -0.02em; height: 0.16em; background: var(--mango); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 20 1, 32 9, 50 5 S 82 1, 98 6 S 114 7, 118 3' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 20 1, 32 9, 50 5 S 82 1, 98 6 S 114 7, 118 3' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
 
   .hero { padding: 40px 24px 80px; }
   .lede { font-size: 30px; line-height: 1.3; max-width: 700px; margin: 0 auto 1.5rem; }
