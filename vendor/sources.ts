@@ -731,6 +731,23 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "libxml-ruby",
+    origin: {
+      type: "git",
+      url: "https://github.com/xml4r/libxml-ruby.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:336 resolves libxml-ruby (5.0.5),
+      // which ActiveSupport's XmlMini LibXML engines require.
+      ref: "5.0.5",
+    },
+    packages: [
+      {
+        name: "libxml-ruby",
+        libPath: "lib/libxml",
+        testPath: "test",
+      },
+    ],
+  },
+  {
     name: "racc",
     origin: {
       type: "git",

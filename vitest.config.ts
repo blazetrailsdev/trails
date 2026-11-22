@@ -479,6 +479,7 @@ const alias = {
   "@blazetrails/vite-trails/": path.resolve(__dirname, "packages/vite-trails/lib") + "/",
   "@blazetrails/vite-trails": path.resolve(__dirname, "packages/vite-trails/lib/index.ts"),
   "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/lib/fugit.ts"),
+  "@blazetrails/libxml-ruby": path.resolve(__dirname, "packages/libxml-ruby/lib/libxml-ruby.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/lib/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/lib/index.ts"),
 };

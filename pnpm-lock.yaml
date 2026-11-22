@@ -1045,6 +1045,18 @@ importers:
         specifier: 0.0.19
         version: 0.0.19
 
+  packages/libxml-ruby:
+    dependencies:
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+      libxml2-wasm:
+        specifier: ^0.7.1
+        version: 0.7.1
+
   packages/mail:
     dependencies:
       '@blazetrails/date':

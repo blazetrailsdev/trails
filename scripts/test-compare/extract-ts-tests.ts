@@ -66,6 +66,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "mini-magick",
     "image-processing",
     "mail",
+    "libxml-ruby",
     "mini-mime",
     "net-smtp",
     "rake",

@@ -139,6 +139,8 @@
     { "path": "packages/rake/tsconfig.test.json" },
     { "path": "packages/html-sanitizer" },
     { "path": "packages/html-sanitizer/tsconfig.test.json" },
+    { "path": "packages/libxml-ruby" },
+    { "path": "packages/libxml-ruby/tsconfig.test.json" },
     { "path": "packages/nokogiri" },
     { "path": "packages/nokogiri/tsconfig.test.json" },
     { "path": "packages/activerecord-cli" },

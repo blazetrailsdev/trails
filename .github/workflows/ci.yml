@@ -1080,6 +1080,7 @@ jobs:
           packages/i18n
           packages/mail
           packages/actionmailer
+          packages/libxml-ruby
           packages/marcel
           packages/image-processing
           packages/mini-magick
@@ -1336,6 +1337,7 @@ jobs:
           packages/i18n
           packages/mail
           packages/actionmailer
+          packages/libxml-ruby
           packages/marcel
           packages/image-processing
           packages/mini-magick

@@ -941,6 +941,22 @@
       "processor.ts::Processor": "ImageProcessing::Processor"
     }
   },
+  "libxml-ruby": {
+    "rows": 9,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "attr.ts::Attr": "LibXML::XML::Attr",
+      "attributes.ts::Attributes": "LibXML::XML::Attributes",
+      "document.ts::Document": "LibXML::XML::Document",
+      "error.ts::Error": "LibXML::XML::Error",
+      "node.ts::Node": "LibXML::XML::Node",
+      "parser.ts::Parser": "LibXML::XML::Parser",
+      "parser/context.ts::Context": "LibXML::XML::Parser::Context",
+      "sax-callbacks.ts::Callbacks": "LibXML::XML::SaxParser::Callbacks",
+      "sax-parser.ts::SaxParser": "LibXML::XML::SaxParser"
+    }
+  },
   "mail": {
     "rows": 132,
     "excluded": ["multibyte/encoding-error.ts::EncodingError"],
