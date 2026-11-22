@@ -34,10 +34,10 @@ export class Result {
   }
 
   /**
-   * @missingRailsCall cast — CONVERGEABLE mysql2-result-each-ports-rb-mysql-result-each
-   * @missingRailsCall cast_booleans — CONVERGEABLE mysql2-result-each-ports-rb-mysql-result-each
-   * @missingRailsCall database_timezone — CONVERGEABLE mysql2-result-each-ports-rb-mysql-result-each
-   * @missingRailsCall application_timezone — CONVERGEABLE mysql2-result-each-ports-rb-mysql-result-each
+   * @missingRailsCall cast — CONVERGEABLE mysql2-result-each-reads-its-cast-options-per-call
+   * @missingRailsCall cast_booleans — CONVERGEABLE mysql2-result-each-reads-its-cast-options-per-call
+   * @missingRailsCall database_timezone — CONVERGEABLE mysql2-result-each-reads-its-cast-options-per-call
+   * @missingRailsCall application_timezone — CONVERGEABLE mysql2-result-each-reads-its-cast-options-per-call
    */
   each(
     opts: QueryOptions | ((row: unknown[] | Record<string, unknown>) => unknown) = {},
