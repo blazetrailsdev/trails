@@ -8,6 +8,7 @@ export { raw, safeJoin, toSentence } from "./output-safety-helper.js";
 export type { ToSentenceOptions } from "./output-safety-helper.js";
 
 export { debug } from "./debug-helper.js";
+export { atomFeed, AtomBuilder, AtomFeedBuilder, AtomFeedHelper } from "./atom-feed-helper.js";
 
 export {
   tag,
