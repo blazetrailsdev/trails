@@ -258,7 +258,11 @@ export class Response {
   private _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
   /** @inventedArm if — CONVERGEABLE rack-body-parts-are-safebuffer-objects */
-  constructor(body: any = null, status: number | string = 200, headers: RackHeaders = {}) {
+  constructor(
+    body: any = null,
+    status: number | string = 200,
+    headers: RackHeaders | Hash<string, any> = {},
+  ) {
     this.status = Number(toI(status));
 
     if (!(isPlainHash(headers) || (headers as unknown) instanceof Hash)) {
@@ -266,7 +270,7 @@ export class Response {
     }
 
     this.headers = {};
-    eachPair(headers as unknown as Record<string, any> | Hash<string, any>, (k, v) => {
+    eachPair(headers, (k, v) => {
       this.headers[k.toLowerCase()] = v;
     });
     this._writer = this.append.bind(this);
