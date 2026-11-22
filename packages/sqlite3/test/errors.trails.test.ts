@@ -12,6 +12,7 @@ import {
   rbSqlite3RaiseWithSql,
   status2klass,
 } from "../lib/errors.js";
+import { errors as nodeSqliteErrors } from "../lib/engine/node-sqlite.js";
 import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 import { errors } from "../lib/engine/better-sqlite3.js";
 
@@ -50,7 +51,7 @@ describe("status2klass", () => {
 describe("rbSqlite3Raise", () => {
   it("raises the gem class with the primary code and keeps the native error as cause", () => {
     const native = Object.assign(new Error("database is locked"), { errcode: 517 });
-    const error = raised(() => rbSqlite3Raise(native)) as BusyException;
+    const error = raised(() => rbSqlite3Raise(native, nodeSqliteErrors)) as BusyException;
     expect(error).toBeInstanceOf(BusyException);
     expect(error.code).toBe(5);
     expect(error.sql).toBeNull();

@@ -188,15 +188,14 @@ export function status2klass(status: number): typeof Exception | null {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-node-sqlite-engine */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-libsql-engines */
 function nativeStatus(error: unknown): number | null {
-  const { errcode, rawCode } = (error ?? {}) as Record<string, unknown>;
-  if (typeof errcode === "number") return errcode & 0xff;
+  const { rawCode } = (error ?? {}) as Record<string, unknown>;
   if (typeof rawCode === "number") return rawCode & 0xff;
   return null;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-node-sqlite-engine */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-libsql-engines */
 const nativeErrors: EngineErrors = {
   errcode: nativeStatus,
   errmsg: (error) => (error as { message: string }).message,

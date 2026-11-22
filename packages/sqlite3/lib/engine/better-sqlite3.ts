@@ -6,6 +6,7 @@ import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "..
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
+import { columnText } from "./column-text.js";
 
 const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
 
@@ -157,21 +158,6 @@ function prepareStatement(
     columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
     setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
   };
-}
-
-/** @internal */
-function columnText(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value !== "number") return String(value);
-  const [mantissa, exponent] = value.toExponential(14).split("e");
-  const exp = Number(exponent);
-  if (value !== 0 && Number.isFinite(value) && (exp < -4 || exp >= 15)) {
-    const m = String(Number(mantissa));
-    const sign = exp < 0 ? "-" : "+";
-    return `${m.includes(".") ? m : `${m}.0`}e${sign}${String(Math.abs(exp)).padStart(2, "0")}`;
-  }
-  const text = String(Number(value.toPrecision(15)));
-  return /^-?\d+$/.test(text) ? `${text}.0` : text;
 }
 
 export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) => {
