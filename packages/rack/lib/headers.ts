@@ -93,15 +93,6 @@ for (const str of [
   KNOWN_HEADERS[str] = KNOWN_HEADERS[downcased] = downcased;
 }
 
-/** @internal */
-function downcaseKey(key: string): string {
-  return typeof key === "string"
-    ? Object.hasOwn(KNOWN_HEADERS, key)
-      ? KNOWN_HEADERS[key]
-      : key.toLowerCase()
-    : key;
-}
-
 export class Headers extends Hash<string, string> {
   static KNOWN_HEADERS = KNOWN_HEADERS;
 
@@ -125,7 +116,7 @@ export class Headers extends Hash<string, string> {
   }
 
   override get(key: string): string | undefined {
-    return super.get(downcaseKey(key));
+    return super.get(this.downcaseKey(key));
   }
 
   override set(key: string, value: string): this {
@@ -140,7 +131,7 @@ export class Headers extends Hash<string, string> {
   }
 
   override assoc(key: string): [string, string] | null {
-    return super.assoc(downcaseKey(key));
+    return super.assoc(this.downcaseKey(key));
   }
 
   override compareByIdentity(): never {
@@ -148,24 +139,24 @@ export class Headers extends Hash<string, string> {
   }
 
   override delete(key: string, block?: (key: string) => string) {
-    return super.delete(downcaseKey(key), block);
+    return super.delete(this.downcaseKey(key), block);
   }
 
   override dig(key: string, ...a: unknown[]): unknown {
-    return super.dig(downcaseKey(key), ...a);
+    return super.dig(this.downcaseKey(key), ...a);
   }
 
   fetch(key: string, ...defaultValue: any[]): string {
-    key = downcaseKey(key);
+    key = this.downcaseKey(key);
     return fetch(this as Map<string, string>, key, ...defaultValue) as string;
   }
 
   override fetchValues(...a: string[]): string[] {
-    return super.fetchValues(...a.map((key) => downcaseKey(key)));
+    return super.fetchValues(...a.map((key) => this.downcaseKey(key)));
   }
 
   hasKey(key: string): boolean {
-    return super.has(downcaseKey(key));
+    return super.has(this.downcaseKey(key));
   }
 
   override isInclude(key: string): boolean {
@@ -261,7 +252,16 @@ export class Headers extends Hash<string, string> {
   }
 
   except(...a: string[]): Hash<string, string> {
-    return except(this as Map<string, string>, ...a.map((key) => downcaseKey(key)));
+    return except(this as Map<string, string>, ...a.map((key) => this.downcaseKey(key)));
+  }
+
+  /** @internal */
+  private downcaseKey(key: string): string {
+    return typeof key === "string"
+      ? Object.hasOwn(KNOWN_HEADERS, key)
+        ? KNOWN_HEADERS[key]
+        : key.toLowerCase()
+      : key;
   }
 }
 
