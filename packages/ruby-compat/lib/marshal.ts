@@ -149,7 +149,7 @@ interface LoadArg {
 }
 
 /** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
-function tObjectP(obj: unknown): obj is Record<string, unknown> {
+function tObjectP(obj: unknown): obj is Set<unknown> | Record<string, unknown> {
   return (
     obj instanceof Set ||
     (Object.prototype.toString.call(obj) === "[object Object]" && rbObjClass(obj) !== Hash)
