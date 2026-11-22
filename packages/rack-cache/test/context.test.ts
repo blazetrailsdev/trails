@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {} from "@blazetrails/vitest-matchers";
 import type { Headers } from "@blazetrails/rack";
 import { Marshal, Timeout, rbObjIvarGet } from "@blazetrails/ruby-compat";
@@ -192,7 +192,7 @@ describe("Rack::Cache::Context", () => {
     expect(H.response!.status).toEqual(304);
     expect(H.response!.originalHeaders).not.toInclude("content-length");
     expect(H.response!.originalHeaders).not.toInclude("content-type");
-    expect(H.response!.body).toEqual("");
+    expect(H.response!.body.length === 0).toBeTruthy();
     expect(H.cache!.trace).toContain("miss");
     expect(H.cache!.trace).toContain("store");
   });
@@ -211,7 +211,7 @@ describe("Rack::Cache::Context", () => {
     expect(H.response!.originalHeaders).not.toInclude("content-length");
     expect(H.response!.originalHeaders).not.toInclude("content-type");
     expect(H.response!.headers).toInclude("etag");
-    expect(H.response!.body).toEqual("");
+    expect(H.response!.body.length === 0).toBeTruthy();
     expect(H.cache!.trace).toContain("miss");
     expect(H.cache!.trace).toContain("store");
   });
@@ -990,29 +990,23 @@ describe("Rack::Cache::Context", () => {
     expect(H.response!.body).toEqual("Hello World");
     expect(H.cache!.trace).toContain("store");
 
-    let metastoreCalls = 0;
+    let metastore = vi.fn(() => Promise.reject(new Timeout.Error("Timeout::Error")));
     await get("/", {}, (cache) => {
-      cache.metastore = () => {
-        metastoreCalls += 1;
-        return Promise.reject(new Timeout.Error("Timeout::Error"));
-      };
+      cache.metastore = metastore;
     });
+    expect(metastore).toHaveBeenCalledTimes(1);
     expect(H.response!.isOk).toBeTruthy();
     expect(H.response!.body).toEqual("Hello World");
     expect(H.cache!.trace).toContain("pass");
-    expect(metastoreCalls).toEqual(1);
 
-    metastoreCalls = 0;
+    metastore = vi.fn(() => Promise.reject(new Timeout.Error("Timeout::Error")));
     await post("/", {}, (cache) => {
-      cache.metastore = () => {
-        metastoreCalls += 1;
-        return Promise.reject(new Timeout.Error("Timeout::Error"));
-      };
+      cache.metastore = metastore;
     });
+    expect(metastore).toHaveBeenCalledTimes(1);
     expect(H.response!.isOk).toBeTruthy();
     expect(H.response!.body).toEqual("Hello World");
     expect(H.cache!.trace).toContain("pass");
-    expect(metastoreCalls).toEqual(1);
   });
 
   it("does not cache when cache-control response header changed to private (reset @cache_control on dup)", async () => {
