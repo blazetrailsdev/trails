@@ -5,10 +5,13 @@ import { Entry } from "./entry.js";
 import { LocalCache } from "./strategy/local-cache.js";
 import { Store, inspectOptions } from "./store.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `prepend Strategy::LocalCache` (null_store.rb:15).
-export interface NullStore extends Pick<Included<typeof LocalCache>, "withLocalCache"> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface NullStore extends Pick<
+  Included<typeof LocalCache>,
+  "withLocalCache" | "middleware"
+> {}
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class NullStore extends Store implements CacheStore {
   static {
     prepend(this, LocalCache);

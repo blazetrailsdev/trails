@@ -81,10 +81,13 @@ async function _then<T>(redis: RedisClient, block: (c: Redis) => T | Promise<T>)
   return await redis.use(block);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `prepend Strategy::LocalCache` (redis_cache_store.rb:63).
-export interface RedisCacheStore extends Pick<Included<typeof LocalCache>, "withLocalCache"> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface RedisCacheStore extends Pick<
+  Included<typeof LocalCache>,
+  "withLocalCache" | "middleware"
+> {}
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RedisCacheStore extends Store implements CacheStore {
   static supportsCacheVersioning(): boolean {
     return true;
@@ -291,10 +294,8 @@ export class RedisCacheStore extends Store implements CacheStore {
     const keys: Buffer[] = [];
     for (const name of names) keys.push(await this.normalizeKey(name, options));
 
-    const values = await this.failsafe(
-      "read_multi_entries",
-      { returning: {} as Record<number, Buffer | null> },
-      () => _then(this.redis, (c) => c.mgetBuffer(...keys)),
+    const values = await this.failsafe("read_multi_entries", { returning: {} }, () =>
+      _then(this.redis, (c) => c.mgetBuffer(...keys)),
     );
 
     for (const [i, name] of names.entries()) {

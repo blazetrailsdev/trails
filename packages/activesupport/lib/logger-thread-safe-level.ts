@@ -11,7 +11,7 @@ function inspect(value: unknown): string {
 /** @internal */
 export class LoggerThreadSafeLevel {
   /** @internal */
-  declare protected localLevelKey: symbol;
+  declare protected localLevelKey: string;
 
   get localLevel(): number | null {
     return IsolatedExecutionState.get<number>(this.localLevelKey) ?? null;

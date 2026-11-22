@@ -1,4 +1,5 @@
 import {
+  rbObjId,
   Logger as RubyLogger,
   rbInspect,
   rbObjRespondTo,
@@ -41,7 +42,7 @@ const defaultOutput: LoggerOutput = {
 export class Logger extends RubyLogger {
   declare static silencer: boolean;
   /** @internal */
-  declare protected localLevelKey: symbol;
+  declare protected localLevelKey: string;
 
   static isLoggerOutputsTo(logger: Logger | BroadcastLogger, ...sources: unknown[]): boolean {
     const loggers: (Logger | BroadcastLogger)[] =
@@ -65,7 +66,7 @@ export class Logger extends RubyLogger {
     kwargs?: LoggerKwargs,
   ) {
     super(logdev, shiftAge, shiftSize, kwargs);
-    this.localLevelKey = Symbol("loggerThreadSafeLevel");
+    this.localLevelKey = `logger_thread_safe_level_${rbObjId(this)}`;
     this.formatter ??= new SimpleFormatter();
   }
 

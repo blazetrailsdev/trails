@@ -149,7 +149,7 @@ interface LoadArg {
 }
 
 /** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
-function tObjectP(obj: unknown): obj is object {
+function tObjectP(obj: unknown): obj is Record<string, unknown> {
   return (
     obj instanceof Set ||
     (Object.prototype.toString.call(obj) === "[object Object]" && rbObjClass(obj) !== Hash)
@@ -169,8 +169,7 @@ function mustNotBeAnonymous(type: string, path: string): string {
  * a class that is not a singleton, which `rb_class_real` answers unchanged.
  */
 function class2path(klass: AnyClass | Module): string {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const path = rbModName(klass as AnyClass) ?? rbModToS(klass as AnyClass);
+  const path = rbModName(klass) ?? rbModToS(klass as AnyClass);
 
   mustNotBeAnonymous(typeof klass === "function" ? "class" : "module", path);
   if (rbPathToClass(path) !== klass) {
@@ -1291,12 +1290,10 @@ function rObjectFor(
           continue;
         }
         v = rObjectFor(arg, null, extmod, type);
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v as unknown)) {
+        if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v)) {
           throw new ArgumentError("dump format error (user class)");
         }
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        const klass = rbObjClass(v) as AnyClass;
+        const klass = rbObjClass(v);
         const proto = c.prototype as object;
         if (v instanceof Module || !(c === klass || proto instanceof klass)) {
           const tmp = objAllocByKlass(c, arg, null);
