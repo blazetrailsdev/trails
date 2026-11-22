@@ -249,6 +249,49 @@ describe("assertionValueMismatch", () => {
     ]);
   });
 
+  it("re-pads a column-aligned table after the trails rename", () => {
+    const rails =
+      "          Prefix Verb URI\n      rails_blob GET  /rails/x\nrails_blob_proxy GET  /rails/y\n";
+    const trails =
+      "           Prefix Verb URI\n      trails_blob GET  /trails/x\ntrails_blob_proxy GET  /trails/y\n";
+    expect(
+      assertionValueMismatch(["assert_equal"], [`s:${rails}`], ["toBe"], [`s:${trails}`], false),
+    ).toBe(null);
+  });
+
+  it("drops Propshaft's assets row from a Rails routes table", () => {
+    const rails =
+      "Prefix Verb URI      Controller#Action\n            /assets  Propshaft::Server\n rails GET  /rails/x rails#show\n";
+    const trails = "Prefix Verb URI       Controller#Action\ntrails GET  /trails/x trails#show\n";
+    expect(
+      assertionValueMismatch(["assert_equal"], [`s:${rails}`], ["toBe"], [`s:${trails}`], false),
+    ).toBe(null);
+  });
+
+  it("still reports a mis-padded cell inside a column with snake names", () => {
+    const rails = "          Prefix Verb\n        new_post GET\nrails_blob_proxy GET\n";
+    const trails = "           Prefix Verb\n        new_post GET\ntrails_blob_proxy GET\n";
+    expect(
+      assertionValueMismatch(["assert_equal"], [`s:${rails}`], ["toBe"], [`s:${trails}`], false),
+    ).not.toBe(null);
+  });
+
+  it("still reports a table whose trailing blanks differ", () => {
+    const rails = "Prefix Verb  \n rails GET\n";
+    const trails = "Prefix Verb\ntrails GET\n";
+    expect(
+      assertionValueMismatch(["assert_equal"], [`s:${rails}`], ["toBe"], [`s:${trails}`], false),
+    ).not.toBe(null);
+  });
+
+  it("still reports a table whose padding differs beyond the rename", () => {
+    const rails = "Prefix Verb\n rails GET\n";
+    const trails = "Prefix  Verb\n trails GET\n";
+    expect(
+      assertionValueMismatch(["assert_equal"], [`s:${rails}`], ["toBe"], [`s:${trails}`], false),
+    ).not.toBe(null);
+  });
+
   it("does not fold whitespace for an ordinary must_equal pair", () => {
     expect(
       assertionValueMismatch(["must_equal"], ["s:a  b"], ["toEqual"], ["s:a b"], false),
