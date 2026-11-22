@@ -21,7 +21,7 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
 
   it("raises the gem's class for a failed prepare, with the SQL", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    await expect(db.prepare("SELECT * FROM nope")).rejects.toThrow(SQLite3.SQLException);
+    expect(() => db.prepare("SELECT * FROM nope")).toThrow(SQLite3.SQLException);
     try {
       await db.prepare("SELECT * FROM nope");
     } catch (e) {

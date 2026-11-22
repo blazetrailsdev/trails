@@ -85,6 +85,25 @@ describe("SQLite3::Statement over a fake engine", () => {
     );
   });
 
+  it("prepare and execute answer synchronously on a sync engine, and a promise on an async one", async () => {
+    const sync = fakeDatabase([[1]], ["a"], false).db;
+    const stmt = sync.prepare("x");
+    expect(stmt).toBeInstanceOf(SQLite3.Statement);
+    const rs = (stmt as InstanceType<typeof SQLite3.Statement>).execute(7);
+    expect(rs).not.toBeInstanceOf(Promise);
+    expect(sync.prepare("x", (s) => s.isClosed())).toBe(false);
+
+    const { db, engineDb, binds } = fakeDatabase([[1]], ["a"], true);
+    const prepare = engineDb.prepare;
+    engineDb.prepare = (sql) => Promise.resolve(prepare(sql));
+    const pending = db.prepare("x");
+    expect(pending).toBeInstanceOf(Promise);
+    const executed = (await pending).execute(7);
+    expect(executed).toBeInstanceOf(Promise);
+    await executed;
+    expect(binds).toEqual([[1, 7]]);
+  });
+
   it("done? survives close, and a discarded database refuses step", async () => {
     const fake = fakeDatabase([], [], false);
     let discarded = false;

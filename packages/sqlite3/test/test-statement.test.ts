@@ -24,7 +24,7 @@ describe("TestStatement", () => {
   it("new closed handle", async () => {
     db = new SQLite3.Database(":memory:", { engine });
     await db.close();
-    await expect(SQLite3.Statement.new(db, 'select "foo"')).rejects.toThrow(ArgumentError);
+    expect(() => SQLite3.Statement.new(db, 'select "foo"')).toThrow(ArgumentError);
   });
 
   it("new with remainder", async () => {
