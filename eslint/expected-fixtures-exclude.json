@@ -1,1 +1,4 @@
-[]
+[
+  "packages/activerecord/test/cases/attribute-methods.test.ts",
+  "packages/activerecord/test/cases/fixtures.test.ts"
+]

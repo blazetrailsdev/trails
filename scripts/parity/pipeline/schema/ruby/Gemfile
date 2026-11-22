@@ -6,6 +6,6 @@
 
 source "https://rubygems.org"
 
-gem "activerecord", "8.0.2"     # tracks rails ref in vendor/sources.ts
-gem "sqlite3", "~> 2.1"         # matches AR 8.0.2 declared dependency range
+gem "activerecord", "8.0.5.2"     # tracks rails ref in vendor/sources.ts
+gem "sqlite3", "~> 2.1"         # matches AR 8.0.5.2 declared dependency range
 gem "minitest", "~> 5.25"       # canonicalize_test.rb
