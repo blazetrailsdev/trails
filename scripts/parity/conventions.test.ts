@@ -136,7 +136,7 @@ describe("snakeToCamel", () => {
   });
 
   it("spells a `ruby` token as `Ruby`", () => {
-    expect(rubyMethodToTs("load_ruby_config")).toBe("loadRubyConfig");
+    expect(snakeToCamel("load_ruby_config")).toBe("loadRubyConfig");
   });
 
   it("renames rails as a whole token only", () => {
