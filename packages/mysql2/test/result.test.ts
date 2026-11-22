@@ -44,14 +44,13 @@ describe("Mysql2::Result", () => {
     it("should yield rows as hash's", async () => {
       const result = (await state.client.query("SELECT 1"))!;
       result.each((row) => {
-        expect(row).toBeInstanceOf(Object);
-        expect(Array.isArray(row)).toBe(false);
+        expect(row).toBeExactInstanceOf(Object);
       });
     });
     it("should yield rows as hash's with symbol keys if :symbolize_keys was set to true", async () => {
       const result = (await state.client.query("SELECT 1"))!;
       result.each({ symbolizeKeys: true }, (row) => {
-        expect(typeof Object.keys(row)[0]).toBe("string");
+        expect(Object.keys(row)[0]).toBeExactInstanceOf(String);
       });
     });
     it("should be able to return results as an array", async () => {
