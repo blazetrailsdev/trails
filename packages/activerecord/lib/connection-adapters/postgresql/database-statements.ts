@@ -253,7 +253,10 @@ export async function setConstraints(
 
 const IDLE_TRANSACTION_STATUSES = [PG.PQTRANS_IDLE, PG.PQTRANS_INTRANS, PG.PQTRANS_INERROR];
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsCall library_version — PERMANENT
+ */
 export async function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): Promise<void> {
   try {
     if (
