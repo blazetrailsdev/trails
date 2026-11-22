@@ -11,6 +11,11 @@ import "./app/channels/turbo/streams-channel.js";
 import "./app/jobs/turbo/streams/action-broadcast-job.js";
 import "./app/jobs/turbo/streams/broadcast-job.js";
 import "./app/jobs/turbo/streams/broadcast-stream-job.js";
+import type { DriveHelper } from "./app/helpers/turbo/drive-helper.js";
+import type { FramesHelper } from "./app/helpers/turbo/frames-helper.js";
+import type { IncludesHelper } from "./app/helpers/turbo/includes-helper.js";
+import type { StreamsHelper } from "./app/helpers/turbo/streams-helper.js";
+import type { ActionHelper } from "./app/helpers/turbo/streams/action-helper.js";
 import "./app/helpers/turbo/drive-helper.js";
 import "./app/helpers/turbo/frames-helper.js";
 import "./app/helpers/turbo/includes-helper.js";
@@ -41,6 +46,17 @@ declare module "@blazetrails/actionpack" {
   interface RenderOptions {
     turboStream?: unknown;
   }
+}
+
+type EngineHelpers = typeof DriveHelper &
+  typeof FramesHelper &
+  typeof IncludesHelper &
+  typeof StreamsHelper &
+  typeof ActionHelper;
+
+declare module "@blazetrails/actionview" {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface Base extends EngineHelpers {}
 }
 
 declare module "@blazetrails/trailties/trailtie/configuration" {
