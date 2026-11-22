@@ -781,6 +781,7 @@ export default defineConfig({
             "packages/stimulus/**",
             "packages/fugit/**",
             "packages/sqlite3/**",
+            "packages/mysql2/**",
             ...(ARCONN === "postgresql"
               ? []
               : ["packages/actioncable/test/subscription-adapter/postgresql.test.ts"]),
@@ -842,6 +843,20 @@ export default defineConfig({
             "./packages/actiontext/test/support/build-templates.ts",
             "./packages/stimulus/test/support/build-templates.ts",
           ],
+          setupFiles: otherSetupFiles,
+        },
+      },
+      {
+        // The gem's specs share tables (`lastIdTest` in client_spec.rb and
+        // statement_spec.rb) and RSpec runs the files serially in one process.
+        resolve: otherResolve,
+        test: {
+          name: "mysql2",
+          globals: true,
+          include: ["packages/mysql2/test/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          pool: "forks",
+          poolOptions: { forks: { singleFork: true } },
           setupFiles: otherSetupFiles,
         },
       },

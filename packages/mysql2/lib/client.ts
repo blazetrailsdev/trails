@@ -1,3 +1,4 @@
+import mysqlCore from "mysql2";
 import mysql from "mysql2/promise";
 import {
   BigDecimal,
@@ -44,6 +45,11 @@ export interface Mysql2Result<
   each(opts?: QueryOptions | ((row: Row) => unknown), block?: (row: Row) => unknown): Row[];
   free(): void;
 }
+
+type ClientHandshake = {
+  handshake: { authPluginName: string };
+  sendCredentials(...args: unknown[]): unknown;
+};
 
 type Handshake = { _handshakePacket?: { serverVersion?: string } };
 
@@ -199,7 +205,8 @@ type NpmConnection = mysql.Connection & {
 const MYSQL2_MAX_TIME = 315578267999;
 const MYSQL2_MIN_TIME = 2678400;
 
-type Field = {
+/** @internal */
+export type Field = {
   type: string;
   name: string;
   length?: number;
@@ -408,7 +415,8 @@ export class Client {
   private sslMode: number | undefined;
   /** @internal */
   connection!: NpmConnection;
-  private INVALID_DATE: Error | undefined;
+  /** @internal */
+  INVALID_DATE: Error | undefined;
 
   static defaultQueryOptions(): QueryOptions {
     return (this._defaultQueryOptions ||= {
@@ -741,7 +749,6 @@ export class Client {
     return new Rational(Time.local(2010).utcOffset, 86400);
   }
 
-  /** @missingRailsCall default_auth — CONVERGEABLE mysql2-client-default-auth-reaches-the-npm-handshake */
   private async connect(
     user: string | null,
     pass: string | null,
@@ -824,13 +831,27 @@ export class Client {
     ) {
       config.ssl = { rejectUnauthorized: false };
     }
-    const connection = (await (async () =>
-      mysql.createConnection(config as mysql.ConnectionOptions))()
+    const defaultAuth = this.defaultAuth;
+    const createConnection = async () => {
+      if (defaultAuth == null) return mysql.createConnection(config as mysql.ConnectionOptions);
+      return new Promise<mysql.Connection>((resolve, reject) => {
+        const core = mysqlCore.createConnection(config as mysql.ConnectionOptions);
+        const handshake = (core as unknown as { _command: ClientHandshake })._command;
+        const sendCredentials = handshake.sendCredentials;
+        handshake.sendCredentials = function (this: ClientHandshake, ...args: unknown[]) {
+          this.handshake.authPluginName = defaultAuth;
+          return sendCredentials.apply(this, args);
+        };
+        core.once("connect", () => resolve(core.promise()));
+        core.once("error", reject);
+      });
+    };
+    const connection = (await createConnection()
       .catch((e: unknown) => {
         if (this.sslMode !== Client.SSL_MODE_PREFERRED) throw e;
         if ((e as { code?: unknown }).code !== "HANDSHAKE_NO_SSL_SUPPORT") throw e;
         delete config.ssl;
-        return mysql.createConnection(config as mysql.ConnectionOptions);
+        return createConnection();
       })
       .catch((e: unknown) => this.raiseMysql2Error(e))) as NpmConnection;
     this.connection = connection;
@@ -875,7 +896,8 @@ export class Client {
     if (!this._automaticClose) this.automaticClose = false;
   }
 
-  private typeCast(queryOptions: QueryOptions): TypeCast {
+  /** @internal */
+  typeCast(queryOptions: QueryOptions): TypeCast {
     const typeCast = this.connectionTypeCast;
     return (field, next) =>
       cast(this, queryOptions, field, typeCast ? () => typeCast(field, next) : next);
@@ -891,10 +913,12 @@ export class Client {
     ) {
       await this.connect(...this.connectArgs);
     }
+    const options = { ...this.options(sql, opts), typeCast: (field: Field) => field.buffer() };
     return this.storeResult(
       await (this.connection.query as unknown as (options: object) => Promise<Native>)
-        .call(this.connection, this.options(sql, opts))
+        .call(this.connection, options)
         .catch((e: unknown) => this.raiseMysql2Error(e)),
+      opts,
     );
   }
 
@@ -909,7 +933,7 @@ export class Client {
   }
 
   /** @internal */
-  storeResult([rawResult, rawFields]: Native): Mysql2Result | null {
+  storeResult([rawResult, rawFields]: Native, queryOptions?: QueryOptions): Mysql2Result | null {
     let result = rawResult as Array<unknown[] | Record<string, unknown>> | mysql.ResultSetHeader;
     let fields = rawFields;
     if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
@@ -925,6 +949,9 @@ export class Client {
         (fields ?? []).map((field) => field.name),
         result,
         error,
+        queryOptions && this,
+        queryOptions,
+        fields,
       );
     }
     this.affectedRows = result.affectedRows ?? 0;
