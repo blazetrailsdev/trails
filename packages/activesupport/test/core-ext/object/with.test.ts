@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { NoMethodError } from "@blazetrails/ruby-compat";
-import { objectWith } from "../../../lib/core-ext/object/with.js";
+import { with as with_ } from "../../../lib/core-ext/object/with.js";
 import { assertNotRespondTo } from "../../../lib/testing/assertions.js";
 
 class Record {
@@ -31,7 +31,7 @@ describe("WithTest", () => {
     expect(object.publicAttr).toBe("public");
     expect(object.anotherPublicAttr).toBe("another_public");
 
-    objectWith(object as any, { publicAttr: "changed", anotherPublicAttr: "changed_too" }, () => {
+    with_(object as any, { publicAttr: "changed", anotherPublicAttr: "changed_too" }, () => {
       expect(object.publicAttr).toBe("changed");
       expect(object.anotherPublicAttr).toBe("changed_too");
     });
@@ -45,7 +45,7 @@ describe("WithTest", () => {
     expect(object.anotherPublicAttr).toBe("another_public");
 
     expect(() => {
-      objectWith(object as any, { publicAttr: "changed", anotherPublicAttr: "changed_too" }, () => {
+      with_(object as any, { publicAttr: "changed", anotherPublicAttr: "changed_too" }, () => {
         expect(object.publicAttr).toBe("changed");
         expect(object.anotherPublicAttr).toBe("changed_too");
         throw new Error("Oops");
@@ -61,7 +61,7 @@ describe("WithTest", () => {
     expect(object.mixedAttr).toBe("mixed");
 
     expect(() => {
-      objectWith(object as any, { publicAttr: "changed", mixedAttr: "changed_too" }, () => {
+      with_(object as any, { publicAttr: "changed", mixedAttr: "changed_too" }, () => {
         expect(false).toBeTruthy();
       });
     }).toThrow(NoMethodError);
@@ -72,21 +72,21 @@ describe("WithTest", () => {
 
   it("only works with public attributes", () => {
     expect(() => {
-      objectWith(object as any, { privateAttr: "changed" }, () => {});
+      with_(object as any, { privateAttr: "changed" }, () => {});
     }).toThrow(NoMethodError);
     expect(() => {
-      objectWith(object as any, { protectedAttr: "changed" }, () => {});
+      with_(object as any, { protectedAttr: "changed" }, () => {});
     }).toThrow(NoMethodError);
 
     expect(object.mixedAttr).toBe("mixed");
     expect(() => {
-      objectWith(object as any, { mixedAttr: "changed" }, () => {});
+      with_(object as any, { mixedAttr: "changed" }, () => {});
     }).toThrow(NoMethodError);
     expect(object.mixedAttr).toBe("mixed");
   });
 
   it("yields the instance to the block", () => {
-    const result = objectWith(object as any, { publicAttr: "1" }, (o) => o.publicAttr);
+    const result = with_(object as any, { publicAttr: "1" }, (o) => o.publicAttr);
     expect(result).toBe("1");
   });
 

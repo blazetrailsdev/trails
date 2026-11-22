@@ -1,5 +1,11 @@
 import { afterAll, beforeEach } from "vitest";
-import { Logger, TopLevel, delegate, objectWith, setTrailsRoot } from "@blazetrails/activesupport";
+import {
+  Logger,
+  TopLevel,
+  delegate,
+  with as with_,
+  setTrailsRoot,
+} from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, Migrator } from "@blazetrails/activerecord";
 import { Trails } from "@blazetrails/trailties";
 import { ActionController } from "@blazetrails/actionpack";
@@ -55,7 +61,7 @@ afterAll(async () => {
 
 export async function withProductionDebouncer(block: () => Promise<unknown>): Promise<void> {
   try {
-    await objectWith(ThreadDebouncer, { debouncerClass: Debouncer }, block);
+    await with_(ThreadDebouncer, { debouncerClass: Debouncer }, block);
   } finally {
     await new Promise((resolve) => setTimeout(resolve, (Debouncer.DEFAULT_DELAY + 0.2) * 1000));
 

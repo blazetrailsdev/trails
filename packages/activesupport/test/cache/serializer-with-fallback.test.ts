@@ -5,7 +5,7 @@ import { KeyError, StringIO } from "@blazetrails/ruby-compat";
 import { Logger } from "../../lib/logger.js";
 import { Entry } from "../../lib/cache/entry.js";
 import { Store } from "../../lib/cache/index.js";
-import { objectWith } from "../../lib/core-ext/object/with.js";
+import { with as with_ } from "../../lib/core-ext/object/with.js";
 import { assertNotNil, assertNil } from "../../lib/testing/assertions.js";
 
 const FORMATS = [...SerializerWithFallback.SERIALIZERS.keys()];
@@ -29,7 +29,7 @@ function makeEntry() {
 
 function assertLogs(pattern: RegExp, block: () => unknown) {
   const io = new StringIO();
-  objectWith(Store, { logger: new Logger(io) }, block);
+  with_(Store, { logger: new Logger(io) }, block);
   expect(io.string()).toMatch(pattern);
 }
 
