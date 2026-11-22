@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {} from "@blazetrails/vitest-matchers";
-import { TopLevel, type Extended } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import {
   assertChanges,
   assertDifference,
@@ -33,7 +33,6 @@ import {
   User,
 } from "../../support/test-helper.js";
 import type { Many } from "../../../lib/attached/many.js";
-import type { ClassMethods } from "../../../lib/attached/model.js";
 
 // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
 Object.assign(Blob.prototype, {
@@ -47,7 +46,6 @@ afterAll(() => {
   delete blob.analyzeLater;
 });
 
-type Attachable = Extended<typeof ClassMethods>;
 type FirstBlob = { first(): Promise<Blob> };
 type Delegated = { reload(): Promise<unknown>; count(): Promise<number> };
 
@@ -941,7 +939,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
         return "users";
       }
       static {
-        (this as unknown as Attachable).hasManyAttached("signatures", {
+        this.hasManyAttached("signatures", {
           service: (user) => `disk_${(user as unknown as ExtraAttached).mirrorRegion()}`,
         });
       }
@@ -993,7 +991,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     activeStorage.service = null;
     try {
       const error = await assertRaises([RuntimeError], {}, () => {
-        (User as unknown as Attachable).hasManyAttached("featuredPhotos");
+        User.hasManyAttached("featuredPhotos");
       });
 
       expect(error.message).toMatch(
@@ -1006,7 +1004,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
   it("raises error when misconfigured service is passed", async () => {
     const error = await assertRaises([ArgumentError], {}, () =>
-      (User as unknown as Attachable).hasManyAttached("featuredPhotos", { service: "unknown" }),
+      User.hasManyAttached("featuredPhotos", { service: "unknown" }),
     );
 
     expect(error.message).toMatch(/Cannot configure service "unknown" for .*User#featuredPhotos/);
@@ -1018,7 +1016,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
         return "users";
       }
       static {
-        (this as unknown as Attachable).hasManyAttached("featuredVlogs", {
+        this.hasManyAttached("featuredVlogs", {
           service: () => "unknown",
         });
       }

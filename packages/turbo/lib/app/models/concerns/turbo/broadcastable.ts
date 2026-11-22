@@ -9,6 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { rbFSend, rbObjRespondTo, rbProcCall, rtest } from "@blazetrails/ruby-compat";
 import { Turbo } from "../../../../turbo-trails.js";
+import type {} from "@blazetrails/activerecord/base.js";
 
 type Options = Record<string, unknown>;
 
@@ -126,6 +127,20 @@ export const ClassMethods = {
     return this.suppressedTurboBroadcasts;
   },
 };
+
+declare module "@blazetrails/activerecord/base.js" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- the engine's on_load(:active_record) include reaches Base's statics only through a namespace merged onto the class.
+  namespace Base {
+    const broadcastsTo: typeof ClassMethods.broadcastsTo;
+    const broadcasts: typeof ClassMethods.broadcasts;
+    const broadcastsRefreshesTo: typeof ClassMethods.broadcastsRefreshesTo;
+    const broadcastsRefreshes: typeof ClassMethods.broadcastsRefreshes;
+    const broadcastTargetDefault: typeof ClassMethods.broadcastTargetDefault;
+    const suppressingTurboBroadcasts: typeof ClassMethods.suppressingTurboBroadcasts;
+    const isSuppressedTurboBroadcasts: typeof ClassMethods.isSuppressedTurboBroadcasts;
+    let suppressedTurboBroadcasts: boolean | null;
+  }
+}
 
 export const Broadcastable = {
   ClassMethods,

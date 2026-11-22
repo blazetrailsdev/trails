@@ -228,6 +228,14 @@ function hasManyAttached(
 
 export const ClassMethods = { hasOneAttached, hasManyAttached };
 
+declare module "@blazetrails/activerecord/base.js" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- the engine's on_load(:active_record) include reaches Base's statics only through a namespace merged onto the class.
+  namespace Base {
+    const hasOneAttached: typeof ClassMethods.hasOneAttached;
+    const hasManyAttached: typeof ClassMethods.hasManyAttached;
+  }
+}
+
 function validateServiceConfiguration(
   serviceName: string | null,
   modelClass: unknown,

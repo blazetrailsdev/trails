@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TopLevel, type Extended } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import {
   assertChanges,
   assertNoChanges,
@@ -33,11 +33,9 @@ import {
   Group,
   User,
 } from "../../support/test-helper.js";
-import type { ClassMethods } from "../../../lib/attached/model.js";
 import type { Attachment } from "../../../lib/attachment.js";
 import type { One } from "../../../lib/attached/one.js";
 
-type Attachable = Extended<typeof ClassMethods>;
 type Job = (block: () => unknown) => Promise<unknown>;
 
 const blobOf = async (one: One): Promise<Blob> => (await (await one.attachment)!.blob)!;
@@ -847,7 +845,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
         return "users";
       }
       static {
-        (this as unknown as Attachable).hasOneAttached("signature", {
+        this.hasOneAttached("signature", {
           service: (user) => `disk_${(user as unknown as ExtraAttached).mirrorRegion()}`,
         });
       }
@@ -869,7 +867,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
     activeStorage.service = null;
     try {
       const error = await assertRaises([RuntimeError], {}, () => {
-        (User as unknown as Attachable).hasOneAttached("featuredPhoto");
+        User.hasOneAttached("featuredPhoto");
       });
 
       expect(error.message).toMatch(
@@ -882,7 +880,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
   it("raises error when misconfigured service is passed", async () => {
     const error = await assertRaises([ArgumentError], {}, () =>
-      (User as unknown as Attachable).hasOneAttached("featuredPhoto", { service: "unknown" }),
+      User.hasOneAttached("featuredPhoto", { service: "unknown" }),
     );
 
     expect(error.message).toMatch(/Cannot configure service "unknown" for .*User#featuredPhoto/);
@@ -894,7 +892,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
         return "users";
       }
       static {
-        (this as unknown as Attachable).hasOneAttached("featuredVlog", {
+        this.hasOneAttached("featuredVlog", {
           service: () => "unknown",
         });
       }

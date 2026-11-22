@@ -1638,6 +1638,9 @@ importers:
       '@blazetrails/activejob':
         specifier: workspace:*
         version: link:../activejob
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
@@ -1657,9 +1660,6 @@ importers:
       '@blazetrails/activemodel':
         specifier: workspace:*
         version: link:../activemodel
-      '@blazetrails/activerecord':
-        specifier: workspace:*
-        version: link:../activerecord
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc

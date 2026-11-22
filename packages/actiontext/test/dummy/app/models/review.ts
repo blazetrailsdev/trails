@@ -9,9 +9,7 @@ export class Review extends ApplicationRecord {
   static {
     this.belongsTo("message");
 
-    (this as unknown as { hasRichText(name: string, options?: object): void }).hasRichText(
-      "content",
-    );
+    this.hasRichText("content");
   }
 }
 constSet(TopLevel, "Review", Review);

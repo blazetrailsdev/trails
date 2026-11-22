@@ -31,6 +31,7 @@
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rake": "workspace:*",
@@ -42,7 +43,6 @@
   },
   "devDependencies": {
     "@blazetrails/activemodel": "workspace:*",
-    "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
     "@hotwired/turbo-rails": "8.0.23",

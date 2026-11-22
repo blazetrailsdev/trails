@@ -1395,7 +1395,9 @@
     "rack-proxy": {},
     "rack-session": {},
     "rack-test": {},
+    "mysql2": {},
     "pg": {},
+    "sqlite3": {},
     "thor": {
       "base.ts": {
         "*": {
@@ -1435,7 +1437,9 @@
     "rack-proxy": [],
     "rack-session": [],
     "rack-test": [],
+    "mysql2": [],
     "pg": [],
+    "sqlite3": [],
     "thor": []
   }
 }
