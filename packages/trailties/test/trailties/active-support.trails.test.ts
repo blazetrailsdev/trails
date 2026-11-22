@@ -83,7 +83,7 @@ describe("ActiveSupport::Railtie initialize_beginning_of_week", () => {
 
 describe("ActiveSupport::Railtie set_configs", () => {
   afterEach(() => {
-    ActiveSupport.Cache.setFormatVersion!(7.0);
+    ActiveSupport.setCacheFormatVersion(7.0);
   });
 
   it("assigns config.activeSupport through ActiveSupport's writers", async () => {
@@ -97,6 +97,6 @@ describe("ActiveSupport::Railtie set_configs", () => {
       reloader: class extends Reloader {},
     };
     await runTrailtieInitializers(Trailtie, app);
-    expect(ActiveSupport.Cache.formatVersion!()).toBe(7.1);
+    expect(ActiveSupport.cacheFormatVersion()).toBe(7.1);
   });
 });
