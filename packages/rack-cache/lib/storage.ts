@@ -35,8 +35,8 @@ export class Storage {
   }
 
   clear(): null {
-    this._metastores = {};
-    this._entitystores = {};
+    for (const key of Object.keys(this._metastores)) delete this._metastores[key];
+    for (const key of Object.keys(this._entitystores)) delete this._entitystores[key];
     return null;
   }
 
