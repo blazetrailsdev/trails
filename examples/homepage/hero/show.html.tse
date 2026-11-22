@@ -1,0 +1,3 @@
+<article>
+  <h1><%= post.titel %></h1>
+</article>

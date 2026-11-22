@@ -25,7 +25,7 @@ const blocks = [
     file: "config/routes.ts",
     lang: "ts",
     title: "Routes map URLs to actions.",
-    body: "The routing DSL keeps Rails' names: `resources` with nested and shallow routes, `member` actions, `namespace`, and named routes.",
+    body: "The routing DSL keeps Rails' names: `resources` with nested and shallow routes, `member` actions, and named routes.",
   },
   {
     file: "app/views/posts/show.html.tse",
@@ -35,26 +35,18 @@ const blocks = [
   },
 ];
 
-const check = `import { ApplicationController } from "./application-controller.ts";
-import { Post } from "../models/post.ts";
+const HERO = path.join(EXAMPLE_ROOT, "hero");
 
-export class PostsController extends ApplicationController {
-  async destroy(): Promise<void> {
-    const post = await Post.find(this.params.expect("id"));
-    await post.destory();
-    await this.redirectTo("/posts", { status: 303 });
-  }
-}`;
-
-const checkError =
-  "app/controllers/posts-controller.ts(7,16): error TS2551: Property 'destory' does not exist on type 'Post'. Did you mean 'destroy'?";
-
-const view = `<article>
-  <h1><%= post.titel %></h1>
-</article>`;
-
-const viewError =
-  "app/views/posts/show.html.tse(2,15): error TS2551: Property 'titel' does not exist on type 'Post'. Did you mean 'title'?";
+async function heroPane(file: string, source: string, lang: string) {
+  const errors: Record<string, string> = JSON.parse(
+    await fs.readFile(path.join(HERO, "errors.json"), "utf8"),
+  );
+  const error = errors[file];
+  const [, line, col, name] = /\((\d+),(\d+)\): .*?Property '([^']+)'/.exec(error)!;
+  const code = (await fs.readFile(path.join(HERO, source), "utf8")).trimEnd();
+  const from = Number(col) - 1;
+  return withError(code, lang, Number(line), from, from + name.length, error);
+}
 
 function withError(
   code: string,
@@ -98,8 +90,8 @@ export async function load() {
     buildRef: parity.buildRef,
     coverage: Object.fromEntries(parity.packages.map((p) => [p.name, percent(p.api)])),
     hero: {
-      check: await withError(check, "ts", 7, 15, 22, checkError),
-      view: await withError(view, "erb", 2, 14, 19, viewError),
+      check: await heroPane("app/controllers/posts-controller.ts", "posts-controller.ts", "ts"),
+      view: await heroPane("app/views/posts/show.html.tse", "show.html.tse", "erb"),
     },
     blocks: await Promise.all(
       blocks.map(async ({ lang, ...rest }) => ({

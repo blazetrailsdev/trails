@@ -1,0 +1,4 @@
+{
+  "app/controllers/posts-controller.ts": "app/controllers/posts-controller.ts(7,16): error TS2551: Property 'destory' does not exist on type 'Post'. Did you mean 'destroy'?",
+  "app/views/posts/show.html.tse": "app/views/posts/show.html.tse(2,16): error TS2551: Property 'titel' does not exist on type 'Post'. Did you mean 'title'?"
+}

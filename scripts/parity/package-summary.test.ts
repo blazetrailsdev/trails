@@ -277,6 +277,7 @@ describe("package-summary", () => {
     expect(railsCounterpartOf("vite-trails")).toBe("vite_rails");
     expect(railsCounterpartOf("vite-assets")).toBe("vite_ruby");
     expect(railsCounterpartOf("activerecord")).toBe("activerecord");
+    expect(railsCounterpartOf("rack-proxy")).toBe("rack-proxy");
     expect(vendorSourceOf("vite-trails")).toBe("vite_ruby");
     expect(vendorSourceOf("activerecord")).toBe("rails");
   });

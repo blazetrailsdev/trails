@@ -3,6 +3,7 @@
   import "@fontsource-variable/instrument-sans";
   import "@fontsource-variable/jetbrains-mono";
   import { base } from "$app/paths";
+  import { LANDING_TILES as tiles } from "$lib/landing-tiles";
 
   let { data } = $props();
   let tab = $state("caught");
@@ -38,14 +39,6 @@
     { label: "Parity", href: `${repo}/blob/main/docs/parity-gates.md` },
   ];
 
-  const tiles = [
-    "activerecord", "activemodel", "actionpack", "actionview",
-    "actionmailer", "actionmailbox", "actiontext", "activejob",
-    "activestorage", "actioncable", "activesupport", "arel",
-    "rack", "trailties", "solid-queue", "solid-cache",
-    "solid-cable", "turbo", "stimulus", "vite-trails",
-    "i18n", "thor",
-  ];
   const railsGems = new Set([
     "activerecord", "activemodel", "actionpack", "actionview",
     "actionmailer", "actionmailbox", "actiontext", "activejob",
