@@ -72,7 +72,7 @@ export class Configurator {
 
   /** @internal */
   private resolve(className: string): ServiceClass {
-    if (loadErrors.has(className))
+    if (loadErrors.has(className) || !constDefined(Service, `${camelize(className)}Service`))
       throw new RuntimeError(`Missing service adapter for ${rbInspect(className)}`);
     return constGet(Service, `${camelize(className)}Service`) as ServiceClass;
   }
