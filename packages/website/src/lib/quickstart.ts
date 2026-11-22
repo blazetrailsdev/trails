@@ -84,7 +84,10 @@ export function landingHero(blocks: QuickstartBlock[]) {
   const file = quickstartBlock(blocks, "quickstart-typecheck", "// app/models/check.ts");
   const error = blocks.find((b) => b.region === "quickstart-typecheck" && b.lang === "text");
   const at = error && /^\/\/ (\S+)/.exec(file.code);
-  const pos = at && new RegExp(`^${at[1]}\\((\\d+),(\\d+)\\)`).exec(error.code);
+  const pos =
+    at && error?.code.startsWith(`${at[1]}(`)
+      ? /^\((\d+),(\d+)\)/.exec(error.code.slice(at[1].length))
+      : null;
   if (!error || !pos) throw new Error("README Quickstart has no trails-tsc error for check.ts");
   return { file, error, line: Number(pos[1]) + 1, column: Number(pos[2]) };
 }

@@ -60,7 +60,7 @@
   <header class="hero">
     <h1>Convention over configuration.<br />Now with types.</h1>
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
-    <span class="pill">trails &mdash; pre-release &middot; {data.headline} of the upstream API matched &middot; measured at {data.measuredAt}</span>
+    <span class="pill">trails &mdash; pre-release &middot; {data.headline} of the Rails frameworks' API matched &middot; measured at {data.measuredAt}</span>
     <div class="stage">
       <div class="tabs" role="tablist" aria-label="Examples">
         <button role="tab" aria-selected={tab === "caught"} onclick={() => (tab = "caught")}>Caught by the compiler</button>
@@ -217,7 +217,6 @@
   .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 100px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
   .tiles a:hover, .tiles a:focus-visible { background: var(--orange); color: #fff; transform: translateY(-2px); box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); }
   .tiles a:hover small, .tiles a:focus-visible small { color: rgb(255 255 255 / 0.85); }
-  .tiles li:nth-last-child(2) { grid-column: 2; }
   .tiles small { font-size: 13px; font-weight: 500; color: #7a6450; }
 
   .band { background: var(--tint); padding: 90px 24px; }
@@ -264,9 +263,8 @@
     .mark { order: -1; justify-self: center; }
     .nav ul { justify-content: center; flex-wrap: wrap; gap: 16px; }
     .tiles { grid-template-columns: repeat(2, 1fr); }
-    .tiles li:nth-last-child(2) { grid-column: auto; }
-    .blocks, .cards, .split { grid-template-columns: 1fr; }
-      .ai { flex-direction: column; }
+    .blocks, .cards { grid-template-columns: 1fr; }
+    .ai { flex-direction: column; }
     .card { padding: 40px 24px; }
   }
 </style>

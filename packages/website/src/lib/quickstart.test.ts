@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { describe, expect, it } from "vitest";
+import { REPO_ROOT } from "./parity.js";
 import {
   LANDING_BLOCKS,
   LANDING_STEPS,
@@ -24,7 +25,7 @@ describe("landing page", () => {
   it("follows an edit to the Quickstart", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "website-quickstart-"));
     try {
-      const readme = await fs.readFile("../../README.md", "utf8");
+      const readme = await fs.readFile(path.join(REPO_ROOT, "README.md"), "utf8");
       await fs.writeFile(
         path.join(root, "README.md"),
         readme.replace("export class Post extends", "export class Article extends"),

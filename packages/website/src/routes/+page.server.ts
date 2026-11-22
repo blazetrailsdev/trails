@@ -1,7 +1,7 @@
 import { codeToHtml } from "shiki";
 
 import { PACKAGE_GROUPS } from "$lib/package-groups";
-import { loadParity, percent, shortSha, type PackageFigures } from "$lib/parity";
+import { RAILS_FRAMEWORKS, loadParity, percent, shortSha, type PackageFigures } from "$lib/parity";
 import {
   LANDING_BLOCKS,
   LANDING_STEPS,
@@ -70,7 +70,13 @@ export async function load() {
   return {
     measuredAt: shortSha(parity.measuredAt),
     buildRef: parity.buildRef,
-    headline: percent(total(parity.packages.map((p) => p.api))),
+    headline: percent(
+      total(
+        parity.packages
+          .filter((p) => p.railsCounterpart !== null && RAILS_FRAMEWORKS.has(p.railsCounterpart))
+          .map((p) => p.api),
+      ),
+    ),
     groups: PACKAGE_GROUPS.map((g) => ({
       title: g.title,
       packages: g.packages.map((name) => {
