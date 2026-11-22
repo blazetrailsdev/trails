@@ -169,7 +169,8 @@ function mustNotBeAnonymous(type: string, path: string): string {
  * a class that is not a singleton, which `rb_class_real` answers unchanged.
  */
 function class2path(klass: AnyClass | Module): string {
-  const path = rbModName(klass) ?? rbModToS(klass as AnyClass);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS 7 needs it; the TS 6 lint does not
+  const path = rbModName(klass as AnyClass) ?? rbModToS(klass as AnyClass);
 
   mustNotBeAnonymous(typeof klass === "function" ? "class" : "module", path);
   if (rbPathToClass(path) !== klass) {
@@ -1290,10 +1291,12 @@ function rObjectFor(
           continue;
         }
         v = rObjectFor(arg, null, extmod, type);
-        if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v)) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS 7 needs it; the TS 6 lint does not
+        if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v as unknown)) {
           throw new ArgumentError("dump format error (user class)");
         }
-        const klass = rbObjClass(v);
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS 7 needs it; the TS 6 lint does not
+        const klass = rbObjClass(v) as AnyClass;
         const proto = c.prototype as object;
         if (v instanceof Module || !(c === klass || proto instanceof klass)) {
           const tmp = objAllocByKlass(c, arg, null);
