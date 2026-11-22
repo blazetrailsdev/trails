@@ -25,7 +25,9 @@ type OwnMember =
   | "isAttached"
   | "loadedAttachment";
 
-type DelegatedAttachment = Omit<Attachment, OwnMember> & Omit<Blob, keyof Attachment | OwnMember>;
+type DelegatedAttachment = Partial<
+  Omit<Attachment, OwnMember> & Omit<Blob, keyof Attachment | OwnMember>
+>;
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface One extends DelegatedAttachment {}
