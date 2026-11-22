@@ -125,7 +125,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async
     if (rbObjRespondTo(TopLevel.Trails!.cache, "middleware")) {
       this.config.middleware!.insertBefore(
         Runtime,
-        (TopLevel.Trails!.cache as unknown as { middleware: unknown }).middleware,
+        (TopLevel.Trails!.cache as unknown as { middleware(): unknown }).middleware(),
       );
     }
   }

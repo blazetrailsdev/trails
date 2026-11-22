@@ -761,6 +761,12 @@ export class Author extends Base {
     this.belongsTo("authorAddress", { dependent: "destroy" });
     this.belongsTo("authorAddressExtra", { dependent: "delete", className: "AuthorAddress" });
 
+    this.belongsTo("publishedAuthor", {
+      className: "PublishedAuthor",
+      foreignKey: "published_author_id",
+      optional: true,
+    });
+
     this.hasMany("categoryPostComments", { through: "categories", source: "postComments" });
 
     this.hasMany(
@@ -970,6 +976,8 @@ export interface Author {
   set authorAddress(value: AuthorAddress | null);
   get authorAddressExtra(): AuthorAddress | null | Promise<AuthorAddress | null>;
   set authorAddressExtra(value: AuthorAddress | null);
+  get publishedAuthor(): PublishedAuthor | null | Promise<PublishedAuthor | null>;
+  set publishedAuthor(value: PublishedAuthor | null);
   get recentPost(): Post | null | Promise<Post | null>;
   set recentPost(value: Post | null);
   get recentResponse(): Comment | null | Promise<Comment | null>;
@@ -1035,3 +1043,15 @@ export interface AuthorFavoriteWithScope {
   get favoriteAuthor(): Author | null | Promise<Author | null>;
   set favoriteAuthor(value: Author | null);
 }
+
+export class PublishedAuthor extends Base {
+  declare books: AssociationProxy<PublishedBook>;
+
+  static tableName = "authors";
+
+  static {
+    this.hasMany("books", { className: "PublishedBook", foreignKey: "author_id" });
+  }
+}
+constSet(TopLevel, "PublishedAuthor", PublishedAuthor);
+DescendantsTracker.registerSubclass(Base, PublishedAuthor);

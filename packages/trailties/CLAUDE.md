@@ -178,7 +178,7 @@ resolution is root § "Call-time constant resolution".
 
 ## A package-shipped engine's root is its package root (`Engine.find_root`)
 
-Rails' `Engine.find_root` (`vendor/rails/v8.0.2/railties/lib/rails/engine.rb:375-377`)
+Rails' `Engine.find_root` (`vendor/rails/v8.0.5.2/railties/lib/rails/engine.rb:375-377`)
 is `find_root_with_flag "lib", from`: it walks up from `called_from` to the
 first directory holding `lib/`, which for a gem is the gem's root. An npm
 package has `src/` and `dist/`, never `lib/`, so the walk from an engine's
@@ -208,13 +208,13 @@ declaration, so this section is its receipt.
 
 `Base.inherited` adds a named subclass not ending in `Base` to
 `Rails::Command.subclasses`
-(`vendor/rails/v8.0.2/railties/lib/rails/command/base.rb:59-65`). JS has no hook
+(`vendor/rails/v8.0.5.2/railties/lib/rails/command/base.rb:59-65`). JS has no hook
 at `extends` (CLAUDE.md § "`inherited` is deferred to own-property memo guards"),
 so `Base.methodAdded` seats the class the first time it adds a command, and
 `Base.namespace(name)` seats it when it names its namespace, both with
 `inherited`'s guard. That second seat registers a class that defines no command
 of its own (`RakeCommand` calls `namespace "rake"`,
-`vendor/rails/v8.0.2/railties/lib/rails/commands/rake/rake_command.rb`) and
+`vendor/rails/v8.0.5.2/railties/lib/rails/commands/rake/rake_command.rb`) and
 answers through `printing_commands` / `perform`. A subclass that does neither is
 never seated, which loses nothing: `find_by_namespace` has nothing to dispatch.
 
@@ -222,7 +222,7 @@ never seated, which loses nothing: `find_by_namespace` has nothing to dispatch.
 
 `trails test` hands off to Vitest (RFC 0212 open question 1, trails#9567), so
 `Rails::TestUnitReporter < Minitest::StatisticsReporter`
-(`vendor/rails/v8.0.2/railties/lib/rails/test_unit/reporter.rb:7`) has no
+(`vendor/rails/v8.0.5.2/railties/lib/rails/test_unit/reporter.rb:7`) has no
 superclass here, and its `super` calls have nothing to reach.
 `test-unit/vitest-reporter.ts` is the sole reporter of a `trails test` run. Its
 `VitestReporter` stands in for Minitest's reporter calls, and carries the
@@ -255,7 +255,7 @@ exists to handle. The fallback's nineteen members are a scoped skip in
 ## `runner` evaluates its code argument (`RunnerCommand#perform`'s `eval`)
 
 `RunnerCommand#perform` evals a code string or stdin at `TOPLEVEL_BINDING`
-(`vendor/rails/v8.0.2/railties/lib/rails/commands/runner/runner_command.rb:37,48`).
+(`vendor/rails/v8.0.5.2/railties/lib/rails/commands/runner/runner_command.rb:37,48`).
 JS has no such binding, so `evalToplevel` in `commands/runner.ts` builds a
 sloppy-mode async function with `with (TopLevel)`, where constants resolve.
 Root § "Templates are precompiled" keeps eval out of what serves production; a
@@ -265,7 +265,7 @@ the operator on 2026-11-02 (trails#9630).
 ## A `require` in the `Application` class body runs after the class (`add_to_config`)
 
 Ruby's class body is ordinary code, so `add_to_config`
-(`vendor/rails/v8.0.2/railties/test/isolation/abstract_unit.rb`) can put a
+(`vendor/rails/v8.0.5.2/railties/test/isolation/abstract_unit.rb`) can put a
 `require "foo"` there (`test/application/initializers/load_path_test.rb:27-43`),
 and it resolves because `Application.inherited` has already run
 `add_lib_to_load_path!` (`railties/lib/rails/application.rb`). The generated
@@ -311,7 +311,7 @@ mechanism"; its cross-table rules and
 ## A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)
 
 A trails app ships through npm and pnpm, so Rails' Gemfile, Bundler and
-gemspec surface (`vendor/rails/v8.0.2/railties/lib/rails/generators/app_base.rb`'s
+gemspec surface (`vendor/rails/v8.0.5.2/railties/lib/rails/generators/app_base.rb`'s
 `GemfileEntry`, `gemfile_entries`, the `*_gemfile_entry` builders,
 `exec_bundle_command`, `add_bundler_platforms`; `plugin_generator.rb`'s gemspec;
 `benchmark_generator.rb`'s `add_ips_to_gemfile`) is ported onto this mapping.

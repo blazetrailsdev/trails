@@ -52,6 +52,14 @@ export const ActiveSupport = {
       RedisCacheStore?: typeof import("./cache/redis-cache-store.js").RedisCacheStore;
       NullStore?: typeof import("./cache/null-store.js").NullStore;
       SolidCacheStore?: new (...args: any[]) => import("./cache/index.js").CacheStore;
+      Strategy?: {
+        name: string;
+        LocalCache?: typeof import("./cache/strategy/local-cache.js").LocalCache & {
+          LocalCacheRegistry?: typeof import("./cache/strategy/local-cache.js").LocalCacheRegistry;
+          LocalStore?: typeof import("./cache/strategy/local-cache.js").LocalStore;
+          Middleware?: typeof import("./cache/strategy/local-cache-middleware.js").Middleware;
+        };
+      };
     };
   Concurrency: { name: string };
   JSON: typeof import("./json.js");

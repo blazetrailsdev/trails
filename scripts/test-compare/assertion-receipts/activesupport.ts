@@ -130,6 +130,33 @@ export const activesupport: Record<string, AssertionReceipt[]> = {
         "json/encoding_test.rb:81 `result.encoding` — a JS string carries no encoding tag (ruby-compat/lib/string/force-encoding.ts)",
     },
   ],
+  "activesupport:log_subscriber_test.rb › SyncLogSubscriberTest › event attributes": [
+    {
+      kind: "assert_operator",
+      value: null,
+      as: null,
+      reason:
+        'log_subscriber_test.rb:101 `assert_operator event.allocations, :>, 0` — V8 reports heap occupancy, not a monotonic allocated-object count, so `Event#allocations` answers 0 (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+  ],
+  "activesupport:notifications_test.rb › SubscribeEventObjectsTest › subscribe events": [
+    {
+      kind: "assert_operator",
+      value: null,
+      as: null,
+      reason:
+        'notifications_test.rb:38 `assert_operator event.allocations, :>, 0` — V8 reports heap occupancy, not a monotonic allocated-object count, so `Event#allocations` answers 0 (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+  ],
+  "activesupport:notifications_test.rb › SubscribeEventObjectsTest › subscribe via top level api": [
+    {
+      kind: "assert_operator",
+      value: null,
+      as: null,
+      reason:
+        'notifications_test.rb:79 `assert_operator event.allocations, :>=, 100` — V8 reports heap occupancy, not a monotonic allocated-object count, so `Event#allocations` answers 0 (CLAUDE.md, "Runtime facts Node does not expose")',
+    },
+  ],
   "activesupport:safe_buffer_test.rb › SafeBufferTest › Should not fail if the returned object is not a string":
     [
       {

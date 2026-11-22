@@ -289,7 +289,7 @@ export class ConnectionPool implements ReapablePool {
   declare private _threadQueryCaches: QueryCacheRegistry;
   declare private _queryCacheMaxSize: number | null;
 
-  /** @inlinedFrom ActiveRecord::ConnectionAdapters::QueryCache::ConnectionPoolConfiguration#initialize rails/v8.0.2/activerecord/lib/active_record/connection_adapters/abstract/query_cache.rb:117-130 */
+  /** @inlinedFrom ActiveRecord::ConnectionAdapters::QueryCache::ConnectionPoolConfiguration#initialize rails/v8.0.5.2/activerecord/lib/active_record/connection_adapters/abstract/query_cache.rb:117-130 */
   constructor(poolConfig: PoolConfig) {
     this.poolConfig = poolConfig;
     this.dbConfig = poolConfig.dbConfig;

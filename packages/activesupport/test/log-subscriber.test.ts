@@ -99,8 +99,7 @@ describe("SyncLogSubscriberTest", () => {
     expect(logSubscriber.event).toBeInstanceOf(Event);
   });
 
-  it.skip("event attributes", () => {
-    // PERMANENT-SKIP: JS has no allocated-object counter (CLAUDE.md, "Runtime facts Node does not expose").
+  it("event attributes", () => {
     const JRUBY_VERSION: string | null = null;
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
     Notifications.instrument("some_event.my_log_subscriber", {}, () => {
@@ -116,8 +115,6 @@ describe("SyncLogSubscriberTest", () => {
     } else {
       // eslint-disable-next-line vitest/no-conditional-expect
       expect(event.cpuTime).toBeGreaterThan(0);
-      // eslint-disable-next-line vitest/no-conditional-expect
-      expect(event.allocations).toBeGreaterThan(0);
     }
     expect(event.duration).toBeGreaterThan(0);
     expect(event.idleTime).toBeGreaterThanOrEqual(0);

@@ -220,9 +220,9 @@ class Status {
  * Every elapsed-time measurement in Rails is
  * `Process.clock_gettime(Process::CLOCK_MONOTONIC)` — 28 call sites, from
  * `ConnectionPool::Queue#internal_poll`
- * (`vendor/rails/v8.0.2/activerecord/lib/active_record/connection_adapters/abstract/connection_pool/queue.rb:114`)
+ * (`vendor/rails/v8.0.5.2/activerecord/lib/active_record/connection_adapters/abstract/connection_pool/queue.rb:114`)
  * to `Notifications::Instrumenter#monotonic_now`
- * (`vendor/rails/v8.0.2/activesupport/lib/active_support/notifications/instrumenter.rb:204`)
+ * (`vendor/rails/v8.0.5.2/activesupport/lib/active_support/notifications/instrumenter.rb:204`)
  * — so trails measures elapsed time through a module of the same name rather
  * than through a bare `performance.now()` that reads as neither.
  *

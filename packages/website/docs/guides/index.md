@@ -6,7 +6,7 @@ description: Guides for Trails, laid out on the Rails Guides table of contents.
 # Guides
 
 These guides follow the sections and order of the Rails Guides table of contents
-(`vendor/rails/v8.0.2/guides/source/documents.yaml`). The Rails Guides are a structural
+(`vendor/rails/v8.0.5.2/guides/source/documents.yaml`). The Rails Guides are a structural
 reference only: they are CC BY-SA 4.0 and trails documentation is CC BY 4.0, so every
 trails guide is written from scratch and no Rails Guides prose is copied or adapted
 ([LICENSES.md](https://github.com/blazetrailsdev/trails/blob/main/LICENSES.md)).

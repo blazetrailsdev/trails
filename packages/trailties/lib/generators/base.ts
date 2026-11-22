@@ -121,7 +121,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
   _gemGroups: string[];
 
   /**
-   * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.2/railties/lib/rails/generators/actions.rb:10-13
+   * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.5.2/railties/lib/rails/generators/actions.rb:10-13
    * @inlinedFrom Thor::Actions#initialize thor/v1.3.2/lib/thor/actions.rb:72-85
    */
   constructor(args: unknown[] = [], options: unknown = {}, config: GeneratorConfig = {}) {

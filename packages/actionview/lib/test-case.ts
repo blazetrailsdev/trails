@@ -540,7 +540,7 @@ export interface TestCase extends Behavior {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class TestCase extends ActiveSupportTestCase {
-  /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
+  /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.5.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
   constructor(name: string) {
     (new.target as unknown as typeof ClassMethods).includeHelperModulesBang.call(
       new.target as unknown as BehaviorClass,

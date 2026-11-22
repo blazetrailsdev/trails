@@ -100,7 +100,7 @@ export class Base {
    * @inventedArm if — PERMANENT
    * @inventedArm getPrototypeOf — PERMANENT
    * @inventedArm throw — PERMANENT
-   * @inlinedFrom ActiveJob::Core#initialize rails/v8.0.2/activejob/lib/active_job/core.rb:93-102
+   * @inlinedFrom ActiveJob::Core#initialize rails/v8.0.5.2/activejob/lib/active_job/core.rb:93-102
    */
   constructor(...arguments_: unknown[]) {
     const last = arguments_[arguments_.length - 1];

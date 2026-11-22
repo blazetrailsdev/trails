@@ -26,7 +26,7 @@ describe("vendor/sources.ts", () => {
     expect(rails!.origin).toEqual({
       type: "git",
       url: "https://github.com/rails/rails.git",
-      ref: "v8.0.2",
+      ref: "v8.0.5.2",
     });
     expect(rails!.packages.map((p) => p.name).sort()).toEqual(
       [
@@ -305,12 +305,12 @@ describe("vendor/sources.ts", () => {
 
   it("resolvePath returns absolute lib path for a known package", () => {
     const p = resolvePath("activerecord");
-    expect(p.endsWith("vendor/rails/v8.0.2/activerecord/lib/active_record")).toBe(true);
+    expect(p.endsWith("vendor/rails/v8.0.5.2/activerecord/lib/active_record")).toBe(true);
   });
 
   it("resolvePath('test') returns absolute test path", () => {
     const p = resolvePath("activerecord", "test");
-    expect(p.endsWith("vendor/rails/v8.0.2/activerecord/test/cases")).toBe(true);
+    expect(p.endsWith("vendor/rails/v8.0.5.2/activerecord/test/cases")).toBe(true);
   });
 
   it("resolvePath throws for unknown package", () => {
@@ -322,7 +322,7 @@ describe("vendor/sources.ts", () => {
   });
 
   it("vendoredRoot returns absolute source root", () => {
-    expect(vendoredRoot("rails").endsWith("vendor/rails/v8.0.2")).toBe(true);
+    expect(vendoredRoot("rails").endsWith("vendor/rails/v8.0.5.2")).toBe(true);
   });
 
   it("versionDir keeps a dotted tag and normalizes an underscore tag", () => {
@@ -343,19 +343,19 @@ describe("vendor/sources.ts", () => {
 
   it("VENDOR_DIR is the vendor/ directory every source root hangs off", () => {
     expect(VENDOR_DIR.endsWith("/vendor")).toBe(true);
-    expect(vendoredRoot("rails")).toBe(`${VENDOR_DIR}/rails/v8.0.2`);
+    expect(vendoredRoot("rails")).toBe(`${VENDOR_DIR}/rails/v8.0.5.2`);
   });
 
   it("resolveSourcePath resolves a gem subdir inside a source root", () => {
     expect(resolveSourcePath("rails", "activerecord")).toBe(
-      `${VENDOR_DIR}/rails/v8.0.2/activerecord`,
+      `${VENDOR_DIR}/rails/v8.0.5.2/activerecord`,
     );
   });
 
   it("resolveSourcePath resolves the AR test schema, fixtures and models dirs", () => {
     for (const dir of ["schema", "fixtures", "models"]) {
       expect(resolveSourcePath("rails", `activerecord/test/${dir}`)).toBe(
-        `${VENDOR_DIR}/rails/v8.0.2/activerecord/test/${dir}`,
+        `${VENDOR_DIR}/rails/v8.0.5.2/activerecord/test/${dir}`,
       );
     }
   });
@@ -371,7 +371,7 @@ describe("vendor/sources.ts", () => {
 
   it("resolveSourcePath resolves against an explicit vendorDir", () => {
     expect(resolveSourcePath("rails", "activerecord/lib", "/tmp/x/vendor")).toBe(
-      "/tmp/x/vendor/rails/v8.0.2/activerecord/lib",
+      "/tmp/x/vendor/rails/v8.0.5.2/activerecord/lib",
     );
   });
 
@@ -468,11 +468,11 @@ describe("vendor/sources.ts", () => {
   it("libPathsManifest returns absolute lib dirs for every api-compared package", () => {
     const m = libPathsManifest();
     expect(Object.keys(m).sort()).toEqual(apiComparePackages().sort());
-    expect(m["activerecord"].endsWith("vendor/rails/v8.0.2/activerecord/lib/active_record")).toBe(
+    expect(m["activerecord"].endsWith("vendor/rails/v8.0.5.2/activerecord/lib/active_record")).toBe(
       true,
     );
     expect(
-      m["abstractcontroller"].endsWith("vendor/rails/v8.0.2/actionpack/lib/abstract_controller"),
+      m["abstractcontroller"].endsWith("vendor/rails/v8.0.5.2/actionpack/lib/abstract_controller"),
     ).toBe(true);
     expect(m["rack"].endsWith("vendor/rack/v3.2.8/lib/rack")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/lib/global_id")).toBe(true);
@@ -547,7 +547,7 @@ describe("vendor/sources.ts", () => {
     );
     expect(m["thor"].endsWith("vendor/thor/v1.3.2/spec")).toBe(true);
     expect(m["erubi"].endsWith("vendor/erubi/1.13.1/test")).toBe(true);
-    expect(m["activerecord"].endsWith("vendor/rails/v8.0.2/activerecord/test/cases")).toBe(true);
+    expect(m["activerecord"].endsWith("vendor/rails/v8.0.5.2/activerecord/test/cases")).toBe(true);
     expect(m["rack"].endsWith("vendor/rack/v3.2.8/test")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/test/cases")).toBe(true);
     expect(m["image-processing"].endsWith("vendor/image_processing/v1.14.0/test")).toBe(true);

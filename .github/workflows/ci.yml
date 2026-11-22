@@ -2303,7 +2303,11 @@ jobs:
         # `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>`.
         run: pnpm exec tsx scripts/api-compare/lint-body-pins.ts
       - name: Bump-ledger gate
-        run: pnpm exec tsx scripts/api-compare/lint-bump-ledger.ts
+        run: |
+          if git rev-parse --verify -q HEAD^2 >/dev/null && ! git merge-base HEAD^1 HEAD^2 >/dev/null; then
+            git fetch --no-tags --deepen=500 origin "$GITHUB_REF"
+          fi
+          pnpm exec tsx scripts/api-compare/lint-bump-ledger.ts
       - name: API comparison (calls)
         # Writes the call-set artifact (output/call-mismatches.json) over
         # SIGNIFICANT_CALLS (all ported names except `super` and the
@@ -2625,7 +2629,7 @@ jobs:
           path: ${{ runner.temp }}/parity-outputs/
           retention-days: 90
       - name: AR-closure test manifest guard
-        # Fails when a file under vendor/rails/v8.0.2/activesupport/test/ is neither
+        # Fails when a file under vendor/rails/v8.0.5.2/activesupport/test/ is neither
         # derived by R1/R2 nor aliased nor listed out-of-closure, so a vendor
         # bump cannot land a new Rails test file silently on either side of the
         # boundary (RFC 0105). Manifest only — it moves no denominator.

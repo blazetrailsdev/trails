@@ -84,7 +84,7 @@ export class MessageEncryptor extends Codec {
   private memoLengthOfEncodedIv?: number;
   private memoLengthOfEncodedAuthTag?: number;
 
-  /** @inlinedFrom ActiveSupport::Messages::Rotator#initialize rails/v8.0.2/activesupport/lib/active_support/messages/rotator.rb:6-12 */
+  /** @inlinedFrom ActiveSupport::Messages::Rotator#initialize rails/v8.0.5.2/activesupport/lib/active_support/messages/rotator.rb:6-12 */
   constructor(
     secret: string | Buffer,
     signSecret: string | Buffer | null = null,

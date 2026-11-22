@@ -166,11 +166,11 @@ export default defineConfig(
       "packages/vite-trails/templates/**",
       // The Journey visualizer's shipped assets: fsm.js and fsm.css are
       // byte-for-byte copies of
-      // vendor/rails/v8.0.2/actionpack/lib/action_dispatch/journey/visualizer/, and
+      // vendor/rails/v8.0.5.2/actionpack/lib/action_dispatch/journey/visualizer/, and
       // index.html.tse is that directory's index.html.erb. TransitionTable#visualizer
       // reads all three off disk (transition_table.rb:128-131).
       "packages/actionpack/lib/action-dispatch/journey/visualizer/**",
-      // Byte-for-byte copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
+      // Byte-for-byte copies of vendor/rails/v8.0.5.2/actionpack/test/fixtures/{public,公共}.
       "packages/actionpack/test/fixtures/public/**",
       "packages/actionpack/test/fixtures/公共/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
@@ -183,7 +183,7 @@ export default defineConfig(
       "packages/stimulus/test/fixtures/**",
       // Copies of vendor/stimulus-rails/v1.3.4/lib/install/app, bin/rails spelled bin/trails.
       "packages/stimulus/lib/install/app/**",
-      // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
+      // Byte-for-byte copies of vendor/rails/v8.0.5.2/activestorage/test/fixtures/files.
       "packages/activestorage/test/fixtures/files/**",
       // Byte-for-byte copies of vendor/rack/v3.2.8/test/cgi/assets.
       "packages/rack/test/cgi/assets/**",

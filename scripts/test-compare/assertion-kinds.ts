@@ -298,14 +298,14 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
 const AREL_HELPER_ALIAS: Record<string, string> = {
   // `sql.must_be_like other` squeezes runs of whitespace and strips BOTH
   // operands, then `must_equal`
-  // (vendor/rails/v8.0.2/activerecord/test/cases/arel/helper.rb:10-13).
+  // (vendor/rails/v8.0.5.2/activerecord/test/cases/arel/helper.rb:10-13).
   must_be_like: "assert_equal",
   // `assert_edge(name, dot)` is `assert_match(/->.*label="name"/, dot)`
-  // (vendor/rails/v8.0.2/activerecord/test/cases/arel/visitors/dot_test.rb:13-15).
+  // (vendor/rails/v8.0.5.2/activerecord/test/cases/arel/visitors/dot_test.rb:13-15).
   assert_edge: "assert_match",
   // ActionDispatch's shared test helper `assert_headers` is `assert_equal value,
   // actual[key]` over each expected header
-  // (vendor/rails/v8.0.2/actionpack/test/abstract_unit.rb:490-495).
+  // (vendor/rails/v8.0.5.2/actionpack/test/abstract_unit.rb:490-495).
   assert_headers: "assert_equal",
 };
 
@@ -362,7 +362,7 @@ const SPEC_FORM_ALIAS: Record<string, string> = {
  * `must_equal`, …) to a canonical kind, or `null` when there is no mapped twin.
  * Handles the minitest `must_*`/`wont_*` spec forms — which arel's suite uses
  * throughout, `Arel::Spec < Minitest::Spec`
- * (vendor/rails/v8.0.2/activerecord/test/cases/arel/helper.rb:29) — by resolving them
+ * (vendor/rails/v8.0.5.2/activerecord/test/cases/arel/helper.rb:29) — by resolving them
  * to their `assert_*`/`refute_*` builtin before lookup, via SPEC_FORM_ALIAS for
  * the `must_be_*` family and the bare prefix rewrite for the rest.
  */

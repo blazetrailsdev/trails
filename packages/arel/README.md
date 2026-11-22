@@ -1,7 +1,7 @@
 # @blazetrails/arel
 
 The trails port of Rails' Arel, the SQL AST that ActiveRecord builds every
-query with (`vendor/rails/v8.0.2/activerecord/lib/arel`). It covers tables and
+query with (`vendor/rails/v8.0.5.2/activerecord/lib/arel`). It covers tables and
 attributes, the node tree, predications, the select / insert / update / delete
 managers, and the `ToSql` visitor with its SQLite, PostgreSQL and MySQL
 subclasses, plus the `Dot` visitor.
@@ -50,7 +50,7 @@ the Arel errors.
 
 `Arel::Visitors::Visitor` derives the method to call from the visited object's
 class at runtime, `:"visit_#{klass.name.gsub('::', '_')}"`
-(`vendor/rails/v8.0.2/activerecord/lib/arel/visitors/visitor.rb:17-21`), and caches it
+(`vendor/rails/v8.0.5.2/activerecord/lib/arel/visitors/visitor.rb:17-21`), and caches it
 per visitor class. trails does the same through ruby-compat's `rbObjClass` and `rbModName`, which
 read the path `rbSetClassPathString` gave the class where it is seated on its
 namespace, since a JS constructor name carries no namespace.

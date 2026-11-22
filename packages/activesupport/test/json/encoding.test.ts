@@ -5,13 +5,22 @@ import { DateTime, Time } from "@blazetrails/date";
 import { TimeWithZone } from "../../lib/time-with-zone.js";
 import { TimeZone } from "../../lib/values/time-zone.js";
 import { Encoding, type EncodeOptions } from "../../lib/json/encoding.js";
-import { asJson, ToJsonWithActiveSupportEncoder } from "../../lib/core-ext/object/json.js";
+import { asJson, Hash, ToJsonWithActiveSupportEncoder } from "../../lib/core-ext/object/json.js";
 import { BigDecimal } from "../../lib/core-ext/big-decimal/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
-import { Struct } from "@blazetrails/ruby-compat";
+import { Hash as RubyHash, JSON as RubyJSON, Struct } from "@blazetrails/ruby-compat";
 import { Date as RubyDate } from "@blazetrails/date";
 import { assertNil } from "../../lib/testing/assertions.js";
 import { withEnvTz } from "../../lib/time-zone-test-helpers.js";
+
+class HashWithAsJson extends RubyHash<string, unknown> {
+  asJsonCalled: boolean | null = null;
+
+  asJson(options: EncodeOptions | null = {}): unknown {
+    this.asJsonCalled = true;
+    return Hash.asJson(this, options);
+  }
+}
 
 class Hashlike {
   toHash(): Record<string, unknown> {
@@ -422,11 +431,35 @@ describe("TestJSONEncoding", () => {
 
   it.skip("data encoding", () => {});
 
-  it.skip("json gem dump by passing active support encoder", () => {});
+  it("json gem dump by passing active support encoder", () => {
+    const h = new HashWithAsJson();
+    h.set(":foo", "hello");
+    h.set(":bar", "world");
 
-  it.skip("json gem generate by passing active support encoder", () => {});
+    expect(RubyJSON.dump(h)).toBe(`{"foo":"hello","bar":"world"}`);
+    assertNil(h.asJsonCalled);
+  });
 
-  it.skip("json gem pretty generate by passing active support encoder", () => {});
+  it("json gem generate by passing active support encoder", () => {
+    const h = new HashWithAsJson();
+    h.set(":foo", "hello");
+    h.set(":bar", "world");
+
+    expect(RubyJSON.generate(h)).toBe(`{"foo":"hello","bar":"world"}`);
+    assertNil(h.asJsonCalled);
+  });
+
+  it("json gem pretty generate by passing active support encoder", () => {
+    const h = new HashWithAsJson();
+    h.set(":foo", "hello");
+    h.set(":bar", "world");
+
+    expect(RubyJSON.prettyGenerate(h)).toBe(`{
+  "foo": "hello",
+  "bar": "world"
+}`);
+    assertNil(h.asJsonCalled);
+  });
 
   it.skip("to json works on io objects", () => {});
 });

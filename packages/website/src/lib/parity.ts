@@ -28,7 +28,7 @@ export const SUMMARY_SHA_PATH = "scripts/parity/output/package-summary.sha";
 export const BUILD_SHA_PATH = "scripts/parity/output/build.sha";
 export const GITHUB_REPO = "https://github.com/blazetrailsdev/trails";
 
-/** The gems of the Rails repository, the top-level directories of `vendor/rails/v8.0.2/`. */
+/** The gems of the Rails repository, the top-level directories of `vendor/rails/v8.0.5.2/`. */
 export const RAILS_FRAMEWORKS: ReadonlySet<string> = new Set([
   "actioncable",
   "actionmailbox",

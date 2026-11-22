@@ -272,23 +272,23 @@ as convergence classes.
   the main worktree; bumping a `ref` follows the procedure in
   [vendor/README.md § "Upgrading a source"](vendor/README.md#upgrading-a-source-bumping-ref)).
   Before porting or fixing anything, read the corresponding Rails code and test
-  there — e.g. `vendor/rails/v8.0.2/activerecord/lib/active_record/...` and
-  `vendor/rails/v8.0.2/activerecord/test/cases/...`. The canonical test schema is
-  `vendor/rails/v8.0.2/activerecord/test/schema/schema.rb`, which
+  there — e.g. `vendor/rails/v8.0.5.2/activerecord/lib/active_record/...` and
+  `vendor/rails/v8.0.5.2/activerecord/test/cases/...`. The canonical test schema is
+  `vendor/rails/v8.0.5.2/activerecord/test/schema/schema.rb`, which
   `packages/activerecord/test/support/test-schema.ts` mirrors — when a
   test needs a table or column, check schema.rb first; if it's not there,
   don't invent it. Likewise, Rails' test models live in
-  `vendor/rails/v8.0.2/activerecord/test/models/` (ours:
+  `vendor/rails/v8.0.5.2/activerecord/test/models/` (ours:
   `packages/activerecord/test/models/`) and its fixture data in
-  `vendor/rails/v8.0.2/activerecord/test/fixtures/` (ours:
+  `vendor/rails/v8.0.5.2/activerecord/test/fixtures/` (ours:
   `packages/activerecord/test/fixtures/`) — mirror those too
   rather than making up models or fixture rows.
 - To map a trails test name or method/constant to its vendored Rails
   `file:line` instead of hand-grepping, run `pnpm rails:find <query>` — it
   reuses the test-compare / api-compare manifests and falls back to a scoped
-  grep of `vendor/rails/v8.0.2/activerecord/`, tagging each result with the mode.
+  grep of `vendor/rails/v8.0.5.2/activerecord/`, tagging each result with the mode.
 - A `vendor/<source>/…` citation names the version it was verified against
-  (`vendor/rails/v8.0.2/…`, not `vendor/rails/…`); `pnpm vendor:recite`
+  (`vendor/rails/v8.0.5.2/…`, not `vendor/rails/…`); `pnpm vendor:recite`
   rewrites unversioned or stale citations to each source's active version, and
   `scripts/vendor-citations.test.ts` (Preflight, so docs-only PRs too) fails
   CI on any citation it would rewrite
@@ -713,9 +713,9 @@ only then calls `super`, which lands in `API#initialize` because
 
 ```ts
 /**
- * @inlinedFrom ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:56-78
- * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482
- * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84
+ * @inlinedFrom ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.5.2/activerecord/lib/active_record/inheritance.rb:56-78
+ * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.5.2/activerecord/lib/active_record/core.rb:471-482
+ * @inlinedFrom ActiveModel::API#initialize rails/v8.0.5.2/activemodel/lib/active_model/api.rb:80-84
  */
 constructor(attributes = null) { … }
 ```
@@ -1008,10 +1008,10 @@ Ruby finds a class by name at run time: `constantize`, `const_get`,
 
 - **A name Rails computes, or one application data supplies, is a lookup.**
   `constantize` is `Object.const_get(camel_cased_word)`
-  (`vendor/rails/v8.0.2/activesupport/lib/active_support/inflector/methods.rb:289-291`):
+  (`vendor/rails/v8.0.5.2/activesupport/lib/active_support/inflector/methods.rb:289-291`):
   `constGet(Object, word)` walks `TopLevel` by segment and calls the
   receiver's `constMissing` on a miss. `compute_type`
-  (`vendor/rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:255-261`)
+  (`vendor/rails/v8.0.5.2/activerecord/lib/active_record/inheritance.rb:255-261`)
   ports line for line. A literal argument is typed through ruby-compat's
   `ConstantTable`, and answers `unknown` otherwise.
 - **A known name is still an ES import.** A name that is a literal at the call
@@ -1104,10 +1104,10 @@ tag or a raised mark never closes a finding. Ruled by the operator on
 
 Ruby's `thread_mattr_accessor` stores through `IsolatedExecutionState`, keyed
 on `Thread.current`
-(`vendor/rails/v8.0.2/activesupport/lib/active_support/isolated_execution_state.rb`),
+(`vendor/rails/v8.0.5.2/activesupport/lib/active_support/isolated_execution_state.rb`),
 so a block that pushes onto a thread-local stack and pops in `ensure`
 (`Contexts.with_encryption_context`,
-`vendor/rails/v8.0.2/activerecord/lib/active_record/encryption/contexts.rb:33-43`)
+`vendor/rails/v8.0.5.2/activerecord/lib/active_record/encryption/contexts.rb:33-43`)
 cannot interleave with a sibling. One trails `Thread` holds many in-flight
 promises, and a thread-local read carries no signal of which sibling is
 reading. So the block's entry opens the child context:
@@ -1389,12 +1389,12 @@ classes (`[1, 2, 3].sample`, `"hello".exclude?`). trails installs nothing on
 extension is a free function the caller imports. So `active_support.bare` has
 no observable arm, and a Rails test that asserts a core-ext method is present
 or absent on a native value
-(`vendor/rails/v8.0.2/railties/test/application/initializers/frameworks_test.rb:186-201`)
+(`vendor/rails/v8.0.5.2/railties/test/application/initializers/frameworks_test.rb:186-201`)
 is parked as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
 
 For the same reason a framework is loaded by an ES import, not by a load path:
 `use_frameworks`' `$:.reject!`
-(`vendor/rails/v8.0.2/railties/test/isolation/abstract_unit.rb:494`) has no
+(`vendor/rails/v8.0.5.2/railties/test/isolation/abstract_unit.rb:494`) has no
 port, and a test asserting a framework constant is undefined in a process that
 imports it (`frameworks_test.rb:212-216`) is parked the same way. Ruled by the
 operator on 2026-11-09.
@@ -1411,7 +1411,7 @@ would not recognise. **trails does not port Ruby pattern matching**: Minitest's
 `deconstruct_keys` members already ported (`Date`, `GlobalID`, `URI::GID`,
 ruby-compat's `Hash`) stay as plain methods. A Rails test
 whose assertions are patterns (`PatternMatchingTestCases`,
-`vendor/rails/v8.0.2/actionview/test/template/test_case_test.rb:490-516`) is
+`vendor/rails/v8.0.5.2/actionview/test/template/test_case_test.rb:490-516`) is
 parked as `it.skip` under a `PERMANENT-SKIP:` line citing this section. Ruled by
 the operator on 2026-10-21.
 
@@ -1457,17 +1457,17 @@ Two fallbacks exist, and both are last resorts:
   caller-supplied and the set it comes from is open — extended by application
   code, so no table the framework writes can enumerate it. `Object#try`'s
   `public_send(*args, &block)`
-  (`vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/object/try.rb:14-15`)
+  (`vendor/rails/v8.0.5.2/activesupport/lib/active_support/core_ext/object/try.rb:14-15`)
   takes any name its caller passes. `MimeResponds::Collector#any`'s
   `args.each { |type| send(type, &block) }`
-  (`vendor/rails/v8.0.2/actionpack/lib/action_controller/metal/mime_responds.rb:262-264`)
+  (`vendor/rails/v8.0.5.2/actionpack/lib/action_controller/metal/mime_responds.rb:262-264`)
   dispatches a registered Mime symbol, and `Mime::Type.register` appends to
   `SET` at run time
-  (`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/http/mime_type.rb:186-193`),
+  (`vendor/rails/v8.0.5.2/actionpack/lib/action_dispatch/http/mime_type.rb:186-193`),
   which is why the collector is a Proxy in the first place (§ "Ruby protocol
   methods with a different JS mechanism"). `Channel::Base#dispatch_action`'s
   `public_send action, data`
-  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/channel/base.rb:280-286`)
+  (`vendor/rails/v8.0.5.2/actioncable/lib/action_cable/channel/base.rb:280-286`)
   dispatches a client-supplied string gated by `action_methods`, which is the
   USER subclass's public instance methods less `Base`'s (`:128-134`) — a set
   the framework cannot see. A gate on a set application code supplies is not a

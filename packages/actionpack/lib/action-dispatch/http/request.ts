@@ -207,8 +207,8 @@ export class Request {
 
   /**
    * @inlinedFrom Rack::Request::Env#initialize rack/v3.2.8/lib/rack/request.rb:91-96
-   * @inlinedFrom ActionDispatch::Http::URL#initialize rails/v8.0.2/actionpack/lib/action_dispatch/http/url.rb:181-185
-   * @inlinedFrom ActionDispatch::Http::FilterParameters#initialize rails/v8.0.2/actionpack/lib/action_dispatch/http/filter_parameters.rb:24-30
+   * @inlinedFrom ActionDispatch::Http::URL#initialize rails/v8.0.5.2/actionpack/lib/action_dispatch/http/url.rb:181-185
+   * @inlinedFrom ActionDispatch::Http::FilterParameters#initialize rails/v8.0.5.2/actionpack/lib/action_dispatch/http/filter_parameters.rb:24-30
    */
   constructor(env: RackEnv = {}) {
     this.env = env;

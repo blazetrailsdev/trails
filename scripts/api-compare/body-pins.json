@@ -53139,8 +53139,8 @@
     "package": "activerecord",
     "rubyFile": "fixture_set/table_row.rb",
     "rubyName": "add_join_records",
-    "digest": "3300e6c1b78ea178",
-    "ref": "v8.0.2"
+    "digest": "55578254dff26bd8",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",

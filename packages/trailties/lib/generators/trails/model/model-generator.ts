@@ -20,7 +20,7 @@ export interface ModelGenerator extends Included<typeof ModelHelpers> {}
 export class ModelGenerator extends NamedBase {
   declare options: ModelGeneratorOptions;
 
-  /** @inlinedFrom Rails::Generators::ModelHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/model_helpers.rb:26-45 */
+  /** @inlinedFrom Rails::Generators::ModelHelpers#initialize rails/v8.0.5.2/railties/lib/rails/generators/model_helpers.rb:26-45 */
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
     super(args, localOptions, config);
     if (this.isPluralModelName(this.name) && !this.options.forcePlural) {

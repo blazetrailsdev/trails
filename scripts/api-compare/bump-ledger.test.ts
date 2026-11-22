@@ -397,6 +397,20 @@ describe("ledgerScope", () => {
     expect(skipped).toBe(1);
     expect([packages[0].totalExtras, packages[0].totalNovel]).toEqual([2, 1]);
   });
+
+  it("lint-extra-surface-ratchet: subtracts an @internal name on a removed pair", () => {
+    const pkg = {
+      package: "activerecord",
+      totalExtras: 0,
+      totalNovel: 0,
+      noCounterpartFiles: 0,
+      totalInternal: 2,
+      internalFiles: [{ tsFile: "gone.ts", names: ["gone", "kept"] }],
+      extraFiles: [],
+    };
+    const { packages, skipped } = withoutRemoved([pkg], scope.removedTsName);
+    expect([skipped, packages[0].totalInternal]).toEqual([1, 1]);
+  });
 });
 
 describe("signature rows", () => {

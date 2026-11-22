@@ -98,6 +98,7 @@ export const TEST_SCHEMA: Schema = {
       author_address_extra_id: "big_integer",
       organization_id: "string",
       owned_essay_id: "string",
+      published_author_id: "integer",
     },
     indexes: [{ columns: "author_address_id" }, { columns: "author_address_extra_id" }],
     foreignKeys: [
@@ -164,6 +165,15 @@ export const TEST_SCHEMA: Schema = {
       { columns: "(lower(external_id))", unique: true },
       { columns: "author_id" },
     ],
+  },
+
+  book_identifiers: {
+    columns: {
+      book_id: "big_integer",
+      id_type: { type: "string", null: false },
+      id_value: { type: "string", null: false },
+    },
+    indexes: [{ columns: "book_id" }],
   },
 
   encrypted_books: {
@@ -300,6 +310,12 @@ export const TEST_SCHEMA: Schema = {
       author: "string",
     },
     primaryKey: ["title", "author"],
+  },
+
+  cpk_posts_tags: {
+    post_title: "string",
+    post_author: "string",
+    tag_id: "integer",
   },
 
   cpk_comments: {

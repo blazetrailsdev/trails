@@ -179,7 +179,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   }
 
   const internalMarks = await loadInternalMarks();
-  const currentInternal = measureInternal(report.packages);
+  const currentInternal = measureInternal(ledgered.packages);
   const internal = internalViolations(internalMarks, currentInternal);
   if (internal.unmarked.length > 0) {
     console.error(

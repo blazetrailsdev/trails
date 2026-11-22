@@ -11,8 +11,8 @@ describe("ActionMailbox", () => {
   });
 
   it("answers its version and a memoized deprecator", () => {
-    expect(VERSION.STRING).toBe("8.0.2");
-    expect(version().toString()).toBe("8.0.2");
+    expect(VERSION.STRING).toBe("8.0.5.2");
+    expect(version().toString()).toBe("8.0.5.2");
     expect(ActionMailbox.deprecator()).toBe(deprecator());
   });
 });

@@ -16,7 +16,7 @@ export class TypeMetadata extends DelegateClass(SqlTypeMetadata) {
   readonly fmod: number | null;
 
   /**
-   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.5.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15
    * @inventedArm if — PERMANENT
    */
   constructor(
@@ -48,7 +48,7 @@ export class TypeMetadata extends DelegateClass(SqlTypeMetadata) {
 
   /**
    * @internal
-   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable#deduplicated rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:24-26
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable#deduplicated rails/v8.0.5.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:24-26
    */
   deduplicated(): this {
     this.__setobj__(this.__getobj__().deduplicate());

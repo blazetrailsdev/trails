@@ -149,6 +149,7 @@ export namespace JSON {
         });
         return buffer + arrayNl + indent.repeat(depth - 1) + "]";
       }
+      if (value instanceof Hash) value = value.toJSON();
       if (value !== null && typeof value === "object") {
         depth += 1;
         let buffer = "{";
@@ -162,6 +163,15 @@ export namespace JSON {
       return globalJSON.stringify(value) ?? "null";
     };
     return generate(obj, 0);
+  }
+
+  /**
+   * `JSON.generate` (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:300-307`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function generate(obj: unknown): string {
+    return globalJSON.stringify(obj) ?? "null";
   }
 
   export function dump(value: unknown): string {

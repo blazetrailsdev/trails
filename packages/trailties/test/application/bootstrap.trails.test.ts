@@ -25,6 +25,7 @@ const baseConfig = (): BootstrapConfig => ({
   logFormatter: null,
   defaultLogFile: async () => ({ write() {} }),
   paths: () => ({ get: () => ({ first: () => "log/test.log" }) }),
+  middleware: new Configuration("/app").middleware,
 });
 
 class TestApp extends Bootstrap implements BootstrapHost {
@@ -77,7 +78,7 @@ describe(":initialize_cache lookup_store arms", () => {
     const app = new TestApp();
     const middleware = class LocalCacheMiddleware {};
     const config = new Configuration("/app");
-    config.cacheStore = Object.assign(new NullStore(), { middleware });
+    config.cacheStore = Object.assign(new NullStore(), { middleware: () => middleware });
     const insertBefore = vi.spyOn(config.middleware as MiddlewareStackProxy, "insertBefore");
     app.config = config as unknown as BootstrapConfig;
     await app.runInitializers("all");

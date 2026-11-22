@@ -192,7 +192,7 @@ this section. A new instance is not a new decision to argue.
 Superseded. The heading is kept so citations resolve. The session now loads
 lazily, as Rails does: `Request::Session#load_for_read!` calls `load!`, which
 calls the store's `load_session`
-(`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/request/session.rb:255-282`),
+(`vendor/rails/v8.0.5.2/actionpack/lib/action_dispatch/request/session.rb:255-282`),
 on the first `session[...]` read. A cache-backed store's `find_session` reads
 `ActiveSupport::Cache::Store`, which is async in trails, so every
 `Request::Session` accessor (`get`, `set`, `fetch`, `dig`, `hasKey`, `keys`,
@@ -209,7 +209,7 @@ templates became async.
 ## Request params are a null-prototype plain object (`ParamBuilder#make_params`)
 
 Rails' `make_params` answers `ActiveSupport::HashWithIndifferentAccess.new`
-(`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/http/param_builder.rb:162-164`).
+(`vendor/rails/v8.0.5.2/actionpack/lib/action_dispatch/http/param_builder.rb:162-164`).
 trails' `makeParams` answers `Object.create(null)`, and `paramsHashType`
 accepts a null-prototype or plain object. A params hash is keyed by the
 request's own strings, so the String/Symbol folding is the identity.
@@ -227,7 +227,7 @@ Ruled by the operator on 2026-10-18, closing story
 Ruby sets `$!` for the length of a `rescue`, so a constructor called there can
 read the exception being handled with no argument:
 `ActionController::BadRequest#initialize`
-(`vendor/rails/v8.0.2/actionpack/lib/action_controller/metal/exceptions.rb:10-13`)
+(`vendor/rails/v8.0.5.2/actionpack/lib/action_controller/metal/exceptions.rb:10-13`)
 is `super(msg)` and then `set_backtrace $!.backtrace if $!`. JS has no
 equivalent: a `catch` binds its exception to a local only, and no hook runs on
 entry to a `catch` that could seat a carrier. **The exception being rescued is
@@ -269,7 +269,7 @@ the operator on 2026-10-15 (trails#8947). There is no story to add an HTML4 pars
 
 ## A colon-leading route path is a Symbol (`Mapper#map_match`'s `path_types`)
 
-`Mapper#map_match` (`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/routing/mapper.rb:1962-2006`)
+`Mapper#map_match` (`vendor/rails/v8.0.5.2/actionpack/lib/action_dispatch/routing/mapper.rb:1962-2006`)
 groups its paths by class: a String is a path (`post ":action"` draws
 `/:action(.:format)` with a dynamic segment), a Symbol is an action
 (`post :action` draws `/action(.:format)`, `path_for_action`, `:1887-1895`).

@@ -223,15 +223,31 @@ export class TableRow {
     if (targets != null && targets !== false) {
       const tableName = association.joinTable;
       const columnType = association.primaryKeyType;
-      const lhsKey = association.lhsKey as string;
-      const rhsKey = association.rhsKey as string;
+      const lhsKey = association.lhsKey;
+      const rhsKey = association.rhsKey;
 
       targets = Array.isArray(targets) ? targets : String(targets).split(/\s*,\s*/);
       const joins = (targets as unknown[]).map((target) => {
-        const join: Record<string, unknown> = {
-          [lhsKey]: this._row[this.modelMetadata.primaryKeyName as string],
-          [rhsKey]: FixtureSet.identify(String(target), columnType),
-        };
+        const join: Record<string, unknown> = {};
+
+        if (Array.isArray(rhsKey)) {
+          const compositeKey = FixtureSet.compositeIdentify(String(target), rhsKey);
+          for (const [column, value] of Object.entries(compositeKey)) {
+            join[column] = value;
+          }
+        } else {
+          join[rhsKey] = FixtureSet.identify(String(target), columnType);
+        }
+
+        if (Array.isArray(lhsKey)) {
+          const primaryKeyName = this.modelMetadata.primaryKeyName as string[];
+          lhsKey.forEach((fkey, i) => {
+            join[fkey] = this._row[primaryKeyName[i]];
+          });
+        } else {
+          join[lhsKey] = this._row[this.modelMetadata.primaryKeyName as string];
+        }
+
         for (const col of association.timestampColumnNames) {
           join[col] = this._now;
         }

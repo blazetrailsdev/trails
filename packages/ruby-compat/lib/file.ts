@@ -143,7 +143,7 @@ export interface FileOpenOpt {
  * `File` (`vendor/ruby/v3.3.11/file.c:7354` `rb_cFile`), the sliver of it trails calls.
  *
  * Rails reaches the filesystem through this class — `File.exist?(key)` in
- * `vendor/rails/v8.0.2/activesupport/lib/active_support/cache/file_store.rb:125`,
+ * `vendor/rails/v8.0.5.2/activesupport/lib/active_support/cache/file_store.rb:125`,
  * `File.join(cache_path, ...)` at `file_store.rb:185`,
  * `File.realpath(dir)` at `file_store.rb:196` — so trails reaches it through a
  * class of the same name rather than through members named after node's `fs`.

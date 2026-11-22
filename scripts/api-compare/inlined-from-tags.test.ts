@@ -53,7 +53,7 @@ describe("inlinedFromIn", () => {
     ["no citation", `${TAG} ActiveModel::API#initialize`],
     [
       "a citation spelling vendor/",
-      `${TAG} ActiveModel::API#initialize vendor/rails/v8.0.2/a.rb:1-2`,
+      `${TAG} ActiveModel::API#initialize vendor/rails/v8.0.5.2/a.rb:1-2`,
     ],
     ["a citation with one line", `${TAG} ActiveModel::API#initialize rails/v8.0.2/a.rb:80`],
     ["a backwards span", `${TAG} ActiveModel::API#initialize rails/v8.0.2/a.rb:84-80`],

@@ -99,7 +99,7 @@ ActionTextNamespace.TagHelper = TagHelper;
 export class ActionText extends Base {
   declare domId: (recordOrClass: unknown, prefix?: string | null) => string;
 
-  /** @inlinedFrom ActionView::Helpers::Tags::Placeholderable#initialize rails/v8.0.2/actionview/lib/action_view/helpers/tags/placeholderable.rb:7-20 */
+  /** @inlinedFrom ActionView::Helpers::Tags::Placeholderable#initialize rails/v8.0.5.2/actionview/lib/action_view/helpers/tags/placeholderable.rb:7-20 */
   constructor(
     objectName: unknown,
     methodName: unknown,

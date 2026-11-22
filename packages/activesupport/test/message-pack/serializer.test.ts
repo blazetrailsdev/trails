@@ -61,6 +61,11 @@ describe("MessagePackSerializerTest", () => {
     expect(MessagePack.isSignature(Buffer.from("{}"))).toBeFalsy();
   });
 
+  it("#signature? handles non-ASCII-only non-binary-encoded strings", () => {
+    expect(MessagePack.isSignature(dump("ümlaut"))).toBeTruthy();
+    expect(MessagePack.isSignature("ümlaut")).toBeFalsy();
+  });
+
   it("roundtrips base types", () => {
     expect(roundtrip(null)).toBe(null);
     expect(roundtrip(true)).toBe(true);

@@ -23,8 +23,7 @@ describe("SubscribeEventObjectsTest", () => {
   beforeEach(setupTestCase);
   afterEach(teardownTestCase);
 
-  it.skip("subscribe events", () => {
-    // PERMANENT-SKIP: JS has no allocated-object counter (CLAUDE.md, "Runtime facts Node does not expose").
+  it("subscribe events", () => {
     const evs: Event[] = [];
     notifier.subscribe(null, (event: Event) => {
       evs.push(event);
@@ -33,7 +32,6 @@ describe("SubscribeEventObjectsTest", () => {
     Notifications.instrument("foo");
     const event = evs[0];
     expect(event, "should have an event").toBeTruthy();
-    expect(event.allocations).toBeGreaterThan(0);
     expect(event.cpuTime).toBeGreaterThan(0);
     expect(event.idleTime).toBeGreaterThanOrEqual(0);
     expect(event.duration).toBeGreaterThan(0);
@@ -61,8 +59,7 @@ describe("SubscribeEventObjectsTest", () => {
     });
   });
 
-  it.skip("subscribe via top level api", () => {
-    // PERMANENT-SKIP: JS has no allocated-object counter (CLAUDE.md, "Runtime facts Node does not expose").
+  it("subscribe via top level api", () => {
     const oldNotifier = Notifications.notifier;
     Notifications.notifier = new Fanout();
     try {
@@ -76,7 +73,6 @@ describe("SubscribeEventObjectsTest", () => {
       });
 
       expect(event).toBeTruthy();
-      expect(event!.allocations).toBeGreaterThanOrEqual(100);
     } finally {
       Notifications.notifier = oldNotifier;
     }

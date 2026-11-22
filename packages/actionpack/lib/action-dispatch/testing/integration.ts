@@ -241,7 +241,7 @@ export class Session {
 
   private _mockSessionMemo?: RackTestSession;
 
-  /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
+  /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.5.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
   constructor(app: unknown) {
     (this as Record<symbol, unknown>)[urlForMod._routesIvar] = null;
     this._app = app;
@@ -684,7 +684,7 @@ type SessionMethodMissing = Pick<
 export class IntegrationTest<App = RoutesApp> extends TestCase {
   routes: RouteSet = new RouteSet();
 
-  /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
+  /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.5.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
   constructor(
     ...args:
       | ConstructorParameters<typeof TestCase>

@@ -85,6 +85,10 @@ export const fixtureRegistry = {
     model: () => import("../models/binary.js").then((m) => m.Binary),
     data: FixtureData.binaryFixtureData,
   },
+  bookIdentifiers: {
+    model: () => import("../models/book-identifier.js").then((m) => m.BookIdentifier),
+    data: FixtureData.bookIdentifierFixtureData,
+  },
   books: {
     model: () => import("../models/book.js").then((m) => m.Book),
     data: FixtureData.bookFixtureData,
@@ -191,6 +195,10 @@ export const fixtureRegistry = {
   cpkOrderTags: {
     model: () => import("../models/cpk.js").then((m) => m.CpkOrderTag),
     data: FixtureData.cpkOrderTagFixtureData,
+  },
+  cpkPosts: {
+    model: () => import("../models/cpk.js").then((m) => m.CpkPost),
+    data: FixtureData.cpkPostFixtureData,
   },
   cpkReviews: {
     model: () => import("../models/cpk.js").then((m) => m.CpkReview),

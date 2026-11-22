@@ -218,7 +218,7 @@ async function globHelperAsync(
  * `Dir` (`vendor/ruby/v3.3.11/dir.c:3632` `rb_cDir`), the sliver of it trails calls.
  *
  * Rails reaches directories through this class — `Dir.children(cache_path)` in
- * `vendor/rails/v8.0.2/activesupport/lib/active_support/cache/file_store.rb:34`,
+ * `vendor/rails/v8.0.5.2/activesupport/lib/active_support/cache/file_store.rb:34`,
  * `Dir.delete(dir)` at `file_store.rb:198`, `Dir.each_child(dir)` at
  * `file_store.rb:210` — so trails reaches them through a class of the same
  * name. The backend is the `FsAdapter` contract in `./fs-adapter.js`.

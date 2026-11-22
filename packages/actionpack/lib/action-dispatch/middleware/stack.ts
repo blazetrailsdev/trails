@@ -17,7 +17,9 @@ export interface RackAppObject {
 export type MiddlewareBlock = (...args: any[]) => unknown;
 type MiddlewareArgs = unknown[] | [...unknown[], MiddlewareBlock];
 
-export type MiddlewareFactory = new (app: any, ...args: any[]) => unknown;
+export type MiddlewareFactory =
+  | (new (app: any, ...args: any[]) => unknown)
+  | { name: string; "new"(app: unknown, ...args: unknown[]): unknown };
 
 export class Middleware {
   constructor(
@@ -43,7 +45,11 @@ export class Middleware {
   }
 
   build(app: RackApp | RackAppObject): RackApp | RackAppObject {
-    return new this.klass(app, ...this.args, ...(this.block ? [this.block] : [])) as RackAppObject;
+    const args = [...this.args, ...(this.block ? [this.block] : [])];
+    if (typeof this.klass !== "function") {
+      return this.klass.new(app, ...args) as RackAppObject;
+    }
+    return new this.klass(app, ...args) as RackAppObject;
   }
 
   buildInstrumented(app: RackApp | RackAppObject): InstrumentationProxy {

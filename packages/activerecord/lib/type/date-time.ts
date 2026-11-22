@@ -8,7 +8,7 @@ export interface DateTime extends Timezone {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DateTime extends ActiveModelDateTime {
-  /** @inlinedFrom ActiveRecord::Type::Internal::Timezone#initialize rails/v8.0.2/activerecord/lib/active_record/type/internal/timezone.rb:7-10 */
+  /** @inlinedFrom ActiveRecord::Type::Internal::Timezone#initialize rails/v8.0.5.2/activerecord/lib/active_record/type/internal/timezone.rb:7-10 */
   constructor({
     timezone,
     ...kwargs

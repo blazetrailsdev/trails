@@ -1,10 +1,22 @@
-import { rbModName } from "@blazetrails/ruby-compat";
+import { prepend, rbModName, type Included } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "../namespaces.js";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
+import { LocalCache } from "./strategy/local-cache.js";
 import { Store, inspectOptions } from "./store.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface NullStore extends Pick<
+  Included<typeof LocalCache>,
+  "withLocalCache" | "middleware"
+> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class NullStore extends Store implements CacheStore {
+  static {
+    prepend(this, LocalCache);
+  }
+
   static supportsCacheVersioning(): boolean {
     return true;
   }

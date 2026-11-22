@@ -40,7 +40,7 @@ export class Column {
     return this.sqlTypeMetadata?.sqlType ?? null;
   }
 
-  /** @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15 */
+  /** @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods#new rails/v8.0.5.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15 */
   constructor(
     name: string,
     defaultValue: string | Uint8Array | null,
@@ -120,7 +120,7 @@ export class Column {
 
   /**
    * @internal
-   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable#deduplicated rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:24-26
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable#deduplicated rails/v8.0.5.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:24-26
    */
   deduplicated(): this {
     if (this.sqlTypeMetadata) this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();

@@ -134,7 +134,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /**
    * @internal
    * @missingRailsName class — PERMANENT
-   * @inlinedFrom ActiveRecord::Associations::ThroughAssociation#build_record rails/v8.0.2/activerecord/lib/active_record/associations/through_association.rb:116-129
+   * @inlinedFrom ActiveRecord::Associations::ThroughAssociation#build_record rails/v8.0.5.2/activerecord/lib/active_record/associations/through_association.rb:116-129
    */
   override buildRecord(
     attributes?: Record<string, unknown> | PermittedAttributes,

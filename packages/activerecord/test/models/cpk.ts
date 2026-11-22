@@ -213,6 +213,17 @@ export interface CpkChapter {
   set book(value: CpkBook | null);
 }
 
+export class CpkOptionalChapter extends CpkChapter {
+  static {
+    constSet(Cpk, "OptionalChapter", this);
+    DescendantsTracker.registerSubclass(CpkChapter, this);
+  }
+
+  static {
+    this.belongsTo("book", { foreignKey: ["author_id", "book_id"], optional: true });
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkChapterDestroyAsync extends Base {
   static {
@@ -451,6 +462,8 @@ export class CpkTag extends Base {
 
 export class CpkPost extends Base {
   declare comments: AssociationProxy<CpkComment>;
+  declare postsTags: AssociationProxy<CpkPostsTag>;
+  declare tags: AssociationProxy<CpkTag>;
   declare author: string;
   declare title: string;
 
@@ -466,7 +479,37 @@ export class CpkPost extends Base {
       foreignKey: ["commentable_title", "commentable_author"],
       as: "commentable",
     });
+    this.hasMany("postsTags", {
+      className: "Cpk::PostsTag",
+      foreignKey: ["post_title", "post_author"],
+    });
+    this.hasMany("tags", { through: "postsTags", className: "Cpk::Tag" });
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class CpkPostsTag extends Base {
+  declare post_title: string;
+  declare post_author: string;
+  declare tag_id: number;
+
+  static {
+    constSet(Cpk, "PostsTag", this);
+    DescendantsTracker.registerSubclass(Base, this);
+  }
+  static tableName = "cpk_posts_tags";
+
+  static {
+    this.belongsTo("post", { className: "Cpk:Post", foreignKey: ["post_title", "post_author"] });
+    this.belongsTo("tag", { className: "Cpk::Tag" });
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CpkPostsTag {
+  get post(): CpkPost | null | Promise<CpkPost | null>;
+  set post(value: CpkPost | null);
+  get tag(): CpkTag | null | Promise<CpkTag | null>;
+  set tag(value: CpkTag | null);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

@@ -132,7 +132,7 @@ export class ConsoleCommand extends Base {
     klass.methodAdded("perform");
   }
 
-  /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.2/railties/lib/rails/command/environment_argument.rb:16-26 */
+  /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.5.2/railties/lib/rails/command/environment_argument.rb:16-26 */
   constructor(...[args = [], localOptions = {}, config = {}]: ConstructorParameters<typeof Base>) {
     let consoleOptions: string[] = [];
 

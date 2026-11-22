@@ -53,12 +53,27 @@ describe("NullStoreTest", () => {
     assertNil(await store.read("name"));
   });
 
-  it.skip("local store strategy", () => {
-    // BLOCKED: port-cache-strategy-local-cache
+  it("local store strategy", async () => {
+    const cache = new NullStore();
+    await cache.withLocalCache(async () => {
+      await cache.write("name", "value");
+      expect(await cache.read("name")).toEqual("value");
+      await cache.delete("name");
+      assertNil(await cache.read("name"));
+      await cache.write("name", "value");
+    });
+    assertNil(await cache.read("name"));
   });
 
-  it.skip("local store repeated reads", () => {
-    // BLOCKED: port-cache-strategy-local-cache
+  it("local store repeated reads", async () => {
+    const cache = new NullStore();
+    await cache.withLocalCache(async () => {
+      await cache.read("foo");
+      assertNil(await cache.read("foo"));
+
+      await cache.readMulti("foo", "bar");
+      expect(Object.fromEntries(await cache.readMulti("foo", "bar"))).toEqual({});
+    });
   });
 
   it("clear", async () => {

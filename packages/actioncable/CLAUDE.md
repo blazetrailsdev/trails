@@ -10,13 +10,13 @@ one in this file.
 ## Node's event loop stands in for Action Cable's nio4r selector (`StreamEventLoop`, `Stream#write`)
 
 `ActionCable::Connection::StreamEventLoop`
-(`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/stream_event_loop.rb`)
+(`vendor/rails/v8.0.5.2/actioncable/lib/action_cable/connection/stream_event_loop.rb`)
 owns an `NIO::Selector` and one thread running `run` (`:86-133`): it drains a
 todo queue, `select`s, reads up to 4096 bytes from each readable socket with
 `read_nonblock` and hands them to `stream.receive`, and calls
 `stream.flush_write_buffer` for each writable one. `spawn` (`:62-80`) starts
 that thread and `wakeup` (`:82-84`) interrupts the `select`. `Stream#write`
-(`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/stream.rb:37-70`)
+(`vendor/rails/v8.0.5.2/actioncable/lib/action_cable/connection/stream.rb:37-70`)
 calls `write_nonblock` and keeps the unwritten tail in `@write_head` /
 `@write_buffer` for the loop to flush (`:72-92`).
 
@@ -58,12 +58,12 @@ thread.** The `connection/` port, when it lands, follows these rules:
   adds the dependency), built with
   `Driver.http` from a request-shaped object read off the Rack env where Rails
   calls `WebSocket::Driver.rack(self, …)`
-  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/client_socket.rb:49`);
+  (`vendor/rails/v8.0.5.2/actioncable/lib/action_cable/connection/client_socket.rb:49`);
   the driver's `io` stream's `data` event calls `ClientSocket#write` (`:76`),
   where the Ruby driver calls `socket.write`.
 - `Connection::WebSocket` is otherwise a plain port; its one covered call is
   `::WebSocket::Driver.websocket?(env)`
-  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/web_socket.rb:14`),
+  (`vendor/rails/v8.0.5.2/actioncable/lib/action_cable/connection/web_socket.rb:14`),
   which is `Driver.isWebSocket` on the same request-shaped object.
 
 The files this section will cover, none ported yet, so a grep finds every

@@ -1245,7 +1245,7 @@ describe("CI runs every tooling test suite", () => {
       // the source, so it is rule data that happens to live in a package.
       "packages/activerecord/test/support/stubbed-ddl-methods.ts",
       // eslint/expected-fixtures.mjs reads the Rails-declared fixture sets.
-      "vendor/rails/v8.0.2/activerecord/test/cases/base_test.rb",
+      "vendor/rails/v8.0.5.2/activerecord/test/cases/base_test.rb",
     ]) {
       expect(lintAll.test(input), `${input} must force a full lint`).toBe(true);
     }
@@ -1481,7 +1481,7 @@ describe("CI runs every tooling test suite", () => {
       expect(withThor.thor_only).toBe("false");
 
       expect(
-        (await runGate("vendor/rails/v8.0.2/actioncable/lib/action_cable.rb")).actioncable_only,
+        (await runGate("vendor/rails/v8.0.5.2/actioncable/lib/action_cable.rb")).actioncable_only,
       ).toBe("false");
       expect((await runGate("packages/activesupport/lib/index.ts")).actioncable_affected).toBe(
         "true",

@@ -3,7 +3,7 @@ import type {
   AdapterName,
 } from "../../lib/connection-adapters/abstract-adapter.js";
 import type { AbstractMysqlAdapter } from "../../lib/connection-adapters/abstract-mysql-adapter.js";
-import type { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
+import { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
 import { ActiveRecordError } from "../../lib/errors.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
 import { noteAdapterSpecificSchemaLoaded } from "./drop-all-tables.js";
@@ -246,27 +246,34 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   await createTestUniqueConstraintsTable(adapter);
 
   if (await adapter.supportsPartitionedIndexes()) {
-    await adapter.createTable(
-      "measurements",
-      { id: false, force: true, options: "PARTITION BY LIST (city_id)" },
-      (t) => {
-        t.string("city_id", { null: false });
-        t.date("logdate", { null: false });
-        t.integer("peaktemp");
-        t.integer("unitsales");
-        t.index(["logdate", "city_id"], { unique: true });
-      },
-    );
-    await adapter.createTable("measurements_toronto", {
-      id: false,
-      force: true,
-      options: "PARTITION OF measurements FOR VALUES IN (1)",
-    });
-    await adapter.createTable("measurements_concepcion", {
-      id: false,
-      force: true,
-      options: "PARTITION OF measurements FOR VALUES IN (2)",
-    });
+    const previousUnloggedTables = PostgreSQLAdapter.createUnloggedTables;
+    try {
+      PostgreSQLAdapter.createUnloggedTables = false;
+
+      await adapter.createTable(
+        "measurements",
+        { id: false, force: true, options: "PARTITION BY LIST (city_id)" },
+        (t) => {
+          t.string("city_id", { null: false });
+          t.date("logdate", { null: false });
+          t.integer("peaktemp");
+          t.integer("unitsales");
+          t.index(["logdate", "city_id"], { unique: true });
+        },
+      );
+      await adapter.createTable("measurements_toronto", {
+        id: false,
+        force: true,
+        options: "PARTITION OF measurements FOR VALUES IN (1)",
+      });
+      await adapter.createTable("measurements_concepcion", {
+        id: false,
+        force: true,
+        options: "PARTITION OF measurements FOR VALUES IN (2)",
+      });
+    } finally {
+      PostgreSQLAdapter.createUnloggedTables = previousUnloggedTables;
+    }
   }
 
   await adapter.addIndex("companies", ["firm_id", "type"], {

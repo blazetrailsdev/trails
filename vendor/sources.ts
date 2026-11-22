@@ -103,7 +103,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rails/rails.git",
-      ref: "v8.0.2",
+      ref: "v8.0.5.2",
     },
     packages: [
       {

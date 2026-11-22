@@ -149,7 +149,7 @@ interface LoadArg {
 }
 
 /** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
-function tObjectP(obj: unknown): obj is object {
+function tObjectP(obj: unknown): obj is Set<unknown> | Record<string, unknown> {
   return (
     obj instanceof Set ||
     (Object.prototype.toString.call(obj) === "[object Object]" && rbObjClass(obj) !== Hash)
@@ -169,7 +169,7 @@ function mustNotBeAnonymous(type: string, path: string): string {
  * a class that is not a singleton, which `rb_class_real` answers unchanged.
  */
 function class2path(klass: AnyClass | Module): string {
-  const path = rbModName(klass as AnyClass) ?? rbModToS(klass as AnyClass);
+  const path = rbModName(klass) ?? rbModToS(klass as AnyClass);
 
   mustNotBeAnonymous(typeof klass === "function" ? "class" : "module", path);
   if (rbPathToClass(path) !== klass) {
@@ -1290,10 +1290,10 @@ function rObjectFor(
           continue;
         }
         v = rObjectFor(arg, null, extmod, type);
-        if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v as unknown)) {
+        if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v)) {
           throw new ArgumentError("dump format error (user class)");
         }
-        const klass = rbObjClass(v) as AnyClass;
+        const klass = rbObjClass(v);
         const proto = c.prototype as object;
         if (v instanceof Module || !(c === klass || proto instanceof klass)) {
           const tmp = objAllocByKlass(c, arg, null);
@@ -1607,14 +1607,14 @@ export const Marshal = {
    * `Marshal.dump(obj, limit = -1)` (`marshal_dump`,
    * `vendor/ruby/v3.3.11/marshal.c:1207`, over `w_object`, `marshal.c:846`), for the types a
    * schema-cache dump holds
-   * (`vendor/rails/v8.0.2/activerecord/lib/active_record/connection_adapters/schema_cache.rb:416-418`):
+   * (`vendor/rails/v8.0.5.2/activerecord/lib/active_record/connection_adapters/schema_cache.rb:416-418`):
    * `nil`, `true`, `false`, Integer, Float, String, Symbol, Array, Hash and a
    * plain ivar object, plus Class and Module, and an object answering
    * `marshal_dump` (`TYPE_USRMARSHAL`, `marshal.c:910`). Any other value takes
    * the `T_DATA` arm's `TypeError`, and an object whose singleton class holds
    * a method or an ivar takes `w_extended`'s (`marshal.c:556`), which is what
    * `DebugHelper#debug` probes for
-   * (`vendor/rails/v8.0.2/actionview/lib/action_view/helpers/debug_helper.rb:29`).
+   * (`vendor/rails/v8.0.5.2/actionview/lib/action_view/helpers/debug_helper.rb:29`).
    *
    * @boundary: a JS string carries no encoding tag, so `encoding_name`
    *  (`marshal.c:661`) answers UTF-8 for every String and `has_ivars`

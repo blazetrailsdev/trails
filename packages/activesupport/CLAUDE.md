@@ -124,7 +124,7 @@ before the synchronous reader.** As a consequence:
 ## A thread-owned lock is owned by the Fiber (`ThreadLoadInterlockAwareMonitor`)
 
 Rails' `ThreadLoadInterlockAwareMonitor` records `Thread.current` as its owner
-(`vendor/rails/v8.0.2/activesupport/lib/active_support/concurrency/load_interlock_aware_monitor.rb:46-63`),
+(`vendor/rails/v8.0.5.2/activesupport/lib/active_support/concurrency/load_interlock_aware_monitor.rb:46-63`),
 and its `@mutex` is owned by the Fiber, as Ruby 3's `Mutex` is. Ruby runs one
 flow per Thread, so the Fiber that locks the mutex is the one whose exit
 unlocks it. JS can start two flows on one Thread, and `ExecutionWrapper.wrap`
@@ -145,7 +145,7 @@ expose").
 
 Rails' child ends with
 `exit!(0)` and answers `Minitest::Result.from(self)`
-(`vendor/rails/v8.0.2/activesupport/lib/active_support/testing/isolation.rb:83-87`).
+(`vendor/rails/v8.0.5.2/activesupport/lib/active_support/testing/isolation.rb:83-87`).
 A Vitest child hands its result back and lets the runner finish, so
 `isolation.ts` calls neither, and dumps the test itself. Both are `PERMANENT`
 receipts. Ruled by the operator on 2026-11-01 (trails#9561).
@@ -153,7 +153,7 @@ receipts. Ruled by the operator on 2026-11-01 (trails#9561).
 ## A name ported on two receivers is exported once from the barrel (`compact_blank`, `to_fs`, `to_xml`)
 
 Ruby tells `Enumerable#compact_blank` and `Hash#compact_blank`
-(`vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/enumerable.rb:184-186`,
+(`vendor/rails/v8.0.5.2/activesupport/lib/active_support/core_ext/enumerable.rb:184-186`,
 `:222-224`) apart by receiver. Each ports as a free function at its Rails name
 in its own module (`enumerable-utils.ts`, `hash-utils.ts`), and one flat ESM
 namespace cannot hold both. The barrel `index.ts` exports at most one of them,
