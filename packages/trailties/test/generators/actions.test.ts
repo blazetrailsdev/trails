@@ -537,8 +537,10 @@ describe("ActionsTest", () => {
       await gen.github("user/repo", { a: "correct", other: true }, () => gen.gem("foo"));
       await gen.github("user/repo2", { branch: "main" }, () => gen.gem("bar"));
     });
-    await assertFile("package.json", /"foo": "github:user\/repo",\n/);
-    await assertFile("package.json", /"bar": "github:user\/repo2#main"\n/);
+    await assertFile(
+      "package.json",
+      /"foo": "github:user\/repo",\n {4}"bar": "github:user\/repo2#main"\n/,
+    );
   });
 
   it("github should create newline between blocks", async () => {
