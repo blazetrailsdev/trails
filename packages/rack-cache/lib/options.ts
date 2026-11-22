@@ -56,7 +56,7 @@ export class Options {
   declare _defaultOptions: OptionsHash;
 
   static optionAccessor(key: string): void {
-    const name = Options.optionName(key);
+    const name = this.optionName(key);
     const method = camelized(key.slice(1));
     Object.defineProperty(this.prototype, method, {
       get(this: Options) {
@@ -69,7 +69,7 @@ export class Options {
     });
     Object.defineProperty(this.prototype, `is${method[0].toUpperCase()}${method.slice(1)}`, {
       value(this: Options) {
-        return !!this.options[name];
+        return this.options[name] != null && this.options[name] !== false;
       },
       writable: true,
       configurable: true,

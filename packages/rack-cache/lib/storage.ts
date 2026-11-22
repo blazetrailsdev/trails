@@ -1,5 +1,6 @@
 import {
   RuntimeError,
+  TopLevel,
   URI,
   constDefined,
   constGet,
@@ -57,9 +58,14 @@ export class Storage {
         throw new RuntimeError(`Unknown storage provider: ${String(uri)}`);
       }
     } else {
-      const Dalli = await import("memjs").catch(() => null);
+      const Dalli = await import("memjs").catch((error: { code?: string }) => {
+        if (error.code === "ERR_MODULE_NOT_FOUND") return null;
+        throw error;
+      });
       if (Dalli != null && uri instanceof Dalli.Client) {
         return await (constGet(type, "Dalli") as StoreClass).resolve(uri);
+      } else if (constDefined(TopLevel, "Memcached") && rbObjRespondTo(uri, "stats")) {
+        return await (constGet(type, "MemCached") as StoreClass).resolve(uri);
       } else {
         throw new RuntimeError(`Unknown storage provider: ${String(uri)}`);
       }
