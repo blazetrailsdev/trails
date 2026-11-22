@@ -1199,14 +1199,17 @@
     }
   },
   "rake": {
-    "rows": 33,
+    "rows": 34,
     "excluded": ["promise.ts::Promise"],
     "unwalked": [
       "dsl-definition.ts::DSL",
       "file-utils-ext.ts::FileUtilsExt",
       "version.ts::Version"
     ],
-    "residue": { "win32.ts::Win32HomeError": "Rake::Win32::Win32HomeError" }
+    "residue": {
+      "private-reader.ts::ClassMethods": "Rake::PrivateReader::ClassMethods",
+      "win32.ts::Win32HomeError": "Rake::Win32::Win32HomeError"
+    }
   },
   "solid-cable": {
     "rows": 4,

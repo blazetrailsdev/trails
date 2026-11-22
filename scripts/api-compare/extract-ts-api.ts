@@ -1123,9 +1123,6 @@ export function extractFromProgram(
             file: relPath,
             includes: [],
             extends: [],
-            // `export const M = extend({ ... }, Other)` seats the literal's
-            // members on the module object itself, Ruby's `class << self` /
-            // `def self.x` (mail/parsers/address_lists_parser.rb:17-31946).
             instanceMethods: extendLiteral ? [] : methods,
             classMethods: extendLiteral ? methods.map((m) => ({ ...m, isStatic: true })) : [],
             ...(objectLiteral ? { objectLiteral: true } : {}),

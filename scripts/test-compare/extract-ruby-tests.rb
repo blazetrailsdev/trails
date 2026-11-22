@@ -1821,8 +1821,6 @@ class TestExtractor
   def add_gate(test_case, body_node, body_gate: :compute)
     unless @class_stack.empty?
       test_case[:rubyClass] = @class_stack.last
-      # The Rails class path: a class nested in `module ActionMailbox` is
-      # `ActionMailbox::TestHelperTest` (actionmailbox/test/unit/test_helper_test.rb:5-6).
       test_case[:rubyClassPath] = @class_stack.join("::") if @class_stack.length > 1
     end
     parts = []

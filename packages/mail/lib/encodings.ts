@@ -152,7 +152,10 @@ export const Encodings = {
   },
 
   /** @missingRailsArgs ascii_only? — PERMANENT */
-  encodeNonUsascii(address: string | Uint8Array, charset: string | null): string | Uint8Array {
+  encodeNonUsascii<T extends string | Uint8Array>(
+    address: T | string,
+    charset: string | null,
+  ): T | string {
     if (isAsciiOnly(address) || charset == null) return address;
     const encoding = address instanceof Uint8Array ? rbObjEncoding(address) : null;
     const tagged = (str: string): string | Uint8Array =>
@@ -160,7 +163,7 @@ export const Encodings = {
 
     address = (typeof address === "string" ? address : binaryString(address)).replace(
       /("[^"]*[^/]")/g,
-      (s) => Encodings.bValueEncode(Utilities.unquote(tagged(s) as string), charset) as string,
+      (s) => Encodings.bValueEncode<string>(Utilities.unquote(tagged(s) as string), charset),
     );
 
     const tokens = stringSplit(address, /\s/).map(tagged);
@@ -178,7 +181,10 @@ export const Encodings = {
     }).join(" ");
   },
 
-  bValueEncode(string: string | Uint8Array, encoding: string | null = null): string | Uint8Array {
+  bValueEncode<T extends string | Uint8Array>(
+    string: T,
+    encoding: string | null = null,
+  ): T | string {
     if (isAsciiOnly(string instanceof Uint8Array ? string : String(string ?? ""))) {
       return string;
     } else {

@@ -4,7 +4,7 @@ import { File } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Config } from "../lib/config.js";
 import { ViteAssets } from "../lib/vite-assets.js";
-import "./test_app/config/application.js";
+import "./test_app/config/application.mjs";
 import { pathToTestApp, refreshConfig, withRailsEnv } from "./support/test-helper.js";
 
 const vendorCandidate = new URL("../../../vendor/vite_ruby/v3.11.1", import.meta.url).pathname;
@@ -136,13 +136,18 @@ describe("ConfigTest", () => {
 
     expect(env["VITE_RUBY_ASSET_HOST"]).toBeUndefined();
 
+    const actionController = (
+      TopLevel.Trails!.application as unknown as {
+        config: { actionController: { assetHost: unknown } };
+      }
+    ).config.actionController;
     try {
-      TopLevel.Trails!.application.config.actionController.assetHost = "assets-cdn.com";
+      actionController.assetHost = "assets-cdn.com";
       env = (await refreshConfig()).toEnv();
 
       expect(env["VITE_RUBY_ASSET_HOST"]).toBe("assets-cdn.com");
     } finally {
-      TopLevel.Trails!.application.config.actionController.assetHost = null;
+      actionController.assetHost = null;
     }
   });
 

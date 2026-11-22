@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError, Encoding, TypeError, forceEncoding } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Encoding,
+  TypeError,
+  forceEncoding,
+  rbObjEncoding,
+} from "@blazetrails/ruby-compat";
 import "../lib/index.js";
 import { Mail } from "../lib/mail.js";
 import type { Field } from "../lib/field.js";
@@ -156,6 +162,7 @@ describe("mail encoding", () => {
       mail.charset = "ISO-8859-1";
       mail.setTo(latin1("Mikel Linds\xE4r <mikel@test.lindsaar.net>"));
       const result = (mail.get("to") as Field).encoded();
+      expect(rbObjEncoding(result)).toBe(Encoding.UTF_8);
       expect(result).toEqual(
         "To: Mikel =?ISO-8859-1?B?TGluZHPkcg==?= <mikel@test.lindsaar.net>\r\n",
       );
@@ -168,6 +175,7 @@ describe("mail encoding", () => {
         ["Mikel Linds\xE4r <mikel@test.lindsaar.net>", "\xE4d <ada@test.lindsaar.net>"].map(latin1),
       );
       const result = (mail.get("to") as Field).encoded();
+      expect(rbObjEncoding(result)).toBe(Encoding.UTF_8);
       expect(result).toEqual(
         "To: Mikel =?ISO-8859-1?B?TGluZHPkcg==?= <mikel@test.lindsaar.net>, \r\n =?ISO-8859-1?B?5GQ=?= <ada@test.lindsaar.net>\r\n",
       );
@@ -191,6 +199,7 @@ describe("mail encoding", () => {
         expect((mail.get(field) as Field).field.errors).toEqual([]);
 
         const result = (mail.get(field) as Field).encoded();
+        expect(rbObjEncoding(result)).toBe(Encoding.UTF_8);
         expect(result).toEqual(
           `${field}: Mikel =?ISO-8859-1?B?TGluZHPkcg==?= <mikel@test.lindsaar.net>, \r\n =?ISO-8859-1?B?5GQ=?= <ada@test.lindsaar.net>\r\n`,
         );
