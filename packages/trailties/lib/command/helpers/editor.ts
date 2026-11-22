@@ -48,6 +48,7 @@ export const Editor = defineModule(
       });
       try {
         const result = await rbFSystem(...Shellwords.shellwords(this.editor()!), String(filePath));
+        if (!interrupted) await new Promise((resolve) => setTimeout(resolve, 100));
         if (interrupted) throw new Interrupt();
         return result;
       } finally {
