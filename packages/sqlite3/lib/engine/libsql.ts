@@ -7,6 +7,8 @@ import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
 import { columnText } from "./column-text.js";
+import { withBusyHandler } from "./busy-handler.js";
+import { bindParameterIndex } from "./bind-parameter-index.js";
 
 const CONNECTION_FAILED = /^ConnectionFailed\(".*: (\d+)"\)$/;
 
@@ -76,23 +78,6 @@ export function checkReplicaOptions(options: ReplicaOptions): void {
   }
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-function withBusyHandler<T>(handler: () => BusyHandler | null, attempt: () => T): T {
-  let count = 0;
-  for (;;) {
-    try {
-      return attempt();
-    } catch (e) {
-      const busy = handler();
-      if (busy == null || errors.errcode(e) !== SQLite3.Constants.ErrorCode.BUSY) throw e;
-      if (busy(count++) === false) throw e;
-    }
-  }
-}
-
 /** @internal */
 function prepareStatement(
   raw: Libsql.Database,
@@ -100,7 +85,7 @@ function prepareStatement(
   handler: () => BusyHandler | null,
   setChanges: (n: number) => void,
 ): EngineStatement {
-  const stmt = withBusyHandler(handler, () => raw.prepare(sql));
+  const stmt = withBusyHandler(errors, handler, () => raw.prepare(sql));
   const reader = stmt.reader;
   if (reader) stmt.raw(true);
   const positional: SqliteBindValue[] = [];
@@ -124,8 +109,7 @@ function prepareStatement(
         return;
       }
       const name = key.replace(/^[:@$]/, "");
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      if (!new RegExp(`[:@$]${escaped}(?![\\w$])`).test(sql)) {
+      if (bindParameterIndex(sql, name) === 0) {
         throw new SQLite3.Exception("no such bind parameter");
       }
       named[name] = value;
@@ -138,14 +122,14 @@ function prepareStatement(
     step() {
       if (done) return null;
       if (!reader) {
-        setChanges(withBusyHandler(handler, () => stmt.run(...args()).changes));
+        setChanges(withBusyHandler(errors, handler, () => stmt.run(...args()).changes));
         done = true;
         return null;
       }
       const r =
         rows !== null
           ? rows.next()
-          : withBusyHandler(handler, () => {
+          : withBusyHandler(errors, handler, () => {
               const started = stmt.iterate(...args()) as Iterator<unknown[]>;
               try {
                 const first = started.next();
@@ -195,13 +179,13 @@ function database(raw: Libsql.Database): EngineDatabase {
         const head = rest.slice(0, tail);
         rest = rest.slice(tail).trim();
         if (empty) continue;
-        const stmt = withBusyHandler(busy, () => raw.prepare(head));
+        const stmt = withBusyHandler(errors, busy, () => raw.prepare(head));
         if (!stmt.reader) {
-          changes = withBusyHandler(busy, () => stmt.run().changes);
+          changes = withBusyHandler(errors, busy, () => stmt.run().changes);
         } else {
           stmt.safeIntegers(true).raw(true);
           const names = stmt.columns().map((c) => c.name);
-          for (const row of withBusyHandler(busy, () => stmt.all() as unknown[][])) {
+          for (const row of withBusyHandler(errors, busy, () => stmt.all() as unknown[][])) {
             const vals = row.map(columnText);
             results.push(
               resultsAsHash ? Object.fromEntries(names.map((name, i) => [name, vals[i]])) : vals,
