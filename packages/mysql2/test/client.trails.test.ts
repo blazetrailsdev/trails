@@ -126,10 +126,6 @@ describe("Mysql2::Client#warning_count", () => {
     expect(client.warningCount).toBe(2);
   });
 
-  type Cast = { typeCast(field: object, next: () => unknown): unknown };
-  const castOf = (native: { mock: { calls: object[][] } }, call = 0): Cast["typeCast"] =>
-    (native.mock.calls[call][0] as Cast).typeCast;
-
   type Column = [name: string, type: string & keyof typeof mysql.Types, length?: number];
   const rowOf = (columns: Column[], ...values: Array<string | Uint8Array | null>) => [
     [Object.fromEntries(columns.map(([name], i) => [name, cell(values[i])]))],
@@ -274,15 +270,41 @@ describe("Mysql2::Client#warning_count", () => {
       [{ sql: "SELECT ?", rowsAsArray: false }, [1]],
       [{ sql: "SELECT ?", rowsAsArray: true }, [1, "x"]],
     ]);
-    const time = castOf(execute, 1)(
-      { type: "DATETIME", string: () => "2026-04-27 14:23:55" },
-      () => null,
-    ) as Time;
-    expect(time.isUtc()).toBe(true);
     expect(client.queryOptions).toEqual(Mysql2.Client.defaultQueryOptions());
 
     await stmt.execute(1, Temporal.PlainDate.from("2020-01-02"));
     expect(execute.mock.calls[2]).toMatchObject([{ rowsAsArray: false }, [1, "2020-01-02"]]);
+  });
+
+  it("a Statement#execute result reads its cast options per #each call", async () => {
+    const fields = [
+      { name: "t", type: mysql.Types.DATETIME, encoding: "binary" },
+      { name: "b", type: mysql.Types.TINY, columnLength: 1, encoding: "binary" },
+    ];
+    const execute = vi.fn(async () => [[{ t: "2026-04-27 14:23:55", b: "1" }], fields]);
+    const prepare = vi.fn(async () => ({ statement: { columns: fields, parameters: [] } }));
+    const client = await clientOn({ execute, prepare });
+    const stmt = await client.prepare("SELECT 1");
+    const rowOf = async (opts: object) =>
+      (await stmt.execute())!.each(opts)[0] as { t: Time; b: unknown };
+    expect((await rowOf({ databaseTimezone: "utc" })).t.isUtc()).toBe(true);
+    expect((await rowOf({ databaseTimezone: "local" })).t.isUtc()).toBe(false);
+    expect((await rowOf({ databaseTimezone: "local", applicationTimezone: "utc" })).t.isUtc()).toBe(
+      true,
+    );
+    expect((await rowOf({ castBooleans: true })).b).toBe(true);
+    expect((await rowOf({})).b).toBe(1);
+
+    const stderr = vi.spyOn(globalThis.process.stderr, "write").mockImplementation(() => true);
+    try {
+      const row = await rowOf({ cast: false, cacheRows: false });
+      expect(row.t).toBeInstanceOf(Time);
+      expect(stderr.mock.calls.map(([m]) => String(m)).join("")).toMatch(
+        /:cache_rows is forced for prepared statements \(if not streaming\)\n:cast is forced for prepared statements/,
+      );
+    } finally {
+      stderr.mockRestore();
+    }
   });
 
   it("default_query_options is one shared Hash each client dups", async () => {
