@@ -29,19 +29,19 @@ class CacheTest extends TestCase {
           }
 
           async expiresEtag() {
-            await this._renderConditionally({ etag: "1" });
+            await this.renderConditionally({ etag: "1" });
           }
 
           async expiresLastModified() {
             lastModified ??= new Date();
-            await this._renderConditionally({ lastModified });
+            await this.renderConditionally({ lastModified });
           }
 
           async keepsIfModifiedSince() {
             await this.render({ plain: this.request.headers.get("If-Modified-Since") });
           }
 
-          async _renderConditionally(headers: Record<string, unknown>) {
+          private async renderConditionally(headers: Record<string, unknown>) {
             if (await this.isStale(undefined, { ...headers, public: !this.params.get("private") })) {
               await this.render({ plain: SecureRandom.hex(16) });
             }
