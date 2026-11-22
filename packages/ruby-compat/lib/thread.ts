@@ -1,4 +1,5 @@
 import { excBacktraceLocations, type Location } from "./backtrace-location.js";
+import { Process } from "./process.js";
 import { ThreadError } from "./thread-error.js";
 import { RuntimeError } from "./runtime-error.js";
 import { stderr } from "./process-adapter.js";
@@ -494,17 +495,26 @@ export class Thread<R = unknown> {
 /**
  * Ruby's `Kernel#sleep` (`rb_f_sleep`, `vendor/ruby/v3.3.11/process.c:5055-5078`):
  * sleeps the current thread, forever with no argument, and answers the whole
- * seconds slept. `Thread#raise` interrupts it.
+ * seconds slept. `Thread#raise` interrupts it. A timer that fires before the
+ * deadline sleeps again for the rest, as `sleep_hrtime`'s `hrtime_update_expire`
+ * loop does (`vendor/ruby/v3.3.11/thread.c:1278-1311`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbFSleep(duration: number | null = null): Promise<number> {
   const beg = Math.floor(Date.now() / 1000);
   return Thread.blockingRegion<number>((wake) => {
-    const timer =
-      duration == null
-        ? undefined
-        : setTimeout(() => wake(Math.floor(Date.now() / 1000) - beg), duration * 1000);
+    if (duration == null) return () => {};
+    const end = Process.clockGettime(Process.CLOCK_MONOTONIC) + duration;
+    let timer: ReturnType<typeof setTimeout>;
+    const nativeSleep = (rel: number) => {
+      timer = setTimeout(() => {
+        const now = Process.clockGettime(Process.CLOCK_MONOTONIC);
+        if (now >= end) wake(Math.floor(Date.now() / 1000) - beg);
+        else nativeSleep(end - now);
+      }, rel * 1000);
+    };
+    nativeSleep(duration);
     return () => clearTimeout(timer);
   });
 }
