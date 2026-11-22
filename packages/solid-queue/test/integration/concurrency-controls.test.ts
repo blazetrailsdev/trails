@@ -48,7 +48,7 @@ async function assertStoredSequence(result: JobResult, sequence: string[]) {
     .map((name) => `s${name}c${name}`)
     .join("");
   const actual = await Record.uncached(async () =>
-    (await result.reload()).status.split(" + ").sort().join(""),
+    (await result.reload()).status!.split(" + ").sort().join(""),
   );
   expect(actual).toEqual(expected);
 }
