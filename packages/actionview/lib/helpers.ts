@@ -8,6 +8,7 @@ import {
 import { include } from "@blazetrails/ruby-compat";
 import { Tags } from "./namespaces.js";
 import { ActiveModelHelper } from "./helpers/active-model-helper.js";
+import { AtomFeedHelper } from "./helpers/atom-feed-helper.js";
 import { AssetTagHelper } from "./helpers/asset-tag-helper.js";
 import { AssetUrlHelper } from "./helpers/asset-url-helper.js";
 import { CacheHelper } from "./helpers/cache-helper.js";
@@ -64,6 +65,7 @@ include(Helpers, Benchmarkable);
 include(Helpers, ActiveModelHelper);
 include(Helpers, AssetTagHelper);
 include(Helpers, AssetUrlHelper);
+include(Helpers, AtomFeedHelper);
 include(Helpers, CacheHelper);
 include(Helpers, CaptureHelper);
 include(Helpers, ContentExfiltrationPreventionHelper);

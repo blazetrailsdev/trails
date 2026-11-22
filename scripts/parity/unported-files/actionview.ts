@@ -27,15 +27,6 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "newlines keep, so the backtrace line matches the template's.",
   },
   {
-    pattern: "helpers/atom_feed_helper.rb",
-    testFile: "template/atom_feed_helper_test.rb",
-    package: "actionview",
-    reason:
-      "`AtomFeedHelper#atom_feed` (atom_feed_helper.rb:96-125) and its `AtomBuilder` / " +
-      "`AtomFeedBuilder` (atom_feed_helper.rb:127-204) have no trails port yet; the `.builder` " +
-      "handler they render through is ported (`template/handlers/builder.ts`).",
-  },
-  {
     pattern: "/render_parser.rb",
     package: "actionview",
     reason:

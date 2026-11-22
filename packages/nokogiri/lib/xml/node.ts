@@ -87,6 +87,10 @@ export class XmlNode {
     return (this._node as XmlTreeNode).content ?? "";
   }
 
+  get text(): string {
+    return this.content;
+  }
+
   get children(): XmlNode[] {
     if (!(this._node instanceof Nokogiri.LibXml2!.XmlElement)) return [];
     const result: XmlNode[] = [];

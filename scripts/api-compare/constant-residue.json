@@ -264,7 +264,7 @@
     }
   },
   "actionview": {
-    "rows": 169,
+    "rows": 172,
     "excluded": ["helpers/form-helper.ts::FormBuilder"],
     "unwalked": [
       "cache-expiry.ts::CacheExpiry",
@@ -272,6 +272,7 @@
       "helpers.ts::Helpers",
       "helpers/asset-tag-helper.ts::AssetTagHelper",
       "helpers/asset-url-helper.ts::AssetUrlHelper",
+      "helpers/atom-feed-helper.ts::AtomFeedHelper",
       "helpers/cache-helper.ts::CacheHelper",
       "helpers/capture-helper.ts::CaptureHelper",
       "helpers/content-exfiltration-prevention-helper.ts::ContentExfiltrationPreventionHelper",
