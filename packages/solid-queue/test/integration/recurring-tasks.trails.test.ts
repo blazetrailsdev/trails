@@ -66,5 +66,6 @@ describe("ForkedRecurringTasksTest", { timeout: 30_000 }, () => {
     expect(task?.schedule).toBe("every second");
     expect(task?.class_name).toBe("AddToBufferJob");
     expect(task?.arguments).toEqual([42]);
+    expect(task?.static).toBe(true);
   });
 });

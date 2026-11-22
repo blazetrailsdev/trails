@@ -4,8 +4,9 @@ import {
   exitBang,
   rbForkPayload,
   rbForkedPipe,
+  rbModName,
 } from "@blazetrails/ruby-compat";
-import { Process, RecurringTask } from "../index.js";
+import { Process, RecurringTask, Scheduler } from "../index.js";
 import { ForkGuard } from "./runnable.js";
 
 const { boot, processClass, attributes, name, supervisorId } = rbForkPayload() as {
@@ -18,10 +19,10 @@ const { boot, processClass, attributes, name, supervisorId } = rbForkPayload() a
 
 await import(boot);
 
-if (Array.isArray(attributes.recurringTasks)) {
+if (processClass === rbModName(Scheduler)) {
   await RecurringTask.loadSchema();
-  attributes.recurringTasks = attributes.recurringTasks.map(
-    (task: Record<string, unknown>) => new RecurringTask(task),
+  attributes.recurringTasks = (attributes.recurringTasks as Record<string, unknown>[]).map(
+    (task) => new RecurringTask(task),
   );
 }
 
