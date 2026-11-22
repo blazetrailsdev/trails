@@ -71,11 +71,13 @@ describe("Mysql2::Result", () => {
       const result = (await state.client.query("SELECT 1 UNION SELECT 2", { cacheRows: false }))!;
       expect(result.toA()).toEqual(result.toA());
     });
+    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
     it.skip("should yield different value for #first if streaming", () => {});
     it("should yield the same value for #first if streaming is disabled", async () => {
       const result = (await state.client.query("SELECT 1 UNION SELECT 2", { stream: false }))!;
       expect(result.toA()[0]).toEqual(result.toA()[0]);
     });
+    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
     it.skip("should throw an exception if we try to iterate twice when streaming is enabled", () => {});
   });
   describe("#fields", () => {
@@ -100,6 +102,7 @@ describe("Mysql2::Result", () => {
     it.skip("should return json type on mysql 8.0", () => {});
   });
   describe("streaming", () => {
+    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
     it.skip("should maintain a count while streaming", () => {});
     it.skip("should retain the count when mixing first and each", () => {});
     it.skip("should not yield nil at the end of streaming", () => {});

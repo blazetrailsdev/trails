@@ -184,6 +184,7 @@ describe("Mysql2::Statement", () => {
     it.skip("should be able to retrieve query with param in different encoding correctly", () => {});
   });
   describe("streaming result", () => {
+    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
     it.skip("should be able to stream query result", () => {});
   });
   describe("#each", () => {
@@ -211,6 +212,7 @@ describe("Mysql2::Statement", () => {
       const result = (await (await state.client.prepare("SELECT 1")).execute())!;
       expect(result.toA()[0]).toBe(result.toA()[0]);
     });
+    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
     it.skip("should yield different value for #first if streaming", () => {});
     it("should yield the same value for #first if streaming is disabled", async () => {
       const result = (await (
@@ -218,6 +220,7 @@ describe("Mysql2::Statement", () => {
       ).execute({ stream: false }))!;
       expect(result.toA()[0]).toEqual(result.toA()[0]);
     });
+    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
     it.skip("should throw an exception if we try to iterate twice when streaming is enabled", () => {});
   });
   describe("#fields", () => {

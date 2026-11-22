@@ -2,6 +2,7 @@ import { rbScanArgs } from "@blazetrails/ruby-compat";
 import type { Client, Field, Mysql2Result, QueryOptions } from "./client.js";
 import { Error as Mysql2Error } from "./error.js";
 import { Mysql2 } from "./mysql2.js";
+import type { Result } from "./result.js";
 
 declare module "./mysql2.js" {
   interface Mysql2Namespace {
@@ -76,7 +77,7 @@ export class Statement {
       .catch((e: unknown) => this.client.raiseMysql2Error(e));
     const result = this.client.storeResult(native, currentQueryOptions);
     this.lastId = (native[0] as { insertId?: number }).insertId ?? 0;
-    if (result) result.stmtWrapper = this;
+    if (result) (result as Result).stmtWrapper = this;
     this.affectedRows = result?.size ?? this.client.affectedRows;
     return result;
   }

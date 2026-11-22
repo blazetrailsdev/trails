@@ -3,7 +3,7 @@ import { Time } from "@blazetrails/date";
 import mysqlCore from "mysql2";
 import mysql from "mysql2/promise";
 import { File, NameError, stderr } from "@blazetrails/ruby-compat";
-import { Mysql2, type Client } from "../lib/index.js";
+import { Mysql2, type Client, type Result } from "../lib/index.js";
 
 async function clientOn(connection: object): Promise<Client> {
   const createConnection = vi
@@ -285,7 +285,7 @@ describe("Mysql2::Client#warning_count", () => {
     const prepare = vi.fn(async () => ({ statement: { columns: fields, parameters: [] } }));
     const client = await clientOn({ execute, prepare });
     const stmt = await client.prepare("SELECT 1");
-    const rowOf = async (opts: object) =>
+    const rowOf = async (opts: Parameters<Result["each"]>[0]) =>
       (await stmt.execute())!.each(opts)[0] as { t: Time; b: unknown };
     expect((await rowOf({ databaseTimezone: "utc" })).t.isUtc()).toBe(true);
     expect((await rowOf({ databaseTimezone: "local" })).t.isUtc()).toBe(false);
