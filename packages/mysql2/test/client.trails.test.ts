@@ -1,6 +1,7 @@
 import { it, expect, describe, vi } from "vitest";
 import { Time } from "@blazetrails/date";
 import mysql from "mysql2/promise";
+import { File, NameError } from "@blazetrails/ruby-compat";
 import { Mysql2, type Client } from "../lib/index.js";
 
 async function clientOn(connection: object): Promise<Client> {
@@ -397,5 +398,89 @@ describe("Mysql2::Client#initialize option writers", () => {
     expect(client.parseSslMode("verify_ca")).toBe(Mysql2.Client.SSL_MODE_VERIFY_CA);
     expect(client.parseSslMode("SSL_MODE_DISABLED")).toBe(Mysql2.Client.SSL_MODE_DISABLED);
     expect(client.parseSslMode("bogus")).toBeUndefined();
+  });
+
+  it("parse_ssl_mode raises NameError for a name that is not a constant name", async () => {
+    const client = await clientOn({});
+    expect(() => client.parseSslMode("verify ca")).toThrow(NameError);
+    expect(() => client.parseSslMode("verify ca")).toThrow(
+      "wrong constant name SSL_MODE_VERIFY CA",
+    );
+    expect(() => client.parseSslMode("SSL_MODE_x y")).toThrow("wrong constant name SSL_MODE_X Y");
+  });
+
+  it("feeds find_default_ca_path to ssl_set as sslca for VERIFY_CA and VERIFY_IDENTITY", async () => {
+    const ca = new URL("./fixtures/my.cnf", import.meta.url).pathname;
+    const find = vi.spyOn(Mysql2.Client.prototype, "findDefaultCaPath").mockReturnValue(ca);
+    try {
+      const contents = await File.readAsync(ca);
+      expect((await configFor({ sslMode: "verify_ca" })).config.ssl).toMatchObject({
+        ca: contents,
+      });
+      expect((await configFor({ sslMode: "verify_identity" })).config.ssl).toMatchObject({
+        ca: contents,
+      });
+      expect(
+        ((await configFor({ sslMode: "required" })).config.ssl as Record<string, unknown>).ca,
+      ).toBeUndefined();
+    } finally {
+      find.mockRestore();
+    }
+  });
+
+  it("reads :default_file's [client] and :default_group sections under the explicit options", async () => {
+    const defaultFile = new URL("./fixtures/my.cnf", import.meta.url).pathname;
+    const { config } = await configFor({ defaultFile, defaultGroup: "trails", host: "explicit" });
+    expect(config).toMatchObject({
+      user: "cnfuser",
+      port: 3307,
+      host: "explicit",
+      database: "cnfdb",
+    });
+    expect(config.socketPath).toBeUndefined();
+    expect((await configFor({ defaultFile })).config.database).toBeUndefined();
+  });
+
+  it("refuses the mysql_clear_password plugin unless :enable_cleartext_plugin", async () => {
+    const plugins = (await configFor({})).config.authPlugins as Record<string, () => () => never>;
+    expect(() => plugins.mysql_clear_password()()).toThrow(Mysql2.Error);
+    expect(() => plugins.mysql_clear_password()()).toThrow("plugin not enabled");
+    expect((await configFor({ enableCleartextPlugin: true })).config.authPlugins).toBeUndefined();
+  });
+
+  it("tries TLS for :ssl_mode PREFERRED and retries in plaintext when the server has none", async () => {
+    const seen: unknown[] = [];
+    const createConnection = vi
+      .spyOn(mysql, "createConnection")
+      .mockImplementationOnce(async (config) => {
+        seen.push((config as Record<string, unknown>).ssl);
+        throw Object.assign(new Error("no ssl"), { code: "HANDSHAKE_NO_SSL_SUPPORT" });
+      })
+      .mockImplementationOnce(async (config) => {
+        seen.push((config as Record<string, unknown>).ssl);
+        return {} as never;
+      });
+    try {
+      await Mysql2.Client.new({ sslMode: "preferred" });
+    } finally {
+      createConnection.mockRestore();
+    }
+    expect(seen).toEqual([{ rejectUnauthorized: false }, undefined]);
+  });
+
+  it("reconnects before a query on a closed connection when :reconnect", async () => {
+    const query = vi.fn(async () => [[{ "1": 1 }], [{ name: "1" }]]);
+    const connection = { query, connection: { stream: { destroyed: true } } };
+    const createConnection = vi
+      .spyOn(mysql, "createConnection")
+      .mockResolvedValue(connection as never);
+    try {
+      await (await Mysql2.Client.new({ reconnect: true })).query("SELECT 1");
+      expect(createConnection).toHaveBeenCalledTimes(2);
+      await (await Mysql2.Client.new({})).query("SELECT 1");
+      expect(createConnection).toHaveBeenCalledTimes(3);
+    } finally {
+      createConnection.mockRestore();
+    }
   });
 });
