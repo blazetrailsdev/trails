@@ -26,7 +26,7 @@ export interface ActionsHost {
   findInSourcePaths(file: string): Promise<string>;
   _indentation: number;
   _gemGroups: string[];
-  _githubRepos: string[];
+  _githubRepos: { repo: string; options: Record<string, unknown> }[];
   prependFile(path: string, ...args: unknown[]): unknown;
 }
 
@@ -41,6 +41,8 @@ export interface GemOptions {
  * @missingRailsCall quote — PERMANENT
  * @inventedArm writeAsync — PERMANENT
  * @inventedArm every — PERMANENT
+ * @inventedArm github — PERMANENT
+ * @inventedArm ref — PERMANENT
  */
 export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): Promise<void> {
   const options = (extractOptionsBang(args) ?? {}) as GemOptions;
@@ -62,8 +64,10 @@ export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): 
   log.call(this, "gemfile", message);
 
   const groups = [...this._gemGroups, ...[options.group ?? []].flat()];
-  const github = options.github != null ? String(options.github) : this._githubRepos.at(-1);
-  const ref = options.tag ?? options.branch ?? options.ref;
+  const source =
+    options.github != null ? { repo: String(options.github), options } : this._githubRepos.at(-1);
+  const gitOptions = options.github != null ? options : (source?.options ?? {});
+  const ref = gitOptions.ref ?? gitOptions.branch ?? gitOptions.tag;
 
   await this.inRoot(async () => {
     const json = JSON.parse(await File.readAsync("package.json")) as Record<
@@ -78,8 +82,8 @@ export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): 
       ...json[key],
       [name]: options.git
         ? String(options.git)
-        : github != null
-          ? `github:${github}${ref != null ? `#${String(ref)}` : ""}`
+        : source != null
+          ? `github:${source.repo}${ref != null ? `#${String(ref)}` : ""}`
           : _versions.join(" ") || "*",
     };
     await File.writeAsync("package.json", `${JSON.stringify(json, null, 2)}\n`);
@@ -121,7 +125,7 @@ export async function github(
   log.call(this, "github", `github ${str.join(", ")}`);
 
   await this.inRoot(async () => {
-    this._githubRepos.push(repo);
+    this._githubRepos.push({ repo, options });
     try {
       await withIndentation.call(
         this,

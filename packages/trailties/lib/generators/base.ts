@@ -123,7 +123,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  _githubRepos: string[];
+  _githubRepos: { repo: string; options: Record<string, unknown> }[];
 
   /**
    * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.5.2/railties/lib/rails/generators/actions.rb:10-13
