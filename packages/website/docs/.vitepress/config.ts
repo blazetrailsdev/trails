@@ -128,11 +128,14 @@ export default defineConfig({
         {
           text: "Extending Trails",
           items: [
+            { text: "The Basics of Creating Trails Plugins", link: "/guides/plugins" },
+            { text: "Trails on Rack", link: "/guides/rails-on-rack" },
             { text: "Getting Started with Engines", link: "/guides/engines" },
             {
               text: "Creating and Customizing Trails Generators & Templates",
               link: "/guides/generators",
             },
+            { text: "Trails Application Templates", link: "/guides/rails-application-templates" },
           ],
         },
         {
