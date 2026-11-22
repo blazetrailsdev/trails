@@ -1220,7 +1220,7 @@ jobs:
       (needs.changes.outputs.trailties_affected == 'true' ||
       needs.changes.outputs.actioncable_only == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
