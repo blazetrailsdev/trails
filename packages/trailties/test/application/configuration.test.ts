@@ -59,6 +59,12 @@ import { DatabaseTasks } from "@blazetrails/activerecord";
 import { Annotation } from "../../lib/source-annotation-extractor.js";
 import "../../lib/trailties/active-record.js";
 import { Trailtie as ActionMailerTrailtie } from "../../lib/trailties/action-mailer.js";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { ActionController } from "@blazetrails/actionpack";
+import { include } from "@blazetrails/ruby-compat";
+import type { Generation } from "../support/isolation/abstract-unit.js";
+import "../support/isolation/abstract-unit.js";
 import { Application } from "../../lib/application.js";
 import { LOAD_DEFAULTS_VERSION } from "../../lib/application/configuration.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
@@ -66,6 +72,15 @@ import { EnvHelpers } from "../support/env-helpers.js";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 
 const envHelpers = new EnvHelpers();
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface ConfigurationTest extends Generation {
+  get(path: string): Promise<unknown>;
+  lastResponse(): { body: string };
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class ConfigurationTest extends TestCase {}
+include(ConfigurationTest, Isolation);
 
 let appPath: string;
 
@@ -116,7 +131,6 @@ describe("ConfigurationTest", () => {
     unknown,
   ][];
   const verifyForeignKeysForFixtures = ActiveRecord.verifyForeignKeysForFixtures();
-  const verboseEnqueueLogs = ActiveJob.verboseEnqueueLogs();
 
   beforeEach(async () => {
     trailtieOptions = Object.values(TrailtieConfiguration._options)
@@ -134,8 +148,6 @@ describe("ConfigurationTest", () => {
   afterEach(async () => {
     for (const [owner, key, value] of frameworkDefaults) owner[key] = value;
     ActiveRecord.setVerifyForeignKeysForFixtures(verifyForeignKeysForFixtures);
-    ActiveJob.setVerboseEnqueueLogs(verboseEnqueueLogs);
-    ActiveJobTrailtie.config.activeJob.delete("verboseEnqueueLogs");
     ActiveJobTrailtie.config.activeJob.delete("enqueueAfterTransactionCommit");
     for (const [options, snapshot] of trailtieOptions) {
       for (const key of Object.keys(options)) if (!(key in snapshot)) delete options[key];
@@ -1105,18 +1117,47 @@ Trails.application!.configure(function () {
   });
 
   it("debug_exception_log_level is :fatal by default for upgraded apps", async () => {
-    const application = await app("development");
-    await application.initializeBang();
+    const t = new ConfigurationTest("test");
+    await t.makeBasicApp();
 
-    expect(String(application.envConfig()["action_dispatch.debug_exception_log_level"])).toBe("4");
+    class OmgController extends ActionController.Base {
+      async index(): Promise<void> {
+        await this.render({
+          plain: String(this.request.env["action_dispatch.debug_exception_log_level"]),
+        });
+      }
+    }
+    constSet(TopLevel, "OmgController", OmgController);
+    onTestFinished(() => {
+      rbModRemoveConst(TopLevel, "OmgController");
+    });
+
+    await t.get("/");
+
+    expect(t.lastResponse().body).toBe("4");
   });
 
   it("debug_exception_log_level is :error for new apps", async () => {
-    const application = await app("development");
-    application.config.loadDefaults("7.1");
-    await application.initializeBang();
+    const t = new ConfigurationTest("test");
+    await t.makeBasicApp((app) => {
+      app.config.loadDefaults("7.1");
+    });
 
-    expect(String(application.envConfig()["action_dispatch.debug_exception_log_level"])).toBe("3");
+    class OmgController extends ActionController.Base {
+      async index(): Promise<void> {
+        await this.render({
+          plain: String(this.request.env["action_dispatch.debug_exception_log_level"]),
+        });
+      }
+    }
+    constSet(TopLevel, "OmgController", OmgController);
+    onTestFinished(() => {
+      rbModRemoveConst(TopLevel, "OmgController");
+    });
+
+    await t.get("/");
+
+    expect(t.lastResponse().body).toBe("3");
   });
 
   it("ActiveRecord::Base.has_many_inversing is true by default for new apps", async () => {
@@ -1291,31 +1332,40 @@ Trails.application!.configure(function () {
     expect(Serializers.serializers()).toContain(DummySerializer);
   });
 
-  it("config.active_job.verbose_enqueue_logs defaults to false in production", async () => {
-    const application = await app("production");
-    application.config.secretKeyBase = "secret";
-    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
-    await application.initializeBang();
+  it(
+    "config.active_job.verbose_enqueue_logs defaults to true in development",
+    { timeout: 120_000 },
+    async () => {
+      const t = new ConfigurationTest("test");
+      await t.buildApp();
+      onTestFinished(() => t.teardownApp());
 
-    expect(ActiveJob.verboseEnqueueLogs()).toBeFalsy();
-  });
+      expect((await t.trails("runner", "console.log(ActiveJob.verboseEnqueueLogs())")).trim()).toBe(
+        "true",
+      );
+    },
+  );
 
-  it("config.active_job.verbose_enqueue_logs defaults to true in development", async () => {
-    await mkdir(join(appPath, "config", "environments"));
-    await writeFile(
-      join(appPath, "config", "environments", "development.ts"),
-      `import { Trails } from "@blazetrails/trailties";
-Trails.application!.configure(function () {
-  this.config.activeJob.verboseEnqueueLogs = true;
-});
-`,
-    );
-    const application = await app("development");
-    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
-    await application.initializeBang();
+  it(
+    "config.active_job.verbose_enqueue_logs defaults to false in production",
+    { timeout: 120_000 },
+    async () => {
+      const t = new ConfigurationTest("test");
+      await t.buildApp();
+      onTestFinished(() => t.teardownApp());
 
-    expect(ActiveJob.verboseEnqueueLogs()).toBeTruthy();
-  });
+      expect(
+        (
+          await t.trails(
+            "runner",
+            "-e",
+            "production",
+            "console.log(ActiveJob.verboseEnqueueLogs())",
+          )
+        ).trim(),
+      ).toBe("false");
+    },
+  );
 
   it("config.active_job.enqueue_after_transaction_commit is deprecated", async () => {
     const application = await app("production");
