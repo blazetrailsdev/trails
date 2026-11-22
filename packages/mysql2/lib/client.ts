@@ -949,7 +949,7 @@ export class Client {
     const stmt = await this.connection
       .prepare(this.options(sql, this.queryOptions) as never)
       .catch((e: unknown) => this.raiseMysql2Error(e));
-    return new Statement(this, sql, stmt);
+    return new Statement(this, sql, stmt as unknown as ConstructorParameters<typeof Statement>[2]);
   }
 
   abandonResultsBang(): void {}
