@@ -34,7 +34,7 @@ export function quickstartBlock(
   region: string,
   prefix: string,
 ): QuickstartBlock {
-  const found = blocks.find((b) => b.region === region && b.code.startsWith(prefix));
+  const found = blocks.find((b) => b.region === region && b.code.trimStart().startsWith(prefix));
   if (found === undefined) throw new Error(`README Quickstart has no ${region} block "${prefix}"`);
   return found;
 }
@@ -48,14 +48,14 @@ export const LANDING_BLOCKS = [
     body: "The generator writes a model that declares no attributes. They come from the table, and `trails-tsc` types them from `db/schema.ts`.",
   },
   {
-    region: "quickstart-scaffold",
-    prefix: "// db/migrate/",
-    title: "Migrations build the schema.",
-    body: "A migration subclasses `Migration.get(8.0)`, Rails' `ActiveRecord::Migration[8.0]`, and `pnpm db:migrate` dumps `db/schema.ts` as Rails dumps `schema.rb`.",
+    region: "quickstart-controller",
+    prefix: "// app/controllers/posts-controller.ts",
+    title: "Controllers turn requests into responses.",
+    body: "The scaffold's controller is Rails' template: `index` through `destroy`, a `setPost` before-action and `postParams()` over `params.expect`.",
   },
   {
     region: "quickstart-query",
-    prefix: "             Prefix",
+    prefix: "Prefix Verb",
     title: "Routes map requests to controllers.",
     body: '`this.resources("posts")` draws the seven RESTful routes, and `bin/trails routes` prints them as Rails does.',
   },
@@ -76,7 +76,12 @@ export const LANDING_STEPS = [
     tag: "Step 2",
     title: "Scaffold a model and controller",
   },
-  { region: "quickstart-server", prefix: "bin/trails server", tag: "Step 3", title: "Serve it" },
+  {
+    region: "quickstart-server",
+    prefix: "bin/trails server",
+    tag: "Step 3",
+    title: "Serve the controller",
+  },
 ] as const;
 
 /** The hero: the Quickstart's `trails-tsc` file and the error the build reports for it. */

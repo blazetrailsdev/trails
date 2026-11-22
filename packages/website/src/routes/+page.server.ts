@@ -64,7 +64,7 @@ export async function load() {
   const byName = new Map(parity.packages.map((p) => [p.name, p]));
   const html = (code: string, lang: string) =>
     codeToHtml(code, {
-      lang: code.startsWith("<!DOCTYPE") ? "html" : lang || "text",
+      lang: lang || "text",
       theme: "github-dark",
     });
   return {

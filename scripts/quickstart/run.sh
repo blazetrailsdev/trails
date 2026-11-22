@@ -80,6 +80,7 @@ migrated=$(pnpm --silent db:migrate)
 compare "db:migrate" "$(block text 3)" "$migrated"
 compare "migration" "$(block ts 1 | tail -n +2)" "$(cat db/migrate/*_create_posts.ts)"
 compare "model" "$(block ts 2 | tail -n +2)" "$(cat app/models/post.ts)"
+compare "controller" "$(block ts 4 | tail -n +2)" "$(cat app/controllers/posts-controller.ts)"
 
 echo "== script/hello.ts"
 mkdir -p script
@@ -171,9 +172,9 @@ stop_server
 echo "== pnpm build"
 built=$(pnpm --silent build 2>&1) || fail "pnpm build failed: $built"
 if grep -F "trails-tsc: warning" <<<"$built"; then fail "pnpm build warned"; fi
-block ts 4 | tail -n +2 >app/models/check.ts
+block ts 5 | tail -n +2 >app/models/check.ts
 if checked=$(pnpm --silent build 2>&1); then fail "check.ts type-checked"; fi
-compare_prefix "check.ts" "$(block text 9)" "$checked"
+compare_prefix "check.ts" "$(block text 8)" "$checked"
 rm app/models/check.ts
 
 echo "== pnpm test"
