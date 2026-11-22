@@ -98,7 +98,7 @@ export class Database {
     const stmt = await Statement.new(this, sql);
     if (block === undefined) return stmt;
 
-    return rbEnsure(
+    return await rbEnsure(
       () => block(stmt),
       () => {
         if (!stmt.isClosed()) return stmt.close();
