@@ -3,6 +3,7 @@ import { codeToHtml } from "shiki";
 import * as fs from "fs/promises";
 import * as path from "path";
 
+import { check, checkError, squiggle, view, viewError } from "$lib/landing-samples";
 import { GITHUB_REPO, REPO_ROOT, loadParity, percent, shortSha } from "$lib/parity";
 
 const EXAMPLE = "examples/homepage";
@@ -35,35 +36,8 @@ const blocks = [
   },
 ];
 
-const check = `import { ApplicationController } from "./application-controller.ts";
-import { Post } from "../models/post.ts";
-
-export class PostsController extends ApplicationController {
-  async destroy(): Promise<void> {
-    const post = await Post.find(this.params.expect("id"));
-    await post.destory();
-    await this.redirectTo("/posts", { status: 303 });
-  }
-}`;
-
-const checkError =
-  "app/controllers/posts-controller.ts(7,16): error TS2551: Property 'destory' does not exist on type 'Post'. Did you mean 'destroy'?";
-
-const view = `<article>
-  <h1><%= post.titel %></h1>
-</article>`;
-
-const viewError =
-  "app/views/posts/show.html.tse(2,15): error TS2551: Property 'titel' does not exist on type 'Post'. Did you mean 'title'?";
-
-function withError(
-  code: string,
-  lang: string,
-  line: number,
-  from: number,
-  to: number,
-  message: string,
-) {
+function withError(code: string, lang: string, message: string) {
+  const { line, from, to } = squiggle(message);
   return codeToHtml(code, {
     lang,
     theme: "github-dark",
@@ -98,8 +72,8 @@ export async function load() {
     buildRef: parity.buildRef,
     coverage: Object.fromEntries(parity.packages.map((p) => [p.name, percent(p.api)])),
     hero: {
-      check: await withError(check, "ts", 7, 15, 22, checkError),
-      view: await withError(view, "erb", 2, 14, 19, viewError),
+      check: await withError(check, "ts", checkError),
+      view: await withError(view, "erb", viewError),
     },
     blocks: await Promise.all(
       blocks.map(async ({ lang, ...rest }) => ({

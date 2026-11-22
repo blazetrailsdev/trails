@@ -2181,6 +2181,8 @@ jobs:
         run: pnpm --filter @blazetrails/website exec vite build
       - name: Build docs (typedoc + VitePress)
         run: pnpm --filter @blazetrails/website run docs:build
+      - name: Compile-check the landing page samples
+        run: pnpm --filter @blazetrails/website exec vitest run src/lib/landing-samples.test.ts
 
   rails-comparison:
     name: Rails API/Test Comparison

@@ -33,6 +33,7 @@ export const packageEntries: Array<[string, string]> = [
   ],
   ["@blazetrails/actionview", "../actionview/lib/index.ts"],
   ["@blazetrails/tse-compiler", "../tse-compiler/lib/index.ts"],
+  ["@blazetrails/trails-tsc", "../trails-tsc/lib/index.ts"],
   ["@blazetrails/actionpack", "../actionpack/lib/index.ts"],
   ["@blazetrails/trailties/all", "../trailties/lib/all.ts"],
   ["@blazetrails/trailties/generators", "../trailties/lib/generators/index.ts"],

@@ -5,7 +5,7 @@ several frameworks: the `Post` model uses Active Record, Active Storage, Action 
 Turbo broadcasts and an Active Job callback. The job delivers an Action Mailer email, and the controller and
 view are Action Pack and Action View.
 
-This is not a runnable app, and CI does not check it. To typecheck it locally:
+This is not a runnable app. CI compiles it, view included, in `packages/website/src/lib/landing-samples.test.ts`. To typecheck it locally:
 
 ```sh
 pnpm --filter @blazetrails/example-homepage typecheck
