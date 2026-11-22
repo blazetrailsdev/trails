@@ -173,7 +173,7 @@ describe("AtomFeedTest", () => {
   it("providing builder to atom feed", async () => {
     await tc.withRestfulRouting("scrolls", async () => {
       await tc.get("index", { params: { id: "provide_builder" } });
-      expect(isBlank(tc.response.body)).toBe(true);
+      expect(isBlank(tc.response.body)).toBeTruthy();
     });
   });
 
