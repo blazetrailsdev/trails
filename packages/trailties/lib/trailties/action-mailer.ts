@@ -147,3 +147,4 @@ export class Trailtie extends BaseTrailtie {
 }
 
 Object.defineProperty(Trailtie, "name", { value: "ActionMailer::Railtie" });
+ActionMailer.Railtie = Trailtie;

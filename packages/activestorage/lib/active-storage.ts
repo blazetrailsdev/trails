@@ -29,6 +29,8 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_storage/fixture_set": () => import("@blazetrails/activestorage/testing/fixture-set"),
 };
 
+import type { Engine } from "./engine.js";
+
 export const ActiveStorage = {
   name: "ActiveStorage",
   loadPath,
@@ -37,6 +39,7 @@ export const ActiveStorage = {
   Reflection: { name: string };
   Attached: unknown;
   Attachment?: typeof Attachment;
+  Engine?: typeof Engine;
   FixtureSet?: typeof FixtureSet;
   Service: unknown;
   Previewer: typeof Previewer;
@@ -424,7 +427,7 @@ export const Transformers = {
     "active_storage/transformers/transformer": () => import("./transformers/transformer.js"),
     "active_storage/transformers/image_processing_transformer": () =>
       import("./transformers/image-processing-transformer.js"),
-  } as Record<string, () => Promise<unknown>>,
+  },
 } as AutoloadModule & {
   Transformer: unknown;
   ImageProcessingTransformer: unknown;

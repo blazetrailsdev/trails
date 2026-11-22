@@ -84,3 +84,5 @@ export class Engine extends TrailsEngine {
     });
   }
 }
+
+ActionMailbox.Engine = Engine;

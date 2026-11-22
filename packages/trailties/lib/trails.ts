@@ -19,6 +19,7 @@ import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
 import type { ActionMethods } from "./generators/trails/app/app-generator.js";
 import { VERSION, gemVersion } from "./gem-version.js";
+import { deprecator } from "./deprecator.js";
 import { version } from "./version.js";
 import type { Info } from "./info.js";
 import type { InfoController } from "./info-controller.js";
@@ -120,6 +121,7 @@ export class Trails {
     invoke(fullNamespace: string, args?: string[], config?: Record<string, unknown>): Promise<void>;
   };
   static version = version;
+  static deprecator = deprecator;
 
   static get configuration(): Configuration | null {
     return Trails.application?.config ?? null;

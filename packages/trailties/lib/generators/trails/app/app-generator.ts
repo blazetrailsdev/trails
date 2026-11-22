@@ -23,11 +23,6 @@ import { CredentialsGenerator } from "../credentials/credentials-generator.js";
 import { DevcontainerGenerator } from "../devcontainer/devcontainer-generator.js";
 import { MasterKeyGenerator } from "../master-key/master-key-generator.js";
 
-const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
-  skipActionMailer: true,
-  skipActiveStorage: true,
-};
-
 const META_OPTIONS = ["minimal"];
 
 const DB_ALIAS: Record<string, DatabaseName> = {
@@ -642,7 +637,7 @@ export class AppGenerator extends AppBase {
     if (this.options.database)
       this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
     this.implyOptions(AppGenerator.OPTION_IMPLICATIONS, { metaOptions: META_OPTIONS });
-    const options: AppBaseOptions = { ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...this.options };
+    const options: AppBaseOptions = this.options;
     const skipDependents = options.skipActiveStorage ? true : undefined;
     this.options = Object.freeze({
       skipActionMailbox: skipDependents,

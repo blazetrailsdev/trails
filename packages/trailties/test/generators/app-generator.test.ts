@@ -717,7 +717,10 @@ describe("AppGeneratorTest", () => {
 
     await Dir.chdir(t.destinationRoot, async () => {
       await File.open("config/initializers/deprecation.ts", "a", (file) =>
-        file.puts("Trails.deprecator.warn('test deprecation message');"),
+        file.puts(
+          'import { Trails } from "@blazetrails/trailties";',
+          "Trails.deprecator().warn('test deprecation message');",
+        ),
       );
 
       const stderr = await capture("stderr", () => runAppUpdate.call(t));
@@ -729,7 +732,7 @@ describe("AppGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--skip-action-mailbox"]);
     await t.assertFile(
       "config/application.ts",
-      /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-mailbox"/m,
+      /^\/\/\s+import\s+"@blazetrails\/actionmailbox\/engine"/m,
     );
   });
 
@@ -737,7 +740,7 @@ describe("AppGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--skip-action-text"]);
     await t.assertFile(
       "config/application.ts",
-      /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-text"/m,
+      /^\/\/\s+import\s+"@blazetrails\/actiontext\/engine"/m,
     );
   });
 
@@ -880,9 +883,7 @@ describe("AppGeneratorTest", () => {
     });
     await t.assertFile("config/application.ts", (content: string) => {
       expect(content).toMatch(/^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/active-job"/m);
-      expect(content).toMatch(
-        /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/active-storage"/m,
-      );
+      expect(content).toMatch(/^\/\/\s+import\s+"@blazetrails\/activestorage\/engine"/m);
       expect(content).toMatch(
         /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-mailer"/m,
       );
@@ -1315,25 +1316,17 @@ describe("AppGenerator", () => {
   it("skips scaffolding for subsystems trails has no package for", async () => {
     await t.runGenerator();
 
-    for (const path of [
-      "config/puma.ts",
-      "config/storage.ts",
-      "app/mailers",
-      "app/channels",
-      "app/views/layouts/mailer.html.tse",
-      "app/views/layouts/mailer.text.tse",
-    ])
-      t.assertNoFile(path);
+    for (const path of ["config/puma.ts", "app/channels"]) t.assertNoFile(path);
   });
 
   it("keeps storage/ for a sqlite3 app with Active Storage skipped", async () => {
-    await t.runGenerator([t.destinationRoot, "--database=sqlite3"]);
+    await t.runGenerator([t.destinationRoot, "--database=sqlite3", "--skip-active-storage"]);
 
     await t.assertFile("storage/.keep");
   });
 
   it("skips storage/ for a non-sqlite3 app with Active Storage skipped", async () => {
-    await t.runGenerator([t.destinationRoot, "--database=postgresql"]);
+    await t.runGenerator([t.destinationRoot, "--database=postgresql", "--skip-active-storage"]);
 
     t.assertNoDirectory("storage");
   });
@@ -1555,6 +1548,27 @@ describe("AppGenerator", () => {
     assertOption(generator, "skipSolid");
     assertOption(generator, "skipSystemTest");
     assertOption(generator, "skipThruster");
+  });
+
+  it("minimal trails app with no skip implied option", () => {
+    const generator = t.generator([t.destinationRoot], ["--minimal", "--no-skip-action-text"]);
+
+    assertNotOption(generator, "skipActionText");
+    assertNotOption(generator, "skipActiveStorage");
+    assertNotOption(generator, "skipActiveJob");
+    assertOption(generator, "skipActionMailbox");
+    assertOption(generator, "skipActionMailer");
+    assertOption(generator, "minimal");
+  });
+
+  it("dockerfile", async () => {
+    await t.runGenerator();
+
+    await t.assertFile("Dockerfile", (content: string) => {
+      expect(content).toMatch(/assets:precompile/);
+      expect(content).toMatch(/libvips/);
+      expect(content).not.toMatch(/yarn/);
+    });
   });
 
   it("rejects an unknown sqlite driver", () => {
@@ -1825,7 +1839,7 @@ describe("AppGeneratorTest", () => {
   );
 
   it("create keeps", async () => {
-    await t.runGenerator([t.destinationRoot, ...UNPORTED]);
+    await t.runGenerator([t.destinationRoot]);
     const foldersWithKeep = [
       "app/assets/images",
       "app/controllers/concerns",
@@ -1917,7 +1931,7 @@ describe("AppGeneratorTest", () => {
   });
 
   it("devcontainer", async () => {
-    await t.runGenerator([t.destinationRoot, "--devcontainer", "--name=my-app", ...UNPORTED]);
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "--name=my-app"]);
 
     await assertDevcontainerJsonFile.call(t, (content) => {
       expect(content.name).toBe("my_app");
