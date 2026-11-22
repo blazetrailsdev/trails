@@ -1829,29 +1829,70 @@ export class Hash<K, V> extends Map<K, V> {
   }
 
   /**
-   * `Hash#transform_keys` (`vendor/ruby/v3.3.11/hash.c:3227` `rb_hash_transform_keys`),
-   * the block arm: a new bare Hash keyed by the block's result.
+   * `Hash#transform_keys` (`vendor/ruby/v3.3.11/hash.c:3227` `rb_hash_transform_keys`):
+   * a new bare Hash keyed by `hash2`'s mapping, else the block's result, else
+   * the key itself (`transform_keys_hash_i`, `:3166`), or by the block alone
+   * (`transform_keys_i`, `:3182`). The blockless Enumerator arm is not ported.
    *
    * @noRailsEquivalent PERMANENT
    */
-  transformKeys(block: (key: NoInfer<K>) => NoInfer<K>): Hash<K, V> {
+  transformKeys(
+    hash2: object | ((key: NoInfer<K>) => NoInfer<K>),
+    block?: (key: NoInfer<K>) => NoInfer<K>,
+  ): Hash<K, V> {
+    if (typeof hash2 === "function") [hash2, block] = [undefined as never, hash2 as typeof block];
+    const trans =
+      hash2 === undefined
+        ? undefined
+        : (rbToHashType(hash2 as Record<string, unknown>) as Map<unknown, K> | Record<string, K>);
     const result = new Hash<K, V>();
-    for (const [key, value] of super.entries()) result.set(block(key), value);
+    if (trans !== undefined) {
+      for (const [key, value] of super.entries()) {
+        let newKey: K;
+        if (trans instanceof Map ? trans.has(key) : Object.hasOwn(trans, key as PropertyKey)) {
+          newKey = trans instanceof Map ? trans.get(key)! : trans[key as string & K];
+        } else if (block !== undefined) {
+          newKey = block(key);
+        } else {
+          newKey = key;
+        }
+        result.set(newKey, value);
+      }
+    } else {
+      for (const [key, value] of super.entries()) result.set(block!(key), value);
+    }
     return result;
   }
 
   /**
    * `Hash#transform_keys!` (`vendor/ruby/v3.3.11/hash.c:3267`
-   * `rb_hash_transform_keys_bang`), the block arm.
+   * `rb_hash_transform_keys_bang`).
    *
    * @noRailsEquivalent PERMANENT
    */
-  transformKeysBang(block: (key: K) => K): this {
+  transformKeysBang(
+    hash2: object | ((key: NoInfer<K>) => NoInfer<K>),
+    block?: (key: NoInfer<K>) => NoInfer<K>,
+  ): this {
+    if (typeof hash2 === "function") [hash2, block] = [undefined as never, hash2 as typeof block];
+    const trans =
+      hash2 === undefined
+        ? undefined
+        : (rbToHashType(hash2 as Record<string, unknown>) as Map<unknown, K> | Record<string, K>);
     this.modifyCheck();
     const pairs = [...super.entries()];
     const newKeys = new Set<K>();
     for (const [key, val] of pairs) {
-      const newKey = block(key);
+      let newKey: K;
+      if (trans === undefined) {
+        newKey = block!(key);
+      } else if (trans instanceof Map ? trans.has(key) : Object.hasOwn(trans, key as PropertyKey)) {
+        newKey = trans instanceof Map ? trans.get(key)! : trans[key as string & K];
+      } else if (block !== undefined) {
+        newKey = block(key);
+      } else {
+        newKey = key;
+      }
       if (!newKeys.has(key)) this.deleteEntry(key);
       this.set(newKey, val);
       newKeys.add(newKey);
