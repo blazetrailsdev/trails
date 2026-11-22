@@ -35,4 +35,8 @@ CREATE USER IF NOT EXISTS 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON `activerecord\_unittest%`.* TO 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON `ar\_cli\_e2e%`.* TO 'rails'@'localhost';
+-- The mysql2 gem's spec runs as root (vendor/mysql2/0.5.6/spec/configuration.yml.example);
+-- statement_spec.rb's stmt_count reads performance_schema.prepared_statements_instances.
+GRANT SELECT ON performance_schema.* TO 'rails'@'%';
+GRANT SELECT ON performance_schema.* TO 'rails'@'localhost';
 FLUSH PRIVILEGES;

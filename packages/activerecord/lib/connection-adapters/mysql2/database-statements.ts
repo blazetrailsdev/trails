@@ -145,7 +145,8 @@ export async function performQuery(
       this._affectedRowsBeforeWarnings = result?.size ?? rawConnection.affectedRows;
     } else if (prepare) {
       const stmt =
-        this._statements.get(sql) ?? (await this._statements.set(sql, rawConnection.prepare(sql)));
+        this._statements.get(sql) ??
+        (await this._statements.set(sql, await rawConnection.prepare(sql)));
       try {
         result = await stmt.execute(...typeCastedBinds);
         this._affectedRowsBeforeWarnings = stmt.affectedRows;
@@ -155,7 +156,7 @@ export async function performQuery(
         throw e;
       }
     } else {
-      const stmt = rawConnection.prepare(sql);
+      const stmt = await rawConnection.prepare(sql);
       try {
         result = await stmt.execute(...typeCastedBinds);
         this._affectedRowsBeforeWarnings = stmt.affectedRows;

@@ -1,4 +1,5 @@
 import { rbScanArgs } from "@blazetrails/ruby-compat";
+import type { PreparedStatementInfo } from "mysql2/promise";
 import type { Client, Mysql2Result, QueryOptions } from "./client.js";
 import { Error as Mysql2Error } from "./error.js";
 import { Mysql2 } from "./mysql2.js";
@@ -16,7 +17,30 @@ export class Statement {
   constructor(
     private client: Client,
     private sql: string,
+    private stmt: PreparedStatementInfo,
   ) {}
+
+  private get statement(): {
+    columns: { name: string }[];
+    parameters: unknown[];
+    close(): unknown;
+  } {
+    return (this.stmt as unknown as { statement: never }).statement;
+  }
+
+  get paramCount(): number {
+    return this.statement.parameters.length;
+  }
+
+  get fieldCount(): number {
+    return this.statement.columns.length;
+  }
+
+  get fields(): string[] | null {
+    const fields = this.statement.columns;
+    if (fields.length === 0) return null;
+    return fields.map((field) => field.name);
+  }
 
   execute(...args: unknown[]): Promise<Mysql2Result | null> {
     return this._execute(args);
@@ -38,7 +62,8 @@ export class Statement {
 
   close(): void {
     this.closed = true;
-    this.client.unprepare(this.client.options(this.sql, this.client.queryOptions));
+    const options = this.client.options(this.sql, this.client.queryOptions);
+    if (this.client.unprepare(options) !== this.statement) this.statement.close();
   }
 }
 

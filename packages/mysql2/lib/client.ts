@@ -2,6 +2,7 @@ import mysql from "mysql2/promise";
 import {
   BigDecimal,
   constDefined,
+  Dir,
   File,
   hasKey,
   kernelInteger,
@@ -56,7 +57,18 @@ const MY_CNF_KEYS: Record<string, string> = {
   port: "port",
   socket: "socketPath",
   database: "database",
+  "default-character-set": "charset",
+  "connect-timeout": "connectTimeout",
+  timeout: "connectTimeout",
+  compress: "compress",
+  "multi-statements": "multipleStatements",
+  "ssl-ca": "ca",
+  "ssl-cert": "cert",
+  "ssl-key": "key",
+  "ssl-cipher": "cipher",
 };
+
+const MY_CNF_SSL_KEYS = ["ca", "cert", "key", "cipher"];
 
 /** @noRailsEquivalent PERMANENT */
 async function myLoadDefaults(file: string, groups: string[]): Promise<Options> {
@@ -65,17 +77,44 @@ async function myLoadDefaults(file: string, groups: string[]): Promise<Options> 
   for (const raw of (await File.readAsync(file)).split(/\r?\n/)) {
     const line = raw.trim();
     if (line === "" || line.startsWith("#") || line.startsWith(";")) continue;
+    const directive = /^!(include|includedir)\s+(.+)$/.exec(line);
+    if (directive) {
+      const path = File.expandPath(directive[2].trim(), File.dirname(file));
+      const files =
+        directive[1] === "include"
+          ? [path]
+          : (await Dir.childrenAsync(path))
+              .filter((name) => name.endsWith(".cnf"))
+              .sort()
+              .map((name) => File.join(path, name));
+      for (const included of files) {
+        const { ssl, ...rest } = await myLoadDefaults(included, groups);
+        Object.assign(defaults, rest);
+        if (ssl) defaults.ssl = { ...(defaults.ssl as Options | undefined), ...(ssl as Options) };
+      }
+      continue;
+    }
     const header = /^\[(.+)\]$/.exec(line);
     if (header) {
       group = header[1].trim();
       continue;
     }
     if (group == null || !groups.includes(group)) continue;
-    const [, name, value = ""] = /^([^=\s]+)\s*(?:=\s*(.*))?$/.exec(line) ?? [];
-    const key = name && MY_CNF_KEYS[name];
+    const [, name, value] = /^([^=\s]+)\s*(?:=\s*(.*))?$/.exec(line) ?? [];
+    const key = name && MY_CNF_KEYS[name.replace(/_/g, "-")];
     if (!key) continue;
-    const v = value.replace(/^(["'])(.*)\1$/, "$2");
-    defaults[key] = key === "port" ? Number(v) : v;
+    const v = (value ?? "").replace(/^(["'])(.*)\1$/, "$2");
+    if (MY_CNF_SSL_KEYS.includes(key)) {
+      defaults.ssl = { ...(defaults.ssl as Options | undefined), [key]: v };
+    } else if (key === "port") {
+      defaults[key] = Number(v);
+    } else if (key === "connectTimeout") {
+      defaults[key] = Number(v) * 1000;
+    } else if (key === "compress" || key === "multipleStatements") {
+      defaults[key] = value == null || !["0", "false", "off"].includes(v.toLowerCase());
+    } else {
+      defaults[key] = v;
+    }
   }
   return defaults;
 }
@@ -141,7 +180,13 @@ type Protocol = {
   writePacket(packet: object): void;
   _resetSequenceId(): void;
   handlePacket?: (packet?: EofPacket) => unknown;
-  stream?: { destroyed?: boolean; removeAllListeners?(): unknown; unref?(): unknown };
+  stream?: {
+    destroyed?: boolean;
+    removeAllListeners?(): unknown;
+    unref?(): unknown;
+    write?(chunk: unknown, cb?: (err?: unknown) => void): boolean;
+    destroy?(err: unknown): unknown;
+  };
   _closing?: boolean;
 };
 type Packet = { isError(): boolean; asError(encoding: string): Error };
@@ -696,10 +741,7 @@ export class Client {
     return new Rational(Time.local(2010).utcOffset, 86400);
   }
 
-  /**
-   * @missingRailsCall write_timeout — CONVERGEABLE mysql2-client-write-timeout-and-default-auth-reach-the-npm-connection
-   * @missingRailsCall default_auth — CONVERGEABLE mysql2-client-write-timeout-and-default-auth-reach-the-npm-connection
-   */
+  /** @missingRailsCall default_auth — CONVERGEABLE mysql2-client-default-auth-reaches-the-npm-handshake */
   private async connect(
     user: string | null,
     pass: string | null,
@@ -719,13 +761,18 @@ export class Client {
     if (this.connectTimeout != null) config.connectTimeout = this.connectTimeout * 1000;
     if (this.charsetName != null) config.charset = this.charsetName;
     if (this.secureAuth != null) config.insecureAuth = !this.secureAuth;
+    let sslDefaults: unknown;
     if (this.defaultFile != null) {
       const group = this.defaultGroup;
-      const defaults = await myLoadDefaults(this.defaultFile, [
+      let defaults = await myLoadDefaults(this.defaultFile, [
         "client",
         ...(group != null ? [group] : []),
       ]);
-      for (const [key, value] of Object.entries(defaults)) config[key] ??= value;
+      ({ ssl: sslDefaults, ...defaults } = defaults);
+      for (const [key, value] of Object.entries(defaults)) {
+        if (Object.hasOwn(args, key)) config[key] ??= value;
+        else config[key] = value;
+      }
     }
     if (this.enableCleartextPlugin !== true) {
       config.authPlugins = {
@@ -743,11 +790,12 @@ export class Client {
     if (this.localInfile === false) flags &= ~CLIENT_FLAGS.LOCAL_FILES;
     if (
       this.ssl !== undefined ||
+      sslDefaults !== undefined ||
       (this.sslMode != null &&
         this.sslMode !== Client.SSL_MODE_DISABLED &&
         this.sslMode !== Client.SSL_MODE_PREFERRED)
     ) {
-      const { key, cert, ca, cipher } = this.ssl ?? {};
+      const { key, cert, ca, cipher } = { ...this.ssl, ...(sslDefaults as typeof this.ssl) };
       const ssl: Options = {
         rejectUnauthorized:
           (flags & CLIENT_FLAGS.SSL_VERIFY_SERVER_CERT) !== 0 ||
@@ -768,7 +816,11 @@ export class Client {
     if ((flags & CLIENT_FLAGS.IGNORE_SPACE) === 0) (config.flags as string[]).push("-IGNORE_SPACE");
     if ((flags & CLIENT_FLAGS.COMPRESS) !== 0) config.compress = true;
 
-    if (this.ssl === undefined && this.sslMode === Client.SSL_MODE_PREFERRED) {
+    if (
+      this.ssl === undefined &&
+      sslDefaults === undefined &&
+      this.sslMode === Client.SSL_MODE_PREFERRED
+    ) {
       config.ssl = { rejectUnauthorized: false };
     }
     const connection = (await (async () =>
@@ -786,6 +838,23 @@ export class Client {
     }
 
     const protocol = connection.connection;
+    const stream = protocol?.stream;
+    const write = stream?.write;
+    if (this.writeTimeout != null && typeof write === "function") {
+      const timeout = this.writeTimeout * 1000;
+      stream!.write = (chunk, cb) => {
+        const timer = setTimeout(() => {
+          const error = new globalThis.Error("Lost connection to MySQL server during query");
+          stream!.destroy?.(
+            Object.assign(error, { code: "PROTOCOL_CONNECTION_LOST", fatal: true }),
+          );
+        }, timeout);
+        return write.call(stream, chunk, (err?: unknown) => {
+          clearTimeout(timer);
+          cb?.(err);
+        });
+      };
+    }
     const handlePacket = protocol?.handlePacket;
     if (typeof handlePacket === "function") {
       protocol!.handlePacket = (packet) => {
@@ -871,12 +940,16 @@ export class Client {
   }
 
   /** @internal */
-  unprepare(options: Record<string, unknown>): void {
-    this.connection.unprepare(options as never);
+  unprepare(options: Record<string, unknown>): unknown {
+    return this.connection.unprepare(options as never);
   }
 
-  prepare(sql: string): Statement {
-    return new Statement(this, sql);
+  async prepare(sql: string): Promise<Statement> {
+    if (this.isClosed()) throw new Mysql2Error("MySQL client is not connected");
+    const stmt = await this.connection
+      .prepare(this.options(sql, this.queryOptions) as never)
+      .catch((e: unknown) => this.raiseMysql2Error(e));
+    return new Statement(this, sql, stmt);
   }
 
   abandonResultsBang(): void {}
