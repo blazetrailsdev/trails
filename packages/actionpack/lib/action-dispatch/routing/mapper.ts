@@ -1387,7 +1387,10 @@ export class Mapper {
     }
   }
 
-  /** @missingRailsCall read — PERMANENT */
+  /**
+   * @missingRailsCall read — PERMANENT
+   * @missingRailsCall exist? — PERMANENT
+   */
   draw(name: string): void {
     const path = this._drawPaths.find(
       (_path) => loadedFileExports(`${_path}/${name}.ts`) !== undefined,

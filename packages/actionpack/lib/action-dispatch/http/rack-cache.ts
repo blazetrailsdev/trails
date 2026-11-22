@@ -41,7 +41,6 @@ export class RailsMetaStore extends MetaStore {
     }
   }
 
-  /** @missingRailsArgs dump — PERMANENT */
   override async write(key: string, value: any): Promise<unknown> {
     return await this._store.write(key, Marshal.dump(value, -1, true));
   }
