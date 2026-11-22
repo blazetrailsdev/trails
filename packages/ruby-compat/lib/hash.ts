@@ -764,6 +764,15 @@ export function transformValuesBang<H extends Record<string, unknown> | Map<unkn
 }
 
 /**
+ * The Map arm: `rb_hash_transform_values` answers a bare `Hash`
+ * (`rb_hash_new`), whatever the receiver's class and without its default.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`).
+ */
+export function transformValues<K, T, U>(
+  hash: Hash<K, T> | Map<K, T>,
+  block: (value: T) => U,
+): Hash<K, U>;
+/**
  * Ruby `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`
  * `rb_hash_transform_values`) — a NEW hash with the same keys in the same
  * order and each value replaced by the block's result.
@@ -773,12 +782,6 @@ export function transformValues<T, U>(
   hash: Record<string, T> | { transformValues(block: (value: T) => unknown): object },
   block: (value: T) => U,
 ): Record<string, U>;
-/**
- * The Map arm: `rb_hash_transform_values` answers a bare `Hash`
- * (`rb_hash_new`), whatever the receiver's class and without its default.
- * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`).
- */
-export function transformValues<K, T, U>(hash: Map<K, T>, block: (value: T) => U): Hash<K, U>;
 /**
  * Either arm, for a receiver typed as either.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`).
@@ -851,6 +854,13 @@ export function slice(
 }
 
 /**
+ * The Map arm: `hash_dup_with_compare_by_id` (`vendor/ruby/v3.3.11/hash.c:1563`)
+ * answers a bare `Hash` whatever the receiver's class, keeping only its
+ * `compare_by_identity` table type.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/v3.3.11/hash.c:2683`).
+ */
+export function except<K, V>(hash: Hash<K, V> | Map<K, V>, ...keys: K[]): Hash<K, V>;
+/**
  * Ruby `Hash#except` (`vendor/ruby/v3.3.11/hash.c:2683` `rb_hash_except`) — a dup
  * with the given keys deleted, keys that are absent ignored.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/v3.3.11/hash.c:2683`).
@@ -859,13 +869,6 @@ export function except<T>(
   receiver: Record<string, T> | { except(...keys: string[]): Record<string, T> },
   ...keys: string[]
 ): Record<string, T>;
-/**
- * The Map arm: `hash_dup_with_compare_by_id` (`vendor/ruby/v3.3.11/hash.c:1563`)
- * answers a bare `Hash` whatever the receiver's class, keeping only its
- * `compare_by_identity` table type.
- * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/v3.3.11/hash.c:2683`).
- */
-export function except<K, V>(hash: Map<K, V>, ...keys: K[]): Hash<K, V>;
 /**
  * Either arm, for a receiver typed as either.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/v3.3.11/hash.c:2683`).
@@ -1712,6 +1715,158 @@ export class Hash<K, V> extends Map<K, V> {
       super.set(key, block(value));
     }
     return this;
+  }
+
+  /**
+   * `Hash#store` (`vendor/ruby/v3.3.11/hash.c:7177`), `rb_hash_aset`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  store(key: K, value: V): this {
+    return this.set(key, value);
+  }
+
+  /**
+   * `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176` `rb_hash_fetch_m`); the body is
+   * {@link fetch}'s.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  fetch(key: K, ...rest: unknown[]): unknown {
+    return fetch(this as Map<K, V>, key, ...rest);
+  }
+
+  /**
+   * `Hash#key?` / `#has_key?` (`vendor/ruby/v3.3.11/hash.c:3671` `rb_hash_has_key`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  hasKey(key: K): boolean {
+    return this.has(key);
+  }
+
+  /**
+   * `Hash#member?` (`vendor/ruby/v3.3.11/hash.c:7239`), `rb_hash_has_key`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  isMember(key: K): boolean {
+    return this.has(key);
+  }
+
+  /**
+   * `Hash#invert` (`vendor/ruby/v3.3.11/hash.c:3900` `rb_hash_invert`): a new bare
+   * Hash mapping each value to its key.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  invert(): Map<unknown, K> {
+    const h = new Hash<V, K>();
+    for (const [key, value] of super.entries()) h.set(value, key);
+    return h;
+  }
+
+  /**
+   * `Hash#to_proc` (`vendor/ruby/v3.3.11/hash.c:4752` `rb_hash_to_proc`): a lambda
+   * answering `hash[key]`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toProc(): (key: never) => V | undefined | null {
+    return (key: K) => this.get(key);
+  }
+
+  /**
+   * `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`
+   * `rb_hash_transform_values`): a new Hash with each value replaced by the
+   * block's result.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  transformValues(block: (value: NoInfer<V>) => NoInfer<V>): Hash<K, V> {
+    const result = new Hash<K, V>();
+    for (const [key, value] of super.entries()) result.set(key, block(value));
+    return result;
+  }
+
+  /**
+   * `Hash#update` (`vendor/ruby/v3.3.11/hash.c:4028` `rb_hash_update`); the body is
+   * {@link update}'s.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  update(...others: unknown[]): this {
+    return update(this as never, ...(others as never[])) as unknown as this;
+  }
+
+  /**
+   * `Hash#merge!` (`vendor/ruby/v3.3.11/hash.c:7247`), defined onto `rb_hash_update`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  mergeBang(...others: unknown[]): this {
+    return this.update(...others);
+  }
+
+  /**
+   * `Hash#values_at` (`vendor/ruby/v3.3.11/hash.c:2713` `rb_hash_values_at`): each
+   * key's `rb_hash_aref`, the default included.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  valuesAt(...keys: K[]): (V | undefined | null)[] {
+    return keys.map((key) => this.get(key));
+  }
+
+  /**
+   * `Hash#slice` (`vendor/ruby/v3.3.11/hash.c:2651` `rb_hash_slice`); the body is
+   * {@link slice}'s.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  slice(...keys: K[]): Hash<K, V> {
+    return slice(this as Map<K, V>, ...keys);
+  }
+
+  /**
+   * `Hash#transform_keys` (`vendor/ruby/v3.3.11/hash.c:3227` `rb_hash_transform_keys`),
+   * the block arm: a new bare Hash keyed by the block's result.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  transformKeys(block: (key: NoInfer<K>) => NoInfer<K>): Hash<K, V> {
+    const result = new Hash<K, V>();
+    for (const [key, value] of super.entries()) result.set(block(key), value);
+    return result;
+  }
+
+  /**
+   * `Hash#transform_keys!` (`vendor/ruby/v3.3.11/hash.c:3267`
+   * `rb_hash_transform_keys_bang`), the block arm.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  transformKeysBang(block: (key: K) => K): this {
+    this.modifyCheck();
+    const pairs = [...super.entries()];
+    const newKeys = new Set<K>();
+    for (const [key, val] of pairs) {
+      const newKey = block(key);
+      if (!newKeys.has(key)) this.deleteEntry(key);
+      this.set(newKey, val);
+      newKeys.add(newKey);
+    }
+    return this;
+  }
+
+  /**
+   * `Hash#except` (`vendor/ruby/v3.3.11/hash.c:2683` `rb_hash_except`); the body is
+   * {@link except}'s.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  except(...keys: K[]): Hash<K, V> {
+    return except(this as Map<K, V>, ...keys);
   }
 
   /**
