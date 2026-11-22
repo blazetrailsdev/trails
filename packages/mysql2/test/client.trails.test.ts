@@ -1,5 +1,6 @@
 import { it, expect, describe, vi } from "vitest";
 import { Time } from "@blazetrails/date";
+import mysqlCore from "mysql2";
 import mysql from "mysql2/promise";
 import { File, NameError } from "@blazetrails/ruby-compat";
 import { Mysql2, type Client } from "../lib/index.js";
@@ -125,24 +126,39 @@ describe("Mysql2::Client#warning_count", () => {
     expect(client.warningCount).toBe(2);
   });
 
-  it("query merges its options over query_options, and _query casts with what it is handed", async () => {
-    const native = vi.fn(async (_options: object) => [[], [{ name: "a" }]]);
-    const client = await clientOn({ query: native });
-    await client.query("SELECT 1", { databaseTimezone: "utc" });
-    expect(client.queryOptions.databaseTimezone).toBe("local");
-    const { typeCast } = native.mock.calls[0][0] as {
-      typeCast(field: object, next: () => unknown): Time;
-    };
-    const time = typeCast({ type: "DATETIME", string: () => "2026-04-27 14:23:55" }, () => null);
-    expect(time.getutc().hour).toBe(14);
-  });
-
   type Cast = { typeCast(field: object, next: () => unknown): unknown };
   const castOf = (native: { mock: { calls: object[][] } }, call = 0): Cast["typeCast"] =>
     (native.mock.calls[call][0] as Cast).typeCast;
 
+  type Column = [name: string, type: string & keyof typeof mysql.Types, length?: number];
+  const rowOf = (columns: Column[], ...values: Array<string | Uint8Array | null>) => [
+    [Object.fromEntries(columns.map(([name], i) => [name, cell(values[i])]))],
+    columns.map(([name, type, columnLength]) => ({
+      name,
+      type: mysql.Types[type],
+      columnLength,
+      characterSet: ["BIT", "NEWDECIMAL"].includes(type)
+        ? mysql.Charsets.BINARY
+        : mysql.Charsets.UTF8MB4_GENERAL_CI,
+      encoding: ["BIT", "NEWDECIMAL"].includes(type) ? "binary" : "utf8",
+    })),
+  ];
+  const cell = (value: string | Uint8Array | null | undefined) =>
+    value == null ? null : typeof value === "string" ? value : String.fromCharCode(...value);
+
+  it("query merges its options over query_options, and _query casts with what it is handed", async () => {
+    const native = vi.fn(async (_options: object) =>
+      rowOf([["a", "DATETIME"]], "2026-04-27 14:23:55"),
+    );
+    const client = await clientOn({ query: native });
+    const result = (await client.query("SELECT 1", { databaseTimezone: "utc" }))!;
+    expect(client.queryOptions.databaseTimezone).toBe("local");
+    const time = (result.toA()[0] as Record<string, Time>)["a"];
+    expect(time.getutc().hour).toBe(14);
+  });
+
   it("_query answers a hash row keyed by field name, symbolize_keys or not", async () => {
-    const native = vi.fn(async (_options: object) => [[{ a: 1 }], [{ name: "a" }]]);
+    const native = vi.fn(async (_options: object) => rowOf([["a", "LONG"]], "1"));
     const client = await clientOn({ query: native });
     for (const symbolizeKeys of [false, true]) {
       const result = (await client.query("SELECT 1 AS a", { symbolizeKeys }))!;
@@ -153,57 +169,98 @@ describe("Mysql2::Client#warning_count", () => {
   });
 
   it("_query answers the raw string for every field when cast is false", async () => {
-    const native = vi.fn(async (_options: object) => [[], [{ name: "a" }]]);
+    const native = vi.fn(async (_options: object) =>
+      rowOf(
+        [
+          ["a", "LONGLONG"],
+          ["b", "DATETIME"],
+        ],
+        "1",
+        null,
+      ),
+    );
     const client = await clientOn({ query: native });
-    await client.query("SELECT 1", { cast: false });
-    const next = vi.fn(() => 1);
-    const field = { type: "LONGLONG", string: () => "1" };
-    expect(castOf(native)(field, next)).toBe("1");
-    expect(castOf(native)({ type: "DATETIME", string: () => null }, next)).toBeNull();
-    expect(next).not.toHaveBeenCalled();
+    const result = (await client.query("SELECT 1", { cast: false }))!;
+    expect(result.toA()).toEqual([{ a: "1", b: null }]);
   });
 
   it("_query casts a TINYINT(1) and a BIT(1) to a boolean only under cast_booleans", async () => {
-    const native = vi.fn(async (_options: object) => [[], [{ name: "a" }]]);
+    const columns: Column[] = [
+      ["t1", "TINY", 1],
+      ["t0", "TINY", 1],
+      ["tn", "TINY", 1],
+      ["t4", "TINY", 4],
+      ["b1", "BIT", 1],
+      ["b0", "BIT", 1],
+      ["b8", "BIT", 8],
+    ];
+    const values = ["1", "0", null, "1", Uint8Array.of(1), Uint8Array.of(0), Uint8Array.of(1)];
+    const native = vi.fn(async (_options: object) => rowOf(columns, ...values));
     const client = await clientOn({ query: native });
-    await client.query("SELECT 1");
-    await client.query("SELECT 1", { castBooleans: true });
-    const tiny = (value: string | null, length = 1) => ({
-      type: "TINY",
-      length,
-      string: () => value,
-    });
-    const bit = (value: number, length = 1) => ({
-      type: "BIT",
-      length,
-      string: () => null,
-      buffer: () => Uint8Array.of(value),
-    });
-    const next = () => "next";
-    expect(castOf(native, 0)(tiny("1"), () => 1)).toBe(1);
-    expect(castOf(native, 0)(bit(1), next)).toBe("next");
-    expect(castOf(native, 1)(tiny("1"), next)).toBe(true);
-    expect(castOf(native, 1)(tiny("0"), next)).toBe(false);
-    expect(castOf(native, 1)(tiny(null), next)).toBeNull();
-    expect(castOf(native, 1)(tiny("1", 4), () => 1)).toBe(1);
-    expect(castOf(native, 1)(bit(1), next)).toBe(true);
-    expect(castOf(native, 1)(bit(0), next)).toBe(false);
-    expect(castOf(native, 1)(bit(1, 8), next)).toBe("next");
+    const plain = (await client.query("SELECT 1"))!.toA()[0];
+    const cast = (await client.query("SELECT 1", { castBooleans: true }))!.toA()[0];
+    expect(plain).toMatchObject({ t1: 1, t0: 0, tn: null, t4: 1 });
+    expect((plain as Record<string, unknown>)["b1"]).toEqual(Buffer.of(1));
+    expect(cast).toMatchObject({ t1: true, t0: false, tn: null, t4: 1, b1: true, b0: false });
+    expect((cast as Record<string, unknown>)["b8"]).toEqual(Buffer.of(1));
   });
 
   it("_query converts a time to application_timezone when one is named", async () => {
-    const native = vi.fn(async (_options: object) => [[], [{ name: "a" }]]);
+    const native = vi.fn(async (_options: object) =>
+      rowOf([["a", "DATETIME"]], "2026-04-27 14:23:55"),
+    );
     const client = await clientOn({ query: native });
-    const field = { type: "DATETIME", string: () => "2026-04-27 14:23:55" };
-    await client.query("SELECT 1", { databaseTimezone: "utc" });
-    await client.query("SELECT 1", { databaseTimezone: "utc", applicationTimezone: "local" });
-    await client.query("SELECT 1", { databaseTimezone: "local", applicationTimezone: "utc" });
-    const [unnamed, local, utc] = [0, 1, 2].map((call) => castOf(native, call)(field, () => null));
-    expect((unnamed as Time).isUtc()).toBe(true);
-    expect((local as Time).isUtc()).toBe(false);
-    expect((local as Time).getutc().hour).toBe(14);
-    expect((utc as Time).isUtc()).toBe(true);
-    expect((utc as Time).getlocal().hour).toBe(14);
+    const read = async (options: Parameters<Client["query"]>[1]) =>
+      ((await client.query("SELECT 1", options))!.toA()[0] as Record<string, Time>)["a"];
+    const unnamed = await read({ databaseTimezone: "utc" });
+    const local = await read({ databaseTimezone: "utc", applicationTimezone: "local" });
+    const utc = await read({ databaseTimezone: "local", applicationTimezone: "utc" });
+    expect(unnamed.isUtc()).toBe(true);
+    expect(local.isUtc()).toBe(false);
+    expect(local.getutc().hour).toBe(14);
+    expect(utc.isUtc()).toBe(true);
+    expect(utc.getlocal().hour).toBe(14);
+  });
+
+  it("Result#each casts with the options it is given, over the query's", async () => {
+    const native = vi.fn(async (_options: object) =>
+      rowOf(
+        [
+          ["a", "TINY", 1],
+          ["b", "DATETIME"],
+        ],
+        "1",
+        "2026-04-27 14:23:55",
+      ),
+    );
+    const client = await clientOn({ query: native });
+    const uncast = (await client.query("SELECT 1"))!;
+    expect(uncast.each({ cast: false })).toEqual([{ a: "1", b: "2026-04-27 14:23:55" }]);
+    expect(uncast.each()).toEqual([{ a: "1", b: "2026-04-27 14:23:55" }]);
+    const booleans = (await client.query("SELECT 1"))!;
+    expect((booleans.each({ castBooleans: true })[0] as Record<string, unknown>)["a"]).toBe(true);
+    const zoned = (await client.query("SELECT 1", { databaseTimezone: "local" }))!;
+    const [row] = zoned.each({ databaseTimezone: "utc", applicationTimezone: "local" });
+    const b = (row as Record<string, Time>)["b"];
+    expect(b.isUtc()).toBe(false);
+    expect(b.getutc().hour).toBe(14);
+  });
+
+  it("_query reads a binary-charset NEWDECIMAL, as SUM answers, as a number", async () => {
+    const native = vi.fn(async (_options: object) => rowOf([["s", "NEWDECIMAL"]], "318"));
+    const client = await clientOn({ query: native });
+    expect((await client.query("SELECT SUM(1)"))!.toA()).toEqual([{ s: 318 }]);
+  });
+
+  it("Result#each casts again on each call when cache_rows is false", async () => {
+    const native = vi.fn(async (_options: object) => rowOf([["a", "TINY", 1]], "1"));
+    const client = await clientOn({ query: native });
+    const result = (await client.query("SELECT 1", { cacheRows: false }))!;
+    expect(result.each({ castBooleans: true })).toEqual([{ a: true }]);
+    expect(result.each({ cast: false })).toEqual([{ a: "1" }]);
+    const cached = (await client.query("SELECT 1"))!;
+    expect(cached.each({ castBooleans: true })).toEqual([{ a: true }]);
+    expect(cached.each({ cast: false })).toEqual([{ a: true }]);
   });
 
   it("Statement#execute merges its keywords over query_options, and always casts", async () => {
@@ -563,5 +620,49 @@ describe("Mysql2::Client#initialize option writers", () => {
     } finally {
       createConnection.mockRestore();
     }
+  });
+});
+
+describe("Mysql2::Client default_auth", () => {
+  it("answers the server's handshake with the default_auth plugin", async () => {
+    const seen: string[] = [];
+    const handshake = {
+      handshake: { authPluginName: "caching_sha2_password" },
+      sendCredentials(this: { handshake: { authPluginName: string } }) {
+        seen.push(this.handshake.authPluginName);
+      },
+    };
+    const listeners: Record<string, () => void> = {};
+    const core = {
+      _command: handshake,
+      once: (event: string, fn: () => void) => (listeners[event] = fn),
+      off: (event: string) => delete listeners[event],
+      promise: () => ({}),
+    };
+    const createConnection = vi.spyOn(mysqlCore, "createConnection").mockReturnValue(core as never);
+    try {
+      const client = Mysql2.Client.new({ defaultAuth: "mysql_native_password" });
+      await vi.waitFor(() => expect(createConnection).toHaveBeenCalled());
+      handshake.sendCredentials();
+      const connect = listeners["connect"];
+      delete listeners["connect"];
+      connect();
+      await client;
+    } finally {
+      createConnection.mockRestore();
+    }
+    expect(seen).toEqual(["mysql_native_password"]);
+    expect(listeners).toEqual({});
+  });
+
+  it("finds the driver's ClientHandshake as the connection's first command", () => {
+    const core = mysqlCore.createConnection({ host: "127.0.0.1", port: 1 });
+    core.on("error", () => {});
+    const handshake = (core as unknown as { _command: { constructor: { name: string } } })._command;
+    expect(handshake.constructor.name).toBe("ClientHandshake");
+    expect(typeof (handshake as unknown as { sendCredentials: unknown }).sendCredentials).toBe(
+      "function",
+    );
+    core.destroy();
   });
 });

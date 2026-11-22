@@ -91,12 +91,14 @@ describe("mysql2Client cast", () => {
     const raw = await clientOn({
       config: local,
       query: async () => [
-        [[local.typeCast!(field("TIMESTAMP", "2026-04-27 14:23:55"), next)]],
-        [{ name: "created_at" }],
+        [{ created_at: "2026-04-27 14:23:55" }],
+        [{ name: "created_at", type: mysql.Types.TIMESTAMP }],
       ],
     });
     raw.queryOptions.databaseTimezone = "local";
-    const [[val]] = (await raw.query("SELECT created_at FROM t"))!.toA() as [[RubyTime]];
+    const [{ created_at: val }] = (await raw.query("SELECT created_at FROM t"))!.toA() as [
+      { created_at: RubyTime },
+    ];
     expect(val.isUtc()).toBe(false);
     expect([val.year, val.month, val.day, val.hour, val.min, val.sec]).toEqual([
       2026, 4, 27, 14, 23, 55,
@@ -132,12 +134,12 @@ describe("mysql2Client cast", () => {
           invalid.typeCast!(field("DATE", "2026-00-00"), next);
           throw new Error("server error mid-result");
         }
-        return [[[1]], [{ name: "x" }]];
+        return [[{ x: "1" }], [{ name: "x", type: mysql.Types.LONG }]];
       },
     });
     await expect(raw.query("SELECT d FROM t")).rejects.toThrow("server error mid-result");
     reject = false;
-    expect((await raw.query("SELECT 1 AS x"))!.toA()).toEqual([[1]]);
+    expect((await raw.query("SELECT 1 AS x"))!.toA()).toEqual([{ x: 1 }]);
   });
 
   it("raises Mysql2::Error from to_a for a non-zero date with a zero month or day", async () => {
