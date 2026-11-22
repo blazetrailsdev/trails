@@ -24,7 +24,7 @@ import { cattrAccessor } from "../module-ext.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
 import { ActiveSupport } from "../namespaces.js";
 
-ActiveSupport.Cache.formatVersion = 7.0;
+ActiveSupport.Cache._formatVersion = 7.0;
 
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
@@ -149,7 +149,7 @@ export abstract class Store {
     let coder = this.options.coder as CacheCoder | null | undefined;
     delete this.options.coder;
     if (!hadCoder) {
-      const legacySerializer = ActiveSupport.Cache.formatVersion < 7.1 && !this.options.serializer;
+      const legacySerializer = ActiveSupport.Cache._formatVersion < 7.1 && !this.options.serializer;
       let serializer = this.options.serializer as Serializer | string | undefined;
       delete this.options.serializer;
       serializer ||= this.defaultSerializer();
@@ -483,14 +483,14 @@ export abstract class Store {
   }
 
   private defaultSerializer(): Serializer {
-    switch (ActiveSupport.Cache.formatVersion) {
+    switch (ActiveSupport.Cache._formatVersion) {
       case 7.0:
         return SerializerWithFallback.get("marshal_7_0");
       case 7.1:
         return SerializerWithFallback.get("marshal_7_1");
       default:
         throw new ArgumentError(
-          `Unrecognized ActiveSupport::Cache.format_version: ${rbInspect(ActiveSupport.Cache.formatVersion)}`,
+          `Unrecognized ActiveSupport::Cache.format_version: ${rbInspect(ActiveSupport.Cache._formatVersion)}`,
         );
     }
   }
@@ -625,7 +625,7 @@ export abstract class Store {
       throw new ArgumentError("Cannot specify :compressor and :coder options together");
     }
 
-    if (ActiveSupport.Cache.formatVersion < 7.1 && !options.serializer && options.compressor) {
+    if (ActiveSupport.Cache._formatVersion < 7.1 && !options.serializer && options.compressor) {
       throw new ArgumentError(
         "Cannot specify :compressor option when using" +
           " default serializer and cache format version is < 7.1",

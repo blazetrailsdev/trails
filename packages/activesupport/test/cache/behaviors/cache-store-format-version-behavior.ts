@@ -7,8 +7,7 @@ import {
   uniq,
 } from "@blazetrails/ruby-compat";
 import { Entry } from "../../../lib/cache/entry.js";
-import { ActiveSupport } from "../../../lib/namespaces.js";
-import { objectWith } from "../../../lib/core-ext/object/with.js";
+import { formatVersion as currentFormatVersion, setFormatVersion } from "../../../lib/cache.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 
 /** @internal */
@@ -148,5 +147,11 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
 }
 
 function withFormat<T>(formatVersion: number, block: () => T): T {
-  return objectWith(ActiveSupport.Cache, { formatVersion }, block);
+  const old = currentFormatVersion();
+  setFormatVersion(formatVersion);
+  try {
+    return block();
+  } finally {
+    setFormatVersion(old);
+  }
 }

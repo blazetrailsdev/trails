@@ -1,5 +1,4 @@
 import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat";
-import { isBlank } from "../object/blank.js";
 
 export class Array {
   static from<T>(self: T[], position: number): T[] {
@@ -56,13 +55,6 @@ export class Array {
 
   static secondToLast<T>(self: T[]): T | undefined {
     return self.at(-2);
-  }
-
-  static compactBlankBang<T>(self: T[]): T[] {
-    for (let i = self.length - 1; i >= 0; i--) {
-      if (isBlank(self[i])) self.splice(i, 1);
-    }
-    return self;
   }
 }
 

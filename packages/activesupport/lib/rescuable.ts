@@ -162,7 +162,8 @@ export const ClassMethods = {
 };
 
 export const Rescuable = { rescueWithHandler, handlerForRescue, ClassMethods };
-extend(Rescuable, Concern).included(null, function (this: object) {
+extend(Rescuable, Concern);
+Concern.included.call(Rescuable, null, function (this: object) {
   classAttribute.call(this, "rescueHandlers", { default: [] });
 });
 export type Rescuable = Included<typeof Rescuable>;
