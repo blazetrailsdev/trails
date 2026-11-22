@@ -147,10 +147,19 @@ and from the engine the host's are reached through the `main_app` mounted helper
 
 ### Engine Setup
 
-Rails copies an engine's migrations into the host with
-`railties:install:migrations`. That task is not ported yet, so copy the files
-from the engine's `db/migrate/` into the host's by hand and run
-`pnpm trails db:migrate`; see the [trailties package page](/packages/trailties).
+Copy the engine's migrations into the host, then run them:
+
+<!-- typecheck:skip -->
+
+```sh
+pnpm trails blorgh:install:migrations
+pnpm trails db:migrate
+```
+
+Every engine with a `db/migrate/` directory defines
+`<engine>:install:migrations`, and `railties:install:migrations` copies those
+of every engine at once. A copied file gets a new timestamp and the engine's
+name as a suffix, and one already copied is skipped.
 
 ### Using a Class Provided by the Application
 
