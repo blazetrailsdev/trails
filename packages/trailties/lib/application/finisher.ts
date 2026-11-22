@@ -133,6 +133,7 @@ Finisher.initializer(
 );
 
 Finisher.initializer("build_middleware_stack", async function (this: FinisherHost) {
+  /** @inventedArm if — PERMANENT */
   if (this.config.actionDispatch.rackCache) {
     for (const feature of ["rack/cache", "action_dispatch/http/rack_cache"]) {
       await rbFRequire(Trails.loadPath, feature).catch((e: unknown) => {

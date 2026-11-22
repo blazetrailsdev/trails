@@ -19,7 +19,7 @@ import {
   SSL,
   Static,
 } from "@blazetrails/actionpack";
-import type { ExecutorLike } from "@blazetrails/actionpack";
+import type { ExecutorLike, MiddlewareFactory } from "@blazetrails/actionpack";
 import {
   ConditionalGet,
   ETag,
@@ -87,7 +87,7 @@ export class DefaultMiddlewareStack {
     let rackCache;
     if ((rackCache = this.loadRackCache()) != null) {
       require("action_dispatch/http/rack_cache");
-      stack.use(Rack.Cache as never, rackCache);
+      stack.use(Rack.Cache as MiddlewareFactory, rackCache);
     }
 
     if (config.allowConcurrency === false) {

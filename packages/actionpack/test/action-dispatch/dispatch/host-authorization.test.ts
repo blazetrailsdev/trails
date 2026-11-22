@@ -1,7 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
 import {
   HostAuthorization,
-  ALLOWED_HOSTS_IN_DEVELOPMENT,
   type HostPermission,
 } from "../../../lib/action-dispatch/middleware/host-authorization.js";
 import { IPAddr, StringIO } from "@blazetrails/ruby-compat";
@@ -214,7 +213,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("localhost works in dev", async () => {
-    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+    testCase.app = buildApp(HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT);
 
     await testCase.get("/", {
       env: {
@@ -228,7 +227,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("localhost using IPV4 works in dev", async () => {
-    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+    testCase.app = buildApp(HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT);
 
     await testCase.get("/", {
       env: {
@@ -242,7 +241,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("localhost using IPV4 with port works in dev", async () => {
-    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+    testCase.app = buildApp(HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT);
 
     await testCase.get("/", {
       env: {
@@ -256,7 +255,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("localhost using IPV4 binding in all addresses works in dev", async () => {
-    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+    testCase.app = buildApp(HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT);
 
     await testCase.get("/", {
       env: {
@@ -270,7 +269,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("localhost using IPV4 with port binding in all addresses works in dev", async () => {
-    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+    testCase.app = buildApp(HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT);
 
     await testCase.get("/", {
       env: {
@@ -284,7 +283,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("localhost using IPV6 works in dev", async () => {
-    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+    testCase.app = buildApp(HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT);
 
     await testCase.get("/", {
       env: {
@@ -298,7 +297,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("localhost using IPV6 with port works in dev", async () => {
-    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+    testCase.app = buildApp(HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT);
 
     await testCase.get("/", {
       env: {
@@ -312,7 +311,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("localhost using IPV6 binding in all addresses works in dev", async () => {
-    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+    testCase.app = buildApp(HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT);
 
     await testCase.get("/", {
       env: {
@@ -326,7 +325,7 @@ describe("HostAuthorizationTest", () => {
   });
 
   it("localhost using IPV6 with port binding in all addresses works in dev", async () => {
-    testCase.app = buildApp(ALLOWED_HOSTS_IN_DEVELOPMENT);
+    testCase.app = buildApp(HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT);
 
     await testCase.get("/", {
       env: {

@@ -22,14 +22,6 @@ export const VALID_IP_HOSTNAME: RegExp[] = [
   new RegExp(`^${IPV6_HOSTNAME_WITH_PORT}$`, "i"),
 ];
 
-/** @internal */
-export const ALLOWED_HOSTS_IN_DEVELOPMENT: (string | RegExp | IPAddr)[] = [
-  ".localhost",
-  ".test",
-  new IPAddr("0.0.0.0/0"),
-  new IPAddr("::/0"),
-];
-
 export type HostPermission =
   | string
   | RegExp
@@ -108,7 +100,12 @@ type RackApp =
   | { call(env: RackEnv): Promise<RackResponse> };
 
 export class HostAuthorization {
-  static ALLOWED_HOSTS_IN_DEVELOPMENT = ALLOWED_HOSTS_IN_DEVELOPMENT;
+  static ALLOWED_HOSTS_IN_DEVELOPMENT: (string | RegExp | IPAddr)[] = [
+    ".localhost",
+    ".test",
+    new IPAddr("0.0.0.0/0"),
+    new IPAddr("::/0"),
+  ];
   private app: RackApp | { call: RackApp };
   private permissions: Permissions;
   private exclude?: (request: Request) => boolean;

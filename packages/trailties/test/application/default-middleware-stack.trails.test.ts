@@ -1,5 +1,5 @@
 import type { RackResponse } from "@blazetrails/rack";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { LoadError, rbFSend } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import {
   Callbacks,
@@ -25,7 +25,7 @@ import {
   TempfileReaper,
 } from "@blazetrails/rack";
 import type { RackEnv } from "@blazetrails/rack";
-import "../../lib/trailties/action-dispatch.js";
+import { Trailtie as ActionDispatchTrailtie } from "../../lib/trailties/action-dispatch.js";
 import { Application } from "../../lib/application.js";
 import { Root } from "../../lib/paths.js";
 import { Logger } from "../../lib/rack/logger.js";
@@ -56,6 +56,21 @@ function buildStack(mutate?: (c: Configuration) => void): unknown[] {
 }
 
 describe("DefaultMiddlewareStack (trails)", () => {
+  it("raises load_rack_cache's LoadError when rack-cache was never loaded", () => {
+    const build = () =>
+      defaultStack((c) => {
+        c.actionDispatch.rackCache = true;
+      });
+    try {
+      expect(build).toThrow(LoadError);
+      expect(build).toThrow(
+        "cannot load such file -- rack/cache Be sure to add rack-cache to your Gemfile",
+      );
+    } finally {
+      ActionDispatchTrailtie.config.actionDispatch.rackCache = false;
+    }
+  });
+
   it("uses the content security policy and permissions policy middleware in Rails' order", () => {
     const klasses = buildStack();
     const csp = klasses.indexOf(ContentSecurityPolicyMiddleware);

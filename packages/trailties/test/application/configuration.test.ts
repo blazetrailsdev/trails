@@ -75,7 +75,7 @@ import * as UrlHelper from "@blazetrails/actionview/helpers/url-helper";
 import * as AssetTagHelper from "@blazetrails/actionview/helpers/asset-tag-helper";
 import { Engine as ActiveStorageEngine } from "@blazetrails/activestorage/engine";
 import { Engine as ActionTextEngine } from "@blazetrails/actiontext/engine";
-import { ActionText } from "@blazetrails/actiontext";
+import { Attachment } from "@blazetrails/actiontext";
 import { ActiveStorage } from "@blazetrails/activestorage";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Base as ActionMailerBase, MailDeliveryJob } from "@blazetrails/actionmailer";
@@ -2119,13 +2119,13 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     application.config.loadDefaults("6.1");
     await application.initializeBang();
 
-    expect(ActionText.Attachment.tagName).toBe("action-text-attachment");
+    expect(Attachment.tagName).toBe("action-text-attachment");
   });
 
   it("action_text.config.attachment_tag_name is 'action-text-attachment' without defaults", async () => {
     await (await app("development")).initializeBang();
 
-    expect(ActionText.Attachment.tagName).toBe("action-text-attachment");
+    expect(Attachment.tagName).toBe("action-text-attachment");
   });
 
   it("action_text.config.attachment_tag_name is can be overridden", async () => {
@@ -2133,7 +2133,7 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     application.config.actionText.attachmentTagName = "link";
     await application.initializeBang();
 
-    expect(ActionText.Attachment.tagName).toBe("link");
+    expect(Attachment.tagName).toBe("link");
   });
 
   it("ActionMailer::Base.delivery_job is ActionMailer::MailDeliveryJob by default", async () => {
@@ -2280,8 +2280,8 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     application.config.activeStorage.unsupportedImageProcessingArguments = ["-write", "-danger"];
     await application.initializeBang();
 
-    expect(ActiveStorage.unsupportedImageProcessingArguments.includes("-danger")).toBe(true);
-    expect(ActiveStorage.unsupportedImageProcessingArguments.includes("-set")).toBe(false);
+    expect(ActiveStorage.unsupportedImageProcessingArguments).toContain("-danger");
+    expect(ActiveStorage.unsupportedImageProcessingArguments).not.toContain("-set");
   });
 
   it("ActiveSupport::Messages::Codec.default_serializer is :json_allow_marshal by default for new apps", async () => {
