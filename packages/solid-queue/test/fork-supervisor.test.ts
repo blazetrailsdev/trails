@@ -410,7 +410,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
   });
 
   it("fail orphaned executions by releasing their concurrency locks", async () => {
-    const result = await JobResult.createBang({ queue_name: "default", status: "" });
+    const result = await JobResult.createBang({ queue_name: "default", status: "seq: " });
     for (let i = 0; i < 4; i++) {
       await ThrottledUpdateResultJob.set({ queue: "new_queue" }).performLater(result);
     }
