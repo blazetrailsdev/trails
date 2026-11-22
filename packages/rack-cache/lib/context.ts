@@ -14,11 +14,10 @@ import { Request } from "./request.js";
 import { Response } from "./response.js";
 import type { Storage } from "./storage.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a Rack env holds values of every type
-type Env = Record<string, any>;
+type Env = Record<string, unknown>;
 type EntityStore = Parameters<MetaStore["store"]>[2];
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Rack::Cache::Options` (`rack-cache/context.rb:10`)
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Context extends Omit<Options, "metastore" | "entitystore"> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -362,9 +361,11 @@ export class Context {
   /** @internal */
   private log(level: "error" | "info", message: string): void {
     if (this._env!["rack.logger"] != null && this._env!["rack.logger"] !== false) {
-      this._env!["rack.logger"][level](message);
+      (this._env!["rack.logger"] as Record<typeof level, (message: string) => void>)[level](
+        message,
+      );
     } else {
-      this._env!["rack.errors"].write(message);
+      (this._env!["rack.errors"] as { write(message: string): void }).write(message);
     }
   }
 
