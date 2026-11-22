@@ -1924,6 +1924,9 @@ importers:
       '@blazetrails/image-processing':
         specifier: workspace:*
         version: link:../../packages/image-processing
+      '@blazetrails/libxml-ruby':
+        specifier: workspace:*
+        version: link:../../packages/libxml-ruby
       '@blazetrails/mail':
         specifier: workspace:*
         version: link:../../packages/mail
