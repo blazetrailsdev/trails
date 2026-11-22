@@ -66,7 +66,11 @@ export class SaxParser {
       const xuri = xnode.namespaceUri || null;
       const name = xprefix ? `${xprefix}:${xnode.name}` : xnode.name;
       if (typeof handler.onStartElement === "function") handler.onStartElement(name, attributes);
-      handler.onStartElementNs(xnode.name, attributes, xprefix, xuri, {});
+      const namespaces: Record<string, string | null> = {};
+      for (const [nsPrefix, nsUri] of Object.entries(xnode.localNamespaces)) {
+        namespaces[nsPrefix] = nsUri;
+      }
+      handler.onStartElementNs(xnode.name, attributes, xprefix, xuri, namespaces);
       let xcurrent = xnode.firstChild;
       while (xcurrent !== null) {
         this._walk(handler, xcurrent);
