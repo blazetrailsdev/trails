@@ -2,14 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import type { Extended } from "@blazetrails/activesupport";
 import { StringIO } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
 import { Blob } from "../../lib/blob.js";
 import { Attachment } from "../../lib/attachment.js";
 import { createBlob, User } from "../support/test-helper.js";
-import type { ClassMethods } from "../../lib/attached/model.js";
 import { Many } from "../../lib/attached/many.js";
 
 type PhotosUser = User & {
@@ -23,7 +21,7 @@ class Gallery extends User {
     return "users";
   }
   static {
-    (this as unknown as Extended<typeof ClassMethods>).hasManyAttached("photos");
+    this.hasManyAttached("photos");
   }
 }
 

@@ -64,7 +64,6 @@ export class Cipher {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Cipher {
   const loadPath: Autoload.Autoload["loadPath"];
   let Aes256Gcm: typeof AesGcmCipher;

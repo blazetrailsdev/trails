@@ -19,6 +19,9 @@
       "path": "../actionview"
     },
     {
+      "path": "../activerecord"
+    },
+    {
       "path": "../activesupport"
     },
     {

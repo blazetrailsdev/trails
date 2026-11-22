@@ -228,6 +228,13 @@ function hasManyAttached(
 
 export const ClassMethods = { hasOneAttached, hasManyAttached };
 
+declare module "@blazetrails/activerecord/base.js" {
+  namespace Base {
+    const hasOneAttached: typeof ClassMethods.hasOneAttached;
+    const hasManyAttached: typeof ClassMethods.hasManyAttached;
+  }
+}
+
 function validateServiceConfiguration(
   serviceName: string | null,
   modelClass: unknown,

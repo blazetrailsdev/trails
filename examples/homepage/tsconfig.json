@@ -8,7 +8,7 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node", "@blazetrails/activestorage", "@blazetrails/actiontext", "@blazetrails/turbo"]
   },
   "include": ["app"]
 }

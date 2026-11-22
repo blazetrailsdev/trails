@@ -111,6 +111,14 @@ function richTextAssociationNames(this: typeof Base): string[] {
 
 const ClassMethods = { hasRichText, withAllRichText, richTextAssociationNames };
 
+declare module "@blazetrails/activerecord/base.js" {
+  namespace Base {
+    const hasRichText: typeof ClassMethods.hasRichText;
+    const withAllRichText: typeof ClassMethods.withAllRichText;
+    const richTextAssociationNames: typeof ClassMethods.richTextAssociationNames;
+  }
+}
+
 export const Attribute = {} as Extended<typeof Concern> & {
   ClassMethods: typeof ClassMethods;
 };

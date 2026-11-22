@@ -5,19 +5,17 @@ import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertio
 import type { RichText } from "../../lib/rich-text.js";
 import { Message } from "../dummy/app/models/message.js";
 
-type HasRichText = { hasRichText(name: string, options?: object): void };
-
 class MessageWithStrictLoading extends Message {
   static {
     this.strictLoadingByDefault = true;
 
-    (this as unknown as HasRichText).hasRichText("strict_loading_content");
+    this.hasRichText("strict_loading_content");
   }
 }
 
 class MessageWithFooter extends MessageWithStrictLoading {
   static {
-    (this as unknown as HasRichText).hasRichText("footer", { strictLoading: false });
+    this.hasRichText("footer", { strictLoading: false });
   }
 }
 

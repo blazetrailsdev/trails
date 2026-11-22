@@ -210,6 +210,9 @@ export default defineConfig(
   eslint.configs.recommended,
   typescriptEslintRecommended,
   {
+    rules: { "@typescript-eslint/no-namespace": ["error", { allowDeclarations: true }] },
+  },
+  {
     // The rule tests run under vitest, where RuleTester picks up the injected
     // describe/it globals; the hooks around them are equally global.
     files: ["eslint/*.test.mjs"],

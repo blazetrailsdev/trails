@@ -1,4 +1,4 @@
-import { Notifications, type Extended } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { ActionController } from "@blazetrails/actionpack";
 import { Image } from "@blazetrails/mini-magick/image";
@@ -11,7 +11,6 @@ import {
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import type { ClassMethods } from "../../lib/attached/model.js";
 import type { Attachment } from "../../lib/attachment.js";
 import type { Many } from "../../lib/attached/many.js";
 import type { One } from "../../lib/attached/one.js";
@@ -55,16 +54,15 @@ export class User extends Base {
   static {
     this.validates("name", { presence: true });
 
-    const attached = this as unknown as Extended<typeof ClassMethods>;
-    attached.hasOneAttached("avatar");
-    attached.hasOneAttached("coverPhoto", { dependent: false, service: "local" });
-    attached.hasOneAttached("avatarWithVariants", {}, (attachable) => {
+    this.hasOneAttached("avatar");
+    this.hasOneAttached("coverPhoto", { dependent: false, service: "local" });
+    this.hasOneAttached("avatarWithVariants", {}, (attachable) => {
       attachable.variant("thumb", { resizeToLimit: [100, 100] });
     });
-    attached.hasOneAttached("avatarWithPreprocessed", {}, (attachable) => {
+    this.hasOneAttached("avatarWithPreprocessed", {}, (attachable) => {
       attachable.variant("bool", { resizeToLimit: [1, 1], preprocessed: true });
     });
-    attached.hasOneAttached("avatarWithConditionalPreprocessed", {}, (attachable) => {
+    this.hasOneAttached("avatarWithConditionalPreprocessed", {}, (attachable) => {
       attachable.variant("proc", {
         resizeToLimit: [2, 2],
         preprocessed: (user: User) => user.name === "transform via proc",
@@ -74,18 +72,18 @@ export class User extends Base {
         preprocessed: ":isShouldPreprocessed",
       });
     });
-    attached.hasOneAttached("introVideo");
-    attached.hasOneAttached("namePronunciationAudio");
+    this.hasOneAttached("introVideo");
+    this.hasOneAttached("namePronunciationAudio");
 
-    attached.hasManyAttached("highlights");
-    attached.hasManyAttached("vlogs", { dependent: false, service: "local" });
-    attached.hasManyAttached("highlightsWithVariants", {}, (attachable) => {
+    this.hasManyAttached("highlights");
+    this.hasManyAttached("vlogs", { dependent: false, service: "local" });
+    this.hasManyAttached("highlightsWithVariants", {}, (attachable) => {
       attachable.variant("thumb", { resizeToLimit: [100, 100] });
     });
-    attached.hasManyAttached("highlightsWithPreprocessed", {}, (attachable) => {
+    this.hasManyAttached("highlightsWithPreprocessed", {}, (attachable) => {
       attachable.variant("bool", { resizeToLimit: [1, 1], preprocessed: true });
     });
-    attached.hasManyAttached("highlightsWithConditionalPreprocessed", {}, (attachable) => {
+    this.hasManyAttached("highlightsWithConditionalPreprocessed", {}, (attachable) => {
       attachable.variant("proc", {
         resizeToLimit: [2, 2],
         preprocessed: (user: User) => user.name === "transform via proc",
@@ -95,10 +93,10 @@ export class User extends Base {
         preprocessed: ":isShouldPreprocessed",
       });
     });
-    attached.hasOneAttached("resume", {}, (attachable) => {
+    this.hasOneAttached("resume", {}, (attachable) => {
       attachable.variant("preview", { resizeToFill: [400, 400] });
     });
-    attached.hasOneAttached("resumeWithPreprocessing", {}, (attachable) => {
+    this.hasOneAttached("resumeWithPreprocessing", {}, (attachable) => {
       attachable.variant("preview", { resizeToFill: [400, 400], preprocessed: true });
     });
 
@@ -140,7 +138,7 @@ export class Group extends Base {
   declare users: AssociationProxy<User>;
 
   static {
-    (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("avatar");
+    this.hasOneAttached("avatar");
     this.hasMany("users", { autosave: true });
 
     this.acceptsNestedAttributesFor("users");

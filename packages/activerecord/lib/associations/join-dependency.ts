@@ -484,7 +484,6 @@ export class JoinDependency {
 type ModelCache = Hash<JoinPart, Hash<unknown, any>>;
 type Seen = Hash<any, Hash<JoinPart, Hash<unknown, any>>>;
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace JoinDependency {
   const loadPath: Autoload.Autoload["loadPath"];
   let JoinBase: typeof import("./join-dependency/join-base.js").JoinBase;

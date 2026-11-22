@@ -95,7 +95,6 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace PG {
   export type Connection = import("./connection.js").Connection;
   export type Result = import("./result.js").Result;
@@ -104,11 +103,9 @@ export declare namespace PG {
   export type TypeMapAllStrings = import("./type-map-all-strings.js").TypeMapAllStrings;
   export type TypeMapByOid = import("./type-map-by-oid.js").TypeMapByOid;
   export type SimpleDecoder = import("./simple-decoder.js").SimpleDecoder;
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   export namespace TextEncoder {
     export type Array = import("./text-encoder/array.js").Array;
   }
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   export namespace TextDecoder {
     export type Array = import("./text-decoder/array.js").Array;
   }

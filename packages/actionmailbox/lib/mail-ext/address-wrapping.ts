@@ -1,7 +1,6 @@
 import { Address } from "@blazetrails/mail";
 
 declare module "@blazetrails/mail/elements/address" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Address {
     let wrap: (address: unknown) => Address;
   }

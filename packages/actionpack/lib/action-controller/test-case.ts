@@ -548,7 +548,6 @@ export class TestCase extends ActiveSupportTestCase {
   static executorAroundEachRequest: boolean | null | undefined = null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace -- `Behavior::ClassMethods`, `class_attribute :_controller_class` and `RoutingAssertions::ClassMethods` reach `TestCase` through `include Behavior` (`actionpack/lib/action_controller/test_case.rb:379-414,599,696`); a namespace merged onto the class is how the added statics surface on the type side.
 export declare namespace TestCase {
   /** @internal */
   let _controllerClass: ControllerClass | null | undefined;

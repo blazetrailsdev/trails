@@ -9,7 +9,6 @@ import type { IncineratesController } from "./action-mailbox/incinerates-control
 import type { ReroutesController } from "./action-mailbox/reroutes-controller.js";
 
 declare module "@blazetrails/trailties/trails" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Trails {
     let Conductor: {
       BaseController: Omit<typeof ActionController.Base, "prototype"> &

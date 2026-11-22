@@ -7,16 +7,13 @@ import { File, include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 type DrawCallback = Parameters<RouteSet["draw"]>[0];
 
 declare module "@blazetrails/actionpack/testing" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby reopens `class ActionController::TestCase` (`actionview/test/abstract_unit.rb:116-127`) to add `self.with_routes`; a namespace merged onto the class is how an added static surfaces on the type side.
   namespace TestCase {
     let withRoutes: (block: DrawCallback) => void;
   }
 }
 
 declare module "@blazetrails/actionpack" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- see above.
   namespace ActionController {
-    // eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby reopens `class ActionController::Base` (`actionview/test/abstract_unit.rb:107-114`) to add `self.test_routes`.
     namespace Base {
       let testRoutes: (block: DrawCallback) => RouteSet;
     }
