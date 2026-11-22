@@ -28,7 +28,7 @@ describe("TestStatement", () => {
   });
 
   it("new with remainder", async () => {
-    const stmt = new SQLite3.Statement(db, "select 'foo';bar");
+    const stmt = await SQLite3.Statement.new(db, "select 'foo';bar");
     expect(stmt.remainder).toBe("bar");
     await stmt.close();
   });
@@ -187,7 +187,7 @@ describe("TestStatement", () => {
 
   it("bind blob", async () => {
     await db.execute("create table foo(text BLOB)");
-    const stmt = new SQLite3.Statement(db, "insert into foo(text) values (?)");
+    const stmt = await SQLite3.Statement.new(db, "insert into foo(text) values (?)");
     await stmt.bindParam(1, new TextEncoder().encode("hello"));
     await stmt.execute();
     await stmt.close();
