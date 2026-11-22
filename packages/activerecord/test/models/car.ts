@@ -11,6 +11,7 @@ import type { PriceEstimate } from "./price-estimate.js";
 import type { Tyre } from "./tyre.js";
 import type { Wheel } from "./wheel.js";
 import { Base } from "../../lib/base.js";
+import { Rollback } from "../../lib/errors.js";
 import { Time as RubyTime } from "@blazetrails/date";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -142,3 +143,13 @@ export class FastCar extends Car {
 }
 constSet(TopLevel, "FastCar", FastCar);
 DescendantsTracker.registerSubclass(Car, FastCar);
+
+export class BrokenCar extends Car {
+  static {
+    this.afterSave(function () {
+      throw new Rollback();
+    });
+  }
+}
+constSet(TopLevel, "BrokenCar", BrokenCar);
+DescendantsTracker.registerSubclass(Car, BrokenCar);

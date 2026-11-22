@@ -246,27 +246,35 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   await createTestUniqueConstraintsTable(adapter);
 
   if (await adapter.supportsPartitionedIndexes()) {
-    await adapter.createTable(
-      "measurements",
-      { id: false, force: true, options: "PARTITION BY LIST (city_id)" },
-      (t) => {
-        t.string("city_id", { null: false });
-        t.date("logdate", { null: false });
-        t.integer("peaktemp");
-        t.integer("unitsales");
-        t.index(["logdate", "city_id"], { unique: true });
-      },
-    );
-    await adapter.createTable("measurements_toronto", {
-      id: false,
-      force: true,
-      options: "PARTITION OF measurements FOR VALUES IN (1)",
-    });
-    await adapter.createTable("measurements_concepcion", {
-      id: false,
-      force: true,
-      options: "PARTITION OF measurements FOR VALUES IN (2)",
-    });
+    const klass = adapter.constructor as typeof PostgreSQLAdapter;
+    const previousUnloggedTables = klass.createUnloggedTables;
+    try {
+      klass.createUnloggedTables = false;
+
+      await adapter.createTable(
+        "measurements",
+        { id: false, force: true, options: "PARTITION BY LIST (city_id)" },
+        (t) => {
+          t.string("city_id", { null: false });
+          t.date("logdate", { null: false });
+          t.integer("peaktemp");
+          t.integer("unitsales");
+          t.index(["logdate", "city_id"], { unique: true });
+        },
+      );
+      await adapter.createTable("measurements_toronto", {
+        id: false,
+        force: true,
+        options: "PARTITION OF measurements FOR VALUES IN (1)",
+      });
+      await adapter.createTable("measurements_concepcion", {
+        id: false,
+        force: true,
+        options: "PARTITION OF measurements FOR VALUES IN (2)",
+      });
+    } finally {
+      klass.createUnloggedTables = previousUnloggedTables;
+    }
   }
 
   await adapter.addIndex("companies", ["firm_id", "type"], {

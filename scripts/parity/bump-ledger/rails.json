@@ -26,6 +26,14 @@
   {
     "package": "actioncable",
     "rubyFile": "subscription_adapter/redis.rb",
+    "rubyName": "ConnectionError",
+    "kind": "constant",
+    "from": "v8.0.2",
+    "to": "v8.0.5.2"
+  },
+  {
+    "package": "actioncable",
+    "rubyFile": "subscription_adapter/redis.rb",
     "rubyName": "ensure_listener_running",
     "kind": "drift",
     "from": "v8.0.2",
@@ -1025,14 +1033,6 @@
   },
   {
     "package": "activerecord",
-    "rubyFile": "fixture_set/table_row.rb",
-    "rubyName": "add_join_records",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activerecord",
     "rubyFile": "future_result.rb",
     "rubyName": "execute_or_skip",
     "kind": "drift",
@@ -1172,6 +1172,14 @@
     "rubyFile": "tasks/database_tasks.rb",
     "rubyName": "reconstruct_from_schema",
     "kind": "drift",
+    "from": "v8.0.2",
+    "to": "v8.0.5.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "tasks/database_tasks.rb",
+    "rubyName": "schema_up_to_date?",
+    "kind": "signature",
     "from": "v8.0.2",
     "to": "v8.0.5.2"
   },
@@ -1564,6 +1572,22 @@
     "rubyFile": "core_ext/enumerable.rb",
     "rubyName": "sole",
     "kind": "drift",
+    "from": "v8.0.2",
+    "to": "v8.0.5.2"
+  },
+  {
+    "package": "activesupport",
+    "rubyFile": "core_ext/object/try.rb",
+    "rubyName": "try",
+    "kind": "signature",
+    "from": "v8.0.2",
+    "to": "v8.0.5.2"
+  },
+  {
+    "package": "activesupport",
+    "rubyFile": "core_ext/object/try.rb",
+    "rubyName": "try!",
+    "kind": "signature",
     "from": "v8.0.2",
     "to": "v8.0.5.2"
   },
@@ -2028,38 +2052,6 @@
     "rubyFile": "test_unit/reporter.rb",
     "rubyName": "relative_path_for",
     "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "tasks/database_tasks.rb",
-    "rubyName": "schema_up_to_date?",
-    "kind": "signature",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "core_ext/object/try.rb",
-    "rubyName": "try",
-    "kind": "signature",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "core_ext/object/try.rb",
-    "rubyName": "try!",
-    "kind": "signature",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "actioncable",
-    "rubyFile": "subscription_adapter/redis.rb",
-    "rubyName": "ConnectionError",
-    "kind": "constant",
     "from": "v8.0.2",
     "to": "v8.0.5.2"
   }

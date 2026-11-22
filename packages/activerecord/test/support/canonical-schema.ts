@@ -339,6 +339,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.references("author_address_extra");
     t.string("organization_id");
     t.string("owned_essay_id");
+    t.integer("published_author_id");
   });
 
   await addForeignKey("authors", "author_addresses", { deferrable: "immediate" });
@@ -394,6 +395,12 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.index(["author_id", "name"], { unique: true });
     t.index("isbn", { unique: true, where: "published_on IS NOT NULL" });
     t.index("(lower(external_id))", { unique: true });
+  });
+
+  await define("book_identifiers", {}, (t) => {
+    t.references("book");
+    t.string("id_type", { null: false });
+    t.string("id_value", { null: false });
   });
 
   await define("encrypted_books", {}, (t) => {
@@ -502,6 +509,12 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("cpk_posts", { primaryKey: ["title", "author"] }, (t) => {
     t.string("title");
     t.string("author");
+  });
+
+  await define("cpk_posts_tags", {}, (t) => {
+    t.string("post_title");
+    t.string("post_author");
+    t.integer("tag_id");
   });
 
   await define("cpk_comments", {}, (t) => {
