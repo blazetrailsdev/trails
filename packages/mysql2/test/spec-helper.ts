@@ -38,10 +38,14 @@ export function specHelper(): { client: Client } {
         long_blob_test LONGBLOB, long_text_test LONGTEXT, enum_test ENUM('val1', 'val2'),
         set_test SET('val1', 'val2'), PRIMARY KEY (id)
       )`);
-    await client.query("SELECT GET_LOCK('mysql2_test', 60)");
-    await client.query("BEGIN");
-    await client.query("DELETE FROM mysql2_test;");
-    await client.query(`
+    const lock = (await client.query("SELECT GET_LOCK('mysql2_test', 60) AS l"))!.toA()[0] as {
+      l: unknown;
+    };
+    if (lock.l !== 1) throw new Error("could not acquire the mysql2_test reseed lock");
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM mysql2_test;");
+      await client.query(`
       INSERT INTO mysql2_test (
         null_test, bit_test, single_bit_test, tiny_int_test, bool_cast_test, small_int_test,
         medium_int_test, int_test, big_int_test, float_test, float_zero_test, double_test,
@@ -56,9 +60,14 @@ export function specHelper(): { client: Client } {
         "test", "test", "test", "test", "test",
         "test", "test", 'val1', 'val1,val2'
       )`);
-    await client.query("COMMIT");
-    await client.query("SELECT RELEASE_LOCK('mysql2_test')");
-    await client.close();
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      await client.query("SELECT RELEASE_LOCK('mysql2_test')");
+      await client.close();
+    }
     clients = [];
   });
   beforeEach(async () => {
