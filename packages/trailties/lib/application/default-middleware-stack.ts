@@ -26,11 +26,12 @@ import {
   Head,
   Lock,
   MethodOverride,
+  Rack,
   Runtime,
   Sendfile,
   TempfileReaper,
 } from "@blazetrails/rack";
-import { LoadError, rbFArray } from "@blazetrails/ruby-compat";
+import { LoadError, rbFArray, rbRequireLoaded as require } from "@blazetrails/ruby-compat";
 import { DatabaseSelector, ShardSelector } from "@blazetrails/activerecord";
 import { Logger } from "../rack/logger.js";
 import { SilenceRequest } from "../rack/silence-request.js";
@@ -83,8 +84,11 @@ export class DefaultMiddlewareStack {
       });
     }
 
-    /** @missingRailsCall use — CONVERGEABLE default-middleware-stack-omits-rack-cache */
-    this.loadRackCache();
+    let rackCache;
+    if ((rackCache = this.loadRackCache()) != null) {
+      require("action_dispatch/http/rack_cache");
+      stack.use(Rack.Cache as never, rackCache);
+    }
 
     if (config.allowConcurrency === false) {
       stack.use(Lock);
@@ -174,9 +178,10 @@ export class DefaultMiddlewareStack {
     if (rackCache == null || rackCache === false) return null;
 
     try {
-      throw new LoadError("cannot load such file -- rack/cache");
+      require("rack/cache");
     } catch (error) {
-      (error as LoadError).message += " Be sure to add rack-cache to your Gemfile";
+      if (!(error instanceof LoadError)) throw error;
+      error.message += " Be sure to add rack-cache to your Gemfile";
       throw error;
     }
 

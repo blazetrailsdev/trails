@@ -4,7 +4,14 @@ import {
   runLoadHooks,
   type ExecutionHook,
 } from "@blazetrails/activesupport";
-import { File, Monitor, rbClassSuperclass, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import {
+  File,
+  LoadError,
+  Monitor,
+  rbClassSuperclass,
+  rbFRequire,
+  rbObjIsKindOf,
+} from "@blazetrails/ruby-compat";
 import { Loader } from "@blazetrails/zeitwerk";
 import type { Autoloaders } from "../autoloaders.js";
 import { Initializable } from "../initializable.js";
@@ -50,6 +57,7 @@ export interface FinisherConfig {
   isReloadingEnabled(): boolean;
   isSessionStore(): unknown;
   sessionStore(newSessionStore?: unknown, options?: Record<string, unknown>): unknown;
+  actionDispatch: { rackCache: boolean | Record<string, unknown> };
 }
 
 export interface FinisherRoutesReloader {
@@ -124,7 +132,14 @@ Finisher.initializer(
   },
 );
 
-Finisher.initializer("build_middleware_stack", function (this: FinisherHost) {
+Finisher.initializer("build_middleware_stack", async function (this: FinisherHost) {
+  if (this.config.actionDispatch.rackCache) {
+    for (const feature of ["rack/cache", "action_dispatch/http/rack_cache"]) {
+      await rbFRequire(Trails.loadPath, feature).catch((e: unknown) => {
+        if (!(e instanceof LoadError)) throw e;
+      });
+    }
+  }
   this.buildMiddlewareStack();
 });
 

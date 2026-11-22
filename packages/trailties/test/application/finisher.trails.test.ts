@@ -55,6 +55,7 @@ class TestApp extends Finisher {
     },
   };
   config: FinisherConfig = {
+    actionDispatch: { rackCache: false },
     root: null,
     allowConcurrency: null,
     toPrepareBlocks: [],

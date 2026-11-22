@@ -215,8 +215,7 @@ describe("Trails::Command::MiddlewareTest", { timeout: 120_000 }, () => {
     ).not.toContain("Rack::Cache");
   });
 
-  // BLOCKED: default-middleware-stack-omits-rack-cache
-  it.skip("Rack::Cache is present when action_dispatch.rack_cache is set", async () => {
+  it("Rack::Cache is present when action_dispatch.rack_cache is set", async () => {
     await t.addToConfig("this.config.actionDispatch.rackCache = true;");
 
     await t.bootBang();
