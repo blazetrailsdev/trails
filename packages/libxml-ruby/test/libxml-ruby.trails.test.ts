@@ -64,4 +64,35 @@ describe("LibXML::XML (trails)", () => {
     expect(LibXML.XML.Error.getHandler()).toBeNull();
     LibXML.XML.Error.setHandler(LibXML.XML.Error.VERBOSE_HANDLER);
   });
+
+  it("passes an element's own namespace declarations to onStartElementNs", () => {
+    const seen: [string, string | null, string | null, Record<string, string | null>][] = [];
+    const parser = LibXML.XML.SaxParser.string('<x:a xmlns:x="u"><x:b/></x:a>');
+    parser.callbacks = {
+      ...LibXML.XML.SaxParser.Callbacks,
+      onStartElementNs: (name, _attributes, prefix, uri, namespaces) => {
+        seen.push([name, prefix, uri, namespaces]);
+      },
+    };
+    parser.parse();
+    expect(seen).toEqual([
+      ["a", "x", "u", { x: "u" }],
+      ["b", "x", "u", {}],
+    ]);
+  });
+
+  it("calls onStartDocument, onError and onEndDocument, then raises the last error", () => {
+    const result: string[] = [];
+    const parser = LibXML.XML.SaxParser.string("<Results>");
+    parser.callbacks = {
+      ...LibXML.XML.SaxParser.Callbacks,
+      onStartDocument: () => result.push("startdoc"),
+      onError: () => result.push("error"),
+      onEndDocument: () => result.push("end_document"),
+    };
+    expect(() => parser.parse()).toThrow(LibXML.XML.Error);
+    expect(result[0]).toBe("startdoc");
+    expect(result.at(-1)).toBe("end_document");
+    expect(result).toContain("error");
+  });
 });

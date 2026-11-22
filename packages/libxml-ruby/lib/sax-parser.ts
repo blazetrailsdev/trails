@@ -63,6 +63,7 @@ export class SaxParser {
     return true;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private _walk(handler: SaxCallbacks, xnode: XmlTreeNode): void {
     const LibXml2 = Nokogiri.LibXml2!;
     if (xnode instanceof LibXml2.XmlElement) {
