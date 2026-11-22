@@ -35,9 +35,9 @@ describe("TestDatabase", () => {
 
   it("prepare", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    let stmt: InstanceType<typeof SQLite3.Statement> | undefined;
+    let stmt: Awaited<ReturnType<typeof SQLite3.Statement.new>> | undefined;
     try {
-      stmt = db.prepare("select 'hello world'");
+      stmt = await db.prepare("select 'hello world'");
       expect(stmt).toBeInstanceOf(SQLite3.Statement);
     } finally {
       await stmt?.close();
@@ -54,7 +54,7 @@ describe("TestDatabase", () => {
   });
 
   it("close with open statements", async () => {
-    const s = db.prepare("select 'foo'");
+    const s = await db.prepare("select 'foo'");
     try {
       expect(() => db.close()).not.toThrow();
     } finally {

@@ -1,4 +1,11 @@
-import { ArgumentError, Enumerable, Hash, include, rbBlockGivenP } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Enumerable,
+  Hash,
+  include,
+  rbBlockGivenP,
+  rbClassNewInstance,
+} from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
 import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 import type { SqliteBindValue } from "./driver.js";
@@ -22,17 +29,29 @@ export class Statement {
   #st!: EngineStatement;
   #connection: Database;
   #columns: (string | null)[] | null;
-  readonly remainder: string;
+  remainder!: string;
 
   declare toA: () => unknown[][] | Promise<unknown[][]>;
   declare first: () => unknown[] | null | Promise<unknown[] | null>;
 
-  constructor(db: Database, sql: string) {
+  static new(db: Database, sql: string): Statement | Promise<Statement> {
+    const stmt = rbClassNewInstance(this, db, sql);
+    const remainder = stmt.prepare(db, sql);
+    if (remainder instanceof Promise) {
+      return remainder.then((r) => {
+        stmt.remainder = r;
+        return stmt;
+      });
+    }
+    stmt.remainder = remainder;
+    return stmt;
+  }
+
+  protected constructor(db: Database, sql: string) {
     if (db.isClosed()) throw new ArgumentError("prepare called on a closed database");
 
     this.#connection = db;
     this.#columns = null;
-    this.remainder = this.prepare(db, sql);
   }
 
   async execute(...bindVars: unknown[]): Promise<ResultSet> {
@@ -188,15 +207,20 @@ export class Statement {
   }
 
   /** @internal */
-  private prepare(db: Database, sql: string): string {
-    let st: EngineStatement, remainder: string;
+  private prepare(db: Database, sql: string): string | Promise<string> {
+    let prepared: [EngineStatement, string] | Promise<[EngineStatement, string]>;
     try {
-      [st, remainder] = db._engine.prepare(sql);
+      prepared = db._engine.prepare(sql);
     } catch (e) {
       rbSqlite3RaiseWithSql(e, sql, db._engine);
     }
-    this.#st = st;
-    return remainder;
+    const assign = ([st, remainder]: [EngineStatement, string]): string => {
+      this.#st = st;
+      return remainder;
+    };
+    return prepared instanceof Promise
+      ? prepared.then(assign, (e: unknown) => rbSqlite3RaiseWithSql(e, sql, db._engine))
+      : assign(prepared);
   }
 
   /** @internal */

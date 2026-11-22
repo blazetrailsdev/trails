@@ -5,11 +5,11 @@ import { engine } from "../lib/engine/better-sqlite3.js";
 
 describe("TestStatement", () => {
   let db: InstanceType<typeof SQLite3.Database>;
-  let stmt: InstanceType<typeof SQLite3.Statement>;
+  let stmt: Awaited<ReturnType<typeof SQLite3.Statement.new>>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     db = new SQLite3.Database(":memory:", { engine });
-    stmt = new SQLite3.Statement(db, "select 'foo'");
+    stmt = await SQLite3.Statement.new(db, "select 'foo'");
   });
 
   afterEach(async () => {
@@ -24,7 +24,7 @@ describe("TestStatement", () => {
   it("new closed handle", async () => {
     db = new SQLite3.Database(":memory:", { engine });
     await db.close();
-    expect(() => new SQLite3.Statement(db, 'select "foo"')).toThrow(ArgumentError);
+    expect(() => SQLite3.Statement.new(db, 'select "foo"')).toThrow(ArgumentError);
   });
 
   it("empty remainder", async () => {
@@ -42,7 +42,7 @@ describe("TestStatement", () => {
   });
 
   it("bind param string", async () => {
-    const stmt = new SQLite3.Statement(db, "select ?");
+    const stmt = await SQLite3.Statement.new(db, "select ?");
     await stmt.bindParam(1, "hello");
     let result: unknown = null;
     await stmt.each((x) => {
@@ -53,7 +53,7 @@ describe("TestStatement", () => {
   });
 
   it("bind param int", async () => {
-    const stmt = new SQLite3.Statement(db, "select ?");
+    const stmt = await SQLite3.Statement.new(db, "select ?");
     await stmt.bindParam(1, 10);
     let result: unknown = null;
     await stmt.each((x) => {
@@ -64,7 +64,7 @@ describe("TestStatement", () => {
   });
 
   it("bind nil", async () => {
-    const stmt = new SQLite3.Statement(db, "select ?");
+    const stmt = await SQLite3.Statement.new(db, "select ?");
     await stmt.bindParam(1, null);
     let result: unknown = null;
     await stmt.each((x) => {
@@ -75,7 +75,7 @@ describe("TestStatement", () => {
   });
 
   it("bind 64", async () => {
-    const stmt = new SQLite3.Statement(db, "select ?");
+    const stmt = await SQLite3.Statement.new(db, "select ?");
     await stmt.bindParam(1, 2 ** 31);
     let result: unknown = null;
     await stmt.each((x) => {
@@ -86,7 +86,7 @@ describe("TestStatement", () => {
   });
 
   it("bind double", async () => {
-    const stmt = new SQLite3.Statement(db, "select ?");
+    const stmt = await SQLite3.Statement.new(db, "select ?");
     await stmt.bindParam(1, 2.2);
     let result: unknown = null;
     await stmt.each((x) => {
@@ -97,7 +97,7 @@ describe("TestStatement", () => {
   });
 
   it("named bind", async () => {
-    const stmt = new SQLite3.Statement(db, "select :foo");
+    const stmt = await SQLite3.Statement.new(db, "select :foo");
     await stmt.bindParam(":foo", "hello");
     let result: unknown = null;
     await stmt.each((x) => {
@@ -108,7 +108,7 @@ describe("TestStatement", () => {
   });
 
   it("named bind no colon", async () => {
-    const stmt = new SQLite3.Statement(db, "select :foo");
+    const stmt = await SQLite3.Statement.new(db, "select :foo");
     await stmt.bindParam("foo", "hello");
     let result: unknown = null;
     await stmt.each((x) => {
@@ -119,7 +119,7 @@ describe("TestStatement", () => {
   });
 
   it("named bind symbol", async () => {
-    const stmt = new SQLite3.Statement(db, "select :foo");
+    const stmt = await SQLite3.Statement.new(db, "select :foo");
     await stmt.bindParam("foo", "hello");
     let result: unknown = null;
     await stmt.each((x) => {
@@ -130,7 +130,7 @@ describe("TestStatement", () => {
   });
 
   it("named bind not found", async () => {
-    const s = new SQLite3.Statement(db, "select :foo");
+    const s = await SQLite3.Statement.new(db, "select :foo");
     expect(() => s.bindParam("bar", "hello")).toThrow(SQLite3.Exception);
     await s.close();
   });

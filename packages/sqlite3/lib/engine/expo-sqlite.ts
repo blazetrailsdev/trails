@@ -5,6 +5,7 @@ import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "..
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
+import { columnText } from "./column-text.js";
 
 /** @internal */
 interface ExpoResult extends AsyncIterable<unknown[]> {
@@ -81,9 +82,40 @@ async function withBusyHandler<T>(
   }
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+async function storageClasses(
+  opening: () => Promise<ExpoDatabase>,
+  sql: string,
+  count: number,
+): Promise<unknown[][] | null> {
+  const cols = Array.from({ length: count }, (_, i) => `c${i}`);
+  let st: ExpoStatement;
+  try {
+    st = await (
+      await opening()
+    ).prepareAsync(
+      `WITH t(${cols.join(", ")}) AS (${sql.replace(/;\s*$/, "")}) ` +
+        `SELECT ${cols.map((c) => `typeof(${c})`).join(", ")} FROM t`,
+    );
+  } catch {
+    return null;
+  }
+  try {
+    const rows: unknown[][] = [];
+    for await (const row of await st.executeForRawResultAsync([])) rows.push(row);
+    return rows;
+  } finally {
+    await st.finalizeAsync();
+  }
+}
+
 /** @internal */
 function prepareStatement(
   opening: () => Promise<ExpoDatabase>,
+  prepared: Promise<ExpoStatement> | null,
   sql: string,
   empty: boolean,
   handler: () => BusyHandler | null,
@@ -91,7 +123,6 @@ function prepareStatement(
 ): EngineStatement {
   const positional: SqliteBindValue[] = [];
   const named: Record<string, SqliteBindValue> = {};
-  let prepared: Promise<ExpoStatement> | null = null;
   let names: string[] | null = empty ? [] : null;
   let rows: AsyncIterator<unknown[]> | null = null;
   let done = false;
@@ -183,11 +214,20 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
         const head = rest.slice(0, tail);
         rest = rest.slice(tail).trim();
         if (empty) continue;
-        const stmt = prepareStatement(opening, head, false, () => handler, setChanges);
+        const stmt = prepareStatement(opening, null, head, false, () => handler, setChanges);
         try {
           const names = (await stmt.columnCount()) === 0 ? [] : null;
-          for (let row = await stmt.step(); row !== null; row = await stmt.step()) {
-            const vals = row.map((v) => (v == null ? null : String(v)));
+          const types = names
+            ? null
+            : await storageClasses(opening, head, await stmt.columnCount());
+          for (let n = 0, row = await stmt.step(); row !== null; n++, row = await stmt.step()) {
+            const vals = row.map((v, i) =>
+              typeof v === "number" && types?.[n]?.[i] === "real"
+                ? columnText(v)
+                : v == null
+                  ? null
+                  : String(v),
+            );
             if (!resultsAsHash) results.push(vals);
             else {
               const keys = names ?? (await Promise.all(vals.map((_, i) => stmt.columnName(i))));
@@ -200,10 +240,19 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       }
       return results;
     },
-    prepare(sql) {
+    async prepare(sql) {
       const [tail, empty] = statementTail(sql);
+      const head = sql.slice(0, tail);
+      const prepared = empty ? null : await (await opening()).prepareAsync(head);
       return [
-        prepareStatement(opening, sql.slice(0, tail), empty, () => handler, setChanges),
+        prepareStatement(
+          opening,
+          prepared && Promise.resolve(prepared),
+          head,
+          empty,
+          () => handler,
+          setChanges,
+        ),
         sql.slice(tail),
       ];
     },

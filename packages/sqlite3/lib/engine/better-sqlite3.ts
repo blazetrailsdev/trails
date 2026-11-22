@@ -75,16 +75,22 @@ function prepareStatement(
   let done = false;
   let closed = false;
   const bound = <T>(call: (args: unknown[]) => T): T => {
-    const args: unknown[] = Array.from(positional, (v) => (v === undefined ? null : v));
-    if (Object.keys(named).length !== 0) return call([...args, named]);
+    const args: unknown[] = [];
+    const params: Record<string, unknown> = { ...named };
+    Array.from(positional, (v, i) => {
+      if (bindParameterIndex(sql, String(i + 1)) !== 0) params[i + 1] = v ?? null;
+      else args.push(v ?? null);
+    });
     for (;;) {
       try {
-        return call(args);
+        return call(Object.keys(params).length !== 0 ? [...args, params] : args);
       } catch (e) {
-        if (!(e instanceof RangeError) || !e.message.startsWith("Too few parameter values")) {
-          throw e;
-        }
-        args.push(null);
+        const missing =
+          e instanceof RangeError && /^Missing named parameter "(\d+)"/.exec(e.message);
+        if (missing) params[missing[1]] = null;
+        else if (e instanceof RangeError && e.message.startsWith("Too few parameter values")) {
+          args.push(null);
+        } else throw e;
       }
     }
   };

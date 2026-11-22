@@ -67,12 +67,22 @@ export function sharedCacheDatabase(database: string, flags: number): string {
 }
 
 /** @internal */
-function open(file: string, mode: number): DatabaseSync {
+function open(file: string, mode: number, quirks = true): DatabaseSync {
   const { DatabaseSync } = loadNodeSqlite();
-  return new DatabaseSync(sharedCacheDatabase(file, mode), {
-    readOnly: (mode & SQLite3.Constants.Open.READONLY) !== 0,
+  const { Open } = SQLite3.Constants;
+  let database = sharedCacheDatabase(file, mode);
+  if ((mode & (Open.READWRITE | Open.CREATE)) === Open.READWRITE) {
+    if (!database.startsWith("file:")) {
+      database = `file:${database.replace(/[%?#]/g, (c) => encodeURIComponent(c))}`;
+    }
+    const hash = database.indexOf("#");
+    const body = hash === -1 ? database : database.slice(0, hash);
+    database = `${body}${body.includes("?") ? "&" : "?"}mode=rw${hash === -1 ? "" : database.slice(hash)}`;
+  }
+  return new DatabaseSync(database, {
+    readOnly: (mode & Open.READONLY) !== 0,
     enableForeignKeyConstraints: false,
-    enableDoubleQuotedStringLiterals: true,
+    enableDoubleQuotedStringLiterals: quirks,
     timeout: 0,
   });
 }
@@ -165,7 +175,7 @@ function prepareStatement(
 }
 
 export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) => {
-  const raw = open(file, mode);
+  let raw = open(file, mode);
   let handler: BusyHandler | null = null;
   let changesStmt: StatementSync | null = null;
   const db: EngineDatabase = {
@@ -180,7 +190,11 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       }
       return Number((changesStmt.get() as unknown as [number])[0]);
     },
-    disableQuirkMode: () => {},
+    disableQuirkMode: () => {
+      raw.close();
+      raw = open(file, mode, false);
+      changesStmt = null;
+    },
     busyHandler: (block) => {
       handler = block;
     },

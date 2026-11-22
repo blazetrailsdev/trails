@@ -18,7 +18,7 @@ export interface EngineErrors {
 export interface EngineDatabase extends EngineErrors {
   isClosed(): boolean;
   isDiscarded(): boolean;
-  prepare(sql: string): [EngineStatement, string];
+  prepare(sql: string): [EngineStatement, string] | Promise<[EngineStatement, string]>;
   execBatch(sql: string, resultsAsHash: boolean | null): unknown[] | Promise<unknown[]>;
   changes(): number | Promise<number>;
   close(): void | Promise<void>;
@@ -92,18 +92,21 @@ export class Database {
     );
   }
 
-  prepare(sql: string): Statement;
-  prepare<T>(sql: string, block: (stmt: Statement) => T): T;
-  prepare<T>(sql: string, block?: (stmt: Statement) => T): Statement | T {
-    const stmt = new Statement(this, sql);
-    if (block === undefined) return stmt;
+  prepare(sql: string): Statement | Promise<Statement>;
+  prepare<T>(sql: string, block: (stmt: Statement) => T): T | Promise<T>;
+  prepare<T>(sql: string, block?: (stmt: Statement) => T): Statement | T | Promise<Statement | T> {
+    const prepared = Statement.new(this, sql);
+    const yieldStatement = (stmt: Statement): Statement | T => {
+      if (block === undefined) return stmt;
 
-    return rbEnsure(
-      () => block(stmt),
-      () => {
-        if (!stmt.isClosed()) return stmt.close();
-      },
-    );
+      return rbEnsure(
+        () => block(stmt),
+        () => {
+          if (!stmt.isClosed()) return stmt.close();
+        },
+      );
+    };
+    return prepared instanceof Promise ? prepared.then(yieldStatement) : yieldStatement(prepared);
   }
 
   async execute(
@@ -139,7 +142,7 @@ export class Database {
     bindVars: unknown = [],
     block?: (result: ResultSet) => T,
   ): Promise<ResultSet | Awaited<T>> {
-    const result = await this.prepare(sql).execute(bindVars);
+    const result = await (await this.prepare(sql)).execute(bindVars);
     if (block) {
       return rbEnsure(
         () => block(result),
