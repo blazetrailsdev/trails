@@ -1,0 +1,25 @@
+{
+  "name": "@blazetrails/example-homepage",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The slice of a trails blog the blazetrails.dev home page shows: one feature per framework",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@blazetrails/actionmailer": "workspace:*",
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actiontext": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activestorage": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/turbo": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5"
+  }
+}

@@ -56,7 +56,6 @@
   const cards = [
     { tag: "Learning", title: "Read the guides", body: "Walk through each framework, from models to mailers to WebSockets.", href: guides },
     { tag: "Source", title: "Browse on GitHub", body: "Read the code and the Rails source it mirrors.", href: repo },
-    { tag: "Keeping up", title: "See what’s new", body: "Recent commits to trails, as they land on main.", href: `${repo}/commits/main` },
   ];
 </script>
 
@@ -87,9 +86,17 @@
       </div>
       {#if tab === "caught"}
         <div class="pane" role="tabpanel">
-          <div class="file">app/controllers/posts-controller.ts &middot; scratch edit of examples/cloudflare-worker &middot; tsc --noEmit</div>
-          {@html data.hero.check}
-          <p class="note">A typo in an attribute name, caught before the app runs. The error is the compiler's real output for this action added to a scratch copy of the <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">cloudflare-worker example</a>.</p>
+          <div class="split">
+            <div>
+              <div class="file">app/controllers/posts-controller.ts &middot; tsc --noEmit</div>
+              {@html data.hero.check}
+            </div>
+            <div>
+              <div class="file">app/views/posts/show.html.tse &middot; trails-tsc-views build &amp;&amp; tsc</div>
+              {@html data.hero.view}
+            </div>
+          </div>
+          <p class="note">Typos in a controller and in a template, both caught before the app runs. Each error is the compiler's real output for a scratch edit of the <a href="{repo}/tree/{data.buildRef}/examples/homepage">home page example</a>.</p>
         </div>
       {:else}
         <div class="pane ai" role="tabpanel">
@@ -105,7 +112,7 @@
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
     <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby gem"} API</small>{/if}</a></li>{/each}</ul>
     <p class="small"><strong>And there are more packages besides these.</strong> The gems Rails depends on are ported alongside them.</p>
-    <p class="fine">Each percentage is the share of the upstream gem's public API names (classes, modules, methods and constants) that have a matching name in the trails package. &ldquo;Rails API&rdquo; marks a gem from the Rails repository; &ldquo;Ruby gem API&rdquo; marks one of the gems Rails depends on, such as rack, i18n or thor. &ldquo;Measured at {data.measuredAt}&rdquo; names the trails commit the figures were computed on.</p>
+    <p class="fine">Each percentage is the share of the upstream gem's public API names (classes, modules, methods and constants) that have a matching name in the trails package. &ldquo;Rails API&rdquo; marks a gem from the Rails repository; &ldquo;Ruby gem API&rdquo; marks one of the gems Rails depends on, such as rack, i18n or thor. &ldquo;Measured at {data.measuredAt}&rdquo; names the trails commit the figures were computed on. A trails app's client-side JavaScript, Turbo and Stimulus included, uses these same packages, so the code in the browser and on the server is all compatible.</p>
   </section>
 
   <section class="band">
@@ -120,11 +127,11 @@
     {#each data.blocks as b}
       <div class="block">
         <div class="code">
-          <a class="file" href={b.href}>examples/cloudflare-worker/{b.file}</a>
+          <a class="file" href={b.href}>examples/homepage/{b.file}</a>
           {@html b.html}
         </div>
         <h3>{b.title}</h3>
-        <p>{b.body}</p>
+        <p>{@html b.body}</p>
       </div>
     {/each}
   </section>
@@ -133,7 +140,7 @@
     <div class="card">
       <h2>Built for Rails developers, new and seasoned.</h2>
       <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/{data.buildRef}/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/{data.buildRef}/examples/react-native-notes">React Native app</a>. On the roadmap: the full stack running in the browser.</p>
-      <p class="small"><code>{installs.npm}</code></p>
+      <p class="small"><strong>trails and Rails apps can work side by side.</strong> In live demos, a trails app and a Rails app read each other's encrypted passwords and exchange Active Job messages across the two languages in real time.</p>
       <a class="cta" href="{base}/docs/guides/idioms">Blaze trails &rsaquo;</a>
     </div>
   </section>
@@ -161,7 +168,6 @@
       </div>
     </div>
     <p class="small">Building interactive pages? trails ports <a href="{base}/docs/packages/turbo">Turbo</a> and <a href="{base}/docs/packages/stimulus">Stimulus</a>, so your app can update its pages over the wire with server-rendered HTML and little custom JavaScript.</p>
-    <p class="small">Follow along on <a href={repo}>GitHub</a>.</p>
   </section>
 
   <footer class="foot">
@@ -169,7 +175,7 @@
       <li><a href={repo}>Source</a></li>
       <li><a href="{repo}/blob/main/LICENSES.md">License</a></li>
     </ul>
-    <p>trails is an independent TypeScript re-implementation of Ruby on Rails. The Rails trademarks are the intellectual property of David Heinemeier Hansson, and exclusively licensed to the Rails Foundation. Uses of ‘Rails’ and ‘Ruby on Rails’ in this website are for identification purposes only and do not imply an endorsement by or affiliation with Rails, the trademark owner, or the Rails Foundation.</p>
+    <p>trails is an independent TypeScript re-implementation of Ruby on Rails. The Rails trademarks are exclusively licensed to the Rails Foundation. Uses of ‘Rails’ and ‘Ruby on Rails’ in this website are for identification purposes only and do not imply an endorsement by or affiliation with Rails, the trademark owner, or the Rails Foundation.</p>
   </footer>
 </div>
 
@@ -187,7 +193,8 @@
     font: 21px/1.45 var(--sans);
     text-align: center;
   }
-  a { color: inherit; }
+  a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+  .page :global(:not(pre) > code) { font: 0.9em var(--mono); background: var(--tint); border: 1px solid #ecd9b0; border-radius: 4px; padding: 0.05em 0.35em; }
   h1, h2, h3 { font-family: var(--display); }
   h1, h2 { color: var(--orange); font-weight: 800; letter-spacing: -0.035em; margin: 0 auto 1.5rem; }
   h1 { font-size: 78px; line-height: 72px; max-width: 1200px; }
@@ -198,11 +205,9 @@
   .cta { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; font-size: 21px; }
 
   .announce { background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; padding: 8px; }
-  .announce a { text-decoration: none; }
 
   .nav { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 40px; padding: 20px 40px; }
   .nav ul { display: flex; gap: 36px; list-style: none; margin: 0; padding: 0; font-size: 16px; font-weight: 600; }
-  .nav a { text-decoration: none; }
   .left { justify-content: flex-end; }
   .mark { text-decoration: none; }
   .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--ink); }
@@ -223,6 +228,9 @@
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .fine { font-size: 15px; line-height: 1.45; max-width: 760px; margin: 1.5rem auto 0; color: #7a6450; }
   .pane { background: #3a2a1f; min-height: 380px; }
+  .split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  .split > div + div { border-left: 1px solid #4a3628; }
+  .pane .file { text-align: left; padding: 8px 22px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
   .ai { display: flex; align-items: center; justify-content: center; gap: 48px; padding: 32px 40px; }
   .meme { display: block; width: 260px; height: auto; border-radius: 8px; }
@@ -232,15 +240,16 @@
 
   .company { padding: 40px 24px 100px; }
   .tiles { display: grid; grid-template-columns: repeat(4, 220px); justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 48px 0; }
-  .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; text-decoration: none; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+  .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
   .tiles a:hover, .tiles a:focus-visible { background: var(--orange); color: #fff; transform: translateY(-2px); box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); }
   .tiles a:hover small, .tiles a:focus-visible small { color: rgb(255 255 255 / 0.85); }
   .tiles li:nth-last-child(2) { grid-column: 2; }
   .tiles small { font-size: 13px; font-weight: 500; color: #7a6450; }
 
   .band { background: var(--tint); padding: 90px 24px; }
-  .company + .band { clip-path: polygon(0 5vw, 100% 0, 100% 100%, 0 100%); padding-top: calc(90px + 5vw); }
-  .band:has(+ .start) { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5vw), 0 100%); padding-bottom: calc(90px + 5vw); }
+  .company + .band { clip-path: polygon(0 0, 100% 3vw, 100% 100%, 0 100%); padding-top: calc(90px + 3vw); }
+  .band:has(+ .start) { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - 7vw)); padding-bottom: calc(90px + 7vw); }
+  .foot { clip-path: polygon(0 4.5vw, 38% 0, 100% 1.5vw, 100% 100%, 0 100%); padding-top: calc(60px + 4.5vw) !important; }
   .card { background: #fff; max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px rgb(0 0 0 / 0.08); }
   .band > .card:first-child { margin-top: 0; }
 
@@ -248,14 +257,14 @@
   .block { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; padding-bottom: 60px; }
   .code { display: flex; flex-direction: column; }
   .code { background: #3a2a1f; border-radius: 6px; overflow: hidden; text-align: left; }
-  .file { display: block; background: #2a1e16; color: #e4d2bc; font: 13px var(--mono); text-align: center; padding: 8px; text-decoration: none; }
-  a.file:hover { text-decoration: underline; }
+  .file { display: block; background: #2a1e16; color: #e4d2bc; font: 13px var(--mono); text-align: center; padding: 8px; }
+  div.file { text-decoration: none; }
   .code :global(pre) { flex: 1; margin: 0; padding: 20px; font: 13px/1.6 var(--mono); overflow-x: auto; background: #3a2a1f !important; }
   .block p { font-size: 21px; line-height: 26px; margin: 0 auto; max-width: 500px; }
 
   .start { padding: 90px 24px; }
-  .cards { display: grid; grid-template-columns: repeat(3, 340px); justify-content: center; gap: 30px; margin-top: 40px; }
-  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); text-decoration: none; font-size: 18px; line-height: 23px; }
+  .cards { display: grid; grid-template-columns: repeat(2, 340px); justify-content: center; gap: 30px; margin-top: 40px; }
+  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); font-size: 18px; line-height: 23px; }
   .start-card strong { font-size: 26px; line-height: 31px; text-decoration: underline; text-underline-offset: 3px; }
   .tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--mango); color: var(--ink); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 10px; border-radius: 3px; }
 
@@ -282,7 +291,8 @@
     .nav ul { justify-content: center; flex-wrap: wrap; gap: 16px; }
     .tiles { grid-template-columns: repeat(2, 1fr); }
     .tiles li:nth-last-child(2) { grid-column: auto; }
-    .blocks, .cards { grid-template-columns: 1fr; }
+    .blocks, .cards, .split { grid-template-columns: 1fr; }
+    .split > div + div { border-left: 0; border-top: 1px solid #4a3628; }
     .ai { flex-direction: column; }
     .card { padding: 40px 24px; }
   }
