@@ -48,6 +48,7 @@ describe("a booted app's models are warm before user code runs", () => {
         ":method": "POST",
         ":params": { post: { title: "x" } },
         HTTP_ACCEPT: "application/json",
+        HTTP_HOST: "localhost",
       }),
     ) as Promise<RackResponse>);
     expect([status, [...(body as Iterable<string>)].join("")]).toEqual([201, '{"title":"x"}']);

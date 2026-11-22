@@ -1,4 +1,5 @@
 import { Dir } from "@blazetrails/ruby-compat";
+import { quietly } from "@blazetrails/activesupport/testing/stream";
 import { assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Base as ThorBase } from "@blazetrails/thor/shell";
@@ -180,6 +181,17 @@ describe("ApiAppGeneratorTest", () => {
 
     t.assertNoFile("config/initializers/assets.ts");
     t.assertNoFile("config/initializers/content-security-policy.ts");
+  });
+
+  it("app update does not generate unnecessary bin files", async () => {
+    await t.runGenerator();
+
+    const generator = new AppGenerator(
+      ["trails"],
+      { api: true, update: true },
+      { destinationRoot: t.destinationRoot, shell: shell },
+    );
+    await quietly(() => generator.updateBinFiles());
   });
 
   it("app update does not generate public files", async () => {

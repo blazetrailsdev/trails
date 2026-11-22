@@ -49,6 +49,10 @@ export class Engine extends TrailsEngine {
     this.isolateNamespace(ActionText);
     this.config.eagerLoadNamespaces.push(ActionText);
 
+    this.config.paths().add("db/migrate", {
+      with: File.join(import.meta.dirname, "db", "migrate"),
+    });
+
     this.config.paths().add("lib/tasks", {
       with: File.join(import.meta.dirname, "tasks"),
       glob: `*${File.extname(import.meta.filename)}`,

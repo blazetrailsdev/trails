@@ -3,6 +3,7 @@ import type { MiddlewareFactory } from "@blazetrails/actionpack";
 import {
   ActionDispatch,
   ContentSecurityPolicy,
+  HostAuthorization,
   PermissionsPolicy,
   type NonceGenerator,
 } from "@blazetrails/actionpack";
@@ -27,7 +28,15 @@ import {
   rbInspect,
   SecureRandom,
 } from "@blazetrails/ruby-compat";
-import { FileUtils, isPlainHash, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  env as ENV,
+  FileUtils,
+  type IPAddr,
+  isPlainHash,
+  rbObjId,
+  RuntimeError,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 import { LogSubscriber, reverseMergeBang, wrap } from "@blazetrails/activesupport";
 import type { DatabaseConfigModule } from "../database.js";
 import { Configuration as EngineConfiguration } from "../engine/configuration.js";
@@ -67,7 +76,14 @@ export class Configuration extends EngineConfiguration {
   filterRedirect: Array<string | RegExp> = [];
   precompileFilterParameters: boolean | null = null;
   helpersPaths: string[] = [];
-  hosts: Array<string | RegExp | ((host: string) => boolean)> = [];
+  hosts: Array<string | RegExp | IPAddr | ((host: string) => boolean)> = Trails.env.isDevelopment()
+    ? [
+        ...HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT,
+        ...stringSplit(String(ENV["TRAILS_DEVELOPMENT_HOSTS"] ?? ""), ",").map((host) =>
+          host.trim(),
+        ),
+      ]
+    : [];
   hostAuthorization: Record<string, unknown> = {};
   publicFileServer: PublicFileServer = { enabled: true, indexName: "index", headers: null };
   assumeSsl = false;

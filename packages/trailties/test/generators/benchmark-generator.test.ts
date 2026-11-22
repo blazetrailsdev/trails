@@ -67,4 +67,15 @@ for (const [name, fn] of Object.entries(reports)) {
 `);
     });
   });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("generate benchmark twice only adds ips gem once", async () => {
+    await t.runGenerator(["my_benchmark"]);
+    await t.runGenerator(["my_benchmark"]);
+
+    await t.assertFile("package.json", (content) => {
+      const occurrences = content.split('"benchmark-ips"').length - 1;
+      expect(occurrences, "Should only have benchmark-ips present once").toBe(1);
+    });
+  });
 });

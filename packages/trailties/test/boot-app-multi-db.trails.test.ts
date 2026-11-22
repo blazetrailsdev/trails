@@ -46,6 +46,7 @@ describe("a booted multi-database app's pools are warm before user code runs", (
         ":method": "POST",
         ":params": params,
         HTTP_ACCEPT: "application/json",
+        HTTP_HOST: "localhost",
       }),
     ) as Promise<RackResponse>;
   }

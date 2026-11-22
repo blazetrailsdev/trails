@@ -73,18 +73,23 @@ import "../support/isolation/abstract-unit.js";
 import * as FormTagHelper from "@blazetrails/actionview/helpers/form-tag-helper";
 import * as UrlHelper from "@blazetrails/actionview/helpers/url-helper";
 import * as AssetTagHelper from "@blazetrails/actionview/helpers/asset-tag-helper";
-import "@blazetrails/activestorage/engine";
+import { Engine as ActiveStorageEngine } from "@blazetrails/activestorage/engine";
+import { Engine as ActionTextEngine } from "@blazetrails/actiontext/engine";
+import { Attachment } from "@blazetrails/actiontext";
 import { ActiveStorage } from "@blazetrails/activestorage";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
+import { Base as ActionMailerBase, MailDeliveryJob } from "@blazetrails/actionmailer";
 import { Base as ActiveRecordBase, SchemaReflection } from "@blazetrails/activerecord";
 import { DestroyAssociationAsyncJob } from "@blazetrails/activerecord/destroy-association-async-job";
 import { CacheRequest } from "@blazetrails/actionpack";
+import { Codec } from "@blazetrails/activesupport/messages/codec";
+import { Metadata } from "@blazetrails/activesupport/messages/metadata";
 import {
   ActiveSupport,
   setUtcToLocalReturnsUtcOffsetTimes,
   utcToLocalReturnsUtcOffsetTimes,
 } from "@blazetrails/activesupport";
+import { Trailtie as ActiveSupportTrailtie } from "../../lib/trailties/active-support.js";
 import { Trailtie as ActiveRecordTrailtie } from "../../lib/trailties/active-record.js";
 import { Trailtie as ActionDispatchTrailtie } from "../../lib/trailties/action-dispatch.js";
 import * as Rack from "@blazetrails/rack";
@@ -141,6 +146,11 @@ describe("ConfigurationTest", () => {
   const actionMailer = (
     ActionMailerTrailtie.config.actionMailer as unknown as OrderedOptions
   ).toH();
+  const activeStorage = (ActiveStorageEngine.config.activeStorage as OrderedOptions).toH();
+  const actionText = (ActionTextEngine.config.actionText as OrderedOptions).toH();
+  const activeSupport = { ...ActiveSupportTrailtie.config.activeSupport };
+  const { defaultSerializer } = Codec;
+  const { useMessageSerializerForMetadata } = Metadata;
   let trailsApplication: Application | null;
 
   beforeAll(() => {
@@ -211,9 +221,23 @@ describe("ConfigurationTest", () => {
     for (const [config, snapshot] of [
       [ActiveJobTrailtie.config.activeJob, activeJob],
       [ActionMailerTrailtie.config.actionMailer, actionMailer],
+      [
+        ActiveStorageEngine.config.activeStorage,
+        {
+          ...activeStorage,
+          serviceConfigurations: ActiveStorageEngine.config.activeStorage.serviceConfigurations,
+        },
+      ],
+      [ActionTextEngine.config.actionText, actionText],
     ] as const) {
       (config as unknown as OrderedOptions).clear().update(snapshot);
     }
+    for (const key of Object.keys(ActiveSupportTrailtie.config.activeSupport)) {
+      delete (ActiveSupportTrailtie.config.activeSupport as Record<string, unknown>)[key];
+    }
+    Object.assign(ActiveSupportTrailtie.config.activeSupport, activeSupport);
+    Codec.defaultSerializer = defaultSerializer;
+    Metadata.useMessageSerializerForMetadata = useMessageSerializerForMetadata;
     setUtcToLocalReturnsUtcOffsetTimes(false);
     ActionMailerBase.smtpSettings = smtpSettings;
     setEnv("TRAILS_ENV", trailsEnv);
@@ -2058,5 +2082,259 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     await (await app("development")).initializeBang();
 
     assertNil(ActiveStorage.queues.analysis);
+  });
+
+  it("ActiveStorage.queues[:purge] is :active_storage_purge by default in 6.0", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.0");
+    await application.initializeBang();
+
+    expect(ActiveStorage.queues.purge).toBe("active_storage_purge");
+  });
+
+  it("ActiveStorage.queues[:purge] is nil by default in 6.1", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.1");
+    await application.initializeBang();
+
+    assertNil(ActiveStorage.queues.purge);
+  });
+
+  it("ActiveStorage.queues[:purge] is nil without Rails 6 defaults", async () => {
+    await (await app("development")).initializeBang();
+
+    assertNil(ActiveStorage.queues.purge);
+  });
+
+  it("ActiveStorage.queues[:mirror] is nil without Rails 6 defaults", async () => {
+    await (await app("development")).initializeBang();
+
+    assertNil(ActiveStorage.queues.mirror);
+  });
+
+  it("ActiveStorage.queues[:mirror] is nil by default", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    assertNil(ActiveStorage.queues.mirror);
+  });
+
+  it("action_text.config.attachment_tag_name is 'action-text-attachment' with Rails 6 defaults", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.1");
+    await application.initializeBang();
+
+    expect(Attachment.tagName).toBe("action-text-attachment");
+  });
+
+  it("action_text.config.attachment_tag_name is 'action-text-attachment' without defaults", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(Attachment.tagName).toBe("action-text-attachment");
+  });
+
+  it("action_text.config.attachment_tag_name is can be overridden", async () => {
+    const application = await app("development");
+    application.config.actionText.attachmentTagName = "link";
+    await application.initializeBang();
+
+    expect(Attachment.tagName).toBe("link");
+  });
+
+  it("ActionMailer::Base.delivery_job is ActionMailer::MailDeliveryJob by default", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActionMailerBase.deliveryJob).toBe(MailDeliveryJob);
+  });
+
+  it("hosts include .localhost in development", async () => {
+    await (await app("development")).initializeBang();
+    expect(Trails.application!.config.hosts).toContain(".localhost");
+  });
+
+  it("hosts include .test in development", async () => {
+    await (await app("development")).initializeBang();
+    expect(Trails.application!.config.hosts).toContain(".test");
+  });
+
+  it("hosts reads multiple values from RAILS_DEVELOPMENT_HOSTS", async () => {
+    const host = "agoodhost.com";
+    const anotherHost = "bananapants.com";
+    await envHelpers.switchEnv(
+      "TRAILS_DEVELOPMENT_HOSTS",
+      [host, anotherHost].join(","),
+      async () => {
+        await (await app("development")).initializeBang();
+        expect(Trails.application!.config.hosts).toContain(host);
+        expect(Trails.application!.config.hosts).toContain(anotherHost);
+      },
+    );
+  });
+
+  it("hosts reads multiple values from RAILS_DEVELOPMENT_HOSTS and trims white space", async () => {
+    const host = "agoodhost.com";
+    const hostWithWhiteSpace = `  ${host} `;
+    const anotherHost = "bananapants.com";
+    const anotherHostWithWhiteSpace = `     ${anotherHost}`;
+    await envHelpers.switchEnv(
+      "TRAILS_DEVELOPMENT_HOSTS",
+      [hostWithWhiteSpace, anotherHostWithWhiteSpace].join(","),
+      async () => {
+        await (await app("development")).initializeBang();
+        expect(Trails.application!.config.hosts).toContain(host);
+        expect(Trails.application!.config.hosts).toContain(anotherHost);
+      },
+    );
+  });
+
+  it("hosts reads from RAILS_DEVELOPMENT_HOSTS", async () => {
+    const host = "agoodhost.com";
+    await envHelpers.switchEnv("TRAILS_DEVELOPMENT_HOSTS", host, async () => {
+      await (await app("development")).initializeBang();
+      expect(Trails.application!.config.hosts).toContain(host);
+    });
+  });
+
+  it("hosts does not read from RAILS_DEVELOPMENT_HOSTS in production", async () => {
+    const host = "agoodhost.com";
+    await envHelpers.switchEnv("TRAILS_DEVELOPMENT_HOSTS", host, async () => {
+      await app("production");
+      expect(Trails.application!.config.hosts).not.toContain(host);
+    });
+  });
+
+  it("disable_sandbox is false by default", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(Trails.configuration!.disableSandbox).toBe(false);
+  });
+
+  it("disable_sandbox can be overridden", async () => {
+    const application = await app("development");
+    application.config.disableSandbox = true;
+    await application.initializeBang();
+
+    expect(Trails.configuration!.disableSandbox).toBeTruthy();
+  });
+
+  it("rake_eager_load is false by default", async () => {
+    await (await app("development")).initializeBang();
+    expect(Trails.application!.config.rakeEagerLoad).toBe(false);
+  });
+
+  it("rake_eager_load is set correctly", async () => {
+    const application = await app("development");
+    application.config.setRoot(appPath);
+    application.config.rakeEagerLoad = true;
+    await application.initializeBang();
+
+    expect(Trails.application!.config.rakeEagerLoad).toBe(true);
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)"
+  it.skip("unknown_asset_fallback is false by default", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(
+      (Trails.application!.config as unknown as { assets: { unknownAssetFallback: unknown } })
+        .assets.unknownAssetFallback,
+    ).toBe(false);
+  });
+
+  it("ActiveStorage.video_preview_arguments uses the old arguments without Rails 7 defaults", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveStorage.videoPreviewArguments).toBe("-y -vframes 1 -f image2");
+  });
+
+  it("ActiveStorage.video_preview_arguments uses the new arguments by default", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(ActiveStorage.videoPreviewArguments).toBe(
+      "-vf 'select=eq(n\\,0)+eq(key\\,1)+gt(scene\\,0.015),loop=loop=-1:size=2,trim=start_frame=1' -frames:v 1 -f image2",
+    );
+  });
+
+  it("ActiveStorage.variant_processor uses mini_magick without Rails 7 defaults", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveStorage.variantProcessor).toBe("mini_magick");
+  });
+
+  it("ActiveStorage.variant_processor uses vips by default", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(ActiveStorage.variantProcessor).toBe("vips");
+  });
+
+  it("ActiveStorage.supported_image_processing_methods can be configured via config.active_storage.supported_image_processing_methods", async () => {
+    const application = await app("development");
+    application.config.activeStorage.supportedImageProcessingMethods = ["write", "set"];
+    await application.initializeBang();
+
+    expect(ActiveStorage.supportedImageProcessingMethods.includes("write")).toBeTruthy();
+    expect(ActiveStorage.supportedImageProcessingMethods.includes("set")).toBeTruthy();
+  });
+
+  it("ActiveStorage.unsupported_image_processing_arguments can be configured via config.active_storage.unsupported_image_processing_arguments", async () => {
+    const application = await app("development");
+    application.config.activeStorage.unsupportedImageProcessingArguments = ["-write", "-danger"];
+    await application.initializeBang();
+
+    expect(
+      (ActiveStorage.unsupportedImageProcessingArguments as string[]).includes("-danger"),
+    ).toBeTruthy();
+    expect(
+      (ActiveStorage.unsupportedImageProcessingArguments as string[]).includes("-set"),
+    ).toBeFalsy();
+  });
+
+  it("ActiveSupport::Messages::Codec.default_serializer is :json_allow_marshal by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(Codec.defaultSerializer).toBe("json_allow_marshal");
+  });
+
+  it("ActiveSupport::Messages::Codec.default_serializer is :marshal by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(Codec.defaultSerializer).toBe("marshal");
+  });
+
+  it("ActiveSupport::Messages::Codec.default_serializer can be configured via config.active_support.message_serializer", async () => {
+    const application = await app("development");
+    application.config.activeSupport.messageSerializer = ":json_allow_marshal";
+    await application.initializeBang();
+
+    expect(Codec.defaultSerializer).toBe("json_allow_marshal");
+  });
+
+  it("ActiveSupport::Messages::Metadata.use_message_serializer_for_metadata is true by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(Metadata.useMessageSerializerForMetadata).toBeTruthy();
+  });
+
+  it("ActiveSupport::Messages::Metadata.use_message_serializer_for_metadata is false by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(Metadata.useMessageSerializerForMetadata).toBeFalsy();
+  });
+
+  it("ActiveSupport::Messages::Metadata.use_message_serializer_for_metadata can be configured via config.active_support.use_message_serializer_for_metadata", async () => {
+    const application = await app("development");
+    application.config.activeSupport.useMessageSerializerForMetadata = true;
+    await application.initializeBang();
+
+    expect(Metadata.useMessageSerializerForMetadata).toBeTruthy();
   });
 });
