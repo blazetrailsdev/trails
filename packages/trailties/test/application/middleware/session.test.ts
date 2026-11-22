@@ -3,11 +3,18 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
-import { ActionController, Flash, type FlashHash } from "@blazetrails/actionpack";
+import {
+  ActionController,
+  Flash,
+  type FlashHash,
+  type MiddlewareStack,
+} from "@blazetrails/actionpack";
 import { Methods } from "@blazetrails/rack-test";
 import {
   FileUtils,
   Marshal,
+  env as ENV,
+  setEnv,
   hashAref,
   TopLevel,
   constSet,
@@ -249,7 +256,7 @@ describe("MiddlewareSessionTest", { timeout: 120_000 }, () => {
     const cipher = "aes-256-gcm";
     const secret = t.app().keyGenerator().generateKey("authenticated encrypted cookie");
     const encryptor = new MessageEncryptor(
-      secret.subarray(0, MessageEncryptor.keyLen(cipher)),
+      Buffer.from(secret.subarray(0, MessageEncryptor.keyLen(cipher))),
       null,
       { cipher },
     );
@@ -289,7 +296,7 @@ describe("MiddlewareSessionTest", { timeout: 120_000 }, () => {
     const cipher = "aes-256-gcm";
     const secret = t.app().keyGenerator().generateKey("authenticated encrypted cookie");
     const encryptor = new MessageEncryptor(
-      secret.subarray(0, MessageEncryptor.keyLen(cipher)),
+      Buffer.from(secret.subarray(0, MessageEncryptor.keyLen(cipher))),
       null,
       { cipher, serializer: Marshal },
     );
@@ -328,7 +335,7 @@ describe("MiddlewareSessionTest", { timeout: 120_000 }, () => {
     const cipher = "aes-256-gcm";
     const secret = t.app().keyGenerator().generateKey("authenticated encrypted cookie");
     const encryptor = new MessageEncryptor(
-      secret.subarray(0, MessageEncryptor.keyLen(cipher)),
+      Buffer.from(secret.subarray(0, MessageEncryptor.keyLen(cipher))),
       null,
       { cipher, serializer: Marshal },
     );
@@ -413,7 +420,7 @@ describe("MiddlewareSessionTest", { timeout: 120_000 }, () => {
       const cipher = "aes-256-gcm";
       const secret = t.app().keyGenerator().generateKey("authenticated encrypted cookie");
       const encryptor = new MessageEncryptor(
-        secret.subarray(0, MessageEncryptor.keyLen(cipher)),
+        Buffer.from(secret.subarray(0, MessageEncryptor.keyLen(cipher))),
         null,
         { cipher, serializer: Marshal },
       );
@@ -457,7 +464,7 @@ describe("MiddlewareSessionTest", { timeout: 120_000 }, () => {
     expect(t.lastResponse().status).toBe(200);
     expect(t.lastResponse().body).toBe("It worked!");
 
-    expect(Trails.application!.middleware.includes(Flash)).toBe(false);
+    expect((Trails.application!.middleware as MiddlewareStack).includes(Flash)).toBe(false);
   });
 
   it("disabled session allows reads and delete but fail on writes", async () => {
