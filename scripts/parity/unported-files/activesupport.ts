@@ -143,7 +143,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "concurrency/load_interlock_aware_monitor_test.rb",
-    tests: ["entering with no blocking", "entering with blocking", "lock owned by thread"],
+    tests: ["lock owned by thread"],
     reason:
       "LoadInterlockAwareMonitor#synchronize hands the GVL back to the autoload interlock " +
       "while a second `Thread` contends for the monitor " +

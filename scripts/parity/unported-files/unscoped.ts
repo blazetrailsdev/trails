@@ -16,18 +16,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       'is the native promise".',
   },
   {
-    testFile: "relation/load_async_test.rb",
-    className: "LoadAsyncTest",
-    tests: ["load async instrumentation is thread safe"],
-    reason:
-      "Parks a thread inside the connection's `log` on a Concurrent::CountDownLatch " +
-      "(load_async_test.rb:161-195) while a second thread runs `Post.count`. A JS " +
-      "event loop has no thread to block, and trails' adapter monitor serializes " +
-      "the two statements, so the interleaving the test asserts cannot occur. " +
-      "Every other case in the file asserts the Relation#load_async surface and " +
-      "is enrolled in relation/load-async.test.ts.",
-  },
-  {
     testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: ["omap fixtures"],

@@ -19,6 +19,7 @@ describe("TrimJobTest", () => {
 
   it("trims a limited number of messages", async () => {
     vi.spyOn(SolidCable, "trimChance").mockReturnValue(99.999);
+    vi.spyOn(Math, "random").mockReturnValue(0);
     await withCableConfig({ trimBatchSize: 2, messageRention: "1.second" }, async () => {
       for (let i = 0; i < 4; i++) {
         await Message.broadcast("foo", "bar");

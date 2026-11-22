@@ -807,6 +807,7 @@ export default defineConfig({
           globalSetup: [
             "./packages/activerecord/test/support/template-global-setup.ts",
             "./packages/actiontext/test/support/local-secret.ts",
+            "./packages/turbo/test/support/local-secret.ts",
           ],
           pool: "forks",
           browser: { enabled: false, screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
