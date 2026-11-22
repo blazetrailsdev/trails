@@ -40,6 +40,8 @@ const defaultOutput: LoggerOutput = {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerSilence` (`logger.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
 export class Logger extends RubyLogger {
   declare static silencer: boolean;
+  /** @internal */
+  declare protected localLevelKey: symbol;
 
   static isLoggerOutputsTo(logger: Logger | BroadcastLogger, ...sources: unknown[]): boolean {
     const loggers: (Logger | BroadcastLogger)[] =
@@ -55,6 +57,7 @@ export class Logger extends RubyLogger {
     );
   }
 
+  /** @inlinedFrom ActiveSupport::LoggerThreadSafeLevel#initialize rails/v8.0.5.2/activesupport/lib/active_support/logger_thread_safe_level.rb:10-13 */
   constructor(
     logdev: Logdev = defaultOutput,
     shiftAge?: number | string | LoggerKwargs,
@@ -62,6 +65,7 @@ export class Logger extends RubyLogger {
     kwargs?: LoggerKwargs,
   ) {
     super(logdev, shiftAge, shiftSize, kwargs);
+    this.localLevelKey = Symbol("loggerThreadSafeLevel");
     this.formatter ??= new SimpleFormatter();
   }
 

@@ -10,12 +10,8 @@ function inspect(value: unknown): string {
 
 /** @internal */
 export class LoggerThreadSafeLevel {
-  declare private _localLevelKey?: symbol;
-
   /** @internal */
-  protected get localLevelKey(): symbol {
-    return (this._localLevelKey ??= Symbol("loggerThreadSafeLevel"));
-  }
+  declare protected localLevelKey: symbol;
 
   get localLevel(): number | null {
     return IsolatedExecutionState.get<number>(this.localLevelKey) ?? null;
