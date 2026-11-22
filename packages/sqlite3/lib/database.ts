@@ -345,7 +345,11 @@ export class Database {
 
   /** @internal */
   private loadExtensionInternal(file: string): void {
-    this._engine.loadExtensionInternal(file);
+    try {
+      this._engine.loadExtensionInternal(file);
+    } catch (e) {
+      rbSqlite3Raise(e, this._engine);
+    }
   }
 
   /** @internal */

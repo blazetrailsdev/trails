@@ -118,6 +118,13 @@ describe("TestDatabase", () => {
     expect(mocked.loadExtensionInternalPath).toEqual(["/path/to/extension"]);
   });
 
+  it("load extension error with nonexistent path", () => {
+    db.enableLoadExtension(true);
+
+    expect(() => db.loadExtension("/nonexistent/path")).toThrow(SQLite3.Exception);
+    expect(() => db.loadExtension(new Pathname("nonexistent"))).toThrow(SQLite3.Exception);
+  });
+
   it("load extension error with invalid argument", () => {
     db.enableLoadExtension(true);
 
