@@ -5,7 +5,8 @@
   "type": "module",
   "description": "The slice of a trails blog the blazetrails.dev home page shows: one feature per framework",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check:hero": "node scripts/check-hero.mjs"
   },
   "dependencies": {
     "@blazetrails/actionmailer": "workspace:*",
@@ -17,9 +18,11 @@
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trailties": "workspace:*",
     "@blazetrails/turbo": "workspace:*"
   },
   "devDependencies": {
+    "@blazetrails/trails-tsc": "workspace:*",
     "@types/node": "^25.3.5"
   }
 }

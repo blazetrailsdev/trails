@@ -158,6 +158,7 @@ export default defineConfig(
   {
     ignores: [
       "vendor/**",
+      "examples/homepage/hero/**",
       "**/dist/**",
       "**/*.tt.js",
       "packages/thor/test/fixtures/doc/*.rb.js",

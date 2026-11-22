@@ -198,10 +198,16 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../../packages/ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../../packages/trailties
       '@blazetrails/turbo':
         specifier: workspace:*
         version: link:../../packages/turbo
     devDependencies:
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../../packages/trails-tsc
       '@types/node':
         specifier: ^25.3.5
         version: 25.3.5

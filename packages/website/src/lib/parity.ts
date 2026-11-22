@@ -124,7 +124,7 @@ export async function loadParity(root = REPO_ROOT): Promise<ParityData> {
     const source =
       counterpart === null
         ? null
-        : (lock?.sources[counterpart] ??
+        : (lock?.sources[entry?.vendorSource ?? counterpart] ??
           (RAILS_FRAMEWORKS.has(counterpart) ? lock?.sources.rails : null));
     packages.push({
       name: dir,

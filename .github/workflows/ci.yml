@@ -2183,6 +2183,8 @@ jobs:
         run: pnpm --filter @blazetrails/website exec vite build
       - name: Build docs (typedoc + VitePress)
         run: pnpm --filter @blazetrails/website run docs:build
+      - name: Check the home page hero's compiler errors
+        run: pnpm --filter @blazetrails/example-homepage check:hero
 
   rails-comparison:
     name: Rails API/Test Comparison
