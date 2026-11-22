@@ -1,4 +1,4 @@
-import { Dir, File, getFs } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
 
 export interface EntryMeta {
   mtime: number;
@@ -26,8 +26,7 @@ export class Entry {
   }
 
   async meta(): Promise<EntryMeta> {
-    const fs = getFs();
-    const lstat = fs.lstat ? await fs.lstat(this.sysPath()) : fs.lstatSync(this.sysPath());
+    const lstat = await File.lstatAsync(this.sysPath());
     return { mtime: lstat.mtime.getTime() / 1000, mode: lstat.mode, size: lstat.size };
   }
 
@@ -49,6 +48,6 @@ export class Entry {
   }
 
   private async _entries(dir: string): Promise<string[]> {
-    return await Dir.childrenAsync(dir);
+    return await Dir.entriesAsync(dir);
   }
 }

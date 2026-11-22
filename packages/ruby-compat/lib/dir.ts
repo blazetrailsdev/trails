@@ -488,6 +488,17 @@ export class Dir {
   }
 
   /**
+   * `Dir.entries` (`vendor/ruby/v3.3.11/dir.c:3324` `dir_entries`): `"."` and
+   * `".."` ahead of the entries {@link Dir.childrenAsync} answers, over the
+   * backend's async `readdir`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.entries` (`vendor/ruby/v3.3.11/dir.c:3324`).
+   */
+  static async entriesAsync(dirname: string): Promise<string[]> {
+    return [".", "..", ...(await Dir.childrenAsync(dirname))];
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/dir.c:3288` `dir_foreach`, which yields `"."` and `".."`
    * ahead of the entries `Dir.children` answers — the two `dir_each` reads
    * out of the directory stream and `dir_each_entry` filters only for

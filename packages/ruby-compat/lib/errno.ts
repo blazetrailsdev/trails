@@ -447,28 +447,6 @@ class ETIMEDOUT extends SystemCallError {
 }
 
 /**
- * `Errno::EHOSTDOWN`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
- * as {@link ENOTTY} is: the host's own error carrying `code: "EHOSTDOWN"` is this
- * class to `rescue Errno::EHOSTDOWN`.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Errno::EHOSTDOWN`.
- */
-class EHOSTDOWN extends SystemCallError {
-  static readonly Errno = 112;
-  readonly code = "EHOSTDOWN";
-
-  constructor(mesg?: string) {
-    super(mesg == null ? "Host is down" : `Host is down - ${mesg}`);
-    this.name = "Errno::EHOSTDOWN";
-    this.errno = EHOSTDOWN.Errno;
-  }
-
-  static [Symbol.hasInstance](error: unknown): boolean {
-    return (error as { code?: unknown } | null | undefined)?.code === "EHOSTDOWN";
-  }
-}
-
-/**
  * `Errno::EHOSTUNREACH`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
  * as {@link ENOTTY} is: the host's own error carrying `code: "EHOSTUNREACH"` is this
  * class to `rescue Errno::EHOSTUNREACH`.
@@ -527,7 +505,6 @@ export const Errno = {
   ECONNREFUSED,
   ECONNRESET,
   EEXIST,
-  EHOSTDOWN,
   EHOSTUNREACH,
   EINTR,
   EINVAL,

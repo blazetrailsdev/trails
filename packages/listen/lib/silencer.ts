@@ -32,11 +32,11 @@ export class Silencer {
   }
 
   private _isIgnore(path: string): boolean {
-    return this.ignorePatterns.some((pattern) => pattern.test(path));
+    return this.ignorePatterns.some((pattern) => path.search(pattern) !== -1);
   }
 
   private _isOnly(path: string): boolean {
-    return this.onlyPatterns!.some((pattern) => pattern.test(path));
+    return this.onlyPatterns!.some((pattern) => path.search(pattern) !== -1);
   }
 
   private _initIgnores(

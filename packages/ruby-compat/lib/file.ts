@@ -522,6 +522,17 @@ export class File extends IO {
   }
 
   /**
+   * `File.lstat` (`vendor/ruby/v3.3.11/file.c:1404` `rb_file_s_lstat`) over the
+   * backend's async `lstat`, or its `lstatSync`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.lstat` (`vendor/ruby/v3.3.11/file.c:1404`).
+   */
+  static async lstatAsync(fileName: string): Promise<FsStatResult> {
+    const fs = getFs();
+    return fs.lstat ? await fs.lstat(fileName) : fs.lstatSync(fileName);
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:1305` `rb_file_s_size` — the byte size of the named
    * file, which is `File.stat(file_name).size`.
    *

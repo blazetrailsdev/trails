@@ -57,7 +57,7 @@ export class Record {
 
     const result: { [key: string]: FileData } = {};
     for (const [key, values] of subtree) {
-      if (values != null && typeof values === "object") {
+      if (values != null && typeof values === "object" && !Array.isArray(values)) {
         result[key] = "mtime" in values ? values : {};
       }
     }
