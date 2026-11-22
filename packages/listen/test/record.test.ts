@@ -52,7 +52,7 @@ describe("Listen::Record", () => {
     });
 
     it("sets itself when nil", () => {
-      record.addDir({ toString: () => "" });
+      record.addDir(null);
       expect(recordTree(record)).toEqual({});
     });
 

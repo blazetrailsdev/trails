@@ -21,9 +21,9 @@ export class Record {
     this._silencer = silencer;
   }
 
-  addDir(relPath: { toString(): string }): FileData | undefined {
-    if (!this.isEmptyDirname(relPath.toString())) {
-      return this._tree.get(relPath.toString());
+  addDir(relPath: { toString(): string } | null): FileData | undefined {
+    if (!this.isEmptyDirname((relPath ?? "").toString())) {
+      return this._tree.get((relPath ?? "").toString());
     }
     return undefined;
   }
