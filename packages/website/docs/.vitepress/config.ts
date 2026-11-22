@@ -125,6 +125,10 @@ export default defineConfig({
             },
             { text: "Internationalization (I18n) API", link: "/guides/i18n" },
             { text: "The Trails Initialization Process", link: "/guides/initialization" },
+            {
+              text: "Working with JavaScript in Trails",
+              link: "/guides/working-with-javascript-in-rails",
+            },
           ],
         },
         {
@@ -138,11 +142,19 @@ export default defineConfig({
               link: "/guides/generators",
             },
             { text: "Trails Application Templates", link: "/guides/rails-application-templates" },
+            {
+              text: "Threading and Code Execution in Trails",
+              link: "/guides/threading-and-code-execution",
+            },
           ],
         },
         {
           text: "Going to Production",
           items: [
+            {
+              text: "Tuning Performance for Deployment",
+              link: "/guides/tuning-performance-for-deployment",
+            },
             { text: "Caching with Trails: An Overview", link: "/guides/caching-with-rails" },
             { text: "Error Reporting in Trails Applications", link: "/guides/error-reporting" },
             { text: "Securing Trails Applications", link: "/guides/security" },
