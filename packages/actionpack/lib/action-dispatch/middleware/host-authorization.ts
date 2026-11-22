@@ -108,6 +108,7 @@ type RackApp =
   | { call(env: RackEnv): Promise<RackResponse> };
 
 export class HostAuthorization {
+  static ALLOWED_HOSTS_IN_DEVELOPMENT = ALLOWED_HOSTS_IN_DEVELOPMENT;
   private app: RackApp | { call: RackApp };
   private permissions: Permissions;
   private exclude?: (request: Request) => boolean;
