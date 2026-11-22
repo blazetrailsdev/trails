@@ -147,7 +147,7 @@ describe("Rack::Cache::Context", () => {
     expect(H.response!.isOk).toBeTruthy();
     expect(H.cache!.trace).toContain("store");
     expect(H.cache!.trace).toContain("ignore");
-    expect(H.response!.headers["set-cookie"] == null).toBeTruthy();
+    expect(H.response!.headers["set-cookie"]).toBeUndefined();
   });
 
   it("does remove all configured ignore_headers from a cacheable response", async () => {
@@ -163,8 +163,8 @@ describe("Rack::Cache::Context", () => {
     expect(H.response!.isOk).toBeTruthy();
     expect(H.cache!.trace).toContain("store");
     expect(H.cache!.trace).toContain("ignore");
-    expect(H.response!.headers["set-cookie"] == null).toBeTruthy();
-    expect(H.response!.headers["x-strip-me"] == null).toBeTruthy();
+    expect(H.response!.headers["set-cookie"]).toBeUndefined();
+    expect(H.response!.headers["x-strip-me"]).toBeUndefined();
   });
 
   it("does not remove set-cookie response header from a private response", async () => {
