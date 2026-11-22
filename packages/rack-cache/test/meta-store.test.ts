@@ -8,7 +8,7 @@ import { MetaStore } from "../lib/meta-store.js";
 import { Request } from "../lib/request.js";
 import { Response } from "../lib/response.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ruby's duck-typed @store / @entity_store
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Store = any;
 
 export function rackCacheMetaStoreImplementation(
