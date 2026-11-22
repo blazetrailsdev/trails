@@ -1,4 +1,3 @@
-import { currentAdapter } from "../support/adapter-helper.js";
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "../../lib/index.js";
@@ -11,6 +10,7 @@ import { describeIfSupports, itIfSupports } from "../support/supports.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { Entrant } from "../models/entrant.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 
 fixtures({}, { useTransactionalTests: false });
 

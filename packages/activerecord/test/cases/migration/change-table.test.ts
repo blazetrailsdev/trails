@@ -1,6 +1,6 @@
-import { currentAdapter } from "../../support/adapter-helper.js";
 import { describe, it, expect, expect as vitestExpect } from "vitest";
 import { assertNot } from "@blazetrails/activesupport/testing/assertions";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Table } from "../../../lib/connection-adapters/abstract/schema-definitions.js";
 import {

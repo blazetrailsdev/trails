@@ -1,7 +1,7 @@
-import { currentAdapter } from "../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../../../lib/base.js";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 
 let adapter: SQLite3Adapter;
 

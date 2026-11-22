@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { StandardError } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "../../../../lib/index.js";
@@ -25,6 +24,7 @@ import {
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { newSqlitePool } from "../../../support/pooled-sqlite-adapter.js";
 import * as DdlHelper from "../../../support/ddl-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { NullPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
 import { StatementInvalid, StatementTimeout } from "../../../../lib/errors.js";
 import { BusyException } from "@blazetrails/sqlite3";

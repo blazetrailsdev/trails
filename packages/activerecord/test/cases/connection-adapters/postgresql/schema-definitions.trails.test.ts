@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
 import { ColumnDefinition } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
@@ -18,6 +17,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../../../../lib/base.js";
 import { PostgreSQLAdapter } from "../../../../lib/connection-adapters/postgresql-adapter.js";
 import type { TableDefinitionConn } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 let leased: TableDefinitionConn;
 

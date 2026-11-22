@@ -1,8 +1,8 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
 import "../../../../lib/index.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 function copyTable(conn: any, from: string, to: string, options: Record<string, unknown> = {}) {
   return conn.copyTable(from, to, { temporary: true, ...options });

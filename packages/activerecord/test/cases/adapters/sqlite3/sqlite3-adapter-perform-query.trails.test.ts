@@ -1,10 +1,10 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../../../../lib/base.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { ReadOnlyError } from "../../../../lib/errors.js";
 import { Result } from "../../../../lib/result.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 let adapter: SQLite3Adapter;
 

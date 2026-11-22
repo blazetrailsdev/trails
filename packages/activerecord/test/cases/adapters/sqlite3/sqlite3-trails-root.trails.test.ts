@@ -1,10 +1,10 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, afterEach, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { setTrailsRoot } from "@blazetrails/activesupport";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3 Trails.root path resolution", () => {
   afterEach(() => setTrailsRoot(null));

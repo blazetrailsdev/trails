@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { SQLite3 } from "@blazetrails/sqlite3";
 import { describe, it, expect } from "vitest";
 import { assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
@@ -6,6 +5,7 @@ import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adap
 import { Rollback, TransactionIsolationError } from "../../../../lib/errors.js";
 import { inMemoryDb } from "../../../support/adapter-helper.js";
 import { ambientPoolConfiguration } from "../../../support/test-adapter.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 function sharedCacheFlags(): number {
   return (

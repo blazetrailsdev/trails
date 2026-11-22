@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { quotingHost } from "../../../support/quoting-host.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
@@ -6,6 +5,7 @@ import { Rational, TypeError } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { DateTime as ARDateTimeType } from "../../../../lib/type/date-time.js";
 import { TypeMap } from "../../../../lib/type/type-map.js";

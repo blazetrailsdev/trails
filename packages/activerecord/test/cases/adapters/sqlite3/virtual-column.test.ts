@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { File as FixtureFile } from "../../../../lib/fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../../config.js";
@@ -10,6 +9,7 @@ import { itIfSupports } from "../../../support/supports.js";
 import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../../../lib/connection-adapters/sqlite3/column.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

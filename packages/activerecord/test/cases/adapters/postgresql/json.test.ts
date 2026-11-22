@@ -1,9 +1,9 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import "../../../../lib/index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { jsonSharedTestCases, JsonDataType as klass } from "../../json-shared-test-cases.js";
 import type { AbstractAdapter } from "../../../../lib/connection-adapters/abstract-adapter.js";
 import type { TableDefinition } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";

@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -19,6 +18,7 @@ import "../../../../lib/tasks/sqlite-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
 import { Base } from "../../../../lib/base.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 function tmpDbPath(): string {
   return path.join(os.tmpdir(), `db_create-${randomUUID()}.sqlite3`);

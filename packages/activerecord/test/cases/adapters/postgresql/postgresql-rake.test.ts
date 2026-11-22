@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
 import {
   getOsAsync,
@@ -11,6 +10,7 @@ import "../../../../lib/tasks/postgresql-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
 import { ARUNIT_DATABASE } from "../../../support/config.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { DatabaseAlreadyExists } from "../../../../lib/errors.js";
 import { Base } from "../../../../lib/base.js";
 import { dumpSchemas, setDumpSchemas } from "../../../../lib/active-record.js";

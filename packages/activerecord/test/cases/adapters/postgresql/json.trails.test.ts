@@ -1,8 +1,8 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import "../../../../lib/index.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { JsonDataType as klass } from "../../json-shared-test-cases.js";
 import type { AbstractAdapter } from "../../../../lib/connection-adapters/abstract-adapter.js";
 import type { TableDefinition } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";

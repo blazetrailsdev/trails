@@ -1,6 +1,6 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, afterEach } from "vitest";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3StatementPoolTest", () => {
   const openAdapters: SQLite3Adapter[] = [];

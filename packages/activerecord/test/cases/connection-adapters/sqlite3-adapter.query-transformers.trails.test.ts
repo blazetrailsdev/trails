@@ -1,8 +1,8 @@
-import { currentAdapter } from "../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "../../../lib/base.js";
 import { fixtures } from "../../support/use-fixtures.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import type { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { QueryTransformer } from "../../../lib/query-transformers.js";
 import { queryTransformers } from "../../../lib/active-record.js";

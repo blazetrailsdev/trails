@@ -1,4 +1,3 @@
-import { currentAdapter } from "../support/adapter-helper.js";
 import type { TimeZone } from "@blazetrails/activesupport";
 import { Hash, hashAref, hasKey, keys } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
@@ -11,6 +10,7 @@ import { Time as RubyTime } from "@blazetrails/date";
 
 import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../support/use-fixtures.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 
 import { Pirate } from "../models/pirate.js";
 import { Parrot, LiveParrot } from "../models/parrot.js";

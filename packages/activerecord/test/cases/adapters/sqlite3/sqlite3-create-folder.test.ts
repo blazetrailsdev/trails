@@ -1,9 +1,9 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3CreateFolder", () => {
   it("sqlite creates directory", async () => {

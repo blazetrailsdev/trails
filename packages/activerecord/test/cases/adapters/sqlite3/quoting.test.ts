@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { toF } from "@blazetrails/ruby-compat";
@@ -6,6 +5,7 @@ import { base36, BigDecimal, TimeWithZone, TimeZone, toFs } from "@blazetrails/a
 import "../../../../lib/index.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import * as Type from "../../../../lib/type.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { defaultTimezone, setDefaultTimezone } from "../../../../lib/active-record.js";

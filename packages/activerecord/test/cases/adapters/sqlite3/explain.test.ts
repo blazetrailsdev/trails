@@ -1,7 +1,7 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
 import "../../../../lib/index.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Author } from "../../../models/author.js";
 import "../../../support/canonical-model-index.js";
 

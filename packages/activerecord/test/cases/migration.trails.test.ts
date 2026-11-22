@@ -1,4 +1,3 @@
-import { currentAdapter } from "../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
 import { excBacktraceLocations, NoMethodError, StandardError } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -18,6 +17,7 @@ import { Table } from "../../lib/connection-adapters/abstract/schema-definitions
 import { fixtures } from "../support/use-fixtures.js";
 import { anonymousMigration } from "../support/anonymous-migration.js";
 import { migrationProxy } from "../support/migration-proxy.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { migrationStrategy, setMigrationStrategy } from "../../lib/active-record.js";
 
 describe("MigrationTest", () => {
