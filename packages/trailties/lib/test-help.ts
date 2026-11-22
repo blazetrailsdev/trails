@@ -10,7 +10,6 @@ import { ActiveJob } from "@blazetrails/activejob";
 import { Trails } from "./trails.js";
 
 declare module "@blazetrails/activesupport/test-case" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- `include ActiveRecord::TestFixtures` in the `on_load(:active_support_test_case)` block below (`railties/lib/rails/test_help.rb:19`) extends `TestFixtures::ClassMethods` onto `ActiveSupport::TestCase`; a namespace merged onto the class is how the added statics surface on the type side.
   namespace TestCase {
     const setFixtureClass: Extended<typeof ClassMethods>["setFixtureClass"];
     const fixtures: Extended<typeof ClassMethods>["fixtures"];

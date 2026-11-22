@@ -201,7 +201,6 @@ type BuildApp = typeof buildApp;
 type StubControllers = typeof stubControllers;
 
 declare module "../../lib/action-dispatch/testing/integration.js" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby reopens `class ActionDispatch::IntegrationTest` (`abstract_unit.rb:118`) to add `self.build_app` and `self.stub_controllers`; a namespace merged onto the class is how an added static surfaces on the type side.
   namespace IntegrationTest {
     let buildApp: BuildApp;
     let stubControllers: StubControllers;
@@ -291,7 +290,6 @@ Base.testRoutes = function (this: typeof Base, block: DrawCallback): RouteSet {
 type TestRoutes = (this: typeof Base, block: DrawCallback) => RouteSet;
 
 declare module "../../lib/action-controller/base.js" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby reopens `class ActionController::Base` (`abstract_unit.rb:229`) to add `self.test_routes`; a namespace merged onto the class is how an added static surfaces on the type side.
   namespace Base {
     let testRoutes: TestRoutes;
   }

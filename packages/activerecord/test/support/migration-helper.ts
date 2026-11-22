@@ -6,7 +6,6 @@ import { Migration } from "../../lib/migration.js";
 import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 
 declare module "../../lib/migration.js" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- `class << self; attr_accessor :message_count; end` reopens `Migration` (`activerecord/test/cases/migration/helper.rb:7-8`); a namespace merged onto the class is how the added static surfaces on the type side.
   namespace Migration {
     let messageCount: number;
   }

@@ -67,7 +67,6 @@ export class Preloader {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Preloader {
   const loadPath: Autoload.Autoload["loadPath"];
   let Association: typeof import("./preloader/association.js").Association;

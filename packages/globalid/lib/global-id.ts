@@ -170,7 +170,6 @@ export class GlobalID {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace GlobalID {
   const loadPath: Autoload.Autoload["loadPath"];
   let Locator: typeof LocatorClass;

@@ -27,7 +27,6 @@ const DEFAULT_CONCURRENCY_GROUP = function (this: ConcurrencyControls): unknown 
 const CONCURRENCY_ON_CONFLICT_BEHAVIOUR = ["block", "discard"];
 
 declare module "@blazetrails/activejob/base" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Base {
     let concurrencyKey: unknown;
     let concurrencyGroup: unknown;

@@ -361,7 +361,6 @@ export interface TestCase extends Behavior {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TestCase extends ActiveSupportTestCase {}
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace TestCase {
   /** @internal */
   let _channelClass: ChannelClass | null | undefined;

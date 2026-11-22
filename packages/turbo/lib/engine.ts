@@ -26,7 +26,6 @@ import { ThreadDebouncer } from "./app/models/turbo/thread-debouncer.js";
 import { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
 
 declare module "@blazetrails/actionpack/testing" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace RequestEncoder {
     let TurboStreamEncoder: typeof IdentityEncoder | undefined;
   }

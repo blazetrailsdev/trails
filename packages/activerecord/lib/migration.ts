@@ -1364,7 +1364,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Migration {
   let CommandRecorder:
     | typeof import("./migration/command-recorder.js").CommandRecorder

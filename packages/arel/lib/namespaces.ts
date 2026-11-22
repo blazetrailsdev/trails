@@ -44,7 +44,6 @@ export const Collectors = { name: "Arel::Collectors" } as {
   name: string;
 } & typeof CollectorsModule;
 constSet(Arel, "Collectors", Collectors);
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Collectors {
   export type SQLString = CollectorsModule.SQLString;
   export type Bind = CollectorsModule.Bind;
@@ -54,7 +53,6 @@ export declare namespace Collectors {
 }
 
 export const Nodes = { name: "Arel::Nodes", loadPath } as AutoloadModule & typeof NodesModule;
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Nodes {
   export type Node = NodesModule.Node;
   export type And = NodesModule.And;
@@ -187,7 +185,6 @@ export const Visitors = { name: "Arel::Visitors", loadPath } as AutoloadModule &
     typeof VisitorsModule,
     "ToSql" | "UnsupportedVisitError" | "MySQL" | "PostgreSQL" | "SQLite" | "Dot" | "Visitor"
   >;
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Visitors {
   export type ToSql = VisitorsModule.ToSql;
   export type UnsupportedVisitError = VisitorsModule.UnsupportedVisitError;
