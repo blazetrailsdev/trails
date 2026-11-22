@@ -1220,6 +1220,17 @@ export const SOURCES: readonly UpstreamSource[] = [
     packages: [],
   },
   {
+    name: "listen",
+    origin: {
+      type: "git",
+      url: "https://github.com/guard/listen.git",
+      // Read-anchor only: @blazetrails/listen wraps @parcel/watcher rather
+      // than porting the gem line for line (operator ruling 2026-11-22).
+      ref: "v3.9.0",
+    },
+    packages: [],
+  },
+  {
     name: "turbo-rails",
     origin: {
       type: "git",
