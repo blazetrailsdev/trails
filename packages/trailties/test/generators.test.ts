@@ -17,6 +17,7 @@ import {
   getProcessAdapter,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/generators/base.js";
+import { assertFile } from "../lib/generators/testing/assertions.js";
 import { ModelGenerator as TestUnitModelGenerator } from "../lib/generators/test-unit/model/model-generator.js";
 import { Application } from "../lib/application.js";
 import { Generators } from "../lib/generators.js";
@@ -301,9 +302,9 @@ describe("GeneratorsTest", () => {
     try {
       await capture("stdout", () => Generators.invoke("model", ["user"], { destinationRoot }));
 
-      const path = File.join(destinationRoot, "app/models/user.ts");
-      expect(File.isExist(path)).toBe(true);
-      expect(File.read(path)).toBe("empty");
+      await assertFile.call({ destinationRoot }, "app/models/user.ts", (content: string) => {
+        expect(content).toBe("empty");
+      });
     } finally {
       FileUtils.rmRf(File.dirname(template));
       FileUtils.rmRf(destinationRoot);
