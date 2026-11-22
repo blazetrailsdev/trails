@@ -185,7 +185,7 @@
       "sha": "b9c646a8486ef3e76f70919568cac070276da0e1"
     },
     "sqlite3": {
-      "ref": "v2.7.3",
+      "ref": "v2.7.2",
       "sha": "0cfccfc91c93afb11769dc7b830cb5d7ae2addcc"
     },
     "stimulus-rails": {
@@ -213,8 +213,8 @@
       "sha": "77de9ea2b94044d72622f72d44d392953843a1d7"
     },
     "zeitwerk": {
-      "ref": "v2.7.3",
-      "sha": "77c971c0f602bd0e5961d22dc7541d863737dbcb"
+      "ref": "v2.7.2",
+      "sha": "6aa28216c8dbea60bea097d7c7e6f4cc5210a080"
     }
   }
 }

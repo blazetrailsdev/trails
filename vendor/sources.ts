@@ -607,7 +607,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/fxn/zeitwerk.git",
-      ref: "v2.7.3",
+      ref: "v2.7.2",
     },
     packages: [
       {

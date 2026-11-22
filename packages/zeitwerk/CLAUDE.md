@@ -10,7 +10,7 @@ one in this file.
 ## `Module#autoload` is a build step (`Zeitwerk::Loader#define_autoload`)
 
 `define_autoload` calls `Module#autoload`
-(`vendor/zeitwerk/v2.7.3/lib/zeitwerk/loader.rb:542`), which binds a name and
+(`vendor/zeitwerk/v2.7.2/lib/zeitwerk/loader.rb:542`), which binds a name and
 runs `require` synchronously at first reference. JS has no hook on an unresolved
 identifier and no synchronous `import()`. **The asynchrony goes at the load, and
 the walk's result can be built ahead of time.** In development and test the walk
