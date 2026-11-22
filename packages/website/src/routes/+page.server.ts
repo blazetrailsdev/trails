@@ -56,11 +56,6 @@ const view = `<article>
 const viewError =
   "app/views/posts/show.html.tse(2,15): error TS2551: Property 'titel' does not exist on type 'Post'. Did you mean 'title'?";
 
-function inlineCode(text: string) {
-  const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
-}
-
 function withError(
   code: string,
   lang: string,
@@ -109,7 +104,7 @@ export async function load() {
     blocks: await Promise.all(
       blocks.map(async ({ lang, ...rest }) => ({
         ...rest,
-        body: inlineCode(rest.body),
+        body: rest.body.split("`"),
         href: `${GITHUB_REPO}/blob/${parity.buildRef}/${EXAMPLE}/${rest.file}`,
         html: await codeToHtml(
           (await fs.readFile(path.join(EXAMPLE_ROOT, rest.file), "utf8")).trimEnd(),

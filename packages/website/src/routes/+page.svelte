@@ -131,7 +131,7 @@
           {@html b.html}
         </div>
         <h3>{b.title}</h3>
-        <p>{@html b.body}</p>
+        <p>{#each b.body as part, i}{#if i % 2}<code>{part}</code>{:else}{part}{/if}{/each}</p>
       </div>
     {/each}
   </section>
@@ -264,7 +264,7 @@
 
   .start { padding: 90px 24px; }
   .cards { display: grid; grid-template-columns: repeat(2, 340px); justify-content: center; gap: 30px; margin-top: 40px; }
-  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); font-size: 18px; line-height: 23px; }
+  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); text-decoration: none; font-size: 18px; line-height: 23px; }
   .start-card strong { font-size: 26px; line-height: 31px; text-decoration: underline; text-underline-offset: 3px; }
   .tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--mango); color: var(--ink); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 10px; border-radius: 3px; }
 
