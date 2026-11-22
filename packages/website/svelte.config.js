@@ -13,9 +13,13 @@ const config = {
       handleHttpError: ({ path, message }) => {
         const docs = `${process.env.SITE_BASE ?? ""}/docs/`;
         if (
-          ["", "guides/", "guides/idioms", "api/@blazetrails/arel/README"].some(
-            (p) => path === docs + p,
-          ) ||
+          [
+            "",
+            "guides/",
+            "guides/idioms",
+            "guides/getting-started",
+            "api/@blazetrails/arel/README",
+          ].some((p) => path === docs + p) ||
           /^packages\/[a-z0-9-]+$/.test(path.slice(docs.length))
         )
           return;

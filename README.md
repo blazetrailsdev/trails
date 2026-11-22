@@ -264,6 +264,79 @@ The scaffold is a complete CRUD resource: a controller with `index` through
 `destroy`, a `setPost` before-action and `postParams()` over `params.expect`,
 and views ported from Rails' scaffold templates.
 
+<!-- #region quickstart-controller -->
+
+<!-- prettier-ignore -->
+```ts
+// app/controllers/posts-controller.ts (generated)
+import { Post } from "../models/post.ts";
+import { ApplicationController } from "./application-controller.ts";
+
+export class PostsController extends ApplicationController {
+  static {
+    this.beforeAction(":_setPost", { only: ["show", "edit", "update", "destroy"] });
+  }
+
+  declare posts: Post[];
+
+  declare post: Post;
+
+  // GET /posts
+  async index(): Promise<void> {
+    this.posts = await Post.all();
+  }
+
+  // GET /posts/1
+  async show(): Promise<void> {}
+
+  // GET /posts/new
+  async new(): Promise<void> {
+    this.post = new Post();
+  }
+
+  // GET /posts/1/edit
+  async edit(): Promise<void> {}
+
+  // POST /posts
+  async create(): Promise<void> {
+    this.post = new Post(this._postParams());
+
+    if (await this.post.save()) {
+      await this.redirectTo(this.post, { notice: "Post was successfully created." });
+    } else {
+      await this.render("new", { status: ":unprocessable_entity" });
+    }
+  }
+
+  // PATCH/PUT /posts/1
+  async update(): Promise<void> {
+    if (await this.post.update(this._postParams())) {
+      await this.redirectTo(this.post, { notice: "Post was successfully updated.", status: ":see_other" });
+    } else {
+      await this.render("edit", { status: ":unprocessable_entity" });
+    }
+  }
+
+  // DELETE /posts/1
+  async destroy(): Promise<void> {
+    await this.post.destroyBang();
+    await this.redirectTo(this.postsPath(), { notice: "Post was successfully destroyed.", status: ":see_other" });
+  }
+
+  // Use callbacks to share common setup or constraints between actions.
+  private async _setPost(): Promise<void> {
+    this.post = await Post.find(this.params.expect("id"));
+  }
+
+  // Only allow a list of trusted parameters through.
+  private _postParams() {
+    return this.params.expect({ post: ["title", "body"] });
+  }
+}
+```
+
+<!-- #endregion quickstart-controller -->
+
 <!-- #region quickstart-server -->
 
 ```sh
@@ -297,7 +370,10 @@ Open `http://localhost:3927/posts` and the scaffold works as it does in Rails:
 `GET /posts`, with the development-mode `<!-- BEGIN … -->` / `<!-- END … -->`
 template comments and blank lines stripped:
 
-```text
+<!-- #region quickstart-page -->
+
+<!-- prettier-ignore -->
+```html
 <!DOCTYPE html>
 <html>
   <head>
@@ -335,10 +411,14 @@ template comments and blank lines stripped:
 </html>
 ```
 
+<!-- #endregion quickstart-page -->
+
 ### 6. Type-check with `trails-tsc`
 
 `pnpm build` runs `trails-tsc --schema db/schema.ts`, the schema-aware `tsc`.
 The model is typed from the schema with no `declare` lines. This file:
+
+<!-- #region quickstart-typecheck -->
 
 ```ts
 // app/models/check.ts
@@ -358,6 +438,8 @@ fails the build with:
 app/models/check.ts(6,11): error TS2322: Type 'string | null' is not assignable to type 'number'.
   Type 'null' is not assignable to type 'number'.
 ```
+
+<!-- #endregion quickstart-typecheck -->
 
 The build also passes after `generate scaffold`.
 
