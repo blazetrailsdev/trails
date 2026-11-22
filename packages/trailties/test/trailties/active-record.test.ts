@@ -41,7 +41,9 @@ const blogApp = (): {
   config: Configuration;
   deprecators: Deprecators;
   credentials: typeof credentials;
+  executor: typeof Executor;
 } => ({
+  executor: class extends Executor {},
   deprecators: new Deprecators(),
   config: Object.assign(new Configuration("/nonexistent-app"), { filterParameters: [] }),
   credentials,
@@ -157,7 +159,10 @@ describe("RailtieTest", () => {
   it("runInitializers copies sqlite3 strict strings flag onto SQLite3Adapter", async () => {
     const cfg = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
     cfg.sqlite3AdapterStrictStringsByDefault = true;
-    await runTrailtieInitializers(Trailtie, blogApp());
+    const app = blogApp();
+    app.config.enableReloading = false;
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("after_initialize", app);
     expect(SQLite3Adapter.strictStringsByDefault).toBe(true);
   });
 
@@ -165,7 +170,10 @@ describe("RailtieTest", () => {
     const cfg = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
     cfg.postgresqlAdapterDecodeDates = true;
     PostgreSQLAdapter.decodeDates = false;
-    await runTrailtieInitializers(Trailtie, blogApp());
+    const app = blogApp();
+    app.config.enableReloading = false;
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("after_initialize", app);
     expect(PostgreSQLAdapter.decodeDates).toBe(true);
   });
 
@@ -173,7 +181,10 @@ describe("RailtieTest", () => {
     const cfg = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
     delete cfg.postgresqlAdapterDecodeDates;
     PostgreSQLAdapter.decodeDates = false;
-    await runTrailtieInitializers(Trailtie, blogApp());
+    const app = blogApp();
+    app.config.enableReloading = false;
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("after_initialize", app);
     expect(PostgreSQLAdapter.decodeDates).toBe(false);
   });
 
