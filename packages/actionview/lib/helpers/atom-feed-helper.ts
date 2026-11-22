@@ -72,8 +72,8 @@ export function atomFeed(
   xml.instructBang();
   if (options.instruct != null && options.instruct !== false) {
     for (const [target, attrs] of Object.entries(options.instruct)) {
-      if (isPlainHash(attrs)) {
-        xml.instructBang(target, attrs);
+      if (isPlainHash(attrs) || attrs instanceof Map) {
+        xml.instructBang(target, attrs instanceof Map ? Object.fromEntries(attrs) : attrs);
       } else if (Array.isArray(attrs) || rbObjRespondTo(attrs, "each")) {
         for (const attrGroup of attrs as Iterable<Record<string, unknown>>)
           xml.instructBang(target, attrGroup);
