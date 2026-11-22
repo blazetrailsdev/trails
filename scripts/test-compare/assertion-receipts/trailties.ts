@@ -35,15 +35,6 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         "api_app_generator_test.rb:109 sits in a block assert_no_file never yields; the port's assertNoFile takes no block",
     },
   ],
-  "trailties:generators/app_generator_test.rb › AppGeneratorTest › dockerfile": [
-    {
-      kind: "assert_no_match",
-      value: null,
-      as: null,
-      reason:
-        'app_generator_test.rb:1233 asserts no node-gyp because Rails defaults to importmap; CLAUDE.md, "importmap-rails and propshaft are out of scope" makes Vite the default, so using_node? is true',
-    },
-  ],
   "trailties:generators/app_generator_test.rb › AppGeneratorTest › css option with asset pipeline tailwind":
     [
       {
@@ -125,6 +116,15 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           'app_generator_test.rb:1568 asserts the Capybara server port variable; the devcontainer exports the Vitest system-testing server port instead (CLAUDE.md, "System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)")',
       },
     ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › dockerfile": [
+    {
+      kind: "assert_no_match",
+      value: null,
+      as: null,
+      reason:
+        'app_generator_test.rb:1233 asserts no node-gyp because Rails defaults to importmap; CLAUDE.md, "importmap-rails and propshaft are out of scope" makes Vite the default, so using_node? is true',
+    },
+  ],
   "trailties:generators/app_generator_test.rb › AppGeneratorTest › hotwire": [
     {
       kind: "assert_gem",
