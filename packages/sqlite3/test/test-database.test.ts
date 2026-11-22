@@ -3,6 +3,7 @@ import { Pathname, Tempfile, TypeError } from "@blazetrails/ruby-compat";
 import type {} from "@blazetrails/vitest-matchers";
 import { SQLite3 } from "../lib/index.js";
 import { engine } from "../lib/engine/better-sqlite3.js";
+import { engine as quirkEngine } from "../lib/engine/node-sqlite.js";
 
 class FakeExtensionSpecifier {
   static toPath(): string {
@@ -36,6 +37,91 @@ describe("TestDatabase", () => {
 
   afterEach(async () => {
     if (!db.isClosed()) await db.close();
+  });
+
+  it("segv", async () => {
+    expect(() => new SQLite3.Database(1 as unknown as string, { engine })).toThrow();
+  });
+
+  it("execute batch2", async () => {
+    await db.close();
+    db = new SQLite3.Database(":memory:", { engine: quirkEngine });
+    db.resultsAsHash = true;
+    let returnValue = await db.executeBatch2(`
+        CREATE TABLE items (id integer PRIMARY KEY AUTOINCREMENT, name string);
+        INSERT INTO items (name) VALUES ("foo");
+        INSERT INTO items (name) VALUES ("bar");
+        SELECT * FROM items;
+      `);
+    expect(returnValue).toEqual([
+      { id: "1", name: "foo" },
+      { id: "2", name: "bar" },
+    ]);
+
+    returnValue = await db.executeBatch2("SELECT * FROM items;", (result) => {
+      const row = result as Record<string, unknown>;
+      row["id"] = Number.parseInt(row["id"] as string, 10);
+      return row;
+    });
+    expect(returnValue).toEqual([
+      { id: 1, name: "foo" },
+      { id: 2, name: "bar" },
+    ]);
+
+    returnValue = await db.executeBatch2('INSERT INTO items (name) VALUES ("oof")');
+    expect(returnValue).toBeEmpty();
+
+    returnValue = await db.executeBatch2(
+      `CREATE TABLE employees (id integer PRIMARY KEY AUTOINCREMENT, name string, age integer(3));
+        INSERT INTO employees (age) VALUES (30);
+        INSERT INTO employees (age) VALUES (40);
+        INSERT INTO employees (age) VALUES (20);
+        SELECT age FROM employees;`,
+      (result) => {
+        const row = result as Record<string, unknown>;
+        row["age"] = Number.parseInt(row["age"] as string, 10);
+        return row;
+      },
+    );
+    expect(returnValue).toEqual([{ age: 30 }, { age: 40 }, { age: 20 }]);
+
+    returnValue = await db.executeBatch2("SELECT name FROM employees");
+    expect(returnValue).toEqual([{ name: null }, { name: null }, { name: null }]);
+
+    db.resultsAsHash = false;
+    returnValue = await db.executeBatch2(
+      `CREATE TABLE managers (id integer PRIMARY KEY AUTOINCREMENT, age integer(3));
+        INSERT INTO managers (age) VALUES (50);
+        INSERT INTO managers (age) VALUES (60);
+        SELECT id, age from managers;`,
+      (result) => {
+        result = (result as string[]).map((res) => Number.parseInt(res, 10));
+        return result;
+      },
+    );
+    expect(returnValue).toEqual([
+      [1, 50],
+      [2, 60],
+    ]);
+
+    await expect(
+      (async () => db.executeBatch2('INSERT INTO items (names) VALUES ("bazz")'))(),
+    ).rejects.toThrow(SQLite3.Exception);
+  });
+
+  it("strict mode", async () => {
+    let db = new SQLite3.Database(":memory:", { engine: quirkEngine });
+    await db.execute("create table numbers (val int);");
+    await db.execute('create index index_numbers_nope ON numbers ("nope");');
+    await db.close();
+
+    db = new SQLite3.Database(":memory:", { engine: quirkEngine, strict: true });
+    await db.execute("create table numbers (val int);");
+    const raised = db.execute('create index index_numbers_nope ON numbers ("nope");');
+    await expect(raised).rejects.toThrow(SQLite3.SQLException);
+    const error = (await raised.catch((e: unknown) => e)) as Error;
+    expect(error.message).toMatch(/no such column: "?nope"?/);
+    await db.close();
   });
 
   it("encoding", async () => {
