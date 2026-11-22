@@ -148,6 +148,7 @@ function prepareStatement(
     isDone: () => done,
     columnCount: () => (reader ? stmt.columns().length : 0),
     columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
+    columnDecltype: (index) => (reader ? (stmt.columns()[index]?.type ?? null) : null),
     setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
   };
 }
@@ -166,6 +167,8 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     close: () => void raw.close(),
     changes: () => changes,
     disableQuirkMode: () => {},
+    loadExtensionInternal: (file) => void raw.loadExtension(file),
+    enableLoadExtension: () => {},
     busyHandler: (block) => {
       handler = block;
     },

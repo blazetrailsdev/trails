@@ -1444,6 +1444,10 @@ importers:
       libsql:
         specifier: ^0.5.29
         version: 0.5.29
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/stimulus:
     dependencies:

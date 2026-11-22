@@ -727,6 +727,7 @@ export default defineConfig({
           exclude: [...SHARED_EXCLUDE],
           setupFiles: [
             "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/vitest-matchers/lib/setup.ts",
             "./packages/nokogiri/test/support/setup-extension.ts",
           ],
         },

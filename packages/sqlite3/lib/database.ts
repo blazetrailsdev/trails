@@ -1,4 +1,14 @@
-import { Encoding, RuntimeError, include, rbEnsure } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Encoding,
+  Thread,
+  RuntimeError,
+  TypeError,
+  include,
+  rbEnsure,
+  rbInspect,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import type { Included } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
 import { Constants } from "./constants.js";
@@ -24,10 +34,14 @@ export interface EngineDatabase extends EngineErrors {
   close(): void | Promise<void>;
   disableQuirkMode(): void;
   busyHandler(handler: BusyHandler | null): void;
+  loadExtensionInternal(file: string): void;
+  enableLoadExtension(onoff: boolean): void;
 }
 
 export type EngineOpenV2 = ((file: string, mode: number, zvfs: string | null) => EngineDatabase) &
   Partial<EngineErrors>;
+
+export type SyncCloseEngineDatabase = Omit<EngineDatabase, "close"> & { close(): void };
 
 export interface DatabaseOptions {
   readonly?: boolean;
@@ -35,6 +49,8 @@ export interface DatabaseOptions {
   flags?: number;
   strict?: boolean;
   resultsAsHash?: boolean;
+  defaultTransactionMode?: string | null;
+  extensions?: unknown;
   /** @noRailsEquivalent PERMANENT */
   engine: EngineOpenV2;
 }
@@ -54,9 +70,24 @@ export class Database {
   _engine!: EngineDatabase;
   #openEngine: EngineOpenV2;
   #readonly: boolean;
+  #defaultTransactionMode: string;
   #timeoutDeadline = 0;
 
-  constructor(file: string, options: DatabaseOptions, zvfs: string | null = null) {
+  constructor(file: string, options: DatabaseOptions, zvfs?: string | null);
+  constructor(
+    file: string,
+    options: DatabaseOptions & {
+      engine: (...args: Parameters<EngineOpenV2>) => SyncCloseEngineDatabase;
+    },
+    zvfs: string | null,
+    block: (db: Database) => unknown,
+  );
+  constructor(
+    file: string,
+    options: DatabaseOptions,
+    zvfs: string | null = null,
+    block?: (db: Database) => unknown,
+  ) {
     let mode = Constants.Open.READWRITE | Constants.Open.CREATE;
 
     if (options.readonly) mode = Constants.Open.READONLY;
@@ -82,8 +113,24 @@ export class Database {
 
     this.resultsAsHash = options.resultsAsHash ?? null;
     this.#readonly = (mode & Constants.Open.READONLY) !== 0;
+    this.#defaultTransactionMode = options.defaultTransactionMode ?? "deferred";
+
+    this.initializeExtensions(options.extensions ?? null);
 
     ForkSafety.track(this);
+
+    if (block) {
+      let result: unknown;
+      try {
+        result = block(this);
+      } finally {
+        (this as Database & { _engine: SyncCloseEngineDatabase }).close();
+      }
+      if (result instanceof Promise) {
+        new Thread(() => result);
+        throw new ArgumentError("Database.new with a block runs synchronously");
+      }
+    }
   }
 
   async encoding(): Promise<Encoding | null> {
@@ -160,6 +207,33 @@ export class Database {
     });
   }
 
+  async transaction<T>(
+    mode: string | null = null,
+    block?: (db: this) => T,
+  ): Promise<true | Awaited<T>> {
+    if (mode == null) mode = this.#defaultTransactionMode;
+    await this.execute(`begin ${mode} transaction`);
+
+    if (block) {
+      let abort = false;
+      try {
+        return await block(this);
+      } catch (e) {
+        abort = true;
+        throw e;
+      } finally {
+        if (!(abort && (await this.rollback()))) await this.commit();
+      }
+    } else {
+      return true;
+    }
+  }
+
+  async commit(): Promise<true> {
+    await this.execute("commit transaction");
+    return true;
+  }
+
   async rollback(): Promise<true> {
     await this.execute("rollback transaction");
     return true;
@@ -185,6 +259,8 @@ export class Database {
     });
   }
 
+  close(this: Database & { _engine: SyncCloseEngineDatabase }): this;
+  close(): this | Promise<this>;
   close(): this | Promise<this> {
     let r: void | Promise<void>;
     try {
@@ -213,6 +289,37 @@ export class Database {
     return this;
   }
 
+  loadExtension(extensionSpecifier: unknown): void {
+    if (rbObjRespondTo(extensionSpecifier, "toPath")) {
+      extensionSpecifier = (extensionSpecifier as { toPath(): string }).toPath();
+    } else if (typeof extensionSpecifier !== "string") {
+      throw new TypeError(
+        `extension_specifier ${rbInspect(extensionSpecifier)} is not a String or a valid extension specifier object`,
+      );
+    }
+    this.loadExtensionInternal(extensionSpecifier as string);
+  }
+
+  initializeExtensions(extensions: unknown): void {
+    if (extensions == null) return;
+    if (!Array.isArray(extensions)) throw new TypeError("extensions must be an Array");
+    if (extensions.length === 0) return;
+
+    try {
+      this.enableLoadExtension(true);
+
+      for (const extension of extensions) {
+        this.loadExtension(extension);
+      }
+    } finally {
+      this.enableLoadExtension(false);
+    }
+  }
+
+  enableLoadExtension(onoff: boolean): void {
+    this._engine.enableLoadExtension(onoff);
+  }
+
   buildResultSet(stmt: Statement): ResultSet {
     if (this.resultsAsHash) {
       return new HashResultSet(this, stmt);
@@ -234,6 +341,15 @@ export class Database {
   /** @internal */
   private disableQuirkMode(): void {
     this._engine.disableQuirkMode();
+  }
+
+  /** @internal */
+  private loadExtensionInternal(file: string): void {
+    try {
+      this._engine.loadExtensionInternal(file);
+    } catch (e) {
+      rbSqlite3Raise(e, this._engine);
+    }
   }
 
   /** @internal */

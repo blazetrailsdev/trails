@@ -147,6 +147,7 @@ function prepareStatement(
     columnCount: () => (names !== null ? names.length : metadata().then((n) => n.length)),
     columnName: (index) =>
       names !== null ? (names[index] ?? null) : metadata().then((n) => n[index] ?? null),
+    columnDecltype: () => null,
     setReadBigInts: () => {},
   };
 }
@@ -173,6 +174,10 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     },
     changes: () => changes,
     disableQuirkMode: () => {},
+    loadExtensionInternal: () => {
+      throw new RuntimeError("load_extension is not supported by the expo-sqlite driver");
+    },
+    enableLoadExtension: () => {},
     busyHandler: (block) => {
       handler = block;
     },

@@ -1,16 +1,20 @@
 import BetterSqlite3 from "better-sqlite3";
 import { SQLite3 } from "../../lib/index.js";
-import type { BusyHandler, EngineDatabase, EngineOpenV2 } from "../../lib/database.js";
+import type { BusyHandler, EngineOpenV2, SyncCloseEngineDatabase } from "../../lib/database.js";
 import type { EngineStatement } from "../../lib/statement.js";
 import type { SqliteBindValue } from "../../lib/driver.js";
+import { statementTail } from "../../lib/engine/statement-tail.js";
 
-export function engineDatabase(
-  file = ":memory:",
-): EngineDatabase & { quirkModeDisabled: boolean; handler: BusyHandler | null } {
+export function engineDatabase(file = ":memory:"): SyncCloseEngineDatabase & {
+  quirkModeDisabled: boolean;
+  handler: BusyHandler | null;
+  loadExtensionToggles: boolean[];
+} {
   const raw = new BetterSqlite3(file);
   let changes = 0;
   const db = {
     quirkModeDisabled: false,
+    loadExtensionToggles: [] as boolean[],
     handler: null as BusyHandler | null,
     errcode: () => null,
     errmsg: (e: unknown) => String(e),
@@ -23,6 +27,10 @@ export function engineDatabase(
     },
     busyHandler: (handler: BusyHandler | null) => {
       db.handler = handler;
+    },
+    loadExtensionInternal: (file: string) => void raw.loadExtension(file),
+    enableLoadExtension: (onoff: boolean) => {
+      db.loadExtensionToggles.push(onoff);
     },
     execBatch(sql: string, resultsAsHash: boolean): unknown[] {
       const stmt = raw.prepare(sql);
@@ -38,6 +46,9 @@ export function engineDatabase(
       });
     },
     prepare(sql: string): [EngineStatement, string] {
+      const [tail] = statementTail(sql);
+      const remainder = sql.slice(tail);
+      sql = sql.slice(0, tail);
       const stmt = raw.prepare(sql);
       const reader = stmt.reader;
       if (reader) stmt.raw(true);
@@ -86,12 +97,14 @@ export function engineDatabase(
         isDone: () => done,
         columnCount: () => (reader ? stmt.columns().length : 0),
         columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
+        columnDecltype: (index) => (reader ? (stmt.columns()[index]?.type ?? null) : null),
         setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
       };
-      return [engine, ""];
+      return [engine, remainder];
     },
   };
   return db;
 }
 
-export const engine: EngineOpenV2 = (file) => engineDatabase(file);
+export const engine = (...[file]: Parameters<EngineOpenV2>): SyncCloseEngineDatabase =>
+  engineDatabase(file);

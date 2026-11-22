@@ -27,6 +27,12 @@ describe("TestStatement", () => {
     await expect(SQLite3.Statement.new(db, 'select "foo"')).rejects.toThrow(ArgumentError);
   });
 
+  it("new with remainder", async () => {
+    const stmt = await SQLite3.Statement.new(db, "select 'foo';bar");
+    expect(stmt.remainder).toBe("bar");
+    await stmt.close();
+  });
+
   it("empty remainder", async () => {
     expect(stmt.remainder).toBe("");
   });
@@ -177,5 +183,19 @@ describe("TestStatement", () => {
   it("column name", async () => {
     expect(await stmt.columnName(0)).toBe("'foo'");
     expect(await stmt.columnName(10)).toBeNull();
+  });
+
+  it("bind blob", async () => {
+    await db.execute("create table foo(text BLOB)");
+    const stmt = await SQLite3.Statement.new(db, "insert into foo(text) values (?)");
+    await stmt.bindParam(1, new TextEncoder().encode("hello"));
+    await stmt.execute();
+    await stmt.close();
+    await db.prepare("select * from foo", async (v) => {
+      expect(new Uint8Array((await v.first())![0] as Uint8Array)).toEqual(
+        new TextEncoder().encode("hello"),
+      );
+      expect(await v.types()).toEqual(["blob"]);
+    });
   });
 });

@@ -74,5 +74,8 @@
       "ref": "v2.6.0",
       "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
     }
-  ]
+  ],
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
+  }
 }

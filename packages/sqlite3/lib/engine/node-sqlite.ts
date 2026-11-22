@@ -84,6 +84,7 @@ function open(file: string, mode: number, quirks = true): DatabaseSync {
     enableForeignKeyConstraints: false,
     enableDoubleQuotedStringLiterals: quirks,
     timeout: 0,
+    allowExtension: true,
   });
 }
 
@@ -170,6 +171,7 @@ function prepareStatement(
     isDone: () => done,
     columnCount: () => columns.length,
     columnName: (index) => columns[index]?.name ?? null,
+    columnDecltype: (index) => columns[index]?.type ?? null,
     setReadBigInts: (toggle) => stmt.setReadBigInts(toggle),
   };
 }
@@ -202,6 +204,8 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       raw = open(file, mode, false);
       changesStmt = null;
     },
+    loadExtensionInternal: (file) => raw.loadExtension(file),
+    enableLoadExtension: (onoff) => raw.enableLoadExtension(onoff),
     busyHandler: (block) => {
       handler = block;
     },
