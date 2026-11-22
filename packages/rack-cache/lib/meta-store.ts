@@ -387,14 +387,20 @@ export class Dalli extends MemCacheBase {
     return store;
   }
 
-  /** @missingRailsArgs get — PERMANENT */
+  /**
+   * @missingRailsArgs get — PERMANENT
+   * @inventedArm load — PERMANENT
+   */
   override async read(key: string): Promise<Entry[]> {
     key = this.hexdigest(key);
     const { value } = await this.cache.get(key);
     return value != null ? (Marshal.load(value) as Entry[]) : [];
   }
 
-  /** @missingRailsArgs set — PERMANENT */
+  /**
+   * @missingRailsArgs set — PERMANENT
+   * @inventedArm dump — PERMANENT
+   */
   override async write(key: string, entries: Entry[], ttl: number | null = 0): Promise<boolean> {
     key = this.hexdigest(key);
     return this.cache.set(key, Marshal.dump(entries, -1, true), { expires: ttl });
