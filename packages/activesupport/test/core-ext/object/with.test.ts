@@ -4,8 +4,24 @@ import { with as with_ } from "../../../lib/core-ext/object/with.js";
 import { assertNotRespondTo } from "../../../lib/testing/assertions.js";
 
 class Record {
-  publicAttr = "public";
-  anotherPublicAttr = "another_public";
+  private _publicAttr = "public";
+  private _anotherPublicAttr = "another_public";
+
+  get publicAttr(): string {
+    return this._publicAttr;
+  }
+
+  set publicAttr(value: string) {
+    this._publicAttr = value;
+  }
+
+  get anotherPublicAttr(): string {
+    return this._anotherPublicAttr;
+  }
+
+  set anotherPublicAttr(value: string) {
+    this._anotherPublicAttr = value;
+  }
 
   get mixedAttr(): string {
     return this._mixedAttr;

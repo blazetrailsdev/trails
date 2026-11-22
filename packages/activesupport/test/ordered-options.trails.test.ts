@@ -5,7 +5,7 @@
  * reaches only through nested Hashes.
  */
 import { describe, it, expect } from "vitest";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { KeyError, rbEqual } from "@blazetrails/ruby-compat";
 import { OrderedOptions } from "../lib/ordered-options.js";
 import { HashWithIndifferentAccess } from "../lib/hash-with-indifferent-access.js";
 
@@ -87,5 +87,19 @@ describe("OrderedOptions Hash#==", () => {
     expect(rbEqual(hwia, left)).toBe(true);
     expect(rbEqual(other, hwia)).toBe(false);
     expect(rbEqual(hwia, other)).toBe(false);
+  });
+});
+
+describe("OrderedOptions#fetch", () => {
+  it("raises KeyError inspecting a missing key as a Symbol", () => {
+    let error: unknown;
+    try {
+      new OrderedOptions().fetch("nothing");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(KeyError);
+    expect((error as KeyError).message).toBe("key not found: :nothing");
+    expect((error as KeyError).key()).toBe("nothing");
   });
 });

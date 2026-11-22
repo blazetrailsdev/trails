@@ -3028,6 +3028,36 @@ function extractDefinePropertyAccessorDirect(
     const { members, file } = generatedAccessorMembers(expr, host, info, srcDir);
     pushGeneratedAccessor(members, file, call.nameExpr.text, line, writerParams, receipt);
   }
+  if (isNamespaceSeat(call.target, checker) && ts.isSourceFile(expr.parent.parent)) {
+    const file = path.relative(srcDir, expr.getSourceFile().fileName).replace(/\\/g, "/");
+    const members = ((info.fileFunctions ??= {})[file] ??= []);
+    pushGeneratedAccessor(members, file, call.nameExpr.text, line, writerParams, receipt);
+  }
+}
+
+/**
+ * A namespace object's member, `ActiveSupport.Cache`: a property-access chain
+ * rooted at a `const` initialized with an object literal. An accessor seated
+ * on one at a file's top level is the Ruby module's singleton `attr_accessor`
+ * (`activesupport/lib/active_support/cache.rb:55-58`), credited beside the
+ * file's module functions.
+ */
+function isNamespaceSeat(expr: ts.Expression, checker: ts.TypeChecker): boolean {
+  let e = unwrapTsExpression(expr);
+  if (!ts.isPropertyAccessExpression(e) || e.name.text === "prototype") return false;
+  while (ts.isPropertyAccessExpression(e)) e = unwrapTsExpression(e.expression);
+  if (!ts.isIdentifier(e)) return false;
+  const decl = resolvedDeclaration(e, checker);
+  if (!decl || !ts.isVariableDeclaration(decl) || !decl.initializer) return false;
+  let init: ts.Expression = decl.initializer;
+  while (
+    ts.isAsExpression(init) ||
+    ts.isSatisfiesExpression(init) ||
+    ts.isParenthesizedExpression(init)
+  ) {
+    init = init.expression;
+  }
+  return ts.isObjectLiteralExpression(init);
 }
 
 /**
@@ -4512,6 +4542,18 @@ function includedHookOwner(expr: ts.Expression): string | undefined {
   if (hook === undefined) return undefined;
   let owner: ts.Expression = hook.expression;
   while (ts.isParenthesizedExpression(owner) || ts.isAsExpression(owner)) owner = owner.expression;
+  // `extend(X, Concern).included(...)` is Rails' `extend Concern; included do … end`
+  // (`activesupport/lib/active_support/rescuable.rb:12-16`): `extend` answers `X`.
+  if (
+    ts.isCallExpression(owner) &&
+    ts.isIdentifier(owner.expression) &&
+    owner.expression.text === "extend" &&
+    owner.arguments.length === 2 &&
+    ts.isIdentifier(owner.arguments[1]) &&
+    owner.arguments[1].text === "Concern"
+  ) {
+    owner = owner.arguments[0];
+  }
   if (!ts.isIdentifier(owner)) return undefined;
   const name = ts.isPropertyAccessExpression(hook) ? hook.name : hook.argumentExpression;
   return ts.isIdentifier(name) && name.text === "included" ? owner.text : undefined;
@@ -8779,6 +8821,19 @@ function isCheckerProvenString(expr: ts.Expression): boolean {
 }
 
 /**
+ * Whether the TS checker proves `expr` a union of string literals none of
+ * which ends in `\r\n`. MRI's `rb_str_chop` drops a trailing `\r\n` as one
+ * unit (`vendor/ruby/v3.3.11/string.c`, `chopped_length`), so `slice(0, -1)`
+ * is the whole of `chop` only on such a receiver.
+ */
+function isCheckerProvenCrlfFreeString(expr: ts.Expression): boolean {
+  const type = currentChecker?.getTypeAtLocation(expr);
+  if (type === undefined) return false;
+  const parts = type.isUnion() ? type.types : [type];
+  return parts.every((t) => t.isStringLiteral() && !t.value.endsWith("\r\n"));
+}
+
+/**
  * Whether the TS checker proves `expr` a one-character string literal, the
  * operand shape for which `replaceAll` is Ruby's `tr`.
  */
@@ -8981,7 +9036,7 @@ function nativeValueForms(n: ts.Node): string[] {
         return typed ? ["drop", TYPED_NATIVE_FORM.drop] : ["drop"];
       }
       if (args.length !== 2 || first.getText() !== "0") return [];
-      if (second.getText() === "-1" && isCheckerProvenString(n.expression.expression)) {
+      if (second.getText() === "-1" && isCheckerProvenCrlfFreeString(n.expression.expression)) {
         return [TYPED_STRING_FORM.chop];
       }
       return typed ? ["take", TYPED_NATIVE_FORM.take, TYPED_NATIVE_FORM.first] : ["take"];

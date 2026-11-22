@@ -14,7 +14,6 @@ import {
   symbolToS,
   valuesAt,
 } from "@blazetrails/ruby-compat";
-import { Module, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
 import { isBlank } from "./core-ext/object/blank.js";
 import { isDuplicable } from "./core-ext/object/duplicable.js";
 import * as XmlMini from "./xml-mini.js";
@@ -125,24 +124,6 @@ export function deepUnderscoreKeys(obj: unknown): unknown {
       .toLowerCase()
       .replace(/^_/, ""),
   );
-}
-
-export function isExtractableOptions(self: unknown): boolean {
-  if (self !== null && typeof self === "object" && "isExtractableOptions" in self) {
-    return (self as { isExtractableOptions(): boolean }).isExtractableOptions();
-  }
-  return isPlainObject(self);
-}
-
-export function extractOptionsBang<T>(args: T[]): AnyObject {
-  const last = args[args.length - 1];
-  const isHash =
-    (isPlainObject(last) && !rbObjIsKindOf(last, Module)) ||
-    (last !== null && typeof last === "object" && "isExtractableOptions" in last);
-  if (args.length > 0 && isHash && isExtractableOptions(last)) {
-    return args.pop() as unknown as AnyObject;
-  }
-  return {};
 }
 
 export function stringifyKeys<T extends AnyObject>(obj: T): Record<string, unknown> {

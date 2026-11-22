@@ -1,6 +1,6 @@
 import { NameError } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
-import { extractOptionsBang } from "../../hash-utils.js";
+import { extractOptionsBang } from "../array/extract-options.js";
 
 interface ThreadMattrReaderOptions {
   instanceReader?: boolean;
