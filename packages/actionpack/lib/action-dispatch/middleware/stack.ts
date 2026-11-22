@@ -44,7 +44,6 @@ export class Middleware {
       : (this.klass as object).constructor.name;
   }
 
-  /** @inventedArm new — PERMANENT */
   build(app: RackApp | RackAppObject): RackApp | RackAppObject {
     const args = [...this.args, ...(this.block ? [this.block] : [])];
     if (typeof this.klass !== "function") {
