@@ -919,7 +919,7 @@ export class Client {
     ) {
       await this.connect(...this.connectArgs);
     }
-    const options = { ...this.options(sql, opts), typeCast: (field: Field) => field.buffer() };
+    const options = { ...this.options(sql, opts), typeCast: (field: Field) => field.string() };
     return this.storeResult(
       await (this.connection.query as unknown as (options: object) => Promise<Native>)
         .call(this.connection, options)

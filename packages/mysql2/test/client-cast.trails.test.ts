@@ -91,7 +91,7 @@ describe("mysql2Client cast", () => {
     const raw = await clientOn({
       config: local,
       query: async () => [
-        [{ created_at: Buffer.from("2026-04-27 14:23:55") }],
+        [{ created_at: "2026-04-27 14:23:55" }],
         [{ name: "created_at", type: mysql.Types.TIMESTAMP }],
       ],
     });
@@ -134,7 +134,7 @@ describe("mysql2Client cast", () => {
           invalid.typeCast!(field("DATE", "2026-00-00"), next);
           throw new Error("server error mid-result");
         }
-        return [[{ x: Buffer.from("1") }], [{ name: "x", type: mysql.Types.LONG }]];
+        return [[{ x: "1" }], [{ name: "x", type: mysql.Types.LONG }]];
       },
     });
     await expect(raw.query("SELECT d FROM t")).rejects.toThrow("server error mid-result");

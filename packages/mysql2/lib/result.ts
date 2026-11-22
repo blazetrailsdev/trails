@@ -79,22 +79,21 @@ export class Result {
     row: unknown[] | Record<string, unknown>,
     typeCast: ReturnType<Client["typeCast"]>,
   ): unknown[] | Record<string, unknown> {
-    const castField = (bytes: unknown, i: number): unknown => {
+    const castField = (value: unknown, i: number): unknown => {
       const packet = this.fieldPackets[i];
-      const raw = bytes as Uint8Array | null;
-      const text = (encoding = packet.encoding ?? "utf8") => {
-        if (raw === null) return null;
-        if (Buffer.isEncoding(encoding))
-          return Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength).toString(encoding);
-        return new TextDecoder(encoding === "cesu8" ? "utf-8" : encoding).decode(raw);
+      const raw = value as string | null;
+      const text = (encoding = packet.encoding) => {
+        if (raw === null || encoding === packet.encoding || encoding === "ascii") return raw;
+        return Buffer.from(raw, "latin1").toString(encoding as BufferEncoding);
       };
+      const bytes = () => (raw === null ? null : Buffer.from(raw, "latin1"));
       const type = TYPE_NAMES[packet.type!];
       const field: Field = {
         type,
         name: packet.name,
         length: packet.columnLength,
         string: text,
-        buffer: () => raw,
+        buffer: bytes,
       };
       return typeCast(field, () => {
         if (raw === null) return null;
@@ -107,12 +106,19 @@ export class Result {
           case "FLOAT":
           case "DOUBLE":
             return Number(text("ascii"));
+          case "DECIMAL":
+          case "NEWDECIMAL":
+          case "DATE":
+          case "DATETIME":
+          case "TIMESTAMP":
+          case "TIME":
+            return text("ascii");
           case "LONGLONG": {
             const value = text("ascii")!;
             return Number.isSafeInteger(Number(value)) ? Number(value) : value;
           }
           default:
-            return packet.characterSet === mysql.Charsets.BINARY ? raw : text();
+            return packet.characterSet === mysql.Charsets.BINARY ? bytes() : raw;
         }
       });
     };

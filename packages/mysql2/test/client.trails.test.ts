@@ -130,19 +130,21 @@ describe("Mysql2::Client#warning_count", () => {
   const castOf = (native: { mock: { calls: object[][] } }, call = 0): Cast["typeCast"] =>
     (native.mock.calls[call][0] as Cast).typeCast;
 
-  type Column = [name: string, type: keyof typeof mysql.Types, length?: number];
+  type Column = [name: string, type: string & keyof typeof mysql.Types, length?: number];
   const rowOf = (columns: Column[], ...values: Array<string | Uint8Array | null>) => [
     [Object.fromEntries(columns.map(([name], i) => [name, cell(values[i])]))],
     columns.map(([name, type, columnLength]) => ({
       name,
       type: mysql.Types[type],
       columnLength,
-      characterSet: type === "BIT" ? mysql.Charsets.BINARY : mysql.Charsets.UTF8MB4_GENERAL_CI,
-      encoding: "utf8",
+      characterSet: ["BIT", "NEWDECIMAL"].includes(type)
+        ? mysql.Charsets.BINARY
+        : mysql.Charsets.UTF8MB4_GENERAL_CI,
+      encoding: ["BIT", "NEWDECIMAL"].includes(type) ? "binary" : "utf8",
     })),
   ];
   const cell = (value: string | Uint8Array | null | undefined) =>
-    value == null ? null : typeof value === "string" ? Buffer.from(value) : Buffer.from(value);
+    value == null ? null : typeof value === "string" ? value : String.fromCharCode(...value);
 
   it("query merges its options over query_options, and _query casts with what it is handed", async () => {
     const native = vi.fn(async (_options: object) =>
@@ -242,6 +244,12 @@ describe("Mysql2::Client#warning_count", () => {
     const b = (row as Record<string, Time>)["b"];
     expect(b.isUtc()).toBe(false);
     expect(b.getutc().hour).toBe(14);
+  });
+
+  it("_query reads a binary-charset NEWDECIMAL, as SUM answers, as a number", async () => {
+    const native = vi.fn(async (_options: object) => rowOf([["s", "NEWDECIMAL"]], "318"));
+    const client = await clientOn({ query: native });
+    expect((await client.query("SELECT SUM(1)"))!.toA()).toEqual([{ s: 318 }]);
   });
 
   it("Result#each casts again on each call when cache_rows is false", async () => {
