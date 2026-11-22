@@ -14,16 +14,16 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
     await db.executeBatch2("CREATE TABLE t (a INTEGER, b TEXT); INSERT INTO t VALUES (1, 'x');");
     expect(await db.changes()).toBe(1);
     expect(await db.execute("SELECT a, b FROM t WHERE a = ?", [1])).toEqual([[1, "x"]]);
-    const stmt = db.prepare("SELECT 1; SELECT 2");
+    const stmt = await db.prepare("SELECT 1; SELECT 2");
     expect(stmt.remainder).toBe(" SELECT 2");
     await stmt.close();
   });
 
-  it("raises the gem's class for a failed prepare, with the SQL", () => {
+  it("raises the gem's class for a failed prepare, with the SQL", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    expect(() => db.prepare("SELECT * FROM nope")).toThrow(SQLite3.SQLException);
+    await expect(db.prepare("SELECT * FROM nope")).rejects.toThrow(SQLite3.SQLException);
     try {
-      db.prepare("SELECT * FROM nope");
+      await db.prepare("SELECT * FROM nope");
     } catch (e) {
       expect((e as InstanceType<typeof SQLite3.Exception>).sql).toBe("SELECT * FROM nope");
     }
@@ -83,7 +83,7 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
 
   it("binds a named parameter by its exact name, and rejects a prefix of another", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    const stmt = db.prepare("SELECT :idx AS v");
+    const stmt = await db.prepare("SELECT :idx AS v");
     expect(() => stmt.bindParam(":id", 1)).toThrow("no such bind parameter");
     await stmt.bindParam(":idx", 2);
     expect(await stmt.step()).toEqual([2]);
@@ -108,18 +108,45 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
   it("does not restart a statement already part-way through its rows", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
     await db.executeBatch2("CREATE TABLE r (a); INSERT INTO r VALUES (1), (2), (3);");
-    const stmt = db.prepare("SELECT a FROM r ORDER BY a");
+    const stmt = await db.prepare("SELECT a FROM r ORDER BY a");
     const rows: unknown[] = [];
     for (let row = await stmt.step(); row !== null; row = await stmt.step()) rows.push(row);
     expect(rows).toEqual([[1], [2], [3]]);
     await stmt.close();
   });
 
-  it("rejects a named parameter that appears only inside a string literal or comment", () => {
+  it("rejects a named parameter that appears only inside a string literal or comment", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    const stmt = db.prepare("SELECT ':foo', ? AS [a:baz] -- :bar");
+    const stmt = await db.prepare("SELECT ':foo', ? AS [a:baz] -- :bar");
     expect(() => stmt.bindParam(":foo", 1)).toThrow("no such bind parameter");
     expect(() => stmt.bindParam(":bar", 1)).toThrow("no such bind parameter");
     expect(() => stmt.bindParam(":baz", 1)).toThrow("no such bind parameter");
+  });
+
+  it("strict: true turns off double-quoted string literals", async () => {
+    const db = new SQLite3.Database(":memory:", { engine, strict: true });
+    await expect(db.prepare('SELECT "nope"')).rejects.toThrow(SQLite3.SQLException);
+    const quirky = new SQLite3.Database(":memory:", { engine });
+    expect(await quirky.execute('SELECT "nope"')).toEqual([["nope"]]);
+  });
+
+  it("opens READWRITE without CREATE only on an existing file", async () => {
+    const path = `${getOs().tmpdir()}/sqlite3-no-create-${Date.now()}.db`;
+    paths.push(path);
+    const flags = SQLite3.Constants.Open.READWRITE;
+    expect(() => new SQLite3.Database(path, { engine, flags })).toThrow(SQLite3.CantOpenException);
+    expect(File.isExist(path)).toBe(false);
+    await new SQLite3.Database(path, { engine }).close();
+    const db = new SQLite3.Database(path, { engine, flags });
+    expect(await db.execute("SELECT 1")).toEqual([[1]]);
+    await db.close();
+  });
+
+  it("refuses to disable quirk mode once the handle is used", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    await db.executeBatch2("CREATE TABLE q (a)");
+    expect(() => db._engine.disableQuirkMode()).toThrow(
+      "disable_quirk_mode after the handle is used is not supported by the node:sqlite driver",
+    );
   });
 });

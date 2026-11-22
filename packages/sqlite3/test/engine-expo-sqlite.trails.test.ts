@@ -13,7 +13,12 @@ vi.mock("expo-sqlite", () => ({
     const raw = new BetterSqlite3(":memory:");
     return {
       prepareAsync: async (sql: string) => {
-        const stmt = raw.prepare(sql);
+        let stmt: BetterSqlite3.Statement;
+        try {
+          stmt = raw.prepare(sql);
+        } catch (e) {
+          throw native(`Error code 1: ${(e as Error).message}`);
+        }
         if (stmt.reader) stmt.raw(true);
         return {
           executeForRawResultAsync: async (params: unknown[] | Record<string, unknown>) => {
@@ -71,7 +76,7 @@ describe("SQLite3::Database over the expo-sqlite engine", () => {
   it("answers changes and column_count from the last result, without I/O", async () => {
     await db.execute("INSERT INTO t VALUES (2, 'y')");
     expect(db.changes()).toBe(1);
-    const stmt = db.prepare("SELECT a, b FROM t");
+    const stmt = await db.prepare("SELECT a, b FROM t");
     await stmt.step();
     expect(stmt.columnCount()).toBe(2);
     expect(stmt.columns()).toEqual(["a", "b"]);
@@ -108,5 +113,17 @@ describe("SQLite3::Database over the expo-sqlite engine", () => {
           flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.SHAREDCACHE,
         }),
     ).toThrow("SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver");
+  });
+
+  it("execute_batch2 answers sqlite3_exec's column text", async () => {
+    expect(await db.executeBatch2("SELECT 1.0, 0.1 + 0.2, 7, 1e20")).toEqual([
+      ["1.0", "0.3", "7", "1.0e+20"],
+    ]);
+  });
+
+  it("raises a failed prepare from Database#prepare, with its SQL", async () => {
+    const error = await Promise.resolve(db.prepare("SELECT * FROM nope")).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SQLite3.SQLException);
+    expect((error as InstanceType<typeof SQLite3.SQLException>).sql).toBe("SELECT * FROM nope");
   });
 });

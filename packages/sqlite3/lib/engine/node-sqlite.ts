@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import { LoadError } from "@blazetrails/ruby-compat";
+import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
 import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "../database.js";
@@ -67,12 +67,22 @@ export function sharedCacheDatabase(database: string, flags: number): string {
 }
 
 /** @internal */
-function open(file: string, mode: number): DatabaseSync {
+function open(file: string, mode: number, quirks = true): DatabaseSync {
   const { DatabaseSync } = loadNodeSqlite();
-  return new DatabaseSync(sharedCacheDatabase(file, mode), {
-    readOnly: (mode & SQLite3.Constants.Open.READONLY) !== 0,
+  const { Open } = SQLite3.Constants;
+  let database = sharedCacheDatabase(file, mode);
+  if ((mode & (Open.READWRITE | Open.CREATE)) === Open.READWRITE) {
+    if (!database.startsWith("file:")) {
+      database = `file:${database.replace(/[%?#]/g, (c) => encodeURIComponent(c))}`;
+    }
+    const hash = database.indexOf("#");
+    const body = hash === -1 ? database : database.slice(0, hash);
+    database = `${body}${body.includes("?") ? "&" : "?"}mode=rw${hash === -1 ? "" : database.slice(hash)}`;
+  }
+  return new DatabaseSync(database, {
+    readOnly: (mode & Open.READONLY) !== 0,
     enableForeignKeyConstraints: false,
-    enableDoubleQuotedStringLiterals: true,
+    enableDoubleQuotedStringLiterals: quirks,
     timeout: 0,
   });
 }
@@ -165,7 +175,8 @@ function prepareStatement(
 }
 
 export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) => {
-  const raw = open(file, mode);
+  let raw = open(file, mode);
+  let used = false;
   let handler: BusyHandler | null = null;
   let changesStmt: StatementSync | null = null;
   const db: EngineDatabase = {
@@ -174,17 +185,28 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     isDiscarded: () => false,
     close: () => raw.close(),
     changes: () => {
+      used = true;
       if (changesStmt === null) {
         changesStmt = raw.prepare("SELECT changes()");
         changesStmt.setReturnArrays(true);
       }
       return Number((changesStmt.get() as unknown as [number])[0]);
     },
-    disableQuirkMode: () => {},
+    disableQuirkMode: () => {
+      if (used) {
+        throw new RuntimeError(
+          "disable_quirk_mode after the handle is used is not supported by the node:sqlite driver",
+        );
+      }
+      raw.close();
+      raw = open(file, mode, false);
+      changesStmt = null;
+    },
     busyHandler: (block) => {
       handler = block;
     },
     execBatch(sql, resultsAsHash) {
+      used = true;
       const results: unknown[] = [];
       let rest = sql.trim();
       while (rest !== "") {
@@ -222,6 +244,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       return results;
     },
     prepare(sql) {
+      used = true;
       const [tail] = statementTail(sql);
       return [prepareStatement(raw, sql.slice(0, tail), () => handler), sql.slice(tail)];
     },

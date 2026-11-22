@@ -53,7 +53,7 @@ function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
 describe("SQLite3::Statement over a fake engine", () => {
   it("bindParams numbers positionals from 1 and binds hash keys by name", async () => {
     const { db, binds } = fakeDatabase([], [], false);
-    const stmt = new SQLite3.Statement(db, "select ?, :b, ?");
+    const stmt = await SQLite3.Statement.new(db, "select ?, :b, ?");
     await stmt.bindParams([1, [{ b: 2 }]], 3);
     expect(binds).toEqual([
       [1, 1],
@@ -63,11 +63,10 @@ describe("SQLite3::Statement over a fake engine", () => {
   });
 
   it("columns maps columnName over columnCount, sync and async", async () => {
-    expect(new SQLite3.Statement(fakeDatabase([], ["a", "b"], false).db, "x").columns()).toEqual([
-      "a",
-      "b",
-    ]);
-    const stmt = new SQLite3.Statement(fakeDatabase([], ["a", "b"], true).db, "x");
+    expect(
+      await (await SQLite3.Statement.new(fakeDatabase([], ["a", "b"], false).db, "x")).columns(),
+    ).toEqual(["a", "b"]);
+    const stmt = await SQLite3.Statement.new(fakeDatabase([], ["a", "b"], true).db, "x");
     const columns = stmt.columns();
     expect(columns).toBeInstanceOf(Promise);
     expect(await columns).toEqual(["a", "b"]);
@@ -75,19 +74,23 @@ describe("SQLite3::Statement over a fake engine", () => {
 
   it("toA collects each row, sync and async", async () => {
     const rows = [[1], [2]];
-    expect(new SQLite3.Statement(fakeDatabase(rows, [], false).db, "x").toA()).toEqual(rows);
-    expect(await new SQLite3.Statement(fakeDatabase(rows, [], true).db, "x").toA()).toEqual(rows);
+    expect(
+      await (await SQLite3.Statement.new(fakeDatabase(rows, [], false).db, "x")).toA(),
+    ).toEqual(rows);
+    expect(await (await SQLite3.Statement.new(fakeDatabase(rows, [], true).db, "x")).toA()).toEqual(
+      rows,
+    );
   });
 
   it("done? survives close, and a discarded database refuses step", async () => {
     const fake = fakeDatabase([], [], false);
     let discarded = false;
     fake.engineDb.isDiscarded = () => discarded;
-    const stmt = new SQLite3.Statement(fake.db, "x");
+    const stmt = await SQLite3.Statement.new(fake.db, "x");
     await stmt.step();
     await stmt.close();
     expect(stmt.isDone()).toBe(true);
-    const live = new SQLite3.Statement(fake.db, "x");
+    const live = await SQLite3.Statement.new(fake.db, "x");
     discarded = true;
     expect(() => live.step()).toThrow(
       "cannot use a statement associated with a discarded database",
@@ -96,13 +99,13 @@ describe("SQLite3::Statement over a fake engine", () => {
 
   it("bindParams binds in order, awaiting each async bind", async () => {
     const { db, binds } = fakeDatabase([], [], true);
-    const stmt = new SQLite3.Statement(db, "x");
+    const stmt = await SQLite3.Statement.new(db, "x");
     await stmt.bindParams(1, 2, 3);
     expect(binds.map(([k]) => k)).toEqual([1, 2, 3]);
   });
 
   it("a closed statement raises from every C primitive but closed? and done?", async () => {
-    const stmt = new SQLite3.Statement(fakeDatabase([], [], false).db, "x");
+    const stmt = await SQLite3.Statement.new(fakeDatabase([], [], false).db, "x");
     await stmt.close();
     expect(stmt.isClosed()).toBe(true);
     for (const call of [
