@@ -16,7 +16,7 @@ export class EntityStore {
   protected slurp(body: Body, block: (part: Part) => unknown): [string, number] {
     const digest = Digest.SHA1.new();
     let size = 0;
-    each(body as Iterable<Part>, (part) => {
+    each(body, (part) => {
       size += this.bytesize(part);
       digest.update(part);
       block(part);

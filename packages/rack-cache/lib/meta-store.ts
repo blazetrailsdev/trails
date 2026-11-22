@@ -29,7 +29,7 @@ export class MetaStore {
   static HEAP: typeof Heap;
   static MEM: typeof Heap;
 
-  async lookup(request: Request, entityStore: EntityStore | null): Promise<Response | null> {
+  async lookup(request: Request, entityStore: EntityStore): Promise<Response | null> {
     const key = this.cacheKey(request);
     const entries = await this.read(key);
 
@@ -44,7 +44,7 @@ export class MetaStore {
     const [, res] = match;
     const entityKey = res.get("x-content-digest");
     let body: unknown;
-    if (entityKey != null && (body = await entityStore!.open(entityKey)) != null) {
+    if (entityKey != null && (body = await entityStore.open(entityKey)) != null) {
       return this.restoreResponse(res, body);
     } else {
       try {
@@ -108,7 +108,10 @@ export class MetaStore {
   }
 
   cacheKey(request: Request): string {
-    const keygen = request.env["rack-cache.cache_key"] ?? Key;
+    const keygen =
+      request.env["rack-cache.cache_key"] != null && request.env["rack-cache.cache_key"] !== false
+        ? request.env["rack-cache.cache_key"]
+        : Key;
     return rbProcCall(keygen, request) as string;
   }
 
