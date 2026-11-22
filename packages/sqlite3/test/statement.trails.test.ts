@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { block } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../lib/index.js";
 import type { EngineDatabase } from "../lib/database.js";
-import type { EngineStatement } from "../lib/statement.js";
+import type { EngineStatement, Statement } from "../lib/statement.js";
 
 function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
   const binds: [string | number, unknown][] = [];
@@ -90,9 +90,9 @@ describe("SQLite3::Statement over a fake engine", () => {
     const sync = fakeDatabase([[1]], ["a"], false).db;
     const stmt = sync.prepare("x");
     expect(stmt).toBeInstanceOf(SQLite3.Statement);
-    const rs = (stmt as InstanceType<typeof SQLite3.Statement>).execute(7);
+    const rs = (stmt as Statement).execute(7);
     expect(rs).not.toBeInstanceOf(Promise);
-    const yielded = (sync.prepare("x") as InstanceType<typeof SQLite3.Statement>).execute(
+    const yielded = (sync.prepare("x") as Statement).execute(
       7,
       block(() => "block value"),
     );
@@ -109,7 +109,7 @@ describe("SQLite3::Statement over a fake engine", () => {
     await executed;
     expect(binds).toEqual([[1, 7]]);
 
-    let held: InstanceType<typeof SQLite3.Statement> | undefined;
+    let held: Statement | undefined;
     const value = db.prepare("x", async (s) => {
       held = s;
       await Promise.resolve();
