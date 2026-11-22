@@ -826,7 +826,6 @@ export default defineConfig({
             "packages/actiontext/test/generators/**/*.test.ts",
             "packages/stimulus/test/generator.test.ts",
           ],
-          // CI's Trailties Tests job runs mailer-previews in a leg of its own.
           exclude: process.env.TRAILTIES_EXCLUDE
             ? [...SHARED_EXCLUDE, process.env.TRAILTIES_EXCLUDE]
             : SHARED_EXCLUDE,

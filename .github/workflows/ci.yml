@@ -1224,9 +1224,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # mailer-previews.test.ts boots an isolated app per test and runs ~11 min
-        # on its own; vitest shards by file, so it gets a leg of its own and the
-        # rest of the suite splits four ways.
         shard: [1, 2, 3, 4, mailer-previews]
     steps:
       - uses: actions/checkout@v5
