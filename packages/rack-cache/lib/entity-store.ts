@@ -7,6 +7,7 @@ import {
   Thread,
   each,
   rbClassNewInstance,
+  rbDeclareIvar,
   rbObjId,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -109,6 +110,7 @@ export class Heap extends EntityStore {
 }
 
 EntityStore.Heap = Heap;
+rbDeclareIvar(Heap, "@options", "_options");
 EntityStore.HEAP = Heap;
 EntityStore.MEM = Heap;
 

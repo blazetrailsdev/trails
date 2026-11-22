@@ -8,5 +8,6 @@ export { Key } from "./key.js";
 export { MetaStore } from "./meta-store.js";
 export { Request } from "./request.js";
 export { Response } from "./response.js";
+export { Storage } from "./storage.js";
 
 Rack.Cache = Cache;
