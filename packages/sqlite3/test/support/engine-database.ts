@@ -3,6 +3,7 @@ import { SQLite3 } from "../../lib/index.js";
 import type { BusyHandler, EngineOpenV2, SyncCloseEngineDatabase } from "../../lib/database.js";
 import type { EngineStatement } from "../../lib/statement.js";
 import type { SqliteBindValue } from "../../lib/driver.js";
+import { statementTail } from "../../lib/engine/statement-tail.js";
 
 export function engineDatabase(file = ":memory:"): SyncCloseEngineDatabase & {
   quirkModeDisabled: boolean;
@@ -45,24 +46,10 @@ export function engineDatabase(file = ":memory:"): SyncCloseEngineDatabase & {
       });
     },
     prepare(sql: string): [EngineStatement, string] {
-      let remainder = "";
-      let stmt: BetterSqlite3.Statement;
-      try {
-        stmt = raw.prepare(sql);
-      } catch (e) {
-        const tail = [...sql.matchAll(/;/g)].find((m) => {
-          try {
-            raw.prepare(sql.slice(0, m.index + 1));
-            return true;
-          } catch {
-            return false;
-          }
-        });
-        if (!tail) throw e;
-        remainder = sql.slice(tail.index + 1);
-        sql = sql.slice(0, tail.index + 1);
-        stmt = raw.prepare(sql);
-      }
+      const [tail] = statementTail(sql);
+      const remainder = sql.slice(tail);
+      sql = sql.slice(0, tail);
+      const stmt = raw.prepare(sql);
       const reader = stmt.reader;
       if (reader) stmt.raw(true);
       const positional: SqliteBindValue[] = [];
