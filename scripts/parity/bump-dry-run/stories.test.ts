@@ -35,6 +35,7 @@ const input = (over: Partial<StoryInput> = {}): StoryInput => ({
   toTests: tests("core", "a/x_test.rb", ["XTest > kept", "XTest > new"]),
   tsFileOf: new Map([["core a/x.rb", "a/x.ts"]]),
   tsTestFileOf: new Map(),
+  missing: new Map(),
   libDir: (pkg, ref) => `vendor/gem/${ref}/${pkg}/lib`,
   testDir: (pkg, ref) => `vendor/gem/${ref}/${pkg}/test`,
   order: ["web", "core"],
@@ -88,6 +89,48 @@ describe("burn-down stories", () => {
     expect(md).toContain("- `XTest > new`");
     expect(md).toMatch(/^deps:\n {2}- gem-2-web$/m);
     expect(md).toContain('packages: ["gem-core"]');
+  });
+
+  it("drops an added test the comparer matches and keeps a same-path test in another file", () => {
+    const stories = planStories(
+      input({
+        fromTests: tests("core", "a/x_test.rb", ["T > a"]),
+        toTests: {
+          packages: {
+            core: {
+              files: [
+                {
+                  file: "a/x_test.rb",
+                  testCases: [{ path: "T > b", description: "b", file: "a/x_test.rb" }],
+                },
+                {
+                  file: "a/y_test.rb",
+                  testCases: [
+                    { path: "T > a", description: "a", file: "a/y_test.rb" },
+                    { path: "T > c", description: "c", file: "a/y_test.rb" },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        testRows: [
+          {
+            package: "core",
+            rubyFile: "a/x_test.rb",
+            path: "T > a",
+            toPath: "T > b",
+            kind: "moved",
+            from: "v1",
+            to: "v2",
+          },
+        ],
+        missing: new Map([["core a/y_test.rb", new Set(["a"])]]),
+      }),
+    );
+    const core = stories.find((s) => s.package === "core")!;
+    expect(core.testFiles.get("a/y_test.rb")!.added).toEqual(["T > a"]);
+    expect(core.testFiles.get("a/x_test.rb")!.removed).toEqual([]);
   });
 
   it("slugs a ref", () => {

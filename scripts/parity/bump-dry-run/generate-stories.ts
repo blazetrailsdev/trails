@@ -44,8 +44,22 @@ async function readJson<T>(file: string): Promise<T> {
 interface Comparison {
   results: {
     package: string;
-    files: { rubyFile: string; expectedTsFile?: string; conventionTsFile?: string }[];
+    files: {
+      rubyFile: string;
+      expectedTsFile?: string;
+      conventionTsFile?: string;
+      tsFileExists?: boolean;
+      missingTests?: string[];
+    }[];
   }[];
+}
+
+function missingOf(c: Comparison) {
+  const m = new Map<string, Set<string>>();
+  for (const r of c.results)
+    for (const f of r.files)
+      if (f.tsFileExists) m.set(`${r.package} ${f.rubyFile}`, new Set(f.missingTests ?? []));
+  return m;
 }
 
 function fileMap(c: Comparison, field: "expectedTsFile" | "conventionTsFile") {
@@ -78,6 +92,9 @@ export async function main(args: readonly string[]): Promise<number> {
     const entry = source.packages.find((p) => p.name === pkg);
     return path.posix.join("vendor", source.name, versionDir(ref), entry?.[kind] ?? pkg);
   };
+  const testComparison = await readJson<Comparison>(
+    "scripts/test-compare/output/convention-comparison.json",
+  );
   const input: StoryInput = {
     source: source.name,
     from,
@@ -86,7 +103,10 @@ export async function main(args: readonly string[]): Promise<number> {
     pairRows: await readJson<PairSeedRow[]>(`scripts/parity/bump-ledger/${source.name}.json`),
     testRows: await readJson<TestSeedRow[]>(
       `scripts/parity/bump-ledger/${source.name}.tests.json`,
-    ).catch(() => []),
+    ).catch((e: NodeJS.ErrnoException) => {
+      if (e.code === "ENOENT") return [];
+      throw e;
+    }),
     fromTests: await readJson<RubyTestManifest>(fromTests),
     toTests: await readJson<RubyTestManifest>(
       flag(args, "to-tests") ?? "scripts/test-compare/output/rails-tests.json",
@@ -95,10 +115,8 @@ export async function main(args: readonly string[]): Promise<number> {
       await readJson<Comparison>("scripts/api-compare/output/api-comparison.json"),
       "expectedTsFile",
     ),
-    tsTestFileOf: fileMap(
-      await readJson<Comparison>("scripts/test-compare/output/convention-comparison.json"),
-      "conventionTsFile",
-    ),
+    tsTestFileOf: fileMap(testComparison, "conventionTsFile"),
+    missing: missingOf(testComparison),
     libDir: dir("libPath"),
     testDir: dir("testPath"),
     order: config.order ?? [],
