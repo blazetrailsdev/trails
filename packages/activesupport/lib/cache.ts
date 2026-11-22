@@ -16,6 +16,14 @@ export type { CacheLogger, StoreOptions } from "./cache/store.js";
 export { DeserializationError } from "./cache/deserialization-error.js";
 export { Entry } from "./cache/entry.js";
 
+export function formatVersion(): number {
+  return ActiveSupport.Cache._formatVersion;
+}
+
+export function setFormatVersion(value: number): void {
+  ActiveSupport.Cache._formatVersion = value;
+}
+
 export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheStore {
   if (typeof store === "string" && store.startsWith(":")) {
     const extracted = extractOptionsBang(parameters);
@@ -90,4 +98,6 @@ Object.assign(ActiveSupport.Cache, {
   DeserializationError,
   lookupStore,
   expandCacheKey,
+  formatVersion,
+  setFormatVersion,
 });

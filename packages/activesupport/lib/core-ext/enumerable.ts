@@ -142,6 +142,13 @@ export function compactBlank<T>(collection: Iterable<T> | Each<T>): T[] {
   return reject(collection, (item) => isBlank(item));
 }
 
+export function compactBlankBang<T>(self: T[]): T[] {
+  for (let i = self.length - 1; i >= 0; i--) {
+    if (isBlank(self[i])) self.splice(i, 1);
+  }
+  return self;
+}
+
 export function many<T>(collection: Iterable<T> | Each<T>, fn?: (item: T) => unknown): boolean {
   let cnt = 0;
   if (fn) {

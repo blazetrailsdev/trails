@@ -3,8 +3,7 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import { Entry } from "../../../lib/cache/entry.js";
 import { coder } from "../../../lib/cache/coder.js";
 import "../../../lib/cache.js";
-import { ActiveSupport } from "../../../lib/namespaces.js";
-import { objectWith } from "../../../lib/core-ext/object/with.js";
+import { formatVersion as currentFormatVersion, setFormatVersion } from "../../../lib/cache.js";
 import { deflate, inflate } from "../../../lib/gzip.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 
@@ -34,11 +33,17 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
   });
 
   afterEach(async () => {
-    ActiveSupport.Cache.formatVersion = 7.0;
+    setFormatVersion(7.0);
   });
 
   function withFormat<T>(formatVersion: number, block: () => T): T {
-    return objectWith(ActiveSupport.Cache, { formatVersion }, block);
+    const old = currentFormatVersion();
+    setFormatVersion(formatVersion);
+    try {
+      return block();
+    } finally {
+      setFormatVersion(old);
+    }
   }
 
   function computeEntrySizeReduction(value: unknown, withOptions: StoreOptions = {}): number {

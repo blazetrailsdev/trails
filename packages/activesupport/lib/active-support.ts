@@ -25,11 +25,11 @@ export function setTestParallelizationThreshold(value: number): void {
 }
 
 export function cacheFormatVersion(): number {
-  return ActiveSupport.Cache.formatVersion;
+  return ActiveSupport.Cache.formatVersion!();
 }
 
 export function setCacheFormatVersion(value: number): void {
-  ActiveSupport.Cache.formatVersion = value;
+  ActiveSupport.Cache.setFormatVersion!(value);
 }
 
 export function toTimePreservesTimezone(): boolean | string {

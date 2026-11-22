@@ -1,3 +1,4 @@
+import { compactBlankBang as arrayCompactBlankBang } from "../../lib/core-ext/enumerable.js";
 import { describe, it, expect } from "vitest";
 import { sum } from "../../lib/enumerable-utils.js";
 import {
@@ -29,7 +30,6 @@ import {
 import { Range } from "@blazetrails/ruby-compat/range";
 import { assertEqual, assertRaise, assertRaises } from "../../lib/testing/assertions.js";
 import "../../lib/core-ext/enumerable.js";
-import { Array as ArrayExt } from "../../lib/core-ext/array/access.js";
 
 class Payment {
   constructor(readonly price: number | null) {}
@@ -403,7 +403,7 @@ describe("EnumerableTests", () => {
 
   it("array compact blank!", () => {
     const values: unknown[] = [1, "", null, 2, " ", [], {}, false, true];
-    ArrayExt.compactBlankBang(values);
+    arrayCompactBlankBang(values);
 
     expect(values).toEqual([1, 2, true]);
   });

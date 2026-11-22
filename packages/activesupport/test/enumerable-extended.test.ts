@@ -1,3 +1,4 @@
+import { compactBlankBang as arrayCompactBlankBang } from "../lib/core-ext/enumerable.js";
 import { describe, it, expect } from "vitest";
 import { sum, any } from "../lib/enumerable-utils.js";
 import {
@@ -240,7 +241,7 @@ describe("EnumerableTests", () => {
   it("array compact blank!", async () => {
     const { Array: ArrayExt } = await import("../lib/core-ext/array/access.js");
     const arr = [1, null, "", "hello"];
-    const result = ArrayExt.compactBlankBang(arr);
+    const result = arrayCompactBlankBang(arr);
     expect(result).toBe(arr);
     expect(result).toEqual([1, "hello"]);
   });
