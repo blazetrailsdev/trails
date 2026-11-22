@@ -110,6 +110,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "globalid",
   "i18n",
   "image-processing",
+  "libxml-ruby",
   "loofah",
   "mail",
   "marcel",
