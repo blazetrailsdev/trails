@@ -65,7 +65,7 @@
         ]
       },
       { "name": "helpers", "prefixes": ["helpers", "template/"] },
-      { "name": "rendering", "prefixes": ["renderer/", "template.rb", "template/"] }
+      { "name": "rendering", "prefixes": ["renderer/", "template.rb"] }
     ],
     "activesupport": [
       { "name": "core-ext", "prefixes": ["core_ext/"] },
