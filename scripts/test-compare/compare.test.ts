@@ -18,6 +18,7 @@ import {
   sharingPackages,
   normalize,
   parseMinExtra,
+  classPathQualified,
   rejectsSiblingClassCandidate,
   rubyToConventionTs,
   SHARED_CACHE_BEHAVIORS_DIR,
@@ -316,6 +317,25 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("relation/where_test.rb", "activerecord")).toBe(
       "relation/where.test.ts",
     );
+  });
+});
+
+describe("classPathQualified", () => {
+  it("writes the class segment as the Rails class path under an enclosing module", () => {
+    expect(
+      classPathQualified({
+        ancestors: ["TestHelperTest"],
+        description: "mail",
+        rubyClass: "TestHelperTest",
+        rubyClassPath: "ActionMailbox::TestHelperTest",
+      }),
+    ).toBe("actionmailbox::testhelpertest > mail");
+  });
+
+  it("answers undefined for a class with no enclosing module", () => {
+    expect(
+      classPathQualified({ ancestors: ["FooTest"], description: "x", rubyClass: "FooTest" }),
+    ).toBeUndefined();
   });
 });
 

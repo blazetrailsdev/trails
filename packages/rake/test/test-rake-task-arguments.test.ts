@@ -107,7 +107,7 @@ describe("TestRakeTaskArguments", () => {
     expect(ta.get("bb")).toBe("original_val");
   });
 
-  // PERMANENT-SKIP: the default is keyed by the String "cc" where the lookup is
+  // PERMANENT-SKIP: CLAUDE.md, "A Ruby Symbol is a JS string": `"cc"` and `:cc` are one key, so the default is found.
   it.skip("default arguments that dont match names are ignored", () => {
     const ta = new TaskArguments(["aa", "bb"], [null, "original_val"]);
     ta.withDefaults({ cc: "default_val" });

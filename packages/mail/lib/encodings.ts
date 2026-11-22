@@ -1,9 +1,12 @@
 import {
   type Encoding,
   b,
+  binaryBytes,
+  binaryString,
   chomp,
   eachSlice,
   encode,
+  forceEncoding,
   type Enumerator,
   Errno,
   isAsciiOnly,
@@ -149,30 +152,34 @@ export const Encodings = {
   },
 
   /** @missingRailsArgs ascii_only? — PERMANENT */
-  encodeNonUsascii(address: string, charset: string | null): string {
+  encodeNonUsascii(address: string | Uint8Array, charset: string | null): string | Uint8Array {
     if (isAsciiOnly(address) || charset == null) return address;
+    const encoding = address instanceof Uint8Array ? rbObjEncoding(address) : null;
+    const tagged = (str: string): string | Uint8Array =>
+      encoding == null ? str : forceEncoding(binaryBytes(str), encoding);
 
-    address = address.replace(/("[^"]*[^/]")/g, (s) =>
-      Encodings.bValueEncode(Utilities.unquote(s), charset),
+    address = (typeof address === "string" ? address : binaryString(address)).replace(
+      /("[^"]*[^/]")/g,
+      (s) => Encodings.bValueEncode(Utilities.unquote(tagged(s) as string), charset) as string,
     );
 
-    const tokens = stringSplit(address, /\s/);
+    const tokens = stringSplit(address, /\s/).map(tagged);
 
-    return Utilities.mapWithIndex(tokens, (word: string, i) => {
+    return Utilities.mapWithIndex(tokens, (word: string | Uint8Array, i) => {
       if (isAsciiOnly(word)) {
-        return word;
+        return typeof word === "string" ? word : binaryString(word);
       } else {
         const previousNonAscii = i > 0 && tokens[i - 1] != null && !isAsciiOnly(tokens[i - 1]);
         if (previousNonAscii) {
-          word = ` ${word}`;
+          word = typeof word === "string" ? ` ${word}` : tagged(` ${binaryString(word)}`);
         }
         return Encodings.bValueEncode(word, charset);
       }
     }).join(" ");
   },
 
-  bValueEncode(string: string, encoding: string | null = null): string {
-    if (isAsciiOnly(String(string ?? ""))) {
+  bValueEncode(string: string | Uint8Array, encoding: string | null = null): string | Uint8Array {
+    if (isAsciiOnly(string instanceof Uint8Array ? string : String(string ?? ""))) {
       return string;
     } else {
       return [...(Encodings.eachBase64ChunkByterange(string, 60) as Enumerator<string>)]
@@ -237,7 +244,7 @@ export const Encodings = {
 
   /** @internal */
   eachBase64ChunkByterange(
-    str: string,
+    str: string | Uint8Array,
     maxBytesizePerBase64Chunk: number,
     block?: (chunk: string) => void,
   ): Enumerator<RubyString> | void {
@@ -255,7 +262,7 @@ export const Encodings = {
 
   /** @internal */
   eachChunkByterange(
-    str: string,
+    str: string | Uint8Array,
     maxBytesizePerChunk: number,
     block?: (chunk: string) => void,
   ): Enumerator<RubyString> | void {
@@ -266,7 +273,9 @@ export const Encodings = {
     let offset = 0;
     let chunksize = 0;
 
-    for (const chr of str) {
+    for (const chr of typeof str === "string"
+      ? str
+      : Array.from(str, (byte) => Uint8Array.of(byte))) {
       const charsize = b(chr).length;
 
       if (chunksize + charsize > maxBytesizePerChunk) {

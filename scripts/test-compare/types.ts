@@ -57,6 +57,7 @@ export interface TestCaseInfo {
    * extractor only.
    */
   rubyClass?: string;
+  rubyClassPath?: string;
   /** Source file */
   file: string;
   /** Line number in source */

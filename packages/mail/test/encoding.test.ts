@@ -151,8 +151,7 @@ describe("mail encoding", () => {
       expect(result).toEqual("Subject: =?ISO-8859-1?Q?This_is_=E4_string?=\r\n");
     });
 
-    // BLOCKED: mail-latin1-encoding-tests-use-tagged-bytes
-    it.skip("should allow you to send in unencoded strings to address fields and encode them", () => {
+    it("should allow you to send in unencoded strings to address fields and encode them", () => {
       const mail = Mail.new();
       mail.charset = "ISO-8859-1";
       mail.setTo(latin1("Mikel Linds\xE4r <mikel@test.lindsaar.net>"));
@@ -162,8 +161,7 @@ describe("mail encoding", () => {
       );
     });
 
-    // BLOCKED: mail-latin1-encoding-tests-use-tagged-bytes
-    it.skip("should allow you to send in multiple unencoded strings to address fields and encode them", () => {
+    it("should allow you to send in multiple unencoded strings to address fields and encode them", () => {
       const mail = Mail.new();
       mail.charset = "ISO-8859-1";
       mail.setTo(
@@ -181,8 +179,7 @@ describe("mail encoding", () => {
       ["Cc", "setCc"],
       ["Reply-To", "setReplyTo"],
     ] as const) {
-      // BLOCKED: mail-latin1-encoding-tests-use-tagged-bytes
-      it.skip(`allows multiple unencoded strings in ${field}`, () => {
+      it(`allows multiple unencoded strings in ${field}`, () => {
         const array = [
           "Mikel Linds\xE4r <mikel@test.lindsaar.net>",
           "\xE4d <ada@test.lindsaar.net>",

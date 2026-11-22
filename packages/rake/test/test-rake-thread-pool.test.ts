@@ -1,21 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { StandardError, block } from "@blazetrails/ruby-compat";
+import { StandardError, Thread, block } from "@blazetrails/ruby-compat";
 import { ThreadPool } from "../lib/thread-pool.js";
 
 const sleep = (seconds: number) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
 describe("TestRakeTestThreadPool", () => {
-  // PERMANENT-SKIP: a future runs on the event loop; there is no Thread.current to compare.
-  it.skip("pool executes in current thread for zero threads", () => {});
+  it("pool executes in current thread for zero threads", async () => {
+    const pool = new ThreadPool(0);
+    const f = pool.future(block(() => Thread.current()));
+    await pool.join();
+    expect(await f.value()).toBe(Thread.current());
+  });
 
-  // PERMANENT-SKIP: a future runs on the event loop; there is no Thread.current to compare.
-  it.skip("pool executes in other thread for pool of size one", () => {});
+  it("pool executes in other thread for pool of size one", async () => {
+    const pool = new ThreadPool(1);
+    const f = pool.future(block(() => Thread.current()));
+    await pool.join();
+    expect(await f.value()).not.toBe(Thread.current());
+  });
 
-  // PERMANENT-SKIP: a future runs on the event loop; there is no Thread.current to compare.
-  it.skip("pool executes in two other threads for pool of size two", () => {});
+  it("pool executes in two other threads for pool of size two", async () => {
+    const pool = new ThreadPool(2);
+    try {
+      const futures = Array.from({ length: 2 }, () =>
+        pool.future<Thread>(
+          block(async () => {
+            await sleep(0.1);
+            return Thread.current();
+          }),
+        ),
+      );
+      const threads = await Promise.all(futures.map((f) => f.value()));
 
-  // PERMANENT-SKIP: a future runs on the event loop; there is no Thread.current to compare.
-  it.skip("pool creates the correct number of threads", () => {});
+      expect(threads[0]).not.toBe(threads[1]);
+      expect(threads[0]).not.toBe(Thread.current());
+      expect(threads[1]).not.toBe(Thread.current());
+    } finally {
+      await pool.join();
+    }
+  });
+
+  it("pool creates the correct number of threads", async () => {
+    const pool = new ThreadPool(2);
+    const threads = new Set<Thread>();
+    for (let i = 0; i < 10; i++) {
+      pool.future(
+        block(async () => {
+          await sleep(0.02);
+          threads.add(Thread.current());
+        }),
+      );
+    }
+    await pool.join();
+    expect(threads.size).toBe(2);
+  });
 
   it("pool future does not duplicate arguments", async () => {
     const pool = new ThreadPool(2);

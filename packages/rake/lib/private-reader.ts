@@ -1,6 +1,6 @@
 import { extend, included, rbClearMethodCache } from "@blazetrails/ruby-compat";
 
-const ClassMethods = {
+export const ClassMethods = {
   privateReader(this: { prototype: object }, ...names: string[]): void {
     for (const name of names) {
       Object.defineProperty(this.prototype, name, {

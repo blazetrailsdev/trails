@@ -1,9 +1,11 @@
 import { ArgumentError } from "../argument-error.js";
+import { Encoding } from "../encoding.js";
 import { IndexError } from "../index-error.js";
 import { rbBuiltinClassName } from "../object.js";
 import { Range } from "../range.js";
 import { TypeError } from "../type-error.js";
 import { bytes, isCharBoundary, strNew } from "./bytes.js";
+import { forceEncoding, rbObjEncoding } from "./force-encoding.js";
 import {
   checkArity,
   num2long,
@@ -92,7 +94,12 @@ export function rbStrByteslice(str: string, ...args: unknown[]): string | null {
  * (`vendor/ruby/v3.3.11/string.c:6330`).
  */
 export function byteslice(str: Uint8Array, ...args: unknown[]): Uint8Array | null {
-  return strByteslice(str, args, (beg, end) => str.slice(beg, end));
+  const enc = rbObjEncoding(str);
+  return strByteslice(str, args, (beg, end) => {
+    const sub = str.slice(beg, end);
+    if (enc === Encoding.ASCII_8BIT || enc === Encoding.UTF_8) return sub;
+    return forceEncoding(sub, enc) as Uint8Array;
+  });
 }
 
 function strByteslice<T>(

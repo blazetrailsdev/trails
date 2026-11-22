@@ -98,7 +98,7 @@ export class Config {
     return this.root.join(this.sourceCodeDir);
   }
 
-  async loadTsConfig(): Promise<void> {
+  async loadRubyConfig(): Promise<void> {
     const rbConfigPath = File.expandPath(
       this.configPath.replace(/.json$/, ".ts"),
       this.root.toString(),

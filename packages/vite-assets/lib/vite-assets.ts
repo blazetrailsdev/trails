@@ -238,7 +238,7 @@ export class ViteAssets {
   async prewarmConfig(): Promise<Config> {
     if (this._config === undefined) {
       await this.configure();
-      await this._config!.loadTsConfig();
+      await this._config!.loadRubyConfig();
     }
 
     return this._config!;

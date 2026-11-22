@@ -84,7 +84,6 @@ export class ThreadPool {
   private startThread(): void {
     if (!(this._threads.size < this._maxActiveThreads)) return;
     const t = new Thread(async () => {
-      await null;
       try {
         while (this.safeThreadCount() <= this._maxActiveThreads) {
           if (!(await this.processQueueItem())) break;
