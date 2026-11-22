@@ -421,13 +421,12 @@ mattrAccessor.call(ActiveStorage, "videoPreviewArguments", { default: "-y -vfram
 
 export const Transformers = {
   name: "ActiveStorage::Transformers",
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS 7 needs this cast for the outer one; the TS 6 lint checker calls it unnecessary.
   loadPath: {
     "active_storage/transformers/transformer": () => import("./transformers/transformer.js"),
     "active_storage/transformers/image_processing_transformer": () =>
       import("./transformers/image-processing-transformer.js"),
-  } as Record<string, () => Promise<unknown>>,
-} as AutoloadModule & {
+  },
+} as unknown as AutoloadModule & {
   Transformer: unknown;
   ImageProcessingTransformer: unknown;
 };
