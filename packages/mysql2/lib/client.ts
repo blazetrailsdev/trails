@@ -53,7 +53,8 @@ export interface Mysql2Result<
 
 export interface Mysql2StreamResult<
   Row extends unknown[] | Record<string, unknown> = unknown[] | Record<string, unknown>,
-> extends Omit<Mysql2Result<Row>, "toA" | "first" | "each"> {
+> extends Omit<Mysql2Result<Row>, "toA" | "first" | "each" | "free"> {
+  free(): Promise<void>;
   toA(): Promise<Row[]>;
   first(): Promise<Row | null>;
   each(
@@ -1037,7 +1038,10 @@ export class Client {
       command.once("end", () => resolve(null));
       command.once("error", reject);
     }).catch((e: unknown) => this.raiseMysql2Error(e));
-    if (fields === null) return null;
+    if (fields == null) {
+      const header = await rows.next().catch((e: unknown) => this.raiseMysql2Error(e));
+      return this.storeResult([header.value, undefined]) as null;
+    }
     const resultObj = new Result(
       fields.map((field) => field.name),
       [],

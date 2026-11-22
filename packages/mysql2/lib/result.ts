@@ -178,6 +178,15 @@ export class Result {
       cacheRows = true;
     }
     if (this.stmtWrapper && !cast) warn(":cast is forced for prepared statements");
+    const dbTz = opts.databaseTimezone;
+    if (dbTz !== "local" && dbTz !== "utc") {
+      if (dbTz != null) {
+        warn(":database_timezone option must be :utc or :local - defaulting to :local");
+      }
+      opts.databaseTimezone = "local";
+    }
+    const appTz = opts.applicationTimezone;
+    if (appTz !== "local" && appTz !== "utc") opts.applicationTimezone = null;
     const asArray = opts.as === "array";
     const asHash = opts.as != null && !asArray;
     const shape = (row: Row): Row => {
@@ -213,27 +222,31 @@ export class Result {
     return source;
   }
 
-  private _each(fetchRowFunc: (row: Row) => Row, block?: (row: Row) => unknown): Promise<Row[]> {
+  private async _each(
+    fetchRowFunc: (row: Row) => Row,
+    block?: (row: Row) => unknown,
+  ): Promise<Row[]> {
     if (this.streamingComplete) {
       throw new Mysql2Error(
         "You have already fetched all the rows for this query and streaming is true. (to reiterate you must requery).",
       );
     }
     const client = this.client!;
-    return (async () => {
-      for (;;) {
-        const next = await this.streamRows!.next().catch((e: unknown) =>
-          client.raiseMysql2Error(e),
-        );
-        if (next.done) break;
-        const row = fetchRowFunc(next.value);
-        this.numberOfRows++;
-        if (block) await block(row);
-      }
-      this.streamingComplete = true;
-      client.freeResult(this);
-      return this.rows;
-    })();
+    let errstr: unknown;
+    for (;;) {
+      const next = await this.streamRows!.next().catch((e: unknown) => {
+        errstr = e;
+        return { done: true as const, value: undefined };
+      });
+      if (next.done) break;
+      const row = fetchRowFunc(next.value);
+      this.numberOfRows++;
+      if (block) await block(row);
+    }
+    client.freeResult(this);
+    this.streamingComplete = true;
+    if (errstr !== undefined) client.raiseMysql2Error(errstr);
+    return this.rows;
   }
 
   private fetchRowStmt(row: Row, args: QueryOptions): Row {
@@ -255,10 +268,10 @@ export class Result {
           return new RubyDate(year, month, day).toDate();
         }
         case "TIME": {
-          const [, hour, minute, second, part] = /^(\d+):(\d+):(\d+)(?:\.(\d+))?/
-            .exec(val as string)!
-            .map(Number);
-          let time = Time[args.databaseTimezone!](2000, 1, 1, hour, minute, second, part || 0);
+          const tokens = /^(\d+):(\d+):(\d+)(?:\.(\d+))?/.exec(val as string)!;
+          const [hour, minute, second] = tokens.slice(1, 4).map(Number);
+          const part = Number((tokens[4] ?? "").padEnd(6, "0"));
+          let time = Time[args.databaseTimezone!](2000, 1, 1, hour, minute, second, part);
           if (args.applicationTimezone != null) {
             if (args.applicationTimezone === "local") {
               time = time.getlocal();
@@ -270,8 +283,9 @@ export class Result {
         }
         case "DATETIME":
         case "TIMESTAMP": {
-          const [, year, month, day, hour, minute, second, part] =
-            /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)(?:\.(\d+))?/.exec(val as string)!.map(Number);
+          const tokens = /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)(?:\.(\d+))?/.exec(val as string)!;
+          const [year, month, day, hour, minute, second] = tokens.slice(1, 7).map(Number);
+          const part = Number((tokens[7] ?? "").padEnd(6, "0"));
           const seconds =
             year * 31557600 + month * 2592000 + day * 86400 + hour * 3600 + minute * 60 + second;
           if (seconds < MYSQL2_MIN_TIME || seconds > MYSQL2_MAX_TIME) {
@@ -287,15 +301,7 @@ export class Result {
             }
             return dt;
           }
-          let time = Time[args.databaseTimezone!](
-            year,
-            month,
-            day,
-            hour,
-            minute,
-            second,
-            part || 0,
-          );
+          let time = Time[args.databaseTimezone!](year, month, day, hour, minute, second, part);
           if (args.applicationTimezone != null) {
             if (args.applicationTimezone === "local") {
               time = time.getlocal();
@@ -368,8 +374,14 @@ export class Result {
     return Object.fromEntries(this.fields.map((name, i) => [name, castField(row[name], i)]));
   }
 
-  free(): void {
+  free(): void | Promise<void> {
     this.rows = [];
+    if (!this.isStreaming || this.streamingComplete) return;
+    this.streamingComplete = true;
+    return (async () => {
+      while (!(await this.streamRows!.next()).done);
+      this.client!.freeResult(this);
+    })();
   }
 }
 
