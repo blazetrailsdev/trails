@@ -447,7 +447,7 @@ The operator reversed two rulings on 2026-10-30, in RFC 0213.
   Lookup now walks the namespaces; an import is still right for a known name.
 - **The former no-autoloader ruling.** Its premise was that Zeitwerk is not vendored,
   so a port would have no Ruby source to mirror. Vendoring v2.7.2, the version
-  Rails 8.0.2 locks (`vendor/rails/v8.0.5.2/Gemfile.lock:676`), removes that, and
+  Rails 8.0.2 locked (2.7.3 at `vendor/rails/v8.0.5.2/Gemfile.lock:698`), removes that, and
   only `Module#autoload` lacks a JS form. The application scan in
   `packages/trailties/lib/application/finisher.ts` was an invented loader with
   no file contract and no reload.
