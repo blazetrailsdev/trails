@@ -24,12 +24,12 @@ describe("RackHeadersTest", () => {
     fh = Headers.get("AB", "1", "cd", "2", "3", "4");
   });
 
+  // PERMANENT-SKIP: CLAUDE.md, "Method visibility is compile-time only (`Module#private`, `basic_obj_respond_to`'s `pub`)" — the private `downcase_key` is still a public instance method.
   it.skip("public interface", () => {
-    // BLOCKED: ruby-compat-hash-answers-rack-headers-public-interface
     const headersMethods = publicInstanceMethods(Headers).sort();
     const hashMethods = publicInstanceMethods(Hash).sort();
-    expect(headersMethods.filter((m) => !hashMethods.includes(m))).toHaveLength(0);
-    expect(hashMethods.filter((m) => !headersMethods.includes(m))).toHaveLength(0);
+    expect(headersMethods.filter((m) => !hashMethods.includes(m))).toBeEmpty();
+    expect(hashMethods.filter((m) => !headersMethods.includes(m))).toBeEmpty();
   });
 
   it("class aref", () => {

@@ -925,7 +925,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const indifferentStrings = new HashWithIndifferentAccess<number>(strings());
     indifferentStrings.transformValuesBang((v) => v * 2);
 
-    expect(plainly(indifferentStrings)).toEqual({ a: 2, b: 4 });
+    expect(plainly<number>(indifferentStrings)).toEqual({ a: 2, b: 4 });
     expect(indifferentStrings).toBeInstanceOf(HashWithIndifferentAccess);
   });
 
@@ -942,7 +942,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const hash = new HashWithIndifferentAccess<unknown>(hashContainNilValue);
     let compactedHash = hash.compact();
 
-    expect(plainly(compactedHash)).toEqual(strings());
+    expect(plainly<NonNullable<unknown>>(compactedHash)).toEqual(strings());
     expect(plainly(hash)).toEqual(hashContainNilValue);
     expect(compactedHash).toBeInstanceOf(HashWithIndifferentAccess);
 
