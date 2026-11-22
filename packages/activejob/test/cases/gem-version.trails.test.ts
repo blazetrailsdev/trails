@@ -4,7 +4,7 @@ import { VERSION, gemVersion } from "../../lib/gem-version.js";
 
 describe("ActiveJob.gem_version", () => {
   it("is a Gem::Version built from VERSION::STRING", () => {
-    expect(VERSION.STRING).toBe("8.0.2");
+    expect(VERSION.STRING).toBe("8.0.5.2");
     expect(gemVersion()).toBeInstanceOf(Gem.Version);
     expect(gemVersion().version).toBe(VERSION.STRING);
   });
