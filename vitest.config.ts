@@ -826,7 +826,9 @@ export default defineConfig({
             "packages/actiontext/test/generators/**/*.test.ts",
             "packages/stimulus/test/generator.test.ts",
           ],
-          exclude: SHARED_EXCLUDE,
+          exclude: process.env.TRAILTIES_EXCLUDE
+            ? [...SHARED_EXCLUDE, process.env.TRAILTIES_EXCLUDE]
+            : SHARED_EXCLUDE,
           globalSetup: [
             "./packages/trailties/test/support/build-templates.ts",
             "./packages/trailties/test/support/isolation/global-setup.ts",
