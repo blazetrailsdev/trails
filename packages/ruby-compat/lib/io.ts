@@ -1404,26 +1404,76 @@ export class IO {
    * `rb_io_gets_m` (`vendor/ruby/v3.3.11/io.c:4363`): the bytes up to and
    * including the next `sep` (`$/`, `"\n"`, by default), or the rest of the stream,
    * in the external encoding as {@link readAll} answers it; `nil` at EOF.
+   * `limit` caps the bytes read (`""` for 0), and `chomp: true` drops the
+   * trailing `sep`, with a `\r` before the default `"\n"`
+   * (`rb_io_getline_0`, `vendor/ruby/v3.3.11/io.c:4128`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`
    * (`vendor/ruby/v3.3.11/io.c:4363`).
    */
-  gets(sep = "\n"): string | Uint8Array | null {
+  gets(
+    sep: string | number | { chomp?: boolean } = "\n",
+    limit: number | null | { chomp?: boolean } = null,
+    opts: { chomp?: boolean } = {},
+  ): string | Uint8Array | null {
+    if (typeof sep === "object") {
+      opts = sep;
+      sep = "\n";
+    } else if (typeof limit === "object" && limit !== null) {
+      opts = limit;
+      limit = null;
+    }
+    if (typeof sep === "number") {
+      limit = sep;
+      sep = "\n";
+    }
+    const chomp = opts.chomp != null && opts.chomp !== false;
     const rsptr = new TextEncoder().encode(sep);
     const bytes: number[] = [];
     let b: number | null;
+    if (limit === 0) return "";
     while ((b = this.getbyte()) !== null) {
       bytes.push(b);
       if (
-        bytes.length >= rsptr.length &&
-        rsptr.every((c, i) => bytes[bytes.length - rsptr.length + i] === c)
+        (typeof limit === "number" && limit >= 0 && bytes.length >= limit) ||
+        (bytes.length >= rsptr.length &&
+          rsptr.every((c, i) => bytes[bytes.length - rsptr.length + i] === c))
       )
         break;
     }
     if (bytes.length === 0) return null;
+    if (
+      chomp &&
+      bytes.length >= rsptr.length &&
+      rsptr.every((c, i) => bytes[bytes.length - rsptr.length + i] === c)
+    ) {
+      bytes.length -= rsptr.length;
+      if (sep === "\n" && bytes[bytes.length - 1] === 0x0d) bytes.length -= 1;
+    }
     const str = Uint8Array.from(bytes);
     if (this.enc2 === null) return ioEncStr(str, str.length, this.ioReadEncoding());
     return ioEncStr(str, str.length, this.enc2, this.ioReadEncoding());
+  }
+
+  /**
+   * `rb_io_readlines` (`vendor/ruby/v3.3.11/io.c:4518`) through `io_readlines`
+   * (`io.c:4527`): every remaining line, read as {@link gets} reads one.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#readlines`
+   * (`vendor/ruby/v3.3.11/io.c:4518`).
+   */
+  readlines(
+    sep: string | number | { chomp?: boolean } = "\n",
+    limit: number | null | { chomp?: boolean } = null,
+    opts: { chomp?: boolean } = {},
+  ): (string | Uint8Array)[] {
+    if (limit === 0 || sep === 0) throw new ArgumentError("invalid limit: 0 for readlines");
+    const ary: (string | Uint8Array)[] = [];
+    let line: string | Uint8Array | null;
+    while ((line = this.gets(sep, limit, opts)) !== null) {
+      ary.push(line);
+    }
+    return ary;
   }
 
   /**
