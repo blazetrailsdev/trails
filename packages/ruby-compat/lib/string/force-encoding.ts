@@ -128,7 +128,8 @@ export function isAsciiOnly(string: string | Uint8Array): boolean {
  * `rb_enc_fast_mbclen`): each character of {@link rbObjEncoding}'s encoding as
  * its own bytes, so a multi-byte character is one element. A single-byte
  * encoding, or one `TextDecoder` has no label for, yields one byte per
- * character.
+ * character, and so does each byte of an invalid sequence, as
+ * `rb_enc_fast_mbclen` sizes it.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_str_each_char` (`vendor/ruby/v3.3.11/string.c:9307`).
  */
@@ -140,13 +141,25 @@ export function rbStrEachCharBytes(str: Uint8Array): Uint8Array[] {
     for (let i = 0; i < str.length; i++) chars.push(rbEncAssociate(str.slice(i, i + 1), enc));
     return chars;
   }
-  const decoder = new TextDecoder(label, { ignoreBOM: true });
+  let decoder = new TextDecoder(label, { ignoreBOM: true });
   let start = 0;
   for (let i = 0; i < str.length; i++) {
-    if (decoder.decode(str.subarray(i, i + 1), { stream: true }) !== "" || i + 1 === str.length) {
+    const text = decoder.decode(str.subarray(i, i + 1), { stream: true });
+    if (text === "") continue;
+    if ([...text].length === 1 && text !== "\ufffd") {
       chars.push(rbEncAssociate(str.slice(start, i + 1), enc));
       start = i + 1;
+      continue;
     }
+    for (; start < i; start++) chars.push(rbEncAssociate(str.slice(start, start + 1), enc));
+    decoder = new TextDecoder(label, { ignoreBOM: true });
+    if (decoder.decode(str.subarray(i, i + 1), { stream: true }) !== "") {
+      chars.push(rbEncAssociate(str.slice(i, i + 1), enc));
+      start = i + 1;
+    }
+  }
+  for (; start < str.length; start++) {
+    chars.push(rbEncAssociate(str.slice(start, start + 1), enc));
   }
   return chars;
 }

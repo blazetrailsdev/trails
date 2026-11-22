@@ -13,4 +13,17 @@ describe("Encodings.eachChunkByterange", () => {
       [0x8c, 0xea],
     ]);
   });
+
+  it("keeps a UTF-8 character whole across chunks", () => {
+    const chunks: unknown[] = [];
+    Encodings.eachChunkByterange("日本", 4, (chunk) => chunks.push(chunk));
+    expect(chunks).toEqual(["日", "本"]);
+  });
+
+  it("sizes each byte of an invalid sequence as its own character", () => {
+    const str = forceEncoding(Uint8Array.of(0xe3, 0x81, 0x41), "UTF-8");
+    const chunks: unknown[] = [];
+    Encodings.eachChunkByterange(str, 1, (chunk) => chunks.push(Array.from(chunk as never)));
+    expect(chunks).toEqual([[0xe3], [0x81], [0x41]]);
+  });
 });
