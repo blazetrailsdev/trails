@@ -26,11 +26,11 @@ export default {
   //   bucket: `your_own_bucket-${Trails.env}`,
   // },
 
-<%# @noRailsEquivalent PERMANENT microsoft -%>
+<%# @noRailsEquivalent PERMANENT -%>
   // mirror: {
   //   service: "Mirror",
   //   primary: "local",
-<%# @noRailsEquivalent PERMANENT mirrors -%>
+<%# @noRailsEquivalent PERMANENT -%>
   //   mirrors: ["amazon", "google"],
   // },
 };
