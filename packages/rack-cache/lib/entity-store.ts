@@ -37,8 +37,12 @@ export class EntityStore {
     };
     if (Symbol.iterator in body) {
       for (const part of body) await yieldPart(part);
+    } else if (body instanceof File) {
+      for await (const part of body.eachAsync()) await yieldPart(part);
     } else {
-      await each(body, yieldPart);
+      let yielded: unknown = null;
+      await each(body, (part) => (yielded = Promise.resolve(yielded).then(() => yieldPart(part))));
+      await yielded;
     }
     if (rbObjRespondTo(body, "close")) await body.close!();
     return [digest.hexdigest(), size];
