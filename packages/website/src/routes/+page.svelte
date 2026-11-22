@@ -105,7 +105,7 @@
     <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
     <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby gem"} API</small>{/if}</a></li>{/each}</ul>
-    <p class="small"><strong>And there are more packages besides these.</strong> The gems Rails depends on are ported alongside them.</p>
+    <p class="small"><strong>And more.</strong> We&rsquo;re bringing all the friends along.</p>
     <p class="fine">Each percentage is the share of the upstream gem's public API names (classes, modules, methods and constants) that have a matching name in the trails package. &ldquo;Rails API&rdquo; marks a gem the Rails project owns, such as Active Record, Solid Queue or thor; &ldquo;Ruby gem API&rdquo; marks one of the other gems Rails depends on, such as rack or i18n. &ldquo;Measured at {data.measuredAt}&rdquo; names the trails commit the figures were computed on. A trails app's client-side JavaScript, Turbo and Stimulus included, uses these same packages, so the code in the browser and on the server is all compatible.</p>
   </section>
 
