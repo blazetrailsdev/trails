@@ -185,7 +185,7 @@
       "sha": "b9c646a8486ef3e76f70919568cac070276da0e1"
     },
     "sqlite3": {
-      "ref": "v2.7.2",
+      "ref": "v2.7.3",
       "sha": "0cfccfc91c93afb11769dc7b830cb5d7ae2addcc"
     },
     "stimulus-rails": {

@@ -87608,15 +87608,15 @@
     "package": "mini-magick",
     "rubyFile": "shell.rb",
     "rubyName": "execute",
-    "digest": "b13b8175402e6e11",
-    "ref": "v5.2.0"
+    "digest": "d420b3e437eb6388",
+    "ref": "v5.3.1"
   },
   {
     "package": "mini-magick",
     "rubyFile": "shell.rb",
     "rubyName": "log",
-    "digest": "bd5208b31d5addb1",
-    "ref": "v5.2.0"
+    "digest": "1cb250978de597bb",
+    "ref": "v5.3.1"
   },
   {
     "package": "mini-magick",
@@ -87657,8 +87657,8 @@
     "package": "mini-magick",
     "rubyFile": "tool.rb",
     "rubyName": "executable",
-    "digest": "9fa5dac31a983ec7",
-    "ref": "v5.2.0"
+    "digest": "b48a4ec76d459262",
+    "ref": "v5.3.1"
   },
   {
     "package": "mini-magick",
@@ -87692,8 +87692,8 @@
     "package": "mini-magick",
     "rubyFile": "tool.rb",
     "rubyName": "new",
-    "digest": "4b15da66c96df283",
-    "ref": "v5.2.0"
+    "digest": "c003d6f98ed6bb31",
+    "ref": "v5.3.1"
   },
   {
     "package": "mini-magick",
@@ -89134,8 +89134,8 @@
     "package": "pg",
     "rubyFile": "connection.rb",
     "rubyName": "cancel",
-    "digest": "62fc999efdf45115",
-    "ref": "v1.5.9"
+    "digest": "990d94119edb5281",
+    "ref": "v1.6.2"
   },
   {
     "package": "pg",
@@ -93142,8 +93142,8 @@
     "package": "rack-session",
     "rubyFile": "pool.rb",
     "rubyName": "delete_session",
-    "digest": "e9110edaf4264abc",
-    "ref": "v2.1.0"
+    "digest": "91646353080b9ab2",
+    "ref": "v2.1.1"
   },
   {
     "package": "rack-session",
@@ -93177,8 +93177,8 @@
     "package": "rack-session",
     "rubyFile": "pool.rb",
     "rubyName": "write_session",
-    "digest": "a6d550e06b4e8dd3",
-    "ref": "v2.1.0"
+    "digest": "1e43f4572003368f",
+    "ref": "v2.1.1"
   },
   {
     "package": "rack-test",
@@ -93716,8 +93716,8 @@
     "package": "rails-dom-testing",
     "rubyFile": "assertions/selector_assertions.rb",
     "rubyName": "assert_dom",
-    "digest": "c90ae9feef5c54aa",
-    "ref": "v2.2.0"
+    "digest": "5b900729a8f3fd2d",
+    "ref": "v2.3.0"
   },
   {
     "package": "rails-dom-testing",
@@ -93786,8 +93786,8 @@
     "package": "rails-dom-testing",
     "rubyFile": "assertions/selector_assertions/html_selector.rb",
     "rubyName": "extract_equality_tests",
-    "digest": "8ba6f14f0b29f14e",
-    "ref": "v2.2.0"
+    "digest": "62e6d47d9adf8838",
+    "ref": "v2.3.0"
   },
   {
     "package": "rails-dom-testing",
@@ -93807,15 +93807,15 @@
     "package": "rails-dom-testing",
     "rubyFile": "assertions/selector_assertions/html_selector.rb",
     "rubyName": "filter",
-    "digest": "36edad623a60c7f8",
-    "ref": "v2.2.0"
+    "digest": "118627e6da3d26e7",
+    "ref": "v2.3.0"
   },
   {
     "package": "rails-dom-testing",
     "rubyFile": "assertions/selector_assertions/html_selector.rb",
     "rubyName": "initialize",
-    "digest": "0352091d8762f5dd",
-    "ref": "v2.2.0"
+    "digest": "d8643e7ac6996bf0",
+    "ref": "v2.3.0"
   },
   {
     "package": "rails-dom-testing",
@@ -94003,8 +94003,8 @@
     "package": "solid-cable",
     "rubyFile": "trim_job.rb",
     "rubyName": "trim?",
-    "digest": "e2ea41bc6da14487",
-    "ref": "v3.0.7"
+    "digest": "bcafab660b5428eb",
+    "ref": "v3.0.12"
   },
   {
     "package": "solid-cable",
@@ -94038,8 +94038,8 @@
     "package": "sqlite3",
     "rubyFile": "database.rb",
     "rubyName": "encoding",
-    "digest": "d10ee3b805f3e20a",
-    "ref": "v2.6.0"
+    "digest": "6d236e7125bca9ff",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -94374,8 +94374,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "encoding=",
-    "digest": "3c09c0d8954c47ab",
-    "ref": "v2.6.0"
+    "digest": "a2c2a1da9daca499",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -94521,8 +94521,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "journal_mode=",
-    "digest": "7450ecf7465af588",
-    "ref": "v2.6.0"
+    "digest": "811f973af3870a65",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -94563,8 +94563,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "locking_mode=",
-    "digest": "461cc4c6769a8db1",
-    "ref": "v2.6.0"
+    "digest": "c00e2f13d37a6262",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -94745,8 +94745,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "set_enum_pragma",
-    "digest": "e59f1523b5fe86d6",
-    "ref": "v2.6.0"
+    "digest": "0db9e909432f4181",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -94927,8 +94927,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "wal_checkpoint=",
-    "digest": "43dc65baaa85eacd",
-    "ref": "v2.6.0"
+    "digest": "a26e1c22427230dd",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -95466,8 +95466,8 @@
     "package": "thor",
     "rubyFile": "actions/file_manipulation.rb",
     "rubyName": "gsub_file",
-    "digest": "796082f2e40cea81",
-    "ref": "v1.3.2"
+    "digest": "cf2dcd0975d903a6",
+    "ref": "v1.4.0"
   },
   {
     "package": "thor",
@@ -95529,8 +95529,8 @@
     "package": "thor",
     "rubyFile": "actions/file_manipulation.rb",
     "rubyName": "with_output_buffer",
-    "digest": "4e87773277de8cee",
-    "ref": "v1.3.2"
+    "digest": "4704776712c629db",
+    "ref": "v1.4.0"
   },
   {
     "package": "thor",
@@ -97117,13 +97117,6 @@
   {
     "package": "thor",
     "rubyFile": "shell/basic.rb",
-    "rubyName": "git_merge_tool",
-    "digest": "8b31dd19b3c3c96d",
-    "ref": "v1.3.2"
-  },
-  {
-    "package": "thor",
-    "rubyFile": "shell/basic.rb",
     "rubyName": "indent",
     "digest": "091aa48334f8ec45",
     "ref": "v1.3.2"
@@ -97153,15 +97146,15 @@
     "package": "thor",
     "rubyFile": "shell/basic.rb",
     "rubyName": "merge",
-    "digest": "79bb7b5b358549c6",
-    "ref": "v1.3.2"
+    "digest": "7c66bb3c3d1ab271",
+    "ref": "v1.4.0"
   },
   {
     "package": "thor",
     "rubyFile": "shell/basic.rb",
     "rubyName": "merge_tool",
-    "digest": "bf0f86fc4ad0e144",
-    "ref": "v1.3.2"
+    "digest": "b67108a2a6fba3e0",
+    "ref": "v1.4.0"
   },
   {
     "package": "thor",
@@ -97258,8 +97251,8 @@
     "package": "thor",
     "rubyFile": "shell/basic.rb",
     "rubyName": "show_diff",
-    "digest": "0b6f09d759170a7a",
-    "ref": "v1.3.2"
+    "digest": "cc343b6a1dd96d38",
+    "ref": "v1.4.0"
   },
   {
     "package": "thor",
