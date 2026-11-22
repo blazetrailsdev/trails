@@ -135,6 +135,10 @@ describe("snakeToCamel", () => {
     expect(snakeToCamel("load_bundle")).toBe("loadBundle");
   });
 
+  it("spells a `ruby` token as `Ruby`", () => {
+    expect(snakeToCamel("load_ruby_config")).toBe("loadRubyConfig");
+  });
+
   it("renames rails as a whole token only", () => {
     expect(snakeToCamel("rails_env")).toBe("trailsEnv");
     expect(snakeToCamel("from_rails_root")).toBe("fromTrailsRoot");

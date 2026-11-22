@@ -121,3 +121,53 @@ export function isAsciiOnly(string: string | Uint8Array): boolean {
   if (typeof string === "string") return /^[\x00-\x7f]*$/.test(string);
   return string.every((byte) => byte < 0x80);
 }
+
+/**
+ * `String#each_char` over an encoding-tagged `Uint8Array`
+ * (`vendor/ruby/v3.3.11/string.c:9307` `rb_str_each_char`, which advances by
+ * `rb_enc_fast_mbclen`): each character of {@link rbObjEncoding}'s encoding as
+ * its own bytes, so a multi-byte character is one element. A single-byte
+ * encoding, or one `TextDecoder` has no label for, yields one byte per
+ * character, and so does each byte of an invalid sequence, as
+ * `rb_enc_fast_mbclen` sizes it.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_str_each_char` (`vendor/ruby/v3.3.11/string.c:9307`).
+ */
+export function rbStrEachCharBytes(str: Uint8Array): Uint8Array[] {
+  const enc = rbObjEncoding(str);
+  const chars: Uint8Array[] = [];
+  const label = enc.decoderLabel;
+  if (label === null) {
+    for (let i = 0; i < str.length; i++) chars.push(rbEncAssociate(str.slice(i, i + 1), enc));
+    return chars;
+  }
+  const isWhole = (bytes: Uint8Array): boolean => {
+    try {
+      new TextDecoder(label, { fatal: true, ignoreBOM: true }).decode(bytes);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  let decoder = new TextDecoder(label, { ignoreBOM: true });
+  let start = 0;
+  for (let i = 0; i < str.length; i++) {
+    const text = decoder.decode(str.subarray(i, i + 1), { stream: true });
+    if (text === "") continue;
+    if ([...text].length === 1 && (text !== "\ufffd" || isWhole(str.subarray(start, i + 1)))) {
+      chars.push(rbEncAssociate(str.slice(start, i + 1), enc));
+      start = i + 1;
+      continue;
+    }
+    for (; start < i; start++) chars.push(rbEncAssociate(str.slice(start, start + 1), enc));
+    decoder = new TextDecoder(label, { ignoreBOM: true });
+    if (decoder.decode(str.subarray(i, i + 1), { stream: true }) !== "") {
+      chars.push(rbEncAssociate(str.slice(i, i + 1), enc));
+      start = i + 1;
+    }
+  }
+  for (; start < str.length; start++) {
+    chars.push(rbEncAssociate(str.slice(start, start + 1), enc));
+  }
+  return chars;
+}
