@@ -1881,7 +1881,7 @@ export class Hash<K, V> extends Map<K, V> {
         : (rbToHashType(hash2 as Record<string, unknown>) as Map<unknown, K> | Record<string, K>);
     this.modifyCheck();
     const pairs = [...super.entries()];
-    const newKeys = new Set<K>();
+    const newKeys = new Hash<K, null>();
     for (const [key, val] of pairs) {
       let newKey: K;
       if (trans === undefined) {
@@ -1895,7 +1895,7 @@ export class Hash<K, V> extends Map<K, V> {
       }
       if (!newKeys.has(key)) this.deleteEntry(key);
       this.set(newKey, val);
-      newKeys.add(newKey);
+      newKeys.set(newKey, null);
     }
     return this;
   }
