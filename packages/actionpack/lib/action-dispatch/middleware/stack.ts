@@ -19,7 +19,7 @@ type MiddlewareArgs = unknown[] | [...unknown[], MiddlewareBlock];
 
 export type MiddlewareFactory =
   | (new (app: any, ...args: any[]) => unknown)
-  | { name: string; new: (app: any, ...args: any[]) => unknown };
+  | { name: string; "new"(app: unknown, ...args: unknown[]): unknown };
 
 export class Middleware {
   constructor(
