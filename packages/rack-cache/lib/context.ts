@@ -1,5 +1,6 @@
 import {
   excBacktrace,
+  type Included,
   include,
   rbModName,
   rbObjClone,
@@ -17,10 +18,6 @@ import type { Storage } from "./storage.js";
 type Env = Record<string, unknown>;
 type EntityStore = Parameters<MetaStore["store"]>[2];
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Context extends Omit<Options, "metastore" | "entitystore"> {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Context {
   /** @internal */
   private _trace: unknown[];
@@ -37,7 +34,13 @@ export class Context {
   /** @internal */
   private _request!: Request;
 
+  /** @internal */
   declare _env: Env | null | undefined;
+
+  /** @internal */
+  declare _defaultOptions: Options["_defaultOptions"];
+
+  declare set: Included<Options>["set"];
 
   /** @internal */
   declare protected initializeOptions: (options?: Record<string, unknown>) => void;
@@ -63,19 +66,22 @@ export class Context {
     this.initializeOptions(options);
     if (block !== undefined) block(this);
 
-    this._privateHeaderKeys = (this.privateHeaders as string[]).map(
+    this._privateHeaderKeys = ((this as unknown as Options).privateHeaders as string[]).map(
       (name) => `HTTP_${name.toUpperCase().replaceAll("-", "_")}`,
     );
   }
 
   async metastore(): Promise<MetaStore> {
-    const uri = this.options["rack-cache.metastore"];
-    return (await (this.storage as Storage).resolveMetastoreUri(uri, this._options)) as MetaStore;
+    const uri = (this as unknown as Options).options["rack-cache.metastore"];
+    return (await ((this as unknown as Options).storage as Storage).resolveMetastoreUri(
+      uri,
+      this._options,
+    )) as MetaStore;
   }
 
   async entitystore(): Promise<EntityStore> {
-    const uri = this.options["rack-cache.entitystore"];
-    return (await (this.storage as Storage).resolveEntitystoreUri(
+    const uri = (this as unknown as Options).options["rack-cache.entitystore"];
+    return (await ((this as unknown as Options).storage as Storage).resolveEntitystoreUri(
       uri,
       this._options,
     )) as EntityStore;
@@ -122,7 +128,7 @@ export class Context {
     const trace = this._trace.join(", ");
     response.headers.set("x-rack-cache", trace);
 
-    if (this.isVerbose()) {
+    if ((this as unknown as Options).isVerbose()) {
       const message = `cache: [${this._request.requestMethod} ${this._request.fullpath}] ${trace}\n`;
       this.logInfo(message);
     }
@@ -170,7 +176,10 @@ export class Context {
   private isFreshEnough(entry: Response): boolean | null {
     if (entry.isFresh()) {
       let maxAge;
-      if (this.isAllowRevalidate() && (maxAge = this._request.cacheControl.maxAge()) != null) {
+      if (
+        (this as unknown as Options).isAllowRevalidate() &&
+        (maxAge = this._request.cacheControl.maxAge()) != null
+      ) {
         return maxAge > 0 && maxAge >= entry.age;
       } else {
         return true;
@@ -210,7 +219,7 @@ export class Context {
   /** @internal */
   private async lookup(): Promise<Response> {
     const noCache = this._request.isNoCache();
-    if (noCache != null && noCache !== false && this.isAllowReload()) {
+    if (noCache != null && noCache !== false && (this as unknown as Options).isAllowReload()) {
       this.record("reload");
       return this.fetch();
     } else {
@@ -228,7 +237,7 @@ export class Context {
           return entry;
         } else {
           this.record("stale");
-          if (this.isFaultTolerant()) {
+          if ((this as unknown as Options).isFaultTolerant()) {
             return this.validateWithStaleCacheFailover(entry);
           } else {
             return this.validate(entry);
@@ -312,11 +321,11 @@ export class Context {
     } else {
       const mustRevalidate = response.cacheControl.isMustRevalidate();
       if (
-        (this.defaultTtl as number) > 0 &&
+        ((this as unknown as Options).defaultTtl as number) > 0 &&
         response.ttl == null &&
         (mustRevalidate == null || mustRevalidate === false)
       ) {
-        response.ttl = this.defaultTtl as number;
+        response.ttl = (this as unknown as Options).defaultTtl as number;
       }
     }
 
@@ -340,7 +349,7 @@ export class Context {
 
   /** @internal */
   private stripIgnoreHeaders(response: Response): unknown[] | undefined {
-    const strippedValues = (this.ignoreHeaders as string[]).map((name) =>
+    const strippedValues = ((this as unknown as Options).ignoreHeaders as string[]).map((name) =>
       response.headers.delete(name),
     );
     if (strippedValues.some((value) => value != null)) return this.record("ignore");
@@ -349,7 +358,7 @@ export class Context {
 
   /** @internal */
   private logError(exception: Error): void {
-    const message = `cache error: ${exception.message}\n${(excBacktrace(exception) ?? []).join("\n")}\n`;
+    const message = `cache error: ${exception.message}\n${excBacktrace(exception)!.join("\n")}\n`;
     this.log("error", message);
   }
 
