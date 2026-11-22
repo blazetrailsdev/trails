@@ -22,9 +22,9 @@ import { Application } from "../lib/application.js";
 import { Generators } from "../lib/generators.js";
 import { Trails } from "../lib/trails.js";
 import "../lib/trailties/active-record.js";
+import { noColorBang } from "../lib/command/behavior.js";
 
 let ModelGenerator: typeof import("../lib/generators/trails/model/model-generator.js").ModelGenerator;
-import { noColorBang } from "../lib/command/behavior.js";
 
 const GENERATORS_PATH = nodePath.join(
   decodeURIComponent(new URL("../lib/", import.meta.url).pathname),
@@ -312,7 +312,7 @@ describe("GeneratorsTest", () => {
 
   it("usage with embedded ruby", async () => {
     await import("./fixtures/lib/generators/usage-template/usage-template-generator.js");
-    const output = await capture("stdout", () => Generators.invoke("usage_template", ["--help"]));
+    const output = await capture("stdout", () => Generators.invoke("usage-template", ["--help"]));
     expect(output).toMatch(/:: 2 ::/);
   });
 

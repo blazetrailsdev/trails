@@ -5,7 +5,7 @@
 <% this.moduleNamespacing(() => { -%>
 import { <%= parentLeaf === parentClass ? parentClass : `${parentLeaf} as ${parentClass}` %> } from "<%= "../".repeat(this.classPath().length) || "./" %><%= ActiveSupport.Inflector.dasherize(ActiveSupport.Inflector.underscore(parentClassName.replace(/::/g, "/"))) %><%= this.ext() %>";
 
-export class <%= ActiveSupport.Inflector.camelize(this.fileName) %> extends <%= parentClass %> {
+export class <%= this.className().split("::").at(-1) %> extends <%= parentClass %> {
 <% if (attributes.some((a) => a.reference() || a.richText() || a.attachment() || a.attachments() || a.token() || a.passwordDigest())) { -%>
   static {
 <% attributes.filter((a) => a.reference()).forEach((attribute) => { -%>
