@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { block } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../lib/index.js";
 import type { EngineDatabase } from "../lib/database.js";
-import type { EngineStatement } from "../lib/statement.js";
+import type { EngineStatement, Statement } from "../lib/statement.js";
 
 function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
   const binds: [string | number, unknown][] = [];
@@ -83,6 +84,41 @@ describe("SQLite3::Statement over a fake engine", () => {
     expect(await (await SQLite3.Statement.new(fakeDatabase(rows, [], true).db, "x")).toA()).toEqual(
       rows,
     );
+  });
+
+  it("prepare and execute answer synchronously on a sync engine, and a promise on an async one", async () => {
+    const sync = fakeDatabase([[1]], ["a"], false).db;
+    const stmt = sync.prepare("x");
+    expect(stmt).toBeInstanceOf(SQLite3.Statement);
+    const rs = (stmt as Statement).execute(7);
+    expect(rs).not.toBeInstanceOf(Promise);
+    const yielded = (sync.prepare("x") as Statement).execute(
+      7,
+      block(() => "block value"),
+    );
+    expect(yielded).toBeInstanceOf(SQLite3.ResultSet);
+    expect(sync.prepare("x", (s) => s.isClosed())).toBe(false);
+
+    const { db, engineDb, binds } = fakeDatabase([[1]], ["a"], true);
+    const prepare = engineDb.prepare;
+    engineDb.prepare = (sql) => Promise.resolve(prepare(sql));
+    const pending = db.prepare("x");
+    expect(pending).toBeInstanceOf(Promise);
+    const executed = (await pending).execute(7);
+    expect(executed).toBeInstanceOf(Promise);
+    await executed;
+    expect(binds).toEqual([[1, 7]]);
+
+    let held: Statement | undefined;
+    const value = db.prepare("x", async (s) => {
+      held = s;
+      await Promise.resolve();
+      expect(s.isClosed()).toBe(false);
+      return "done";
+    });
+    expect(value).toBeInstanceOf(Promise);
+    expect(await value).toBe("done");
+    expect(held!.isClosed()).toBe(true);
   });
 
   it("done? survives close, and a discarded database refuses step", async () => {
