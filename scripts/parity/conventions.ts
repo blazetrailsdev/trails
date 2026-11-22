@@ -1643,9 +1643,33 @@ export function isInheritanceSkipClass(fqn: string): boolean {
   return INHERITANCE_SKIP_CLASS_FQNS.has(fqn);
 }
 
-/** True when `fqn` names a {@link RUBY_ONLY_CLASSES} entry. */
+/**
+ * A Ruby class a package's RFC leaves unported, inside a Ruby file whose other
+ * classes ARE ported, so neither `unported-files.ts` (whole file) nor
+ * {@link SCOPED_SKIP_GROUPS} (method names per file, which would also skip the
+ * same-named members of the ported sibling classes) fits. Class-level, like
+ * {@link RUBY_ONLY_CLASSES}: the class is neither scored nor expected as a
+ * superclass host.
+ */
+export const UNPORTED_CLASSES: RubyOnlyClass[] = [
+  "Rack::Cache::MetaStore::MemCached",
+  "Rack::Cache::MetaStore::GAEStore",
+  "Rack::Cache::EntityStore::MemCached",
+  "Rack::Cache::EntityStore::GAEStore",
+].map((fqn) => ({
+  fqn,
+  reason:
+    "RFC 0168-rack-cache-gem-port Non-goals: the `memcached` gem binding and " +
+    "JRuby's Google App Engine memcache service " +
+    "(`rack-cache/lib/rack/cache/meta_store.rb:362-439`, `entity_store.rb:245-331`) " +
+    "have no Node runtime; the Dalli and Heap/Disk stores in the same files are ported.",
+}));
+
+const UNPORTED_CLASS_FQNS = new Set(UNPORTED_CLASSES.map((c) => c.fqn));
+
+/** True when `fqn` names a {@link RUBY_ONLY_CLASSES} or {@link UNPORTED_CLASSES} entry. */
 export function isRubyOnlyClass(fqn: string): boolean {
-  return RUBY_ONLY_CLASS_FQNS.has(fqn);
+  return RUBY_ONLY_CLASS_FQNS.has(fqn) || UNPORTED_CLASS_FQNS.has(fqn);
 }
 
 /**

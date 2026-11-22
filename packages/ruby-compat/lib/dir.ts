@@ -456,6 +456,20 @@ export class Dir {
   }
 
   /**
+   * {@link Dir.mkdir} over the backend's async `mkdir`, or its `mkdirSync`,
+   * with `dir_s_mkdir`'s optional `permissions` argument.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.mkdir`
+   * (`vendor/ruby/v3.3.11/dir.c:1494`).
+   */
+  static async mkdirAsync(dirname: string, permissions?: number): Promise<number> {
+    const fs = getFs();
+    if (fs.mkdir) await fs.mkdir(dirname, permissions == null ? {} : { mode: permissions });
+    else fs.mkdirSync(dirname);
+    return 0;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/dir.c:3421` `dir_s_children`: every entry EXCEPT `"."` and
    * `".."`, and it raises rather than answering `[]` when the directory is
    * missing.

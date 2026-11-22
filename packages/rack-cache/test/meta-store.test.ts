@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type {} from "@blazetrails/vitest-matchers";
 import { Time } from "@blazetrails/date";
 import { MockRequest } from "@blazetrails/rack";
-import { NotImplementedError, StringIO } from "@blazetrails/ruby-compat";
+import { NotImplementedError, StringIO, each } from "@blazetrails/ruby-compat";
 import { EntityStore, Heap as EntityHeap } from "../lib/entity-store.js";
+import { createTempDirectory, removeEntrySecure } from "./support/test-helper.js";
 import { MetaStore } from "../lib/meta-store.js";
 import { Request } from "../lib/request.js";
 import { Response } from "../lib/response.js";
@@ -12,7 +13,9 @@ import { Response } from "../lib/response.js";
 type Store = any;
 
 export function rackCacheMetaStoreImplementation(
-  stores: () => { store: Store; entityStore: Store },
+  stores: () =>
+    | { store: Store; entityStore: Store }
+    | Promise<{ store: Store; entityStore: Store }>,
 ): void {
   let store: Store;
   let entityStore: Store;
@@ -29,9 +32,12 @@ export function rackCacheMetaStoreImplementation(
     return new Response(status, headers, body);
   }
 
-  function slurp(body: Iterable<string>): string {
+  async function slurp(body: Iterable<string>): Promise<string> {
     let buf = "";
-    for (const part of body) buf += part;
+    await each(
+      body,
+      (part) => (buf += typeof part === "string" ? part : new TextDecoder().decode(part)),
+    );
     return buf;
   }
 
@@ -50,8 +56,8 @@ export function rackCacheMetaStoreImplementation(
     return cacheKey;
   }
 
-  beforeEach(() => {
-    ({ store, entityStore } = stores());
+  beforeEach(async () => {
+    ({ store, entityStore } = await stores());
     request = mockRequest("/", {});
     response = mockResponse(200, {}, ["hello world"]);
   });
@@ -160,11 +166,12 @@ export function rackCacheMetaStoreImplementation(
     await storeSimpleEntry(null, null, io);
 
     const key = response.headers.fetch("x-content-digest");
-    expect(await entityStore.read(key)).toBe("TEST");
+    const data = await entityStore.read(key);
+    expect(data instanceof Uint8Array ? new TextDecoder().decode(data) : data).toBe("TEST");
 
     expect(io.isClosed()).toBeTruthy();
 
-    expect([...(response.body as string[])]).toEqual(["TEST"]);
+    expect([await slurp(response.body as string[])]).toEqual(["TEST"]);
   });
 
   it("sets the x-content-digest response header before storing", async () => {
@@ -241,8 +248,7 @@ export function rackCacheMetaStoreImplementation(
   it("restores response body from entity store with #lookup", async () => {
     await storeSimpleEntry();
     const lookedUp = await store.lookup(request, entityStore);
-    let body = "";
-    for (const p of lookedUp.body) body += p;
+    const body = await slurp(lookedUp.body);
     expect(body).toBe("test");
   });
 
@@ -338,9 +344,9 @@ export function rackCacheMetaStoreImplementation(
       const res3 = mockResponse(200, { [vary]: "Foo Bar" }, ["test 3"]);
       await store.store(req3, res3, entityStore);
 
-      expect(slurp((await store.lookup(req3, entityStore)).body)).toBe("test 3");
-      expect(slurp((await store.lookup(req1, entityStore)).body)).toBe("test 1");
-      expect(slurp((await store.lookup(req2, entityStore)).body)).toBe("test 2");
+      expect(await slurp((await store.lookup(req3, entityStore)).body)).toBe("test 3");
+      expect(await slurp((await store.lookup(req1, entityStore)).body)).toBe("test 1");
+      expect(await slurp((await store.lookup(req2, entityStore)).body)).toBe("test 2");
 
       expect((await store.read(key)).length).toBe(3);
     });
@@ -349,17 +355,17 @@ export function rackCacheMetaStoreImplementation(
       const req1 = mockRequest("/test", { HTTP_FOO: "Foo", HTTP_BAR: "Bar" });
       const res1 = mockResponse(200, { [vary]: "Foo Bar" }, ["test 1"]);
       const key = await store.store(req1, res1, entityStore);
-      expect(slurp((await store.lookup(req1, entityStore)).body)).toBe("test 1");
+      expect(await slurp((await store.lookup(req1, entityStore)).body)).toBe("test 1");
 
       const req2 = mockRequest("/test", { HTTP_FOO: "Bling", HTTP_BAR: "Bam" });
       const res2 = mockResponse(200, { [vary]: "Foo Bar" }, ["test 2"]);
       await store.store(req2, res2, entityStore);
-      expect(slurp((await store.lookup(req2, entityStore)).body)).toBe("test 2");
+      expect(await slurp((await store.lookup(req2, entityStore)).body)).toBe("test 2");
 
       const req3 = mockRequest("/test", { HTTP_FOO: "Foo", HTTP_BAR: "Bar" });
       const res3 = mockResponse(200, { [vary]: "Foo Bar" }, ["test 3"]);
       await store.store(req3, res3, entityStore);
-      expect(slurp((await store.lookup(req1, entityStore)).body)).toBe("test 3");
+      expect(await slurp((await store.lookup(req1, entityStore)).body)).toBe("test 3");
 
       expect((await store.read(key)).length).toBe(2);
     });
@@ -406,6 +412,20 @@ describe("Rack::Cache::MetaStore", () => {
     rackCacheMetaStoreImplementation(() => ({
       store: new MetaStore.Heap(),
       entityStore: new EntityHeap(),
+    }));
+  });
+
+  describe("Disk", () => {
+    let tempDir: string;
+    beforeEach(async () => {
+      tempDir = await createTempDirectory();
+    });
+    afterEach(async () => {
+      await removeEntrySecure(tempDir);
+    });
+    rackCacheMetaStoreImplementation(async () => ({
+      store: await MetaStore.Disk.new(`${tempDir}/meta`),
+      entityStore: await EntityStore.Disk.new(`${tempDir}/entity`),
     }));
   });
 });

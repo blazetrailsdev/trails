@@ -160,12 +160,12 @@ export class Response {
     this.maxAge = this.age + seconds;
   }
 
-  get lastModified(): string | undefined {
-    return this.headers.get("last-modified");
+  get lastModified(): string | null {
+    return this.headers.get("last-modified") ?? null;
   }
 
-  get etag(): string | undefined {
-    return this.headers.get("etag");
+  get etag(): string | null {
+    return this.headers.get("etag") ?? null;
   }
 
   static readonly NOT_MODIFIED_OMIT_HEADERS: ReadonlySet<string> = new Set([
@@ -186,8 +186,8 @@ export class Response {
     return null;
   }
 
-  get vary(): string | undefined {
-    return this.headers.get("vary");
+  get vary(): string | null {
+    return this.headers.get("vary") ?? null;
   }
 
   isVary(): boolean {

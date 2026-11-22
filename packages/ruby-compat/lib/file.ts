@@ -653,7 +653,7 @@ export class File extends IO {
     const fd = await getFs().openAsync(fileName, vmode.replace(/b/g, ""), perm);
     let file: File;
     try {
-      file = new File(fd, mode, opt);
+      file = new this(fd, mode, opt);
     } catch (error) {
       getFs().closeSync(fd);
       throw error;

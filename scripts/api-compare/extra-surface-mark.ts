@@ -179,6 +179,7 @@ export const ROWLESS_PACKAGES = [
   "marcel",
   "mini-magick",
   "rack",
+  "rack-cache",
   "rack-session",
   "rack-test",
   "rackup",

@@ -1,7 +1,18 @@
-import { Digest, each, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  Digest,
+  Errno,
+  File,
+  FileUtils,
+  Process,
+  Thread,
+  each,
+  rbClassNewInstance,
+  rbObjId,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 
 type Part = string | Uint8Array;
-type Body = (Iterable<Part> | { each(block: (part: Part) => unknown): unknown }) & {
+type RackBody = (Iterable<Part> | { each(block: (part: Part) => unknown): unknown }) & {
   close?: () => unknown;
 };
 
@@ -11,17 +22,22 @@ export class EntityStore {
   static MEM: typeof Heap;
   static Noop: typeof Noop;
   static NOOP: typeof Noop;
+  static Disk: typeof Disk;
+  static DISK: typeof Disk;
+  static FILE: typeof Disk;
 
   /** @internal */
-  protected slurp(body: Body, block: (part: Part) => unknown): [string, number] {
+  protected async slurp(body: RackBody, block: (part: Part) => unknown): Promise<[string, number]> {
     const digest = Digest.SHA1.new();
     let size = 0;
-    each(body, (part) => {
+    let yielded: Promise<unknown> = Promise.resolve();
+    await each(body, (part) => {
       size += this.bytesize(part);
       digest.update(part);
-      block(part);
+      yielded = yielded.then(() => block(part));
     });
-    if (rbObjRespondTo(body, "close")) body.close!();
+    await yielded;
+    if (rbObjRespondTo(body, "close")) await body.close!();
     return [digest.hexdigest(), size];
   }
 
@@ -68,9 +84,9 @@ export class Heap extends EntityStore {
     return buf;
   }
 
-  async write(body: Body, _ttl: number | null = null): Promise<[string, number]> {
+  async write(body: RackBody, _ttl: number | null = null): Promise<[string, number]> {
     const buf: Part[] = [];
-    const [key, size] = this.slurp(body, (part) => buf.push(part));
+    const [key, size] = await this.slurp(body, (part) => buf.push(part));
     this._hash[key] = buf;
     return [key, size];
   }
@@ -102,8 +118,8 @@ export class Noop extends EntityStore {
     return [];
   }
 
-  async write(body: Body, _ttl: number | null = null): Promise<[string, number]> {
-    const [key, size] = this.slurp(body, (part) => part);
+  async write(body: RackBody, _ttl: number | null = null): Promise<[string, number]> {
+    const [key, size] = await this.slurp(body, (part) => part);
     return [key, size];
   }
 
@@ -118,3 +134,109 @@ export class Noop extends EntityStore {
 
 EntityStore.Noop = Noop;
 EntityStore.NOOP = Noop;
+
+export class Body extends File {
+  /** @missingRailsCall read — PERMANENT */
+  // @ts-expect-error TS2416: Ruby's IO#each is synchronous; this override reads through the async fs.
+  override async each(block: (part: Uint8Array) => unknown): Promise<this> {
+    let part: Uint8Array | null;
+    while ((part = await this.readAsync(8192)) != null) {
+      await block(part);
+    }
+    return this;
+  }
+
+  override toPath(): string | null {
+    return this.path();
+  }
+}
+
+export class Disk extends EntityStore {
+  static Body = Body;
+
+  readonly root: string;
+
+  protected constructor(root: string) {
+    super();
+    this.root = root;
+  }
+
+  static async new(root: string): Promise<Disk> {
+    const store = rbClassNewInstance(this, root) as Disk;
+    await FileUtils.mkdirPAsync(root, { mode: 0o755 });
+    return store;
+  }
+
+  async isExist(key: string): Promise<boolean> {
+    return File.isExistAsync(this.bodyPath(key));
+  }
+
+  async read(key: string): Promise<Part | null> {
+    try {
+      return await File.openAsync(this.bodyPath(key), "rb", (f) => f.readAsync());
+    } catch (error) {
+      if (error instanceof Errno.ENOENT) return null;
+      throw error;
+    }
+  }
+
+  async open(key: string): Promise<Body | null> {
+    try {
+      return (await Body.openAsync(this.bodyPath(key), "rb")) as unknown as Body;
+    } catch (error) {
+      if (error instanceof Errno.ENOENT) return null;
+      throw error;
+    }
+  }
+
+  async write(body: RackBody, _ttl: number | null = null): Promise<[string, number]> {
+    const filename = ["buf", Process.pid, rbObjId(Thread.current())].join("-");
+    const tempFile = this.storagePath(filename);
+    const [key, size] = await File.openAsync(tempFile, "wb", (dest) =>
+      this.slurp(body, (part) => dest.writeAsync(part)),
+    );
+
+    const path = this.bodyPath(key);
+    if (await File.isExistAsync(path)) {
+      await File.deleteAsync(tempFile);
+    } else {
+      await FileUtils.mkdirPAsync(File.dirname(path), { mode: 0o755 });
+      await FileUtils.mvAsync(tempFile, path);
+    }
+    return [key, size];
+  }
+
+  async purge(key: string): Promise<null> {
+    try {
+      await File.deleteAsync(this.bodyPath(key));
+      return null;
+    } catch (error) {
+      if (error instanceof Errno.ENOENT) return null;
+      throw error;
+    }
+  }
+
+  /** @internal */
+  protected storagePath(stem: string): string {
+    return File.join(this.root, stem);
+  }
+
+  /** @internal */
+  protected spread(key: string): string {
+    return `${key.slice(0, 2)}/${key.slice(2)}`;
+  }
+
+  /** @internal */
+  protected bodyPath(key: string): string {
+    return this.storagePath(this.spread(key));
+  }
+
+  static async resolve(uri: { opaque: string | null; path: string }): Promise<Disk> {
+    const path = File.expandPath(uri.opaque ?? uri.path);
+    return this.new(path);
+  }
+}
+
+EntityStore.Disk = Disk;
+EntityStore.DISK = Disk;
+EntityStore.FILE = Disk;
