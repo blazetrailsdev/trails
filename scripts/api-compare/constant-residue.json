@@ -1135,12 +1135,13 @@
     }
   },
   "rack-cache": {
-    "rows": 19,
+    "rows": 20,
     "excluded": [],
     "unwalked": [],
     "residue": {
       "cache-control.ts::CacheControl": "Rack::Cache::CacheControl",
       "cache.ts::Cache": "Rack::Cache",
+      "context.ts::Context": "Rack::Cache::Context",
       "entity-store.ts::Body": "Rack::Cache::EntityStore::Disk::Body",
       "entity-store.ts::Dalli": "Rack::Cache::EntityStore::Dalli",
       "entity-store.ts::Disk": "Rack::Cache::EntityStore::Disk",
