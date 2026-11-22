@@ -63,7 +63,7 @@
   <nav class="nav">
     <ul class="left">{#each navLeft as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
     <a href="{base}/" class="mark" title="BlazeTrails home">
-      <span class="wm" aria-hidden="true"><span class="blaze">blaze</span>tra<span class="i">ı</span>ls</span>
+      <span class="wm" aria-hidden="true"><span class="blaze">blaze</span><span class="trails">trails</span></span>
       <span class="sr-only">blazetrails</span>
     </a>
     <ul class="right">{#each navRight as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
@@ -206,8 +206,8 @@
   .mark { text-decoration: none; }
   .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--ink); }
   .blaze { color: var(--orange); }
-  .i { position: relative; }
-  .i::before { content: ""; position: absolute; left: 50%; transform: translateX(-50%); top: 0.02em; width: 0.26em; height: 0.17em; background: var(--mango); border-radius: 0.035em; }
+  .trails { position: relative; display: inline-block; padding-bottom: 0.16em; }
+  .trails::after { content: ""; position: absolute; left: 0.02em; right: 0.06em; bottom: 0; height: 0.12em; background: linear-gradient(var(--mango), var(--mango)) top / 100% 0.03em no-repeat, linear-gradient(var(--mango), var(--mango)) bottom / 100% 0.03em no-repeat, repeating-linear-gradient(90deg, var(--mango) 0 0.05em, transparent 0.05em 0.2em); }
 
   .hero { padding: 40px 24px 80px; }
   .lede { font-size: 30px; line-height: 1.3; max-width: 700px; margin: 0 auto 1.5rem; }
