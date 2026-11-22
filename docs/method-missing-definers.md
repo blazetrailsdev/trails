@@ -46,6 +46,7 @@ Class-specific rules live in the owning package's `CLAUDE.md`, under
 | `rake/task_arguments.rb`                              | Proxy (proto chain)   |
 | `action_dispatch/routing/routes_proxy.rb`             | Proxy (proto chain)   |
 | `builder/xmlbase.rb`                                  | Proxy (proto chain)   |
+| `helpers/atom_feed_helper.rb`                         | Proxy (proto chain)   |
 | `mini_magick/tool.rb`                                 | Proxy (proto chain)   |
 | `mini_magick/image.rb`                                | Proxy (proto chain)   |
 | `image_processing/chainable.rb`                       | Proxy (proto chain)   |

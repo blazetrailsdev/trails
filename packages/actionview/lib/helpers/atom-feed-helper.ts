@@ -51,6 +51,7 @@ export function atomFeed(
   options: AtomFeedOptions = {},
   block: Block<AtomFeedBuilder>,
 ): unknown {
+  if (typeof options === "function") [options, block] = [{}, options];
   if (options.schemaDate != null && options.schemaDate !== false) {
     if (rbObjRespondTo(options.schemaDate, "strftime"))
       options.schemaDate = (options.schemaDate as { strftime(format: string): string }).strftime(
@@ -66,21 +67,22 @@ export function atomFeed(
   const xml: XmlBase =
     deleted ??
     (() => {
-      throw new NameError("local variable 'xml' is not defined");
+      throw new NameError("local variable `xml' is not defined for #<Binding>");
     })();
   xml.instructBang();
   if (options.instruct != null && options.instruct !== false) {
     for (const [target, attrs] of Object.entries(options.instruct)) {
       if (isPlainHash(attrs)) {
         xml.instructBang(target, attrs);
-      } else if (Array.isArray(attrs)) {
-        attrs.forEach((attrGroup) => xml.instructBang(target, attrGroup));
+      } else if (Array.isArray(attrs) || rbObjRespondTo(attrs, "each")) {
+        for (const attrGroup of attrs as Iterable<Record<string, unknown>>)
+          xml.instructBang(target, attrGroup);
       }
     }
   }
 
   const feedOpts: Record<string, unknown> = {
-    "xml:lang": options.language || "en-US",
+    "xml:lang": options.language != null ? options.language : "en-US",
     xmlns: "http://www.w3.org/2005/Atom",
   };
   Object.assign(feedOpts, options);
@@ -88,15 +90,23 @@ export function atomFeed(
 
   return xml.feed(feedOpts, () => {
     xml.id(
-      options.id ||
-        `tag:${this.request.host},${options.schemaDate}:${this.request.fullpath.split(".")[0]}`,
+      options.id != null
+        ? options.id
+        : `tag:${this.request.host},${options.schemaDate}:${this.request.fullpath.split(".")[0]}`,
     );
     xml.link({
       rel: "alternate",
       type: "text/html",
-      href: options.rootUrl || this.request.protocol + this.request.hostWithPort(),
+      href:
+        options.rootUrl != null
+          ? options.rootUrl
+          : this.request.protocol + this.request.hostWithPort(),
     });
-    xml.link({ rel: "self", type: "application/atom+xml", href: options.url || this.request.url });
+    xml.link({
+      rel: "self",
+      type: "application/atom+xml",
+      href: options.url != null && options.url !== false ? options.url : this.request.url,
+    });
 
     return block(new AtomFeedBuilder(xml, this, options));
   });
@@ -169,8 +179,9 @@ export class AtomFeedBuilder extends AtomBuilder {
     if (typeof options === "function") [options, block] = [{}, options];
     return this._xml.entry(() => {
       this._xml.id(
-        options.id ||
-          `tag:${this._view.request.host},${this._feedOptions.schemaDate}:${rbModName(record.constructor)}/${record.id}`,
+        options.id != null
+          ? options.id
+          : `tag:${this._view.request.host},${this._feedOptions.schemaDate}:${rbModName(record.constructor)}/${record.id}`,
       );
 
       if (options.published || (rbObjRespondTo(record, "createdAt") && record.createdAt)) {
@@ -184,7 +195,7 @@ export class AtomFeedBuilder extends AtomBuilder {
       const type = Object.hasOwn(options, "type") ? options.type : "text/html";
 
       const url = Object.hasOwn(options, "url") ? options.url : this._view.polymorphicUrl(record);
-      if (url) this._xml.link({ rel: "alternate", type: type, href: url });
+      if (url != null && url !== false) this._xml.link({ rel: "alternate", type: type, href: url });
 
       return block(new AtomBuilder(this._xml));
     });
