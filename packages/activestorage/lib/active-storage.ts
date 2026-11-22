@@ -29,6 +29,8 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_storage/fixture_set": () => import("@blazetrails/activestorage/testing/fixture-set"),
 };
 
+import type { Engine } from "./engine.js";
+
 export const ActiveStorage = {
   name: "ActiveStorage",
   loadPath,
@@ -37,7 +39,7 @@ export const ActiveStorage = {
   Reflection: { name: string };
   Attached: unknown;
   Attachment?: typeof Attachment;
-  Engine?: unknown;
+  Engine?: typeof Engine;
   FixtureSet?: typeof FixtureSet;
   Service: unknown;
   Previewer: typeof Previewer;
