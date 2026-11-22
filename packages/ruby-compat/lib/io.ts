@@ -637,7 +637,7 @@ export class IO {
   /**
    * `IO.default_console_size` (`vendor/ruby/v3.3.11/ext/io/console/lib/console/size.rb:3-8`).
    *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `io/console/size`.
+   * @noRailsEquivalent PERMANENT
    */
   static defaultConsoleSize(): [number, number] {
     return [Number(rbStrToI(env.LINES ?? "")) || 25, Number(rbStrToI(env.COLUMNS ?? "")) || 80];
@@ -645,13 +645,19 @@ export class IO {
 
   /**
    * `IO.console_size` (`vendor/ruby/v3.3.11/ext/io/console/lib/console/size.rb:17-21`).
-   * Node exposes no `/dev/tty` handle, so `console.winsize` is read off a TTY
-   * stdout; without one it is the `NoMethodError` arm.
+   * Node exposes no `/dev/tty` handle (`console_dev`,
+   * `vendor/ruby/v3.3.11/ext/io/console/console.c`), so `console.winsize` is read
+   * off whichever of stdout and stderr is a TTY; with neither it is the
+   * `NoMethodError` arm.
    *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `io/console/size`.
+   * @noRailsEquivalent PERMANENT
    */
   static consoleSize(): [number, number] {
-    if (stdout.isTTY && stdout.columns != null) return [stdout.rows ?? 0, stdout.columns];
+    for (const console of [stdout, stderr]) {
+      if (console.isTTY && console.columns != null && console.rows != null) {
+        return [console.rows, console.columns];
+      }
+    }
     return IO.defaultConsoleSize();
   }
 

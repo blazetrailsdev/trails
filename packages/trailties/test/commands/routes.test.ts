@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import type { ThorClass } from "@blazetrails/thor";
-import { File, include, setEnv } from "@blazetrails/ruby-compat";
+import { env, File, include, setEnv } from "@blazetrails/ruby-compat";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { lookupBang, subclasses } from "../../lib/command/behavior.js";
@@ -297,12 +297,13 @@ trails_conductor_inbound_email_incinerate POST /trails/conductor/action_mailbox/
   it("trails routes with expanded option", async () => {
     await t.appFile("config/routes.ts", routes(`this.get("/cart", { to: "cart#show" });`));
 
+    const columns = env.COLUMNS;
     setEnv("COLUMNS", "27");
     let output: string;
     try {
       output = await t.runRoutesCommand(["--expanded"]);
     } finally {
-      setEnv("COLUMNS", undefined);
+      setEnv("COLUMNS", columns);
     }
 
     output = output.replace(/\.ts:\d+$/gm, ".ts:XX");

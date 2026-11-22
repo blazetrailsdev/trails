@@ -1,3 +1,4 @@
+import { getPath } from "./fs-adapter.js";
 import { TypeError } from "./type-error.js";
 
 /**
@@ -52,7 +53,7 @@ export class Location {
       this.path = `(${location.slice(0, location.lastIndexOf(", "))})`;
     } else {
       const file = path ? path[1] : location;
-      this.path = file.startsWith("file://") ? decodeURIComponent(new URL(file).pathname) : file;
+      this.path = file.startsWith("file://") ? getPath().fileURLToPath!(file) : file;
     }
 
     const position = /:(\d+):(\d+)\)?$/.exec(this._frame);
