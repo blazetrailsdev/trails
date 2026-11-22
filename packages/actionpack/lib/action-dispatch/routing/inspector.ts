@@ -1,6 +1,6 @@
 import { underscore, type SafeBuffer } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
-import { RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
+import { IO, RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
 import type { Endpoint } from "./endpoint.js";
 import type { Route } from "../journey/route.js";
 import { RouteSet } from "./route-set.js";
@@ -270,7 +270,7 @@ export class Sheet extends Base {
 export class Expanded extends Base {
   private width: number;
 
-  constructor({ width = 80 }: { width?: number } = {}) {
+  constructor({ width = IO.consoleSize()[1] }: { width?: number } = {}) {
     super();
     this.width = width;
   }

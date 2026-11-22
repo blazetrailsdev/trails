@@ -7,7 +7,8 @@ import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
 import { EOFError } from "./eof-error.js";
 import { IOError } from "./io-error.js";
 import { ArgumentError } from "./argument-error.js";
-import { stderr, stdout, type WriteStream } from "./process-adapter.js";
+import { env, stderr, stdout, type WriteStream } from "./process-adapter.js";
+import { rbStrToI } from "./string/convert.js";
 import { verbose } from "./verbose.js";
 import { Errno } from "./errno.js";
 import { format } from "./kernel-format.js";
@@ -631,6 +632,27 @@ export class IO {
    */
   static get NULL(): string {
     return getPath().sep === "\\" ? "NUL" : "/dev/null";
+  }
+
+  /**
+   * `IO.default_console_size` (`vendor/ruby/v3.3.11/ext/io/console/lib/console/size.rb:3-8`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `io/console/size`.
+   */
+  static defaultConsoleSize(): [number, number] {
+    return [Number(rbStrToI(env.LINES ?? "")) || 25, Number(rbStrToI(env.COLUMNS ?? "")) || 80];
+  }
+
+  /**
+   * `IO.console_size` (`vendor/ruby/v3.3.11/ext/io/console/lib/console/size.rb:17-21`).
+   * Node exposes no `/dev/tty` handle, so `console.winsize` is read off a TTY
+   * stdout; without one it is the `NoMethodError` arm.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `io/console/size`.
+   */
+  static consoleSize(): [number, number] {
+    if (stdout.isTTY && stdout.columns != null) return [stdout.rows ?? 0, stdout.columns];
+    return IO.defaultConsoleSize();
   }
 
   /**

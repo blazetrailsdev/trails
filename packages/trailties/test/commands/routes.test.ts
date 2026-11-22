@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import type { ThorClass } from "@blazetrails/thor";
-import { include } from "@blazetrails/ruby-compat";
+import { File, include, setEnv } from "@blazetrails/ruby-compat";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { lookupBang, subclasses } from "../../lib/command/behavior.js";
@@ -292,5 +292,168 @@ trails_conductor_inbound_email_incinerate POST /trails/conductor/action_mailbox/
                     trails_direct_uploads POST /trails/active_storage/direct_uploads(.:format)                                                    active_storage/direct_uploads#create
 `,
     );
+  });
+
+  it("trails routes with expanded option", async () => {
+    await t.appFile("config/routes.ts", routes(`this.get("/cart", { to: "cart#show" });`));
+
+    setEnv("COLUMNS", "27");
+    let output: string;
+    try {
+      output = await t.runRoutesCommand(["--expanded"]);
+    } finally {
+      setEnv("COLUMNS", undefined);
+    }
+
+    output = output.replace(/\.ts:\d+$/gm, ".ts:XX");
+
+    const appPath = await t.appPath();
+    const trailsGemRoot = File.expandPath("../../../", import.meta.dirname);
+
+    expect(output).toBe(`--[ Route 1 ]--------------
+Prefix            | cart
+Verb              | GET
+URI               | /cart(.:format)
+Controller#Action | cart#show
+Source Location   | ${appPath}/config/routes.ts:XX
+--[ Route 2 ]--------------
+Prefix            | trails_postmark_inbound_emails
+Verb              | POST
+URI               | /trails/action_mailbox/postmark/inbound_emails(.:format)
+Controller#Action | action_mailbox/ingresses/postmark/inbound_emails#create
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 3 ]--------------
+Prefix            | trails_relay_inbound_emails
+Verb              | POST
+URI               | /trails/action_mailbox/relay/inbound_emails(.:format)
+Controller#Action | action_mailbox/ingresses/relay/inbound_emails#create
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 4 ]--------------
+Prefix            | trails_sendgrid_inbound_emails
+Verb              | POST
+URI               | /trails/action_mailbox/sendgrid/inbound_emails(.:format)
+Controller#Action | action_mailbox/ingresses/sendgrid/inbound_emails#create
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 5 ]--------------
+Prefix            | trails_mandrill_inbound_health_check
+Verb              | GET
+URI               | /trails/action_mailbox/mandrill/inbound_emails(.:format)
+Controller#Action | action_mailbox/ingresses/mandrill/inbound_emails#healthCheck
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 6 ]--------------
+Prefix            | trails_mandrill_inbound_emails
+Verb              | POST
+URI               | /trails/action_mailbox/mandrill/inbound_emails(.:format)
+Controller#Action | action_mailbox/ingresses/mandrill/inbound_emails#create
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 7 ]--------------
+Prefix            | trails_mailgun_inbound_emails
+Verb              | POST
+URI               | /trails/action_mailbox/mailgun/inbound_emails/mime(.:format)
+Controller#Action | action_mailbox/ingresses/mailgun/inbound_emails#create
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 8 ]--------------
+Prefix            | trails_conductor_inbound_emails
+Verb              | GET
+URI               | /trails/conductor/action_mailbox/inbound_emails(.:format)
+Controller#Action | trails/conductor/action_mailbox/inbound_emails#index
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 9 ]--------------
+Prefix            | 
+Verb              | POST
+URI               | /trails/conductor/action_mailbox/inbound_emails(.:format)
+Controller#Action | trails/conductor/action_mailbox/inbound_emails#create
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 10 ]-------------
+Prefix            | new_trails_conductor_inbound_email
+Verb              | GET
+URI               | /trails/conductor/action_mailbox/inbound_emails/new(.:format)
+Controller#Action | trails/conductor/action_mailbox/inbound_emails#new
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 11 ]-------------
+Prefix            | trails_conductor_inbound_email
+Verb              | GET
+URI               | /trails/conductor/action_mailbox/inbound_emails/:id(.:format)
+Controller#Action | trails/conductor/action_mailbox/inbound_emails#show
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 12 ]-------------
+Prefix            | new_trails_conductor_inbound_email_source
+Verb              | GET
+URI               | /trails/conductor/action_mailbox/inbound_emails/sources/new(.:format)
+Controller#Action | trails/conductor/action_mailbox/inbound_emails/sources#new
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 13 ]-------------
+Prefix            | trails_conductor_inbound_email_sources
+Verb              | POST
+URI               | /trails/conductor/action_mailbox/inbound_emails/sources(.:format)
+Controller#Action | trails/conductor/action_mailbox/inbound_emails/sources#create
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 14 ]-------------
+Prefix            | trails_conductor_inbound_email_reroute
+Verb              | POST
+URI               | /trails/conductor/action_mailbox/:inbound_email_id/reroute(.:format)
+Controller#Action | trails/conductor/action_mailbox/reroutes#create
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 15 ]-------------
+Prefix            | trails_conductor_inbound_email_incinerate
+Verb              | POST
+URI               | /trails/conductor/action_mailbox/:inbound_email_id/incinerate(.:format)
+Controller#Action | trails/conductor/action_mailbox/incinerates#create
+Source Location   | ${trailsGemRoot}/actionmailbox/lib/config/routes.ts:XX
+--[ Route 16 ]-------------
+Prefix            | trails_service_blob
+Verb              | GET
+URI               | /trails/active_storage/blobs/redirect/:signed_id/*filename(.:format)
+Controller#Action | active_storage/blobs/redirect#show
+Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
+--[ Route 17 ]-------------
+Prefix            | trails_service_blob_proxy
+Verb              | GET
+URI               | /trails/active_storage/blobs/proxy/:signed_id/*filename(.:format)
+Controller#Action | active_storage/blobs/proxy#show
+Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
+--[ Route 18 ]-------------
+Prefix            | 
+Verb              | GET
+URI               | /trails/active_storage/blobs/:signed_id/*filename(.:format)
+Controller#Action | active_storage/blobs/redirect#show
+Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
+--[ Route 19 ]-------------
+Prefix            | trails_blob_representation
+Verb              | GET
+URI               | /trails/active_storage/representations/redirect/:signed_blob_id/:variation_key/*filename(.:format)
+Controller#Action | active_storage/representations/redirect#show
+Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
+--[ Route 20 ]-------------
+Prefix            | trails_blob_representation_proxy
+Verb              | GET
+URI               | /trails/active_storage/representations/proxy/:signed_blob_id/:variation_key/*filename(.:format)
+Controller#Action | active_storage/representations/proxy#show
+Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
+--[ Route 21 ]-------------
+Prefix            | 
+Verb              | GET
+URI               | /trails/active_storage/representations/:signed_blob_id/:variation_key/*filename(.:format)
+Controller#Action | active_storage/representations/redirect#show
+Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
+--[ Route 22 ]-------------
+Prefix            | trails_disk_service
+Verb              | GET
+URI               | /trails/active_storage/disk/:encoded_key/*filename(.:format)
+Controller#Action | active_storage/disk#show
+Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
+--[ Route 23 ]-------------
+Prefix            | update_trails_disk_service
+Verb              | PUT
+URI               | /trails/active_storage/disk/:encoded_token(.:format)
+Controller#Action | active_storage/disk#update
+Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
+--[ Route 24 ]-------------
+Prefix            | trails_direct_uploads
+Verb              | POST
+URI               | /trails/active_storage/direct_uploads(.:format)
+Controller#Action | active_storage/direct_uploads#create
+Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
+`);
   });
 });
