@@ -1,4 +1,4 @@
-import { Dir, File, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
+import { Dir, File, Pathname, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 
 export interface PathOptions {
   with?: string | string[];
@@ -196,6 +196,12 @@ export class Path {
   }
   toA(): string[] {
     return this.expanded();
+  }
+
+  paths(): Pathname[] {
+    if (this._root.path === null) throw new RuntimeError("You need to set a path root");
+
+    return this._paths.map((p) => new Pathname(this._root.path!).join(p));
   }
 
   extensions(): string[] | undefined {

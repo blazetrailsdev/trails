@@ -74,6 +74,8 @@ export interface ActiveRecordConfig {
   raiseIntWiderThan64bit?: boolean;
   yamlColumnPermittedClasses?: unknown[];
   sqlite3AdapterStrictStringsByDefault?: boolean;
+  destroyAssociationAsyncJob?: unknown;
+  destroyAssociationAsyncBatchSize?: number | null;
   tableNamePrefix?: string;
   tableNameSuffix?: string;
   postgresqlAdapterDecodeDates?: boolean;
