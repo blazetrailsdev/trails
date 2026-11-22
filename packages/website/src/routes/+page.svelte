@@ -63,7 +63,7 @@
   <nav class="nav">
     <ul class="left">{#each navLeft as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
     <a href="{base}/" class="mark" title="BlazeTrails home">
-      <span class="wm" aria-hidden="true"><span class="blaze">blaze</span>tra<span class="i">ı</span>ls</span>
+      <span class="wm" aria-hidden="true"><span class="blaze">blaze</span><span class="trails">trails</span></span>
       <span class="sr-only">blazetrails</span>
     </a>
     <ul class="right">{#each navRight as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
@@ -105,7 +105,7 @@
     <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
     <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby gem"} API</small>{/if}</a></li>{/each}</ul>
-    <p class="small"><strong>And there are more packages besides these.</strong> The gems Rails depends on are ported alongside them.</p>
+    <p class="small"><strong>And more.</strong> We&rsquo;re bringing all the friends along.</p>
     <p class="fine">Each percentage is the share of the upstream gem's public API names (classes, modules, methods and constants) that have a matching name in the trails package. &ldquo;Rails API&rdquo; marks a gem the Rails project owns, such as Active Record, Solid Queue or thor; &ldquo;Ruby gem API&rdquo; marks one of the other gems Rails depends on, such as rack or i18n. &ldquo;Measured at {data.measuredAt}&rdquo; names the trails commit the figures were computed on. A trails app's client-side JavaScript, Turbo and Stimulus included, uses these same packages, so the code in the browser and on the server is all compatible.</p>
   </section>
 
@@ -135,7 +135,6 @@
       <h2>Built for Rails developers, new and seasoned.</h2>
       <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/{data.buildRef}/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/{data.buildRef}/examples/react-native-notes">React Native app</a>. On the roadmap: the full stack running in the browser.</p>
       <p class="small"><strong>trails and Rails apps can work side by side.</strong> In live demos, a trails app and a Rails app read each other's encrypted passwords and exchange Active Job messages across the two languages in real time.</p>
-      <a class="cta" href="{base}/docs/guides/idioms">Blaze trails &rsaquo;</a>
     </div>
   </section>
 
@@ -196,7 +195,6 @@
   h3 { color: var(--orange); font-size: 36px; line-height: 34px; margin: 1.5rem 0 0.75rem; }
   .intro { font-size: 39px; line-height: 44px; max-width: 960px; margin: 0 auto 1.5rem; }
   .small { font-size: 26px; line-height: 29px; max-width: 900px; margin: 1.5rem auto 0; }
-  .cta { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; font-size: 21px; }
 
   .announce { background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; padding: 8px; }
 
@@ -206,8 +204,8 @@
   .mark { text-decoration: none; }
   .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--ink); }
   .blaze { color: var(--orange); }
-  .i { position: relative; }
-  .i::before { content: ""; position: absolute; left: 50%; transform: translateX(-50%); top: 0.02em; width: 0.26em; height: 0.17em; background: var(--mango); border-radius: 0.035em; }
+  .trails { position: relative; display: inline-block; padding-bottom: 0.16em; }
+  .trails::after { content: ""; position: absolute; left: 0; right: 0.04em; bottom: -0.02em; height: 0.16em; background: var(--mango); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 20 1, 32 9, 50 5 S 82 1, 98 6 S 114 7, 118 3' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 20 1, 32 9, 50 5 S 82 1, 98 6 S 114 7, 118 3' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
 
   .hero { padding: 40px 24px 80px; }
   .lede { font-size: 30px; line-height: 1.3; max-width: 700px; margin: 0 auto 1.5rem; }
