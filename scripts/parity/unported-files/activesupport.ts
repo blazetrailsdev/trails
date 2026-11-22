@@ -119,26 +119,11 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "promise, so the killed thread's share is never released.",
   },
   {
+    pattern: "dependencies/require_dependency.rb",
     testFile: "dependencies_test.rb",
-    tests: [
-      "require_dependency looks autoload paths up",
-      "require_dependency looks autoload paths up (idempotent)",
-      "require_dependency handles absolute paths correctly",
-      "require_dependency handles absolute paths correctly (idempotent)",
-      "require_dependency supports arguments that respond to to_path",
-      "require_dependency supports arguments that respond to to_path (idempotent)",
-      "require_dependency fallback to Kernel#require",
-      "require_dependency fallback to Kernel#require (idempotent)",
-      "require_dependency raises LoadError if the given argument is not found",
-      "require_dependency raises ArgumentError if the argument is not a String and does not respond to #to_path",
-    ],
+    package: "activesupport",
     reason:
-      "`require_dependency` is a thin wrapper over Ruby's `Kernel#require` against " +
-      "`$LOAD_PATH`/`autoload_paths` (dependencies/require_dependency.rb:11-23), and each case asserts a " +
-      "synchronous load, its idempotence on a second call, `Pathname#to_path` coercion, or " +
-      "the `LoadError` it raises. ESM `import` is asynchronous, resolves through the " +
-      "package graph rather than a mutable load path, and caches per specifier, so there " +
-      "is nothing for the trails port to answer these against.",
+      'PERMANENT: CLAUDE.md, "`Module#autoload` is a build step" and "The application loader is Zeitwerk".',
   },
   {
     testFile: "transliterate_test.rb",

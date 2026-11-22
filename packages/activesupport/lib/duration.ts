@@ -43,6 +43,7 @@ import type { TimeWithZone } from "./time-with-zone.js";
 import { actsLike } from "./core-ext/object/acts-like.js";
 import { ISO8601Parser } from "./duration/iso8601-parser.js";
 import { ISO8601Serializer } from "./duration/iso8601-serializer.js";
+import type { YAML } from "@blazetrails/ruby-compat/yaml";
 
 function numericUminus(x: unknown): unknown {
   if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
@@ -304,6 +305,15 @@ export class Duration {
 
   toI(): number {
     return Math.trunc(this.inSeconds());
+  }
+
+  /** @inventedArm assign — PERMANENT */
+  initWith(coder: YAML.Coder): void {
+    Object.assign(this, new Duration(coder["value"] as number, coder["parts"] as DurationParts));
+  }
+
+  encodeWith(coder: YAML.Coder): void {
+    coder.setMap({ value: this.value, parts: this.parts });
   }
 
   toF(): number {

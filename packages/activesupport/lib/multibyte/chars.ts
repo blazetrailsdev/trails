@@ -33,6 +33,10 @@ export class Chars {
     this.wrappedString = string;
   }
 
+  toString(): string {
+    return this.wrappedString;
+  }
+
   toS(): string {
     return this.wrappedString;
   }
@@ -103,7 +107,7 @@ export class Chars {
   titleize(): Chars {
     return this.chars(
       this.downcase()
-        .toS()
+        .toString()
         .replace(WORD_BOUNDARY_TITLEIZE, (_m, c: string) => c.toUpperCase()),
     );
   }
@@ -131,16 +135,16 @@ export class Chars {
   }
 
   asJson(options: EncodeOptions | null = null): unknown {
-    return JsonString.asJson(this.toS(), options);
+    return JsonString.asJson(this.toString(), options);
   }
 
   reverseBang(...args: []): this {
-    this.wrappedString = this.reverse(...args).toS();
+    this.wrappedString = this.reverse(...args).toString();
     return this;
   }
 
   tidyBytesBang(...args: [force?: boolean]): this {
-    this.wrappedString = this.tidyBytes(...args).toS();
+    this.wrappedString = this.tidyBytes(...args).toString();
     return this;
   }
 

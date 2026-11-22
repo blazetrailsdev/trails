@@ -1,41 +1,41 @@
 import type { AnyClass } from "./descendants-tracker.js";
 import { Interlock } from "./dependencies/interlock.js";
 
-export const Dependencies = {
-  interlock: new Interlock(),
+export class Dependencies {
+  static interlock: Interlock = new Interlock();
 
-  autoloadPaths: [] as string[],
-
-  autoloadOncePaths: [] as string[],
-
-  _eagerLoadPaths: new Set<string>(),
-
-  _autoloadedTrackedClasses: new Set<AnyClass>(),
-
-  autoloader: null as { reload(): Promise<void>; eagerLoad(): Promise<void> } | null,
-
-  runInterlock<T>(block: () => T | Promise<T>): Promise<T> {
+  static runInterlock<T>(block: () => T | Promise<T>): Promise<T> {
     return this.interlock.running(block);
-  },
+  }
 
-  loadInterlock<T>(block: () => T | Promise<T>): Promise<T | undefined> {
+  static loadInterlock<T>(block: () => T | Promise<T>): Promise<T | undefined> {
     return this.interlock.loading(block);
-  },
+  }
 
-  unloadInterlock<T>(block: () => T | Promise<T>): Promise<T | undefined> {
+  static unloadInterlock<T>(block: () => T | Promise<T>): Promise<T | undefined> {
     return this.interlock.unloading(block);
-  },
+  }
+
+  static autoloadPaths: string[] = [];
+
+  static autoloadOncePaths: string[] = [];
+
+  static _eagerLoadPaths: Set<string> = new Set();
+
+  static _autoloadedTrackedClasses: Set<AnyClass> = new Set();
+
+  static autoloader: { reload(): Promise<void>; eagerLoad(): Promise<void> } | null = null;
 
   /** @inventedArm eagerLoad — PERMANENT */
-  async clear(): Promise<void> {
+  static async clear(): Promise<void> {
     await this.unloadInterlock(async () => {
       this._autoloadedTrackedClasses.clear();
       await this.autoloader!.reload();
       await this.autoloader!.eagerLoad();
     });
-  },
+  }
 
-  isEagerLoad(path: string): boolean {
+  static isEagerLoad(path: string): boolean {
     return this._eagerLoadPaths.has(path);
-  },
-};
+  }
+}

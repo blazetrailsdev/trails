@@ -12,7 +12,7 @@ describe("MultibyteProxyText", () => {
       this.wrappedString = string.replace(/[^\u0000-\u007F]/gu, "?");
     }
 
-    toS(): string {
+    toString(): string {
       return this.wrappedString;
     }
   }
@@ -31,9 +31,9 @@ describe("MultibyteProxyText", () => {
 
   it("custom multibyte encoder", () => {
     withCustomEncoder(AsciiOnlyEncoder, () => {
-      expect(mbChars("søme string 123").toS()).toEqual("s?me string 123");
+      expect(mbChars("søme string 123").toString()).toEqual("s?me string 123");
     });
 
-    expect(mbChars("søme string 123").toS()).toEqual("søme string 123");
+    expect(mbChars("søme string 123").toString()).toEqual("søme string 123");
   });
 });

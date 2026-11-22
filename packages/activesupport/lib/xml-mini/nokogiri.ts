@@ -1,4 +1,5 @@
 import { StringIO, warn } from "@blazetrails/ruby-compat";
+import { isBlank } from "../core-ext/object/blank.js";
 
 const CONTENT_ROOT = "__content__";
 
@@ -29,43 +30,43 @@ interface XmlNode {
   isCdata(): boolean;
 }
 
-function nodeToHash(node: XmlNode): XmlHash {
-  const hash: XmlHash = {};
+export const Document = {
+  toHash(this: { root: XmlNode }): XmlHash {
+    return Node.toHash.call(this.root);
+  },
+};
 
-  for (const child of node.children) {
-    if (child.isElement()) {
-      const childHash = nodeToHash(child);
-      const key = child.name;
-      if (Object.hasOwn(hash, key)) {
-        const existing = hash[key];
-        if (Array.isArray(existing)) {
-          existing.push(childHash);
-        } else {
-          hash[key] = [existing, childHash];
-        }
-      } else {
-        hash[key] = childHash;
-      }
-    } else if (child.isText() || child.isCdata()) {
-      const existing = hash[CONTENT_ROOT];
-      hash[CONTENT_ROOT] = typeof existing === "string" ? existing + child.content : child.content;
+export const Node = {
+  toHash(this: XmlNode, hash: XmlHash = {}): XmlHash {
+    const nodeHash: XmlHash = {};
+
+    const existing = hash[this.name];
+    if (Array.isArray(existing)) {
+      existing.push(nodeHash);
+    } else if (typeof existing === "object" && existing !== null) {
+      hash[this.name] = [existing, nodeHash];
+    } else if (existing == null) {
+      hash[this.name] = nodeHash;
     }
-  }
 
-  if (
-    Object.hasOwn(hash, CONTENT_ROOT) &&
-    Object.keys(hash).length > 1 &&
-    (hash[CONTENT_ROOT] as string).trim() === ""
-  ) {
-    delete hash[CONTENT_ROOT];
-  }
+    for (const c of this.children) {
+      if (c.isElement()) {
+        Node.toHash.call(c, nodeHash);
+      } else if (c.isText() || c.isCdata()) {
+        nodeHash[CONTENT_ROOT] ??= "";
+        nodeHash[CONTENT_ROOT] += c.content;
+      }
+    }
 
-  for (const attr of node.attributeNodes) {
-    hash[attr.nodeName] = attr.value;
-  }
+    if (Object.keys(nodeHash).length > 1 && isBlank(nodeHash[CONTENT_ROOT])) {
+      delete nodeHash[CONTENT_ROOT];
+    }
 
-  return hash;
-}
+    for (const a of this.attributeNodes) nodeHash[a.nodeName] = a.value;
+
+    return hash;
+  },
+};
 
 export function parse(data: string | StringIO | null | undefined): XmlHash {
   if (!(data instanceof StringIO)) {
@@ -80,7 +81,7 @@ export function parse(data: string | StringIO | null | undefined): XmlHash {
       if (doc.errors.length > 0) {
         throw doc.errors[0];
       }
-      return { [doc.root.name]: nodeToHash(doc.root) };
+      return Document.toHash.call(doc);
     } finally {
       doc.dispose();
     }

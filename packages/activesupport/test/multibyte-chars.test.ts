@@ -48,15 +48,15 @@ function chars(str: string): AnyChars {
   return new Chars(str) as AnyChars;
 }
 
-function inspectCodepoints(str: string | { toS(): string }): string {
-  return Array.from(typeof str === "string" ? str : str.toS(), (c) =>
+function inspectCodepoints(str: string | { toString(): string }): string {
+  return Array.from(typeof str === "string" ? str : str.toString(), (c) =>
     c.codePointAt(0)!.toString(16),
   ).join(" ");
 }
 
 function assertEqualCodepoints(
-  expected: string | { toS(): string },
-  actual: string | { toS(): string },
+  expected: string | { toString(): string },
+  actual: string | { toString(): string },
   message?: string,
 ): void {
   expect(inspectCodepoints(actual), message).toEqual(inspectCodepoints(expected));
@@ -84,7 +84,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     const original = " Un bUen café \udc92";
     const proxy = chars(original);
     proxy.tidyBytesBang();
-    expect(proxy.toS()).not.toEqual(original);
+    expect(proxy.toString()).not.toEqual(original);
   });
 
   it("capitalize bang should return self when modifying wrapped string", () => {
@@ -97,7 +97,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     const original = " él piDió Un bUen café ";
     const proxy = chars(original) as Chars & Record<string, any>;
     proxy.capitalizeBang();
-    expect(proxy.toS()).not.toEqual(original);
+    expect(proxy.toString()).not.toEqual(original);
   });
 
   it("downcase bang should return self when modifying wrapped string", () => {
@@ -110,7 +110,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     const original = " él piDió Un bUen café ";
     const proxy = chars(original) as Chars & Record<string, any>;
     proxy.downcaseBang();
-    expect(proxy.toS()).not.toEqual(original);
+    expect(proxy.toString()).not.toEqual(original);
   });
 
   it("lstrip bang should return self when modifying wrapped string", () => {
@@ -123,7 +123,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     const original = " él piDió Un bUen café ";
     const proxy = chars(original) as Chars & Record<string, any>;
     proxy.lstripBang();
-    expect(proxy.toS()).not.toEqual(original);
+    expect(proxy.toString()).not.toEqual(original);
   });
 
   it("reverse bang should return self when modifying wrapped string", () => {
@@ -136,7 +136,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     const original = " él piDió Un bUen café ";
     const proxy = chars(original) as Chars & Record<string, any>;
     proxy.reverseBang();
-    expect(proxy.toS()).not.toEqual(original);
+    expect(proxy.toString()).not.toEqual(original);
   });
 
   it("rstrip bang should return self when modifying wrapped string", () => {
@@ -149,7 +149,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     const original = " él piDió Un bUen café ";
     const proxy = chars(original) as Chars & Record<string, any>;
     proxy.rstripBang();
-    expect(proxy.toS()).not.toEqual(original);
+    expect(proxy.toString()).not.toEqual(original);
   });
 
   it("swapcase bang should return self when modifying wrapped string", () => {
@@ -162,7 +162,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     const original = " él piDió Un bUen café ";
     const proxy = chars(original) as Chars & Record<string, any>;
     proxy.swapcaseBang();
-    expect(proxy.toS()).not.toEqual(original);
+    expect(proxy.toString()).not.toEqual(original);
   });
 
   it("upcase bang should return self when modifying wrapped string", () => {
@@ -175,7 +175,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     const original = " él piDió Un bUen café ";
     const proxy = chars(original) as Chars & Record<string, any>;
     proxy.upcaseBang();
-    expect(proxy.toS()).not.toEqual(original);
+    expect(proxy.toString()).not.toEqual(original);
   });
 
   it("unicode string should have utf8 encoding", () => {
@@ -310,7 +310,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("indexed insert should raise on index overflow", async () => {
-    const before = chars_.toS();
+    const before = chars_.toString();
     await assertRaise([IndexError], {}, () => chars_.set(10, "a"));
     await assertRaise([IndexError], {}, () => chars_.set(10, 4, "a"));
     await assertRaise([IndexError], {}, () => chars_.set(/ii/, "a"));
@@ -319,7 +319,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("indexed insert should raise on range overflow", async () => {
-    const before = chars_.toS();
+    const before = chars_.toString();
     await assertRaise([RangeError], {}, () => chars_.set(new Range(10, 12), "a"));
     expect(chars_).toEqual(before);
   });
@@ -554,7 +554,7 @@ describe("MultibyteCharsTest", () => {
   });
 
   it("wraps the original string", () => {
-    expect(chars.toS()).toEqual(UNICODE_STRING);
+    expect(chars.toString()).toEqual(UNICODE_STRING);
     expect(chars.wrappedString).toEqual(UNICODE_STRING);
   });
 
@@ -702,7 +702,7 @@ describe("MultibyteCharsExtrasTest", () => {
   it("limit should keep under the specified byte limit", () => {
     const example = chars(UNICODE_STRING);
     for (let limit = 1; limit <= UNICODE_STRING.length; limit++) {
-      assert(example.limit(limit).toS().length <= limit);
+      assert(example.limit(limit).toString().length <= limit);
     }
   });
 
@@ -794,7 +794,7 @@ describe("MultibyteCharsExtrasTest", () => {
       "\x00": "\x00",
     };
     for (const [bad, good] of Object.entries(singleByteCases)) {
-      expect(chars(bad).tidyBytes().toS()).toEqual(good);
+      expect(chars(bad).tidyBytes().toString()).toEqual(good);
       expect(chars(`${bad}${bad}`).tidyBytes()).toEqual(`${good}${good}`);
       expect(chars(`${bad}${bad}${bad}`).tidyBytes()).toEqual(`${good}${good}${good}`);
       expect(chars(`${bad}a`).tidyBytes()).toEqual(`${good}a`);
@@ -808,7 +808,7 @@ describe("MultibyteCharsExtrasTest", () => {
     const byteString = "\udcb8\udc9e\x08\udc88\udca5";
     const tidyString = String.fromCodePoint(0xb8, 0x17e, 0x8, 0x2c6, 0xa5);
     assertEqualCodepoints(tidyString, chars(byteString).tidyBytes());
-    await assertNothingRaised(() => Array.from(chars(byteString).tidyBytes().toS()));
+    await assertNothingRaised(() => Array.from(chars(byteString).tidyBytes().toString()));
 
     assertEqualCodepoints("\u00f0\u00a5\u00a4\x21", chars("\udcf0\udca5\udca4\x21").tidyBytes());
   });
