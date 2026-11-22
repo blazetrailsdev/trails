@@ -169,6 +169,43 @@ importers:
         specifier: ^4.86.0
         version: 4.164.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.3.5)
 
+  examples/homepage:
+    dependencies:
+      '@blazetrails/actionmailer':
+        specifier: workspace:*
+        version: link:../../packages/actionmailer
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../../packages/actionpack
+      '@blazetrails/actiontext':
+        specifier: workspace:*
+        version: link:../../packages/actiontext
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../../packages/actionview
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../../packages/activejob
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../../packages/activerecord
+      '@blazetrails/activestorage':
+        specifier: workspace:*
+        version: link:../../packages/activestorage
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../../packages/activesupport
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../../packages/ruby-compat
+      '@blazetrails/turbo':
+        specifier: workspace:*
+        version: link:../../packages/turbo
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.5
+        version: 25.3.5
+
   examples/react-native-notes:
     dependencies:
       '@blazetrails/activemodel':

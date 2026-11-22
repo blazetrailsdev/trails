@@ -1,0 +1,6 @@
+<%= turboStreamFrom(post.author) %>
+<article>
+  <h1><%= post.title %></h1>
+  <%= imageTag(post.coverImage.variant({ resizeToLimit: [800, 400] })) %>
+  <%= post.body %>
+</article>
