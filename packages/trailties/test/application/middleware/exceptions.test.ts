@@ -16,7 +16,8 @@ include(MiddlewareExceptionsTest, Methods);
 registerSpecType(/^MiddlewareExceptionsTest$/, MiddlewareExceptionsTest);
 
 type Host = Generation &
-  Omit<Rack, "get"> & {
+  Omit<Rack, "get" | "app"> & {
+    app(env?: string): Promise<Application>;
     get(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
     post(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
     request(path: string, env?: Record<string, unknown>): Promise<unknown>;
