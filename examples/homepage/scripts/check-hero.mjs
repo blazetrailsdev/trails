@@ -20,40 +20,45 @@ const map = (scratch) =>
 function compile(name, edits) {
   const scratch = path.join(root, `.hero-check-${name}`);
   fs.rmSync(scratch, { recursive: true, force: true });
-  fs.mkdirSync(scratch);
-  fs.cpSync(path.join(root, "app"), path.join(scratch, "app"), { recursive: true });
-  for (const [from, to] of edits) fs.copyFileSync(path.join(root, from), path.join(scratch, to));
-  fs.writeFileSync(
-    path.join(scratch, "tsconfig.json"),
-    JSON.stringify({ extends: "../tsconfig.json", include: ["app", "gen/views"] }),
-  );
-  execFileSync(
-    process.execPath,
-    [
-      path.join(repo, "packages/trails-tsc/bin/trails-tsc-views.js"),
-      "build",
-      "--views",
-      "app/views",
-      "--out",
-      "gen",
-    ],
-    { cwd: scratch, stdio: "ignore" },
-  );
   let out = "";
+  let lines;
   try {
+    fs.mkdirSync(scratch);
+    fs.cpSync(path.join(root, "app"), path.join(scratch, "app"), { recursive: true });
+    for (const [from, to] of edits) fs.copyFileSync(path.join(root, from), path.join(scratch, to));
+    fs.writeFileSync(
+      path.join(scratch, "tsconfig.json"),
+      JSON.stringify({ extends: "../tsconfig.json", include: ["app", "gen/views"] }),
+    );
     execFileSync(
       process.execPath,
-      [path.join(repo, "node_modules/typescript-5/bin/tsc"), "--noEmit", "-p", "."],
-      {
-        cwd: scratch,
-        encoding: "utf8",
-      },
+      [
+        path.join(repo, "packages/trails-tsc/bin/trails-tsc-views.js"),
+        "build",
+        "--views",
+        "app/views",
+        "--out",
+        "gen",
+      ],
+      { cwd: scratch, stdio: "ignore" },
     );
-  } catch (err) {
-    out = String(err.stdout);
+    try {
+      execFileSync(
+        process.execPath,
+        [path.join(repo, "node_modules/typescript-5/bin/tsc"), "--noEmit", "-p", "."],
+        {
+          cwd: scratch,
+          encoding: "utf8",
+        },
+      );
+    } catch (err) {
+      out = String(err.stdout);
+      if (err.stderr) process.stderr.write(String(err.stderr));
+    }
+    lines = map(scratch);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
   }
-  const lines = map(scratch);
-  fs.rmSync(scratch, { recursive: true, force: true });
   const reported = [];
   for (const line of out.split("\n")) {
     const m = /^(.+?)\((\d+),(\d+)\): (.*)$/.exec(line);
