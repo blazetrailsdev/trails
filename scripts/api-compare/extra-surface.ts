@@ -910,6 +910,8 @@ interface PackageTotals {
    * `@internal` lowers `totalAllowlisted` and raises this, so the swap shows.
    */
   totalInternal: number;
+  /** The names `totalInternal` counts, per TS file, for the bump ledger's `removed` skip. */
+  internalFiles: { tsFile: string; names: string[] }[];
   /**
    * The `rubyFile === null` slice of the totals above — files no Rails file
    * maps onto. Broken out so a consumer can tell how much of a package's
@@ -1241,6 +1243,7 @@ export function countTsInternalNames(
   fileFunctions: MethodInfo[] | undefined,
   internalConstants: string[],
   railsPrivate: ReadonlySet<string> = new Set(),
+  names: string[] = [],
 ): number {
   const isInternal = (m: MethodInfo): boolean =>
     m.internal === true &&
@@ -1253,16 +1256,19 @@ export function countTsInternalNames(
   const fileFunctionEntries = new Set((fileFunctions ?? []).map(fileFunctionKey));
   const isOwnMember = (m: MethodInfo): boolean =>
     isInternal(m) && !(m.bodyless === true && functionNames.has(m.name));
-  let count = internalConstants.filter((n) => !n.startsWith("_") && !railsPrivate.has(n)).length;
+  const start = names.length;
+  names.push(...internalConstants.filter((n) => !n.startsWith("_") && !railsPrivate.has(n)));
   for (const c of [...classes, ...modules]) {
     if (c.file !== file) continue;
-    count += [...c.instanceMethods, ...c.classMethods].filter(
-      (m) =>
+    for (const m of [...c.instanceMethods, ...c.classMethods])
+      if (
         isOwnMember(m) &&
-        !(c.synthesizedFileModule === true && fileFunctionEntries.has(fileFunctionKey(m))),
-    ).length;
+        !(c.synthesizedFileModule === true && fileFunctionEntries.has(fileFunctionKey(m)))
+      )
+        names.push(m.name);
   }
-  return count + (fileFunctions ?? []).filter(isInternal).length;
+  for (const fn of fileFunctions ?? []) if (isInternal(fn)) names.push(fn.name);
+  return names.length - start;
 }
 
 /**
@@ -2490,6 +2496,7 @@ function buildPackageReport(
     totalInterfaceExempt: 0,
     totalOverrideExempt: 0,
     totalInternal: 0,
+    internalFiles: [],
     noCounterpartFiles: 0,
     noCounterpartExtras: 0,
     noCounterpartNovel: 0,
@@ -2718,6 +2725,7 @@ function buildPackageReport(
               undefined,
               "private",
             );
+      const internalNames: string[] = [];
       result.totalInternal += countTsInternalNames(
         expectedTs,
         classes,
@@ -2725,7 +2733,10 @@ function buildPackageReport(
         fileFns,
         [...internalConsts],
         railsPrivate,
+        internalNames,
       );
+      if (internalNames.length > 0)
+        result.internalFiles.push({ tsFile: expectedTs, names: internalNames });
     }
     if (classes.length === 0 && modules.length === 0 && !fileFns && fileConsts.length === 0)
       continue;

@@ -462,6 +462,8 @@ export interface LedgeredTotals {
   totalExtras: number;
   totalNovel: number;
   noCounterpartFiles: number;
+  totalInternal?: number;
+  internalFiles?: { tsFile: string; names: string[] }[];
   extraFiles: {
     tsFile: string;
     rubyFile: string | null;
@@ -493,7 +495,21 @@ export function withoutRemoved<T extends LedgeredTotals>(
       novel -= hit.filter((e) => e.kind === "novel").length;
       if (f.rubyFile === null && hit.length > 0 && hit.length === f.extras.length) noCounterpart--;
     }
-    return { ...p, totalExtras: extras, totalNovel: novel, noCounterpartFiles: noCounterpart };
+    let internal = p.totalInternal;
+    for (const f of p.internalFiles ?? []) {
+      const hit = f.names.filter((name) =>
+        removedTsName({ package: p.package, tsFile: f.tsFile, tsName: name }),
+      ).length;
+      skipped += hit;
+      if (internal !== undefined) internal -= hit;
+    }
+    return {
+      ...p,
+      totalExtras: extras,
+      totalNovel: novel,
+      noCounterpartFiles: noCounterpart,
+      totalInternal: internal,
+    };
   });
   return { packages: out, skipped };
 }
