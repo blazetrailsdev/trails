@@ -46,7 +46,7 @@ const userModel = `
       include(this, Conversion);
     }
     static get modelName() {
-      return (this._modelName ??= new ModelName(this.constructor as any, null, "User"));
+      return (this._modelName ??= new ModelName(this.constructor as typeof User, null, "User"));
     }
     isPersisted() {
       return false;
@@ -384,7 +384,8 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
 
     await t.appFile(
       "config/routes/external.ts",
-      `export function drawRoutes(this: any) {
+      `import type { Mapper } from "@blazetrails/actionpack/action-dispatch/routing/mapper.js";
+        export function drawRoutes(this: Mapper) {
         this.get(":controller/:action");
       }`,
     );
@@ -415,7 +416,7 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
           `
             async bar() { await this.render({ plain: "bar" }); }
             async baz() { await this.render({ plain: "baz" }); }
-            async custom() { await this.render({ plain: (this as any).customUrl() }); }
+            async custom() { await this.render({ plain: (this as { customUrl?(): string }).customUrl!() }); }
             async mapping() {
               const { User } = await import("../models/user.ts");
               await this.render({ plain: this.urlFor(new User()) });
@@ -440,7 +441,8 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
 
       await t.appFile(
         "config/routes/external.ts",
-        `export function drawRoutes(this: any) {
+        `import type { Mapper } from "@blazetrails/actionpack/action-dispatch/routing/mapper.js";
+        export function drawRoutes(this: Mapper) {
           this.get("foo", { to: "foo#bar" });
         }`,
       );
@@ -472,7 +474,8 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
 
       await t.appFile(
         "config/routes/another-external.ts",
-        `export function drawRoutes(this: any) {
+        `import type { Mapper } from "@blazetrails/actionpack/action-dispatch/routing/mapper.js";
+        export function drawRoutes(this: Mapper) {
           this.get("foo", { to: "foo#baz" });
         }`,
       );
@@ -499,7 +502,7 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
         "FooController",
         `
           async index() { await this.render({ plain: "foo" }); }
-          async custom() { await this.render({ plain: (this as any).customUrl() }); }
+          async custom() { await this.render({ plain: (this as { customUrl?(): string }).customUrl!() }); }
           async mapping() {
             const { User } = await import("../models/user.ts");
             await this.render({ plain: this.urlFor(new User()) });
@@ -515,7 +518,11 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
 
     await t.appFile("app/models/user.ts", userModel);
     const { User } = await import(await t.appPath("app/models/user.ts"));
-    const urlHelpers = (): any => Trails.application!.routes().urlHelpers();
+    const urlHelpers = () =>
+      Trails.application!.routes().urlHelpers() as unknown as Record<
+        string,
+        (...args: unknown[]) => string
+      >;
 
     await t.appFile("config/routes.ts", routes(`this.get("foo", { to: "foo#index" });`));
 
@@ -595,7 +602,11 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
 
     await t.appFile("app/models/user.ts", userModel);
     const { User } = await import(await t.appPath("app/models/user.ts"));
-    const urlHelpers = (): any => Trails.application!.routes().urlHelpers();
+    const urlHelpers = () =>
+      Trails.application!.routes().urlHelpers() as unknown as Record<
+        string,
+        (...args: unknown[]) => string
+      >;
 
     await t.appFile(
       "config/routes.ts",
@@ -674,8 +685,8 @@ describe("RoutingTest", { timeout: 120_000 }, () => {
         `
           async index() {
             const { Context } = await import("../models/context.ts");
-            const context: any = new Context();
-            await this.render({ plain: context.fooPath() });
+            const context = new Context() as { fooPath?(): string };
+            await this.render({ plain: context.fooPath!() });
           }
         `,
       ),

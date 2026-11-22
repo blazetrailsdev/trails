@@ -745,7 +745,14 @@ export class NamedRouteCollection {
           if (members == null) continue;
           for (const [name, method] of Object.entries(Object.getOwnPropertyDescriptors(members))) {
             const own = Object.getOwnPropertyDescriptor(proto, name);
-            if (name !== "constructor" && own && own.value === method.value && !installed.has(name))
+            if (
+              name !== "constructor" &&
+              own &&
+              own.value === method.value &&
+              own.get === method.get &&
+              own.set === method.set &&
+              !installed.has(name)
+            )
               below.set(name, own);
           }
         }

@@ -199,7 +199,7 @@ export class Path {
   }
 
   paths(): Pathname[] {
-    if (this._root.path === null) throw new Error("You need to set a path root");
+    if (this._root.path === null) throw new RuntimeError("You need to set a path root");
 
     return this._paths.map((p) => new Pathname(this._root.path!).join(p));
   }
