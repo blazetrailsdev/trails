@@ -1,0 +1,26 @@
+# SeaweedFS (S3) and fake-gcs-server (GCS) for the cloud service tests, as the
+# activestorage-cloud-tests CI job starts them. WEED_S3_SSE_KEY enables SSE-S3,
+# which "uploading with server-side encryption" needs; it guards no data.
+#
+#   docker compose -f packages/activestorage/test/support/emulators/compose.yml up -d --wait
+#   node packages/activestorage/test/support/emulators/create-buckets.ts
+#   ACTIVE_STORAGE_S3_ENDPOINT=http://localhost:8333 \
+#   ACTIVE_STORAGE_GCS_ENDPOINT=http://localhost:4443 \
+#     pnpm vitest run packages/activestorage/test/service/
+services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
+    command: server -dir=/data -s3 -s3.port=8333 -ip.bind=0.0.0.0
+    environment:
+      WEED_S3_SSE_KEY: trails-ci-not-a-secret
+    ports:
+      - 8333:8333
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8333/healthz"]
+      interval: 2s
+      retries: 30
+  fake-gcs-server:
+    image: fsouza/fake-gcs-server:1.56.1@sha256:797ce226d62f947c009dc40246b30cfb456b8473d8241407f9d6f2c04e4d69ef
+    command: -scheme http -port 4443
+    ports:
+      - 4443:4443

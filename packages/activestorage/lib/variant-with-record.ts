@@ -70,7 +70,7 @@ export class VariantWithRecord {
 
   async url(options?: { [k: string]: unknown }): Promise<string | null> {
     const image = (await this.image) as (One & Pick<Blob, "url">) | null;
-    return image?.url(options) ?? null;
+    return (await image?.url(options)) ?? null;
   }
 
   async download(block?: (chunk: Uint8Array) => unknown): Promise<Uint8Array | void | null> {

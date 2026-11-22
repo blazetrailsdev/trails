@@ -5,9 +5,13 @@ import { Downloader } from "./downloader.js";
 import { ActiveStorage } from "./active-storage.js";
 import type { Filename } from "./filename.js";
 import type { Configurator } from "./service/configurator.js";
+import type { DiskService } from "./service/disk-service.js";
+import type { MirrorService } from "./service/mirror-service.js";
 
 export class Service {
   declare static Configurator: typeof Configurator;
+  declare static DiskService: typeof DiskService;
+  declare static MirrorService: typeof MirrorService;
 
   name: string | null = null;
   protected public: boolean | undefined;
@@ -91,13 +95,13 @@ export class Service {
     throw new NotImplementedError();
   }
 
-  url(key: string, options: Record<string, unknown> = {}): string {
-    return this.instrument("url", { key: key }, (payload) => {
+  async url(key: string, options: Record<string, unknown> = {}): Promise<string> {
+    return await this.instrument("url", { key: key }, async (payload) => {
       let generatedUrl: string;
       if (this.isPublic()) {
-        generatedUrl = this.publicUrl(key, options);
+        generatedUrl = await this.publicUrl(key, options);
       } else {
-        generatedUrl = this.privateUrl(key, options);
+        generatedUrl = await this.privateUrl(key, options);
       }
 
       payload.url = generatedUrl;
@@ -106,7 +110,7 @@ export class Service {
     });
   }
 
-  urlForDirectUpload(
+  async urlForDirectUpload(
     _key: string,
     _options: {
       expiresIn: unknown;
@@ -115,7 +119,7 @@ export class Service {
       checksum: string;
       customMetadata?: Record<string, unknown>;
     },
-  ): string {
+  ): Promise<string> {
     throw new NotImplementedError();
   }
 
@@ -137,12 +141,15 @@ export class Service {
   }
 
   /** @internal */
-  protected privateUrl(_key: string, _options: Record<string, unknown>): string {
+  protected privateUrl(_key: string, _options: Record<string, unknown>): string | Promise<string> {
     throw new NotImplementedError();
   }
 
   /** @internal */
-  protected publicUrl(_key: string, _options: Record<string, unknown> = {}): string {
+  protected publicUrl(
+    _key: string,
+    _options: Record<string, unknown> = {},
+  ): string | Promise<string> {
     throw new NotImplementedError();
   }
 

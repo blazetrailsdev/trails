@@ -17,14 +17,14 @@ export const FIXTURE_DATA = Uint8Array.from(
 );
 
 export function SharedServiceTests<T extends Service>(
-  SERVICE: T,
+  SERVICE: T | Promise<T>,
 ): {
   service: T;
   key: string;
   routes: RouteSet;
 } {
   const routes = TopLevel.Trails!.application!.routes() as unknown as RouteSet;
-  const ctx = { service: SERVICE, key: "", routes };
+  const ctx = { service: undefined as unknown as T, key: "", routes };
 
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
@@ -34,7 +34,7 @@ export function SharedServiceTests<T extends Service>(
       port: null,
     };
     ctx.key = base58(24);
-    ctx.service = SERVICE;
+    ctx.service = await SERVICE;
     await ctx.service.upload(ctx.key, new StringIO(FIXTURE_DATA));
   });
 
