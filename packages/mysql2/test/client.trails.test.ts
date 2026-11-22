@@ -244,6 +244,17 @@ describe("Mysql2::Client#warning_count", () => {
     expect(b.getutc().hour).toBe(14);
   });
 
+  it("Result#each casts again on each call when cache_rows is false", async () => {
+    const native = vi.fn(async (_options: object) => rowOf([["a", "TINY", 1]], "1"));
+    const client = await clientOn({ query: native });
+    const result = (await client.query("SELECT 1", { cacheRows: false }))!;
+    expect(result.each({ castBooleans: true })).toEqual([{ a: true }]);
+    expect(result.each({ cast: false })).toEqual([{ a: "1" }]);
+    const cached = (await client.query("SELECT 1"))!;
+    expect(cached.each({ castBooleans: true })).toEqual([{ a: true }]);
+    expect(cached.each({ cast: false })).toEqual([{ a: true }]);
+  });
+
   it("Statement#execute merges its keywords over query_options, and always casts", async () => {
     const execute = vi.fn(async (_options: object, _values: unknown[]) => [[[1]], [{ name: "a" }]]);
     const prepare = vi.fn(async () => ({ statement: { columns: [], parameters: [{}] } }));
@@ -617,6 +628,7 @@ describe("Mysql2::Client default_auth", () => {
     const core = {
       _command: handshake,
       once: (event: string, fn: () => void) => (listeners[event] = fn),
+      off: (event: string) => delete listeners[event],
       promise: () => ({}),
     };
     const createConnection = vi.spyOn(mysqlCore, "createConnection").mockReturnValue(core as never);
@@ -624,11 +636,25 @@ describe("Mysql2::Client default_auth", () => {
       const client = Mysql2.Client.new({ defaultAuth: "mysql_native_password" });
       await vi.waitFor(() => expect(createConnection).toHaveBeenCalled());
       handshake.sendCredentials();
-      listeners["connect"]();
+      const connect = listeners["connect"];
+      delete listeners["connect"];
+      connect();
       await client;
     } finally {
       createConnection.mockRestore();
     }
     expect(seen).toEqual(["mysql_native_password"]);
+    expect(listeners).toEqual({});
+  });
+
+  it("finds the driver's ClientHandshake as the connection's first command", () => {
+    const core = mysqlCore.createConnection({ host: "127.0.0.1", port: 1 });
+    core.on("error", () => {});
+    const handshake = (core as unknown as { _command: { constructor: { name: string } } })._command;
+    expect(handshake.constructor.name).toBe("ClientHandshake");
+    expect(typeof (handshake as unknown as { sendCredentials: unknown }).sendCredentials).toBe(
+      "function",
+    );
+    core.destroy();
   });
 });

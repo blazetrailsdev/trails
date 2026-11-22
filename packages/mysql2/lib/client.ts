@@ -29,6 +29,7 @@ export interface QueryOptions {
   applicationTimezone?: "utc" | "local" | null;
   cast?: boolean;
   castBooleans?: boolean;
+  cacheRows?: boolean;
   symbolizeKeys?: boolean;
   [key: string]: unknown;
 }
@@ -293,9 +294,7 @@ function cast(
         year * 31557600 + month * 2592000 + day * 86400 + hour * 3600 + min * 60 + sec;
       if (seconds === 0) return null;
       if (month < 1 || day < 1) {
-        client["INVALID_DATE"] ??= new Mysql2.Error(
-          `Invalid date in field '${field.name}': ${raw}`,
-        );
+        client.INVALID_DATE ??= new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`);
         return null;
       }
       if (seconds < MYSQL2_MIN_TIME || seconds > MYSQL2_MAX_TIME) {
@@ -334,9 +333,7 @@ function cast(
       const [year, month, day] = tokens.slice(1, 4).map(Number);
       if (year + month + day === 0) return null;
       if (month < 1 || day < 1) {
-        client["INVALID_DATE"] ??= new Mysql2.Error(
-          `Invalid date in field '${field.name}': ${raw}`,
-        );
+        client.INVALID_DATE ??= new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`);
         return null;
       }
       return new RubyDate(year, month, day).toDate();
@@ -425,6 +422,7 @@ export class Client {
       symbolizeKeys: false,
       databaseTimezone: "local",
       applicationTimezone: null,
+      cacheRows: true,
       connectFlags:
         CLIENT_FLAGS.REMEMBER_OPTIONS |
         CLIENT_FLAGS.LONG_PASSWORD |
@@ -842,8 +840,16 @@ export class Client {
           this.handshake.authPluginName = defaultAuth;
           return sendCredentials.apply(this, args);
         };
-        core.once("connect", () => resolve(core.promise()));
-        core.once("error", reject);
+        const onError = (e: unknown) => {
+          core.off("connect", onConnect);
+          reject(e);
+        };
+        const onConnect = () => {
+          core.off("error", onError);
+          resolve(core.promise());
+        };
+        core.once("connect", onConnect);
+        core.once("error", onError);
       });
     };
     const connection = (await createConnection()

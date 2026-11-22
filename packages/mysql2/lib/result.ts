@@ -1,4 +1,5 @@
 import mysql from "mysql2/promise";
+import { rtest } from "@blazetrails/ruby-compat";
 import type { Client, Field, QueryOptions } from "./client.js";
 import { Mysql2 } from "./mysql2.js";
 
@@ -47,18 +48,23 @@ export class Result {
     if (typeof opts === "function") [opts, block] = [{}, opts];
     if (this.error) throw this.error;
     opts = { ...this.queryOptions, ...opts };
+    let source = this.rows;
     if (this.client) {
       const client = this.client;
-      client["INVALID_DATE"] = undefined;
-      this.rows = this.rows.map((row) => this.fetchRow(row, opts));
-      this.client = undefined;
-      const error = client["INVALID_DATE"];
-      client["INVALID_DATE"] = undefined;
+      const typeCast = client.typeCast(opts);
+      client.INVALID_DATE = undefined;
+      source = this.rows.map((row) => this.fetchRow(row, typeCast));
+      const error = client.INVALID_DATE;
+      client.INVALID_DATE = undefined;
       if (error) throw error;
+      if (rtest(opts.cacheRows)) {
+        this.rows = source;
+        this.client = undefined;
+      }
     }
     const asArray = opts.as === "array";
     const asHash = opts.as != null && !asArray;
-    const rows = this.rows.map((row) => {
+    const rows = source.map((row) => {
       if (asArray && !Array.isArray(row)) return this.fields.map((f) => row[f]);
       if (asHash && Array.isArray(row)) {
         return Object.fromEntries(this.fields.map((f, i) => [f, row[i]]));
@@ -71,9 +77,8 @@ export class Result {
 
   private fetchRow(
     row: unknown[] | Record<string, unknown>,
-    opts: QueryOptions,
+    typeCast: ReturnType<Client["typeCast"]>,
   ): unknown[] | Record<string, unknown> {
-    const typeCast = this.client!["typeCast"](opts);
     const castField = (bytes: unknown, i: number): unknown => {
       const packet = this.fieldPackets[i];
       const raw = bytes as Uint8Array | null;
