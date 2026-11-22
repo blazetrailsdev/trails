@@ -49,7 +49,7 @@ export class Storage {
     uri: unknown,
     options: Record<string, unknown> = {},
   ): Promise<unknown> {
-    if (rbObjRespondTo(uri, "scheme") || typeof uri === "string") {
+    if (rbObjRespondTo(uri, "scheme") || rbObjRespondTo(uri, "toStr")) {
       if (!rbObjRespondTo(uri, "scheme")) uri = URI.parse(uri as string);
       const scheme = (uri as { scheme: string }).scheme.toUpperCase();
       if (constDefined(type, scheme)) {

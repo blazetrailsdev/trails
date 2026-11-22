@@ -41,7 +41,7 @@ describe("Rack::Cache::Storage", () => {
 
   it("returns an existing MetaStore instance for URI that exists", async () => {
     const store = await storage.resolveMetastoreUri("heap:/");
-    expect(await storage.resolveMetastoreUri("heap:/")).toEqual(store);
+    expect(await storage.resolveMetastoreUri("heap:/")).toBe(store);
   });
 
   it("creates a new EntityStore for URI if none exists", async () => {
@@ -50,7 +50,7 @@ describe("Rack::Cache::Storage", () => {
 
   it("returns an existing EntityStore instance for URI that exists", async () => {
     const store = await storage.resolveEntitystoreUri("heap:/");
-    expect(await storage.resolveEntitystoreUri("heap:/")).toEqual(store);
+    expect(await storage.resolveEntitystoreUri("heap:/")).toBe(store);
   });
 
   it("clears all URI -> store mappings with #clear", async () => {
