@@ -33,13 +33,11 @@ const loadPath: Record<string, () => Promise<unknown>> = {};
 const LIB = File.expandPath(decodeURIComponent(new URL(".", import.meta.url).pathname));
 if (!LOAD_PATH.includes(LIB)) LOAD_PATH.push(LIB);
 
-import type { Engine } from "./engine.js";
-
 export const ActionMailbox = { name: "ActionMailbox", loadPath } as AutoloadModule & {
   Base: typeof Base;
   BaseController: typeof BaseController;
   Callbacks: typeof Callbacks;
-  Engine?: typeof Engine;
+  Engine?: unknown;
   Ingresses: {
     Mailgun: { InboundEmailsController?: typeof MailgunInboundEmailsController };
     Mandrill: { InboundEmailsController?: typeof MandrillInboundEmailsController };
