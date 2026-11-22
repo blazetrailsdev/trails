@@ -69,9 +69,19 @@ export class RailsEntityStore extends EntityStore {
     return (await this._store.read(key)) as Part[] | null;
   }
 
-  async read(key: string): Promise<string | null> {
+  async read(key: string): Promise<Part | null> {
     const body = await this.open(key);
-    return body != null ? body.join("") : null;
+    if (body == null) return null;
+    if (!body.some((part) => part instanceof Uint8Array)) return body.join("");
+    const encoder = new TextEncoder();
+    const bytes = body.map((part) => (part instanceof Uint8Array ? part : encoder.encode(part)));
+    const buf = new Uint8Array(bytes.reduce((n, b) => n + b.length, 0));
+    let offset = 0;
+    for (const b of bytes) {
+      buf.set(b, offset);
+      offset += b.length;
+    }
+    return buf;
   }
 
   async write(body: RackBody): Promise<[string, number]> {
