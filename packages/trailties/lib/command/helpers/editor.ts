@@ -40,6 +40,7 @@ export const Editor = defineModule(
      * @inventedArm if — PERMANENT
      * @inventedArm try — PERMANENT
      * @inventedArm onSignal — PERMANENT
+     * @inventedArm setTimeout — PERMANENT
      */
     async systemEditor(this: EditorHost, filePath: string): Promise<boolean | null> {
       let interrupted = false;
