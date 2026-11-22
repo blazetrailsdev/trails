@@ -73,7 +73,6 @@ it the Rails assertions:
 
 ```ts
 import { describe, it } from "vitest";
-import { ActiveSupport } from "@blazetrails/activesupport";
 import { Article } from "../../app/models/article.js";
 import "../test-helper.js";
 
@@ -295,15 +294,26 @@ point.
 stop or move the clock for the rest of a test, or for a block, and
 `travelBack` restores it:
 
-<!-- typecheck:skip -->
-
 ```ts
-import { freezeTime } from "@blazetrails/activesupport";
+import { it } from "vitest";
+import { freezeTime, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 
-it("stamps the article", async () => {
-  await freezeTime(async () => {
-    const article = await Article.create({ title: "Now" });
-    expect(article.createdAt).toEqual(Time.current());
+it("runs with the clock stopped", () => {
+  freezeTime({}, () => {
+    // Time.now answers the same instant for the whole block.
   });
 });
+
+it("stops the clock around async work", async () => {
+  freezeTime();
+  try {
+    await Promise.resolve();
+  } finally {
+    travelBack();
+  }
+});
 ```
+
+The block form runs its block synchronously, as Rails' `freeze_time` yields
+once. Code under test that awaits, such as `Article.create`, goes between a
+blockless `freezeTime()` and `travelBack()`.

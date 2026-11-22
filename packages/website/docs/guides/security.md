@@ -173,10 +173,11 @@ attempts. `rateLimit` in a controller caps requests per client:
 
 ```ts
 import { ActionController } from "@blazetrails/actionpack";
+import { Duration } from "@blazetrails/activesupport";
 
 class SessionsController extends ActionController.Base {
   static {
-    this.rateLimit({ to: 10, within: 180, only: "create" });
+    this.rateLimit({ to: 10, within: Duration.minutes(3), only: "create" });
   }
 }
 ```
