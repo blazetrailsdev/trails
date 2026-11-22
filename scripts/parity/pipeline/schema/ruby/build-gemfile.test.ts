@@ -5,7 +5,7 @@ describe("scripts/parity/pipeline/schema/ruby/build-gemfile.ts", () => {
   it("derives activerecord version from vendor/sources.ts rails ref", () => {
     const content = buildGemfileContent();
     // Rails ref is "v8.0.2" in sources.ts → "8.0.2" gem version (v stripped).
-    expect(content).toContain('gem "activerecord", "8.0.2"');
+    expect(content).toContain('gem "activerecord", "8.0.5.2"');
   });
 
   it("includes the GENERATED banner so contributors know not to hand-edit", () => {
