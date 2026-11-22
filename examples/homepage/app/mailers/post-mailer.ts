@@ -1,6 +1,7 @@
-import { Base, type MessageDelivery } from "@blazetrails/actionmailer";
+import type { MessageDelivery } from "@blazetrails/actionmailer";
+import { ApplicationMailer } from "./application-mailer.ts";
 import type { Post } from "../models/post.ts";
-export class PostMailer extends Base {
+export class PostMailer extends ApplicationMailer {
   declare static published: (post: Post) => MessageDelivery;
   declare post: Post;
   async published(post: Post): Promise<void> {
