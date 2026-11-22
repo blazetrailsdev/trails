@@ -294,8 +294,10 @@ export class RedisCacheStore extends Store implements CacheStore {
     const keys: Buffer[] = [];
     for (const name of names) keys.push(await this.normalizeKey(name, options));
 
-    const values = await this.failsafe("read_multi_entries", { returning: {} }, () =>
-      _then(this.redis, (c) => c.mgetBuffer(...keys)),
+    const values = await this.failsafe<(Buffer | null)[], Record<number, Buffer | null>>(
+      "read_multi_entries",
+      { returning: {} },
+      () => _then(this.redis, (c) => c.mgetBuffer(...keys)),
     );
 
     for (const [i, name] of names.entries()) {
