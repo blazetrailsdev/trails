@@ -69,7 +69,7 @@ export class Trailtie extends BaseTrailtie {
         onLoad("active_record", () => {
           include(Base, EnqueueAfterTransactionCommit);
 
-          if (app.config.activeJob.isKey("enqueueAfterTransactionCommit")) {
+          if (app.config.activeJob.isKey(":enqueueAfterTransactionCommit")) {
             deprecator().warn(
               squish(`
                 \`config.active_job.enqueue_after_transaction_commit\` is deprecated and will be removed in Rails 8.1.

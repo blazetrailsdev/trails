@@ -654,7 +654,7 @@ export class Configuration extends EngineConfiguration {
         const mod = (await import(
           `${getPath().pathToFileURL!(path).href}?loadDatabaseYaml=${Date.now()}`
         )) as { default?: unknown };
-        return (mod.default ?? mod) as Record<string, unknown>;
+        return (mod.default ?? {}) as Record<string, unknown>;
       } finally {
         Trails.application!.config = originalRailsConfig;
       }

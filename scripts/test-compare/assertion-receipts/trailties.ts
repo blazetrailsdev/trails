@@ -1,6 +1,16 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const trailties: Record<string, AssertionReceipt[]> = {
+  "trailties:application/configuration_test.rb › ConfigurationTest › SQLite3Adapter.strict_strings_by_default is false by default for upgraded apps":
+    [
+      {
+        kind: "assert_nothing_raised",
+        value: null,
+        as: null,
+        reason:
+          'configuration_test.rb:2991 `assert_nothing_raised { add_index :posts, :non_existent }` passes only where SQLite re-enables double-quoted string literals; better-sqlite3 compiles SQLITE_DQS=0 (CLAUDE.md, "Runtime facts Node does not expose")',
+      },
+    ],
   "trailties:command/base_test.rb › Rails::Command::BaseTest › ::executable integrates ::bin": [
     {
       kind: "assert_equal",

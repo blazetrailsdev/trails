@@ -67,6 +67,12 @@ export interface ActiveRecordConfig {
   checkSchemaCacheDumpVersion: boolean;
   maintainTestSchema: boolean;
   hasManyInversing: boolean;
+  automaticScopeInversing?: boolean;
+  verifyForeignKeysForFixtures?: boolean;
+  runCommitCallbacksOnFirstSavedInstancesInTransaction?: boolean;
+  useYamlUnsafeLoad?: boolean;
+  raiseIntWiderThan64bit?: boolean;
+  yamlColumnPermittedClasses?: unknown[];
   sqlite3AdapterStrictStringsByDefault?: boolean;
   tableNamePrefix?: string;
   tableNameSuffix?: string;
@@ -122,14 +128,6 @@ const installEncryptionExtendedQueries = (): void => {
     ExtendedDeterministicQueries.installSupport();
     ExtendedDeterministicUniquenessValidator.installSupport();
   }
-};
-
-const setSqlite3StrictStringsByDefault = (adapter: typeof SQLite3Adapter): void => {
-  adapter.strictStringsByDefault = true;
-};
-
-const setPostgresqlDecodeDates = (adapter: typeof PostgreSQLAdapter): void => {
-  adapter.decodeDates = true;
 };
 
 /** @noRailsEquivalent PERMANENT */
@@ -274,17 +272,23 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_record.sqlite3_adapter_strict_strings_by_default", () => {
-      const cfg = this.config.activeRecord;
-      if (cfg.sqlite3AdapterStrictStringsByDefault) {
-        onLoad("active_record_sqlite3adapter", { runOnce: true }, setSqlite3StrictStringsByDefault);
-      }
+      this.config.afterInitialize(() => {
+        if (this.config.activeRecord.sqlite3AdapterStrictStringsByDefault) {
+          onLoad("active_record_sqlite3adapter", function (this: typeof SQLite3Adapter) {
+            this.strictStringsByDefault = true;
+          });
+        }
+      });
     });
 
     this.initializer("active_record.postgresql_adapter_decode_dates", () => {
-      const cfg = this.config.activeRecord;
-      if (cfg.postgresqlAdapterDecodeDates) {
-        onLoad("active_record_postgresqladapter", { runOnce: true }, setPostgresqlDecodeDates);
-      }
+      this.config.afterInitialize(() => {
+        if (this.config.activeRecord.postgresqlAdapterDecodeDates) {
+          onLoad("active_record_postgresqladapter", function (this: typeof PostgreSQLAdapter) {
+            this.decodeDates = true;
+          });
+        }
+      });
     });
 
     this.initializer("active_record.set_configs", () => {
