@@ -36,6 +36,8 @@ export class Result {
   /**
    * @missingRailsCall cast — CONVERGEABLE mysql2-client-prepare-prepares-on-the-server
    * @missingRailsCall cast_booleans — CONVERGEABLE mysql2-client-prepare-prepares-on-the-server
+   * @missingRailsCall database_timezone — CONVERGEABLE mysql2-client-prepare-prepares-on-the-server
+   * @missingRailsCall application_timezone — CONVERGEABLE mysql2-client-prepare-prepares-on-the-server
    */
   each(
     opts: QueryOptions | ((row: unknown[] | Record<string, unknown>) => unknown) = {},
