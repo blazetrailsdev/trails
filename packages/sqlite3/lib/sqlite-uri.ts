@@ -1,6 +1,6 @@
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-libsql-engines
+ * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
  */
 export function resolveUriDatabasePath(database: string): string | null {
   if (database === ":memory:") return null;

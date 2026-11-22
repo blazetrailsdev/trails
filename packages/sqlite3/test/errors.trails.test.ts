@@ -61,7 +61,7 @@ describe("rbSqlite3Raise", () => {
 
   it("rethrows an error that carries no SQLite result code", () => {
     const native = new RangeError("Too few parameter values were provided");
-    expect(raised(() => rbSqlite3Raise(native))).toBe(native);
+    expect(raised(() => rbSqlite3Raise(native, errors))).toBe(native);
   });
 });
 

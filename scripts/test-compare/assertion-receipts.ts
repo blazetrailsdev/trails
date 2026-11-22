@@ -26,6 +26,7 @@ import { rake } from "./assertion-receipts/rake.js";
 import { rubyCompat } from "./assertion-receipts/ruby-compat.js";
 import { solidCache } from "./assertion-receipts/solid-cache.js";
 import { solidQueue } from "./assertion-receipts/solid-queue.js";
+import { sqlite3 } from "./assertion-receipts/sqlite3.js";
 import { trailties } from "./assertion-receipts/trailties.js";
 import { turboRails } from "./assertion-receipts/turbo-rails.js";
 import { tzinfo } from "./assertion-receipts/tzinfo.js";
@@ -72,6 +73,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   "ruby-compat": rubyCompat,
   "solid-cache": solidCache,
   "solid-queue": solidQueue,
+  sqlite3,
   trailties,
   "turbo-rails": turboRails,
   tzinfo,

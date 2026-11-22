@@ -17,6 +17,88 @@ describe("TestStatement", () => {
     if (!db.isClosed()) await db.close();
   });
 
+  it("rows should be frozen", async () => {
+    await db.execute(
+      'CREATE TABLE "things" ("float" float, "int" int, "text" blob, "string" string, "nil" string)',
+    );
+    const stmt = await db.prepare(
+      "INSERT INTO things (float, int, text, string, nil) VALUES (?, ?, ?, ?, ?)",
+    );
+    await stmt.execute(1.2, 2, "blob", "string", null);
+    await stmt.close();
+
+    const rows = (await db.execute(
+      "SELECT float, int, text, string, nil FROM things",
+    )) as unknown[][];
+    expect(Object.isFrozen(rows)).toBeTruthy();
+    expect(rows.length).toEqual(1);
+    const row = rows[0];
+    expect(Object.isFrozen(row)).toBeTruthy();
+    for (const item of row) expect(Object.isFrozen(item)).toBeTruthy();
+  });
+
+  it("double close does not segv", async () => {
+    await db.execute('CREATE TABLE "things" ("number" float NOT NULL)');
+
+    const stmt = await db.prepare("INSERT INTO things (number) VALUES (?)");
+    await expect((async () => stmt.execute(null))()).rejects.toThrow(SQLite3.ConstraintException);
+
+    await stmt.close();
+
+    expect(() => stmt.close()).toThrow(SQLite3.Exception);
+  });
+
+  it("column names are deduped", async () => {
+    await db.execute(
+      "CREATE TABLE 'things' ('float' float, 'int' int, 'text' blob, 'string' string, 'nil' string)",
+    );
+    let stmt = await db.prepare("SELECT float, int, text, string, nil FROM things");
+    try {
+      expect(await stmt.columns()).toEqual(["float", "int", "text", "string", "nil"]);
+      const columns = await stmt.columns();
+      await stmt.close();
+
+      stmt = await db.prepare("SELECT float, int, text, string, nil FROM things");
+      (await stmt.columns()).forEach((str, i) => {
+        expect(Object.isFrozen(columns[i])).toBeTruthy();
+        expect(columns[i]).toBe(str);
+      });
+    } finally {
+      if (!stmt.isClosed()) await stmt.close();
+    }
+  });
+
+  it("insert duplicate records", async () => {
+    await db.execute(
+      'CREATE TABLE "things" ("name" varchar(20) CONSTRAINT "index_things_on_name" UNIQUE)',
+    );
+    const stmt = await db.prepare("INSERT INTO things(name) VALUES(?)");
+    await stmt.execute("ruby");
+
+    const raised = (async () => stmt.execute("ruby"))();
+    await expect(raised).rejects.toThrow(SQLite3.ConstraintException);
+    const exception = (await raised.catch((e: unknown) => e)) as Error;
+    expect(exception.message).toMatch(
+      /(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/,
+    );
+
+    await stmt.close();
+  });
+
+  it("with error", async () => {
+    await db.execute(
+      'CREATE TABLE "employees" ("name" varchar(20) NOT NULL CONSTRAINT "index_employees_on_name" UNIQUE)',
+    );
+    const stmt = await db.prepare("INSERT INTO Employees(name) VALUES(?)");
+    await stmt.execute("employee-1");
+    try {
+      await stmt.execute("employee-1");
+    } catch {}
+    await stmt.resetBang();
+    expect(await stmt.execute("employee-2")).toBeTruthy();
+    await stmt.close();
+  });
+
   it("new", async () => {
     expect(stmt).toBeTruthy();
   });

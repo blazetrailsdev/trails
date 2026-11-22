@@ -101,6 +101,14 @@ export class Statement {
     return reset();
   }
 
+  async executeBang(...bindVars: unknown[]): Promise<unknown[][] | this> {
+    const block = rbBlockGivenP(bindVars.at(-1))
+      ? (bindVars.pop() as (row: unknown[]) => void)
+      : undefined;
+    await this.execute(...bindVars);
+    return block ? this.each(block) : this.toA();
+  }
+
   isActive(): boolean {
     return !this.isDone();
   }
@@ -224,7 +232,14 @@ export class Statement {
     } catch (e) {
       rbSqlite3Raise(e, engine);
     }
-    return r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, engine)) : r;
+    return r instanceof Promise
+      ? r.then(
+          (list) => (list === null ? list : (Object.freeze(list) as unknown[])),
+          (e: unknown) => rbSqlite3Raise(e, engine),
+        )
+      : r === null
+        ? r
+        : (Object.freeze(r) as unknown[]);
   }
 
   isDone(): boolean {

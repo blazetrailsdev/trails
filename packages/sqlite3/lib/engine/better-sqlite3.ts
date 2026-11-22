@@ -7,7 +7,7 @@ import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
-import { bindParameterIndex } from "./bind-parameter-index.js";
+import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 
 const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
@@ -69,6 +69,7 @@ function prepareStatement(
   const stmt = withBusyHandler(errors, handler, () => raw.prepare(sql));
   const reader = stmt.reader;
   if (reader) stmt.raw(true);
+  const names = bindParameterNames(sql);
   const positional: SqliteBindValue[] = [];
   const named: Record<string, SqliteBindValue> = {};
   let rows: Iterator<unknown[]> | null = null;
@@ -76,9 +77,12 @@ function prepareStatement(
   let closed = false;
   const bound = <T>(call: (args: unknown[]) => T): T => {
     const args: unknown[] = [];
-    const params: Record<string, unknown> = { ...named };
+    const params: Record<string, unknown> = {};
+    for (const name of names) if (name !== null) params[name.slice(1)] = null;
+    Object.assign(params, named);
     Array.from(positional, (v, i) => {
-      if (bindParameterIndex(sql, `?${i + 1}`) !== 0) params[i + 1] = v ?? null;
+      if (names[i] != null) params[names[i].slice(1)] = v ?? null;
+      else if (bindParameterIndex(sql, `?${i + 1}`) !== 0) params[i + 1] = v ?? null;
       else args.push(v ?? null);
     });
     for (;;) {

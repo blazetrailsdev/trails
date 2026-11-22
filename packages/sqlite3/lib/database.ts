@@ -342,7 +342,8 @@ export class Database {
       this._engine = this.#openEngine(file, mode, zvfs);
     } catch (e) {
       const { errcode, errmsg } = this.#openEngine;
-      rbSqlite3Raise(e, errcode && errmsg ? { errcode, errmsg } : undefined);
+      if (!errcode || !errmsg) throw e;
+      rbSqlite3Raise(e, { errcode, errmsg });
     }
   }
 
