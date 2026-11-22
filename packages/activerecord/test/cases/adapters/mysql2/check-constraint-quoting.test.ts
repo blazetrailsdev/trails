@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   isMariaDb,
@@ -6,6 +5,7 @@ import {
   Mysql2Adapter,
 } from "../abstract-mysql-adapter/test-helper.js";
 import { describeIfSupports } from "../../../support/supports.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

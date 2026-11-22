@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import {
   SchemaCreation,
@@ -19,6 +18,7 @@ import {
 import { TableDefinition as MyTd } from "../../../../lib/connection-adapters/mysql/schema-definitions.js";
 import { Column } from "../../../../lib/connection-adapters/mysql/column.js";
 import { Base } from "../../../../lib/base.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 let leased: VisitorHostAdapter;
 

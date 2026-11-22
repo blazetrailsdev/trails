@@ -1,6 +1,6 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Mysql2 } from "@blazetrails/mysql2";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   leaseMysqlAdapter,

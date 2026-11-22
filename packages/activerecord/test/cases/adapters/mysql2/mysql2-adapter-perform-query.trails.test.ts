@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { leaseMysqlAdapter, Mysql2Adapter } from "../abstract-mysql-adapter/test-helper.js";
 import { asJson, BigDecimal } from "@blazetrails/activesupport";
@@ -6,6 +5,7 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 import { Base } from "../../../../lib/base.js";
 import { ReadOnlyError, RecordNotUnique } from "../../../../lib/errors.js";
 import type { Mysql2Result } from "@blazetrails/mysql2";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2AdapterPerformQueryTest (trails)", () => {
   let adapter: Mysql2Adapter;

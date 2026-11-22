@@ -60,7 +60,7 @@ const SYSTEM_SCREENSHOT_DIRECTORY = "tmp/screenshots";
 // The pure-unit `connection-adapters/<db>/**` subdirs (OID types, quoting
 // helpers, schema-creation stubs) are NOT in this exclude — they run on every
 // CI job regardless of ARCONN. Live-DB cases inside them are wrapped in
-// `describeIfPg` / `describeIfMysqlAdapter` /
+// `describeIfPg` /
 // `describe.runIf(currentAdapter(...))`.
 //
 // CI sets ARCONN=postgresql on postgres-tests and ARCONN=mysql2 on

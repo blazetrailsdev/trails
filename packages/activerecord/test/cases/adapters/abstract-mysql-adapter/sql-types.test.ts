@@ -1,6 +1,6 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

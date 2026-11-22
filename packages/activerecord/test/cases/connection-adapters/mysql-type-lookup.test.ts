@@ -1,6 +1,6 @@
-import { currentAdapter } from "../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 
 class TestMysqlAdapter extends Mysql2Adapter {
   constructor() {

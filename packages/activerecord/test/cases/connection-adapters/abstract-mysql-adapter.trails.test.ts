@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
 import { NullLock } from "@blazetrails/activesupport";
 import { Base } from "../../../lib/base.js";
@@ -14,6 +13,7 @@ import { SchemaCreation as MysqlSchemaCreation } from "../../../lib/connection-a
 import { NullPool } from "../../../lib/connection-adapters/abstract/connection-pool.js";
 import { Result } from "../../../lib/result.js";
 import { resultFromRowHashes } from "../../support/result-from-row-hashes.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
   return new Column(

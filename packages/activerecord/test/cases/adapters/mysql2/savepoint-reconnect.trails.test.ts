@@ -1,7 +1,7 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Mysql2Adapter, MYSQL_TEST_URL } from "../abstract-mysql-adapter/test-helper.js";
 import { ConnectionFailed } from "../../../../lib/errors.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 interface RetryLoopSeams {
   reconnect(): void | Promise<void>;

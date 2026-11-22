@@ -1,9 +1,9 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, beforeEach, expect } from "vitest";
 import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../../../lib/index.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   const { self } = fixtures({});

@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import {
@@ -15,6 +14,7 @@ import { NoDatabaseError, DatabaseVersionError } from "../../../../lib/errors.js
 import { Mysql2, type Mysql2Result } from "@blazetrails/mysql2";
 import { Base } from "../../../../lib/base.js";
 import { runWithoutConnection } from "../../../support/connection-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { ConnectionUrlResolver } from "../../../../lib/database-configurations/connection-url-resolver.js";
 
 function clearVersionCache(adapter: Mysql2Adapter): void {

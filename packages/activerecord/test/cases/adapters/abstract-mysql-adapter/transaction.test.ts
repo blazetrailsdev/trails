@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import {
   assertDifference,
@@ -9,6 +8,7 @@ import {
 import { Thread, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Base } from "../../../../lib/base.js";
 import {
   StatementTimeout,

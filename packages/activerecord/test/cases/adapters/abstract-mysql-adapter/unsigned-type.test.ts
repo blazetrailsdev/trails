@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
@@ -9,6 +8,7 @@ import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { deprecator } from "../../../../lib/deprecator.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   fixtures({}, { useTransactionalTests: false });

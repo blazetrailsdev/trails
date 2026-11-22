@@ -1,9 +1,9 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
 import { Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { Topic } from "../../../models/topic.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   describe("StoredProcedureTest", () => {

@@ -1,9 +1,9 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import type { Time } from "@blazetrails/date";
 import { Base } from "../../../../lib/index.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Topic } from "../../../models/topic.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))(

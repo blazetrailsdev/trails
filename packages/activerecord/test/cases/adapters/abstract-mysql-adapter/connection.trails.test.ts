@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { leaseMysqlAdapter, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
@@ -8,6 +7,7 @@ import {
   ConnectionNotEstablished,
 } from "../../../../lib/errors.js";
 import mysql from "mysql2/promise";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 function clearVersionCache(adapter: Mysql2Adapter): void {
   (

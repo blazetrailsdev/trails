@@ -1,10 +1,10 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { asJson } from "@blazetrails/activesupport";
 import { Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../../support/supports.js";
 import { Base } from "../../../../lib/index.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Post } from "../../../models/post.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {

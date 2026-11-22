@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { RuntimeError, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -11,6 +10,7 @@ import {
   isRowFormatDynamicByDefault,
 } from "../../../../lib/connection-adapters/mysql/schema-statements.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

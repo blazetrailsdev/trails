@@ -1,8 +1,8 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SavepointTransaction } from "../../../../lib/connection-adapters/abstract/transaction.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 async function makeParentDirty(a: Mysql2Adapter): Promise<void> {
   await a.execQuery("SELECT * FROM `samples` LIMIT 1");

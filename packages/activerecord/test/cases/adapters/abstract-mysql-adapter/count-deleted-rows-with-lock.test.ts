@@ -1,7 +1,7 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
 import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Bulb } from "../../../models/bulb.js";
 import { Author } from "../../../models/author.js";
 import { Car } from "../../../models/car.js";

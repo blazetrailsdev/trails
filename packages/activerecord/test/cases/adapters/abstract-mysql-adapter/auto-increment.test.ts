@@ -1,8 +1,8 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

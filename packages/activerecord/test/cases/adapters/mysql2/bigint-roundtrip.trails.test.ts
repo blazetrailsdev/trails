@@ -1,8 +1,8 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import { leaseMysqlAdapter, Mysql2Adapter } from "../abstract-mysql-adapter/test-helper.js";
 import type { Mysql2Result } from "@blazetrails/mysql2";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

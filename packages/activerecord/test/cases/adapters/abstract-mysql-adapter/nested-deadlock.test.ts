@@ -1,10 +1,10 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { leaseMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { Deadlocked, Rollback, StatementInvalid } from "../../../../lib/errors.js";
 import { SavepointTransaction } from "../../../../lib/connection-adapters/abstract/transaction.js";

@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
@@ -7,6 +6,7 @@ import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/base.js";
 import type { Column as MySQLColumn } from "../../../../lib/connection-adapters/mysql/column.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 class VirtualColumn extends Base {}
 

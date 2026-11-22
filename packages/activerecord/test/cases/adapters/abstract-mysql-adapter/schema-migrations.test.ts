@@ -1,9 +1,9 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { SchemaMigration } from "../../../../lib/schema-migration.js";
 import { InternalMetadata } from "../../../../lib/internal-metadata.js";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import type { Mysql2Result } from "@blazetrails/mysql2";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {

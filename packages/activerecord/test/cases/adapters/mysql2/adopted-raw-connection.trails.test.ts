@@ -1,8 +1,8 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, vi } from "vitest";
 import { Mysql2Adapter, MYSQL_TEST_URL } from "../abstract-mysql-adapter/test-helper.js";
 import { deprecator } from "../../../../lib/deprecator.js";
 import { Mysql2 } from "@blazetrails/mysql2";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))(
   "Mysql2Adapter adopts a raw connection it was handed (trails)",

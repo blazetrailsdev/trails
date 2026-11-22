@@ -1,9 +1,9 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
 import { leaseMysqlAdapter } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Post } from "../../../models/post.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("SchemaTestTrails", () => {
   describe("the SchemaTest @omgpost", () => {

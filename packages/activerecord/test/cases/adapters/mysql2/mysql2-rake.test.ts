@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   type ChildProcessAdapter,
@@ -12,6 +11,7 @@ import { HashConfig } from "../../../../lib/database-configurations/hash-config.
 import { DatabaseAlreadyExists } from "../../../../lib/errors.js";
 import { Base } from "../../../../lib/base.js";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 async function withStubbedConnection(
   connection: unknown,

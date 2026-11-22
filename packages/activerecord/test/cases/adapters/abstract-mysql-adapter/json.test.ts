@@ -1,8 +1,8 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, beforeEach } from "vitest";
 import "../../../../lib/index.js";
 import { leaseMysqlAdapter, supportsJson } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { jsonSharedTestCases } from "../../json-shared-test-cases.js";
 import type { TableDefinition } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
 

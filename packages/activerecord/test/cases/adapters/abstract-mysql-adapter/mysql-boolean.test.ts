@@ -1,9 +1,9 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../../../lib/index.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 class BooleanType extends Base {
   static tableName = "mysql_booleans";

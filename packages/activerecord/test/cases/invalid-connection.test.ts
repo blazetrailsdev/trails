@@ -1,7 +1,7 @@
-import { currentAdapter } from "../support/adapter-helper.js";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { Base } from "../../lib/base.js";
 import { fixtures } from "../support/use-fixtures.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 
 describe.runIf(currentAdapter("Mysql2Adapter"))("TestAdapterWithInvalidConnection", () => {
   fixtures({}, { useTransactionalTests: false });

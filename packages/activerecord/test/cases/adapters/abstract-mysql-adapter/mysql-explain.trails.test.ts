@@ -1,8 +1,8 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Base } from "../../../../lib/index.js";
 import { Author } from "../../../models/author.js";
 import { Post } from "../../../models/post.js";

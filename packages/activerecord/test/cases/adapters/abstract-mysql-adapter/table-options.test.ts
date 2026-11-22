@@ -1,4 +1,3 @@
-import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Logger } from "@blazetrails/activesupport";
 import { Version } from "../../../../lib/connection-adapters/abstract-adapter.js";
@@ -6,6 +5,7 @@ import { Base, Migration, Migrator } from "../../../../lib/index.js";
 import type { MigrationProxy } from "../../../../lib/migration.js";
 import { isMariaDb, mysqlVersion, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 const skipNoTableOptions =
   isMariaDb ||
