@@ -241,6 +241,7 @@ export const MANIFEST_PACKAGES = [
   "thor",
   "mail",
   "libxml-ruby",
+  "listen",
   "mini-mime",
   "net-smtp",
   "rake",

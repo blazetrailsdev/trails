@@ -1,0 +1,52 @@
+{
+  "name": "@blazetrails/listen",
+  "version": "0.1.0",
+  "description": "File system change notifications for Trails, mirroring the listen gem over @parcel/watcher",
+  "type": "module",
+  "main": "dist/listen.js",
+  "types": "dist/listen.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/listen.d.ts",
+      "default": "./dist/listen.js"
+    },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "devDependencies": {
+    "@parcel/watcher": "2.6.0"
+  },
+  "peerDependencies": {
+    "@parcel/watcher": "2.6.0"
+  },
+  "peerDependenciesMeta": {
+    "@parcel/watcher": {
+      "optional": true
+    }
+  },
+  "mirrors": [
+    {
+      "source": "listen",
+      "ref": "v3.9.0",
+      "sha": "7b7a2f586d4363ec6e2e82c72732df92a1476d6e"
+    }
+  ],
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  }
+}

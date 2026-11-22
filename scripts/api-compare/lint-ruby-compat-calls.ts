@@ -115,6 +115,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "mail",
   "marcel",
   "mini-magick",
+  "listen",
   "mini-mime",
   "net-smtp",
   "msgpack",

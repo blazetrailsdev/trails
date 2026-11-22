@@ -1083,6 +1083,7 @@ jobs:
           packages/libxml-ruby
           packages/marcel
           packages/image-processing
+          packages/listen
           packages/mini-magick
           packages/mini-mime
           packages/msgpack
@@ -1340,6 +1341,7 @@ jobs:
           packages/libxml-ruby
           packages/marcel
           packages/image-processing
+          packages/listen
           packages/mini-magick
           packages/mini-mime
           packages/msgpack
