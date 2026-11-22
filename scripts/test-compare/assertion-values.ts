@@ -233,9 +233,12 @@ function foldRenamedExtensionToken(token: string): string {
   const text = token.slice(2);
   const folded = foldCell(text);
   if (folded === text || !text.includes("\n")) return `s:${folded}`;
-  const lines = text.split("\n").filter((line) => !PROPSHAFT_ROUTE_RE.test(line));
-  if (repadTable(lines, (cell) => cell) !== lines.join("\n")) return `s:${folded}`;
-  return `s:${repadTable(lines, foldCell)}`;
+  const lines = text.split("\n");
+  if (repadTable(lines, (cell) => cell) !== text) return `s:${folded}`;
+  return `s:${repadTable(
+    lines.filter((line) => !PROPSHAFT_ROUTE_RE.test(line)),
+    foldCell,
+  )}`;
 }
 
 function foldCell(text: string): string {
