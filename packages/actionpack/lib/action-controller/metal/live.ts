@@ -8,6 +8,8 @@ import {
 } from "../../action-dispatch/http/response.js";
 import {
   CachedThreadPool,
+  ClosedQueueError,
+  IOError,
   File,
   Queue,
   RuntimeError,
@@ -63,7 +65,12 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
       this._response!.deleteHeader("Content-Length");
     }
 
-    await super.write(string);
+    try {
+      await super.write(string);
+    } catch (e) {
+      if (!(e instanceof ClosedQueueError)) throw e;
+      if (this.isConnected) throw new IOError("closed stream");
+    }
 
     if (!this.isConnected) {
       this._buf.clear();
