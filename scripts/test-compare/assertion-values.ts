@@ -112,9 +112,7 @@ function collectSide(
       if (LOOSE_RAILS_KINDS.has(kinds[i])) entry.loose.add(entry.captured.length);
       const token = foldIvarToken(foldSymbolToken(value));
       entry.captured.push(
-        foldRenamedExtensionToken(
-          foldNameToken(side === "trails" ? foldDumpStatementToken(token) : token),
-        ),
+        foldRenamedExtensionToken(side === "trails" ? foldDumpStatementToken(token) : token),
       );
     }
   }
@@ -232,12 +230,73 @@ const RENAMED_EXTENSION_RE = new RegExp(
  */
 function foldRenamedExtensionToken(token: string): string {
   if (!token.startsWith("s:")) return token;
-  return `s:${token
-    .slice(2)
+  const text = token.slice(2);
+  const folded = foldCell(text);
+  if (folded === text || !text.includes("\n")) return `s:${folded}`;
+  return `s:${repadTable(
+    text.split("\n").filter((line) => !PROPSHAFT_ROUTE_RE.test(line)),
+    foldCell,
+  )}`;
+}
+
+function foldCell(text: string): string {
+  return foldNameToken(`s:${renameTokens(text)}`).slice(2);
+}
+
+/**
+ * Propshaft's `/assets` row in a Rails routes table
+ * (railties/test/commands/routes_test.rb:206). trails serves assets through
+ * Vite and never mounts `Propshaft::Server` (CLAUDE.md, "importmap-rails and
+ * propshaft are out of scope"), so the row is dropped before the table is
+ * re-padded.
+ */
+const PROPSHAFT_ROUTE_RE = /^\s*\/assets\s+Propshaft::Server\s*$/;
+
+function renameTokens(text: string): string {
+  return text
     .replace(RENAMED_EXTENSION_RE, (_m, tok: string) => `.${TOKEN_RENAMES[tok]}`)
     .replace(TS_SOURCE_EXTENSION_RE, `.${TOKEN_RENAMES.rb}`)
     .replace(/(?<![A-Za-z])(?:rails|Rails|RAILS)(?![a-z])/g, (tok) => TOKEN_RENAMES[tok])
-    .replace(/(?<![A-Za-z])(?:irb|IRB)(?![A-Za-z])/g, (tok) => TOKEN_RENAMES[tok])}`;
+    .replace(/(?<![A-Za-z])(?:irb|IRB)(?![A-Za-z])/g, (tok) => TOKEN_RENAMES[tok]);
+}
+
+/**
+ * Re-pad a column-aligned table after renaming each cell. A renamed cell
+ * widens its column (`rails_service_blob` is `trails_service_blob` in a
+ * `bin/trails routes` table, railties/test/commands/routes_test.rb:42-85), so
+ * every row of that column is re-padded, as the formatter that printed it
+ * would have. A column is a run of character positions that is not blank in
+ * every line; one whose cells carry leading blanks is right-aligned. Applied
+ * to BOTH sides, so a table already in trails spelling comes back unchanged.
+ */
+function repadTable(lines: string[], rename: (cell: string) => string): string {
+  const rows = lines.filter((line) => line.trim() !== "");
+  const width = Math.max(...rows.map((line) => line.length));
+  const spans: [number, number][] = [];
+  for (let c = 0; c < width; c++) {
+    const blank = rows.every((line) => c >= line.length || line[c] === " ");
+    if (blank) continue;
+    const last = spans.at(-1);
+    if (last && last[1] === c) last[1] = c + 1;
+    else spans.push([c, c + 1]);
+  }
+  if (spans.length < 2) return lines.map(rename).join("\n");
+  const cells = rows.map((line) => spans.map(([s, e]) => line.slice(s, e).padEnd(e - s)));
+  const right = spans.map((_span, i) =>
+    cells.some((row) => row[i].trim() !== "" && row[i].startsWith(" ")),
+  );
+  const renamed = cells.map((row) => row.map((cell) => rename(cell.trim())));
+  const widths = spans.map((_span, i) => Math.max(...renamed.map((row) => row[i].length)));
+  const out = renamed.map((row) => {
+    let line = " ".repeat(spans[0]?.[0] ?? 0);
+    row.forEach((cell, i) => {
+      if (i > 0) line += " ".repeat(spans[i][0] - spans[i - 1][1]);
+      line += right[i] ? cell.padStart(widths[i]) : cell.padEnd(widths[i]);
+    });
+    return line.trimEnd();
+  });
+  let next = 0;
+  return lines.map((line) => (line.trim() === "" ? line : out[next++])).join("\n");
 }
 
 /**
