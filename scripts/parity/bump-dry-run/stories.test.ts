@@ -41,6 +41,7 @@ const input = (over: Partial<StoryInput> = {}): StoryInput => ({
   subsystems: {},
   fileDeps: {},
   splitThreshold: Infinity,
+  trailsPackage: { core: "gem-core" },
   ...over,
 });
 
@@ -86,6 +87,7 @@ describe("burn-down stories", () => {
     expect(md).toContain("body-pins.ts --pin b/y.rb");
     expect(md).toContain("- `XTest > new`");
     expect(md).toMatch(/^deps:\n {2}- gem-2-web$/m);
+    expect(md).toContain('packages: ["gem-core"]');
   });
 
   it("slugs a ref", () => {

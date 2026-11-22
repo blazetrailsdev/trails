@@ -7,7 +7,7 @@
  * seeded ledger (`scripts/parity/bump-ledger/<source>.json`, `.tests.json`).
  * `--from-tests` is test-compare's `rails-tests.json` extracted at `--from`;
  * `--to-tests` defaults to the current one. `--config` holds `order`,
- * `subsystems`, `fileDeps`, `splitThreshold` and `cluster` (`stories.ts`).
+ * `subsystems`, `fileDeps`, `splitThreshold`, `trailsPackage` and `cluster` (`stories.ts`).
  *
  * Hard rules: no node:* imports; process.* only in the entry guard.
  */
@@ -27,6 +27,7 @@ interface Config {
   subsystems?: StoryInput["subsystems"];
   fileDeps?: StoryInput["fileDeps"];
   splitThreshold?: number;
+  trailsPackage?: StoryInput["trailsPackage"];
   cluster?: string;
 }
 
@@ -104,6 +105,7 @@ export async function main(args: readonly string[]): Promise<number> {
     subsystems: config.subsystems ?? {},
     fileDeps: config.fileDeps ?? {},
     splitThreshold: config.splitThreshold ?? Infinity,
+    trailsPackage: config.trailsPackage ?? {},
   };
   const stories = planStories(input);
   await fs.mkdir(path.resolve(ROOT, out), { recursive: true });

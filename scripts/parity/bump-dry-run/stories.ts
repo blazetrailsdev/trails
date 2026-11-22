@@ -39,6 +39,8 @@ export interface StoryInput {
   fileDeps: Readonly<Record<string, readonly string[]>>;
   /** A package with more Ruby files than this is split by `subsystems`. */
   splitThreshold: number;
+  /** A comparer package → the trails package its story lists, where the two differ. */
+  trailsPackage: Readonly<Record<string, string>>;
 }
 
 interface TestFileWork {
@@ -172,7 +174,7 @@ export function renderStory(input: StoryInput, s: Story, cluster: string): strin
     "status: draft",
     `rfc: ${JSON.stringify(input.rfc)}`,
     `cluster: ${cluster}`,
-    `packages: [${JSON.stringify(s.package)}]`,
+    `packages: [${JSON.stringify(input.trailsPackage[s.package] ?? s.package)}]`,
     s.deps.length === 0 ? "deps: []" : ["deps:", ...s.deps.map((d) => `  - ${d}`)].join("\n"),
     "deps-rfc: []",
     `est-loc: ${Math.max(50, rows * 15 + testCount * 25)}`,

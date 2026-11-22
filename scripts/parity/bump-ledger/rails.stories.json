@@ -1,0 +1,85 @@
+{
+  "cluster": "burn-down",
+  "splitThreshold": 15,
+  "trailsPackage": {
+    "abstractcontroller": "actionpack",
+    "actioncontroller": "actionpack",
+    "actiondispatch": "actionpack"
+  },
+  "order": [
+    "arel",
+    "activemodel",
+    "activesupport",
+    "activerecord",
+    "abstractcontroller",
+    "actioncontroller",
+    "actiondispatch",
+    "actionview",
+    "actioncable",
+    "activejob",
+    "actionmailer",
+    "activestorage",
+    "actionmailbox",
+    "actiontext",
+    "trailties"
+  ],
+  "subsystems": {
+    "activerecord": [
+      { "name": "associations", "prefixes": ["associations", "autosave_association"] },
+      {
+        "name": "relation-and-query",
+        "prefixes": ["relation", "finder", "insert_all", "querying", "scoping", "future_result"]
+      },
+      {
+        "name": "connection-adapters",
+        "prefixes": [
+          "connection_adapters/",
+          "adapters/",
+          "connection_handling",
+          "database_configurations",
+          "test_databases"
+        ]
+      },
+      { "name": "migrations-and-schema", "prefixes": ["migration", "schema", "tasks/"] },
+      {
+        "name": "core-and-attributes",
+        "prefixes": [
+          "attribute",
+          "base",
+          "core",
+          "primary_keys",
+          "transactions",
+          "persistence",
+          "model_schema"
+        ]
+      }
+    ],
+    "actionview": [
+      {
+        "name": "sanitizer-helpers",
+        "prefixes": [
+          "helpers/sanitize_helper.rb",
+          "helpers/text_helper.rb",
+          "template/sanitize_helper_test.rb",
+          "template/text_helper_test.rb"
+        ]
+      },
+      { "name": "helpers", "prefixes": ["helpers", "template/"] },
+      { "name": "rendering", "prefixes": ["renderer/", "template.rb", "template/"] }
+    ],
+    "activesupport": [
+      { "name": "core-ext", "prefixes": ["core_ext/"] },
+      { "name": "cache", "prefixes": ["cache"] }
+    ],
+    "actiondispatch": [
+      { "name": "routing", "prefixes": ["routing", "journey"] },
+      { "name": "http", "prefixes": ["http/", "middleware/"] }
+    ]
+  },
+  "fileDeps": {
+    "actionview helpers/sanitize_helper.rb": ["bump-rails-html-sanitizer-to-v1-7-2"],
+    "actionview helpers/text_helper.rb": ["bump-rails-html-sanitizer-to-v1-7-2"],
+    "actionview template/sanitize_helper_test.rb": ["bump-rails-html-sanitizer-to-v1-7-2"],
+    "actionview template/text_helper_test.rb": ["bump-rails-html-sanitizer-to-v1-7-2"]
+  }
+}
