@@ -208,6 +208,7 @@ export class Heap extends MetaStore {
     }
   }
 
+  /** @missingRailsArgs dump — PERMANENT */
   override async write(
     key: string,
     entries: Entry[],
