@@ -1,6 +1,7 @@
 import {
   ArgumentError,
   Encoding,
+  Thread,
   RuntimeError,
   TypeError,
   include,
@@ -123,9 +124,10 @@ export class Database {
       try {
         result = block(this);
       } finally {
-        (this._engine as SyncCloseEngineDatabase).close();
+        (this as Database & { _engine: SyncCloseEngineDatabase }).close();
       }
       if (result instanceof Promise) {
+        new Thread(() => result);
         throw new ArgumentError("Database.new with a block runs synchronously");
       }
     }
@@ -257,6 +259,8 @@ export class Database {
     });
   }
 
+  close(this: Database & { _engine: SyncCloseEngineDatabase }): this;
+  close(): this | Promise<this>;
   close(): this | Promise<this> {
     let r: void | Promise<void>;
     try {
