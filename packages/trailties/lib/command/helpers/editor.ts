@@ -40,6 +40,7 @@ export const Editor = defineModule(
      * @inventedArm if — PERMANENT
      * @inventedArm try — PERMANENT
      * @inventedArm onSignal — PERMANENT
+     * @inventedArm setTimeout — PERMANENT
      */
     async systemEditor(this: EditorHost, filePath: string): Promise<boolean | null> {
       let interrupted = false;
@@ -48,6 +49,7 @@ export const Editor = defineModule(
       });
       try {
         const result = await rbFSystem(...Shellwords.shellwords(this.editor()!), String(filePath));
+        if (!interrupted) await new Promise((resolve) => setTimeout(resolve, 100));
         if (interrupted) throw new Interrupt();
         return result;
       } finally {
