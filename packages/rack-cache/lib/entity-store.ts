@@ -137,7 +137,7 @@ EntityStore.NOOP = Noop;
 
 export class Body extends File {
   /** @missingRailsCall read — PERMANENT */
-  // @ts-expect-error TS2416: Ruby's IO#each is synchronous; this override reads through the async fs.
+  // @ts-expect-error TS2416
   override async each(block: (part: Uint8Array) => unknown): Promise<this> {
     let part: Uint8Array | null;
     while ((part = await this.readAsync(8192)) != null) {
