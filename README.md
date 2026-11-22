@@ -372,40 +372,41 @@ template comments and blank lines stripped:
 
 <!-- #region quickstart-page -->
 
+<!-- prettier-ignore -->
 ```html
 <!DOCTYPE html>
 <html>
   <head>
     <title>Posts</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="csrf-param" content="authenticity_token" />
-    <meta name="csrf-token" content="…" />
-    <link rel="icon" href="/icon.png" type="image/png" />
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/icon.png" />
+<meta name="csrf-token" content="…" />
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
     <link rel="stylesheet" href="/assets/stylesheets/application.css" />
   </head>
   <body>
     <p style="color: green"></p>
-    <h1>Posts</h1>
-    <div id="posts">
-      <div id="post_1">
-        <p>
-          <strong>Title:</strong>
-          Hello
-        </p>
-        <p>
-          <strong>Body:</strong>
-          First post
-        </p>
-      </div>
-      <p>
-        <a href="/posts/1">Show this post</a>
-      </p>
-    </div>
-    <a href="/posts/new">New post</a>
+<h1>Posts</h1>
+<div id="posts">
+    <div id="post_1">
+  <p>
+    <strong>Title:</strong>
+    Hello
+  </p>
+  <p>
+    <strong>Body:</strong>
+    First post
+  </p>
+</div>
+    <p>
+      <a href="/posts/1">Show this post</a>
+    </p>
+</div>
+<a href="/posts/new">New post</a>
   </body>
 </html>
 ```
