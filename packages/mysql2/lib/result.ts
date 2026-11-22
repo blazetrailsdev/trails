@@ -82,9 +82,10 @@ export class Result {
     const castField = (value: unknown, i: number): unknown => {
       const packet = this.fieldPackets[i];
       const raw = value as string | null;
-      const text = (encoding = packet.encoding) => {
-        if (raw === null || encoding === packet.encoding || encoding === "ascii") return raw;
-        return Buffer.from(raw, "latin1").toString(encoding as BufferEncoding);
+      const text = (encoding: string = packet.encoding ?? "utf8") => {
+        if (raw === null || packet.encoding !== "binary" || encoding === "binary") return raw;
+        if (Buffer.isEncoding(encoding)) return Buffer.from(raw, "latin1").toString(encoding);
+        return new TextDecoder(encoding).decode(Buffer.from(raw, "latin1"));
       };
       const bytes = () => (raw === null ? null : Buffer.from(raw, "latin1"));
       const type = TYPE_NAMES[packet.type!];
