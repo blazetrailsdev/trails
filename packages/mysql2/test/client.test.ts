@@ -2,7 +2,7 @@ import "@blazetrails/vitest-matchers";
 import { rbCInteger } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Mysql2 } from "../lib/index.js";
-import { newClient, specHelper } from "./spec-helper.js";
+import { lastIdTestLock, newClient, specHelper } from "./spec-helper.js";
 describe("Mysql2::Client", () => {
   const state = specHelper();
   describe("using defaults file", () => {
@@ -295,6 +295,7 @@ describe("Mysql2::Client", () => {
     await expect(newClient()).resolves.not.toThrow();
   });
   describe("write operations api", () => {
+    lastIdTestLock(state);
     it("should respond to #last_id", async () => {
       await state.client.query(
         "CREATE TABLE IF NOT EXISTS lastIdTest (`id` BIGINT NOT NULL AUTO_INCREMENT, blah INT(11), PRIMARY KEY (`id`))",
