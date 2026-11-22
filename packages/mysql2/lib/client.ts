@@ -30,6 +30,7 @@ export interface QueryOptions {
   cast?: boolean;
   castBooleans?: boolean;
   cacheRows?: boolean;
+  stream?: boolean;
   symbolizeKeys?: boolean;
   [key: string]: unknown;
 }
@@ -351,6 +352,7 @@ function bind(value: unknown): unknown {
     return value.strftime("%Y-%m-%d %H:%M:%S.%6N");
   }
   if (value instanceof Temporal.PlainDate) return value.toString();
+  if (value instanceof BigDecimal) return value.toString();
   return value;
 }
 

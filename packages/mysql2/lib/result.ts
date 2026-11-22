@@ -1,6 +1,8 @@
 import mysql from "mysql2/promise";
-import { rtest } from "@blazetrails/ruby-compat";
+import { rtest, warn } from "@blazetrails/ruby-compat";
 import type { Client, Field, QueryOptions } from "./client.js";
+import { Error as Mysql2Error } from "./error.js";
+import type { Statement } from "./statement.js";
 import { Mysql2 } from "./mysql2.js";
 
 const TYPE_NAMES: Record<number, string> = Object.fromEntries(
@@ -15,6 +17,8 @@ declare module "./mysql2.js" {
 
 export class Result {
   readonly fields: string[];
+  /** @internal */
+  stmtWrapper?: Statement;
   private rows: Array<unknown[] | Record<string, unknown>>;
 
   constructor(
@@ -46,18 +50,29 @@ export class Result {
     block?: (row: unknown[] | Record<string, unknown>) => unknown,
   ): Array<unknown[] | Record<string, unknown>> {
     if (typeof opts === "function") [opts, block] = [{}, opts];
+    if (this.stmtWrapper?.closed) throw new Mysql2Error("Statement handle already closed");
     if (this.error) throw this.error;
     opts = { ...this.queryOptions, ...opts };
+    let cacheRows = rtest(opts.cacheRows);
+    const cast = rtest(opts.cast);
+    const isStreaming = rtest(opts.stream);
+    if (isStreaming && cacheRows) warn(":cache_rows is ignored if :stream is true");
+    if (this.stmtWrapper && !cacheRows && !isStreaming) {
+      warn(":cache_rows is forced for prepared statements (if not streaming)");
+      cacheRows = true;
+    }
+    if (this.stmtWrapper && !cast) warn(":cast is forced for prepared statements");
     let source = this.rows;
     if (this.client) {
       const client = this.client;
-      const typeCast = client.typeCast(opts);
       client.INVALID_DATE = undefined;
-      source = this.rows.map((row) => this.fetchRow(row, typeCast));
+      source = this.rows.map((row) =>
+        this.stmtWrapper ? this.fetchRowStmt(row, opts) : this.fetchRow(row, client.typeCast(opts)),
+      );
       const error = client.INVALID_DATE;
       client.INVALID_DATE = undefined;
       if (error) throw error;
-      if (rtest(opts.cacheRows)) {
+      if (cacheRows) {
         this.rows = source;
         this.client = undefined;
       }
@@ -73,6 +88,13 @@ export class Result {
     });
     if (block) for (const row of rows) block(row);
     return rows;
+  }
+
+  private fetchRowStmt(
+    row: unknown[] | Record<string, unknown>,
+    args: QueryOptions,
+  ): unknown[] | Record<string, unknown> {
+    return this.fetchRow(row, this.client!.typeCast({ ...args, cast: true }));
   }
 
   private fetchRow(
