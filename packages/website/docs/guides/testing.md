@@ -209,7 +209,7 @@ environment keys directly.
 ## Integration Testing
 
 An integration test follows a flow across controllers: sign in, create an
-article, follow the redirect. `followRedirect()` follows the last response's
+article, follow the redirect. `followRedirectBang()` (Rails' `follow_redirect!`) follows the last response's
 redirect, and `IntegrationTest` keeps the session between requests in one
 test. Generate one with `trails generate integration_test user_flows`.
 
@@ -230,8 +230,8 @@ export class ApplicationSystemTestCase extends SystemTestCase {
 }
 ```
 
-A test calls `visit`, `clickOn`, `fillIn` and asserts with `assertSelector`
-and `assertText`. A failing system test saves a screenshot under
+A test drives the browser through the Playwright `Page` that `await
+t.page()` answers; trails does not port Capybara's DSL. A failing system test saves a screenshot under
 `tmp/screenshots/`, and `takeScreenshot()` saves one on demand. A test for
 a mobile layout passes a smaller `screenSize` in its own subclass.
 
