@@ -11,6 +11,7 @@ declare module "./mysql2.js" {
 
 export class Statement {
   affectedRows = 0;
+  lastId = 0;
   /** @internal */
   closed = false;
 
@@ -70,12 +71,11 @@ export class Statement {
         }
       },
     };
-    const result = this.client.storeResult(
-      await this.client
-        .execute(options, args)
-        .catch((e: unknown) => this.client.raiseMysql2Error(e)),
-      currentQueryOptions,
-    );
+    const native = await this.client
+      .execute(options, args)
+      .catch((e: unknown) => this.client.raiseMysql2Error(e));
+    const result = this.client.storeResult(native, currentQueryOptions);
+    this.lastId = (native[0] as { insertId?: number }).insertId ?? 0;
     if (result) result.stmtWrapper = this;
     this.affectedRows = result?.size ?? this.client.affectedRows;
     return result;

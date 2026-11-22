@@ -1,7 +1,7 @@
 import "@blazetrails/vitest-matchers";
-import { rbCFloat, rbCNilClass } from "@blazetrails/ruby-compat";
+import { BigDecimal, rbCFloat, rbCNilClass } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Time } from "@blazetrails/date";
+import { Date as RubyDate, Time } from "@blazetrails/date";
 import { Mysql2, type Client } from "../lib/index.js";
 import { lastIdTestLock, specHelper } from "./spec-helper.js";
 
@@ -70,23 +70,100 @@ describe("Mysql2::Statement", () => {
     result.each((r) => rows.push(r));
     expect(rows).toEqual([{ "1": 1 }]);
   });
-  // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-  it.skip("should handle booleans", () => {});
+  it("should handle booleans", async () => {
+    const stmt = await state.client.prepare("SELECT ? AS `true`, ? AS `false`");
+    const result = (await stmt.execute(true, false))!;
+    expect(result.toA()).toEqual([{ true: 1, false: 0 }]);
+  });
+  // PERMANENT-SKIP: the npm mysql2 driver's Execute toParameter binds a bigint as VAR_STRING, not
   it.skip("should handle bignum but in int64_t", () => {});
   it.skip("should handle bignum but beyond int64_t", () => {});
-  it.skip("should accept keyword arguments on statement execute", () => {});
-  it.skip("should accept bind arguments and keyword arguments on statement execute", () => {});
-  it.skip("should keep its result after other query", () => {});
-  it.skip("should be reusable 1000 times", () => {});
-  it.skip("should be reusable 10000 times", () => {});
-  it.skip("should handle comparisons and likes", () => {});
-  it.skip("should select dates", () => {});
-  it.skip("should prepare Date values", () => {});
+  it("should accept keyword arguments on statement execute", async () => {
+    const stmt = await state.client.prepare("SELECT 1 AS a");
+
+    expect((await stmt.execute({ as: "hash" }))!.toA()[0]).toEqual({ a: 1 });
+    expect((await stmt.execute({ as: "array" }))!.toA()[0]).toEqual([1]);
+  });
+  it("should accept bind arguments and keyword arguments on statement execute", async () => {
+    const stmt = await state.client.prepare("SELECT ? AS a");
+
+    expect((await stmt.execute(1, { as: "hash" }))!.toA()[0]).toEqual({ a: 1 });
+    expect((await stmt.execute(1, { as: "array" }))!.toA()[0]).toEqual([1]);
+  });
+  it("should keep its result after other query", async () => {
+    await state.client.query("CREATE TABLE IF NOT EXISTS mysql2_stmt_q(a int)");
+    await state.client.query("INSERT INTO mysql2_stmt_q (a) VALUES (1), (2)");
+    const stmt = await state.client.prepare("SELECT a FROM mysql2_stmt_q WHERE a = ?");
+    const result1 = (await stmt.execute(1))!;
+    const result2 = (await stmt.execute(2))!;
+    expect(result2.toA()[0]).toEqual({ a: 2 });
+    expect(result1.toA()[0]).toEqual({ a: 1 });
+    await state.client.query("DROP TABLE IF EXISTS mysql2_stmt_q");
+  });
+  it("should be reusable 1000 times", async () => {
+    const statement = await state.client.prepare("SELECT 1");
+    for (let i = 0; i < 1000; i++) {
+      const result = (await statement.execute())!;
+      expect(result.toA().length).toBe(1);
+    }
+  });
+  it("should be reusable 10000 times", async () => {
+    const statement = await state.client.prepare("SELECT 1");
+    for (let i = 0; i < 10000; i++) {
+      const result = (await statement.execute())!;
+      expect(result.toA().length).toBe(1);
+    }
+  }, 60_000);
+  it("should handle comparisons and likes", async () => {
+    await state.client.query("CREATE TABLE IF NOT EXISTS mysql2_stmt_q(a int, b varchar(10))");
+    await state.client.query('INSERT INTO mysql2_stmt_q (a, b) VALUES (1, "Hello"), (2, "World")');
+    let statement = await state.client.prepare("SELECT * FROM mysql2_stmt_q WHERE a < ?");
+    let results = (await statement.execute(2))!;
+    expect(results.toA()[0]).toEqual({ a: 1, b: "Hello" });
+
+    statement = await state.client.prepare("SELECT * FROM mysql2_stmt_q WHERE b LIKE ?");
+    results = (await statement.execute("%orld"))!;
+    expect(results.toA()[0]).toEqual({ a: 2, b: "World" });
+
+    await state.client.query("DROP TABLE IF EXISTS mysql2_stmt_q");
+  });
+  it("should select dates", async () => {
+    const statement = await state.client.prepare("SELECT NOW()");
+    const result = (await statement.execute())!;
+    expect(Object.values(result.toA()[0])[0]).toBeExactInstanceOf(Time);
+  });
+  it("should prepare Date values", async () => {
+    const now = RubyDate.today();
+    const statement = await state.client.prepare("SELECT ? AS a");
+    const result = (await statement.execute(now))!;
+    expect(String((result.toA()[0] as Record<string, unknown>)["a"])).toBe(now.toString());
+  });
+  // PERMANENT-SKIP: the npm mysql2 driver's Execute toParameter binds a time only as a JS Date,
   it.skip("should prepare Time values with microseconds", () => {});
   it.skip("should prepare DateTime values with microseconds", () => {});
-  it.skip("should tell us about the fields", () => {});
+  it("should tell us about the fields", async () => {
+    const statement = await state.client.prepare("SELECT 1 as foo, 2");
+    await statement.execute();
+    const list = statement.fields!;
+    expect(list.length).toBe(2);
+    expect(list[0]).toBe("foo");
+    expect(list[1]).toBe("2");
+  });
+  // PERMANENT-SKIP: the npm mysql2 driver's Execute toParameter binds a string as VAR_STRING, not
   it.skip("should handle as a decimal binding a BigDecimal", () => {});
-  it.skip("should update a DECIMAL value passing a BigDecimal", () => {});
+  it("should update a DECIMAL value passing a BigDecimal", async () => {
+    await state.client.query("DROP TABLE IF EXISTS mysql2_stmt_decimal_test");
+    await state.client.query("CREATE TABLE mysql2_stmt_decimal_test (decimal_test DECIMAL(10,3))");
+
+    await (
+      await state.client.prepare("INSERT INTO mysql2_stmt_decimal_test VALUES (?)")
+    ).execute(new BigDecimal("123.45"));
+
+    const test_result = (await state.client.query(
+      "SELECT * FROM mysql2_stmt_decimal_test",
+    ))!.toA()[0] as Record<string, BigDecimal>;
+    expect(test_result["decimal_test"].toF()).toBe(123.45);
+  });
   // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
   it.skip("should warn but still work if cache_rows is set to false", () => {});
   describe("utf8_db", () => {
@@ -266,9 +343,30 @@ describe("Mysql2::Statement", () => {
     });
   });
   describe("last_id", () => {
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should return last insert id", () => {});
-    it.skip("should handle bigint ids", () => {});
+    lastIdTestLock(state);
+    beforeEach(async () => {
+      await state.client.query(
+        "CREATE TABLE IF NOT EXISTS lastIdTest (`id` BIGINT NOT NULL AUTO_INCREMENT, blah INT(11), PRIMARY KEY (`id`))",
+      );
+    });
+    afterEach(async () => {
+      await state.client.query("DROP TABLE lastIdTest");
+    });
+    it("should return last insert id", async () => {
+      const stmt = await state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
+      expect(stmt.lastId).toBe(0);
+      await stmt.execute(1);
+      expect(stmt.lastId).toBe(1);
+    });
+    it("should handle bigint ids", async () => {
+      let stmt = await state.client.prepare("INSERT INTO lastIdTest (id, blah) VALUES (?, ?)");
+      await stmt.execute(5000000000, 5000);
+      expect(stmt.lastId).toBe(5000000000);
+
+      stmt = await state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
+      await stmt.execute(5001);
+      expect(stmt.lastId).toBe(5000000001);
+    });
   });
   describe("affected_rows", () => {
     lastIdTestLock(state);
