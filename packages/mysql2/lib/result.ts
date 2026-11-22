@@ -55,7 +55,9 @@ export class Result {
     opts = { ...this.queryOptions, ...opts };
     let cacheRows = rtest(opts.cacheRows);
     const cast = rtest(opts.cast);
-    if (this.stmtWrapper && !cacheRows) {
+    const isStreaming = rtest(opts.stream);
+    if (isStreaming && cacheRows) warn(":cache_rows is ignored if :stream is true");
+    if (this.stmtWrapper && !cacheRows && !isStreaming) {
       warn(":cache_rows is forced for prepared statements (if not streaming)");
       cacheRows = true;
     }
@@ -63,9 +65,10 @@ export class Result {
     let source = this.rows;
     if (this.client) {
       const client = this.client;
-      const typeCast = client.typeCast(this.stmtWrapper ? { ...opts, cast: true } : opts);
       client.INVALID_DATE = undefined;
-      source = this.rows.map((row) => this.fetchRow(row, typeCast));
+      source = this.rows.map((row) =>
+        this.stmtWrapper ? this.fetchRowStmt(row, opts) : this.fetchRow(row, client.typeCast(opts)),
+      );
       const error = client.INVALID_DATE;
       client.INVALID_DATE = undefined;
       if (error) throw error;
@@ -85,6 +88,13 @@ export class Result {
     });
     if (block) for (const row of rows) block(row);
     return rows;
+  }
+
+  private fetchRowStmt(
+    row: unknown[] | Record<string, unknown>,
+    args: QueryOptions,
+  ): unknown[] | Record<string, unknown> {
+    return this.fetchRow(row, this.client!.typeCast({ ...args, cast: true }));
   }
 
   private fetchRow(

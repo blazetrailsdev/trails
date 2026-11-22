@@ -30,6 +30,7 @@ export interface QueryOptions {
   cast?: boolean;
   castBooleans?: boolean;
   cacheRows?: boolean;
+  stream?: boolean;
   symbolizeKeys?: boolean;
   [key: string]: unknown;
 }

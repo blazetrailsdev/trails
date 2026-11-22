@@ -42,7 +42,10 @@ export class Statement {
     return this._execute(args);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm typeCast — PERMANENT
+   */
   async _execute(argv: unknown[]): Promise<Mysql2Result | null> {
     if (this.closed) throw new Mysql2Error("Invalid statement handle");
     const [args, kwargs] = rbScanArgs<QueryOptions>(argv);
