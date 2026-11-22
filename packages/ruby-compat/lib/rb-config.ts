@@ -13,7 +13,7 @@ import { getProcessAdapter } from "./process-adapter.js";
  * running interpreter, which here is the JS runtime's executable: its
  * directory, and its file name less `EXEEXT`, so that
  * `File.join(bindir, ruby_install_name) + EXEEXT` is the executable's path, as
- * `Thor::Util.ruby_command` (`vendor/thor/v1.3.2/lib/thor/util.rb:223-225`)
+ * `Thor::Util.ruby_command` (`vendor/thor/v1.4.0/lib/thor/util.rb:223-225`)
  * builds it. Both are read from the process adapter on access, and are empty
  * where the host names no executable.
  *

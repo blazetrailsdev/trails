@@ -9,7 +9,7 @@ root file unless it names one in this file.
 
 `@blazetrails/pg` wraps the `pg` npm client (node-pg) the way
 `packages/bcrypt` wraps `bcryptjs`. The gem's Ruby files and its C extension
-(`vendor/pg/v1.5.9/ext/`) define far more than Rails uses: large objects,
+(`vendor/pg/v1.6.2/ext/`) define far more than Rails uses: large objects,
 pipeline mode, the `sync_*` / `async_*` / `send_*` variants, SSL and trace
 hooks, connection-info readers and `PG::Result`'s field accessors. Most of it
 is libpq surface that node-pg, which speaks the wire protocol itself, does not
@@ -23,7 +23,7 @@ and its `SCOPED_SKIP_GROUPS` entry (`scripts/parity/conventions.ts`,
 is never filed as a porting story unless a trails caller has appeared.
 
 `PG.library_version` is one of these callers' methods with no value to
-return. It is `PQlibVersion()` (`vendor/pg/v1.5.9/ext/pg.c:246-250`), and
+return. It is `PQlibVersion()` (`vendor/pg/v1.6.2/ext/pg.c:246-250`), and
 node-pg links no libpq. So it is skipped, and
 `cancel_any_running_query`'s libpq-18 guard
 (`activerecord/lib/active_record/connection_adapters/postgresql/database_statements.rb:135`)

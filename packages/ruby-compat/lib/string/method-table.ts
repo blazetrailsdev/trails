@@ -535,7 +535,7 @@ export function rbObjNotMatch(obj1: unknown, obj2: unknown): boolean {
  * and the Unicode space separators, which Ruby keeps.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#strip`, which Thor calls on
- * a prompt's answer (`vendor/thor/v1.3.2/lib/thor/shell/basic.rb:339`).
+ * a prompt's answer (`vendor/thor/v1.4.0/lib/thor/shell/basic.rb:339`).
  */
 export function strip(str: string): string {
   return str.replace(LSTRIP, "").replace(RSTRIP, "");

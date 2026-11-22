@@ -10,8 +10,8 @@ alternatives tried for each decision are in
 ## Thor commands register through an explicit `methodAdded`
 
 Thor registers a command whenever the VM fires `method_added` for a public
-`def` (`vendor/thor/v1.3.2/lib/thor/base.rb:729-745`). `Thor.create_command`
-(`vendor/thor/v1.3.2/lib/thor.rb:560-583`) consumes the pending `@usage` /
+`def` (`vendor/thor/v1.4.0/lib/thor/base.rb:729-745`). `Thor.create_command`
+(`vendor/thor/v1.4.0/lib/thor.rb:560-583`) consumes the pending `@usage` /
 `@desc` / `@method_options` the preceding `desc` / `method_option` calls set,
 and clears them. `inherited` (`base.rb:721-725`) registers every subclass in
 `Thor::Base.subclasses` the moment it is defined.
@@ -66,9 +66,9 @@ class is not a new decision to argue.
 ## Thor dispatch is async
 
 Thor runs synchronously end to end: `Thor::Base.start`
-(`vendor/thor/v1.3.2/lib/thor/base.rb:582-594`) → `dispatch` → `invoke_command`
-(`vendor/thor/v1.3.2/lib/thor/invocation.rb:122-129`) → `Command#run`
-(`vendor/thor/v1.3.2/lib/thor/command.rb:21-38`) → the command method, each
+(`vendor/thor/v1.4.0/lib/thor/base.rb:582-594`) → `dispatch` → `invoke_command`
+(`vendor/thor/v1.4.0/lib/thor/invocation.rb:122-129`) → `Command#run`
+(`vendor/thor/v1.4.0/lib/thor/command.rb:21-38`) → the command method, each
 returning its value in line.
 
 In trails three leaves of that tree need a promise: reading a line

@@ -5,7 +5,7 @@ the root [CLAUDE.md](../../CLAUDE.md).
 
 ## `Image#==` and `#hash` compare a warm signature (`Image::Info#signature`)
 
-`Image#==` and `#hash` (`vendor/mini_magick/v5.2.0/lib/mini_magick/image.rb:156-163`)
+`Image#==` and `#hash` (`vendor/mini_magick/v5.3.1/lib/mini_magick/image.rb:156-163`)
 read `signature`, which `Image::Info#signature` memoizes from an `identify`
 run in line (`image/info.rb:112-114`). In trails that run is a child process,
 so it is awaited: `Info#signature` answers the memoized String once it has
@@ -28,7 +28,7 @@ pins both arms.
 ## The constructor's block is awaited by the next run (`Image#initialize`'s `combine_options`)
 
 `Image#initialize` ends `combine_options(&block) if block`
-(`vendor/mini_magick/v5.2.0/lib/mini_magick/image.rb:149-155`), a `mogrify`
+(`vendor/mini_magick/v5.3.1/lib/mini_magick/image.rb:149-155`), a `mogrify`
 run in line. In trails that run is an awaited child process and a JS
 constructor cannot await, so the constructor seats its promise on
 `Info#_pending`, and every later operation on the image awaits it first:

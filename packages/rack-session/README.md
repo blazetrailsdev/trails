@@ -5,7 +5,7 @@ gem.
 
 `rack-session` is not part of the Rails monorepo. Its upstream is
 [rack/rack-session](https://github.com/rack/rack-session), vendored at
-`vendor/rack-session/v2.1.0/` (RFC 0133). It is the anchor for ActionDispatch's
+`vendor/rack-session/v2.1.1/` (RFC 0133). It is the anchor for ActionDispatch's
 session middleware, the same way `vendor/rails/` is the anchor for every
 framework package. `ActionDispatch::Session::CookieStore` subclasses
 `AbstractSecureStore`, which subclasses `Rack::Session::Abstract::PersistedSecure`
@@ -36,17 +36,17 @@ stores, not directly.
 ## The contract
 
 - **The vendored gem is the source of truth.** Read
-  `vendor/rack-session/v2.1.0/lib/rack/session/<file>.rb` before writing
+  `vendor/rack-session/v2.1.1/lib/rack/session/<file>.rb` before writing
   anything here, the same way every other package reads `vendor/rails/` first.
 - **Every member cites its anchor.** A ported member carries a
-  `vendor/rack-session/v2.1.0/lib/rack/session/<file>.rb:LINE` citation, so a
+  `vendor/rack-session/v2.1.1/lib/rack/session/<file>.rb:LINE` citation, so a
   reviewer can put the Ruby and the TypeScript side by side.
 - **Both parity gates run over it.** Unlike `date` and `minitest`, whose Ruby
   side is C or is not compared at all, `rack-session` is pure Ruby with a real
-  test suite at `vendor/rack-session/v2.1.0/test/`, so `parity:api` and
+  test suite at `vendor/rack-session/v2.1.1/test/`, so `parity:api` and
   `parity:test` both measure this package.
 - **Workspace dependencies follow the gemspec.** The gemspec declares
-  `rack >= 3.0.0` (`vendor/rack-session/v2.1.0/rack-session.gemspec:24`), and
+  `rack >= 3.0.0` (`vendor/rack-session/v2.1.1/rack-session.gemspec:24`), and
   the code uses `Rack::Request`, `Rack::Utils.set_cookie_header` and
   `Rack::Response`, so `@blazetrails/rack` is the one framework dependency. The
   other is `@blazetrails/ruby-compat`, the leaf every package may use for Ruby

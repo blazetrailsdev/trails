@@ -97,7 +97,7 @@ function encodes(str: string[], s0: Uint8Array, len: number, type: string, tailL
  * (`cache/coder.rb:44,77-82`), and the `L>` `MessagePack::Bigint` packs its
  * words with (`vendor/msgpack/v1.8.0/lib/msgpack/bigint.rb:8`), and the `q>` `MessagePack::Timestamp`
  * packs a timestamp96's seconds with (`vendor/msgpack/v1.8.0/lib/msgpack/timestamp.rb:65`), and the `v`
- * `Rack::Session::Encryptor` packs its padding length with (`vendor/rack-session/v2.1.0/lib/rack/session/encryptor.rb:173`): `C`, `l`,
+ * `Rack::Session::Encryptor` packs its padding length with (`vendor/rack-session/v2.1.1/lib/rack/session/encryptor.rb:173`): `C`, `l`,
  * `L`, `q`, `Q`, `S` (`pack.c:483-487`) and `v` through `pack_integer` (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
  * an absolute byte position (`pack.c:617-639`), and to `u` (`pack.c:662-691`,
  * uuencoded, its String read as its UTF-8 bytes) and `M` (`pack.c:693-698`,

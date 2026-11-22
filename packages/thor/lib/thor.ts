@@ -707,9 +707,9 @@ export class Thor {
   }
 
   /**
-   * @inlinedFrom Thor::Shell#initialize thor/v1.3.2/lib/thor/shell.rb:44-48
-   * @inlinedFrom Thor::Invocation#initialize thor/v1.3.2/lib/thor/invocation.rb:23-27
-   * @inlinedFrom Thor::Base#initialize thor/v1.3.2/lib/thor/base.rb:53-113
+   * @inlinedFrom Thor::Shell#initialize thor/v1.4.0/lib/thor/shell.rb:44-48
+   * @inlinedFrom Thor::Invocation#initialize thor/v1.4.0/lib/thor/invocation.rb:23-27
+   * @inlinedFrom Thor::Base#initialize thor/v1.4.0/lib/thor/base.rb:53-113
    * @inventedArm if — PERMANENT
    */
   constructor(

@@ -234,7 +234,7 @@ export class Process {
   /**
    * `vendor/ruby/v3.3.11/process.c:9169` — what `Open3.capture2e` answers as
    * its second value, which `Thor::Actions#run` asks `success?`
-   * (`vendor/thor/v1.3.2/lib/thor/actions.rb:265-266`).
+   * (`vendor/thor/v1.4.0/lib/thor/actions.rb:265-266`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Process::Status`
    * (`vendor/ruby/v3.3.11/process.c:9169`).

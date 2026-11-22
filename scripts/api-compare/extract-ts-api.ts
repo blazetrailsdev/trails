@@ -3873,7 +3873,7 @@ export function isConstantCaseName(name: string): boolean {
 /**
  * Readers a top-level `Klass.attribute("name", …)` call generates, the TS twin
  * of MiniMagick::Image's `attribute` macro
- * (`vendor/mini_magick/v5.2.0/lib/mini_magick/image.rb:118-128`). The class
+ * (`vendor/mini_magick/v5.3.1/lib/mini_magick/image.rb:118-128`). The class
  * types them through a merged interface, which alone reads as
  * declaration-only; the macro call is the body. Calls inside a top-level
  * block are read too. Only classes in `ATTRIBUTE_MACRO_CLASSES` are credited.
@@ -7061,7 +7061,7 @@ function rtestFallback(conditional: ts.ConditionalExpression): ts.Expression | u
 /**
  * The `y` of `rtest(x) ? y : x`, or undefined for any other conditional: Ruby's
  * `x && y` (`peek && peek.to_s !~ /^-{1,2}\S+/`,
- * `vendor/thor/v1.3.2/lib/thor/parser/arguments.rb:85`) spelled exactly, since
+ * `vendor/thor/v1.4.0/lib/thor/parser/arguments.rb:85`) spelled exactly, since
  * JS `&&` also stops on `0`, `""` and `NaN`. The twin of {@link rtestFallback},
  * and tokens as the `and` Ruby's operator emits.
  */

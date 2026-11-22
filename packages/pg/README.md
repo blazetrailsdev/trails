@@ -1,7 +1,7 @@
 # @blazetrails/pg
 
 A port of Ruby's [`pg`](https://github.com/ged/ruby-pg) gem
-(`vendor/pg/v1.5.9`), the gem `postgresql_adapter.rb:3-4` requires. The gem's
+(`vendor/pg/v1.6.2`), the gem `postgresql_adapter.rb:3-4` requires. The gem's
 API is ported by name; [`node-pg`](https://node-postgres.com) is the engine
 underneath, as `@msgpack/msgpack` is for `@blazetrails/msgpack`. `pg` is an
 optional peer dependency.

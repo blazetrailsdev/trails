@@ -49,14 +49,14 @@ packages/actionpack/test/fixtures/
 packages/actionview/test/fixtures/actionpack/
 # Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures, read by magic-byte detection.
 packages/marcel/test/fixtures/
-# Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures, read by ImageMagick.
+# Byte-for-byte copies of vendor/mini_magick/v5.3.1/spec/fixtures, read by ImageMagick.
 packages/mini-magick/test/fixtures/
 # Byte-for-byte copies of vendor/rails/v8.0.5.2/activestorage/test/fixtures/files.
 packages/activestorage/test/fixtures/files/
 # Byte-for-byte copies of vendor/rack/v3.2.8/test/cgi/assets and test/static.
 packages/rack/test/cgi/assets/
 packages/rack/test/static/
-# Byte-for-byte copies of vendor/thor/v1.3.2/spec/fixtures; the `.ts` beside them are the ported `.thor` files.
+# Byte-for-byte copies of vendor/thor/v1.4.0/spec/fixtures; the `.ts` beside them are the ported `.thor` files.
 packages/thor/test/fixtures/*
 !packages/thor/test/fixtures/*.ts
 
