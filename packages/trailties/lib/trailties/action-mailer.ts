@@ -19,6 +19,8 @@ export interface ActionMailerConfig extends OrderedOptions {
   smtpSettings?: Record<string, unknown> | null;
   deliveryMethod?: string | null;
   performCaching?: boolean | null;
+  raiseDeliveryErrors?: boolean | null;
+  defaultUrlOptions?: Record<string, unknown> | null;
 }
 
 declare module "../trailtie/configuration.js" {
@@ -147,3 +149,4 @@ export class Trailtie extends BaseTrailtie {
 }
 
 Object.defineProperty(Trailtie, "name", { value: "ActionMailer::Railtie" });
+ActionMailer.Railtie = Trailtie;

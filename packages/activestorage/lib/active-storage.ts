@@ -22,6 +22,7 @@ import type * as Errors from "./errors.js";
 import type { LogSubscriber } from "./log-subscriber.js";
 import type { Previewer } from "./previewer.js";
 import type { FixtureSet } from "./fixture-set.js";
+import type { Engine } from "./engine.js";
 
 export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -37,6 +38,7 @@ export const ActiveStorage = {
   Reflection: { name: string };
   Attached: unknown;
   Attachment?: typeof Attachment;
+  Engine?: typeof Engine;
   FixtureSet?: typeof FixtureSet;
   Service: unknown;
   Previewer: typeof Previewer;
@@ -424,8 +426,8 @@ export const Transformers = {
     "active_storage/transformers/transformer": () => import("./transformers/transformer.js"),
     "active_storage/transformers/image_processing_transformer": () =>
       import("./transformers/image-processing-transformer.js"),
-  } as Record<string, () => Promise<unknown>>,
-} as AutoloadModule & {
+  },
+} as unknown as AutoloadModule & {
   Transformer: unknown;
   ImageProcessingTransformer: unknown;
 };

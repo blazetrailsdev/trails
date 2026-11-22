@@ -25,6 +25,7 @@ import type { Router } from "./router.js";
 import type { Routing } from "./routing.js";
 import type { RoutingJob } from "./routing-job.js";
 import type { TestCase } from "./test-case.js";
+import type { Engine } from "./engine.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -37,6 +38,7 @@ export const ActionMailbox = { name: "ActionMailbox", loadPath } as AutoloadModu
   Base: typeof Base;
   BaseController: typeof BaseController;
   Callbacks: typeof Callbacks;
+  Engine?: typeof Engine;
   Ingresses: {
     Mailgun: { InboundEmailsController?: typeof MailgunInboundEmailsController };
     Mandrill: { InboundEmailsController?: typeof MandrillInboundEmailsController };

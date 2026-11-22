@@ -63,6 +63,10 @@ import { Bundler, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 
 import "@blazetrails/trailties/all";
+import type {} from "@blazetrails/activestorage/engine";
+import type {} from "@blazetrails/actionmailbox/engine";
+import type {} from "@blazetrails/actiontext/engine";
+import type {} from "@blazetrails/actioncable/engine";
 
 // Require the gem ports listed in package.json, including any ports
 // you've limited to :test, :development, or :production.

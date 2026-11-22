@@ -55,6 +55,7 @@ export const ActionMailer = { name: "ActionMailer", loadPath } as AutoloadModule
   NonInferrableMailerError: typeof NonInferrableMailerError;
   TestCase: typeof TestCase;
   TestHelper: typeof TestHelper;
+  Railtie?: unknown;
 };
 constSet(TopLevel, "ActionMailer", ActionMailer);
 extend(ActionMailer, Autoload);

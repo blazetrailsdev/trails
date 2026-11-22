@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { Dir, getFs, include } from "@blazetrails/ruby-compat";
+import { Dir, include } from "@blazetrails/ruby-compat";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 
@@ -19,15 +19,6 @@ describe("active_storage:install", () => {
   beforeEach(async () => {
     t = new ActiveStorageInstallTest("test");
     await t.buildApp();
-    const application = await t.appPath("config", "application.ts");
-    const source = await getFs().readFile(application, "utf-8");
-    await t.appFile(
-      "config/application.ts",
-      source.replace(
-        `// import "@blazetrails/trailties/trailties/active-storage";`,
-        `import "@blazetrails/activestorage/engine";`,
-      ),
-    );
   });
 
   afterEach(() => t.teardownApp());
