@@ -33,6 +33,10 @@ export class Result {
     return this.rows;
   }
 
+  /**
+   * @missingRailsCall cast — CONVERGEABLE mysql2-client-prepare-prepares-on-the-server
+   * @missingRailsCall cast_booleans — CONVERGEABLE mysql2-client-prepare-prepares-on-the-server
+   */
   each(
     opts: QueryOptions | ((row: unknown[] | Record<string, unknown>) => unknown) = {},
     block?: (row: unknown[] | Record<string, unknown>) => unknown,
