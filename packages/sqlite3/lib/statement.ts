@@ -106,10 +106,7 @@ export class Statement {
       ? (bindVars.pop() as (row: unknown[]) => void)
       : undefined;
     await this.execute(...bindVars);
-    if (block) return this.each(block);
-    const rows: unknown[][] = [];
-    await this.each((row) => rows.push(row));
-    return rows;
+    return block ? this.each(block) : this.toA();
   }
 
   isActive(): boolean {

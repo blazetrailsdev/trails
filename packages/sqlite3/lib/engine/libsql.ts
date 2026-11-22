@@ -7,7 +7,7 @@ import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
-import { bindParameterIndex } from "./bind-parameter-index.js";
+import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 
 const CONNECTION_FAILED = /^ConnectionFailed\(".*: (\d+)"\)$/;
@@ -41,7 +41,13 @@ export interface LibsqlReplicaOptions extends Database.Options {
 /** @internal */
 function open(file: string, mode: number, options: Database.Options): Database.Database {
   const { Open, ErrorCode } = SQLite3.Constants;
-  if ((mode & Open.CREATE) === 0 && file !== ":memory:" && !File.isExist(file)) {
+  if (
+    (mode & Open.CREATE) === 0 &&
+    file !== "" &&
+    file !== ":memory:" &&
+    !file.startsWith("file:") &&
+    !File.isExist(file)
+  ) {
     throw Object.assign(new Error("unable to open database file"), {
       rawCode: ErrorCode.CANTOPEN,
     });
@@ -66,9 +72,16 @@ function prepareStatement(
   let rows: Iterator<unknown[]> | null = null;
   let done = false;
   let closed = false;
+  const names = bindParameterNames(sql);
   const args = (): unknown[] => {
-    const values: unknown[] = Array.from(positional, (v) => v ?? null);
-    return Object.keys(named).length !== 0 ? [...values, named] : values;
+    const values: unknown[] = Array.from(
+      { length: Math.max(names.length, positional.length) },
+      (_, i) => positional[i] ?? null,
+    );
+    for (const [name, v] of Object.entries(named)) {
+      values[names.findIndex((n) => n !== null && n.slice(1) === name)] = v ?? null;
+    }
+    return values;
   };
   return {
     close: () => {

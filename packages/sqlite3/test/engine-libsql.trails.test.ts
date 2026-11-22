@@ -147,3 +147,12 @@ describe("the libsql replica engine", () => {
     await replica.close();
   });
 });
+
+describe("libsql engine binds", () => {
+  it("binds a positional value into a named slot, and an unbound named parameter as NULL", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    expect(await db.execute("SELECT ?, :named", [1, 2])).toEqual([[1, 2]]);
+    expect(await db.execute("SELECT ?, :named", [1])).toEqual([[1, null]]);
+    await db.close();
+  });
+});

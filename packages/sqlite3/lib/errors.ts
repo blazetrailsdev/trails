@@ -188,30 +188,26 @@ export function status2klass(status: number): typeof Exception | null {
   }
 }
 
-export function rbSqlite3Raise(error: unknown, db?: EngineErrors): never {
-  const errcode = db === undefined ? null : db.errcode(error);
+export function rbSqlite3Raise(error: unknown, db: EngineErrors): never {
+  const errcode = db.errcode(error);
   const status = errcode == null ? null : errcode & 0xff;
   const klass = status == null ? null : status2klass(status);
   if (klass == null) throw error;
 
-  const exception = new klass(db!.errmsg(error));
+  const exception = new klass(db.errmsg(error));
   exception.code = status;
   exception.cause = error;
 
   throw exception;
 }
 
-export function rbSqlite3RaiseWithSql(
-  error: unknown,
-  sql: string | null,
-  db?: EngineErrors,
-): never {
-  const errcode = db === undefined ? null : db.errcode(error);
+export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null, db: EngineErrors): never {
+  const errcode = db.errcode(error);
   const status = errcode == null ? null : errcode & 0xff;
   const klass = status == null ? null : status2klass(status);
   if (klass == null) throw error;
 
-  const exception = new klass(db!.errmsg(error));
+  const exception = new klass(db.errmsg(error));
   exception.code = status;
   exception.cause = error;
   if (sql != null) {
