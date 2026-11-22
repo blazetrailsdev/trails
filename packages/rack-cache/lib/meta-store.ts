@@ -341,6 +341,12 @@ MetaStore.FILE = Disk;
 export class MemCacheBase extends MetaStore {
   cache!: DalliClient;
 
+  /** @noRailsEquivalent PERMANENT */
+  keyWithNamespace(key: string): string {
+    const namespace = this.cache.options.namespace;
+    return namespace == null ? key : `${String(namespace)}:${key}`;
+  }
+
   static async resolve(uri: unknown): Promise<MemCacheBase> {
     if (rbObjRespondTo(uri, "scheme")) {
       const { host, port, query, path } = uri as Generic;
@@ -393,7 +399,7 @@ export class Dalli extends MemCacheBase {
    */
   override async read(key: string): Promise<Entry[]> {
     key = this.hexdigest(key);
-    const { value } = await this.cache.get(key);
+    const { value } = await this.cache.get(this.keyWithNamespace(key));
     return value != null ? (Marshal.load(value) as Entry[]) : [];
   }
 
@@ -403,11 +409,13 @@ export class Dalli extends MemCacheBase {
    */
   override async write(key: string, entries: Entry[], ttl: number | null = 0): Promise<boolean> {
     key = this.hexdigest(key);
-    return this.cache.set(key, Marshal.dump(entries, -1, true), { expires: ttl });
+    return this.cache.set(this.keyWithNamespace(key), Marshal.dump(entries, -1, true), {
+      expires: ttl,
+    });
   }
 
   override async purge(key: string): Promise<null> {
-    await this.cache.delete(this.hexdigest(key));
+    await this.cache.delete(this.keyWithNamespace(this.hexdigest(key)));
     return null;
   }
 }

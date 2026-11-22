@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import * as Cache from "../lib/cache.js";
 import type { Context } from "../lib/context.js";
-import type { Options } from "../lib/options.js";
 
 describe("Rack::Cache", () => {
   function dumbApp(_env: Record<string, unknown>, block?: () => unknown) {
@@ -25,8 +24,8 @@ describe("Rack::Cache", () => {
 
   it("sets options provided in the options Hash", () => {
     const object = Cache.new(app, { ":foo": "bar", "foo.bar": "bling" });
-    expect((object as unknown as Options).options["foo.bar"]).toEqual("bling");
-    expect((object as unknown as Options).options["rack-cache.foo"]).toEqual("bar");
+    expect(object.options["foo.bar"]).toEqual("bling");
+    expect(object.options["rack-cache.foo"]).toEqual("bar");
   });
 
   it("takes a block; executes it during initialization", () => {

@@ -6,10 +6,10 @@ type OptionsHash = Record<string, unknown>;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Options {
-  verbose: unknown;
+  verbose: boolean;
   /** @noRailsEquivalent PERMANENT */
   isVerbose(): boolean;
-  storage: unknown;
+  storage: Storage;
   /** @noRailsEquivalent PERMANENT */
   isStorage(): boolean;
   metastore: unknown;
@@ -21,25 +21,25 @@ export interface Options {
   entitystore: unknown;
   /** @noRailsEquivalent PERMANENT */
   isEntitystore(): boolean;
-  defaultTtl: unknown;
+  defaultTtl: number;
   /** @noRailsEquivalent PERMANENT */
   isDefaultTtl(): boolean;
-  ignoreHeaders: unknown;
+  ignoreHeaders: string[];
   /** @noRailsEquivalent PERMANENT */
   isIgnoreHeaders(): boolean;
-  privateHeaders: unknown;
+  privateHeaders: string[];
   /** @noRailsEquivalent PERMANENT */
   isPrivateHeaders(): boolean;
-  allowReload: unknown;
+  allowReload: boolean;
   /** @noRailsEquivalent PERMANENT */
   isAllowReload(): boolean;
-  allowRevalidate: unknown;
+  allowRevalidate: boolean;
   /** @noRailsEquivalent PERMANENT */
   isAllowRevalidate(): boolean;
-  useNativeTtl: unknown;
+  useNativeTtl: boolean;
   /** @noRailsEquivalent PERMANENT */
   isUseNativeTtl(): boolean;
-  faultTolerant: unknown;
+  faultTolerant: boolean;
   /** @noRailsEquivalent PERMANENT */
   isFaultTolerant(): boolean;
 }
