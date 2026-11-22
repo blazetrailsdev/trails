@@ -9,6 +9,7 @@ import {
   rbModDeprecateConstant,
   rbSetClassPathString,
   rbBlockGivenP,
+  rbObjDup,
 } from "@blazetrails/ruby-compat";
 import type { Block } from "@blazetrails/ruby-compat";
 import { MiniMagick } from "./mini-magick.js";
@@ -70,14 +71,19 @@ export class Tool {
   ];
 
   static new(
-    ...args: Arg[] | [...Arg[], BlockPass<(instance: CliTool) => unknown> | undefined]
+    name: string,
+    options: Record<string, unknown> | BlockPass<(instance: CliTool) => unknown> | undefined = {},
+    block?: BlockPass<(instance: CliTool) => unknown>,
   ): CliTool | Promise<unknown> {
-    const block = rbBlockGivenP(args.at(-1))
-      ? (args.pop() as (instance: CliTool) => unknown)
-      : undefined;
-    const instance = new this(...(args as [string, Record<string, unknown>?]));
+    if (rbBlockGivenP(options)) {
+      block = options as BlockPass<(instance: CliTool) => unknown>;
+      options = {};
+    }
+    const instance = new this(name, options as Record<string, unknown>);
     if (block != null) {
-      return Promise.resolve(block(instance as CliTool)).then(() => instance.call());
+      return Promise.resolve((block as (instance: CliTool) => unknown)(instance as CliTool)).then(
+        () => instance.call(),
+      );
     } else {
       return instance as CliTool;
     }
@@ -118,7 +124,7 @@ export class Tool {
   }
 
   executable() {
-    const exe = rbFArray(MiniMagick.cliPrefix) as string[];
+    const exe = rbObjDup(rbFArray(MiniMagick.cliPrefix)) as string[];
     if (MiniMagick.isImagemagick7() && this.name !== "magick") {
       exe.push("magick");
     }

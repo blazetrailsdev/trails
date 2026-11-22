@@ -1,5 +1,5 @@
 import {
-  Benchmark,
+  Process,
   env as ENV,
   STDERR as $stderr,
   slice,
@@ -55,7 +55,7 @@ export class Shell {
     try {
       const env: Record<string, string | null | undefined> =
         MiniMagick.restrictedEnv != null && MiniMagick.restrictedEnv !== false
-          ? slice(ENV, "HOME", "PATH", "LANG")
+          ? slice({ ...ENV }, "HOME", "PATH", "LANG")
           : {};
       Object.assign(env, MiniMagick.cliEnv);
       if (timeout != null && timeout !== false) env["MAGICK_TIME_LIMIT"] = String(timeout);
@@ -78,10 +78,9 @@ export class Shell {
 
   /** @internal */
   private async log<T>(command: string, block: () => Promise<T>): Promise<T> {
-    let value!: T;
-    const duration = await Benchmark.realtime(async () => {
-      value = await block();
-    });
+    const timeStart = Process.clockGettime(Process.CLOCK_MONOTONIC);
+    const value = await block();
+    const duration = Process.clockGettime(Process.CLOCK_MONOTONIC) - timeStart;
     MiniMagick.logger!.debug(format("[%.2fs] %s", duration, command));
     return value;
   }
