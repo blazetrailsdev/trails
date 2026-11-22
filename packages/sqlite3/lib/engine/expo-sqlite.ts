@@ -229,7 +229,13 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     async prepare(sql) {
       const [tail, empty] = statementTail(sql);
       const head = sql.slice(0, tail);
-      const prepared = empty ? null : await (await opening()).prepareAsync(head);
+      const raw = empty ? null : await opening();
+      const prepared =
+        raw &&
+        (await withBusyHandler(
+          () => handler,
+          () => raw.prepareAsync(head),
+        ));
       return [
         prepareStatement(
           opening,
