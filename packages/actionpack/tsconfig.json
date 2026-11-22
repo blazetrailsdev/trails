@@ -18,6 +18,7 @@
     { "path": "../rackup" },
     { "path": "../rack-session" },
     { "path": "../rack-test" },
+    { "path": "../rack-cache" },
     { "path": "../nokogiri" }
   ]
 }

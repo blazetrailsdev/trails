@@ -525,6 +525,9 @@ importers:
         specifier: '>=3.0.0'
         version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.23.15)(yaml@2.8.3)
     devDependencies:
+      '@blazetrails/rack-cache':
+        specifier: workspace:*
+        version: link:../rack-cache
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc

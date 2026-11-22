@@ -52,6 +52,7 @@ describe("published entry points", () => {
       "index.ts",
       "system-testing.ts",
       "testing.ts",
+      "rack-cache.ts",
     ]);
 
     const bare = await bareSpecifiersFrom(entries);
