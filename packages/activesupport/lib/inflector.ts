@@ -121,13 +121,16 @@ export function humanize(
     if (result.endsWith(" id")) result = result.slice(0, -" id".length);
   }
 
-  result = result.replace(/([a-z\d]+)/gi, (match) => {
+  result = result.replace(/([\p{Alpha}\d]+)/giu, (match) => {
     match = match.toLowerCase();
     return inflections().acronyms.get(match) ?? match;
   });
 
   if (cap) {
-    result = result.replace(/^./u, (m) => m.toUpperCase());
+    result = result.replace(/^\p{Alpha}/u, (match) => {
+      match = match.toUpperCase();
+      return match;
+    });
   }
 
   return result;

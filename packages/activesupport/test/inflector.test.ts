@@ -1014,8 +1014,8 @@ describe("InflectorTest", () => {
   }
 
   it("humanize with international characters", () => {
-    expect(humanize("é_employee")).toBe("É employee");
-    expect(humanize("ü_user")).toBe("Ü user");
+    expect(humanize("áÉÍÓÚ")).toBe("Áéíóú");
+    expect(humanize("аБВГДЕ")).toBe("Абвгде");
   });
 
   it("const regexp", () => {
