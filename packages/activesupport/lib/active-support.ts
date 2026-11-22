@@ -3,6 +3,7 @@ import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-
 import { ActiveSupport } from "./namespaces.js";
 import { preserveTimezone, setPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
 import "./cache/store.js";
+import { formatVersion, setFormatVersion } from "./cache.js";
 
 let _testOrder: string | null = null;
 
@@ -25,11 +26,11 @@ export function setTestParallelizationThreshold(value: number): void {
 }
 
 export function cacheFormatVersion(): number {
-  return ActiveSupport.Cache.formatVersion!();
+  return formatVersion();
 }
 
 export function setCacheFormatVersion(value: number): void {
-  ActiveSupport.Cache.setFormatVersion!(value);
+  setFormatVersion(value);
 }
 
 export function toTimePreservesTimezone(): boolean | string {

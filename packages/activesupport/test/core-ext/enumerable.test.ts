@@ -1,5 +1,5 @@
-import { compactBlankBang as arrayCompactBlankBang } from "../../lib/core-ext/enumerable.js";
 import { describe, it, expect } from "vitest";
+import { compactBlankBang as arrayCompactBlankBang } from "../../lib/core-ext/enumerable.js";
 import { sum } from "../../lib/enumerable-utils.js";
 import {
   exclude,
