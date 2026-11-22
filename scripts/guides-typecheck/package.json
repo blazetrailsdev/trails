@@ -20,6 +20,7 @@
     "@blazetrails/builder": "workspace:*",
     "@blazetrails/chronic": "workspace:*",
     "@blazetrails/date": "workspace:*",
+    "@blazetrails/libxml-ruby": "workspace:*",
     "@blazetrails/et-orbi": "workspace:*",
     "@blazetrails/fugit": "workspace:*",
     "@blazetrails/raabro": "workspace:*",
