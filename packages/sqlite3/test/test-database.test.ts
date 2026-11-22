@@ -278,20 +278,19 @@ describe("TestDatabase", () => {
         try {
           db = new SQLite3.Database(tf.path()!, { engine, defaultTransactionMode: item.mode });
           db2 = new SQLite3.Database(tf.path()!, { engine });
-          const reader = db2;
           await db.transaction(null, async () => {
             const sqlForReadTest = "select * from foo";
             if (item.read) {
-              await expect(reader.execute(sqlForReadTest)).resolves.not.toThrow();
+              await expect(db2!.execute(sqlForReadTest)).resolves.not.toThrow();
             } else {
-              await expect(reader.execute(sqlForReadTest)).rejects.toThrow(SQLite3.BusyException);
+              await expect(db2!.execute(sqlForReadTest)).rejects.toThrow(SQLite3.BusyException);
             }
 
             const sqlForWriteTest = "insert into foo values (2)";
             if (item.write) {
-              await expect(reader.execute(sqlForWriteTest)).resolves.not.toThrow();
+              await expect(db2!.execute(sqlForWriteTest)).resolves.not.toThrow();
             } else {
-              await expect(reader.execute(sqlForWriteTest)).rejects.toThrow(SQLite3.BusyException);
+              await expect(db2!.execute(sqlForWriteTest)).rejects.toThrow(SQLite3.BusyException);
             }
           });
         } finally {
