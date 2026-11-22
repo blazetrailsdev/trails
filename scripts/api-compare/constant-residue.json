@@ -957,6 +957,12 @@
       "sax-parser.ts::SaxParser": "LibXML::XML::SaxParser"
     }
   },
+  "listen": {
+    "rows": 1,
+    "excluded": [],
+    "unwalked": [],
+    "residue": { "listener.ts::Listener": "Listen::Listener" }
+  },
   "mail": {
     "rows": 132,
     "excluded": ["multibyte/encoding-error.ts::EncodingError"],
