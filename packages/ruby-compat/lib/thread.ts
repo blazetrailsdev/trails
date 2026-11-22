@@ -510,7 +510,7 @@ export function rbFSleep(duration: number | null = null): Promise<number> {
     const nativeSleep = (rel: number) => {
       timer = setTimeout(() => {
         const now = Process.clockGettime(Process.CLOCK_MONOTONIC);
-        if (now >= end) wake(Math.floor(Date.now() / 1000) - beg);
+        if (now > end) wake(Math.floor(Date.now() / 1000) - beg);
         else nativeSleep(end - now);
       }, rel * 1000);
     };
