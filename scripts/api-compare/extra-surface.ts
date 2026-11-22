@@ -1985,7 +1985,7 @@ function resolveDelegatedClass(
  * otherwise score `moved` off `Nokogiri::XML::ParseOptions`, a gem none of them
  * depends on.
  */
-const OWN_MOVED_CREDIT_PACKAGES = new Set(["thor", "globalid", "fugit", "raabro"]);
+const OWN_MOVED_CREDIT_PACKAGES = new Set(["thor", "globalid", "fugit", "raabro", "pg"]);
 
 /** The Ruby-name oracle a file in `pkg` is scored against. */
 function creditCandidates(

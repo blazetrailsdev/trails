@@ -3,7 +3,6 @@ import { SimpleEncoder } from "../simple-encoder.js";
 import { PG } from "../namespaces.js";
 
 export class Boolean extends SimpleEncoder {
-  /** @noRailsEquivalent PERMANENT */
   encode(value: unknown, _encoding: unknown = null): string | null {
     switch (typeof value) {
       case "boolean":

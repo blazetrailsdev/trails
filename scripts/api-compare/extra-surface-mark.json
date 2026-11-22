@@ -23,6 +23,12 @@
     "noCounterpartFiles": 0,
     "allowed": 11
   },
+  "pg": {
+    "novel": 18,
+    "total": 18,
+    "noCounterpartFiles": 1,
+    "allowed": 3
+  },
   "ruby-compat": {
     "novel": 0,
     "total": 51,

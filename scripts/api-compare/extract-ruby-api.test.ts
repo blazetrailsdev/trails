@@ -5614,4 +5614,57 @@ describe("Ruby extractor C extension scan", { timeout: RUBY_SUBPROCESS_TIMEOUT_M
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+  it("reads rb_define_const, pg_define_coder and errorcodes.def", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "c-ext-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "pg.c"),
+        [
+          "void init(void) {",
+          '\trb_mPG = rb_define_module( "PG" );',
+          '\trb_eServerError = rb_define_class_under( rb_mPG, "ServerError", rb_cObject );',
+          '\trb_mPG_TextDecoder = rb_define_module_under( rb_mPG, "TextDecoder" );',
+          '\trb_cPG_Coder = rb_define_class_under( rb_mPG, "Coder", rb_cObject );',
+          '\trb_define_const( rb_cPG_Coder, "FORMAT_ERROR_MASK", INT2NUM(12) );',
+          '\t/* dummy = rb_define_class_under( rb_mPG_TextDecoder, "Boolean", rb_cPG_Coder ); */',
+          '\tpg_define_coder( "Boolean", pg_text_dec_boolean, rb_cPG_Coder, rb_mPG_TextDecoder );',
+          "}",
+        ].join("\n"),
+      );
+      fs.writeFileSync(
+        path.join(dir, "errorcodes.def"),
+        [
+          "{",
+          '  VALUE klass = define_error_class( "ConnectionException", NULL );',
+          '  register_error_class( "08", klass );',
+          "}",
+          "{",
+          '  VALUE klass = define_error_class( "ConnectionDoesNotExist", "08" );',
+          '  register_error_class( "08003", klass );',
+          "}",
+        ].join("\n"),
+      );
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_c_ext_dir(${JSON.stringify(dir)}, { "pg_errors.c" => "exceptions.rb" })
+        puts JSON.generate(
+          consts: ex.file_constants,
+          decode: ex.classes["PG::TextDecoder::Boolean"][:instanceMethods].map { |m| [m[:name], m[:params]] },
+          errors: %w[PG::ConnectionException PG::ConnectionDoesNotExist].map { |f| [ex.classes[f][:file], ex.classes[f][:superclass]] })
+      `;
+      const out = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      expect(out.consts["coder.rb"]).toEqual({
+        FORMAT_ERROR_MASK: { kind: "c", namespace: "PG::Coder" },
+      });
+      expect(out.decode).toEqual([["decode", [{ name: "args", kind: "rest" }]]]);
+      expect(out.errors).toEqual([
+        ["exceptions.rb", "PG::ServerError"],
+        ["exceptions.rb", "PG::ConnectionException"],
+      ]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
