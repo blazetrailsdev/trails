@@ -169,8 +169,8 @@ describe("Mysql2::Statement", () => {
     const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
     try {
       const result = (await statement.execute({ cacheRows: false }))!.toA();
-      expect(write.mock.calls.map(([m]) => String(m)).join("")).toMatch(
-        /:cache_rows is forced for prepared statements/,
+      expect(write).toHaveBeenCalledWith(
+        expect.stringMatching(/:cache_rows is forced for prepared statements/),
       );
       expect(result.length).toBe(1);
     } finally {
@@ -403,9 +403,14 @@ describe("Mysql2::Statement", () => {
       const result = (await (
         await state.client.prepare("SELECT CAST('1972-00-27 00:00:00' AS DATETIME) as bad_datetime")
       ).execute())!;
-      expect(() => result.each()).toThrow(
-        new Mysql2.Error("Invalid date in field 'bad_datetime': 1972-00-27 00:00:00"),
-      );
+      expect(() => result.each()).toThrow(Mysql2.Error);
+      let message: string | null = null;
+      try {
+        result.each();
+      } catch (e) {
+        message = (e as Error).message;
+      }
+      expect(message).toBe("Invalid date in field 'bad_datetime': 1972-00-27 00:00:00");
     });
     describe("string encoding for ENUM values", () => {
       // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either".
@@ -439,23 +444,20 @@ describe("Mysql2::Statement", () => {
       for (const field of [
         "char_test",
         "varchar_test",
-        "tiny_text_test",
-        "text_test",
-        "medium_text_test",
-        "long_text_test",
-      ]) {
-        expect(test_result[field]).toBeExactInstanceOf(String);
-        expect(test_result[field]).toBe("test");
-      }
-      for (const field of [
         "varbinary_test",
         "tiny_blob_test",
+        "tiny_text_test",
         "blob_test",
+        "text_test",
         "medium_blob_test",
+        "medium_text_test",
         "long_blob_test",
+        "long_text_test",
       ]) {
-        expect(test_result[field]).toBeInstanceOf(Uint8Array);
-        expect(new TextDecoder().decode(test_result[field] as Uint8Array)).toBe("test");
+        const value = test_result[field];
+        const text = value instanceof Uint8Array ? new TextDecoder().decode(value) : value;
+        expect(text).toBeExactInstanceOf(String);
+        expect(text).toBe("test");
       }
     });
     describe("string encoding for #{type} values", () => {
