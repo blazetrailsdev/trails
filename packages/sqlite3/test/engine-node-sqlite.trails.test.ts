@@ -142,11 +142,12 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
     await db.close();
   });
 
-  it("refuses to disable quirk mode once the handle is used", async () => {
+  it("disables quirk mode on a used handle", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    await db.executeBatch2("CREATE TABLE q (a)");
-    expect(() => db._engine.disableQuirkMode()).toThrow(
-      "disable_quirk_mode after the handle is used is not supported by the node:sqlite driver",
-    );
+    await db.executeBatch2("CREATE TABLE q (a); INSERT INTO q VALUES (1)");
+    db._engine.disableQuirkMode();
+    expect(await db.execute("SELECT a FROM q")).toEqual([[1]]);
+    await expect(db.execute('SELECT "nope"')).rejects.toThrow(SQLite3.SQLException);
+    await db.close();
   });
 });
