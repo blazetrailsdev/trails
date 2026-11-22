@@ -775,18 +775,16 @@ describe("main cross-package and parked-stub credit", () => {
   });
 
   it("does not count a pending stub for an unported case as extra", async () => {
-    const name = "load async instrumentation is thread safe";
-    const stubs = [tc(["LoadAsyncTest"], name, true), tc(["OtherTest"], name, true)];
+    const name = "omap fixtures";
+    const stubs = [tc(["FixturesTest"], name, true), tc(["OtherTest"], name, true)];
     const result = await compare(
-      "relation/load_async_test.rb",
+      "fixtures_test.rb",
       {
         activerecord: {
-          files: [
-            { file: `${PKG_SRC_DIRS.activerecord}relation/load-async.test.ts`, testCases: stubs },
-          ],
+          files: [{ file: `${PKG_SRC_DIRS.activerecord}fixtures.test.ts`, testCases: stubs }],
         },
       },
-      [tc(["LoadAsyncTest"], name)],
+      [tc(["FixturesTest"], name)],
       "activerecord",
     );
     expect([result.rubyTestCount, result.matched, result.extra]).toEqual([0, 0, 1]);

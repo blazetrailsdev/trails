@@ -198,7 +198,7 @@ describe("LoadAsyncTest", () => {
         },
       );
 
-      expect(notificationCalled).toBe(true);
+      expect(notificationCalled).toBeTruthy();
     } finally {
       latch2.countDown();
       delete (connection as { log?: LogMethod }).log;
