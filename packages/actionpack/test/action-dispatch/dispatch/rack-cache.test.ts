@@ -21,10 +21,10 @@ describe("RackCacheMetaStoreTest", () => {
   });
 
   it("stuff is deep duped", async () => {
-    await store.write("foo", { bar: "original" });
-    let hash = await store.read("foo");
+    await store.write("foo", { bar: "original" } as never);
+    let hash = (await store.read("foo")) as unknown as Record<string, string>;
     hash.bar = "changed";
-    hash = await store.read("foo");
+    hash = (await store.read("foo")) as unknown as Record<string, string>;
     expect(hash.bar).toBe("original");
   });
 });

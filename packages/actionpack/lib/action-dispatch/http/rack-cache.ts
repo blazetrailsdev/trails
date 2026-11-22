@@ -1,4 +1,4 @@
-import { EntityStore, MetaStore } from "@blazetrails/rack-cache";
+import { EntityStore, MetaStore, type Response } from "@blazetrails/rack-cache";
 import { Marshal, TopLevel } from "@blazetrails/ruby-compat";
 
 type Store = {
@@ -8,6 +8,7 @@ type Store = {
 };
 
 type Part = string | Uint8Array;
+type Entry = [Record<string, unknown>, Response["headers"]];
 type RackBody = Iterable<Part> | { each(block: (part: Part) => unknown): unknown };
 
 declare module "@blazetrails/rack-cache" {
@@ -32,16 +33,16 @@ export class RailsMetaStore extends MetaStore {
     this._store = store;
   }
 
-  override async read(key: string): Promise<any> {
+  override async read(key: string): Promise<Entry[]> {
     let data: unknown;
     if ((data = await this._store.read(key)) != null && data !== false) {
-      return Marshal.load(data);
+      return Marshal.load(data) as Entry[];
     } else {
       return [];
     }
   }
 
-  override async write(key: string, value: any): Promise<unknown> {
+  override async write(key: string, value: Entry[]): Promise<unknown> {
     return await this._store.write(key, Marshal.dump(value, -1, true));
   }
 }
