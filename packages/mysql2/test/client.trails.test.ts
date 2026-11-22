@@ -464,6 +464,29 @@ describe("Mysql2::Client#initialize option writers", () => {
     });
   });
 
+  it(":default_file's ssl options are ignored under ssl_mode DISABLED", async () => {
+    const defaultFile = new URL("./fixtures/my-full.cnf", import.meta.url).pathname;
+    expect((await configFor({ defaultFile, sslMode: "disabled" })).config.ssl).toBeUndefined();
+  });
+
+  it("Statement#close closes its prepared handle exactly once, cached or not", async () => {
+    const cached = { columns: [], parameters: [], close: vi.fn() };
+    const uncached = { columns: [], parameters: [], close: vi.fn() };
+    let handle = cached;
+    const unprepare = vi.fn(() => {
+      if (handle !== cached) return undefined;
+      cached.close();
+      return cached;
+    });
+    const prepare = vi.fn(async () => ({ statement: handle }));
+    const client = await clientOn({ prepare, unprepare });
+    (await client.prepare("SELECT 1")).close();
+    expect(cached.close).toHaveBeenCalledOnce();
+    handle = uncached;
+    (await client.prepare("SELECT 2")).close();
+    expect(uncached.close).toHaveBeenCalledOnce();
+  });
+
   it(":write_timeout fails a write that has not drained with CR_SERVER_LOST", async () => {
     vi.useFakeTimers();
     try {

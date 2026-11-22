@@ -769,6 +769,7 @@ export class Client {
         ...(group != null ? [group] : []),
       ]);
       ({ ssl: sslDefaults, ...defaults } = defaults);
+      if (this.sslMode === Client.SSL_MODE_DISABLED) sslDefaults = undefined;
       for (const [key, value] of Object.entries(defaults)) {
         if (Object.hasOwn(args, key)) config[key] ??= value;
         else config[key] = value;
