@@ -122,11 +122,9 @@ cattrAccessor.call(Redis, "redisConnector", {
 
 class BaseConnectionError extends StandardError {}
 
-export class Listener extends SubscriberMap {
-  static readonly CONNECTION_ERRORS: readonly (typeof StandardError)[] = Object.freeze([
-    BaseConnectionError,
-  ]);
+class RedisClientConnectionError extends StandardError {}
 
+export class Listener extends SubscriberMap {
   private _adapter: Redis;
   private _eventLoop: StreamEventLoop;
   private _subscribeCallbacks: Map<string, ((() => unknown) | null)[]>;
@@ -210,6 +208,7 @@ export class Listener extends SubscriberMap {
       });
 
       conn.on("end", () => reject(new BaseConnectionError("Connection lost")));
+      conn.on("error", (error: Error) => reject(new RedisClientConnectionError(error.message)));
       originalClient.subscribe("_action_cable_internal").catch(reject);
     }).finally(() => {
       conn.options.retryStrategy = retryStrategy;
@@ -306,6 +305,11 @@ export class Listener extends SubscriberMap {
       this._whenConnected.length = 0;
     });
   }
+
+  static readonly CONNECTION_ERRORS: readonly (typeof StandardError)[] = Object.freeze([
+    BaseConnectionError,
+    RedisClientConnectionError,
+  ]);
 
   /** @internal */
   private extractSubscribedClient(conn: RedisConnection): RedisConnection {
