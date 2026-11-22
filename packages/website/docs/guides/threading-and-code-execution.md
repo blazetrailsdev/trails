@@ -193,9 +193,10 @@ own:
 - **Active Record** checks connections back in and clears the query cache in
   the Executor's complete callback.
 - **Active Job** wraps each job it performs in the Reloader.
-- **Action Cable** wraps each channel action and each broadcast it delivers.
-- **Active Support's `CurrentAttributes`** resets in the Executor's complete
-  callback, which is why its values never leak from one request into the next.
+- **Action Cable** wraps the work each connection does, and each channel's
+  subscribe and unsubscribe callbacks.
+- **Active Support's `CurrentAttributes`** resets in the Executor's run
+  callback, so each unit of work starts with empty values.
 
 ### Configuration
 
