@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { with as with_ } from "../../../lib/core-ext/object/with.js";
 
-describe("objectWith with an async block", () => {
+describe("with with an async block", () => {
   it("restores after the awaited block settles", async () => {
     const obj = { foo: "old" };
     let during: string | undefined;
