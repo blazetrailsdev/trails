@@ -158,7 +158,7 @@ export async function request(
   _cachePrototype ??= new Context(app, {}, _cacheConfig ?? undefined);
   cache = rbObjClone(_cachePrototype);
   caches.push(cache);
-  _request = new MockRequest(cache as unknown as ConstructorParameters<typeof MockRequest>[0]);
+  _request = new MockRequest(cache);
   if (block !== undefined) block(cache);
   response = await _request.request(method.toUpperCase(), uri, opts);
   responses.push(response);

@@ -87,7 +87,7 @@ export class Context {
     )) as EntityStore;
   }
 
-  async call(env: Env): Promise<[number, object, unknown]> {
+  async call(env: Env): Promise<[number, Record<string, string>, unknown]> {
     if (
       env["rack.run_once"] != null &&
       env["rack.run_once"] !== false &&
@@ -99,7 +99,7 @@ export class Context {
     }
   }
 
-  async callBang(env: Env): Promise<[number, object, unknown]> {
+  async callBang(env: Env): Promise<[number, Record<string, string>, unknown]> {
     this._trace = [];
     for (const [k, v] of Object.entries(this._defaultOptions)) {
       if (env[k] == null || env[k] === false) env[k] = v;

@@ -3,6 +3,7 @@ import {
   ArgumentError,
   Hash,
   hashDelete,
+  eachPair,
   isPlainHash,
   rbFSend,
   toI,
@@ -265,15 +266,9 @@ export class Response {
     }
 
     this.headers = {};
-    if ((headers as unknown) instanceof Hash) {
-      (headers as unknown as Hash<string, any>).each((k: string, v: any) => {
-        this.headers[k.toLowerCase()] = v;
-      });
-    } else {
-      for (const [k, v] of Object.entries(headers)) {
-        this.headers[k.toLowerCase()] = v;
-      }
-    }
+    eachPair(headers as unknown as Record<string, any> | Hash<string, any>, (k, v) => {
+      this.headers[k.toLowerCase()] = v;
+    });
     this._writer = this.append.bind(this);
     this._block = null;
 
