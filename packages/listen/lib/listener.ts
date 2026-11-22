@@ -200,7 +200,11 @@ export class Listener {
       const relativePath = event.path.slice(root.length + 1);
       if (this._isIgnore(relativePath)) continue;
       const dir = this._options.relative ? this._safeRelativeFromCwd(root) : root;
-      this._changes.push([ACTIONS[event.type], File.join(dir, relativePath), relativePath]);
+      this._changes.push([
+        ACTIONS[event.type],
+        new Pathname(dir).plusOp(relativePath).toString(),
+        relativePath,
+      ]);
     }
     if (this._state === "processingEvents") this._scheduleProcessChanges();
   }
