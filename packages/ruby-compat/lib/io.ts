@@ -1435,7 +1435,7 @@ export class IO {
     while ((b = this.getbyte()) !== null) {
       bytes.push(b);
       if (
-        (typeof limit === "number" && bytes.length >= limit) ||
+        (typeof limit === "number" && limit >= 0 && bytes.length >= limit) ||
         (bytes.length >= rsptr.length &&
           rsptr.every((c, i) => bytes[bytes.length - rsptr.length + i] === c))
       )
