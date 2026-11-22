@@ -481,7 +481,7 @@ export {
   type CompletableExecution,
 } from "./execution-wrapper.js";
 export { Executor } from "./executor.js";
-export { objectWith } from "./core-ext/object/with.js";
+export { with } from "./core-ext/object/with.js";
 export { withOptions } from "./core-ext/object/with-options.js";
 export { OptionMerger } from "./option-merger.js";
 export { ArrayInquirer } from "./array-inquirer.js";
