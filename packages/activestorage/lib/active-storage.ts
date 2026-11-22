@@ -22,14 +22,13 @@ import type * as Errors from "./errors.js";
 import type { LogSubscriber } from "./log-subscriber.js";
 import type { Previewer } from "./previewer.js";
 import type { FixtureSet } from "./fixture-set.js";
+import type { Engine } from "./engine.js";
 
 export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
   "active_storage/fixture_set": () => import("@blazetrails/activestorage/testing/fixture-set"),
 };
-
-import type { Engine } from "./engine.js";
 
 export const ActiveStorage = {
   name: "ActiveStorage",

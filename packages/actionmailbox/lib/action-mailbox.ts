@@ -25,6 +25,7 @@ import type { Router } from "./router.js";
 import type { Routing } from "./routing.js";
 import type { RoutingJob } from "./routing-job.js";
 import type { TestCase } from "./test-case.js";
+import type { Engine } from "./engine.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -32,8 +33,6 @@ const loadPath: Record<string, () => Promise<unknown>> = {};
 
 const LIB = File.expandPath(decodeURIComponent(new URL(".", import.meta.url).pathname));
 if (!LOAD_PATH.includes(LIB)) LOAD_PATH.push(LIB);
-
-import type { Engine } from "./engine.js";
 
 export const ActionMailbox = { name: "ActionMailbox", loadPath } as AutoloadModule & {
   Base: typeof Base;
