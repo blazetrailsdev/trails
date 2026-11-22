@@ -1,7 +1,5 @@
-import { SQLite3 } from "./namespaces.js";
 import "./constants.js";
-import { createRequire } from "node:module";
-import { File, LoadError } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import {
   type ColumnInfo,
   type RunResult,
@@ -17,13 +15,8 @@ import {
 } from "./driver.js";
 import { resolveUriDatabasePath } from "./sqlite-uri.js";
 import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
+import { errors, loadNodeSqlite, nodeSqlite, sharedCacheDatabase } from "./engine/node-sqlite.js";
 import "./constants.generated.js";
-
-type NodeSqliteModule = typeof import("node:sqlite");
-let nodeSqlite: NodeSqliteModule | undefined;
-try {
-  nodeSqlite = createRequire(import.meta.url)("node:sqlite") as NodeSqliteModule;
-} catch {}
 
 export const isNodeSqliteAvailable = nodeSqlite !== undefined;
 
@@ -49,7 +42,7 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
         ...expandBinds(binds),
       );
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -136,7 +129,7 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
     try {
       return new NodeSqliteStatement(this.raw.prepare(sql));
     } catch (e) {
-      rbSqlite3RaiseWithSql(e, sql);
+      rbSqlite3RaiseWithSql(e, sql, errors);
     }
   }
 
@@ -153,7 +146,7 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
     try {
       this.raw.exec(sql);
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -211,7 +204,7 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
       }
       return stmt.all();
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -220,7 +213,7 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
       this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
       return (this.#changesStmt.get() as { v: number }).v;
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -229,7 +222,7 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
       this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
       return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 
@@ -241,19 +234,14 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
       this._open = false;
       this.raw.close();
     } catch (e) {
-      rbSqlite3Raise(e);
+      rbSqlite3Raise(e, errors);
     }
   }
 }
 
 /** @internal */
 function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseSync {
-  if (!nodeSqlite) {
-    throw new LoadError(
-      "node:sqlite is not available. Node 22.5+ is required. " +
-        "On Node 22.5–22.9 you may also need --experimental-sqlite.",
-    );
-  }
+  const { DatabaseSync } = loadNodeSqlite();
   const opts: import("node:sqlite").DatabaseSyncOptions = {
     ...(config.driverOptions as import("node:sqlite").DatabaseSyncOptions | undefined),
     readOnly: config.readOnly ?? false,
@@ -261,21 +249,10 @@ function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseS
   };
   opts.enableDoubleQuotedStringLiterals = !(config.strict ?? false);
   try {
-    return new nodeSqlite.DatabaseSync(sharedCacheDatabase(config), opts);
+    return new DatabaseSync(sharedCacheDatabase(config.database, config.flags ?? 0), opts);
   } catch (e) {
-    rbSqlite3Raise(e);
+    rbSqlite3Raise(e, errors);
   }
-}
-
-function sharedCacheDatabase(config: SqliteOpenConfig): string {
-  if (((config.flags ?? 0) & SQLite3.Constants.Open.SHAREDCACHE) === 0) return config.database;
-  if (config.database.startsWith("file:")) {
-    const hash = config.database.indexOf("#");
-    const body = hash === -1 ? config.database : config.database.slice(0, hash);
-    const fragment = hash === -1 ? "" : config.database.slice(hash);
-    return `${body}${body.includes("?") ? "&" : "?"}cache=shared${fragment}`;
-  }
-  return `file:${config.database}?cache=shared`;
 }
 
 const capabilities: SqliteDriverCapabilities = {
@@ -306,15 +283,10 @@ export const nodeSqliteDriver: SqliteDriver = {
   },
 
   async restoreFromPath(sourcePath: string, destination: string): Promise<void> {
-    if (!nodeSqlite) {
-      throw new LoadError(
-        "node:sqlite is not available. Node 22.5+ is required. " +
-          "On Node 22.5–22.9 you may also need --experimental-sqlite.",
-      );
-    }
-    const source = new nodeSqlite.DatabaseSync(sourcePath, { readOnly: true });
+    const sqlite = loadNodeSqlite();
+    const source = new sqlite.DatabaseSync(sourcePath, { readOnly: true });
     try {
-      await nodeSqlite.backup(source, destination);
+      await sqlite.backup(source, destination);
     } finally {
       source.close();
     }
