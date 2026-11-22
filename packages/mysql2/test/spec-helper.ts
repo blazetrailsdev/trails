@@ -38,6 +38,8 @@ export function specHelper(): { client: Client } {
         long_blob_test LONGBLOB, long_text_test LONGTEXT, enum_test ENUM('val1', 'val2'),
         set_test SET('val1', 'val2'), PRIMARY KEY (id)
       )`);
+    await client.query("SELECT GET_LOCK('mysql2_test', 60)");
+    await client.query("BEGIN");
     await client.query("DELETE FROM mysql2_test;");
     await client.query(`
       INSERT INTO mysql2_test (
@@ -54,6 +56,8 @@ export function specHelper(): { client: Client } {
         "test", "test", "test", "test", "test",
         "test", "test", 'val1', 'val1,val2'
       )`);
+    await client.query("COMMIT");
+    await client.query("SELECT RELEASE_LOCK('mysql2_test')");
     await client.close();
     clients = [];
   });
