@@ -46,6 +46,7 @@ defineConstants([
   [m8, "Command", "Thor::Command"],
   [m9, "CoreExt", "Thor::CoreExt"],
   [m9, "HashWithIndifferentAccess", "Thor::CoreExt::HashWithIndifferentAccess"],
+  [m10, "Correctable", "Thor::Correctable"],
   [m8, "DynamicCommand", "Thor::DynamicCommand"],
   [m10, "Error", "Thor::Error"],
   [m10, "ExclusiveArgumentError", "Thor::ExclusiveArgumentError"],

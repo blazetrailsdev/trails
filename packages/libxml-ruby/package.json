@@ -1,0 +1,35 @@
+{
+  "name": "@blazetrails/libxml-ruby",
+  "version": "0.1.0",
+  "description": "LibXML::XML parser, SAX parser and node surface for Trails, mirroring libxml-ruby",
+  "type": "module",
+  "main": "dist/libxml-ruby.js",
+  "types": "dist/libxml-ruby.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/libxml-ruby.d.ts",
+      "default": "./dist/libxml-ruby.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/nokogiri": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "libxml2-wasm": "^0.7.1"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "mirrors": [
+    {
+      "source": "libxml-ruby",
+      "ref": "5.0.5",
+      "sha": "daa51c5174196516be6cd3cb05d4e1c8f9e11ea0"
+    }
+  ]
+}

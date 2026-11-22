@@ -186,6 +186,7 @@ defineConstants([
   [m20, "Configurable", "ActiveSupport::Configurable"],
   [m20, "Configurable.ClassMethods", "ActiveSupport::Configurable::ClassMethods"],
   [m20, "Configuration", "ActiveSupport::Configurable::Configuration"],
+  [m27, "Enumerable", "ActiveSupport::CoreExt::Object::Json::Enumerable"],
   [m31, "CurrentAttributes", "ActiveSupport::CurrentAttributes"],
   [m32, "DeepMergeable", "ActiveSupport::DeepMergeable"],
   [m33, "Delegation", "ActiveSupport::Delegation"],

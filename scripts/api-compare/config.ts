@@ -240,6 +240,7 @@ export const MANIFEST_PACKAGES = [
   "sqlite3",
   "thor",
   "mail",
+  "libxml-ruby",
   "mini-mime",
   "net-smtp",
   "rake",

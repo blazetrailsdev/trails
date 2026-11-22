@@ -2,6 +2,7 @@ import { defineConstants } from "@blazetrails/ruby-compat";
 import * as m0 from "./mini-mime.js";
 
 defineConstants([
+  [m0, "MiniMime", "MiniMime"],
   [m0, "Configuration", "MiniMime::Configuration"],
   [m0, "Db", "MiniMime::Db"],
   [m0, "Db.Cache", "MiniMime::Db::Cache"],

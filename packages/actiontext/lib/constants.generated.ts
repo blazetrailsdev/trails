@@ -46,4 +46,6 @@ defineConstants([
   [m19, "TrixAttachment", "ActionText::TrixAttachment"],
   [m14, "VERSION", "ActionText::VERSION"],
   [m1, "ActionText", "ActionView::Helpers::Tags::ActionText"],
+  [m1, "FormBuilder", "App::Helpers::ActionText::TagHelper::FormBuilder"],
+  [m1, "FormHelper", "App::Helpers::ActionText::TagHelper::FormHelper"],
 ]);

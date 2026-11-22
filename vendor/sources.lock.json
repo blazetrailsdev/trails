@@ -48,9 +48,17 @@
       "ref": "v1.14.0",
       "sha": "8185ea61518d8cf477594505cd4b5ab478b28aea"
     },
+    "libxml-ruby": {
+      "ref": "5.0.5",
+      "sha": "daa51c5174196516be6cd3cb05d4e1c8f9e11ea0"
+    },
     "libyaml": {
       "ref": "0.2.5",
       "sha": "2c891fc7a770e8ba2fec34fc6b545c672beb37e6"
+    },
+    "listen": {
+      "ref": "v3.9.0",
+      "sha": "7b7a2f586d4363ec6e2e82c72732df92a1476d6e"
     },
     "loofah": {
       "ref": "v2.24.0",
