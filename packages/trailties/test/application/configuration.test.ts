@@ -2215,7 +2215,7 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     application.config.disableSandbox = true;
     await application.initializeBang();
 
-    expect(Trails.configuration!.disableSandbox).toBe(true);
+    expect(Trails.configuration!.disableSandbox).toBeTruthy();
   });
 
   it("rake_eager_load is false by default", async () => {
@@ -2277,8 +2277,8 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     application.config.activeStorage.supportedImageProcessingMethods = ["write", "set"];
     await application.initializeBang();
 
-    expect(ActiveStorage.supportedImageProcessingMethods.includes("write")).toBe(true);
-    expect(ActiveStorage.supportedImageProcessingMethods.includes("set")).toBe(true);
+    expect(ActiveStorage.supportedImageProcessingMethods.includes("write")).toBeTruthy();
+    expect(ActiveStorage.supportedImageProcessingMethods.includes("set")).toBeTruthy();
   });
 
   it("ActiveStorage.unsupported_image_processing_arguments can be configured via config.active_storage.unsupported_image_processing_arguments", async () => {
@@ -2286,8 +2286,12 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     application.config.activeStorage.unsupportedImageProcessingArguments = ["-write", "-danger"];
     await application.initializeBang();
 
-    expect(ActiveStorage.unsupportedImageProcessingArguments).toContain("-danger");
-    expect(ActiveStorage.unsupportedImageProcessingArguments).not.toContain("-set");
+    expect(
+      (ActiveStorage.unsupportedImageProcessingArguments as string[]).includes("-danger"),
+    ).toBeTruthy();
+    expect(
+      (ActiveStorage.unsupportedImageProcessingArguments as string[]).includes("-set"),
+    ).toBeFalsy();
   });
 
   it("ActiveSupport::Messages::Codec.default_serializer is :json_allow_marshal by default for new apps", async () => {
@@ -2317,7 +2321,7 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
     await application.initializeBang();
 
-    expect(Metadata.useMessageSerializerForMetadata).toBe(true);
+    expect(Metadata.useMessageSerializerForMetadata).toBeTruthy();
   });
 
   it("ActiveSupport::Messages::Metadata.use_message_serializer_for_metadata is false by default for upgraded apps", async () => {
@@ -2331,6 +2335,6 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     application.config.activeSupport.useMessageSerializerForMetadata = true;
     await application.initializeBang();
 
-    expect(Metadata.useMessageSerializerForMetadata).toBe(true);
+    expect(Metadata.useMessageSerializerForMetadata).toBeTruthy();
   });
 });

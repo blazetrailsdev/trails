@@ -65,55 +65,49 @@ async function runGeneratorInstance(): Promise<string> {
   return capture("stdout", () => generator.invokeAll());
 }
 
-async function assertAuthenticationFiles({ api }: { api: boolean }): Promise<void> {
-  await t.assertFile("app/models/user.ts");
-  await t.assertFile("app/models/current.ts");
-  await t.assertFile("app/models/session.ts");
-  await t.assertFile("app/controllers/sessions-controller.ts");
-  await t.assertFile("app/controllers/concerns/authentication.ts");
-  if (api) t.assertNoFile("app/views/sessions/new.html.tse");
-  else await t.assertFile("app/views/sessions/new.html.tse");
-  if (!api) await t.assertFile("app/channels/application-cable/connection.ts");
-
-  await t.assertFile("app/controllers/application-controller.ts", (content) => {
-    const lines = content.split("\n");
-    const classIndex = lines.findIndex((line) => line.startsWith("export class "));
-    const [classLine, includesLine] = lines.slice(classIndex, classIndex + 2);
-
-    expect(classLine, "does not affect class definition").toMatch(
-      /^export class ApplicationController extends ActionController\.(Base|API) \{$/,
-    );
-    expect(includesLine, "includes module on first line of class definition").toMatch(
-      /^ {2}declare static allowUnauthenticatedAccess/,
-    );
-    expect(content).toMatch(/static \{\n {4}include\(this, Authentication\);/);
-  });
-
-  await t.assertFile("package.json", (content) => {
-    expect(content).toMatch(/\n\s*"@blazetrails\/bcrypt"/);
-  });
-
-  await t.assertFile("config/routes.ts", (content) => {
-    expect(content).toMatch(/this\.resource\("session"\)/);
-  });
-
-  await t.assertMigration("db/migrate/create_sessions.ts", (content) => {
-    expect(content).toMatch(/t\.references\("user", \{ null: false, foreignKey: true \}\)/);
-  });
-
-  await t.assertMigration("db/migrate/create_users.ts", (content) => {
-    expect(content).toMatch(/t\.string\("password_digest", \{ null: false \}\)/);
-  });
-
-  await t.assertFile("test/models/user.test.ts");
-  await t.assertFile("test/fixtures/users.yml");
-}
-
 describe("AuthenticationGeneratorTest", { timeout: 120_000 }, () => {
   it("authentication generator", async () => {
     await t.runGenerator([]);
 
-    await assertAuthenticationFiles({ api: false });
+    await t.assertFile("app/models/user.ts");
+    await t.assertFile("app/models/current.ts");
+    await t.assertFile("app/models/session.ts");
+    await t.assertFile("app/controllers/sessions-controller.ts");
+    await t.assertFile("app/controllers/concerns/authentication.ts");
+    await t.assertFile("app/views/sessions/new.html.tse");
+    await t.assertFile("app/channels/application-cable/connection.ts");
+
+    await t.assertFile("app/controllers/application-controller.ts", (content) => {
+      const lines = content.split("\n");
+      const classIndex = lines.findIndex((line) => line.startsWith("export class "));
+      const [classLine, includesLine] = lines.slice(classIndex, classIndex + 2);
+
+      expect(classLine, "does not affect class definition").toBe(
+        "export class ApplicationController extends ActionController.Base {",
+      );
+      expect(includesLine, "includes module on first line of class definition").toBe(
+        '  declare static allowUnauthenticatedAccess: Extended<typeof ClassMethods>["allowUnauthenticatedAccess"];',
+      );
+    });
+
+    await t.assertFile("package.json", (content) => {
+      expect(content).toMatch(/\n\s*"@blazetrails\/bcrypt"/);
+    });
+
+    await t.assertFile("config/routes.ts", (content) => {
+      expect(content).toMatch(/this\.resource\("session"\)/);
+    });
+
+    await t.assertMigration("db/migrate/create_sessions.ts", (content) => {
+      expect(content).toMatch(/t\.references\("user", \{ null: false, foreignKey: true \}\)/);
+    });
+
+    await t.assertMigration("db/migrate/create_users.ts", (content) => {
+      expect(content).toMatch(/t\.string\("password_digest", \{ null: false \}\)/);
+    });
+
+    await t.assertFile("test/models/user.test.ts");
+    await t.assertFile("test/fixtures/users.yml");
   });
 
   it("authentication generator without bcrypt in gemfile", async () => {
@@ -130,7 +124,44 @@ describe("AuthenticationGeneratorTest", { timeout: 120_000 }, () => {
   it("authentication generator with api flag", async () => {
     await t.runGenerator(["--api"]);
 
-    await assertAuthenticationFiles({ api: true });
+    await t.assertFile("app/models/user.ts");
+    await t.assertFile("app/models/current.ts");
+    await t.assertFile("app/models/session.ts");
+    await t.assertFile("app/controllers/sessions-controller.ts");
+    await t.assertFile("app/controllers/concerns/authentication.ts");
+    t.assertNoFile("app/views/sessions/new.html.tse");
+
+    await t.assertFile("app/controllers/application-controller.ts", (content) => {
+      const lines = content.split("\n");
+      const classIndex = lines.findIndex((line) => line.startsWith("export class "));
+      const [classLine, includesLine] = lines.slice(classIndex, classIndex + 2);
+
+      expect(classLine, "does not affect class definition").toBe(
+        "export class ApplicationController extends ActionController.Base {",
+      );
+      expect(includesLine, "includes module on first line of class definition").toBe(
+        '  declare static allowUnauthenticatedAccess: Extended<typeof ClassMethods>["allowUnauthenticatedAccess"];',
+      );
+    });
+
+    await t.assertFile("package.json", (content) => {
+      expect(content).toMatch(/\n\s*"@blazetrails\/bcrypt"/);
+    });
+
+    await t.assertFile("config/routes.ts", (content) => {
+      expect(content).toMatch(/this\.resource\("session"\)/);
+    });
+
+    await t.assertMigration("db/migrate/create_sessions.ts", (content) => {
+      expect(content).toMatch(/t\.references\("user", \{ null: false, foreignKey: true \}\)/);
+    });
+
+    await t.assertMigration("db/migrate/create_users.ts", (content) => {
+      expect(content).toMatch(/t\.string\("password_digest", \{ null: false \}\)/);
+    });
+
+    await t.assertFile("test/models/user.test.ts");
+    await t.assertFile("test/fixtures/users.yml");
   });
 
   it("model test is skipped if test framework is given", async () => {
