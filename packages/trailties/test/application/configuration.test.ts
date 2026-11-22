@@ -2401,6 +2401,11 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
     return (await t.app(env)) as unknown as Application;
   }
 
+  async function makeBasicApp(block?: (app: typeof Application) => unknown): Promise<void> {
+    ActiveStorageEngine.config.activeStorage.serviceConfigurations ??= {};
+    await t.makeBasicApp(block);
+  }
+
   async function suppressDefaultConfig(): Promise<void> {
     await FileUtils.mvAsync(
       `${await t.appPath()}/config/environments`,
@@ -2506,7 +2511,7 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
   });
 
   it("EtagWithFlash module doesn't break when the session store is disabled", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.sessionStore(":disabled");
     });
 
@@ -2521,7 +2526,7 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
   });
 
   it("EtagWithFlash module doesn't break for API apps", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.apiOnly = true;
     });
 
@@ -2536,7 +2541,7 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
   });
 
   it("application verifier can be used in the entire application", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.secretKeyBase = "b3c631c314c0bbca50c1b2843150fe33";
       application.config.sessionStore(":disabled");
     });
@@ -2636,7 +2641,7 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
   });
 
   it("application verifier can build different verifiers", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.sessionStore(":disabled");
     });
 
@@ -2717,7 +2722,7 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
   });
 
   it("protect from forgery is the default in a new app", async () => {
-    await t.makeBasicApp();
+    await makeBasicApp();
 
     omgController(async function () {
       await this.render({ inline: "<%= csrfMetaTags() %>" });
@@ -2816,7 +2821,7 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
   });
 
   it("request forgery token param can be changed", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       (
         application.config.actionController as unknown as Record<string, unknown>
       ).requestForgeryProtectionToken = "_xsrf_token_here";
@@ -2831,12 +2836,12 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
   });
 
   it("sets ActionDispatch.test_app", async () => {
-    await t.makeBasicApp();
+    await makeBasicApp();
     expect(ActionDispatch.testApp).toBe(Trails.application);
   });
 
   it("sets ActionDispatch::Response.default_charset", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.actionDispatch.defaultCharset = "utf-16";
     });
 
@@ -2968,7 +2973,7 @@ ${POSTS_ROUTES}
   });
 
   it("config.action_dispatch.show_exceptions is sent in env", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.actionDispatch.showExceptions = "all";
     });
 
@@ -3078,7 +3083,7 @@ ${POSTS_ROUTES}
   });
 
   it("config.action_dispatch.ignore_accept_header", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.actionDispatch.ignoreAcceptHeader = true;
     });
 
@@ -3097,7 +3102,7 @@ ${POSTS_ROUTES}
   });
 
   it("Rails.application#env_config exists and includes some existing parameters", async () => {
-    await t.makeBasicApp();
+    await makeBasicApp();
 
     const a = await app();
     expect(a.envConfig()["action_dispatch.parameter_filter"]).toEqual(a.config.filterParameters);
@@ -3110,12 +3115,12 @@ ${POSTS_ROUTES}
   });
 
   it("config.colorize_logging default is true", async () => {
-    await t.makeBasicApp();
+    await makeBasicApp();
     expect((await app()).config.colorizeLogging).toBeTruthy();
   });
 
   it("default session store initializer does not overwrite the user defined session store even if it is disabled", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.sessionStore(":disabled");
     });
 
@@ -3124,7 +3129,7 @@ ${POSTS_ROUTES}
 
   it("default session store initializer sets session store to cookie store", async () => {
     const sessionOptions = { key: "_myapp_session", cookieOnly: true };
-    await t.makeBasicApp();
+    await makeBasicApp();
 
     expect((await app()).config.sessionStore()).toBe(Session.CookieStore);
     for (const [key, value] of Object.entries(sessionOptions)) {
@@ -3156,7 +3161,7 @@ ${POSTS_ROUTES}
   });
 
   it("config.log_level with custom logger", async () => {
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.logger = new Logger(STDOUT);
       application.config.logLevel = "debug";
     });
@@ -3207,7 +3212,7 @@ ${POSTS_ROUTES}
   it("config.logger when logger is already a Broadcast Logger", async () => {
     const logger = new BroadcastLogger();
 
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.logger = logger;
     });
     expect(Trails.logger).toBe(logger);
@@ -3216,7 +3221,7 @@ ${POSTS_ROUTES}
   it("config.logger when logger is not a Broadcast Logger", async () => {
     const logger = new Logger(STDOUT);
 
-    await t.makeBasicApp((application) => {
+    await makeBasicApp((application) => {
       application.config.logger = logger;
     });
 
@@ -3226,7 +3231,7 @@ ${POSTS_ROUTES}
 
   // PERMANENT-SKIP: CLAUDE.md, "Method visibility is compile-time only (`Module#private`, `basic_obj_respond_to`'s `pub`)" — `respond_to?(:method_missing)` and `respond_to?(:method_missing, true)` answer the same.
   it.skip("respond_to? accepts include_private", async () => {
-    await t.makeBasicApp();
+    await makeBasicApp();
 
     expect(rbObjRespondTo(Trails.configuration, "methodMissing")).toBe(false);
     expect(Trails.configuration!.isRespondTo("methodMissing", true)).toBe(true);
