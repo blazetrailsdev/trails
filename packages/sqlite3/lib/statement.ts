@@ -61,21 +61,21 @@ export class Statement {
     const block = rbBlockGivenP(bindVars.at(-1))
       ? (bindVars.pop() as (results: ResultSet) => unknown)
       : undefined;
-    const yieldResults = (results: ResultSet): ResultSet | Promise<ResultSet> => {
-      if (block) {
-        const r = block(results);
-        if (r instanceof Promise) return r.then(() => results);
+    const reset = (): ResultSet | Promise<ResultSet> => {
+      if (this.isActive() || this.isDone()) {
+        const r = this.resetBang();
+        if (r instanceof Promise) return r.then(bind);
       }
-      return results;
+      return bind();
     };
-    const stepIfNoColumns = (count: number, results: ResultSet) => {
-      if (count === 0) {
-        const r = this.step();
-        if (r instanceof Promise) return r.then(() => yieldResults(results));
+    const bind = (): ResultSet | Promise<ResultSet> => {
+      if (bindVars.length !== 0) {
+        const r = this.bindParams(...bindVars);
+        if (r instanceof Promise) return r.then(buildResults);
       }
-      return yieldResults(results);
+      return buildResults();
     };
-    const buildResults = () => {
+    const buildResults = (): ResultSet | Promise<ResultSet> => {
       const results = this.#connection.buildResultSet(this);
 
       const count = this.columnCount();
@@ -83,19 +83,22 @@ export class Statement {
         ? count.then((c) => stepIfNoColumns(c, results))
         : stepIfNoColumns(count, results);
     };
-    const bind = () => {
-      if (bindVars.length !== 0) {
-        const r = this.bindParams(...bindVars);
-        if (r instanceof Promise) return r.then(buildResults);
+    const stepIfNoColumns = (count: number, results: ResultSet): ResultSet | Promise<ResultSet> => {
+      if (count === 0) {
+        const r = this.step();
+        if (r instanceof Promise) return r.then(() => yieldResults(results));
       }
-      return buildResults();
+      return yieldResults(results);
+    };
+    const yieldResults = (results: ResultSet): ResultSet | Promise<ResultSet> => {
+      if (block) {
+        const r = block(results);
+        if (r instanceof Promise) return r.then(() => results);
+      }
+      return results;
     };
 
-    if (this.isActive() || this.isDone()) {
-      const r = this.resetBang();
-      if (r instanceof Promise) return r.then(bind);
-    }
-    return bind();
+    return reset();
   }
 
   isActive(): boolean {
