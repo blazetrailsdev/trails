@@ -379,8 +379,11 @@ export class Result {
     if (!this.isStreaming || this.streamingComplete) return;
     this.streamingComplete = true;
     return (async () => {
-      while (!(await this.streamRows!.next()).done);
-      this.client!.freeResult(this);
+      try {
+        while (!(await this.streamRows!.next()).done);
+      } finally {
+        this.client!.freeResult(this);
+      }
     })();
   }
 }

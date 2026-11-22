@@ -26,10 +26,16 @@ describe("Mysql2::Result (trails)", () => {
   });
 
   it("a streamed non-SELECT answers nil and records affected rows", async () => {
-    await state.client.query("CREATE TEMPORARY TABLE streamed_write (id INT)");
-    expect(
-      await state.client.query("INSERT INTO streamed_write VALUES (1), (2)", { stream: true }),
-    ).toBeNull();
-    expect(state.client.affectedRows).toBe(2);
+    await state.client.query("BEGIN");
+    try {
+      expect(
+        await state.client.query("UPDATE mysql2_test SET varchar_test = 'streamed'", {
+          stream: true,
+        }),
+      ).toBeNull();
+      expect(state.client.affectedRows).toBe(1);
+    } finally {
+      await state.client.query("ROLLBACK");
+    }
   });
 });
