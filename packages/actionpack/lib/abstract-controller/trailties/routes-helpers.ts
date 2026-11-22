@@ -29,7 +29,10 @@ export interface RoutesHelpersClassMethods extends HelpersClassMethods {
 }
 
 interface RoutesHelpersModule {
-  /** @inventedArm if — PERMANENT */
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm includedModules — PERMANENT
+   */
   with(
     routes: UrlHelpersRouteSet,
     includePathHelpers?: boolean,
@@ -97,27 +100,21 @@ Object.defineProperty(RoutesHelpers, "with", {
       const installed = new Map<string, PropertyDescriptor>();
       const inherited = (key: string, descriptor: PropertyDescriptor): PropertyDescriptor =>
         inheritedDescriptor(proto, key, descriptor);
+      const includedMembers = new Set<unknown>();
+      for (const m of includedModules(cls)) {
+        const source = typeof m === "function" ? (m as ClassModule).prototype : m;
+        if (source === null || typeof source !== "object") continue;
+        for (const member of Object.values(Object.getOwnPropertyDescriptors(source))) {
+          if (member.value !== undefined) includedMembers.add(member.value);
+          if (member.get !== undefined) includedMembers.add(member.get);
+        }
+      }
       const isCopiedFromIncludedModule = (key: string): boolean => {
         const own = Object.getOwnPropertyDescriptor(proto, key)!;
-        return includedModules(cls).some((m) => {
-          let source: PropertyDescriptor | undefined;
-          if (typeof m === "function") {
-            for (
-              let p: object | null = (m as ClassModule).prototype;
-              p && !source;
-              p = Object.getPrototypeOf(p) as object | null
-            ) {
-              source = Object.getOwnPropertyDescriptor(p, key);
-            }
-          } else if (m !== null && typeof m === "object") {
-            source = Object.getOwnPropertyDescriptor(m, key);
-          }
-          if (!source) return false;
-          return (
-            (source.value !== undefined && source.value === own.value) ||
-            (source.get !== undefined && source.get === own.get)
-          );
-        });
+        return (
+          (own.value !== undefined && includedMembers.has(own.value)) ||
+          (own.get !== undefined && includedMembers.has(own.get))
+        );
       };
       for (const [key, descriptor] of includedDescriptors(cls, mod)) {
         if (
