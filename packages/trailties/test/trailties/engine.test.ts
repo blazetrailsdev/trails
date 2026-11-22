@@ -17,7 +17,6 @@ import {
   getFs,
   include,
   NoMethodError,
-  rbModName,
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import type { Bukkit, Generation } from "../support/isolation/abstract-unit.js";
@@ -467,12 +466,18 @@ Trails.application!.routes().draw(function () {
     await t.get("/bar");
     expect(t.lastResponse().body.trim()).toBe("App's bar partial");
 
+    const { BukkitsEngine } = (await import(`${plugin.path}/lib/bukkits.ts`)) as {
+      BukkitsEngine: typeof Engine;
+    };
+    const { BlogEngine } = (await import(`${blog.path}/lib/blog.ts`)) as {
+      BlogEngine: typeof Engine;
+    };
     expect(
       Trails.application!.orderedRailties()
         .flat(Infinity)
-        .map((r) => rbModName((r as object).constructor))
+        .map((r) => (r as object).constructor)
         .slice(-3),
-    ).toEqual(["BukkitsEngine", "AppTemplate", "BlogEngine"]);
+    ).toEqual([BukkitsEngine, Trails.application!.constructor, BlogEngine]);
   });
 
   it(
