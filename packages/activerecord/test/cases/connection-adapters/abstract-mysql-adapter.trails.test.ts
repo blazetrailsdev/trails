@@ -1,7 +1,7 @@
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
 import { NullLock } from "@blazetrails/activesupport";
 import { Base } from "../../../lib/base.js";
-import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 import { Column } from "../../../lib/connection-adapters/mysql/column.js";
 import { TypeMetadata } from "../../../lib/connection-adapters/mysql/type-metadata.js";
 import { SqlTypeMetadata } from "../../../lib/connection-adapters/sql-type-metadata.js";
@@ -244,109 +244,112 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
   });
 });
 
-describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () => {
-  function makeTextColumn(
-    opts: { collation?: string | null; defaultFunction?: string | null } = {},
-  ) {
-    return new Column(
-      "body",
-      "hello",
-      new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
-      true,
-      opts.defaultFunction ?? null,
-      {
-        collation: opts.collation ?? "utf8mb4_unicode_ci",
-      },
-    );
-  }
+describe.runIf(currentAdapter("Mysql2Adapter"))(
+  "AbstractMysqlAdapter#buildChangeColumnDefinition",
+  () => {
+    function makeTextColumn(
+      opts: { collation?: string | null; defaultFunction?: string | null } = {},
+    ) {
+      return new Column(
+        "body",
+        "hello",
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
+        true,
+        opts.defaultFunction ?? null,
+        {
+          collation: opts.collation ?? "utf8mb4_unicode_ci",
+        },
+      );
+    }
 
-  async function makeAdapter(column: Column) {
-    const { Mysql2Adapter } = await import("../../../lib/connection-adapters/mysql2-adapter.js");
-    const adapter = Object.create(Mysql2Adapter.prototype);
-    adapter.columnFor = async (_t: string, _c: string) => column;
-    return adapter;
-  }
+    async function makeAdapter(column: Column) {
+      const { Mysql2Adapter } = await import("../../../lib/connection-adapters/mysql2-adapter.js");
+      const adapter = Object.create(Mysql2Adapter.prototype);
+      adapter.columnFor = async (_t: string, _c: string) => column;
+      return adapter;
+    }
 
-  it("returns a ChangeColumnDefinition with the column name", async () => {
-    const col = makeTextColumn();
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
-    expect(cd).toBeInstanceOf(ChangeColumnDefinition);
-    expect(cd.name).toBe("body");
-  });
-
-  it("inherits collation from existing column when changing to a text type", async () => {
-    const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
-    expect(cd.column.options.collation).toBe("utf8mb4_unicode_ci");
-  });
-
-  it("does not inherit collation when changing to a non-text type", async () => {
-    const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", "integer");
-    expect(cd.column.options.collation).toBeUndefined();
-  });
-
-  it("collation: null sentinel drops collation (no_collation)", async () => {
-    const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text", {
-      collation: "no_collation",
+    it("returns a ChangeColumnDefinition with the column name", async () => {
+      const col = makeTextColumn();
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+      expect(cd).toBeInstanceOf(ChangeColumnDefinition);
+      expect(cd.name).toBe("body");
     });
-    expect(cd.column.options.collation).toBeUndefined();
-  });
 
-  it("explicit collation option overrides column collation", async () => {
-    const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text", {
-      collation: "ascii_bin",
+    it("inherits collation from existing column when changing to a text type", async () => {
+      const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+      expect(cd.column.options.collation).toBe("utf8mb4_unicode_ci");
     });
-    expect(cd.column.options.collation).toBe("ascii_bin");
-  });
 
-  it("inherits null from existing column when not specified", async () => {
-    const col = makeTextColumn();
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
-    expect(cd.column.options.null).toBe(true);
-  });
+    it("does not inherit collation when changing to a non-text type", async () => {
+      const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "body", "integer");
+      expect(cd.column.options.collation).toBeUndefined();
+    });
 
-  it("inherits default from existing column when not specified", async () => {
-    const col = makeTextColumn();
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
-    expect(cd.column.options.default).toBe("hello");
-  });
+    it("collation: null sentinel drops collation (no_collation)", async () => {
+      const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "body", "text", {
+        collation: "no_collation",
+      });
+      expect(cd.column.options.collation).toBeUndefined();
+    });
 
-  it("uses defaultFunction as lambda when column has a function default", async () => {
-    const col = makeTextColumn({ defaultFunction: "uuid()" });
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
-    expect(typeof cd.column.options.default).toBe("function");
-    expect((cd.column.options.default as () => string)()).toBe("uuid()");
-  });
+    it("explicit collation option overrides column collation", async () => {
+      const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "body", "text", {
+        collation: "ascii_bin",
+      });
+      expect(cd.column.options.collation).toBe("ascii_bin");
+    });
 
-  it("falls back to column.sqlType when type argument is empty", async () => {
-    const col = makeTextColumn();
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", null);
-    expect(cd.column.type).toBe("varchar(255)");
-  });
+    it("inherits null from existing column when not specified", async () => {
+      const col = makeTextColumn();
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+      expect(cd.column.options.null).toBe(true);
+    });
 
-  it("function default renders as unquoted SQL expression in the CHANGE clause", async () => {
-    const { SchemaCreation } =
-      await import("../../../lib/connection-adapters/mysql/schema-creation.js");
-    const col = makeTextColumn({ defaultFunction: "uuid()" });
-    const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "uid", "string");
-    const sql = await new SchemaCreation(await Base.leaseConnection()).accept(cd);
-    expect(sql).toContain("DEFAULT uuid()");
-    expect(sql).not.toContain("DEFAULT 'uuid()'");
-  });
-});
+    it("inherits default from existing column when not specified", async () => {
+      const col = makeTextColumn();
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+      expect(cd.column.options.default).toBe("hello");
+    });
+
+    it("uses defaultFunction as lambda when column has a function default", async () => {
+      const col = makeTextColumn({ defaultFunction: "uuid()" });
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+      expect(typeof cd.column.options.default).toBe("function");
+      expect((cd.column.options.default as () => string)()).toBe("uuid()");
+    });
+
+    it("falls back to column.sqlType when type argument is empty", async () => {
+      const col = makeTextColumn();
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "body", null);
+      expect(cd.column.type).toBe("varchar(255)");
+    });
+
+    it("function default renders as unquoted SQL expression in the CHANGE clause", async () => {
+      const { SchemaCreation } =
+        await import("../../../lib/connection-adapters/mysql/schema-creation.js");
+      const col = makeTextColumn({ defaultFunction: "uuid()" });
+      const adapter = await makeAdapter(col);
+      const cd = await adapter.buildChangeColumnDefinition("users", "uid", "string");
+      const sql = await new SchemaCreation(await Base.leaseConnection()).accept(cd);
+      expect(sql).toContain("DEFAULT uuid()");
+      expect(sql).not.toContain("DEFAULT 'uuid()'");
+    });
+  },
+);
 
 describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", () => {
   async function makeAdapter() {
@@ -521,35 +524,38 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefaultDefinition (#1568)", () =
   });
 });
 
-describeIfMysqlAdapter("AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#1568)", () => {
-  async function visit(cd: ChangeColumnDefaultDefinition): Promise<string> {
-    return new MysqlSchemaCreation(await Base.leaseConnection()).accept(cd);
-  }
+describe.runIf(currentAdapter("Mysql2Adapter"))(
+  "AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#1568)",
+  () => {
+    async function visit(cd: ChangeColumnDefaultDefinition): Promise<string> {
+      return new MysqlSchemaCreation(await Base.leaseConnection()).accept(cd);
+    }
 
-  async function buildFor(column: Column, defaultOrChanges: unknown) {
-    const adapter = await makeMinimalMysqlAdapter({ columnFor: async () => column });
-    return adapter.buildChangeColumnDefaultDefinition(
-      "users",
-      "body",
-      defaultOrChanges,
-    ) as Promise<ChangeColumnDefaultDefinition>;
-  }
+    async function buildFor(column: Column, defaultOrChanges: unknown) {
+      const adapter = await makeMinimalMysqlAdapter({ columnFor: async () => column });
+      return adapter.buildChangeColumnDefaultDefinition(
+        "users",
+        "body",
+        defaultOrChanges,
+      ) as Promise<ChangeColumnDefaultDefinition>;
+    }
 
-  it("emits DROP DEFAULT for null default on a NOT NULL column", async () => {
-    const cd = await buildFor(makeChangeColumnTextColumn({ null_: false }), null);
-    expect(await visit(cd)).toBe("ALTER COLUMN `body` DROP DEFAULT");
-  });
+    it("emits DROP DEFAULT for null default on a NOT NULL column", async () => {
+      const cd = await buildFor(makeChangeColumnTextColumn({ null_: false }), null);
+      expect(await visit(cd)).toBe("ALTER COLUMN `body` DROP DEFAULT");
+    });
 
-  it("emits SET DEFAULT NULL for null default on a nullable column", async () => {
-    const cd = await buildFor(makeChangeColumnTextColumn({ null_: true }), null);
-    expect(await visit(cd)).toBe("ALTER COLUMN `body` SET DEFAULT NULL");
-  });
+    it("emits SET DEFAULT NULL for null default on a nullable column", async () => {
+      const cd = await buildFor(makeChangeColumnTextColumn({ null_: true }), null);
+      expect(await visit(cd)).toBe("ALTER COLUMN `body` SET DEFAULT NULL");
+    });
 
-  it("emits SET DEFAULT <literal> for a non-null default", async () => {
-    const cd = await buildFor(makeChangeColumnTextColumn({ null_: true }), "world");
-    expect(await visit(cd)).toBe("ALTER COLUMN `body` SET DEFAULT 'world'");
-  });
-});
+    it("emits SET DEFAULT <literal> for a non-null default", async () => {
+      const cd = await buildFor(makeChangeColumnTextColumn({ null_: true }), "world");
+      expect(await visit(cd)).toBe("ALTER COLUMN `body` SET DEFAULT 'world'");
+    });
+  },
+);
 
 describe("AbstractMysqlAdapter#changeColumnDefault wiring (#1568)", () => {
   async function build(column: Column) {

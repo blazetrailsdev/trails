@@ -4,7 +4,6 @@ import { Base } from "../../lib/index.js";
 import { NotNullViolation } from "../../lib/errors.js";
 import { adapterType } from "../support/test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
-import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { isMariaDb } from "../support/mysql-server-version.js";
 import { describeIfSupports, itIfSupports } from "../support/supports.js";
 import { fixtures } from "../support/use-fixtures.js";
@@ -232,7 +231,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgresqlDefaultExpression
   });
 });
 
-describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MysqlDefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(async () => {
@@ -305,7 +304,7 @@ describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
   });
 });
 
-describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("DefaultsTestWithoutTransactionalFixtures", () => {
   async function withMysqlNotNullTable(
     strict: boolean,
     fn: (klass: typeof Base) => Promise<void>,

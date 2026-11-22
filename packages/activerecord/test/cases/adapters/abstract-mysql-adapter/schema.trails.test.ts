@@ -1,10 +1,11 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect } from "vitest";
-import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
+import { leaseMysqlAdapter } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Post } from "../../../models/post.js";
 
-describeIfMysqlAdapter("SchemaTestTrails", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("SchemaTestTrails", () => {
   describe("the SchemaTest @omgpost", () => {
     it("does not rebind the canonical Post in the model registry", async () => {
       const adapter = await leaseMysqlAdapter();

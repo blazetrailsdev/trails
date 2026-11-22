@@ -1,16 +1,12 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-  MYSQL_TEST_URL,
-} from "./test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { Post } from "../../../models/post.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
@@ -110,7 +106,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 });
 
-describeIfMysqlAdapter("MySQLAnsiQuotesTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLAnsiQuotesTest", () => {
   let ansi: Mysql2Adapter | undefined;
   beforeEach(() => {
     ansi = new Mysql2Adapter({ uri: MYSQL_TEST_URL, variables: { sql_mode: "ANSI_QUOTES" } });

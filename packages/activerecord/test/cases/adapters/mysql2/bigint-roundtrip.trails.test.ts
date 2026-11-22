@@ -1,13 +1,10 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BigIntegerType } from "@blazetrails/activemodel";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "../abstract-mysql-adapter/test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter } from "../abstract-mysql-adapter/test-helper.js";
 import type { Mysql2Result } from "@blazetrails/mysql2";
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   const type = new BigIntegerType({ limit: 8 });
   const BIG = 2n ** 62n;

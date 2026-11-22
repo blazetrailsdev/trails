@@ -1,5 +1,6 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SavepointTransaction } from "../../../../lib/connection-adapters/abstract/transaction.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 
@@ -11,7 +12,7 @@ function assertSavepoint(a: Mysql2Adapter): void {
   expect(a.currentTransaction()).toBeInstanceOf(SavepointTransaction);
 }
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();

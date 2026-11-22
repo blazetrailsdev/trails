@@ -1,10 +1,10 @@
-import { it, expect, vi } from "vitest";
-import { describeIfMysqlAdapter } from "../../../support/describe-if-mysql-adapter.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect, vi } from "vitest";
 import { Mysql2Adapter } from "../../../../lib/connection-adapters/mysql2-adapter.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { databaseCli } from "../../../../lib/active-record.js";
 
-describeIfMysqlAdapter("Mysql2DbConsoleTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2DbConsoleTest", () => {
   const makeDbConfig = (config: Record<string, unknown>) =>
     new HashConfig("test", "primary", config);
 

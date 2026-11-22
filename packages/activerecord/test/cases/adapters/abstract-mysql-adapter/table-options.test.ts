@@ -1,15 +1,10 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Logger } from "@blazetrails/activesupport";
 import { Version } from "../../../../lib/connection-adapters/abstract-adapter.js";
 import { Base, Migration, Migrator } from "../../../../lib/index.js";
 import type { MigrationProxy } from "../../../../lib/migration.js";
-import {
-  describeIfMysqlAdapter,
-  isMariaDb,
-  mysqlVersion,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "./test-helper.js";
+import { isMariaDb, mysqlVersion, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 const skipNoTableOptions =
@@ -19,7 +14,7 @@ const skipNoTableOptions =
 
 const dumpTable = (adapter: Mysql2Adapter, tableName: string) => dumpTableSchema(tableName);
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();

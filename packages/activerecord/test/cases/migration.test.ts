@@ -55,7 +55,6 @@ import {
   fetch,
 } from "@blazetrails/ruby-compat";
 import { Mysql2Adapter } from "../../lib/connection-adapters/mysql2-adapter.js";
-import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 import { anonymousMigration } from "../support/anonymous-migration.js";
 import { InternalMetadata } from "../../lib/internal-metadata.js";
@@ -2363,7 +2362,7 @@ describe("BulkAlterTableMigrationsTest", () => {
   });
 });
 
-describeIfMysqlAdapter("BulkAlterTableMigrationsTest", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("BulkAlterTableMigrationsTest", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();

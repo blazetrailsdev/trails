@@ -1,8 +1,9 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
+import { leaseMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/base.js";
 import { Deadlocked, Rollback, StatementInvalid } from "../../../../lib/errors.js";
@@ -52,7 +53,7 @@ function flunkOnLostSavepoint(errors: unknown[]): void {
   );
 }
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   describe("NestedDeadlockTest", () => {
     fixtures([], { useTransactionalTests: false });
 

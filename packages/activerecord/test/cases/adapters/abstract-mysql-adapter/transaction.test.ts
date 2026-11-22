@@ -1,3 +1,4 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import {
   assertDifference,
@@ -6,7 +7,7 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { Thread, rbObjSingletonClass } from "@blazetrails/ruby-compat";
-import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/base.js";
 import {
@@ -48,7 +49,7 @@ function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
   };
 }
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();

@@ -1,4 +1,5 @@
-import { it, expect, beforeAll } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   SchemaCreation,
   type VisitorHostAdapter,
@@ -18,14 +19,13 @@ import {
 import { TableDefinition as MyTd } from "../../../../lib/connection-adapters/mysql/schema-definitions.js";
 import { Column } from "../../../../lib/connection-adapters/mysql/column.js";
 import { Base } from "../../../../lib/base.js";
-import { describeIfMysqlAdapter } from "../../../support/describe-if-mysql-adapter.js";
 
 let leased: VisitorHostAdapter;
 
 const mysqlConn = (overrides: Record<string, unknown> = {}): VisitorHostAdapter =>
   Object.assign(Object.create(leased), overrides) as VisitorHostAdapter;
 
-describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("MySQL::SchemaCreation", () => {
   let sc: SchemaCreation;
 
   beforeAll(async () => {
@@ -207,120 +207,123 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 });
 
-describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
-  beforeAll(async () => {
-    leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
-  });
-
-  const toSql = (td: MyTd, host: VisitorHostAdapter = mysqlConn()) =>
-    new SchemaCreation(host).accept(td);
-
-  it("emits bigint AUTO_INCREMENT PRIMARY KEY for default id column", async () => {
-    const td = new MyTd(mysqlConn(), "users");
-    td.setPrimaryKey("users", "primary_key");
-    td.string("name");
-    expect(await toSql(td)).toBe(
-      "CREATE TABLE `users` (`id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, `name` varchar(255))",
-    );
-  });
-
-  it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
-    const td = new MyTd(mysqlConn(), "t");
-    td.column("full_name", "virtual", { as: "CONCAT(a, b)" });
-    const col = td.columns.find((c) => c.name === "full_name")!;
-    expect(col.type).toBeUndefined();
-    const sql = await toSql(td);
-    expect(sql).toContain("`full_name`  AS (CONCAT(a, b))");
-    expect(sql).not.toContain("varchar");
-  });
-
-  it("honors id: false (no primary key column)", async () => {
-    const td = new MyTd(mysqlConn(), "logs");
-    td.setPrimaryKey("logs", false);
-    td.string("body");
-    expect(await toSql(td)).toBe("CREATE TABLE `logs` (`body` varchar(255))");
-  });
-
-  it("appends DEFAULT CHARSET and COLLATE from table options", async () => {
-    const td = new MyTd(mysqlConn(), "posts", {
-      charset: "utf8mb4",
-      collation: "utf8mb4_unicode_ci",
+describe.runIf(currentAdapter("Mysql2Adapter"))(
+  "MySQL::TableDefinition#toSql via SchemaCreation.accept",
+  () => {
+    beforeAll(async () => {
+      leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
     });
-    td.string("title");
-    const sql = await toSql(td);
-    expect(sql).toContain("DEFAULT CHARSET=utf8mb4");
-    expect(sql).toContain("COLLATE=utf8mb4_unicode_ci");
-  });
 
-  it("emits IF NOT EXISTS and TEMPORARY modifiers", async () => {
-    const td = new MyTd(mysqlConn(), "tmp", { temporary: true, ifNotExists: true });
-    td.integer("n");
-    expect(await toSql(td)).toBe("CREATE TEMPORARY TABLE IF NOT EXISTS `tmp` (`n` int)");
-  });
+    const toSql = (td: MyTd, host: VisitorHostAdapter = mysqlConn()) =>
+      new SchemaCreation(host).accept(td);
 
-  it("emits composite PRIMARY KEY clause", async () => {
-    const td = new MyTd(mysqlConn(), "memberships");
-    td.setPrimaryKey("memberships", "primary_key", ["user_id", "group_id"]);
-    td.bigint("user_id", { null: false });
-    td.bigint("group_id", { null: false });
-    const sql = await toSql(td);
-    expect(sql).toContain("PRIMARY KEY (`user_id`, `group_id`)");
-  });
+    it("emits bigint AUTO_INCREMENT PRIMARY KEY for default id column", async () => {
+      const td = new MyTd(mysqlConn(), "users");
+      td.setPrimaryKey("users", "primary_key");
+      td.string("name");
+      expect(await toSql(td)).toBe(
+        "CREATE TABLE `users` (`id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, `name` varchar(255))",
+      );
+    });
 
-  it("inlines indexes when supportsIndexesInCreate (MySQL)", async () => {
-    const td = new MyTd(mysqlConn(), "users");
-    td.string("email");
-    td.index(["email"], { unique: true, name: "idx_users_email" });
-    const sql = await toSql(td);
-    expect(sql).toContain("UNIQUE INDEX `idx_users_email` (`email`)");
-  });
+    it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
+      const td = new MyTd(mysqlConn(), "t");
+      td.column("full_name", "virtual", { as: "CONCAT(a, b)" });
+      const col = td.columns.find((c) => c.name === "full_name")!;
+      expect(col.type).toBeUndefined();
+      const sql = await toSql(td);
+      expect(sql).toContain("`full_name`  AS (CONCAT(a, b))");
+      expect(sql).not.toContain("varchar");
+    });
 
-  it("inlines FOREIGN KEY constraints", async () => {
-    const td = new MyTd(mysqlConn(), "posts");
-    td.bigint("author_id");
-    td.foreignKey("authors", { column: "author_id" });
-    const sql = await toSql(td);
-    expect(sql).toContain("CONSTRAINT ");
-    expect(sql).toContain("FOREIGN KEY (`author_id`) REFERENCES `authors` (`id`)");
-  });
+    it("honors id: false (no primary key column)", async () => {
+      const td = new MyTd(mysqlConn(), "logs");
+      td.setPrimaryKey("logs", false);
+      td.string("body");
+      expect(await toSql(td)).toBe("CREATE TABLE `logs` (`body` varchar(255))");
+    });
 
-  it("inlines CHECK constraints", async () => {
-    const td = new MyTd(mysqlConn(), "products");
-    td.integer("price");
-    td.checkConstraint("price > 0", { name: "price_positive" });
-    const sql = await toSql(td);
-    expect(sql).toContain("CONSTRAINT price_positive CHECK (price > 0)");
-  });
+    it("appends DEFAULT CHARSET and COLLATE from table options", async () => {
+      const td = new MyTd(mysqlConn(), "posts", {
+        charset: "utf8mb4",
+        collation: "utf8mb4_unicode_ci",
+      });
+      td.string("title");
+      const sql = await toSql(td);
+      expect(sql).toContain("DEFAULT CHARSET=utf8mb4");
+      expect(sql).toContain("COLLATE=utf8mb4_unicode_ci");
+    });
 
-  it("appends MySQL COMMENT on table option", async () => {
-    const td = new MyTd(mysqlConn(), "notes", { comment: "user-supplied" });
-    td.string("body");
-    expect(await toSql(td)).toContain("COMMENT 'user-supplied'");
-  });
+    it("emits IF NOT EXISTS and TEMPORARY modifiers", async () => {
+      const td = new MyTd(mysqlConn(), "tmp", { temporary: true, ifNotExists: true });
+      td.integer("n");
+      expect(await toSql(td)).toBe("CREATE TEMPORARY TABLE IF NOT EXISTS `tmp` (`n` int)");
+    });
 
-  it("emits AS clause after table options for CTAS", async () => {
-    const td = new MyTd(mysqlConn(), "snapshot", { as: "SELECT 1" });
-    expect(await toSql(td)).toMatch(/CREATE TABLE `snapshot`.* AS SELECT 1$/);
-  });
+    it("emits composite PRIMARY KEY clause", async () => {
+      const td = new MyTd(mysqlConn(), "memberships");
+      td.setPrimaryKey("memberships", "primary_key", ["user_id", "group_id"]);
+      td.bigint("user_id", { null: false });
+      td.bigint("group_id", { null: false });
+      const sql = await toSql(td);
+      expect(sql).toContain("PRIMARY KEY (`user_id`, `group_id`)");
+    });
 
-  it("skips FK emission when host adapter has foreignKeys disabled", async () => {
-    const host = mysqlConn({ supportsForeignKeys: () => true, _config: { foreignKeys: false } });
-    const td = new MyTd(host, "posts");
-    td.bigint("author_id");
-    td.foreignKey("authors", { column: "author_id" });
-    expect(await toSql(td, host)).not.toContain("FOREIGN KEY");
-  });
+    it("inlines indexes when supportsIndexesInCreate (MySQL)", async () => {
+      const td = new MyTd(mysqlConn(), "users");
+      td.string("email");
+      td.index(["email"], { unique: true, name: "idx_users_email" });
+      const sql = await toSql(td);
+      expect(sql).toContain("UNIQUE INDEX `idx_users_email` (`email`)");
+    });
 
-  it("skips CHECK emission when host adapter reports !supportsCheckConstraints", async () => {
-    const host = mysqlConn({ supportsCheckConstraints: () => false });
-    const td = new MyTd(host, "products");
-    td.integer("price");
-    td.checkConstraint("price > 0", { name: "p_pos" });
-    expect(await toSql(td, host)).not.toContain("CHECK");
-  });
-});
+    it("inlines FOREIGN KEY constraints", async () => {
+      const td = new MyTd(mysqlConn(), "posts");
+      td.bigint("author_id");
+      td.foreignKey("authors", { column: "author_id" });
+      const sql = await toSql(td);
+      expect(sql).toContain("CONSTRAINT ");
+      expect(sql).toContain("FOREIGN KEY (`author_id`) REFERENCES `authors` (`id`)");
+    });
 
-describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
+    it("inlines CHECK constraints", async () => {
+      const td = new MyTd(mysqlConn(), "products");
+      td.integer("price");
+      td.checkConstraint("price > 0", { name: "price_positive" });
+      const sql = await toSql(td);
+      expect(sql).toContain("CONSTRAINT price_positive CHECK (price > 0)");
+    });
+
+    it("appends MySQL COMMENT on table option", async () => {
+      const td = new MyTd(mysqlConn(), "notes", { comment: "user-supplied" });
+      td.string("body");
+      expect(await toSql(td)).toContain("COMMENT 'user-supplied'");
+    });
+
+    it("emits AS clause after table options for CTAS", async () => {
+      const td = new MyTd(mysqlConn(), "snapshot", { as: "SELECT 1" });
+      expect(await toSql(td)).toMatch(/CREATE TABLE `snapshot`.* AS SELECT 1$/);
+    });
+
+    it("skips FK emission when host adapter has foreignKeys disabled", async () => {
+      const host = mysqlConn({ supportsForeignKeys: () => true, _config: { foreignKeys: false } });
+      const td = new MyTd(host, "posts");
+      td.bigint("author_id");
+      td.foreignKey("authors", { column: "author_id" });
+      expect(await toSql(td, host)).not.toContain("FOREIGN KEY");
+    });
+
+    it("skips CHECK emission when host adapter reports !supportsCheckConstraints", async () => {
+      const host = mysqlConn({ supportsCheckConstraints: () => false });
+      const td = new MyTd(host, "products");
+      td.integer("price");
+      td.checkConstraint("price > 0", { name: "p_pos" });
+      expect(await toSql(td, host)).not.toContain("CHECK");
+    });
+  },
+);
+
+describe.runIf(currentAdapter("Mysql2Adapter"))("MySQL::TableDefinition column methods", () => {
   beforeAll(async () => {
     leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
   });
@@ -359,18 +362,21 @@ describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
   });
 });
 
-describeIfMysqlAdapter("MySQL::SchemaCreation inline index options (trails)", () => {
-  let sc: SchemaCreation;
+describe.runIf(currentAdapter("Mysql2Adapter"))(
+  "MySQL::SchemaCreation inline index options (trails)",
+  () => {
+    let sc: SchemaCreation;
 
-  beforeAll(async () => {
-    leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
-    sc = new SchemaCreation(mysqlConn());
-  });
+    beforeAll(async () => {
+      leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
+      sc = new SchemaCreation(mysqlConn());
+    });
 
-  it("routes an inline index's length option through addIndexOptions", async () => {
-    const td = new MyTd(mysqlConn(), "users");
-    td.string("email");
-    td.index(["email"], { length: 10 });
-    expect(await sc.accept(td)).toContain("INDEX `index_users_on_email` (`email`(10))");
-  });
-});
+    it("routes an inline index's length option through addIndexOptions", async () => {
+      const td = new MyTd(mysqlConn(), "users");
+      td.string("email");
+      td.index(["email"], { length: 10 });
+      expect(await sc.accept(td)).toContain("INDEX `index_users_on_email` (`email`(10))");
+    });
+  },
+);

@@ -1,6 +1,7 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../../../lib/index.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 
@@ -8,7 +9,7 @@ class BooleanType extends Base {
   static tableName = "mysql_booleans";
 }
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   fixtures({}, { useTransactionalTests: false });
   let adapter: Mysql2Adapter;
   let savedEmulateBooleans: boolean;

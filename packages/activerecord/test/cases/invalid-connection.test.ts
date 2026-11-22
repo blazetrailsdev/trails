@@ -1,9 +1,9 @@
-import { beforeEach, afterEach, it, expect } from "vitest";
+import { currentAdapter } from "../support/adapter-helper.js";
+import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { Base } from "../../lib/base.js";
-import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { fixtures } from "../support/use-fixtures.js";
 
-describeIfMysqlAdapter("TestAdapterWithInvalidConnection", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("TestAdapterWithInvalidConnection", () => {
   fixtures({}, { useTransactionalTests: false });
   class Bird extends Base {}
 

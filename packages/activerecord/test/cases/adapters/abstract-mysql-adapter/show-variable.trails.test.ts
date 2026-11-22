@@ -1,7 +1,8 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, beforeEach, expect } from "vitest";
-import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 
-describeIfMysqlAdapter("AbstractMysqlAdapter#showVariable", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("AbstractMysqlAdapter#showVariable", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();

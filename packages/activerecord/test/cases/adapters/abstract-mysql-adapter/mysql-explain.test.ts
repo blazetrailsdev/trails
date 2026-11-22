@@ -1,6 +1,7 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { describeIfMysqlAdapter, isMariaDb, Mysql2Adapter } from "./test-helper.js";
+import { isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../../../lib/connection-adapters/abstract-adapter.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
@@ -9,7 +10,7 @@ import { Post } from "../../../models/post.js";
 
 fixtures({}, { useTransactionalTests: false });
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   constSet(TopLevel, "Author", Author);
   constSet(TopLevel, "Post", Post);
 

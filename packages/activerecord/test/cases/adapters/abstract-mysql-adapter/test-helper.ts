@@ -3,7 +3,6 @@ import { arunitDatabaseNames } from "../../../support/arunit2-config.js";
 import { mysqlSettings } from "../../../support/config.js";
 import { Base } from "../../../../lib/base.js";
 
-export { describeIfMysqlAdapter } from "../../../support/describe-if-mysql-adapter.js";
 export {
   MYSQL_TEST_URL,
   isMariaDb,

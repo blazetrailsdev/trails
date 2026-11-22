@@ -1,9 +1,10 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, beforeEach, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
-import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 
-describeIfMysqlAdapter("AbstractMysqlAdapter advisory locks", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("AbstractMysqlAdapter advisory locks", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();

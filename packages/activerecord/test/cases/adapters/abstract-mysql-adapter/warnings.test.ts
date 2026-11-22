@@ -1,12 +1,13 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SQLWarning } from "../../../../lib/errors.js";
 import { Base } from "../../../../lib/base.js";
 import type { Mysql2Result } from "@blazetrails/mysql2";
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   const { self } = fixtures([]);
 
   beforeEach(() => {

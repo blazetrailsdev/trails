@@ -1,11 +1,12 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { SchemaMigration } from "../../../../lib/schema-migration.js";
 import { InternalMetadata } from "../../../../lib/internal-metadata.js";
-import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import type { Mysql2Result } from "@blazetrails/mysql2";
 
-describeIfMysqlAdapter("Mysql2Adapter", () => {
+describe.runIf(currentAdapter("Mysql2Adapter"))("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();

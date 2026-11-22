@@ -17,10 +17,7 @@ describe("gates.ts pure helpers", () => {
       adapters: ["postgresql"],
       source: ["wrapper"],
     });
-    expect(gateFromWrapper("describeIfMysqlAdapter")).toEqual({
-      adapters: ["mysql"],
-      source: ["wrapper"],
-    });
+    expect(() => gateFromWrapper("describeIfMysqlAdapter")).toThrow(/unregistered gate wrapper/);
     expect(() => gateFromWrapper("describeIfSqlite")).toThrow(/unregistered gate wrapper/);
     expect(gateFromWrapper("describe")).toBeNull();
   });
@@ -395,11 +392,11 @@ describe("TS extractor gate detection", () => {
   it("threads describeIfPg/Mysql/Sqlite onto contained tests", () => {
     const g = tsGates(`
       describeIfPg("PgSuite", () => { it("a", () => {}); });
-      describeIfMysqlAdapter("MysqlSuite", () => { it("b", () => {}); });
+      describe.runIf(currentAdapter("Mysql2Adapter"))("MysqlSuite", () => { it("b", () => {}); });
       describe("Plain", () => { it("c", () => {}); });
     `);
     expect(g["a"]).toEqual({ adapters: ["postgresql"], source: ["wrapper"] });
-    expect(g["b"]).toEqual({ adapters: ["mysql"], source: ["wrapper"] });
+    expect(g["b"]).toEqual({ adapters: ["mysql"], source: ["test"] });
     expect(g["c"]).toBeUndefined();
   });
 
@@ -422,23 +419,23 @@ describe("TS extractor gate detection", () => {
   });
 
   it("composes an adapter wrapper's .skipIf form with the inline guard", () => {
-    // describeIfMysqlAdapter restricts to mysql; skipIf(postgres) → runs on !postgres;
-    // intersection = mysql.
+    // describeIfPg restricts to postgresql; skipIf(mysql) → runs on !mysql;
+    // intersection = postgresql.
     const g = tsGates(`
-      describeIfMysqlAdapter.skipIf(adapterType === "postgres")("S", () => { it("j", () => {}); });
+      describeIfPg.skipIf(adapterType === "mysql")("S", () => { it("j", () => {}); });
     `);
-    // wrapper gate (mysql) ∩ inline guard → source unions both origins.
-    expect(g["j"]).toEqual({ adapters: ["mysql"], source: ["test", "wrapper"] });
+    // wrapper gate (postgresql) ∩ inline guard → source unions both origins.
+    expect(g["j"]).toEqual({ adapters: ["postgresql"], source: ["test", "wrapper"] });
   });
 
   it("preserves an empty adapter set for contradictory nested wrappers", () => {
     const g = tsGates(`
       describeIfPg("outer", () => {
-        describeIfMysqlAdapter("inner", () => { it("never", () => {}); });
+        describe.runIf(currentAdapter("Mysql2Adapter"))("inner", () => { it("never", () => {}); });
       });
     `);
     // pg ∩ mysql = [] → "runs nowhere", kept distinct from an absent key.
-    expect(g["never"]).toEqual({ adapters: [], source: ["wrapper"] });
+    expect(g["never"]).toEqual({ adapters: [], source: ["test", "wrapper"] });
   });
 
   it("handles describeIfSupports.skipIf without losing the suite title/gate", () => {
@@ -537,7 +534,7 @@ describe("gate stack across a same-file shared-cases helper", () => {
         describeIfPg("A", () => {
           sharedCases();
         });
-        describeIfMysqlAdapter("B", () => {
+        describe.runIf(currentAdapter("Mysql2Adapter"))("B", () => {
           sharedCases();
         });
       `),
