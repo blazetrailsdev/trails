@@ -26,4 +26,11 @@ describe("Encodings.eachChunkByterange", () => {
     Encodings.eachChunkByterange(str, 1, (chunk) => chunks.push(Array.from(chunk as never)));
     expect(chunks).toEqual([[0xe3], [0x81], [0x41]]);
   });
+
+  it("keeps an encoded U+FFFD whole", () => {
+    const str = forceEncoding(Uint8Array.of(0x84, 0x31, 0xa4, 0x37), "GB18030");
+    const chunks: unknown[] = [];
+    Encodings.eachChunkByterange(str, 4, (chunk) => chunks.push(Array.from(chunk as never)));
+    expect(chunks).toEqual([[0x84, 0x31, 0xa4, 0x37]]);
+  });
 });
