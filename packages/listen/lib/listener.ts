@@ -273,7 +273,7 @@ export class Listener {
     return this._calculateAddRemoveDifference(actions, path, modified);
   }
 
-  /** @inventedArm exist — PERMANENT */
+  /** @internal */
   _calculateAddRemoveDifference(
     actions: Action[],
     _path: string,
