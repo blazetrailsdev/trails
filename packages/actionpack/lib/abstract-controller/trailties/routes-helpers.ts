@@ -105,7 +105,7 @@ Object.defineProperty(RoutesHelpers, "with", {
         const source = typeof m === "function" ? (m as ClassModule).prototype : m;
         if (source === null || typeof source !== "object") continue;
         for (const member of Object.values(Object.getOwnPropertyDescriptors(source))) {
-          if (member.value !== undefined) includedMembers.add(member.value);
+          if (typeof member.value === "function") includedMembers.add(member.value);
           if (member.get !== undefined) includedMembers.add(member.get);
         }
       }
