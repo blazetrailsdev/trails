@@ -221,4 +221,32 @@ describe("TestDatabase", () => {
     const result = await db.transaction(null, () => "foo");
     expect(result).toBe("foo");
   });
+
+  it("new yields self", () => {
+    let thing: unknown = null;
+    new SQLite3.Database(":memory:", { engine }, null, (db) => {
+      thing = db;
+    });
+    expect(thing).toBeInstanceOf(SQLite3.Database);
+  });
+
+  it("block closes self", () => {
+    let thing: InstanceType<typeof SQLite3.Database> | null = null;
+    new SQLite3.Database(":memory:", { engine }, null, (db) => {
+      thing = db;
+      expect(thing.isClosed()).toBeFalsy();
+    });
+    expect(thing!.isClosed()).toBeTruthy();
+  });
+
+  it("block closes self even raised", () => {
+    let thing: InstanceType<typeof SQLite3.Database> | null = null;
+    try {
+      new SQLite3.Database(":memory:", { engine }, null, (db) => {
+        thing = db;
+        throw new Error();
+      });
+    } catch {}
+    expect(thing!.isClosed()).toBeTruthy();
+  });
 });

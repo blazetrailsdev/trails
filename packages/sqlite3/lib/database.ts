@@ -1,4 +1,5 @@
 import {
+  ArgumentError,
   Encoding,
   RuntimeError,
   TypeError,
@@ -39,6 +40,8 @@ export interface EngineDatabase extends EngineErrors {
 export type EngineOpenV2 = ((file: string, mode: number, zvfs: string | null) => EngineDatabase) &
   Partial<EngineErrors>;
 
+export type SyncCloseEngineDatabase = Omit<EngineDatabase, "close"> & { close(): void };
+
 export interface DatabaseOptions {
   readonly?: boolean;
   readwrite?: boolean;
@@ -69,7 +72,21 @@ export class Database {
   #defaultTransactionMode: string;
   #timeoutDeadline = 0;
 
-  constructor(file: string, options: DatabaseOptions, zvfs: string | null = null) {
+  constructor(file: string, options: DatabaseOptions, zvfs?: string | null);
+  constructor(
+    file: string,
+    options: DatabaseOptions & {
+      engine: (...args: Parameters<EngineOpenV2>) => SyncCloseEngineDatabase;
+    },
+    zvfs: string | null,
+    block: (db: Database) => unknown,
+  );
+  constructor(
+    file: string,
+    options: DatabaseOptions,
+    zvfs: string | null = null,
+    block?: (db: Database) => unknown,
+  ) {
     let mode = Constants.Open.READWRITE | Constants.Open.CREATE;
 
     if (options.readonly) mode = Constants.Open.READONLY;
@@ -100,6 +117,18 @@ export class Database {
     this.initializeExtensions(options.extensions ?? null);
 
     ForkSafety.track(this);
+
+    if (block) {
+      let result: unknown;
+      try {
+        result = block(this);
+      } finally {
+        (this._engine as SyncCloseEngineDatabase).close();
+      }
+      if (result instanceof Promise) {
+        throw new ArgumentError("Database.new with a block runs synchronously");
+      }
+    }
   }
 
   async encoding(): Promise<Encoding | null> {

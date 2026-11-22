@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { ArgumentError, RuntimeError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../lib/index.js";
 import { engineDatabase } from "./support/engine-database.js";
 
@@ -119,5 +119,21 @@ describe("SQLite3::Database over a fake engine", () => {
       () => new SQLite3.Database(":memory:", { engine: () => raw, extensions: ["/nope"] }),
     ).toThrow(SQLite3.Exception);
     expect(raw.loadExtensionToggles).toEqual([true, false]);
+  });
+
+  it("new raises on a block that returns a promise, after closing", async () => {
+    let thing: InstanceType<typeof SQLite3.Database> | null = null;
+    const pending: Promise<void>[] = [];
+    expect(
+      () =>
+        new SQLite3.Database(":memory:", { engine: () => engineDatabase() }, null, (db) => {
+          thing = db;
+          const p = Promise.resolve();
+          pending.push(p);
+          return p;
+        }),
+    ).toThrow(ArgumentError);
+    await Promise.all(pending);
+    expect(thing!.isClosed()).toBeTruthy();
   });
 });
