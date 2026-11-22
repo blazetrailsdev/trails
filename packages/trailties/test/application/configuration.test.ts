@@ -7,6 +7,7 @@ import {
   expect,
   it,
   onTestFinished,
+  vi,
 } from "vitest";
 import { constSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { ActionDispatch, Session } from "@blazetrails/actionpack";
@@ -48,6 +49,27 @@ import {
   RuntimeError,
   setEnv,
 } from "@blazetrails/ruby-compat";
+import * as ActiveRecord from "@blazetrails/activerecord";
+import { Dependencies } from "@blazetrails/activesupport";
+import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
+import { File, LOAD_PATH, OpenSSL, StandardError } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
+import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
+import { Digest } from "@blazetrails/activesupport/digest";
+import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
+import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
+import { ActiveJob, Serializers } from "@blazetrails/activejob";
+import { Trailtie as ActiveJobTrailtie } from "../../lib/trailties/active-job.js";
+import { Configuration as TrailtieConfiguration } from "../../lib/trailtie/configuration.js";
+import { DatabaseTasks } from "@blazetrails/activerecord";
+import { Annotation } from "../../lib/source-annotation-extractor.js";
+import { Trailtie as ActionMailerTrailtie } from "../../lib/trailties/action-mailer.js";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { ActionController } from "@blazetrails/actionpack";
+import { include } from "@blazetrails/ruby-compat";
+import type { Generation } from "../support/isolation/abstract-unit.js";
+import "../support/isolation/abstract-unit.js";
 import * as FormTagHelper from "@blazetrails/actionview/helpers/form-tag-helper";
 import * as UrlHelper from "@blazetrails/actionview/helpers/url-helper";
 import * as AssetTagHelper from "@blazetrails/actionview/helpers/asset-tag-helper";
@@ -63,9 +85,7 @@ import {
   setUtcToLocalReturnsUtcOffsetTimes,
   utcToLocalReturnsUtcOffsetTimes,
 } from "@blazetrails/activesupport";
-import { Trailtie as ActionMailerTrailtie } from "../../lib/trailties/action-mailer.js";
 import { Trailtie as ActiveRecordTrailtie } from "../../lib/trailties/active-record.js";
-import { Trailtie as ActiveJobTrailtie } from "../../lib/trailties/active-job.js";
 import { Trailtie as ActionDispatchTrailtie } from "../../lib/trailties/action-dispatch.js";
 import * as Rack from "@blazetrails/rack";
 import { Application } from "../../lib/application.js";
@@ -75,6 +95,15 @@ import { EnvHelpers } from "../support/env-helpers.js";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 
 const envHelpers = new EnvHelpers();
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface ConfigurationTest extends Generation {
+  get(path: string): Promise<unknown>;
+  lastResponse(): { body: string };
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class ConfigurationTest extends TestCase {}
+include(ConfigurationTest, Isolation);
 
 let appPath: string;
 
@@ -122,7 +151,31 @@ describe("ConfigurationTest", () => {
     Trails.application = trailsApplication;
   });
 
+  let trailtieOptions: [Record<string, unknown>, Record<string, unknown>][];
+  const frameworkDefaults = [
+    [ActiveRecord.Base, "hasManyInversing"],
+    [ActiveRecord.Base, "automaticScopeInversing"],
+    [ActiveRecord.Base, "runCommitCallbacksOnFirstSavedInstancesInTransaction"],
+    [MessageEncryptor, "useAuthenticatedMessageEncryption"],
+    [Digest, "_hashDigestClass"],
+    [KeyGenerator, "_hashDigestClass"],
+    [ActiveSupport, "testParallelizationThreshold"],
+    [ActiveJob.Base, "enqueueAfterTransactionCommit"],
+    [SQLite3Adapter, "strictStringsByDefault"],
+  ].map(([owner, key]) => [owner, key, (owner as Record<string, unknown>)[key as string]]) as [
+    Record<string, unknown>,
+    string,
+    unknown,
+  ][];
+  const verifyForeignKeysForFixtures = ActiveRecord.verifyForeignKeysForFixtures();
+
   beforeEach(async () => {
+    trailtieOptions = Object.values(TrailtieConfiguration._options)
+      .filter(
+        (options): options is Record<string, unknown> =>
+          typeof options === "object" && options !== null && !(options instanceof OrderedOptions),
+      )
+      .map((options) => [options, { ...options }]);
     appPath = await mkdtemp(join(tmpdir(), "trails-config-for-"));
     await mkdir(join(appPath, "config"));
     await writeFile(join(appPath, "config", "storage.ts"), "export default {};\n");
@@ -130,10 +183,18 @@ describe("ConfigurationTest", () => {
   });
 
   afterEach(async () => {
+    for (const [owner, key, value] of frameworkDefaults) owner[key] = value;
+    ActiveRecord.setVerifyForeignKeysForFixtures(verifyForeignKeysForFixtures);
+    ActiveJobTrailtie.config.activeJob.delete("enqueueAfterTransactionCommit");
+    for (const [options, snapshot] of trailtieOptions) {
+      for (const key of Object.keys(options)) if (!(key in snapshot)) delete options[key];
+      Object.assign(options, snapshot);
+    }
     Resolver.caching = true;
     SanitizeHelper.sanitizerVendor = sanitizerVendor;
     Application.appClass = null;
     delete ActionViewTrailtie.config.actionView.cacheTemplateLoading;
+    ActionMailerTrailtie.config.actionMailer.showPreviews = null;
     Object.assign(ActionMailboxEngine.config.actionMailbox, actionMailbox);
     ActionMailboxEngine.config.actionMailbox.queues!.set(
       "incineration",
@@ -842,6 +903,809 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
 
     await assertRaises([ArgumentError], {}, () => application.initializeBang());
   });
+
+  it("config.active_record.verbose_query_logs is false by default in development", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveRecord.verboseQueryLogs()).toBeFalsy();
+  });
+
+  it("config.active_record.use_yaml_unsafe_load is false by default", async () => {
+    const application = await app("production");
+    application.config.secretKeyBase = "secret";
+    await application.initializeBang();
+    expect(ActiveRecord.useYamlUnsafeLoad()).toBeFalsy();
+  });
+
+  it("config.active_record.use_yaml_unsafe_load can be configured", async () => {
+    const application = await app("production");
+    application.config.secretKeyBase = "secret";
+    application.config.activeRecord.useYamlUnsafeLoad = true;
+    await application.initializeBang();
+    expect(ActiveRecord.useYamlUnsafeLoad()).toBeTruthy();
+  });
+
+  it("config.active_record.raise_int_wider_than_64bit is true by default", async () => {
+    const application = await app("production");
+    application.config.secretKeyBase = "secret";
+    await application.initializeBang();
+    expect(ActiveRecord.raiseIntWiderThan64bit()).toBeTruthy();
+  });
+
+  it("config.active_record.raise_int_wider_than_64bit can be configured", async () => {
+    const application = await app("production");
+    application.config.secretKeyBase = "secret";
+    application.config.activeRecord.raiseIntWiderThan64bit = false;
+    await application.initializeBang();
+    expect(ActiveRecord.raiseIntWiderThan64bit()).toBeFalsy();
+  });
+
+  it("config.active_record.yaml_column_permitted_classes is [Symbol] by default", async () => {
+    const application = await app("production");
+    application.config.secretKeyBase = "secret";
+    await application.initializeBang();
+    expect(ActiveRecord.yamlColumnPermittedClasses()).toEqual([Symbol]);
+  });
+
+  it("config.active_record.yaml_column_permitted_classes can be configured", async () => {
+    const application = await app("production");
+    application.config.secretKeyBase = "secret";
+    application.config.activeRecord.yamlColumnPermittedClasses = [Symbol, Time];
+    await application.initializeBang();
+    expect(ActiveRecord.yamlColumnPermittedClasses()).toEqual([Symbol, Time]);
+  });
+
+  it("config.default_log_file returns a File instance", async () => {
+    const application = await app("development");
+
+    const defaultLogFile = await application.config.defaultLogFile();
+    expect(defaultLogFile).toBeInstanceOf(File);
+    expect(defaultLogFile.path()).toBe(Trails.application!.config.paths().get("log")!.first());
+  });
+
+  it("config.log_file_size returns a 100MB size number in development", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+
+    expect(application.config.logFileSize).toBe(Numeric.megabytes(100));
+  });
+
+  it("config.log_file_size returns a 100MB size number in test", async () => {
+    const application = await app("test");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+
+    expect(application.config.logFileSize).toBe(Numeric.megabytes(100));
+  });
+
+  it("config.log_file_size returns no limit in production", async () => {
+    const application = await app("production");
+
+    assertNil(application.config.logFileSize);
+  });
+
+  it("rake_tasks block works at instance level", async () => {
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.configure(function () {
+  this.config.ranBlock = false;
+
+  this.rakeTasks(() => {
+    this.config.ranBlock = true;
+  });
+});
+`,
+    );
+
+    await (await app("development")).initializeBang();
+    const config = Trails.configuration as unknown as { ranBlock: boolean };
+    expect(config.ranBlock).toBeFalsy();
+
+    await Trails.application!.loadTasks();
+    expect(config.ranBlock).toBeTruthy();
+  });
+
+  it("generators block works at instance level", async () => {
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.configure(function () {
+  this.config.ranBlock = false;
+
+  this.generators(() => {
+    this.config.ranBlock = true;
+  });
+});
+`,
+    );
+
+    await (await app("development")).initializeBang();
+    const config = Trails.configuration as unknown as { ranBlock: boolean };
+    expect(config.ranBlock).toBeFalsy();
+
+    await Trails.application!.loadGenerators();
+    expect(config.ranBlock).toBeTruthy();
+  });
+
+  it("console block works at instance level", async () => {
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.configure(function () {
+  this.config.ranBlock = false;
+
+  this.console(() => {
+    this.config.ranBlock = true;
+  });
+});
+`,
+    );
+
+    await (await app("development")).initializeBang();
+    const config = Trails.configuration as unknown as { ranBlock: boolean };
+    expect(config.ranBlock).toBeFalsy();
+
+    await Trails.application!.loadConsole();
+    expect(config.ranBlock).toBeTruthy();
+  });
+
+  it("runner block works at instance level", async () => {
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.configure(function () {
+  this.config.ranBlock = false;
+
+  this.runner(() => {
+    this.config.ranBlock = true;
+  });
+});
+`,
+    );
+
+    await (await app("development")).initializeBang();
+    const config = Trails.configuration as unknown as { ranBlock: boolean };
+    expect(config.ranBlock).toBeFalsy();
+
+    await Trails.application!.loadRunner();
+    expect(config.ranBlock).toBeTruthy();
+  });
+
+  it("loading the first existing database configuration available", async () => {
+    await writeFile(join(appPath, "config", "database.ts"), "export default {};\n");
+    const application = await app("development");
+    application.config.paths().add("config/database", { with: "config/nonexistent.ts" });
+    application.config.paths().get("config/database")!.push("config/database.ts");
+
+    expect(await Trails.application!.config.databaseConfiguration()).toBeInstanceOf(Object);
+  });
+
+  it("autoload paths do not include asset paths", async () => {
+    await (await app("development")).initializeBang();
+    for (const path of Dependencies.autoloadPaths) {
+      expect(path.endsWith("app/assets")).toBeFalsy();
+      expect(path.endsWith("app/javascript")).toBeFalsy();
+    }
+  });
+
+  it("load_database_yaml returns blank hash if configuration file is blank", async () => {
+    await writeFile(join(appPath, "config", "database.ts"), "");
+    await app("development");
+    expect(await Trails.application!.config.loadDatabaseYaml()).toEqual({});
+  });
+
+  it("load_database_yaml returns blank hash if no database configuration is found", async () => {
+    await app("development");
+    expect(await Trails.application!.config.loadDatabaseYaml()).toEqual({});
+  });
+
+  it("raises with proper error message if no database configuration found", async () => {
+    const err = await envHelpers.switchEnv("DATABASE_URL", undefined, () =>
+      assertRaises([RuntimeError], {}, async () => {
+        await app("development");
+        await Trails.application!.config.databaseConfiguration();
+      }),
+    );
+    expect(err.message).toMatch("config/database");
+  });
+
+  it("loads database.yml using shared keys", async () => {
+    await writeFile(
+      join(appPath, "config", "database.ts"),
+      `export default { shared: { username: "bobby", adapter: "sqlite3" }, development: { database: "dev_db" } };`,
+    );
+
+    await app("development");
+
+    const arConfig = (await Trails.application!.config.databaseConfiguration()) as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(arConfig["development"]["adapter"]).toBe("sqlite3");
+    expect(arConfig["development"]["username"]).toBe("bobby");
+    expect(arConfig["development"]["database"]).toBe("dev_db");
+  });
+
+  it("loads database.yml using shared keys for undefined environments", async () => {
+    await writeFile(
+      join(appPath, "config", "database.ts"),
+      `export default { shared: { username: "bobby", adapter: "sqlite3", database: "dev_db" } };`,
+    );
+
+    await app("development");
+
+    const arConfig = (await Trails.application!.config.databaseConfiguration()) as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(arConfig["development"]["adapter"]).toBe("sqlite3");
+    expect(arConfig["development"]["username"]).toBe("bobby");
+    expect(arConfig["development"]["database"]).toBe("dev_db");
+  });
+
+  it("loads database.yml using shared keys with a 3-tier config", async () => {
+    await writeFile(
+      join(appPath, "config", "database.ts"),
+      `export default { shared: { username: "bobby", adapter: "sqlite3" }, development: { primary: { database: "dev_db" } } };`,
+    );
+
+    await app("development");
+
+    const arConfig = (await Trails.application!.config.databaseConfiguration()) as Record<
+      string,
+      Record<string, Record<string, unknown>>
+    >;
+    expect(arConfig["development"]["primary"]["adapter"]).toBe("sqlite3");
+    expect(arConfig["development"]["primary"]["username"]).toBe("bobby");
+    expect(arConfig["development"]["primary"]["database"]).toBe("dev_db");
+  });
+
+  it("loads database.yml using 3-tier shared keys with a 3-tier config", async () => {
+    await writeFile(
+      join(appPath, "config", "database.ts"),
+      `export default { shared: { one: { migrations_path: "db/one" }, two: { migrations_path: "db/two" } }, development: { one: { adapter: "sqlite3" }, two: { adapter: "sqlite3" } } };`,
+    );
+
+    await app("development");
+
+    const arConfig = (await Trails.configuration!.databaseConfiguration()) as Record<
+      string,
+      Record<string, Record<string, unknown>>
+    >;
+    expect(arConfig["development"]["one"]["migrations_path"]).toBe("db/one");
+    expect(arConfig["development"]["two"]["migrations_path"]).toBe("db/two");
+  });
+
+  it("config.action_mailer.show_previews defaults to true in development", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(Trails.application!.config.actionMailer.showPreviews).toBeTruthy();
+  });
+
+  it("config.action_mailer.show_previews defaults to false in production", async () => {
+    const application = await app("production");
+    application.config.secretKeyBase = "secret";
+    await application.initializeBang();
+
+    expect(Trails.application!.config.actionMailer.showPreviews).toBe(false);
+  });
+
+  it("config.action_mailer.show_previews can be set in the configuration file", async () => {
+    const application = await app("production");
+    application.config.secretKeyBase = "secret";
+    application.config.actionMailer.showPreviews = true;
+    await application.initializeBang();
+
+    expect(Trails.application!.config.actionMailer.showPreviews).toBe(true);
+  });
+
+  it("config.annotations wrapping SourceAnnotationExtractor::Annotation class", async () => {
+    const application = await app("development");
+    application.config
+      .annotations()
+      .registerExtensions("coffee", (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`));
+    await application.initializeBang();
+
+    assertNotNil(Annotation.extensions.get("\\.(coffee)$"));
+  });
+
+  it("autoload paths do not include custom config.javascript_paths", async () => {
+    const application = await app("development");
+    application.config.javascriptPath = "webpack";
+    await mkdir(join(appPath, "app", "webpack"), { recursive: true });
+    await application.initializeBang();
+
+    for (const path of Dependencies.autoloadPaths) {
+      expect(path.endsWith("app/assets")).toBeFalsy();
+      expect(path.endsWith("app/webpack")).toBeFalsy();
+    }
+  });
+
+  it("autoload paths are not added to $LOAD_PATH if opted-in", async () => {
+    await mkdir(join(appPath, "lib"), { recursive: true });
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    application.config.addAutoloadPathsToLoadPath = true;
+    await application.initializeBang();
+
+    const autoloadPaths = Dependencies.autoloadPaths;
+    const autoloadPathsFromAppAndEngines = autoloadPaths.filter(
+      (path) => !path.endsWith("mailers/previews"),
+    );
+    expect(Trails.configuration!.addAutoloadPathsToLoadPath).toBe(true);
+    expect(autoloadPathsFromAppAndEngines.filter((p) => !LOAD_PATH.includes(p))).toBeEmpty();
+
+    expect(Trails.configuration!.paths().loadPaths()).not.toBeEmpty();
+    expect(
+      Trails.configuration!.paths()
+        .loadPaths()
+        .filter((p) => !LOAD_PATH.includes(p)),
+    ).toBeEmpty();
+  });
+
+  it("autoload paths are not added to $LOAD_PATH by default, except for lib", async () => {
+    await mkdir(join(appPath, "lib"), { recursive: true });
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    application.config.autoloadLib({ ignore: ["assets", "tasks"] });
+    await application.initializeBang();
+    onTestFinished(() => application.autoloaders.main.unload());
+
+    expect(Dependencies.autoloadPaths.filter((p) => LOAD_PATH.includes(p))).toEqual([
+      `${appPath}/lib`,
+    ]);
+
+    expect(Trails.configuration!.paths().loadPaths()).not.toBeEmpty();
+    expect(
+      Trails.configuration!.paths()
+        .loadPaths()
+        .filter((p) => !LOAD_PATH.includes(p)),
+    ).toBeEmpty();
+  });
+
+  it("lib is added to $LOAD_PATH regardless of config.add_autoload_paths_to_load_path", async () => {
+    await mkdir(join(appPath, "lib"), { recursive: true });
+    const lib = File.join(appPath, "lib");
+
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    application.config.autoloadPaths.push(lib);
+    await application.initializeBang();
+
+    expect(Trails.configuration!.addAutoloadPathsToLoadPath).toBeFalsy();
+    expect(LOAD_PATH).toContain(lib);
+  });
+
+  it("config.autoload_lib(...) is generated by default", async () => {
+    await mkdir(join(appPath, "lib", "m"), { recursive: true });
+    await mkdir(join(appPath, "lib", "assets"), { recursive: true });
+    await mkdir(join(appPath, "lib", "tasks"), { recursive: true });
+    await writeFile(join(appPath, "lib", "x.ts"), "export const X = true;\n");
+    await writeFile(join(appPath, "lib", "m", "x.ts"), "export const X = true;\n");
+    await writeFile(join(appPath, "lib", "assets", "x.ts"), "export const X = true;\n");
+    await writeFile(join(appPath, "lib", "tasks", "x.ts"), "export const X = true;\n");
+
+    const application = await app("development");
+    application.config.autoloadLib({ ignore: ["assets", "tasks"] });
+    await application.initializeBang();
+    onTestFinished(() => application.autoloaders.main.unload());
+
+    expect(Trails.application!.config.autoloadPaths).toContain(`${appPath}/lib`);
+    expect(Trails.application!.config.eagerLoadPaths).toContain(`${appPath}/lib`);
+
+    expect(constGet(TopLevel, "X")).toBeTruthy();
+    expect(constGet(TopLevel, "M::X")).toBeTruthy();
+    expect(() => constGet(TopLevel, "Assets")).toThrow(NameError);
+    expect(() => constGet(TopLevel, "Tasks")).toThrow(NameError);
+  });
+
+  it("autoload paths can be set in the config file of the environment", async () => {
+    await mkdir(join(appPath, "custom_autoload_path"));
+    await mkdir(join(appPath, "custom_autoload_once_path"));
+    await mkdir(join(appPath, "custom_eager_load_path"));
+
+    const application = await app("development");
+    application.config.autoloadPaths.push(`${appPath}/custom_autoload_path`);
+    application.config.autoloadOncePaths.push(`${appPath}/custom_autoload_once_path`);
+    application.config.eagerLoadPaths.push(`${appPath}/custom_eager_load_path`);
+    await application.initializeBang();
+
+    const config = Trails.application!.config;
+    expect(config.autoloadPaths).toContain(`${appPath}/custom_autoload_path`);
+    expect(config.autoloadOncePaths).toContain(`${appPath}/custom_autoload_once_path`);
+    expect(config.eagerLoadPaths).toContain(`${appPath}/custom_eager_load_path`);
+  });
+
+  it("setup_initial_database_yaml does not print a warning", async () => {
+    await writeFile(
+      join(appPath, "config", "database.ts"),
+      `import { Trails } from "@blazetrails/trailties";\nexport default { [Trails.env.toString()]: { username: "bobby", adapter: "sqlite3", database: "dev_db" } };\n`,
+    );
+    await app("development");
+
+    const warn = vi.spyOn(console, "warn");
+    const log = vi.spyOn(console, "log");
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+    });
+    await DatabaseTasks.setupInitialDatabaseYaml();
+    expect([...warn.mock.calls, ...log.mock.calls]).toEqual([]);
+  });
+
+  it("api_only is false by default", async () => {
+    await (await app("development")).initializeBang();
+    expect(Trails.application!.config.apiOnly).toBeFalsy();
+  });
+
+  it("api_only generator config is set when api_only is set", async () => {
+    const application = await app("development");
+    application.config.apiOnly = true;
+    await application.initializeBang();
+
+    await Trails.application!.loadGenerators();
+    expect(Trails.configuration!.apiOnly).toBeTruthy();
+  });
+
+  it("debug_exception_response_format is :api by default if api_only is enabled", async () => {
+    const application = await app("development");
+    application.config.apiOnly = true;
+    await application.initializeBang();
+
+    expect(Trails.configuration!.debugExceptionResponseFormat).toBe("api");
+  });
+
+  it("debug_exception_response_format can be overridden", async () => {
+    await mkdir(join(appPath, "config", "environments"));
+    await writeFile(
+      join(appPath, "config", "environments", "development.ts"),
+      `import { Trails } from "@blazetrails/trailties";\nTrails.application!.configure(function () {\n  this.config.debugExceptionResponseFormat = "default";\n});\n`,
+    );
+
+    const application = await app("development");
+    application.config.apiOnly = true;
+    await application.initializeBang();
+
+    expect(Trails.configuration!.debugExceptionResponseFormat).toBe("default");
+  });
+
+  it("debug_exception_log_level is :fatal by default for upgraded apps", async () => {
+    const t = new ConfigurationTest("test");
+    await t.makeBasicApp();
+
+    class OmgController extends ActionController.Base {
+      async index(): Promise<void> {
+        await this.render({
+          plain: String(this.request.env["action_dispatch.debug_exception_log_level"]),
+        });
+      }
+    }
+    constSet(TopLevel, "OmgController", OmgController);
+    onTestFinished(() => {
+      rbModRemoveConst(TopLevel, "OmgController");
+    });
+
+    await t.get("/");
+
+    expect(t.lastResponse().body).toBe("4");
+  });
+
+  it("debug_exception_log_level is :error for new apps", async () => {
+    const t = new ConfigurationTest("test");
+    await t.makeBasicApp((app) => {
+      app.config.loadDefaults("7.1");
+    });
+
+    class OmgController extends ActionController.Base {
+      async index(): Promise<void> {
+        await this.render({
+          plain: String(this.request.env["action_dispatch.debug_exception_log_level"]),
+        });
+      }
+    }
+    constSet(TopLevel, "OmgController", OmgController);
+    onTestFinished(() => {
+      rbModRemoveConst(TopLevel, "OmgController");
+    });
+
+    await t.get("/");
+
+    expect(t.lastResponse().body).toBe("3");
+  });
+
+  it("ActiveRecord::Base.has_many_inversing is true by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(ActiveRecord.Base.hasManyInversing).toBe(true);
+  });
+
+  it("ActiveRecord::Base.has_many_inversing is false by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveRecord.Base.hasManyInversing).toBe(false);
+  });
+
+  it("ActiveRecord::Base.has_many_inversing can be configured via config.active_record.has_many_inversing", async () => {
+    const application = await app("development");
+    application.config.activeRecord.hasManyInversing = true;
+    await application.initializeBang();
+
+    expect(ActiveRecord.Base.hasManyInversing).toBe(true);
+  });
+
+  it("ActiveRecord::Base.automatic_scope_inversing is true by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(ActiveRecord.Base.automaticScopeInversing).toBe(true);
+  });
+
+  it("ActiveRecord::Base.automatic_scope_inversing is false by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveRecord.Base.automaticScopeInversing).toBe(false);
+  });
+
+  it("ActiveRecord::Base.automatic_scope_inversing can be configured via config.active_record.automatic_scope_inversing", async () => {
+    const application = await app("development");
+    application.config.activeRecord.automaticScopeInversing = true;
+    await application.initializeBang();
+
+    expect(ActiveRecord.Base.automaticScopeInversing).toBe(true);
+  });
+
+  it("ActiveRecord.verify_foreign_keys_for_fixtures is true by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(ActiveRecord.verifyForeignKeysForFixtures()).toBe(true);
+  });
+
+  it("ActiveRecord.verify_foreign_keys_for_fixtures is false by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveRecord.verifyForeignKeysForFixtures()).toBe(false);
+  });
+
+  it("ActiveRecord.verify_foreign_keys_for_fixtures can be configured via config.active_record.verify_foreign_keys_for_fixtures", async () => {
+    const application = await app("development");
+    application.config.activeRecord.verifyForeignKeysForFixtures = true;
+    await application.initializeBang();
+
+    expect(ActiveRecord.verifyForeignKeysForFixtures()).toBe(true);
+  });
+
+  it("ActiveRecord::Base.run_commit_callbacks_on_first_saved_instances_in_transaction is false by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(ActiveRecord.Base.runCommitCallbacksOnFirstSavedInstancesInTransaction).toBe(false);
+  });
+
+  it("ActiveRecord::Base.run_commit_callbacks_on_first_saved_instances_in_transaction is true by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActiveRecord.Base.runCommitCallbacksOnFirstSavedInstancesInTransaction).toBe(true);
+  });
+
+  it("ActiveRecord::Base.run_commit_callbacks_on_first_saved_instances_in_transaction can be configured via config.active_record.run_commit_callbacks_on_first_saved_instances_in_transaction", async () => {
+    const application = await app("development");
+    application.config.activeRecord.runCommitCallbacksOnFirstSavedInstancesInTransaction = false;
+    await application.initializeBang();
+
+    expect(ActiveRecord.Base.runCommitCallbacksOnFirstSavedInstancesInTransaction).toBe(false);
+  });
+
+  it("ActiveSupport::MessageEncryptor.use_authenticated_message_encryption is true by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(MessageEncryptor.useAuthenticatedMessageEncryption).toBe(true);
+  });
+
+  it("ActiveSupport::MessageEncryptor.use_authenticated_message_encryption is false by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(MessageEncryptor.useAuthenticatedMessageEncryption).toBe(false);
+  });
+
+  it("ActiveSupport::MessageEncryptor.use_authenticated_message_encryption can be configured via config.active_support.use_authenticated_message_encryption", async () => {
+    const application = await app("development");
+    application.config.activeSupport.useAuthenticatedMessageEncryption = true;
+    await application.initializeBang();
+
+    expect(MessageEncryptor.useAuthenticatedMessageEncryption).toBe(true);
+  });
+
+  it("ActiveSupport::Digest.hash_digest_class is OpenSSL::Digest::SHA256 by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(Digest.hashDigestClass).toBe(OpenSSL.Digest.SHA256);
+  });
+
+  it("ActiveSupport::Digest.hash_digest_class is OpenSSL::Digest::MD5 by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(Digest.hashDigestClass).toBe(OpenSSL.Digest.MD5);
+  });
+
+  it("ActiveSupport::Digest.hash_digest_class can be configured via config.active_support.hash_digest_class", async () => {
+    const application = await app("development");
+    application.config.activeSupport.hashDigestClass = OpenSSL.Digest.SHA256;
+    await application.initializeBang();
+
+    expect(Digest.hashDigestClass).toBe(OpenSSL.Digest.SHA256);
+  });
+
+  it("ActiveSupport::KeyGenerator.hash_digest_class is OpenSSL::Digest::SHA256 by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(KeyGenerator.hashDigestClass).toBe(OpenSSL.Digest.SHA256);
+  });
+
+  it("ActiveSupport::KeyGenerator.hash_digest_class is OpenSSL::Digest::SHA1 by default for upgraded apps", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(KeyGenerator.hashDigestClass).toBe(OpenSSL.Digest.SHA1);
+  });
+
+  it("ActiveSupport::KeyGenerator.hash_digest_class can be configured via config.active_support.key_generator_hash_digest_class", async () => {
+    const application = await app("development");
+    application.config.activeSupport.keyGeneratorHashDigestClass = OpenSSL.Digest.SHA256;
+    await application.initializeBang();
+
+    expect(KeyGenerator.hashDigestClass).toBe(OpenSSL.Digest.SHA256);
+  });
+
+  it("ActiveSupport.test_parallelization_threshold can be configured via config.active_support.test_parallelization_threshold", async () => {
+    const application = await app("test");
+    application.config.activeSupport.testParallelizationThreshold = 1234;
+    await application.initializeBang();
+
+    expect(ActiveSupport.testParallelizationThreshold).toBe(1234);
+  });
+
+  it("custom serializers should be able to set via config.active_job.custom_serializers in an initializer", async () => {
+    class DummySerializer extends Serializers.ObjectSerializer {}
+
+    const application = await app("development");
+    application.config.activeJob.customSerializers.push(DummySerializer);
+    await application.initializeBang();
+
+    expect(Serializers.serializers()).toContain(DummySerializer);
+  });
+
+  it(
+    "config.active_job.verbose_enqueue_logs defaults to true in development",
+    { timeout: 120_000 },
+    async () => {
+      const t = new ConfigurationTest("test");
+      await t.buildApp();
+      onTestFinished(() => t.teardownApp());
+
+      expect(
+        JSON.parse(await t.trails("runner", "console.log(ActiveJob.verboseEnqueueLogs())")),
+      ).toBeTruthy();
+    },
+  );
+
+  it(
+    "config.active_job.verbose_enqueue_logs defaults to false in production",
+    { timeout: 120_000 },
+    async () => {
+      const t = new ConfigurationTest("test");
+      await t.buildApp();
+      onTestFinished(() => t.teardownApp());
+
+      expect(
+        JSON.parse(
+          await t.trails(
+            "runner",
+            "-e",
+            "production",
+            "console.log(ActiveJob.verboseEnqueueLogs())",
+          ),
+        ),
+      ).toBeFalsy();
+    },
+  );
+
+  it("config.active_job.enqueue_after_transaction_commit is deprecated", async () => {
+    const application = await app("production");
+    application.config.secretKeyBase = "secret";
+    application.config.activeJob.enqueueAfterTransactionCommit = ":always";
+    await application.initializeBang();
+
+    await assertNothingRaised(() => ActiveRecord.Base);
+
+    expect(ActiveJob.Base.enqueueAfterTransactionCommit).toBe(true);
+  });
+
+  it("active record job queue is set", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(ActiveRecord.queues()).toEqual({});
+  });
+
+  it("SQLite3Adapter.strict_strings_by_default is true by default for new apps", async () => {
+    await mkdir(join(appPath, "config", "initializers"));
+    await writeFile(
+      join(appPath, "config", "initializers", "active_record.ts"),
+      `import { Base } from "@blazetrails/activerecord";\nawait Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });\n`,
+    );
+
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(SQLite3Adapter.strictStringsByDefault).toBe(true);
+  });
+
+  it("SQLite3Adapter.strict_strings_by_default is false by default for upgraded apps", async () => {
+    await mkdir(join(appPath, "config", "initializers"));
+    await writeFile(
+      join(appPath, "config", "initializers", "active_record.ts"),
+      `import { Base } from "@blazetrails/activerecord";\nawait Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });\n`,
+    );
+
+    await (await app("development")).initializeBang();
+
+    expect(SQLite3Adapter.strictStringsByDefault).toBe(false);
+  });
+
+  it("SQLite3Adapter.strict_strings_by_default can be configured via config.active_record.sqlite3_adapter_strict_strings_by_default", async () => {
+    await mkdir(join(appPath, "config", "initializers"));
+    await writeFile(
+      join(appPath, "config", "initializers", "active_record.ts"),
+      `import { Base } from "@blazetrails/activerecord";\nawait Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });\n`,
+    );
+
+    const application = await app("development");
+    application.config.activeRecord.sqlite3AdapterStrictStringsByDefault = true;
+    await application.initializeBang();
+
+    expect(SQLite3Adapter.strictStringsByDefault).toBe(true);
+  });
+
+  it("SQLite3Adapter.strict_strings_by_default can be configured via config.active_record.sqlite3_adapter_strict_strings_by_default in an initializer", async () => {
+    class Post extends ActiveRecord.Base {}
+    await mkdir(join(appPath, "config", "initializers"));
+    await writeFile(
+      join(appPath, "config", "initializers", "new_framework_defaults_7_1.ts"),
+      `import { Trails } from "@blazetrails/trailties";\nTrails.application!.config.activeRecord.sqlite3AdapterStrictStringsByDefault = true;\n`,
+    );
+    await writeFile(
+      join(appPath, "config", "initializers", "active_record.ts"),
+      `import { Base } from "@blazetrails/activerecord";\nawait Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });\n`,
+    );
+
+    await (await app("development")).initializeBang();
+
+    expect(SQLite3Adapter.strictStringsByDefault).toBe(true);
+
+    await (await Post.leaseConnection()).createTable("posts");
+    const error = await assertRaises([StandardError], {}, async () =>
+      (await Post.leaseConnection()).addIndex("posts", "non_existent"),
+    );
+
+    expect(error.message).toMatch(/no such column: "?non_existent"?/);
+  });
+
   it("destroy association async job should be loaded in configs", async () => {
     await (await app("development")).initializeBang();
 

@@ -56,6 +56,7 @@ export interface ActiveSupportConfig {
   useAuthenticatedMessageEncryption?: boolean | null;
   keyGeneratorHashDigestClass?: typeof KeyGenerator.hashDigestClass | null;
   useMessageSerializerForMetadata?: boolean;
+  testParallelizationThreshold?: number;
 }
 
 declare module "../trailtie/configuration.js" {
