@@ -3,7 +3,7 @@ import type {
   AdapterName,
 } from "../../lib/connection-adapters/abstract-adapter.js";
 import type { AbstractMysqlAdapter } from "../../lib/connection-adapters/abstract-mysql-adapter.js";
-import type { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
+import { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
 import { ActiveRecordError } from "../../lib/errors.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
 import { noteAdapterSpecificSchemaLoaded } from "./drop-all-tables.js";
@@ -246,10 +246,9 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   await createTestUniqueConstraintsTable(adapter);
 
   if (await adapter.supportsPartitionedIndexes()) {
-    const klass = adapter.constructor as typeof PostgreSQLAdapter;
-    const previousUnloggedTables = klass.createUnloggedTables;
+    const previousUnloggedTables = PostgreSQLAdapter.createUnloggedTables;
     try {
-      klass.createUnloggedTables = false;
+      PostgreSQLAdapter.createUnloggedTables = false;
 
       await adapter.createTable(
         "measurements",
@@ -273,7 +272,7 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
         options: "PARTITION OF measurements FOR VALUES IN (2)",
       });
     } finally {
-      klass.createUnloggedTables = previousUnloggedTables;
+      PostgreSQLAdapter.createUnloggedTables = previousUnloggedTables;
     }
   }
 
