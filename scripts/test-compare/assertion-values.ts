@@ -233,10 +233,9 @@ function foldRenamedExtensionToken(token: string): string {
   const text = token.slice(2);
   const folded = foldCell(text);
   if (folded === text || !text.includes("\n")) return `s:${folded}`;
-  return `s:${repadTable(
-    text.split("\n").filter((line) => !PROPSHAFT_ROUTE_RE.test(line)),
-    foldCell,
-  )}`;
+  const lines = text.split("\n").filter((line) => !PROPSHAFT_ROUTE_RE.test(line));
+  if (repadTable(lines, (cell) => cell) !== lines.join("\n")) return `s:${folded}`;
+  return `s:${repadTable(lines, foldCell)}`;
 }
 
 function foldCell(text: string): string {
@@ -266,8 +265,9 @@ function renameTokens(text: string): string {
  * `bin/trails routes` table, railties/test/commands/routes_test.rb:42-85), so
  * every row of that column is re-padded, as the formatter that printed it
  * would have. A column is a run of character positions that is not blank in
- * every line; one whose cells carry leading blanks is right-aligned. Applied
- * to BOTH sides, so a table already in trails spelling comes back unchanged.
+ * every line; one whose cells carry leading blanks is right-aligned. A side is
+ * re-padded only when it is already padded exactly as this function would pad
+ * it, so a mis-padded cell on either side is still reported.
  */
 function repadTable(lines: string[], rename: (cell: string) => string): string {
   const rows = lines.filter((line) => line.trim() !== "");

@@ -268,6 +268,22 @@ describe("assertionValueMismatch", () => {
     ).toBe(null);
   });
 
+  it("still reports a mis-padded cell inside a column with snake names", () => {
+    const rails = "          Prefix Verb\n        new_post GET\nrails_blob_proxy GET\n";
+    const trails = "           Prefix Verb\n        new_post GET\ntrails_blob_proxy GET\n";
+    expect(
+      assertionValueMismatch(["assert_equal"], [`s:${rails}`], ["toBe"], [`s:${trails}`], false),
+    ).not.toBe(null);
+  });
+
+  it("still reports a table whose trailing blanks differ", () => {
+    const rails = "Prefix Verb  \n rails GET\n";
+    const trails = "Prefix Verb\ntrails GET\n";
+    expect(
+      assertionValueMismatch(["assert_equal"], [`s:${rails}`], ["toBe"], [`s:${trails}`], false),
+    ).not.toBe(null);
+  });
+
   it("still reports a table whose padding differs beyond the rename", () => {
     const rails = "Prefix Verb\n rails GET\n";
     const trails = "Prefix  Verb\n trails GET\n";
