@@ -14,6 +14,7 @@ import {
   type BootstrapConfig,
   type BootstrapHost,
 } from "../../lib/application/bootstrap.js";
+import { Configuration } from "../../lib/application/configuration.js";
 import { Trails } from "../../lib/trails.js";
 
 const baseConfig = (): BootstrapConfig => ({
@@ -23,6 +24,7 @@ const baseConfig = (): BootstrapConfig => ({
   logFormatter: null,
   defaultLogFile: async () => ({ write() {} }),
   paths: () => ({ get: () => ({ first: () => "log/test.log" }) }),
+  middleware: new Configuration("/app").middleware,
 });
 
 class TestApp extends Bootstrap implements BootstrapHost {
