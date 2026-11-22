@@ -38,26 +38,7 @@
     { label: "Parity", href: `${repo}/blob/main/docs/parity-gates.md` },
   ];
 
-  const tiles = [
-    "activerecord", "activemodel", "actionpack", "actionview",
-    "actionmailer", "actionmailbox", "actiontext", "activejob",
-    "activestorage", "actioncable", "activesupport", "arel",
-    "rack", "trailties", "solid-queue", "solid-cache",
-    "solid-cable", "turbo", "stimulus", "vite-trails",
-    "i18n", "thor",
-  ];
-  const railsGems = new Set([
-    "activerecord", "activemodel", "actionpack", "actionview",
-    "actionmailer", "actionmailbox", "actiontext", "activejob",
-    "activestorage", "actioncable", "activesupport", "arel", "trailties",
-    "solid-queue", "solid-cache", "solid-cable", "thor",
-  ]);
-
-
-  const cards = [
-    { tag: "Learning", title: "Read the guides", body: "Walk through each framework, from models to mailers to WebSockets.", href: guides },
-    { tag: "Source", title: "Browse on GitHub", body: "Read the code and the Rails source it mirrors.", href: repo },
-  ];
+  const gettingStarted = `${base}/docs/guides/getting-started`;
 </script>
 
 <svelte:head>
@@ -79,7 +60,7 @@
   <header class="hero">
     <h1>Convention over configuration.<br />Now with types.</h1>
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
-    <span class="pill">trails &mdash; pre-release &middot; measured at {data.measuredAt}</span>
+    <span class="pill">trails &mdash; pre-release &middot; {data.headline} of the upstream API matched &middot; measured at {data.measuredAt}</span>
     <div class="stage">
       <div class="tabs" role="tablist" aria-label="Examples">
         <button role="tab" aria-selected={tab === "caught"} onclick={() => (tab = "caught")}>Caught by the compiler</button>
@@ -87,17 +68,9 @@
       </div>
       {#if tab === "caught"}
         <div class="pane" role="tabpanel">
-          <div class="split">
-            <div>
-              <div class="file">app/controllers/posts-controller.ts &middot; tsc --noEmit</div>
-              {@html data.hero.check}
-            </div>
-            <div>
-              <div class="file">app/views/posts/show.html.tse &middot; trails-tsc-views build &amp;&amp; tsc</div>
-              {@html data.hero.view}
-            </div>
-          </div>
-          <p class="note">Typos in a controller and in a template, both caught before the app runs. Each error is the compiler's real output for a scratch edit of the <a href="{repo}/tree/{data.buildRef}/examples/homepage">home page example</a>.</p>
+          <div class="file">{data.hero.file} &middot; trails-tsc --schema db/schema.ts</div>
+          {@html data.hero.html}
+          <p class="note">The model is typed from the schema, so a wrong type is caught before the app runs. The file and the error are step 6 of the <a href="{gettingStarted}">Getting Started</a> Quickstart, which CI runs on every commit.</p>
         </div>
       {:else}
         <div class="pane ai" role="tabpanel">
@@ -111,9 +84,11 @@
   <section class="company">
     <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
-    <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby gem"} API</small>{/if}</a></li>{/each}</ul>
-    <p class="small"><strong>And there are more packages besides these.</strong> The gems Rails depends on are ported alongside them.</p>
-    <p class="fine">Each percentage is the share of the upstream gem's public API names (classes, modules, methods and constants) that have a matching name in the trails package. &ldquo;Rails API&rdquo; marks a gem the Rails project owns, such as Active Record, Solid Queue or thor; &ldquo;Ruby gem API&rdquo; marks one of the other gems Rails depends on, such as rack or i18n. &ldquo;Measured at {data.measuredAt}&rdquo; names the trails commit the figures were computed on. A trails app's client-side JavaScript, Turbo and Stimulus included, uses these same packages, so the code in the browser and on the server is all compatible.</p>
+    {#each data.groups as g}
+      <h3>{g.title}</h3>
+      <ul class="tiles">{#each g.packages as t}<li><a href="{base}/docs/packages/{t.name}"><span>{t.name}</span>{#if t.railsCounterpart}<small>{t.railsCounterpart}</small>{/if}<small>API {t.api} &middot; tests {t.tests}</small></a></li>{/each}</ul>
+    {/each}
+    <p class="fine">Under each package is the upstream gem it ports, then the share of that gem's public API names (classes, modules, methods and constants) with a matching name in trails, and the share of its tests with a matching trails test. &ldquo;Measured at {data.measuredAt}&rdquo; names the trails commit the figures were computed on.</p>
   </section>
 
   <section class="band">
@@ -128,7 +103,6 @@
     {#each data.blocks as b}
       <div class="block">
         <div class="code">
-          <a class="file" href={b.href}>examples/homepage/{b.file}</a>
           {@html b.html}
         </div>
         <h3>{b.title}</h3>
@@ -149,11 +123,11 @@
   <section class="start">
     <h2>Start a trails app.</h2>
     <div class="cards">
-      {#each cards as c}
-        <a class="start-card" href={c.href}>
+      {#each data.steps as c}
+        <a class="start-card" href={gettingStarted}>
           <span class="tag">{c.tag}</span>
           <strong>{c.title}</strong>
-          <span>{c.body}</span>
+          {@html c.html}
         </a>
       {/each}
     </div>
@@ -229,8 +203,6 @@
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .fine { font-size: 15px; line-height: 1.45; max-width: 760px; margin: 1.5rem auto 0; color: #7a6450; }
   .pane { background: #3a2a1f; min-height: 380px; }
-  .split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
-  .split > div + div { border-left: 1px solid #4a3628; }
   .pane .file { text-align: left; padding: 8px 22px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
   .ai { display: flex; align-items: center; justify-content: center; gap: 48px; padding: 32px 40px; }
@@ -240,8 +212,9 @@
   .pane :global(.tip) { display: block; width: max-content; max-width: 100%; margin: 6px 0 4px 2ch; padding: 8px 12px; background: #2b1d14; border: 1px solid #ff5d5d; border-radius: 6px; color: #ffb4b4; font-size: 13px; white-space: normal; }
 
   .company { padding: 40px 24px 100px; }
-  .tiles { display: grid; grid-template-columns: repeat(4, 220px); justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 48px 0; }
-  .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 84px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 220px); justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 16px 0 40px; }
+  .company h3 { margin: 32px 0 0; }
+  .tiles a { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 100px; background: var(--tint); border-radius: 8px; font-weight: 700; font-size: 20px; transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
   .tiles a:hover, .tiles a:focus-visible { background: var(--orange); color: #fff; transform: translateY(-2px); box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); }
   .tiles a:hover small, .tiles a:focus-visible small { color: rgb(255 255 255 / 0.85); }
   .tiles li:nth-last-child(2) { grid-column: 2; }
@@ -293,8 +266,7 @@
     .tiles { grid-template-columns: repeat(2, 1fr); }
     .tiles li:nth-last-child(2) { grid-column: auto; }
     .blocks, .cards, .split { grid-template-columns: 1fr; }
-    .split > div + div { border-left: 0; border-top: 1px solid #4a3628; }
-    .ai { flex-direction: column; }
+      .ai { flex-direction: column; }
     .card { padding: 40px 24px; }
   }
 </style>

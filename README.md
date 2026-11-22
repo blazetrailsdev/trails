@@ -297,6 +297,8 @@ Open `http://localhost:3927/posts` and the scaffold works as it does in Rails:
 `GET /posts`, with the development-mode `<!-- BEGIN … -->` / `<!-- END … -->`
 template comments and blank lines stripped:
 
+<!-- #region quickstart-page -->
+
 ```text
 <!DOCTYPE html>
 <html>
@@ -335,10 +337,14 @@ template comments and blank lines stripped:
 </html>
 ```
 
+<!-- #endregion quickstart-page -->
+
 ### 6. Type-check with `trails-tsc`
 
 `pnpm build` runs `trails-tsc --schema db/schema.ts`, the schema-aware `tsc`.
 The model is typed from the schema with no `declare` lines. This file:
+
+<!-- #region quickstart-typecheck -->
 
 ```ts
 // app/models/check.ts
@@ -358,6 +364,8 @@ fails the build with:
 app/models/check.ts(6,11): error TS2322: Type 'string | null' is not assignable to type 'number'.
   Type 'null' is not assignable to type 'number'.
 ```
+
+<!-- #endregion quickstart-typecheck -->
 
 The build also passes after `generate scaffold`.
 
