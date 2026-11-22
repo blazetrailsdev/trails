@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   Deprecators,
+  isBlank,
   MessageVerifiers,
   OrderedOptions,
   ParameterFilter,
@@ -66,6 +67,7 @@ import { Trailtie as ActionMailerTrailtie } from "../../lib/trailties/action-mai
 import { Trailtie as ActiveRecordTrailtie } from "../../lib/trailties/active-record.js";
 import { Trailtie as ActiveJobTrailtie } from "../../lib/trailties/active-job.js";
 import { Trailtie as ActionDispatchTrailtie } from "../../lib/trailties/action-dispatch.js";
+import * as Rack from "@blazetrails/rack";
 import { Application } from "../../lib/application.js";
 import { LOAD_DEFAULTS_VERSION } from "../../lib/application/configuration.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
@@ -78,6 +80,11 @@ let appPath: string;
 
 async function setCustomConfig(contents: string): Promise<void> {
   await writeFile(join(appPath, "config", "custom.ts"), contents);
+}
+
+async function appFile(path: string, contents: string): Promise<void> {
+  await mkdir(join(appPath, path, ".."), { recursive: true });
+  await writeFile(join(appPath, path), contents);
 }
 
 async function app(trailsEnv: string): Promise<Application> {
@@ -227,8 +234,13 @@ describe("ConfigurationTest", () => {
   });
 
   it("filter_parameters should be able to set via config.filter_parameters in an initializer", async () => {
+    await appFile(
+      "config/initializers/filter-parameters-logging.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.config.filterParameters.push("password", "foo", "bar");
+`,
+    );
     const application = await app("development");
-    Trails.application!.config.filterParameters.push("password", "foo", "bar");
     await application.initializeBang();
 
     expect(Trails.application!.envConfig()["action_dispatch.parameter_filter"]).toEqual([
@@ -326,6 +338,30 @@ describe("ConfigurationTest", () => {
     await application.initializeBang();
 
     expect(SchemaReflection.useSchemaCacheDump).toBe(false);
+  });
+
+  it("By default logs tags are not set in development", async () => {
+    await envHelpers.withTrailsEnv("development", async () => {
+      await app("development");
+      expect(isBlank(Trails.application!.config.logTags)).toBe(true);
+    });
+  });
+
+  it("config.to_prepare is forwarded to ActionDispatch", async () => {
+    let prepared = false;
+
+    const application = await app("development");
+    application.config.secretKeyBase = "secret";
+    application.config.toPrepare(() => {
+      prepared = true;
+    });
+
+    expect(prepared).toBe(false);
+
+    await application.initializeBang();
+
+    await application.call(Rack.MockRequest.envFor("/"));
+    expect(prepared).toBe(true);
   });
 
   it("config.enable_reloading is !config.cache_classes", async () => {
@@ -855,8 +891,14 @@ describe("ConfigurationTest", () => {
   });
 
   it("ActionView::Helpers::FormTagHelper.default_enforce_utf8 can be configured via config.action_view.default_enforce_utf8", async () => {
+    await appFile(
+      "config/initializers/new-framework-defaults-6-0.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.config.actionView.defaultEnforceUtf8 = true;
+`,
+    );
+
     const application = await app("development");
-    application.config.actionView.defaultEnforceUtf8 = true;
     await application.initializeBang();
 
     expect(FormTagHelper.defaultEnforceUtf8).toBe(true);
@@ -878,8 +920,14 @@ describe("ConfigurationTest", () => {
   });
 
   it("ActionView::Helpers::UrlHelper.button_to_generates_button_tag can be configured via config.action_view.button_to_generates_button_tag", async () => {
+    await appFile(
+      "config/initializers/new-framework-defaults-7-0.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.config.actionView.buttonToGeneratesButtonTag = true;
+`,
+    );
+
     const application = await app("development");
-    application.config.actionView.buttonToGeneratesButtonTag = true;
     await application.initializeBang();
 
     expect(UrlHelper.buttonToGeneratesButtonTag).toBe(true);
@@ -948,8 +996,14 @@ describe("ConfigurationTest", () => {
   });
 
   it("ActionView::Helpers::AssetTagHelper.apply_stylesheet_media_default can be configured via config.action_view.apply_stylesheet_media_default", async () => {
+    await appFile(
+      "config/initializers/new-framework-defaults-7-0.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.config.actionView.applyStylesheetMediaDefault = false;
+`,
+    );
+
     const application = await app("development");
-    application.config.actionView.applyStylesheetMediaDefault = false;
     await application.initializeBang();
 
     expect(AssetTagHelper.applyStylesheetMediaDefault).toBe(false);
@@ -999,9 +1053,17 @@ describe("ConfigurationTest", () => {
   });
 
   it("Rails.application.config.action_dispatch.ssl_default_redirect_status can be configured in an initializer", async () => {
+    await appFile(
+      "config/initializers/new-framework-defaults-6-1.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.config.actionDispatch.sslDefaultRedirectStatus = 308;
+`,
+    );
+
     const application = await app("production");
     application.config.loadDefaults("6.0");
-    application.config.actionDispatch.sslDefaultRedirectStatus = 308;
+    application.config.secretKeyBase = "secret";
+    await application.initializeBang();
 
     expect(Trails.application!.config.actionDispatch.sslDefaultRedirectStatus).toBe(308);
   });
@@ -1021,9 +1083,15 @@ describe("ConfigurationTest", () => {
   });
 
   it("Rails.application.config.active_support.to_time_preserves_timezone can be configured in an initializer", async () => {
+    await appFile(
+      "config/initializers/new-framework-defaults-8-0.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.config.activeSupport.toTimePreservesTimezone = ":zone";
+`,
+    );
+
     const application = await app("development");
     application.config.loadDefaults("7.2");
-    application.config.activeSupport.toTimePreservesTimezone = ":zone";
     await application.initializeBang();
 
     expect(ActiveSupport.toTimePreservesTimezone()).toBe(":zone");
@@ -1092,10 +1160,16 @@ describe("ConfigurationTest", () => {
   });
 
   it("ActiveSupport.utc_to_local_returns_utc_offset_times can be configured in an initializer", async () => {
+    await appFile(
+      "config/initializers/new-framework-defaults-6-1.ts",
+      `import { setUtcToLocalReturnsUtcOffsetTimes } from "@blazetrails/activesupport";
+setUtcToLocalReturnsUtcOffsetTimes(true);
+`,
+    );
+
     const application = await app("development");
     application.config.loadDefaults("6.0");
     await application.initializeBang();
-    setUtcToLocalReturnsUtcOffsetTimes(true);
 
     expect(utcToLocalReturnsUtcOffsetTimes()).toBe(true);
   });
