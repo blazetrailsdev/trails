@@ -19,6 +19,8 @@ export interface ActionMailerConfig extends OrderedOptions {
   smtpSettings?: Record<string, unknown> | null;
   deliveryMethod?: string | null;
   performCaching?: boolean | null;
+  raiseDeliveryErrors?: boolean | null;
+  defaultUrlOptions?: Record<string, unknown> | null;
 }
 
 declare module "../trailtie/configuration.js" {

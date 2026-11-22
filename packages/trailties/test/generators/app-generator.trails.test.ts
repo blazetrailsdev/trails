@@ -289,7 +289,13 @@ describe("AppGenerator (trails-only)", () => {
   it("guards each namespaced environment setting the way the Rails templates do", async () => {
     await new AppGenerator(
       ["my-app"],
-      { skipInstall: true, database: "sqlite", api: true, skipActiveRecord: true },
+      {
+        skipInstall: true,
+        database: "sqlite",
+        api: true,
+        skipActiveRecord: true,
+        skipActionMailer: true,
+      },
       { destinationRoot: tmpDir },
     ).invokeAll();
 
