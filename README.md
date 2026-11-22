@@ -206,16 +206,39 @@ bin/trails routes
 ```
 
 ```text
-             Prefix Verb   URI Pattern               Controller#Action
-              posts GET    /posts(.:format)          posts#index
-                    POST   /posts(.:format)          posts#create
-           new_post GET    /posts/new(.:format)      posts#new
-          edit_post GET    /posts/:id/edit(.:format) posts#edit
-               post GET    /posts/:id(.:format)      posts#show
-                    PATCH  /posts/:id(.:format)      posts#update
-                    PUT    /posts/:id(.:format)      posts#update
-                    DELETE /posts/:id(.:format)      posts#destroy
-trails_health_check GET    /up(.:format)             trails/health#show
+                                   Prefix Verb   URI Pattern                                                                                        Controller#Action
+                                    posts GET    /posts(.:format)                                                                                   posts#index
+                                          POST   /posts(.:format)                                                                                   posts#create
+                                 new_post GET    /posts/new(.:format)                                                                               posts#new
+                                edit_post GET    /posts/:id/edit(.:format)                                                                          posts#edit
+                                     post GET    /posts/:id(.:format)                                                                               posts#show
+                                          PATCH  /posts/:id(.:format)                                                                               posts#update
+                                          PUT    /posts/:id(.:format)                                                                               posts#update
+                                          DELETE /posts/:id(.:format)                                                                               posts#destroy
+                      trails_health_check GET    /up(.:format)                                                                                      trails/health#show
+           trails_postmark_inbound_emails POST   /trails/action_mailbox/postmark/inbound_emails(.:format)                                           action_mailbox/ingresses/postmark/inbound_emails#create
+              trails_relay_inbound_emails POST   /trails/action_mailbox/relay/inbound_emails(.:format)                                              action_mailbox/ingresses/relay/inbound_emails#create
+           trails_sendgrid_inbound_emails POST   /trails/action_mailbox/sendgrid/inbound_emails(.:format)                                           action_mailbox/ingresses/sendgrid/inbound_emails#create
+     trails_mandrill_inbound_health_check GET    /trails/action_mailbox/mandrill/inbound_emails(.:format)                                           action_mailbox/ingresses/mandrill/inbound_emails#healthCheck
+           trails_mandrill_inbound_emails POST   /trails/action_mailbox/mandrill/inbound_emails(.:format)                                           action_mailbox/ingresses/mandrill/inbound_emails#create
+            trails_mailgun_inbound_emails POST   /trails/action_mailbox/mailgun/inbound_emails/mime(.:format)                                       action_mailbox/ingresses/mailgun/inbound_emails#create
+          trails_conductor_inbound_emails GET    /trails/conductor/action_mailbox/inbound_emails(.:format)                                          trails/conductor/action_mailbox/inbound_emails#index
+                                          POST   /trails/conductor/action_mailbox/inbound_emails(.:format)                                          trails/conductor/action_mailbox/inbound_emails#create
+       new_trails_conductor_inbound_email GET    /trails/conductor/action_mailbox/inbound_emails/new(.:format)                                      trails/conductor/action_mailbox/inbound_emails#new
+           trails_conductor_inbound_email GET    /trails/conductor/action_mailbox/inbound_emails/:id(.:format)                                      trails/conductor/action_mailbox/inbound_emails#show
+new_trails_conductor_inbound_email_source GET    /trails/conductor/action_mailbox/inbound_emails/sources/new(.:format)                              trails/conductor/action_mailbox/inbound_emails/sources#new
+   trails_conductor_inbound_email_sources POST   /trails/conductor/action_mailbox/inbound_emails/sources(.:format)                                  trails/conductor/action_mailbox/inbound_emails/sources#create
+   trails_conductor_inbound_email_reroute POST   /trails/conductor/action_mailbox/:inbound_email_id/reroute(.:format)                               trails/conductor/action_mailbox/reroutes#create
+trails_conductor_inbound_email_incinerate POST   /trails/conductor/action_mailbox/:inbound_email_id/incinerate(.:format)                            trails/conductor/action_mailbox/incinerates#create
+                      trails_service_blob GET    /trails/active_storage/blobs/redirect/:signed_id/*filename(.:format)                               active_storage/blobs/redirect#show
+                trails_service_blob_proxy GET    /trails/active_storage/blobs/proxy/:signed_id/*filename(.:format)                                  active_storage/blobs/proxy#show
+                                          GET    /trails/active_storage/blobs/:signed_id/*filename(.:format)                                        active_storage/blobs/redirect#show
+               trails_blob_representation GET    /trails/active_storage/representations/redirect/:signed_blob_id/:variation_key/*filename(.:format) active_storage/representations/redirect#show
+         trails_blob_representation_proxy GET    /trails/active_storage/representations/proxy/:signed_blob_id/:variation_key/*filename(.:format)    active_storage/representations/proxy#show
+                                          GET    /trails/active_storage/representations/:signed_blob_id/:variation_key/*filename(.:format)          active_storage/representations/redirect#show
+                      trails_disk_service GET    /trails/active_storage/disk/:encoded_key/*filename(.:format)                                       active_storage/disk#show
+               update_trails_disk_service PUT    /trails/active_storage/disk/:encoded_token(.:format)                                               active_storage/disk#update
+                    trails_direct_uploads POST   /trails/active_storage/direct_uploads(.:format)                                                    active_storage/direct_uploads#create
 ```
 
 The console loads every model before it prompts:
