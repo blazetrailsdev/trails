@@ -34,16 +34,9 @@ export class Statement {
   declare toA: () => unknown[][] | Promise<unknown[][]>;
   declare first: () => unknown[] | null | Promise<unknown[] | null>;
 
-  static new(db: Database, sql: string): Statement | Promise<Statement> {
+  static async new(db: Database, sql: string): Promise<Statement> {
     const stmt = rbClassNewInstance(this, db, sql);
-    const remainder = stmt.prepare(db, sql);
-    if (remainder instanceof Promise) {
-      return remainder.then((r) => {
-        stmt.remainder = r;
-        return stmt;
-      });
-    }
-    stmt.remainder = remainder;
+    stmt.remainder = await stmt.prepare(db, sql);
     return stmt;
   }
 
@@ -207,20 +200,15 @@ export class Statement {
   }
 
   /** @internal */
-  private prepare(db: Database, sql: string): string | Promise<string> {
-    let prepared: [EngineStatement, string] | Promise<[EngineStatement, string]>;
+  private async prepare(db: Database, sql: string): Promise<string> {
+    let st: EngineStatement, remainder: string;
     try {
-      prepared = db._engine.prepare(sql);
+      [st, remainder] = await db._engine.prepare(sql);
     } catch (e) {
       rbSqlite3RaiseWithSql(e, sql, db._engine);
     }
-    const assign = ([st, remainder]: [EngineStatement, string]): string => {
-      this.#st = st;
-      return remainder;
-    };
-    return prepared instanceof Promise
-      ? prepared.then(assign, (e: unknown) => rbSqlite3RaiseWithSql(e, sql, db._engine))
-      : assign(prepared);
+    this.#st = st;
+    return remainder;
   }
 
   /** @internal */

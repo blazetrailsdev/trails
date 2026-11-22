@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import { LoadError } from "@blazetrails/ruby-compat";
+import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
 import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "../database.js";
@@ -176,6 +176,7 @@ function prepareStatement(
 
 export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) => {
   let raw = open(file, mode);
+  let used = false;
   let handler: BusyHandler | null = null;
   let changesStmt: StatementSync | null = null;
   const db: EngineDatabase = {
@@ -184,6 +185,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     isDiscarded: () => false,
     close: () => raw.close(),
     changes: () => {
+      used = true;
       if (changesStmt === null) {
         changesStmt = raw.prepare("SELECT changes()");
         changesStmt.setReturnArrays(true);
@@ -191,6 +193,11 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       return Number((changesStmt.get() as unknown as [number])[0]);
     },
     disableQuirkMode: () => {
+      if (used) {
+        throw new RuntimeError(
+          "disable_quirk_mode after the handle is used is not supported by the node:sqlite driver",
+        );
+      }
       raw.close();
       raw = open(file, mode, false);
       changesStmt = null;
@@ -199,6 +206,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       handler = block;
     },
     execBatch(sql, resultsAsHash) {
+      used = true;
       const results: unknown[] = [];
       let rest = sql.trim();
       while (rest !== "") {
@@ -236,6 +244,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       return results;
     },
     prepare(sql) {
+      used = true;
       const [tail] = statementTail(sql);
       return [prepareStatement(raw, sql.slice(0, tail), () => handler), sql.slice(tail)];
     },

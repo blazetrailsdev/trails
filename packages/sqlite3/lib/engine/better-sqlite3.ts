@@ -78,7 +78,7 @@ function prepareStatement(
     const args: unknown[] = [];
     const params: Record<string, unknown> = { ...named };
     Array.from(positional, (v, i) => {
-      if (bindParameterIndex(sql, String(i + 1)) !== 0) params[i + 1] = v ?? null;
+      if (bindParameterIndex(sql, `?${i + 1}`) !== 0) params[i + 1] = v ?? null;
       else args.push(v ?? null);
     });
     for (;;) {

@@ -92,21 +92,18 @@ export class Database {
     );
   }
 
-  prepare(sql: string): Statement | Promise<Statement>;
-  prepare<T>(sql: string, block: (stmt: Statement) => T): T | Promise<T>;
-  prepare<T>(sql: string, block?: (stmt: Statement) => T): Statement | T | Promise<Statement | T> {
-    const prepared = Statement.new(this, sql);
-    const yieldStatement = (stmt: Statement): Statement | T => {
-      if (block === undefined) return stmt;
+  prepare(sql: string): Promise<Statement>;
+  prepare<T>(sql: string, block: (stmt: Statement) => T): Promise<Awaited<T>>;
+  async prepare<T>(sql: string, block?: (stmt: Statement) => T): Promise<Statement | Awaited<T>> {
+    const stmt = await Statement.new(this, sql);
+    if (block === undefined) return stmt;
 
-      return rbEnsure(
-        () => block(stmt),
-        () => {
-          if (!stmt.isClosed()) return stmt.close();
-        },
-      );
-    };
-    return prepared instanceof Promise ? prepared.then(yieldStatement) : yieldStatement(prepared);
+    return rbEnsure(
+      () => block(stmt),
+      () => {
+        if (!stmt.isClosed()) return stmt.close();
+      },
+    );
   }
 
   async execute(

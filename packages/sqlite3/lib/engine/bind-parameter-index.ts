@@ -8,6 +8,6 @@ export function bindParameterIndex(sql: string, name: string): number {
     " ",
   );
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const prefix = /^\d+$/.test(name) ? "\\?" : "[:@$]";
+  const prefix = name.startsWith("?") ? "" : "[:@$]";
   return new RegExp(`${prefix}${escaped}(?![\\w$])`).test(code) ? 1 : 0;
 }

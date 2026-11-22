@@ -21,7 +21,7 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
 
   it("raises the gem's class for a failed prepare, with the SQL", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
-    expect(() => db.prepare("SELECT * FROM nope")).toThrow(SQLite3.SQLException);
+    await expect(db.prepare("SELECT * FROM nope")).rejects.toThrow(SQLite3.SQLException);
     try {
       await db.prepare("SELECT * FROM nope");
     } catch (e) {
@@ -123,5 +123,11 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
     expect(await stmt.step()).toEqual(["b", "c", null]);
     await stmt.close();
     expect(await db.execute("SELECT ?2, ?1", ["a", "b"])).toEqual([["b", "a"]]);
+  });
+
+  it("numbers a bare ? after a ?NNN as SQLite does", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    expect(await db.execute("SELECT ?2, ?", ["a", "b", "c"])).toEqual([["b", "c"]]);
+    expect(await db.execute("SELECT ?, ?1", ["a"])).toEqual([["a", "a"]]);
   });
 });

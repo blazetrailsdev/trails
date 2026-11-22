@@ -82,36 +82,6 @@ async function withBusyHandler<T>(
   }
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-async function storageClasses(
-  opening: () => Promise<ExpoDatabase>,
-  sql: string,
-  count: number,
-): Promise<unknown[][] | null> {
-  const cols = Array.from({ length: count }, (_, i) => `c${i}`);
-  let st: ExpoStatement;
-  try {
-    st = await (
-      await opening()
-    ).prepareAsync(
-      `WITH t(${cols.join(", ")}) AS (${sql.replace(/;\s*$/, "")}) ` +
-        `SELECT ${cols.map((c) => `typeof(${c})`).join(", ")} FROM t`,
-    );
-  } catch {
-    return null;
-  }
-  try {
-    const rows: unknown[][] = [];
-    for await (const row of await st.executeForRawResultAsync([])) rows.push(row);
-    return rows;
-  } finally {
-    await st.finalizeAsync();
-  }
-}
-
 /** @internal */
 function prepareStatement(
   opening: () => Promise<ExpoDatabase>,
@@ -214,28 +184,44 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
         const head = rest.slice(0, tail);
         rest = rest.slice(tail).trim();
         if (empty) continue;
-        const stmt = prepareStatement(opening, null, head, false, () => handler, setChanges);
+        const raw = await opening();
+        const st = await withBusyHandler(
+          () => handler,
+          () => raw.prepareAsync(head),
+        );
+        let typed: ExpoStatement | null = null;
         try {
-          const names = (await stmt.columnCount()) === 0 ? [] : null;
-          const types = names
-            ? null
-            : await storageClasses(opening, head, await stmt.columnCount());
-          for (let n = 0, row = await stmt.step(); row !== null; n++, row = await stmt.step()) {
-            const vals = row.map((v, i) =>
-              typeof v === "number" && types?.[n]?.[i] === "real"
+          const names = await st.getColumnNamesAsync();
+          if (names.length !== 0) {
+            const cols = names.map((_, i) => `c${i}`);
+            typed = await raw
+              .prepareAsync(
+                `WITH t(${cols.join(", ")}) AS (${head.replace(/;\s*$/, "")}\n) ` +
+                  `SELECT ${cols.join(", ")}, ${cols.map((c) => `typeof(${c})`).join(", ")} FROM t`,
+              )
+              .catch(() => null);
+          }
+          const result = await withBusyHandler(
+            () => handler,
+            () => (typed ?? st).executeForRawResultAsync([]),
+          );
+          setChanges(result.changes);
+          if (names.length === 0) continue;
+          for await (const row of result) {
+            const vals = names.map((_, i) => {
+              const v = row[i];
+              if (v == null) return null;
+              return typeof v === "number" && row[names.length + i] === "real"
                 ? columnText(v)
-                : v == null
-                  ? null
-                  : String(v),
+                : String(v);
+            });
+            results.push(
+              resultsAsHash ? Object.fromEntries(names.map((name, i) => [name, vals[i]])) : vals,
             );
-            if (!resultsAsHash) results.push(vals);
-            else {
-              const keys = names ?? (await Promise.all(vals.map((_, i) => stmt.columnName(i))));
-              results.push(Object.fromEntries(keys.map((k, i) => [k, vals[i]])));
-            }
           }
         } finally {
-          await stmt.close();
+          await typed?.finalizeAsync();
+          await st.finalizeAsync();
         }
       }
       return results;
