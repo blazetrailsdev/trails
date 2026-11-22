@@ -1,5 +1,13 @@
 import { subscribe, type AsyncSubscription, type Event } from "@parcel/watcher";
-import { ArgumentError, File, rbBlockGivenP, rbInspect, Thread } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Dir,
+  File,
+  Pathname,
+  rbBlockGivenP,
+  rbInspect,
+  Thread,
+} from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export interface ListenerOptions {
@@ -62,7 +70,7 @@ export class Listener {
   /** @internal */
   _subscriptions: AsyncSubscription[] = [];
   /** @internal */
-  _changes: [Action, string][] = [];
+  _changes: [Action, string, string][] = [];
   /** @internal */
   _onlyPatterns: RegExp[] | null = null;
   /** @internal */
@@ -166,7 +174,12 @@ export class Listener {
     for (const dir of this._dirs) {
       const root = await File.realpathAsync(dir);
       const subscription = await subscribe(root, (err, events) => {
-        if (err != null) throw err;
+        if (err != null) {
+          new Thread(() => {
+            throw err;
+          });
+          return;
+        }
         this._queueChanges(root, events);
       });
       this._subscriptions.push(subscription);
@@ -185,11 +198,21 @@ export class Listener {
     if (this._state === "stopped") return;
     for (const event of events) {
       const relativePath = event.path.slice(root.length + 1);
-      if (this._isSilenced(relativePath)) continue;
-      const path = this._options.relative ? relativePath : event.path;
-      this._changes.push([ACTIONS[event.type], path]);
+      if (this._isIgnore(relativePath)) continue;
+      const dir = this._options.relative ? this._safeRelativeFromCwd(root) : root;
+      this._changes.push([ACTIONS[event.type], File.join(dir, relativePath), relativePath]);
     }
     if (this._state === "processingEvents") this._scheduleProcessChanges();
+  }
+
+  /** @internal */
+  _safeRelativeFromCwd(dir: string): string {
+    try {
+      return new Pathname(dir).relativePathFrom(new Pathname(Dir.pwd())).toString();
+    } catch (e) {
+      if (e instanceof ArgumentError) return dir;
+      throw e;
+    }
   }
 
   /** @internal */
@@ -197,9 +220,18 @@ export class Listener {
     if (this._timer != null || this._changes.length === 0) return;
     const latency = this._options.waitForDelay ?? WAIT_FOR_DELAY;
     this._timer = setTimeout(() => {
-      this._timer = null;
-      if (this._state !== "processingEvents") return;
-      new Thread(() => this._processChanges());
+      if (this._state !== "processingEvents") {
+        this._timer = null;
+        return;
+      }
+      new Thread(async () => {
+        try {
+          await this._processChanges();
+        } finally {
+          this._timer = null;
+          if (this._state === "processingEvents") this._scheduleProcessChanges();
+        }
+      });
     }, latency * 1000);
   }
 
@@ -210,7 +242,7 @@ export class Listener {
 
     if (this._block == null) return;
 
-    const hash = this._squashChanges(changes);
+    const hash = await this._squashChanges(changes);
     const result: [string[], string[], string[]] = [hash.modified, hash.added, hash.removed];
     if (result.every((a) => a.length === 0)) return;
 
@@ -218,24 +250,35 @@ export class Listener {
   }
 
   /** @internal */
-  _squashChanges(changes: [Action, string][]): Record<Action, string[]> {
+  async _squashChanges(changes: [Action, string, string][]): Promise<Record<Action, string[]>> {
     const actions = new Map<string, Action[]>();
-    for (const [change, path] of changes) {
+    for (const [change, path, relativePath] of changes) {
+      const type = (await File.isDirectoryAsync(path)) ? "dir" : "file";
+      if (this._isSilenced(relativePath, type)) continue;
       const list = actions.get(path);
       if (list) list.push(change);
       else actions.set(path, [change]);
     }
     const squashed: Record<Action, string[]> = { modified: [], added: [], removed: [] };
     for (const [path, actionList] of actions) {
-      const type = this._logicalActionFor(actionList);
+      const type = this._logicalActionFor(path, actionList);
       if (type != null) squashed[type].push(path);
     }
     return squashed;
   }
 
   /** @internal */
-  _logicalActionFor(actions: Action[]): Action | null {
+  _logicalActionFor(path: string, actions: Action[]): Action | null {
     const modified = actions.find((x) => x === "modified") ?? null;
+    return this._calculateAddRemoveDifference(actions, path, modified);
+  }
+
+  /** @inventedArm exist — PERMANENT */
+  _calculateAddRemoveDifference(
+    actions: Action[],
+    _path: string,
+    defaultIfExists: Action | null,
+  ): Action | null {
     const added = actions.filter((x) => x === "added").length;
     const removed = actions.filter((x) => x === "removed").length;
     const diff = added - removed;
@@ -246,7 +289,7 @@ export class Listener {
       } else if (diff === 0 && added > 0) {
         return "modified";
       } else {
-        return modified;
+        return defaultIfExists;
       }
     } else {
       return diff < 0 ? "removed" : null;
@@ -254,11 +297,20 @@ export class Listener {
   }
 
   /** @internal */
-  _isSilenced(path: string): boolean {
+  _isSilenced(path: string, type: "dir" | "file"): boolean {
     return (
-      this._ignorePatterns.some((pattern) => pattern.test(path)) ||
-      (this._onlyPatterns != null && !this._onlyPatterns.some((pattern) => pattern.test(path)))
+      this._isIgnore(path) || (this._onlyPatterns != null && type === "file" && !this._isOnly(path))
     );
+  }
+
+  /** @internal */
+  _isIgnore(path: string): boolean {
+    return this._ignorePatterns.some((pattern) => path.search(pattern) !== -1);
+  }
+
+  /** @internal */
+  _isOnly(path: string): boolean {
+    return (this._onlyPatterns ?? []).some((pattern) => path.search(pattern) !== -1);
   }
 
   /** @internal */

@@ -1,4 +1,4 @@
-import { Dir, File, FileUtils, block } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, Pathname, block } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Listen } from "../lib/listen.js";
@@ -62,5 +62,19 @@ describe("Listen against a real directory", () => {
     await listener.start();
     await seen;
     expect(calls).toEqual([[[], [File.join(dir, "keep.rb")], []]]);
+  });
+
+  it("yields paths under the watched directory relative to the cwd when relative", async () => {
+    const { calls, callback, next } = changes();
+    const listener = Listen.to(dir, { waitForDelay: 0.05, relative: true }, callback);
+    await listener.start();
+    const seen = next();
+    await File.writeAsync(File.join(dir, "a.rb"), "x");
+    await seen;
+    const expected = File.join(
+      new Pathname(dir).relativePathFrom(new Pathname(Dir.pwd())).toString(),
+      "a.rb",
+    );
+    expect(calls).toEqual([[[], [expected], []]]);
   });
 });
