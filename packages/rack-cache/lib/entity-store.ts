@@ -4,13 +4,19 @@ import {
   File,
   FileUtils,
   Process,
+  StringIO,
   Thread,
+  type Generic,
+  camelized,
   each,
+  extend,
   rbClassNewInstance,
   rbDeclareIvar,
   rbObjId,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
+import { Utils } from "@blazetrails/rack";
+import type { Client as DalliClient } from "memjs";
 
 type Part = string | Uint8Array;
 type RackBody = (Iterable<Part> | { each(block: (part: Part) => unknown): unknown }) & {
@@ -26,6 +32,10 @@ export class EntityStore {
   static Disk: typeof Disk;
   static DISK: typeof Disk;
   static FILE: typeof Disk;
+  static MemCacheBase: typeof MemCacheBase;
+  static Dalli: typeof Dalli;
+  static MEMCACHE: typeof Dalli;
+  static MEMCACHED: typeof Dalli;
 
   /** @internal */
   protected async slurp(body: RackBody, block: (part: Part) => unknown): Promise<[string, number]> {
@@ -252,3 +262,85 @@ Disk.Body = Body;
 EntityStore.Disk = Disk;
 EntityStore.DISK = Disk;
 EntityStore.FILE = Disk;
+
+export class MemCacheBase extends EntityStore {
+  cache!: DalliClient;
+
+  async open(key: string): Promise<Part[] | null> {
+    const data = await (this as unknown as Dalli).read(key);
+    return data != null ? [data] : null;
+  }
+
+  static async resolve(uri: unknown): Promise<MemCacheBase> {
+    if (rbObjRespondTo(uri, "scheme")) {
+      const { host, port, query, path } = uri as Generic;
+      const server = `${host}:${port ?? "11211"}`;
+      const options: Record<string, unknown> = (this as unknown as typeof Utils).parseQuery(
+        query ?? "",
+      );
+      for (const key of Object.keys(options)) {
+        let value: unknown = options[key];
+        delete options[key];
+        value = value === "true" ? true : value === "false" ? false : value;
+        options[camelized(key)] = value;
+      }
+      options.namespace = path!.replace(/^\//, "");
+      return (this as unknown as typeof Dalli).new(server, options);
+    } else {
+      return (this as unknown as typeof Dalli).new(uri);
+    }
+  }
+}
+
+extend(MemCacheBase, Utils);
+
+export class Dalli extends MemCacheBase {
+  /** @missingRailsCall new — PERMANENT */
+  protected constructor(
+    _server: unknown = "localhost:11211",
+    _options: Record<string, unknown> = {},
+  ) {
+    super();
+  }
+
+  /** @missingRailsCall require — PERMANENT */
+  static async new(
+    server: unknown = "localhost:11211",
+    options: Record<string, unknown> = {},
+  ): Promise<Dalli> {
+    const store = rbClassNewInstance(this, server, options) as Dalli;
+    store.cache = rbObjRespondTo(server, "stats")
+      ? (server as DalliClient)
+      : (await import("memjs")).Client.create(server as string, options);
+    return store;
+  }
+
+  async isExist(key: string): Promise<boolean> {
+    return (await this.cache.get(key)).value != null;
+  }
+
+  async read(key: string): Promise<Part | null> {
+    let { value: data } = await this.cache.get(key);
+    if (data instanceof Uint8Array)
+      data = new Uint8Array(data.buffer, data.byteOffset, data.length);
+    return data;
+  }
+
+  /** @missingRailsArgs set — PERMANENT */
+  async write(body: RackBody, ttl: number | null = null): Promise<[string, number] | null> {
+    const buf = new StringIO(new Uint8Array(0));
+    const [key, size] = await this.slurp(body, (part) => buf.write(part));
+    if (await this.cache.set(key, buf.string(), { expires: ttl })) return [key, size];
+    return null;
+  }
+
+  async purge(key: string): Promise<null> {
+    await this.cache.delete(key);
+    return null;
+  }
+}
+
+EntityStore.MemCacheBase = MemCacheBase;
+EntityStore.Dalli = Dalli;
+EntityStore.MEMCACHE = Dalli;
+EntityStore.MEMCACHED = EntityStore.MEMCACHE;

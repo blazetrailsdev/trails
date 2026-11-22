@@ -3,7 +3,14 @@ import { rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { EntityStore, Noop } from "../lib/entity-store.js";
 import { MetaStore } from "../lib/meta-store.js";
 import { Storage } from "../lib/storage.js";
-import { createTempDirectory, removeEntrySecure } from "./support/test-helper.js";
+import {
+  createTempDirectory,
+  haveDalli,
+  MEMCACHED,
+  removeEntrySecure,
+} from "./support/test-helper.js";
+
+const HAVE_DALLI = await haveDalli();
 
 describe("Rack::Cache::Storage", () => {
   let storage: Storage;
@@ -99,5 +106,24 @@ describe("Rack::Cache::Storage", () => {
         expect(await storage.resolveEntitystoreUri(uri + tempDir)).toBeInstanceOf(EntityStore);
       });
     }
+  });
+
+  describe.runIf(HAVE_DALLI)("MemCache Store URIs", () => {
+    for (const scheme of ["memcache:", "memcached:"]) {
+      it(`resolves ${scheme} meta store URIs`, async () => {
+        const uri = scheme + "//" + MEMCACHED;
+        expect(await storage.resolveMetastoreUri(uri)).toBeInstanceOf(MetaStore);
+      });
+
+      it(`resolves ${scheme} entity store URIs`, async () => {
+        const uri = scheme + "//" + MEMCACHED;
+        expect(await storage.resolveEntitystoreUri(uri)).toBeInstanceOf(EntityStore);
+      });
+    }
+
+    it("supports namespaces in memcached: URIs", async () => {
+      const uri = "memcached://" + MEMCACHED + "/namespace";
+      expect(await storage.resolveMetastoreUri(uri)).toBeInstanceOf(MetaStore);
+    });
   });
 });

@@ -40,10 +40,7 @@ export class Storage {
     return null;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs resolve — CONVERGEABLE port-rack-cache-memcache-stores
-   */
+  /** @internal */
   private async createStore(
     type: object,
     uri: unknown,
@@ -60,7 +57,12 @@ export class Storage {
         throw new RuntimeError(`Unknown storage provider: ${String(uri)}`);
       }
     } else {
-      throw new RuntimeError(`Unknown storage provider: ${String(uri)}`);
+      const Dalli = await import("memjs").catch(() => null);
+      if (Dalli != null && uri instanceof Dalli.Client) {
+        return await (constGet(type, "Dalli") as StoreClass).resolve(uri);
+      } else {
+        throw new RuntimeError(`Unknown storage provider: ${String(uri)}`);
+      }
     }
   }
 

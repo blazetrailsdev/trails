@@ -5,6 +5,7 @@ export {
   Headers,
   Key,
   MetaStore,
+  Options,
   Request,
   Response,
   Storage,

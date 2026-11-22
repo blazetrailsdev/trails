@@ -1135,21 +1135,26 @@
     }
   },
   "rack-cache": {
-    "rows": 14,
+    "rows": 19,
     "excluded": [],
     "unwalked": [],
     "residue": {
       "cache-control.ts::CacheControl": "Rack::Cache::CacheControl",
       "cache.ts::Cache": "Rack::Cache",
       "entity-store.ts::Body": "Rack::Cache::EntityStore::Disk::Body",
+      "entity-store.ts::Dalli": "Rack::Cache::EntityStore::Dalli",
       "entity-store.ts::Disk": "Rack::Cache::EntityStore::Disk",
       "entity-store.ts::EntityStore": "Rack::Cache::EntityStore",
       "entity-store.ts::Heap": "Rack::Cache::EntityStore::Heap",
+      "entity-store.ts::MemCacheBase": "Rack::Cache::EntityStore::MemCacheBase",
       "entity-store.ts::Noop": "Rack::Cache::EntityStore::Noop",
       "key.ts::Key": "Rack::Cache::Key",
+      "meta-store.ts::Dalli": "Rack::Cache::MetaStore::Dalli",
       "meta-store.ts::Disk": "Rack::Cache::MetaStore::Disk",
       "meta-store.ts::Heap": "Rack::Cache::MetaStore::Heap",
+      "meta-store.ts::MemCacheBase": "Rack::Cache::MetaStore::MemCacheBase",
       "meta-store.ts::MetaStore": "Rack::Cache::MetaStore",
+      "options.ts::Options": "Rack::Cache::Options",
       "request.ts::Request": "Rack::Cache::Request",
       "response.ts::Response": "Rack::Cache::Response",
       "storage.ts::Storage": "Rack::Cache::Storage"
