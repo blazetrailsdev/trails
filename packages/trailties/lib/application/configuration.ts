@@ -484,19 +484,6 @@ export class Configuration extends EngineConfiguration {
     return SourceAnnotationExtractor.Annotation;
   }
 
-  get logLevel(): LogLevel | number | string {
-    return this._logLevel;
-  }
-
-  set logLevel(level: LogLevel | number | string) {
-    this._logLevel = level;
-    this._broadcastLogLevel = level;
-  }
-
-  get broadcastLogLevel(): LogLevel | number | string | null {
-    return this._broadcastLogLevel;
-  }
-
   inspect(): string {
     return `#<${rbModName(this.constructor)}:0x${(rbObjId(this) * 2).toString(16).padStart(14, "0")}>`;
   }
@@ -585,6 +572,19 @@ export class Configuration extends EngineConfiguration {
     this.generators().apiOnly = value;
 
     this._debugExceptionResponseFormat ??= "api";
+  }
+
+  get logLevel(): LogLevel | number | string {
+    return this._logLevel;
+  }
+
+  set logLevel(level: LogLevel | number | string) {
+    this._logLevel = level;
+    this._broadcastLogLevel = level;
+  }
+
+  get broadcastLogLevel(): LogLevel | number | string | null {
+    return this._broadcastLogLevel;
   }
 
   get debugExceptionResponseFormat(): "default" | "api" {
