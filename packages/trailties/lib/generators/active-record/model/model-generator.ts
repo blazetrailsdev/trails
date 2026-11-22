@@ -4,7 +4,7 @@ import { dasherize, type GeneratorOptions } from "../../base.js";
 import { Base } from "../../active-record.js";
 import type { GeneratedAttribute } from "../../generated-attribute.js";
 import { Generators } from "../../../generators.js";
-import { camelize, classify, underscore } from "@blazetrails/activesupport";
+import { camelize, underscore } from "@blazetrails/activesupport";
 
 export interface ModelGeneratorOptions extends GeneratorOptions {
   migration?: boolean;
@@ -50,52 +50,9 @@ export class ModelGenerator extends Base {
 
   async createModelFile(): Promise<void> {
     if (this.database() != null && !this.isCustomParent()) await this.generateAbstractClass();
-    const className = camelize(this.fileName);
-    const relativeRoot = "../".repeat(this.classPath().length);
-    const attributes = this.attributes;
-
-    const parentClassName = this.parentClassName();
-    const parentClass = classify(parentClassName.replace(/::/g, "_").replace(/\//g, "_"));
-    const parentPath = dasherize(parentClassName.replace(/::/g, "/"));
-    const parentLeaf = classify(parentClassName.split("::").pop()!);
-    const importName = parentLeaf === parentClass ? parentClass : `${parentLeaf} as ${parentClass}`;
-    const importPath = `import { ${importName} } from "${relativeRoot || "./"}${parentPath}${this.ext()}";`;
-
-    const bodyLines: string[] = [];
-
-    for (const attribute of attributes.filter((a) => a.reference())) {
-      bodyLines.push(
-        `    this.belongsTo("${attribute.name}"${attribute.polymorphic() ? ", { polymorphic: true }" : ""});`,
-      );
-    }
-    for (const attribute of attributes.filter((a) => a.richText())) {
-      bodyLines.push(`    this.hasRichText("${attribute.name}");`);
-    }
-    for (const attribute of attributes.filter((a) => a.attachment())) {
-      bodyLines.push(`    this.hasOneAttached("${attribute.name}");`);
-    }
-    for (const attribute of attributes.filter((a) => a.attachments())) {
-      bodyLines.push(`    this.hasManyAttached("${attribute.name}");`);
-    }
-    for (const attribute of attributes.filter((a) => a.token())) {
-      bodyLines.push(
-        `    this.hasSecureToken(${attribute.name !== "token" ? `"${attribute.name}"` : ""});`,
-      );
-    }
-    if (attributes.some((a) => a.passwordDigest())) {
-      bodyLines.push("    this.hasSecurePassword();");
-    }
-
-    const staticBlock = bodyLines.length > 0 ? `  static {\n${bodyLines.join("\n")}\n  }\n` : "";
-    const ext = this.ext();
-
-    await this.createFile(
-      File.join("app/models", ...this.classPath(), `${dasherize(this.fileName)}${ext}`),
-      `${importPath}
-
-export class ${className} extends ${parentClass} {
-${staticBlock}}
-`,
+    await this.template(
+      "model.ts",
+      File.join("app/models", ...this.classPath(), `${dasherize(this.fileName)}${this.ext()}`),
     );
   }
 
