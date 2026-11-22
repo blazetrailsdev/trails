@@ -9,8 +9,8 @@ import { assertEmpty, assertInDelta } from "@blazetrails/activesupport/testing/a
 import { Time as RubyTime } from "@blazetrails/date";
 
 import { itIfSupports } from "../support/supports.js";
-import { describeIfPostgresqlAdapter } from "../support/describe-if-postgresql-adapter.js";
 import { fixtures } from "../support/use-fixtures.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 
 import { Pirate } from "../models/pirate.js";
 import { Parrot, LiveParrot } from "../models/parrot.js";
@@ -1099,7 +1099,7 @@ describe("DirtyTest", () => {
   });
 });
 
-describeIfPostgresqlAdapter("DirtyTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("DirtyTest", () => {
   fixtures([], { useTransactionalTests: false });
 
   itIfSupports(

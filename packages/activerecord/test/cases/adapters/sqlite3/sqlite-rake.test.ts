@@ -1,4 +1,4 @@
-import { it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -13,12 +13,12 @@ import {
   stderr,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { DatabaseTasks } from "../../../../lib/tasks/database-tasks.js";
 import "../../../../lib/tasks/sqlite-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
 import { Base } from "../../../../lib/base.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 function tmpDbPath(): string {
   return path.join(os.tmpdir(), `db_create-${randomUUID()}.sqlite3`);
@@ -47,7 +47,7 @@ function captureStreams(): { out: () => string; err: () => string } {
   return { out: () => outString, err: () => errString };
 }
 
-describeIfSqlite("SqliteDBCreateTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SqliteDBCreateTest", () => {
   const database = "db_create.sqlite3";
   let configuration: HashConfig;
   let streams: ReturnType<typeof captureStreams>;
@@ -127,7 +127,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
   });
 });
 
-describeIfSqlite("SqliteDBDropTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SqliteDBDropTest", () => {
   const root = "/rails/root";
   const database = "db_create.sqlite3";
   const databaseRoot = `${root}/${database}`;
@@ -201,7 +201,7 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 });
 
-describeIfSqlite("SqliteDBCharsetTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SqliteDBCharsetTest", () => {
   const database = "db_create.sqlite3";
   let configuration: HashConfig;
 
@@ -226,7 +226,7 @@ describeIfSqlite("SqliteDBCharsetTest", () => {
   });
 });
 
-describeIfSqlite("SqliteDBCollationTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SqliteDBCollationTest", () => {
   const database = "db_create.sqlite3";
   let configuration: HashConfig;
 
@@ -244,7 +244,7 @@ describeIfSqlite("SqliteDBCollationTest", () => {
   });
 });
 
-describeIfSqlite("SqliteStructureDumpTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SqliteStructureDumpTest", () => {
   const created: string[] = [];
   let database: string;
   let configuration: HashConfig;
@@ -336,7 +336,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
   });
 });
 
-describeIfSqlite("SqliteStructureLoadTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SqliteStructureLoadTest", () => {
   const created: string[] = [];
 
   beforeEach(() => {});

@@ -80,12 +80,7 @@ export function finalizeGate(gate: TestGate): TestGate {
   return out;
 }
 
-export const ADAPTER_GATE_WRAPPERS = [
-  "describeIfPg",
-  "describeIfPostgresqlAdapter",
-  "describeIfMysqlAdapter",
-  "describeIfSqlite",
-] as const;
+export const ADAPTER_GATE_WRAPPERS = ["describeIfPg", "describeIfMysqlAdapter"] as const;
 
 const REGISTERED_GATE_WRAPPERS: ReadonlySet<string> = new Set<string>([
   ...ADAPTER_GATE_WRAPPERS,
@@ -122,14 +117,9 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
   switch (name) {
     case "describeIfPg":
       return { adapters: ["postgresql"], source: ["wrapper"] };
-    // The port of `current_adapter?(:PostgreSQLAdapter)`.
-    case "describeIfPostgresqlAdapter":
-      return { adapters: ["postgresql"], source: ["wrapper"] };
     // The port of `current_adapter?(:Mysql2Adapter)`.
     case "describeIfMysqlAdapter":
       return { adapters: ["mysql"], source: ["wrapper"] };
-    case "describeIfSqlite":
-      return { adapters: ["sqlite"], source: ["wrapper"] };
     case "describeIfSupports":
     case "itIfSupports":
       return featureArg

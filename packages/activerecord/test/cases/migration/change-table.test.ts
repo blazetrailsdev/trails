@@ -1,12 +1,12 @@
 import { describe, it, expect, expect as vitestExpect } from "vitest";
 import { assertNot } from "@blazetrails/activesupport/testing/assertions";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Table } from "../../../lib/connection-adapters/abstract/schema-definitions.js";
 import {
   Table as PgTable,
   type SchemaStatementsConstraintLike,
 } from "../../../lib/connection-adapters/postgresql/schema-definitions.js";
-import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 
 type Call = { method: string; args: unknown[] };
 type ExpectFn = (method: string, returns: unknown, args: unknown[]) => void;
@@ -379,7 +379,7 @@ describe("Migration", () => {
     });
   });
 
-  describeIfPostgresqlAdapter("TableTest", () => {
+  describe.runIf(currentAdapter("PostgreSQLAdapter"))("TableTest", () => {
     it("json creates json column", async () => {
       await withPgChangeTable(async (t, expect) => {
         expect("addColumn", null, ["delete_me", "foo", "json"]);

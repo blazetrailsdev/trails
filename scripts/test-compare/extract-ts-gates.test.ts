@@ -21,10 +21,7 @@ describe("gates.ts pure helpers", () => {
       adapters: ["mysql"],
       source: ["wrapper"],
     });
-    expect(gateFromWrapper("describeIfSqlite")).toEqual({
-      adapters: ["sqlite"],
-      source: ["wrapper"],
-    });
+    expect(() => gateFromWrapper("describeIfSqlite")).toThrow(/unregistered gate wrapper/);
     expect(gateFromWrapper("describe")).toBeNull();
   });
 
@@ -398,11 +395,11 @@ describe("TS extractor gate detection", () => {
   it("threads describeIfPg/Mysql/Sqlite onto contained tests", () => {
     const g = tsGates(`
       describeIfPg("PgSuite", () => { it("a", () => {}); });
-      describeIfSqlite("SqliteSuite", () => { it("b", () => {}); });
+      describeIfMysqlAdapter("MysqlSuite", () => { it("b", () => {}); });
       describe("Plain", () => { it("c", () => {}); });
     `);
     expect(g["a"]).toEqual({ adapters: ["postgresql"], source: ["wrapper"] });
-    expect(g["b"]).toEqual({ adapters: ["sqlite"], source: ["wrapper"] });
+    expect(g["b"]).toEqual({ adapters: ["mysql"], source: ["wrapper"] });
     expect(g["c"]).toBeUndefined();
   });
 
@@ -521,10 +518,10 @@ describe("gate stack across a same-file shared-cases helper", () => {
         function sharedCases(columnType) {
           it("default", () => {});
         }
-        describeIfPostgresqlAdapter("PostgresqlJSONTest", () => {
+        describeIfPg("PostgresqlJSONTest", () => {
           sharedCases("json");
         });
-        describeIfPostgresqlAdapter("PostgresqlJSONBTest", () => {
+        describeIfPg("PostgresqlJSONBTest", () => {
           sharedCases("jsonb");
         });
       `),
@@ -537,7 +534,7 @@ describe("gate stack across a same-file shared-cases helper", () => {
         function sharedCases() {
           it("default", () => {});
         }
-        describeIfPostgresqlAdapter("A", () => {
+        describeIfPg("A", () => {
           sharedCases();
         });
         describeIfMysqlAdapter("B", () => {

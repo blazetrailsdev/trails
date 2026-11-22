@@ -1,8 +1,8 @@
-import { it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 function copyTable(conn: any, from: string, to: string, options: Record<string, unknown> = {}) {
   return conn.copyTable(from, to, { temporary: true, ...options });
@@ -52,7 +52,7 @@ async function testCopyTable(
   } catch {}
 }
 
-describeIfSqlite("CopyTableTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("CopyTableTest", () => {
   fixtures(["customers"]);
 
   it("copy table", async () => {

@@ -1,14 +1,14 @@
-import { it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../../../lib/connection-adapters/sqlite3/column.js";
 
 let adapter: SQLite3Adapter;
 
-describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3VirtualColumnTest trails extras", () => {
   fixtures([]);
 
   beforeEach(async () => {

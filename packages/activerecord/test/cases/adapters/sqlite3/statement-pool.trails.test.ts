@@ -1,8 +1,8 @@
-import { it, expect, afterEach } from "vitest";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
+import { describe, it, expect, afterEach } from "vitest";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
-describeIfSqlite("SQLite3StatementPoolTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3StatementPoolTest", () => {
   const openAdapters: SQLite3Adapter[] = [];
   const track = (adapter: SQLite3Adapter): SQLite3Adapter => {
     openAdapters.push(adapter);

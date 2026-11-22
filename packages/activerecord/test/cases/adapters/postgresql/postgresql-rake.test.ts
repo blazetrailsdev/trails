@@ -1,16 +1,16 @@
-import { it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
 import {
   getOsAsync,
   getChildProcessAsync,
   type ChildProcessAdapter,
 } from "@blazetrails/ruby-compat";
 import { stdout, stderr, File, FileUtils } from "@blazetrails/ruby-compat";
-import { describeIfPostgresqlAdapter } from "../../../support/describe-if-postgresql-adapter.js";
 import { DatabaseTasks } from "../../../../lib/tasks/database-tasks.js";
 import "../../../../lib/tasks/postgresql-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
 import { ARUNIT_DATABASE } from "../../../support/config.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { DatabaseAlreadyExists } from "../../../../lib/errors.js";
 import { Base } from "../../../../lib/base.js";
 import { dumpSchemas, setDumpSchemas } from "../../../../lib/active-record.js";
@@ -72,7 +72,7 @@ function captureStdio(): { out: string[]; err: string[] } {
   return { out, err };
 }
 
-describeIfPostgresqlAdapter("PostgreSQLDBCreateTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLDBCreateTest", () => {
   let connection: { createDatabase: ReturnType<typeof vi.fn> };
   let stdio: { out: string[]; err: string[] };
 
@@ -198,7 +198,7 @@ describeIfPostgresqlAdapter("PostgreSQLDBCreateTest", () => {
   });
 });
 
-describeIfPostgresqlAdapter("PostgreSQLDBDropTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLDBDropTest", () => {
   let connection: { dropDatabase: ReturnType<typeof vi.fn> };
   let stdio: { out: string[]; err: string[] };
 
@@ -240,7 +240,7 @@ describeIfPostgresqlAdapter("PostgreSQLDBDropTest", () => {
   });
 });
 
-describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLPurgeTest", () => {
   let connection: {
     createDatabase: ReturnType<typeof vi.fn>;
     dropDatabase: ReturnType<typeof vi.fn>;
@@ -324,7 +324,7 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
   });
 });
 
-describeIfPostgresqlAdapter("PostgreSQLDBCharsetTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLDBCharsetTest", () => {
   beforeEach(() => {});
 
   it("db retrieves charset", async () => {
@@ -338,7 +338,7 @@ describeIfPostgresqlAdapter("PostgreSQLDBCharsetTest", () => {
   });
 });
 
-describeIfPostgresqlAdapter("PostgreSQLDBCollationTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLDBCollationTest", () => {
   beforeEach(() => {});
 
   it("db retrieves collation", async () => {
@@ -352,7 +352,7 @@ describeIfPostgresqlAdapter("PostgreSQLDBCollationTest", () => {
   });
 });
 
-describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest", () => {
   let system: MockInstance<NonNullable<ChildProcessAdapter["system"]>>;
   let filename: string;
   let previousFlags: typeof DatabaseTasks.structureDumpFlags;
@@ -597,7 +597,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   });
 });
 
-describeIfPostgresqlAdapter("PostgreSQLStructureLoadTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest", () => {
   let system: MockInstance<NonNullable<ChildProcessAdapter["system"]>>;
   let previousFlags: typeof DatabaseTasks.structureLoadFlags;
   let expectedArgs: string[];

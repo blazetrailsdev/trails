@@ -7,7 +7,6 @@ import { Current, Migration, IllegalMigrationNameError } from "../../lib/migrati
 import { DefaultStrategy } from "../../lib/migration/default-strategy.js";
 import { Base } from "../../lib/base.js";
 import { RecordNotUnique } from "../../lib/errors.js";
-import { describeIfPostgresqlAdapter } from "../support/describe-if-postgresql-adapter.js";
 import { SchemaMigration } from "../../lib/schema-migration.js";
 import { InternalMetadata } from "../../lib/internal-metadata.js";
 import { adapterType, checkoutRawTestAdapter } from "../support/test-adapter.js";
@@ -18,6 +17,7 @@ import { Table } from "../../lib/connection-adapters/abstract/schema-definitions
 import { fixtures } from "../support/use-fixtures.js";
 import { anonymousMigration } from "../support/anonymous-migration.js";
 import { migrationProxy } from "../support/migration-proxy.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { migrationStrategy, setMigrationStrategy } from "../../lib/active-record.js";
 
 describe("MigrationTest", () => {
@@ -735,39 +735,42 @@ describe("Migration index forwarders", () => {
   });
 });
 
-describeIfPostgresqlAdapter("Migration index forwarders (PostgreSQL)", () => {
-  fixtures({}, { useTransactionalTests: false });
-  it("addIndex concurrently leaves an invalid index after a unique violation", async () => {
-    const conn = await Base.leaseConnection();
-    await conn.dropTable("ex", { ifExists: true });
-    await conn.createTable("ex", { force: true }, (t) => {
-      t.integer("number");
-    });
-    try {
-      await conn.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
-      const mig = new (class extends Migration.Current {})();
-
-      let error: unknown;
-      try {
-        await mig.addIndex("ex", "number", {
-          unique: true,
-          algorithm: "concurrently",
-          name: "invalid_index",
-        });
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeInstanceOf(RecordNotUnique);
-
-      expect(await mig.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
-      expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: true })).toBe(
-        false,
-      );
-      expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: false })).toBe(
-        true,
-      );
-    } finally {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))(
+  "Migration index forwarders (PostgreSQL)",
+  () => {
+    fixtures({}, { useTransactionalTests: false });
+    it("addIndex concurrently leaves an invalid index after a unique violation", async () => {
+      const conn = await Base.leaseConnection();
       await conn.dropTable("ex", { ifExists: true });
-    }
-  });
-});
+      await conn.createTable("ex", { force: true }, (t) => {
+        t.integer("number");
+      });
+      try {
+        await conn.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
+        const mig = new (class extends Migration.Current {})();
+
+        let error: unknown;
+        try {
+          await mig.addIndex("ex", "number", {
+            unique: true,
+            algorithm: "concurrently",
+            name: "invalid_index",
+          });
+        } catch (e) {
+          error = e;
+        }
+        expect(error).toBeInstanceOf(RecordNotUnique);
+
+        expect(await mig.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
+        expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: true })).toBe(
+          false,
+        );
+        expect(await mig.indexExists("ex", "number", { name: "invalid_index", valid: false })).toBe(
+          true,
+        );
+      } finally {
+        await conn.dropTable("ex", { ifExists: true });
+      }
+    });
+  },
+);

@@ -1,8 +1,8 @@
-import { it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import "../../../../lib/index.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 
 type Row = Record<string, unknown>;
@@ -23,7 +23,7 @@ interface TableRebuildInternals {
 
 fixtures([]);
 
-describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3Adapter table-rebuild cluster", () => {
   let db: SQLite3Adapter;
   let leased: SQLite3Adapter | undefined;
   const internals = (): TableRebuildInternals => db as unknown as TableRebuildInternals;

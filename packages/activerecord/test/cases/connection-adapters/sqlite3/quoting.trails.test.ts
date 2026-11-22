@@ -5,7 +5,7 @@ import { Rational, TypeError } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { DateTime as ARDateTimeType } from "../../../../lib/type/date-time.js";
 import { TypeMap } from "../../../../lib/type/type-map.js";
@@ -335,67 +335,70 @@ describe("SQLite3::Quoting", () => {
     });
   });
 
-  describeIfSqlite("SQLite microsecond round-trip — integration", () => {
-    let adapter: SQLite3Adapter;
+  describe.runIf(currentAdapter("SQLite3Adapter"))(
+    "SQLite microsecond round-trip — integration",
+    () => {
+      let adapter: SQLite3Adapter;
 
-    beforeEach(async () => {
-      adapter = (await Base.leaseConnection()) as SQLite3Adapter;
-      await adapter.execute(`DROP TABLE IF EXISTS "quoting_events"`);
-      await adapter.execute(`CREATE TABLE "quoting_events" (
+      beforeEach(async () => {
+        adapter = (await Base.leaseConnection()) as SQLite3Adapter;
+        await adapter.execute(`DROP TABLE IF EXISTS "quoting_events"`);
+        await adapter.execute(`CREATE TABLE "quoting_events" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
         "ts"  DATETIME,
         "dt"  DATETIME,
         "d"   DATE,
         "t"   TIME
       )`);
-    });
+      });
 
-    afterEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS "quoting_events"`);
-    });
+      afterEach(async () => {
+        await adapter.execute(`DROP TABLE IF EXISTS "quoting_events"`);
+      });
 
-    it("Temporal.Instant with microsecond precision survives INSERT → SELECT as Instant", async () => {
-      const instant = Temporal.Instant.from("2026-04-18T12:34:56.123456Z");
-      await adapter.execute(`INSERT INTO "quoting_events" ("ts") VALUES (${quote(instant)})`);
-      const rows = (await adapter.execute(`SELECT "ts" FROM "quoting_events" LIMIT 1`))!;
-      const raw = rows[0].ts as string;
-      const cast = new ARDateTimeType().cast(raw);
-      expect(cast).toBeInstanceOf(RubyTime);
-      expect(
-        (cast as RubyTime).toR().cmp(new Rational(instant.epochNanoseconds, 1_000_000_000n)),
-      ).toBe(0);
-    });
+      it("Temporal.Instant with microsecond precision survives INSERT → SELECT as Instant", async () => {
+        const instant = Temporal.Instant.from("2026-04-18T12:34:56.123456Z");
+        await adapter.execute(`INSERT INTO "quoting_events" ("ts") VALUES (${quote(instant)})`);
+        const rows = (await adapter.execute(`SELECT "ts" FROM "quoting_events" LIMIT 1`))!;
+        const raw = rows[0].ts as string;
+        const cast = new ARDateTimeType().cast(raw);
+        expect(cast).toBeInstanceOf(RubyTime);
+        expect(
+          (cast as RubyTime).toR().cmp(new Rational(instant.epochNanoseconds, 1_000_000_000n)),
+        ).toBe(0);
+      });
 
-    it("Temporal.PlainDateTime with microseconds survives INSERT → SELECT as Instant", async () => {
-      const dt = Temporal.PlainDateTime.from("2026-04-18T12:34:56.654321");
-      await adapter.execute(`INSERT INTO "quoting_events" ("dt") VALUES (${quote(dt)})`);
-      const rows = (await adapter.execute(`SELECT "dt" FROM "quoting_events" LIMIT 1`))!;
-      const raw = rows[0].dt as string;
-      const cast = new ARDateTimeType().cast(raw) as RubyTime;
-      expect(cast).toBeInstanceOf(RubyTime);
-      expect(cast.usec).toBe(654321);
-    });
+      it("Temporal.PlainDateTime with microseconds survives INSERT → SELECT as Instant", async () => {
+        const dt = Temporal.PlainDateTime.from("2026-04-18T12:34:56.654321");
+        await adapter.execute(`INSERT INTO "quoting_events" ("dt") VALUES (${quote(dt)})`);
+        const rows = (await adapter.execute(`SELECT "dt" FROM "quoting_events" LIMIT 1`))!;
+        const raw = rows[0].dt as string;
+        const cast = new ARDateTimeType().cast(raw) as RubyTime;
+        expect(cast).toBeInstanceOf(RubyTime);
+        expect(cast.usec).toBe(654321);
+      });
 
-    it("Temporal.PlainDate survives INSERT → SELECT", async () => {
-      const date = Temporal.PlainDate.from("2026-04-18");
-      await adapter.execute(`INSERT INTO "quoting_events" ("d") VALUES (${quote(date)})`);
-      const rows = (await adapter.execute(`SELECT "d" FROM "quoting_events" LIMIT 1`))!;
-      const raw = rows[0].d as string;
-      const cast = new DateType().cast(raw);
-      expect(cast).toBeInstanceOf(Temporal.PlainDate);
-      const pd = cast as Temporal.PlainDate;
-      expect(pd.year).toBe(2026);
-      expect(pd.month).toBe(4);
-      expect(pd.day).toBe(18);
-    });
+      it("Temporal.PlainDate survives INSERT → SELECT", async () => {
+        const date = Temporal.PlainDate.from("2026-04-18");
+        await adapter.execute(`INSERT INTO "quoting_events" ("d") VALUES (${quote(date)})`);
+        const rows = (await adapter.execute(`SELECT "d" FROM "quoting_events" LIMIT 1`))!;
+        const raw = rows[0].d as string;
+        const cast = new DateType().cast(raw);
+        expect(cast).toBeInstanceOf(Temporal.PlainDate);
+        const pd = cast as Temporal.PlainDate;
+        expect(pd.year).toBe(2026);
+        expect(pd.month).toBe(4);
+        expect(pd.day).toBe(18);
+      });
 
-    it("Time::Value with microseconds survives INSERT → SELECT", async () => {
-      const time = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 654321));
-      await adapter.execute(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
-      const rows = (await adapter.execute(`SELECT "t" FROM "quoting_events" LIMIT 1`))!;
-      const raw = rows[0].t as string;
-      const cast = new TimeType().cast(raw) as RubyTime;
-      expect(cast.getutc().xmlschema(6)).toBe("2000-01-01T14:23:55.654321Z");
-    });
-  });
+      it("Time::Value with microseconds survives INSERT → SELECT", async () => {
+        const time = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 654321));
+        await adapter.execute(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
+        const rows = (await adapter.execute(`SELECT "t" FROM "quoting_events" LIMIT 1`))!;
+        const raw = rows[0].t as string;
+        const cast = new TimeType().cast(raw) as RubyTime;
+        expect(cast.getutc().xmlschema(6)).toBe("2000-01-01T14:23:55.654321Z");
+      });
+    },
+  );
 });

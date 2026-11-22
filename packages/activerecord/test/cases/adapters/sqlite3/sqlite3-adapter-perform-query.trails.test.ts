@@ -1,10 +1,10 @@
-import { it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../../../../lib/base.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { ReadOnlyError } from "../../../../lib/errors.js";
 import { Result } from "../../../../lib/result.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
 let adapter: SQLite3Adapter;
 
@@ -21,7 +21,7 @@ afterEach(async () => {
   await adapter.disconnectBang();
 });
 
-describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterPerformQueryTest (trails)", () => {
   it("execute runs a non-row-returning statement and returns no rows", async () => {
     await expect(adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`)).resolves.toEqual([]);
     await expect(adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`)).resolves.toEqual([]);

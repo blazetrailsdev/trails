@@ -1,14 +1,14 @@
-import { it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { jsonSharedTestCases, JsonDataType as klass } from "../../json-shared-test-cases.js";
 import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 
 const columnType = "json";
 
-describeIfSqlite("SQLite3JSONTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3JSONTest", () => {
   fixtures([]);
 
   let connection: SQLite3Adapter;

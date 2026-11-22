@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { fixtures } from "../../../support/use-fixtures.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
 import { Post } from "../../../models/post.js";
 
-describeIfSqlite("SQLite3Adapter", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3Adapter", () => {
   describe("BindParameterTest", () => {
     fixtures(["posts"]);
 

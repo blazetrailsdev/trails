@@ -1,12 +1,12 @@
-import { it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { File } from "@blazetrails/ruby-compat";
 import { setTrailsRoot, trailsRoot } from "@blazetrails/activesupport";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { databaseCli } from "../../../../lib/active-record.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 
-describeIfSqlite("SQLite3DbConsoleTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3DbConsoleTest", () => {
   const root = (path: string) => File.expandPath(path, trailsRoot() ?? undefined);
 
   const makeDbConfig = (config: Record<string, unknown>) =>

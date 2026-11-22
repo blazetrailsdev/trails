@@ -1,7 +1,6 @@
 import { StandardError } from "@blazetrails/ruby-compat";
-import { it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Owner } from "../../../models/owner.js";
@@ -25,6 +24,7 @@ import {
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { newSqlitePool } from "../../../support/pooled-sqlite-adapter.js";
 import * as DdlHelper from "../../../support/ddl-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { NullPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
 import { StatementInvalid, StatementTimeout } from "../../../../lib/errors.js";
 import { BusyException } from "@blazetrails/sqlite3";
@@ -121,7 +121,7 @@ class DualEncoding extends Base {
   declare data: Uint8Array;
 }
 
-describeIfSqlite("SQLite3AdapterTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
   fixtures(["owners"], { useTransactionalTests: false });
 
   it("database should get created when missing parent directories for database path", async () => {
