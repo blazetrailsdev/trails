@@ -135,7 +135,6 @@
       <h2>Built for Rails developers, new and seasoned.</h2>
       <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/{data.buildRef}/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/{data.buildRef}/examples/react-native-notes">React Native app</a>. On the roadmap: the full stack running in the browser.</p>
       <p class="small"><strong>trails and Rails apps can work side by side.</strong> In live demos, a trails app and a Rails app read each other's encrypted passwords and exchange Active Job messages across the two languages in real time.</p>
-      <a class="cta" href="{base}/docs/guides/idioms">Blaze trails &rsaquo;</a>
     </div>
   </section>
 
@@ -196,7 +195,6 @@
   h3 { color: var(--orange); font-size: 36px; line-height: 34px; margin: 1.5rem 0 0.75rem; }
   .intro { font-size: 39px; line-height: 44px; max-width: 960px; margin: 0 auto 1.5rem; }
   .small { font-size: 26px; line-height: 29px; max-width: 900px; margin: 1.5rem auto 0; }
-  .cta { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; font-size: 21px; }
 
   .announce { background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; padding: 8px; }
 
