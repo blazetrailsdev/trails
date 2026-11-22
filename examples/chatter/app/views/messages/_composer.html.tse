@@ -1,0 +1,10 @@
+<% const id = parent ? `composer_${parent.id}` : "composer"; %>
+<%= formWith({ model: [room, new Message()], id, class: "composer", data: { controller: "composer", action: "keydown->composer#submitOnEnter turbo:submit-end->composer#reset" } }, (form) => { %>
+  <% if (parent) { %><%= form.hiddenField("parent_id", { value: parent.id }) %><% } %>
+  <%= form.textArea("body", { rows: 1, placeholder: parent ? "Reply…" : "Message " + (room.isChannel() ? `#${room.name}` : ""), data: { composer_target: "input" } }) %>
+  <div class="composer-actions">
+    <label class="attach" title="Attach files">📎<%= form.fileField("attachments", { multiple: true, class: "hidden", data: { action: "change->composer#filesChanged" } }) %></label>
+    <span class="files" data-composer-target="files"></span>
+    <%= form.submit("Send", { class: "button" }) %>
+  </div>
+<% }) %>

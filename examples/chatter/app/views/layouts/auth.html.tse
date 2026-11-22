@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Sign in · Chatter</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrfMetaTags() %>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/assets/application.css">
+    <script type="module" src="/assets/application.js"></script>
+  </head>
+  <body class="auth">
+    <div class="auth-card">
+      <div class="logo">💬 Chatter</div>
+      <%= render({ partial: "shared/flash" }) %>
+      <%= yield %>
+    </div>
+  </body>
+</html>

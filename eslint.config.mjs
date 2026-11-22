@@ -233,6 +233,12 @@ export default defineConfig(
     languageOptions: { sourceType: "commonjs", globals: { module: "writable" } },
   },
   {
+    files: ["examples/chatter/app/javascript/**/*.js"],
+    languageOptions: {
+      globals: { document: "readonly", window: "readonly", MutationObserver: "readonly" },
+    },
+  },
+  {
     files: [
       "examples/react-native-notes/*.config.js",
       "examples/react-native-notes/{babel,shims,headless}/*.js",

@@ -100,7 +100,8 @@ Object.defineProperty(RoutesHelpers, "with", {
       for (const [key, descriptor] of includedDescriptors(cls, mod)) {
         if (
           Object.hasOwn(proto, key) &&
-          !earlier.some((included) => isIncludedMember(proto, key, included))
+          !earlier.some((included) => isIncludedMember(proto, key, included)) &&
+          !isCopiedFromIncludedModule(cls, key)
         ) {
           continue;
         }
@@ -148,6 +149,29 @@ export function isIncludedMember(
   if (!own) return true;
   const mine = installed.get(key);
   return mine !== undefined && own.value === mine.value && own.get === mine.get;
+}
+
+function isCopiedFromIncludedModule(cls: RoutesHelpersControllerClass, key: string): boolean {
+  const own = Object.getOwnPropertyDescriptor(cls.prototype, key)!;
+  return includedModules(cls).some((m) => {
+    let source: PropertyDescriptor | undefined;
+    if (typeof m === "function") {
+      for (
+        let p: object | null = (m as ClassModule).prototype;
+        p && !source;
+        p = Object.getPrototypeOf(p) as object | null
+      ) {
+        source = Object.getOwnPropertyDescriptor(p, key);
+      }
+    } else if (m !== null && typeof m === "object") {
+      source = Object.getOwnPropertyDescriptor(m, key);
+    }
+    if (!source) return false;
+    return (
+      (source.value !== undefined && source.value === own.value) ||
+      (source.get !== undefined && source.get === own.get)
+    );
+  });
 }
 
 function includedDescriptors(

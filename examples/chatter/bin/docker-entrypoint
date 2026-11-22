@@ -1,0 +1,6 @@
+#!/bin/bash -e
+# Create or migrate the database before the web process starts.
+if [ "${1}" == "sh" ]; then
+  node bin/trails db:prepare
+fi
+exec "${@}"

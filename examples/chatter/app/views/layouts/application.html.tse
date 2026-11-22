@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= contentFor("title") ?? "Chatter" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrfMetaTags() %>
+    <%= cspMetaTag() %>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/assets/application.css" data-turbo-track="reload">
+    <script type="module" src="/assets/application.js" data-turbo-track="reload"></script>
+    <%= yield("head") %>
+  </head>
+  <body>
+    <div class="app">
+      <%= render({ partial: "shared/sidebar" }) %>
+      <main class="main">
+        <%= render({ partial: "shared/flash" }) %>
+        <%= yield %>
+      </main>
+      <aside class="panel">
+        <%= turboFrameTag("thread") %>
+      </aside>
+    </div>
+  </body>
+</html>

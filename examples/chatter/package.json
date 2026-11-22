@@ -1,0 +1,58 @@
+{
+  "name": "@blazetrails/example-chatter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*.tse": {
+      "types": "./.trails/views/*.tse.d.ts",
+      "default": "./.trails/views/*.tse.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm build:views && pnpm build:assets",
+    "trails": "trails",
+    "dev": "trails server",
+    "db:create": "trails db:create",
+    "db:migrate": "trails db:migrate",
+    "db:seed": "trails db:seed",
+    "db:setup": "trails db:setup",
+    "db:reset": "trails db:reset",
+    "build:views": "trails-tsc-views build --views app/views",
+    "build:assets": "vite build"
+  },
+  "dependencies": {
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/date": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rackup": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/trailties": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/actionmailer": "workspace:*",
+    "@blazetrails/activestorage": "workspace:*",
+    "@blazetrails/actionmailbox": "workspace:*",
+    "@blazetrails/actiontext": "workspace:*",
+    "@blazetrails/solid-cache": "workspace:*",
+    "@blazetrails/solid-queue": "workspace:*",
+    "@blazetrails/solid-cable": "workspace:*",
+    "@blazetrails/actioncable": "workspace:*",
+    "@blazetrails/turbo": "workspace:*",
+    "@blazetrails/stimulus": "workspace:*",
+    "@blazetrails/net-smtp": "workspace:*",
+    "@blazetrails/mysql2": "workspace:*",
+    "@hotwired/turbo-rails": "^8.0.12",
+    "@hotwired/stimulus": "^3.2.2",
+    "mysql2": "^3.18.2"
+  },
+  "devDependencies": {
+    "@blazetrails/activerecord-cli": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@types/node": "^25.3.5",
+    "vite": "^7.0.0"
+  }
+}
