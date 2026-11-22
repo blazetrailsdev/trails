@@ -195,8 +195,9 @@ own:
 - **Active Job** wraps each job it performs in the Reloader.
 - **Action Cable** wraps the work each connection does, and each channel's
   subscribe and unsubscribe callbacks.
-- **Active Support's `CurrentAttributes`** resets in the Executor's run
-  callback, so each unit of work starts with empty values.
+- **Active Support's `CurrentAttributes`** resets in both the Executor's run
+  and complete callbacks, so values never cross from one unit of work into the
+  next, and the Reloader clears every instance before classes are unloaded.
 
 ### Configuration
 
@@ -209,8 +210,9 @@ in the generated `config/environments/*.ts` files.
 
 The load interlock is a share lock: any number of units of work may hold it in
 the shared ("running") mode at once, and unloading needs it in the exclusive
-mode. The Executor takes the shared side for the duration of each wrap; the
-Reloader takes the exclusive side to unload. So a reload waits for running work
+mode. When reloading is enabled, the Executor takes the shared side for the
+duration of each wrap and the Reloader takes the exclusive side to unload;
+with reloading off, the hook is not registered and wraps never touch the lock. So a reload waits for running work
 to finish, and new work waits for a reload to finish.
 
 The lock is `ActiveSupport::Dependencies.interlock`, an `Interlock` built on
