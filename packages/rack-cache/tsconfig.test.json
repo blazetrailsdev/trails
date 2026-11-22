@@ -4,6 +4,6 @@
     "outDir": "dist-test",
     "rootDir": "."
   },
-  "include": ["test"],
+  "include": ["test", "lib/types"],
   "references": [{ "path": "./tsconfig.json" }]
 }

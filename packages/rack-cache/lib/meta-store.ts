@@ -8,6 +8,10 @@ import {
   IOError,
   Marshal,
   NotImplementedError,
+  type Generic,
+  camelized,
+  extend,
+  rbObjRespondTo,
   rbModName,
   rbObjDup,
   rbClassNewInstance,
@@ -17,6 +21,8 @@ import {
   toS,
   warn,
 } from "@blazetrails/ruby-compat";
+import { Utils } from "@blazetrails/rack";
+import type { Client as DalliClient } from "memjs";
 import { Noop } from "./entity-store.js";
 import { Key } from "./key.js";
 import type { Request } from "./request.js";
@@ -39,6 +45,10 @@ export class MetaStore {
   static Disk: typeof Disk;
   static DISK: typeof Disk;
   static FILE: typeof Disk;
+  static MemCacheBase: typeof MemCacheBase;
+  static Dalli: typeof Dalli;
+  static MEMCACHE: typeof Dalli;
+  static MEMCACHED: typeof Dalli;
 
   async lookup(request: Request, entityStore: EntityStore): Promise<Response | null> {
     const key = this.cacheKey(request);
@@ -327,3 +337,82 @@ export class Disk extends MetaStore {
 MetaStore.Disk = Disk;
 MetaStore.DISK = Disk;
 MetaStore.FILE = Disk;
+
+export class MemCacheBase extends MetaStore {
+  cache!: DalliClient;
+
+  static async resolve(uri: unknown): Promise<MemCacheBase> {
+    if (rbObjRespondTo(uri, "scheme")) {
+      const { host, port, query, path } = uri as Generic;
+      const server = `${host}:${port ?? "11211"}`;
+      const options: Record<string, unknown> = (this as unknown as typeof Utils).parseQuery(
+        query ?? "",
+      );
+      for (const key of Object.keys(options)) {
+        let value: unknown = options[key];
+        delete options[key];
+        value = value === "true" ? true : value === "false" ? false : value;
+        options[camelized(key)] = value;
+      }
+
+      options.namespace = toS(path).replace(/^\//, "");
+
+      return (this as unknown as typeof Dalli).new(server, options);
+    } else {
+      return (this as unknown as typeof Dalli).new(uri);
+    }
+  }
+}
+
+extend(MemCacheBase, Utils);
+
+export class Dalli extends MemCacheBase {
+  /** @missingRailsCall new — PERMANENT */
+  protected constructor(
+    _server: unknown = "localhost:11211",
+    _options: Record<string, unknown> = {},
+  ) {
+    super();
+  }
+
+  /** @missingRailsCall require — PERMANENT */
+  static async new(
+    server: unknown = "localhost:11211",
+    options: Record<string, unknown> = {},
+  ): Promise<Dalli> {
+    const store = rbClassNewInstance(this, server, options) as Dalli;
+    store.cache = rbObjRespondTo(server, "stats")
+      ? (server as DalliClient)
+      : (await import("memjs")).Client.create(server as string, options);
+    return store;
+  }
+
+  /**
+   * @missingRailsArgs get — PERMANENT
+   * @inventedArm load — PERMANENT
+   */
+  override async read(key: string): Promise<Entry[]> {
+    key = this.hexdigest(key);
+    const { value } = await this.cache.get(key);
+    return value != null ? (Marshal.load(value) as Entry[]) : [];
+  }
+
+  /**
+   * @missingRailsArgs set — PERMANENT
+   * @inventedArm dump — PERMANENT
+   */
+  override async write(key: string, entries: Entry[], ttl: number | null = 0): Promise<boolean> {
+    key = this.hexdigest(key);
+    return this.cache.set(key, Marshal.dump(entries, -1, true), { expires: ttl });
+  }
+
+  override async purge(key: string): Promise<null> {
+    await this.cache.delete(this.hexdigest(key));
+    return null;
+  }
+}
+
+MetaStore.MemCacheBase = MemCacheBase;
+MetaStore.Dalli = Dalli;
+MetaStore.MEMCACHE = Dalli;
+MetaStore.MEMCACHED = MetaStore.MEMCACHE;

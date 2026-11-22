@@ -1214,6 +1214,9 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
+      memjs:
+        specifier: ^1.3.2
+        version: 1.3.2
 
   packages/rack-cors:
     dependencies:
@@ -6028,6 +6031,10 @@ packages:
   media-typer@0.3.0:
     resolution: {integrity: sha512-dq+qelQ9akHpcOl/gUVRTxVIOkAJ1wR3QAvb4RsVjS8oVoFjDGTc679wJYmUmknUF5HwMLOgb5O+a3KxfWapPQ==}
     engines: {node: '>= 0.6'}
+
+  memjs@1.3.2:
+    resolution: {integrity: sha512-qUEg2g8vxPe+zPn09KidjIStHPtoBO8Cttm8bgJFWWabbsjQ9Av9Ky+6UcvKx6ue0LLb/LEhtcyQpRyKfzeXcg==}
+    engines: {node: '>=0.10.0'}
 
   memoize-one@5.2.1:
     resolution: {integrity: sha512-zYiwtZUcYyXKo/np96AGZAckk+FWWsUdJ3cHGGmld7+AhvcWmQyGCYUh1hc4Q/pkOhb65dQR/pqCyK0cOaHz4Q==}
@@ -11809,6 +11816,8 @@ snapshots:
   mdurl@2.0.0: {}
 
   media-typer@0.3.0: {}
+
+  memjs@1.3.2: {}
 
   memoize-one@5.2.1: {}
 

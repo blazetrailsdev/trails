@@ -1,7 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Dir, File, getFs, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Disk, EntityStore, Heap, Noop } from "../lib/entity-store.js";
-import { createTempDirectory, removeEntrySecure } from "./support/test-helper.js";
+import { Dir, File, URI, getFs, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Dalli, Disk, EntityStore, Heap, Noop } from "../lib/entity-store.js";
+import {
+  createTempDirectory,
+  dalli,
+  haveDalli,
+  MEMCACHED,
+  removeEntrySecure,
+} from "./support/test-helper.js";
+import type { Client } from "memjs";
+import { MetaStore } from "../lib/meta-store.js";
+
+const HAVE_DALLI = await haveDalli();
 
 function assertShaLike(object: string | null | undefined): void {
   expect(object).toBeTruthy();
@@ -225,6 +235,51 @@ describe("Rack::Cache::EntityStore", () => {
       }
       expect(subdirs.length).toBe(28);
     });
+  });
+
+  // PERMANENT-SKIP: RFC 0168 Non-goals — `MemCached` binds the `memcached` C-extension gem.
+  describe.skip("MemCached", () => {
+    rackCacheEntityStoreImplementation(() => null as never);
+  });
+
+  describe.skip("options parsing", () => {
+    // PERMANENT-SKIP: RFC 0168 Non-goals — `MemCached` binds the `memcached` C-extension gem.
+    it.skip("passes options from uri", () => {});
+    // PERMANENT-SKIP: RFC 0168 Non-goals — `MemCached` binds the `memcached` C-extension gem.
+    it.skip("takes namespace into account", () => {});
+  });
+
+  describe.runIf(HAVE_DALLI)("Dalli", () => {
+    let store: Dalli | null;
+    beforeEach(async () => {
+      await (dalli as Client).flush();
+      store = await EntityStore.Dalli.new(dalli);
+    });
+    afterEach(() => {
+      store = null;
+    });
+    rackCacheEntityStoreImplementation(() => store as unknown as Heap);
+  });
+
+  describe.runIf(HAVE_DALLI)("options parsing", () => {
+    let dalliMetastore: { cache: Client };
+    beforeEach(async () => {
+      const uri = URI.parse(`memcached://${MEMCACHED}/obj_ns1?show_backtraces=true`);
+      dalliMetastore = await MetaStore.Dalli.resolve(uri);
+    });
+
+    it("passes options from uri", () => {
+      expect(dalliMetastore.cache.options.showBacktraces).toBe(true);
+    });
+
+    it("takes namespace into account", () => {
+      expect(dalliMetastore.cache.options.namespace).toBe("obj_ns1");
+    });
+  });
+
+  // PERMANENT-SKIP: RFC 0168 Non-goals — `GAEStore` is Java-only (`app_engine.rb:5-13`).
+  describe.skip("GAEStore", () => {
+    rackCacheEntityStoreImplementation(() => null as never);
   });
 });
 
