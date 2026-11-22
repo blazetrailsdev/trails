@@ -1340,14 +1340,14 @@ export class Base extends Model {
   /**
    * @internal
    * @inlinedFrom ActiveRecord::TouchLater#init_internals rails/v8.0.5.2/activerecord/lib/active_record/touch_later.rb:49-52
-   * @inlinedFrom ActiveRecord::Transactions#init_internals rails/v8.0.5.2/activerecord/lib/active_record/transactions.rb:432-437
+   * @inlinedFrom ActiveRecord::Transactions#init_internals rails/v8.0.5.2/activerecord/lib/active_record/transactions.rb:433-439
    * @inlinedFrom ActiveRecord::AutosaveAssociation#init_internals rails/v8.0.5.2/activerecord/lib/active_record/autosave_association.rb:290-293
    * @inlinedFrom ActiveRecord::Associations#init_internals rails/v8.0.5.2/activerecord/lib/active_record/associations.rb:75-78
    * @inlinedFrom ActiveRecord::Timestamp#init_internals rails/v8.0.5.2/activerecord/lib/active_record/timestamp.rb:102-105
    * @inlinedFrom ActiveRecord::AttributeMethods::Dirty#init_internals rails/v8.0.5.2/activerecord/lib/active_record/attribute_methods/dirty.rb:196-202
    * @inlinedFrom ActiveModel::Dirty#init_internals rails/v8.0.5.2/activemodel/lib/active_model/dirty.rb:372-376
    * @inlinedFrom ActiveRecord::Persistence#init_internals rails/v8.0.5.2/activerecord/lib/active_record/persistence.rb:814-818
-   * @inlinedFrom ActiveRecord::Core#init_internals rails/v8.0.5.2/activerecord/lib/active_record/core.rb:834-849
+   * @inlinedFrom ActiveRecord::Core#init_internals rails/v8.0.5.2/activerecord/lib/active_record/core.rb:836-851
    */
   initInternals(): void {
     this._readonly = false;
