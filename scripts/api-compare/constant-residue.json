@@ -1134,16 +1134,19 @@
     }
   },
   "rack-cache": {
-    "rows": 10,
+    "rows": 13,
     "excluded": [],
     "unwalked": [],
     "residue": {
       "cache-control.ts::CacheControl": "Rack::Cache::CacheControl",
       "cache.ts::Cache": "Rack::Cache",
+      "entity-store.ts::Body": "Rack::Cache::EntityStore::Disk::Body",
+      "entity-store.ts::Disk": "Rack::Cache::EntityStore::Disk",
       "entity-store.ts::EntityStore": "Rack::Cache::EntityStore",
       "entity-store.ts::Heap": "Rack::Cache::EntityStore::Heap",
       "entity-store.ts::Noop": "Rack::Cache::EntityStore::Noop",
       "key.ts::Key": "Rack::Cache::Key",
+      "meta-store.ts::Disk": "Rack::Cache::MetaStore::Disk",
       "meta-store.ts::Heap": "Rack::Cache::MetaStore::Heap",
       "meta-store.ts::MetaStore": "Rack::Cache::MetaStore",
       "request.ts::Request": "Rack::Cache::Request",

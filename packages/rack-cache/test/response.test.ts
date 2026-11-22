@@ -179,7 +179,7 @@ describe("Rack::Cache::Response", () => {
 
   describe("#vary", () => {
     it("is nil when no Vary header is present", () => {
-      expect(res!.vary ?? null).toBeNull();
+      expect(res!.vary).toBeNull();
     });
     it("returns the literal value of the Vary header", () => {
       res!.headers.set("vary", "Foo Bar Baz");

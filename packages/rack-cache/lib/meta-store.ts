@@ -1,9 +1,16 @@
 import {
+  ARGV,
   Digest,
+  Dir,
+  Errno,
+  File,
+  FileUtils,
+  IOError,
   Marshal,
   NotImplementedError,
   rbModName,
   rbObjDup,
+  rbClassNewInstance,
   rbProcCall,
   toI,
   toS,
@@ -28,6 +35,9 @@ export class MetaStore {
   static Heap: typeof Heap;
   static HEAP: typeof Heap;
   static MEM: typeof Heap;
+  static Disk: typeof Disk;
+  static DISK: typeof Disk;
+  static FILE: typeof Disk;
 
   async lookup(request: Request, entityStore: EntityStore): Promise<Response | null> {
     const key = this.cacheKey(request);
@@ -88,7 +98,8 @@ export class MetaStore {
 
     const vary = response.vary;
     const entries = (await this.read(key)).filter(
-      ([env, res]) => !(vary === res.get("vary") && this.isRequestsMatch(vary, env, storedEnv)),
+      ([env, res]) =>
+        !(vary === (res.get("vary") ?? null) && this.isRequestsMatch(vary, env, storedEnv)),
     );
 
     const headers = this.persistResponse(response);
@@ -234,3 +245,83 @@ export class Heap extends MetaStore {
 MetaStore.Heap = Heap;
 MetaStore.HEAP = Heap;
 MetaStore.MEM = Heap;
+
+export class Disk extends MetaStore {
+  readonly root: string;
+
+  protected constructor(root: string = `/tmp/rack-cache/meta-${ARGV[0]}`) {
+    super();
+    this.root = File.expandPath(root);
+  }
+
+  static async new(root?: string): Promise<Disk> {
+    const store = rbClassNewInstance(this, root) as Disk;
+    await FileUtils.mkdirPAsync(root ?? `/tmp/rack-cache/meta-${ARGV[0]}`, { mode: 0o755 });
+    return store;
+  }
+
+  override async read(key: string): Promise<Entry[]> {
+    try {
+      const path = this.keyPath(key);
+      return (await File.openAsync(path, "rb", async (io) =>
+        Marshal.load(await io.readAsync()),
+      )) as Entry[];
+    } catch (error) {
+      if (error instanceof Errno.ENOENT || error instanceof IOError) return [];
+      throw error;
+    }
+  }
+
+  /** @missingRailsArgs dump — PERMANENT */
+  override async write(
+    key: string,
+    entries: Entry[],
+    _ttl: number | null = null,
+  ): Promise<unknown> {
+    let tries = 0;
+    let path: string;
+    for (;;) {
+      try {
+        path = this.keyPath(key);
+        return await File.openAsync(path, "wb", (io) =>
+          io.writeAsync(Marshal.dump(entries, -1, true)),
+        );
+      } catch (error) {
+        if (!(error instanceof Errno.ENOENT || error instanceof IOError)) throw error;
+        await Dir.mkdirAsync(File.dirname(path!), 0o755);
+        if ((tries += 1) === 1) continue;
+        return null;
+      }
+    }
+  }
+
+  override async purge(key: string): Promise<null> {
+    try {
+      const path = this.keyPath(key);
+      await File.deleteAsync(path);
+      return null;
+    } catch (error) {
+      if (error instanceof Errno.ENOENT || error instanceof IOError) return null;
+      throw error;
+    }
+  }
+
+  /** @internal */
+  private keyPath(key: string): string {
+    return File.join(this.root, this.spread(this.hexdigest(key)));
+  }
+
+  /** @internal */
+  private spread(sha: string, n: number = 2): string {
+    return `${sha.slice(0, n)}/${sha.slice(n)}`;
+  }
+
+  static async resolve(uri: { opaque: string | null; path: string }): Promise<Disk> {
+    const path = File.expandPath(uri.opaque ?? uri.path);
+    return this.new(path);
+  }
+}
+
+MetaStore.Disk = Disk;
+MetaStore.DISK = Disk;
+MetaStore.FILE = Disk;
