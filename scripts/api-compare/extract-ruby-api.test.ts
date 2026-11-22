@@ -5628,7 +5628,14 @@ describe("Ruby extractor C extension scan", { timeout: RUBY_SUBPROCESS_TIMEOUT_M
           '\trb_define_const( rb_cPG_Coder, "FORMAT_ERROR_MASK", INT2NUM(12) );',
           '\t/* dummy = rb_define_class_under( rb_mPG_TextDecoder, "Boolean", rb_cPG_Coder ); */',
           '\tpg_define_coder( "Boolean", pg_text_dec_boolean, rb_cPG_Coder, rb_mPG_TextDecoder );',
-          '\trb_mPG_BinaryFormatting = rb_define_module_under( rb_mPG, "BinaryFormatting" );',
+          '\trb_mPG_BinaryFormatting = rb_define_module_under( rb_cPG_Coder, "BinaryFormatting" );',
+          "}",
+        ].join("\n"),
+      );
+      fs.writeFileSync(
+        path.join(dir, "a_binary.c"),
+        [
+          "void init_binary(void) {",
           '\trb_mPG_BinaryEncoder = rb_define_module_under( rb_mPG, "BinaryEncoder" );',
           '\t/* dummy = rb_define_class_under( rb_mPG_BinaryEncoder, "Int2", rb_cPG_Coder ); */',
           '\tpg_define_coder( "Int2", pg_bin_enc_int2, rb_cPG_Coder, rb_mPG_BinaryEncoder );',
@@ -5669,7 +5676,7 @@ describe("Ruby extractor C extension scan", { timeout: RUBY_SUBPROCESS_TIMEOUT_M
       expect(out.consts["binary_encoder/int2.rb"]).toEqual({
         CFUNC: { kind: "c", namespace: "PG::BinaryEncoder::Int2" },
       });
-      expect(out.includes).toEqual([[], ["PG::BinaryFormatting"]]);
+      expect(out.includes).toEqual([[], ["PG::Coder::BinaryFormatting"]]);
       expect(out.decode).toEqual([["decode", [{ name: "args", kind: "rest" }]]]);
       expect(out.errors).toEqual([
         ["exceptions.rb", "PG::ServerError"],
