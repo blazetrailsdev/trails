@@ -16,7 +16,7 @@ import {
   multipartTotalPartLimit,
   setMultipartTotalPartLimit,
 } from "../lib/utils.js";
-import { ArgumentError, Errno, StringIO, b } from "@blazetrails/ruby-compat";
+import { ArgumentError, Errno, IO, StringIO, b } from "@blazetrails/ruby-compat";
 import { MockRequest } from "../lib/mock-request.js";
 import { Params, QueryParser } from "../lib/query-parser.js";
 import { Request } from "../lib/request.js";
@@ -123,7 +123,7 @@ it("supports uploading files in binary mode", () => {
 });
 
 it("delegates keyword arguments to the tempfile", () => {
-  const file = new UploadedFile(multipartFile("file1.txt")) as any;
+  const file = new UploadedFile(multipartFile("file1.txt")) as unknown as IO;
   expect(file.readlines({ chomp: true })).toEqual([b("contents")]);
   file.rewind();
   expect(file.gets({ chomp: true })).toEqual(b("contents"));
