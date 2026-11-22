@@ -990,19 +990,29 @@ describe("Rack::Cache::Context", () => {
     expect(H.response!.body).toEqual("Hello World");
     expect(H.cache!.trace).toContain("store");
 
+    let metastoreCalls = 0;
     await get("/", {}, (cache) => {
-      cache.metastore = () => Promise.reject(new Timeout.Error("Timeout::Error"));
+      cache.metastore = () => {
+        metastoreCalls += 1;
+        return Promise.reject(new Timeout.Error("Timeout::Error"));
+      };
     });
     expect(H.response!.isOk).toBeTruthy();
     expect(H.response!.body).toEqual("Hello World");
     expect(H.cache!.trace).toContain("pass");
+    expect(metastoreCalls).toEqual(1);
 
+    metastoreCalls = 0;
     await post("/", {}, (cache) => {
-      cache.metastore = () => Promise.reject(new Timeout.Error("Timeout::Error"));
+      cache.metastore = () => {
+        metastoreCalls += 1;
+        return Promise.reject(new Timeout.Error("Timeout::Error"));
+      };
     });
     expect(H.response!.isOk).toBeTruthy();
     expect(H.response!.body).toEqual("Hello World");
     expect(H.cache!.trace).toContain("pass");
+    expect(metastoreCalls).toEqual(1);
   });
 
   it("does not cache when cache-control response header changed to private (reset @cache_control on dup)", async () => {
