@@ -157,7 +157,6 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config/storage.ts
   },
 
   // Use trails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
-  // Add @aws-sdk/client-s3, @aws-sdk/s3-request-presigner and @aws-sdk/lib-storage to package.json
   // amazon: {
   //   service: "S3",
   //   accessKeyId: Trails.application.credentials.dig("aws", "access_key_id"),
@@ -167,7 +166,6 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config/storage.ts
   // },
 
   // Remember not to checkin your GCS keyfile to a repository
-  // Add @google-cloud/storage to package.json
   // google: {
   //   service: "GCS",
   //   project: "your_project",

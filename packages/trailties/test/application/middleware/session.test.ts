@@ -345,7 +345,92 @@ describe("MiddlewareSessionTest", { timeout: 120_000 }, () => {
   });
 
   // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" (A Marshal blob written by Ruby): the fixture cookie is a Ruby Marshal dump.
-  it.skip("session upgrading from AES-CBC-HMAC encryption to AES-GCM encryption", () => {});
+  it.skip("session upgrading from AES-CBC-HMAC encryption to AES-GCM encryption", async () => {
+    await t.appFile("config/routes.ts", routes(`this.get(":controller(/:action)");`));
+
+    await t.controller(
+      "foo",
+      controller(
+        "FooController",
+        `
+          async writeRawSession() {
+            // AES-256-CBC with SHA1 HMAC & SHA1 key derivation
+            // {"session_id"=>"1965d95720fffc123941bdfb7d2e6870", "foo"=>1}
+            this.cookies().set("_myapp_session", "TlgrdS85aUpDd1R2cDlPWlR6K0FJeGExckwySjZ2Z0pkR3d2QnRObGxZT25aalJWYWVvbFVLcHF4d0VQVDdSaFF2QjFPbG9MVjJzeWp3YjcyRUlKUUU2ZlR4bXlSNG9ZUkJPRUtld0E3dVU9LS0xNDZXbGpRZ3NjdW43N2haUEZJSUNRPT0=--3639b5ce54c09495cfeaae928cd5634e0c4b2e96");
+            await this.head(":ok");
+          }
+
+          async writeSession() {
+            await this.session.set("foo", ((await this.session.get("foo")) as number) + 1);
+            await this.head(":ok");
+          }
+
+          async readSession() {
+            await this.render({ plain: await this.session.get("foo") });
+          }
+
+          async readEncryptedCookie() {
+            await this.render({ plain: hashAref(this.cookies().encrypted.get("_myapp_session") as object, "foo") });
+          }
+
+          async readRawCookie() {
+            await this.render({ plain: this.cookies().get("_myapp_session") });
+          }
+        `,
+        "ActionController.Base",
+      ),
+    );
+
+    await t.addToConfig(`
+        // Use a static key
+        Trails.application!.credentials.secretKeyBase = "known key base";
+
+        // Enable AEAD cookies
+        this.config.actionDispatch.useAuthenticatedCookieEncryption = true;
+
+        // Use SHA1 key derivation
+        this.config.activeSupport.keyGeneratorHashDigestClass = OpenSSL.Digest.SHA1;
+
+        this.config.actionDispatch.cookiesSerializer = ":marshal";
+`);
+
+    const oldTrailsEnv = ENV["TRAILS_ENV"];
+    setEnv("TRAILS_ENV", "production");
+    try {
+      await requireEnvironment();
+
+      await t.get("/foo/writeRawSession");
+      await t.get("/foo/readSession");
+      expect(t.lastResponse().body).toBe("1");
+
+      await t.get("/foo/writeSession");
+      await t.get("/foo/readSession");
+      expect(t.lastResponse().body).toBe("2");
+
+      await t.get("/foo/readEncryptedCookie");
+      expect(t.lastResponse().body).toBe("2");
+
+      const cipher = "aes-256-gcm";
+      const secret = t.app().keyGenerator().generateKey("authenticated encrypted cookie");
+      const encryptor = new MessageEncryptor(
+        secret.subarray(0, MessageEncryptor.keyLen(cipher)),
+        null,
+        { cipher, serializer: Marshal },
+      );
+
+      await t.get("/foo/readRawCookie");
+      expect(
+        hashAref(
+          encryptor.decryptAndVerify(t.lastResponse().body, {
+            purpose: "cookie._myapp_session",
+          }) as object,
+          "foo",
+        ),
+      ).toBe(2);
+    } finally {
+      setEnv("TRAILS_ENV", oldTrailsEnv);
+    }
+  });
 
   it("calling reset_session on request does not trigger an error for API apps", async () => {
     await t.addToConfig("this.config.apiOnly = true;");
