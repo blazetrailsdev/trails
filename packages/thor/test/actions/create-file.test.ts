@@ -177,11 +177,15 @@ describe("Thor::Actions::CreateFile", () => {
 
         it("executes the block given to run merge tool", async () => {
           createFile("doc/config.rb");
-          Object.assign(_base.shell, { mergeTool: async () => "meld" });
+          Object.assign(_base.shell, { mergeTool: () => "meld" });
           readline.mockReturnValueOnce("m");
           await invokeBang();
           expect(readline).toHaveBeenCalledTimes(1);
-          expect(rbFSystem).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/meld/));
+          expect(rbFSystem).toHaveBeenCalledExactlyOnceWith(
+            "meld",
+            expect.stringMatching(/doc\/config\.rb/),
+            expect.stringMatching(/doc\/config\.rb/),
+          );
         });
       });
     });

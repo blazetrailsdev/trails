@@ -155,7 +155,7 @@ describe("Thor::Actions copy_file, link_file, get and template (trails)", () => 
     const previous = new StringIO();
     h.outputBuffer = previous;
     expect(() => h.withOutputBuffer(Object.freeze(new StringIO()), () => {})).toThrow(
-      new ArgumentError("Buffer can not be a frozen object"),
+      new ArgumentError("Buffer cannot be a frozen object"),
     );
     expect(h.outputBuffer).toBeNull();
   });

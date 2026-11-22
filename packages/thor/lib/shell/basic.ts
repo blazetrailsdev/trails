@@ -5,8 +5,6 @@ import {
   Hash,
   isSymbol,
   matchOperator,
-  NotImplementedError,
-  Open3,
   print,
   puts,
   constGet,
@@ -182,7 +180,7 @@ export class Basic {
         if (block != null) await this.showDiff(destination, await block());
         this.say("Retrying...");
       } else if (rtest(matchOperator(answer, this.is("merge")))) {
-        if (block != null && (await this.mergeTool()).length !== 0) {
+        if (block != null && this.mergeTool().length !== 0) {
           await this.merge(destination, await block());
           return null;
         }
@@ -275,11 +273,16 @@ export class Basic {
   protected async showDiff(destination: string, content: unknown): Promise<void> {
     const diffCmd = env["THOR_DIFF"] ?? env["TRAILS_DIFF"] ?? "diff -u";
 
-    await Tempfile.open(File.basename(destination), File.dirname(destination), async (temp) => {
-      temp.write(content as string | Uint8Array);
-      temp.rewind();
-      await rbFSystem(`${diffCmd} "${destination}" "${temp.path()}"`);
-    });
+    await Tempfile.open(
+      File.basename(destination),
+      File.dirname(destination),
+      { binmode: true },
+      async (temp) => {
+        temp.write(content as string | Uint8Array);
+        temp.rewind();
+        await rbFSystem(`${diffCmd} "${destination}" "${temp.path()}"`);
+      },
+    );
   }
 
   /** @internal */
@@ -365,23 +368,13 @@ export class Basic {
       async (temp) => {
         temp.write(content as string | Uint8Array);
         temp.rewind();
-        await rbFSystem(`${await this.mergeTool()} "${temp.path()}" "${destination}"`);
+        await rbFSystem(this.mergeTool(), temp.path()!, destination);
       },
     );
   }
 
   /** @internal */
-  protected async mergeTool(): Promise<string> {
-    return (this._mergeTool ??= env["THOR_MERGE"] ?? (await this.gitMergeTool()));
-  }
-
-  /** @internal */
-  protected async gitMergeTool(): Promise<string> {
-    try {
-      return toS((await Open3.capture3("git config merge.tool"))[0]).trimEnd();
-    } catch (e) {
-      if (e instanceof NotImplementedError) throw e;
-      return "";
-    }
+  protected mergeTool(): string {
+    return (this._mergeTool ??= env["THOR_MERGE"] ?? "git difftool --no-index");
   }
 }

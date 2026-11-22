@@ -155,11 +155,11 @@ describe("Thor::Actions create_file, create_link and empty_directory (trails)", 
       File.write(File.join(root, "a.txt"), "old");
       const r = answering("m");
       const shell = r.shell as unknown as {
-        mergeTool(): Promise<string>;
+        mergeTool(): string;
         merge(destination: string, content: unknown): Promise<void>;
       };
       const merged: unknown[][] = [];
-      shell.mergeTool = async () => "tool";
+      shell.mergeTool = () => "tool";
       shell.merge = async (destination, content) => {
         merged.push([destination, content]);
       };
@@ -172,7 +172,7 @@ describe("Thor::Actions create_file, create_link and empty_directory (trails)", 
     it("asks for a merge tool on m when none is set", async () => {
       File.write(File.join(root, "a.txt"), "old");
       const r = answering("m", "n");
-      (r.shell as unknown as { mergeTool(): Promise<string> }).mergeTool = async () => "";
+      (r.shell as unknown as { mergeTool(): string }).mergeTool = () => "";
       const out = await capture(":stdout", () => r.createFile("a.txt", "new"));
       expect(out).toMatch(/Please specify merge tool to `THOR_MERGE` env\./);
     });
