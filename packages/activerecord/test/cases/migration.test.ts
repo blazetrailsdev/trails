@@ -44,7 +44,6 @@ function emitTableSql(td: TableDefinition): Promise<string> {
 import { Person } from "../models/person.js";
 import { loadSchemaFromAdapter } from "../../lib/model-schema.js";
 import { itIfSupports, describeIfSupports } from "../support/supports.js";
-import { describeIfPostgresqlAdapter } from "../support/describe-if-postgresql-adapter.js";
 import { Time } from "@blazetrails/date";
 import {
   Dir,
@@ -260,30 +259,33 @@ describe("MigrationTest", () => {
     }
   });
 
-  describeIfPostgresqlAdapter("IndexForTableWithSchemaMigrationTest", () => {
-    it("add and remove index", async () => {
-      const adapter = (await freshAdapter()) as DatabaseAdapter & {
-        createSchema(name: string): Promise<void>;
-        dropSchema(name: string): Promise<void>;
-        indexExists(table: string, column: string): Promise<boolean>;
-      };
-      await adapter.createSchema("my_schema");
-      try {
-        // eslint-disable-next-line blazetrails/require-table-teardown
-        await adapter.createTable("my_schema.values", { force: true }, (t) => {
-          t.integer("value");
-        });
+  describe.runIf(currentAdapter("PostgreSQLAdapter"))(
+    "IndexForTableWithSchemaMigrationTest",
+    () => {
+      it("add and remove index", async () => {
+        const adapter = (await freshAdapter()) as DatabaseAdapter & {
+          createSchema(name: string): Promise<void>;
+          dropSchema(name: string): Promise<void>;
+          indexExists(table: string, column: string): Promise<boolean>;
+        };
+        await adapter.createSchema("my_schema");
+        try {
+          // eslint-disable-next-line blazetrails/require-table-teardown
+          await adapter.createTable("my_schema.values", { force: true }, (t) => {
+            t.integer("value");
+          });
 
-        await adapter.addIndex("my_schema.values", "value");
-        expect(await adapter.indexExists("my_schema.values", "value")).toBeTruthy();
+          await adapter.addIndex("my_schema.values", "value");
+          expect(await adapter.indexExists("my_schema.values", "value")).toBeTruthy();
 
-        await adapter.removeIndex("my_schema.values", { column: "value" });
-        expect(await adapter.indexExists("my_schema.values", "value")).toBeFalsy();
-      } finally {
-        await adapter.dropSchema("my_schema");
-      }
-    });
-  });
+          await adapter.removeIndex("my_schema.values", { column: "value" });
+          expect(await adapter.indexExists("my_schema.values", "value")).toBeFalsy();
+        } finally {
+          await adapter.dropSchema("my_schema");
+        }
+      });
+    },
+  );
 });
 
 async function freshAdapter(): Promise<DatabaseAdapter> {

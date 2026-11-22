@@ -1,7 +1,7 @@
-import { it, expect, beforeEach, afterEach } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { StringIO } from "@blazetrails/ruby-compat";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
@@ -10,7 +10,7 @@ import { Schema } from "../../../../lib/schema.js";
 
 let adapter: SQLite3Adapter;
 
-describeIfSqlite("SQLite3VirtualTableTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3VirtualTableTest", () => {
   fixtures([]);
 
   beforeEach(async () => {

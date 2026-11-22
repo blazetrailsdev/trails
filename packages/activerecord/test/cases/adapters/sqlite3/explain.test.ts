@@ -1,11 +1,11 @@
-import { it, expect } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect } from "vitest";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Author } from "../../../models/author.js";
 import "../../../support/canonical-model-index.js";
 
-describeIfSqlite("SQLite3ExplainTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3ExplainTest", () => {
   const { authors } = fixtures(["authors", "authorAddresses"]);
 
   it("explain for one query", async () => {

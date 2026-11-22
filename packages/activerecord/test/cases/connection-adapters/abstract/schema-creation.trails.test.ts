@@ -7,9 +7,7 @@ import {
   TableDefinition,
 } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
 import { Base } from "../../../../lib/base.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { currentAdapter } from "../../../support/adapter-helper.js";
-import { describeIfPostgresqlAdapter } from "../../../support/describe-if-postgresql-adapter.js";
 import type { TableDefinitionConn } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
 import type { SchemaCreationConn } from "../../../../lib/connection-adapters/abstract/schema-creation.js";
 
@@ -29,52 +27,58 @@ describe("SchemaCreation#typeToSql virtual / nil pass-through", () => {
   });
 });
 
-describeIfPostgresqlAdapter("SchemaCreation drop-constraint visitors", () => {
-  it("visit_DropForeignKey emits DROP CONSTRAINT with a quoted name", () => {
-    const sc = new SchemaCreation(conn) as any;
-    expect(sc.visitDropForeignKey("fk_rails_abc")).toBe('DROP CONSTRAINT "fk_rails_abc"');
-  });
+describe.runIf(currentAdapter("PostgreSQLAdapter"))(
+  "SchemaCreation drop-constraint visitors",
+  () => {
+    it("visit_DropForeignKey emits DROP CONSTRAINT with a quoted name", () => {
+      const sc = new SchemaCreation(conn) as any;
+      expect(sc.visitDropForeignKey("fk_rails_abc")).toBe('DROP CONSTRAINT "fk_rails_abc"');
+    });
 
-  it("visit_DropCheckConstraint emits DROP CONSTRAINT with a quoted name", async () => {
-    const sc = new SchemaCreation(conn) as any;
-    expect(await sc.visitDropCheckConstraint("chk_rails_abc")).toBe(
-      'DROP CONSTRAINT "chk_rails_abc"',
-    );
-  });
-});
+    it("visit_DropCheckConstraint emits DROP CONSTRAINT with a quoted name", async () => {
+      const sc = new SchemaCreation(conn) as any;
+      expect(await sc.visitDropCheckConstraint("chk_rails_abc")).toBe(
+        'DROP CONSTRAINT "chk_rails_abc"',
+      );
+    });
+  },
+);
 
-describeIfSqlite("SchemaCreation#visit_TableDefinition inline indexes", () => {
-  class IndexesInCreate extends SchemaCreation {
-    protected override supportsIndexesInCreate(): boolean {
-      return true;
+describe.runIf(currentAdapter("SQLite3Adapter"))(
+  "SchemaCreation#visit_TableDefinition inline indexes",
+  () => {
+    class IndexesInCreate extends SchemaCreation {
+      protected override supportsIndexesInCreate(): boolean {
+        return true;
+      }
+
+      protected async indexInCreate(
+        tableName: string,
+        columnName: string | string[],
+      ): Promise<string> {
+        return `INDEX index_${tableName}_on_${String(columnName)} (${String(columnName)})`;
+      }
     }
 
-    protected async indexInCreate(
-      tableName: string,
-      columnName: string | string[],
-    ): Promise<string> {
-      return `INDEX index_${tableName}_on_${String(columnName)} (${String(columnName)})`;
-    }
-  }
+    it("emits index_in_create for each index when supports_indexes_in_create? is true", async () => {
+      const td = new TableDefinition(conn, "users");
+      td.string("email");
+      td.index("email");
 
-  it("emits index_in_create for each index when supports_indexes_in_create? is true", async () => {
-    const td = new TableDefinition(conn, "users");
-    td.string("email");
-    td.index("email");
+      const sql = await new IndexesInCreate(conn).accept(td);
+      expect(sql).toContain("INDEX index_users_on_email (email)");
+    });
 
-    const sql = await new IndexesInCreate(conn).accept(td);
-    expect(sql).toContain("INDEX index_users_on_email (email)");
-  });
+    it("emits no inline index when supports_indexes_in_create? is false", async () => {
+      const td = new TableDefinition(conn, "users");
+      td.string("email");
+      td.index("email");
 
-  it("emits no inline index when supports_indexes_in_create? is false", async () => {
-    const td = new TableDefinition(conn, "users");
-    td.string("email");
-    td.index("email");
-
-    const sql = await new SchemaCreation(conn).accept(td);
-    expect(sql).not.toContain("INDEX");
-  });
-});
+      const sql = await new SchemaCreation(conn).accept(td);
+      expect(sql).not.toContain("INDEX");
+    });
+  },
+);
 
 describe("SchemaCreation support predicates", () => {
   it("supports_indexes_in_create? is true only on MySQL", () => {
@@ -96,7 +100,7 @@ describe("SchemaCreation support predicates", () => {
   });
 });
 
-describeIfPostgresqlAdapter("SchemaCreation quoting delegations", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("SchemaCreation quoting delegations", () => {
   it("quote_column_name / quote_table_name delegate to the quoter", () => {
     const sc = new SchemaCreation(conn) as any;
     expect(sc.quoteColumnName("title")).toBe('"title"');
@@ -104,31 +108,37 @@ describeIfPostgresqlAdapter("SchemaCreation quoting delegations", () => {
   });
 });
 
-describeIfPostgresqlAdapter("SchemaCreation#quotedColumnsForIndex sub-part length gating", () => {
-  it("does not append sub-part length on postgres", async () => {
-    const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
-      lengths: { title: 10 },
+describe.runIf(currentAdapter("PostgreSQLAdapter"))(
+  "SchemaCreation#quotedColumnsForIndex sub-part length gating",
+  () => {
+    it("does not append sub-part length on postgres", async () => {
+      const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
+        lengths: { title: 10 },
+      });
+      const sql = await (new SchemaCreation(conn) as any).visitCreateIndexDefinition(
+        new CreateIndexDefinition(idx),
+      );
+      expect(sql).not.toContain("(10)");
+      expect(sql).toContain('("title")');
     });
-    const sql = await (new SchemaCreation(conn) as any).visitCreateIndexDefinition(
-      new CreateIndexDefinition(idx),
-    );
-    expect(sql).not.toContain("(10)");
-    expect(sql).toContain('("title")');
-  });
-});
+  },
+);
 
-describeIfSqlite("SchemaCreation#quotedColumnsForIndex sub-part length gating", () => {
-  it("does not append sub-part length on sqlite", async () => {
-    const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
-      lengths: { title: 10 },
+describe.runIf(currentAdapter("SQLite3Adapter"))(
+  "SchemaCreation#quotedColumnsForIndex sub-part length gating",
+  () => {
+    it("does not append sub-part length on sqlite", async () => {
+      const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
+        lengths: { title: 10 },
+      });
+      const sql = await (new SchemaCreation(conn) as any).visitCreateIndexDefinition(
+        new CreateIndexDefinition(idx),
+      );
+      expect(sql).not.toContain("(10)");
+      expect(sql).toContain('("title")');
     });
-    const sql = await (new SchemaCreation(conn) as any).visitCreateIndexDefinition(
-      new CreateIndexDefinition(idx),
-    );
-    expect(sql).not.toContain("(10)");
-    expect(sql).toContain('("title")');
-  });
-});
+  },
+);
 
 describe("SchemaCreation#quotedColumns delegates to the connection", () => {
   const host = {
@@ -187,16 +197,19 @@ describe("SchemaCreation#typeToSql decimal precision/scale", () => {
   });
 });
 
-describeIfSqlite("SchemaCreation#visit_ForeignKeyDefinition nil column lists", () => {
-  it("renders empty column lists for a nil column and primary key (Ruby Array())", () => {
-    const sc = new SchemaCreation(conn) as any;
-    const fk = new ForeignKeyDefinition("astronauts", "rockets", {
-      column: null as unknown as string,
-      primaryKey: null as unknown as string,
-      name: "fk_rails_abc",
+describe.runIf(currentAdapter("SQLite3Adapter"))(
+  "SchemaCreation#visit_ForeignKeyDefinition nil column lists",
+  () => {
+    it("renders empty column lists for a nil column and primary key (Ruby Array())", () => {
+      const sc = new SchemaCreation(conn) as any;
+      const fk = new ForeignKeyDefinition("astronauts", "rockets", {
+        column: null as unknown as string,
+        primaryKey: null as unknown as string,
+        name: "fk_rails_abc",
+      });
+      expect(sc.visitForeignKeyDefinition(fk)).toBe(
+        'CONSTRAINT "fk_rails_abc" FOREIGN KEY () REFERENCES "rockets" ("id")',
+      );
     });
-    expect(sc.visitForeignKeyDefinition(fk)).toBe(
-      'CONSTRAINT "fk_rails_abc" FOREIGN KEY () REFERENCES "rockets" ("id")',
-    );
-  });
-});
+  },
+);

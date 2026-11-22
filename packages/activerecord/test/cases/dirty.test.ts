@@ -1,3 +1,4 @@
+import { currentAdapter } from "../support/adapter-helper.js";
 import type { TimeZone } from "@blazetrails/activesupport";
 import { Hash, hashAref, hasKey, keys } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
@@ -9,7 +10,6 @@ import { assertEmpty, assertInDelta } from "@blazetrails/activesupport/testing/a
 import { Time as RubyTime } from "@blazetrails/date";
 
 import { itIfSupports } from "../support/supports.js";
-import { describeIfPostgresqlAdapter } from "../support/describe-if-postgresql-adapter.js";
 import { fixtures } from "../support/use-fixtures.js";
 
 import { Pirate } from "../models/pirate.js";
@@ -1099,7 +1099,7 @@ describe("DirtyTest", () => {
   });
 });
 
-describeIfPostgresqlAdapter("DirtyTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("DirtyTest", () => {
   fixtures([], { useTransactionalTests: false });
 
   itIfSupports(

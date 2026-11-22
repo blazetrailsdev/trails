@@ -1,6 +1,6 @@
-import { it, expect } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect } from "vitest";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 
@@ -52,7 +52,7 @@ async function testCopyTable(
   } catch {}
 }
 
-describeIfSqlite("CopyTableTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("CopyTableTest", () => {
   fixtures(["customers"]);
 
   it("copy table", async () => {

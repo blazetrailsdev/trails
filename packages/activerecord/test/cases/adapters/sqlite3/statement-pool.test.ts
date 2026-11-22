@@ -1,6 +1,6 @@
-import { it } from "vitest";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it } from "vitest";
 
-describeIfSqlite("SQLite3StatementPoolTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3StatementPoolTest", () => {
   it.skip("cache is per pid", () => {});
 });

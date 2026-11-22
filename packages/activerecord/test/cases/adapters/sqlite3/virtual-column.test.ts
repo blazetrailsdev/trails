@@ -1,7 +1,7 @@
-import { expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { File as FixtureFile } from "../../../../lib/fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../../config.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/index.js";
 import { FixtureSet } from "../../../../lib/fixtures.js";
 import { fixtures } from "../../../support/use-fixtures.js";
@@ -63,7 +63,7 @@ async function reloadColumnInformation(): Promise<void> {
   await VirtualColumn.loadSchema();
 }
 
-describeIfSqlite("SQLite3VirtualColumnTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3VirtualColumnTest", () => {
   itIfSupports("virtual_columns", "virtual column with full inserts", async () => {
     const partialInsertsWas = VirtualColumn.partialInserts;
     VirtualColumn.partialInserts = false;

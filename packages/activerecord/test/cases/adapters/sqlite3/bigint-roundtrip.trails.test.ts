@@ -1,6 +1,6 @@
-import { it, expect, beforeEach, afterEach } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { BigIntegerType, IntegerType, BooleanType } from "@blazetrails/activemodel";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
@@ -11,7 +11,7 @@ const bigType = new BigIntegerType();
 const intType = new IntegerType();
 const boolType = new BooleanType();
 
-describeIfSqlite("SQLite3 bigint round-trip", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3 bigint round-trip", () => {
   fixtures([]);
 
   beforeEach(async () => {

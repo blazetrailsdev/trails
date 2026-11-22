@@ -1,7 +1,7 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { StandardError } from "@blazetrails/ruby-compat";
-import { it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { Owner } from "../../../models/owner.js";
@@ -121,7 +121,7 @@ class DualEncoding extends Base {
   declare data: Uint8Array;
 }
 
-describeIfSqlite("SQLite3AdapterTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
   fixtures(["owners"], { useTransactionalTests: false });
 
   it("database should get created when missing parent directories for database path", async () => {

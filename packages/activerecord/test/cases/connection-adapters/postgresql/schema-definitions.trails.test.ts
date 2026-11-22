@@ -1,3 +1,4 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
 import { ColumnDefinition } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
@@ -16,7 +17,6 @@ import {
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../../../../lib/base.js";
 import { PostgreSQLAdapter } from "../../../../lib/connection-adapters/postgresql-adapter.js";
-import { describeIfPostgresqlAdapter } from "../../../support/describe-if-postgresql-adapter.js";
 import type { TableDefinitionConn } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
 
 let leased: TableDefinitionConn;
@@ -144,7 +144,7 @@ describe("UniqueConstraintDefinition", () => {
   });
 });
 
-describeIfPostgresqlAdapter("TableDefinition", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("TableDefinition", () => {
   it("accumulates exclusion constraints", () => {
     const td = new TableDefinition(leased, "products");
     td.exclusionConstraint("price WITH =, range WITH &&", { name: "price_check", using: "gist" });
@@ -198,7 +198,7 @@ describeIfPostgresqlAdapter("TableDefinition", () => {
   });
 });
 
-describeIfPostgresqlAdapter("PostgreSQL::TableDefinition#enum", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQL::TableDefinition#enum", () => {
   const typeToSql = (type: string, options: object): string =>
     (
       leased as unknown as {
@@ -231,111 +231,114 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition#enum", () => {
   });
 });
 
-describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => {
-  const types = [
-    ["bigserial", "bigserial"],
-    ["serial", "serial"],
-    ["bit", "bit"],
-    ["bitVarying", "bit_varying"],
-    ["uuid", "uuid"],
-    ["jsonb", "jsonb"],
-    ["daterange", "daterange"],
-    ["int4range", "int4range"],
-    ["int8range", "int8range"],
-    ["numrange", "numrange"],
-    ["timestamptz", "timestamptz"],
-    ["tsrange", "tsrange"],
-    ["tstzrange", "tstzrange"],
-    ["oid", "oid"],
-    ["cidr", "cidr"],
-    ["citext", "citext"],
-    ["hstore", "hstore"],
-    ["inet", "inet"],
-    ["interval", "interval"],
-    ["ltree", "ltree"],
-    ["macaddr", "macaddr"],
-    ["money", "money"],
-    ["point", "point"],
-    ["line", "line"],
-    ["lseg", "lseg"],
-    ["box", "box"],
-    ["path", "path"],
-    ["polygon", "polygon"],
-    ["circle", "circle"],
-    ["tsvector", "tsvector"],
-    ["xml", "xml"],
-  ] as const;
+describe.runIf(currentAdapter("PostgreSQLAdapter"))(
+  "PostgreSQL::TableDefinition column methods",
+  () => {
+    const types = [
+      ["bigserial", "bigserial"],
+      ["serial", "serial"],
+      ["bit", "bit"],
+      ["bitVarying", "bit_varying"],
+      ["uuid", "uuid"],
+      ["jsonb", "jsonb"],
+      ["daterange", "daterange"],
+      ["int4range", "int4range"],
+      ["int8range", "int8range"],
+      ["numrange", "numrange"],
+      ["timestamptz", "timestamptz"],
+      ["tsrange", "tsrange"],
+      ["tstzrange", "tstzrange"],
+      ["oid", "oid"],
+      ["cidr", "cidr"],
+      ["citext", "citext"],
+      ["hstore", "hstore"],
+      ["inet", "inet"],
+      ["interval", "interval"],
+      ["ltree", "ltree"],
+      ["macaddr", "macaddr"],
+      ["money", "money"],
+      ["point", "point"],
+      ["line", "line"],
+      ["lseg", "lseg"],
+      ["box", "box"],
+      ["path", "path"],
+      ["polygon", "polygon"],
+      ["circle", "circle"],
+      ["tsvector", "tsvector"],
+      ["xml", "xml"],
+    ] as const;
 
-  it("defines one column per name", () => {
-    for (const [method] of types) {
-      const td = new TableDefinition(leased, "t");
-      (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", "c");
-      expect(td.columns.map((c) => c.name)).toEqual(["a", "b", "c"]);
-    }
-  });
-
-  it("applies the trailing options to every name", () => {
-    for (const [method] of types) {
-      const td = new TableDefinition(leased, "t");
-      (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", {
-        null: false,
-      });
-      expect(td.columns).toHaveLength(2);
-      for (const col of td.columns) {
-        expect(col.options.null).toBe(false);
+    it("defines one column per name", () => {
+      for (const [method] of types) {
+        const td = new TableDefinition(leased, "t");
+        (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", "c");
+        expect(td.columns.map((c) => c.name)).toEqual(["a", "b", "c"]);
       }
-    }
-  });
+    });
 
-  it("raises when given no column name", () => {
-    for (const [method, trailsType] of types) {
+    it("applies the trailing options to every name", () => {
+      for (const [method] of types) {
+        const td = new TableDefinition(leased, "t");
+        (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", {
+          null: false,
+        });
+        expect(td.columns).toHaveLength(2);
+        for (const col of td.columns) {
+          expect(col.options.null).toBe(false);
+        }
+      }
+    });
+
+    it("raises when given no column name", () => {
+      for (const [method, trailsType] of types) {
+        const td = new TableDefinition(leased, "t");
+        expect(() =>
+          (td as unknown as Record<string, (...args: unknown[]) => void>)[method](),
+        ).toThrow(`Missing column name(s) for ${trailsType}`);
+        expect(() =>
+          (td as unknown as Record<string, (...args: unknown[]) => void>)[method]({ null: false }),
+        ).toThrow(`Missing column name(s) for ${trailsType}`);
+      }
+    });
+
+    it("creates an index for every name when index is passed", () => {
+      for (const [method] of types) {
+        const td = new TableDefinition(leased, "t");
+        (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", {
+          index: true,
+        });
+        expect(td.indexes.map(([columnName]) => columnName)).toEqual([["a"], ["b"]]);
+        expect(td.columns.every((c) => !("index" in c.options))).toBe(true);
+      }
+    });
+
+    it("raises on a duplicate column name", () => {
+      for (const [method] of types) {
+        const td = new TableDefinition(leased, "t");
+        expect(() =>
+          (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "a"),
+        ).toThrow("you can't define an already defined column 'a' on 't'.");
+      }
+    });
+
+    it("keeps type-specific SQL types when defining multiple columns", () => {
       const td = new TableDefinition(leased, "t");
-      expect(() =>
-        (td as unknown as Record<string, (...args: unknown[]) => void>)[method](),
-      ).toThrow(`Missing column name(s) for ${trailsType}`);
-      expect(() =>
-        (td as unknown as Record<string, (...args: unknown[]) => void>)[method]({ null: false }),
-      ).toThrow(`Missing column name(s) for ${trailsType}`);
-    }
-  });
+      td.bit("a", "b", { limit: 8 });
+      td.bitVarying("c", { limit: 4 });
+      td.bigserial("d", "e");
+      const schemaCreation = new PgSchemaCreation(leased as unknown as PgSchemaCreationHost);
+      expect(td.columns.map((c) => (leased as any).typeToSql(c.type, c.options))).toEqual([
+        "bit(8)",
+        "bit(8)",
+        "bit varying(4)",
+        "bigserial",
+        "bigserial",
+      ]);
+    });
+  },
+);
 
-  it("creates an index for every name when index is passed", () => {
-    for (const [method] of types) {
-      const td = new TableDefinition(leased, "t");
-      (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", {
-        index: true,
-      });
-      expect(td.indexes.map(([columnName]) => columnName)).toEqual([["a"], ["b"]]);
-      expect(td.columns.every((c) => !("index" in c.options))).toBe(true);
-    }
-  });
-
-  it("raises on a duplicate column name", () => {
-    for (const [method] of types) {
-      const td = new TableDefinition(leased, "t");
-      expect(() =>
-        (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "a"),
-      ).toThrow("you can't define an already defined column 'a' on 't'.");
-    }
-  });
-
-  it("keeps type-specific SQL types when defining multiple columns", () => {
-    const td = new TableDefinition(leased, "t");
-    td.bit("a", "b", { limit: 8 });
-    td.bitVarying("c", { limit: 4 });
-    td.bigserial("d", "e");
-    const schemaCreation = new PgSchemaCreation(leased as unknown as PgSchemaCreationHost);
-    expect(td.columns.map((c) => (leased as any).typeToSql(c.type, c.options))).toEqual([
-      "bit(8)",
-      "bit(8)",
-      "bit varying(4)",
-      "bigserial",
-      "bigserial",
-    ]);
-  });
-});
-
-describeIfPostgresqlAdapter("AlterTable", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("AlterTable", () => {
   it("validateConstraint pushes to constraintValidations", () => {
     const td = new TableDefinition(leased, "products");
     const at = new AlterTable(td);
@@ -360,7 +363,7 @@ describeIfPostgresqlAdapter("AlterTable", () => {
   });
 });
 
-describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("TableDefinition#toSql", () => {
   const toSql = (td: TableDefinition): Promise<string> => {
     const adapter = (td as any).conn;
     return new PgSchemaCreation("typeToSql" in adapter ? adapter : undefined).accept(td);
@@ -520,7 +523,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 });
 
-describeIfPostgresqlAdapter("TableDefinition#toSql default quoting", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("TableDefinition#toSql default quoting", () => {
   it("handles default values containing doubled single-quotes without mis-parsing", async () => {
     const td = new TableDefinition(leased, "messages");
     td.string("body", { default: "Bob's" });
@@ -594,17 +597,20 @@ describe("Table delegation", () => {
   });
 });
 
-describeIfPostgresqlAdapter("TableDefinition#validColumnDefinitionOptions", () => {
-  it("adds the PostgreSQL-specific option keys to the abstract set", () => {
-    const td = new TableDefinition(leased, "articles");
-    const opts = (td as any).validColumnDefinitionOptions() as string[];
-    for (const key of ["array", "using", "castAs", "as", "type", "enumType", "stored"]) {
-      expect(opts).toContain(key);
-    }
-    expect(opts).toContain("collation");
-    expect(opts).toContain("ifNotExists");
-  });
-});
+describe.runIf(currentAdapter("PostgreSQLAdapter"))(
+  "TableDefinition#validColumnDefinitionOptions",
+  () => {
+    it("adds the PostgreSQL-specific option keys to the abstract set", () => {
+      const td = new TableDefinition(leased, "articles");
+      const opts = (td as any).validColumnDefinitionOptions() as string[];
+      for (const key of ["array", "using", "castAs", "as", "type", "enumType", "stored"]) {
+        expect(opts).toContain(key);
+      }
+      expect(opts).toContain("collation");
+      expect(opts).toContain("ifNotExists");
+    });
+  },
+);
 
 describe("ColumnMethods#primary_key", () => {
   function table() {

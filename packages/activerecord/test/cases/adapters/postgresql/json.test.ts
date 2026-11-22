@@ -1,7 +1,7 @@
-import { it, expect, beforeEach } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect, beforeEach } from "vitest";
 import "../../../../lib/index.js";
 import { sql as arelSql } from "@blazetrails/arel";
-import { describeIfPostgresqlAdapter } from "../../../support/describe-if-postgresql-adapter.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { jsonSharedTestCases, JsonDataType as klass } from "../../json-shared-test-cases.js";
@@ -60,12 +60,12 @@ function postgresqlJsonSharedTestCases(columnType: string): void {
   });
 }
 
-describeIfPostgresqlAdapter("PostgresqlJSONTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgresqlJSONTest", () => {
   fixtures([]);
   postgresqlJsonSharedTestCases("json");
 });
 
-describeIfPostgresqlAdapter("PostgresqlJSONBTest", () => {
+describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgresqlJSONBTest", () => {
   fixtures([]);
   postgresqlJsonSharedTestCases("jsonb");
 });

@@ -1,16 +1,16 @@
-import { it, expect, beforeEach, afterEach } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import { getChildProcess } from "@blazetrails/ruby-compat";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { SQLiteDatabaseTasks } from "../../../../lib/tasks/sqlite-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
 import { Base } from "../../../../lib/base.js";
 
-describeIfSqlite("SqliteStructureDumpTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SqliteStructureDumpTest", () => {
   const created: string[] = [];
   let database: string;
   let configuration: HashConfig;

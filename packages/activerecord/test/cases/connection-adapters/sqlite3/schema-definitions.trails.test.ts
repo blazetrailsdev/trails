@@ -1,12 +1,12 @@
-import { it, expect, beforeAll } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect, beforeAll } from "vitest";
 import { TableDefinition } from "../../../../lib/connection-adapters/sqlite3/schema-definitions.js";
 import { SchemaCreation } from "../../../../lib/connection-adapters/sqlite3/schema-creation.js";
 import { Base } from "../../../../lib/base.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import type { TableDefinitionConn } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
 import type { SchemaCreationConn } from "../../../../lib/connection-adapters/abstract/schema-creation.js";
 
-describeIfSqlite("SQLite3::TableDefinition", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3::TableDefinition", () => {
   let conn: TableDefinitionConn & SchemaCreationConn;
 
   beforeAll(async () => {

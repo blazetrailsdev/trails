@@ -1,7 +1,7 @@
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { SQLite3 } from "@blazetrails/sqlite3";
-import { it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import { assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { Rollback, TransactionIsolationError } from "../../../../lib/errors.js";
 import { inMemoryDb } from "../../../support/adapter-helper.js";
@@ -36,7 +36,7 @@ function readUncommitted(conn: SQLite3Adapter): boolean {
   return row.read_uncommitted !== 0;
 }
 
-describeIfSqlite("SQLite3TransactionTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3TransactionTest", () => {
   it("shared_cached? is true when cache-mode is enabled", async () => {
     await withConnection({ flags: sharedCacheFlags() }, async (conn) => {
       expect(conn.isSharedCache()).toBeTruthy();

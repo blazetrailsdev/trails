@@ -1,9 +1,9 @@
-import { it, expect, beforeEach } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { toF } from "@blazetrails/ruby-compat";
 import { base36, BigDecimal, TimeWithZone, TimeZone, toFs } from "@blazetrails/activesupport";
 import "../../../../lib/index.js";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import * as Type from "../../../../lib/type.js";
@@ -12,7 +12,7 @@ import { defaultTimezone, setDefaultTimezone } from "../../../../lib/active-reco
 
 let conn: SQLite3Adapter;
 
-describeIfSqlite("SQLite3QuotingTest", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3QuotingTest", () => {
   fixtures([]);
 
   beforeEach(async () => {

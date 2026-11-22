@@ -1,11 +1,11 @@
-import { it, expect } from "vitest";
+import { currentAdapter } from "../../../support/adapter-helper.js";
+import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 
-describeIfSqlite("SQLite3CreateFolder", () => {
+describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3CreateFolder", () => {
   it("sqlite creates directory", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sqlite-create-folder-"));
     let conn: SQLite3Adapter | undefined;
