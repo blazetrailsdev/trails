@@ -33,6 +33,7 @@ import {
   FileUtils,
   type IPAddr,
   isPlainHash,
+  rbModName,
   rbObjId,
   RuntimeError,
   stringSplit,
@@ -92,12 +93,14 @@ export class Configuration extends EngineConfiguration {
   timeZone: string | null | false = "UTC";
   beginningOfWeek: WeekDay = ":monday";
   logger: unknown = null;
-  logLevel: LogLevel | number | string = "debug";
+  /** @internal */
+  private _logLevel: LogLevel | number | string = "debug";
   logFormatter: Logger["formatter"] = new SimpleFormatter();
   logTags: Tagger[] = [];
   logFileSize: number | null = null;
   autoflushLog = true;
-  broadcastLogLevel: LogLevel | number | string | null = null;
+  /** @internal */
+  private _broadcastLogLevel: LogLevel | number | string | null = null;
   silenceHealthcheckPath: string | null = null;
   cacheClasses: boolean | null = null;
   cacheStore: unknown = [":file_store", `${this.root ?? ""}/tmp/cache/`];
@@ -481,8 +484,21 @@ export class Configuration extends EngineConfiguration {
     return SourceAnnotationExtractor.Annotation;
   }
 
+  get logLevel(): LogLevel | number | string {
+    return this._logLevel;
+  }
+
+  set logLevel(level: LogLevel | number | string) {
+    this._logLevel = level;
+    this._broadcastLogLevel = level;
+  }
+
+  get broadcastLogLevel(): LogLevel | number | string | null {
+    return this._broadcastLogLevel;
+  }
+
   inspect(): string {
-    return `#<${this.constructor.name}:0x${(rbObjId(this) * 2).toString(16).padStart(14, "0")}>`;
+    return `#<${rbModName(this.constructor)}:0x${(rbObjId(this) * 2).toString(16).padStart(14, "0")}>`;
   }
 
   /** @internal */

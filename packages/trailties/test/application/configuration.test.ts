@@ -10,7 +10,7 @@ import {
   vi,
 } from "vitest";
 import { constSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
-import { ActionDispatch, Session } from "@blazetrails/actionpack";
+import { ActionController, ActionDispatch, Response, Session } from "@blazetrails/actionpack";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,10 +18,16 @@ import {
   Deprecators,
   isBlank,
   MessageVerifiers,
+  BroadcastLogger,
   OrderedOptions,
   ParameterFilter,
   runLoadHooks,
 } from "@blazetrails/activesupport";
+import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { dumpSchemaAfterMigration } from "@blazetrails/activerecord";
+import { Methods } from "@blazetrails/rack-test";
+import { Loader } from "@blazetrails/zeitwerk";
 import {
   assertNothingRaised,
   assertRaises,
@@ -41,6 +47,12 @@ import { days, Logger } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   constGet,
+  File,
+  FileUtils,
+  include,
+  rbInspect,
+  rbObjRespondTo,
+  STDOUT,
   NameError,
   TopLevel,
   env,
@@ -96,6 +108,9 @@ import * as Rack from "@blazetrails/rack";
 import { Application } from "../../lib/application.js";
 import { LOAD_DEFAULTS_VERSION } from "../../lib/application/configuration.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
+import { Inflector } from "../../lib/autoloaders/inflector.js";
+import type { Generation, Rack } from "../support/isolation/abstract-unit.js";
+import "../support/isolation/abstract-unit.js";
 import { EnvHelpers } from "../support/env-helpers.js";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 
@@ -2336,5 +2351,880 @@ setUtcToLocalReturnsUtcOffsetTimes(true);
     await application.initializeBang();
 
     expect(Metadata.useMessageSerializerForMetadata).toBeTruthy();
+  });
+});
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface IsolatedConfigurationTest
+  extends Generation, Omit<Rack, "assert" | "assertEqual" | "assertMatch">, EnvHelpers {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class IsolatedConfigurationTest extends TestCase {}
+include(IsolatedConfigurationTest, Isolation);
+include(IsolatedConfigurationTest, Methods);
+include(IsolatedConfigurationTest, EnvHelpers);
+registerSpecType(/^ApplicationTests::ConfigurationTest$/, IsolatedConfigurationTest);
+
+type Host = Omit<IsolatedConfigurationTest, "get"> & {
+  get(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
+  post(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
+  patch(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
+  put(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
+  lastResponse(): { status: number; body: string; isOk: boolean };
+};
+
+const POST_MODEL = `
+  import { Model } from "@blazetrails/activemodel";
+  export class Post extends Model {
+    name: unknown = null;
+  }
+`;
+
+const postsController = (body: string, parent = "ApplicationController"): string => `
+  import { ApplicationController } from "./application-controller.ts";
+  import { ActionController } from "@blazetrails/actionpack";
+  import { Post } from "../models/post.ts";
+  export class PostsController extends ${parent} {
+    ${body}
+  }
+`;
+
+const POSTS_ROUTES = `
+  this.routes().prepend(function () {
+    this.resources("posts");
+  });
+`;
+
+describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
+  useInMemoryDatabaseUrl();
+  let t: Host;
+
+  async function app(env = "development"): Promise<Application> {
+    return (await t.app(env)) as unknown as Application;
+  }
+
+  async function suppressDefaultConfig(): Promise<void> {
+    await FileUtils.mvAsync(
+      `${await t.appPath()}/config/environments`,
+      `${await t.appPath()}/config/__environments__`,
+    );
+  }
+
+  async function restoreDefaultConfig(): Promise<void> {
+    await FileUtils.rmRfAsync(`${await t.appPath()}/config/environments`);
+    await FileUtils.mvAsync(
+      `${await t.appPath()}/config/__environments__`,
+      `${await t.appPath()}/config/environments`,
+    );
+    await t.removeFromEnvConfig("production", 'this\\.config\\.logLevel = "error";');
+  }
+
+  function omgController(index: (this: ActionController.Base) => Promise<void>): void {
+    const OmgController = class extends ActionController.Base {};
+    Object.assign(OmgController.prototype, { index });
+    constSet(TopLevel, "OmgController", OmgController);
+    onTestFinished(() => {
+      rbModRemoveConst(TopLevel, "OmgController");
+    });
+  }
+
+  beforeEach(async () => {
+    t = new IsolatedConfigurationTest("test") as unknown as Host;
+    await t.buildApp();
+    await suppressDefaultConfig();
+  });
+
+  afterEach(async () => {
+    await t.teardownApp();
+    Trails.application = null;
+    Application.appClass = null;
+  });
+
+  it("config.paths can be mutated after accessing auto/eager load paths", async () => {
+    await t.appDir("vendor/auto");
+    await t.appDir("vendor/once");
+    await t.appDir("vendor/eager");
+
+    await t.addToConfig(`
+      this.config.autoloadPaths;
+      this.config.autoloadOncePaths;
+      this.config.eagerLoadPaths;
+
+      this.config.paths().add("vendor/auto", { autoload: true });
+      this.config.paths().add("vendor/once", { autoloadOnce: true });
+      this.config.paths().add("vendor/eager", { eagerLoad: true });
+`);
+
+    await app("development");
+
+    expect(Dependencies.autoloadPaths).toContain(`${Trails.root()}/vendor/auto`);
+    expect(Dependencies.autoloadOncePaths).toContain(`${Trails.root()}/vendor/once`);
+    expect([...Dependencies._eagerLoadPaths]).toContain(`${Trails.root()}/vendor/eager`);
+  });
+
+  it("config.paths.public sets Rails.public_path", async () => {
+    await t.addToConfig(`this.config.paths().set("public", "somewhere");`);
+
+    await app("development");
+    expect(String(await Trails.publicPath())).toBe(
+      String(new Pathname(await t.appPath()).join("somewhere")),
+    );
+  });
+
+  for (const env of ["development", "test", "production"]) {
+    it(`In ${env} mode, config.public_file_server.enabled is on by default`, async () => {
+      await restoreDefaultConfig();
+
+      await t.withTrailsEnv(env, async () => {
+        await app(env);
+        expect((await app()).config.publicFileServer.enabled).toBeTruthy();
+      });
+    });
+  }
+
+  it("In production mode, STDOUT logging is the default", async () => {
+    await restoreDefaultConfig();
+
+    await t.withTrailsEnv("production", async () => {
+      await app("production");
+      expect(Logger.isLoggerOutputsTo((await app()).config.logger as Logger, STDOUT)).toBeTruthy();
+    });
+  });
+
+  it("EtagWithFlash module doesn't break when the session store is disabled", async () => {
+    await t.makeBasicApp((application) => {
+      application.config.sessionStore(":disabled");
+    });
+
+    omgController(async function () {
+      await this.isStale(undefined, { weakEtag: "something" });
+      await this.render({ plain: "else" });
+    });
+
+    await t.get("/");
+
+    expect(t.lastResponse().isOk).toBeTruthy();
+  });
+
+  it("EtagWithFlash module doesn't break for API apps", async () => {
+    await t.makeBasicApp((application) => {
+      application.config.apiOnly = true;
+    });
+
+    omgController(async function () {
+      await this.isStale(undefined, { weakEtag: "something" });
+      await this.render({ plain: "else" });
+    });
+
+    await t.get("/");
+
+    expect(t.lastResponse().isOk).toBeTruthy();
+  });
+
+  it("application verifier can be used in the entire application", async () => {
+    await t.makeBasicApp((application) => {
+      application.config.secretKeyBase = "b3c631c314c0bbca50c1b2843150fe33";
+      application.config.sessionStore(":disabled");
+    });
+
+    const message = (await app()).messageVerifier("sensitive_value").generate("some_value");
+
+    expect(Trails.application!.messageVerifier("sensitive_value").verify(message)).toBe(
+      "some_value",
+    );
+
+    const secret = (await app()).keyGenerator().generateKey("sensitive_value");
+    const verifier = new MessageVerifier(secret);
+    expect(verifier.verify(message)).toBe("some_value");
+  });
+
+  it("application will use secret_key_base from credentials if present in local env", async () => {
+    const credentialsSecret = "credentials_secret";
+    await t.addToConfig(`
+      const credentials = await Trails.application.credentials();
+      credentials.set("secret_key_base", "${credentialsSecret}");
+`);
+
+    await app("development");
+
+    expect((await app()).secretKeyBase()).toBe(credentialsSecret);
+  });
+
+  it("application will not generate secret_key_base in tmp file if blank in production", async () => {
+    await t.appFile(
+      "config/initializers/secret-token.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        (await Trails.application.credentials()).set("secret_key_base", null);
+`,
+    );
+
+    await assertRaises([ArgumentError], {}, () => app("production"));
+  });
+
+  it("raises when secret_key_base is blank", async () => {
+    await t.appFile(
+      "config/initializers/secret-token.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        (await Trails.application.credentials()).set("secret_key_base", null);
+`,
+    );
+
+    const error = await assertRaises([ArgumentError], {}, () => app("production"));
+    expect(error.message).toMatch(/Missing `secret_key_base`./);
+  });
+
+  it("dont raise in production when dummy secret_key_base is used", async () => {
+    await t.switchEnv("SECRET_KEY_BASE_DUMMY", "1", async () => {
+      await t.appFile(
+        "config/initializers/secret-token.ts",
+        `
+        import { Trails } from "@blazetrails/trailties";
+        (await Trails.application.credentials()).set("secret_key_base", null);
+`,
+      );
+
+      await assertNothingRaised(() => app("production"));
+
+      expect((await app()).secretKeyBase()).not.toBeNull();
+      expect(await File.isExistAsync(await t.appPath("tmp/local_secret.txt"))).toBeTruthy();
+    });
+  });
+
+  it("raise when secret_key_base is not a type of string", async () => {
+    await t.addToConfig(
+      `await (await Trails.application.credentials()).set("secret_key_base", 123);`,
+    );
+
+    await assertRaises([ArgumentError], {}, () => app("production"));
+  });
+
+  it("don't output secret_key_base when calling inspect", async () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+    await t.addToConfig(`Trails.application.config.secretKeyBase = "${secret}";`);
+    await app("production");
+
+    expect(rbInspect(Trails.application!.config)).not.toMatch(new RegExp(secret));
+    expect(rbInspect(Trails.application!.config)).toMatch(
+      /^#<Trails::Application::Configuration:0x[0-9a-f]+>$/,
+    );
+  });
+
+  it("Rails.application.key_generator supports specifying a secret base", async () => {
+    await app("production");
+
+    const key = (await app()).keyGenerator().generateKey("salt");
+    const otherKey = (await app()).keyGenerator("other secret base").generateKey("salt");
+
+    expect(key).not.toEqual(otherKey);
+    expect(otherKey.length).toBe(key.length);
+  });
+
+  it("application verifier can build different verifiers", async () => {
+    await t.makeBasicApp((application) => {
+      application.config.sessionStore(":disabled");
+    });
+
+    const defaultVerifier = (await app()).messageVerifier("sensitive_value");
+    const textVerifier = (await app()).messageVerifier("text");
+
+    const message = textVerifier.generate("some_value");
+
+    expect(textVerifier.verify(message)).toBe("some_value");
+    await assertRaises([InvalidSignature], {}, () => defaultVerifier.verify(message));
+
+    expect((await app()).messageVerifier("sensitive_value")).toBe(defaultVerifier);
+    expect(textVerifier).not.toBe(defaultVerifier);
+  });
+
+  it("Rails.application.message_verifiers.rotate supports :secret_key_base option", async () => {
+    const oldSecretKeyBase = "old secret_key_base";
+
+    await t.addToConfig(`
+      this.config.beforeInitialize((app) => {
+        app.messageVerifiers().rotate({ secretKeyBase: ${JSON.stringify(oldSecretKeyBase)} });
+      });
+`);
+
+    await app("production");
+
+    const oldSecret = (await app()).keyGenerator(oldSecretKeyBase).generateKey("salt");
+    const oldMessage = new MessageVerifier(oldSecret).generate("old message");
+
+    expect((await app()).messageVerifiers().get("salt").verify(oldMessage)).toBe("old message");
+  });
+
+  it("app.secret_key_base uses config.secret_key_base in development", async () => {
+    await t.appFile(
+      "config/initializers/secret-token.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        Trails.application.config.secretKeyBase = "3b7cd727ee24e8444053437c36cc66c3";
+`,
+    );
+
+    await app("development");
+    expect((await app()).secretKeyBase()).toBe("3b7cd727ee24e8444053437c36cc66c3");
+  });
+
+  it("app.secret_key_base uses config.secret_key_base in production", async () => {
+    await t.removeFile("config/credentials.yml.enc");
+    await t.appFile(
+      "config/initializers/secret-token.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        Trails.application.config.secretKeyBase = "iaminallyoursecretkeybase";
+`,
+    );
+
+    await app("production");
+
+    expect((await app()).secretKeyBase()).toBe("iaminallyoursecretkeybase");
+  });
+
+  it("credentials does not raise error when require_master_key is false and master key does not exist", async () => {
+    await t.removeFile("config/master.key");
+    await t.addToConfig("this.config.requireMasterKey = false;");
+    await app("development");
+
+    expect((await (await app()).credentials()).dig("secret_key_base")).toBeFalsy();
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" (`fork`) — the boot must abort in a forked child so `$?.exitstatus` can be read.
+  it.skip("require_master_key aborts app boot when missing key", async () => {
+    await t.removeFile("config/master.key");
+    await t.addToConfig("this.config.requireMasterKey = true;");
+
+    await app("development");
+  });
+
+  it("protect from forgery is the default in a new app", async () => {
+    await t.makeBasicApp();
+
+    omgController(async function () {
+      await this.render({ inline: "<%= csrfMetaTags() %>" });
+    });
+
+    await t.get("/");
+    expect(t.lastResponse().body).toMatch(/csrf-param/);
+  });
+
+  it("form_with outputs ids by default", async () => {
+    await t.appFile("app/models/post.ts", POST_MODEL);
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(`
+        async index() {
+          await this.render({ inline: "<%= formWith({ model: new Post() }, (f) => f.textField('name')) %>", locals: { Post } });
+        }
+`),
+    );
+    await t.addToConfig(POSTS_ROUTES);
+
+    await app("development");
+
+    await t.get("/posts");
+
+    expect(t.lastResponse().body).toMatch(/id=('|")post_name('|")/);
+  });
+
+  it("form_with can be configured with form_with_generates_ids", async () => {
+    await t.appFile(
+      "config/initializers/form-builder.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        Trails.configuration.actionView.formWithGeneratesIds = false;
+`,
+    );
+    await t.appFile("app/models/post.ts", POST_MODEL);
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(`
+        async index() {
+          await this.render({ inline: "<%= formWith({ model: new Post() }, (f) => f.textField('name')) %>", locals: { Post } });
+        }
+`),
+    );
+    await t.addToConfig(POSTS_ROUTES);
+
+    await app("development");
+
+    await t.get("/posts");
+
+    expect(t.lastResponse().body).not.toMatch(/id=('|")post_name('|")/);
+  });
+
+  it("form_with can be configured with form_with_generates_remote_forms", async () => {
+    await t.appFile(
+      "config/initializers/form-builder.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        Trails.configuration.actionView.formWithGeneratesRemoteForms = true;
+`,
+    );
+    await t.appFile("app/models/post.ts", POST_MODEL);
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(`
+        async index() {
+          await this.render({ inline: "<%= formWith({ model: new Post() }, (f) => f.textField('name')) %>", locals: { Post } });
+        }
+`),
+    );
+    await t.addToConfig(POSTS_ROUTES);
+
+    await app("development");
+
+    await t.get("/posts");
+    expect(t.lastResponse().body).toMatch(/data-remote/);
+  });
+
+  it("form_with generates non remote forms by default", async () => {
+    await t.appFile("app/models/post.ts", POST_MODEL);
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(`
+        async index() {
+          await this.render({ inline: "<%= formWith({ model: new Post() }, (f) => f.textField('name')) %>", locals: { Post } });
+        }
+`),
+    );
+    await t.addToConfig(POSTS_ROUTES);
+
+    await app("development");
+
+    await t.get("/posts");
+    expect(t.lastResponse().body).not.toMatch(/data-remote/);
+  });
+
+  it("request forgery token param can be changed", async () => {
+    await t.makeBasicApp((application) => {
+      (
+        application.config.actionController as unknown as Record<string, unknown>
+      ).requestForgeryProtectionToken = "_xsrf_token_here";
+    });
+
+    omgController(async function () {
+      await this.render({ inline: "<%= csrfMetaTags() %>" });
+    });
+
+    await t.get("/");
+    expect(t.lastResponse().body).toMatch("_xsrf_token_here");
+  });
+
+  it("sets ActionDispatch.test_app", async () => {
+    await t.makeBasicApp();
+    expect(ActionDispatch.testApp).toBe(Trails.application);
+  });
+
+  it("sets ActionDispatch::Response.default_charset", async () => {
+    await t.makeBasicApp((application) => {
+      application.config.actionDispatch.defaultCharset = "utf-16";
+    });
+
+    expect(Response.defaultCharset).toBe("utf-16");
+  });
+
+  it("default preview interceptor can be removed", async () => {
+    await t.appFile(
+      "config/initializers/preview-interceptors.ts",
+      `
+        import { Base, InlinePreviewInterceptor } from "@blazetrails/actionmailer";
+        const interceptors = Base.previewInterceptors;
+        interceptors.splice(interceptors.indexOf(InlinePreviewInterceptor), 1);
+`,
+    );
+
+    await app("development");
+
+    expect(ActionMailerBase.previewInterceptors).toEqual([]);
+  });
+
+  it("allows setting the queue name for the ActionMailer::MailDeliveryJob", async () => {
+    await t.addToConfig(`this.config.actionMailer.deliverLaterQueueName = "test_default";`);
+
+    await app("development");
+
+    expect(ActionMailerBase.deliverLaterQueueName).toBe("test_default");
+  });
+
+  it("ActionMailer::DeliveryJob queue name is :mailers without the Rails defaults", async () => {
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+
+    await app("development");
+
+    expect(ActionMailerBase.deliverLaterQueueName).toBe("mailers");
+  });
+
+  it("ActionMailer::DeliveryJob queue name is nil by default in 6.1", async () => {
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(`this.config.loadDefaults("6.1");`);
+
+    await app("development");
+
+    expect(ActionMailerBase.deliverLaterQueueName).toBeNull();
+  });
+
+  it("valid timezone is setup correctly", async () => {
+    await t.addToConfig(`
+      this.config.setRoot("${await t.appPath()}");
+      this.config.timeZone = "Wellington";
+`);
+
+    await app("development");
+
+    expect(Trails.application!.config.timeZone).toBe("Wellington");
+  });
+
+  it("raises when an invalid timezone is defined in the config", async () => {
+    await t.addToConfig(`
+      this.config.setRoot("${await t.appPath()}");
+      this.config.timeZone = "That big hill over yonder hill";
+`);
+
+    await assertRaises([ArgumentError], {}, () => app("development"));
+  });
+
+  it("autoloaders", async () => {
+    await app("development");
+
+    expect(Trails.autoloaders.isZeitwerkEnabled()).toBeTruthy();
+    expect(Trails.autoloaders.main).toBeInstanceOf(Loader);
+    expect(Trails.autoloaders.main.tag).toBe("trails.main");
+    expect(Trails.autoloaders.once).toBeInstanceOf(Loader);
+    expect(Trails.autoloaders.once.tag).toBe("trails.once");
+    expect((Trails.autoloaders as unknown as { toA(): Loader[] }).toA()).toEqual([
+      Trails.autoloaders.main,
+      Trails.autoloaders.once,
+    ]);
+    expect(Trails.autoloaders.main.inflector).toBe(Inflector);
+    expect(Trails.autoloaders.once.inflector).toBe(Inflector);
+  });
+
+  it("config.action_view.cache_template_loading with config.enable_reloading in an environment", async () => {
+    await t.buildApp({ initializers: true });
+    await t.addToEnvConfig("development", "this.config.enableReloading = true;");
+
+    await import("@blazetrails/actionview");
+    await import("../../lib/trailties/action-view.js");
+
+    await app("development");
+
+    expect(Resolver.caching).toBe(false);
+  });
+
+  it("ActionController::Base::renderer uses Rails.application.default_url_options and config.force_ssl", async () => {
+    await t.addToConfig(`
+      this.config.forceSsl = true;
+
+      Trails.application.defaultUrlOptions = {
+        host: "foo.example.com",
+        port: 9001,
+        scriptName: "/bar",
+      };
+${POSTS_ROUTES}
+`);
+
+    await app("development");
+
+    const ApplicationController = constGet(
+      TopLevel,
+      "ApplicationController",
+    ) as typeof ActionController.Base;
+    const postsUrl = await ApplicationController.renderer.render({ inline: "<%= postsUrl() %>" });
+    expect(String(postsUrl)).toBe("https://foo.example.com:9001/bar/posts");
+  });
+
+  it("ActionController::Base.raise_on_open_redirects is true by default for new apps", async () => {
+    await app("development");
+
+    expect(ActionController.Base.raiseOnOpenRedirects).toBe(true);
+  });
+
+  it("ActionController::Base.raise_on_open_redirects is false by default for upgraded apps", async () => {
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(`this.config.loadDefaults("6.1");`);
+    await app("development");
+
+    expect(ActionController.Base.raiseOnOpenRedirects).toBe(false);
+  });
+
+  it("config.action_dispatch.show_exceptions is sent in env", async () => {
+    await t.makeBasicApp((application) => {
+      application.config.actionDispatch.showExceptions = "all";
+    });
+
+    omgController(async function () {
+      await this.render({ plain: String(this.request.env["action_dispatch.show_exceptions"]) });
+    });
+
+    await t.get("/");
+    expect(t.lastResponse().body).toBe("all");
+  });
+
+  it("config.action_controller.permit_all_parameters = true", async () => {
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(
+        `
+        async create() {
+          await this.render({ plain: this.params.get("post").isPermitted() ? "permitted" : "forbidden" });
+        }
+`,
+        "ActionController.Base",
+      ),
+    );
+    await t.addToConfig(`${POSTS_ROUTES}
+      this.config.actionController.permitAllParameters = true;
+`);
+
+    await app("development");
+
+    await t.post("/posts", { post: { title: "zomg" } });
+    expect(t.lastResponse().body).toBe("permitted");
+  });
+
+  it("config.action_controller.always_permitted_parameters are: controller, action by default", async () => {
+    await app("development");
+
+    expect(ActionController.Parameters.alwaysPermittedParameters).toEqual(["controller", "action"]);
+  });
+
+  it("config.action_controller.always_permitted_parameters = ['controller', 'action', 'format']", async () => {
+    await t.addToConfig(
+      `this.config.actionController.alwaysPermittedParameters = ["controller", "action", "format"];`,
+    );
+
+    await app("development");
+
+    expect(ActionController.Parameters.alwaysPermittedParameters).toEqual([
+      "controller",
+      "action",
+      "format",
+    ]);
+  });
+
+  it("config.action_controller.always_permitted_parameters = ['controller','action','format'] does not raise exception", async () => {
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(
+        `
+        async create() {
+          await this.render({ plain: this.params.permit({ post: ["title"] }) });
+        }
+`,
+        "ActionController.Base",
+      ),
+    );
+    await t.addToConfig(`${POSTS_ROUTES}
+      this.config.actionController.alwaysPermittedParameters = ["controller", "action", "format"];
+      this.config.actionController.actionOnUnpermittedParameters = "raise";
+`);
+
+    await app("development");
+
+    expect(ActionController.Parameters.actionOnUnpermittedParameters).toBe("raise");
+
+    await t.post("/posts", { post: { title: "zomg" }, format: "json" });
+    expect(t.lastResponse().status).toBe(200);
+  });
+
+  it("config.action_controller.action_on_unpermitted_parameters is :log by default in development", async () => {
+    await app("development");
+
+    expect(ActionController.Parameters.actionOnUnpermittedParameters).toBe("log");
+  });
+
+  it("config.action_controller.action_on_unpermitted_parameters is :log by default in test", async () => {
+    await app("test");
+
+    expect(ActionController.Parameters.actionOnUnpermittedParameters).toBe("log");
+  });
+
+  it("config.action_controller.action_on_unpermitted_parameters is false by default in production", async () => {
+    await app("production");
+
+    expect(ActionController.Parameters.actionOnUnpermittedParameters).toBe(false);
+  });
+
+  it("config.action_controller.default_protect_from_forgery is true by default", async () => {
+    await app("development");
+
+    const filters: unknown[] = [];
+    (
+      ActionController.Base as unknown as {
+        __callbacks: Record<string, { each(fn: (c: { filter: unknown }) => void): unknown }>;
+      }
+    ).__callbacks["process_action"].each((c) => filters.push(c.filter));
+    expect(filters).toContain(":verifyAuthenticityToken");
+  });
+
+  it("config.action_dispatch.ignore_accept_header", async () => {
+    await t.makeBasicApp((application) => {
+      application.config.actionDispatch.ignoreAcceptHeader = true;
+    });
+
+    omgController(async function () {
+      await this.respondTo((format) => {
+        format.html(() => this.render({ plain: "HTML" }));
+        format.xml(() => this.render({ plain: "XML" }));
+      });
+    });
+
+    await t.get("/", {}, { HTTP_ACCEPT: "application/xml" });
+    expect(t.lastResponse().body).toBe("HTML");
+
+    await t.get("/", { format: "xml" }, { HTTP_ACCEPT: "application/xml" });
+    expect(t.lastResponse().body).toBe("XML");
+  });
+
+  it("Rails.application#env_config exists and includes some existing parameters", async () => {
+    await t.makeBasicApp();
+
+    const a = await app();
+    expect(a.envConfig()["action_dispatch.parameter_filter"]).toEqual(a.config.filterParameters);
+    expect(a.envConfig()["action_dispatch.show_exceptions"]).toEqual(
+      a.config.actionDispatch.showExceptions,
+    );
+    expect(a.envConfig()["action_dispatch.logger"]).toBe(Trails.logger);
+    expect(a.envConfig()["action_dispatch.backtrace_cleaner"]).toBe(Trails.backtraceCleaner);
+    expect(a.envConfig()["action_dispatch.key_generator"]).toBe(Trails.application!.keyGenerator());
+  });
+
+  it("config.colorize_logging default is true", async () => {
+    await t.makeBasicApp();
+    expect((await app()).config.colorizeLogging).toBeTruthy();
+  });
+
+  it("default session store initializer does not overwrite the user defined session store even if it is disabled", async () => {
+    await t.makeBasicApp((application) => {
+      application.config.sessionStore(":disabled");
+    });
+
+    expect((await app()).config.sessionStore()).toBeNull();
+  });
+
+  it("default session store initializer sets session store to cookie store", async () => {
+    const sessionOptions = { key: "_myapp_session", cookieOnly: true };
+    await t.makeBasicApp();
+
+    expect((await app()).config.sessionStore()).toBe(Session.CookieStore);
+    for (const [key, value] of Object.entries(sessionOptions)) {
+      expect((await app()).config.sessionOptions[key]).toBe(value);
+    }
+  });
+
+  it("config.log_level defaults to debug in development", async () => {
+    await restoreDefaultConfig();
+    await app("development");
+
+    expect(Trails.logger!.level).toBe(Logger.DEBUG);
+  });
+
+  it("config.log_level default to info in production", async () => {
+    await restoreDefaultConfig();
+    await app("production");
+
+    expect(Trails.logger!.level).toBe(Logger.INFO);
+  });
+
+  it("config.log_level can be overwritten by ENV['RAILS_LOG_LEVEL'] in production", async () => {
+    await restoreDefaultConfig();
+
+    await t.switchEnv("TRAILS_LOG_LEVEL", "debug", async () => {
+      await app("production");
+      expect(Trails.logger!.level).toBe(Logger.DEBUG);
+    });
+  });
+
+  it("config.log_level with custom logger", async () => {
+    await t.makeBasicApp((application) => {
+      application.config.logger = new Logger(STDOUT);
+      application.config.logLevel = "debug";
+    });
+    expect(Trails.logger!.level).toBe(Logger.DEBUG);
+  });
+
+  it("config.log_level does not override the level of the broadcast with the default value", async () => {
+    await t.addToConfig(`
+      const stdout = new Logger(STDOUT, { level: Logger.INFO });
+      const stderr = new Logger(STDERR, { level: Logger.ERROR });
+      this.config.logger = new BroadcastLogger(stdout, stderr);
+`);
+    await t.appFile(
+      "config/application.ts",
+      `import { BroadcastLogger, Logger } from "@blazetrails/activesupport";\nimport { STDERR, STDOUT } from "@blazetrails/ruby-compat";\n` +
+        (await getFs().readFile(await t.appPath("config/application.ts"), "utf-8")),
+    );
+
+    await app("development");
+
+    expect((Trails.logger as unknown as BroadcastLogger).broadcasts.map((l) => l.level)).toEqual([
+      Logger.INFO,
+      Logger.ERROR,
+    ]);
+  });
+
+  it("config.log_level overrides the level of the broadcast when a custom value is set", async () => {
+    await t.addToConfig(`
+      const stdout = new Logger(STDOUT);
+      const stderr = new Logger(STDERR);
+      this.config.logger = new BroadcastLogger(stdout, stderr);
+      this.config.logLevel = "warn";
+`);
+    await t.appFile(
+      "config/application.ts",
+      `import { BroadcastLogger, Logger } from "@blazetrails/activesupport";\nimport { STDERR, STDOUT } from "@blazetrails/ruby-compat";\n` +
+        (await getFs().readFile(await t.appPath("config/application.ts"), "utf-8")),
+    );
+
+    await app("development");
+
+    expect((Trails.logger as unknown as BroadcastLogger).broadcasts.map((l) => l.level)).toEqual([
+      Logger.WARN,
+      Logger.WARN,
+    ]);
+  });
+
+  it("config.logger when logger is already a Broadcast Logger", async () => {
+    const logger = new BroadcastLogger();
+
+    await t.makeBasicApp((application) => {
+      application.config.logger = logger;
+    });
+    expect(Trails.logger).toBe(logger);
+  });
+
+  it("config.logger when logger is not a Broadcast Logger", async () => {
+    const logger = new Logger(STDOUT);
+
+    await t.makeBasicApp((application) => {
+      application.config.logger = logger;
+    });
+
+    expect(Trails.logger).toBeInstanceOf(BroadcastLogger);
+    expect((Trails.logger as unknown as BroadcastLogger).broadcasts).toContain(logger);
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Method visibility is compile-time only (`Module#private`, `basic_obj_respond_to`'s `pub`)" — `respond_to?(:method_missing)` and `respond_to?(:method_missing, true)` answer the same.
+  it.skip("respond_to? accepts include_private", async () => {
+    await t.makeBasicApp();
+
+    expect(rbObjRespondTo(Trails.configuration, "methodMissing")).toBe(false);
+    expect(Trails.configuration!.isRespondTo("methodMissing", true)).toBe(true);
+  });
+
+  it("config.active_record.dump_schema_after_migration is false on production", async () => {
+    await t.buildApp();
+
+    await app("production");
+
+    expect(dumpSchemaAfterMigration()).toBeFalsy();
+  });
+
+  it("config.active_record.dump_schema_after_migration is true by default in development", async () => {
+    await app("development");
+
+    expect(dumpSchemaAfterMigration()).toBeTruthy();
   });
 });
