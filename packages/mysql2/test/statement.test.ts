@@ -2,7 +2,7 @@ import "@blazetrails/vitest-matchers";
 import { BigDecimal, rbCFloat, rbCNilClass, stderr } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Date as RubyDate, Time } from "@blazetrails/date";
-import { Mysql2, type Client } from "../lib/index.js";
+import { Mysql2, type Client, type Mysql2StreamResult } from "../lib/index.js";
 import { lastIdTestLock, specHelper } from "./spec-helper.js";
 
 const testResult = async (client: Client) =>
@@ -184,8 +184,30 @@ describe("Mysql2::Statement", () => {
     it.skip("should be able to retrieve query with param in different encoding correctly", () => {});
   });
   describe("streaming result", () => {
-    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
-    it.skip("should be able to stream query result", () => {});
+    it("should be able to stream query result", async () => {
+      let n = 1;
+      const stmt = await state.client.prepare("SELECT 1 UNION SELECT 2");
+      const result = (await stmt.execute({
+        stream: true,
+        cacheRows: false,
+        as: "array",
+      })) as unknown as Mysql2StreamResult<unknown[]>;
+      await result.each((r) => {
+        /* eslint-disable vitest/no-conditional-expect -- mirrors statement_spec.rb:266 `case n` */
+        switch (n) {
+          case 1:
+            expect(r).toEqual([1]);
+            break;
+          case 2:
+            expect(r).toEqual([2]);
+            break;
+          default:
+            expect.fail("returned more than two rows");
+        }
+        /* eslint-enable vitest/no-conditional-expect */
+        n += 1;
+      });
+    });
   });
   describe("#each", () => {
     it("should yield rows as hash's", async () => {
@@ -212,16 +234,33 @@ describe("Mysql2::Statement", () => {
       const result = (await (await state.client.prepare("SELECT 1")).execute())!;
       expect(result.toA()[0]).toBe(result.toA()[0]);
     });
-    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
-    it.skip("should yield different value for #first if streaming", () => {});
+    it("should yield different value for #first if streaming", async () => {
+      const result = (await (
+        await state.client.prepare("SELECT 1 UNION SELECT 2")
+      ).execute({
+        stream: true,
+        cacheRows: true,
+      })) as unknown as Mysql2StreamResult;
+      expect(await result.first()).not.toEqual(await result.first());
+    });
     it("should yield the same value for #first if streaming is disabled", async () => {
       const result = (await (
         await state.client.prepare("SELECT 1 UNION SELECT 2")
       ).execute({ stream: false }))!;
       expect(result.toA()[0]).toEqual(result.toA()[0]);
     });
-    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
-    it.skip("should throw an exception if we try to iterate twice when streaming is enabled", () => {});
+    it("should throw an exception if we try to iterate twice when streaming is enabled", async () => {
+      const result = (await (
+        await state.client.prepare("SELECT 1 UNION SELECT 2")
+      ).execute({
+        stream: true,
+        cacheRows: false,
+      })) as unknown as Mysql2StreamResult;
+      await expect(async () => {
+        await result.each(() => {});
+        await result.each(() => {});
+      }).rejects.toThrow(Mysql2.Error);
+    });
   });
   describe("#fields", () => {
     it("method should exist", async () => {
@@ -400,9 +439,9 @@ describe("Mysql2::Statement", () => {
       expect(test_result["enum_test"]).toBe("val1");
     });
     it("should raise an error given an invalid DATETIME", async () => {
-      const result = (await (
-        await state.client.prepare("SELECT CAST('1972-00-27 00:00:00' AS DATETIME) as bad_datetime")
-      ).execute())!;
+      const result = (await state.client.query(
+        "SELECT CAST('1972-00-27 00:00:00' AS DATETIME) as bad_datetime",
+      ))!;
       expect(() => result.each()).toThrow(Mysql2.Error);
       let message: string | null = null;
       try {

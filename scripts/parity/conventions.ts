@@ -791,12 +791,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     packages: ["mysql2"],
   },
   {
-    reason: "not called by activerecord",
-    names: ["server_flags"],
-    rubyFiles: ["result.rb"],
-    packages: ["mysql2"],
-  },
-  {
     reason: PG_UNPORTED_REASON,
     names: [
       "version_string",

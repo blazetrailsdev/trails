@@ -1,5 +1,5 @@
 import { rbScanArgs } from "@blazetrails/ruby-compat";
-import type { Client, Field, Mysql2Result, QueryOptions } from "./client.js";
+import { bind, type Client, type Field, type Mysql2Result, type QueryOptions } from "./client.js";
 import { Error as Mysql2Error } from "./error.js";
 import { Mysql2 } from "./mysql2.js";
 import type { Result } from "./result.js";
@@ -53,25 +53,27 @@ export class Statement {
       bigNumberStrings: true,
       typeCast: (field: Field, next: () => unknown) => {
         switch (field.type) {
-          case "SHORT":
-          case "LONG":
-          case "INT24":
-          case "YEAR":
-          case "FLOAT":
-          case "DOUBLE":
-          case "LONGLONG":
-          case "DECIMAL":
-          case "NEWDECIMAL": {
-            const value = next();
-            return value == null ? null : String(value);
-          }
-          case "JSON":
-            return field.string("binary");
-          default:
+          case "DATE":
+          case "NEWDATE":
+          case "DATETIME":
+          case "TIMESTAMP":
+          case "TIME":
             return field.string();
+          case "JSON":
+            return field.string("utf8");
+          default:
+            return next();
         }
       },
     };
+    if (currentQueryOptions.stream === true) {
+      const result = await this.client.useResult(
+        this.client.connection.connection!.execute({ ...options, values: args.map(bind) }),
+        currentQueryOptions,
+      );
+      if (result) (result as unknown as Result).stmtWrapper = this;
+      return result as unknown as Mysql2Result | null;
+    }
     const native = await this.client
       .execute(options, args)
       .catch((e: unknown) => this.client.raiseMysql2Error(e));

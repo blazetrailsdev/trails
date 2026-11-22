@@ -1,5 +1,11 @@
 import "@blazetrails/vitest-matchers";
-import { BigDecimal, rbCFloat, rbCNilClass } from "@blazetrails/ruby-compat";
+import {
+  BigDecimal,
+  Enumerable,
+  isModuleIncluded,
+  rbCFloat,
+  rbCNilClass,
+} from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Time } from "@blazetrails/date";
 import { Mysql2, type Client, type Result } from "../lib/index.js";
@@ -12,9 +18,11 @@ const testResult = async (client: Client) =>
   >;
 describe("Mysql2::Result", () => {
   const state = specHelper();
-  // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
+  // PERMANENT-SKIP: a JS class cannot undefine its allocator (`rb_undef_alloc_func`): `new Result(...)` always constructs.
   it.skip("should raise a TypeError exception when it doesn't wrap a result set", () => {});
-  it.skip("should have included Enumerable", () => {});
+  it("should have included Enumerable", () => {
+    expect(isModuleIncluded(Mysql2.Result, Enumerable)).toBe(true);
+  });
   it("should respond to #each", async () => {
     const result = await state.client.query("SELECT 1");
     expect(result).toRespondTo("each");
@@ -28,8 +36,11 @@ describe("Mysql2::Result", () => {
 
     await expect(state.client.query("SELECT 1")).resolves.not.toThrow();
   });
-  // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-  it.skip("should respond to #count, which is aliased as #size", () => {});
+  it("should respond to #count, which is aliased as #size", async () => {
+    const r = await state.client.query("SELECT 1");
+    expect(r).toRespondTo("count");
+    expect(r).toRespondTo("size");
+  });
   it("should be able to return the number of rows in the result set", async () => {
     const r = await state.client.query("SELECT 1");
     expect((r as Result).count()).toBe(1);
@@ -71,14 +82,28 @@ describe("Mysql2::Result", () => {
       const result = (await state.client.query("SELECT 1 UNION SELECT 2", { cacheRows: false }))!;
       expect(result.toA()).toEqual(result.toA());
     });
-    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
-    it.skip("should yield different value for #first if streaming", () => {});
+    it("should yield different value for #first if streaming", async () => {
+      const result = (await state.client.query("SELECT 1 UNION SELECT 2", {
+        stream: true,
+        cacheRows: false,
+      }))!;
+      expect(await result.first()).not.toEqual(await result.first());
+    });
     it("should yield the same value for #first if streaming is disabled", async () => {
       const result = (await state.client.query("SELECT 1 UNION SELECT 2", { stream: false }))!;
       expect(result.toA()[0]).toEqual(result.toA()[0]);
     });
-    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
-    it.skip("should throw an exception if we try to iterate twice when streaming is enabled", () => {});
+    it("should throw an exception if we try to iterate twice when streaming is enabled", async () => {
+      const result = (await state.client.query("SELECT 1 UNION SELECT 2", {
+        stream: true,
+        cacheRows: false,
+      }))!;
+
+      await expect(async () => {
+        await result.toA();
+        await result.toA();
+      }).rejects.toThrow(Mysql2.Error);
+    });
   });
   describe("#fields", () => {
     it("method should exist", async () => {
@@ -91,22 +116,131 @@ describe("Mysql2::Result", () => {
       const result = await state.client.query("SELECT 'a', 'b', 'c'");
       expect(result!.fields).toEqual(["a", "b", "c"]);
     });
-    // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either".
-    it.skip("should return an array of frozen strings", () => {});
+    it("should return an array of frozen strings", async () => {
+      const result = await state.client.query("SELECT 'a', 'b', 'c'");
+      for (const f of result!.fields) {
+        expect(Object.isFrozen(f)).toBe(true);
+      }
+    });
   });
   describe("#field_types", () => {
-    // PERMANENT-SKIP: Field / field_types / server_flags are outside the RFC 0254 surface (Non-goals).
-    it.skip("method should exist", () => {});
-    it.skip("should return correct types", () => {});
-    it.skip("should return an array of field types in proper order", () => {});
-    it.skip("should return json type on mysql 8.0", () => {});
+    const testResult = () =>
+      state.client.query("SELECT * FROM mysql2_test ORDER BY id DESC LIMIT 1");
+    it("method should exist", async () => {
+      expect(await testResult()).toRespondTo("fieldTypes");
+    });
+    it("should return correct types", async () => {
+      const expectedTypes = [
+        "mediumint(9)",
+        "varchar(10)",
+        "bit(64)",
+        "bit(1)",
+        "tinyint(4)",
+        "tinyint(1)",
+        "smallint(6)",
+        "mediumint(9)",
+        "int(11)",
+        "bigint(20)",
+        "float(10,3)",
+        "float(10,3)",
+        "double(10,3)",
+        "decimal(10,3)",
+        "decimal(10,3)",
+        "date",
+        "datetime",
+        "timestamp",
+        "time",
+        "year(4)",
+        "char(10)",
+        "varchar(10)",
+        "binary(10)",
+        "varbinary(10)",
+        "tinyblob",
+        "tinytext",
+        "blob",
+        "text",
+        "mediumblob",
+        "mediumtext",
+        "longblob",
+        "longtext",
+        "enum",
+        "set",
+      ];
+
+      expect((await testResult())!.fieldTypes()).toEqual(expectedTypes);
+    });
+    it("should return an array of field types in proper order", async () => {
+      const result = await state.client.query(
+        "SELECT cast('a' as char), " +
+          "cast(1.2 as decimal(15, 2)), " +
+          "cast(1.2 as decimal(15, 5)), " +
+          "cast(1.2 as decimal(15, 4)), " +
+          "cast(1.2 as decimal(15, 10)), " +
+          "cast(1.2 as decimal(14, 0)), " +
+          "cast(1.2 as decimal(15, 0)), " +
+          "cast(1.2 as decimal(16, 0)), " +
+          "cast(1.0 as decimal(16, 1))",
+      );
+
+      const expectedTypes = [
+        "varchar(1)",
+        "decimal(15,2)",
+        "decimal(15,5)",
+        "decimal(15,4)",
+        "decimal(15,10)",
+        "decimal(14,0)",
+        "decimal(15,0)",
+        "decimal(16,0)",
+        "decimal(16,1)",
+      ];
+
+      expect(result!.fieldTypes()).toEqual(expectedTypes);
+    });
+    it("should return json type on mysql 8.0", async () => {
+      // eslint-disable-next-line vitest/no-conditional-in-test, vitest/no-conditional-tests -- mirrors result_spec.rb:198 `next unless`
+      if (!/8.\d+.\d+/.test(state.client.serverInfo().version!)) return;
+
+      const result = await state.client.query("SELECT JSON_OBJECT('key', 'value')");
+      expect(result!.fieldTypes()).toEqual(["json"]);
+    });
   });
   describe("streaming", () => {
-    // BLOCKED: mysql2-result-stream-option-reads-the-driver-row-stream
-    it.skip("should maintain a count while streaming", () => {});
-    it.skip("should retain the count when mixing first and each", () => {});
-    it.skip("should not yield nil at the end of streaming", () => {});
-    it.skip("#count should be zero for rows after streaming when there were no results", () => {});
+    it("should maintain a count while streaming", async () => {
+      const result = (await state.client.query("SELECT 1", { stream: true, cacheRows: false }))!;
+      expect(result.count()).toBe(0);
+      await result.toA();
+      expect(result.count()).toBe(1);
+    });
+    it("should retain the count when mixing first and each", async () => {
+      const result = (await state.client.query("SELECT 1 UNION SELECT 2", {
+        stream: true,
+        cacheRows: false,
+      }))!;
+      expect(result.count()).toBe(0);
+      await result.first();
+      expect(result.count()).toBe(1);
+      await result.toA();
+      expect(result.count()).toBe(2);
+    });
+    it("should not yield nil at the end of streaming", async () => {
+      const result = (await state.client.query("SELECT * FROM mysql2_test", {
+        stream: true,
+        cacheRows: false,
+      }))!;
+      await result.each((r) => {
+        expect(r).not.toBeNull();
+      });
+    });
+    it("#count should be zero for rows after streaming when there were no results", async () => {
+      await state.client.query("USE activerecord_unittest");
+      const result = (await state.client.query(
+        "SELECT * FROM mysql2_test WHERE null_test IS NOT NULL",
+        { stream: true, cacheRows: false },
+      ))!;
+      expect(result.count()).toBe(0);
+      await result.toA();
+      expect(result.count()).toBe(0);
+    });
     it.skip("should raise an exception if streaming ended due to a timeout", () => {});
   });
   describe("row data type mapping", () => {
@@ -362,9 +496,16 @@ describe("Mysql2::Result", () => {
     });
   });
   describe("server flags", () => {
-    // PERMANENT-SKIP: Field / field_types / server_flags are outside the RFC 0254 surface (Non-goals).
-    it.skip("should set a definitive value for query_was_slow", () => {});
-    it.skip("should set a definitive value for no_index_used", () => {});
-    it.skip("should set a definitive value for no_good_index_used", () => {});
+    const testResult = () =>
+      state.client.query("SELECT * FROM mysql2_test ORDER BY null_test DESC LIMIT 1");
+    it("should set a definitive value for query_was_slow", async () => {
+      expect((await testResult())!.serverFlags.queryWasSlow).toBe(false);
+    });
+    it("should set a definitive value for no_index_used", async () => {
+      expect((await testResult())!.serverFlags.noIndexUsed).toBe(true);
+    });
+    it("should set a definitive value for no_good_index_used", async () => {
+      expect((await testResult())!.serverFlags.noGoodIndexUsed).toBe(false);
+    });
   });
 });
