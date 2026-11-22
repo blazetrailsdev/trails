@@ -19,9 +19,6 @@ const TYPE_NAMES: Record<number, string> = Object.fromEntries(
 const MYSQL2_MAX_BYTES_PER_CHAR = 3;
 const ENUM_FLAG = 256;
 const SET_FLAG = 2048;
-const SERVER_QUERY_NO_GOOD_INDEX_USED = 16;
-const SERVER_QUERY_NO_INDEX_USED = 32;
-const SERVER_QUERY_WAS_SLOW = 2048;
 
 type Row = unknown[] | Record<string, unknown>;
 
@@ -60,15 +57,6 @@ export class Result {
     this.fields = fields;
     this.rows = rows;
     this.isStreaming = queryOptions.stream === true;
-  }
-
-  /** @internal */
-  setServerQueryFlags(serverStatus: number): void {
-    this.serverFlags = {
-      noGoodIndexUsed: (serverStatus & SERVER_QUERY_NO_GOOD_INDEX_USED) !== 0,
-      noIndexUsed: (serverStatus & SERVER_QUERY_NO_INDEX_USED) !== 0,
-      queryWasSlow: (serverStatus & SERVER_QUERY_WAS_SLOW) !== 0,
-    };
   }
 
   count(): number {

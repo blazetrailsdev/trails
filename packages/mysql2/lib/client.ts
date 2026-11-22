@@ -236,6 +236,9 @@ export const MYSQL2_MAX_TIME = 315578267999;
 /** @internal */
 export const MYSQL2_MIN_TIME = 2678400;
 const CR_COMMANDS_OUT_OF_SYNC = 2014;
+const SERVER_QUERY_NO_GOOD_INDEX_USED = 16;
+const SERVER_QUERY_NO_INDEX_USED = 32;
+const SERVER_QUERY_WAS_SLOW = 2048;
 
 /** @internal */
 export type Field = {
@@ -1014,7 +1017,7 @@ export class Client {
         queryOptions,
         fields,
       );
-      resultObj.setServerQueryFlags(this.serverStatus);
+      this.setServerQueryFlags(resultObj);
       return resultObj as unknown as Mysql2Result;
     }
     this.affectedRows = result.affectedRows ?? 0;
@@ -1044,9 +1047,18 @@ export class Client {
       fields,
     );
     resultObj.streamRows = rows;
-    resultObj.setServerQueryFlags(this.serverStatus);
+    this.setServerQueryFlags(resultObj);
     this.activeResult = resultObj;
     return resultObj as unknown as Mysql2StreamResult;
+  }
+
+  /** @internal */
+  setServerQueryFlags(result: Result): void {
+    result.serverFlags = {
+      noGoodIndexUsed: (this.serverStatus & SERVER_QUERY_NO_GOOD_INDEX_USED) !== 0,
+      noIndexUsed: (this.serverStatus & SERVER_QUERY_NO_INDEX_USED) !== 0,
+      queryWasSlow: (this.serverStatus & SERVER_QUERY_WAS_SLOW) !== 0,
+    };
   }
 
   /** @internal */
