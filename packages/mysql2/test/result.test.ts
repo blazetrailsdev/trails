@@ -15,7 +15,10 @@ describe("Mysql2::Result", () => {
   // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
   it.skip("should raise a TypeError exception when it doesn't wrap a result set", () => {});
   it.skip("should have included Enumerable", () => {});
-  it.skip("should respond to #each", () => {});
+  it("should respond to #each", async () => {
+    const result = await state.client.query("SELECT 1");
+    expect(result).toRespondTo("each");
+  });
   it("should respond to #free", async () => {
     const result = await state.client.query("SELECT 1");
     expect(result).toRespondTo("free");
@@ -38,10 +41,25 @@ describe("Mysql2::Result", () => {
     });
   });
   describe("#each", () => {
+    it("should yield rows as hash's", async () => {
+      const result = (await state.client.query("SELECT 1"))!;
+      result.each((row) => {
+        expect(row).toBeExactInstanceOf(Object);
+      });
+    });
+    it("should yield rows as hash's with symbol keys if :symbolize_keys was set to true", async () => {
+      const result = (await state.client.query("SELECT 1"))!;
+      result.each({ symbolizeKeys: true }, (row) => {
+        expect(Object.keys(row)[0]).toBeExactInstanceOf(String);
+      });
+    });
+    it("should be able to return results as an array", async () => {
+      const result = (await state.client.query("SELECT 1"))!;
+      result.each({ as: "array" }, (row) => {
+        expect(row).toBeInstanceOf(Array);
+      });
+    });
     // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should yield rows as hash's", () => {});
-    it.skip("should yield rows as hash's with symbol keys if :symbolize_keys was set to true", () => {});
-    it.skip("should be able to return results as an array", () => {});
     it.skip("should cache previously yielded results by default", () => {});
     // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
     it.skip("should not cache previously yielded results if cache_rows is disabled", () => {});

@@ -1,6 +1,7 @@
 import mysql from "mysql2/promise";
 import {
   BigDecimal,
+  constDefined,
   File,
   hasKey,
   kernelInteger,
@@ -38,12 +39,46 @@ export interface Mysql2Result<
   readonly fields: string[];
   readonly size: number;
   toA(): Row[];
+  count(): number;
+  each(opts?: QueryOptions | ((row: Row) => unknown), block?: (row: Row) => unknown): Row[];
   free(): void;
 }
 
 type Handshake = { _handshakePacket?: { serverVersion?: string } };
 
 const CR_SERVER_GONE_ERROR = 2006;
+const CR_AUTH_PLUGIN_CANNOT_LOAD = 2059;
+
+const MY_CNF_KEYS: Record<string, string> = {
+  user: "user",
+  password: "password",
+  host: "host",
+  port: "port",
+  socket: "socketPath",
+  database: "database",
+};
+
+/** @noRailsEquivalent PERMANENT */
+async function myLoadDefaults(file: string, groups: string[]): Promise<Options> {
+  const defaults: Options = {};
+  let group: string | null = null;
+  for (const raw of (await File.readAsync(file)).split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line === "" || line.startsWith("#") || line.startsWith(";")) continue;
+    const header = /^\[(.+)\]$/.exec(line);
+    if (header) {
+      group = header[1].trim();
+      continue;
+    }
+    if (group == null || !groups.includes(group)) continue;
+    const [, name, value = ""] = /^([^=\s]+)\s*(?:=\s*(.*))?$/.exec(line) ?? [];
+    const key = name && MY_CNF_KEYS[name];
+    if (!key) continue;
+    const v = value.replace(/^(["'])(.*)\1$/, "$2");
+    defaults[key] = key === "port" ? Number(v) : v;
+  }
+  return defaults;
+}
 
 const CR_ERRNOS: Record<string, number> = {
   ENOTFOUND: 2005,
@@ -509,10 +544,10 @@ export class Client {
     const m = toS(mode).toUpperCase();
     const modes = Client as unknown as Record<string, number | undefined>;
     if (m.startsWith("SSL_MODE_")) {
-      if (Object.hasOwn(Client, m)) return modes[m];
+      if (constDefined(Client, m)) return modes[m];
     } else {
       const x = "SSL_MODE_" + m;
-      if (Object.hasOwn(Client, x)) return modes[x];
+      if (constDefined(Client, x)) return modes[x];
     }
     warn(`Unknown MySQL ssl_mode flag: ${toS(mode)}`);
     return undefined;
@@ -662,13 +697,8 @@ export class Client {
   }
 
   /**
-   * @missingRailsCall write_timeout — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
-   * @missingRailsCall reconnect — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
-   * @missingRailsCall default_file — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
-   * @missingRailsCall default_group — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
-   * @missingRailsCall default_auth — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
-   * @missingRailsCall enable_cleartext_plugin — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
-   * @missingRailsCall ssl_mode — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
+   * @missingRailsCall write_timeout — CONVERGEABLE mysql2-client-write-timeout-and-default-auth-reach-the-npm-connection
+   * @missingRailsCall default_auth — CONVERGEABLE mysql2-client-write-timeout-and-default-auth-reach-the-npm-connection
    */
   private async connect(
     user: string | null,
@@ -689,6 +719,26 @@ export class Client {
     if (this.connectTimeout != null) config.connectTimeout = this.connectTimeout * 1000;
     if (this.charsetName != null) config.charset = this.charsetName;
     if (this.secureAuth != null) config.insecureAuth = !this.secureAuth;
+    if (this.defaultFile != null) {
+      const group = this.defaultGroup;
+      const defaults = await myLoadDefaults(this.defaultFile, [
+        "client",
+        ...(group != null ? [group] : []),
+      ]);
+      for (const [key, value] of Object.entries(defaults)) config[key] ??= value;
+    }
+    if (this.enableCleartextPlugin !== true) {
+      config.authPlugins = {
+        mysql_clear_password: () => () => {
+          throw Mysql2Error.newWithArgs(
+            "Authentication plugin 'mysql_clear_password' cannot be loaded: plugin not enabled",
+            0,
+            CR_AUTH_PLUGIN_CANNOT_LOAD,
+            "HY000",
+          );
+        },
+      };
+    }
     if (this.localInfile === true) flags |= CLIENT_FLAGS.LOCAL_FILES;
     if (this.localInfile === false) flags &= ~CLIENT_FLAGS.LOCAL_FILES;
     if (
@@ -718,10 +768,18 @@ export class Client {
     if ((flags & CLIENT_FLAGS.IGNORE_SPACE) === 0) (config.flags as string[]).push("-IGNORE_SPACE");
     if ((flags & CLIENT_FLAGS.COMPRESS) !== 0) config.compress = true;
 
+    if (this.ssl === undefined && this.sslMode === Client.SSL_MODE_PREFERRED) {
+      config.ssl = { rejectUnauthorized: false };
+    }
     const connection = (await (async () =>
-      mysql.createConnection(config as mysql.ConnectionOptions))().catch((e: unknown) =>
-      this.raiseMysql2Error(e),
-    )) as NpmConnection;
+      mysql.createConnection(config as mysql.ConnectionOptions))()
+      .catch((e: unknown) => {
+        if (this.sslMode !== Client.SSL_MODE_PREFERRED) throw e;
+        if ((e as { code?: unknown }).code !== "HANDSHAKE_NO_SSL_SUPPORT") throw e;
+        delete config.ssl;
+        return mysql.createConnection(config as mysql.ConnectionOptions);
+      })
+      .catch((e: unknown) => this.raiseMysql2Error(e))) as NpmConnection;
     this.connection = connection;
     if (this.initCommand != null) {
       await connection.query(this.initCommand).catch((e: unknown) => this.raiseMysql2Error(e));
@@ -756,6 +814,13 @@ export class Client {
   private connectionTypeCast: TypeCast | undefined;
 
   private async _query(sql: string, opts: QueryOptions): Promise<Mysql2Result | null> {
+    if (
+      this.reconnect === true &&
+      this.connection.connection?._closing !== true &&
+      this.isClosed()
+    ) {
+      await this.connect(...this.connectArgs);
+    }
     return this.storeResult(
       await (this.connection.query as unknown as (options: object) => Promise<Native>)
         .call(this.connection, this.options(sql, opts))

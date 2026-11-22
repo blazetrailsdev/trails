@@ -1,5 +1,6 @@
 import { rbScanArgs } from "@blazetrails/ruby-compat";
 import type { Client, Mysql2Result, QueryOptions } from "./client.js";
+import { Error as Mysql2Error } from "./error.js";
 import { Mysql2 } from "./mysql2.js";
 
 declare module "./mysql2.js" {
@@ -10,6 +11,7 @@ declare module "./mysql2.js" {
 
 export class Statement {
   affectedRows = 0;
+  private closed = false;
 
   constructor(
     private client: Client,
@@ -22,6 +24,7 @@ export class Statement {
 
   /** @internal */
   async _execute(argv: unknown[]): Promise<Mysql2Result | null> {
+    if (this.closed) throw new Mysql2Error("Invalid statement handle");
     const [args, kwargs] = rbScanArgs<QueryOptions>(argv);
     const currentQueryOptions = { ...this.client.queryOptions, ...kwargs, cast: true };
     const result = this.client.storeResult(
@@ -34,6 +37,7 @@ export class Statement {
   }
 
   close(): void {
+    this.closed = true;
     this.client.unprepare(this.client.options(this.sql, this.client.queryOptions));
   }
 }
