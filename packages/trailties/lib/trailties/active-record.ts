@@ -68,6 +68,8 @@ export interface ActiveRecordConfig {
   maintainTestSchema: boolean;
   hasManyInversing: boolean;
   sqlite3AdapterStrictStringsByDefault?: boolean;
+  destroyAssociationAsyncJob?: unknown;
+  destroyAssociationAsyncBatchSize?: number | null;
   tableNamePrefix?: string;
   tableNameSuffix?: string;
   postgresqlAdapterDecodeDates?: boolean;

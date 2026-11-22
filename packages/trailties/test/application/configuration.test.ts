@@ -13,7 +13,13 @@ import { ActionDispatch, Session } from "@blazetrails/actionpack";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  Deprecators,
+  MessageVerifiers,
+  OrderedOptions,
+  ParameterFilter,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
 import {
   assertNothingRaised,
   assertRaises,
@@ -48,7 +54,7 @@ import "@blazetrails/activestorage/engine";
 import { ActiveStorage } from "@blazetrails/activestorage";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
-import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
+import { Base as ActiveRecordBase, SchemaReflection } from "@blazetrails/activerecord";
 import { DestroyAssociationAsyncJob } from "@blazetrails/activerecord/destroy-association-async-job";
 import { CacheRequest } from "@blazetrails/actionpack";
 import {
@@ -57,6 +63,7 @@ import {
   utcToLocalReturnsUtcOffsetTimes,
 } from "@blazetrails/activesupport";
 import { Trailtie as ActionMailerTrailtie } from "../../lib/trailties/action-mailer.js";
+import { Trailtie as ActiveRecordTrailtie } from "../../lib/trailties/active-record.js";
 import { Trailtie as ActiveJobTrailtie } from "../../lib/trailties/active-job.js";
 import { Trailtie as ActionDispatchTrailtie } from "../../lib/trailties/action-dispatch.js";
 import { Application } from "../../lib/application.js";
@@ -92,6 +99,8 @@ describe("ConfigurationTest", () => {
   const actionView = { ...ActionViewTrailtie.config.actionView };
   const smtpSettings = ActionMailerBase.smtpSettings;
   const actionDispatch = { ...ActionDispatchTrailtie.config.actionDispatch };
+  const activeRecord = { ...ActiveRecordTrailtie.config.activeRecord };
+  const { checkSchemaCacheDumpVersion, useSchemaCacheDump } = SchemaReflection;
   const activeJob = (ActiveJobTrailtie.config.activeJob as unknown as OrderedOptions).toH();
   const actionMailer = (
     ActionMailerTrailtie.config.actionMailer as unknown as OrderedOptions
@@ -129,6 +138,8 @@ describe("ConfigurationTest", () => {
     Object.assign(ActionViewTrailtie.config.actionView, actionView);
     ActiveJobBase.retryJitter = 0.0;
     Object.assign(ActionDispatchTrailtie.config.actionDispatch, actionDispatch);
+    Object.assign(ActiveRecordTrailtie.config.activeRecord, activeRecord);
+    Object.assign(SchemaReflection, { checkSchemaCacheDumpVersion, useSchemaCacheDump });
     for (const [config, snapshot] of [
       [ActiveJobTrailtie.config.activeJob, activeJob],
       [ActionMailerTrailtie.config.actionMailer, actionMailer],
@@ -140,6 +151,181 @@ describe("ConfigurationTest", () => {
     setEnv("TRAILS_ENV", trailsEnv);
     _resetTrailsEnv();
     await rm(appPath, { recursive: true, force: true });
+  });
+
+  it("Rails.env does not set the RAILS_ENV environment variable which would leak out into rake tasks", async () => {
+    await envHelpers.switchEnv("TRAILS_ENV", undefined, async () => {
+      Trails.env = "development";
+      expect(Trails.env.toString()).toBe("development");
+      assertNil(env.TRAILS_ENV);
+    });
+  });
+
+  it("Rails.groups returns available groups", async () => {
+    Trails.env = "development";
+    expect(Trails.groups()).toEqual(["default", "development"]);
+    expect(Trails.groups({ assets: ["development"] })).toEqual([
+      "default",
+      "development",
+      "assets",
+    ]);
+    expect(Trails.groups("another", { assets: ["development"] })).toEqual([
+      "default",
+      "development",
+      "another",
+      "assets",
+    ]);
+
+    Trails.env = "test";
+    expect(Trails.groups({ assets: ["development"] })).toEqual(["default", "test"]);
+
+    await envHelpers.switchEnv("TRAILS_GROUPS", "javascripts,stylesheets", async () => {
+      expect(Trails.groups()).toEqual(["default", "test", "javascripts", "stylesheets"]);
+    });
+  });
+
+  it("Rails.application is nil until app is initialized", async () => {
+    Trails.application = null;
+    assertNil(Trails.application);
+    const application = await app("development");
+    expect(Trails.application).toBe((application.constructor as typeof Application).instance());
+  });
+
+  it("Rails.application responds to all instance methods", async () => {
+    const application = await app("development");
+    const AppTemplate = application.constructor as unknown as { routesReloader(): unknown };
+    expect(Trails.application!.routesReloader()).toBe(AppTemplate.routesReloader());
+    expect(Trails.application!.messageVerifiers()).toBeInstanceOf(MessageVerifiers);
+    expect(Trails.application!.deprecators).toBeInstanceOf(Deprecators);
+  });
+
+  it("Rails::Application responds to paths", async () => {
+    const application = await app("development");
+    const AppTemplate = application.constructor as unknown as Pick<Application, "paths">;
+    expect(AppTemplate.paths().get("app/views")!.expanded()).toEqual([join(appPath, "app/views")]);
+  });
+
+  it("the application root is set correctly", async () => {
+    await app("development");
+    expect(Trails.application!.root()).toBe(appPath);
+  });
+
+  it("the application root can be seen from the application singleton", async () => {
+    const application = await app("development");
+    const AppTemplate = application.constructor as unknown as Pick<Application, "root">;
+    expect(AppTemplate.root()).toBe(appPath);
+  });
+
+  it("filter_parameters should be able to set via config.filter_parameters", async () => {
+    await assertNothingRaised(async () => {
+      const application = await app("development");
+      application.config.filterParameters.push("foo", "bar", (key: string, value: unknown) =>
+        /baz/.test(key) ? String(value).split("").reverse().join("") : value,
+      );
+      await application.initializeBang();
+    });
+  });
+
+  it("filter_parameters should be able to set via config.filter_parameters in an initializer", async () => {
+    const application = await app("development");
+    Trails.application!.config.filterParameters.push("password", "foo", "bar");
+    await application.initializeBang();
+
+    expect(Trails.application!.envConfig()["action_dispatch.parameter_filter"]).toEqual([
+      "password",
+      "foo",
+      "bar",
+    ]);
+  });
+
+  it("filter_parameters is precompiled when config.precompile_filter_parameters is true", async () => {
+    const filters = [/foo/, "bar", "baz.qux"];
+
+    const application = await app("development");
+    application.config.filterParameters.push(...filters);
+    application.config.precompileFilterParameters = true;
+    await application.initializeBang();
+
+    expect(Trails.application!.envConfig()["action_dispatch.parameter_filter"]).toEqual(
+      ParameterFilter.precompileFilters(filters),
+    );
+  });
+
+  it("filter_parameters is not precompiled when config.precompile_filter_parameters is false", async () => {
+    const filters = [/foo/, "bar", "baz.qux"];
+
+    const application = await app("development");
+    application.config.filterParameters.push(...filters);
+    application.config.precompileFilterParameters = false;
+    await application.initializeBang();
+
+    expect(Trails.application!.envConfig()["action_dispatch.parameter_filter"]).toEqual(filters);
+  });
+
+  it("filter_parameters reflects changes to config.filter_parameters after being precompiled", async () => {
+    const application = await app("development");
+    application.config.filterParameters.push(/foo/, "bar");
+    application.config.precompileFilterParameters = true;
+    await application.initializeBang();
+
+    expect(Trails.application!.envConfig()["action_dispatch.parameter_filter"]).not.toHaveLength(0);
+
+    Trails.application!.config.filterParameters.push("baz.qux");
+
+    expect(Trails.application!.envConfig()["action_dispatch.parameter_filter"]).toContain(
+      "baz.qux",
+    );
+  });
+
+  it("config.precompile_filter_parameters is true by default for new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+
+    expect(Trails.application!.config.precompileFilterParameters).toBe(true);
+  });
+
+  it("config.precompile_filter_parameters is false by default for upgraded apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("7.0");
+
+    expect(Trails.application!.config.precompileFilterParameters).toBeFalsy();
+  });
+
+  it("application is always added to eager_load namespaces", async () => {
+    const application = await app("development");
+    expect(Trails.application!.config.eagerLoadNamespaces).toContain(application.constructor);
+  });
+
+  it("propagates check_schema_cache_dump_version=true to ActiveRecord::ConnectionAdapters::SchemaReflection", async () => {
+    const application = await app("development");
+    application.config.activeRecord.checkSchemaCacheDumpVersion = true;
+    await application.initializeBang();
+
+    expect(SchemaReflection.checkSchemaCacheDumpVersion).toBe(true);
+  });
+
+  it("propagates check_schema_cache_dump_version=false to ActiveRecord::ConnectionAdapters::SchemaReflection", async () => {
+    const application = await app("development");
+    application.config.activeRecord.checkSchemaCacheDumpVersion = false;
+    await application.initializeBang();
+
+    expect(SchemaReflection.checkSchemaCacheDumpVersion).toBe(false);
+  });
+
+  it("propagates use_schema_cache_dump=true to ActiveRecord::ConnectionAdapters::SchemaReflection", async () => {
+    const application = await app("development");
+    application.config.activeRecord.useSchemaCacheDump = true;
+    await application.initializeBang();
+
+    expect(SchemaReflection.useSchemaCacheDump).toBe(true);
+  });
+
+  it("propagates use_schema_cache_dump=false to ActiveRecord::ConnectionAdapters::SchemaReflection", async () => {
+    const application = await app("development");
+    application.config.activeRecord.useSchemaCacheDump = false;
+    await application.initializeBang();
+
+    expect(SchemaReflection.useSchemaCacheDump).toBe(false);
   });
 
   it("config.enable_reloading is !config.cache_classes", async () => {
@@ -629,7 +815,9 @@ describe("ConfigurationTest", () => {
   it("ActiveRecord::Base.destroy_association_async_job can be configured via config.active_record.destroy_association_async_job", async () => {
     class DummyDestroyAssociationAsyncJob {}
     constSet(TopLevel, "DummyDestroyAssociationAsyncJob", DummyDestroyAssociationAsyncJob);
-    onTestFinished(() => rbModRemoveConst(TopLevel, "DummyDestroyAssociationAsyncJob"));
+    onTestFinished(() => {
+      rbModRemoveConst(TopLevel, "DummyDestroyAssociationAsyncJob");
+    });
     const application = await app("test");
     application.config.activeRecord.destroyAssociationAsyncJob = "DummyDestroyAssociationAsyncJob";
     await application.initializeBang();
