@@ -990,7 +990,16 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
       "not called by activerecord or actioncable; the pg port carries only the surface trails' adapters call (operator ruling 2026-11-22). PERMANENT.",
-    names: ["init_openssl", "init_ssl", "isthreadsafe", "library_version"],
+    names: ["init_openssl", "init_ssl", "isthreadsafe"],
+    rubyFiles: ["pg.rb", "../pg.rb"],
+    packages: ["pg"],
+  },
+  {
+    reason:
+      "`PG.library_version` is `PQlibVersion()` (vendor/pg/v1.5.9/ext/pg.c:246-250) and node-pg links no libpq, so " +
+      "`cancel_any_running_query`'s libpq-18 guard (postgresql/database_statements.rb:135) has no value to read " +
+      "(operator ruling 2026-11-22). PERMANENT.",
+    names: ["library_version"],
     rubyFiles: ["pg.rb", "../pg.rb"],
     packages: ["pg"],
   },
