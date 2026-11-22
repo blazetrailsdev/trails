@@ -114,4 +114,11 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
     expect(rows).toEqual([[1], [2], [3]]);
     await stmt.close();
   });
+
+  it("rejects a named parameter that appears only inside a string literal or comment", () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    const stmt = db.prepare("SELECT ':foo', ? -- :bar");
+    expect(() => stmt.bindParam(":foo", 1)).toThrow("no such bind parameter");
+    expect(() => stmt.bindParam(":bar", 1)).toThrow("no such bind parameter");
+  });
 });

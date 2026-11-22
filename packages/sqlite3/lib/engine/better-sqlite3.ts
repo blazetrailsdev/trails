@@ -6,6 +6,8 @@ import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "..
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
+import { withBusyHandler } from "./busy-handler.js";
+import { bindParameterIndex } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 
 const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
@@ -57,23 +59,6 @@ function open(file: string, mode: number): BetterSqlite3.Database {
   return new BetterSqlite3(file, opts);
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-function withBusyHandler<T>(handler: () => BusyHandler | null, attempt: () => T): T {
-  let count = 0;
-  for (;;) {
-    try {
-      return attempt();
-    } catch (e) {
-      const busy = handler();
-      if (busy == null || errors.errcode(e) !== SQLite3.Constants.ErrorCode.BUSY) throw e;
-      if (busy(count++) === false) throw e;
-    }
-  }
-}
-
 /** @internal */
 function prepareStatement(
   raw: BetterSqlite3.Database,
@@ -81,7 +66,7 @@ function prepareStatement(
   handler: () => BusyHandler | null,
   setChanges: (n: number) => void,
 ): EngineStatement {
-  const stmt = withBusyHandler(handler, () => raw.prepare(sql));
+  const stmt = withBusyHandler(errors, handler, () => raw.prepare(sql));
   const reader = stmt.reader;
   if (reader) stmt.raw(true);
   const positional: SqliteBindValue[] = [];
@@ -115,8 +100,7 @@ function prepareStatement(
         return;
       }
       const name = key.replace(/^[:@$]/, "");
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      if (!new RegExp(`[:@$]${escaped}(?![\\w$])`).test(sql)) {
+      if (bindParameterIndex(sql, name) === 0) {
         throw new SQLite3.Exception("no such bind parameter");
       }
       named[name] = value;
@@ -129,14 +113,16 @@ function prepareStatement(
     step() {
       if (done) return null;
       if (!reader) {
-        setChanges(withBusyHandler(handler, () => bound((args) => stmt.run(...args)).changes));
+        setChanges(
+          withBusyHandler(errors, handler, () => bound((args) => stmt.run(...args)).changes),
+        );
         done = true;
         return null;
       }
       const r =
         rows !== null
           ? rows.next()
-          : withBusyHandler(handler, () => {
+          : withBusyHandler(errors, handler, () => {
               const started = bound((args) => stmt.iterate(...args)) as Iterator<unknown[]>;
               try {
                 const first = started.next();
@@ -186,11 +172,13 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
         rest = rest.slice(tail).trim();
         if (empty) continue;
         const stmt = withBusyHandler(
+          errors,
           () => handler,
           () => raw.prepare(head),
         );
         if (!stmt.reader) {
           changes = withBusyHandler(
+            errors,
             () => handler,
             () => stmt.run().changes,
           );
@@ -198,6 +186,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
           stmt.safeIntegers(true).raw(true);
           const names = stmt.columns().map((c) => c.name);
           for (const row of withBusyHandler(
+            errors,
             () => handler,
             () => stmt.all() as unknown[][],
           )) {

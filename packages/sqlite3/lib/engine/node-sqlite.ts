@@ -7,6 +7,8 @@ import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "..
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
+import { withBusyHandler } from "./busy-handler.js";
+import { bindParameterIndex } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 
 /** @internal */
@@ -75,23 +77,6 @@ function open(file: string, mode: number): DatabaseSync {
   });
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-function withBusyHandler<T>(handler: () => BusyHandler | null, attempt: () => T): T {
-  let count = 0;
-  for (;;) {
-    try {
-      return attempt();
-    } catch (e) {
-      const busy = handler();
-      if (busy == null || errors.errcode(e) !== SQLite3.Constants.ErrorCode.BUSY) throw e;
-      if (busy(count++) === false) throw e;
-    }
-  }
-}
-
 /** @internal */
 function bindValue(value: SqliteBindValue): SqliteBindValue {
   if ((value as unknown) instanceof Number) return (value as unknown as number).valueOf();
@@ -105,7 +90,7 @@ function prepareStatement(
   sql: string,
   handler: () => BusyHandler | null,
 ): EngineStatement {
-  const stmt: StatementSync = withBusyHandler(handler, () => raw.prepare(sql));
+  const stmt: StatementSync = withBusyHandler(errors, handler, () => raw.prepare(sql));
   stmt.setAllowBareNamedParameters(true);
   const columns = stmt.columns();
   const reader = columns.length > 0;
@@ -131,8 +116,7 @@ function prepareStatement(
         return;
       }
       const name = key.replace(/^[:@$]/, "");
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      if (!new RegExp(`[:@$]${escaped}(?![\\w$])`).test(sql)) {
+      if (bindParameterIndex(sql, name) === 0) {
         throw new SQLite3.Exception("no such bind parameter");
       }
       named[name] = bindValue(value);
@@ -145,7 +129,7 @@ function prepareStatement(
     step() {
       if (done) return null;
       if (!reader) {
-        withBusyHandler(handler, () =>
+        withBusyHandler(errors, handler, () =>
           stmt.run(...(args() as import("node:sqlite").SQLInputValue[])),
         );
         done = true;
@@ -154,7 +138,7 @@ function prepareStatement(
       const r =
         rows !== null
           ? rows.next()
-          : withBusyHandler(handler, () => {
+          : withBusyHandler(errors, handler, () => {
               const started = stmt.iterate(
                 ...(args() as import("node:sqlite").SQLInputValue[]),
               ) as Iterator<unknown>;
@@ -190,8 +174,10 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     isDiscarded: () => false,
     close: () => raw.close(),
     changes: () => {
-      changesStmt ??= raw.prepare("SELECT changes()");
-      changesStmt.setReturnArrays(true);
+      if (changesStmt === null) {
+        changesStmt = raw.prepare("SELECT changes()");
+        changesStmt.setReturnArrays(true);
+      }
       return Number((changesStmt.get() as unknown as [number])[0]);
     },
     disableQuirkMode: () => {},
@@ -207,12 +193,14 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
         rest = rest.slice(tail).trim();
         if (empty) continue;
         const stmt = withBusyHandler(
+          errors,
           () => handler,
           () => raw.prepare(head),
         );
         const names = stmt.columns().map((c) => c.name);
         if (names.length === 0) {
           withBusyHandler(
+            errors,
             () => handler,
             () => stmt.run(),
           );
@@ -221,6 +209,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
         stmt.setReadBigInts(true);
         stmt.setReturnArrays(true);
         for (const row of withBusyHandler(
+          errors,
           () => handler,
           () => stmt.all() as unknown as unknown[][],
         )) {
