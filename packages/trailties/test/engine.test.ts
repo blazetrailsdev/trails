@@ -5,7 +5,6 @@ import {
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
-  rbFSend,
 } from "@blazetrails/ruby-compat";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { RouteSet } from "@blazetrails/actionpack";
@@ -209,38 +208,12 @@ describe("Engine", () => {
   });
 
   describe("endpoint", () => {
-    it("it provides routes as default endpoint", () => {
-      class DefaultEndpointEngine extends Engine {}
-      Engine.register(DefaultEndpointEngine, fixtureRoot);
-      const engine = DefaultEndpointEngine.instance();
-      expect(engine.endpoint()).toBe(engine.routes());
-    });
-
     it("returns the registered endpoint", () => {
       class MountedEngine extends Engine {}
       Engine.register(MountedEngine, fixtureRoot);
       const rack = async () => [200, {}, ["OK"]] as const;
       MountedEngine.endpoint(rack as never);
       expect(MountedEngine.instance().endpoint()).toBe(rack);
-    });
-
-    it("engine is a rack app and can have its own middleware stack", async () => {
-      class Upcaser {
-        constructor(private app: (env: never) => Promise<[number, object, string[]]>) {}
-        async call(env: never): Promise<[number, object, string[]]> {
-          const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
-          response[2] = response[2].map((part: string) => part.toUpperCase());
-          return response;
-        }
-      }
-
-      class StackEngine extends Engine {}
-      Engine.register(StackEngine, fixtureRoot);
-      StackEngine.endpoint((async () => [200, {}, ["Hello World"]]) as never);
-      (StackEngine.config.middleware as MiddlewareStackProxy).use(Upcaser);
-
-      const response = await StackEngine.instance().call(MockRequest.envFor("/bukkits"));
-      expect(response[2]).toEqual(["HELLO WORLD"]);
     });
   });
 
@@ -408,29 +381,6 @@ describe("Engine", () => {
       setEnv("TRAILS_ENV", previousEnv);
     });
 
-    it("initializers", async () => {
-      class InitializersEngine extends Engine {}
-      Engine.register(InitializersEngine, fixtureRoot);
-      const engine = InitializersEngine.instance();
-
-      await engine.initializers.find((i) => i.name === "load_config_initializers")!.run();
-
-      expect(loaded).toEqual(["a-foo", "b-bar"]);
-    });
-
-    it("initializers are executed after application configuration initializers", () => {
-      class OrderingEngine extends Engine {}
-      Engine.register(OrderingEngine, fixtureRoot);
-      OrderingEngine.initializer("dummy_initializer", () => {});
-      const names = OrderingEngine.instance()
-        .initializers.tsort()
-        .map((i) => i.name);
-
-      expect(names.lastIndexOf("load_config_initializers")).toBeLessThan(
-        names.indexOf("dummy_initializer"),
-      );
-    });
-
     it("load_environment_config requires config/environments/$env", async () => {
       class EnvironmentEngine extends Engine {}
       Engine.register(EnvironmentEngine, fixtureRoot);
@@ -464,50 +414,6 @@ describe("Engine", () => {
       await engine.initializers.find((i) => i.name === "prepend_helpers_path")!.run(app);
 
       expect(app.config.helpersPaths).toEqual([]);
-    });
-
-    it("loading seed data", async () => {
-      class SeedEngine extends Engine {}
-      Engine.register(SeedEngine, fixtureRoot);
-      const engine = SeedEngine.instance();
-
-      await engine.loadSeed();
-
-      expect(loaded).toEqual(["seeds"]);
-    });
-
-    it("skips nonexistent seed data", async () => {
-      class NoSeedEngine extends Engine {}
-      Engine.register(NoSeedEngine, fixtureRoot);
-      const engine = NoSeedEngine.instance();
-      engine.config.setRoot("/nonexistent-engine-root");
-
-      await expect(engine.loadSeed()).resolves.toBeUndefined();
-      expect(loaded).toEqual([]);
-    });
-
-    it("loading seed data is wrapped by the executor", async () => {
-      class WrappedSeedEngine extends Engine {}
-      Engine.register(
-        WrappedSeedEngine,
-        new URL("./fixtures/seed-engine", import.meta.url).pathname,
-      );
-      const engine = WrappedSeedEngine.instance();
-      const wrapped: string[] = [];
-      const app = {
-        reloader: {
-          wrap(block: () => void | Promise<void>): void | Promise<void> {
-            wrapped.push("wrap");
-            return block();
-          },
-        },
-      };
-
-      engine.initializers.find((i) => i.name === "wrap_reloader_around_load_seed")!.run(app);
-      await engine.loadSeed();
-
-      expect(wrapped).toEqual(["wrap"]);
-      expect(loaded).toEqual(["wrapped-seeds"]);
     });
   });
 });

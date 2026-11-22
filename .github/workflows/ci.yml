@@ -1883,6 +1883,48 @@ jobs:
           PGPORT: "5432"
           PGUSER: rails
 
+  trailties-postgres-tests:
+    name: Trailties PostgreSQL Tests
+    needs: changes
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (needs.changes.outputs.docs_only != 'true' &&
+      contains(github.event.pull_request.labels.*.name, 'run-trailties-postgres'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: activerecord_unittest
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_INITDB_ARGS: "--no-sync"
+        ports:
+          - 5432:5432
+        options: >-
+          --mount type=tmpfs,destination=/var/lib/postgresql/data
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm build
+      - name: Provision Rails' test role
+        run: |
+          psql -h localhost -U postgres -d activerecord_unittest \
+            -v ON_ERROR_STOP=1 -f scripts/db-init/postgres/01-rails-role.sql
+      - run: pnpm vitest run packages/trailties/test/application/rake/multi-dbs.test.ts
+        env:
+          ARCONN: postgresql
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: rails
+
   mysql-tests:
     name: Active Record MySQL Tests
     needs: changes
@@ -2852,6 +2894,7 @@ jobs:
       - maria-prepared-tests
       - postgres-tests
       - actioncable-postgres-tests
+      - trailties-postgres-tests
       - actioncable-redis-tests
       - mysql-tests
       - maria-tests
@@ -2901,6 +2944,7 @@ jobs:
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
           QUICKSTART_NOT_REQUIRED: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
           PROMISE_COUNTS_NOT_REQUIRED: ${{ github.event_name != 'pull_request' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.website_only == 'true' }}
+          TRAILTIES_POSTGRES_NOT_REQUIRED: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-trailties-postgres')) }}
           GUIDES_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-guides') }}
         run: |
           set -euo pipefail
@@ -2954,6 +2998,11 @@ jobs:
                   ;;
                 actioncable-postgres-tests|actioncable-redis-tests)
                   if [ "$ACTIONCABLE_AFFECTED" = "false" ]; then
+                    continue
+                  fi
+                  ;;
+                trailties-postgres-tests)
+                  if [ "$TRAILTIES_POSTGRES_NOT_REQUIRED" = "true" ]; then
                     continue
                   fi
                   ;;

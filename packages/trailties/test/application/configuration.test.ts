@@ -1,9 +1,21 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+} from "vitest";
+import { constSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { ActionDispatch, Session } from "@blazetrails/actionpack";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
 import {
+  assertNothingRaised,
   assertRaises,
   assertNil,
   assertNotNil,
@@ -20,6 +32,9 @@ import type { Base as CableServer } from "@blazetrails/actioncable/server/base";
 import { days, Logger } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  constGet,
+  NameError,
+  TopLevel,
   env,
   getFs,
   Pathname,
@@ -87,6 +102,105 @@ describe("ConfigurationTest", () => {
     setEnv("TRAILS_ENV", trailsEnv);
     _resetTrailsEnv();
     await rm(appPath, { recursive: true, force: true });
+  });
+
+  it("config.enable_reloading is !config.cache_classes", async () => {
+    await app("development");
+
+    const config = Trails.application!.config;
+
+    expect(config.enableReloading).toBe(!config.cacheClasses);
+
+    for (const enabled of [true, false]) {
+      config.enableReloading = enabled;
+      expect(config.enableReloading).toBe(enabled);
+      expect(config.isReloadingEnabled()).toBe(enabled);
+      expect(!config.cacheClasses).toBe(enabled);
+    }
+
+    for (const enabled of [true, false]) {
+      config.cacheClasses = enabled;
+      expect(!config.enableReloading).toBe(enabled);
+      expect(!config.isReloadingEnabled()).toBe(enabled);
+      expect(config.cacheClasses).toBe(enabled);
+    }
+  });
+
+  it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", async () => {
+    try {
+      await assertNothingRaised(async () => {
+        const application = await app("development");
+        constSet(ActionDispatch.Session, "MyCustomStore", class extends Session.CookieStore {});
+        application.config.sessionStore(":my_custom_store");
+        application.config.sessionStore();
+      });
+    } finally {
+      rbModRemoveConst(ActionDispatch.Session, "MyCustomStore");
+    }
+  });
+
+  it("config.session_store with unknown store raises helpful error", async () => {
+    const application = await app("development");
+    application.config.sessionStore(":unknown_store");
+    const e = await assertRaises([RuntimeError], {}, () => application.config.sessionStore());
+
+    expect(e.message).toMatch(/Unable to resolve session store :unknown_store/);
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (array ignore)", async () => {
+    await mkdir(join(appPath, "lib", "tasks"), { recursive: true });
+    await writeFile(join(appPath, "lib", "x.ts"), "export const X = true;\n");
+    await writeFile(join(appPath, "lib", "tasks", "x.ts"), "export const X = true;\n");
+    await mkdir(join(appPath, "lib", "generators"), { recursive: true });
+    await writeFile(join(appPath, "lib", "generators", "x.ts"), "export const X = true;\n");
+    const application = await app("development");
+    application.config.autoloadLib({ ignore: ["tasks", "generators"] });
+    await application.initializeBang();
+    onTestFinished(() => application.autoloaders.main.unload());
+
+    const config = Trails.application!.config;
+    expect(config.autoloadPaths).toContain(`${appPath}/lib`);
+    expect(config.eagerLoadPaths).toContain(`${appPath}/lib`);
+
+    expect(constGet(TopLevel, "X")).toBeTruthy();
+    expect(() => constGet(TopLevel, "Tasks")).toThrow(NameError);
+    expect(() => constGet(TopLevel, "Generators")).toThrow(NameError);
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (empty array ignore)", async () => {
+    await mkdir(join(appPath, "lib", "tasks"), { recursive: true });
+    await writeFile(join(appPath, "lib", "x.ts"), "export const X = true;\n");
+    await writeFile(join(appPath, "lib", "tasks", "x.ts"), "export const X = true;\n");
+
+    const application = await app("development");
+    application.config.autoloadLib({ ignore: [] });
+    await application.initializeBang();
+    onTestFinished(() => application.autoloaders.main.unload());
+
+    const config = Trails.application!.config;
+    expect(config.autoloadPaths).toContain(`${appPath}/lib`);
+    expect(config.eagerLoadPaths).toContain(`${appPath}/lib`);
+
+    expect(constGet(TopLevel, "X")).toBeTruthy();
+    expect(constGet(TopLevel, "Tasks::X")).toBeTruthy();
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (scalar ignore)", async () => {
+    await mkdir(join(appPath, "lib", "tasks"), { recursive: true });
+    await writeFile(join(appPath, "lib", "x.ts"), "export const X = true;\n");
+    await writeFile(join(appPath, "lib", "tasks", "x.ts"), "export const X = true;\n");
+
+    const application = await app("development");
+    application.config.autoloadLib({ ignore: "tasks" });
+    await application.initializeBang();
+    onTestFinished(() => application.autoloaders.main.unload());
+
+    const config = Trails.application!.config;
+    expect(config.autoloadPaths).toContain(`${appPath}/lib`);
+    expect(config.eagerLoadPaths).toContain(`${appPath}/lib`);
+
+    expect(constGet(TopLevel, "X")).toBeTruthy();
+    expect(() => constGet(TopLevel, "Tasks")).toThrow(NameError);
   });
 
   it("Trails.env falls back to development if TRAILS_ENV is blank and RACK_ENV is nil", async () => {

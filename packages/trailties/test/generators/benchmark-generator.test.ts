@@ -2,8 +2,8 @@ import { Dir, File } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { beforeEach, describe, expect, it } from "vitest";
-import { BenchmarkGenerator } from "../../../../lib/generators/trails/benchmark/benchmark-generator.js";
-import { TestCase } from "../../../../lib/generators/test-case.js";
+import { BenchmarkGenerator } from "../../lib/generators/trails/benchmark/benchmark-generator.js";
+import { TestCase } from "../../lib/generators/test-case.js";
 
 class BenchmarkGeneratorTest extends TestCase {}
 BenchmarkGeneratorTest.destination(Dir.mktmpdir());
@@ -22,9 +22,21 @@ describe("BenchmarkGeneratorTest", () => {
     await t.runGenerator(["my_benchmark"]);
 
     await t.assertFile("script/benchmarks/my_benchmark.ts", (content) => {
-      expect(content).toContain("before: () => {}");
-      expect(content).toContain("after: () => {}");
-      expect(content).toContain("performance.now()");
+      expect(content).toBe(`import "../../config/environment.ts";
+
+// Any benchmarking setup goes here...
+
+const reports: Record<string, () => void> = {
+  before: () => {},
+  after: () => {},
+};
+
+for (const [name, fn] of Object.entries(reports)) {
+  const start = performance.now();
+  fn();
+  console.log(\`\${name}: \${(performance.now() - start).toFixed(3)}ms\`);
+}
+`);
     });
   });
 
@@ -38,8 +50,21 @@ describe("BenchmarkGeneratorTest", () => {
     await t.runGenerator(["my_benchmark", "with_patch", "without_patch"]);
 
     await t.assertFile("script/benchmarks/my_benchmark.ts", (content) => {
-      expect(content).toContain("with_patch: () => {}");
-      expect(content).toContain("without_patch: () => {}");
+      expect(content).toBe(`import "../../config/environment.ts";
+
+// Any benchmarking setup goes here...
+
+const reports: Record<string, () => void> = {
+  with_patch: () => {},
+  without_patch: () => {},
+};
+
+for (const [name, fn] of Object.entries(reports)) {
+  const start = performance.now();
+  fn();
+  console.log(\`\${name}: \${(performance.now() - start).toFixed(3)}ms\`);
+}
+`);
     });
   });
 });

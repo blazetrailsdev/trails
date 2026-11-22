@@ -11,11 +11,11 @@ import {
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { beforeAll, beforeEach, describe, it } from "vitest";
-import { ActiveModel } from "../../../../lib/generators/active-model.js";
-import { Application } from "../../../../lib/application.js";
-import "../../../../lib/test-unit/trailtie.js";
-import { copyRoutes } from "../../generators-test-helper.js";
-import { TestCase } from "../../../../lib/generators/test-case.js";
+import { ActiveModel } from "../../lib/generators/active-model.js";
+import { Application } from "../../lib/application.js";
+import "../../lib/test-unit/trailtie.js";
+import { copyRoutes } from "./generators-test-helper.js";
+import { TestCase } from "../../lib/generators/test-case.js";
 
 class ScaffoldControllerGeneratorApp extends Application {}
 class ScaffoldControllerGeneratorTest extends TestCase {}
@@ -27,7 +27,7 @@ let t: TestCase;
 beforeAll(async () => {
   await ScaffoldControllerGeneratorApp.instance().loadGenerators();
   const { ScaffoldControllerGenerator } =
-    await import("../../../../lib/generators/trails/scaffold-controller/scaffold-controller-generator.js");
+    await import("../../lib/generators/trails/scaffold-controller/scaffold-controller-generator.js");
   ScaffoldControllerGeneratorTest.tests(ScaffoldControllerGenerator);
 });
 
@@ -343,6 +343,11 @@ describe("ScaffoldControllerGeneratorTest", () => {
       assertMatch(/class UsersController extends ApplicationController/, content);
       assertNoMatch(/respondTo/, content);
 
+      assertMatch(
+        /this\.beforeAction\(":_setUser", \{ only: \["show", "update", "destroy"\] \}\)/,
+        content,
+      );
+
       await t.assertInstanceMethod("index", content, (m) => {
         assertMatch(/this\.users = await User\.all\(\)/, m);
         assertMatch(/this\.render\(\{ json: this\.users \}\)/, m);
@@ -368,9 +373,11 @@ describe("ScaffoldControllerGeneratorTest", () => {
       });
     });
 
-    for (const view of ["index", "edit", "show", "new", "_form"]) {
-      t.assertNoFile(`app/views/users/${view}.html.tse`);
-    }
+    t.assertNoFile("app/views/users/index.html.tse");
+    t.assertNoFile("app/views/users/edit.html.tse");
+    t.assertNoFile("app/views/users/show.html.tse");
+    t.assertNoFile("app/views/users/new.html.tse");
+    t.assertNoFile("app/views/users/_form.html.tse");
   });
 
   it("api controller tests", async () => {
