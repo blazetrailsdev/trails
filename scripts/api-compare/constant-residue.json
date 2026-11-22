@@ -1135,7 +1135,7 @@
     }
   },
   "rack-cache": {
-    "rows": 13,
+    "rows": 14,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1151,7 +1151,8 @@
       "meta-store.ts::Heap": "Rack::Cache::MetaStore::Heap",
       "meta-store.ts::MetaStore": "Rack::Cache::MetaStore",
       "request.ts::Request": "Rack::Cache::Request",
-      "response.ts::Response": "Rack::Cache::Response"
+      "response.ts::Response": "Rack::Cache::Response",
+      "storage.ts::Storage": "Rack::Cache::Storage"
     }
   },
   "rack-cors": {

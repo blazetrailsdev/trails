@@ -6,6 +6,7 @@ import * as m3 from "./key.js";
 import * as m4 from "./meta-store.js";
 import * as m5 from "./request.js";
 import * as m6 from "./response.js";
+import * as m7 from "./storage.js";
 
 defineConstants([
   [m1, null, "Rack::Cache"],
@@ -21,4 +22,5 @@ defineConstants([
   [m4, "Heap", "Rack::Cache::MetaStore::Heap"],
   [m5, "Request", "Rack::Cache::Request"],
   [m6, "Response", "Rack::Cache::Response"],
+  [m7, "Storage", "Rack::Cache::Storage"],
 ]);

@@ -11,6 +11,7 @@ import {
   rbModName,
   rbObjDup,
   rbClassNewInstance,
+  rbDeclareIvar,
   rbProcCall,
   toI,
   toS,
@@ -243,6 +244,7 @@ export class Heap extends MetaStore {
 }
 
 MetaStore.Heap = Heap;
+rbDeclareIvar(Heap, "@options", "_options");
 MetaStore.HEAP = Heap;
 MetaStore.MEM = Heap;
 
