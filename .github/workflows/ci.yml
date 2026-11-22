@@ -1224,15 +1224,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        # mailer-previews.test.ts boots an isolated app per test and runs ~11 min
+        # on its own; vitest shards by file, so it gets a leg of its own and the
+        # rest of the suite splits four ways.
+        shard: [1, 2, 3, 4, mailer-previews]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
       - run: pnpm build
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
-        run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard != 'mailer-previews'
+        env:
+          TRAILTIES_EXCLUDE: packages/trailties/test/application/mailer-previews.test.ts
+        run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/4
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 'mailer-previews'
+        run: pnpm vitest run packages/trailties/test/application/mailer-previews.test.ts
       - if: needs.changes.outputs.actioncable_only == 'true' && matrix.shard == 1
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
