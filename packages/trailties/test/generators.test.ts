@@ -3,18 +3,29 @@ import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
+import { buildTemplates } from "@blazetrails/trails-tsc";
 import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { Basic } from "@blazetrails/thor/shell/basic";
 import { Color } from "@blazetrails/thor/shell/color";
-import { File, LOAD_PATH, SystemExit, getProcessAdapter } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  FileUtils,
+  LOAD_PATH,
+  SystemExit,
+  getProcessAdapter,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../lib/generators/base.js";
-import { ModelGenerator } from "../lib/generators/trails/model/model-generator.js";
+import { assertFile } from "../lib/generators/testing/assertions.js";
 import { ModelGenerator as TestUnitModelGenerator } from "../lib/generators/test-unit/model/model-generator.js";
 import { Application } from "../lib/application.js";
 import { Generators } from "../lib/generators.js";
 import { Trails } from "../lib/trails.js";
+import "../lib/trailties/active-record.js";
 import { noColorBang } from "../lib/command/behavior.js";
+
+let ModelGenerator: typeof import("../lib/generators/trails/model/model-generator.js").ModelGenerator;
 
 const GENERATORS_PATH = nodePath.join(
   decodeURIComponent(new URL("../lib/", import.meta.url).pathname),
@@ -35,6 +46,8 @@ beforeAll(async () => {
   Generators.templatesPath().push(File.join(FIXTURES, "lib", "templates"));
   fixturesLib = File.join(Trails.root()!, "lib");
   LOAD_PATH.unshift(fixturesLib);
+  await GeneratorsTestApp.instance().loadGenerators();
+  ({ ModelGenerator } = await import("../lib/generators/trails/model/model-generator.js"));
   await Generators.lookupBang();
 });
 
@@ -268,6 +281,40 @@ describe("GeneratorsTest", () => {
     expect(mspec!.sourcePaths()).toContain(
       File.join(Trails.root()!, "lib", "templates", "fixjour"),
     );
+  });
+
+  it("rails root templates", async () => {
+    const template = File.join(
+      Trails.root()!,
+      "lib",
+      "templates",
+      "active_record",
+      "model",
+      "model.ts",
+    );
+
+    FileUtils.mkdirP(File.dirname(template));
+    File.write(template, "empty");
+    await buildTemplates([template]);
+
+    const destinationRoot = Dir.mktmpdir();
+    File.write(File.join(destinationRoot, "tsconfig.json"), "{}");
+    try {
+      await capture("stdout", () => Generators.invoke("model", ["user"], { destinationRoot }));
+
+      await assertFile.call({ destinationRoot }, "app/models/user.ts", (content: string) => {
+        expect(content).toBe("empty");
+      });
+    } finally {
+      FileUtils.rmRf(File.dirname(template));
+      FileUtils.rmRf(destinationRoot);
+    }
+  });
+
+  it("usage with embedded ruby", async () => {
+    await import("./fixtures/lib/generators/usage-template/usage-template-generator.js");
+    const output = await capture("stdout", () => Generators.invoke("usage-template", ["--help"]));
+    expect(output).toMatch(/:: 2 ::/);
   });
 
   it("hide namespace", () => {

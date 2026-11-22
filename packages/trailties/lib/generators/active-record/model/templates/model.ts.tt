@@ -1,0 +1,32 @@
+<% const parentClassName = this.parentClassName(); -%>
+<% const parentClass = ActiveSupport.Inflector.classify(parentClassName.replace(/::/g, "_").replace(/\//g, "_")); -%>
+<% const parentLeaf = ActiveSupport.Inflector.classify(parentClassName.split("::").pop()); -%>
+<% const attributes = this.attributes; -%>
+<% this.moduleNamespacing(() => { -%>
+import { <%= parentLeaf === parentClass ? parentClass : `${parentLeaf} as ${parentClass}` %> } from "<%= "../".repeat(this.classPath().length) || "./" %><%= ActiveSupport.Inflector.dasherize(ActiveSupport.Inflector.underscore(parentClassName.replace(/::/g, "/"))) %><%= this.ext() %>";
+
+export class <%= this.className().split("::").at(-1) %> extends <%= parentClass %> {
+<% if (attributes.some((a) => a.reference() || a.richText() || a.attachment() || a.attachments() || a.token() || a.passwordDigest())) { -%>
+  static {
+<% attributes.filter((a) => a.reference()).forEach((attribute) => { -%>
+    this.belongsTo("<%= attribute.name %>"<%= attribute.polymorphic() ? ", { polymorphic: true }" : "" %>);
+<% }); -%>
+<% attributes.filter((a) => a.richText()).forEach((attribute) => { -%>
+    this.hasRichText("<%= attribute.name %>");
+<% }); -%>
+<% attributes.filter((a) => a.attachment()).forEach((attribute) => { -%>
+    this.hasOneAttached("<%= attribute.name %>");
+<% }); -%>
+<% attributes.filter((a) => a.attachments()).forEach((attribute) => { -%>
+    this.hasManyAttached("<%= attribute.name %>");
+<% }); -%>
+<% attributes.filter((a) => a.token()).forEach((attribute) => { -%>
+    this.hasSecureToken(<% if (attribute.name !== "token") { %>"<%= attribute.name %>"<% } %>);
+<% }); -%>
+<% if (attributes.some((a) => a.passwordDigest())) { -%>
+    this.hasSecurePassword();
+<% } -%>
+  }
+<% } -%>
+}
+<% }); -%>
