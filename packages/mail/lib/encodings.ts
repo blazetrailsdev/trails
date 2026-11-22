@@ -11,6 +11,7 @@ import {
   Errno,
   isAsciiOnly,
   rbObjEncoding,
+  rbStrEachCharBytes,
   RuntimeError,
   StandardError,
   stringSplit,
@@ -282,9 +283,7 @@ export const Encodings = {
     let offset = 0;
     let chunksize = 0;
 
-    for (const chr of typeof str === "string"
-      ? str
-      : Array.from(str, (byte) => Uint8Array.of(byte))) {
+    for (const chr of typeof str === "string" ? str : rbStrEachCharBytes(str)) {
       const charsize = b(chr).length;
 
       if (chunksize + charsize > maxBytesizePerChunk) {

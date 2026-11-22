@@ -121,3 +121,32 @@ export function isAsciiOnly(string: string | Uint8Array): boolean {
   if (typeof string === "string") return /^[\x00-\x7f]*$/.test(string);
   return string.every((byte) => byte < 0x80);
 }
+
+/**
+ * `String#each_char` over an encoding-tagged `Uint8Array`
+ * (`vendor/ruby/v3.3.11/string.c:9307` `rb_str_each_char`, which advances by
+ * `rb_enc_fast_mbclen`): each character of {@link rbObjEncoding}'s encoding as
+ * its own bytes, so a multi-byte character is one element. A single-byte
+ * encoding, or one `TextDecoder` has no label for, yields one byte per
+ * character.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_str_each_char` (`vendor/ruby/v3.3.11/string.c:9307`).
+ */
+export function rbStrEachCharBytes(str: Uint8Array): Uint8Array[] {
+  const enc = rbObjEncoding(str);
+  const chars: Uint8Array[] = [];
+  const label = enc.decoderLabel;
+  if (label === null) {
+    for (let i = 0; i < str.length; i++) chars.push(rbEncAssociate(str.slice(i, i + 1), enc));
+    return chars;
+  }
+  const decoder = new TextDecoder(label, { ignoreBOM: true });
+  let start = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (decoder.decode(str.subarray(i, i + 1), { stream: true }) !== "" || i + 1 === str.length) {
+      chars.push(rbEncAssociate(str.slice(start, i + 1), enc));
+      start = i + 1;
+    }
+  }
+  return chars;
+}

@@ -531,6 +531,7 @@ export {
   isAsciiOnly,
   isValidEncoding,
   rbObjEncoding,
+  rbStrEachCharBytes,
 } from "./string/force-encoding.js";
 export { encode } from "./string/encode.js";
 export { Encoding } from "./encoding.js";

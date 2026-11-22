@@ -161,8 +161,7 @@ const FILE_TOKEN_RENAME_PATTERN = new RegExp(
  * installs through a package manager, never Bundler: `run_bundle`
  * (generators/app_base.rb:705-707), `bundle_command` (:645), `bundle_install?`
  * (:671) and the `skip_bundle` option credit at the install spelling, while
- * `bundle` itself stays free for a JS bundle. vite_ruby is `vite-assets`, and
- * `load_ruby_config` loads `config/vite.ts`, so neither spells Ruby.
+ * `bundle` itself stays free for a JS bundle. vite_ruby is `vite-assets`.
  */
 export const PHRASE_RENAMES: Record<string, string> = {
   apply_rails_template: "apply_trails_template",
@@ -173,7 +172,6 @@ export const PHRASE_RENAMES: Record<string, string> = {
   gemfile_entry: "package_entry",
   gemfile_entries: "package_entries",
   edit_gemfile: "edit_package_json",
-  load_ruby_config: "load_ts_config",
   vite_ruby: "vite_assets",
 };
 
