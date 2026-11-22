@@ -56,10 +56,6 @@
       "ref": "0.2.5",
       "sha": "2c891fc7a770e8ba2fec34fc6b545c672beb37e6"
     },
-    "listen": {
-      "ref": "v3.9.0",
-      "sha": "7b7a2f586d4363ec6e2e82c72732df92a1476d6e"
-    },
     "loofah": {
       "ref": "v2.24.0",
       "sha": "85990602c6fdb40489138e80080ca508200c7137"

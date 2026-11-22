@@ -3,6 +3,9 @@ import { StandardError, RuntimeError, STDERR } from "@blazetrails/ruby-compat";
 export type ErrorHandler = (error: Error) => void;
 
 export class Error extends StandardError {
+  file: string | null = null;
+  line: number | null = null;
+
   static _handler: ErrorHandler | null = null;
 
   static readonly VERBOSE_HANDLER: ErrorHandler = (error) => {

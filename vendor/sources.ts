@@ -731,29 +731,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
-    name: "listen",
-    origin: {
-      type: "git",
-      url: "https://github.com/guard/listen.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:338 resolves listen (3.9.0), which
-      // ActiveSupport::EventedFileUpdateChecker requires.
-      ref: "v3.9.0",
-    },
-    packages: [
-      {
-        name: "listen",
-        libPath: "lib/listen",
-        testPath: "spec",
-        compareApi: false,
-        apiExcludedReason:
-          "no packages/listen exists yet; enrolling it is listen-port-listener-fsm-and-listen-to.",
-        compareTests: false,
-        testsExcludedReason:
-          "no packages/listen exists yet; enrolling it is listen-port-listener-fsm-and-listen-to.",
-      },
-    ],
-  },
-  {
     name: "libxml-ruby",
     origin: {
       type: "git",

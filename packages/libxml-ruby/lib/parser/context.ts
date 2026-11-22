@@ -4,7 +4,6 @@ export interface IO {
   read(): string | null;
 }
 
-/** @noRailsEquivalent PERMANENT */
 export class Context {
   io: IO | null = null;
   encoding: string | null = null;

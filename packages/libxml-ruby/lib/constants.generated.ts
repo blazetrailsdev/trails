@@ -5,8 +5,9 @@ import * as m2 from "./document.js";
 import * as m3 from "./error.js";
 import * as m4 from "./node.js";
 import * as m5 from "./parser.js";
-import * as m6 from "./sax-callbacks.js";
-import * as m7 from "./sax-parser.js";
+import * as m6 from "./parser/context.js";
+import * as m7 from "./sax-callbacks.js";
+import * as m8 from "./sax-parser.js";
 
 defineConstants([
   [m0, "Attr", "LibXML::XML::Attr"],
@@ -15,6 +16,7 @@ defineConstants([
   [m3, "Error", "LibXML::XML::Error"],
   [m4, "Node", "LibXML::XML::Node"],
   [m5, "Parser", "LibXML::XML::Parser"],
-  [m7, "SaxParser", "LibXML::XML::SaxParser"],
-  [m6, "Callbacks", "LibXML::XML::SaxParser::Callbacks"],
+  [m6, "Context", "LibXML::XML::Parser::Context"],
+  [m8, "SaxParser", "LibXML::XML::SaxParser"],
+  [m7, "Callbacks", "LibXML::XML::SaxParser::Callbacks"],
 ]);

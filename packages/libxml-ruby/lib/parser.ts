@@ -34,7 +34,11 @@ export class Parser {
       return new Document(LibXml2.XmlDocument.fromString(this.context._source));
     } catch (e) {
       if (e instanceof LibXml2.XmlParseError) {
-        throw new Error(e.details[0]?.message.trim() ?? e.message);
+        const xerror = e.details.at(-1);
+        const error = new Error(xerror?.message.trim() ?? e.message);
+        error.file = xerror?.file ?? null;
+        error.line = xerror?.line ?? null;
+        throw error;
       }
       throw e;
     }

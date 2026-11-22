@@ -34,20 +34,26 @@ export class SaxParser {
   parse(): boolean {
     const LibXml2 = Nokogiri.LibXml2!;
     const handler = this.callbacks;
+    handler?.onStartDocument();
     let xdoc: XmlDocument;
     try {
       xdoc = LibXml2.XmlDocument.fromString(this.context._source);
     } catch (e) {
       if (e instanceof LibXml2.XmlParseError) {
-        const errors = e.details.map((detail) => new Error(detail.message.trim()));
+        const errors = e.details.map((detail) => {
+          const error = new Error(detail.message.trim());
+          error.file = detail.file ?? null;
+          error.line = detail.line ?? null;
+          return error;
+        });
         for (const error of errors) handler?.onError(error);
-        throw errors[0] ?? new Error(e.message);
+        handler?.onEndDocument();
+        throw errors.at(-1) ?? new Error(e.message);
       }
       throw e;
     }
     try {
       if (handler != null) {
-        handler.onStartDocument();
         this._walk(handler, xdoc.root);
         handler.onEndDocument();
       }

@@ -1,5 +1,5 @@
 import { Nokogiri } from "@blazetrails/nokogiri";
-import type { XmlTreeNode } from "libxml2-wasm";
+import type { XmlNode } from "libxml2-wasm";
 import { Attributes } from "./attributes.js";
 import type { Attr } from "./attr.js";
 
@@ -9,10 +9,9 @@ export class Node {
   static readonly TEXT_NODE = 3;
   static readonly CDATA_SECTION_NODE = 4;
   static readonly ENTITY_REF_NODE = 5;
-  static readonly PI_NODE = 7;
   static readonly COMMENT_NODE = 8;
 
-  constructor(readonly _xnode: XmlTreeNode) {}
+  constructor(readonly _xnode: XmlNode) {}
 
   get name(): string | null {
     const xnode = this._xnode;
@@ -27,10 +26,11 @@ export class Node {
     const LibXml2 = Nokogiri.LibXml2!;
     const xnode = this._xnode;
     if (xnode instanceof LibXml2.XmlElement) return Node.ELEMENT_NODE;
+    if (xnode instanceof LibXml2.XmlAttribute) return Node.ATTRIBUTE_NODE;
     if (xnode instanceof LibXml2.XmlCData) return Node.CDATA_SECTION_NODE;
     if (xnode instanceof LibXml2.XmlText) return Node.TEXT_NODE;
-    if (xnode instanceof LibXml2.XmlComment) return Node.COMMENT_NODE;
     if (xnode instanceof LibXml2.XmlEntityReference) return Node.ENTITY_REF_NODE;
+    if (xnode instanceof LibXml2.XmlComment) return Node.COMMENT_NODE;
     return null;
   }
 
