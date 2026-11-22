@@ -58,6 +58,7 @@ const MY_CNF_KEYS: Record<string, string> = {
   database: "database",
 };
 
+/** @noRailsEquivalent PERMANENT */
 async function myLoadDefaults(file: string, groups: string[]): Promise<Options> {
   const defaults: Options = {};
   let group: string | null = null;
@@ -71,7 +72,7 @@ async function myLoadDefaults(file: string, groups: string[]): Promise<Options> 
     }
     if (group == null || !groups.includes(group)) continue;
     const [, name, value = ""] = /^([^=\s]+)\s*(?:=\s*(.*))?$/.exec(line) ?? [];
-    const key = name && MY_CNF_KEYS[name.replace(/-/g, "_")];
+    const key = name && MY_CNF_KEYS[name];
     if (!key) continue;
     const v = value.replace(/^(["'])(.*)\1$/, "$2");
     defaults[key] = key === "port" ? Number(v) : v;
@@ -696,7 +697,6 @@ export class Client {
   }
 
   /**
-   * @missingRailsCall write_timeout — CONVERGEABLE mysql2-client-unwired-writers-reach-the-npm-connection
    * @missingRailsCall write_timeout — CONVERGEABLE mysql2-client-write-timeout-and-default-auth-reach-the-npm-connection
    * @missingRailsCall default_auth — CONVERGEABLE mysql2-client-write-timeout-and-default-auth-reach-the-npm-connection
    */
