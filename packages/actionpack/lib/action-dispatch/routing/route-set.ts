@@ -1,3 +1,4 @@
+import type { Pathname } from "@blazetrails/ruby-compat";
 import {
   Concern,
   extractOptionsBang,
@@ -35,6 +36,7 @@ import {
   RFC2396_PARSER,
   classModule,
   rbClearMethodCache,
+  includedModules,
 } from "@blazetrails/ruby-compat";
 import { Routing } from "../../namespaces.js";
 import { Mapper, type Mapping } from "./mapper.js";
@@ -733,11 +735,28 @@ export class NamedRouteCollection {
         }
       }
     }
+    if (!includes) {
+      const below = new Map<string, PropertyDescriptor>();
+      const klass = (proto as { constructor?: unknown }).constructor;
+      if (typeof klass === "function" && klass.prototype === proto) {
+        for (const mod of includedModules(klass)) {
+          const members =
+            typeof mod === "function" ? (mod as { prototype: object }).prototype : mod;
+          if (members == null) continue;
+          for (const [name, method] of Object.entries(Object.getOwnPropertyDescriptors(members))) {
+            const own = Object.getOwnPropertyDescriptor(proto, name);
+            if (name !== "constructor" && own && own.value === method.value && !installed.has(name))
+              below.set(name, own);
+          }
+        }
+      }
+      includes = [below, installed];
+    }
     this._includers.add({
       proto: new WeakRef(proto),
       supportsPath,
       installed,
-      includes: includes ?? [installed],
+      includes,
       wrap,
     });
   }
@@ -830,7 +849,7 @@ export class RouteSet {
   private _config: Config;
   disableClearAndFinalize = false;
   resourcesPathNames: Record<string, string> = { new: "new", edit: "edit" };
-  drawPaths: string[] = [];
+  drawPaths: Array<string | Pathname> = [];
   readonly envKey: string = `ROUTES_${(RouteSet._envSeq = (RouteSet._envSeq ?? 0) + 1)}_SCRIPT_NAME`;
   private static _envSeq?: number;
   set: JourneyRoutes = new JourneyRoutes();

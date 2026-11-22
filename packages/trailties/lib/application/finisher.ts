@@ -145,7 +145,7 @@ Finisher.initializer("run_prepare_callbacks", async function (this: FinisherHost
 /** @inventedArm if — PERMANENT */
 Finisher.initializer("eager_load!", async function (this: FinisherHost) {
   if (this.config.eagerLoad === true) {
-    runLoadHooks("before_eager_load", this);
+    await runLoadHooks("before_eager_load", this);
     await Loader.eagerLoadAll();
     await Trails.eagerLoadBang();
     for (const namespace of this.config.eagerLoadNamespaces) {

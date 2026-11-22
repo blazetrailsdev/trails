@@ -324,7 +324,7 @@ describe("Engine", () => {
     expect(reloader.paths[0]).toMatch(/config\/routes\.ts$/);
     expect(reloader.routeSets).toEqual([engine.routes()]);
     expect(engine.routes().drawPaths).toEqual(appRoutes.drawPaths);
-    expect(appRoutes.drawPaths[0]).toMatch(/config\/routes$/);
+    expect(String(appRoutes.drawPaths[0])).toMatch(/config\/routes$/);
   });
 
   it("add_view_paths prepends app/views onto the action_controller load hook", async () => {

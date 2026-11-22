@@ -1,3 +1,4 @@
+import type { Pathname } from "@blazetrails/ruby-compat";
 import { Redirect, Redirection } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
 import { Dispatcher, StaticDispatcher, type DrawCallback, type RouteSet } from "./route-set.js";
@@ -330,7 +331,7 @@ interface RouteSetLike {
   urlHelpers(): object;
   addRoute(mapping: Mapping, name?: string | null | false): unknown;
   resourcesPathNames: Record<string, string>;
-  drawPaths: string[];
+  drawPaths: Array<string | Pathname>;
   defaultUrlOptions: Record<string, unknown>;
   requestClass(): { prototype: object };
   addUrlHelper: RouteSet["addUrlHelper"];
@@ -1082,7 +1083,7 @@ export class Mapper {
   /** @internal */
   _set: RouteSetLike;
   /** @internal */
-  _drawPaths: string[];
+  _drawPaths: Array<string | Pathname>;
   /** @internal */
   _scope: Scope;
 

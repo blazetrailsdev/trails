@@ -18,6 +18,7 @@ import {
 import { Dependencies } from "@blazetrails/activesupport";
 import { MethodCallAssertions } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Stream } from "@blazetrails/activesupport/testing/stream";
+import { assert, assertEqual, assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { MockRequest } from "@blazetrails/rack";
 import { ConnectionAdapters } from "@blazetrails/activerecord";
@@ -52,12 +53,8 @@ async function puts(
   await fs.writeFile!(file, prior + (string.endsWith("\n") ? string : `${string}\n`));
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Rack extends Paths {
-  assert(test: unknown): void;
-  assertEqual(expected: unknown, actual: unknown): void;
-  assertMatch(matcher: string | RegExp, obj: string): void;
-}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface Rack extends Paths {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Rack {
   static readonly [classModule] = true;
@@ -94,10 +91,10 @@ export class Rack {
   async assertWelcome(resp: RackResponse): Promise<void> {
     resp = rbFArray(resp) as RackResponse;
 
-    this.assertEqual(200, resp[0]);
-    this.assertMatch("text/html", resp[1]["Content-Type"]);
-    this.assertMatch("charset=utf-8", resp[1]["Content-Type"]);
-    this.assert(/Trails version:/.test(await this.extractBody(resp)));
+    assertEqual(200, resp[0]);
+    assertMatch("text/html", resp[1]["content-type"]);
+    assertMatch("charset=utf-8", resp[1]["content-type"]);
+    assert(/Trails version:/.test(await this.extractBody(resp)));
   }
 }
 
