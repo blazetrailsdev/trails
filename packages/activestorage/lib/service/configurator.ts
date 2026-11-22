@@ -20,6 +20,7 @@ export class Configurator {
   /** @noRailsEquivalent PERMANENT */
   static async load(configurations: Record<string, Record<string, unknown>>): Promise<void> {
     for (const config of Object.values(configurations)) {
+      if (config.service == null) continue;
       const className = String(config.service);
       loadErrors.delete(className);
       if (constDefined(Service, `${camelize(className)}Service`)) continue;
@@ -70,7 +71,10 @@ export class Configurator {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm constDefined — PERMANENT
+   */
   private resolve(className: string): ServiceClass {
     if (loadErrors.has(className) || !constDefined(Service, `${camelize(className)}Service`))
       throw new RuntimeError(`Missing service adapter for ${rbInspect(className)}`);

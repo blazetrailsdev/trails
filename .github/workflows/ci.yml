@@ -1859,9 +1859,6 @@ jobs:
       - run: node packages/activestorage/test/support/emulators/create-buckets.ts
       - uses: ./.github/actions/activestorage-media-binaries
       - run: pnpm vitest run packages/activestorage/test/service/ packages/activestorage/test/controllers/ --project '!system'
-        env:
-          ACTIVE_STORAGE_S3_ENDPOINT: http://localhost:8333
-          ACTIVE_STORAGE_GCS_ENDPOINT: http://localhost:4443
 
   actioncable-redis-tests:
     name: Action Cable Redis Tests
