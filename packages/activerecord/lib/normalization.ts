@@ -83,7 +83,7 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
   readonly normalizer: (value: unknown) => unknown;
   readonly normalizeNil: boolean;
 
-  /** @inlinedFrom ActiveModel::Type::SerializeCastValue#initialize rails/v8.0.2/activemodel/lib/active_model/type/serialize_cast_value.rb:41-44 */
+  /** @inlinedFrom ActiveModel::Type::SerializeCastValue#initialize rails/v8.0.5.2/activemodel/lib/active_model/type/serialize_cast_value.rb:41-44 */
   constructor({
     castType,
     normalizer,

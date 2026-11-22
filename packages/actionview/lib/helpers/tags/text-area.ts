@@ -7,7 +7,7 @@ import { Placeholderable } from "./placeholderable.js";
 import { Translator } from "./translator.js";
 
 export class TextArea extends Base {
-  /** @inlinedFrom ActionView::Helpers::Tags::Placeholderable#initialize rails/v8.0.2/actionview/lib/action_view/helpers/tags/placeholderable.rb:7-20 */
+  /** @inlinedFrom ActionView::Helpers::Tags::Placeholderable#initialize rails/v8.0.5.2/actionview/lib/action_view/helpers/tags/placeholderable.rb:7-20 */
   constructor(
     objectName: unknown,
     methodName: unknown,

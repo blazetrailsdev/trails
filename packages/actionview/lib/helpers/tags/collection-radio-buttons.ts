@@ -28,7 +28,7 @@ export class CollectionRadioButtons extends Base {
   private _textMethod: unknown;
   private _htmlOptions: Record<string, unknown>;
 
-  /** @inlinedFrom ActionView::Helpers::Tags::CollectionHelpers#initialize rails/v8.0.2/actionview/lib/action_view/helpers/tags/collection_helpers.rb:30-37 */
+  /** @inlinedFrom ActionView::Helpers::Tags::CollectionHelpers#initialize rails/v8.0.5.2/actionview/lib/action_view/helpers/tags/collection_helpers.rb:30-37 */
   constructor(
     objectName: unknown,
     methodName: unknown,

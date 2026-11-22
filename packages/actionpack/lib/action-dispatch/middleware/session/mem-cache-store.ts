@@ -18,7 +18,7 @@ export interface MemCacheStoreSessionOptions extends CacheStoreSessionOptions {
  * and the calls are not made.
  */
 export class MemCacheStore extends CacheStore {
-  /** @inlinedFrom ActionDispatch::Session::Compatibility#initialize rails/v8.0.2/actionpack/lib/action_dispatch/middleware/session/abstract_store.rb:23-26 */
+  /** @inlinedFrom ActionDispatch::Session::Compatibility#initialize rails/v8.0.5.2/actionpack/lib/action_dispatch/middleware/session/abstract_store.rb:23-26 */
   constructor(app?: RackApp, options: MemCacheStoreSessionOptions = {}) {
     if (options.expireAfter == null && options.expires != null) {
       options.expireAfter = options.expires;

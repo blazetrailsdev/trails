@@ -22,7 +22,7 @@ export class ResourceGenerator extends ModelGenerator {
   declare _controllerClassPath: string[];
   declare options: ResourceGeneratorOptions;
 
-  /** @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26 */
+  /** @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.5.2/railties/lib/rails/generators/resource_helpers.rb:17-26 */
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
     super(args, localOptions, config);
     const controllerName = this.name;

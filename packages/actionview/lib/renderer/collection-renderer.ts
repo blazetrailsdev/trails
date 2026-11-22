@@ -165,7 +165,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
   /** @internal */
   contextPrefix: string | undefined;
 
-  /** @inlinedFrom ActionView::AbstractRenderer::ObjectRendering#initialize rails/v8.0.2/actionview/lib/action_view/renderer/abstract_renderer.rb:37-40 */
+  /** @inlinedFrom ActionView::AbstractRenderer::ObjectRendering#initialize rails/v8.0.5.2/actionview/lib/action_view/renderer/abstract_renderer.rb:37-40 */
   constructor(lookupContext: LookupContext, options: RenderOptions = {}) {
     super(lookupContext, options);
     this.contextPrefix = lookupContext.prefixes[0];

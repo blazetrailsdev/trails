@@ -66,7 +66,7 @@ source; trailmap's suite is what found it. `@noRailsEquivalent PERMANENT`.
 Ruby seats `Zoo` when `class Zoo` opens, so `on_namespace_loaded` defines
 `Zoo::ReptileHouse`'s autoload before the body runs, and `include ReptileHouse`
 loads it synchronously
-(`vendor/rails/v8.0.2/railties/test/application/initializers/load_path_test.rb:57-72`).
+(`vendor/rails/v8.0.5.2/railties/test/application/initializers/load_path_test.rb:57-72`).
 A JS class body runs while its module evaluates, before `require` sees the
 export, and cannot await a load. Such a body is a module-eval read, so by
 § "Call-time constant resolution" it is a plain ES import of the child file:

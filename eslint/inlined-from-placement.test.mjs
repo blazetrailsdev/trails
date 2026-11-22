@@ -130,7 +130,7 @@ tester.run("inlined-from-placement", rule, {
     },
     {
       code: onConstructor(
-        "ActiveModel::API#initialize vendor/rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84",
+        "ActiveModel::API#initialize vendor/rails/v8.0.5.2/activemodel/lib/active_model/api.rb:80-84",
       ),
       filename: BASE,
       errors: [{ messageId: "malformedCitation" }],

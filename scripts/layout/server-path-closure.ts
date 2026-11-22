@@ -53,9 +53,9 @@ export interface PackageExports {
  * `Configuration#lookup_delivery_method` (mail/configuration.rb:44),
  * `Mail::TestRetriever` likewise (mail/network.rb:15, configuration.rb:64), and
  * `Rails::TestUnitRailtie` is required by `rails/all.rb`
- * (vendor/rails/v8.0.2/railties/lib/rails/all.rb), loading no test framework.
+ * (vendor/rails/v8.0.5.2/railties/lib/rails/all.rb), loading no test framework.
  * `ActiveJob::QueueAdapters::TestAdapter` is autoloaded from lib
- * (vendor/rails/v8.0.2/activejob/lib/active_job/queue_adapters.rb:125) and
+ * (vendor/rails/v8.0.5.2/activejob/lib/active_job/queue_adapters.rb:125) and
  * resolved by `lookup(:test)` (:135) in any environment.
  */
 const SERVER_EXPORTS = new Set([

@@ -64,7 +64,7 @@ function classOf(value: object): ObjectClass {
 export const Extensions = {
   /**
    * Mirrors `ActiveSupport::MessagePack::Extensions#install`
-   * (`vendor/rails/v8.0.2/activesupport/lib/active_support/message_pack/extensions.rb:20-110`).
+   * (`vendor/rails/v8.0.5.2/activesupport/lib/active_support/message_pack/extensions.rb:20-110`).
    *
    * Type 0 reads Rails' bytes; a `":name"` Symbol is not packed through it until
    * the packer has its `T_SYMBOL` arm

@@ -43,7 +43,7 @@ arguments can still be misread.
 ## Templates are precompiled (`Template#compile`'s `module_eval`)
 
 Rails compiles a template at its first render: `compiled_source`
-(`vendor/rails/v8.0.2/actionview/lib/action_view/template.rb:443-486`) wraps
+(`vendor/rails/v8.0.5.2/actionview/lib/action_view/template.rb:443-486`) wraps
 the handler's Ruby in a `def`, and `compile` (`:500-539`) hands it to
 `mod.module_eval(compiled_source, identifier, offset)`. JS can only evaluate
 source text through `eval`, `new Function` or `vm`, each of which runs code
@@ -101,7 +101,7 @@ stand-in, runs `transpileModule` and evaluates it, and the `other` vitest
 project's setup installs it through `setTemplateCompiler`.
 
 **`Template#spot` is line-based.** Rails' `spot`
-(`vendor/rails/v8.0.2/actionview/lib/action_view/template.rb:231-246`) parses
+(`vendor/rails/v8.0.5.2/actionview/lib/action_view/template.rb:231-246`) parses
 `compiled_source` with Prism to find the failing node's span. trails builds no
 second compiler, by operator ruling (2026-10-19), so no in-process JS parser
 stands in for Prism: `spot` answers the backtrace line of `compiled_source`,

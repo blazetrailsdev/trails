@@ -1394,9 +1394,9 @@ type Block = (...args: unknown[]) => unknown;
  * (`vendor/ruby/v3.3.11/array.c:8606`) and `Enumerable`
  * (`vendor/ruby/v3.3.11/enum.c:5047`) define that a Relation sends its
  * records: by `delegate ..., to: :records`
- * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation/delegation.rb:98-103`)
+ * (`vendor/rails/v8.0.5.2/activerecord/lib/active_record/relation/delegation.rb:98-103`)
  * and by `include Enumerable`
- * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation.rb:67`).
+ * (`vendor/rails/v8.0.5.2/activerecord/lib/active_record/relation.rb:67`).
  * A name the ported `Enumerable` module answers is not repeated here. `-`, `|` and `&` go by the method Ruby
  * also names them (`difference`, `union`, `intersection`) and `+` is `plus`;
  * a block is a trailing `rbObjIsProc` function, and with no block an

@@ -479,13 +479,13 @@ export class Base extends Metal {
 
   /**
    * @inventedArm if — PERMANENT
-   * @inlinedFrom ActiveRecord::Railties::ControllerRuntime#initialize rails/v8.0.2/activerecord/lib/active_record/railties/controller_runtime.rb:26-29
-   * @inlinedFrom ActionController::Instrumentation#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/instrumentation.rb:23-26
-   * @inlinedFrom ActionController::RequestForgeryProtection#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/request_forgery_protection.rb:366-369
-   * @inlinedFrom ActionView::Layouts#initialize rails/v8.0.2/actionview/lib/action_view/layouts.rb:361-364
-   * @inlinedFrom ActionView::Rendering#initialize rails/v8.0.2/actionview/lib/action_view/rendering.rb:32-35
-   * @inlinedFrom ActionController::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/url_for.rb:32-35
-   * @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114
+   * @inlinedFrom ActiveRecord::Railties::ControllerRuntime#initialize rails/v8.0.5.2/activerecord/lib/active_record/railties/controller_runtime.rb:26-29
+   * @inlinedFrom ActionController::Instrumentation#initialize rails/v8.0.5.2/actionpack/lib/action_controller/metal/instrumentation.rb:23-26
+   * @inlinedFrom ActionController::RequestForgeryProtection#initialize rails/v8.0.5.2/actionpack/lib/action_controller/metal/request_forgery_protection.rb:366-369
+   * @inlinedFrom ActionView::Layouts#initialize rails/v8.0.5.2/actionview/lib/action_view/layouts.rb:361-364
+   * @inlinedFrom ActionView::Rendering#initialize rails/v8.0.5.2/actionview/lib/action_view/rendering.rb:32-35
+   * @inlinedFrom ActionController::UrlFor#initialize rails/v8.0.5.2/actionpack/lib/action_controller/metal/url_for.rb:32-35
+   * @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.5.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114
    */
   constructor() {
     super();

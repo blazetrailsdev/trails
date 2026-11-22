@@ -235,7 +235,7 @@ describe("OverridingLocalPrefixesTest", () => {
 });
 
 class WithLayouts extends PrefixedViews {
-  /** @inlinedFrom ActionView::Layouts#initialize rails/v8.0.2/actionview/lib/action_view/layouts.rb:361-364 */
+  /** @inlinedFrom ActionView::Layouts#initialize rails/v8.0.5.2/actionview/lib/action_view/layouts.rb:361-364 */
   constructor(...args: ConstructorParameters<typeof PrefixedViews>) {
     super(...args);
     (this as unknown as LayoutsHost)._actionHasLayout = true;

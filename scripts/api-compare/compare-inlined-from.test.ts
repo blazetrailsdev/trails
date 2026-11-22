@@ -334,7 +334,7 @@ describe("inlinedFromTags on a constructor", () => {
   const ctorOf = (body: string, head = "") => {
     const file = ts.createSourceFile(
       "packages/activemodel/lib/t.ts",
-      `${head}\nclass T {\n  /** @inlinedFrom ActiveModel::Attributes#initialize rails/v8.0.2/activemodel/lib/active_model/attributes.rb:106-109 */\n  constructor() {\n${body}\n  }\n}`,
+      `${head}\nclass T {\n  /** @inlinedFrom ActiveModel::Attributes#initialize rails/v8.0.5.2/activemodel/lib/active_model/attributes.rb:106-109 */\n  constructor() {\n${body}\n  }\n}`,
       ts.ScriptTarget.Latest,
       true,
     );

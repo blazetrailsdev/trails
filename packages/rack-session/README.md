@@ -9,7 +9,7 @@ gem.
 session middleware, the same way `vendor/rails/` is the anchor for every
 framework package. `ActionDispatch::Session::CookieStore` subclasses
 `AbstractSecureStore`, which subclasses `Rack::Session::Abstract::PersistedSecure`
-(`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/middleware/session/abstract_store.rb:97`),
+(`vendor/rails/v8.0.5.2/actionpack/lib/action_dispatch/middleware/session/abstract_store.rb:97`),
 so the base classes need a port of their own, not scaffolding inside actionpack.
 
 ## What is ported

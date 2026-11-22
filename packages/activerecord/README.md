@@ -325,7 +325,7 @@ migrations extend `Migration` directly, which raises since #8794
 
 ## Contributing and measuring parity
 
-Read the Rails source under `vendor/rails/v8.0.2/activerecord/` first, port the
+Read the Rails source under `vendor/rails/v8.0.5.2/activerecord/` first, port the
 behavior, then port or unskip the Rails tests that prove it. Tests live next to
 their source as `*.test.ts`, named after the Rails test so `parity:test` can
 match them. Never rename a test to make it pass.

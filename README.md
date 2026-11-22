@@ -631,7 +631,7 @@ pnpm parity:test                 # "Rails tests" column: Rails test cases matche
 ```
 
 `parity:api` matches each Ruby method in the vendored Rails source
-(`vendor/rails/v8.0.2`, plus the vendored gems) to a TypeScript method by name,
+(`vendor/rails/v8.0.5.2`, plus the vendored gems) to a TypeScript method by name,
 under the rules in [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md).
 `parity:test` matches each Rails test case to a ported test of the same name. A
 matched test passes in CI or is counted as skipped.
@@ -771,7 +771,7 @@ variables.
 | MySQL/MariaDB    | `ARCONN=mysql2 pnpm vitest run <file>`     | `MYSQL_HOST` `MYSQL_PORT` `MYSQL_SOCK`  |
 
 These are the keys Rails interpolates
-(`vendor/rails/v8.0.2/activerecord/test/config.example.yml:12-20`), plus the
+(`vendor/rails/v8.0.5.2/activerecord/test/config.example.yml:12-20`), plus the
 `PG*` set its `postgresql:` entries leave to libpq
 (`config.example.yml:74-81`). Each has a working default (`localhost` and the
 stock port), so a local server on default ports needs only `ARCONN`.
@@ -801,7 +801,7 @@ gates that enforce them are in:
 
 Work is tracked as RFCs and stories in the separate `tasks` repository. Pick
 work with `pnpm tasks ready`, not from docs. The Rails source every port is
-checked against is vendored at `vendor/rails/v8.0.2/` by `pnpm vendor:fetch`.
+checked against is vendored at `vendor/rails/v8.0.5.2/` by `pnpm vendor:fetch`.
 
 ## Disclaimer
 

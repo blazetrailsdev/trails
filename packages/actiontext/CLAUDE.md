@@ -6,7 +6,7 @@ the root [CLAUDE.md](../../CLAUDE.md).
 ## `RichText`'s `blank?` / `present?` / `empty?` read a loaded plain text
 
 `RichText` delegates `blank?`, `empty?` and `present?` to `to_plain_text`
-(`vendor/rails/v8.0.2/actiontext/app/models/action_text/rich_text.rb:89`), which
+(`vendor/rails/v8.0.5.2/actiontext/app/models/action_text/rich_text.rb:89`), which
 renders each attachment and so reaches a GlobalID lookup. That is async here,
 and `Base` declares `isBlank` / `isPresent` sync, as activesupport's
 `isBlank(record)` reads them. So the three predicates are sync and read the

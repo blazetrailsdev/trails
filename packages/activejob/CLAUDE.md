@@ -10,7 +10,7 @@ one in this file.
 ## A job's `perform` and `enqueue` are async (`perform_now` / `perform_later`)
 
 Rails runs a job synchronously. `Execution#perform_now`
-(`vendor/rails/v8.0.2/activejob/lib/active_job/execution.rb:45-58`) bumps
+(`vendor/rails/v8.0.5.2/activejob/lib/active_job/execution.rb:45-58`) bumps
 `executions`, deserializes the arguments and calls `_perform_job`, which runs
 `perform(*arguments)` inside `run_callbacks :perform` (`:65-70`); its
 `rescue Exception` hands any error to `rescue_with_handler`, and returns the

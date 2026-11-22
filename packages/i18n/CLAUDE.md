@@ -88,7 +88,7 @@ As a consequence:
 - A Rails test that depends on a lookup reaching a cache store is parked as
   `it.skip` under a `PERMANENT-SKIP:` line citing this section. The one
   instance is `translate caching backend`
-  (`vendor/rails/v8.0.2/actionview/test/template/translation_helper_test.rb:390-410`),
+  (`vendor/rails/v8.0.5.2/actionview/test/template/translation_helper_test.rb:390-410`),
   at `packages/actionview/test/template/translation-helper.test.ts`. Its body is
   empty rather than Rails', because that body names two things the port does
   not define: `I18n::Backend::Cache`, which this section leaves unported, and

@@ -298,9 +298,9 @@ async function gzfileWrap<G extends GzipReader | GzipWriter, T>(
  *
  * Rails reaches this module from more than one file — `Zlib.crc32(db_name_hash)`
  * for the advisory-lock id in
- * `vendor/rails/v8.0.2/activerecord/lib/active_record/migration.rb:1617`, and
+ * `vendor/rails/v8.0.5.2/activerecord/lib/active_record/migration.rb:1617`, and
  * `host % (Zlib.crc32(source) % 4)` in
- * `vendor/rails/v8.0.2/actionview/lib/action_view/helpers/asset_url_helper.rb:295`
+ * `vendor/rails/v8.0.5.2/actionview/lib/action_view/helpers/asset_url_helper.rb:295`
  * (its `require "zlib"` at `asset_url_helper.rb:3`) — and Ruby has exactly one
  * `Zlib`, so trails has exactly one too.
  *

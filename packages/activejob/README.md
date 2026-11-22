@@ -1,12 +1,12 @@
 # @blazetrails/activejob
 
-The port of Rails' `activejob` gem (`vendor/rails/v8.0.2/activejob/`).
+The port of Rails' `activejob` gem (`vendor/rails/v8.0.5.2/activejob/`).
 
 ## Constant names
 
 Job data names classes by their Ruby constant path and resolves them again
 with `constantize`: `Core#serialize` writes `"job_class" => self.class.name`
-(`vendor/rails/v8.0.2/activejob/lib/active_job/core.rb:109`) and
+(`vendor/rails/v8.0.5.2/activejob/lib/active_job/core.rb:109`) and
 `Core::ClassMethods#deserialize` reads it back with
 `job_data["job_class"].constantize` (`:63`);
 `ObjectSerializer#serialize` writes `"_aj_serialized" => self.class.name`

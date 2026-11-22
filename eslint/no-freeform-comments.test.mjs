@@ -34,10 +34,10 @@ tester.run("no-freeform-comments", rule, {
       code: `/** @perf 100ns — CONVERGEABLE rbfsend-per-prototype-writer-cache */\nconst x = 1;\n`,
     },
     {
-      code: `/** @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84 */\nconst x = 1;\n`,
+      code: `/** @inlinedFrom ActiveModel::API#initialize rails/v8.0.5.2/activemodel/lib/active_model/api.rb:80-84 */\nconst x = 1;\n`,
     },
     {
-      code: `/**\n * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482\n * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84\n */\nconst x = 1;\n`,
+      code: `/**\n * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.5.2/activerecord/lib/active_record/core.rb:471-482\n * @inlinedFrom ActiveModel::API#initialize rails/v8.0.5.2/activemodel/lib/active_model/api.rb:80-84\n */\nconst x = 1;\n`,
     },
     { code: `/**\n * @internal\n * @noRailsEquivalent PERMANENT\n */\nconst x = 1;\n` },
     // Tool directives change behaviour when deleted.

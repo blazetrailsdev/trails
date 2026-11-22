@@ -72,7 +72,7 @@ export class CredentialsCommand extends Base {
     klass.methodAdded("diff");
   }
 
-  /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.2/railties/lib/rails/command/environment_argument.rb:16-26 */
+  /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.5.2/railties/lib/rails/command/environment_argument.rb:16-26 */
   constructor(...args: ConstructorParameters<typeof Base>) {
     super(...args);
 

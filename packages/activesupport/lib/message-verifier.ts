@@ -62,7 +62,7 @@ export class MessageVerifier extends Codec {
   private secret: string | Bytes;
   private digest: string;
 
-  /** @inlinedFrom ActiveSupport::Messages::Rotator#initialize rails/v8.0.2/activesupport/lib/active_support/messages/rotator.rb:6-12 */
+  /** @inlinedFrom ActiveSupport::Messages::Rotator#initialize rails/v8.0.5.2/activesupport/lib/active_support/messages/rotator.rb:6-12 */
   constructor(
     secret: string | Bytes,
     { onRotation = null, ...options }: MessageVerifierOptions = {},

@@ -590,7 +590,7 @@ export interface CopyStreamSource {
  *
  * Rails writes a credentials file through this class —
  * `IO.binwrite "#{content_path}.tmp", encrypt(contents)`
- * (`vendor/rails/v8.0.2/activesupport/lib/active_support/encrypted_file.rb:79`) — so
+ * (`vendor/rails/v8.0.5.2/activesupport/lib/active_support/encrypted_file.rb:79`) — so
  * trails writes it through a class of the same name. The backend is the
  * `FsAdapter` contract in `./fs-adapter.js`, the same one `File` writes through.
  *
@@ -963,7 +963,7 @@ export class IO {
   /**
    * `IO.popen` (`rb_io_s_popen`, `vendor/ruby/v3.3.11/io.c:7946-7966`) for the
    * Array command and block form Active Storage calls
-   * (`vendor/rails/v8.0.2/activestorage/lib/active_storage/previewer.rb:82`):
+   * (`vendor/rails/v8.0.5.2/activestorage/lib/active_storage/previewer.rb:82`):
    * `pname` is the program and its argv, exec'd with no shell
    * (`rb_execarg_new`, `io.c:7975`), and `err:` redirects the child's stderr
    * to an IO (`rb_execarg_extract_options`, `io.c:7988`). The block is

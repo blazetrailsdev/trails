@@ -30,7 +30,7 @@ carries `@inventedArm connectsTo — PERMANENT` against this section.
 `record.ts`'s `this.tableNamePrefix = SolidQueue.tableNamePrefix` has no line
 in `record.rb`. Rails gets the prefix from the reader `isolate_namespace`
 defines on `SolidQueue`
-(`vendor/rails/v8.0.2/railties/lib/rails/engine.rb:396-398`) through
+(`vendor/rails/v8.0.5.2/railties/lib/rails/engine.rb:396-398`) through
 `full_table_name_prefix`'s `module_parents` walk. Rails defines no
 `table_name_prefix=` writer, so a `config.solid_queue.table_name_prefix` raises
 `NoMethodError` in the `solid_queue.config` initializer, and there is no

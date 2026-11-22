@@ -24,8 +24,8 @@ class Base extends AbstractController.Base {
   declare _renderedFormat: unknown;
 
   /**
-   * @inlinedFrom ActionView::Layouts#initialize rails/v8.0.2/actionview/lib/action_view/layouts.rb:361-364
-   * @inlinedFrom ActionView::Rendering#initialize rails/v8.0.2/actionview/lib/action_view/rendering.rb:32-35
+   * @inlinedFrom ActionView::Layouts#initialize rails/v8.0.5.2/actionview/lib/action_view/layouts.rb:361-364
+   * @inlinedFrom ActionView::Rendering#initialize rails/v8.0.5.2/actionview/lib/action_view/rendering.rb:32-35
    */
   constructor() {
     super();
