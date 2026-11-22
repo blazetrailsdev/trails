@@ -1550,27 +1550,6 @@ describe("AppGenerator", () => {
     assertOption(generator, "skipThruster");
   });
 
-  it("minimal trails app with no skip implied option", () => {
-    const generator = t.generator([t.destinationRoot], ["--minimal", "--no-skip-action-text"]);
-
-    assertNotOption(generator, "skipActionText");
-    assertNotOption(generator, "skipActiveStorage");
-    assertNotOption(generator, "skipActiveJob");
-    assertOption(generator, "skipActionMailbox");
-    assertOption(generator, "skipActionMailer");
-    assertOption(generator, "minimal");
-  });
-
-  it("dockerfile", async () => {
-    await t.runGenerator();
-
-    await t.assertFile("Dockerfile", (content: string) => {
-      expect(content).toMatch(/assets:precompile/);
-      expect(content).toMatch(/libvips/);
-      expect(content).not.toMatch(/yarn/);
-    });
-  });
-
   it("rejects an unknown sqlite driver", () => {
     expect(() => t.generator([t.destinationRoot], { sqliteDriver: "bogus-driver" })).toThrow(
       /Unknown SQLite driver/,
@@ -1792,6 +1771,27 @@ describe("AppGeneratorTest", () => {
   it.skip("bootsnap with dev option", async () => {
     await t.runGenerator([t.destinationRoot, "--dev"]);
     await assertNoGem("bootsnap");
+  });
+
+  it("minimal trails app with no skip implied option", () => {
+    const generator = t.generator([t.destinationRoot], ["--minimal", "--no-skip-action-text"]);
+
+    assertNotOption(generator, "skipActionText");
+    assertNotOption(generator, "skipActiveStorage");
+    assertNotOption(generator, "skipActiveJob");
+    assertOption(generator, "skipActionMailbox");
+    assertOption(generator, "skipActionMailer");
+    assertOption(generator, "minimal");
+  });
+
+  it("dockerfile", async () => {
+    await t.runGenerator();
+
+    await t.assertFile("Dockerfile", (content: string) => {
+      expect(content).toMatch(/assets:precompile/);
+      expect(content).toMatch(/libvips/);
+      expect(content).not.toMatch(/yarn/);
+    });
   });
 
   it("inclusion of ruby version", async () => {
