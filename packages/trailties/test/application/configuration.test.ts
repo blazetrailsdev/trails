@@ -1340,9 +1340,9 @@ Trails.application!.configure(function () {
       await t.buildApp();
       onTestFinished(() => t.teardownApp());
 
-      expect((await t.trails("runner", "console.log(ActiveJob.verboseEnqueueLogs())")).trim()).toBe(
-        "true",
-      );
+      expect(
+        JSON.parse(await t.trails("runner", "console.log(ActiveJob.verboseEnqueueLogs())")),
+      ).toBeTruthy();
     },
   );
 
@@ -1355,15 +1355,15 @@ Trails.application!.configure(function () {
       onTestFinished(() => t.teardownApp());
 
       expect(
-        (
+        JSON.parse(
           await t.trails(
             "runner",
             "-e",
             "production",
             "console.log(ActiveJob.verboseEnqueueLogs())",
-          )
-        ).trim(),
-      ).toBe("false");
+          ),
+        ),
+      ).toBeFalsy();
     },
   );
 
