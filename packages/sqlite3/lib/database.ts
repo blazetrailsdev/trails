@@ -134,9 +134,7 @@ export class Database {
   }
 
   async encoding(): Promise<Encoding | null> {
-    return this.prepare("PRAGMA encoding", async (stmt) =>
-      Encoding.find(String((await stmt.first())![0])),
-    );
+    return Encoding.find(String(await Pragmas.encoding.call(this)));
   }
 
   prepare(sql: string): Statement | Promise<Statement>;
