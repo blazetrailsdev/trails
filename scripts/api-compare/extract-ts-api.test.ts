@@ -9211,7 +9211,12 @@ describe("object-literal modules and Struct.new constants", () => {
       `,
     });
     const mod = info.modules["content-type-parser.ts:ContentTypeParser"];
-    expect(mod.instanceMethods.map((m) => m.name)).toEqual(["_transKeys", "start", "parse"]);
+    expect(mod.instanceMethods).toEqual([]);
+    expect(mod.classMethods.map((m) => [m.name, m.isStatic])).toEqual([
+      ["_transKeys", true],
+      ["start", true],
+      ["parse", true],
+    ]);
   });
 
   it("does not credit a plain literal's data properties", () => {
@@ -9239,7 +9244,7 @@ describe("object-literal modules and Struct.new constants", () => {
         export const Driver = extend({ name: "x", open(): void {} }, {});
       `,
     });
-    expect(info.modules["driver.ts:Driver"].instanceMethods.map((m) => m.name)).toEqual(["open"]);
+    expect(info.modules["driver.ts:Driver"].classMethods.map((m) => m.name)).toEqual(["open"]);
   });
 
   it("credits an exported alias of a same-file literal", () => {

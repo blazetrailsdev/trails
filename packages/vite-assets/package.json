@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@blazetrails/rack-test": "workspace:*",
+    "@blazetrails/trailties": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*"
   },
   "engines": {

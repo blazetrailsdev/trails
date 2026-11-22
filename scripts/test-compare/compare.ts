@@ -403,6 +403,26 @@ function rubyTestClass(tc: { rubyClass?: string }): string | undefined {
 }
 
 /**
+ * The Ruby path with the test class's segment written as its full Rails class
+ * path, `ActionMailbox::TestHelperTest` for a class nested in
+ * `module ActionMailbox` (actionmailbox/test/unit/test_helper_test.rb:5-6), so a
+ * port whose describe names the qualified class matches by path.
+ */
+export function classPathQualified(tc: {
+  ancestors: string[];
+  description: string;
+  rubyClass?: string;
+  rubyClassPath?: string;
+}): string | undefined {
+  if (tc.rubyClass === undefined || tc.rubyClassPath === undefined) return undefined;
+  const at = tc.ancestors.lastIndexOf(tc.rubyClass);
+  if (at === -1) return undefined;
+  const ancestors = [...tc.ancestors];
+  ancestors[at] = tc.rubyClassPath;
+  return normPath(ancestors, tc.description);
+}
+
+/**
  * A describe name reduced to the class it names. Rails' own nesting puts a
  * sibling class inside a `module` (`prefix_generation_test.rb:7`, `:26`), and
  * the port that mirrors that writes the qualified
@@ -1210,6 +1230,10 @@ export function main(
         const np = normPath(tc.ancestors, tc.description);
         let tsIdx = consumeIndex(pathIndex.get(np), consumedTs);
         if (tsIdx < 0) tsIdx = consumeIndex(pathAliasIndex.get(np), consumedTs);
+        if (tsIdx < 0) {
+          const qp = classPathQualified(tc);
+          if (qp !== undefined) tsIdx = consumeIndex(pathIndex.get(qp), consumedTs);
+        }
         if (tsIdx >= 0) {
           consumedTs.add(tsIdx);
           matchedRuby.add(ri);

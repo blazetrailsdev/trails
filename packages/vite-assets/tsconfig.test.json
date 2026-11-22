@@ -12,6 +12,10 @@
     },
     {
       "path": "../rack-test"
+    },
+    {
+      "path": "../vite-trails"
     }
-  ]
+  ],
+  "files": ["test/test_app/config/application.mts"]
 }

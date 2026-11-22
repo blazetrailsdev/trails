@@ -1819,7 +1819,10 @@ class TestExtractor
   # `body_gate` defaults to `:compute` (derive from `body_node`); module tests
   # pass their precomputed in-body skip gate instead, since the sexp is gone.
   def add_gate(test_case, body_node, body_gate: :compute)
-    test_case[:rubyClass] = @class_stack.last unless @class_stack.empty?
+    unless @class_stack.empty?
+      test_case[:rubyClass] = @class_stack.last
+      test_case[:rubyClassPath] = @class_stack.join("::") if @class_stack.length > 1
+    end
     parts = []
     parts << { adapters: @file_adapter_gate } if @file_adapter_gate
     @gate_stack.each { |g| parts << g }

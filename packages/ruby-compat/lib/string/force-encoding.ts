@@ -15,6 +15,17 @@ export function rbObjEncoding(obj: string | Uint8Array): Encoding {
 }
 
 /**
+ * `rb_enc_associate` (`vendor/ruby/v3.3.11/encoding.c:1007`): tags the bytes with
+ * the encoding and keeps them bytes, whatever the encoding.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_enc_associate` (`vendor/ruby/v3.3.11/encoding.c:1007`).
+ */
+export function rbEncAssociate(bytes: Uint8Array, enc: Encoding): Uint8Array {
+  encodings.set(bytes, enc);
+  return bytes;
+}
+
+/**
  * Ruby core `String#force_encoding` (`vendor/ruby/v3.3.11/string.c:11005`
  * `rb_str_force_encoding`), which Rails inherits rather than defines.
  *

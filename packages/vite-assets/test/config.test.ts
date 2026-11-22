@@ -1,8 +1,11 @@
+import { createRequire } from "node:module";
 import type {} from "@blazetrails/vitest-matchers";
+import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Config } from "../lib/config.js";
 import { ViteAssets } from "../lib/vite-assets.js";
+import "./test_app/config/application.mjs";
 import { pathToTestApp, refreshConfig, withRailsEnv } from "./support/test-helper.js";
 
 const vendorCandidate = new URL("../../../vendor/vite_ruby/v3.11.1", import.meta.url).pathname;
@@ -59,8 +62,17 @@ describe("ConfigTest", () => {
     assertPath("public/vite", config.buildOutputDir());
   });
 
-  // PERMANENT-SKIP: config/vite_public_dir.rb is Ruby, and reads
-  it.skip("ruby config file", () => {});
+  it("ruby config file", async () => {
+    expect(config.toEnv()["EXAMPLE_PATH"]).toBeUndefined();
+
+    await refreshConfig({ configPath: "config/vite_public_dir.json" });
+
+    expect(ViteAssets.config().publicOutputDir).toBe("from_ruby");
+    expect(ViteAssets.config().toEnv()["EXAMPLE_PATH"]).toBe(
+      new URL("..", `file://${createRequire(import.meta.url).resolve("@blazetrails/trailties")}`)
+        .pathname,
+    );
+  });
 
   it("dev server meta path is scoped to mode", async () => {
     assertPath("test_app/tmp/vite-ruby-production.json", config.devServerMetaPath());
@@ -121,8 +133,25 @@ describe("ConfigTest", () => {
     });
   });
 
-  // PERMANENT-SKIP: reads Rails.application.config.action_controller.asset_host,
-  it.skip("to env", () => {});
+  it("to env", async () => {
+    let env = config.toEnv();
+
+    expect(env["VITE_RUBY_ASSET_HOST"]).toBeUndefined();
+
+    const actionController = (
+      TopLevel.Trails!.application as unknown as {
+        config: { actionController: { assetHost: unknown } };
+      }
+    ).config.actionController;
+    try {
+      actionController.assetHost = "assets-cdn.com";
+      env = (await refreshConfig()).toEnv();
+
+      expect(env["VITE_RUBY_ASSET_HOST"]).toBe("assets-cdn.com");
+    } finally {
+      actionController.assetHost = null;
+    }
+  });
 
   it("environment vars", async () => {
     const env = ViteAssets.env();

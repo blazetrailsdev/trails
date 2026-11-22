@@ -51,6 +51,7 @@ defineConstants([
   [m15, "MultiTask", "Rake::MultiTask"],
   [m16, "NameSpace", "Rake::NameSpace"],
   [m17, "PrivateReader", "Rake::PrivateReader"],
+  [m17, "ClassMethods", "Rake::PrivateReader::ClassMethods"],
   [m18, "PseudoStatus", "Rake::PseudoStatus"],
   [m19, "RuleRecursionOverflowError", "Rake::RuleRecursionOverflowError"],
   [m20, "Scope", "Rake::Scope"],

@@ -1069,6 +1069,7 @@ export function extractFromProgram(
           attributeReceivers ??= new Set(
             collectClassAttributeCalls(sourceFile).map((call) => call.receiver),
           );
+          const extendLiteral = extendModuleLiteral(decl.initializer) !== undefined;
           const moduleLiteral =
             extendModuleLiteral(decl.initializer) ??
             sameFileLiteralAlias(decl.initializer, checker);
@@ -1122,8 +1123,8 @@ export function extractFromProgram(
             file: relPath,
             includes: [],
             extends: [],
-            instanceMethods: methods,
-            classMethods: [],
+            instanceMethods: extendLiteral ? [] : methods,
+            classMethods: extendLiteral ? methods.map((m) => ({ ...m, isStatic: true })) : [],
             ...(objectLiteral ? { objectLiteral: true } : {}),
             ...(modReason !== undefined ? { noRailsEquivalent: modReason } : {}),
           };

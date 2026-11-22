@@ -1,13 +1,41 @@
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
 import { describe, it, expect } from "vitest";
-import { ArgumentError, File, RuntimeError, StringIO, Tempfile } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  File,
+  RUBY_PLATFORM,
+  RuntimeError,
+  StringIO,
+  Tempfile,
+} from "@blazetrails/ruby-compat";
 import { UploadedFile } from "../lib/uploaded-file.js";
 import { mustBe, mustRespondTo, wontBe } from "./support/assertions.js";
 
-describe("Rack::Test::UploadedFile", () => {
-  function filePath(): string {
-    return File.dirname(new URL(import.meta.url).pathname) + "/fixtures/foo.txt";
-  }
+function filePath(): string {
+  return File.dirname(new URL(import.meta.url).pathname) + "/fixtures/foo.txt";
+}
 
+function localPaths(n: number): string[] {
+  const localPaths = Array.from({ length: n }, () => new UploadedFile(filePath()));
+  expect(localPaths.map((f) => f.localPath!).every((f) => File.isExist(f))).toBe(true);
+  const paths = localPaths.map((f) => f.localPath!);
+  expect(new Set(paths).size).toBe(n);
+  return paths;
+}
+
+async function gcStart(paths: string[]): Promise<void> {
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+  setFlagsFromString("--expose-gc");
+  const gc = runInNewContext("gc") as () => void;
+  for (let i = 0; i < 50 && paths.every((f) => File.isExist(f)); i++) {
+    await tick();
+    gc();
+    await tick();
+  }
+}
+
+describe("Rack::Test::UploadedFile", () => {
   function binmodeHost(uploadedFile: UploadedFile): Record<string, () => unknown> {
     return uploadedFile.tempfile as unknown as Record<string, () => unknown>;
   }
@@ -59,9 +87,11 @@ describe("Rack::Test::UploadedFile", () => {
     expect(() => new UploadedFile("does_not_exist")).toThrow(RuntimeError);
   });
 
-  it.skip("removes local paths on garbage collection", () => {
-    // PERMANENT-SKIP: the assertion is that `GC.start` runs Tempfile's finalizer
-    // (`vendor/ruby/v3.3.11/lib/tempfile.rb:299`) and unlinks the file. JS has no
+  it("removes local paths on garbage collection", async () => {
+    const paths = RUBY_PLATFORM() === "java" ? localPaths(500) : localPaths(50);
+    await gcStart(paths);
+
+    expect(paths.every((f) => File.isExist(f))).toBe(false);
   });
 
   it("#initialize with an IO object sets the specified filename", () => {
