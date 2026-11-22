@@ -72,7 +72,7 @@ describe("NullStoreTest", () => {
       assertNil(await cache.read("foo"));
 
       await cache.readMulti("foo", "bar");
-      expect(await cache.readMulti("foo", "bar")).toEqual({});
+      expect(Object.fromEntries(await cache.readMulti("foo", "bar"))).toEqual({});
     });
   });
 
