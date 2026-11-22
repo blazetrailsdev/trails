@@ -8,6 +8,7 @@ import type {} from "@blazetrails/activestorage/engine";
 import type {} from "@blazetrails/actionmailbox/engine";
 import type {} from "@blazetrails/actiontext/engine";
 import type {} from "@blazetrails/actioncable/engine";
+import "@blazetrails/turbo/engine";
 
 // Require the gem ports listed in package.json, including any ports
 // you've limited to :test, :development, or :production.
