@@ -390,9 +390,12 @@ export class Dalli extends MemCacheBase {
   /**
    * @missingRailsArgs get — PERMANENT
    * @inventedArm load — PERMANENT
+   * @inventedArm if — PERMANENT
    */
   override async read(key: string): Promise<Entry[]> {
     key = this.hexdigest(key);
+    if (this.cache.options.namespace != null)
+      key = `${String(this.cache.options.namespace)}:${key}`;
     const { value } = await this.cache.get(key);
     return value != null ? (Marshal.load(value) as Entry[]) : [];
   }
@@ -400,14 +403,21 @@ export class Dalli extends MemCacheBase {
   /**
    * @missingRailsArgs set — PERMANENT
    * @inventedArm dump — PERMANENT
+   * @inventedArm if — PERMANENT
    */
   override async write(key: string, entries: Entry[], ttl: number | null = 0): Promise<boolean> {
     key = this.hexdigest(key);
+    if (this.cache.options.namespace != null)
+      key = `${String(this.cache.options.namespace)}:${key}`;
     return this.cache.set(key, Marshal.dump(entries, -1, true), { expires: ttl });
   }
 
+  /** @inventedArm if — PERMANENT */
   override async purge(key: string): Promise<null> {
-    await this.cache.delete(this.hexdigest(key));
+    key = this.hexdigest(key);
+    if (this.cache.options.namespace != null)
+      key = `${String(this.cache.options.namespace)}:${key}`;
+    await this.cache.delete(key);
     return null;
   }
 }

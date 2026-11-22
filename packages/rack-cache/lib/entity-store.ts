@@ -315,26 +315,40 @@ export class Dalli extends MemCacheBase {
     return store;
   }
 
+  /** @inventedArm if — PERMANENT */
   async isExist(key: string): Promise<boolean> {
+    if (this.cache.options.namespace != null)
+      key = `${String(this.cache.options.namespace)}:${key}`;
     return (await this.cache.get(key)).value != null;
   }
 
+  /** @inventedArm if — PERMANENT */
   async read(key: string): Promise<Part | null> {
+    if (this.cache.options.namespace != null)
+      key = `${String(this.cache.options.namespace)}:${key}`;
     let { value: data } = await this.cache.get(key);
     if (data instanceof Uint8Array)
       data = new Uint8Array(data.buffer, data.byteOffset, data.length);
     return data;
   }
 
-  /** @missingRailsArgs set — PERMANENT */
+  /**
+   * @missingRailsArgs set — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   async write(body: RackBody, ttl: number | null = null): Promise<[string, number] | null> {
     const buf = new StringIO(new Uint8Array(0));
     const [key, size] = await this.slurp(body, (part) => buf.write(part));
-    if (await this.cache.set(key, buf.string(), { expires: ttl })) return [key, size];
+    const namespace = this.cache.options.namespace;
+    const namespacedKey = namespace != null ? `${String(namespace)}:${key}` : key;
+    if (await this.cache.set(namespacedKey, buf.string(), { expires: ttl })) return [key, size];
     return null;
   }
 
+  /** @inventedArm if — PERMANENT */
   async purge(key: string): Promise<null> {
+    if (this.cache.options.namespace != null)
+      key = `${String(this.cache.options.namespace)}:${key}`;
     await this.cache.delete(key);
     return null;
   }
