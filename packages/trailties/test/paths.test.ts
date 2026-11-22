@@ -63,9 +63,34 @@ describe("PathsTest", () => {
     expect(() => new Root(null)).not.toThrow();
   });
 
+  test("a paths object initialized with nil can be updated", async () => {
+    const r = new Root(null);
+    r.add("app");
+    r.path = "/root";
+    expect(r.get("app")!.toAry()).toEqual(["app"]);
+    expect(r.get("app")!.toA()).toEqual(["/root/app"]);
+  });
+
+  test("creating a root level path", async () => {
+    root.add("app");
+    expect(root.get("app")!.toA()).toEqual(["/foo/bar/app"]);
+  });
+
   test("creating a root level path with options", async () => {
     root.add("app", { with: "/foo/bar" });
     expect(root.get("app")!.toA()).toEqual(["/foo/bar"]);
+  });
+
+  test("raises exception if root path never set", async () => {
+    const r = new Root(null);
+    r.add("app");
+    expect(() => r.get("app")!.toA()).toThrow();
+  });
+
+  test("creating a child level path", async () => {
+    root.add("app");
+    root.add("app/models");
+    expect(root.get("app/models")!.toA()).toEqual(["/foo/bar/app/models"]);
   });
 
   test("creating a child level path with option", async () => {
@@ -85,6 +110,17 @@ describe("PathsTest", () => {
     root.add("config/locales");
 
     expect(root.get("config/locales")!.absoluteCurrent()).toEqual("/foo/bar/config/locales");
+  });
+
+  test("adding multiple physical paths as an array", async () => {
+    root.add("app", { with: ["/app", "/app2"] });
+    expect(root.get("app")!.toA()).toEqual(["/app", "/app2"]);
+  });
+
+  test("adding multiple physical paths using #push", async () => {
+    root.add("app");
+    root.get("app")!.push("app2");
+    expect(root.get("app")!.toA()).toEqual(["/foo/bar/app", "/foo/bar/app2"]);
   });
 
   test("adding multiple physical paths using <<", async () => {
@@ -107,16 +143,24 @@ describe("PathsTest", () => {
 
   test("it is possible to add a path that should be autoloaded only once", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.add("app", { with: "/app" });
     root.get("app")!.autoloadOnceBang();
     expect(root.get("app")!.isAutoloadOnce()).toBe(true);
     expect(root.autoloadOnce()).toContain(root.get("app")!.expanded()[0]);
   });
 
+  test("it is possible to remove a path that should be autoloaded only once", async () => {
+    root.add("app", { with: "/app" });
+    root.get("app")!.autoloadOnceBang();
+    expect(root.get("app")!.isAutoloadOnce()).toBeTruthy();
+
+    root.get("app")!.skipAutoloadOnceBang();
+    expect(root.get("app")!.isAutoloadOnce()).toBeFalsy();
+    expect(root.autoloadOnce()).not.toContain(root.get("app")!.expanded()[0]);
+  });
+
   test("it is possible to add a path without assignment and specify it should be loaded only once", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.add("app", { with: "/app", autoloadOnce: true });
     expect(root.get("app")!.isAutoloadOnce()).toBe(true);
     expect(root.autoloadOnce()).toContain("/app");
@@ -124,7 +168,6 @@ describe("PathsTest", () => {
 
   test("it is possible to add multiple paths without assignment and specify it should be loaded only once", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.add("app", { with: ["/app", "/app2"], autoloadOnce: true });
     expect(root.get("app")!.isAutoloadOnce()).toBe(true);
     expect(root.autoloadOnce()).toContain("/app");
@@ -133,7 +176,6 @@ describe("PathsTest", () => {
 
   test("making a path autoload_once more than once only includes it once in @root.load_once", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.set("app", "/app");
     root.get("app")!.autoloadOnceBang();
     root.get("app")!.autoloadOnceBang();
@@ -144,7 +186,6 @@ describe("PathsTest", () => {
 
   test("paths added to a load_once path should be added to the autoload_once collection", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.set("app", "/app");
     root.get("app")!.autoloadOnceBang();
     root.get("app")!.push("/app2");
@@ -153,16 +194,24 @@ describe("PathsTest", () => {
 
   test("it is possible to mark a path as eager loaded", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.set("app", "/app");
     root.get("app")!.eagerLoadBang();
     expect(root.get("app")!.isEagerLoad()).toBe(true);
     expect(root.eagerLoad()).toContain(root.get("app")!.toA()[0]);
   });
 
+  test("it is possible to skip a path from eager loading", async () => {
+    root.add("app", { with: "/app" });
+    root.get("app")!.eagerLoadBang();
+    expect(root.get("app")!.isEagerLoad()).toBeTruthy();
+
+    root.get("app")!.skipEagerLoadBang();
+    expect(root.get("app")!.isEagerLoad()).toBeFalsy();
+    expect(root.eagerLoad()).not.toContain(root.get("app")!.toA()[0]);
+  });
+
   test("it is possible to add a path without assignment and mark it as eager", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.add("app", { with: "/app", eagerLoad: true });
     expect(root.get("app")!.isEagerLoad()).toBe(true);
     expect(root.eagerLoad()).toContain("/app");
@@ -170,7 +219,6 @@ describe("PathsTest", () => {
 
   test("it is possible to add multiple paths without assignment and mark them as eager", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.add("app", { with: ["/app", "/app2"], eagerLoad: true });
     expect(root.get("app")!.isEagerLoad()).toBe(true);
     expect(root.eagerLoad()).toContain("/app");
@@ -179,7 +227,6 @@ describe("PathsTest", () => {
 
   test("it is possible to create a path without assignment and mark it both as eager and load once", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.add("app", { with: "/app", eagerLoad: true, autoloadOnce: true });
     expect(root.get("app")!.isEagerLoad()).toBe(true);
     expect(root.get("app")!.isAutoloadOnce()).toBe(true);
@@ -189,7 +236,6 @@ describe("PathsTest", () => {
 
   test("making a path eager more than once only includes it once in @root.eager_paths", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.set("app", "/app");
     root.get("app")!.eagerLoadBang();
     root.get("app")!.eagerLoadBang();
@@ -198,7 +244,6 @@ describe("PathsTest", () => {
 
   test("paths added to an eager_load path should be added to the eager_load collection", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.set("app", "/app");
     root.get("app")!.eagerLoadBang();
     root.get("app")!.push("/app2");
@@ -231,16 +276,21 @@ describe("PathsTest", () => {
 
   test("a path can be added to the load path", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.set("app", "app");
     root.get("app")!.loadPathBang();
     root.set("app/models", "app/models");
     expect(root.loadPaths()).toEqual(["/foo/bar/app"]);
   });
 
+  test("a path can be added to the load path on creation", async () => {
+    install(true);
+    root.add("app", { with: "/app", loadPath: true });
+    expect(root.get("app")!.isLoadPath()).toBeTruthy();
+    expect(root.loadPaths()).toEqual(["/app"]);
+  });
+
   test("a path can be marked as autoload path", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.set("app", "app");
     root.get("app")!.autoloadBang();
     root.set("app/models", "app/models");
@@ -249,68 +299,9 @@ describe("PathsTest", () => {
 
   test("a path can be marked as autoload on creation", async () => {
     install(true);
-    root = new Root("/foo/bar");
     root.add("app", { with: "/app", autoload: true });
     expect(root.get("app")!.isAutoload()).toBe(true);
     expect(root.autoloadPaths()).toEqual(["/app"]);
-  });
-
-  test("load paths does include directories", async () => {
-    install(true);
-    root = new Root("/foo/bar");
-    root.add("app/special", {
-      autoloadOnce: true,
-      eagerLoad: true,
-      autoload: true,
-      loadPath: true,
-    });
-    expect(root.autoloadOnce()).toEqual(["/foo/bar/app/special"]);
-    expect(root.eagerLoad()).toEqual(["/foo/bar/app/special"]);
-    expect(root.autoloadPaths()).toEqual(["/foo/bar/app/special"]);
-    expect(root.loadPaths()).toEqual(["/foo/bar/app/special"]);
-  });
-  test("a paths object initialized with nil can be updated", async () => {
-    const r = new Root(null);
-    r.add("app");
-    r.path = "/root";
-    expect(r.get("app")!.toAry()).toEqual(["app"]);
-    expect(r.get("app")!.toA()).toEqual(["/root/app"]);
-  });
-
-  test("creating a root level path", async () => {
-    root.add("app");
-    expect(root.get("app")!.toA()).toEqual(["/foo/bar/app"]);
-  });
-
-  test("raises exception if root path never set", async () => {
-    const r = new Root(null);
-    r.add("app");
-    expect(() => r.get("app")!.toA()).toThrow();
-  });
-
-  test("creating a child level path", async () => {
-    root.add("app");
-    root.add("app/models");
-    expect(root.get("app/models")!.toA()).toEqual(["/foo/bar/app/models"]);
-  });
-
-  test("adding multiple physical paths as an array", async () => {
-    root.add("app", { with: ["/app", "/app2"] });
-    expect(root.get("app")!.toA()).toEqual(["/app", "/app2"]);
-  });
-
-  test("adding multiple physical paths using #push", async () => {
-    root.add("app");
-    root.get("app")!.push("app2");
-    expect(root.get("app")!.toA()).toEqual(["/foo/bar/app", "/foo/bar/app2"]);
-  });
-
-  test("a path can be added to the load path on creation", async () => {
-    install(true);
-    root = new Root("/foo/bar");
-    root.add("app", { with: "/app", loadPath: true });
-    expect(root.get("app")!.isLoadPath()).toBeTruthy();
-    expect(root.loadPaths()).toEqual(["/app"]);
   });
 
   test("load paths does NOT include files", async () => {
@@ -326,24 +317,18 @@ describe("PathsTest", () => {
     expect(root.loadPaths()).toEqual([]);
   });
 
-  test("it is possible to remove a path that should be autoloaded only once", async () => {
-    root.add("app", { with: "/app" });
-    root.get("app")!.autoloadOnceBang();
-    expect(root.get("app")!.isAutoloadOnce()).toBeTruthy();
-
-    root.get("app")!.skipAutoloadOnceBang();
-    expect(root.get("app")!.isAutoloadOnce()).toBeFalsy();
-    expect(root.autoloadOnce()).not.toContain(root.get("app")!.expanded()[0]);
-  });
-
-  test("it is possible to skip a path from eager loading", async () => {
-    root.add("app", { with: "/app" });
-    root.get("app")!.eagerLoadBang();
-    expect(root.get("app")!.isEagerLoad()).toBeTruthy();
-
-    root.get("app")!.skipEagerLoadBang();
-    expect(root.get("app")!.isEagerLoad()).toBeFalsy();
-    expect(root.eagerLoad()).not.toContain(root.get("app")!.toA()[0]);
+  test("load paths does include directories", async () => {
+    install(true);
+    root.add("app/special", {
+      autoloadOnce: true,
+      eagerLoad: true,
+      autoload: true,
+      loadPath: true,
+    });
+    expect(root.autoloadOnce()).toEqual(["/foo/bar/app/special"]);
+    expect(root.eagerLoad()).toEqual(["/foo/bar/app/special"]);
+    expect(root.autoloadPaths()).toEqual(["/foo/bar/app/special"]);
+    expect(root.loadPaths()).toEqual(["/foo/bar/app/special"]);
   });
 });
 
