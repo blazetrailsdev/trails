@@ -1,0 +1,4 @@
+periodic_add_to_buffer:
+  class: AddToBufferJob
+  args: [42]
+  schedule: every second
