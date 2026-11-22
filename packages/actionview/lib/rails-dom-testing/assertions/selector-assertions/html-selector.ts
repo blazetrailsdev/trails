@@ -11,6 +11,7 @@ export interface EqualityTests {
   count?: number;
   minimum?: number;
   maximum?: number;
+  strict?: unknown;
 }
 
 export class HTMLSelector {
@@ -22,14 +23,25 @@ export class HTMLSelector {
   private readonly values: unknown[];
   private readonly root: { css(...args: unknown[]): NodeSet };
   private selector!: string;
+  private strict: unknown;
 
-  constructor(values: unknown[], previousSelection: unknown = null, rootFallback: () => unknown) {
+  constructor(
+    values: unknown[],
+    previousSelection: unknown = null,
+    options: { refute?: boolean } | (() => unknown) = {},
+    rootFallback?: () => unknown,
+  ) {
+    if (typeof options === "function") {
+      rootFallback = options;
+      options = {};
+    }
+    const { refute = false } = options;
     this.values = values;
-    this.root = this.extractRoot(previousSelection, rootFallback) as {
+    this.root = this.extractRoot(previousSelection, rootFallback!) as {
       css(...args: unknown[]): NodeSet;
     };
     this.extractSelectors();
-    this.tests = this.extractEqualityTests();
+    this.tests = this.extractEqualityTests(refute);
     this.message = this.values.shift();
 
     if (this.message != null && Object.getPrototypeOf(this.message) === Object.prototype) {
@@ -60,14 +72,18 @@ export class HTMLSelector {
 
     let contentMismatch: string | null = null;
     const textMatches = "text" in this.tests;
+    const htmlMatches = "html" in this.tests;
     const regexMatching = matchWith instanceof RegExp;
 
     const remaining = [...matches].filter((match: Html5Node) => {
-      let content = textMatches ? match.text : match.children.join("");
+      let content = textMatches ? match.text : match.innerHtml();
 
       if (!NO_STRIP.includes(match.name)) content = strip(content);
       if (textMatches && match.name === "textarea" && content.startsWith("\n")) {
         content = content.slice(1);
+      }
+      if (!(NO_STRIP.includes(match.name) || htmlMatches)) {
+        content = this.collapseHtmlWhitespaceBang(content);
       }
 
       if (regexMatching ? content.search(matchWith) !== -1 : content === matchWith) return true;
@@ -111,7 +127,7 @@ export class HTMLSelector {
     this.selector = HTMLSelector.context.substituteBang(selector, this.values);
   }
 
-  private extractEqualityTests(): EqualityTests {
+  private extractEqualityTests(refute: boolean): EqualityTests {
     let comparisons: EqualityTests = {};
     const comparator = this.values.shift();
     if (comparator != null && Object.getPrototypeOf(comparator) === Object.prototype) {
@@ -131,11 +147,42 @@ export class HTMLSelector {
       throw new ArgumentError("I don't understand what you're trying to match");
     }
 
+    if (refute) {
+      if (
+        comparisons.count != null ||
+        (comparisons.minimum != null && comparator != null) ||
+        comparisons.maximum != null
+      ) {
+        throw new ArgumentError(
+          "Cannot use true, false, Integer, Range, :count, :minimum and :maximum when asserting that a selector does not match",
+        );
+      }
+
+      comparisons.count = 0;
+    }
+
     if (comparisons.count != null) {
       comparisons.minimum = comparisons.maximum = comparisons.count;
     } else {
       comparisons.minimum ??= 1;
     }
+
+    if (
+      comparisons.minimum != null &&
+      comparisons.maximum != null &&
+      comparisons.minimum > comparisons.maximum
+    ) {
+      throw new ArgumentError(
+        "Range begin or :minimum cannot be greater than Range end or :maximum",
+      );
+    }
+
+    this.strict = comparisons.strict;
+
     return comparisons;
+  }
+
+  private collapseHtmlWhitespaceBang(text: string): string {
+    return text.replace(/\s+/g, " ");
   }
 }

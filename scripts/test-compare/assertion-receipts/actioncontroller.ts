@@ -50,4 +50,14 @@ export const actioncontroller: Record<string, AssertionReceipt[]> = {
         'controller/routing_test.rb:112 `assert_equal ::Encoding::UTF_8, hash["id"].encoding` — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
     },
   ],
+  "actioncontroller:controller/caching_test.rb › CollectionCacheTest › preserves order when reading from cache plus rendering":
+    [
+      {
+        kind: "assert_select",
+        value: "s::root",
+        as: null,
+        reason:
+          'controller/caching_test.rb:426 `assert_select ":root", html: "<body><p>david, 1\\n  david, 2\\n  david, 3\\n\\n</p></body>"` matches the HTML4 parser\'s tree (a `<p>` around the text, no `<head>`); trails parses HTML5 only (packages/actionpack/CLAUDE.md, "DOM testing is HTML5 only")',
+      },
+    ],
 };

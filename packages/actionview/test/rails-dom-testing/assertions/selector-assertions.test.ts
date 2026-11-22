@@ -11,6 +11,7 @@ import { block, ArgumentError, Range } from "@blazetrails/ruby-compat";
 import { CSS, XML, type Html5Document, type NodeSet } from "@blazetrails/nokogiri";
 import { Testing } from "../../../lib/rails-dom-testing/testing.js";
 import {
+  assertNotSelect as _assertNotSelect,
   assertSelect as _assertSelect,
   assertSelectEncoded as _assertSelectEncoded,
   cssSelect as _cssSelect,
@@ -20,6 +21,7 @@ describe("AssertSelectTest", () => {
   let htmlDocument: Html5Document;
   const host = { documentRootElement: () => htmlDocument.root };
   const assertSelect = _assertSelect.bind(host);
+  const assertNotSelect = _assertNotSelect.bind(host);
   const cssSelect = _cssSelect.bind(host);
   const assertSelectEncoded = _assertSelectEncoded.bind(host);
   const renderXml = (xml: string) => (htmlDocument = XML.Document.parse(xml) as never);
@@ -130,6 +132,52 @@ describe("AssertSelectTest", () => {
     expect(() => assertSelect("div", { minimum: 1, maximum: 2 })).not.toThrow();
     assertFailure(/Expected between 3 and 4 elements matching "div", found 2/, () =>
       assertSelect("div", { minimum: 3, maximum: 4 }),
+    );
+  });
+
+  it("zero counts with block", async () => {
+    renderHtml("<div>foo</div>");
+
+    const errors = [
+      await assertRaises([ArgumentError], {}, () =>
+        assertSelect(
+          "p",
+          false,
+          block(() => null),
+        ),
+      ),
+      await assertRaises([ArgumentError], {}, () =>
+        assertSelect(
+          "p",
+          0,
+          block(() => null),
+        ),
+      ),
+      await assertRaises([ArgumentError], {}, () =>
+        assertSelect(
+          "p",
+          { count: 0 },
+          block(() => null),
+        ),
+      ),
+      await assertRaises([ArgumentError], {}, () =>
+        assertSelect(
+          "p",
+          new Range(0, 0),
+          block(() => null),
+        ),
+      ),
+      await assertRaises([ArgumentError], {}, () =>
+        assertSelect(
+          "p",
+          { minimum: 0, maximum: 0 },
+          block(() => null),
+        ),
+      ),
+    ];
+    assertEqual(
+      ["Cannot be called with a block when asserting that a selector does not match"],
+      [...new Set(errors.map((e) => e.message))],
     );
   });
 
@@ -244,6 +292,183 @@ describe("AssertSelectTest", () => {
         expect(() => assertSelect("div", { html: /\w*/, count: 2 })).not.toThrow();
         expect(() => assertSelect("div", { html: "<span>foo</span>", count: 2 })).toThrow();
       }),
+    );
+  });
+
+  it("assert select with invalid range", async () => {
+    renderHtml("<div>foo</div>");
+    const error = await assertRaises([ArgumentError], {}, () =>
+      assertSelect(
+        "div",
+        new Range(2, 1),
+        block(() => null),
+      ),
+    );
+    assertEqual(
+      "Range begin or :minimum cannot be greater than Range end or :maximum",
+      error.message,
+    );
+  });
+
+  it("assert select with invalid minimum and maximum", async () => {
+    renderHtml("<div>foo</div>");
+    let error = await assertRaises([ArgumentError], {}, () =>
+      assertSelect(
+        "div",
+        { maximum: 0 },
+        block(() => null),
+      ),
+    );
+    assertEqual(
+      "Range begin or :minimum cannot be greater than Range end or :maximum",
+      error.message,
+    );
+    error = await assertRaises([ArgumentError], {}, () =>
+      assertSelect(
+        "div",
+        { minimum: 2, maximum: 1 },
+        block(() => null),
+      ),
+    );
+    assertEqual(
+      "Range begin or :minimum cannot be greater than Range end or :maximum",
+      error.message,
+    );
+  });
+
+  it("assert select text equality collapses whitespace", () => {
+    renderHtml("<p>Some\n   line-broken\n   text</p>");
+
+    expect(() =>
+      assertSelect(
+        "p",
+        { text: "Some line-broken text" },
+        "Whitespace was not collapsed from text",
+      ),
+    ).not.toThrow();
+
+    renderHtml("<p>Some<br><br>line-broken<br><br>text</p>");
+
+    expect(() =>
+      assertSelect("p", { text: "Someline-brokentext" }, "<br> was not removed from text"),
+    ).not.toThrow();
+  });
+
+  it("assert select html equality respects whitespace", () => {
+    renderHtml("<p>Some\n   line-broken\n   text</p>");
+
+    expect(() =>
+      assertSelect(
+        "p",
+        { html: "Some\n   line-broken\n   text" },
+        "Whitespace was collapsed from html",
+      ),
+    ).not.toThrow();
+
+    renderHtml("<p>Some<br><br>line-broken<br><br>text</p>");
+
+    expect(() =>
+      assertSelect(
+        "p",
+        { html: "Some<br><br>line-broken<br><br>text" },
+        "<br> was removed from html",
+      ),
+    ).not.toThrow();
+  });
+
+  it("assert not select", () => {
+    renderHtml('<div id="1"></div>');
+    assertNotSelect("p");
+    assertFailure(/Expected exactly 0 elements matching "div", found 1/, () =>
+      assertNotSelect("div"),
+    );
+    assertFailure(/Expected exactly 0 elements matching "div#1", found 1/, () =>
+      assertNotSelect("div#1"),
+    );
+  });
+
+  it("assert not select with true", async () => {
+    renderHtml('<div id="1"></div>');
+    const error = await assertRaises([ArgumentError], {}, () => assertNotSelect("div", true));
+    assertEqual(
+      "Cannot use true, false, Integer, Range, :count, :minimum and :maximum when asserting that a selector does not match",
+      error.message,
+    );
+  });
+
+  it("assert not select with false", async () => {
+    renderHtml('<div id="1"></div>');
+    const error = await assertRaises([ArgumentError], {}, () => assertNotSelect("div", false));
+    assertEqual(
+      "Cannot use true, false, Integer, Range, :count, :minimum and :maximum when asserting that a selector does not match",
+      error.message,
+    );
+  });
+
+  it("assert not select with integer", async () => {
+    renderHtml('<div id="1"></div>');
+    const error = await assertRaises([ArgumentError], {}, () => assertNotSelect("div", 1));
+    assertEqual(
+      "Cannot use true, false, Integer, Range, :count, :minimum and :maximum when asserting that a selector does not match",
+      error.message,
+    );
+  });
+
+  it("assert not select with range", async () => {
+    renderHtml('<div id="1"></div>');
+    const error = await assertRaises([ArgumentError], {}, () =>
+      assertNotSelect("div", new Range(1, 5)),
+    );
+    assertEqual(
+      "Cannot use true, false, Integer, Range, :count, :minimum and :maximum when asserting that a selector does not match",
+      error.message,
+    );
+  });
+
+  it("assert not select with count", async () => {
+    renderHtml('<div id="1"></div>');
+    const error = await assertRaises([ArgumentError], {}, () =>
+      assertNotSelect("div", { count: 1 }),
+    );
+    assertEqual(
+      "Cannot use true, false, Integer, Range, :count, :minimum and :maximum when asserting that a selector does not match",
+      error.message,
+    );
+  });
+
+  it("assert not select with minimum", async () => {
+    renderHtml('<div id="1"></div>');
+    const error = await assertRaises([ArgumentError], {}, () =>
+      assertNotSelect("div", { minimum: 1 }),
+    );
+    assertEqual(
+      "Cannot use true, false, Integer, Range, :count, :minimum and :maximum when asserting that a selector does not match",
+      error.message,
+    );
+  });
+
+  it("assert not select with maximum", async () => {
+    renderHtml('<div id="1"></div>');
+    const error = await assertRaises([ArgumentError], {}, () =>
+      assertNotSelect("div", { maximum: 1 }),
+    );
+    assertEqual(
+      "Cannot use true, false, Integer, Range, :count, :minimum and :maximum when asserting that a selector does not match",
+      error.message,
+    );
+  });
+
+  it("assert not select with block", async () => {
+    renderHtml("<div>foo</div>");
+    const error = await assertRaises([ArgumentError], {}, () =>
+      assertNotSelect(
+        "p",
+        block(() => null),
+      ),
+    );
+    assertEqual(
+      "Cannot be called with a block when asserting that a selector does not match",
+      error.message,
     );
   });
 
