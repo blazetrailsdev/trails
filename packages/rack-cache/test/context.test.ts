@@ -316,33 +316,29 @@ describe("Rack::Cache::Context", () => {
     expect(H.response!.headers).toInclude("age");
   });
 
-  it(
-    "reloads responses when cache hits but no-cache request directive present " +
-      "when allow_reload is set true",
-    async () => {
-      let count = 0;
-      respondWith(200, { "cache-control": "max-age=10000" }, undefined, (req, res) => {
-        count += 1;
-        res.body = count === 1 ? ["Hello World"] : ["Goodbye World"];
-      });
+  it("reloads responses when cache hits but no-cache request directive present when allow_reload is set true", async () => {
+    let count = 0;
+    respondWith(200, { "cache-control": "max-age=10000" }, undefined, (req, res) => {
+      count += 1;
+      res.body = count === 1 ? ["Hello World"] : ["Goodbye World"];
+    });
 
-      await get("/");
-      expect(H.response!.isOk).toBeTruthy();
-      expect(H.response!.body).toEqual("Hello World");
-      expect(H.cache!.trace).toContain("store");
+    await get("/");
+    expect(H.response!.isOk).toBeTruthy();
+    expect(H.response!.body).toEqual("Hello World");
+    expect(H.cache!.trace).toContain("store");
 
-      await get("/");
-      expect(H.response!.isOk).toBeTruthy();
-      expect(H.response!.body).toEqual("Hello World");
-      expect(H.cache!.trace).toContain("fresh");
+    await get("/");
+    expect(H.response!.isOk).toBeTruthy();
+    expect(H.response!.body).toEqual("Hello World");
+    expect(H.cache!.trace).toContain("fresh");
 
-      await get("/", { "rack-cache.allow_reload": true, HTTP_CACHE_CONTROL: "no-cache" });
-      expect(H.response!.isOk).toBeTruthy();
-      expect(H.response!.body).toEqual("Goodbye World");
-      expect(H.cache!.trace).toContain("reload");
-      expect(H.cache!.trace).toContain("store");
-    },
-  );
+    await get("/", { "rack-cache.allow_reload": true, HTTP_CACHE_CONTROL: "no-cache" });
+    expect(H.response!.isOk).toBeTruthy();
+    expect(H.response!.body).toEqual("Goodbye World");
+    expect(H.cache!.trace).toContain("reload");
+    expect(H.cache!.trace).toContain("store");
+  });
 
   it("does not reload responses when allow_reload is set false (default)", async () => {
     let count = 0;
@@ -372,74 +368,65 @@ describe("Rack::Cache::Context", () => {
     expect(H.cache!.trace).not.toContain("reload");
   });
 
-  it(
-    "revalidates fresh cache entry when max-age request directive is exceeded " +
-      "when allow_revalidate option is set true",
-    async () => {
-      let count = 0;
-      respondWith(undefined, undefined, undefined, (req, res) => {
-        count += 1;
-        res.setHeader("cache-control", "max-age=10000");
-        res.setHeader("etag", String(count));
-        res.body = count === 1 ? ["Hello World"] : ["Goodbye World"];
-      });
+  it("revalidates fresh cache entry when max-age request directive is exceeded when allow_revalidate option is set true", async () => {
+    let count = 0;
+    respondWith(undefined, undefined, undefined, (req, res) => {
+      count += 1;
+      res.setHeader("cache-control", "max-age=10000");
+      res.setHeader("etag", String(count));
+      res.body = count === 1 ? ["Hello World"] : ["Goodbye World"];
+    });
 
-      await get("/");
-      expect(H.response!.isOk).toBeTruthy();
-      expect(H.response!.body).toEqual("Hello World");
-      expect(H.cache!.trace).toContain("store");
+    await get("/");
+    expect(H.response!.isOk).toBeTruthy();
+    expect(H.response!.body).toEqual("Hello World");
+    expect(H.cache!.trace).toContain("store");
 
-      await get("/");
-      expect(H.response!.isOk).toBeTruthy();
-      expect(H.response!.body).toEqual("Hello World");
-      expect(H.cache!.trace).toContain("fresh");
+    await get("/");
+    expect(H.response!.isOk).toBeTruthy();
+    expect(H.response!.body).toEqual("Hello World");
+    expect(H.cache!.trace).toContain("fresh");
 
-      await get("/", { "rack-cache.allow_revalidate": true, HTTP_CACHE_CONTROL: "max-age=0" });
-      expect(H.response!.isOk).toBeTruthy();
-      expect(H.response!.body).toEqual("Goodbye World");
-      expect(H.cache!.trace).toContain("stale");
-      expect(H.cache!.trace).toContain("invalid");
-      expect(H.cache!.trace).toContain("store");
-    },
-  );
+    await get("/", { "rack-cache.allow_revalidate": true, HTTP_CACHE_CONTROL: "max-age=0" });
+    expect(H.response!.isOk).toBeTruthy();
+    expect(H.response!.body).toEqual("Goodbye World");
+    expect(H.cache!.trace).toContain("stale");
+    expect(H.cache!.trace).toContain("invalid");
+    expect(H.cache!.trace).toContain("store");
+  });
 
-  it(
-    "returns a stale cache entry when max-age request directive is exceeded " +
-      "when allow_revalidate and fault_tolerant options are set to true and " +
-      "the remote server returns a connection error",
-    async () => {
-      let count = 0;
-      respondWith(undefined, undefined, undefined, (req, res) => {
-        count += 1;
-        if (count === 2) throw new Timeout.Error("Connection failed");
-        res.setHeader("cache-control", "max-age=10000");
-        res.setHeader("etag", String(count));
-        res.body = count === 1 ? ["Hello World"] : ["Goodbye World"];
-      });
+  it("returns a stale cache entry when max-age request directive is exceeded when allow_revalidate and fault_tolerant options are set to true and the remote server returns a connection error", async () => {
+    let count = 0;
+    respondWith(undefined, undefined, undefined, (req, res) => {
+      count += 1;
+      if (count === 2) throw new Timeout.Error("Connection failed");
+      res.setHeader("cache-control", "max-age=10000");
+      res.setHeader("etag", String(count));
+      res.body = count === 1 ? ["Hello World"] : ["Goodbye World"];
+    });
 
-      await get("/");
-      expect(H.response!.isOk).toBeTruthy();
-      expect(H.response!.body).toEqual("Hello World");
-      expect(H.cache!.trace).toContain("store");
+    await get("/");
+    expect(H.response!.isOk).toBeTruthy();
+    expect(H.response!.body).toEqual("Hello World");
+    expect(H.cache!.trace).toContain("store");
 
-      await get("/", {
-        "rack-cache.allow_revalidate": true,
-        "rack-cache.fault_tolerant": true,
-        HTTP_CACHE_CONTROL: "max-age=0",
-      });
-      expect(H.response!.isOk).toBeTruthy();
-      expect(H.response!.body).toEqual("Hello World");
-      expect(H.cache!.trace).toContain("stale");
-      expect(H.cache!.trace).toContain("connnection_failed");
+    await get("/", {
+      "rack-cache.allow_revalidate": true,
+      "rack-cache.fault_tolerant": true,
+      HTTP_CACHE_CONTROL: "max-age=0",
+    });
+    expect(H.response!.isOk).toBeTruthy();
+    expect(H.response!.body).toEqual("Hello World");
+    expect(H.cache!.trace).toContain("stale");
+    expect(H.cache!.trace).toContain("connnection_failed");
 
-      await get("/", { "rack-cache.allow_revalidate": true, HTTP_CACHE_CONTROL: "max-age=0" });
-      expect(H.response!.isOk).toBeTruthy();
-      expect(H.response!.body).toEqual("Goodbye World");
-      expect(H.cache!.trace).toContain("stale");
-      expect(H.cache!.trace).toContain("invalid");
-      expect(H.cache!.trace).toContain("store");
-    },
-  );
+    await get("/", { "rack-cache.allow_revalidate": true, HTTP_CACHE_CONTROL: "max-age=0" });
+    expect(H.response!.isOk).toBeTruthy();
+    expect(H.response!.body).toEqual("Goodbye World");
+    expect(H.cache!.trace).toContain("stale");
+    expect(H.cache!.trace).toContain("invalid");
+    expect(H.cache!.trace).toContain("store");
+  });
 
   it("does not revalidate fresh cache entry when enable_revalidate option is set false (default)", async () => {
     let count = 0;

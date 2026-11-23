@@ -2822,17 +2822,27 @@ class TestExtractor
       left = traverse_for_string(node[1])
       right = traverse_for_string(node[2])
       left && right ? left + right : nil
+    when :binary
+      # `it 'a ' + 'b' do` (rack-cache/test/context_test.rb:292-293).
+      return traverse_children_for_string(node) unless node[2] == :+
+      left = traverse_for_string(node[1])
+      right = traverse_for_string(node[3])
+      left && right ? left + right : nil
     when :@tstring_content
       node[1]
     else
-      node.each do |child|
-        if child.is_a?(Array)
-          result = traverse_for_string(child)
-          return result if result
-        end
-      end
-      nil
+      traverse_children_for_string(node)
     end
+  end
+
+  def traverse_children_for_string(node)
+    node.each do |child|
+      if child.is_a?(Array)
+        result = traverse_for_string(child)
+        return result if result
+      end
+    end
+    nil
   end
 
   INTERPOLATION_PLACEHOLDER = "<expr>"

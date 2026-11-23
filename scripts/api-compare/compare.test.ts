@@ -4654,6 +4654,18 @@ describe("declarationOnlyInFile", () => {
       ),
     ).toBe(false);
   });
+
+  it("credits a define_method_macro entry, defined at run time on both sides", () => {
+    expect(
+      declarationOnlyInFile(
+        "options.ts",
+        "verbose",
+        new Map([["options.ts", new Map([["verbose", new Set(["Options"])]])]]),
+        new Map(),
+        "define_method_macro",
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("rubyMethodToTsForFqn", () => {

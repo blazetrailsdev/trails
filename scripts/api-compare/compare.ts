@@ -2510,6 +2510,11 @@ export function misplacedClusterVerdict(
  * is the same shape: `define_singleton_method` in Ruby and `defineModelCallbacks`
  * in TS, so `ActiveRecord::Callbacks::ClassMethods`' interface is its only
  * static form.
+ *
+ * A `define_method_macro` entry, a `define_method` a class's own macro runs
+ * (`Rack::Cache::Options.option_accessor`, `rack-cache/lib/rack/cache/options.rb:13-18`),
+ * is the same shape again: `optionAccessor` defines it with
+ * `Object.defineProperty`.
  */
 export function declarationOnlyInFile(
   tsFile: string,
@@ -2521,7 +2526,12 @@ export function declarationOnlyInFile(
 ): boolean {
   if (bodylessOwnersByFile.get(tsFile)?.has(name) !== true) return false;
   if (rubyNotes === "alias" && aliasNamesByFile?.get(tsFile)?.has(name) === true) return false;
-  if (rubyNotes === "register_detail" || rubyNotes === "define_model_callbacks") return false;
+  if (
+    rubyNotes === "register_detail" ||
+    rubyNotes === "define_model_callbacks" ||
+    rubyNotes === "define_method_macro"
+  )
+    return false;
   return bodiedOwnersByFile.get(tsFile)?.has(name) !== true;
 }
 
