@@ -438,6 +438,11 @@ describe("Mysql2::Client#initialize", () => {
     expect(config).not.toHaveProperty("strict");
     expect(config).not.toHaveProperty("readTimeout");
   });
+
+  it("connects over TCP when a host other than localhost is given with a socket", async () => {
+    const config = await driverConfig({ host: "db", socket: "/tmp/s" });
+    expect(config).not.toHaveProperty("socketPath");
+  });
 });
 
 describe("Mysql2::Error", () => {
