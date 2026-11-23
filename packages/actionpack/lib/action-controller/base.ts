@@ -215,7 +215,6 @@ import {
 
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
 
-/** @noRailsEquivalent PERMANENT */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface BaseHelpers {}
 
