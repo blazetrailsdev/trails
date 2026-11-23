@@ -23,9 +23,10 @@ export default defineConfig({
   base: `${siteBase}/docs/`,
   outDir: "../build/docs",
   cleanUrls: true,
+  appearance: false,
 
   themeConfig: {
-    siteTitle: "BlazeTrails",
+    siteTitle: false,
     nav: [
       { text: "Docs", link: "/" },
       { text: "Guides", link: "/guides/" },

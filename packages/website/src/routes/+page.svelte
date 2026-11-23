@@ -2,6 +2,7 @@
   import "@fontsource-variable/bricolage-grotesque";
   import "@fontsource-variable/instrument-sans";
   import "@fontsource-variable/jetbrains-mono";
+  import "$lib/brand.css";
   import { base } from "$app/paths";
   import { LANDING_TILES as tiles } from "$lib/landing-tiles";
 
@@ -174,13 +175,13 @@
 
 <style>
   .page {
-    --orange: #e8590c;
-    --mango: #f2b01e;
-    --ink: #2b1d14;
-    --tint: #fdf1d6;
-    --display: "Bricolage Grotesque Variable", "Helvetica Neue", Arial, sans-serif;
-    --sans: "Instrument Sans Variable", "Helvetica Neue", Arial, system-ui, sans-serif;
-    --mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --orange: var(--bt-orange);
+    --mango: var(--bt-mango);
+    --ink: var(--bt-ink);
+    --tint: var(--bt-tint);
+    --display: var(--bt-font-display);
+    --sans: var(--bt-font-sans);
+    --mono: var(--bt-font-mono);
     background: #fff;
     color: var(--ink);
     font: 21px/1.45 var(--sans);
@@ -205,7 +206,7 @@
   .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--ink); }
   .blaze { color: var(--orange); }
   .trails { position: relative; display: inline-block; padding-bottom: 0.16em; }
-  .trails::after { content: ""; position: absolute; left: 0; right: 0.04em; bottom: -0.02em; height: 0.16em; background: var(--mango); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 20 1, 32 9, 50 5 S 82 1, 98 6 S 114 7, 118 3' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 20 1, 32 9, 50 5 S 82 1, 98 6 S 114 7, 118 3' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
+  .trails::after { content: ""; position: absolute; left: 0; right: 0.04em; bottom: -0.02em; height: 0.16em; background: var(--mango); -webkit-mask: var(--bt-wordmark-underline) center / 100% 100% no-repeat; mask: var(--bt-wordmark-underline) center / 100% 100% no-repeat; }
 
   .hero { padding: 40px 24px 80px; }
   .lede { font-size: 30px; line-height: 1.3; max-width: 700px; margin: 0 auto 1.5rem; }
