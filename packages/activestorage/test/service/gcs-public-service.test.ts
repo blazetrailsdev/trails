@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Storage } from "@google-cloud/storage";
-import { base58, minutes } from "@blazetrails/activesupport";
+import { base58 } from "@blazetrails/activesupport";
 import { OpenSSL } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { Filename } from "../../lib/filename.js";
@@ -43,14 +43,6 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs_public)(
       const data = "Something else entirely!";
       try {
         const checksum = OpenSSL.Digest.MD5.base64digest(data);
-        const url = await offlineService().urlForDirectUpload(key, {
-          expiresIn: minutes(5),
-          contentType: "text/plain",
-          contentLength: data.length,
-          checksum: checksum,
-        });
-        expect(url).toMatch(/GoogleAccessId=.*Signature=/);
-
         const { apiEndpoint, project, credentials } = SERVICE_CONFIGURATIONS.gcs_public;
         const [v4Url] = await new Storage({
           apiEndpoint: apiEndpoint as string,

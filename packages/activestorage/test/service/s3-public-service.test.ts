@@ -45,6 +45,12 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3_public)(
       });
 
       expect(url).toMatch(new RegExp(`${ctx.service.bucket}/${ctx.key}`));
+
+      const { host, pathname } = new URL(url);
+      const response = await fetch(
+        `${String(SERVICE_CONFIGURATIONS.s3_public.endpoint)}/${host}${pathname}`,
+      );
+      expect(String(response.status)).toBe("200");
     });
 
     it("direct upload", async () => {
