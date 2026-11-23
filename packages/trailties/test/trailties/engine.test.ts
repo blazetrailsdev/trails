@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/activerecord";
 import {
   constGet,
+  rbFRequireFile,
   Dir,
   File,
   FileUtils,
@@ -22,6 +23,7 @@ import {
 import type { Bukkit, Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { Methods } from "@blazetrails/rack-test";
+import { Task } from "@blazetrails/rake";
 import { Engine } from "../../lib/engine.js";
 import { Trails } from "../../lib/trails.js";
 import { env, rbFSend, setEnv } from "@blazetrails/ruby-compat";
@@ -73,6 +75,16 @@ export class ${mod}Engine extends Engine {
 }
 `;
 
+const bukkitController = `import { ActionController } from "@blazetrails/actionpack";
+export class BukkitController extends ActionController.Base {
+  async index() {}
+}
+`;
+
+type ActionControllerClass = {
+  action(name: string): (env: unknown) => Promise<[number, unknown, { body: string }]>;
+};
+
 const migrationSource = (klass: string, body = ""): string => `
 import { Migration } from "@blazetrails/activerecord";
 export class ${klass} extends Migration.Current {${body}}
@@ -88,6 +100,7 @@ describe("EngineTest", () => {
 
     plugin = await t.engine("bukkits", async (plugin) => {
       await plugin.write("lib/bukkits.ts", engineSource("bukkits", "Bukkits", "bukkits"));
+      await plugin.write("lib/another.ts", "export class Another {}\n");
     });
   });
 
@@ -523,6 +536,147 @@ Trails.application!.routes().draw(function () {
       expect(t.lastResponse().body.trim()).toBe("Bukkit's foo partial");
     },
   );
+
+  it("no rake task without migrations", { timeout: 240_000 }, async () => {
+    await t.bootTrails();
+    await Trails.application!.loadTasks();
+    expect(Task.isTaskDefined("bukkits:install:migrations")).toBe(false);
+  });
+
+  it("puts its lib directory on load path", { timeout: 240_000 }, async () => {
+    await t.bootTrails();
+    await rbFRequireFile("another");
+    expect((constGet(TopLevel, "Another") as { name: string }).name).toBe("Another");
+  });
+
+  it("when the bootstrap hook runs, autoload paths are set", { timeout: 240_000 }, async () => {
+    globals.testAutoloadOncePaths = [];
+    globals.testAutoloadPaths = [];
+
+    await t.addToConfig(`
+    // Unrealistic configuration, but keeps the test simple.
+    this.config.autoloadOncePaths.push(${JSON.stringify(`${await t.appPath()}/app/helpers`)});
+
+    this.initializer("inspect autoload paths", { after: "bootstrap_hook" }, async () => {
+      const { Dependencies } = (await import("@blazetrails/activesupport"));
+      const { TopLevel } = (await import("@blazetrails/ruby-compat"));
+      const globals = TopLevel as Record<string, string[]>;
+      globals.testAutoloadOncePaths = [...globals.testAutoloadOncePaths, ...Dependencies.autoloadOncePaths];
+      globals.testAutoloadPaths = [...globals.testAutoloadPaths, ...Dependencies.autoloadPaths];
+    });
+`);
+
+    await t.bootTrails();
+
+    expect(globals.testAutoloadOncePaths).toContain(`${await t.appPath()}/app/helpers`);
+    expect(globals.testAutoloadPaths).toContain(`${await t.appPath()}/app/controllers`);
+  });
+
+  it("puts its models directory on autoload path", { timeout: 240_000 }, async () => {
+    await plugin.write("app/models/my-bukkit.ts", "export class MyBukkit {}");
+    await t.bootTrails();
+    expect(() => constGet(TopLevel, "MyBukkit")).not.toThrow();
+  });
+
+  it("puts its controllers directory on autoload path", { timeout: 240_000 }, async () => {
+    await plugin.write("app/controllers/bukkit-controller.ts", "export class BukkitController {}");
+    await t.bootTrails();
+    expect(() => constGet(TopLevel, "BukkitController")).not.toThrow();
+  });
+
+  it("can draw routes in app routes from engines", { timeout: 240_000 }, async () => {
+    await plugin.write(
+      "config/routes/testing.ts",
+      `import type { Mapper } from "@blazetrails/actionpack/action-dispatch/routing/mapper.js";
+export function drawRoutes(this: Mapper) {
+  this.get("/testing", { to: "test#action", as: "testing" });
+}
+`,
+    );
+
+    await plugin.write(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.routes().draw(function () {
+  this.draw("testing");
+});
+`,
+    );
+
+    await plugin.write(
+      "app/controllers/testing-controller.ts",
+      `import { ActionController } from "@blazetrails/actionpack";
+export class TestingController extends ActionController.Base {
+  async index() {
+    await this.render({ plain: "test" });
+  }
+}
+`,
+    );
+
+    await t.bootTrails();
+
+    await t.get("/testing");
+
+    expect(t.lastResponse().body).toBe("test");
+  });
+
+  it("adds its views to view paths", { timeout: 240_000 }, async () => {
+    await plugin.write("app/controllers/bukkit-controller.ts", bukkitController);
+
+    await plugin.write("app/views/bukkit/index.html.tse", "Hello bukkits\n");
+
+    await t.bootTrails();
+
+    const BukkitController = constGet(TopLevel, "BukkitController") as ActionControllerClass;
+    const response = await BukkitController.action("index")(MockRequest.envFor("/"));
+    expect(response[2].body).toBe("Hello bukkits\n");
+  });
+
+  it(
+    "adds its views to view paths with lower priority than app ones",
+    { timeout: 240_000 },
+    async () => {
+      await plugin.write("app/controllers/bukkit-controller.ts", bukkitController);
+
+      await plugin.write("app/views/bukkit/index.html.tse", "Hello bukkits\n");
+      await t.appFile("app/views/bukkit/index.html.tse", "Hi bukkits\n");
+
+      await t.bootTrails();
+
+      const BukkitController = constGet(TopLevel, "BukkitController") as ActionControllerClass;
+      const response = await BukkitController.action("index")(MockRequest.envFor("/"));
+      expect(response[2].body).toBe("Hi bukkits\n");
+    },
+  );
+
+  it("adds helpers to controller views", { timeout: 240_000 }, async () => {
+    await plugin.write("app/controllers/bukkit-controller.ts", bukkitController);
+
+    await plugin.write(
+      "app/helpers/bukkit-helper.ts",
+      `export const BukkitHelper = {
+  bukkits() {
+    return "bukkits";
+  },
+};
+`,
+    );
+
+    await plugin.write("app/views/bukkit/index.html.tse", "Hello <%= this.bukkits() %>\n");
+
+    await t.bootTrails();
+
+    const BukkitController = constGet(TopLevel, "BukkitController") as ActionControllerClass;
+    const response = await BukkitController.action("index")(MockRequest.envFor("/"));
+    expect(response[2].body).toBe("Hello bukkits\n");
+  });
+
+  it("autoload any path under app", { timeout: 240_000 }, async () => {
+    await plugin.write("app/anything/foo.ts", "export const Foo = {};\n");
+    await t.bootTrails();
+    expect(constGet(TopLevel, "Foo")).toBeTruthy();
+  });
 });
 
 const fixtureRoot = new URL("../fixtures/initializer-engine", import.meta.url).pathname;
