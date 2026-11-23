@@ -226,12 +226,22 @@ async function start(): Promise<void> {
   await navigator.serviceWorker.register("/sw.js", { scope: "/" });
   await navigator.serviceWorker.ready;
   if (!navigator.serviceWorker.controller) {
-    await new Promise((resolve) =>
-      navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true }),
-    );
+    const claimed = await new Promise<boolean>((resolve) => {
+      navigator.serviceWorker.addEventListener("controllerchange", () => resolve(true), {
+        once: true,
+      });
+      setTimeout(() => resolve(false), 2000);
+    });
+    if (!claimed) {
+      location.reload();
+      return;
+    }
   }
   open(current in files ? current : Object.keys(files)[0]);
   restart();
 }
 
-void start();
+start().catch((e: unknown) => {
+  statusEl.textContent = "Could not start";
+  log("error", String(e));
+});

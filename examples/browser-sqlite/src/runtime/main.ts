@@ -93,8 +93,8 @@ const cookies = new CookieJar(files.cookies ?? {});
 
 let serialize: Promise<unknown> = Promise.resolve();
 function serially<T>(fn: () => Promise<T>): Promise<T> {
-  const run = serialize.then(fn);
-  serialize = run.catch(() => undefined);
+  const run = serialize.then(fn, fn);
+  serialize = run;
   return run;
 }
 

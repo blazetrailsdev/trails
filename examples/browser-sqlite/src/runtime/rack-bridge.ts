@@ -1,17 +1,5 @@
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
-
-class StringIO {
-  constructor(private data = "") {}
-  read(): string {
-    return this.data;
-  }
-  write(s: string): void {
-    this.data += s;
-  }
-  string(): string {
-    return this.data;
-  }
-}
+import { StringIO } from "@blazetrails/ruby-compat";
 
 /** The Rack env for a request the service worker forwarded, mounted at `scriptName`. */
 export function rackEnv(
@@ -24,7 +12,6 @@ export function rackEnv(
   const url = new URL(href);
   const path = decodeURI(url.pathname);
   const pathInfo = path.startsWith(scriptName) ? path.slice(scriptName.length) || "/" : path;
-  const input = body ? new TextDecoder().decode(body) : "";
   const env: RackEnv = {
     REQUEST_METHOD: method.toUpperCase(),
     SCRIPT_NAME: scriptName,
@@ -37,7 +24,7 @@ export function rackEnv(
     HTTPS: url.protocol === "https:" ? "on" : "off",
     REMOTE_ADDR: "127.0.0.1",
     "rack.url_scheme": url.protocol.slice(0, -1),
-    "rack.input": new StringIO(input),
+    "rack.input": new StringIO(new Uint8Array(body ?? new ArrayBuffer(0))),
     "rack.errors": new StringIO(),
   };
   if (body) env.CONTENT_LENGTH = String(body.byteLength);

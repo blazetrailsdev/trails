@@ -74,13 +74,16 @@ export async function openDatabaseAsync(name: string) {
     }
   }
 
+  const totalChanges = () => Number(database.exec("SELECT total_changes()")[0].values[0][0]);
+
   function execute<T>(stmt: Statement, params: Params | undefined, shape: "raw" | "object") {
+    const before = totalChanges();
     stmt.reset();
     const bound = convert(params ?? []);
     if (hasParams(bound)) stmt.bind(bound);
     const rows: T[] = [];
     while (stmt.step()) rows.push((shape === "raw" ? stmt.get() : stmt.getAsObject()) as T);
-    const changes = database.getRowsModified();
+    const changes = totalChanges() === before ? 0 : database.getRowsModified();
     stmt.reset();
     return result(rows, changes, lastInsertRowId());
   }

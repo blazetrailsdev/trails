@@ -1343,6 +1343,15 @@ export default defineConfig(
     },
   },
   {
+    files: ["examples/browser-sqlite/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: false }],
+      "blazetrails/constructor-creates-no-promise": "error",
+      "blazetrails/no-swallowed-rejection": "error",
+      "blazetrails/no-floating-maybe-promise": "error",
+    },
+  },
+  {
     files: [
       "packages/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
       "scripts/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
