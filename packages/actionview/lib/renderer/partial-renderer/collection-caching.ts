@@ -1,4 +1,4 @@
-import { MemoryStore, SafeBuffer, indexWith } from "@blazetrails/activesupport";
+import { MemoryStore, SafeBuffer, indexWith, isPlainObject } from "@blazetrails/activesupport";
 import type { CacheStore } from "@blazetrails/activesupport";
 import { Hash, hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
@@ -161,7 +161,12 @@ export async function fetchOrCachePartial(
   });
 
   if (entriesToWrite.size !== 0) {
-    await collectionCache().writeMulti(entriesToWrite);
+    const cached = this.options.cached;
+    if (isPlainObject(cached) && Object.hasOwn(cached, "expiresIn")) {
+      await collectionCache().writeMulti(entriesToWrite, { expiresIn: cached.expiresIn as number });
+    } else {
+      await collectionCache().writeMulti(entriesToWrite);
+    }
   }
 
   return keyedPartials;

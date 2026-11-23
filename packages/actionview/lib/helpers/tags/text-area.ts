@@ -35,7 +35,7 @@ export class TextArea extends Base {
 
   override render(): unknown {
     const options = stringifyKeys(this._options);
-    this.addDefaultNameAndId(options);
+    this.addDefaultNameAndField(options);
 
     const size = hashDelete(options, "size");
     if (size != null && size !== false) {

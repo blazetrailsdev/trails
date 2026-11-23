@@ -85,18 +85,11 @@ export class Label extends Base {
   override render(block?: (builder: LabelBuilder) => unknown): unknown {
     const options = stringifyKeys(this._options);
     const tagValue = hashDelete(options, "value");
-    const nameAndId = { ...options };
 
-    if (nameAndId["for"] != null && nameAndId["for"] !== false) {
-      nameAndId["id"] = nameAndId["for"];
-    } else {
-      delete nameAndId["id"];
-    }
-
-    this.addDefaultNameAndIdForValue(tagValue, nameAndId);
+    this.addDefaultNameAndFieldForValue(tagValue, options, "for");
     delete options["index"];
+    delete options["name"];
     delete options["namespace"];
-    if (!Object.hasOwn(options, "for")) options["for"] = nameAndId["id"];
 
     const builder = new LabelBuilder(
       this._templateObject,
@@ -116,9 +109,9 @@ export class Label extends Base {
     }
 
     if (content instanceof Promise) {
-      return content.then((content) => this.labelTag(nameAndId["id"], content, options));
+      return content.then((content) => this.labelTag(options["for"], content, options));
     }
-    return this.labelTag(nameAndId["id"], content, options);
+    return this.labelTag(options["for"], content, options);
   }
 
   private renderComponent(builder: LabelBuilder): unknown {
