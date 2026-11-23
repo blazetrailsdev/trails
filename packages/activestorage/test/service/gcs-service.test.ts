@@ -243,7 +243,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
         contentType: "text/html",
         filename: new Filename("test.html"),
       });
-      const response = await fetch(url);
+      const response = await fetch(url.replace("//localhost:", "//127.0.0.1:"));
       expect(response.headers.get("Content-Type")?.split(";")[0]).toBe("text/plain");
       expect((await storedMetadata(key)).contentDisposition).toMatch(/attachment;.*test.txt/);
     } finally {
@@ -266,7 +266,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
         contentType: "text/html",
         filename: new Filename("test.html"),
       });
-      const response = await fetch(url);
+      const response = await fetch(url.replace("//localhost:", "//127.0.0.1:"));
       expect(response.headers.get("Content-Type")?.split(";")[0]).toBe("text/plain");
       expect(decodeURIComponent(url)).toMatch(/response-content-disposition=inline;.*test.html/);
     } finally {
@@ -313,7 +313,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
         contentType: "text/html",
         filename: new Filename("test.html"),
       });
-      await fetch(url);
+      await fetch(url.replace("//localhost:", "//127.0.0.1:"));
       expect(((await storedMetadata(key)).metadata as Record<string, unknown>).foo).toBe("baz");
     } finally {
       await ctx.service.delete(key);
@@ -344,7 +344,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
         contentType: "text/html",
         filename: new Filename("test.html"),
       });
-      const response = await fetch(url);
+      const response = await fetch(url.replace("//localhost:", "//127.0.0.1:"));
       expect(response.headers.get("Content-Type")?.split(";")[0]).toBe("text/plain");
       expect((await storedMetadata(key)).contentDisposition).toMatch(/inline;.*test.txt/);
       expect(((await storedMetadata(key)).metadata as Record<string, unknown>).foo).toBe("bar");
