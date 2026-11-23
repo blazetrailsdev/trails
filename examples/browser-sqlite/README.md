@@ -14,7 +14,9 @@ pnpm smoke   # headless Chromium: boot, create a post through the form, edit a v
 
 The app (`template/`) is a small blog, laid out the way `trails generate scaffold` lays one out
 and styled with the trails website's brand (orange and mango, Bricolage Grotesque, Instrument
-Sans and Fira Code), light or dark by the browser's color scheme. It runs unchanged under Node. It exercises:
+Sans and Fira Code), light or dark by the browser's color scheme. The layout loads its fonts from Google Fonts on purpose: it is ordinary app code that renders the same
+under Node, and the editor's bundled fonts are not assets the app serves. Offline, the preview falls
+back to system fonts. It runs unchanged under Node. It exercises:
 
 - **Routing**: `root`, `resources("posts")` with all seven actions, and `comments` nested under
   posts (`only: ["create", "destroy"]`)
