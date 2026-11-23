@@ -28,19 +28,6 @@
       }
     ],
     "activemodel": [],
-    "arel": [
-      {
-        "name": "Node",
-        "methods": ["toSql"],
-        "rubyFile": "nodes/node.rb",
-        "tsFile": "nodes/node.ts"
-      },
-      {
-        "name": "TreeManager",
-        "methods": ["toSql"],
-        "rubyFile": "tree_manager.rb",
-        "tsFile": "tree-manager.ts"
-      }
-    ]
+    "arel": []
   }
 }

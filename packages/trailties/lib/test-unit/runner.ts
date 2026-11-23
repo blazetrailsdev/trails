@@ -82,7 +82,10 @@ export class Runner {
     return success || exit(false);
   }
 
-  /** @inventedArm rbFSystem — PERMANENT */
+  /**
+   * @inventedArm rbFSystem — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   static async run(argv: string[] = []): Promise<void> {
     const tests = await this.loadTests(argv);
     this.rejectUnknownOptions(argv);
@@ -95,7 +98,7 @@ export class Runner {
       verbose ? { TRAILS_TEST_VERBOSE: "1" } : {},
       "vitest",
       "run",
-      ...(locations.length > 0 ? locations : ["--passWithNoTests", "test/.none"]),
+      ...(locations.length > 0 ? locations : ["--passWithNoTests", "../../.none"]),
       ...(name != null && !lineFiltered ? ["-t", name.source] : []),
       ...(argv.includes("-f") || argv.includes("--fail-fast") ? ["--bail", "1"] : []),
       "--reporter",
