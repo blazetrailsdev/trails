@@ -2172,6 +2172,9 @@ importers:
       '@blazetrails/thor':
         specifier: workspace:*
         version: link:../../packages/thor
+      '@blazetrails/trails':
+        specifier: workspace:*
+        version: link:../../packages/trails
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../../packages/trails-tsc

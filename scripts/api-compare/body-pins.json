@@ -68915,8 +68915,8 @@
     "package": "activesupport",
     "rubyFile": "cache/redis_cache_store.rb",
     "rubyName": "initialize",
-    "digest": "e3756a090bea6f36",
-    "ref": "v8.0.2"
+    "digest": "3a3c2ac2512e7c07",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -69923,8 +69923,8 @@
     "package": "activesupport",
     "rubyFile": "core_ext/class/attribute.rb",
     "rubyName": "class_attribute",
-    "digest": "d9c00f28b78caf86",
-    "ref": "v8.0.2"
+    "digest": "2d37f19ebf0d4f70",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -70720,6 +70720,13 @@
   {
     "package": "activesupport",
     "rubyFile": "core_ext/enumerable.rb",
+    "rubyName": "compact_blank!",
+    "digest": "6d797e82dc744588",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "activesupport",
+    "rubyFile": "core_ext/enumerable.rb",
     "rubyName": "exclude?",
     "digest": "7c785641590ce0eb",
     "ref": "v8.0.2"
@@ -70798,8 +70805,8 @@
     "package": "activesupport",
     "rubyFile": "core_ext/enumerable.rb",
     "rubyName": "sole",
-    "digest": "9005e54e42d64b9b",
-    "ref": "v8.0.2"
+    "digest": "3ba87c53b6d4cb4f",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
