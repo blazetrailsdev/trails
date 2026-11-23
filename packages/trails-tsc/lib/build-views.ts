@@ -136,7 +136,12 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   if (shimPaths.length > 0) {
     const host = cachingHost();
     const helperFiles = helpers.map((file) => path.join(appDir, "helpers", file));
-    const roots = [...shimPaths, ...controllers.map((c) => c.file), ...helperFiles];
+    const roots = [
+      ...shimPaths,
+      ...controllers.map((c) => c.file),
+      ...mailers.classes.map((m) => m.file),
+      ...helperFiles,
+    ];
     let program = ts.createProgram(roots, EMIT_OPTIONS, host);
     for (
       let pass = 0;
