@@ -237,9 +237,6 @@ export { eachCurrentEnvironment } from "./tasks/database-tasks.js";
 export { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
 export { PostgreSQLDatabaseTasks } from "./tasks/postgresql-database-tasks.js";
 export { MySQLDatabaseTasks } from "./tasks/mysql-database-tasks.js";
-import "./tasks/sqlite-database-tasks.js";
-import "./tasks/postgresql-database-tasks.js";
-import "./tasks/mysql-database-tasks.js";
 export {
   Migrator,
   UnknownMigrationVersionError,

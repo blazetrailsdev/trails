@@ -4,7 +4,6 @@ import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
-import { DatabaseTasks } from "./database-tasks.js";
 import { Tasks } from "../namespaces.js";
 
 type ConfigHash = Record<string, unknown>;
@@ -151,5 +150,3 @@ export class MySQLDatabaseTasks {
 }
 
 Tasks.MySQLDatabaseTasks = MySQLDatabaseTasks;
-DatabaseTasks.registerTask(/mysql/, MySQLDatabaseTasks);
-DatabaseTasks.registerTask(/trilogy/, MySQLDatabaseTasks);

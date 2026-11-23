@@ -1,0 +1,5 @@
+@blazetrails/globalid
+=====================
+
+This package is a TypeScript port of Rails' globalid gem
+(https://github.com/rails/globalid), licensed under the MIT License.
