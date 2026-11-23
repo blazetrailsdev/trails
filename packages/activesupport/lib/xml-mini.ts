@@ -6,7 +6,6 @@ import { LoadError, StringIO } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Time as RubyTime } from "@blazetrails/date";
 import { Duration } from "./duration.js";
 import { utc as dateTimeUtc } from "./core-ext/date-time/calculations.js";
-import { ArgumentError } from "./hash-utils.js";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { toF, toI } from "./core-ext/string/conversions.js";
 import { Psych } from "@blazetrails/ruby-compat/psych";
@@ -102,7 +101,7 @@ export const PARSING: Record<
       return toD(number);
     }
     if (typeof number === "number" && !Number.isInteger(number)) {
-      throw new ArgumentError("can't omit precision for a Float.");
+      return new BigDecimal(number, 0);
     }
     return new BigDecimal(number as string | number | bigint);
   },

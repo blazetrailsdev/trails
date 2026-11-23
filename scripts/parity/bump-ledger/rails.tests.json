@@ -26,14 +26,6 @@
   {
     "package": "activerecord",
     "rubyFile": "finder_test.rb",
-    "path": "FinderTest > find one message with custom primary key",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "finder_test.rb",
     "path": "FinderTest > find some message with custom primary key",
     "kind": "changed",
     "from": "v8.0.2",
@@ -51,62 +43,6 @@
     "package": "activerecord",
     "rubyFile": "primary_keys_test.rb",
     "path": "PrimaryKeyIntegerNilDefaultTest > schema dump primary key integer with default nil",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "hash_with_indifferent_access_test.rb",
-    "path": "HashWithIndifferentAccessTest > indifferent transform keys",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "hash_with_indifferent_access_test.rb",
-    "path": "HashWithIndifferentAccessTest > indifferent transform keys bang",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "number_helper_test.rb",
-    "path": "NumberHelperTest > to delimited",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "safe_buffer_test.rb",
-    "path": "SafeBufferTest > Should preserve html_safe? status on multiplication",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "test_case_test.rb",
-    "path": "AssertionsTest > assert changes message with lambda",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "test_case_test.rb",
-    "path": "AssertionsTest > assert changes with to option but no change has special message",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "xml_mini_test.rb",
-    "path": "ParsingTest > decimal",
     "kind": "changed",
     "from": "v8.0.2",
     "to": "v8.0.5.2"

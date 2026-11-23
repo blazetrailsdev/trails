@@ -48,38 +48,44 @@ class CustomLogger {
     return true;
   }
 
-  debug(message: unknown): void {
-    this.add(Logger.DEBUG, message);
+  debug(message: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.DEBUG, message, null, block);
   }
 
-  info(message: unknown): void {
-    this.add(Logger.INFO, message);
+  info(message: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.INFO, message, null, block);
   }
 
-  warn(message: unknown): void {
-    this.add(Logger.WARN, message);
+  warn(message: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.WARN, message, null, block);
   }
 
-  error(message: unknown): void {
-    this.add(Logger.ERROR, message);
+  error(message: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.ERROR, message, null, block);
   }
 
-  fatal(message: unknown): void {
-    this.add(Logger.FATAL, message);
+  fatal(message: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.FATAL, message, null, block);
   }
 
-  unknown(message: unknown): void {
-    this.add(Logger.UNKNOWN, message);
+  unknown(message: unknown = null, block?: () => unknown): boolean {
+    return this.add(Logger.UNKNOWN, message, null, block);
   }
 
   append(x: string): void {
     this.chevrons.push(x);
   }
 
-  add(messageLevel: number, message: unknown = null, progname: unknown = null): void {
+  add(
+    messageLevel: number,
+    message: unknown = null,
+    progname: unknown = null,
+    block?: () => unknown,
+  ): boolean {
     if (messageLevel >= (this.localLevel as number)) {
-      this.adds.push([messageLevel, message ?? null, progname ?? null]);
+      this.adds.push([messageLevel, block !== undefined ? block() : message, progname ?? null]);
     }
+    return true;
   }
 
   isDebug(): boolean {
@@ -123,35 +129,35 @@ class FakeLogger extends CustomLogger {
 }
 
 class KwargsAcceptingLogger extends CustomLogger {
-  override debug(message: unknown, kwargs: unknown = {}): void {
-    this.add(Logger.DEBUG, `${inspect(kwargs)} ${message}`);
+  override debug(message: unknown, kwargs: unknown = {}): boolean {
+    return this.add(Logger.DEBUG, `${inspect(kwargs)} ${message}`);
   }
 
-  override info(message: unknown, kwargs: unknown = {}): void {
-    this.add(Logger.INFO, `${inspect(kwargs)} ${message}`);
+  override info(message: unknown, kwargs: unknown = {}): boolean {
+    return this.add(Logger.INFO, `${inspect(kwargs)} ${message}`);
   }
 
-  override warn(message: unknown, kwargs: unknown = {}): void {
-    this.add(Logger.WARN, `${inspect(kwargs)} ${message}`);
+  override warn(message: unknown, kwargs: unknown = {}): boolean {
+    return this.add(Logger.WARN, `${inspect(kwargs)} ${message}`);
   }
 
-  override error(message: unknown, kwargs: unknown = {}): void {
-    this.add(Logger.ERROR, `${inspect(kwargs)} ${message}`);
+  override error(message: unknown, kwargs: unknown = {}): boolean {
+    return this.add(Logger.ERROR, `${inspect(kwargs)} ${message}`);
   }
 
-  override fatal(message: unknown, kwargs: unknown = {}): void {
-    this.add(Logger.FATAL, `${inspect(kwargs)} ${message}`);
+  override fatal(message: unknown, kwargs: unknown = {}): boolean {
+    return this.add(Logger.FATAL, `${inspect(kwargs)} ${message}`);
   }
 
-  override unknown(message: unknown, kwargs: unknown = {}): void {
-    this.add(Logger.UNKNOWN, `${inspect(kwargs)} ${message}`);
+  override unknown(message: unknown, kwargs: unknown = {}): boolean {
+    return this.add(Logger.UNKNOWN, `${inspect(kwargs)} ${message}`);
   }
 
-  override add(severity: number, message: unknown = null, kwargs: unknown = null): void {
+  override add(severity: number, message: unknown = null, kwargs: unknown = null): boolean {
     if (kwargs != null && typeof kwargs === "object") {
       return super.add(severity, `${inspect(kwargs)} ${message}`);
     }
-    super.add(severity, message);
+    return super.add(severity, message);
   }
 }
 
@@ -442,14 +448,31 @@ describe("BroadcastLoggerTest", () => {
     expect((logger as any).foo()).toBeTruthy();
   });
 
-  it("calling a method that accepts a block", () => {
-    const logger = new BroadcastLogger(asLogger(new CustomLogger()));
-
-    let called = false;
-    (logger as any).bar(() => {
-      called = true;
+  it("methods are called on each logger", () => {
+    let calls = 0;
+    const loggers = [new CustomLogger(), new FakeLogger(), new CustomLogger()];
+    loggers.forEach((logger) => {
+      Object.defineProperty(logger, "specialMethod", {
+        value: () => {
+          calls += 1;
+        },
+      });
     });
-    expect(called).toBeTruthy();
+    const logger = new BroadcastLogger(...loggers.map(asLogger));
+    (logger as any).specialMethod();
+    expect(calls).toEqual(3);
+  });
+
+  it("calling a method that accepts a block is yielded only once", () => {
+    let called = 0;
+    logger.info(null, () => {
+      called += 1;
+      return "Hello";
+    });
+
+    expect(called, "block should be called just once").toEqual(1);
+    expect(log1.adds).toEqual([[Logger.INFO, "Hello", null]]);
+    expect(log2.adds).toEqual([[Logger.INFO, "Hello", null]]);
   });
 
   it("calling a method that accepts args", () => {

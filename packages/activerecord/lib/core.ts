@@ -24,6 +24,7 @@ import {
   filterMap,
   rbObjRespondTo,
   inherited,
+  rbInspect,
 } from "@blazetrails/ruby-compat";
 import {
   NameError,
@@ -855,7 +856,7 @@ export async function find(this: typeof Base, ...ids: unknown[]): Promise<any> {
   const record = await cachedFindBy.call(this, [primaryKey], [id]);
   if (record) return record;
   throw new RecordNotFound(
-    `Couldn't find ${this.name} with '${primaryKey}'=${String(id)}`,
+    `Couldn't find ${this.name} with '${primaryKey}'=${rbInspect(id)}`,
     this.name,
     primaryKey,
     id,

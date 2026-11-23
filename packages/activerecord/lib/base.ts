@@ -1383,6 +1383,7 @@ export class Base extends Model {
     this._alreadyCalled = null;
 
     this._startTransactionState = null;
+    this._lastTransactionReturnStatus = null;
     this._committedAlreadyCalled = null;
     this._newRecordBeforeLastCommit = null;
 
@@ -1797,6 +1798,8 @@ export interface Base
   _destroyedByAssociation: unknown;
   /** @internal */
   _startTransactionState?: _Transactions.TransactionRecordState | null;
+  /** @internal */
+  _lastTransactionReturnStatus?: unknown;
   /** @internal */
   _committedAlreadyCalled?: boolean | null;
   /** @internal */

@@ -815,7 +815,7 @@ describe("FinderTest", () => {
     }
     await expect(MercedesCar.find("Hello World!")).rejects.toThrow(RecordNotFound);
     const e = await MercedesCar.find("Hello World!").catch((err: unknown) => err);
-    expect((e as Error).message).toBe("Couldn't find MercedesCar with 'name'=Hello World!");
+    expect((e as Error).message).toBe("Couldn't find MercedesCar with 'name'=\"Hello World!\"");
   });
 
   it("find some message with custom primary key", async () => {

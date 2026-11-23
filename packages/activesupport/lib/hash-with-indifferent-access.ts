@@ -216,9 +216,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   dup(): HashWithIndifferentAccess<V> {
-    const newHash = new (this.constructor as typeof HashWithIndifferentAccess<V>)(this);
-    this.setDefaults(newHash);
-    return newHash;
+    return this.copyDefaults(new (this.constructor as typeof HashWithIndifferentAccess<V>)(this));
   }
 
   reverseMerge(otherHash: AnyObject | HashWithIndifferentAccess<V>): HashWithIndifferentAccess<V> {
@@ -334,18 +332,31 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.selectBang((k, v) => !block(k, v));
   }
 
+  transformKeys(): Enumerator;
   transformKeys(block: (key: string) => string): HashWithIndifferentAccess<V>;
   transformKeys(
     hash: AnyObject | null,
     block?: (key: string) => string,
   ): HashWithIndifferentAccess<V>;
   transformKeys(
-    hash: AnyObject | null | ((key: string) => string),
+    hash?: AnyObject | null | ((key: string) => string),
     block?: (key: string) => string,
-  ): HashWithIndifferentAccess<V> {
-    const dup = new HashWithIndifferentAccess<V>(this);
-    dup.transformKeysBang(hash as AnyObject | null, block);
-    return dup;
+  ): HashWithIndifferentAccess<V> | Enumerator {
+    if (arguments.length === 0) hash = NOT_GIVEN;
+    if (typeof hash === "function") {
+      block = hash;
+      hash = NOT_GIVEN;
+    }
+    const klass = this.constructor as typeof HashWithIndifferentAccess<V>;
+    if (NOT_GIVEN === hash) {
+      if (block) {
+        return new klass(super.transformKeys(block));
+      } else {
+        return toEnum(this, "transformKeys");
+      }
+    } else {
+      return new klass(super.transformKeys(hash as AnyObject, block));
+    }
   }
 
   transformKeysBang(): Enumerator;
@@ -360,21 +371,15 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       block = hash;
       hash = NOT_GIVEN;
     }
-    if (NOT_GIVEN === hash && !block) return toEnum(this, "transformKeysBang");
-
-    if (hash == null) {
-      throw new TypeError("no implicit conversion of nil into Hash");
-    } else if (NOT_GIVEN === hash) {
-      for (const key of [...this.keys()]) this.set(block!(key), this.delete(key));
-    } else if (block) {
-      for (const key of [...this.keys()]) {
-        this.set((hash[key] as string) || block(key), this.delete(key));
+    if (NOT_GIVEN === hash) {
+      if (block) {
+        return this.replace(this.copyDefaults(this.transformKeys(block)));
+      } else {
+        return toEnum(this, "transformKeysBang");
       }
     } else {
-      for (const key of [...this.keys()]) this.set((hash[key] as string) || key, this.delete(key));
+      return this.replace(this.copyDefaults(this.transformKeys(hash as AnyObject | null, block)));
     }
-
-    return this;
   }
 
   transformValues<W = V>(block: (value: V) => W): HashWithIndifferentAccess<W> {
@@ -566,8 +571,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   toHash(): Hash<string, unknown> | AnyObject {
     const copy = this.toH() as Hash<string, unknown> | AnyObject;
     transformValuesBang(copy, (v) => this.convertValueToHash(v as V));
-    if (copy instanceof Hash) this.setDefaults(copy);
-    return copy;
+    return copy instanceof Hash ? this.copyDefaults(copy) : copy;
   }
 
   toProc(): (key: string) => V | undefined {
@@ -631,13 +635,14 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     }
   }
 
-  private setDefaults(target: Hash<string, V> | Hash<string, unknown>): void {
+  private copyDefaults<T extends Hash<string, V> | Hash<string, unknown>>(target: T): T {
     const seat = target as Hash<string, V>;
     if (this.defaultProc()) {
       seat.setDefaultProc(this.defaultProc());
     } else {
       seat.setDefault(this.default());
     }
+    return target;
   }
 
   private convertValueToHash(value: V): unknown {

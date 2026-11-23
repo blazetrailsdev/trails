@@ -2,7 +2,6 @@ import { NoMethodError, rbObjDup, rbObjRespondTo } from "@blazetrails/ruby-compa
 import { include } from "@blazetrails/ruby-compat/include";
 import { Logger, type LogLevel } from "./logger.js";
 import { LoggerSilence } from "./logger-silence.js";
-import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";
 import { ActiveSupport } from "./namespaces.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerSilence` (`broadcast_logger.rb:75`); the class/interface merge is how `include()` surfaces on the type side.
@@ -10,8 +9,6 @@ export class BroadcastLogger {
   declare static silencer: boolean;
 
   public broadcasts: (Logger | BroadcastLogger)[];
-
-  protected _formatter: Logger["formatter"] = null;
 
   progname: unknown;
 
@@ -33,136 +30,176 @@ export class BroadcastLogger {
     return this;
   }
 
-  get level(): number {
-    return Math.min(...this.broadcasts.map((logger) => logger.level));
-  }
-
-  set level(level: number | LogLevel | string) {
-    this.dispatch((logger) => {
-      logger.level = level;
-    });
-  }
-
-  set sevThreshold(level: number | LogLevel | string) {
-    this.level = level;
-  }
-
-  set localLevel(value: number | LogLevel | null) {
-    this.dispatch((logger) => {
-      if ("localLevel" in logger) {
-        logger.localLevel = value;
-      }
+  set localLevel(level: number | LogLevel | null) {
+    this.broadcasts.forEach((logger) => {
+      if ("localLevel" in logger) logger.localLevel = level;
     });
   }
 
   get localLevel(): number | null {
-    return Object.getOwnPropertyDescriptor(
-      LoggerThreadSafeLevel.prototype,
-      "localLevel",
-    )!.get!.call(this) as number | null;
+    const loggers = this.broadcasts.filter((logger) => "localLevel" in logger);
+
+    return loggers.map((logger) => logger.localLevel)[0] ?? null;
   }
 
-  set formatter(value: Logger["formatter"]) {
-    this.dispatch((logger) => {
-      logger.formatter = value;
-    });
+  append(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.append(...(args as Parameters<Logger["append"]>)),
+      ...args,
+    );
+  }
 
-    this._formatter = value;
+  log(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.log(...(args as Parameters<Logger["add"]>)),
+      ...args,
+    );
+  }
+
+  add(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.add(...(args as Parameters<Logger["add"]>)),
+      ...args,
+    );
+  }
+
+  debug(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.debug(...(args as Parameters<Logger["debug"]>)),
+      ...args,
+    );
+  }
+
+  info(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.info(...(args as Parameters<Logger["info"]>)),
+      ...args,
+    );
+  }
+
+  warn(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.warn(...(args as Parameters<Logger["warn"]>)),
+      ...args,
+    );
+  }
+
+  error(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.error(...(args as Parameters<Logger["error"]>)),
+      ...args,
+    );
+  }
+
+  fatal(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.fatal(...(args as Parameters<Logger["fatal"]>)),
+      ...args,
+    );
+  }
+
+  unknown(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.unknown(...(args as Parameters<Logger["unknown"]>)),
+      ...args,
+    );
+  }
+
+  set level(level: number | LogLevel | string) {
+    this.dispatch((logger) => (logger.level = level));
+  }
+
+  set sevThreshold(level: number | LogLevel | string) {
+    this.dispatch((logger) => (logger.level = level));
+  }
+
+  close(): unknown {
+    return this.dispatch((logger) => logger.close());
   }
 
   get formatter(): Logger["formatter"] {
-    return this._formatter;
+    return this.dispatch((logger) => logger.formatter) as Logger["formatter"];
   }
 
-  add(...args: unknown[]): boolean {
-    return this.dispatch((logger) => logger.add(...(args as Parameters<Logger["add"]>)));
+  set formatter(formatter: Logger["formatter"]) {
+    this.dispatch((logger) => (logger.formatter = formatter));
   }
 
-  declare log: BroadcastLogger["add"];
-
-  debug(...args: unknown[]): boolean {
-    return this.dispatch((logger) => logger.debug(...(args as Parameters<Logger["debug"]>)));
-  }
-
-  info(...args: unknown[]): boolean {
-    return this.dispatch((logger) => logger.info(...(args as Parameters<Logger["info"]>)));
-  }
-
-  warn(...args: unknown[]): boolean {
-    return this.dispatch((logger) => logger.warn(...(args as Parameters<Logger["warn"]>)));
-  }
-
-  error(...args: unknown[]): boolean {
-    return this.dispatch((logger) => logger.error(...(args as Parameters<Logger["error"]>)));
-  }
-
-  fatal(...args: unknown[]): boolean {
-    return this.dispatch((logger) => logger.fatal(...(args as Parameters<Logger["fatal"]>)));
-  }
-
-  unknown(...args: unknown[]): boolean {
-    return this.dispatch((logger) => logger.unknown(...(args as Parameters<Logger["unknown"]>)));
+  get level(): number {
+    return Math.min(...this.broadcasts.map((logger) => logger.level));
   }
 
   isDebug(): boolean {
     return this.broadcasts.some((logger) => logger.isDebug());
   }
 
-  debugBang(): void {
-    this.dispatch((logger) => logger.debugBang());
+  /** @missingRailsArgs dispatch — PERMANENT */
+  debugBang(): unknown {
+    return this.dispatch((logger) => logger.debugBang());
   }
 
   isInfo(): boolean {
     return this.broadcasts.some((logger) => logger.isInfo());
   }
 
-  infoBang(): void {
-    this.dispatch((logger) => logger.infoBang());
+  /** @missingRailsArgs dispatch — PERMANENT */
+  infoBang(): unknown {
+    return this.dispatch((logger) => logger.infoBang());
   }
 
   isWarn(): boolean {
     return this.broadcasts.some((logger) => logger.isWarn());
   }
 
-  warnBang(): void {
-    this.dispatch((logger) => logger.warnBang());
+  /** @missingRailsArgs dispatch — PERMANENT */
+  warnBang(): unknown {
+    return this.dispatch((logger) => logger.warnBang());
   }
 
   isError(): boolean {
     return this.broadcasts.some((logger) => logger.isError());
   }
 
-  errorBang(): void {
-    this.dispatch((logger) => logger.errorBang());
+  /** @missingRailsArgs dispatch — PERMANENT */
+  errorBang(): unknown {
+    return this.dispatch((logger) => logger.errorBang());
   }
 
   isFatal(): boolean {
     return this.broadcasts.some((logger) => logger.isFatal());
   }
 
-  fatalBang(): void {
-    this.dispatch((logger) => logger.fatalBang());
-  }
-
-  close(): void {
-    this.dispatch((logger) => logger.close());
-  }
-
-  append(s: string): void {
-    this.dispatch((logger) => logger.append(s));
+  /** @missingRailsArgs dispatch — PERMANENT */
+  fatalBang(): unknown {
+    return this.dispatch((logger) => logger.fatalBang());
   }
 
   initializeCopy(other: BroadcastLogger): void {
     this.broadcasts = [];
     this.progname = rbObjDup(other.progname);
-    this._formatter = rbObjDup(other.formatter);
 
     this.broadcastTo(...other.broadcasts.map((logger) => rbObjDup(logger)));
   }
 
-  private dispatch(block: (logger: Logger | BroadcastLogger) => void): boolean {
-    this.broadcasts?.forEach((logger) => block(logger));
-    return true;
+  private dispatch(
+    method: (logger: Logger | BroadcastLogger, ...args: unknown[]) => unknown,
+    ...args: unknown[]
+  ): unknown {
+    const block = args.at(-1);
+    if (typeof block === "function") {
+      let called = false,
+        result: unknown = null;
+      args[args.length - 1] = (...blockArgs: unknown[]) => {
+        if (called) {
+          return result;
+        } else {
+          called = true;
+          return (result = block(...blockArgs));
+        }
+      };
+    }
+
+    return this.broadcasts.map((logger) => method(logger, ...args))[0] ?? null;
   }
 
   methodMissing(name: string, ...args: unknown[]): unknown {
@@ -193,8 +230,6 @@ export interface BroadcastLogger {
   silence<T>(severity?: number | LogLevel, fn?: (logger: this) => T): T | undefined;
 }
 include(BroadcastLogger, LoggerSilence);
-
-BroadcastLogger.prototype.log = BroadcastLogger.prototype.add;
 
 ActiveSupport.BroadcastLogger = BroadcastLogger;
 
