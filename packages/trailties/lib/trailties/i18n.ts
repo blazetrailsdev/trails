@@ -1,8 +1,8 @@
 import { I18n, OrderedOptions, isPlainObject, wrap } from "@blazetrails/activesupport";
-import { File, include, rbFSend, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
+import { File, include, NoMethodError, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 import { TranslationHelper } from "@blazetrails/actionview/helpers/translation-helper";
 import { Translation } from "@blazetrails/activemodel";
-import { onLoad } from "@blazetrails/activesupport";
+import { onLoad, type FileUpdateChecker, type Reloader } from "@blazetrails/activesupport";
 import type { Application } from "../application.js";
 import type { Path } from "../paths.js";
 import { Trails } from "../trails.js";
@@ -26,6 +26,17 @@ export interface I18nConfig extends OrderedOptions {
   exceptionHandler?: unknown;
   raiseOnMissingTranslations?: boolean | string | null;
 }
+
+const I18N_WRITERS: Record<string, ((value: never) => void) | undefined> = {
+  config: I18n.setConfig,
+  locale: I18n.setLocale,
+  backend: I18n.setBackend,
+  defaultLocale: I18n.setDefaultLocale,
+  availableLocales: I18n.setAvailableLocales,
+  defaultSeparator: I18n.setDefaultSeparator,
+  exceptionHandler: I18n.setExceptionHandler,
+  enforceAvailableLocales: I18n.setEnforceAvailableLocales,
+};
 
 declare module "../trailtie/configuration.js" {
   interface Configuration {
@@ -83,8 +94,11 @@ export class Trailtie extends BaseTrailtie {
           this.setupRaiseOnMissingTranslationsConfig(app, strict);
           break;
         }
-        default:
-          rbFSend(I18n, `${setting}=`, value);
+        default: {
+          const writer = I18N_WRITERS[setting];
+          if (!writer) throw new NoMethodError(`undefined method '${setting}=' for module I18n`);
+          writer(value as never);
+        }
       }
     }
 
@@ -97,29 +111,25 @@ export class Trailtie extends BaseTrailtie {
       const rootLoadPaths = I18n.loadPath().filter((path) =>
         String(path).startsWith(String(Trails.root())),
       );
-      const FileWatcher = app.config.fileWatcher as new (
-        files: unknown[],
-        dirs: Record<string, string[] | undefined>,
-        block: () => Promise<void>,
-      ) => { executeIfUpdated(block?: () => void): Promise<boolean> };
-      const reloader = new FileWatcher(rootLoadPaths, directories, async () => {
-        await I18n.setLoadPath(
-          I18n.loadPath().filter(
-            (path) =>
-              !(String(path).startsWith(String(Trails.root())) && !File.isExist(String(path))),
-          ),
-        );
-        const loadPath = I18n.loadPath();
-        await I18n.setLoadPath([
-          ...loadPath,
-          ...reloadablePaths
-            .flatMap((path) => path.existent())
-            .filter((p) => !loadPath.includes(p)),
-        ]);
-      });
+      const FileWatcher = app.config.fileWatcher as typeof FileUpdateChecker;
+      const reloader = new FileWatcher(
+        rootLoadPaths as string[],
+        directories as Record<string, string[]>,
+        async () => {
+          await I18n.setLoadPath(
+            I18n.loadPath().filter(
+              (path) =>
+                !(String(path).startsWith(String(Trails.root())) && !File.isExist(String(path))),
+            ),
+          );
+          await I18n.setLoadPath([
+            ...new Set([...I18n.loadPath(), ...reloadablePaths.flatMap((path) => path.existent())]),
+          ]);
+        },
+      );
 
       app.reloaders.push(reloader);
-      app.reloader.toRun(function (this: { requireUnloadLockBang(): void }) {
+      app.reloader.toRun(function (this: Reloader) {
         return reloader.executeIfUpdated(() => this.requireUnloadLockBang());
       });
     }
@@ -136,8 +146,7 @@ export class Trailtie extends BaseTrailtie {
 
     onLoad("active_model_translation", () => {
       if (strict) {
-        Translation.raiseOnMissingTranslations = app.config.i18n
-          .raiseOnMissingTranslations as boolean;
+        Translation.raiseOnMissingTranslations = app.config.i18n.raiseOnMissingTranslations!;
       }
     });
 

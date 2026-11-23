@@ -14,7 +14,7 @@ export class Translation {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
-  static raiseOnMissingTranslations = false;
+  static raiseOnMissingTranslations: boolean | string | null = false;
 
   get i18nScope(): string {
     return "activemodel";
