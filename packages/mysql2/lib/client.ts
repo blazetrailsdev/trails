@@ -78,12 +78,14 @@ type ClientHandshake = {
 
 type Handshake = { _handshakePacket?: { serverVersion?: string } };
 
+const CR_CONNECTION_ERROR = 2002;
 const CR_CONN_HOST_ERROR = 2003;
 const CR_UNKNOWN_HOST = 2005;
 const CR_SERVER_GONE_ERROR = 2006;
 const CR_SERVER_LOST = 2013;
 
 const CLIENT_ERRORS: Record<number, string> = {
+  [CR_CONNECTION_ERROR]: "Can't connect to local server through socket '%-.100s' (%d)",
   [CR_CONN_HOST_ERROR]: "Can't connect to MySQL server on '%-.100s' (%d)",
   [CR_UNKNOWN_HOST]: "Unknown server host '%-.100s' (%d)",
   [CR_SERVER_GONE_ERROR]: "MySQL server has gone away",
@@ -181,6 +183,7 @@ async function myLoadDefaults(file: string, groups: string[]): Promise<Options> 
 }
 
 const CR_ERRNOS: Record<string, number> = {
+  ENOENT: CR_CONNECTION_ERROR,
   ENOTFOUND: CR_UNKNOWN_HOST,
   ECONNREFUSED: CR_CONN_HOST_ERROR,
   EHOSTUNREACH: CR_CONN_HOST_ERROR,
@@ -1433,12 +1436,15 @@ export class Client {
       errorNumber = CR_SERVER_GONE_ERROR;
     }
     if (errorNumber === undefined) throw e;
+    const { hostname, address, port } = e as { hostname?: string; address?: string; port?: number };
+    if (errorNumber === CR_CONN_HOST_ERROR && address !== undefined && port === undefined) {
+      errorNumber = CR_CONNECTION_ERROR;
+    }
     if (errorNumber !== errno) {
-      const { hostname, address } = e as { hostname?: string; address?: string };
       message = CLIENT_ERRORS[errorNumber]
         .replace(
           "%-.100s",
-          String(hostname ?? address ?? this.connection?.config?.host).slice(0, 100),
+          String(hostname ?? address ?? this.connection?.config?.host ?? "localhost").slice(0, 100),
         )
         .replace("%d", String(typeof errno === "number" ? Math.abs(errno) : 0));
     }

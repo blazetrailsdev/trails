@@ -257,12 +257,12 @@ describe("Mysql2::Result", () => {
       }))!;
 
       let i = 0;
-      await expect(
-        res.each(async () => {
-          if (i > 0 && i % 1000 === 0) await new Promise((r) => setTimeout(r, 4000));
-          i++;
-        }),
-      ).rejects.toThrow(/Lost connection/);
+      const each = res.each(async () => {
+        if (i > 0 && i % 1000 === 0) await new Promise((r) => setTimeout(r, 4000));
+        i++;
+      });
+      await expect(each).rejects.toThrow(Mysql2.Error);
+      await expect(each).rejects.toThrow(/Lost connection/);
     }, 60000);
   });
   describe("row data type mapping", () => {
