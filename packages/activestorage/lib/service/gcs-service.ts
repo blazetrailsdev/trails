@@ -208,7 +208,12 @@ export class GCSService extends Service {
         version: "v2" as const,
       };
 
-      const [generatedUrl] = await this.bucket().file(key).getSignedUrl(args);
+      let bucket = this.bucket();
+      if (this.config.iam) {
+        bucket = this.iamBucket({ issuer: await this.issuer(), signer: this.signer() });
+      }
+
+      const [generatedUrl] = await bucket.file(key).getSignedUrl(args);
 
       payload.url = generatedUrl;
 
@@ -308,7 +313,12 @@ export class GCSService extends Service {
       action: "read" as const,
     };
 
-    const [url] = await (await this.fileFor(key))!.getSignedUrl(args);
+    let file = (await this.fileFor(key))!;
+    if (this.config.iam) {
+      file = this.iamBucket({ issuer: await this.issuer(), signer: this.signer() }).file(key);
+    }
+
+    const [url] = await file.getSignedUrl(args);
     return url;
   }
 
@@ -369,13 +379,6 @@ export class GCSService extends Service {
         ...options,
         ...(project == null ? {} : { projectId: project as string }),
       });
-      if (this.config.iam) {
-        this._client = new Storage({
-          ...options,
-          ...(project == null ? {} : { projectId: project as string }),
-          authClient: this.iamAuthClient(this._client.authClient.constructor as GoogleAuthClass),
-        });
-      }
     }
     return this._client;
   }
@@ -384,19 +387,28 @@ export class GCSService extends Service {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  private iamAuthClient(GoogleAuth: GoogleAuthClass): GoogleAuth {
-    const issuer = async () => await this.issuer();
-    const signer = this.signer(GoogleAuth);
-    const IamAuth = class extends (GoogleAuth as new (options: object) => object) {
+  private iamBucket({
+    issuer,
+    signer,
+  }: {
+    issuer: string;
+    signer: (stringToSign: string) => Promise<string>;
+  }): Bucket {
+    const GoogleAuth = this.client().authClient.constructor as new (options: object) => object;
+    const IamAuth = class extends GoogleAuth {
       async getCredentials() {
-        return { client_email: await issuer() };
+        return { client_email: issuer };
       }
 
       async sign(stringToSign: string) {
         return await signer(stringToSign);
       }
     };
-    return new IamAuth({}) as unknown as GoogleAuth;
+    return new Storage({
+      apiEndpoint: this.client().apiEndpoint,
+      projectId: this.client().projectId,
+      authClient: new IamAuth({}) as unknown as GoogleAuth,
+    }).bucket(fetch<string>(this.config, "bucket"));
   }
 
   /** @internal */
@@ -427,9 +439,13 @@ export class GCSService extends Service {
     throw new MetadataServerError();
   }
 
-  /** @internal */
-  private signer(GoogleAuth: GoogleAuthClass): (stringToSign: string) => Promise<string> {
+  /**
+   * @internal
+   * @missingRailsArgs new — PERMANENT
+   */
+  private signer(): (stringToSign: string) => Promise<string> {
     return async (stringToSign: string) => {
+      const GoogleAuth = this.client().authClient.constructor as GoogleAuthClass;
       const scopes = ["https://www.googleapis.com/auth/iam"];
       const iamClient = new GoogleAuth({ scopes: scopes });
 
