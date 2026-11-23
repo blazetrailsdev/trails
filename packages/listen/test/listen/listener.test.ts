@@ -48,6 +48,7 @@ describe("Listener", () => {
           });
           listener = new Listener(dir, dir2);
           await listener.start();
+          if (dirs.length > 0) throw new Error(`realpath never reached ${dirs.join(", ")}`);
         } finally {
           await listener?.stop();
           FileUtils.rmRf(dir2);
