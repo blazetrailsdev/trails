@@ -21,7 +21,7 @@
     },
     scripts: {
       build: "trails-tsc --schema db/schema.ts",
-      test: "vitest run --project unit",
+      test: this.dependsOnSystemTest() ? "vitest run --project unit" : "vitest run",
       trails: "trails",
       dev: "trails server",
       "db:create": "trails db:create",
