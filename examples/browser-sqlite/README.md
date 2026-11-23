@@ -10,10 +10,11 @@ pnpm dev     # Vite dev server; open the printed URL
 pnpm smoke   # headless Chromium: boot, create a post through the form, edit a view, restart
 ```
 
-![The editor: file tree, source, the app in the preview, and its log in the console](docs/screenshots/index-editor.png)
+![The editor: file tree, source, the app in the preview, and its log in the console](docs/screenshots/index-editor-light.png)
 
 The app (`template/`) is a small blog, laid out the way `trails generate scaffold` lays one out
-and styled like the trails website. It runs unchanged under Node. It exercises:
+and styled with the trails website's brand (orange and mango, Bricolage Grotesque, Instrument
+Sans and Fira Code), light or dark by the browser's color scheme. It runs unchanged under Node. It exercises:
 
 - **Routing**: `root`, `resources("posts")` with all seven actions, and `comments` nested under
   posts (`only: ["create", "destroy"]`)
@@ -31,12 +32,17 @@ true })`, presence and length validations, a `beforeValidation` callback that sq
 
 It boots through `Trails.initialize()`, autoloads through Zeitwerk, migrates through
 `MigrationContext`, and answers requests through `Trails.application.call`, as it would under
-Node. `pnpm smoke` walks the whole thing; `SCREENSHOTS=docs/screenshots pnpm smoke` refreshes
-the images here.
+Node. `pnpm smoke` walks the whole thing; `SCREENSHOTS=<dir> pnpm smoke` (and `COLOR_SCHEME=dark` for the dark set)
+saves the images here.
 
-| A failed validation                                           | A post and its comments                         |
-| ------------------------------------------------------------- | ----------------------------------------------- |
-| ![Validation errors](docs/screenshots/validation-preview.png) | ![Post page](docs/screenshots/show-preview.png) |
+|       | A failed validation                                                 | A post and its comments                               |
+| ----- | ------------------------------------------------------------------- | ----------------------------------------------------- |
+| Light | ![Validation errors](docs/screenshots/validation-preview-light.png) | ![Post page](docs/screenshots/show-preview-light.png) |
+| Dark  | ![Validation errors](docs/screenshots/validation-preview-dark.png)  | ![Post page](docs/screenshots/show-preview-dark.png)  |
+
+The editor in dark mode:
+
+![The editor in dark mode](docs/screenshots/index-editor-dark.png)
 
 ## How it fits together
 

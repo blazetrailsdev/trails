@@ -3,48 +3,69 @@
   <head>
     <title><%= contentFor("title") ?? "Trail log" %> · trails</title>
     <%= csrfMetaTags() %>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Instrument+Sans:wght@400..700&family=Fira+Code:wght@400..600&display=swap">
     <style>
       :root {
-        --surface: #1c1916; --raised: #272320; --overlay: #353029; --border: #4a433b;
-        --text: #e4ded4; --muted: #a59d91; --accent: #6b9e50; --accent-hover: #7db060;
-        --error: #d0654e; --success: #7da668; --warning: #d4a04a;
-        --mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+        --orange: #e8590c; --orange-hover: #c94d0a; --mango: #f2b01e;
+        --bg: #fff; --surface: #fff; --tint: #fdf1d6; --tint-border: #ecd9b0;
+        --text: #2b1d14; --muted: #7a6450; --error: #c0392b; --success: #3d7a2c;
+        --display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+        --sans: "Instrument Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+        --mono: "Fira Code", ui-monospace, "SF Mono", Menlo, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1a120c; --surface: #241912; --tint: #2b1d14; --tint-border: #4a3628;
+          --text: #f3e6d6; --muted: #b49a80; --error: #e8735e; --success: #8cc277;
+          color-scheme: dark;
+        }
       }
       * { box-sizing: border-box; }
-      body { margin: 0; background: var(--surface); color: var(--text); font: 14px/1.6 var(--mono); }
-      a { color: var(--accent); text-decoration: none; }
-      a:hover { color: var(--accent-hover); text-decoration: underline; }
-      nav { display: flex; gap: 1.25rem; align-items: center; padding: .75rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--raised); }
-      nav .brand { color: var(--text); font-weight: 700; }
-      nav .brand span { color: var(--accent); }
-      main { max-width: 46rem; margin: 0 auto; padding: 1.5rem; }
-      h1 { font-size: 1.4rem; margin: 0 0 1rem; }
-      h2 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; color: var(--muted); }
-      .card { background: var(--raised); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.25rem; margin: 0 0 .75rem; }
-      .card h3 { margin: 0 0 .25rem; font-size: 1rem; }
-      .meta { color: var(--muted); font-size: 12px; }
-      .badge { font-size: 11px; padding: 0 .4rem; border-radius: 3px; border: 1px solid var(--border); color: var(--muted); }
-      .badge.published { border-color: var(--success); color: var(--success); }
-      .notice { border-left: 3px solid var(--success); background: var(--raised); padding: .5rem .75rem; margin-bottom: 1rem; }
-      .errors { border-left: 3px solid var(--error); background: var(--raised); padding: .5rem .75rem; margin-bottom: 1rem; color: var(--error); }
-      .errors h2 { color: var(--error); margin: 0; font-size: .95rem; }
-      .field { margin-bottom: .75rem; }
-      label { display: block; color: var(--muted); font-size: 12px; margin-bottom: .2rem; }
-      input[type=text], textarea { width: 100%; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: .45rem .6rem; }
-      input[type=text]:focus, textarea:focus { outline: none; border-color: #5a8a42; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--sans); }
+      a { color: var(--orange); text-underline-offset: 3px; }
+      a:hover { color: var(--orange-hover); }
+      nav { display: flex; gap: 1.5rem; align-items: center; padding: .9rem 1.5rem; border-bottom: 1px solid var(--tint-border); font-weight: 600; font-size: 15px; }
+      nav a { color: var(--text); text-decoration: none; }
+      nav a:hover { color: var(--orange); }
+      nav .brand { font: 800 24px/1 var(--display); letter-spacing: -0.04em; color: var(--orange); margin-right: auto; }
+      main { max-width: 46rem; margin: 0 auto; padding: 2rem 1.5rem; }
+      h1, h2, h3 { font-family: var(--display); letter-spacing: -0.03em; }
+      h1 { font-size: 2.4rem; line-height: 1.05; font-weight: 800; color: var(--orange); margin: 0 0 1rem; }
+      h2 { font-size: 1.3rem; margin: 2rem 0 .75rem; }
+      .card { background: var(--surface); border: 1px solid var(--tint-border); border-radius: 10px; padding: 1rem 1.25rem; margin: 0 0 .9rem; box-shadow: 0 2px 0 var(--tint-border); }
+      .card h3 { margin: 0 0 .25rem; font-size: 1.25rem; }
+      .card h3 a { color: var(--text); text-decoration: none; }
+      .card h3 a:hover { color: var(--orange); }
+      .card p { margin: .4rem 0; }
+      .meta { color: var(--muted); font-size: 14px; }
+      .badge { font: 600 12px var(--sans); vertical-align: middle; padding: .1rem .5rem; border-radius: 999px; background: var(--tint); color: var(--muted); border: 1px solid var(--tint-border); letter-spacing: 0; }
+      .badge.published { background: var(--mango); border-color: var(--mango); color: #2b1d14; }
+      .notice { background: var(--tint); border: 1px solid var(--tint-border); border-left: 4px solid var(--mango); border-radius: 6px; padding: .6rem .9rem; margin-bottom: 1.25rem; }
+      .errors { background: var(--tint); border: 1px solid var(--tint-border); border-left: 4px solid var(--error); border-radius: 6px; padding: .6rem .9rem; margin-bottom: 1.25rem; color: var(--error); }
+      .errors h2 { color: var(--error); margin: 0; font-size: 1rem; }
+      .errors ul { margin: .4rem 0 0; }
+      .field { margin-bottom: 1rem; }
+      label { display: block; font-weight: 600; font-size: 14px; margin-bottom: .3rem; }
+      input[type=text], textarea { width: 100%; font: 15px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--tint-border); border-radius: 6px; padding: .55rem .7rem; }
+      input[type=text]:focus, textarea:focus { outline: 2px solid var(--mango); outline-offset: 1px; }
       .field_with_errors input, .field_with_errors textarea { border-color: var(--error); }
-      input[type=submit], button { font: inherit; cursor: pointer; background: var(--accent); color: #1c1916; border: 0; border-radius: 4px; padding: .4rem .9rem; font-weight: 600; }
-      input[type=submit]:hover, button:hover { background: var(--accent-hover); }
+      input[type=checkbox] { accent-color: var(--orange); }
+      input[type=submit], button { font: 600 15px var(--sans); cursor: pointer; background: var(--orange); color: #fff; border: 0; border-radius: 6px; padding: .5rem 1.1rem; }
+      input[type=submit]:hover, button:hover { background: var(--orange-hover); }
       form.button_to { display: inline; }
-      form.button_to button { background: transparent; color: var(--error); border: 1px solid var(--error); padding: .2rem .6rem; font-weight: 400; }
-      .actions { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
-      .tabs a.current { color: var(--text); text-decoration: underline; }
+      form.button_to button { background: transparent; color: var(--error); border: 1px solid currentColor; padding: .3rem .8rem; font-weight: 500; font-size: 14px; }
+      form.button_to button:hover { background: var(--tint); }
+      .actions { display: flex; gap: 1.25rem; align-items: center; margin-top: 1.25rem; font-weight: 600; }
+      .tabs { margin-top: -.25rem; }
+      .tabs a { font-weight: 600; }
       .empty { color: var(--muted); font-style: italic; }
+      code, pre { font-family: var(--mono); }
     </style>
   </head>
   <body>
     <nav>
-      <%= linkTo("trail·log", rootPath(), { class: "brand" }) %>
+      <%= linkTo("trail log", rootPath(), { class: "brand" }) %>
       <%= linkTo("All posts", postsPath()) %>
       <%= linkTo("New post", newPostPath()) %>
     </nav>

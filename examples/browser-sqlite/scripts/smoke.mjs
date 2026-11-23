@@ -10,14 +10,18 @@ if (!url) {
 }
 const shots = process.env.SCREENSHOTS;
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+const colorScheme = process.env.COLOR_SCHEME === "dark" ? "dark" : "light";
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, colorScheme });
 page.on("pageerror", (e) => console.log("[pageerror]", e.message));
 if (process.env.VERBOSE) page.on("console", (m) => console.log(`[${m.type()}]`, m.text()));
 const frame = page.frameLocator("#preview");
 const shot = async (name) => {
   if (!shots) return;
-  await page.locator("#preview").screenshot({ path: `${shots}/${name}-preview.png` });
-  await page.screenshot({ path: `${shots}/${name}-editor.png` });
+  await page.evaluate(() => globalThis.scrollTo(0, 0));
+  await page.screenshot({ path: `${shots}/${name}-editor-${colorScheme}.png` });
+  await page
+    .locator("#preview")
+    .screenshot({ path: `${shots}/${name}-preview-${colorScheme}.png` });
 };
 const see = (selector, hasText) =>
   frame.locator(selector, { hasText }).first().waitFor({ timeout: 30_000 });

@@ -1,3 +1,6 @@
+import "@fontsource-variable/bricolage-grotesque";
+import "@fontsource-variable/instrument-sans";
+import "@fontsource-variable/fira-code";
 import { latin1 } from "../runtime/latin1.ts";
 
 const TEMPLATE = import.meta.glob<string>("../../template/**/*", {
