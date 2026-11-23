@@ -127,6 +127,24 @@ describe("ClassAttributeTest", () => {
     expect(Klass.setting).toBe("plop");
   });
 
+  it("when defined on an instance's singleton class", () => {
+    const object = new Klass();
+
+    classAttribute.call(rbObjSingletonClass(object), "externalAttr", {
+      default: "default_value",
+    });
+    expect(object.externalAttr).toBe("default_value");
+    expect((rbObjSingletonClass(object) as any).externalAttr).toBe("default_value");
+
+    object.externalAttr = "new_value";
+    expect(object.externalAttr).toBe("default_value");
+    expect((rbObjSingletonClass(object) as any).externalAttr).toBe("default_value");
+
+    (rbObjSingletonClass(object) as any).externalAttr = "another_value";
+    expect(object.externalAttr).toBe("another_value");
+    expect((rbObjSingletonClass(object) as any).externalAttr).toBe("another_value");
+  });
+
   it("works well with module singleton classes", () => {
     const module: any = defineModule({});
     classAttribute.call(rbObjSingletonClass(module), "settings", { default: 42 });

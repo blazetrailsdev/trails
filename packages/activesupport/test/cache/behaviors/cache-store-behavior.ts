@@ -873,6 +873,12 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
       },
     );
   });
+
+  it("configuring store with raw", async () => {
+    const cache = host.lookupStore({ raw: true });
+    await cache.write("foo", "bar");
+    expect(await cache.read("foo")).toBe("bar");
+  });
 }
 
 function withRaiseOnInvalidCacheExpirationTime<T>(newValue: boolean, block: () => T): T {
