@@ -1,23 +1,30 @@
 import "../constants.s3-service.generated.js";
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   NoSuchKey,
   NotFound,
   PutObjectCommand,
   S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
-import { NotImplementedError, type Range } from "@blazetrails/ruby-compat";
+import type { Range } from "@blazetrails/ruby-compat";
 import { FileNotFoundError, IntegrityError } from "../errors.js";
 import type { Filename } from "../filename.js";
 import { Service } from "../service.js";
 
 const UPLOAD_OPTION_KEYS: Record<string, string> = { acl: "ACL", sseKmsKeyId: "SSEKMSKeyId" };
 
-type UploadableIO = { size(): number; read(): string | Uint8Array | null };
+type UploadableIO = { size(): number; read(length?: number): string | Uint8Array | null };
+
+const MAXIMUM_UPLOAD_PARTS_COUNT = 10000;
+const MINIMUM_UPLOAD_PART_SIZE = Numeric.megabytes(5);
 
 export class S3Service extends Service {
   readonly client: S3Client;
@@ -96,8 +103,11 @@ export class S3Service extends Service {
           customMetadata: customMetadata,
         });
       } else {
-        /** @inventedArm throw — CONVERGEABLE activestorage-s3-service-multipart-and-compose */
-        throw new NotImplementedError();
+        await this.uploadWithMultipart(key, io, {
+          contentType: contentType,
+          contentDisposition: contentDisposition,
+          customMetadata: customMetadata,
+        });
       }
     });
   }
@@ -152,6 +162,29 @@ export class S3Service extends Service {
     });
   }
 
+  override async deletePrefixed(prefix: string): Promise<void> {
+    await this.instrument("delete_prefixed", { prefix: prefix }, async () => {
+      let continuationToken: string | undefined;
+      do {
+        const page = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
+          }),
+        );
+        if (page.Contents?.length)
+          await this.client.send(
+            new DeleteObjectsCommand({
+              Bucket: this.bucket,
+              Delete: { Objects: page.Contents.map((object) => ({ Key: object.Key })) },
+            }),
+          );
+        continuationToken = page.NextContinuationToken;
+      } while (continuationToken != null);
+    });
+  }
+
   override async isExist(key: string): Promise<boolean> {
     return await this.instrument("exist", { key: key }, async (payload) => {
       let answer: boolean;
@@ -167,6 +200,216 @@ export class S3Service extends Service {
     });
   }
 
+  override async urlForDirectUpload(
+    key: string,
+    {
+      expiresIn,
+      contentType,
+      contentLength,
+      checksum,
+      customMetadata = {},
+    }: {
+      expiresIn: unknown;
+      contentType: string;
+      contentLength: number;
+      checksum: string;
+      customMetadata?: Record<string, unknown>;
+    },
+  ): Promise<string> {
+    return await this.instrument("url", { key: key }, async (payload) => {
+      const generatedUrl = await getSignedUrl(
+        this.client,
+        new PutObjectCommand({
+          ...this.objectFor(key),
+          ContentType: contentType,
+          ContentLength: contentLength,
+          ContentMD5: checksum,
+          Metadata: customMetadata as Record<string, string>,
+          ...this.uploadParams(),
+        }),
+        {
+          expiresIn: Math.trunc(Number(expiresIn)),
+          signableHeaders: new Set(["content-length", "content-type"]),
+        },
+      );
+
+      payload.url = generatedUrl;
+
+      return generatedUrl;
+    });
+  }
+
+  override headersForDirectUpload(
+    _key: string,
+    {
+      contentType,
+      checksum,
+      filename = null,
+      disposition = null,
+      customMetadata = {},
+    }: {
+      contentType: string;
+      checksum: string;
+      filename?: Filename | null;
+      disposition?: string | null;
+      customMetadata?: Record<string, unknown>;
+      [k: string]: unknown;
+    },
+  ): Record<string, string> {
+    let contentDisposition: string | undefined;
+    if (filename != null)
+      contentDisposition = this.contentDispositionWith({
+        type: disposition ?? undefined,
+        filename: filename,
+      });
+
+    return {
+      "Content-Type": contentType,
+      "Content-MD5": checksum,
+      "Content-Disposition": contentDisposition!,
+      ...this.customMetadataHeaders(customMetadata),
+    };
+  }
+
+  override async compose(
+    sourceKeys: string[],
+    destinationKey: string,
+    {
+      filename = null,
+      contentType = null,
+      disposition = null,
+      customMetadata = {},
+    }: {
+      filename?: Filename | null;
+      contentType?: string | null;
+      disposition?: string | null;
+      customMetadata?: Record<string, unknown>;
+    } = {},
+  ): Promise<void> {
+    let contentDisposition: string | undefined;
+    if (disposition != null && filename != null)
+      contentDisposition = this.contentDispositionWith({ type: disposition, filename: filename });
+
+    await this.uploadStream(
+      {
+        key: destinationKey,
+        contentType: contentType,
+        contentDisposition: contentDisposition,
+        partSize: MINIMUM_UPLOAD_PART_SIZE,
+        metadata: customMetadata as Record<string, string>,
+      },
+      async (out) => {
+        for (const sourceKey of sourceKeys) {
+          await this.stream(sourceKey, async (chunk) => {
+            await out.write(chunk);
+          });
+        }
+      },
+    );
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall upload_stream — PERMANENT
+   */
+  private async uploadStream(
+    {
+      key,
+      contentType = null,
+      contentDisposition,
+      partSize,
+      metadata = {},
+    }: {
+      key: string;
+      contentType?: string | null;
+      contentDisposition?: string;
+      partSize: number;
+      metadata?: Record<string, string>;
+    },
+    block: (out: WritableStreamDefaultWriter<Uint8Array>) => Promise<void>,
+  ): Promise<void> {
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+    const upload = new Upload({
+      client: this.client,
+      partSize: partSize,
+      params: {
+        ...this.objectFor(key),
+        Body: readable,
+        ContentType: contentType ?? undefined,
+        ContentDisposition: contentDisposition,
+        Metadata: metadata,
+        ...this.uploadParams(),
+      },
+    });
+    const out = writable.getWriter();
+    const [written, uploaded] = await Promise.allSettled([
+      (async () => {
+        try {
+          await block(out);
+          await out.close();
+        } catch (error) {
+          await out.abort(error);
+          throw error;
+        }
+      })(),
+      upload.done(),
+    ]);
+    if (written.status === "rejected") throw written.reason;
+    if (uploaded.status === "rejected") throw uploaded.reason;
+  }
+
+  /** @internal */
+  protected override async privateUrl(
+    key: string,
+    {
+      expiresIn,
+      filename,
+      disposition,
+      contentType,
+    }: {
+      expiresIn?: unknown;
+      filename?: Filename;
+      disposition?: string;
+      contentType?: string | null;
+      [k: string]: unknown;
+    },
+  ): Promise<string> {
+    return await getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        ...this.objectFor(key),
+        ResponseContentDisposition: this.contentDispositionWith({
+          type: disposition,
+          filename: filename!,
+        }),
+        ResponseContentType: contentType ?? undefined,
+      }),
+      { expiresIn: Math.trunc(Number(expiresIn)) },
+    );
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall public_url — PERMANENT
+   */
+  protected override async publicUrl(
+    key: string,
+    { virtualHost = false }: { virtualHost?: boolean; [k: string]: unknown } = {},
+  ): Promise<string> {
+    const path = key.split("/").map(encodeURIComponent).join("/");
+    if (virtualHost) return `https://${this.bucket}/${path}`;
+    if (this.client.config.endpoint === undefined) {
+      const region = await this.client.config.region();
+      return `https://${this.bucket}.s3.${region}.amazonaws.com/${path}`;
+    }
+    const endpoint = await this.client.config.endpoint();
+    const port = endpoint.port == null ? "" : `:${endpoint.port}`;
+    const base = `${endpoint.protocol}//${endpoint.hostname}${port}${endpoint.path.replace(/\/$/, "")}`;
+    return this.client.config.forcePathStyle
+      ? `${base}/${this.bucket}/${path}`
+      : `${endpoint.protocol}//${this.bucket}.${endpoint.hostname}${port}/${path}`;
+  }
+
   /** @internal */
   private async uploadWithSinglePart(
     key: string,
@@ -174,7 +417,7 @@ export class S3Service extends Service {
     {
       checksum = null,
       contentType = null,
-      contentDisposition = undefined,
+      contentDisposition,
       customMetadata = {},
     }: {
       checksum?: string | null;
@@ -195,12 +438,7 @@ export class S3Service extends Service {
           ContentType: contentType ?? undefined,
           ContentDisposition: contentDisposition,
           Metadata: customMetadata,
-          ...Object.fromEntries(
-            Object.entries(this.uploadOptions).map(([k, v]) => [
-              UPLOAD_OPTION_KEYS[k] ?? k[0].toUpperCase() + k.slice(1),
-              v,
-            ]),
-          ),
+          ...this.uploadParams(),
         }),
       );
     } catch (error) {
@@ -208,6 +446,51 @@ export class S3Service extends Service {
         throw new IntegrityError();
       throw error;
     }
+  }
+
+  /** @internal */
+  private async uploadWithMultipart(
+    key: string,
+    io: UploadableIO,
+    {
+      contentType = null,
+      contentDisposition,
+      customMetadata = {},
+    }: {
+      contentType?: string | null;
+      contentDisposition?: string;
+      customMetadata?: Record<string, string>;
+    } = {},
+  ): Promise<void> {
+    const partSize = Math.max(
+      Math.ceil(io.size() / MAXIMUM_UPLOAD_PARTS_COUNT),
+      MINIMUM_UPLOAD_PART_SIZE,
+    );
+
+    await this.uploadStream(
+      {
+        key: key,
+        contentType: contentType,
+        contentDisposition: contentDisposition,
+        partSize: partSize,
+        metadata: customMetadata,
+      },
+      async (out) => {
+        let chunk: string | Uint8Array | null;
+        while ((chunk = io.read(Numeric.kilobytes(16))) != null && chunk.length > 0)
+          await out.write(typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk);
+      },
+    );
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  private uploadParams(): Record<string, unknown> {
+    return Object.fromEntries(
+      Object.entries(this.uploadOptions).map(([k, v]) => [
+        UPLOAD_OPTION_KEYS[k] ?? k[0].toUpperCase() + k.slice(1),
+        v,
+      ]),
+    );
   }
 
   /** @internal */
@@ -237,6 +520,15 @@ export class S3Service extends Service {
       await block(await chunk.Body!.transformToByteArray());
       offset += chunkSize;
     }
+  }
+
+  /** @internal */
+  protected override customMetadataHeaders(
+    metadata: Record<string, unknown>,
+  ): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(metadata).map(([key, value]) => [`x-amz-meta-${key}`, value as string]),
+    );
   }
 }
 
