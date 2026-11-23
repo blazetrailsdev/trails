@@ -547,7 +547,7 @@ describe("ScaffoldGeneratorTest", () => {
       await t.assertMigration("db/secondary_migrate/create_posts.ts");
       await t.assertFile("app/models/secondary-record.ts", (content) => {
         expect(content).toMatch(/class SecondaryRecord extends ApplicationRecord/);
-        expect(content).toMatch(/connectsTo\(\{ database: \{ writing: "secondary" \} \}\)/);
+        expect(content).toMatch(/connectsTo\(\{ database: \{ writing: ":secondary" \} \}\)/);
         expect(content).toMatch(/this\.abstractClass = true/);
       });
     });
