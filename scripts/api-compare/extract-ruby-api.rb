@@ -1253,7 +1253,7 @@ class ApiExtractor
     return unless target && name
     params_node, body = macro
     record_metaprogrammed_method(fqn, target, name, extract_params(params_node, method(:string_opener_at)),
-                                 "define_method", body: body, params_node: params_node)
+                                 "define_method_macro", body: body, params_node: params_node)
     maybe_update_module_file(fqn, target)
   end
 
@@ -1741,6 +1741,8 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
   end
 
+  DEFINE_METHOD_NOTES = %w[define_method define_method_macro].freeze
+
   # Resolve the two ways one bucket can end up holding the same name twice.
   #
   # A `Struct.new(...)` accessor lives on the anonymous struct SUPERCLASS, so
@@ -1768,11 +1770,11 @@ class ApiExtractor
           end
           info[bucket].reject! { |m| m[:notes] == "struct" && defined_in_body.include?(m[:name]) }
         end
-        next unless info[bucket].any? { |m| m[:notes] == "define_method" }
+        next unless info[bucket].any? { |m| DEFINE_METHOD_NOTES.include?(m[:notes]) }
         literal = info[bucket].each_with_object(Set.new) do |m, acc|
           acc << m[:name] unless m[:notes]
         end
-        info[bucket].reject! { |m| m[:notes] == "define_method" && literal.include?(m[:name]) }
+        info[bucket].reject! { |m| DEFINE_METHOD_NOTES.include?(m[:notes]) && literal.include?(m[:name]) }
       end
     end
   end

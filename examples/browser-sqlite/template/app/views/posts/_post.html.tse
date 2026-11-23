@@ -1,0 +1,5 @@
+<article class="card" id="<%= domId(post) %>">
+  <h3><%= linkTo(post.title, post) %> <span class="badge <%= post.published ? "published" : "" %>"><%= post.published ? "published" : "draft" %></span></h3>
+  <p><%= truncate(post.body ?? "", { length: 140 }) %></p>
+  <div class="meta"><%= timeAgoInWords(post.created_at) %> ago · <%= pluralize(post.comments_count, "comment") %></div>
+</article>

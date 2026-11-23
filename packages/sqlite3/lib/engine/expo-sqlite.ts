@@ -4,7 +4,7 @@ import "../constants.js";
 import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "../database.js";
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
-import { statementTail } from "./statement-tail.js";
+import { closedStatement, statementTail } from "./statement-tail.js";
 import { bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 
@@ -88,13 +88,13 @@ function prepareStatement(
   opening: () => Promise<ExpoDatabase>,
   prepared: Promise<ExpoStatement> | null,
   sql: string,
-  empty: boolean,
   handler: () => BusyHandler | null,
   setChanges: (n: number) => void,
+  finalize: () => Promise<void>,
 ): EngineStatement {
   const positional: SqliteBindValue[] = [];
   const named: Record<string, SqliteBindValue> = {};
-  let names: string[] | null = empty ? [] : null;
+  let names: string[] | null = null;
   let rows: AsyncIterator<unknown[]> | null = null;
   let done = false;
   let closed = false;
@@ -126,10 +126,12 @@ function prepareStatement(
 
   return {
     async close() {
+      if (closed) return;
       closed = true;
       await rows?.return?.();
       await (await typed)?.finalizeAsync();
       if (prepared) await (await prepared).finalizeAsync();
+      await finalize();
     },
     isClosed: () => closed,
     bindParam(key, value) {
@@ -142,10 +144,7 @@ function prepareStatement(
       done = false;
     },
     async step() {
-      if (done || empty) {
-        done = true;
-        return null;
-      }
+      if (done) return null;
       if (rows === null) {
         const cols = (await metadata()).map((_, i) => `c${i}`);
         const wider = readBigInts && cols.length !== 0 ? await (typed ??= intText(cols)) : null;
@@ -194,13 +193,18 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
   const setChanges = (n: number) => {
     changes = n;
   };
+  let liveStatements = 0;
+  const finalize = async () => {
+    liveStatements -= 1;
+    if (closed && liveStatements === 0 && raw) await (await raw).closeAsync();
+  };
   const db: EngineDatabase = {
     ...errors,
     isClosed: () => closed,
     isDiscarded: () => false,
     async close() {
       closed = true;
-      if (raw) await (await raw).closeAsync();
+      if (liveStatements === 0 && raw) await (await raw).closeAsync();
     },
     changes: () => changes,
     disableQuirkMode: () => {},
@@ -264,21 +268,21 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     async prepare(sql) {
       const [tail, empty] = statementTail(sql);
       const head = sql.slice(0, tail);
-      const raw = empty ? null : await opening();
-      const prepared =
-        raw &&
-        (await withBusyHandler(
-          () => handler,
-          () => raw.prepareAsync(head),
-        ));
+      if (empty) return [closedStatement, sql.slice(tail)];
+      const raw = await opening();
+      const prepared = await withBusyHandler(
+        () => handler,
+        () => raw.prepareAsync(head),
+      );
+      liveStatements += 1;
       return [
         prepareStatement(
           opening,
-          prepared && Promise.resolve(prepared),
+          Promise.resolve(prepared),
           head,
-          empty,
           () => handler,
           setChanges,
+          finalize,
         ),
         sql.slice(tail),
       ];

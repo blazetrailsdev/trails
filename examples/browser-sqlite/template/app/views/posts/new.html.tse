@@ -1,0 +1,7 @@
+<% contentFor("title", "New post") %>
+
+<h1>New post</h1>
+
+<%= render("form", { post }) %>
+
+<div class="actions"><%= linkTo("Back to posts", postsPath()) %></div>

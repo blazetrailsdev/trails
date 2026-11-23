@@ -1,0 +1,10 @@
+<% contentFor("title", "Editing post") %>
+
+<h1>Editing post</h1>
+
+<%= render("form", { post }) %>
+
+<div class="actions">
+  <%= linkTo("Show this post", post) %>
+  <%= linkTo("Back to posts", postsPath()) %>
+</div>

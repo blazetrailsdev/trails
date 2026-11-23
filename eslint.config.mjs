@@ -239,6 +239,18 @@ export default defineConfig(
     },
   },
   {
+    files: ["examples/browser-sqlite/public/*.js", "examples/browser-sqlite/scripts/*.mjs"],
+    languageOptions: {
+      globals: {
+        self: "readonly",
+        Response: "readonly",
+        MessageChannel: "readonly",
+        document: "readonly",
+        localStorage: "readonly",
+      },
+    },
+  },
+  {
     files: [
       "examples/react-native-notes/*.config.js",
       "examples/react-native-notes/{babel,shims,headless}/*.js",
@@ -1328,6 +1340,15 @@ export default defineConfig(
       "blazetrails/constructor-creates-no-promise": "warn",
       "blazetrails/no-swallowed-rejection": "warn",
       "blazetrails/no-floating-maybe-promise": "warn",
+    },
+  },
+  {
+    files: ["examples/browser-sqlite/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: false }],
+      "blazetrails/constructor-creates-no-promise": "error",
+      "blazetrails/no-swallowed-rejection": "error",
+      "blazetrails/no-floating-maybe-promise": "error",
     },
   },
   {

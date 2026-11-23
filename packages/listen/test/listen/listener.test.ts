@@ -1,4 +1,4 @@
-import { Dir, FileUtils } from "@blazetrails/ruby-compat";
+import { block, Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Listener, type ListenerOptions } from "../../lib/listen.js";
@@ -20,6 +20,41 @@ describe("Listener", () => {
     vi.restoreAllMocks();
     if (listener != null && !listener.isStopped()) await listener.stop();
     FileUtils.rmRf(dir);
+  });
+
+  describe("initialize", () => {
+    describe("with a block", () => {
+      it("passes the block to the event processor", async () => {
+        const myblock = vi.fn();
+        listener = new Listener(
+          dir,
+          block((...args: string[][]) => myblock(...args)),
+        );
+        expect(listener._block).toBeTruthy();
+        await listener._block!([], [], []);
+        expect(myblock).toHaveBeenCalled();
+      });
+    });
+
+    describe("with directories", () => {
+      it("passes directories to backend", async () => {
+        const dir2 = Dir.mktmpdir();
+        const dirs = [dir, dir2];
+        const realpathAsync = File.realpathAsync.bind(File);
+        try {
+          vi.spyOn(File, "realpathAsync").mockImplementation((path) => {
+            if (path !== dirs.shift()) throw new Error(`unexpected realpath ${String(path)}`);
+            return realpathAsync(path);
+          });
+          listener = new Listener(dir, dir2);
+          await listener.start();
+          if (dirs.length > 0) throw new Error(`realpath never reached ${dirs.join(", ")}`);
+        } finally {
+          await listener?.stop();
+          FileUtils.rmRf(dir2);
+        }
+      });
+    });
   });
 
   describe("#start", () => {

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>trails in the browser</title>
+    <link rel="stylesheet" href="/src/host/style.css" />
+    <script type="module" src="/src/host/main.ts"></script>
+  </head>
+  <body>
+    <header>
+      <strong>trails</strong> in the browser · SQLite via sql.js
+      <span id="status">Starting…</span>
+      <span class="spacer"></span>
+      <label><input type="checkbox" id="autorun" checked /> Restart on edit</label>
+      <button id="run" title="Restart the app (Ctrl+S)">▶ Restart</button>
+      <button id="reset-db">Reset database</button>
+      <button id="reset-files">Reset files</button>
+    </header>
+    <main>
+      <nav id="tree"></nav>
+      <section id="editor-pane">
+        <div id="editor-title"></div>
+        <div id="code">
+          <div id="highlight" aria-hidden="true"></div>
+          <textarea id="editor" spellcheck="false"></textarea>
+        </div>
+      </section>
+      <section id="right">
+        <div id="browser">
+          <form id="address">
+            <button type="button" id="back">←</button>
+            <button type="button" id="reload">⟳</button>
+            <input id="url" value="/" />
+          </form>
+          <iframe id="preview" title="preview"></iframe>
+        </div>
+        <div id="console-pane">
+          <div class="bar">Console <button id="clear">Clear</button></div>
+          <pre id="console"></pre>
+        </div>
+      </section>
+    </main>
+    <div id="runtime-holder" hidden></div>
+  </body>
+</html>

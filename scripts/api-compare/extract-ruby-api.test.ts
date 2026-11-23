@@ -3097,8 +3097,8 @@ describe(
       end
     `);
       expect(m["Image"].map((x) => [x.name, x.notes])).toEqual([
-        ["type", "define_method"],
-        ["width", "define_method"],
+        ["type", "define_method_macro"],
+        ["width", "define_method_macro"],
       ]);
     });
 

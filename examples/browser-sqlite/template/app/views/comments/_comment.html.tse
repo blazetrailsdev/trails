@@ -1,0 +1,5 @@
+<div class="card" id="<%= domId(comment) %>">
+  <div class="meta"><strong><%= comment.author %></strong> · <%= timeAgoInWords(comment.created_at) %> ago</div>
+  <%= simpleFormat(comment.body) %>
+  <%= buttonTo("Remove", postCommentPath(comment.post_id, comment), { method: "delete" }) %>
+</div>

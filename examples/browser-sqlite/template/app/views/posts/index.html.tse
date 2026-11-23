@@ -1,0 +1,15 @@
+<% contentFor("title", "Posts") %>
+
+<h1>Posts</h1>
+
+<p class="tabs meta">
+  <%= linkToUnlessCurrent("All", postsPath()) %> ·
+  <%= linkToUnlessCurrent("Published", postsPath({ filter: "published" })) %>
+</p>
+
+<div id="posts">
+  <% if (posts.length === 0) { %>
+    <p class="empty">No posts yet. <%= linkTo("Write the first one", newPostPath()) %>.</p>
+  <% } %>
+  <%= render({ partial: "posts/post", collection: posts }) %>
+</div>

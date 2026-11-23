@@ -417,7 +417,7 @@ describe("Mysql2::Client#initialize", () => {
       username: "rails",
       user: "driver",
       password: 1,
-      host: "db",
+      host: "localhost",
       port: "3307",
       database: "d",
       socket: "/tmp/s",
@@ -427,7 +427,7 @@ describe("Mysql2::Client#initialize", () => {
     expect(config).toMatchObject({
       user: "rails",
       password: "1",
-      host: "db",
+      host: "localhost",
       port: 3307,
       database: "d",
       socketPath: "/tmp/s",
@@ -437,6 +437,11 @@ describe("Mysql2::Client#initialize", () => {
     expect(config.connectAttributes).toHaveProperty("program_name");
     expect(config).not.toHaveProperty("strict");
     expect(config).not.toHaveProperty("readTimeout");
+  });
+
+  it("connects over TCP when a host other than localhost is given with a socket", async () => {
+    const config = await driverConfig({ host: "db", socket: "/tmp/s" });
+    expect(config).not.toHaveProperty("socketPath");
   });
 });
 

@@ -241,8 +241,30 @@ describe("Mysql2::Result", () => {
       await result.toA();
       expect(result.count()).toBe(0);
     });
-    // PERMANENT-SKIP: net_write_timeout fires only once the server's write blocks. Over TCP on Linux the ~2.6 MB result fits in the autotuned socket buffers (tcp_wmem max 4 MB), so the gem itself (0.5.7 on Connector/C 3.4.8) never raises against MariaDB 11 either; over a unix socket (fixed 208 KB buffers, the gem CI's `localhost`) both the gem and this port raise "Lost connection". trails CI connects over TCP.
-    it.skip("should raise an exception if streaming ended due to a timeout", () => {});
+    it("should raise an exception if streaming ended due to a timeout", async () => {
+      await state.client.query(
+        "CREATE TEMPORARY TABLE streamingTest (val BINARY(255)) ENGINE=MEMORY",
+      );
+
+      for (let i = 0; i < 10000; i++) {
+        await state.client.query(`INSERT INTO streamingTest (val) VALUES ('Foo ${i}')`);
+      }
+
+      await state.client.query("SET net_write_timeout = 1");
+      const res = (await state.client.query("SELECT * FROM streamingTest", {
+        stream: true,
+        cacheRows: false,
+      }))!;
+
+      let i = 0;
+      const each = res.each(async () => {
+        if (i > 0 && i % 1000 === 0) await new Promise((r) => setTimeout(r, 4000));
+        i++;
+      });
+      await expect(each).rejects.toThrow(
+        expect.toSatisfy((e) => e instanceof Mysql2.Error && /Lost connection/.test(e.message)),
+      );
+    }, 60000);
   });
   describe("row data type mapping", () => {
     it("should return nil values for NULL and strings for everything else when :cast is false", async () => {
