@@ -276,6 +276,7 @@ describe("AppGenerator (trails-only)", () => {
     expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toMatch(/^file:.*trails-tsc$/);
     const workspace = File.read(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"));
     expect(workspace).toContain(`  "@blazetrails/trailties": "link:${trailties}"`);
+    expect(workspace).toContain(`  "@blazetrails/trails": "link:${trails}"`);
     expect(workspace).toContain(`  "@blazetrails/arel": "link:`);
     expect(workspace).toContain("allowBuilds:\n  better-sqlite3: true\n  esbuild: true\n");
   });
@@ -283,7 +284,7 @@ describe("AppGenerator (trails-only)", () => {
   it("without --dev keeps the version entries and writes no pnpm-workspace.yaml", async () => {
     await new AppGenerator(
       ["my-app"],
-      { skipInstall: true, database: "sqlite" },
+      { skipInstall: true, database: "sqlite", packageManager: "npm" },
       { destinationRoot: tmpDir },
     ).invokeAll();
 
@@ -293,6 +294,18 @@ describe("AppGenerator (trails-only)", () => {
     expect(pkg.dependencies["@blazetrails/activerecord"]).toBeUndefined();
     expect(pkg.dependencies["@blazetrails/rackup"]).toBe("~0.1.0-alpha0.1");
     expect(File.isExist(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"))).toBe(false);
+  });
+
+  it("hoists every @blazetrails package the templates import under pnpm", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true, database: "sqlite" },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+
+    const workspace = File.read(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"));
+    expect(workspace).toContain('publicHoistPattern:\n  - "@blazetrails/*"\n');
+    expect(workspace).not.toContain("overrides:");
   });
 
   it("guards each namespaced environment setting the way the Rails templates do", async () => {
