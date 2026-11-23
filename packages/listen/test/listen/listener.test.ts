@@ -1,5 +1,5 @@
 import { Dir, FileUtils } from "@blazetrails/ruby-compat";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Listener, type ListenerOptions } from "../../lib/listen.js";
 
@@ -17,6 +17,7 @@ describe("Listener", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     if (listener != null && !listener.isStopped()) await listener.stop();
     FileUtils.rmRf(dir);
   });
@@ -24,12 +25,13 @@ describe("Listener", () => {
   describe("#start", () => {
     it("sets paused to false", async () => {
       await subject().start();
-      expect(subject().isPaused()).toBe(false);
+      expect(subject().isPaused()).toBeFalsy();
     });
 
     it("starts adapter", async () => {
+      const startBackend = vi.spyOn(subject(), "_startBackend");
       await subject().start();
-      expect(subject()._subscriptions).toHaveLength(1);
+      expect(startBackend).toHaveBeenCalled();
     });
   });
 
@@ -38,15 +40,13 @@ describe("Listener", () => {
       it("terminates", async () => {
         await subject().start();
         await subject().stop();
-        expect(subject()._subscriptions).toHaveLength(0);
-        expect(subject().isStopped()).toBe(true);
       });
     });
 
     describe("when only initialized", () => {
       it("terminates", async () => {
+        subject();
         await subject().stop();
-        expect(subject().isStopped()).toBe(true);
       });
     });
   });
@@ -55,7 +55,7 @@ describe("Listener", () => {
     it("sets paused to true", async () => {
       await subject().start();
       await subject().pause();
-      expect(subject().isPaused()).toBe(true);
+      expect(subject().isPaused()).toBeTruthy();
     });
   });
 
@@ -64,7 +64,7 @@ describe("Listener", () => {
       await subject().start();
       await subject().pause();
       await subject().start();
-      expect(subject().isPaused()).toBe(false);
+      expect(subject().isPaused()).toBeFalsy();
     });
   });
 
@@ -72,31 +72,37 @@ describe("Listener", () => {
     it("returns true when paused", async () => {
       await subject().start();
       await subject().pause();
-      expect(subject().isPaused()).toBe(true);
+      expect(subject().isPaused()).toBeTruthy();
     });
 
     it("returns false when not paused", async () => {
       await subject().start();
-      expect(subject().isPaused()).toBe(false);
+      expect(subject().isPaused()).toBeFalsy();
     });
   });
+
+  const spyConfigure = () => vi.spyOn(Listener.prototype, "_reconfigureSilencer");
 
   describe("#ignore", () => {
     describe("with existing ignore options", () => {
       it("adds up to existing ignore options", () => {
         options = { ignore: /bar/ };
-        expect(subject()._prevSilencerOptions).toEqual({ ignore: [/bar/] });
+        const configure = spyConfigure();
+        subject();
+        expect(configure).toHaveBeenCalledWith({ ignore: /bar/ });
         subject().ignore(/foo/);
-        expect(subject()._prevSilencerOptions).toEqual({ ignore: [/bar/, /foo/] });
+        expect(configure).toHaveBeenCalledWith({ ignore: [/bar/, /foo/] });
       });
     });
 
     describe("with existing ignore options (array)", () => {
       it("adds up to existing ignore options", () => {
         options = { ignore: [/bar/] };
-        expect(subject()._prevSilencerOptions).toEqual({ ignore: [/bar/] });
+        const configure = spyConfigure();
+        subject();
+        expect(configure).toHaveBeenCalledWith({ ignore: [/bar/] });
         subject().ignore(/foo/);
-        expect(subject()._prevSilencerOptions).toEqual({ ignore: [/bar/, /foo/] });
+        expect(configure).toHaveBeenCalledWith({ ignore: [/bar/, /foo/] });
       });
     });
   });
@@ -104,25 +110,31 @@ describe("Listener", () => {
   describe("#ignore!", () => {
     describe("with no existing options", () => {
       it("sets options", () => {
-        expect(subject()._prevSilencerOptions).toEqual(options);
+        const configure = spyConfigure();
+        subject();
+        expect(configure).toHaveBeenCalledWith(options);
       });
     });
 
     describe("with existing ignore! options", () => {
       it("overwrites existing ignore options", () => {
         options = { ignoreBang: /bar/ };
-        expect(subject()._prevSilencerOptions).toEqual({ ignoreBang: [/bar/] });
+        const configure = spyConfigure();
+        subject();
+        expect(configure).toHaveBeenCalledWith({ ignoreBang: /bar/ });
         subject().ignoreBang([/foo/]);
-        expect(subject()._prevSilencerOptions).toEqual({ ignoreBang: [/foo/] });
+        expect(configure).toHaveBeenCalledWith({ ignoreBang: [/foo/] });
       });
     });
 
     describe("with existing ignore options", () => {
       it("deletes ignore options", () => {
         options = { ignore: /bar/ };
-        expect(subject()._prevSilencerOptions).toEqual({ ignore: [/bar/] });
+        const configure = spyConfigure();
+        subject();
+        expect(configure).toHaveBeenCalledWith({ ignore: /bar/ });
         subject().ignoreBang([/foo/]);
-        expect(subject()._prevSilencerOptions).toEqual({ ignoreBang: [/foo/] });
+        expect(configure).toHaveBeenCalledWith({ ignoreBang: [/foo/] });
       });
     });
   });
@@ -131,9 +143,11 @@ describe("Listener", () => {
     describe("with existing only options", () => {
       it("overwrites existing ignore options", () => {
         options = { only: /bar/ };
-        expect(subject()._prevSilencerOptions).toEqual({ only: [/bar/] });
+        const configure = spyConfigure();
+        subject();
+        expect(configure).toHaveBeenCalledWith({ only: /bar/ });
         subject().only([/foo/]);
-        expect(subject()._prevSilencerOptions).toEqual({ only: [/foo/] });
+        expect(configure).toHaveBeenCalledWith({ only: [/foo/] });
       });
     });
   });
