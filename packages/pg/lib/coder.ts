@@ -82,7 +82,14 @@ export class Coder {
     this.#name = value;
   }
 
-  toH(): { oid: number; format: number; flags: number; name: string | null } {
+  dup(): this {
+    return new (this.constructor as new (hash: null, kwargs: Record<string, unknown>) => this)(
+      null,
+      this.toH(),
+    );
+  }
+
+  toH(): Record<string, unknown> {
     return {
       oid: this.oid,
       format: this.format,
@@ -92,10 +99,24 @@ export class Coder {
   }
 }
 
+export class SimpleCoder extends Coder {}
+
 export class CompositeCoder extends Coder {
   declare private _elem: Coder | null | undefined;
   declare private _needsQuotation: boolean | undefined;
   declare private _delimiter: string | undefined;
+  declare private _dimensions: number | undefined;
+
+  toH(): Record<string, unknown> {
+    const h: Record<string, unknown> = {
+      ...super.toH(),
+      elementsType: this.elementsType,
+      needsQuotation: this.isNeedsQuotation(),
+      delimiter: this.delimiter,
+    };
+    if (this.dimensions != null) h.dimensions = this.dimensions;
+    return h;
+  }
 
   set elementsType(elemType: Coder | null) {
     _rbCheckFrozen(this);
@@ -132,7 +153,22 @@ export class CompositeCoder extends Coder {
   get delimiter(): string {
     return this._delimiter ?? ",";
   }
+
+  setDimensions(dimensions: number | null): number | null {
+    _rbCheckFrozen(this);
+    if (dimensions != null && dimensions < 0) {
+      throw new ArgumentError("dimensions must be nil or >= 0");
+    }
+    this._dimensions = dimensions == null ? -1 : dimensions;
+    return dimensions;
+  }
+
+  get dimensions(): number | null {
+    const dimensions = this._dimensions ?? -1;
+    return dimensions < 0 ? null : dimensions;
+  }
 }
 
 PG.Coder = Coder;
+PG.SimpleCoder = SimpleCoder;
 PG.CompositeCoder = CompositeCoder;

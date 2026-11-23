@@ -210,6 +210,39 @@ export class Connection {
     });
   }
 
+  closePrepared(stmtName: string | null): Promise<Result> {
+    return this.#sendClose("S", stmtName);
+  }
+
+  closePortal(portal: string | null): Promise<Result> {
+    return this.#sendClose("P", portal);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  #sendClose(type: "S" | "P", name: string | null): Promise<Result> {
+    const stmt = name == null ? "" : stringValue(name);
+    return new Promise((resolve, reject) => {
+      const submittable = {
+        submit(connection: { close(msg: object): void; sync(): void }): null {
+          connection.close({ type, name: stmt });
+          connection.sync();
+          return null;
+        },
+        handleError: (error: unknown) => reject(engine!.pgError(this, error)),
+        handleReadyForQuery: () => {
+          if (type === "S") this.prepared.delete(stmt);
+          resolve(engine!.emptyResult());
+        },
+      };
+      engine!.submit(this, submittable).catch(reject);
+    });
+  }
+
+  declare asyncClosePrepared: Connection["closePrepared"];
+  declare syncClosePrepared: Connection["closePrepared"];
+  declare asyncClosePortal: Connection["closePortal"];
+  declare syncClosePortal: Connection["closePortal"];
+
   execPrepared(stmtName: string, params: unknown[]): Promise<Result> {
     return engine!.execute(this, this.prepared.get(stmtName), params, stmtName);
   }
@@ -512,6 +545,10 @@ export function conndefaultsHash(): Record<string, string | null> {
 
 Connection.prototype.exec = Connection.prototype.asyncExec;
 Connection.prototype.query = Connection.prototype.asyncExec;
+Connection.prototype.asyncClosePrepared = Connection.prototype.closePrepared;
+Connection.prototype.syncClosePrepared = Connection.prototype.closePrepared;
+Connection.prototype.asyncClosePortal = Connection.prototype.closePortal;
+Connection.prototype.syncClosePortal = Connection.prototype.closePortal;
 Connection.prototype.escapeString = escapeString;
 Connection.prototype.escape = escapeString;
 Connection.prototype.escapeBytea = escapeBytea;

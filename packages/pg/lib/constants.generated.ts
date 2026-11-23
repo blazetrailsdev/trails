@@ -24,6 +24,7 @@ import * as m21 from "./type-map-by-oid.js";
 import * as m22 from "./type-map.js";
 
 defineConstants([
+  [m0, "SimpleCoder", "Coder::SimpleCoder"],
   [m0, "Coder", "PG::Coder"],
   [m0, "CompositeCoder", "PG::CompositeCoder"],
   [m1, "CompositeDecoder", "PG::CompositeDecoder"],
