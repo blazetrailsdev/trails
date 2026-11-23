@@ -655,9 +655,9 @@ export class Loader {
       if (raised) return;
       const dirSlash = `${dir}/`;
 
-      for (const loader of Registry.loaders) {
-        if (loader === this) continue;
-        if (loader.__isIgnores(dir)) continue;
+      Registry.loaders.each((loader) => {
+        if (loader === this) return;
+        if (loader.__isIgnores(dir)) return;
 
         for (const rootDir of Object.keys(loader.__roots)) {
           if (this.isIgnores(rootDir)) continue;
@@ -670,7 +670,7 @@ export class Loader {
             );
           }
         }
-      }
+      });
     });
     if (synchronized instanceof Promise) {
       raised = true;
