@@ -6,6 +6,10 @@ import "../../lib/service/gcs-service.js";
 import { SERVICE_CONFIGURATIONS } from "../support/test-helper.js";
 import { SharedServiceTests } from "./shared-service-tests.js";
 
+const SERVICE = SERVICE_CONFIGURATIONS.gcs
+  ? Service.configure("gcs", SERVICE_CONFIGURATIONS)
+  : null;
+
 describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSServiceTest", () => {
-  SharedServiceTests(Service.configure("gcs", SERVICE_CONFIGURATIONS));
+  SharedServiceTests(SERVICE!);
 });
