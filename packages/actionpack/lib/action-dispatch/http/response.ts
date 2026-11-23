@@ -483,6 +483,7 @@ export class Response {
     }
   }
 
+  /** @inventedArm or — CONVERGEABLE response-body-setter-stores-each-only-body-raw */
   async setBody(body: unknown): Promise<void> {
     if (typeof body === "string") {
       this.stream = await this.buildBuffer(this, [body]);
