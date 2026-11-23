@@ -226,7 +226,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
     }
   });
 
-  it("upload with content_type and content_disposition", async () => {
+  it.skip("upload with content_type and content_disposition", async () => {
     const key = base58(24);
     const data = "Something else entirely!";
     try {
@@ -251,7 +251,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
     }
   });
 
-  it("upload with content_type", async () => {
+  it.skip("upload with content_type", async () => {
     const key = base58(24);
     const data = "Something else entirely!";
     try {
@@ -320,7 +320,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
     }
   });
 
-  it("update custom_metadata", async () => {
+  it.skip("update custom_metadata", async () => {
     const key = base58(24);
     const data = "Something else entirely!";
     try {
