@@ -1293,7 +1293,6 @@ export class Client {
     );
   }
 
-  /** @inventedArm if — PERMANENT */
   async ping(): Promise<boolean> {
     if (this.isClosed()) {
       return false;
