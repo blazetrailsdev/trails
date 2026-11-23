@@ -169,8 +169,8 @@ describe("MiddlewareExceptionsTest", { timeout: 120_000 }, () => {
   it("unspecified route when action_dispatch.show_exceptions is set shows 404", async () => {
     (await t.app()).config.actionDispatch.showExceptions = "all";
 
-    await t.get("/foo", {}, { HTTPS: "on" });
-    expect(t.lastResponse().body).toContain("The page you were looking for doesn’t exist.");
+    await expect(t.get("/foo", {}, { HTTPS: "on" })).resolves.not.toThrow();
+    expect(t.lastResponse().body).toMatch("The page you were looking for doesn’t exist.");
   });
 
   it("unspecified route when action_dispatch.show_exceptions and consider_all_requests_local are set shows diagnostics", async () => {
@@ -178,8 +178,8 @@ describe("MiddlewareExceptionsTest", { timeout: 120_000 }, () => {
     app.config.actionDispatch.showExceptions = "all";
     app.config.considerAllRequestsLocal = true;
 
-    await t.get("/foo", {}, { HTTPS: "on" });
-    expect(t.lastResponse().body).toContain("No route matches");
+    await expect(t.get("/foo", {}, { HTTPS: "on" })).resolves.not.toThrow();
+    expect(t.lastResponse().body).toMatch("No route matches");
   });
 
   it("routing to a nonexistent controller when action_dispatch.show_exceptions and consider_all_requests_local are set shows diagnostics", async () => {
@@ -190,7 +190,7 @@ describe("MiddlewareExceptionsTest", { timeout: 120_000 }, () => {
     app.config.considerAllRequestsLocal = true;
 
     await t.get("/articles", {}, { HTTPS: "on" });
-    expect(t.lastResponse().body).toContain("<title>Action Controller: Exception caught</title>");
+    expect(t.lastResponse().body).toMatch("<title>Action Controller: Exception caught</title>");
   });
 
   it("displays diagnostics message when exception raised in template that contains UTF-8", async () => {
@@ -222,7 +222,7 @@ describe("MiddlewareExceptionsTest", { timeout: 120_000 }, () => {
 
     await t.get("/foo?x[y]=1&x[y][][w]=2", {}, { HTTPS: "on" });
     expect(t.lastResponse().status).toBe(400);
-    expect(t.lastResponse().body).toContain("Invalid query parameters");
+    expect(t.lastResponse().body).toMatch("Invalid query parameters");
   });
 
   it("displays diagnostics message when too deep query parameters are provided", async () => {
@@ -237,7 +237,7 @@ describe("MiddlewareExceptionsTest", { timeout: 120_000 }, () => {
 
     await t.get(maliciousUrl, {}, { HTTPS: "on" });
     expect(t.lastResponse().status).toBe(400);
-    expect(t.lastResponse().body).toContain("Invalid query parameters");
+    expect(t.lastResponse().body).toMatch("Invalid query parameters");
   });
 
   it("displays statement invalid template correctly", async () => {
@@ -249,8 +249,8 @@ describe("MiddlewareExceptionsTest", { timeout: 120_000 }, () => {
 
     await t.get("/foo", {}, { HTTPS: "on" });
     expect(t.lastResponse().status).toBe(500);
-    expect(t.lastResponse().body).toContain("<title>Action Controller: Exception caught</title>");
-    expect(t.lastResponse().body).toContain("ActiveRecord::StatementInvalid");
+    expect(t.lastResponse().body).toMatch("<title>Action Controller: Exception caught</title>");
+    expect(t.lastResponse().body).toMatch("ActiveRecord::StatementInvalid");
 
     await t.get(
       "/foo",
@@ -259,7 +259,7 @@ describe("MiddlewareExceptionsTest", { timeout: 120_000 }, () => {
     );
     expect(t.lastResponse().status).toBe(500);
     expect(t.lastResponse().mediaType).toBe("text/plain");
-    expect(t.lastResponse().body).toContain("ActiveRecord::StatementInvalid");
+    expect(t.lastResponse().body).toMatch("ActiveRecord::StatementInvalid");
   });
 
   it("show_exceptions :rescubale with a rescuable error", async () => {
@@ -279,8 +279,9 @@ describe("MiddlewareExceptionsTest", { timeout: 120_000 }, () => {
 
     (await t.app()).config.actionDispatch.showExceptions = "rescuable";
 
-    const error = await t.get("/foo", {}, { HTTPS: "on" }).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(RuntimeError);
+    const response = t.get("/foo", {}, { HTTPS: "on" });
+    await expect(response).rejects.toThrow(RuntimeError);
+    const error = await response.catch((e: unknown) => e);
     expect((error as Error).message).toBe("oops");
   });
 });

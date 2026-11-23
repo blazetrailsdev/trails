@@ -464,7 +464,9 @@ describe("MiddlewareSessionTest", { timeout: 120_000 }, () => {
     expect(t.lastResponse().status).toBe(200);
     expect(t.lastResponse().body).toBe("It worked!");
 
-    expect((Trails.application!.middleware as MiddlewareStack).includes(Flash)).toBe(false);
+    expect(
+      (Trails.application!.middleware as MiddlewareStack).middlewares.map((m) => m.klass),
+    ).not.toContain(Flash);
   });
 
   it("disabled session allows reads and delete but fail on writes", async () => {
