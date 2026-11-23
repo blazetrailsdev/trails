@@ -1,5 +1,9 @@
 import {
   ArgumentError,
+  FrozenError,
+  rbInspect,
+  rbObjClassname,
+  rbObjRespondTo,
   LoadError,
   rbAnyToS,
   rbNum2Int,
@@ -43,6 +47,10 @@ export class Connection {
   parameterStatuses: Record<string, string> = {};
   sversion = 0;
   noticeReceiver: ((result: Result) => void) | null = null;
+  declare isnonblocking?: () => boolean;
+  declare pipelineStatus?: () => number;
+  declare encoderForPutCopyData?: object | null;
+  declare decoderForGetCopyData?: object | null;
 
   static conndefaultsHash = conndefaultsHash;
   static escapeString = escapeString;
@@ -166,7 +174,7 @@ export class Connection {
   }
 
   getClientEncoding(): string {
-    return this.parameterStatuses["client_encoding"] ?? "SQL_ASCII";
+    return this.parameterStatuses["client_encoding"] ?? "";
   }
 
   inspect(): string {
@@ -186,6 +194,15 @@ export class Connection {
           ` transaction_status=${Object.keys(PG.Constants).find((c) => c.startsWith("PQTRANS_") && PG.Constants[c as keyof typeof PG.Constants] == this.transactionStatus())}`,
         );
       }
+      /** @inventedArm if — CONVERGEABLE pg-connection-nonblocking-and-copy-data-coders */
+      if (rbObjRespondTo(this, "isnonblocking") && this.isnonblocking!()) {
+        parts.push(` nonblocking=${this.isnonblocking!()}`);
+      }
+      if (rbObjRespondTo(this, "pipelineStatus") && this.pipelineStatus!() != PG.PQ_PIPELINE_OFF) {
+        parts.push(
+          ` pipeline_status=${Object.keys(PG.Constants).find((c) => c.startsWith("PQ_PIPELINE_") && PG.Constants[c as keyof typeof PG.Constants] == this.pipelineStatus!())}`,
+        );
+      }
       if (this.getClientEncoding() != "UTF8") {
         parts.push(` client_encoding=${this.getClientEncoding()}`);
       }
@@ -194,6 +211,12 @@ export class Connection {
       }
       if (!(this.typeMapForQueries instanceof TypeMapAllStrings)) {
         parts.push(` type_map_for_queries=${rbAnyToS(this.typeMapForQueries)}`);
+      }
+      if (this.encoderForPutCopyData != null) {
+        parts.push(` encoder_for_put_copy_data=${rbAnyToS(this.encoderForPutCopyData)}`);
+      }
+      if (this.decoderForGetCopyData != null) {
+        parts.push(` decoder_for_get_copy_data=${rbAnyToS(this.decoderForGetCopyData)}`);
       }
       stats = ` host=${this.host()} port=${this.port()} user=${this.user()}${parts.join("")}`;
     }
@@ -220,6 +243,11 @@ export class Connection {
   declare asyncPipelineSync: Connection["pipelineSync"];
 
   setChunkedRowsMode(chunkSize: unknown): this {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
     const size = rbNum2Int(chunkSize);
     if (size <= 0 || this.pendingResult == null || this.pendingResultTaken) {
       throw new PgError("PQsetChunkedRowsMode ", { connection: this });
