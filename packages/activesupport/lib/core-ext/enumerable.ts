@@ -13,6 +13,7 @@ import {
 import { Range } from "@blazetrails/ruby-compat/range";
 import {
   block,
+  each,
   type Each,
   groupBy as enumGroupBy,
   Hash,
@@ -236,11 +237,7 @@ export function sole<T>(collection: Iterable<T> | Each<T>): T {
     result = element.length === 1 ? element[0] : element;
     found = true;
   };
-  if (typeof (collection as Partial<Each<T>>).each === "function") {
-    (collection as Each<T>).each(block);
-  } else {
-    for (const elem of collection as Iterable<T>) block(elem);
-  }
+  each(collection as object, block);
 
   if (found) {
     return result as T;

@@ -3,12 +3,12 @@ import { rbBlockGivenP, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat
 type TryBlock = (this: unknown, self?: unknown) => unknown;
 
 export interface Tryable {
-  try(...args: unknown[] | [TryBlock]): unknown;
-  tryBang(...args: unknown[] | [TryBlock]): unknown;
+  try(...args: [...unknown[], TryBlock] | unknown[]): unknown;
+  tryBang(...args: [...unknown[], TryBlock] | unknown[]): unknown;
 }
 
 export const Tryable = {
-  try(obj: unknown, ...args: unknown[] | [TryBlock]): unknown {
+  try(obj: unknown, ...args: [...unknown[], TryBlock] | unknown[]): unknown {
     if (obj == null) return null;
     const block = args.at(-1) as TryBlock | undefined;
     if (args.length === 1 && rbBlockGivenP(block)) {
@@ -23,7 +23,7 @@ export const Tryable = {
     return null;
   },
 
-  tryBang(obj: unknown, ...args: unknown[] | [TryBlock]): unknown {
+  tryBang(obj: unknown, ...args: [...unknown[], TryBlock] | unknown[]): unknown {
     if (obj == null) return null;
     const block = args.at(-1) as TryBlock | undefined;
     if (args.length === 1 && rbBlockGivenP(block)) {
@@ -45,13 +45,19 @@ export class Delegator implements Tryable {
     this._delegate = delegate;
   }
 
-  try(...args: unknown[] | [TryBlock]): unknown {
-    const method = args[0] as string;
-    return Tryable.try(method in this ? this : this._delegate, ...args);
+  try(...args: [...unknown[], TryBlock] | unknown[]): unknown {
+    const method = args[0];
+    return Tryable.try(
+      typeof method !== "string" || method in this ? this : this._delegate,
+      ...args,
+    );
   }
 
-  tryBang(...args: unknown[] | [TryBlock]): unknown {
-    const method = args[0] as string;
-    return Tryable.tryBang(method in this ? this : this._delegate, ...args);
+  tryBang(...args: [...unknown[], TryBlock] | unknown[]): unknown {
+    const method = args[0];
+    return Tryable.tryBang(
+      typeof method !== "string" || method in this ? this : this._delegate,
+      ...args,
+    );
   }
 }
