@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { minutes } from "@blazetrails/activesupport";
+import { Storage } from "@google-cloud/storage";
+import { base58, deepMerge, minutes } from "@blazetrails/activesupport";
 import { Utils } from "@blazetrails/rack";
-import { OpenSSL } from "@blazetrails/ruby-compat";
+import { Digest, OpenSSL, StringIO } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { Filename } from "../../lib/filename.js";
 import { Service } from "../../lib/service.js";
@@ -14,8 +15,192 @@ const SERVICE = SERVICE_CONFIGURATIONS.gcs
   ? Service.configure("gcs", SERVICE_CONFIGURATIONS)
   : null;
 
+function configWithCacheControl(): Record<string, Record<string, unknown>> {
+  return deepMerge(SERVICE_CONFIGURATIONS, { gcs: { cacheControl: "public, max-age=1800" } });
+}
+
+async function storedMetadata(key: string): Promise<Record<string, unknown>> {
+  const { apiEndpoint, project, bucket } = SERVICE_CONFIGURATIONS.gcs;
+  const storage = new Storage({ apiEndpoint: apiEndpoint as string, projectId: project as string });
+  const [metadata] = await storage
+    .bucket(bucket as string)
+    .file(key)
+    .getMetadata();
+  return metadata;
+}
+
 describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSServiceTest", () => {
   const ctx = SharedServiceTests(SERVICE!);
+
+  async function directUpload(service: Service, key: string, data: string): Promise<void> {
+    const checksum = OpenSSL.Digest.MD5.base64digest(data);
+    const url = await service.urlForDirectUpload(key, {
+      expiresIn: minutes(5),
+      contentType: "text/plain",
+      contentLength: data.length,
+      checksum: checksum,
+    });
+    await fetch(url, {
+      method: "PUT",
+      body: data,
+      headers: {
+        "Content-Type": "",
+        "Content-MD5": checksum,
+        "x-goog-content-length-range": `${data.length},${data.length}`,
+      },
+    });
+  }
+
+  // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType; the URL's signature is asserted offline by GCSServiceDirectUploadSignatureTest.
+  it.skip("direct upload", async () => {
+    const key = base58(24);
+    const data = "Something else entirely!";
+    try {
+      await directUpload(ctx.service, key, data);
+      expect(new TextDecoder().decode(await ctx.service.download(key))).toBe(data);
+    } finally {
+      await ctx.service.delete(key);
+    }
+  });
+
+  // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType and enforces no x-goog-content-length-range.
+  it.skip("directly uploading file larger than the provided content-length does not work", () => {});
+
+  // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType.
+  it.skip("direct upload with content disposition", () => {});
+
+  // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType; Cache-Control is asserted offline by "direct upload headers with cache control include Cache-Control".
+  it.skip("direct upload with cache control", () => {});
+
+  // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType; the unsigned Content-Type is asserted offline by "direct upload with cache control authorizes only an empty Content-Type".
+  it.skip("direct upload with cache control rejects a Content-Type the URL does not sign", () => {});
+
+  it("upload with content_type and content_disposition", async () => {
+    const key = base58(24);
+    const data = "Something else entirely!";
+    try {
+      await ctx.service.upload(key, new StringIO(data), {
+        checksum: OpenSSL.Digest.MD5.base64digest(data),
+        disposition: "attachment",
+        filename: new Filename("test.txt"),
+        contentType: "text/plain",
+      });
+
+      const url = await ctx.service.url(key, {
+        expiresIn: minutes(2),
+        disposition: "inline",
+        contentType: "text/html",
+        filename: new Filename("test.html"),
+      });
+      const response = await fetch(url);
+      expect(response.headers.get("Content-Type")).toMatch(/^text\/plain/);
+      expect((await storedMetadata(key)).contentDisposition).toMatch(/attachment;.*test.txt/);
+    } finally {
+      await ctx.service.delete(key);
+    }
+  });
+
+  it("upload with content_type", async () => {
+    const key = base58(24);
+    const data = "Something else entirely!";
+    try {
+      await ctx.service.upload(key, new StringIO(data), {
+        checksum: OpenSSL.Digest.MD5.base64digest(data),
+        contentType: "text/plain",
+      });
+
+      const url = await ctx.service.url(key, {
+        expiresIn: minutes(2),
+        disposition: "inline",
+        contentType: "text/html",
+        filename: new Filename("test.html"),
+      });
+      const response = await fetch(url);
+      expect(response.headers.get("Content-Type")).toMatch(/^text\/plain/);
+      expect(decodeURIComponent(url)).toMatch(/response-content-disposition=inline;.*test.html/);
+    } finally {
+      await ctx.service.delete(key);
+    }
+  });
+
+  it("upload with cache_control", async () => {
+    const key = base58(24);
+    const data = "Something else entirely!";
+    const service = Service.configure("gcs", configWithCacheControl());
+    try {
+      await service.upload(key, new StringIO(data), {
+        checksum: Digest.MD5.base64digest(data),
+        contentType: "text/plain",
+      });
+
+      const url = await service.url(key, {
+        expiresIn: minutes(2),
+        disposition: "inline",
+        contentType: "text/html",
+        filename: new Filename("test.html"),
+      });
+      await fetch(url);
+      expect((await storedMetadata(key)).cacheControl).toBe("public, max-age=1800");
+    } finally {
+      await service.delete(key);
+    }
+  });
+
+  it("upload with custom_metadata", async () => {
+    const key = base58(24);
+    const data = "Something else entirely!";
+    try {
+      await ctx.service.upload(key, new StringIO(data), {
+        checksum: Digest.MD5.base64digest(data),
+        contentType: "text/plain",
+        customMetadata: { foo: "baz" },
+      });
+
+      const url = await ctx.service.url(key, {
+        expiresIn: minutes(2),
+        disposition: "inline",
+        contentType: "text/html",
+        filename: new Filename("test.html"),
+      });
+      await fetch(url);
+      expect((await storedMetadata(key)).metadata).toEqual({ foo: "baz" });
+    } finally {
+      await ctx.service.delete(key);
+    }
+  });
+
+  it("update custom_metadata", async () => {
+    const key = base58(24);
+    const data = "Something else entirely!";
+    try {
+      await ctx.service.upload(key, new StringIO(data), {
+        checksum: OpenSSL.Digest.MD5.base64digest(data),
+        disposition: "attachment",
+        filename: new Filename("test.html"),
+        contentType: "text/html",
+        customMetadata: { foo: "baz" },
+      });
+
+      await ctx.service.updateMetadata(key, {
+        disposition: "inline",
+        filename: new Filename("test.txt"),
+        contentType: "text/plain",
+        customMetadata: { foo: "bar" },
+      });
+      const url = await ctx.service.url(key, {
+        expiresIn: minutes(2),
+        disposition: "attachment",
+        contentType: "text/html",
+        filename: new Filename("test.html"),
+      });
+      const response = await fetch(url);
+      expect(response.headers.get("Content-Type")).toMatch(/^text\/plain/);
+      expect((await storedMetadata(key)).contentDisposition).toMatch(/inline;.*test.txt/);
+      expect((await storedMetadata(key)).metadata).toEqual({ foo: "bar" });
+    } finally {
+      await ctx.service.delete(key);
+    }
+  });
 
   it("name", () => {
     expect(ctx.service.name).toBe("gcs");
@@ -30,6 +215,28 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
         contentType: "text/plain",
       }),
     ).toMatch(/response-content-disposition=inline.*test\.txt.*response-content-type=text%2Fplain/);
+  });
+
+  describe.skipIf(!Object.hasOwn(SERVICE_CONFIGURATIONS.gcs ?? {}, "gsaEmail"))("IAM", () => {
+    // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType.
+    it.skip("direct upload with IAM signing", () => {});
+
+    it("url with IAM signing", async () => {
+      const service = Service.configure(
+        "gcs",
+        deepMerge(SERVICE_CONFIGURATIONS, { gcs: { iam: true } }),
+      );
+      expect(
+        await service.url(base58(24), {
+          expiresIn: minutes(2),
+          disposition: "inline",
+          filename: new Filename("test.txt"),
+          contentType: "text/plain",
+        }),
+      ).toMatch(
+        /response-content-disposition=inline.*test\.txt.*response-content-type=text%2Fplain/,
+      );
+    });
   });
 });
 
