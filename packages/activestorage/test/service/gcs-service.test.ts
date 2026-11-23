@@ -226,6 +226,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
     }
   });
 
+  // BLOCKED: gcs-signed-get-content-type-tests-run-against-real-gcs
   it.skip("upload with content_type and content_disposition", async () => {
     const key = base58(24);
     const data = "Something else entirely!";
@@ -251,6 +252,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
     }
   });
 
+  // BLOCKED: gcs-signed-get-content-type-tests-run-against-real-gcs
   it.skip("upload with content_type", async () => {
     const key = base58(24);
     const data = "Something else entirely!";
@@ -320,6 +322,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
     }
   });
 
+  // BLOCKED: gcs-signed-get-content-type-tests-run-against-real-gcs
   it.skip("update custom_metadata", async () => {
     const key = base58(24);
     const data = "Something else entirely!";
