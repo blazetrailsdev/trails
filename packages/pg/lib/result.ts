@@ -59,7 +59,8 @@ export class Result {
     this.#error = error;
   }
 
-  #pgresultGet(): pg.QueryResult {
+  /** @internal */
+  private _pgresultGet(): pg.QueryResult {
     if (this._cleared) throw new PgError("result has been cleared");
     return this.#native;
   }
@@ -79,7 +80,7 @@ export class Result {
   }
 
   resultStatus(): number {
-    this.#pgresultGet();
+    this._pgresultGet();
     if (this.#error != null) return PGConstants.PGRES_FATAL_ERROR;
     return this.nfields() > 0 ? PGConstants.PGRES_TUPLES_OK : PGConstants.PGRES_COMMAND_OK;
   }
@@ -95,7 +96,7 @@ export class Result {
   }
 
   resStatus(...args: unknown[]): string {
-    this.#pgresultGet();
+    this._pgresultGet();
     if (args.length == 0) {
       return Result.resStatus(this.resultStatus());
     } else if (args.length == 1) {
@@ -114,7 +115,7 @@ export class Result {
   }
 
   errorField(fieldcode: number): string | null {
-    this.#pgresultGet();
+    this._pgresultGet();
     const name = _ERROR_FIELDS[fieldcode];
     const fieldstr = name == null || this.#error == null ? null : this.#error[name];
     return fieldstr == null ? null : String(fieldstr);
@@ -125,25 +126,25 @@ export class Result {
   }
 
   ntuples(): number {
-    return (this.#pgresultGet().rows ?? []).length;
+    return (this._pgresultGet().rows ?? []).length;
   }
 
   nfields(): number {
-    return (this.#pgresultGet().fields ?? []).length;
+    return (this._pgresultGet().fields ?? []).length;
   }
 
   ftype(index: number): number {
     if (index < 0 || index >= this.fields().length) {
       throw new ArgumentError(`invalid field number ${index}`);
     }
-    return this.#pgresultGet().fields[index].dataTypeID;
+    return this._pgresultGet().fields[index].dataTypeID;
   }
 
   fmod(columnNumber: number): number {
     if (columnNumber < 0 || columnNumber >= this.fields().length) {
       throw new ArgumentError(`Column number is out of range: ${columnNumber}`);
     }
-    return this.#pgresultGet().fields[columnNumber].dataTypeModifier;
+    return this._pgresultGet().fields[columnNumber].dataTypeModifier;
   }
 
   getvalue(tupNum: number, fieldNum: number): unknown {
@@ -157,15 +158,15 @@ export class Result {
   }
 
   cmdTuples(): number {
-    return this.#pgresultGet().rowCount ?? 0;
+    return this._pgresultGet().rowCount ?? 0;
   }
 
   fields(): string[] {
-    return (this.#pgresultGet().fields ?? []).map((f) => f.name);
+    return (this._pgresultGet().fields ?? []).map((f) => f.name);
   }
 
   values(): unknown[][] {
-    return ((this.#pgresultGet().rows ?? []) as unknown[][]).map((row, i) =>
+    return ((this._pgresultGet().rows ?? []) as unknown[][]).map((row, i) =>
       row.map((_, j) => this.#typecastResultValue(i, j)),
     );
   }

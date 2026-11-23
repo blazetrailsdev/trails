@@ -51,11 +51,8 @@ export class Connection {
   sversion = 0;
   noticeReceiver: ((result: Result) => void) | null = null;
   declare pipelineStatus?: () => number;
-  /** @internal */
   _nonblocking = false;
-  /** @internal */
   _encoderForPutCopyData: Coder | null = null;
-  /** @internal */
   _decoderForGetCopyData: Coder | null = null;
   declare asyncIsnonblocking: Connection["isnonblocking"];
   declare isNonblocking: Connection["isnonblocking"];
