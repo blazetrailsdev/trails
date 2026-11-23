@@ -1373,10 +1373,7 @@ export class PostgreSQLAdapter
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs new — PERMANENT
-   */
+  /** @internal */
   async addPgDecoders(): Promise<void> {
     this._mappedDefaultTimezone = null;
     this.timestampDecoder = null;

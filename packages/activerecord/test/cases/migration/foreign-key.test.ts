@@ -1356,7 +1356,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
   });
 
   describe("CompositeForeignKeyTest", () => {
-    fixtures([], { useTransactionalTests: false });
+    fixtures([]);
 
     it("add composite foreign key raises without options", async () => {
       const conn = await ambientConnection();

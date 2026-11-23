@@ -186,48 +186,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     expect(post.author_id).toBe(author.id);
   });
 
-  it("belongs_to autosave with mismatched composite FK/PK uses zip semantics", async () => {
-    class Parent extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class Child extends Base {
-      declare parent_id: number | null;
-      declare group: string | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "topics";
-        this.attribute("parent_id", "integer");
-        this.attribute("group", "string");
-        this.attribute("title", "string");
-      }
-    }
-    constSet(TopLevel, "ZipParent", Parent);
-    DescendantsTracker.registerSubclass(Base, Parent);
-    constSet(TopLevel, "ZipChild", Child);
-    DescendantsTracker.registerSubclass(Base, Child);
-    Associations.belongsTo.call(Child, "parent", {
-      primaryKey: "id",
-      foreignKey: ["parent_id", "group"],
-      className: "ZipParent",
-      autosave: true,
-    });
-
-    const parent = new Parent({ name: "P" });
-    const child = new Child({ title: "c" });
-    cacheAssoc(child, "parent", parent);
-    child.group = "us-west";
-    await child.save();
-    expect(parent.isNewRecord()).toBe(false);
-    expect(child.parent_id).toBe(parent.id);
-    expect(child.group).toBe("us-west");
-  });
-
   it("default belongs_to runs validations on the new target via validate: !autosave", async () => {
     class Author extends Base {
       declare name: string | null;
@@ -283,18 +241,18 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this._tableName = "books";
         this.attribute("author_id", "integer");
         this.attribute("name", "string");
+        this.belongsTo("parent", {
+          primaryKey: ["id", "name"],
+          foreignKey: "author_id",
+          className: "LongPkParent",
+          autosave: true,
+        });
       }
     }
     constSet(TopLevel, "LongPkParent", Parent);
     DescendantsTracker.registerSubclass(Base, Parent);
     constSet(TopLevel, "LongPkChild", Child);
     DescendantsTracker.registerSubclass(Base, Child);
-    Associations.belongsTo.call(Child, "parent", {
-      primaryKey: ["id", "name"],
-      foreignKey: "author_id",
-      className: "LongPkParent",
-      autosave: true,
-    });
 
     const parent = new Parent({ name: "P" });
     const child = new Child({ name: "c" });

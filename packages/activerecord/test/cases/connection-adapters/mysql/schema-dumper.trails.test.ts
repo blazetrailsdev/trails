@@ -181,16 +181,18 @@ describe("MySQL::SchemaDumper", () => {
   describe("isDefaultPrimaryKey", () => {
     it("true: bigint + autoIncrement + non-unsigned", async () =>
       expect(
-        ((await make()) as any).isDefaultPrimaryKey(col({ bigint: true, autoIncrement: true })),
+        await ((await make()) as any).isDefaultPrimaryKey(
+          col({ bigint: true, autoIncrement: true }),
+        ),
       ).toBe(true));
     it("false: unsigned", async () =>
       expect(
-        ((await make()) as any).isDefaultPrimaryKey(
+        await ((await make()) as any).isDefaultPrimaryKey(
           col({ bigint: true, autoIncrement: true, unsigned: true }),
         ),
       ).toBe(false));
     it("false: no autoIncrement", async () =>
-      expect(((await make()) as any).isDefaultPrimaryKey(col({ bigint: true }))).toBe(false));
+      expect(await ((await make()) as any).isDefaultPrimaryKey(col({ bigint: true }))).toBe(false));
   });
 
   describe("isExplicitPrimaryKeyDefault", () => {
