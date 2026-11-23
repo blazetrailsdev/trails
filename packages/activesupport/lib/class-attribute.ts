@@ -111,7 +111,7 @@ export function classAttribute(this: object, ...attrs: (string | ClassAttributeO
     if (rbModSingletonP(this)) {
       if (instanceReader) {
         methods.get = function (this: object) {
-          return (rbObjSingletonClass(this) as Slots)[name];
+          return Reflect.get(rbObjSingletonClass(this), name);
         };
       }
     } else if (instanceReader) {
