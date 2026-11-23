@@ -46,9 +46,13 @@ function paint(): void {
     (html) => {
       if (run !== painted) return;
       backdrop.innerHTML = html;
+      editor.classList.add("highlighted");
       syncScroll();
     },
-    (e: unknown) => console.error("highlighting failed:", e),
+    (e: unknown) => {
+      editor.classList.remove("highlighted");
+      console.error("highlighting failed:", e);
+    },
   );
 }
 function syncScroll(): void {

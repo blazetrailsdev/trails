@@ -184,10 +184,13 @@ main {
 #editor {
   border: 0;
   resize: none;
-  color: transparent;
+  color: var(--code-text);
   background: transparent;
   caret-color: var(--mango);
   outline: none;
+}
+#editor.highlighted {
+  color: transparent;
 }
 #editor::selection {
   background: rgb(242 176 30 / 0.3);
