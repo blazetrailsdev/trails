@@ -31,6 +31,7 @@ import { ActiveStorage } from "../../../lib/active-storage.js";
 import { Engine } from "../../../lib/engine.js";
 import { Current } from "../../../lib/current.js";
 import "../../../lib/service/configurator.js";
+import { SERVICE_CONFIGURATIONS } from "../service-configurations.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
 
@@ -59,6 +60,7 @@ TopLevel.Trails = {
     activeStorage: {
       service: "local",
       serviceConfigurations: {
+        ...SERVICE_CONFIGURATIONS,
         local: { service: "Disk", root: File.join(Dir.tmpdir(), "active_storage_blobs") },
         local_public: {
           service: "Disk",

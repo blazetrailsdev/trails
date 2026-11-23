@@ -1,5 +1,6 @@
 import "../constants.gcs-service.generated.js";
 import { ApiError, Storage, type Bucket, type File } from "@google-cloud/storage";
+import { isPresent } from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import { fetch, type Range } from "@blazetrails/ruby-compat";
 import { Error as ActiveStorageError, FileNotFoundError, IntegrityError } from "../errors.js";
@@ -176,6 +177,78 @@ export class GCSService extends Service {
     });
   }
 
+  override async urlForDirectUpload(
+    key: string,
+    {
+      expiresIn,
+      checksum,
+      contentLength,
+      customMetadata = {},
+    }: {
+      expiresIn: unknown;
+      checksum: string;
+      contentLength: number;
+      customMetadata?: Record<string, unknown>;
+      [k: string]: unknown;
+    },
+  ): Promise<string> {
+    return await this.instrument("url", { key: key }, async (payload) => {
+      const args = {
+        contentMd5: checksum,
+        expires: Date.now() + Number(expiresIn) * 1000,
+        extensionHeaders: {
+          "x-goog-content-length-range": this.contentLengthRange(contentLength),
+          ...this.customMetadataHeaders(customMetadata),
+        },
+        action: "write" as const,
+        version: "v2" as const,
+      };
+
+      const [generatedUrl] = await this.bucket().file(key).getSignedUrl(args);
+
+      payload.url = generatedUrl;
+
+      return generatedUrl;
+    });
+  }
+
+  override headersForDirectUpload(
+    _key: string,
+    {
+      checksum,
+      contentLength,
+      filename = null,
+      disposition = null,
+      customMetadata = {},
+    }: {
+      checksum: string;
+      contentLength: number;
+      filename?: Filename | null;
+      disposition?: string | null;
+      customMetadata?: Record<string, unknown>;
+      [k: string]: unknown;
+    },
+  ): Record<string, string> {
+    let contentDisposition: string | undefined;
+    if (filename != null)
+      contentDisposition = this.contentDispositionWith({
+        type: disposition ?? undefined,
+        filename: filename,
+      });
+
+    const headers: Record<string, string> = {
+      "Content-MD5": checksum,
+      "Content-Disposition": contentDisposition!,
+      "x-goog-content-length-range": this.contentLengthRange(contentLength),
+      ...this.customMetadataHeaders(customMetadata),
+    };
+    if (isPresent(this.config.cacheControl)) {
+      headers["Cache-Control"] = this.config.cacheControl as string;
+    }
+
+    return headers;
+  }
+
   override async compose(
     sourceKeys: string[],
     destinationKey: string,
@@ -201,6 +274,43 @@ export class GCSService extends Service {
       });
     file.metadata = customMetadata;
     await composed.setMetadata(file);
+  }
+
+  /** @internal */
+  protected override async privateUrl(
+    key: string,
+    {
+      expiresIn,
+      filename,
+      contentType,
+      disposition,
+    }: {
+      expiresIn?: unknown;
+      filename?: Filename;
+      contentType?: string | null;
+      disposition?: string;
+      [k: string]: unknown;
+    },
+  ): Promise<string> {
+    const args = {
+      expires: Date.now() + Number(expiresIn) * 1000,
+      queryParams: {
+        "response-content-disposition": this.contentDispositionWith({
+          type: disposition,
+          filename: filename!,
+        }),
+        ...(contentType == null ? {} : { "response-content-type": contentType }),
+      },
+      action: "read" as const,
+    };
+
+    const [url] = await (await this.fileFor(key))!.getSignedUrl(args);
+    return url;
+  }
+
+  /** @internal */
+  protected override async publicUrl(key: string): Promise<string> {
+    return (await this.fileFor(key))!.publicUrl();
   }
 
   /**
@@ -257,6 +367,20 @@ export class GCSService extends Service {
       });
     }
     return this._client;
+  }
+
+  /** @internal */
+  protected override customMetadataHeaders(
+    metadata: Record<string, unknown>,
+  ): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(metadata).map(([key, value]) => [`x-goog-meta-${key}`, value as string]),
+    );
+  }
+
+  /** @internal */
+  private contentLengthRange(contentLength: number): string {
+    return `${contentLength},${contentLength}`;
   }
 }
 

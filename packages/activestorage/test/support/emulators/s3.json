@@ -1,0 +1,10 @@
+{
+  "identities": [
+    {
+      "name": "trails",
+      "credentials": [{ "accessKey": "trails", "secretKey": "trails-secret" }],
+      "actions": ["Admin", "Read", "List", "Tagging", "Write"]
+    },
+    { "name": "anonymous", "actions": ["Read:trails-public"] }
+  ]
+}
