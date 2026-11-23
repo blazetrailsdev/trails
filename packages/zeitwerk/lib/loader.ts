@@ -110,7 +110,7 @@ export class Loader {
   /** @internal */ _generation: number;
   /** @internal */ _realRoots: Record<string, string>;
 
-  /** @inlinedFrom Zeitwerk::Loader::Config#initialize zeitwerk/v2.7.2/lib/zeitwerk/loader/config.rb:86-101 */
+  /** @inlinedFrom Zeitwerk::Loader::Config#initialize zeitwerk/v2.7.3/lib/zeitwerk/loader/config.rb:86-101 */
   constructor() {
     this.inflector = new Inflector();
     this.logger = (this.constructor as typeof Loader).defaultLogger;
