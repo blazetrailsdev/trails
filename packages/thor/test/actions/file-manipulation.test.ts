@@ -62,6 +62,8 @@ describe("Thor::Actions", () => {
   beforeEach(() => {
     destinationRoot_ = Dir.mktmpdir("thor-sandbox-");
     runner_ = null;
+    readline.mockReset();
+    vi.mocked(rbFSystem).mockReset();
   });
 
   afterEach(() => {
