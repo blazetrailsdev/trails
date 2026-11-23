@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/chronic",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Natural-language date parsing for Trails, mirroring the chronic gem",
   "license": "MIT",
   "repository": {

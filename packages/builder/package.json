@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/builder",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "XML markup builder for Trails, mirroring the builder gem",
   "license": "MIT",
   "repository": {

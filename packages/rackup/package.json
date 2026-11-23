@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/rackup",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "A general server command for Rack applications, mirroring Ruby's rackup",
   "license": "MIT",
   "repository": {

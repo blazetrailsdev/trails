@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/listen",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "File system change notifications for Trails, mirroring the listen gem over @parcel/watcher",
   "license": "MIT",
   "repository": {

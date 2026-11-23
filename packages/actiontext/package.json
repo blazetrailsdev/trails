@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/actiontext",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Rich text content and editing for Trails, mirroring the actiontext gem",
   "license": "MIT",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/fugit",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Cron, duration and time parsing for Trails, mirroring the fugit gem",
   "license": "MIT",
   "repository": {

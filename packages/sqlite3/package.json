@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/sqlite3",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "The SQLite client, mirroring Ruby's sqlite3 gem",
   "license": "MIT",
   "repository": {

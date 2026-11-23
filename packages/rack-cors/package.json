@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/rack-cors",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Rack middleware for Cross-Origin Resource Sharing, mirroring Ruby's rack-cors",
   "license": "MIT",
   "repository": {

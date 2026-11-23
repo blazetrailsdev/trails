@@ -10,7 +10,7 @@ description: How a trails application's tests are laid out, run on Vitest, load 
 > [trailties package](/packages/trailties) ·
 > [actionpack package](/packages/actionpack) ·
 > [activesupport package](/packages/activesupport) ·
-> [vitest-matchers package](https://github.com/blazetrailsdev/trails/tree/main/packages/vitest-matchers)
+> [vitest-matchers package](/packages/vitest-matchers)
 
 A new trails application comes with a test directory, a test database and
 generators that write a test beside every model, controller and mailer they
@@ -98,7 +98,7 @@ Minitest's built-in assertions port to Vitest's `expect`, as the table in
 [CONTRIBUTING.md § "Porting a Minitest assertion"](https://github.com/blazetrailsdev/trails/blob/main/CONTRIBUTING.md#porting-a-minitest-assertion)
 lists: `assert_equal` is `toEqual`, `assert_nil` is `toBeNull`, and so on.
 Where Vitest's matcher gives the wrong answer for a Ruby value — `toBeTruthy`
-on `0` or `""` — [vitest-matchers](https://github.com/blazetrailsdev/trails/tree/main/packages/vitest-matchers) supplies one
+on `0` or `""` — [vitest-matchers](/packages/vitest-matchers) supplies one
 that follows Ruby truthiness.
 
 ### Trails-Specific Assertions

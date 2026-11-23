@@ -32,11 +32,12 @@ jobs:
           test "v$version" = "$GITHUB_REF_NAME"
       - name: Publish (dry run)
         if: github.event_name == 'pull_request'
-        run: pnpm -r publish --dry-run --no-git-checks
+        run: pnpm -r publish --dry-run --no-git-checks --tag practice
       - name: Publish
         if: github.event_name == 'push'
         run: |
+          case "$GITHUB_REF_NAME" in *-alpha0*) tag=practice ;; *) tag=latest ;; esac
           echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc
-          pnpm -r publish --no-git-checks --provenance
+          pnpm -r publish --no-git-checks --provenance --tag "$tag"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

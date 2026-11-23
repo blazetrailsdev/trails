@@ -21,3 +21,17 @@ for (const dir of (await readdir(PACKAGES)).sort()) {
   await writeFile(file, JSON.stringify(manifest, null, 2) + "\n");
   console.log(`${dir}: ${version}`);
 }
+
+const [, major, minor, tiny, pre] = /^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/.exec(version)!;
+const gemVersionFile = path.join(PACKAGES, "trailties", "lib", "gem-version.ts");
+await writeFile(
+  gemVersionFile,
+  (await readFile(gemVersionFile, "utf8"))
+    .replace(/^const MAJOR = .*;$/m, `const MAJOR = ${major};`)
+    .replace(/^const MINOR = .*;$/m, `const MINOR = ${minor};`)
+    .replace(/^const TINY = .*;$/m, `const TINY = ${tiny};`)
+    .replace(
+      /^const PRE: string \| null = .*;$/m,
+      `const PRE: string | null = ${pre === undefined ? "null" : JSON.stringify(pre)};`,
+    ),
+);

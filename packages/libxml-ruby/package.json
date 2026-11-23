@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/libxml-ruby",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "LibXML::XML parser, SAX parser and node surface for Trails, mirroring libxml-ruby",
   "license": "MIT",
   "repository": {

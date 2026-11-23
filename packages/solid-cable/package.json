@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/solid-cable",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Database-backed Action Cable backend for Trails, mirroring the solid_cable gem",
   "license": "MIT",
   "repository": {

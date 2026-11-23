@@ -7,7 +7,7 @@ export function gemVersion(): InstanceType<typeof Gem.Version> {
 const MAJOR = 0;
 const MINOR = 1;
 const TINY = 0;
-const PRE: string | null = null;
+const PRE: string | null = "alpha0";
 
 export const VERSION = {
   MAJOR,

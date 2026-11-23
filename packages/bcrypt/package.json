@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/bcrypt",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "bcrypt() password hashing, mirroring Ruby's bcrypt gem",
   "license": "MIT",
   "repository": {
