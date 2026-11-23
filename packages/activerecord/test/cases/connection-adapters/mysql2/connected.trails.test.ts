@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import mysql from "mysql2/promise";
 import { Mysql2 } from "@blazetrails/mysql2";
 import { Mysql2Adapter } from "../../../../lib/connection-adapters/mysql2-adapter.js";
-import { withCoreQuery } from "../../../support/mysql2-core-query.js";
 
 function adapterWith(raw: unknown): Mysql2Adapter {
   const adapter = Object.create(Mysql2Adapter.prototype) as Mysql2Adapter;
@@ -16,7 +15,7 @@ async function promiseConnection(base: object): Promise<unknown> {
   const connection = new PromiseConnection(Object.assign(Object.create({ on() {} }), base));
   const createConnection = vi
     .spyOn(mysql, "createConnection")
-    .mockResolvedValue(withCoreQuery(connection) as never);
+    .mockResolvedValue(connection as never);
   try {
     return await Mysql2.Client.new({});
   } finally {
