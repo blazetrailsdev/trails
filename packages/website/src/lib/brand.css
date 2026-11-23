@@ -4,6 +4,10 @@
   --bt-mango: #f2b01e;
   --bt-ink: #2b1d14;
   --bt-tint: #fdf1d6;
+  --bt-bg: #fff;
+  --bt-surface: #fff;
+  --bt-text: #2b1d14;
+  --bt-shadow: rgb(0 0 0 / 0.1);
   --bt-tint-border: #ecd9b0;
   --bt-muted: #7a6450;
   --bt-code-bg: #3a2a1f;
@@ -13,4 +17,15 @@
   --bt-font-sans: "Instrument Sans Variable", "Helvetica Neue", Arial, system-ui, sans-serif;
   --bt-font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --bt-wordmark-underline: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 20 1, 32 9, 50 5 S 82 1, 98 6 S 114 7, 118 3' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+html.dark {
+  --bt-bg: #1a120c;
+  --bt-surface: #241912;
+  --bt-text: #f3e6d6;
+  --bt-tint: #2b1d14;
+  --bt-tint-border: #4a3628;
+  --bt-muted: #b49a80;
+  --bt-shadow: rgb(0 0 0 / 0.4);
+  color-scheme: dark;
 }

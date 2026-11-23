@@ -6,18 +6,18 @@
   --vp-c-brand-3: var(--bt-orange);
   --vp-c-brand-soft: rgba(232, 89, 12, 0.12);
 
-  --vp-c-bg: #fff;
+  --vp-c-bg: var(--bt-bg);
   --vp-c-bg-alt: var(--bt-tint);
-  --vp-c-bg-elv: #fff;
+  --vp-c-bg-elv: var(--bt-surface);
   --vp-c-bg-soft: var(--bt-tint);
 
   --vp-c-border: var(--bt-tint-border);
   --vp-c-divider: var(--bt-tint-border);
   --vp-c-gutter: var(--bt-tint);
 
-  --vp-c-text-1: var(--bt-ink);
+  --vp-c-text-1: var(--bt-text);
   --vp-c-text-2: var(--bt-muted);
-  --vp-c-text-3: #a08a74;
+  --vp-c-text-3: var(--bt-muted);
 
   --vp-c-default-soft: rgba(242, 176, 30, 0.14);
   --vp-c-tip-1: var(--bt-orange);
@@ -29,7 +29,7 @@
   --vp-font-family-mono: var(--bt-font-mono);
 
   --vp-code-bg: var(--bt-tint);
-  --vp-code-color: var(--bt-ink);
+  --vp-code-color: var(--bt-text);
   --vp-code-block-bg: var(--bt-code-bg);
   --vp-code-block-color: #fbf1e4;
   --vp-code-block-divider-color: var(--bt-code-border);
@@ -83,7 +83,7 @@
 .VPNavBar,
 .VPNavBar:not(.home) .content-body,
 .VPLocalNav {
-  background: #fff !important;
+  background: var(--bt-bg) !important;
 }
 .VPNavBar .divider-line,
 .VPNavBar.has-sidebar .divider-line {
@@ -96,7 +96,7 @@
 .bt-wm {
   font: 800 26px/1 var(--bt-font-display);
   letter-spacing: -0.045em;
-  color: var(--bt-ink);
+  color: var(--bt-text);
 }
 .bt-wm .blaze {
   color: var(--bt-orange);
@@ -116,4 +116,8 @@
   background: var(--bt-mango);
   -webkit-mask: var(--bt-wordmark-underline) center / 100% 100% no-repeat;
   mask: var(--bt-wordmark-underline) center / 100% 100% no-repeat;
+}
+
+html.dark {
+  --vp-c-warning-1: var(--bt-mango);
 }

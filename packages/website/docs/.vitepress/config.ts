@@ -27,7 +27,6 @@ export default defineConfig({
     ["link", { rel: "icon", href: `${siteBase}/favicon.png`, type: "image/png" }],
     ["link", { rel: "apple-touch-icon", href: `${siteBase}/apple-touch-icon.png` }],
   ],
-  appearance: false,
   markdown: { theme: "github-dark" },
 
   themeConfig: {
