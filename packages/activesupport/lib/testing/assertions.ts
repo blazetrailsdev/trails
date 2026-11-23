@@ -600,7 +600,7 @@ export async function assertNoChanges<T>(
       : expression;
     let error = `\`${codeString}\` changed.`;
     if (message) error = `${message}.\n${error}`;
-    if (Minitest.VERSION > "6") error = `${error}\n${diff(before, after)}`;
+    if (Minitest.VERSION > "6") error = `${error}\n${MinitestAssertions.diff(before, after)}`;
     return error;
   };
 

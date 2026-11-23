@@ -70,6 +70,11 @@ export class Logger {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  set sevThreshold(severity: number | string) {
+    this.level = severity;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   withLevel<T>(severity: number | string, block: () => T): T {
     const prev = this.level;
     this.levelOverride.set(Fiber.current(), Severity.coerce(severity));

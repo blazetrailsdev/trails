@@ -110,11 +110,14 @@ export class BroadcastLogger {
   }
 
   set sevThreshold(level: number | LogLevel | string) {
-    this.dispatch((logger) => (logger.level = level));
+    this.dispatch((logger) => (logger.sevThreshold = level));
   }
 
-  close(): unknown {
-    return this.dispatch((logger) => logger.close());
+  close(...args: unknown[]): unknown {
+    return this.dispatch(
+      (logger, ...args) => logger.close(...(args as Parameters<Logger["close"]>)),
+      ...args,
+    );
   }
 
   get formatter(): Logger["formatter"] {

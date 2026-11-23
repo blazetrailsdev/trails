@@ -15,8 +15,9 @@ export class NumberToDelimitedConverter extends NumberConverter<NumberWithDelimi
 
   /** @missingRailsCall times — PERMANENT */
   private parts(): string[] {
-    // eslint-disable-next-line prefer-const
-    let [left, right] = String(this.number).split(".");
+    const parts = String(this.number).split(".");
+    let left = parts[0];
+    const right = parts[1];
     if (this.delimiterPattern() != null) {
       left = left.replace(
         this.delimiterPattern()!,
