@@ -1,4 +1,13 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { Trailtie as I18nTrailtie } from "../../lib/trailties/i18n.js";
+
+beforeEach(() => {
+  I18nTrailtie._i18nInited = true;
+});
+
+afterEach(() => {
+  I18nTrailtie._i18nInited = false;
+});
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import {
   ArgumentError,
@@ -48,7 +57,7 @@ function blogApp(secretKeyBase: string | null = SECRET_KEY_BASE): TrailtieApp {
 
 async function initializeApp(app: TrailtieApp): Promise<void> {
   await runTrailtieInitializers(Trailtie, app);
-  runLoadHooks("after_initialize", app);
+  await runLoadHooks("after_initialize", app);
 }
 
 describe("RailtieTest", () => {
@@ -82,7 +91,7 @@ describe("RailtieTest", () => {
     await runTrailtieInitializers(Trailtie, app);
     (app.config.get("globalId") as GlobalIdConfig).app = "foobar";
     (app.config.get("globalId") as GlobalIdConfig).expiresIn = months(12).toI();
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
 
     expect(GlobalID.app).toBe("foobar");
     expect(SignedGlobalID.expiresIn).toBe(months(12).toI());
@@ -92,7 +101,7 @@ describe("RailtieTest", () => {
     const app = blogApp();
     await runTrailtieInitializers(Trailtie, app);
     (app.config.get("globalId") as GlobalIdConfig).expiresIn = null;
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
 
     expect(SignedGlobalID.expiresIn).toBeNull();
   });

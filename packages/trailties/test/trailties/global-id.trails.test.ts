@@ -1,4 +1,13 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { Trailtie as I18nTrailtie } from "../../lib/trailties/i18n.js";
+
+beforeEach(() => {
+  I18nTrailtie._i18nInited = true;
+});
+
+afterEach(() => {
+  I18nTrailtie._i18nInited = false;
+});
 import {
   ArgumentError,
   Deprecators,
@@ -54,7 +63,7 @@ describe("GlobalID::Railtie verifier derivation", () => {
 
   const initializeApp = async (app: TrailtieApp): Promise<void> => {
     await runTrailtieInitializers(Trailtie, app);
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
   };
 
   it("leaves the verifier unset when key_generator raises ArgumentError", async () => {

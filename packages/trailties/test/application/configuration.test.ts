@@ -2419,6 +2419,20 @@ const POSTS_ROUTES = `
 
 describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
   useInMemoryDatabaseUrl();
+  const activeSupport = { ...ActiveSupportTrailtie.config.activeSupport };
+  const activeRecord = { ...ActiveRecordTrailtie.config.activeRecord };
+  const isolationLevel = IsolatedExecutionState.isolationLevel;
+  const formatVersion = ActiveSupport.Cache.formatVersion;
+  const raiseOnInvalidCacheExpirationTime = CacheStore.raiseOnInvalidCacheExpirationTime;
+  const runAfterTransactionCallbacks = ActiveRecord.runAfterTransactionCallbacksInOrderDefined();
+  const attributesForInspect = ActiveRecord.Base.attributesForInspect;
+  const wrapperOptions = ActionController.Base._wrapperOptions;
+  const raiseOnMissingCallbackActions = ActionController.Base.raiseOnMissingCallbackActions;
+  const contentHelperSanitizer = ContentHelper.sanitizer;
+  const actionText = (ActionTextEngine.config.actionText as OrderedOptions).toH();
+  const exceptionHandler = I18n.exceptionHandler();
+  const raiseOnMissingTranslations = TranslationHelper.raiseOnMissingTranslations();
+  const i18nConfig = I18nTrailtie.config.i18n.toH();
   let t: Host;
 
   async function app(env = "development"): Promise<Application> {
@@ -2463,6 +2477,28 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
 
   afterEach(async () => {
     await t.teardownApp();
+    for (const key of Object.keys(ActiveSupportTrailtie.config.activeSupport)) {
+      delete (ActiveSupportTrailtie.config.activeSupport as Record<string, unknown>)[key];
+    }
+    Object.assign(ActiveSupportTrailtie.config.activeSupport, activeSupport);
+    for (const key of Object.keys(ActiveRecordTrailtie.config.activeRecord)) {
+      delete (ActiveRecordTrailtie.config.activeRecord as unknown as Record<string, unknown>)[key];
+    }
+    Object.assign(ActiveRecordTrailtie.config.activeRecord, activeRecord);
+    IsolatedExecutionState.isolationLevel = isolationLevel!;
+    ActiveSupport.Cache.formatVersion = formatVersion;
+    CacheStore.raiseOnInvalidCacheExpirationTime = raiseOnInvalidCacheExpirationTime;
+    ActiveRecord.setRunAfterTransactionCallbacksInOrderDefined(runAfterTransactionCallbacks);
+    ActiveRecord.Base.attributesForInspect = attributesForInspect;
+    ActionController.Base._wrapperOptions = wrapperOptions;
+    ActionController.Base.raiseOnMissingCallbackActions = raiseOnMissingCallbackActions;
+    ContentHelper.sanitizer = contentHelperSanitizer;
+    (ActionTextEngine.config.actionText as OrderedOptions).clear().update(actionText);
+    I18n.setExceptionHandler(exceptionHandler);
+    TranslationHelper.setRaiseOnMissingTranslations(raiseOnMissingTranslations);
+    Translation.raiseOnMissingTranslations = false;
+    I18nTrailtie._i18nInited = false;
+    I18nTrailtie.config.i18n.clear().update(i18nConfig);
     Trails.application = null;
     Application.appClass = null;
   });
@@ -3274,84 +3310,6 @@ ${POSTS_ROUTES}
 
     expect(dumpSchemaAfterMigration()).toBeTruthy();
   });
-});
-
-const I18N_HANDLER = `import { I18n } from "@blazetrails/activesupport";
-I18n.setExceptionHandler((exception: unknown) => {
-  if (exception instanceof I18n.MissingTranslation) {
-    return "handled I18n::MissingTranslation";
-  } else {
-    throw exception;
-  }
-});
-`;
-
-describe("ConfigurationTest part 8", { timeout: 120_000 }, () => {
-  useInMemoryDatabaseUrl();
-  const activeSupport = { ...ActiveSupportTrailtie.config.activeSupport };
-  const activeRecord = { ...ActiveRecordTrailtie.config.activeRecord };
-  const isolationLevel = IsolatedExecutionState.isolationLevel;
-  const formatVersion = ActiveSupport.Cache.formatVersion;
-  const raiseOnInvalidCacheExpirationTime = CacheStore.raiseOnInvalidCacheExpirationTime;
-  const runAfterTransactionCallbacks = ActiveRecord.runAfterTransactionCallbacksInOrderDefined();
-  const attributesForInspect = ActiveRecord.Base.attributesForInspect;
-  const wrapperOptions = ActionController.Base._wrapperOptions;
-  const raiseOnMissingCallbackActions = ActionController.Base.raiseOnMissingCallbackActions;
-  const contentHelperSanitizer = ContentHelper.sanitizer;
-  const actionText = (ActionTextEngine.config.actionText as OrderedOptions).toH();
-  const exceptionHandler = I18n.exceptionHandler();
-  const raiseOnMissingTranslations = TranslationHelper.raiseOnMissingTranslations();
-  const i18nConfig = I18nTrailtie.config.i18n.toH();
-  let trailsApplication: Application | null;
-  let t: Host;
-
-  beforeAll(() => {
-    trailsApplication = Trails.application;
-  });
-
-  afterAll(() => {
-    Trails.application = trailsApplication;
-  });
-
-  async function app(env = "development"): Promise<Application> {
-    return (await t.app(env)) as unknown as Application;
-  }
-
-  beforeEach(async () => {
-    t = new IsolatedConfigurationTest("test") as unknown as Host;
-    await t.buildApp();
-    await FileUtils.mvAsync(
-      `${await t.appPath()}/config/environments`,
-      `${await t.appPath()}/config/__environments__`,
-    );
-  });
-
-  afterEach(async () => {
-    await t.teardownApp();
-    for (const key of Object.keys(ActiveSupportTrailtie.config.activeSupport)) {
-      delete (ActiveSupportTrailtie.config.activeSupport as Record<string, unknown>)[key];
-    }
-    Object.assign(ActiveSupportTrailtie.config.activeSupport, activeSupport);
-    for (const key of Object.keys(ActiveRecordTrailtie.config.activeRecord)) {
-      delete (ActiveRecordTrailtie.config.activeRecord as unknown as Record<string, unknown>)[key];
-    }
-    Object.assign(ActiveRecordTrailtie.config.activeRecord, activeRecord);
-    IsolatedExecutionState.isolationLevel = isolationLevel!;
-    ActiveSupport.Cache.formatVersion = formatVersion;
-    CacheStore.raiseOnInvalidCacheExpirationTime = raiseOnInvalidCacheExpirationTime;
-    ActiveRecord.setRunAfterTransactionCallbacksInOrderDefined(runAfterTransactionCallbacks);
-    ActiveRecord.Base.attributesForInspect = attributesForInspect;
-    ActionController.Base._wrapperOptions = wrapperOptions;
-    ActionController.Base.raiseOnMissingCallbackActions = raiseOnMissingCallbackActions;
-    ContentHelper.sanitizer = contentHelperSanitizer;
-    (ActionTextEngine.config.actionText as OrderedOptions).clear().update(actionText);
-    I18n.setExceptionHandler(exceptionHandler);
-    TranslationHelper.setRaiseOnMissingTranslations(raiseOnMissingTranslations);
-    Translation.raiseOnMissingTranslations = false;
-    I18nTrailtie._i18nInited = false;
-    I18nTrailtie.config.i18n.clear().update(i18nConfig);
-    Application.appClass = null;
-  });
 
   it("Rails.application.deprecators includes framework deprecators", async () => {
     await app("production");
@@ -3760,3 +3718,13 @@ export class Foo extends ApplicationRecord {
     ]);
   });
 });
+
+const I18N_HANDLER = `import { I18n } from "@blazetrails/activesupport";
+I18n.setExceptionHandler((exception: unknown) => {
+  if (exception instanceof I18n.MissingTranslation) {
+    return "handled I18n::MissingTranslation";
+  } else {
+    throw exception;
+  }
+});
+`;

@@ -1,5 +1,14 @@
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { Trailtie as I18nTrailtie } from "../../lib/trailties/i18n.js";
+
+beforeEach(() => {
+  I18nTrailtie._i18nInited = true;
+});
+
+afterEach(() => {
+  I18nTrailtie._i18nInited = false;
+});
 import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
 import { Collection, Initializer } from "../../lib/initializable.js";
 import {
@@ -81,7 +90,7 @@ describe("RailtieTest", () => {
     const custom = new DigestClass("sha256", "OpenSSL::Digest::SHA256");
     Trailtie.config.set("activeSupport", { hashDigestClass: custom } satisfies ActiveSupportConfig);
     await runTrailtieInitializers(Trailtie, app);
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
     expect(Digest.hashDigestClass).toBe(custom);
   });
 
@@ -155,7 +164,7 @@ describe("RailtieTest", () => {
     };
     Trailtie.config.set("activeSupport", {} satisfies ActiveSupportConfig);
     await runTrailtieInitializers(Trailtie, yieldedApp);
-    runLoadHooks("after_initialize", yieldedApp);
+    await runLoadHooks("after_initialize", yieldedApp);
     expect(Digest.hashDigestClass).toBe(custom);
   });
 });
