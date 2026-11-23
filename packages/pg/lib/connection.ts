@@ -1,13 +1,15 @@
 import {
   ArgumentError,
   LoadError,
+  rbAnyToS,
+  rbNum2Int,
   rbClassNewInstance,
   stringValue,
 } from "@blazetrails/ruby-compat";
 import { ConnectionBad, Error as PgError, UnableToSend } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { Result } from "./result.js";
-import { _pgTypemapAllStrings } from "./type-map-all-strings.js";
+import { _pgTypemapAllStrings, TypeMapAllStrings } from "./type-map-all-strings.js";
 import type { TypeMap } from "./type-map.js";
 import type * as NodePg from "./engine/node-pg.js";
 
@@ -138,6 +140,91 @@ export class Connection {
       throw new ConnectionBad("PQserverVersion() can't get server version", { connection: this });
     }
     return serverVersion;
+  }
+
+  protocolVersion(): number {
+    if (this.isFinished()) throw new ConnectionBad("connection is closed", { connection: this });
+    const protocolVersion = this.status() === PG.CONNECTION_BAD ? 0 : 3;
+    if (protocolVersion == 0) {
+      throw new ConnectionBad("PQprotocolVersion() can't get protocol version", {
+        connection: this,
+      });
+    }
+    return protocolVersion;
+  }
+
+  host(): string | null {
+    return this.client.host ?? null;
+  }
+
+  port(): number {
+    return Number(this.client.port);
+  }
+
+  user(): string | null {
+    return this.client.user ?? null;
+  }
+
+  getClientEncoding(): string {
+    return this.parameterStatuses["client_encoding"] ?? "SQL_ASCII";
+  }
+
+  inspect(): string {
+    const str = rbAnyToS(this);
+    let stats: string;
+    if (this.isFinished()) {
+      stats = " finished";
+    } else {
+      const parts: string[] = [];
+      if (this.status() != PG.CONNECTION_OK) {
+        parts.push(
+          ` status=${Object.keys(PG.Constants).find((c) => c.startsWith("CONNECTION_") && PG.Constants[c as keyof typeof PG.Constants] == this.status())}`,
+        );
+      }
+      if (this.transactionStatus() != PG.PQTRANS_IDLE) {
+        parts.push(
+          ` transaction_status=${Object.keys(PG.Constants).find((c) => c.startsWith("PQTRANS_") && PG.Constants[c as keyof typeof PG.Constants] == this.transactionStatus())}`,
+        );
+      }
+      if (this.getClientEncoding() != "UTF8") {
+        parts.push(` client_encoding=${this.getClientEncoding()}`);
+      }
+      if (!(this.typeMapForResults instanceof TypeMapAllStrings)) {
+        parts.push(` type_map_for_results=${rbAnyToS(this.typeMapForResults)}`);
+      }
+      if (!(this.typeMapForQueries instanceof TypeMapAllStrings)) {
+        parts.push(` type_map_for_queries=${rbAnyToS(this.typeMapForQueries)}`);
+      }
+      stats = ` host=${this.host()} port=${this.port()} user=${this.user()}${parts.join("")}`;
+    }
+    return `${str.slice(0, -1)}${stats}${str.slice(-1)}`;
+  }
+
+  flush(): boolean {
+    return true;
+  }
+
+  syncPipelineSync(): null {
+    throw new PgError("cannot send pipeline when not in pipeline mode\n", { connection: this });
+  }
+
+  sendPipelineSync(): null {
+    throw new PgError("cannot send pipeline when not in pipeline mode\n", { connection: this });
+  }
+
+  pipelineSync(): boolean {
+    this.sendPipelineSync();
+    return this.flush();
+  }
+
+  declare asyncPipelineSync: Connection["pipelineSync"];
+
+  setChunkedRowsMode(chunkSize: unknown): this {
+    const size = rbNum2Int(chunkSize);
+    if (size <= 0 || this.pendingResult == null || this.pendingResultTaken) {
+      throw new PgError("PQsetChunkedRowsMode ", { connection: this });
+    }
+    return this;
   }
 
   connect(): Promise<unknown> {
@@ -550,6 +637,7 @@ Connection.prototype.asyncClosePrepared = Connection.prototype.closePrepared;
 Connection.prototype.syncClosePrepared = Connection.prototype.closePrepared;
 Connection.prototype.asyncClosePortal = Connection.prototype.closePortal;
 Connection.prototype.syncClosePortal = Connection.prototype.closePortal;
+Connection.prototype.asyncPipelineSync = Connection.prototype.pipelineSync;
 Connection.prototype.escapeString = escapeString;
 Connection.prototype.escape = escapeString;
 Connection.prototype.escapeBytea = escapeBytea;

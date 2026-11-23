@@ -154,8 +154,7 @@ describe("PG::Connection", () => {
     await expect(finish).rejects.toMatchObject({ connection: c });
   });
 
-  // BLOCKED: pg-result-type-map-defaults-to-strings-for-oids-with-no-coder
-  it.skip("can use conn.reset to restart the connection", async () => {
+  it("can use conn.reset to restart the connection", async () => {
     const c = await PG.connect(conninfo);
 
     const res = await c.reset();
@@ -226,6 +225,90 @@ describe("PG::Connection", () => {
       const conn = await PG.connect(conninfo);
       await conn.finish();
       expect(() => conn.serverVersion()).toThrow(PG.ConnectionBad);
+    });
+  });
+
+  describe("protocol_version", () => {
+    it("should retrieve the wrie protocol version", () => {
+      expect(conn.protocolVersion()).toBe(3);
+    });
+
+    it("should raise an error on a bad connection", async () => {
+      const conn = await PG.connect(conninfo);
+      await conn.finish();
+      expect(() => conn.protocolVersion()).toThrow(PG.ConnectionBad);
+    });
+  });
+
+  describe("#inspect", () => {
+    beforeEach(async () => {
+      await conn.exec("ROLLBACK");
+    });
+
+    afterEach(async () => {
+      if (conn.isFinished()) return;
+      await conn.getLastResult();
+      await conn.exec("BEGIN");
+    });
+
+    it("should print host, port and user of a fresh connection, but not more", () => {
+      expect(conn.inspect()).toMatch(
+        new RegExp(`<PG::Connection:[0-9a-fx]+ host=localhost port=${conninfo.port} user=\\w*>`),
+      );
+    });
+
+    it("should tell about finished connection", async () => {
+      const conn = await PG.connect(conninfo);
+      await conn.finish();
+      expect(conn.inspect()).toMatch(/<PG::Connection:[0-9a-fx]+ finished>/);
+    });
+
+    it("should tell about transaction_status", () => {
+      conn.sendQuery("select 8");
+      expect(conn.inspect()).toMatch(/ transaction_status=PQTRANS_ACTIVE/);
+    });
+
+    it("should tell about non UTF8 client encoding", async () => {
+      await conn.setClientEncoding("ISO-8859-1");
+      expect(conn.inspect()).toMatch(/ client_encoding=LATIN1/);
+    });
+  });
+
+  describe("set_chunked_rows_mode", () => {
+    it("raises an error when called at the wrong time", () => {
+      let err: unknown;
+      try {
+        conn.setChunkedRowsMode(2);
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(PG.Error);
+      expect((err as Error).message).toMatch(/PQsetChunkedRowsMode/);
+      expect(err).toMatchObject({ connection: conn });
+    });
+
+    it("raises an error when called with wrong arguments", () => {
+      expect(() => conn.setChunkedRowsMode("nonint")).toThrow(TypeError);
+      expect(() => conn.setChunkedRowsMode(0)).toThrow(/PQsetChunkedRowsMode/);
+      expect(() => conn.setChunkedRowsMode(-2)).toThrow(PG.Error);
+    });
+  });
+
+  describe("pipeline_sync", () => {
+    it("raises an error when not in pipeline mode", () => {
+      let err: unknown;
+      try {
+        conn.pipelineSync();
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(PG.Error);
+      expect(err).toMatchObject({ connection: conn });
+    });
+
+    it("has send_pipeline_sync method", () => {
+      expect(typeof conn.sendPipelineSync).toBe("function");
+      expect(typeof conn.asyncPipelineSync).toBe("function");
     });
   });
 });
