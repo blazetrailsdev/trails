@@ -3,25 +3,17 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { decodeLineMappings } from "@blazetrails/trails-tsc";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repo = path.resolve(root, "../..");
 const expected = JSON.parse(fs.readFileSync(path.join(root, "hero/errors.json"), "utf8"));
 const controller = "app/controllers/posts-controller.ts";
 const view = "app/views/posts/show.html.tse";
-const generated = "gen/views/posts/show.html.tse.ts";
-
-const map = (scratch) =>
-  decodeLineMappings(
-    JSON.parse(fs.readFileSync(path.join(scratch, `${generated}.map`), "utf8")).mappings,
-  );
 
 function compile(name, edits) {
   const scratch = path.join(root, `.hero-check-${name}`);
   fs.rmSync(scratch, { recursive: true, force: true });
   let out = "";
-  let lines;
   try {
     fs.mkdirSync(scratch);
     fs.cpSync(path.join(root, "app"), path.join(scratch, "app"), { recursive: true });
@@ -45,37 +37,26 @@ function compile(name, edits) {
     try {
       execFileSync(
         process.execPath,
-        [path.join(repo, "node_modules/typescript-5/bin/tsc"), "--noEmit", "-p", "."],
+        [path.join(repo, "packages/activerecord-cli/bin/trails-tsc.js"), "--noEmit", "-p", "."],
         {
           cwd: scratch,
           encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
         },
       );
     } catch (err) {
-      out = String(err.stdout);
-      if (err.stderr) process.stderr.write(String(err.stderr));
+      out = `${err.stdout ?? ""}\n${err.stderr ?? ""}`;
     }
-    lines = map(scratch);
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
-  const reported = [];
-  for (const line of out.split("\n")) {
-    const m = /^(.+?)\((\d+),(\d+)\): (.*)$/.exec(line);
-    if (!m) continue;
-    let [, file, ln, col, msg] = m;
-    if (file === generated) {
-      const genLine = Number(ln) - 1;
-      const genCol = Number(col) - 1;
-      const seg = lines.filter((s) => s.genLine === genLine && s.genCol <= genCol).at(-1);
-      if (!seg) continue;
-      file = view;
-      ln = String(seg.srcLine + 1);
-      col = String(seg.srcCol + (genCol - seg.genCol) + 1);
-    }
-    reported.push(`${file}(${ln},${col}): ${msg}`);
-  }
-  return reported;
+  return out.split("\n").filter((line) => /^.+?\(\d+,\d+\): /.test(line));
+}
+
+const unedited = compile("unedited", []);
+if (unedited.length > 0) {
+  console.error(`check-hero: the unedited app does not typecheck:\n  ${unedited.join("\n  ")}`);
+  process.exit(1);
 }
 
 const runs = {

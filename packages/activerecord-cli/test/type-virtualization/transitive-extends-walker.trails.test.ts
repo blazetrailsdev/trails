@@ -67,4 +67,36 @@ describe("collectBaseDescendants", () => {
     expect(superKeys.get(classKey(file("b.ts"), "B"))).toBe(classKey(file("b.ts"), "Record"));
     fs.rmSync(dir, { recursive: true, force: true });
   });
+
+  test("keeps a model Base that another framework package augments", () => {
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "walker-")));
+    const write = (file: string, text: string) => {
+      fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+      fs.writeFileSync(path.join(dir, file), text);
+    };
+    write(
+      "tsconfig.json",
+      JSON.stringify({ compilerOptions: { module: "nodenext", noEmit: true }, include: ["*.ts"] }),
+    );
+    write(
+      "node_modules/@blazetrails/activerecord/package.json",
+      JSON.stringify({ name: "@blazetrails/activerecord", types: "index.d.ts" }),
+    );
+    write("node_modules/@blazetrails/activerecord/index.d.ts", "export declare class Base {}\n");
+    write(
+      "node_modules/@blazetrails/actiontext/package.json",
+      JSON.stringify({ name: "@blazetrails/actiontext", types: "index.d.ts" }),
+    );
+    write(
+      "node_modules/@blazetrails/actiontext/index.d.ts",
+      `declare module "@blazetrails/activerecord" {\n  interface Base {\n    richTextNames(): string[];\n  }\n}\nexport {};\n`,
+    );
+    write(
+      "model.ts",
+      `import "@blazetrails/actiontext";\nimport { Base } from "@blazetrails/activerecord";\nexport class Post extends Base {}\n`,
+    );
+    const { baseNames } = collectBaseDescendants(path.join(dir, "tsconfig.json"));
+    expect(baseNames.has("Post")).toBe(true);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
 });

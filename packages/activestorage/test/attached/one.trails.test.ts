@@ -33,6 +33,13 @@ describe("ActiveStorage::Attached::One", () => {
     user = await Member.createBang({ name: "Josh" });
   });
 
+  it("answers nil for a delegated call on an unattached attachment", async () => {
+    await user.avatar.load();
+    expect(user.avatar.variant({ resizeToLimit: [1, 1] })).toBeNull();
+    expect(user.avatar.blob).toBeNull();
+    expect((user.avatar as unknown as { [k: string]: () => unknown }).notAMethod()).toBeNull();
+  });
+
   it("create awaits the attachment writer before saving", async () => {
     const created = (await Member.create({ name: "Jason", avatar: hash() })) as AvatarUser;
     expect(await created.avatar.isAttached()).toBe(true);

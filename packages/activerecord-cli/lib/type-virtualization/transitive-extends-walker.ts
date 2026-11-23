@@ -80,7 +80,11 @@ function walkClass(
 
   const framework = sym.declarations.some((handle) => {
     const decl = handle.resolve(project);
-    return decl !== undefined && isNonModelFrameworkFile(decl.getSourceFile().fileName);
+    return (
+      decl !== undefined &&
+      ts.isClassDeclaration(decl) &&
+      isNonModelFrameworkFile(decl.getSourceFile().fileName)
+    );
   });
   if (framework) return false;
 
