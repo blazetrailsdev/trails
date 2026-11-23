@@ -31,12 +31,11 @@
 
   const navLeft = [
     { label: "Source", href: repo },
-    { label: "Docs", href: `${base}/docs/` },
     { label: "API", href: `${base}/docs/api/README` },
   ];
   const navRight = [
+    { label: "Docs", href: `${base}/docs/` },
     { label: "Guides", href: guides },
-    { label: "Parity", href: `${repo}/blob/main/docs/parity-gates.md` },
   ];
 
   const railsGems = new Set([
@@ -97,8 +96,9 @@
     <p class="small"><strong>And more.</strong> We&rsquo;re bringing all the friends along.</p>
     <p class="fine">Percentages count the upstream gem&rsquo;s public classes, modules, methods and constants that trails matches by name, measured at {data.measuredAt}.</p>
     <p class="fine"><strong>Rails API:</strong> gems the Rails project owns, like Active Record or Solid Queue. <strong>Ruby gem API:</strong> gems Rails depends on, like rack or i18n.</p>
-    <h3 class="browser" id="browser">The same code in the browser.</h3>
-    <p class="small">A trails app&rsquo;s client-side JavaScript, Turbo and Stimulus included, is compatible with Rails frontend JS packages. Browser and server share one codebase.</p>
+    <h3 class="rails-compat" id="rails-compat">Plays nice with Rails.</h3>
+    <p class="small"><strong>Compatibility is the goal.</strong> A trails app is compatible with Rails frontend JavaScript dependencies. Hotwire&rsquo;s Turbo and Stimulus, and Action Text, all use Rails&rsquo; JS packages directly.</p>
+    <p class="small"><strong>trails and Rails apps can work side by side.</strong> In live demos, a trails app and a Rails app read each other&rsquo;s encrypted passwords and exchange Active Job messages across the two languages in real time.</p>
   </section>
 
   <section class="band">
@@ -126,7 +126,6 @@
     <div class="card">
       <h2>Built for Rails developers, new and seasoned.</h2>
       <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/{data.buildRef}/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/{data.buildRef}/examples/react-native-notes">React Native app</a>. Run <a href="{repo}/tree/{data.buildRef}/examples/browser-sqlite">the full stack in a browser tab</a>, on SQLite.</p>
-      <p class="small"><strong>trails and Rails apps can work side by side.</strong> In live demos, a trails app and a Rails app read each other's encrypted passwords and exchange Active Job messages across the two languages in real time.</p>
     </div>
   </section>
 
@@ -212,7 +211,7 @@
   .note { margin: 0; padding: 0 22px 22px; font-size: 15px; color: #d9c6b0; }
   .note code { color: #fbf1e4; background: #2b1d14 !important; border-color: #4a3628 !important; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  .browser { font-size: 40px; line-height: 1.1; color: var(--orange); font-weight: 800; letter-spacing: -0.02em; margin: 3rem auto 0; }
+  .rails-compat { font-size: 40px; line-height: 1.1; color: var(--orange); font-weight: 800; letter-spacing: -0.02em; margin: 3rem auto 0; }
   .fine { font-size: 15px; line-height: 1.45; max-width: 760px; margin: 1.5rem auto 0; color: var(--bt-muted); }
   .pane { background: #3a2a1f; min-height: 380px; }
   .split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
@@ -239,7 +238,7 @@
   .card { background: var(--bt-surface); max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px var(--bt-shadow); }
   .band > .card:first-child { margin-top: 0; }
 
-  .blocks { padding-top: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 560px)); justify-content: center; column-gap: 50px; }
+  .blocks { padding-top: 0; padding-bottom: 30px; display: grid; grid-template-columns: repeat(2, minmax(0, 560px)); justify-content: center; column-gap: 50px; }
   .block:last-child:nth-child(odd) { grid-column: 1 / -1; width: min(100%, 560px); justify-self: center; }
   .block { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; padding-bottom: 60px; }
   .code { display: flex; flex-direction: column; }
