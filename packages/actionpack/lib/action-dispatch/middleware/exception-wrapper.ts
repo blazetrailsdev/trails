@@ -1,3 +1,5 @@
+import { Response } from "../http/response.js";
+import { UNPROCESSABLE_CONTENT } from "../constants.js";
 import {
   DelegateClass,
   excBacktraceLocations,
@@ -18,7 +20,6 @@ import {
   TopLevel,
   type BacktraceCleaner,
 } from "@blazetrails/activesupport";
-import { statusCode } from "@blazetrails/rack";
 import { PathRegistry, type Spot, type Template } from "@blazetrails/actionview";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
@@ -90,8 +91,8 @@ export class ExceptionWrapper {
         "ActionController::UnknownFormat": ":not_acceptable",
         "ActionDispatch::Http::MimeNegotiation::InvalidType": ":not_acceptable",
         "ActionController::MissingExactTemplate": ":not_acceptable",
-        "ActionController::InvalidAuthenticityToken": ":unprocessable_entity",
-        "ActionController::InvalidCrossOriginRequest": ":unprocessable_entity",
+        "ActionController::InvalidAuthenticityToken": UNPROCESSABLE_CONTENT,
+        "ActionController::InvalidCrossOriginRequest": UNPROCESSABLE_CONTENT,
         "ActionDispatch::Http::Parameters::ParseError": ":bad_request",
         "ActionController::BadRequest": ":bad_request",
         "ActionController::ParameterMissing": ":bad_request",
@@ -284,7 +285,7 @@ export class ExceptionWrapper {
     const status = Object.hasOwn(this.rescueResponses, className)
       ? this.rescueResponses[className]
       : ":internal_server_error";
-    return statusCode(status);
+    return Response.rackStatusCode(status);
   }
 
   isShow(request: ShowExceptionsRequest): boolean {

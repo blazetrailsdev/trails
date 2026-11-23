@@ -37,11 +37,13 @@ export class RequestEncoder {
   private readonly _mime: MimeType;
   private readonly _paramEncoder: ParamEncoder;
   readonly responseParser: ResponseParser;
+  readonly contentType: string;
 
   constructor(
     mimeName: string,
     paramEncoder: ParamEncoder | null,
     responseParser: ResponseParser | null,
+    contentType: string | null,
   ) {
     const mime = Mime.get(mimeName);
     if (!mime) {
@@ -62,10 +64,7 @@ export class RequestEncoder {
               null,
             )
           : rbFSend(params, mid));
-  }
-
-  get contentType(): string {
-    return this._mime.toString();
+    this.contentType = contentType ?? this._mime.toString();
   }
 
   get acceptHeader(): string {
@@ -89,17 +88,27 @@ export class RequestEncoder {
 
   static registerEncoder(
     mimeName: string,
-    options: { paramEncoder?: ParamEncoder; responseParser?: ResponseParser } = {},
+    {
+      paramEncoder = null,
+      responseParser = null,
+      contentType = null,
+    }: {
+      paramEncoder?: ParamEncoder | null;
+      responseParser?: ResponseParser | null;
+      contentType?: string | null;
+    } = {},
   ): void {
     RequestEncoder.encoders.set(
       mimeName,
-      new RequestEncoder(mimeName, options.paramEncoder ?? null, options.responseParser ?? null),
+      new RequestEncoder(mimeName, paramEncoder, responseParser, contentType),
     );
   }
 }
 
 RequestEncoder.registerEncoder(":html", {
   responseParser: (body) => Testing.htmlDocument().parse(body),
+  paramEncoder: (param) => param,
+  contentType: Mime.get(":url_encoded_form")!.toString(),
 });
 RequestEncoder.registerEncoder(":json", {
   responseParser: (body) => JSON.parse(body, { objectClass: HashWithIndifferentAccess }),

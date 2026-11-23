@@ -1,4 +1,5 @@
 import { ActionController } from "../../namespaces.js";
+import { Response } from "../../action-dispatch/http/response.js";
 import {
   Concern,
   extend,
@@ -14,7 +15,6 @@ import {
   type RenderingHost as AbstractRenderHost,
 } from "../../abstract-controller/rendering.js";
 import { Renderer, type RendererController } from "../renderer.js";
-import { statusCode } from "@blazetrails/rack";
 
 export const RENDER_FORMATS_IN_PRIORITY = ["body", "plain", "html"] as const;
 
@@ -48,7 +48,7 @@ export function _normalizeOptions(
     options.html = htmlEscape(options.html);
   }
   if (options.status != null && options.status !== false) {
-    options.status = statusCode(options.status as number | string);
+    options.status = Response.rackStatusCode(options.status as number | string);
   }
   return Rendering.superMethod(this, "_normalizeOptions")!(options) as Record<string, unknown>;
 }
@@ -57,6 +57,7 @@ export interface RenderingHost {
   request: {
     variant?: unknown;
     shouldApplyVaryHeader(): boolean;
+    varyHeaders(): string[];
   } | null;
   response: {
     contentType?: string;
@@ -95,8 +96,20 @@ export function _setRenderedContentType(
 
 /** @internal */
 export function _setVaryHeader(this: Pick<RenderingHost, "request" | "response">): void {
-  if (isBlank(this.response.headers.get("Vary")) && this.request!.shouldApplyVaryHeader()) {
-    this.response.headers.set("Vary", "Accept");
+  if (this.request!.shouldApplyVaryHeader()) {
+    const varyHeaders = String(this.response.headers.get("Vary") ?? "")
+      .split(",")
+      .map((h) => h.trim())
+      .filter((h) => !isBlank(h));
+
+    if (!varyHeaders.includes("*")) {
+      for (const header of this.request!.varyHeaders()) {
+        if (!varyHeaders.some((existing) => existing.toLowerCase() === header.toLowerCase())) {
+          varyHeaders.push(header);
+        }
+      }
+      this.response.headers.set("Vary", varyHeaders.join(", "));
+    }
   }
 }
 

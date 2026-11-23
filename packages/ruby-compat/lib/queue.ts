@@ -245,16 +245,38 @@ export class SizedQueue<T = unknown> extends Queue<T> {
     const sq = queuePtr<T>(this);
 
     if (sq.que.length >= sq.max || sq.pushq.length > 0) {
-      return new Promise<this>((resolve) => {
+      return new Promise<this>((resolve, reject) => {
         sq.pushq.push(() => {
-          queueDoPush(this, sq, object);
-          resolve(this);
+          try {
+            queueDoPush(this, sq, object);
+            resolve(this);
+          } catch (e) {
+            reject(e);
+          }
         });
       });
     }
 
     queueDoPush(this, sq, object);
     return Promise.resolve(this);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/thread_sync.c:1288` `rb_szqueue_close`, which also wakes
+   * every sleeping pusher; each raises `ClosedQueueError`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread::SizedQueue#close`
+   * (`vendor/ruby/v3.3.11/thread_sync.c:1288`).
+   */
+  override close(): this {
+    const sq = queuePtr<T>(this);
+
+    if (!sq.closed) {
+      super.close();
+      while (sq.pushq.length > 0) wakeupOne(sq.pushq);
+    }
+
+    return this;
   }
 
   /**

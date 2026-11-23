@@ -35,7 +35,11 @@ export class PublicExceptions {
       error: fetch<string>(HTTP_STATUS_CODES, String(status), HTTP_STATUS_CODES[500]),
     };
 
-    return this.render(status, contentType, body);
+    if (env["action_dispatch.original_request_method"] === "HEAD") {
+      return this.renderFormat(status, contentType!, "");
+    } else {
+      return this.render(status, contentType, body);
+    }
   }
 
   private render(status: number, contentType: MimeType | undefined, body: ErrorBody): RackResponse {

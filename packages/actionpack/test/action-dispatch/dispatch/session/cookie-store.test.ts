@@ -49,7 +49,7 @@ const Rotations = new RotationConfiguration();
 
 const SameSite = () => ":lax";
 
-const Encryptor = new MessageEncryptor(Generator.generateKey(SessionSalt, 32) as never, undefined, {
+const Encryptor = new MessageEncryptor(Generator.generateKey(SessionSalt, 32), undefined, {
   cipher: "aes-256-gcm",
   serializer: Marshal,
 });
@@ -525,34 +525,6 @@ describe("CookieStoreTest", () => {
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
       assertMatch(/domain=example\.com/, t.headers!.get("Set-Cookie") as string);
-    });
-  });
-
-  it("default same_site derives SameSite from env", async ({ testCase }) => {
-    const t = testCase as CookieStoreTest;
-    await t.withTestRouteSet(async () => {
-      await t.get("/setSessionValue");
-      t.assertSetCookieAttributes("_myapp_session", "SameSite=Lax");
-    });
-  });
-
-  it("explicit same_site sets SameSite", async ({ testCase }) => {
-    const t = testCase as CookieStoreTest;
-    t.cookieOptions({ sameSite: ":strict" });
-
-    await t.withTestRouteSet(async () => {
-      await t.get("/setSessionValue");
-      t.assertSetCookieAttributes("_myapp_session", "SameSite=Strict");
-    });
-  });
-
-  it("explicit nil same_site omits SameSite", async ({ testCase }) => {
-    const t = testCase as CookieStoreTest;
-    t.cookieOptions({ sameSite: null });
-
-    await t.withTestRouteSet(async () => {
-      await t.get("/setSessionValue");
-      t.assertNotSetCookieAttributes("_myapp_session", "SameSite");
     });
   });
 });

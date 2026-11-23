@@ -54,10 +54,6 @@ export class SessionId {
 }
 
 /** @internal */
-export const DEFAULT_SAME_SITE = (request: {
-  cookiesSameSiteProtection?: () => unknown;
-}): unknown => request.cookiesSameSiteProtection?.();
-
 export interface CookieStoreSessionOptions {
   cookieOnly?: boolean;
   sameSite?: unknown;
@@ -67,9 +63,6 @@ export interface CookieStoreSessionOptions {
 export class CookieStore extends AbstractSecureStore {
   constructor(app?: RackApp, options: CookieStoreSessionOptions = {}) {
     options.cookieOnly = true;
-    if (!Object.hasOwn(options, "sameSite")) {
-      options.sameSite = DEFAULT_SAME_SITE;
-    }
     super(app, options);
   }
 

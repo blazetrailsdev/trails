@@ -101,6 +101,7 @@ export class Base {
   private _rejectSubscription: boolean | null;
   /** @internal */
   private _subscriptionConfirmationSent: boolean | null;
+  private _unsubscribed: boolean;
   /** @internal */
   private _parameterFilter?: ParameterFilter;
 
@@ -144,6 +145,7 @@ export class Base {
 
     this._rejectSubscription = null;
     this._subscriptionConfirmationSent = null;
+    this._unsubscribed = false;
 
     this.delegateConnectionIdentifiers();
   }
@@ -169,16 +171,21 @@ export class Base {
   }
 
   async unsubscribeFromChannel(): Promise<unknown> {
+    this._unsubscribed = true;
     return await this.runCallbacks("unsubscribe", () => this.unsubscribed());
   }
 
-  /** @internal */
-  protected subscribed(): unknown {
-    return null;
+  isUnsubscribed(): boolean {
+    return this._unsubscribed;
   }
 
   /** @internal */
   protected unsubscribed(): unknown {
+    return null;
+  }
+
+  /** @internal */
+  protected subscribed(): unknown {
     return null;
   }
 

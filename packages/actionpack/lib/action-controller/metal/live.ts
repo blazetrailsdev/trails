@@ -24,9 +24,15 @@ import {
   stringDelete,
   toEnum,
   toS,
-  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
-import { Concern, IsolatedExecutionState, Notifications, extend } from "@blazetrails/activesupport";
+import {
+  Concern,
+  IsolatedExecutionState,
+  Notifications,
+  classAttribute,
+  extend,
+  mattrAccessor,
+} from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
 import { Base } from "../base.js";
 
@@ -36,11 +42,6 @@ type ErrorCallback = () => unknown;
 
 export class Buffer extends ResponseBuffer<Queue<string | null>> {
   static queueSize: number | null = 10;
-
-  static {
-    Object.defineProperty(this.prototype, "toAry", { value: undefined, configurable: true });
-    rbClearMethodCache();
-  }
 
   ignoreDisconnect: boolean;
 
@@ -87,11 +88,12 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
 
   override async close(): Promise<void> {
     super.close();
-    await this._buf.push(null);
+    this._buf.close();
   }
 
   override abort(): void {
     this._aborted = true;
+    this._buf.close();
     this._buf.clear();
   }
 
@@ -109,6 +111,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
       const popped: string[] = [];
       try {
         while (true) {
+          if (this._buf.isClosed() && this._buf.isEmpty()) break;
           const str = this._buf.pop(true);
           if (str === null) break;
           popped.push(str);
@@ -239,7 +242,10 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
     const t2 = Thread.current();
 
     locals.forEach(([k, v]) => t2.set(k, v));
-    IsolatedExecutionState.shareWith(t1);
+    IsolatedExecutionState.shareWith(t1, {
+      except: (this.constructor as unknown as { liveStreamingExcludedKeys: string[] })
+        .liveStreamingExcludedKeys,
+    });
 
     try {
       await rbCallSuper(this, process, name);
@@ -381,3 +387,11 @@ export const Live = {
   setResponseBody,
 };
 extend(Live, Concern);
+mattrAccessor.call(Live, "liveStreamingExcludedKeys", { default: [] });
+Concern.included.call(Live, null, function (this: object) {
+  classAttribute.call(this, "liveStreamingExcludedKeys", {
+    instanceAccessor: false,
+    default: (Live as unknown as { liveStreamingExcludedKeys: unknown[] })
+      .liveStreamingExcludedKeys,
+  });
+});
