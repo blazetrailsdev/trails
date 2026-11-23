@@ -116,6 +116,14 @@ describe("SecurePasswordTest", () => {
     expect(user.errors.messagesFor("passwordConfirmation")).toEqual(["doesn't match Password"]);
   });
 
+  it("create a new user with validation, a spaces only password, and an incorrect password confirmation", async () => {
+    user.password = " ";
+    user.passwordConfirmation = "something else";
+    expect(await user.isValid("create"), "user should be invalid").toBeFalsy();
+    expect(user.errors.count).toEqual(1);
+    expect(user.errors.messagesFor("passwordConfirmation")).toEqual(["doesn't match Password"]);
+  });
+
   it("resetting password to nil clears the password cache", () => {
     user.password = "password";
     user.password = null;
@@ -187,6 +195,16 @@ describe("SecurePasswordTest", () => {
 
   it("updating an existing user with validation and an incorrect password confirmation", async () => {
     existingUser.password = "password";
+    existingUser.passwordConfirmation = "something else";
+    expect(await existingUser.isValid("update"), "user should be invalid").toBeFalsy();
+    expect(existingUser.errors.count).toEqual(1);
+    expect(existingUser.errors.messagesFor("passwordConfirmation")).toEqual([
+      "doesn't match Password",
+    ]);
+  });
+
+  it("updating an existing user with validation, a spaces only password, and an incorrect password confirmation", async () => {
+    existingUser.password = " ";
     existingUser.passwordConfirmation = "something else";
     expect(await existingUser.isValid("update"), "user should be invalid").toBeFalsy();
     expect(existingUser.errors.count).toEqual(1);

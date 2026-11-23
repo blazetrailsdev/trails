@@ -87,7 +87,7 @@ export function hasSecurePassword(
       }
     });
 
-    klass.validatesConfirmationOf(attribute, { allowBlank: true });
+    klass.validatesConfirmationOf(attribute, { allowNil: true });
   }
 
   const tokenHost = this as TokenHost;
