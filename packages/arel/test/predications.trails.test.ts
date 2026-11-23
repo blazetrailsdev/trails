@@ -112,9 +112,9 @@ describe("PredicationsMixin", () => {
   describe("edge cases (via the mixin, not Attribute's inline predications)", () => {
     const bn = new Nodes.BitwiseNot(users.get("flags"));
 
-    it("eqAny([]) does not crash and renders as NULL (Rails 3-valued logic)", () => {
+    it("eqAny([]) does not crash and renders as an empty grouped OR", () => {
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(bn.eqAny([]));
-      expect(sql).toBe("(NULL)");
+      expect(sql).toBe("()");
     });
 
     it("eqAll([]) does not crash and renders as an empty grouped AND", () => {

@@ -69,7 +69,8 @@ export class ToSql extends Visitor {
 
     this.collectNodesFor(o.wheres, collector, " WHERE ", " AND ");
     this.collectNodesFor(o.orders, collector, " ORDER BY ");
-    return this.maybeVisit(o.limit, collector);
+    this.maybeVisit(o.limit, collector);
+    return this.maybeVisit(o.comment, collector);
   }
 
   protected visitArelNodesUpdateStatement(
@@ -85,7 +86,8 @@ export class ToSql extends Visitor {
 
     this.collectNodesFor(o.wheres, collector, " WHERE ", " AND ");
     this.collectNodesFor(o.orders, collector, " ORDER BY ");
-    return this.maybeVisit(o.limit, collector);
+    this.maybeVisit(o.limit, collector);
+    return this.maybeVisit(o.comment, collector);
   }
 
   protected visitArelNodesInsertStatement(

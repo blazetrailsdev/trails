@@ -7,6 +7,7 @@ import { Table } from "./table.js";
 import { constSet } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
 import type { ArelNode } from "./arel.js";
+import type { Node } from "./nodes/node.js";
 
 export class DeleteManager extends TreeManager<DeleteStatement> {
   declare key: unknown;
@@ -39,6 +40,11 @@ export class DeleteManager extends TreeManager<DeleteStatement> {
 
   having(expr: ArelNode): this {
     this.ast.havings.push(expr);
+    return this;
+  }
+
+  comment(value: Node | null): this {
+    this.ast.comment = value;
     return this;
   }
 }

@@ -11,6 +11,7 @@ import type { UpdateValues } from "./crud.js";
 import { constSet } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
 import type { ArelNode } from "./arel.js";
+import type { Node } from "./nodes/node.js";
 
 export class UpdateManager extends TreeManager<UpdateStatement> {
   declare key: unknown;
@@ -58,6 +59,11 @@ export class UpdateManager extends TreeManager<UpdateStatement> {
 
   having(expr: ArelNode | string): this {
     this.ast.havings.push(expr);
+    return this;
+  }
+
+  comment(value: Node | null): this {
+    this.ast.comment = value;
     return this;
   }
 }

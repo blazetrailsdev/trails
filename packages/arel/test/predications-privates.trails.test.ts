@@ -24,11 +24,11 @@ describe("Predications.groupingAny / groupingAll", () => {
     expect(out).toBeInstanceOf(Nodes.Grouping);
   });
 
-  it("folds an empty `others` to Grouping(NULL) / Grouping(And([]))", () => {
+  it("groups an empty `others` as Grouping(Or([])) / Grouping(And([]))", () => {
     const attr = users.get("id");
     const any = Predications.groupingAny.call(attr, "eq", []);
-    expect(any.expr).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((any.expr as Nodes.SqlLiteral).toString()).toBe("NULL");
+    expect(any.expr).toBeInstanceOf(Nodes.Or);
+    expect((any.expr as Nodes.Or).children).toHaveLength(0);
     expect(attr.eqAny([])).toEqual(any);
 
     const all = Predications.groupingAll.call(attr, "eq", []);
@@ -40,11 +40,12 @@ describe("Predications.groupingAny / groupingAll", () => {
   it("threads *extras through to the dispatched predicate", () => {
     const attr = users.get("name");
 
-    const m = attr.matchesAny(["a%"], "!", true).expr as Nodes.Matches;
+    const m = (attr.matchesAny(["a%"], "!", true).expr as Nodes.Or).children[0] as Nodes.Matches;
     expect(m.escape).toEqual(new Nodes.Quoted("!"));
     expect(m.caseSensitive).toBe(true);
 
-    const d = attr.doesNotMatchAny(["a%"], "!").expr as Nodes.DoesNotMatch;
+    const d = (attr.doesNotMatchAny(["a%"], "!").expr as Nodes.Or)
+      .children[0] as Nodes.DoesNotMatch;
     expect(d.escape).toEqual(new Nodes.Quoted("!"));
     expect(d.caseSensitive).toBe(false);
   });

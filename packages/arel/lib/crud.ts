@@ -56,6 +56,7 @@ export const Crud: Crud = {
     um.offset(this.offset);
     um.order(...this.orders);
     um.wheres = this.constraints;
+    um.comment(this.comment());
     um.key = key;
 
     if (groupValuesColumns.length > 0) um.group(groupValuesColumns);
@@ -74,6 +75,7 @@ export const Crud: Crud = {
     dm.offset(this.offset);
     dm.order(...this.orders);
     dm.wheres = this.constraints;
+    dm.comment(this.comment());
     dm.key = key;
     if (groupValuesColumns.length > 0) dm.group(groupValuesColumns);
     if (havingClause !== null) dm.having(havingClause);

@@ -13,6 +13,7 @@ export class DeleteStatement extends Node {
   havings: ArelNode[];
   limit: Node | null;
   offset: Node | null;
+  comment: Node | null;
   key: ArelNode | ArelNode[] | null;
 
   constructor(relation: ArelNode | Table | null = null, wheres: ArelNode[] = []) {
@@ -24,6 +25,7 @@ export class DeleteStatement extends Node {
     this.havings = [];
     this.limit = null;
     this.offset = null;
+    this.comment = null;
     this.key = null;
   }
 
@@ -35,6 +37,7 @@ export class DeleteStatement extends Node {
       this.orders,
       this.limit,
       this.offset,
+      this.comment,
       this.key,
     ]);
   }
@@ -50,6 +53,7 @@ export class DeleteStatement extends Node {
       rbEqual(this.havings, other.havings) &&
       rbEqual(this.limit, other.limit) &&
       rbEqual(this.offset, other.offset) &&
+      rbEqual(this.comment, other.comment) &&
       rbEqual(this.key, other.key)
     );
   }
