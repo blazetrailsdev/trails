@@ -97,11 +97,29 @@ function prepareStatement(
   let rows: AsyncIterator<unknown[]> | null = null;
   let done = false;
   let closed = false;
+  let readBigInts = false;
+  let typed: Promise<ExpoStatement | null> | null = null;
+  let wide = false;
 
   const stmt = (): Promise<ExpoStatement> =>
     (prepared ??= opening().then((db) => db.prepareAsync(sql)));
   const metadata = async (): Promise<string[]> =>
     (names ??= await (await stmt()).getColumnNamesAsync());
+  const intText = async (cols: string[]): Promise<ExpoStatement | null> => {
+    try {
+      return await (
+        await opening()
+      ).prepareAsync(
+        `WITH t(${cols.join(", ")}) AS (${sql.replace(/;\s*$/, "")}\n) SELECT ${cols.join(", ")}, ` +
+          cols
+            .map((c) => `CASE typeof(${c}) WHEN 'integer' THEN CAST(${c} AS TEXT) END`)
+            .join(", ") +
+          " FROM t",
+      );
+    } catch {
+      return null;
+    }
+  };
   const params = (): unknown[] | Record<string, unknown> =>
     Object.keys(named).length !== 0 ? named : positional.map((v) => (v === undefined ? null : v));
 
@@ -109,6 +127,7 @@ function prepareStatement(
     async close() {
       closed = true;
       await rows?.return?.();
+      await (await typed)?.finalizeAsync();
       if (prepared) await (await prepared).finalizeAsync();
     },
     isClosed: () => closed,
@@ -127,10 +146,13 @@ function prepareStatement(
         return null;
       }
       if (rows === null) {
-        const st = await stmt();
+        const cols = (await metadata()).map((_, i) => `c${i}`);
+        const wider = readBigInts && cols.length !== 0 ? await (typed ??= intText(cols)) : null;
+        wide = wider !== null;
+        const st = wider ?? (await stmt());
         const result = await withBusyHandler(handler, () => st.executeForRawResultAsync(params()));
         setChanges(result.changes);
-        if ((await metadata()).length === 0) {
+        if (cols.length === 0) {
           done = true;
           return null;
         }
@@ -141,14 +163,20 @@ function prepareStatement(
         done = true;
         return null;
       }
-      return r.value;
+      const n = names!.length;
+      if (!wide) return r.value;
+      return r.value
+        .slice(0, n)
+        .map((v, i) => (r.value[n + i] != null ? BigInt(r.value[n + i] as string) : v));
     },
     isDone: () => done,
     columnCount: () => (names !== null ? names.length : metadata().then((n) => n.length)),
     columnName: (index) =>
       names !== null ? (names[index] ?? null) : metadata().then((n) => n[index] ?? null),
     columnDecltype: () => null,
-    setReadBigInts: () => {},
+    setReadBigInts: (toggle) => {
+      readBigInts = toggle;
+    },
   };
 }
 
