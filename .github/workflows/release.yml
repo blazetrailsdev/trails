@@ -7,7 +7,6 @@ on:
     paths:
       - ".github/workflows/release.yml"
       - "scripts/release/**"
-      - "packages/*/package.json"
 
 permissions:
   contents: read
@@ -25,6 +24,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm vitest run scripts/package-publish-shape.test.ts
       - name: Tag matches the lockstep version
         if: github.event_name == 'push'
         run: |
@@ -36,8 +36,7 @@ jobs:
       - name: Publish
         if: github.event_name == 'push'
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc
           pnpm -r publish --no-git-checks --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "true"
