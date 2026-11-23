@@ -47,7 +47,6 @@ export const ACTIVESTORAGE_UNPORTED_FILES: UnportedFile[] = [
     reason: AZURE_SERVICE,
   },
   {
-    pattern: "service/s3_service.rb",
     testFile: "service/s3_service_test.rb",
     package: "activestorage",
     reason: CLOUD_SERVICE,
@@ -58,7 +57,6 @@ export const ACTIVESTORAGE_UNPORTED_FILES: UnportedFile[] = [
     reason: CLOUD_SERVICE,
   },
   {
-    pattern: "service/gcs_service.rb",
     testFile: "service/gcs_service_test.rb",
     package: "activestorage",
     reason: CLOUD_SERVICE,

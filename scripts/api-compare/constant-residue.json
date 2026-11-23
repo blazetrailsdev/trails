@@ -677,7 +677,7 @@
     }
   },
   "activestorage": {
-    "rows": 86,
+    "rows": 90,
     "excluded": [],
     "unwalked": [
       "attached/changes.ts::Changes",
@@ -692,6 +692,8 @@
       "reflection.ts::HasManyAttachedReflection": "ActiveStorage::Reflection::HasManyAttachedReflection",
       "reflection.ts::HasOneAttachedReflection": "ActiveStorage::Reflection::HasOneAttachedReflection",
       "reflection.ts::ReflectionExtension": "ActiveStorage::Reflection::ReflectionExtension",
+      "service/gcs-service.ts::MetadataServerError": "ActiveStorage::Service::GCSService::MetadataServerError",
+      "service/gcs-service.ts::MetadataServerNotFoundError": "ActiveStorage::Service::GCSService::MetadataServerNotFoundError",
       "transformers/image-processing-transformer.ts::UnsupportedImageProcessingArgument": "ActiveStorage::Transformers::ImageProcessingTransformer::UnsupportedImageProcessingArgument",
       "transformers/image-processing-transformer.ts::UnsupportedImageProcessingMethod": "ActiveStorage::Transformers::ImageProcessingTransformer::UnsupportedImageProcessingMethod"
     }
