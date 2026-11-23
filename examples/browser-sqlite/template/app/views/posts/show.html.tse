@@ -1,0 +1,18 @@
+<% contentFor("title", post.title) %>
+
+<h1><%= post.title %> <span class="badge <%= post.published ? "published" : "" %>"><%= post.published ? "published" : "draft" %></span></h1>
+<p class="meta">Posted <%= timeAgoInWords(post.created_at) %> ago</p>
+
+<%= simpleFormat(post.body ?? "") %>
+
+<div class="actions">
+  <%= linkTo("Edit this post", editPostPath(post)) %>
+  <%= linkTo("Back to posts", postsPath()) %>
+  <%= buttonTo("Destroy this post", post, { method: "delete" }) %>
+</div>
+
+<h2><%= pluralize(post.comments_count, "comment") %></h2>
+<%= render({ partial: "comments/comment", collection: (await post.comments.toArray()).filter((c) => c.isPersisted()) }) %>
+
+<h2>Leave a comment</h2>
+<%= render("comments/form", { post, comment }) %>
