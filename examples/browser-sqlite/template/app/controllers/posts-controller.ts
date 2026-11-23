@@ -50,13 +50,10 @@ export class PostsController extends ApplicationController {
 
   async destroy(): Promise<void> {
     await this.post.destroy();
-    await this.redirectTo(
-      { action: "index" },
-      {
-        notice: "Post was successfully destroyed.",
-        status: ":see_other",
-      },
-    );
+    await this.redirectTo(this.postsPath(), {
+      notice: "Post was successfully destroyed.",
+      status: ":see_other",
+    });
   }
 
   private async _setPost(): Promise<void> {
