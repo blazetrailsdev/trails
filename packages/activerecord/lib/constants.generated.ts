@@ -187,40 +187,36 @@ import * as m184 from "./statement-cache.js";
 import * as m185 from "./store.js";
 import * as m186 from "./suppressor.js";
 import * as m187 from "./table-metadata.js";
-import * as m188 from "./tasks/database-tasks.js";
-import * as m189 from "./tasks/mysql-database-tasks.js";
-import * as m190 from "./tasks/postgresql-database-tasks.js";
-import * as m191 from "./tasks/sqlite-database-tasks.js";
-import * as m192 from "./timestamp.js";
-import * as m193 from "./token-for.js";
-import * as m194 from "./touch-later.js";
-import * as m195 from "./trailties/controller-runtime.js";
-import * as m196 from "./trailties/job-runtime.js";
-import * as m197 from "./transaction.js";
-import * as m198 from "./transactions.js";
-import * as m199 from "./translation.js";
-import * as m200 from "./type-caster/connection.js";
-import * as m201 from "./type-caster/map.js";
-import * as m202 from "./type.js";
-import * as m203 from "./type/adapter-specific-registry.js";
-import * as m204 from "./type/date-time.js";
-import * as m205 from "./type/date.js";
-import * as m206 from "./type/decimal-without-scale.js";
-import * as m207 from "./type/hash-lookup-type-map.js";
-import * as m208 from "./type/internal/timezone.js";
-import * as m209 from "./type/json.js";
-import * as m210 from "./type/serialized.js";
-import * as m211 from "./type/text.js";
-import * as m212 from "./type/time.js";
-import * as m213 from "./type/type-map.js";
-import * as m214 from "./type/unsigned-integer.js";
-import * as m215 from "./validations.js";
-import * as m216 from "./validations/absence.js";
-import * as m217 from "./validations/associated.js";
-import * as m218 from "./validations/length.js";
-import * as m219 from "./validations/numericality.js";
-import * as m220 from "./validations/presence.js";
-import * as m221 from "./validations/uniqueness.js";
+import * as m188 from "./timestamp.js";
+import * as m189 from "./token-for.js";
+import * as m190 from "./touch-later.js";
+import * as m191 from "./trailties/controller-runtime.js";
+import * as m192 from "./trailties/job-runtime.js";
+import * as m193 from "./transaction.js";
+import * as m194 from "./transactions.js";
+import * as m195 from "./translation.js";
+import * as m196 from "./type-caster/connection.js";
+import * as m197 from "./type-caster/map.js";
+import * as m198 from "./type.js";
+import * as m199 from "./type/adapter-specific-registry.js";
+import * as m200 from "./type/date-time.js";
+import * as m201 from "./type/date.js";
+import * as m202 from "./type/decimal-without-scale.js";
+import * as m203 from "./type/hash-lookup-type-map.js";
+import * as m204 from "./type/internal/timezone.js";
+import * as m205 from "./type/json.js";
+import * as m206 from "./type/serialized.js";
+import * as m207 from "./type/text.js";
+import * as m208 from "./type/time.js";
+import * as m209 from "./type/type-map.js";
+import * as m210 from "./type/unsigned-integer.js";
+import * as m211 from "./validations.js";
+import * as m212 from "./validations/absence.js";
+import * as m213 from "./validations/associated.js";
+import * as m214 from "./validations/length.js";
+import * as m215 from "./validations/numericality.js";
+import * as m216 from "./validations/presence.js";
+import * as m217 from "./validations/uniqueness.js";
 
 defineConstants([
   [m116, "ActiveRecordError", "ActiveRecord::ActiveRecordError"],
@@ -686,7 +682,7 @@ defineConstants([
   [m150, "HasReadonlyAttributes", "ActiveRecord::ReadonlyAttributes::HasReadonlyAttributes"],
   [m116, "ReadOnlyError", "ActiveRecord::ReadOnlyError"],
   [m116, "ReadOnlyRecord", "ActiveRecord::ReadOnlyRecord"],
-  [m215, "RecordInvalid", "ActiveRecord::RecordInvalid"],
+  [m211, "RecordInvalid", "ActiveRecord::RecordInvalid"],
   [m116, "RecordNotDestroyed", "ActiveRecord::RecordNotDestroyed"],
   [m116, "RecordNotFound", "ActiveRecord::RecordNotFound"],
   [m116, "RecordNotSaved", "ActiveRecord::RecordNotSaved"],
@@ -765,11 +761,6 @@ defineConstants([
   [m186, null, "ActiveRecord::Suppressor"],
   [m187, "TableMetadata", "ActiveRecord::TableMetadata"],
   [m116, "TableNotSpecified", "ActiveRecord::TableNotSpecified"],
-  [m188, "DatabaseNotSupported", "ActiveRecord::Tasks::DatabaseNotSupported"],
-  [m188, "DatabaseTasks", "ActiveRecord::Tasks::DatabaseTasks"],
-  [m189, "MySQLDatabaseTasks", "ActiveRecord::Tasks::MySQLDatabaseTasks"],
-  [m190, "PostgreSQLDatabaseTasks", "ActiveRecord::Tasks::PostgreSQLDatabaseTasks"],
-  [m191, "SQLiteDatabaseTasks", "ActiveRecord::Tasks::SQLiteDatabaseTasks"],
   [
     m18,
     "ThroughCantAssociateThroughHasOneOrManyReflection",
@@ -780,50 +771,50 @@ defineConstants([
     "ThroughNestedAssociationsAreReadonly",
     "ActiveRecord::ThroughNestedAssociationsAreReadonly",
   ],
-  [m192, "Timestamp", "ActiveRecord::Timestamp"],
-  [m193, "TokenFor", "ActiveRecord::TokenFor"],
-  [m193, "RelationMethods", "ActiveRecord::TokenFor::RelationMethods"],
-  [m193, "TokenDefinition", "ActiveRecord::TokenFor::TokenDefinition"],
-  [m194, "TouchLater", "ActiveRecord::TouchLater"],
-  [m195, "ControllerRuntime", "ActiveRecord::Trailties::ControllerRuntime"],
-  [m195, "ClassMethods", "ActiveRecord::Trailties::ControllerRuntime::ClassMethods"],
-  [m196, "JobRuntime", "ActiveRecord::Trailties::JobRuntime"],
-  [m197, "Transaction", "ActiveRecord::Transaction"],
+  [m188, "Timestamp", "ActiveRecord::Timestamp"],
+  [m189, "TokenFor", "ActiveRecord::TokenFor"],
+  [m189, "RelationMethods", "ActiveRecord::TokenFor::RelationMethods"],
+  [m189, "TokenDefinition", "ActiveRecord::TokenFor::TokenDefinition"],
+  [m190, "TouchLater", "ActiveRecord::TouchLater"],
+  [m191, "ControllerRuntime", "ActiveRecord::Trailties::ControllerRuntime"],
+  [m191, "ClassMethods", "ActiveRecord::Trailties::ControllerRuntime::ClassMethods"],
+  [m192, "JobRuntime", "ActiveRecord::Trailties::JobRuntime"],
+  [m193, "Transaction", "ActiveRecord::Transaction"],
   [m116, "TransactionIsolationError", "ActiveRecord::TransactionIsolationError"],
   [m116, "TransactionRollbackError", "ActiveRecord::TransactionRollbackError"],
-  [m198, "Transactions", "ActiveRecord::Transactions"],
-  [m199, "Translation", "ActiveRecord::Translation"],
-  [m202, null, "ActiveRecord::Type"],
-  [m203, "AdapterSpecificRegistry", "ActiveRecord::Type::AdapterSpecificRegistry"],
-  [m205, "Date", "ActiveRecord::Type::Date"],
-  [m204, "DateTime", "ActiveRecord::Type::DateTime"],
-  [m206, "DecimalWithoutScale", "ActiveRecord::Type::DecimalWithoutScale"],
-  [m203, "DecorationRegistration", "ActiveRecord::Type::DecorationRegistration"],
-  [m207, "HashLookupTypeMap", "ActiveRecord::Type::HashLookupTypeMap"],
-  [m208, "Timezone", "ActiveRecord::Type::Internal::Timezone"],
-  [m209, "Json", "ActiveRecord::Type::Json"],
-  [m203, "Registration", "ActiveRecord::Type::Registration"],
-  [m210, "Serialized", "ActiveRecord::Type::Serialized"],
-  [m211, "Text", "ActiveRecord::Type::Text"],
-  [m212, "Time", "ActiveRecord::Type::Time"],
-  [m212, "Value", "ActiveRecord::Type::Time::Value"],
-  [m213, "TypeMap", "ActiveRecord::Type::TypeMap"],
-  [m214, "UnsignedInteger", "ActiveRecord::Type::UnsignedInteger"],
-  [m200, "Connection", "ActiveRecord::TypeCaster::Connection"],
-  [m201, "Map", "ActiveRecord::TypeCaster::Map"],
-  [m203, "TypeConflictError", "ActiveRecord::TypeConflictError"],
+  [m194, "Transactions", "ActiveRecord::Transactions"],
+  [m195, "Translation", "ActiveRecord::Translation"],
+  [m198, null, "ActiveRecord::Type"],
+  [m199, "AdapterSpecificRegistry", "ActiveRecord::Type::AdapterSpecificRegistry"],
+  [m201, "Date", "ActiveRecord::Type::Date"],
+  [m200, "DateTime", "ActiveRecord::Type::DateTime"],
+  [m202, "DecimalWithoutScale", "ActiveRecord::Type::DecimalWithoutScale"],
+  [m199, "DecorationRegistration", "ActiveRecord::Type::DecorationRegistration"],
+  [m203, "HashLookupTypeMap", "ActiveRecord::Type::HashLookupTypeMap"],
+  [m204, "Timezone", "ActiveRecord::Type::Internal::Timezone"],
+  [m205, "Json", "ActiveRecord::Type::Json"],
+  [m199, "Registration", "ActiveRecord::Type::Registration"],
+  [m206, "Serialized", "ActiveRecord::Type::Serialized"],
+  [m207, "Text", "ActiveRecord::Type::Text"],
+  [m208, "Time", "ActiveRecord::Type::Time"],
+  [m208, "Value", "ActiveRecord::Type::Time::Value"],
+  [m209, "TypeMap", "ActiveRecord::Type::TypeMap"],
+  [m210, "UnsignedInteger", "ActiveRecord::Type::UnsignedInteger"],
+  [m196, "Connection", "ActiveRecord::TypeCaster::Connection"],
+  [m197, "Map", "ActiveRecord::TypeCaster::Map"],
+  [m199, "TypeConflictError", "ActiveRecord::TypeConflictError"],
   [m116, "UnknownAttributeReference", "ActiveRecord::UnknownAttributeReference"],
   [m135, "UnknownMigrationVersionError", "ActiveRecord::UnknownMigrationVersionError"],
   [m116, "UnknownPrimaryKey", "ActiveRecord::UnknownPrimaryKey"],
   [m116, "UnmodifiableRelation", "ActiveRecord::UnmodifiableRelation"],
-  [m215, "Validations", "ActiveRecord::Validations"],
-  [m216, "AbsenceValidator", "ActiveRecord::Validations::AbsenceValidator"],
-  [m217, "AssociatedValidator", "ActiveRecord::Validations::AssociatedValidator"],
-  [m216, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
-  [m218, "LengthValidator", "ActiveRecord::Validations::LengthValidator"],
-  [m219, "NumericalityValidator", "ActiveRecord::Validations::NumericalityValidator"],
-  [m220, "PresenceValidator", "ActiveRecord::Validations::PresenceValidator"],
-  [m221, "UniquenessValidator", "ActiveRecord::Validations::UniquenessValidator"],
+  [m211, "Validations", "ActiveRecord::Validations"],
+  [m212, "AbsenceValidator", "ActiveRecord::Validations::AbsenceValidator"],
+  [m213, "AssociatedValidator", "ActiveRecord::Validations::AssociatedValidator"],
+  [m212, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
+  [m214, "LengthValidator", "ActiveRecord::Validations::LengthValidator"],
+  [m215, "NumericalityValidator", "ActiveRecord::Validations::NumericalityValidator"],
+  [m216, "PresenceValidator", "ActiveRecord::Validations::PresenceValidator"],
+  [m217, "UniquenessValidator", "ActiveRecord::Validations::UniquenessValidator"],
   [m116, "ValueTooLong", "ActiveRecord::ValueTooLong"],
   [m121, "VERSION", "ActiveRecord::VERSION"],
   [m116, "WrappedDatabaseException", "ActiveRecord::WrappedDatabaseException"],

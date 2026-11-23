@@ -58,6 +58,9 @@ const SUBPATH_ENTRIES: Record<string, string | string[]> = {
 /** A subpath entry that must not load another subpath's table, so its table is named for it. */
 const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = {};
 
+/** A `LAZY_DIRS` prefix whose files keep their own table even when the package entry re-exports them, so the entry's table does not pin them. */
+const EAGER_LAZY_DIRS: Record<string, string[]> = { activerecord: ["tasks/"] };
+
 /** A directory or file whose files load one at a time, so each carries its own table and loads no sibling. */
 const LAZY_DIRS: Record<string, string[]> = {
   turbo: ["app/channels/turbo/streams-channel.ts", "app/jobs/turbo/streams/"],
@@ -70,6 +73,7 @@ const LAZY_DIRS: Record<string, string[]> = {
     "encryption/message-pack-message-serializer.ts",
     "encryption/read-only-null-encryptor.ts",
     "test-databases.ts",
+    "tasks/",
     "testing/query-assertions.ts",
   ],
   actioncable: [
@@ -315,7 +319,8 @@ async function placement(dir: string) {
     const separated = !reachable.has(file) && separateGraph.has(file);
     const lazy =
       lazyOk &&
-      (((LAZY_DIRS[dir] ?? []).some((prefix) => file.startsWith(prefix)) && !reachable.has(file)) ||
+      (((LAZY_DIRS[dir] ?? []).some((prefix) => file.startsWith(prefix)) &&
+        (!reachable.has(file) || (EAGER_LAZY_DIRS[dir] ?? []).some((p) => file.startsWith(p)))) ||
         (SUBPATH_EXPORT_TABLES[dir] ?? []).includes(file));
     const ownTable =
       excluded.includes(rel) ||

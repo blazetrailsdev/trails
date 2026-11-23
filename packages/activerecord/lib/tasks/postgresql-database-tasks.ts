@@ -1,3 +1,4 @@
+import "../constants.postgresql-database-tasks.generated.js";
 import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
 import { File, FileUtils, rtest, rbEqq, rbFSystem, RuntimeError } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
