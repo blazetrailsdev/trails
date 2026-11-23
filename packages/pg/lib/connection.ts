@@ -134,7 +134,7 @@ export class Connection {
   serverVersion(): number {
     if (this.isFinished()) throw new ConnectionBad("connection is closed", { connection: this });
     const serverVersion = this.status() === PG.CONNECTION_BAD ? 0 : this.sversion;
-    if (serverVersion == 0) {
+    if (serverVersion === 0) {
       throw new ConnectionBad("PQserverVersion() can't get server version", { connection: this });
     }
     return serverVersion;
