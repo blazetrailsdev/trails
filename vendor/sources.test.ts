@@ -60,14 +60,14 @@ describe("vendor/sources.ts", () => {
 
   it("declares the rack-session source, enrolled in both compares", () => {
     // Rack 3 moved Rack::Session out of rack into its own gem, so vendor/rack
-    // (v3.2.8) has no lib/rack/session/. v2.1.0 is what
-    // vendor/rails/Gemfile.lock:440 resolves.
+    // (v3.2.8) has no lib/rack/session/. v2.1.1 is what
+    // vendor/rails/v8.0.5.2/Gemfile.lock:450 resolves.
     const rackSession = SOURCES.find((s) => s.name === "rack-session");
     expect(rackSession).toBeDefined();
     expect(rackSession!.origin).toEqual({
       type: "git",
       url: "https://github.com/rack/rack-session.git",
-      ref: "v2.1.0",
+      ref: "v2.1.1",
     });
     expect(rackSession!.packages).toEqual([
       {
@@ -80,12 +80,12 @@ describe("vendor/sources.ts", () => {
     expect(Object.keys(libPathsManifest())).toContain("rack-session");
     expect(Object.keys(testPathsManifest())).toContain("rack-session");
     expect(
-      resolvePath("rack-session").endsWith("vendor/rack-session/v2.1.0/lib/rack/session"),
+      resolvePath("rack-session").endsWith("vendor/rack-session/v2.1.1/lib/rack/session"),
     ).toBe(true);
-    expect(resolvePath("rack-session", "test").endsWith("vendor/rack-session/v2.1.0/test")).toBe(
+    expect(resolvePath("rack-session", "test").endsWith("vendor/rack-session/v2.1.1/test")).toBe(
       true,
     );
-    expect(vendoredRoot("rack-session").endsWith("vendor/rack-session/v2.1.0")).toBe(true);
+    expect(vendoredRoot("rack-session").endsWith("vendor/rack-session/v2.1.1")).toBe(true);
   });
 
   it("declares the rack-test source, enrolled in both api-compare and test-compare", () => {
@@ -550,13 +550,13 @@ describe("vendor/sources.ts", () => {
         "vite-trails",
       ].sort(),
     );
-    expect(m["thor"].endsWith("vendor/thor/v1.3.2/spec")).toBe(true);
+    expect(m["thor"].endsWith("vendor/thor/v1.4.0/spec")).toBe(true);
     expect(m["erubi"].endsWith("vendor/erubi/1.13.1/test")).toBe(true);
     expect(m["activerecord"].endsWith("vendor/rails/v8.0.5.2/activerecord/test/cases")).toBe(true);
     expect(m["rack"].endsWith("vendor/rack/v3.2.8/test")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/test/cases")).toBe(true);
     expect(m["image-processing"].endsWith("vendor/image_processing/v1.14.0/test")).toBe(true);
-    expect(m["rails-dom-testing"].endsWith("vendor/rails-dom-testing/v2.2.0/test")).toBe(true);
+    expect(m["rails-dom-testing"].endsWith("vendor/rails-dom-testing/v2.3.0/test")).toBe(true);
   });
 
   it("validateSources rejects missing libPath", () => {

@@ -11,7 +11,6 @@ export interface EqualityTests {
   count?: number;
   minimum?: number;
   maximum?: number;
-  strict?: unknown;
 }
 
 export class HTMLSelector {
@@ -23,7 +22,6 @@ export class HTMLSelector {
   private readonly values: unknown[];
   private readonly root: { css(...args: unknown[]): NodeSet };
   private selector!: string;
-  private strict: unknown;
 
   constructor(
     values: unknown[],
@@ -83,7 +81,7 @@ export class HTMLSelector {
         content = content.slice(1);
       }
       if (!(NO_STRIP.includes(match.name) || htmlMatches)) {
-        content = this.collapseHtmlWhitespaceBang(content);
+        content = collapseHtmlWhitespaceBang(content);
       }
 
       if (regexMatching ? content.search(matchWith) !== -1 : content === matchWith) return true;
@@ -177,12 +175,11 @@ export class HTMLSelector {
       );
     }
 
-    this.strict = comparisons.strict;
-
     return comparisons;
   }
+}
 
-  private collapseHtmlWhitespaceBang(text: string): string {
-    return text.replace(/\s+/g, " ");
-  }
+/** @internal */
+function collapseHtmlWhitespaceBang(text: string): string {
+  return text.replace(/\s+/g, " ");
 }
