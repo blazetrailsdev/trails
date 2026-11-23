@@ -1,5 +1,5 @@
 import "../constants.base.generated.js";
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Thor::Base includes Thor::Invocation and Thor::Shell (`thor/v1.3.2/lib/thor/base.rb:30-34`); the class/interface merge is how those mixins surface on the type side. */
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Thor::Base includes Thor::Invocation and Thor::Shell (`thor/v1.4.0/lib/thor/base.rb:30-34`); the class/interface merge is how those mixins surface on the type side. */
 import {
   camelize,
   underscore as _underscore,
