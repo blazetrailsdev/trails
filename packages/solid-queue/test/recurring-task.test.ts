@@ -1,3 +1,4 @@
+import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import { Deadlocked, RecordNotFound, RecordNotUnique } from "@blazetrails/activerecord";
@@ -101,8 +102,6 @@ for (const job of [
 ]) {
   constSet(RecurringTaskTest, job.name, job);
 }
-
-const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
 async function waitWhileWithTimeout(timeout: number, block: () => boolean) {
   const end = Date.now() + timeout * 1000;

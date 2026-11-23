@@ -1,3 +1,4 @@
+import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import { Base as ARBase } from "@blazetrails/activerecord";
@@ -19,7 +20,6 @@ import { ApplicationJob } from "./support/application-job.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import {
-  sleep,
   waitWhileWithTimeout,
   waitForRegisteredProcesses,
   assertMetadata,

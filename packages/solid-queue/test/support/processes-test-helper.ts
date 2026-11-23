@@ -8,6 +8,7 @@ import {
   Thread,
   Timeout,
   getProcessAdapter,
+  rbFSleep as sleep,
   rbFFork,
   signo2signm,
 } from "@blazetrails/ruby-compat";
@@ -15,8 +16,6 @@ import { Process } from "../../lib/process.js";
 import { SolidQueue } from "../../lib/solid-queue.js";
 import { Record as SolidQueueRecord } from "../../lib/record.js";
 import { Supervisor } from "../../lib/supervisor.js";
-
-export const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
 const dummyRoot = `${import.meta.dirname}/dummy`;
 

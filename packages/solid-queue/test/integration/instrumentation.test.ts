@@ -1,3 +1,4 @@
+import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "../support/dummy-application.js";
 import { Deadlocked } from "@blazetrails/activerecord";
@@ -33,7 +34,6 @@ import { ExpectedTestError } from "../support/expected-test-error.js";
 import { JobResult, StoreResultJob } from "../support/job-result.js";
 import { waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
 import {
-  sleep,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";

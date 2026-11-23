@@ -1,3 +1,4 @@
+import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "../support/dummy-application.js";
 import {
@@ -19,7 +20,6 @@ import { loadAppSchema } from "../support/queue-schema.js";
 import {
   isProcessExists,
   runSupervisorAsFork,
-  sleep,
   terminateProcess,
   waitFor,
   waitForRegisteredProcesses,

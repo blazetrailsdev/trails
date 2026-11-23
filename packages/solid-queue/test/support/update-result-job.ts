@@ -1,9 +1,7 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, rbFSleep as sleep, TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationJob } from "./application-job.js";
 import type { JobResult } from "./job-result.js";
-
-const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
 export class UpdateResultJob extends ApplicationJob {
   async perform(

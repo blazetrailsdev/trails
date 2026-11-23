@@ -1,3 +1,4 @@
+import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import { Base as ARBase, StatementInvalid } from "@blazetrails/activerecord";
@@ -32,7 +33,6 @@ import { JobResult, StoreResultJob } from "./support/job-result.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import {
   assertMetadata,
-  sleep,
   waitWhileWithTimeout,
   waitForRegisteredProcesses,
   assertNoRegisteredProcesses,
@@ -184,7 +184,7 @@ describe("WorkerTest", () => {
 
     try {
       vi.spyOn(ClaimedExecution.prototype as never, "finished").mockRejectedValue(
-        new StatementInvalid("transient DB glitch") as never,
+        new StatementInvalid("transient DB glitch"),
       );
 
       await AddToBufferJob.performLater("hey!");
