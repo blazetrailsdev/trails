@@ -523,9 +523,28 @@ describe("buildViews", { timeout: 30_000 }, () => {
       'import { Base } from "@blazetrails/actionmailer";\nexport class PostMailer extends Base { declare post: { title: string }; }',
     );
     write(cwd, "app/views/post-mailer/published.html.tse", "<%= post.titel %>");
+    write(
+      cwd,
+      "app/mailers/admin/notifier.ts",
+      'import { Base } from "@blazetrails/actionmailer";\nexport class Notifier extends Base { declare count: number; }',
+    );
+    write(cwd, "app/views/admin/notifier/welcome.html.tse", "<%= count.toFixd(0) %>");
+    write(
+      cwd,
+      "app/mailers/posts.ts",
+      'import { Base } from "@blazetrails/actionmailer";\nexport class Posts extends Base { declare mailed: string; }',
+    );
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      "export class PostsController { declare page: string; }",
+    );
+    write(cwd, "app/views/posts/show.html.tse", "<%= page.length %><%= mailed.length %>");
     await buildViews({ cwd });
     expect(viewDiagnostics(cwd)).toEqual([
+      "admin/notifier/welcome.html.tse.ts: Property 'toFixd' does not exist on type 'number'. Did you mean 'toFixed'?",
       "post-mailer/published.html.tse.ts: Property 'titel' does not exist on type '{ title: string; }'. Did you mean 'title'?",
+      "posts/show.html.tse.ts: Property 'length' does not exist on type 'never'.",
     ]);
   });
 
