@@ -1089,7 +1089,7 @@ by a ruby-compat `Thread`.** There is no fifth shape and no receipt tag for one.
 
 An `initialize` that is async on only some engines answers `T | Promise<T>`
 from `static new`: `SQLite3::Statement.new` (`packages/sqlite3/lib/statement.ts`;
-`vendor/sqlite3/v2.6.0/lib/sqlite3/statement.rb:28-37`), whose `prepare` is
+`vendor/sqlite3/v2.7.3/lib/sqlite3/statement.rb:28-37`), whose `prepare` is
 synchronous on better-sqlite3 and async on expo-sqlite. Ruled by the operator
 on 2026-11-22.
 
