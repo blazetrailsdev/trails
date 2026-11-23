@@ -54,6 +54,13 @@ describe("GCSService IAM signing", () => {
     await expect(iamService().issuer()).rejects.toBeInstanceOf(MetadataServerNotFoundError);
   });
 
+  it("raises MetadataServerNotFoundError when the metadata server is unreachable", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("fetch failed");
+    });
+    await expect(iamService().issuer()).rejects.toBeInstanceOf(MetadataServerNotFoundError);
+  });
+
   it("raises MetadataServerError when the metadata server has no email", async () => {
     stubMetadataServer(null);
     await expect(iamService().issuer()).rejects.toBeInstanceOf(MetadataServerError);

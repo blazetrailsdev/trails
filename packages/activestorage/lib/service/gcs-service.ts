@@ -26,6 +26,8 @@ export class GCSService extends Service {
   private _client: Storage | undefined;
   /** @internal */
   private _issuer: string | undefined;
+  /** @internal */
+  private _iamBucket: Bucket | undefined;
 
   constructor({ public: public_ = false, ...config }: Record<string, unknown>) {
     super();
@@ -394,6 +396,7 @@ export class GCSService extends Service {
     issuer: string;
     signer: (stringToSign: string) => Promise<string>;
   }): Bucket {
+    if (this._iamBucket !== undefined) return this._iamBucket;
     const GoogleAuth = this.client().authClient.constructor as new (options: object) => object;
     const IamAuth = class extends GoogleAuth {
       async getCredentials() {
@@ -404,11 +407,11 @@ export class GCSService extends Service {
         return await signer(stringToSign);
       }
     };
-    return new Storage({
+    return (this._iamBucket = new Storage({
       apiEndpoint: this.client().apiEndpoint,
       projectId: this.client().projectId,
       authClient: new IamAuth({}) as unknown as GoogleAuth,
-    }).bucket(fetch<string>(this.config, "bucket"));
+    }).bucket(fetch<string>(this.config, "bucket")));
   }
 
   /** @internal */
@@ -428,7 +431,8 @@ export class GCSService extends Service {
     let isMetadata: boolean;
     try {
       isMetadata = (await lookupMetadata("")).headers.get("Metadata-Flavor") === "Google";
-    } catch {
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
       isMetadata = false;
     }
     if (!isMetadata) throw new MetadataServerNotFoundError();
