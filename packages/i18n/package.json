@@ -13,6 +13,7 @@
   },
   "files": [
     "dist",
+    "NOTICE",
     "!dist/**/*.d.ts.map"
   ],
   "scripts": {
