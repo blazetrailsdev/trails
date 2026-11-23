@@ -1958,6 +1958,9 @@ importers:
       '@blazetrails/libxml-ruby':
         specifier: workspace:*
         version: link:../../packages/libxml-ruby
+      '@blazetrails/listen':
+        specifier: workspace:*
+        version: link:../../packages/listen
       '@blazetrails/mail':
         specifier: workspace:*
         version: link:../../packages/mail
