@@ -31,12 +31,11 @@
 
   const navLeft = [
     { label: "Source", href: repo },
-    { label: "Docs", href: `${base}/docs/` },
     { label: "API", href: `${base}/docs/api/README` },
   ];
   const navRight = [
+    { label: "Docs", href: `${base}/docs/` },
     { label: "Guides", href: guides },
-    { label: "Parity", href: `${repo}/blob/main/docs/parity-gates.md` },
   ];
 
   const railsGems = new Set([
@@ -97,8 +96,9 @@
     <p class="small"><strong>And more.</strong> We&rsquo;re bringing all the friends along.</p>
     <p class="fine">Percentages count the upstream gem&rsquo;s public classes, modules, methods and constants that trails matches by name, measured at {data.measuredAt}.</p>
     <p class="fine"><strong>Rails API:</strong> gems the Rails project owns, like Active Record or Solid Queue. <strong>Ruby gem API:</strong> gems Rails depends on, like rack or i18n.</p>
-    <h3 class="browser" id="browser">The same code in the browser.</h3>
-    <p class="small">A trails app&rsquo;s client-side JavaScript, Turbo and Stimulus included, is compatible with Rails frontend JS packages. Browser and server share one codebase.</p>
+    <h3 class="browser" id="browser">Play nice with Rails.</h3>
+    <p class="small"><strong>Compatibility is the goal.</strong> A trails app is compatible with Rails frontend JavaScript dependencies. Turbo, Hotwire, Stimulus, and ActionText all use Rails&rsquo; JS packages directly.</p>
+    <p class="small"><strong>trails and Rails apps can work side by side.</strong> In live demos, a trails app and a Rails app read each other's encrypted passwords and exchange Active Job messages across the two languages in real time.</p>
   </section>
 
   <section class="band">
@@ -126,7 +126,6 @@
     <div class="card">
       <h2>Built for Rails developers, new and seasoned.</h2>
       <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/{data.buildRef}/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/{data.buildRef}/examples/react-native-notes">React Native app</a>. Run <a href="{repo}/tree/{data.buildRef}/examples/browser-sqlite">the full stack in a browser tab</a>, on SQLite.</p>
-      <p class="small"><strong>trails and Rails apps can work side by side.</strong> In live demos, a trails app and a Rails app read each other's encrypted passwords and exchange Active Job messages across the two languages in real time.</p>
     </div>
   </section>
 
