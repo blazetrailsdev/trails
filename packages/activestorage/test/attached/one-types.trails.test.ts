@@ -5,9 +5,13 @@ import type { Blob } from "../../lib/blob.js";
 
 describe("Attached::One types", () => {
   it("answers the members delegate_missing_to forwards to the attachment", () => {
-    expectTypeOf<One["variant"]>().toEqualTypeOf<Attachment["variant"] | undefined>();
-    expectTypeOf<One["blob"]>().toEqualTypeOf<Attachment["blob"] | undefined>();
-    expectTypeOf<One["url"]>().toEqualTypeOf<Blob["url"] | undefined>();
+    expectTypeOf<One["variant"]>().toEqualTypeOf<
+      (...args: Parameters<Attachment["variant"]>) => ReturnType<Attachment["variant"]> | null
+    >();
+    expectTypeOf<One["blob"]>().toEqualTypeOf<Attachment["blob"] | null>();
+    expectTypeOf<One["url"]>().toEqualTypeOf<
+      (...args: Parameters<Blob["url"]>) => ReturnType<Blob["url"]> | null
+    >();
   });
 
   it("keeps its own members' signatures", () => {

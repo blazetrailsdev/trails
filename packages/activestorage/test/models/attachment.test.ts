@@ -178,7 +178,7 @@ describe("ActiveStorage::AttachmentTest", () => {
     const blob = await createBlob();
     await user.avatar.attach(blob);
 
-    const signedId = user.avatar.signedId();
+    const signedId = user.avatar.signedId()!;
     expect(await Blob.findSignedBang(signedId)).toEqual(blob);
     expect(await Blob.findSigned(signedId)).toEqual(blob);
   });
@@ -187,7 +187,7 @@ describe("ActiveStorage::AttachmentTest", () => {
     const blob = await createBlob();
     await user.avatar.attach(blob);
 
-    const signedId = user.avatar.signedId({ purpose: "custom_purpose" });
+    const signedId = user.avatar.signedId({ purpose: "custom_purpose" })!;
     expect(await Blob.findSignedBang(signedId, { purpose: "custom_purpose" })).toEqual(blob);
   });
 
@@ -195,7 +195,7 @@ describe("ActiveStorage::AttachmentTest", () => {
     const blob = await createBlob();
     await user.avatar.attach(blob);
 
-    const signedId = user.avatar.signedId({ expiresIn: Duration.minutes(1) });
+    const signedId = user.avatar.signedId({ expiresIn: Duration.minutes(1) })!;
     expect(await Blob.findSignedBang(signedId)).toEqual(blob);
   });
 
@@ -203,7 +203,7 @@ describe("ActiveStorage::AttachmentTest", () => {
     const blob = await createBlob();
     await user.avatar.attach(blob);
 
-    const signedId = user.avatar.signedId({ expiresIn: Duration.minutes(1) });
+    const signedId = user.avatar.signedId({ expiresIn: Duration.minutes(1) })!;
     travel(Duration.minutes(2));
     expect(await Blob.findSigned(signedId)).toBeNull();
   });
@@ -212,7 +212,7 @@ describe("ActiveStorage::AttachmentTest", () => {
     const blob = await createBlob();
     await user.avatar.attach(blob);
 
-    const signedId = user.avatar.signedId({ expiresAt: currentTimeInstant().add({ minutes: 1 }) });
+    const signedId = user.avatar.signedId({ expiresAt: currentTimeInstant().add({ minutes: 1 }) })!;
     expect(await Blob.findSignedBang(signedId)).toEqual(blob);
   });
 
@@ -220,7 +220,7 @@ describe("ActiveStorage::AttachmentTest", () => {
     const blob = await createBlob();
     await user.avatar.attach(blob);
 
-    const signedId = user.avatar.signedId({ expiresAt: currentTimeInstant().add({ minutes: 1 }) });
+    const signedId = user.avatar.signedId({ expiresAt: currentTimeInstant().add({ minutes: 1 }) })!;
     travel(Duration.minutes(2));
     expect(await Blob.findSigned(signedId)).toBeNull();
   });
@@ -240,7 +240,7 @@ describe("ActiveStorage::AttachmentTest", () => {
     user.strictLoadingBang(true);
     await user.avatar.attach(blob);
 
-    const signedId = user.avatar.signedId();
+    const signedId = user.avatar.signedId()!;
     expect(await Blob.findSigned(signedId)).toEqual(blob);
   });
 

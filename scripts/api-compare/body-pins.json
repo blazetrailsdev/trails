@@ -30760,8 +30760,8 @@
     "package": "activemodel",
     "rubyFile": "secure_password.rb",
     "rubyName": "has_secure_password",
-    "digest": "ccd4c5f63f54815e",
-    "ref": "v8.0.2"
+    "digest": "01b203415638bc06",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activemodel",
@@ -87225,6 +87225,153 @@
     "rubyName": "except",
     "digest": "3651082c9fb9b3fd",
     "ref": "v1.14.8"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "concerns.rb",
+    "rubyName": "resolve_scrubber",
+    "digest": "9873a326c2c492ea",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "allowed_element?",
+    "digest": "a57bf9d6880fdac6",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "cdata_escape",
+    "digest": "6aca2f057d1e32ec",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "cdata_needs_escaping?",
+    "digest": "7adb0accb4d2a912",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "escape_tags",
+    "digest": "1db78b804921c9f2",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "force_correct_attribute_escaping!",
+    "digest": "88c3c13609c85603",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "scrub_attribute_that_allows_local_ref",
+    "digest": "d344a0ebc5768701",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "scrub_attributes",
+    "digest": "b91cbf45fdfed2dc",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "scrub_css",
+    "digest": "ca5e55b052277af4",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "scrub_css_attribute",
+    "digest": "4a1aac7a030a49f7",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "html5/scrub.rb",
+    "rubyName": "scrub_uri_attribute",
+    "digest": "c287cd744643ece9",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "metahelpers.rb",
+    "rubyName": "add_downcased_set_members_to_all_set_constants",
+    "digest": "be86ab129aec1f90",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "scrubber.rb",
+    "rubyName": "append_attribute",
+    "digest": "05b5e6355ec93ada",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "scrubber.rb",
+    "rubyName": "html5lib_sanitize",
+    "digest": "32d1017759666bdc",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "scrubber.rb",
+    "rubyName": "initialize",
+    "digest": "e903bb2986ddbd21",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "scrubber.rb",
+    "rubyName": "scrub",
+    "digest": "9b339682b9025de1",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "scrubber.rb",
+    "rubyName": "traverse",
+    "digest": "fe7001b77458873d",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "scrubber.rb",
+    "rubyName": "traverse_conditionally_bottom_up",
+    "digest": "5a2a485bc6b8fa5c",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "scrubber.rb",
+    "rubyName": "traverse_conditionally_top_down",
+    "digest": "5756b2ee70a8000e",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "scrubbers.rb",
+    "rubyName": "initialize",
+    "digest": "f52ca3d1e38e8762",
+    "ref": "v2.24.0"
+  },
+  {
+    "package": "loofah",
+    "rubyFile": "scrubbers.rb",
+    "rubyName": "scrub",
+    "digest": "e60683a1103871c3",
+    "ref": "v2.24.0"
   },
   {
     "package": "mini-magick",

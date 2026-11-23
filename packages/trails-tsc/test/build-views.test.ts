@@ -424,15 +424,28 @@ describe("buildViews", { timeout: 30_000 }, () => {
       "app/controllers/application-controller.ts",
       "export class ApplicationController { declare static _helpers: { turboStreamFrom(x: unknown): string }; }",
     );
-    write(cwd, "app/mailers/notifier-mailer.ts", "export class NotifierMailer {}");
+    write(
+      cwd,
+      "app/mailers/application-mailer.ts",
+      [
+        'import { Base } from "@blazetrails/actionmailer";',
+        'export class ApplicationMailer extends Base { static { this.layout("notifications"); } }',
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/mailers/notifier.ts",
+      'import { ApplicationMailer } from "./application-mailer.js";\nexport class Notifier extends ApplicationMailer {}',
+    );
+    write(cwd, "app/views/layouts/notifications.html.tse", "<%= turboStreamFrom(1) %>");
+    write(cwd, "app/views/notifier/welcome.html.tse", "<%= turboStreamFrom(1) %>");
+    write(cwd, "app/views/layouts/notifier.html.tse", "<%= turboStreamFrom(1) %>");
     write(cwd, "app/views/posts/show.html.tse", "<%= turboStreamFrom(1) %>");
     write(cwd, "app/views/layouts/application.html.tse", "<%= turboStreamFrom(1) %>");
     write(cwd, "app/views/shared/_banner.html.tse", "<%= turboStreamFrom(1) %>");
-    write(cwd, "app/views/layouts/mailer.html.tse", "<%= turboStreamFrom(1) %>");
-    write(cwd, "app/views/notifier-mailer/welcome.html.tse", "<%= turboStreamFrom(1) %>");
     await buildViews({ cwd });
     expect(viewDiagnostics(cwd)).toEqual(
-      ["layouts/mailer", "notifier-mailer/welcome"].map(
+      ["layouts/notifications", "layouts/notifier", "notifier/welcome"].map(
         (rel) =>
           `${rel}.html.tse.ts: This expression is not callable.\n  Type 'never' has no call signatures.`,
       ),

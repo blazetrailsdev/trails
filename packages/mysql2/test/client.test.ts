@@ -3,6 +3,8 @@ import { File, rbCInteger, rbProgname, Thread, TopLevel } from "@blazetrails/rub
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Mysql2 } from "../lib/index.js";
 import { lastIdTestLock, newClient, specHelper } from "./spec-helper.js";
+
+const testData = new URL("fixtures/test-data", import.meta.url).pathname;
 describe("Mysql2::Client", () => {
   const state = specHelper();
   const isPerformanceSchemaEnabled = async () =>
@@ -342,9 +344,26 @@ describe("Mysql2::Client", () => {
         client.query("LOAD DATA LOCAL INFILE 'spec/test_data' INTO TABLE infileTest"),
       ).rejects.toThrow(/command is not allowed/);
     });
-    // PERMANENT-SKIP: npm mysql2 reads a LOCAL INFILE only through an `infileStreamFactory` returning a Node `Readable`, and this package imports no `node:stream` / `node:fs`.
-    it.skip("should raise an error when a non-existent file is loaded", () => {});
-    it.skip("should LOAD DATA LOCAL INFILE", () => {});
+    it("should raise an error when a non-existent file is loaded", async () => {
+      const client = await newClient({ localInfile: true });
+      await expect(
+        client.query("LOAD DATA LOCAL INFILE 'this/file/is/not/here' INTO TABLE infileTest"),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          constructor: Mysql2.Error,
+          message: "No such file or directory: this/file/is/not/here",
+        }),
+      );
+    });
+    it("should LOAD DATA LOCAL INFILE", async () => {
+      const client = await newClient({ localInfile: true });
+      await client.query(`LOAD DATA LOCAL INFILE '${testData}' INTO TABLE infileTest`);
+      const info = client.queryInfo();
+      expect(info).toEqual({ records: 1, deleted: 0, skipped: 0, warnings: 0 });
+
+      const result = await client.query("SELECT * FROM infileTest");
+      expect(result!.first()).toEqual({ id: 1, foo: "Hello", bar: "World" });
+    });
   });
   it("should expect connect_timeout to be a positive integer", async () => {
     await expect(newClient({ connectTimeout: -1 })).rejects.toThrow(Mysql2.Error);
@@ -491,8 +510,14 @@ describe("Mysql2::Client", () => {
         multiClient = await newClient({ flags: Mysql2.Client.MULTI_STATEMENTS });
       });
 
-      // PERMANENT-SKIP: npm mysql2's Query command settles the whole multi-statement query with the ERR packet and drops the result sets read before it.
-      it.skip("should raise an exception when one of multiple statements fails", () => {});
+      it("should raise an exception when one of multiple statements fails", async () => {
+        const result = await multiClient.query(
+          "SELECT 1 AS 'set_1'; SELECT * FROM invalid_table_name; SELECT 2 AS 'set_2';",
+        );
+        expect(result!.first()!["set_1" as never]).toBe(1);
+        expect(() => multiClient.nextResult()).toThrow(Mysql2.Error);
+        expect(multiClient.nextResult()).toBe(false);
+      });
       it("returns multiple result sets", async () => {
         expect(
           (await multiClient.query("SELECT 1 AS 'set_1'; SELECT 2 AS 'set_2'"))!.first(),
@@ -706,9 +731,25 @@ describe("Mysql2::Client", () => {
       const res = state.client.sessionTrack(Mysql2.Client.SESSION_TRACK_SCHEMA);
       expect(res).toEqual(["information_schema"]);
     });
-    // PERMANENT-SKIP: npm mysql2's ResultSetHeader parses session-track types 0-3 only and drops SESSION_TRACK_TRANSACTION_CHARACTERISTICS / _STATE records.
-    it.skip("returns multiple session track type values when available", () => {});
-    it.skip("returns valid transaction state inside a transaction", () => {});
+    it("returns multiple session track type values when available", async () => {
+      await state.client.query("SET @@SESSION.session_track_transaction_info='CHARACTERISTICS';");
+
+      let res = state.client.sessionTrack(Mysql2.Client.SESSION_TRACK_SYSTEM_VARIABLES);
+      expect(res).toInclude("session_track_transaction_info", "CHARACTERISTICS");
+
+      res = state.client.sessionTrack(Mysql2.Client.SESSION_TRACK_STATE_CHANGE);
+      expect(res).toBeNull();
+
+      res = state.client.sessionTrack(Mysql2.Client.SESSION_TRACK_TRANSACTION_CHARACTERISTICS);
+      expect(res).toInclude("");
+    });
+    it("returns valid transaction state inside a transaction", async () => {
+      await state.client.query("SET @@SESSION.session_track_transaction_info='CHARACTERISTICS'");
+      await state.client.query("START TRANSACTION");
+
+      const res = state.client.sessionTrack(Mysql2.Client.SESSION_TRACK_TRANSACTION_STATE);
+      expect(res).toInclude("T_______");
+    });
     it("returns empty array if session track type not found", async () => {
       await state.client.query("SET @@SESSION.session_track_state_change=ON;");
       const res = state.client.sessionTrack(

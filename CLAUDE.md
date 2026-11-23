@@ -97,7 +97,8 @@ not in the PR body.
 
 Convergence is the goal. Every deviation register in this repo — the
 `call-mismatches-exclude` baselines, `@noRailsEquivalent`,
-`@missingRailsCall`, `SKIP_GROUPS`, and every story in a
+`@missingRailsCall`, `SKIP_GROUPS`, the bump ledger
+(`scripts/parity/bump-ledger/<source>.json`, RFC 0191), and every story in a
 `<package>-surfaced-deviations` bucket — is a **burndown ledger**, not a settled
 decision. A row in one of them says "we know this is wrong and haven't fixed it
 yet." It is never a licence to leave it, to copy the pattern into new code, or
@@ -528,10 +529,18 @@ neither is an error.
    raises elsewhere: trails#8307 made 106 casts redundant and left `main`
    red until trails#8316.
 8. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
-9. **`pnpm parity:changed`** is the one-command local check: it runs CI's
-   comparison gate stack scoped to each changed package (~20–30s each). When
-   `ruby-compat` or `activesupport` changed, `--full` adds the unscoped
-   `pnpm parity:api` compare; it does not run the gate stack unscoped.
+9. **Touched a unit in a bump ledger?** A pair or test with a row in
+   `scripts/parity/bump-ledger/<source>.json` (or `<source>.tests.json`) is
+   not yet re-verified against the new upstream tree. Re-read the port
+   against the new body, converge it, and run
+   `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>`, which deletes
+   its row; from then every ratchet applies to it at full strength. Never add
+   a row, and never re-pin a body you did not re-read
+   ([vendor/README.md § "Upgrading a source"](vendor/README.md#upgrading-a-source-bumping-ref)).
+10. **`pnpm parity:changed`** is the one-command local check: it runs CI's
+    comparison gate stack scoped to each changed package (~20–30s each). When
+    `ruby-compat` or `activesupport` changed, `--full` adds the unscoped
+    `pnpm parity:api` compare; it does not run the gate stack unscoped.
 
 ## Module mixins (Ruby `include` → TypeScript)
 

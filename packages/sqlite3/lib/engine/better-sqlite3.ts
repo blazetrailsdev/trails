@@ -64,12 +64,27 @@ function open(file: string, mode: number): BetterSqlite3.Database {
   return new BetterSqlite3(file, opts);
 }
 
+const closedStatement: EngineStatement = {
+  close: () => {},
+  isClosed: () => true,
+  bindParam: () => {},
+  resetBang: () => {},
+  step: () => null,
+  isDone: () => true,
+  columnCount: () => 0,
+  columnName: () => null,
+  columnDecltype: () => null,
+  bindParameterCount: () => 0,
+  setReadBigInts: () => {},
+};
+
 /** @internal */
 function prepareStatement(
   raw: BetterSqlite3.Database,
   sql: string,
   handler: () => BusyHandler | null,
   setChanges: (n: number) => void,
+  finalize: () => void,
 ): EngineStatement {
   const stmt = withBusyHandler(errors, handler, () => raw.prepare(sql));
   const reader = stmt.reader;
@@ -105,8 +120,10 @@ function prepareStatement(
   };
   return {
     close: () => {
+      if (closed) return;
       rows?.return?.();
       closed = true;
+      finalize();
     },
     isClosed: () => closed,
     bindParam(key, value) {
@@ -170,11 +187,20 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
   const setChanges = (n: number) => {
     changes = n;
   };
+  let zombie = false;
+  let liveStatements = 0;
+  const finalize = () => {
+    liveStatements -= 1;
+    if (zombie && liveStatements === 0) raw.close();
+  };
   const db: EngineDatabase = {
     ...errors,
-    isClosed: () => !raw.open,
+    isClosed: () => zombie || !raw.open,
     isDiscarded: () => false,
-    close: () => void raw.close(),
+    close: () => {
+      if (liveStatements === 0) raw.close();
+      else zombie = true;
+    },
     changes: () => changes,
     disableQuirkMode: () => {},
     loadExtensionInternal: (file) => void raw.loadExtension(file),
@@ -219,11 +245,11 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       return results;
     },
     prepare(sql) {
-      const [tail] = statementTail(sql);
-      return [
-        prepareStatement(raw, sql.slice(0, tail), () => handler, setChanges),
-        sql.slice(tail),
-      ];
+      const [tail, empty] = statementTail(sql);
+      if (empty) return [closedStatement, sql.slice(tail)];
+      const stmt = prepareStatement(raw, sql.slice(0, tail), () => handler, setChanges, finalize);
+      liveStatements += 1;
+      return [stmt, sql.slice(tail)];
     },
   };
   return db;

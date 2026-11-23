@@ -3,7 +3,6 @@ import { writingRole } from "@blazetrails/activerecord/active-record";
 import { isPresent } from "@blazetrails/activesupport";
 import { include, StandardError } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
-import type { Attachment } from "./attachment.js";
 import type { One } from "./attached/one.js";
 import { Servable } from "./blob/servable.js";
 import type { Blob } from "./blob.js";
@@ -104,7 +103,7 @@ export class Preview {
 
   /** @internal */
   private variant(): Variant | VariantWithRecord {
-    return (this.image as One & Attachment).variant(this.variation);
+    return this.image.variant(this.variation)!;
   }
 
   async contentTypeForServing(): Promise<string | null> {

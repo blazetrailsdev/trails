@@ -1282,7 +1282,7 @@
     }
   },
   "sqlite3": {
-    "rows": 35,
+    "rows": 36,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1320,6 +1320,7 @@
       "pragmas.ts::Pragmas": "SQLite3::Pragmas",
       "resultset.ts::HashResultSet": "SQLite3::HashResultSet",
       "resultset.ts::ResultSet": "SQLite3::ResultSet",
+      "statement.ts::Blob": "SQLite3::Blob",
       "statement.ts::Statement": "SQLite3::Statement"
     }
   },

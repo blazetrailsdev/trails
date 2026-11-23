@@ -440,7 +440,12 @@ they clear; the ledger only shrinks.
 When the gate fails:
 
 - **DRIFT** — the vendored body changed. Re-verify the port, then re-pin that
-  file with `--pin`.
+  file with `--pin`. During a bump, a DRIFT pair the bump PR did not converge
+  is a **ledger row**, not a red: the gate reports it as `ledger` and passes.
+  The burn-down story that re-verifies it runs `--pin <ruby-file>`, which
+  clears the pin's DRIFT and deletes the row in the same write. Never re-pin
+  to silence the gate, ledgered or not: a `--pin` is the claim that the port
+  was read against the new body.
 - **STALE** — the pinned method was removed or renamed upstream (or the TS side
   no longer name-matches). Once you have confirmed the pair is genuinely gone,
   `pnpm tsx scripts/api-compare/body-pins.ts --prune` drops every unresolved pin

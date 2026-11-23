@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
 import type { TestCase } from "@blazetrails/actionpack/testing";
-import { except, rbFSend, rbObjRespondTo, RuntimeError } from "@blazetrails/ruby-compat";
+import { except, rbFSend, rbModName, rbObjRespondTo, RuntimeError } from "@blazetrails/ruby-compat";
 import { QueryLogs } from "@blazetrails/activerecord";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -37,7 +37,7 @@ export interface ActionControllerConfig {
   actionOnUnpermittedParameters?: false | "log" | "raise" | null;
 }
 
-type QueryLogsController = { controllerName: string; actionName: string };
+type QueryLogsController = { controllerName(): string | null; actionName: string };
 
 declare module "../trailtie/configuration.js" {
   interface Configuration {
@@ -172,17 +172,15 @@ export class Trailtie extends BaseTrailtie {
           QueryLogs.taggings = {
             ...QueryLogs.taggings,
             controller: (context) =>
-              (context?.controller as QueryLogsController | null | undefined)?.controllerName ??
+              (context?.controller as QueryLogsController | null | undefined)?.controllerName() ??
               null,
             action: (context) =>
               (context?.controller as QueryLogsController | null | undefined)?.actionName ?? null,
             namespaced_controller: (context) => {
               if (context?.controller != null) {
-                const controllerClass = (context.controller as unknown as object).constructor as {
-                  name: string;
-                };
+                const controllerClass = (context.controller as unknown as object).constructor;
                 if (!isAnonymous(controllerClass)) {
-                  const name = controllerClass.name;
+                  const name = rbModName(controllerClass)!;
                   return underscore(
                     name.endsWith("Controller") ? name.slice(0, -"Controller".length) : name,
                   );

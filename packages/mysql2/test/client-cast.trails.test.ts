@@ -3,11 +3,12 @@ import mysql from "mysql2/promise";
 import { BigDecimal } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Mysql2, type Client } from "../lib/index.js";
+import { withCoreQuery } from "./support/core-query.js";
 
 async function clientOn(connection: object): Promise<Client> {
   const createConnection = vi
     .spyOn(mysql, "createConnection")
-    .mockResolvedValue(connection as never);
+    .mockResolvedValue(withCoreQuery(connection) as never);
   try {
     return await Mysql2.Client.new({});
   } finally {

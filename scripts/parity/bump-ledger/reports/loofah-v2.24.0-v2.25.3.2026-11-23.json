@@ -1,0 +1,244 @@
+{
+  "version": 1,
+  "method": "dry-run",
+  "date": "2026-11-23",
+  "source": "loofah",
+  "from": {
+    "ref": "v2.24.0",
+    "sha": "85990602c6fdb40489138e80080ca508200c7137"
+  },
+  "to": {
+    "ref": "v2.25.3",
+    "sha": "bbe007e52e8aeaa520b3e515235d467f5b1416e6"
+  },
+  "trailsCommit": "c3678de38b6a56bd3fd062a276e6fe9185f89333",
+  "packages": [
+    {
+      "package": "loofah",
+      "filesChanged": 4,
+      "linesAdded": 224,
+      "linesRemoved": 71,
+      "pinsDrift": 5,
+      "pinsStale": 0,
+      "rubyFiles": 1,
+      "unpinnedChanged": 0,
+      "methodsBefore": "23/77",
+      "methodsAfter": "23/83",
+      "testsBefore": 185,
+      "testsAfter": 274,
+      "testsAdded": 102,
+      "testsRemoved": 13,
+      "testsChanged": 0,
+      "testsMoved": 0
+    }
+  ],
+  "gates": [
+    {
+      "gate": "API comparison",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "Ruby defs: 843  —  own row 775 (91.9%)  |  excluded file 0  |  rowless file 0  |  global skip 0  |  scoped skip 0  |  operator 29  |  same-name collapse 39  |  predicate kind mismatches 0 / errors.rb                                               errors.ts                                     1      0         0      1 100% ✓ / Ruby defs: 6121  —  own row 5594 (91.4%)  |  excluded file 45  |  rowless",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "API comparison (privates)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "Ruby defs: 843  —  own row 775 (91.9%)  |  excluded file 0  |  rowless file 0  |  global skip 0  |  scoped skip 0  |  operator 29  |  same-name collapse 39  |  predicate kind mismatches 0 / errors.rb                                               errors.ts                                     1      0         0      1 100% ✓ / Ruby defs: 6121  —  own row 5594 (91.4%)  |  excluded file 45  |  rowless",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Extra-surface tag gates",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "nokogiri                  22     101      97     198      25       5      35 / 1     69      1  nokogiri         xml/parse-options.ts / 17     10      0  activerecord-test-support run-token.ts / 28      7      1  nokogiri         xml/node/save-options.ts",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Body-pins gate",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": "green",
+      "summary": "body-pins gate: 253 ledger row(s) — drifted or removed by a ref bump, tracked in scripts/parity/bump-ledger/: / body-pins gate: 5 DRIFTED pin(s) — the vendored Rails body changed.",
+      "ledgeredSummary": "body-pins gate: 258 ledger row(s) — drifted or removed by a ref bump, tracked in scripts/parity/bump-ledger/: / body-pins gate: OK (14742 pinned)"
+    },
+    {
+      "gate": "API comparison (calls)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "Ruby defs: 843  —  own row 775 (91.9%)  |  excluded file 0  |  rowless file 0  |  global skip 0  |  scoped skip 0  |  operator 29  |  same-name collapse 39  |  predicate kind mismatches 0 / errors.rb                                               errors.ts                                     1      0         0      1 100% ✓ / Ruby defs: 6121  —  own row 5594 (91.4%)  |  excluded file 45  |  rowless",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Call-mismatches ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "call-mismatches ratchet: skipped 34 row(s) on a bump-ledgered pair / call-mismatches ratchet: OK (26 baselined, 8 unreviewed, 7 per-file mark(s) totalling 8 tight)",
+      "ledgeredSummary": "call-mismatches ratchet: skipped 34 row(s) on a bump-ledgered pair / call-mismatches ratchet: OK (26 baselined, 8 unreviewed, 7 per-file mark(s) totalling 8 tight)"
+    },
+    {
+      "gate": "Call-argument ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "call-args ratchet: skipped 49 row(s) on a bump-ledgered pair / call-args ratchet: OK (26 baselined shape row(s); naming gated in abstractcontroller, actioncable, actioncontroller, activemodel, activerecord, activerecord-test-support, activesupport, arel, bcrypt, builder, chronic, date, did-you-mean, et-orbi, fugit, globalid, i18n, marcel, mini-magick, raabro, rack, rack-session, rack-test, rails-d",
+      "ledgeredSummary": "call-args ratchet: skipped 49 row(s) on a bump-ledgered pair / call-args ratchet: OK (26 baselined shape row(s); naming gated in abstractcontroller, actioncable, actioncontroller, activemodel, activerecord, activerecord-test-support, activesupport, arel, bcrypt, builder, chronic, date, did-you-mean, et-orbi, fugit, globalid, i18n, marcel, mini-magick, raabro, rack, rack-session, rack-test, rails-d"
+    },
+    {
+      "gate": "Receipt audit (activerecord)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "receipt-audit: skipped 1 row(s) on a bump-ledgered pair",
+      "ledgeredSummary": "receipt-audit: skipped 1 row(s) on a bump-ledgered pair"
+    },
+    {
+      "gate": "Receipt audit (activemodel)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "receipt-audit: skipped 0 row(s) on a bump-ledgered pair",
+      "ledgeredSummary": "receipt-audit: skipped 0 row(s) on a bump-ledgered pair"
+    },
+    {
+      "gate": "Ruby-compat call ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "ruby-compat call ratchet: skipped 0 row(s) on a bump-ledgered pair / ruby-compat call ratchet: OK (64 enrolled package(s), 1 baselined row(s))",
+      "ledgeredSummary": "ruby-compat call ratchet: skipped 0 row(s) on a bump-ledgered pair / ruby-compat call ratchet: OK (64 enrolled package(s), 1 baselined row(s))"
+    },
+    {
+      "gate": "Arm-parity report",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "call-skeleton arms report: 1774 mismatched pair(s) across 709 file(s), 15365 pair(s) compared — report-only, nothing gates on this (RFC 0113) / short-circuit projection: 2274 mismatched pair(s) over the `or` / `and` tokens, which the arm verdicts above do not read / nokogiri                      19 / activerecord/associations/errors.ts                     12",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Missing-throw arm ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "arm-throw gate: skipped 3 row(s) on a bump-ledgered pair / arm-throw gate: OK (activesupport 3/3)",
+      "ledgeredSummary": "arm-throw gate: skipped 3 row(s) on a bump-ledgered pair / arm-throw gate: OK (activesupport 3/3)"
+    },
+    {
+      "gate": "Extra-surface ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "extra-surface gate: skipped 10 row(s) on a bump-ledgered pair / extra-surface gate: OK (abstractcontroller novel 0/0, total 0/0 (rowless), internal 20/20; actioncable novel 0/0, total 0/0 (rowless), internal 48/48; actioncontroller novel 0/0 (pinned), total 10/10, no-counterpart files 0/0, allowed 3/3, internal 83/83; actiondispatch novel 0/0 (pinned), total 6/6, no-counterpart files 0/0, allowed ",
+      "ledgeredSummary": "extra-surface gate: skipped 10 row(s) on a bump-ledgered pair / extra-surface gate: OK (abstractcontroller novel 0/0, total 0/0 (rowless), internal 20/20; actioncable novel 0/0, total 0/0 (rowless), internal 48/48; actioncontroller novel 0/0 (pinned), total 10/10, no-counterpart files 0/0, allowed 3/3, internal 83/83; actiondispatch novel 0/0 (pinned), total 6/6, no-counterpart files 0/0, allowed "
+    },
+    {
+      "gate": "Parameter-name ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "param-name gate: skipped 3 row(s) on a bump-ledgered pair / param-name gate: OK (abstractcontroller 0/0; actioncable 0/0; actioncontroller 0/0; actiondispatch 0/0; actionview 0/0; activemodel 0/0; activerecord 0/0; activesupport 0/0; arel 0/0; bcrypt 0/0; builder 0/0; chronic 0/0; did-you-mean 0/0; et-orbi 0/0; raabro 0/0; zeitwerk 0/0; fugit 0/0; globalid 0/0; listen 0/0; marcel 0/0; mini-magick ",
+      "ledgeredSummary": "param-name gate: skipped 3 row(s) on a bump-ledgered pair / param-name gate: OK (abstractcontroller 0/0; actioncable 0/0; actioncontroller 0/0; actiondispatch 0/0; actionview 0/0; activemodel 0/0; activerecord 0/0; activesupport 0/0; arel 0/0; bcrypt 0/0; builder 0/0; chronic 0/0; did-you-mean 0/0; et-orbi 0/0; raabro 0/0; zeitwerk 0/0; fugit 0/0; globalid 0/0; listen 0/0; marcel 0/0; mini-magick "
+    },
+    {
+      "gate": "Block-parameter ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "block-param gate: skipped 7 row(s) on a bump-ledgered pair / block-param gate: OK (11 dropped block arm(s) under the mark)",
+      "ledgeredSummary": "block-param gate: skipped 7 row(s) on a bump-ledgered pair / block-param gate: OK (11 dropped block arm(s) under the mark)"
+    },
+    {
+      "gate": "Predicate-kind ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "predicate-kind gate: OK",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Inlined-from staleness gate",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "inlined-from gate: OK",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Class-path table gate",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Ambiguous-parent ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "ambiguous-parent gate: OK",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Deprecation manifest up to date",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "eslint/rails-deprecated-methods.json is up to date.",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Dependency lint",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "2 ref mismatches (uses arel but different types):",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Test comparison (TS extract)",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "nokogiri: 18 files, 195 tests",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Test comparison",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "test-compare: skipped 42 mismatch row(s) on a bump-ledgered test / token_for_test.rb                             token-for.test.ts                               18    0    0    0    0     0   18 ✓ / connection_adapters/type_lookup_test.rb       connection-adapters/type-lookup.test.ts         12    0    0    0    0     0   12 ✓ / secure_token_test.rb                          secure-token.test.ts   ",
+      "ledgeredSummary": "test-compare: skipped 42 mismatch row(s) on a bump-ledgered test / token_for_test.rb                             token-for.test.ts                               18    0    0    0    0     0   18 ✓ / connection_adapters/type_lookup_test.rb       connection-adapters/type-lookup.test.ts         12    0    0    0    0     0   12 ✓ / secure_token_test.rb                          secure-token.test.ts   "
+    },
+    {
+      "gate": "Assertion-mismatch ratchet",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": "green",
+      "summary": "assertion-mismatch ratchet: comparing against 9136c75afac5d0c73be36fe62a5a3eb11d07ff2a.",
+      "ledgeredSummary": "assertion-mismatch ratchet: comparing against 9136c75afac5d0c73be36fe62a5a3eb11d07ff2a."
+    },
+    {
+      "gate": "AR-closure test manifest guard",
+      "active": "green",
+      "candidate": "green",
+      "ledgered": null,
+      "summary": "",
+      "ledgeredSummary": null
+    }
+  ],
+  "seed": [
+    {
+      "package": "loofah",
+      "kind": "drift",
+      "rows": 5
+    }
+  ]
+}

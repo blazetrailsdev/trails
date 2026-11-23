@@ -4,11 +4,12 @@ import mysqlCore from "mysql2";
 import mysql from "mysql2/promise";
 import { File, NameError, stderr } from "@blazetrails/ruby-compat";
 import { Mysql2, type Client, type Result } from "../lib/index.js";
+import { withCoreQuery } from "./support/core-query.js";
 
 async function clientOn(connection: object): Promise<Client> {
   const createConnection = vi
     .spyOn(mysql, "createConnection")
-    .mockResolvedValue(connection as never);
+    .mockResolvedValue(withCoreQuery(connection) as never);
   try {
     return await Mysql2.Client.new({});
   } finally {
@@ -75,6 +76,31 @@ describe("mysql2Client", () => {
 });
 
 describe("Mysql2::Client error boundary", () => {
+  it("raises Lost connection from a streamed result whose connection drops", async () => {
+    let fail!: (e: unknown) => void;
+    const pending = new Promise<never>((_, reject) => (fail = reject));
+    const listeners: Record<string, (e: unknown) => void> = {};
+    const command = {
+      once(event: string, listener: (arg: unknown) => void) {
+        if (event === "fields") listener([{ name: "a" }]);
+      },
+      stream: () => ({
+        [Symbol.asyncIterator]: () => ({ next: () => pending }),
+        destroy: (e: unknown) => fail(e),
+      }),
+    };
+    const connection = {
+      once: (event: string, listener: (e: unknown) => void) => (listeners[event] = listener),
+      off: vi.fn(),
+      query: () => command,
+    };
+    const client = await clientOn({ connection });
+    const result = await client.query("SELECT a", { stream: true });
+    listeners.error({ code: "PROTOCOL_CONNECTION_LOST" });
+    const error = await result!.toA().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Mysql2.Error.ConnectionError);
+    expect((error as Error).message).toBe("Lost connection to MySQL server during query");
+  });
   it("raises TimeoutError and ConnectionError for the driver's timeout and connection codes", async () => {
     const timeout = Object.assign(new Error("t"), { code: "PROTOCOL_SEQUENCE_TIMEOUT" });
     const lost = Object.assign(new Error("l"), { code: "PROTOCOL_CONNECTION_LOST" });
@@ -113,6 +139,7 @@ describe("Mysql2::Client#warning_count", () => {
     const packet = {
       offset: 0,
       end: eof.length,
+      buffer: eof,
       isEOF: () => true,
       eofWarningCount: () => eof.readInt16LE(1),
       eofStatusFlags: () => eof.readInt16LE(3),
@@ -282,7 +309,8 @@ describe("Mysql2::Client#warning_count", () => {
       { name: "t", type: mysql.Types.DATETIME, encoding: "binary" },
       { name: "b", type: mysql.Types.TINY, columnLength: 1, encoding: "binary" },
     ];
-    const execute = vi.fn(async () => [[{ t: "2026-04-27 14:23:55", b: 1 }], fields]);
+    const t = new Uint8Array([0xea, 0x07, 4, 27, 14, 23, 55]);
+    const execute = vi.fn(async () => [[{ t, b: 1 }], fields]);
     const prepare = vi.fn(async () => ({ statement: { columns: fields, parameters: [] } }));
     const client = await clientOn({ execute, prepare });
     const stmt = await client.prepare("SELECT 1");
@@ -450,7 +478,7 @@ describe("Mysql2::Client#initialize option writers", () => {
     const query = vi.fn(async () => [[], []]);
     const createConnection = vi
       .spyOn(mysql, "createConnection")
-      .mockResolvedValue({ query } as never);
+      .mockResolvedValue(withCoreQuery({ query }) as never);
     try {
       await Mysql2.Client.new(opts);
       return { config: createConnection.mock.calls[0][0] as Record<string, unknown> };
@@ -634,7 +662,7 @@ describe("Mysql2::Client#initialize option writers", () => {
     const connection = { query, connection: { stream: { destroyed: true } } };
     const createConnection = vi
       .spyOn(mysql, "createConnection")
-      .mockResolvedValue(connection as never);
+      .mockResolvedValue(withCoreQuery(connection) as never);
     try {
       await (await Mysql2.Client.new({ reconnect: true })).query("SELECT 1");
       expect(createConnection).toHaveBeenCalledTimes(2);
