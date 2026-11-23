@@ -61,7 +61,9 @@ export class RakeCommand extends Base {
 
   /** @internal */
   private static nonAppFilePattern(): RegExp {
-    return new RegExp(`^(?!${regexpEscape(root()?.toString() ?? "")})`);
+    return new RegExp(
+      `^(?!(?:at (?:async )?(?:.*\\()?(?:file://)?)?${regexpEscape(root()?.toString() ?? "")})`,
+    );
   }
 
   /** @internal */
