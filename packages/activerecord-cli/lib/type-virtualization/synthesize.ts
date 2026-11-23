@@ -6,6 +6,7 @@ import type {
   RuntimeCall,
   AssociationCall,
   AttachedCall,
+  RichTextCall,
   AttributeCall,
   ScopeCall,
   EnumCall,
@@ -17,6 +18,7 @@ const INDENT = "  ";
 
 const AR_IMPORT = `import("@blazetrails/activerecord")`;
 const AS_IMPORT = `import("@blazetrails/activestorage")`;
+const RICH_TEXT = `import("@blazetrails/actiontext/rich-text.js").RichText`;
 
 export type SchemaColumnValue =
   | string
@@ -415,6 +417,8 @@ function renderCall(
     case "hasOneAttached":
     case "hasManyAttached":
       return renderAttached(info, call);
+    case "hasRichText":
+      return renderRichText(info, call);
     case "scope":
       return renderScope(info, call);
     case "enum":
@@ -478,6 +482,23 @@ function renderSingularAssoc(
       ...line(`declare ${memberName}: ${readerType};`, call.name, false),
       attribute: { memberName, readerType, writerType: `${target} | null` },
     },
+  ];
+}
+
+function renderRichText(info: ClassInfo, call: RichTextCall): RenderedLine[] {
+  const suffix = camelize(call.name);
+  const associationName = `richText${suffix}`;
+  return [
+    line(`declare ${renderDeclaredMemberName(call.name)}: ${RICH_TEXT};`, call.name, false),
+    line(`declare is${suffix}: () => Promise<boolean>;`, `is${suffix}`, false),
+    line(`declare set${suffix}: (body: unknown) => Promise<void>;`, `set${suffix}`, false),
+    line(
+      `declare ${associationName}: ${RICH_TEXT} | null | Promise<${RICH_TEXT} | null>;`,
+      associationName,
+      false,
+    ),
+    scopeLine(info, `with${camelize(associationName)}`, []),
+    scopeLine(info, `with${camelize(associationName)}AndEmbeds`, []),
   ];
 }
 

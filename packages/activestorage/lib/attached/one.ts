@@ -6,6 +6,7 @@ import {
   Thread,
   rbFSend,
 } from "@blazetrails/ruby-compat";
+import { ActiveStorage } from "../active-storage.js";
 import { Attached } from "../attached.js";
 import type { Attachment } from "../attachment.js";
 import type { Blob } from "../blob.js";
@@ -25,7 +26,13 @@ type OwnMember =
   | "isAttached"
   | "loadedAttachment";
 
-type DelegatedAttachment = Partial<
+type AllowNil<T> = {
+  [K in keyof T]: T[K] extends (...args: infer A) => infer R
+    ? (...args: A) => R | null
+    : T[K] | null;
+};
+
+type DelegatedAttachment = AllowNil<
   Omit<Attachment, OwnMember> & Omit<Blob, keyof Attachment | OwnMember>
 >;
 
@@ -122,7 +129,20 @@ Object.setPrototypeOf(
       const attachment = receiver.loadedAttachment(prop) as unknown as {
         [k: string]: unknown;
       } | null;
-      if (attachment == null) return value;
+      if (attachment == null) {
+        let answered: PropertyDescriptor | undefined;
+        for (const klass of [ActiveStorage.Attachment!, ActiveStorage.Blob!]) {
+          for (
+            let p: object | null = klass.prototype;
+            p && !answered;
+            p = Object.getPrototypeOf(p)
+          ) {
+            answered = Object.getOwnPropertyDescriptor(p, prop);
+          }
+        }
+        if (answered === undefined) return value;
+        return typeof answered.value === "function" ? () => null : null;
+      }
       const member = attachment[prop];
       return typeof member === "function" ? member.bind(attachment) : member;
     },

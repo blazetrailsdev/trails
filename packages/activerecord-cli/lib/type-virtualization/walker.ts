@@ -20,6 +20,11 @@ export interface AttachedCall {
   name: string;
 }
 
+export interface RichTextCall {
+  kind: "hasRichText";
+  name: string;
+}
+
 export interface ScopeCall {
   kind: "scope";
   name: string;
@@ -44,6 +49,7 @@ export type RuntimeCall =
   | AttributeCall
   | AssociationCall
   | AttachedCall
+  | RichTextCall
   | ScopeCall
   | EnumCall
   | AliasAttributeCall;
@@ -354,6 +360,8 @@ function readThisCall(stmt: ts.Statement): RuntimeCall | null {
     case "hasOneAttached":
     case "hasManyAttached":
       return readAttachedCall(method, call);
+    case "hasRichText":
+      return readRichTextCall(call);
     case "scope":
       return readScopeCall(call);
     case "enum":
@@ -404,6 +412,12 @@ function readAttachedCall(
   const [nameArg] = call.arguments;
   if (!nameArg || !ts.isStringLiteralLikeNode(nameArg)) return null;
   return { kind, name: nameArg.text };
+}
+
+function readRichTextCall(call: ts.CallExpression): RichTextCall | null {
+  const [nameArg] = call.arguments;
+  if (!nameArg || !ts.isStringLiteralLikeNode(nameArg)) return null;
+  return { kind: "hasRichText", name: nameArg.text };
 }
 
 function readScopeCall(call: ts.CallExpression): ScopeCall | null {

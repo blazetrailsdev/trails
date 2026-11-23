@@ -133,7 +133,7 @@ describe("ActiveStorage::Representations::RedirectControllerWithPreviewsTest", (
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
 
     await (await blob.previewImage.attachment)!.blob;
-    const image = await readImage(blob.previewImage.variant(resizeToLimit));
+    const image = await readImage(blob.previewImage.variant(resizeToLimit)!);
     expect(await image.width()).toBe(77);
     expect(await image.height()).toBe(100);
   });
@@ -182,7 +182,7 @@ describe("ActiveStorage::Representations::RedirectControllerWithPreviewsWithStri
     await blob.reload();
     await blob.previewImage.load();
     await (await blob.previewImage.attachment)!.blob;
-    const image = await readImage(blob.previewImage.variant(resizeToLimit));
+    const image = await readImage(blob.previewImage.variant(resizeToLimit)!);
     expect(await image.width()).toBe(77);
     expect(await image.height()).toBe(100);
   });
