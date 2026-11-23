@@ -198,9 +198,6 @@ export class DefaultMiddlewareStack {
 
   /** @internal */
   private _showExceptionsApp(): unknown {
-    return (
-      this.config.exceptionsApp ??
-      new PublicExceptions(this.paths.get("public")?.toAry()[0] ?? "/public")
-    );
+    return this.config.exceptionsApp ?? new PublicExceptions(this.paths.get("public")!.first()!);
   }
 }

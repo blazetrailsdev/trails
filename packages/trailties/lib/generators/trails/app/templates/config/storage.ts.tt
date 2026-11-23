@@ -1,10 +1,36 @@
 export default {
-  local: {
-    service: "Disk",
-    root: "storage",
-  },
   test: {
     service: "Disk",
     root: "tmp/storage",
   },
+
+  local: {
+    service: "Disk",
+    root: "storage",
+  },
+
+  // Use trails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
+  // amazon: {
+  //   service: "S3",
+  //   accessKeyId: Trails.application.credentials.dig("aws", "access_key_id"),
+  //   secretAccessKey: Trails.application.credentials.dig("aws", "secret_access_key"),
+  //   region: "us-east-1",
+  //   bucket: `your_own_bucket-${Trails.env}`,
+  // },
+
+  // Remember not to checkin your GCS keyfile to a repository
+  // google: {
+  //   service: "GCS",
+  //   project: "your_project",
+  //   credentials: Trails.root.join("path/to/gcs.keyfile"),
+  //   bucket: `your_own_bucket-${Trails.env}`,
+  // },
+
+<%# @noRailsEquivalent PERMANENT -%>
+  // mirror: {
+  //   service: "Mirror",
+  //   primary: "local",
+<%# @noRailsEquivalent PERMANENT -%>
+  //   mirrors: ["amazon", "google"],
+  // },
 };
