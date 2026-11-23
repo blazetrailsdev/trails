@@ -254,6 +254,19 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
+  if (pkg === "listen") {
+    // Specs sit under `spec/lib/`, so `lib/listen/listener_spec.rb` lands on
+    // `listen/listener.test.ts` and `lib/listen_spec.rb` on `listen.test.ts`.
+    const rest = rubyFile.replace(/^lib\//, "");
+    const dir = path.dirname(rest).replace(/_/g, "-");
+    const tsFile =
+      path
+        .basename(rest, ".rb")
+        .replace(/_spec$/, "")
+        .replace(/_/g, "-") + ".test.ts";
+    return dir === "." ? tsFile : path.join(dir, tsFile);
+  }
+
   if (pkg === "et-orbi" || pkg === "raabro" || pkg === "fugit") {
     return (
       path
@@ -1951,6 +1964,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "et-orbi": "packages/et-orbi/test/",
   raabro: "packages/raabro/test/",
   fugit: "packages/fugit/test/",
+  listen: "packages/listen/test/",
   zeitwerk: "packages/zeitwerk/test/",
   "vite-assets": "packages/vite-assets/test/",
   "vite-trails": "packages/vite-trails/test/",
