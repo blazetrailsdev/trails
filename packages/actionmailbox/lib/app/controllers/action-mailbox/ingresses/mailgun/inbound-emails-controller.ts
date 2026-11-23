@@ -10,7 +10,7 @@ import {
   rbStrPlus,
   type Comparable,
 } from "@blazetrails/ruby-compat";
-import { ActionMailbox } from "../../action-mailbox.js";
+import { ActionMailbox } from "../../../../../action-mailbox.js";
 import { BaseController } from "../../base-controller.js";
 
 export class InboundEmailsController extends BaseController {
@@ -122,5 +122,3 @@ export class InboundEmailsController extends BaseController {
     }
   };
 }
-
-ActionMailbox.Ingresses.Mailgun.InboundEmailsController = InboundEmailsController;

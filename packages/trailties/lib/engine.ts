@@ -227,6 +227,18 @@ export class Engine extends Trailtie {
     if (calledFrom !== undefined && !File.isExist(File.join(newCfg.root!, "lib"))) {
       newCfg.paths().add("lib", { with: calledFrom, loadPath: true });
     }
+    if (calledFrom !== undefined && File.isDirectory(File.join(calledFrom, "app"))) {
+      for (const path of [
+        "app",
+        "app/controllers",
+        "app/channels",
+        "app/helpers",
+        "app/models",
+        "app/mailers",
+      ]) {
+        newCfg.paths().get(path)!.push(File.join(calledFrom, path));
+      }
+    }
     this._config = newCfg;
     return newCfg;
   }

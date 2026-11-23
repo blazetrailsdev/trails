@@ -1,7 +1,7 @@
 import { ActionController } from "@blazetrails/actionpack";
 import type { Logger } from "@blazetrails/activesupport";
 import { Encoding, rbStrPlus } from "@blazetrails/ruby-compat";
-import { ActionMailbox } from "../../action-mailbox.js";
+import { ActionMailbox } from "../../../../../action-mailbox.js";
 import { BaseController } from "../../base-controller.js";
 
 export class InboundEmailsController extends BaseController {
@@ -37,5 +37,3 @@ labeled "Include raw email content in JSON payload".
     return rawEmail;
   }
 }
-
-ActionMailbox.Ingresses.Postmark.InboundEmailsController = InboundEmailsController;

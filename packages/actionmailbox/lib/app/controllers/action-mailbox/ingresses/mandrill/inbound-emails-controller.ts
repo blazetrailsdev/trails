@@ -7,7 +7,7 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 import { ArgumentError, Base64, JSON, OpenSSL, env, flatten, sort } from "@blazetrails/ruby-compat";
-import { ActionMailbox } from "../../action-mailbox.js";
+import { ActionMailbox } from "../../../../../action-mailbox.js";
 import { BaseController } from "../../base-controller.js";
 
 export class InboundEmailsController extends BaseController {
@@ -109,5 +109,3 @@ export class InboundEmailsController extends BaseController {
     }
   };
 }
-
-ActionMailbox.Ingresses.Mandrill.InboundEmailsController = InboundEmailsController;

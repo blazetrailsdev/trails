@@ -1,29 +1,7 @@
 import { ActionController } from "@blazetrails/actionpack";
 import { TopLevel, isPresent, remove, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, env, rbModName } from "@blazetrails/ruby-compat";
-import { Trails } from "@blazetrails/trailties";
-import { ActionMailbox } from "./action-mailbox.js";
-import type { InboundEmailsController } from "./action-mailbox/inbound-emails-controller.js";
-import type { SourcesController } from "./action-mailbox/inbound-emails/sources-controller.js";
-import type { IncineratesController } from "./action-mailbox/incinerates-controller.js";
-import type { ReroutesController } from "./action-mailbox/reroutes-controller.js";
-
-declare module "@blazetrails/trailties/trails" {
-  namespace Trails {
-    let Conductor: {
-      BaseController: Omit<typeof ActionController.Base, "prototype"> &
-        (abstract new (...args: never[]) => ActionController.Base & {
-          readonly mainApp: Record<string, (...args: unknown[]) => string>;
-        });
-      ActionMailbox: {
-        InboundEmailsController?: typeof InboundEmailsController;
-        IncineratesController?: typeof IncineratesController;
-        ReroutesController?: typeof ReroutesController;
-        InboundEmails: { SourcesController?: typeof SourcesController };
-      };
-    };
-  }
-}
+import { ActionMailbox } from "../../../action-mailbox.js";
 
 export class BaseController extends ActionController.Base {
   static {
@@ -77,19 +55,3 @@ export class BaseController extends ActionController.Base {
 }
 
 ActionMailbox.BaseController = BaseController;
-
-Trails.Conductor = { ActionMailbox: { InboundEmails: {} } } as typeof Trails.Conductor;
-
-Trails.Conductor.BaseController = class BaseController extends ActionController.Base {
-  declare readonly mainApp: Record<string, (...args: unknown[]) => string>;
-
-  static {
-    this.layout("trails/conductor");
-    this.beforeAction(":ensureDevelopmentEnv");
-  }
-
-  /** @internal */
-  private async ensureDevelopmentEnv(): Promise<void> {
-    if (!Trails.env.isDevelopment()) await this.head(":forbidden");
-  }
-};

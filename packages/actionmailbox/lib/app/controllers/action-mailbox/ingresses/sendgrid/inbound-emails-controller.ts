@@ -1,6 +1,6 @@
 import type { Logger } from "@blazetrails/activesupport";
 import { Encoding, JSON, rbStrPlus } from "@blazetrails/ruby-compat";
-import { ActionMailbox } from "../../action-mailbox.js";
+import { ActionMailbox } from "../../../../../action-mailbox.js";
 import { BaseController } from "../../base-controller.js";
 
 export class InboundEmailsController extends BaseController {
@@ -37,5 +37,3 @@ export class InboundEmailsController extends BaseController {
     return JSON.parse(this.params.require("envelope") as string) as Record<string, unknown>;
   }
 }
-
-ActionMailbox.Ingresses.Sendgrid.InboundEmailsController = InboundEmailsController;

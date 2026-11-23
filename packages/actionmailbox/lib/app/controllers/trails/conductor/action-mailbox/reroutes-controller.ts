@@ -1,9 +1,8 @@
-import { Trails } from "@blazetrails/trailties";
-import { ActionMailbox } from "../action-mailbox.js";
-import type { InboundEmail } from "../inbound-email.js";
-import "../base-controller.js";
+import { ActionMailbox } from "../../../../../action-mailbox.js";
+import type { InboundEmail } from "../../../../../inbound-email.js";
+import { BaseController } from "../base-controller.js";
 
-export class ReroutesController extends Trails.Conductor.BaseController {
+export class ReroutesController extends BaseController {
   async create(): Promise<void> {
     const inboundEmail = await ActionMailbox.InboundEmail.find(this.params.get("inbound_email_id"));
     await this.reroute(inboundEmail);
@@ -17,5 +16,3 @@ export class ReroutesController extends Trails.Conductor.BaseController {
     await inboundEmail.routeLater();
   }
 }
-
-Trails.Conductor.ActionMailbox.ReroutesController = ReroutesController;

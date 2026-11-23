@@ -255,6 +255,25 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "turbo-rails:streams/broadcasts.rb": "app/channels/turbo/streams/broadcasts.ts",
   "turbo-rails:streams/turbo_streams_tag_builder.rb":
     "app/controllers/turbo/streams/turbo-streams-tag-builder.ts",
+  "actionmailbox:base_controller.rb": "app/controllers/action-mailbox/base-controller.ts",
+  "actionmailbox:ingresses/mailgun/inbound_emails_controller.rb":
+    "app/controllers/action-mailbox/ingresses/mailgun/inbound-emails-controller.ts",
+  "actionmailbox:ingresses/mandrill/inbound_emails_controller.rb":
+    "app/controllers/action-mailbox/ingresses/mandrill/inbound-emails-controller.ts",
+  "actionmailbox:ingresses/postmark/inbound_emails_controller.rb":
+    "app/controllers/action-mailbox/ingresses/postmark/inbound-emails-controller.ts",
+  "actionmailbox:ingresses/relay/inbound_emails_controller.rb":
+    "app/controllers/action-mailbox/ingresses/relay/inbound-emails-controller.ts",
+  "actionmailbox:ingresses/sendgrid/inbound_emails_controller.rb":
+    "app/controllers/action-mailbox/ingresses/sendgrid/inbound-emails-controller.ts",
+  "actionmailbox:action_mailbox/inbound_emails_controller.rb":
+    "app/controllers/trails/conductor/action-mailbox/inbound-emails-controller.ts",
+  "actionmailbox:action_mailbox/inbound_emails/sources_controller.rb":
+    "app/controllers/trails/conductor/action-mailbox/inbound-emails/sources-controller.ts",
+  "actionmailbox:action_mailbox/incinerates_controller.rb":
+    "app/controllers/trails/conductor/action-mailbox/incinerates-controller.ts",
+  "actionmailbox:action_mailbox/reroutes_controller.rb":
+    "app/controllers/trails/conductor/action-mailbox/reroutes-controller.ts",
   // Real ports that live under a different file name than the Ruby one, found
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.

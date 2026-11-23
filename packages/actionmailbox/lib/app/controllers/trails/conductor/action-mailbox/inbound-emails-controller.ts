@@ -1,12 +1,11 @@
 import { isPresent } from "@blazetrails/activesupport";
 import type { Parameters, UploadedFile } from "@blazetrails/actionpack";
 import { Mail, type Message } from "@blazetrails/mail";
-import { Trails } from "@blazetrails/trailties";
-import { ActionMailbox } from "../action-mailbox.js";
-import type { InboundEmail } from "../inbound-email.js";
-import "../base-controller.js";
+import { ActionMailbox } from "../../../../../action-mailbox.js";
+import type { InboundEmail } from "../../../../../inbound-email.js";
+import { BaseController } from "../base-controller.js";
 
-export class InboundEmailsController extends Trails.Conductor.BaseController {
+export class InboundEmailsController extends BaseController {
   declare inboundEmails: InboundEmail[];
   declare inboundEmail: InboundEmail;
 
@@ -59,5 +58,3 @@ export class InboundEmailsController extends Trails.Conductor.BaseController {
     return ActionMailbox.InboundEmail.createAndExtractMessageIdBang(mail.toString());
   }
 }
-
-Trails.Conductor.ActionMailbox.InboundEmailsController = InboundEmailsController;
