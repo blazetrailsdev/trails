@@ -247,21 +247,78 @@ interface Controller {
   path: string;
 }
 
-async function allMailers(mailersDir: string): Promise<string[]> {
-  if (!(await exists(mailersDir))) return [];
-  return (await fs.readdir(mailersDir, { recursive: true, encoding: "utf8" }))
-    .map((file) => file.split(path.sep).join("/"))
-    .filter((file) => file.endsWith("-mailer.ts"))
-    .map((file) => file.slice(0, -".ts".length));
+interface Mailers {
+  paths: string[];
+  layouts: string[];
 }
 
-function isMailerView(
-  rel: string,
-  layout: string | undefined,
-  mailers: readonly string[],
-): boolean {
-  if (layout !== undefined) return /(?:^|[/-])mailer$/u.test(layout);
-  return mailers.includes(path.posix.dirname(rel));
+async function allMailers(mailersDir: string): Promise<Mailers> {
+  const mailers: Mailers = { paths: [], layouts: [] };
+  if (!(await exists(mailersDir))) return mailers;
+  const classes = new Map<string, { dir: string; superclass: string; layouts: string[] }>();
+  const framework = new Set<string>();
+  for (const file of await fs.readdir(mailersDir, { recursive: true, encoding: "utf8" })) {
+    if (!file.endsWith(".ts")) continue;
+    const source = ts.createSourceFile(
+      file,
+      await fs.readFile(path.join(mailersDir, file), "utf8"),
+      ts.ScriptTarget.Latest,
+    );
+    for (const statement of source.statements) {
+      if (
+        ts.isImportDeclaration(statement) &&
+        ts.isStringLiteral(statement.moduleSpecifier) &&
+        statement.moduleSpecifier.text === "@blazetrails/actionmailer"
+      ) {
+        const bindings = statement.importClause?.namedBindings;
+        if (bindings && ts.isNamedImports(bindings)) {
+          for (const e of bindings.elements) {
+            if ((e.propertyName ?? e.name).text === "Base") framework.add(e.name.text);
+          }
+        } else if (bindings) framework.add(`${bindings.name.text}.Base`);
+      }
+      if (!ts.isClassDeclaration(statement) || statement.name === undefined) continue;
+      const superclass = statement.heritageClauses?.find(
+        (h) => h.token === ts.SyntaxKind.ExtendsKeyword,
+      )?.types[0]?.expression;
+      if (superclass === undefined) continue;
+      const layouts: string[] = [];
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.text === "layout" &&
+          node.arguments[0] !== undefined &&
+          ts.isStringLiteral(node.arguments[0])
+        ) {
+          layouts.push(node.arguments[0].text.replace(/^layouts\//u, ""));
+        }
+        ts.forEachChild(node, visit);
+      };
+      ts.forEachChild(statement, visit);
+      const dir = path.posix.dirname(file.split(path.sep).join("/"));
+      classes.set(statement.name.text, { dir, superclass: superclass.getText(source), layouts });
+    }
+  }
+  const isMailer = (name: string, seen = new Set<string>()): boolean => {
+    if (framework.has(name)) return true;
+    const klass = classes.get(name);
+    if (klass === undefined || seen.has(name)) return false;
+    seen.add(name);
+    return isMailer(klass.superclass, seen);
+  };
+  for (const [name, { dir, superclass, layouts }] of classes) {
+    if (!isMailer(superclass)) continue;
+    const mailerPath = dasherize(underscore(name));
+    mailers.paths.push(dir === "." ? mailerPath : `${dir}/${mailerPath}`);
+    mailers.layouts.push(...layouts);
+  }
+  return mailers;
+}
+
+function isMailerView(rel: string, layout: string | undefined, mailers: Mailers): boolean {
+  if (layout !== undefined) return mailers.layouts.includes(layout);
+  return mailers.paths.includes(path.posix.dirname(rel));
 }
 
 async function allControllers(controllersDir: string): Promise<Controller[]> {
@@ -975,7 +1032,7 @@ async function templateScope(
   shimDir: string,
   helpers: readonly string[],
   controllers: readonly Controller[],
-  mailers: readonly string[],
+  mailers: Mailers,
 ): Promise<Pick<ViewShim, "view" | "locals" | "model" | "base" | "controller" | "layout">> {
   const view = ['import("@blazetrails/actionview").Base'];
   for (const file of helpers) {

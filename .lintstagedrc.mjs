@@ -6,6 +6,7 @@ export default {
     cmds.push(`prettier --write ${files.join(" ")}`);
     return cmds;
   },
-  "*.{json,md,yml,yaml,css,scss}": ["prettier --write"],
+  "*.{json,json5,jsonc,md,mdx,yml,yaml,css,scss,less,html,htm,vue,svelte,graphql,gql,hbs,handlebars}":
+    ["prettier --write --ignore-unknown"],
   "*": ["scripts/ci/check-control-bytes.sh"],
 };
