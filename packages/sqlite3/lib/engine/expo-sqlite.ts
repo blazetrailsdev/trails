@@ -105,18 +105,21 @@ function prepareStatement(
     (prepared ??= opening().then((db) => db.prepareAsync(sql)));
   const metadata = async (): Promise<string[]> =>
     (names ??= await (await stmt()).getColumnNamesAsync());
-  const intText = (cols: string[]): Promise<ExpoStatement | null> =>
-    opening()
-      .then((db) =>
-        db.prepareAsync(
-          `WITH t(${cols.join(", ")}) AS (${sql.replace(/;\s*$/, "")}\n) SELECT ${cols.join(", ")}, ` +
-            cols
-              .map((c) => `CASE typeof(${c}) WHEN 'integer' THEN CAST(${c} AS TEXT) END`)
-              .join(", ") +
-            " FROM t",
-        ),
-      )
-      .catch(() => null);
+  const intText = async (cols: string[]): Promise<ExpoStatement | null> => {
+    try {
+      return await (
+        await opening()
+      ).prepareAsync(
+        `WITH t(${cols.join(", ")}) AS (${sql.replace(/;\s*$/, "")}\n) SELECT ${cols.join(", ")}, ` +
+          cols
+            .map((c) => `CASE typeof(${c}) WHEN 'integer' THEN CAST(${c} AS TEXT) END`)
+            .join(", ") +
+          " FROM t",
+      );
+    } catch {
+      return null;
+    }
+  };
   const params = (): unknown[] | Record<string, unknown> =>
     Object.keys(named).length !== 0 ? named : positional.map((v) => (v === undefined ? null : v));
 
