@@ -138,7 +138,7 @@ describe("ActiveStorage::Engine", () => {
       }
     ).activeStorage;
     const { serviceConfigurations: configs, service } = activeStorage;
-    const services = Blob.services;
+    const { services, service: blobService } = Blob;
     activeStorage.serviceConfigurations = { local: { service: "Disk", root: "tmp/storage" } };
     activeStorage.service = "local";
     try {
@@ -158,6 +158,7 @@ describe("ActiveStorage::Engine", () => {
       activeStorage.serviceConfigurations = configs;
       activeStorage.service = service;
       Blob.services = services;
+      Blob.service = blobService;
     }
   });
 

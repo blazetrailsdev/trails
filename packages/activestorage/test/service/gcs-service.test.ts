@@ -1,22 +1,23 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Storage } from "@google-cloud/storage";
-import { base58, deepMerge, minutes } from "@blazetrails/activesupport";
+import { base58, minutes } from "@blazetrails/activesupport";
 import { Utils } from "@blazetrails/rack";
 import { Digest, OpenSSL, StringIO } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
+import { FileNotFoundError } from "../../lib/errors.js";
 import { Filename } from "../../lib/filename.js";
 import { Service } from "../../lib/service.js";
 import "../../lib/service/configurator.js";
-import "../../lib/service/gcs-service.js";
+import { GCSService } from "../../lib/service/gcs-service.js";
 import { SERVICE_CONFIGURATIONS } from "../support/test-helper.js";
 import { SharedServiceTests } from "./shared-service-tests.js";
 
 const SERVICE = SERVICE_CONFIGURATIONS.gcs
-  ? Service.configure("gcs", SERVICE_CONFIGURATIONS)
+  ? (Service.configure("gcs", SERVICE_CONFIGURATIONS) as GCSService)
   : null;
 
 function configWithCacheControl(): Record<string, Record<string, unknown>> {
-  return deepMerge(SERVICE_CONFIGURATIONS, { gcs: { cacheControl: "public, max-age=1800" } });
+  return { gcs: { ...SERVICE_CONFIGURATIONS.gcs, cacheControl: "public, max-age=1800" } };
 }
 
 async function storedMetadata(key: string): Promise<Record<string, unknown>> {
@@ -32,31 +33,27 @@ async function storedMetadata(key: string): Promise<Record<string, unknown>> {
 describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSServiceTest", () => {
   const ctx = SharedServiceTests(SERVICE!);
 
-  async function directUpload(service: Service, key: string, data: string): Promise<void> {
-    const checksum = OpenSSL.Digest.MD5.base64digest(data);
-    const url = await service.urlForDirectUpload(key, {
-      expiresIn: minutes(5),
-      contentType: "text/plain",
-      contentLength: data.length,
-      checksum: checksum,
-    });
-    await fetch(url, {
-      method: "PUT",
-      body: data,
-      headers: {
-        "Content-Type": "",
-        "Content-MD5": checksum,
-        "x-goog-content-length-range": `${data.length},${data.length}`,
-      },
-    });
-  }
-
   // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType; the URL's signature is asserted offline by GCSServiceDirectUploadSignatureTest.
   it.skip("direct upload", async () => {
     const key = base58(24);
     const data = "Something else entirely!";
     try {
-      await directUpload(ctx.service, key, data);
+      const checksum = OpenSSL.Digest.MD5.base64digest(data);
+      const url = await ctx.service.urlForDirectUpload(key, {
+        expiresIn: minutes(5),
+        contentType: "text/plain",
+        contentLength: data.length,
+        checksum: checksum,
+      });
+      await fetch(url, {
+        method: "PUT",
+        body: data,
+        headers: {
+          "Content-Type": "",
+          "Content-MD5": checksum,
+          "x-goog-content-length-range": `${data.length},${data.length}`,
+        },
+      });
       expect(new TextDecoder().decode(await ctx.service.download(key))).toBe(data);
     } finally {
       await ctx.service.delete(key);
@@ -64,16 +61,146 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
   });
 
   // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType and enforces no x-goog-content-length-range.
-  it.skip("directly uploading file larger than the provided content-length does not work", () => {});
+  it.skip("directly uploading file larger than the provided content-length does not work", async () => {
+    const key = base58(24);
+    const data = "Some text that is longer than the specified content length";
+    const checksum = OpenSSL.Digest.MD5.base64digest(data);
+    try {
+      const url = await ctx.service.urlForDirectUpload(key, {
+        expiresIn: minutes(5),
+        contentType: "text/plain",
+        contentLength: data.length - 1,
+        checksum: checksum,
+      });
+      const uploadResult = await fetch(url, {
+        method: "PUT",
+        body: data,
+        headers: {
+          ...ctx.service.headersForDirectUpload(key, {
+            checksum: checksum,
+            contentLength: data.length - 1,
+          }),
+          "Content-Type": "",
+        },
+      });
+
+      expect(String(uploadResult.status)).toBe("400");
+      await expect(ctx.service.download(key)).rejects.toThrow(FileNotFoundError);
+    } finally {
+      await ctx.service.delete(key);
+    }
+  });
 
   // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType.
-  it.skip("direct upload with content disposition", () => {});
+  it.skip("direct upload with content disposition", async () => {
+    const key = base58(24);
+    const data = "Something else entirely!";
+    const checksum = OpenSSL.Digest.MD5.base64digest(data);
+    try {
+      let url = await ctx.service.urlForDirectUpload(key, {
+        expiresIn: minutes(5),
+        contentType: "text/plain",
+        contentLength: data.length,
+        checksum: checksum,
+      });
+      await fetch(url, {
+        method: "PUT",
+        body: data,
+        headers: {
+          ...ctx.service.headersForDirectUpload(key, {
+            checksum: checksum,
+            contentLength: data.length,
+            filename: new Filename("test.txt"),
+            disposition: "attachment",
+          }),
+          "Content-Type": "",
+        },
+      });
+
+      url = await ctx.service.url(key, {
+        expiresIn: minutes(2),
+        disposition: "inline",
+        contentType: "text/html",
+        filename: new Filename("test.html"),
+      });
+      const response = await fetch(url);
+      expect(response.headers.get("Content-Disposition")).toBe(
+        "attachment; filename=\"test.txt\"; filename*=UTF-8''test.txt",
+      );
+    } finally {
+      await ctx.service.delete(key);
+    }
+  });
 
   // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType; Cache-Control is asserted offline by "direct upload headers with cache control include Cache-Control".
-  it.skip("direct upload with cache control", () => {});
+  it.skip("direct upload with cache control", async () => {
+    const service = Service.configure("gcs", configWithCacheControl()) as GCSService;
+    const key = base58(24);
+    const data = "Some text";
+    const checksum = Digest.MD5.base64digest(data);
+    try {
+      let url = await service.urlForDirectUpload(key, {
+        expiresIn: minutes(5),
+        contentType: "text/plain",
+        contentLength: data.length,
+        checksum: checksum,
+      });
+      const headers = service.headersForDirectUpload(key, {
+        checksum: checksum,
+        contentLength: data.length,
+        filename: new Filename("test.txt"),
+        disposition: "attachment",
+      });
+      expect(headers["Cache-Control"]).toBe("public, max-age=1800");
+
+      await fetch(url, { method: "PUT", body: data, headers: { ...headers, "Content-Type": "" } });
+
+      url = await service.url(key, {
+        expiresIn: minutes(2),
+        disposition: "inline",
+        contentType: "text/html",
+        filename: new Filename("test.html"),
+      });
+      const response = await fetch(url);
+      expect(response.headers.get("Cache-Control")).toBe("public, max-age=1800");
+    } finally {
+      await service.delete(key);
+    }
+  });
 
   // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType; the unsigned Content-Type is asserted offline by "direct upload with cache control authorizes only an empty Content-Type".
-  it.skip("direct upload with cache control rejects a Content-Type the URL does not sign", () => {});
+  it.skip("direct upload with cache control rejects a Content-Type the URL does not sign", async () => {
+    const service = Service.configure("gcs", configWithCacheControl()) as GCSService;
+    const key = base58(24);
+    const data = "<html></html>";
+    const checksum = Digest.MD5.base64digest(data);
+    try {
+      const url = await service.urlForDirectUpload(key, {
+        expiresIn: minutes(5),
+        contentType: "image/png",
+        contentLength: data.length,
+        checksum: checksum,
+      });
+      const response = await fetch(url, {
+        method: "PUT",
+        body: data,
+        headers: {
+          ...service.headersForDirectUpload(key, {
+            checksum: checksum,
+            contentLength: data.length,
+            filename: new Filename("test.png"),
+            contentType: "image/png",
+          }),
+          "Content-Type": "text/html",
+        },
+      });
+
+      expect(String(response.status)).toBe("403");
+      expect(await service.isExist(key)).toBe(false);
+    } finally {
+      await service.delete(key);
+    }
+  });
 
   it("upload with content_type and content_disposition", async () => {
     const key = base58(24);
@@ -126,7 +253,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
   it("upload with cache_control", async () => {
     const key = base58(24);
     const data = "Something else entirely!";
-    const service = Service.configure("gcs", configWithCacheControl());
+    const service = Service.configure("gcs", configWithCacheControl()) as GCSService;
     try {
       await service.upload(key, new StringIO(data), {
         checksum: Digest.MD5.base64digest(data),
@@ -219,13 +346,40 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
 
   describe.skipIf(!Object.hasOwn(SERVICE_CONFIGURATIONS.gcs ?? {}, "gsaEmail"))("IAM", () => {
     // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType.
-    it.skip("direct upload with IAM signing", () => {});
+    it.skip("direct upload with IAM signing", async () => {
+      const service = Service.configure("gcs", {
+        gcs: { ...SERVICE_CONFIGURATIONS.gcs, iam: true },
+      });
+      const key = base58(24);
+      const data = "Some text";
+      const checksum = Digest.MD5.base64digest(data);
+      try {
+        const url = await service.urlForDirectUpload(key, {
+          expiresIn: minutes(5),
+          contentType: "text/plain",
+          contentLength: data.length,
+          checksum: checksum,
+        });
+        await fetch(url, {
+          method: "PUT",
+          body: data,
+          headers: {
+            "Content-Type": "",
+            "Content-MD5": checksum,
+            "x-goog-content-length-range": `${data.length},${data.length}`,
+          },
+        });
+
+        expect(new TextDecoder().decode(await service.download(key))).toBe(data);
+      } finally {
+        await service.delete(key);
+      }
+    });
 
     it("url with IAM signing", async () => {
-      const service = Service.configure(
-        "gcs",
-        deepMerge(SERVICE_CONFIGURATIONS, { gcs: { iam: true } }),
-      );
+      const service = Service.configure("gcs", {
+        gcs: { ...SERVICE_CONFIGURATIONS.gcs, iam: true },
+      });
       expect(
         await service.url(base58(24), {
           expiresIn: minutes(2),
