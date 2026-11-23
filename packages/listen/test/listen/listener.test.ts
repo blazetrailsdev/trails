@@ -1,4 +1,4 @@
-import { Dir, FileUtils } from "@blazetrails/ruby-compat";
+import { block, Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Listener, type ListenerOptions } from "../../lib/listen.js";
@@ -20,6 +20,36 @@ describe("Listener", () => {
     vi.restoreAllMocks();
     if (listener != null && !listener.isStopped()) await listener.stop();
     FileUtils.rmRf(dir);
+  });
+
+  describe("initialize", () => {
+    describe("with a block", () => {
+      it("passes the block to the event processor", async () => {
+        const myblock = vi.fn();
+        listener = new Listener(
+          dir,
+          block((...args: string[][]) => myblock(...args)),
+        );
+        expect(listener._block).toBeTruthy();
+        await listener._block!([], [], []);
+        expect(myblock).toHaveBeenCalled();
+      });
+    });
+
+    describe("with directories", () => {
+      it("passes directories to backend", async () => {
+        const dir2 = Dir.mktmpdir();
+        try {
+          const realpath = vi.spyOn(File, "realpathAsync");
+          listener = new Listener(dir, dir2);
+          await listener.start();
+          expect(realpath.mock.calls.map((c) => c[0])).toEqual([dir, dir2]);
+        } finally {
+          await listener?.stop();
+          FileUtils.rmRf(dir2);
+        }
+      });
+    });
   });
 
   describe("#start", () => {
