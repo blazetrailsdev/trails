@@ -1,13 +1,13 @@
 import {
   ArgumentError,
   FrozenError,
-  rbInspect,
-  rbObjClassname,
-  rbObjRespondTo,
   LoadError,
   rbAnyToS,
-  rbNum2Int,
   rbClassNewInstance,
+  rbInspect,
+  rbNum2Int,
+  rbObjClassname,
+  rbObjRespondTo,
   stringValue,
 } from "@blazetrails/ruby-compat";
 import { ConnectionBad, Error as PgError, UnableToSend } from "./exceptions.js";
@@ -49,8 +49,8 @@ export class Connection {
   noticeReceiver: ((result: Result) => void) | null = null;
   declare isnonblocking?: () => boolean;
   declare pipelineStatus?: () => number;
-  declare encoderForPutCopyData?: object | null;
-  declare decoderForGetCopyData?: object | null;
+  declare encoderForPutCopyData?: () => object | null;
+  declare decoderForGetCopyData?: () => object | null;
 
   static conndefaultsHash = conndefaultsHash;
   static escapeString = escapeString;
@@ -212,11 +212,13 @@ export class Connection {
       if (!(this.typeMapForQueries instanceof TypeMapAllStrings)) {
         parts.push(` type_map_for_queries=${rbAnyToS(this.typeMapForQueries)}`);
       }
-      if (this.encoderForPutCopyData != null) {
-        parts.push(` encoder_for_put_copy_data=${rbAnyToS(this.encoderForPutCopyData)}`);
+      /** @inventedArm if — CONVERGEABLE pg-connection-nonblocking-and-copy-data-coders */
+      if (rbObjRespondTo(this, "encoderForPutCopyData") && this.encoderForPutCopyData!() != null) {
+        parts.push(` encoder_for_put_copy_data=${rbAnyToS(this.encoderForPutCopyData!()!)}`);
       }
-      if (this.decoderForGetCopyData != null) {
-        parts.push(` decoder_for_get_copy_data=${rbAnyToS(this.decoderForGetCopyData)}`);
+      /** @inventedArm if — CONVERGEABLE pg-connection-nonblocking-and-copy-data-coders */
+      if (rbObjRespondTo(this, "decoderForGetCopyData") && this.decoderForGetCopyData!() != null) {
+        parts.push(` decoder_for_get_copy_data=${rbAnyToS(this.decoderForGetCopyData!()!)}`);
       }
       stats = ` host=${this.host()} port=${this.port()} user=${this.user()}${parts.join("")}`;
     }
