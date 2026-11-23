@@ -1,3 +1,5 @@
+import type { EngineStatement } from "../statement.js";
+
 const COMPLETE_KEYWORDS: Record<string, number> = {
   explain: 3,
   create: 4,
@@ -63,3 +65,21 @@ export function statementTail(sql: string): [tail: number, empty: boolean] {
   }
   return [sql.length, empty];
 }
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export const closedStatement: EngineStatement = {
+  close: () => {},
+  isClosed: () => true,
+  bindParam: () => {},
+  resetBang: () => {},
+  step: () => null,
+  isDone: () => true,
+  columnCount: () => 0,
+  columnName: () => null,
+  columnDecltype: () => null,
+  bindParameterCount: () => 0,
+  setReadBigInts: () => {},
+};

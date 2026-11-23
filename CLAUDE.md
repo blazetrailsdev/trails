@@ -1359,6 +1359,22 @@ ratified here so no port re-derives them.
   is the usage error, the answer for a CLI user. Ruby-compat's own send frames
   are dropped by the same reader, as `vm_call_opt_send` pushes none.
 
+- **A JS thread blocked in a synchronous engine call.** SQLite3's
+  `busy_handler_timeout=` releases the GVL while it waits, so another Ruby
+  thread runs (`test_busy_handler_timeout_releases_gvl`,
+  `vendor/sqlite3/v2.7.3/test/test_integration_pending.rb:116-179`). A
+  synchronous engine (better-sqlite3, node:sqlite) waits inside `step` on the
+  one JS thread, so nothing else runs until it returns. Ruled by the operator
+  on 2026-11-23.
+- **The VM's arity check.** Ruby raises `ArgumentError` for a surplus
+  positional before a method body runs (`argument_arity_error`,
+  `vendor/ruby/v3.3.11/vm_args.c:800`); TypeScript rejects the call at compile
+  time and JS passes it through at run time. A Rails test asserting that raise
+  (`test_raise_if_bind_params_not_an_array`,
+  `vendor/sqlite3/v2.7.3/test/test_statement.rb:491-503`) is permanently
+  unportable, and no method grows a runtime arity guard for it. Ruled by the
+  operator on 2026-11-23.
+
 - Package-specific facts:
   [activerecord](packages/activerecord/CLAUDE.md#a-classmethodsnew-that-runs-after-super-deduplicable)
   (`Deduplicable`, SQLite's DQS setting),

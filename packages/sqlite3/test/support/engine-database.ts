@@ -1,12 +1,12 @@
 import BetterSqlite3 from "better-sqlite3";
 import { SQLite3 } from "../../lib/index.js";
-import type { BusyHandler, EngineOpenV2, SyncCloseEngineDatabase } from "../../lib/database.js";
+import type { BusyHandler, EngineOpenV2, SyncEngineDatabase } from "../../lib/database.js";
 import type { EngineStatement } from "../../lib/statement.js";
 import type { SqliteBindValue } from "../../lib/driver.js";
 import { statementTail } from "../../lib/engine/statement-tail.js";
 import { bindParameterNames } from "../../lib/engine/bind-parameter-index.js";
 
-export function engineDatabase(file = ":memory:"): SyncCloseEngineDatabase & {
+export function engineDatabase(file = ":memory:"): SyncEngineDatabase & {
   quirkModeDisabled: boolean;
   handler: BusyHandler | null;
   loadExtensionToggles: boolean[];
@@ -108,5 +108,5 @@ export function engineDatabase(file = ":memory:"): SyncCloseEngineDatabase & {
   return db;
 }
 
-export const engine = (...[file]: Parameters<EngineOpenV2>): SyncCloseEngineDatabase =>
+export const engine = (...[file]: Parameters<EngineOpenV2>): SyncEngineDatabase =>
   engineDatabase(file);

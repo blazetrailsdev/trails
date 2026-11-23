@@ -305,4 +305,7 @@ describe("TestStatement", () => {
       expect(await v.types()).toEqual(["blob"]);
     });
   });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" — Ruby's VM arity check has no run-time counterpart; TypeScript rejects the surplus argument at compile time.
+  it.skip("raise if bind params not an array", () => {});
 });

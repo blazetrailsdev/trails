@@ -19,6 +19,27 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
     await stmt.close();
   });
 
+  it("closed db behavior", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    const stmt = await SQLite3.Statement.new(db, "select 'foo'");
+    await db.close();
+    expect(db.isClosed()).toBe(true);
+    expect(await stmt.execute()).not.toBeNull();
+    await stmt.close();
+  });
+
+  it("batch last comment is processed", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    expect(
+      await db.executeBatch(`
+        CREATE TABLE items (id integer PRIMARY KEY AUTOINCREMENT);
+        -- omg
+      `),
+    ).toBeNull();
+    expect((await db.prepare("-- omg")).isClosed()).toBe(true);
+    await db.close();
+  });
+
   it("raises the gem's class for a failed prepare, with the SQL", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
     expect(() => db.prepare("SELECT * FROM nope")).toThrow(SQLite3.SQLException);
