@@ -1,3 +1,4 @@
+import { rbFSleep } from "@blazetrails/ruby-compat";
 import { constSet, exitBang, TopLevel } from "@blazetrails/ruby-compat";
 import { include, type Included } from "@blazetrails/activesupport";
 import { GlobalID, Identification } from "@blazetrails/globalid";
@@ -42,7 +43,7 @@ export class StoreResultJob extends ApplicationJob {
       value,
     });
 
-    if (pause != null) await new Promise((resolve) => setTimeout(resolve, pause * 1000));
+    if (pause != null) await rbFSleep(pause);
     if (exception != null) throw new exception();
     if (exitValue != null) exitBang(exitValue);
 

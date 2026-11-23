@@ -1,3 +1,4 @@
+import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "../support/dummy-application.js";
 import { Base, StatementInvalid } from "@blazetrails/activerecord";
@@ -34,7 +35,6 @@ import { UpdateResultJob } from "../support/update-result-job.js";
 import { assertNoUnfinishedJobs, waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
 import {
   runSupervisor,
-  sleep,
   terminateProcess,
   waitFor,
   waitForRegisteredProcesses,

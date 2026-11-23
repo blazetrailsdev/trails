@@ -90,3 +90,19 @@ describe("SolidQueue::Engine", () => {
     });
   });
 });
+
+describe("SolidQueue::Engine solid_queue.time_zone", () => {
+  afterEach(() => {
+    Engine.config.solidQueue.delete("timeZone");
+    SolidQueue.setTimeZone(null);
+  });
+
+  it("keeps an explicitly configured solid_queue.time_zone", async () => {
+    Engine.config.solidQueue.timeZone = "Tokyo";
+    SolidQueue.setTimeZone("Tokyo");
+    const initializer = Engine.initializers.find((i) => i.name === "solid_queue.time_zone")!;
+    await initializer.bind(Engine.instance()).run({ config: { timeZone: "UTC" } });
+
+    expect(SolidQueue.timeZone).toBe("Asia/Tokyo");
+  });
+});

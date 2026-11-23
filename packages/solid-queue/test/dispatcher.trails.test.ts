@@ -1,3 +1,4 @@
+import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
 import "./test-helper.js";
@@ -10,8 +11,6 @@ import { Dispatcher, Job, Process, SolidQueueAdapter, Worker } from "../lib/inde
 import { ApplicationJob } from "./support/application-job.js";
 import { AddToBufferJob, JobBuffer } from "./support/add-to-buffer-job.js";
 import { loadAppSchema } from "./support/queue-schema.js";
-
-const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
 describe("SolidQueue::Dispatcher (trails)", () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;

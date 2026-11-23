@@ -44,7 +44,7 @@ export class Engine extends TrailsEngine {
     });
 
     this.initializer("solid_queue.time_zone", (app: { config: { timeZone: unknown } }) => {
-      if (!this.config.solidQueue.isKey("timeZone")) {
+      if (!this.config.solidQueue.isKey(":timeZone")) {
         SolidQueue.setTimeZone(app.config.timeZone);
       }
     });

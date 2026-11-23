@@ -1,3 +1,4 @@
+import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "../support/dummy-application.js";
 import {
@@ -30,7 +31,6 @@ import {
   terminateProcess,
   waitFor,
   waitForProcessTerminationWithTimeout,
-  sleep,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
