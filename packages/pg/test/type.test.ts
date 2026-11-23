@@ -138,7 +138,7 @@ describe("PG::Type derivations", () => {
       describe("#decode", () => {
         describe("one dimensional arrays", () => {
           describe("empty", () => {
-            it("returns an empty array", () => {
+            it("returns an empty array from text", () => {
               expect(textdecStringArray.decode(`{}`)).toEqual([]);
             });
           });

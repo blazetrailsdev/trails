@@ -200,4 +200,16 @@ describe("PG::Connection", () => {
 
     expect(payload).toBeNull();
   });
+
+  describe("server_version", () => {
+    it("should retrieve the server version", () => {
+      expect(conn.serverVersion()).toBeGreaterThanOrEqual(100000);
+    });
+
+    it("should raise an error on a bad connection", async () => {
+      const conn = await PG.connect(conninfo);
+      await conn.finish();
+      expect(() => conn.serverVersion()).toThrow(PG.ConnectionBad);
+    });
+  });
 });
