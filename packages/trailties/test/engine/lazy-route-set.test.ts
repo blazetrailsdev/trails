@@ -107,6 +107,7 @@ describe("LazyRouteSet", () => {
       loaded = true;
       routes.draw(function () {
         this.root({ to: () => [200, {}, []] });
+        this.resources("products");
       });
       return true;
     });
@@ -138,15 +139,7 @@ describe("LazyRouteSet", () => {
   });
 
   it("app lazily loads routes when url_for is used", () => {
-    let loaded = false;
-    reload.mockImplementation(() => {
-      if (loaded) return null;
-      loaded = true;
-      routes.draw(function () {
-        this.resources("products");
-      });
-      return true;
-    });
+    loadRoutesLazily();
     const appUrlHelpers = routes.urlHelpers() as unknown as {
       urlFor(o: Record<string, unknown>): string;
     };
