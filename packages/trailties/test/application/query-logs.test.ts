@@ -50,7 +50,7 @@ export class UsersController extends ApplicationController {
   }
 
   dynamicContent() {
-    return String(Date.now() / 1000 + Math.random());
+    return String(Date.now() / 1000);
   }
 }
 `,
@@ -80,7 +80,7 @@ export class UserJob extends ActiveJobBase {
   }
 
   dynamicContent() {
-    return String(Date.now() / 1000 + Math.random());
+    return String(Date.now() / 1000);
   }
 }
 `,
