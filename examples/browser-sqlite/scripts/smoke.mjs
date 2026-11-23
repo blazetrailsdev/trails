@@ -1,6 +1,3 @@
-// Boots the example in headless Chromium, creates a post through the
-// preview, edits a view and checks the restarted app, then prints the app
-// console. Starts its own dev server, or pass the URL of a running one.
 import { chromium } from "playwright";
 import { createServer } from "vite";
 

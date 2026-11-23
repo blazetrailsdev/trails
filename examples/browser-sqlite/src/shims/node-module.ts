@@ -1,6 +1,3 @@
-// `@blazetrails/sqlite3` reaches expo-sqlite through
-// `createRequire(import.meta.url)("expo-sqlite")`; in the browser that
-// require answers the runtime's sql.js-backed expo-sqlite.
 export function createRequire(_url: string) {
   return function require(id: string): unknown {
     if (id === "expo-sqlite") {

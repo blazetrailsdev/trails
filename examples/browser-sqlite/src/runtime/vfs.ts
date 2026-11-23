@@ -1,10 +1,6 @@
 import path from "path-browserify";
 import type { Bytes, FsAdapter, FsDirent, FsStatResult } from "@blazetrails/ruby-compat";
 
-/**
- * An in-memory filesystem rooted at `/`. Files hold strings or bytes;
- * directories are explicit entries, created for every file's parents.
- */
 type Entry =
   | { kind: "file"; data: string | Uint8Array; mtime: Date }
   | { kind: "dir"; mtime: Date };
@@ -35,6 +31,10 @@ function asBytes(data: string | Uint8Array): Bytes {
   return out;
 }
 
+/**
+ * An in-memory filesystem rooted at `/`. Files hold strings or bytes;
+ * directories are explicit entries, created for every file's parents.
+ */
 export class VirtualFs {
   readonly entries = new Map<string, Entry>([["/", { kind: "dir", mtime: new Date() }]]);
   private fds = new Map<number, { path: string; pos: number; append: boolean }>();

@@ -11,12 +11,6 @@ import {
   type HashAdapter,
 } from "@blazetrails/ruby-compat";
 
-/**
- * A synchronous crypto adapter for the browser. Web Crypto is async-only,
- * and trails derives keys (`KeyGenerator`), signs and encrypts cookies
- * (`MessageVerifier`, `MessageEncryptor`, AES-256-GCM) synchronously, as
- * Rails does over OpenSSL; the noble libraries do the same in pure JS.
- */
 const HASHES = { md5, sha1, sha256, sha384, sha512 } as const;
 type HashName = keyof typeof HASHES;
 
@@ -106,11 +100,6 @@ function cipherInfo(algorithm: string) {
   };
 }
 
-/**
- * Node's streaming cipher shape over a one-shot noble cipher: `update`
- * buffers, `final` runs the cipher. Callers concatenate `update` and `final`
- * output, so the result is the same bytes.
- */
 function streaming(run: (input: Uint8Array) => Uint8Array, extra: Record<string, unknown> = {}) {
   const chunks: Uint8Array[] = [];
   const adapter = {
@@ -158,6 +147,12 @@ function cipher(algorithm: string, key: Uint8Array, iv: Uint8Array, decrypt: boo
   return adapter;
 }
 
+/**
+ * A synchronous crypto adapter for the browser. Web Crypto is async-only,
+ * and trails derives keys (`KeyGenerator`), signs and encrypts cookies
+ * (`MessageVerifier`, `MessageEncryptor`, AES-256-GCM) synchronously, as
+ * Rails does over OpenSSL; the noble libraries do the same in pure JS.
+ */
 export function installCrypto(): void {
   const adapter: CryptoAdapter = {
     randomBytes: (size) => bytes(crypto.getRandomValues(new Uint8Array(size))),

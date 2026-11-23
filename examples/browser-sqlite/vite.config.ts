@@ -6,13 +6,6 @@ const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 const STUB_PREFIX = "\0node-stub:";
 
-/**
- * Framework packages import Node built-ins at module scope (`zlib` in
- * encryption, `net` in SMTP) for features this app never calls. Each
- * built-in becomes a module with the same export names whose members throw
- * only when called, so loading a package costs nothing and using an
- * unsupported feature says which one.
- */
 function nodeBuiltinStubs(): Plugin {
   const builtins = new Set(builtinModules.flatMap((m) => [m, `node:${m}`]));
   return {

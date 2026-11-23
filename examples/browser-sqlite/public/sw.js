@@ -1,14 +1,3 @@
-/**
- * Routes two kinds of request to the runtime iframe, which runs trails:
- *
- * - `/preview/*`, the pages the preview iframe browses, answered by the
- *   trails application's Rack `call`;
- * - `/rt/<session>/*`, the app's own source modules (transpiled from the
- *   virtual filesystem) and the shims that hand them framework packages.
- *
- * A request the preview makes for an absolute path outside `/preview/`
- * (a hard-coded `href="/posts"`) is moved under it.
- */
 let runtimeId = null;
 
 self.addEventListener("install", () => self.skipWaiting());

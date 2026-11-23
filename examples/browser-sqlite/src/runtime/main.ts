@@ -91,7 +91,6 @@ const { CookieJar } = await import("./cookie-jar.ts");
 const cookies = new CookieJar(files.cookies ?? {});
 
 let serialize: Promise<unknown> = Promise.resolve();
-/** One request at a time: the browser has no AsyncLocalStorage to keep two apart. */
 function serially<T>(fn: () => Promise<T>): Promise<T> {
   const run = serialize.then(fn);
   serialize = run.catch(() => undefined);

@@ -1,14 +1,8 @@
-/**
- * The editor: a file tree and editor over the app's files, the preview the
- * app's pages render in, and the console its output goes to. The app itself
- * runs in a hidden runtime iframe, recreated on every restart so each run
- * evaluates a fresh module graph.
- */
-const TEMPLATE = import.meta.glob("../../template/**/*", {
+const TEMPLATE = import.meta.glob<string>("../../template/**/*", {
   query: "?raw",
   import: "default",
   eager: true,
-}) as Record<string, string>;
+});
 
 const FILES_KEY = "trails-browser:files";
 const DB_KEY = "trails-browser:db";
@@ -56,7 +50,6 @@ function saveDb(bytes: Uint8Array | null): void {
 
 const ANSI_COLORS = ["#666", "#f77", "#7d7", "#fd6", "#79f", "#d8f", "#7df", "#ddd"];
 
-/** Appends `text`, rendering the SGR colour and bold codes the Rails log writes. */
 function appendAnsi(parent: HTMLElement, text: string): void {
   let color: string | null = null;
   let bold = false;

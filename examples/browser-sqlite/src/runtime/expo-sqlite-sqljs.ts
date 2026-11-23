@@ -1,20 +1,12 @@
 import initSqlJs, { type Database, type SqlValue, type Statement } from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 
-/**
- * The slice of expo-sqlite's async API that `@blazetrails/sqlite3`'s
- * expo-sqlite engine calls, answered by sql.js (SQLite compiled to wasm).
- * The runtime seats it where the `node:module` shim's `createRequire` and
- * runtime.html's import map find `expo-sqlite`, so the stock
- * `adapter: "expo-sqlite"` path runs unchanged in the browser.
- */
 const SQL = await initSqlJs({ locateFile: () => wasmUrl } as unknown as Parameters<
   typeof initSqlJs
 >[0]);
 
 const databases = new Map<string, Database>();
 
-/** The adapter expands `database:` to an absolute path; the bytes are keyed by file name. */
 const key = (name: string) => name.replace(/^.*\//, "");
 
 /** The bytes the runtime restores before boot, and persists after each request. */
@@ -60,6 +52,13 @@ function result<T>(rows: T[], changes: number, lastInsertRowId: number) {
   };
 }
 
+/**
+ * The slice of expo-sqlite's async API that `@blazetrails/sqlite3`'s
+ * expo-sqlite engine calls, answered by sql.js (SQLite compiled to wasm).
+ * The runtime seats it where the `node:module` shim's `createRequire` and
+ * runtime.html's import map find `expo-sqlite`, so the stock
+ * `adapter: "expo-sqlite"` path runs unchanged in the browser.
+ */
 export async function openDatabaseAsync(name: string) {
   let db = databases.get(key(name));
   if (!db) databases.set(key(name), (db = new SQL.Database()));
