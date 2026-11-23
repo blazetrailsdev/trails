@@ -22,6 +22,12 @@ import type * as NodePg from "./engine/node-pg.js";
 
 let engine: typeof NodePg | null = null;
 
+const REDIRECT_SEND_METHODS: Record<string, [string, string]> = {
+  isnonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
+  isNonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
+  pipelineSync: ["asyncPipelineSync", "syncPipelineSync"],
+};
+
 /** @noRailsEquivalent PERMANENT */
 async function _requireEngine(): Promise<typeof NodePg> {
   try {
@@ -59,9 +65,10 @@ export class Connection {
   declare asyncSetnonblocking: Connection["setnonblocking"];
 
   static setAsyncSendApi(this: { prototype: Connection }, enable: boolean): void {
-    const proto = this.prototype;
-    proto.isnonblocking = enable ? proto.asyncIsnonblocking : proto.syncIsnonblocking;
-    proto.isNonblocking = enable ? proto.asyncIsnonblocking : proto.syncIsnonblocking;
+    const proto = this.prototype as unknown as Record<string, unknown>;
+    for (const [ali, [async, sync]] of Object.entries(REDIRECT_SEND_METHODS)) {
+      proto[ali] = proto[enable ? async : sync];
+    }
   }
 
   static conndefaultsHash = conndefaultsHash;
@@ -397,23 +404,23 @@ export class Connection {
   }
 
   closePrepared(stmtName: string | null): Promise<Result> {
-    return this._syncDescribeClosePreparedPortal(stmtName, "S");
+    return this._asyncDescribeClosePreparedPortal(stmtName, "S");
   }
 
   closePortal(portal: string | null): Promise<Result> {
-    return this._syncDescribeClosePreparedPortal(portal, "P");
+    return this._asyncDescribeClosePreparedPortal(portal, "P");
   }
 
   syncClosePrepared(stmtName: string | null): Promise<Result> {
-    return this._syncDescribeClosePreparedPortal(stmtName, "S");
+    return this._asyncDescribeClosePreparedPortal(stmtName, "S");
   }
 
   syncClosePortal(stmtName: string | null): Promise<Result> {
-    return this._syncDescribeClosePreparedPortal(stmtName, "P");
+    return this._asyncDescribeClosePreparedPortal(stmtName, "P");
   }
 
   /** @internal */
-  private _syncDescribeClosePreparedPortal(name: string | null, type: "S" | "P"): Promise<Result> {
+  private _asyncDescribeClosePreparedPortal(name: string | null, type: "S" | "P"): Promise<Result> {
     const stmt = name == null ? "" : stringValue(name);
     return new Promise((resolve, reject) => {
       const submittable = {
