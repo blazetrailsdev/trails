@@ -22,6 +22,7 @@ import type * as NodePg from "./engine/node-pg.js";
 
 let engine: typeof NodePg | null = null;
 
+/** @missingRailsCall put_copy_data — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs */
 const REDIRECT_SEND_METHODS: Record<string, [string, string]> = {
   isnonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
   isNonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
@@ -412,11 +413,42 @@ export class Connection {
   }
 
   syncClosePrepared(stmtName: string | null): Promise<Result> {
-    return this._asyncDescribeClosePreparedPortal(stmtName, "S");
+    return this._syncDescribeClosePreparedPortal(stmtName, "S");
   }
 
   syncClosePortal(stmtName: string | null): Promise<Result> {
-    return this._asyncDescribeClosePreparedPortal(stmtName, "P");
+    return this._syncDescribeClosePreparedPortal(stmtName, "P");
+  }
+
+  /** @internal */
+  private async _syncDescribeClosePreparedPortal(
+    name: string | null,
+    type: "S" | "P",
+  ): Promise<Result> {
+    const stmt = name == null ? "" : stringValue(name);
+    let result: unknown = null;
+    await new Promise<void>((resolve) => {
+      const submittable = {
+        submit(connection: { close(msg: object): void; sync(): void }): null {
+          connection.close({ type, name: stmt });
+          connection.sync();
+          return null;
+        },
+        handleError: (error: unknown) => {
+          result = error;
+        },
+        handleReadyForQuery: () => resolve(),
+      };
+      engine!.submit(this, submittable).catch((error: unknown) => {
+        result = error;
+        resolve();
+      });
+    });
+    const rbPgresult = engine!.emptyResult(result);
+    if (rbPgresult.resultStatus() === PG.PGRES_FATAL_ERROR) throw engine!.pgError(this, result);
+    /** @inventedArm if — PERMANENT */
+    if (type === "S") this.prepared.delete(stmt);
+    return rbPgresult;
   }
 
   /** @internal */
