@@ -127,8 +127,11 @@ describe("TestStatement", () => {
 
   it("closed db behavior", async () => {
     await db.close();
-    const result = await stmt.execute();
-    expect(result).not.toBeNull();
+    let result: ReturnType<typeof stmt.execute> | null = null;
+    expect(() => {
+      result = stmt.execute();
+    }).not.toThrow();
+    expect(await result).not.toBeNull();
   });
 
   it("new with remainder", async () => {
