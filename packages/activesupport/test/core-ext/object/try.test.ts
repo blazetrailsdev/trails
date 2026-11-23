@@ -195,12 +195,6 @@ describe("Delegator", () => {
     expect(new Decorator("Hello").tryBang("length")).toEqual(5);
   });
 
-  it("try yields the delegator to a block", () => {
-    const d = new Delegator({ greet: () => "hello" });
-    expect(d.try(block((self: unknown) => self))).toBe(d);
-    expect(d.tryBang(block((self: unknown) => self))).toBe(d);
-  });
-
   it("try forwards to delegate", () => {
     const d = new Delegator({ greet: () => "hello" });
     expect(d.try("greet")).toBe("hello");

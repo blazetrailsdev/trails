@@ -26,10 +26,10 @@ import {
   rational,
   rbEqual,
   rbObjClassname,
+  each,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { first } from "@blazetrails/ruby-compat/enumerable";
-import { each } from "@blazetrails/ruby-compat";
 import { assertEqual, assertRaise, assertRaises } from "../../lib/testing/assertions.js";
 import "../../lib/core-ext/enumerable.js";
 
