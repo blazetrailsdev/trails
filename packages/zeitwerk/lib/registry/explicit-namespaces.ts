@@ -3,29 +3,29 @@ import { Map } from "../cref/map.js";
 import type { Loader } from "../loader.js";
 
 export class ExplicitNamespaces {
-  private _loaders: Map<Loader>;
+  #loaders: Map<Loader>;
 
   constructor() {
-    this._loaders = new Map<Loader>();
+    this.#loaders = new Map<Loader>();
   }
 
   register(cref: Cref, loader: Loader): void {
-    this._loaders.set(cref, loader);
+    this.#loaders.set(cref, loader);
   }
 
   loaderFor(mod: object, cname: string): Loader | null {
-    return this._loaders.deleteModCname(mod, cname);
+    return this.#loaders.deleteModCname(mod, cname);
   }
 
   unregisterLoader(loader: Loader): void {
-    this._loaders.deleteByValue(loader);
+    this.#loaders.deleteByValue(loader);
   }
 
   isRegistered(cref: Cref): Loader | null {
-    return this._loaders.get(cref);
+    return this.#loaders.get(cref);
   }
 
   clear(): void {
-    this._loaders.clear();
+    this.#loaders.clear();
   }
 }

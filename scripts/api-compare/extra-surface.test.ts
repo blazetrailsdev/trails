@@ -5355,6 +5355,17 @@ describe("countTsInternalNames — Rails-backed privates", () => {
   it("counts an @internal member with no Rails-private counterpart", () => {
     expect(countTsInternalNames("backend/memoize.ts", [memoize()], [], undefined, [])).toBe(2);
   });
+
+  it("does not count a #-private field", () => {
+    const c = memoize();
+    c.instanceMethods.push({
+      name: "#autoloads",
+      visibility: "private",
+      internal: true,
+      params: [],
+    } as unknown as ClassInfo["instanceMethods"][number]);
+    expect(countTsInternalNames("backend/memoize.ts", [c], [], undefined, [])).toBe(2);
+  });
 });
 
 describe("buildReport — internal count reads the private walk in TS spelling", () => {

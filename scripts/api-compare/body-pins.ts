@@ -48,6 +48,7 @@
  * Usage:
  *   tsx body-pins.ts --pin <ruby-file>   # pin/re-pin all pairs in one Ruby file
  *   tsx body-pins.ts --pin-all           # pin/re-pin every matched pair (floor)
+ *   tsx body-pins.ts --pin-all --source <name>  # only that vendor source's pairs (a gem floor)
  *   tsx body-pins.ts --prune             # drop pins whose pair no longer matches
  *   tsx body-pins.ts                      # list pin/unpinned counts (no writes)
  *
@@ -200,17 +201,19 @@ function sortPins(pins: BodyPin[]): BodyPin[] {
 }
 
 // Pin (or re-pin) matched pairs at their CURRENT digest. `select` limits which
-// records to (re)pin: a specific Ruby file, or all of them (`--pin-all`). Pins
+// records to (re)pin: a specific Ruby file, or all of them (`--pin-all`),
+// optionally only one vendor source's packages (`--pin-all --source <name>`). Pins
 // outside the selection are preserved untouched; a re-pinned entry keeps its
 // prior `reason`. Returns the sorted next manifest.
 export function pinPairs(
   records: BodyHashRecord[],
   pins: BodyPin[],
-  select: { rubyFile: string } | { all: true },
+  select: { rubyFile: string } | { all: true; packages?: ReadonlySet<string> },
 ): BodyPin[] {
   const byKey = new Map<string, BodyPin>(pins.map((p) => [keyOf(p), p]));
   for (const r of records) {
     if ("rubyFile" in select && r.rubyFile !== select.rubyFile) continue;
+    if ("all" in select && select.packages && !select.packages.has(r.package)) continue;
     const key = keyOf(r);
     // Records dedupe to one pin per key (a Ruby method can appear under several
     // TS candidates, all sharing its body digest); first sighting wins.
@@ -275,10 +278,12 @@ async function clearLedgerRows(
   before: BodyPin[],
   after: BodyPin[],
   records: BodyHashRecord[],
+  onlySource?: string,
 ): Promise<void> {
   const { clearedRows, ledgerPath, loadLedgers, saveLedgerFile } = await import("./bump-ledger.js");
   const current = currentDigests(records);
   for (const [source, rows] of await loadLedgers()) {
+    if (onlySource !== undefined && source !== onlySource) continue;
     const cleared = new Set(clearedRows(rows, before, after, current));
     if (cleared.size === 0) continue;
     await saveLedgerFile(
@@ -317,16 +322,34 @@ async function main(args: string[]): Promise<number> {
   const pinAll = args.includes("--pin-all");
   const pinIdx = args.indexOf("--pin");
   const pinFile = pinIdx >= 0 ? args[pinIdx + 1] : undefined;
+  const sourceIdx = args.indexOf("--source");
+  const sourceName = sourceIdx >= 0 ? args[sourceIdx + 1] : undefined;
+  if (sourceName !== undefined && !pinAll) {
+    console.error("body-pins: --source applies only to --pin-all");
+    return 1;
+  }
+  const source = sourceName === undefined ? undefined : SOURCES.find((s) => s.name === sourceName);
+  if (sourceName !== undefined && !source) {
+    console.error(`body-pins: unknown source ${sourceName} (see vendor/sources.ts)`);
+    return 1;
+  }
 
   if (pinAll || pinFile) {
     const next = pinAll
-      ? pinPairs(artifact.hashes, pins, { all: true })
+      ? pinPairs(artifact.hashes, pins, {
+          all: true,
+          packages: source && new Set(source.packages.map((p) => p.name)),
+        })
       : pinPairs(artifact.hashes, pins, { rubyFile: pinFile! });
     await saveManifest(next);
-    await clearLedgerRows(pins, next, artifact.hashes);
+    await clearLedgerRows(pins, next, artifact.hashes, source?.name);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MANIFEST_PATH)}: ${next.length} pinned pair(s)` +
-        (pinFile ? ` (pinned/re-pinned ${pinFile})` : " (pinned all matched pairs)"),
+        (pinFile
+          ? ` (pinned/re-pinned ${pinFile})`
+          : source
+            ? ` (pinned all matched pairs of ${source.name})`
+            : " (pinned all matched pairs)"),
     );
     return 0;
   }
