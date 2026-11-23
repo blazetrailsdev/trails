@@ -41,9 +41,19 @@ export interface EngineDatabase extends EngineErrors {
 export type EngineOpenV2 = ((file: string, mode: number, zvfs: string | null) => EngineDatabase) &
   Partial<EngineErrors>;
 
-export type SyncCloseEngineDatabase = Omit<EngineDatabase, "close"> & { close(): void };
+export type SyncEngineDatabase = Omit<EngineDatabase, "close" | "execBatch"> & {
+  close(): void;
+  execBatch(sql: string, resultsAsHash: boolean | null): unknown[];
+};
 
-export interface DatabaseOptions {
+export type SyncEngineOpenV2 = ((
+  file: string,
+  mode: number,
+  zvfs: string | null,
+) => SyncEngineDatabase) &
+  Partial<EngineErrors>;
+
+export interface DatabaseOptions<E extends EngineDatabase = EngineDatabase> {
   readonly?: boolean;
   readwrite?: boolean;
   flags?: number;
@@ -52,14 +62,17 @@ export interface DatabaseOptions {
   defaultTransactionMode?: string | null;
   extensions?: unknown;
   /** @noRailsEquivalent PERMANENT */
-  engine: EngineOpenV2;
+  engine: ((file: string, mode: number, zvfs: string | null) => E) & Partial<EngineErrors>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Database extends Omit<Included<typeof Pragmas>, "encoding"> {}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Database<E extends EngineDatabase = EngineDatabase> extends Omit<
+  Included<typeof Pragmas>,
+  "encoding"
+> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Database {
+export class Database<E extends EngineDatabase = EngineDatabase> {
   static quote(string: string): string {
     return string.replace(/'/g, "''");
   }
@@ -67,26 +80,24 @@ export class Database {
   resultsAsHash: boolean | null;
 
   /** @internal */
-  _engine!: EngineDatabase;
-  #openEngine: EngineOpenV2;
+  _engine!: E;
+  #openEngine: DatabaseOptions<E>["engine"];
   #readonly: boolean;
   #defaultTransactionMode: string;
   #timeoutDeadline = 0;
 
-  constructor(file: string, options: DatabaseOptions, zvfs?: string | null);
+  constructor(file: string, options: DatabaseOptions<E>, zvfs?: string | null);
   constructor(
     file: string,
-    options: DatabaseOptions & {
-      engine: (...args: Parameters<EngineOpenV2>) => SyncCloseEngineDatabase;
-    },
+    options: DatabaseOptions<E & SyncEngineDatabase>,
     zvfs: string | null,
-    block: (db: Database) => unknown,
+    block: (db: Database<E & SyncEngineDatabase>) => unknown,
   );
   constructor(
     file: string,
-    options: DatabaseOptions,
+    options: DatabaseOptions<E>,
     zvfs: string | null = null,
-    block?: (db: Database) => unknown,
+    block?: (db: Database<E & SyncEngineDatabase>) => unknown,
   ) {
     let mode = Constants.Open.READWRITE | Constants.Open.CREATE;
 
@@ -122,9 +133,9 @@ export class Database {
     if (block) {
       let result: unknown;
       try {
-        result = block(this);
+        result = block(this as Database<E & SyncEngineDatabase>);
       } finally {
-        (this as Database & { _engine: SyncCloseEngineDatabase }).close();
+        (this as Database<E & SyncEngineDatabase>).close();
       }
       if (result instanceof Promise) {
         new Thread(() => result);
@@ -200,6 +211,12 @@ export class Database {
     return result;
   }
 
+  executeBatch2(
+    this: Database<SyncEngineDatabase>,
+    sql: string,
+    block?: (val: unknown) => unknown,
+  ): unknown[];
+  executeBatch2(sql: string, block?: (val: unknown) => unknown): unknown[] | Promise<unknown[]>;
   executeBatch2(sql: string, block?: (val: unknown) => unknown): unknown[] | Promise<unknown[]> {
     if (block) {
       const result = this.execBatch(sql, this.resultsAsHash);
@@ -289,7 +306,7 @@ export class Database {
     });
   }
 
-  close(this: Database & { _engine: SyncCloseEngineDatabase }): this;
+  close(this: Database<SyncEngineDatabase>): this;
   close(): this | Promise<this>;
   close(): this | Promise<this> {
     let r: void | Promise<void>;

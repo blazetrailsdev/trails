@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { File, getOs } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, getOs } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../lib/index.js";
 import { engine } from "../lib/engine/better-sqlite3.js";
 
@@ -17,6 +17,18 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
     const stmt = await db.prepare("SELECT 1; SELECT 2");
     expect(stmt.remainder).toBe(" SELECT 2");
     await stmt.close();
+  });
+
+  it("raises ArgumentError for a busy handler that answers a promise", async () => {
+    const path = `${getOs().tmpdir()}/engine-busy-promise-${Date.now()}.sqlite3`;
+    paths.push(path);
+    const holder = new SQLite3.Database(path, { engine });
+    holder.executeBatch2("CREATE TABLE t (a); BEGIN EXCLUSIVE; INSERT INTO t VALUES (1)");
+    const waiter = new SQLite3.Database(path, { engine });
+    waiter.busyHandler(async () => true);
+    await expect(waiter.execute("SELECT * FROM t")).rejects.toThrow(ArgumentError);
+    waiter.close();
+    holder.close();
   });
 
   it("raises the gem's class for a failed prepare, with the SQL", async () => {
