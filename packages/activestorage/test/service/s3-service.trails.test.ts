@@ -85,9 +85,11 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3)("S3Service (trails)", () => {
       );
       const destinationKey = base58(24);
 
+      const started = Date.now();
       await expect(service.compose([sourceKey, sourceKey], destinationKey)).rejects.toThrow(
         "UploadPart failed",
       );
+      expect(Date.now() - started).toBeLessThan(10_000);
 
       const { Uploads } = await service.client.send(
         new ListMultipartUploadsCommand({ Bucket: service.bucket, Prefix: destinationKey }),
