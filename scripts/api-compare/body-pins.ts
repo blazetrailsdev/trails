@@ -324,8 +324,12 @@ async function main(args: string[]): Promise<number> {
   const pinFile = pinIdx >= 0 ? args[pinIdx + 1] : undefined;
   const sourceIdx = args.indexOf("--source");
   const sourceName = sourceIdx >= 0 ? args[sourceIdx + 1] : undefined;
-  if (sourceName !== undefined && !pinAll) {
-    console.error("body-pins: --source applies only to --pin-all");
+  if (sourceIdx >= 0 && (sourceName === undefined || sourceName.startsWith("--"))) {
+    console.error("body-pins: --source needs a source name (see vendor/sources.ts)");
+    return 1;
+  }
+  if (sourceName !== undefined && (!pinAll || pinFile !== undefined)) {
+    console.error("body-pins: --source applies only to --pin-all, without --pin");
     return 1;
   }
   const source = sourceName === undefined ? undefined : SOURCES.find((s) => s.name === sourceName);
