@@ -154,7 +154,7 @@ export class Core {
       arguments: this.serializeArgumentsIfNeeded(this.arguments),
       executions: this.executions,
       exception_executions: this.exceptionExecutions,
-      locale: String(I18n.locale()),
+      locale: this.locale ?? String(I18n.locale()),
       timezone: this.timezone,
       enqueued_at: Time.now().utc().iso8601(9),
       scheduled_at: this.scheduledAt != null ? this.scheduledAt.utc().iso8601(9) : null,
@@ -179,9 +179,9 @@ export class Core {
       this.timezone = timeZone?.name ?? null;
     }
     if (jobData["enqueued_at"] != null && jobData["enqueued_at"] !== false)
-      this.enqueuedAt = Time.iso8601(jobData["enqueued_at"] as string);
+      this.enqueuedAt = this.deserializeTime(jobData["enqueued_at"] as Time | string);
     if (jobData["scheduled_at"] != null && jobData["scheduled_at"] !== false)
-      this.scheduledAt = Time.iso8601(jobData["scheduled_at"] as string);
+      this.scheduledAt = this.deserializeTime(jobData["scheduled_at"] as Time | string);
   }
 
   /**
@@ -231,5 +231,14 @@ export class Core {
   /** @internal */
   isArgumentsSerialized(): unknown[] | null | undefined {
     return this._serializedArguments;
+  }
+
+  /** @internal */
+  private deserializeTime(time: Time | string): Time {
+    if (time instanceof Time) {
+      return time;
+    } else {
+      return Time.iso8601(time);
+    }
   }
 }

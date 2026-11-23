@@ -1,5 +1,11 @@
 import { beforeEach, describe, it } from "vitest";
-import { useZone } from "@blazetrails/activesupport";
+import {
+  ActiveSupportJSON,
+  parseJsonTimes,
+  setParseJsonTimes,
+  useZone,
+} from "@blazetrails/activesupport";
+import { availableLocales, setAvailableLocales, setLocale } from "@blazetrails/i18n";
 import {
   assertEqual,
   assertKindOf,
@@ -28,6 +34,78 @@ describe("JobSerializationTest", () => {
 
   it("serialize includes current locale", () => {
     assertEqual("en", new HelloJob().serialize()["locale"]);
+  });
+
+  it("a deserialized job keeps its locale even if I18n.locale changes", () => {
+    const oldLocales = availableLocales();
+    try {
+      setAvailableLocales(["en", "es"]);
+      setLocale("es");
+      const payload = new HelloJob().serialize();
+      assertEqual("es", payload["locale"]);
+
+      setLocale("en");
+
+      const newJob = new HelloJob();
+      newJob.deserialize(payload);
+
+      assertEqual("es", newJob.serialize()["locale"]);
+    } finally {
+      setAvailableLocales(oldLocales);
+    }
+  });
+
+  it("keeps scheduled_at around after deserialization if data doesnt include it", () => {
+    freezeTime();
+
+    const currentTime = Time.now();
+
+    const job = new HelloJob();
+    const serializedJob = job.serialize();
+    job.set({ waitUntil: currentTime });
+
+    job.deserialize(serializedJob);
+
+    assertEqual(currentTime, job.scheduledAt);
+  });
+
+  it("deserializes enqueued_at when ActiveSupport.parse_json_times is true", () => {
+    freezeTime();
+
+    useZone("US/Eastern", () => {
+      withParseJsonTimes(true, () => {
+        const currentTime = Time.now();
+
+        const job = new HelloJob();
+        const serializedJob = job.serialize();
+        const payload = ActiveSupportJSON.decode(ActiveSupportJSON.encode(serializedJob));
+
+        const newJob = new HelloJob();
+        newJob.deserialize(payload as Record<string, unknown>);
+
+        assertEqual(currentTime, newJob.enqueuedAt);
+      });
+    });
+  });
+
+  it("deserializes scheduled_at when ActiveSupport.parse_json_times is true", () => {
+    freezeTime();
+
+    useZone("US/Eastern", () => {
+      withParseJsonTimes(true, () => {
+        const currentTime = Time.now();
+
+        const job = new HelloJob();
+        job.scheduledAt = currentTime;
+        const serializedJob = job.serialize();
+        const payload = ActiveSupportJSON.decode(ActiveSupportJSON.encode(serializedJob));
+
+        const newJob = new HelloJob();
+        newJob.deserialize(payload as Record<string, unknown>);
+
+        assertEqual(currentTime, newJob.scheduledAt);
+      });
+    });
   });
 
   it("serialize and deserialize are symmetric", () => {
@@ -97,3 +175,13 @@ describe("JobSerializationTest", () => {
     assertEqual(job.serialize(), deserializedJob.serialize());
   });
 });
+
+function withParseJsonTimes<T>(value: boolean, fn: () => T): T {
+  const oldValue = parseJsonTimes;
+  setParseJsonTimes(value);
+  try {
+    return fn();
+  } finally {
+    setParseJsonTimes(oldValue);
+  }
+}
