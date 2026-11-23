@@ -58,18 +58,30 @@ describe("pgConnection transaction_status and status", () => {
 
 describe("PG::Connection#send_query and #get_last_result", () => {
   it("dispatches without waiting and hands each result to get_last_result", async () => {
-    const raw = { rows: [[1]], fields: [{ name: "?column?" }], rowCount: 1, command: "SELECT" };
-    const query = vi.fn(() => Promise.resolve(raw));
+    type Submittable = {
+      submit(c: object): null;
+      handleRowDescription(m: object): void;
+      handleDataRow(m: object): void;
+      handleCommandComplete(m: object): void;
+      handleReadyForQuery(): void;
+    };
+    const submitted: Submittable[] = [];
+    const query = vi.fn((s: Submittable) => {
+      submitted.push(s);
+      return new Promise(() => {});
+    });
     const client = fakePgConnection({ query });
     expect(client.sendQuery("SELECT 1")).toBeUndefined();
     expect(query).toHaveBeenCalledOnce();
     expect(() => client.sendQuery("SELECT 2")).toThrow("another command is already in progress");
-    expect(query).toHaveBeenCalledOnce();
     const last = client.getLastResult();
-    const again = client.getLastResult();
-    expect(() => client.sendQuery("SELECT 2")).toThrow("another command is already in progress");
-    expect(await last).toBeInstanceOf(PG.Result);
-    expect(await again).toBeNull();
+    const s = submitted[0];
+    s.submit({ query: vi.fn() });
+    s.handleRowDescription({ fields: [{ name: "?column?", dataTypeID: 23 }] });
+    s.handleDataRow({ fields: ["1"] });
+    s.handleCommandComplete({ text: "SELECT 1" });
+    s.handleReadyForQuery();
+    expect((await last)!.values()).toEqual([["1"]]);
     expect(await client.getLastResult()).toBeNull();
     client.sendQuery("SELECT 2");
     expect(query).toHaveBeenCalledTimes(2);
@@ -137,22 +149,10 @@ describe("PG::Connection#cancel and #block", () => {
   });
 
   it("block answers true with no command in flight, and false once the timeout passes", async () => {
-    expect(await fakePgConnection({ _activeQuery: null }).block()).toBe(true);
-    const connection = { on: vi.fn(), off: vi.fn() };
-    expect(await fakePgConnection({ _activeQuery: {}, connection }).block(0.001)).toBe(false);
-    expect(connection.off).toHaveBeenCalledTimes(5);
-
-    const listeners: (() => void)[] = [];
-    const live = {
-      on: (_event: string, listener: () => void) => listeners.push(listener),
-      off: vi.fn(),
-    };
-    const clear = vi.spyOn(globalThis, "clearTimeout");
-    const blocked = fakePgConnection({ _activeQuery: {}, connection: live }).block(30);
-    listeners.at(-1)!();
-    expect(await blocked).toBe(true);
-    expect(clear).toHaveBeenCalledOnce();
-    clear.mockRestore();
+    const conn = fakePgConnection({ query: () => new Promise(() => {}) });
+    expect(await conn.block()).toBe(true);
+    conn.sendQuery("SELECT 1");
+    expect(await conn.block(0.001)).toBe(false);
   });
 
   it("async_cancel is cancel", async () => {

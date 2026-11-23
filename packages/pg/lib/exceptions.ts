@@ -31,14 +31,23 @@ export class ConnectionBad extends Error {}
 
 export class FeatureNotSupported extends ServerError {}
 
+export class SyntaxErrorOrAccessRuleViolation extends ServerError {}
+
+export class SyntaxError extends SyntaxErrorOrAccessRuleViolation {}
+
 export const ERROR_CLASSES: Record<string, typeof Error> = {
   "0A000": FeatureNotSupported,
   "0A": FeatureNotSupported,
+  "42000": SyntaxErrorOrAccessRuleViolation,
+  "42": SyntaxErrorOrAccessRuleViolation,
+  "42601": SyntaxError,
 };
 
 PG.ERROR_CLASSES = ERROR_CLASSES;
 PG.Error = Error;
 PG.ServerError = ServerError;
 PG.UnableToSend = UnableToSend;
+PG.SyntaxErrorOrAccessRuleViolation = SyntaxErrorOrAccessRuleViolation;
+PG.SyntaxError = SyntaxError;
 PG.ConnectionBad = ConnectionBad;
 PG.FeatureNotSupported = FeatureNotSupported;

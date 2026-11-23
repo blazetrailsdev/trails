@@ -38,6 +38,8 @@ defineConstants([
   [m6, "SimpleCoder", "PG::SimpleCoder"],
   [m7, "SimpleDecoder", "PG::SimpleDecoder"],
   [m8, "SimpleEncoder", "PG::SimpleEncoder"],
+  [m4, "SyntaxError", "PG::SyntaxError"],
+  [m4, "SyntaxErrorOrAccessRuleViolation", "PG::SyntaxErrorOrAccessRuleViolation"],
   [m9, "Array", "PG::TextDecoder::Array"],
   [m10, "Boolean", "PG::TextDecoder::Boolean"],
   [m11, "Bytea", "PG::TextDecoder::Bytea"],

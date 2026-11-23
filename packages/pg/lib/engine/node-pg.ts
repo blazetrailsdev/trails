@@ -8,11 +8,25 @@ import {
 } from "../exceptions.js";
 import { Result } from "../result.js";
 import type { Connection } from "../connection.js";
+import type { TypeMap } from "../type-map.js";
+import { Constants } from "../pg.js";
 
 export type Protocol = pg.Connection & {
   connect(portOrPath: string | number, host?: string): void;
   cancel(processID: number, secretKey: number): void;
+  parse(query: object): void;
+  bind(config: object): void;
+  describe(msg: object): void;
+  execute(config: object): void;
 };
+
+type NativeResult = pg.QueryResult & {
+  addFields(fields: pg.FieldDef[]): void;
+  addRow(row: unknown[]): void;
+  parseRow(rowData: unknown[]): unknown[];
+  addCommandComplete(msg: object): void;
+};
+type NativeResultClass = new (rowMode: string, types: unknown) => NativeResult;
 export type Client = Omit<pg.Client, "connection"> & {
   connection?: Protocol;
   processID?: number | null;
@@ -114,8 +128,12 @@ function types(conn: Connection): { getTypeParser(oid: number, format?: string):
 
 type BinaryParam = { value?: unknown; format?: unknown };
 
-function param(conn: Connection, value: unknown): unknown {
-  const coder = conn.typeMapForQueries._lookupKlass(value);
+function param(
+  conn: Connection,
+  value: unknown,
+  typemap: TypeMap = conn.typeMapForQueries,
+): unknown {
+  const coder = typemap._lookupKlass(value);
   if (coder != null) return coder.encode(value);
   if (value instanceof Number) return value.valueOf();
   if (typeof value === "object" && value !== null && (value as BinaryParam).format === 1) {
@@ -211,4 +229,135 @@ export function _clientConfig(connParams: Record<string, unknown>): pg.ClientCon
     ...(connParams.replication == null ? {} : { replication: connParams.replication }),
     ssl,
   };
+}
+
+export type ProtocolWrite = (connection: Protocol) => void;
+
+export interface PgconnSubmittable {
+  submitted: boolean;
+  writes: ProtocolWrite[];
+  submit(connection: Protocol): null;
+}
+
+export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" | "sync")[]): void {
+  conn._cmdQueue.push(...cmds);
+  const current = conn._submittable;
+  if (current?.submitted) {
+    write(conn.client.connection!);
+    return;
+  }
+  if (current != null) {
+    current.writes.push(write);
+    return;
+  }
+  const client = conn.client;
+  let native = new (pg.Result as unknown as NativeResultClass)("array", types(conn));
+  const deliver = (res: Result | null): void => {
+    if (res != null) res._connection = conn;
+    conn._results.push(res);
+    conn._resultWaiter?.();
+  };
+  const pipelined = (): boolean => conn._pipelineStatus !== Constants.PQ_PIPELINE_OFF;
+  const endCommand = (): void => {
+    conn._chunkSize = 0;
+    native = new (pg.Result as unknown as NativeResultClass)("array", types(conn));
+    if (!pipelined()) return;
+    conn._cmdQueue.shift();
+    deliver(null);
+    if (conn._cmdQueue.length === 0) release();
+  };
+  const reseat = (): void => {
+    client._activeQuery = submittable;
+    (client as { readyForQuery?: boolean }).readyForQuery = false;
+  };
+  const release = (): void => {
+    if (conn._submittable !== submittable) return;
+    conn._submittable = null;
+    if (client._activeQuery !== submittable) return;
+    client._activeQuery = null;
+    (client as { readyForQuery?: boolean }).readyForQuery = true;
+    (client as unknown as { _pulseQueryQueue(): void })._pulseQueryQueue();
+  };
+  const submittable = {
+    submitted: false,
+    writes: [] as ProtocolWrite[],
+    submit(connection: Protocol): null {
+      submittable.submitted = true;
+      for (const write of submittable.writes) write(connection);
+      submittable.writes = [];
+      return null;
+    },
+    handleRowDescription(msg: { fields: pg.FieldDef[] }): void {
+      native.addFields(msg.fields);
+    },
+    handleDataRow(msg: { fields: unknown[] }): void {
+      native.addRow(native.parseRow(msg.fields));
+      if (conn._chunkSize > 0 && native.rows.length === conn._chunkSize) {
+        deliver(new Result({ ...native }, null, Constants.PGRES_TUPLES_CHUNK));
+        native.rows = [];
+      }
+    },
+    handleCommandComplete(msg: object): void {
+      native.addCommandComplete(msg);
+      deliver(new Result({ ...native }));
+      endCommand();
+    },
+    handleEmptyQuery(): void {
+      deliver(new Result({ ...native }, null, Constants.PGRES_EMPTY_QUERY));
+      endCommand();
+    },
+    handleParseComplete(): void {},
+    handlePortalSuspended(): void {},
+    handleError(error: unknown): void {
+      if (!(error instanceof pg.DatabaseError)) {
+        conn._sendError = pgError(conn, error);
+        conn._cmdQueue.length = 0;
+        if (conn._submittable === submittable) conn._submittable = null;
+        conn._resultWaiter?.();
+        return;
+      }
+      deliver(emptyResult(error));
+      if (!pipelined()) return;
+      conn._pipelineStatus = Constants.PQ_PIPELINE_ABORTED;
+      endCommand();
+      while (conn._cmdQueue[0] === "query") {
+        deliver(
+          new Result(
+            { command: "", rowCount: null, oid: 0, fields: [], rows: [] },
+            null,
+            Constants.PGRES_PIPELINE_ABORTED,
+          ),
+        );
+        endCommand();
+      }
+      if (conn._cmdQueue.length > 0) reseat();
+    },
+    handleReadyForQuery(): void {
+      conn._cmdQueue.shift();
+      if (pipelined()) {
+        deliver(new Result({ ...native }, null, Constants.PGRES_PIPELINE_SYNC));
+      } else {
+        deliver(null);
+      }
+      if (conn._cmdQueue.length > 0) reseat();
+      else if (conn._submittable === submittable) conn._submittable = null;
+    },
+  };
+  submittable.writes.push(write);
+  conn._submittable = submittable;
+  submit(conn, submittable).catch((error: unknown) => {
+    conn._sendError = error;
+    conn._cmdQueue.length = 0;
+    if (conn._submittable === submittable) conn._submittable = null;
+    conn._resultWaiter?.();
+  });
+}
+
+export function bindValues(conn: Connection, params: unknown[], typemap: TypeMap): unknown[] {
+  return params.map((v) => {
+    const value = param(conn, v, typemap);
+    return value == null || typeof value === "string" || value instanceof Uint8Array
+      ? value
+      : String(value);
+  });
 }

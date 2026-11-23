@@ -52,8 +52,20 @@ export class Connection {
   prepared = new Map<string, string>();
   readyForQuery = "I";
   bad = false;
-  pendingResult: Promise<{ result: Result } | { error: unknown }> | null = null;
-  pendingResultTaken = false;
+  /** @internal */
+  _pipelineStatus: number = PG.PQ_PIPELINE_OFF;
+  /** @internal */
+  _cmdQueue: ("query" | "sync")[] = [];
+  /** @internal */
+  _results: (Result | null)[] = [];
+  /** @internal */
+  _resultWaiter: (() => void) | null = null;
+  /** @internal */
+  _submittable: NodePg.PgconnSubmittable | null = null;
+  /** @internal */
+  _sendError: unknown = null;
+  /** @internal */
+  _chunkSize = 0;
   typeMapForResults: TypeMap = _pgTypemapAllStrings;
   typeMapForQueries: TypeMap = _pgTypemapAllStrings;
   notifies: NodePg.Notification[] = [];
@@ -61,7 +73,6 @@ export class Connection {
   parameterStatuses: Record<string, string> = {};
   sversion = 0;
   noticeReceiver: ((result: Result) => void) | null = null;
-  declare pipelineStatus?: () => number;
   _nonblocking = false;
   _encoderForPutCopyData: Coder | null = null;
   _decoderForGetCopyData: Coder | null = null;
@@ -221,9 +232,9 @@ export class Connection {
       if (this.isnonblocking()) {
         parts.push(` nonblocking=${this.isnonblocking()}`);
       }
-      if (rbObjRespondTo(this, "pipelineStatus") && this.pipelineStatus!() != PG.PQ_PIPELINE_OFF) {
+      if (rbObjRespondTo(this, "pipelineStatus") && this.pipelineStatus() != PG.PQ_PIPELINE_OFF) {
         parts.push(
-          ` pipeline_status=${Object.keys(PG.Constants).find((c) => c.startsWith("PQ_PIPELINE_") && PG.Constants[c as keyof typeof PG.Constants] == this.pipelineStatus!())}`,
+          ` pipeline_status=${Object.keys(PG.Constants).find((c) => c.startsWith("PQ_PIPELINE_") && PG.Constants[c as keyof typeof PG.Constants] == this.pipelineStatus())}`,
         );
       }
       if (this.getClientEncoding() != "UTF8") {
@@ -310,12 +321,55 @@ export class Connection {
     return this._decoderForGetCopyData;
   }
 
+  pipelineStatus(): number {
+    return this._pipelineStatus;
+  }
+
+  enterPipelineMode(): null {
+    if (this._pipelineStatus != PG.PQ_PIPELINE_OFF) return null;
+    if (this._cmdQueue.length > 0 || this._results.length > 0) {
+      throw new PgError("cannot enter pipeline mode, connection not idle\n", { connection: this });
+    }
+    this._pipelineStatus = PG.PQ_PIPELINE_ON;
+    return null;
+  }
+
+  exitPipelineMode(): null {
+    if (this._pipelineStatus == PG.PQ_PIPELINE_OFF) return null;
+    if (this._cmdQueue.length > 0 || this._results.length > 0) {
+      throw new PgError("cannot exit pipeline mode with uncollected results\n", {
+        connection: this,
+      });
+    }
+    this._pipelineStatus = PG.PQ_PIPELINE_OFF;
+    return null;
+  }
+
   syncPipelineSync(): null {
-    throw new PgError("cannot send pipeline when not in pipeline mode\n", { connection: this });
+    if (this._pipelineStatus == PG.PQ_PIPELINE_OFF) {
+      throw new PgError("cannot send pipeline when not in pipeline mode\n", { connection: this });
+    }
+    engine!.dispatch(this, (connection) => connection.sync(), ["sync"]);
+    return null;
   }
 
   sendPipelineSync(): null {
-    throw new PgError("cannot send pipeline when not in pipeline mode\n", { connection: this });
+    if (this._pipelineStatus == PG.PQ_PIPELINE_OFF) {
+      throw new PgError("cannot send pipeline when not in pipeline mode\n", { connection: this });
+    }
+    engine!.dispatch(this, (connection) => connection.sync(), ["sync"]);
+    return null;
+  }
+
+  sendFlushRequest(): null {
+    if (
+      this._pipelineStatus == PG.PQ_PIPELINE_OFF &&
+      (this._cmdQueue.length > 0 || this._results.length > 0)
+    ) {
+      throw new PgError("another command is already in progress\n", { connection: this });
+    }
+    engine!.dispatch(this, (connection) => connection.flush(), []);
+    return null;
   }
 
   pipelineSync(): boolean {
@@ -332,9 +386,10 @@ export class Connection {
       });
     }
     const size = rbNum2Int(chunkSize);
-    if (size <= 0 || this.pendingResult == null || this.pendingResultTaken) {
+    if (size <= 0 || this._cmdQueue.length === 0 || this._results.length > 0) {
       throw new PgError("PQsetChunkedRowsMode ", { connection: this });
     }
+    this._chunkSize = size;
     return this;
   }
 
@@ -364,8 +419,12 @@ export class Connection {
     this.prepared.clear();
     this.readyForQuery = "I";
     this.bad = false;
-    this.pendingResult = null;
-    this.pendingResultTaken = false;
+    this._pipelineStatus = PG.PQ_PIPELINE_OFF;
+    this._cmdQueue = [];
+    this._results = [];
+    this._submittable = null;
+    this._sendError = null;
+    this._chunkSize = 0;
     await client
       .end()
       .then(() => conn.connect())
@@ -544,31 +603,78 @@ export class Connection {
     if (this.bad) {
       throw new UnableToSend("no connection to the server\n", { connection: this });
     }
-    if (this.pendingResult != null) {
+    if (this._cmdQueue.length > 0 || this._results.length > 0) {
       throw new UnableToSend("another command is already in progress\n", { connection: this });
     }
-    this.pendingResult = this.asyncExec(sql).then(
-      (result) => ({ result }),
-      (error: unknown) => ({ error }),
+    engine!.dispatch(this, (connection) => connection.query(sql), ["query"]);
+  }
+
+  sendQueryParams(
+    command: string,
+    params: unknown[],
+    resultFormat: number | null = null,
+    typeMap: TypeMap | null = null,
+  ): null {
+    if (this.client._ending === true) {
+      throw new ConnectionBad("connection is closed", { connection: this });
+    }
+    if (
+      this._pipelineStatus == PG.PQ_PIPELINE_OFF &&
+      (this._cmdQueue.length > 0 || this._results.length > 0)
+    ) {
+      throw new UnableToSend("PQsendQueryParams another command is already in progress\n", {
+        connection: this,
+      });
+    }
+    const pipeline = this._pipelineStatus != PG.PQ_PIPELINE_OFF;
+    const values = engine!.bindValues(this, params, typeMap ?? this.typeMapForQueries);
+    const binary = resultFormat != null && rbNum2Int(resultFormat) !== 0;
+    engine!.dispatch(
+      this,
+      (connection) => {
+        connection.parse({ text: command, types: [] });
+        connection.bind({ values, binary } as never);
+        connection.describe({ type: "P", name: "" });
+        connection.execute({ portal: "", rows: 0 });
+        if (!pipeline) connection.sync();
+      },
+      ["query"],
     );
-    this.pendingResultTaken = false;
+    return null;
+  }
+
+  syncGetResult(): Result | null {
+    const result = this._results.shift() ?? null;
+    if (result?.resultStatus() === PG.PGRES_PIPELINE_SYNC) {
+      this._pipelineStatus = PG.PQ_PIPELINE_ON;
+    }
+    return result;
+  }
+
+  async getResult(): Promise<Result | null> {
+    await this.block();
+    return this.syncGetResult();
   }
 
   async getLastResult(): Promise<Result | null> {
-    const pending = this.pendingResult;
-    if (pending == null) return null;
-    if (this.pendingResultTaken) {
-      await pending;
-      return null;
+    let prev: Result | null = null;
+    let cur: Result | null;
+    for (;;) {
+      await this.block();
+      cur = this.syncGetResult();
+      if (cur == null) break;
+      prev = cur;
+      const status = cur.resultStatus();
+      if (
+        status === PG.PGRES_COPY_OUT ||
+        status === PG.PGRES_COPY_IN ||
+        status === PG.PGRES_COPY_BOTH
+      ) {
+        break;
+      }
     }
-    this.pendingResultTaken = true;
-    try {
-      const settled = await pending;
-      if ("error" in settled) throw settled.error;
-      return settled.result;
-    } finally {
-      if (this.pendingResult === pending) this.pendingResult = null;
-    }
+    if (prev) prev.check();
+    return prev;
   }
 
   execParams(sql: string | null, params: unknown[]): Promise<Result> {
@@ -590,21 +696,29 @@ export class Connection {
     };
   }
 
-  block(timeout: number | null = null): Promise<boolean> {
-    if (this.client._activeQuery == null) return Promise.resolve(true);
-    const connection = this.client.connection;
-    if (connection == null) return Promise.resolve(true);
-    return new Promise<boolean>((resolve) => {
-      const events = ["readyForQuery", "commandComplete", "errorMessage", "end", "error"];
-      const done = (ret: boolean): void => {
-        clearTimeout(timer);
-        for (const event of events) connection.off(event, settle);
-        resolve(ret);
-      };
-      const settle = (): void => done(true);
-      const timer = timeout == null ? undefined : setTimeout(() => done(false), timeout * 1000);
-      for (const event of events) connection.on(event, settle);
-    });
+  async block(timeout: number | null = null): Promise<boolean> {
+    const ready = (): boolean =>
+      this._results.length > 0 || this._cmdQueue.length === 0 || this._sendError != null;
+    if (!ready()) {
+      const ret = await new Promise<boolean>((resolve) => {
+        const done = (r: boolean): void => {
+          clearTimeout(timer);
+          this._resultWaiter = null;
+          resolve(r);
+        };
+        const timer = timeout == null ? undefined : setTimeout(() => done(false), timeout * 1000);
+        this._resultWaiter = () => {
+          if (ready()) done(true);
+        };
+      });
+      if (!ret) return false;
+    }
+    if (this._sendError != null && this._results.length === 0) {
+      const error = this._sendError;
+      this._sendError = null;
+      throw error;
+    }
+    return true;
   }
 
   /** @missingRailsArgs new — PERMANENT */

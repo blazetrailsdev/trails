@@ -3,6 +3,7 @@ import { TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PG } from "../lib/index.js";
 import type { Connection } from "../lib/connection.js";
+import type { Result } from "../lib/result.js";
 
 const ENV = TopLevel.ENV!;
 const conninfo = {
@@ -263,6 +264,11 @@ describe("PG::Connection", () => {
       expect(conn.inspect()).toMatch(/<PG::Connection:[0-9a-fx]+ finished>/);
     });
 
+    it("should tell about pipeline mode", () => {
+      conn.enterPipelineMode();
+      expect(conn.inspect()).toMatch(/ pipeline_status=PQ_PIPELINE_ON/);
+    });
+
     it("should tell about transaction_status", () => {
       conn.sendQuery("select 8");
       expect(conn.inspect()).toMatch(/ transaction_status=PQTRANS_ACTIVE/);
@@ -327,23 +333,215 @@ describe("PG::Connection", () => {
       expect(() => conn.setChunkedRowsMode(0)).toThrow(/PQsetChunkedRowsMode/);
       expect(() => conn.setChunkedRowsMode(-2)).toThrow(PG.Error);
     });
-  });
 
-  describe("pipeline_sync", () => {
-    it("raises an error when not in pipeline mode", () => {
+    it("should work in chunked rows mode", async () => {
+      conn.sendQuery("SELECT generate_series(1,12)");
+      conn.setChunkedRowsMode(3);
+
+      const results = [];
+      for (;;) {
+        await conn.block();
+        const res = await conn.getResult();
+        if (res == null) break;
+        results.push(res);
+      }
+      expect(results.length).toBe(5);
+      for (const res of results.slice(0, -1)) {
+        expect(res.resultStatus()).toBe(PG.PGRES_TUPLES_CHUNK);
+        const values = res.fieldValues("generate_series");
+        expect(values.length).toBe(3);
+        expect(Number(values[0])).toBeGreaterThan(0);
+      }
+      expect(results.at(-1)!.resultStatus()).toBe(PG.PGRES_TUPLES_OK);
+      expect(results.at(-1)!.ntuples()).toBe(0);
+    });
+
+    it("should receive rows before entire query is finished", async () => {
+      conn.sendQuery("SELECT generate_series(0,999), NULL UNION ALL SELECT 1000, pg_sleep(10);");
+      conn.setChunkedRowsMode(4);
+
+      const startTime = performance.now();
+      const res = (await conn.getResult())!;
+      res.check();
+
+      expect((performance.now() - startTime) / 1000).toBeLessThan(9);
+      expect(res.values()).toEqual([
+        ["0", null],
+        ["1", null],
+        ["2", null],
+        ["3", null],
+      ]);
+      await conn.cancel();
+    });
+
+    it("should receive rows before entire query fails", async () => {
+      await conn.exec(
+        "CREATE FUNCTION errfunc() RETURNS int AS $$ BEGIN RAISE 'test-error'; END; $$ LANGUAGE plpgsql;",
+      );
+      conn.sendQuery("SELECT generate_series(0,999), NULL UNION ALL SELECT 1000, errfunc();");
+      conn.setChunkedRowsMode(5);
+
+      let firstResult: Result | null = null;
       let err: unknown;
       try {
-        conn.pipelineSync();
+        for (;;) {
+          const res = await conn.getResult();
+          if (res == null) break;
+          res.check();
+          firstResult ??= res;
+        }
       } catch (e) {
         err = e;
       }
       expect(err).toBeInstanceOf(PG.Error);
       expect(err).toMatchObject({ connection: conn });
+      expect(firstResult instanceof PG.Result).toBeTruthy();
+      expect(firstResult!.resultStatus()).toBe(PG.PGRES_TUPLES_CHUNK);
+    });
+  });
+
+  describe("pipeline mode", () => {
+    const raised = async (fn: () => unknown): Promise<unknown> => {
+      try {
+        await fn();
+      } catch (e) {
+        return e;
+      }
+      return undefined;
+    };
+
+    describe("pipeline_status", () => {
+      it("can enter and exit the pipeline mode", () => {
+        conn.enterPipelineMode();
+        expect(conn.pipelineStatus()).toBe(PG.PQ_PIPELINE_ON);
+        conn.exitPipelineMode();
+        expect(conn.pipelineStatus()).toBe(PG.PQ_PIPELINE_OFF);
+      });
     });
 
-    it("has send_pipeline_sync method", () => {
-      expect(typeof conn.sendPipelineSync).toBe("function");
-      expect(typeof conn.asyncPipelineSync).toBe("function");
+    describe("enter_pipeline_mode", () => {
+      it("does nothing if already in pipeline mode", () => {
+        conn.enterPipelineMode();
+        conn.enterPipelineMode();
+        expect(conn.pipelineStatus()).toBe(PG.PQ_PIPELINE_ON);
+      });
+
+      it("raises an error when called with pending results", async () => {
+        conn.sendQueryParams("select 1", []);
+        const err = await raised(() => conn.enterPipelineMode());
+        expect(err).toBeInstanceOf(PG.Error);
+        expect(err).toMatchObject({ connection: conn });
+        await conn.getLastResult();
+      });
+    });
+
+    describe("exit_pipeline_mode", () => {
+      it("does nothing if not in pipeline mode", () => {
+        conn.exitPipelineMode();
+        expect(conn.pipelineStatus()).toBe(PG.PQ_PIPELINE_OFF);
+      });
+
+      it("raises an error when called with pending results", async () => {
+        conn.enterPipelineMode();
+        conn.sendQueryParams("select 1", []);
+        const err = await raised(() => conn.exitPipelineMode());
+        expect(err).toBeInstanceOf(PG.Error);
+        expect(err).toMatchObject({ connection: conn });
+        conn.pipelineSync();
+        await conn.getLastResult();
+      });
+    });
+
+    describe("pipeline_sync", () => {
+      it("sends a sync message", async () => {
+        conn.enterPipelineMode();
+        conn.sendQueryParams("select 6", []);
+        conn.pipelineSync();
+        expect((await conn.getResult())!.resultStatus()).toBe(PG.PGRES_TUPLES_OK);
+        expect(await conn.getResult()).toBeNull();
+        expect((await conn.getResult())!.resultStatus()).toBe(PG.PGRES_PIPELINE_SYNC);
+        expect(await conn.getResult()).toBeNull();
+        expect(await conn.getResult()).toBeNull();
+        conn.exitPipelineMode();
+      });
+
+      it("raises an error when not in pipeline mode", () => {
+        let err: unknown;
+        try {
+          conn.pipelineSync();
+        } catch (e) {
+          err = e;
+        }
+        expect(err).toBeInstanceOf(PG.Error);
+        expect(err).toMatchObject({ connection: conn });
+      });
+
+      it("has send_pipeline_sync method", () => {
+        expect(typeof conn.sendPipelineSync).toBe("function");
+        expect(typeof conn.asyncPipelineSync).toBe("function");
+      });
+    });
+
+    describe("send_flush_request", () => {
+      it("flushes all results", async () => {
+        conn.enterPipelineMode();
+        conn.sendQueryParams("select 1", []);
+        conn.sendFlushRequest();
+        conn.flush();
+        expect((await conn.getResult())!.resultStatus()).toBe(PG.PGRES_TUPLES_OK);
+        expect(await conn.getResult()).toBeNull();
+        expect(await conn.getResult()).toBeNull();
+      });
+
+      it("raises an error when called with pending results", async () => {
+        conn.sendQueryParams("select 1", []);
+        let err: unknown;
+        try {
+          conn.sendFlushRequest();
+        } catch (e) {
+          err = e;
+        }
+        expect(err).toBeInstanceOf(PG.Error);
+        expect(err).toMatchObject({ connection: conn });
+        await conn.getLastResult();
+      });
+    });
+
+    describe("get_last_result", () => {
+      it("delivers PGRES_PIPELINE_SYNC", async () => {
+        conn.enterPipelineMode();
+        conn.sendQueryParams("select 6", []);
+        conn.pipelineSync();
+        expect((await conn.getLastResult())!.values()).toEqual([["6"]]);
+        expect((await conn.getLastResult())!.resultStatus()).toBe(PG.PGRES_PIPELINE_SYNC);
+        conn.exitPipelineMode();
+      });
+
+      it("raises an error for PGRES_PIPELINE_ABORT", async () => {
+        conn.enterPipelineMode();
+        conn.sendQueryParams("garbage", []);
+        conn.sendQueryParams("SELECT 7", []);
+        conn.pipelineSync();
+        let err1: InstanceType<typeof PG.Error> | undefined;
+        try {
+          await conn.getLastResult();
+        } catch (e) {
+          if (!(e instanceof PG.SyntaxError)) throw e;
+          err1 = e;
+        }
+        expect(err1!.result!.resultStatus()).toBe(PG.PGRES_FATAL_ERROR);
+        let err2: InstanceType<typeof PG.Error> | undefined;
+        try {
+          await conn.getLastResult();
+        } catch (e) {
+          if (!(e instanceof PG.UnableToSend)) throw e;
+          err2 = e;
+        }
+        expect(err2!.result!.resultStatus()).toBe(PG.PGRES_PIPELINE_ABORTED);
+        expect(conn.pipelineStatus()).toBe(PG.PQ_PIPELINE_ABORTED);
+        expect((await conn.getLastResult())!.resultStatus()).toBe(PG.PGRES_PIPELINE_SYNC);
+        conn.exitPipelineMode();
+      });
     });
   });
 });
