@@ -32,6 +32,7 @@ import {
   FileUtils,
   rbEqual,
   rbFLoad,
+  constGet,
   constSet,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
@@ -109,11 +110,18 @@ export class DatabaseTasks {
   static structureDumpFlags: string | string[] | Record<string, string | string[]> | null = null;
   static structureLoadFlags: string | string[] | Record<string, string | string[]> | null = null;
 
-  private static tasks: Map<RegExp | string, DatabaseTaskHandler>;
+  private static tasks: Map<RegExp | string, DatabaseTaskHandler | string>;
 
-  static registerTask(pattern: RegExp | string, task: DatabaseTaskHandler): void {
+  static registerTask(pattern: RegExp | string, task: DatabaseTaskHandler | string): void {
     this.tasks ??= new Map();
     this.tasks.set(pattern, task);
+  }
+
+  static {
+    this.registerTask(/mysql/, "ActiveRecord::Tasks::MySQLDatabaseTasks");
+    this.registerTask(/trilogy/, "ActiveRecord::Tasks::MySQLDatabaseTasks");
+    this.registerTask(/postgresql/, "ActiveRecord::Tasks::PostgreSQLDatabaseTasks");
+    this.registerTask(/sqlite/, "ActiveRecord::Tasks::SQLiteDatabaseTasks");
   }
 
   /** @internal */
@@ -129,7 +137,7 @@ export class DatabaseTasks {
     if (!task) {
       throw new DatabaseNotSupported(`Rake tasks not supported by '${adapter}' adapter`);
     }
-    return task;
+    return typeof task === "string" ? (constGet(Object, task) as DatabaseTaskHandler) : task;
   }
 
   /** @internal */

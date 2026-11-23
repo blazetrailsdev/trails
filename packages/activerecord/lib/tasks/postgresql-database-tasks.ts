@@ -4,7 +4,6 @@ import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapte
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
-import { DatabaseTasks } from "./database-tasks.js";
 import { Tasks } from "../namespaces.js";
 import { dumpSchemas } from "../active-record.js";
 
@@ -188,4 +187,3 @@ export class PostgreSQLDatabaseTasks {
 }
 
 Tasks.PostgreSQLDatabaseTasks = PostgreSQLDatabaseTasks;
-DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);

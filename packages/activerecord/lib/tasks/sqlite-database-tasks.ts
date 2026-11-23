@@ -122,4 +122,3 @@ export class SQLiteDatabaseTasks {
 }
 
 Tasks.SQLiteDatabaseTasks = SQLiteDatabaseTasks;
-DatabaseTasks.registerTask(/sqlite/, SQLiteDatabaseTasks);
