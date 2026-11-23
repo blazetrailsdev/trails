@@ -25,7 +25,7 @@ describe("IntegrationPendingTestCase", () => {
     let handlerCallCount = 0;
 
     const db2 = new SQLite3.Database("test.db", { engine });
-    db2.executeBatch2("begin exclusive transaction");
+    await db2.executeBatch2("begin exclusive transaction");
 
     db.busyHandler(() => {
       handlerCallCount += 1;
@@ -37,7 +37,7 @@ describe("IntegrationPendingTestCase", () => {
     );
     expect(handlerCallCount).toBe(1);
 
-    db2.executeBatch2("commit transaction");
+    await db2.executeBatch2("commit transaction");
     await db2.close();
   });
 
@@ -45,11 +45,11 @@ describe("IntegrationPendingTestCase", () => {
     let handlerCallCount = 0;
 
     const db2 = new SQLite3.Database("test.db", { engine });
-    db2.executeBatch2("begin exclusive transaction");
+    await db2.executeBatch2("begin exclusive transaction");
 
     db.busyHandler(() => {
       handlerCallCount += 1;
-      db2.executeBatch2("commit transaction");
+      db2.executeBatch2("commit transaction") as unknown[];
       return true;
     });
 
