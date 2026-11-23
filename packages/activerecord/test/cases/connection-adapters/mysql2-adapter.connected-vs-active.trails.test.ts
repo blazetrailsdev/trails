@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
 import mysql from "mysql2/promise";
+import { withCoreQuery } from "../../support/mysql2-core-query.js";
 
 describe("Mysql2Adapter connected? vs active?", () => {
   afterEach(() => {
@@ -14,7 +15,7 @@ describe("Mysql2Adapter connected? vs active?", () => {
       query: () => Promise.resolve([[]]),
       ping,
     };
-    vi.spyOn(mysql, "createConnection").mockResolvedValue(fakeConn as never);
+    vi.spyOn(mysql, "createConnection").mockResolvedValue(withCoreQuery(fakeConn) as never);
   }
 
   it("keeps isConnected true after a failed ping while active goes false", async () => {

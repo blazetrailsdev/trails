@@ -22,6 +22,47 @@ const SET_FLAG = 2048;
 
 type Row = unknown[] | Record<string, unknown>;
 
+/** @noRailsEquivalent PERMANENT */
+interface MysqlTime {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  secondPart: number;
+}
+
+/** @noRailsEquivalent PERMANENT */
+function readBinaryDatetime(buf: Uint8Array): MysqlTime {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const length = buf.byteLength;
+  return {
+    year: length >= 4 ? view.getUint16(0, true) : 0,
+    month: length >= 4 ? buf[2] : 0,
+    day: length >= 4 ? buf[3] : 0,
+    hour: length >= 7 ? buf[4] : 0,
+    minute: length >= 7 ? buf[5] : 0,
+    second: length >= 7 ? buf[6] : 0,
+    secondPart: length >= 11 ? view.getUint32(7, true) : 0,
+  };
+}
+
+/** @noRailsEquivalent PERMANENT */
+function readBinaryTime(buf: Uint8Array): MysqlTime {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const length = buf.byteLength;
+  return {
+    year: 0,
+    month: 0,
+    day: 0,
+    hour: length >= 8 ? view.getUint32(1, true) * 24 + buf[5] : 0,
+    minute: length >= 8 ? buf[6] : 0,
+    second: length >= 8 ? buf[7] : 0,
+    secondPart: length >= 12 ? view.getUint32(8, true) : 0,
+  };
+}
+
 declare module "./mysql2.js" {
   interface Mysql2Namespace {
     Result: typeof Result;
@@ -264,14 +305,20 @@ export class Result {
           return Number.isSafeInteger(Number(val)) ? Number(val) : BigInt(val as string);
         case "DATE":
         case "NEWDATE": {
-          const [year, month, day] = (val as string).split("-").map(Number);
-          return new RubyDate(year, month, day).toDate();
+          const ts = readBinaryDatetime(val as Uint8Array);
+          return new RubyDate(ts.year, ts.month, ts.day).toDate();
         }
         case "TIME": {
-          const tokens = /^(\d+):(\d+):(\d+)(?:\.(\d+))?/.exec(val as string)!;
-          const [hour, minute, second] = tokens.slice(1, 4).map(Number);
-          const part = Number((tokens[4] ?? "").padEnd(6, "0"));
-          let time = Time[args.databaseTimezone!](2000, 1, 1, hour, minute, second, part);
+          const ts = readBinaryTime(val as Uint8Array);
+          let time = Time[args.databaseTimezone!](
+            2000,
+            1,
+            1,
+            ts.hour,
+            ts.minute,
+            ts.second,
+            ts.secondPart,
+          );
           if (args.applicationTimezone != null) {
             if (args.applicationTimezone === "local") {
               time = time.getlocal();
@@ -283,15 +330,18 @@ export class Result {
         }
         case "DATETIME":
         case "TIMESTAMP": {
-          const tokens = /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)(?:\.(\d+))?/.exec(val as string)!;
-          const [year, month, day, hour, minute, second] = tokens.slice(1, 7).map(Number);
-          const part = Number((tokens[7] ?? "").padEnd(6, "0"));
+          const ts = readBinaryDatetime(val as Uint8Array);
           const seconds =
-            year * 31557600 + month * 2592000 + day * 86400 + hour * 3600 + minute * 60 + second;
+            ts.year * 31557600 +
+            ts.month * 2592000 +
+            ts.day * 86400 +
+            ts.hour * 3600 +
+            ts.minute * 60 +
+            ts.second;
           if (seconds < MYSQL2_MIN_TIME || seconds > MYSQL2_MAX_TIME) {
             let offset: number | Rational = 0;
             if (args.databaseTimezone === "local") offset = Mysql2.Client["localOffset"]();
-            let dt = new DateTime(year, month, day, hour, minute, second, offset);
+            let dt = new DateTime(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second, offset);
             if (args.applicationTimezone != null) {
               if (args.applicationTimezone === "local") {
                 dt = dt.newOffset(Mysql2.Client["localOffset"]());
@@ -301,7 +351,15 @@ export class Result {
             }
             return dt;
           }
-          let time = Time[args.databaseTimezone!](year, month, day, hour, minute, second, part);
+          let time = Time[args.databaseTimezone!](
+            ts.year,
+            ts.month,
+            ts.day,
+            ts.hour,
+            ts.minute,
+            ts.second,
+            ts.secondPart,
+          );
           if (args.applicationTimezone != null) {
             if (args.applicationTimezone === "local") {
               time = time.getlocal();

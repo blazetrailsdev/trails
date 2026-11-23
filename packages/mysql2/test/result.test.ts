@@ -241,6 +241,7 @@ describe("Mysql2::Result", () => {
       await result.toA();
       expect(result.count()).toBe(0);
     });
+    // PERMANENT-SKIP: net_write_timeout fires only once the server's write blocks. Over TCP on Linux the ~2.6 MB result fits in the autotuned socket buffers (tcp_wmem max 4 MB), so the gem itself (0.5.7 on Connector/C 3.4.8) never raises against MariaDB 11 either; over a unix socket (fixed 208 KB buffers, the gem CI's `localhost`) both the gem and this port raise "Lost connection". trails CI connects over TCP.
     it.skip("should raise an exception if streaming ended due to a timeout", () => {});
   });
   describe("row data type mapping", () => {
@@ -287,15 +288,15 @@ describe("Mysql2::Result", () => {
         const id1 = await (await state.client.query(
           "INSERT INTO mysql2_test (bool_cast_test) VALUES ( 1)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         const id2 = await (await state.client.query(
           "INSERT INTO mysql2_test (bool_cast_test) VALUES ( 0)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         const id3 = await (await state.client.query(
           "INSERT INTO mysql2_test (bool_cast_test) VALUES (-1)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         ids = [id1, id2, id3];
         const result1 = (await state.client.query(
           `SELECT bool_cast_test FROM mysql2_test WHERE id = ${id1} LIMIT 1`,
@@ -325,11 +326,11 @@ describe("Mysql2::Result", () => {
         const id1 = await (await state.client.query(
           "INSERT INTO mysql2_test (single_bit_test) VALUES (1)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         const id2 = await (await state.client.query(
           "INSERT INTO mysql2_test (single_bit_test) VALUES (0)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         ids = [id1, id2];
         const result1 = (await state.client.query(
           `SELECT single_bit_test FROM mysql2_test WHERE id = ${id1}`,
