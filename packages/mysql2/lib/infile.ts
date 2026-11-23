@@ -1,6 +1,7 @@
 import { Errno, File, Thread } from "@blazetrails/ruby-compat";
 
 const CR_UNKNOWN_ERROR = 2000;
+const CR_OUT_OF_MEMORY = 2008;
 
 interface Mysql2LocalInfileData {
   fd: File | null;
@@ -49,7 +50,7 @@ function mysql2LocalInfileEnd(data: Mysql2LocalInfileData | undefined): void {
 
 function mysql2LocalInfileError(data: Mysql2LocalInfileData | undefined): globalThis.Error {
   if (data) return Object.assign(new globalThis.Error(data.error), { errno: CR_UNKNOWN_ERROR });
-  return Object.assign(new globalThis.Error("Out of memory"), { errno: 2008 });
+  return Object.assign(new globalThis.Error("Out of memory"), { errno: CR_OUT_OF_MEMORY });
 }
 
 export function mysql2SetLocalInfile(): (filename: string) => object {
