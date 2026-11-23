@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/solid-queue",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "Database-backed Active Job backend for Trails, mirroring the solid_queue gem",
   "license": "MIT",
   "repository": {

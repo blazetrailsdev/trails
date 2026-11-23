@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/tse-compiler",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "TSE (Trails Server Embedded) compiler — lexer, AST, JS emitter. Rails analogue: the erubi gem.",
   "license": "MIT",
   "repository": {

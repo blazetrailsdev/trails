@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/activerecord-cli",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "Generators, migrator, and the `ar` CLI for standalone @blazetrails/activerecord projects",
   "license": "MIT",
   "repository": {

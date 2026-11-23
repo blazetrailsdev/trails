@@ -211,8 +211,7 @@ export class AppBuilder {
   /** @inventedArm if — PERMANENT */
   async gemfile(): Promise<void> {
     await this.template("package.json");
-    if (this.options.dev && this.packageManager === "pnpm")
-      await this.template("pnpm-workspace.yaml");
+    if (this.packageManager === "pnpm") await this.template("pnpm-workspace.yaml");
     await this.template("tsconfig.json");
   }
 

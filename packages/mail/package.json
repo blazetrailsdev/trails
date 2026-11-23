@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/mail",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "Email parsing and generation, mirroring Ruby's mail gem",
   "license": "MIT",
   "repository": {

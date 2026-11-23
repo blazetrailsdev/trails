@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/trails-tsc",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "Plugin-driven TypeScript compiler wrapper for trails framework packages",
   "license": "MIT",
   "repository": {

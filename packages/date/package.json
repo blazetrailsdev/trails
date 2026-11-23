@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/date",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "Port of Ruby's date gem: the Temporal-backed Date/DateTime surface",
   "license": "MIT",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/tzinfo",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "Time zone lookups for Trails, standing in for the tzinfo gem",
   "license": "MIT",
   "repository": {
