@@ -10,11 +10,13 @@ export default {
   extends: DefaultTheme,
   Layout() {
     return h(DefaultTheme.Layout, null, {
-      "nav-bar-title-before": () =>
+      "nav-bar-title-before": () => [
         h("span", { class: "bt-wm", "aria-hidden": "true" }, [
           h("span", { class: "blaze" }, "blaze"),
           h("span", { class: "trails" }, "trails"),
         ]),
+        h("span", { class: "visually-hidden" }, "BlazeTrails"),
+      ],
       "doc-after": () => h(GuideFooter),
     });
   },

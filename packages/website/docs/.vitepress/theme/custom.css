@@ -78,9 +78,6 @@
 .vp-doc div[class*="language-"] {
   border-radius: 6px;
 }
-.vp-doc div[class*="language-"] .shiki span {
-  color: var(--shiki-dark, inherit) !important;
-}
 
 .VPNav,
 .VPNavBar,

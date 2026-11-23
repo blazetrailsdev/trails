@@ -24,6 +24,7 @@ export default defineConfig({
   outDir: "../build/docs",
   cleanUrls: true,
   appearance: false,
+  markdown: { theme: "github-dark" },
 
   themeConfig: {
     siteTitle: false,
