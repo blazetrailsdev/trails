@@ -5,8 +5,8 @@ import type { BusyHandler, EngineErrors } from "../database.js";
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
  * @inventedArm if — PERMANENT
+ * @noRailsEquivalent PERMANENT
  */
 export function withBusyHandler<T>(
   errors: EngineErrors,
