@@ -288,7 +288,7 @@ export const MiniMagick = {
     if (rbObjRespondTo(MiniMagickGem.MiniMagick, "convert")) {
       return MiniMagickGem.MiniMagick.convert(...(block ? [blockPass(block)] : []));
     } else {
-      return Tool.Convert.new(...(block ? [blockPass(block)] : []));
+      return Tool.Convert.new(...((block ? [blockPass(block)] : []) as unknown as [string]));
     }
   },
 

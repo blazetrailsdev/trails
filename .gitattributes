@@ -4,7 +4,7 @@ packages/rack/test/cgi/test.gz binary
 packages/actionpack/test/fixtures/multipart/* binary
 # Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures: magic-byte detection reads them exactly.
 packages/marcel/test/fixtures/** binary
-# Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures: ImageMagick reads them.
+# Byte-for-byte copies of vendor/mini_magick/v5.3.1/spec/fixtures: ImageMagick reads them.
 packages/mini-magick/test/fixtures/** binary
 # Byte-for-byte copies of vendor/rails/v8.0.5.2/activestorage/test/fixtures/files.
 packages/activestorage/test/fixtures/files/** binary

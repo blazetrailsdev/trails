@@ -54,26 +54,64 @@ export function assertDom(
   this: SelectorAssertionsHost,
   ...args: AssertDomArgument[] | [...AssertDomArgument[], AssertDomBlock]
 ): NodeSet | undefined {
-  const block = rbBlockGivenP(args.at(-1))
-    ? (args.pop() as unknown as (s: NodeSet | Html5DocumentFragment) => void)
-    : null;
+  const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as AssertDomBlock) : null;
   this.selected ??= null;
 
   const selector = new HTMLSelector(args, this.selected, () => nodeset(this.documentRootElement()));
+  return domAssertions.call(this, selector, block);
+}
 
+export const assertSelect = assertDom;
+
+export function assertNotDom(
+  this: SelectorAssertionsHost,
+  ...args: AssertDomArgument[] | [...AssertDomArgument[], AssertDomBlock]
+): NodeSet | undefined {
+  const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as AssertDomBlock) : null;
+  this.selected ??= null;
+
+  const selector = new HTMLSelector(args, this.selected, { refute: true }, () =>
+    nodeset(this.documentRootElement()),
+  );
+  return domAssertions.call(this, selector, block);
+}
+
+export const refuteDom = assertNotDom;
+export const assertNotSelect = assertNotDom;
+export const refuteSelect = assertNotDom;
+
+/** @internal */
+function domAssertions(
+  this: SelectorAssertionsHost,
+  selector: HTMLSelector,
+  block: AssertDomBlock | null,
+): NodeSet | undefined {
   if (selector.isSelectingNoBody()) {
     assert(true);
     return;
   }
 
+  const { count, maximum: max } = selector.tests;
+
   const matches = selector.select();
   assertSizeMatchBang(matches.size, selector.tests, selector.cssSelector, selector.message);
 
-  if (block && !matches.isEmpty()) nestSelection.call(this, matches, block);
+  if (block) {
+    if (count === 0 || max === 0) {
+      throw new ArgumentError(
+        "Cannot be called with a block when asserting that a selector does not match",
+      );
+    }
+
+    if (!matches.isEmpty())
+      nestSelection.call(
+        this,
+        matches,
+        block as unknown as (s: NodeSet | Html5DocumentFragment) => void,
+      );
+  }
   return matches;
 }
-
-export const assertSelect = assertDom;
 
 export function assertDomEncoded(
   this: SelectorAssertionsHost,

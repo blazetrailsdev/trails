@@ -39,7 +39,7 @@ export const resolveLastSegmentCollision = (fqns: Iterable<string>): string | nu
  * Keys each fqn of a tied collision by its enclosing class as well as its
  * name: `Thor::UndefinedCommandError::SpellChecker` and
  * `Thor::UnknownArgumentError::SpellChecker`
- * (vendor/thor/v1.3.2/lib/thor/error.rb:25-39,66-81) become
+ * (vendor/thor/v1.4.0/lib/thor/error.rb:25-39,66-81) become
  * `UndefinedCommandError.SpellChecker` and `UnknownArgumentError.SpellChecker`,
  * the spelling of a class declared in a namespace merged onto its parent.
  *

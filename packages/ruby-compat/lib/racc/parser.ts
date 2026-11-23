@@ -252,7 +252,7 @@ export abstract class Parser {
 
 /**
  * @noRailsEquivalent PERMANENT — racc gem `Racc`
- * (`vendor/racc/v1.8.0/lib/racc/parser.rb:15`), bundled with Ruby
+ * (`vendor/racc/v1.8.1/lib/racc/parser.rb:15`), bundled with Ruby
  * (`vendor/ruby/v3.3.11/gems/bundled_gems:23`).
  */
 export const Racc = { name: "Racc", ParseError, Parser };

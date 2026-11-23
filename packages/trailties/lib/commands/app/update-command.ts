@@ -49,7 +49,7 @@ export class UpdateCommand extends Base {
   /** @internal */
   private _appGenerator?: AppGenerator;
 
-  /** @inlinedFrom Thor::Actions#initialize thor/v1.3.2/lib/thor/actions.rb:72-85 */
+  /** @inlinedFrom Thor::Actions#initialize thor/v1.4.0/lib/thor/actions.rb:72-85 */
   constructor(
     args: unknown[] = [],
     options: Record<string, unknown> = {},

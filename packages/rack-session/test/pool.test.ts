@@ -303,4 +303,54 @@ describe("Rack::Session::Pool", () => {
     const res = await new MockRequest((env) => app.call(env)).get("/");
     expect(res.headers["set-cookie"]).toBeUndefined();
   });
+
+  it("doesn't allow session id to be reused", async () => {
+    let resumeSlow!: () => void;
+    const slowYield = new Promise<void>((resolve) => (resumeSlow = resolve));
+    const userIdSession = lint(async (env: RackEnv) => {
+      const session = env["rack.session"] as SessionHash;
+      switch (env["PATH_INFO"]) {
+        case "/login":
+          session.set("user_id", 1);
+          break;
+        case "/logout":
+          if (session.get("user_id") == null) throw new Error("User not logged in");
+          session.delete("user_id");
+          session.options()["renew"] = true;
+          break;
+        case "/slow":
+          await slowYield;
+          break;
+      }
+      return new Response(session.inspect()).toA();
+    });
+    const app = new Pool(userIdSession);
+
+    const loginResponse = await new MockRequest((env) => app.call(env)).get("/login");
+    const loginCookie = loginResponse.headers["set-cookie"] as string;
+
+    const slowRequest = new MockRequest((env) => app.call(env)).get("/slow", {
+      HTTP_COOKIE: loginCookie,
+    });
+
+    let response = await new MockRequest((env) => app.call(env)).get("/", {
+      HTTP_COOKIE: loginCookie,
+    });
+    expect(response.body).toBe('{"user_id"=>1}');
+
+    const logoutResponse = await new MockRequest((env) => app.call(env)).get("/logout", {
+      HTTP_COOKIE: loginCookie,
+    });
+    const logoutCookie = logoutResponse.headers["set-cookie"] as string;
+
+    expect(loginCookie.match(sessionMatch)?.[0]).not.toBe(logoutCookie.match(sessionMatch)?.[0]);
+
+    resumeSlow();
+    await slowRequest;
+
+    response = await new MockRequest((env) => app.call(env)).get("/", {
+      HTTP_COOKIE: loginCookie,
+    });
+    expect(response.body).toBe("{}");
+  });
 });

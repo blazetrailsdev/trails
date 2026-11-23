@@ -239,7 +239,7 @@ export const Config = {
 
   /** @internal */
   expandPaths(this: Loader, paths: GlobArg[]): string[] {
-    return (paths.flat(Infinity) as PathArg[]).map((path) => File.expandPath(path.toString()));
+    return (paths.flat(Infinity) as PathArg[]).map((path) => File.expandPath(path));
   },
 
   /** @internal */

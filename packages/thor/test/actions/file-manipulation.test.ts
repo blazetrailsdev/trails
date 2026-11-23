@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dir, File, FileUtils, isEmpty, NameError, rbFBinding } from "@blazetrails/ruby-compat";
 import { capture, isWindows, sourceRoot } from "../support/helper.js";
 import { MyCounter } from "../fixtures/group.js";
+import { Error as ThorError } from "../../lib/error.js";
 
 type Runner = Record<string, any>;
 
@@ -344,6 +345,136 @@ describe("Thor::Actions", () => {
       });
     });
 
+    describe("#gsub_file!", () => {
+      describe("with invoke behavior", () => {
+        it("replaces the content in the file", async () => {
+          await action("gsubFileBang", "doc/README", "__start__", "START");
+          expect(File.read(file())).toEqual("START\nREADME\n__end__\n");
+        });
+
+        it("does not replace if pretending", async () => {
+          runner({ pretend: true });
+          await action("gsubFileBang", "doc/README", "__start__", "START");
+          expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+        });
+
+        it("accepts a block", async () => {
+          await action("gsubFileBang", "doc/README", "__start__", (match: string) =>
+            match.replaceAll("__", "").toUpperCase(),
+          );
+          expect(File.read(file())).toEqual("START\nREADME\n__end__\n");
+        });
+
+        it("logs status", async () => {
+          expect(await action("gsubFileBang", "doc/README", "__start__", "START")).toEqual(
+            "        gsub  doc/README\n",
+          );
+        });
+
+        it("does not log status if required", async () => {
+          expect(
+            await action("gsubFileBang", file(), "__", { verbose: false }, (match: string) =>
+              match.repeat(2),
+            ),
+          ).toBeEmpty();
+        });
+
+        it("cares if the file contents did not change", async () => {
+          await expect(
+            action("gsubFileBang", "doc/README", "___start___", "START"),
+          ).rejects.toThrow(
+            new ThorError(`The content of ${destinationRoot()}/doc/README did not change`),
+          );
+
+          expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+        });
+      });
+
+      describe("with revoke behavior", () => {
+        describe("and no force option", () => {
+          it("does not replace the content in the file", async () => {
+            runner({}, "revoke");
+            await action("gsubFileBang", "doc/README", "__start__", "START");
+            expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+          });
+
+          it("does not replace if pretending", async () => {
+            runner({ pretend: true }, "revoke");
+            await action("gsubFileBang", "doc/README", "__start__", "START");
+            expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+          });
+
+          it("does not replace the content in the file when given a block", async () => {
+            runner({}, "revoke");
+            await action("gsubFileBang", "doc/README", "__start__", (match: string) =>
+              match.replaceAll("__", "").toUpperCase(),
+            );
+            expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+          });
+
+          it("does not log status", async () => {
+            runner({}, "revoke");
+            expect(await action("gsubFileBang", "doc/README", "__start__", "START")).toBeEmpty();
+          });
+
+          it("does not log status if required", async () => {
+            runner({}, "revoke");
+            expect(
+              await action("gsubFileBang", file(), "__", { verbose: false }, (match: string) =>
+                match.repeat(2),
+              ),
+            ).toBeEmpty();
+          });
+        });
+
+        describe("and force option", () => {
+          it("replaces the content in the file", async () => {
+            runner({}, "revoke");
+            await action("gsubFileBang", "doc/README", "__start__", "START", { force: true });
+            expect(File.read(file())).toEqual("START\nREADME\n__end__\n");
+          });
+
+          it("does not replace if pretending", async () => {
+            runner({ pretend: true }, "revoke");
+            await action("gsubFileBang", "doc/README", "__start__", "START", { force: true });
+            expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
+          });
+
+          it("replaces the content in the file when given a block", async () => {
+            runner({}, "revoke");
+            await action(
+              "gsubFileBang",
+              "doc/README",
+              "__start__",
+              { force: true },
+              (match: string) => match.replaceAll("__", "").toUpperCase(),
+            );
+            expect(File.read(file())).toEqual("START\nREADME\n__end__\n");
+          });
+
+          it("logs status", async () => {
+            runner({}, "revoke");
+            expect(
+              await action("gsubFileBang", "doc/README", "__start__", "START", { force: true }),
+            ).toEqual("        gsub  doc/README\n");
+          });
+
+          it("does not log status if required", async () => {
+            runner({}, "revoke");
+            expect(
+              await action(
+                "gsubFileBang",
+                file(),
+                "__",
+                { verbose: false, force: true },
+                (match: string) => match.repeat(2),
+              ),
+            ).toBeEmpty();
+          });
+        });
+      });
+    });
+
     describe("#gsub_file", () => {
       describe("with invoke behavior", () => {
         it("replaces the content in the file", async () => {
@@ -376,6 +507,11 @@ describe("Thor::Actions", () => {
               match.repeat(2),
             ),
           ).toBeEmpty();
+        });
+
+        it("does not care if the file contents did not change", async () => {
+          await action("gsubFile", "doc/README", "___start___", "START");
+          expect(File.read(file())).toEqual("__start__\nREADME\n__end__\n");
         });
       });
 

@@ -83,7 +83,7 @@ function registeredNames(blocks, sourceCode, className = null) {
  * ESLint rule: thor-command-registration
  *
  * Thor registers a command when the VM fires `method_added` for a public `def`
- * (`vendor/thor/v1.3.2/lib/thor/base.rb:729-745`). JS has no such hook, so a
+ * (`vendor/thor/v1.4.0/lib/thor/base.rb:729-745`). JS has no such hook, so a
  * Thor class body fires it itself: `this.methodAdded("name")` in a static
  * block, inside `this.noCommands(() => ...)` for a helper (CLAUDE.md § "Thor
  * commands register through an explicit `methodAdded`"). A forgotten call

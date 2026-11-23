@@ -1,46 +1,54 @@
 import { SQLite3 } from "./namespaces.js";
-import { isSymbol, rbInspect, toI } from "@blazetrails/ruby-compat";
+import { block, fetch, isSymbol, rbInspect, rbObjAsString, toI } from "@blazetrails/ruby-compat";
 
 import type { SqliteBinds } from "./driver.js";
 import { Exception } from "./errors.js";
 
-export const SYNCHRONOUS_MODES: (string | number)[][] = [
-  ["full", 2],
-  ["normal", 1],
-  ["off", 0],
-];
+export const SYNCHRONOUS_MODES: Readonly<Record<string, number>> = Object.freeze({
+  full: 2,
+  normal: 1,
+  off: 0,
+});
 
-export const TEMP_STORE_MODES: (string | number)[][] = [
-  ["default", 0],
-  ["file", 1],
-  ["memory", 2],
-];
+export const TEMP_STORE_MODES: Readonly<Record<string, number>> = Object.freeze({
+  default: 0,
+  file: 1,
+  memory: 2,
+});
 
-export const AUTO_VACUUM_MODES: (string | number)[][] = [
-  ["none", 0],
-  ["full", 1],
-  ["incremental", 2],
-];
+export const AUTO_VACUUM_MODES: Readonly<Record<string, number>> = Object.freeze({
+  none: 0,
+  full: 1,
+  incremental: 2,
+});
 
-export const JOURNAL_MODES: (string | number)[][] = [
-  ["delete"],
-  ["truncate"],
-  ["persist"],
-  ["memory"],
-  ["wal"],
-  ["off"],
-];
+export const JOURNAL_MODES: Readonly<Record<string, string>> = Object.freeze({
+  delete: "delete",
+  truncate: "truncate",
+  persist: "persist",
+  memory: "memory",
+  wal: "wal",
+  off: "off",
+});
 
-export const LOCKING_MODES: (string | number)[][] = [["normal"], ["exclusive"]];
+export const LOCKING_MODES: Readonly<Record<string, string>> = Object.freeze({
+  normal: "normal",
+  exclusive: "exclusive",
+});
 
-export const ENCODINGS: (string | number)[][] = [["utf-8"], ["utf-16"], ["utf-16le"], ["utf-16be"]];
+export const ENCODINGS: Readonly<Record<string, string>> = Object.freeze({
+  "utf-8": "utf-8",
+  "utf-16": "utf-16",
+  "utf-16le": "utf-16le",
+  "utf-16be": "utf-16be",
+});
 
-export const WAL_CHECKPOINTS: (string | number)[][] = [
-  ["passive"],
-  ["full"],
-  ["restart"],
-  ["truncate"],
-];
+export const WAL_CHECKPOINTS: Readonly<Record<string, string>> = Object.freeze({
+  passive: "passive",
+  full: "full",
+  restart: "restart",
+  truncate: "truncate",
+});
 
 export interface PragmasHost {
   execute(sql: string, bindVars?: SqliteBinds, block?: (row: unknown) => void): unknown;
@@ -48,7 +56,7 @@ export interface PragmasHost {
 }
 
 function toS(value: unknown): string {
-  const str = String(value);
+  const str = rbObjAsString(value);
   return str.startsWith(":") ? str.slice(1) : str;
 }
 
@@ -109,13 +117,22 @@ export function setEnumPragma(
   this: PragmasHost,
   name: string,
   mode: unknown,
-  enums: (string | number)[][],
+  enums: (string | number)[][] | Readonly<Record<string, string | number>>,
 ): unknown {
-  const match = enums.find((p) => p.find((i) => toS(i).toLowerCase() === toS(mode).toLowerCase()));
-  if (!match) {
+  let match: unknown;
+  if (Array.isArray(enums)) {
+    match = enums.find((p) => p.find((i) => toS(i).toLowerCase() === toS(mode).toLowerCase()));
+  } else if (!isSymbol(mode) && typeof mode === "string") {
+    match = fetch(enums, mode.toLowerCase());
+  } else {
+    match = mode;
+  }
+
+  if (match == null || match === false) {
     throw new Exception(`unrecognized ${name} ${rbInspect(mode)}`);
   }
-  return this.execute(`PRAGMA ${name}='${toS(match[0]).toUpperCase()}'`);
+
+  return this.execute(`PRAGMA ${name}='${toS(match)}'`);
 }
 
 export async function getIntPragma(this: PragmasHost, name: string): Promise<number | bigint> {
@@ -255,7 +272,7 @@ export function encoding(this: PragmasHost): unknown {
 }
 
 export function setEncoding(this: PragmasHost, mode: unknown): unknown {
-  return setEnumPragma.call(this, "encoding", mode, ENCODINGS);
+  return setStringPragma.call(this, "encoding", mode, ENCODINGS);
 }
 
 export function foreignKeyCheck(this: PragmasHost, ...table: unknown[]): unknown {
@@ -343,7 +360,7 @@ export function journalMode(this: PragmasHost): unknown {
 }
 
 export function setJournalMode(this: PragmasHost, mode: unknown): unknown {
-  return setEnumPragma.call(this, "journal_mode", mode, JOURNAL_MODES);
+  return setStringPragma.call(this, "journal_mode", mode, JOURNAL_MODES);
 }
 
 export function journalSizeLimit(this: PragmasHost): Promise<number | bigint> {
@@ -367,7 +384,7 @@ export function lockingMode(this: PragmasHost): unknown {
 }
 
 export function setLockingMode(this: PragmasHost, mode: unknown): unknown {
-  return setEnumPragma.call(this, "locking_mode", mode, LOCKING_MODES);
+  return setStringPragma.call(this, "locking_mode", mode, LOCKING_MODES);
 }
 
 export function maxPageCount(this: PragmasHost): Promise<number | bigint> {
@@ -567,11 +584,28 @@ export function walCheckpoint(this: PragmasHost): unknown {
 }
 
 export function setWalCheckpoint(this: PragmasHost, mode: unknown): unknown {
-  return setEnumPragma.call(this, "wal_checkpoint", mode, WAL_CHECKPOINTS);
+  return setStringPragma.call(this, "wal_checkpoint", mode, WAL_CHECKPOINTS);
 }
 
 export function setWritableSchema(this: PragmasHost, mode: unknown): unknown {
   return setBooleanPragma.call(this, "writable_schema", mode);
+}
+
+/** @internal */
+function setStringPragma(
+  this: PragmasHost,
+  pragmaName: string,
+  value: unknown,
+  validValues: Readonly<Record<string, string | number>>,
+): unknown {
+  fetch(
+    validValues,
+    toS(value).toLowerCase(),
+    block(() => {
+      throw new Exception(`unrecognized ${pragmaName} ${rbInspect(value)}`);
+    }),
+  );
+  return setEnumPragma.call(this, pragmaName, value, validValues);
 }
 
 export const Pragmas = {

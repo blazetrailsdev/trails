@@ -87227,6 +87227,566 @@
     "ref": "v1.14.8"
   },
   {
+    "package": "mini-magick",
+    "rubyFile": "configuration.rb",
+    "rubyName": "configure",
+    "digest": "1f62e29f054ea870",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "[]",
+    "digest": "a977bbc217b217fd",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "attribute",
+    "digest": "29399b573efbe608",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "collapse!",
+    "digest": "39b0e34bc822c250",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "colorspace",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "combine_options",
+    "digest": "d1a69f91f253abf5",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "composite",
+    "digest": "5fcb05047fdbbdb4",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "create",
+    "digest": "d03af1786f006f5d",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "data",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "destroy!",
+    "digest": "643f5237b3595fab",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "dimensions",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "exif",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "format",
+    "digest": "078f7c4f5a40f5db",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "get_image_from_pixels",
+    "digest": "4bffb1f92f8611c7",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "get_pixels",
+    "digest": "14bc5825b0614750",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "hash",
+    "digest": "221a72052b958329",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "height",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "human_size",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "identify",
+    "digest": "822201a9f4789be1",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "import_pixels",
+    "digest": "4da33296f6b59610",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "initialize",
+    "digest": "a06e8cf549980a24",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "landscape?",
+    "digest": "e97ab00c51deb2de",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "layer?",
+    "digest": "35cf55979f299dd3",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "layers",
+    "digest": "ba33bad6d6ef6489",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "mogrify",
+    "digest": "4f91df77724946f6",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "open",
+    "digest": "07220f9673f75cc1",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "portrait?",
+    "digest": "c00f9698afe6bf6d",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "read",
+    "digest": "3de8f990aae60ffc",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "resolution",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "signature",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "size",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "to_blob",
+    "digest": "3ab872c5c81e1964",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "type",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "valid?",
+    "digest": "055a9896bfee3328",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "validate!",
+    "digest": "49b0a954aed867bf",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "width",
+    "digest": "60a7fb2452b5d256",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image.rb",
+    "rubyName": "write",
+    "digest": "7997c029161c6889",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "[]",
+    "digest": "8ad13882223fa276",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "cheap_info",
+    "digest": "df4228956644c2fd",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "clear",
+    "digest": "444ba5be53cb3aef",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "colorspace",
+    "digest": "1f6cdf67e804e923",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "data",
+    "digest": "3c2d0089a4374538",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "decode_comma_separated_ascii_characters",
+    "digest": "9d8ae256462e7f36",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "exif",
+    "digest": "1dacf2c88ec99d6e",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "identify",
+    "digest": "822201a9f4789be1",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "initialize",
+    "digest": "3b3db50825d4be30",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "parse_warnings",
+    "digest": "c6ce81e020e81b4f",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "path",
+    "digest": "821745855b98eee6",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "raw",
+    "digest": "3fded18ab136432f",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "raw_exif",
+    "digest": "b92328ab234aaf47",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "resolution",
+    "digest": "c85f7d4da52f5421",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "image/info.rb",
+    "rubyName": "signature",
+    "digest": "2ecee9c61a23a5d6",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "mini_magick.rb",
+    "rubyName": "cli_version",
+    "digest": "877b645891df1af4",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "mini_magick.rb",
+    "rubyName": "imagemagick7?",
+    "digest": "fd94e5af7dfd8d22",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "shell.rb",
+    "rubyName": "execute",
+    "digest": "d420b3e437eb6388",
+    "ref": "v5.3.1"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "shell.rb",
+    "rubyName": "log",
+    "digest": "1cb250978de597bb",
+    "ref": "v5.3.1"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "shell.rb",
+    "rubyName": "run",
+    "digest": "572885a6ea7cfa29",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "<<",
+    "digest": "87aac72f4010028c",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "call",
+    "digest": "bdce146fd1a59bdb",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "canvas",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "command",
+    "digest": "e6f27272b74ab27d",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "executable",
+    "digest": "b48a4ec76d459262",
+    "ref": "v5.3.1"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "gradient",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "initialize",
+    "digest": "d8cf2a89fec2c28a",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "logo",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "merge!",
+    "digest": "a44afae15a730151",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "new",
+    "digest": "c003d6f98ed6bb31",
+    "ref": "v5.3.1"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "pango",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "pattern",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "plasma",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "radial_gradient",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "rose",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "stack",
+    "digest": "e8e9dd6c5f6c541f",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "stdin",
+    "digest": "d92121893882754c",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "stdout",
+    "digest": "d92121893882754c",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "text",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "tool.rb",
+    "rubyName": "xc",
+    "digest": "d5903e8e10146036",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "utilities.rb",
+    "rubyName": "tempfile",
+    "digest": "0cefdb3e1fbbb3ca",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "utilities.rb",
+    "rubyName": "which",
+    "digest": "fab2fb5d45512457",
+    "ref": "v5.2.0"
+  },
+  {
+    "package": "mini-magick",
+    "rubyFile": "version.rb",
+    "rubyName": "version",
+    "digest": "1575150db471364f",
+    "ref": "v5.2.0"
+  },
+  {
     "package": "nokogiri",
     "rubyFile": "css.rb",
     "rubyName": "xpath_for",
@@ -88555,6 +89115,146 @@
     "rubyName": "register_variables",
     "digest": "f856643cc2ed8c1b",
     "ref": "v1.18.3"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "coder.rb",
+    "rubyName": "initialize",
+    "digest": "73710061e9200179",
+    "ref": "v1.5.9"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "coder.rb",
+    "rubyName": "to_h",
+    "digest": "5ffb07fbcc0e2316",
+    "ref": "v1.5.9"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "connection.rb",
+    "rubyName": "cancel",
+    "digest": "990d94119edb5281",
+    "ref": "v1.6.2"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "connection.rb",
+    "rubyName": "conndefaults_hash",
+    "digest": "73814af9098f0803",
+    "ref": "v1.5.9"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "connection.rb",
+    "rubyName": "reset",
+    "digest": "eb8ee2ba979943e4",
+    "ref": "v1.5.9"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "exceptions.rb",
+    "rubyName": "initialize",
+    "digest": "89675d7305b65d70",
+    "ref": "v1.5.9"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "pg.rb",
+    "rubyName": "connect",
+    "digest": "f3afe39b1296f90f",
+    "ref": "v1.5.9"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "result.rb",
+    "rubyName": "map_types!",
+    "digest": "bdf40d23001a73cc",
+    "ref": "v1.5.9"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "text_decoder/date.rb",
+    "rubyName": "decode",
+    "digest": "31e9868564807a37",
+    "ref": "v1.5.9"
+  },
+  {
+    "package": "pg",
+    "rubyFile": "text_decoder/timestamp.rb",
+    "rubyName": "initialize",
+    "digest": "fbb019fa1e5ba7e0",
+    "ref": "v1.5.9"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "_racc_do_reduce",
+    "digest": "37f08926adf9a0c1",
+    "ref": "v1.8.0"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "_racc_evalact",
+    "digest": "4957ec2dba5884aa",
+    "ref": "v1.8.0"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "_racc_init_sysvars",
+    "digest": "c6b7fd9bf977cfee",
+    "ref": "v1.8.0"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "_racc_setup",
+    "digest": "97bfb3d50ea95a85",
+    "ref": "v1.8.0"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "next_token",
+    "digest": "161763220299254a",
+    "ref": "v1.8.0"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "on_error",
+    "digest": "99fd280c39588ea1",
+    "ref": "v1.8.0"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "token_to_str",
+    "digest": "94666e4fcd93a02d",
+    "ref": "v1.8.0"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "yyaccept",
+    "digest": "b829128f2e73ac75",
+    "ref": "v1.8.0"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "yyerrok",
+    "digest": "6ee8c1f3427fa8f3",
+    "ref": "v1.8.0"
+  },
+  {
+    "package": "racc",
+    "rubyFile": "parser.rb",
+    "rubyName": "yyerror",
+    "digest": "05ae230497375f78",
+    "ref": "v1.8.0"
   },
   {
     "package": "rack",
@@ -92442,8 +93142,8 @@
     "package": "rack-session",
     "rubyFile": "pool.rb",
     "rubyName": "delete_session",
-    "digest": "e9110edaf4264abc",
-    "ref": "v2.1.0"
+    "digest": "91646353080b9ab2",
+    "ref": "v2.1.1"
   },
   {
     "package": "rack-session",
@@ -92477,8 +93177,8 @@
     "package": "rack-session",
     "rubyFile": "pool.rb",
     "rubyName": "write_session",
-    "digest": "a6d550e06b4e8dd3",
-    "ref": "v2.1.0"
+    "digest": "1e43f4572003368f",
+    "ref": "v2.1.1"
   },
   {
     "package": "rack-test",
@@ -92950,6 +93650,454 @@
     "ref": "v2.2.0"
   },
   {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/dom_assertions.rb",
+    "rubyName": "assert_dom_equal",
+    "digest": "eaa33812e6393850",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/dom_assertions.rb",
+    "rubyName": "assert_dom_not_equal",
+    "digest": "702d41ede82a8e2a",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/dom_assertions.rb",
+    "rubyName": "compare_doms",
+    "digest": "f84aad8edee2cbdd",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/dom_assertions.rb",
+    "rubyName": "equal_attribute?",
+    "digest": "5e5560c87d174a49",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/dom_assertions.rb",
+    "rubyName": "equal_attribute_nodes?",
+    "digest": "e33e3423a617d5fc",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/dom_assertions.rb",
+    "rubyName": "equal_child?",
+    "digest": "49f12f863973ffde",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/dom_assertions.rb",
+    "rubyName": "equal_children?",
+    "digest": "8a98ad0f50e5b385",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/dom_assertions.rb",
+    "rubyName": "extract_children",
+    "digest": "db86ee712426e748",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/dom_assertions.rb",
+    "rubyName": "fragment",
+    "digest": "7d2145b18a354cea",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "assert_dom",
+    "digest": "5b900729a8f3fd2d",
+    "ref": "v2.3.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "assert_dom_email",
+    "digest": "cac24bc249694ca6",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "assert_dom_encoded",
+    "digest": "572852eab15124aa",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "assert_size_match!",
+    "digest": "5c9f2dd69c8284d0",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "count_description",
+    "digest": "60c1b93205785728",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "css_select",
+    "digest": "87c9d74c760bd40a",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "document_root_element",
+    "digest": "e978bb2249559a27",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "nest_selection",
+    "digest": "41ffa090e7d20fca",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "nodeset",
+    "digest": "59e1852b03d2450c",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions.rb",
+    "rubyName": "pluralize_element",
+    "digest": "180a749ce1034c37",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/html_selector.rb",
+    "rubyName": "extract_equality_tests",
+    "digest": "62e6d47d9adf8838",
+    "ref": "v2.3.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/html_selector.rb",
+    "rubyName": "extract_root",
+    "digest": "f8a0925b8a33733b",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/html_selector.rb",
+    "rubyName": "extract_selectors",
+    "digest": "4d1d80f324a6cc9d",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/html_selector.rb",
+    "rubyName": "filter",
+    "digest": "118627e6da3d26e7",
+    "ref": "v2.3.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/html_selector.rb",
+    "rubyName": "initialize",
+    "digest": "d8643e7ac6996bf0",
+    "ref": "v2.3.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/html_selector.rb",
+    "rubyName": "select",
+    "digest": "2ca4d53ebe012237",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/html_selector.rb",
+    "rubyName": "selecting_no_body?",
+    "digest": "cb93f114dcd6c28a",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/substitution_context.rb",
+    "rubyName": "initialize",
+    "digest": "004a5b8d13b492b9",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/substitution_context.rb",
+    "rubyName": "match",
+    "digest": "3a9e1adcdb4db393",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/substitution_context.rb",
+    "rubyName": "matcher_for",
+    "digest": "b9a7a198d80a6ee3",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/substitution_context.rb",
+    "rubyName": "substitutable?",
+    "digest": "aa6165bb0e798e4b",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "assertions/selector_assertions/substitution_context.rb",
+    "rubyName": "substitute!",
+    "digest": "a7b881f94710cd83",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "testing.rb",
+    "rubyName": "choose_html_parser",
+    "digest": "b2804733193f4bcf",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "testing.rb",
+    "rubyName": "html5_support?",
+    "digest": "e961dd7cee86b3ae",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "testing.rb",
+    "rubyName": "html_document",
+    "digest": "c1c6d40942894121",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "rails-dom-testing",
+    "rubyFile": "testing.rb",
+    "rubyName": "html_document_fragment",
+    "digest": "c247d594d07ebc0d",
+    "ref": "v2.2.0"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "message.rb",
+    "rubyName": "broadcast",
+    "digest": "a25a7e416f337ca0",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "message.rb",
+    "rubyName": "channel_hash_for",
+    "digest": "359004f243d6063e",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "message.rb",
+    "rubyName": "channel_hashes_for",
+    "digest": "89c3c8c1483e656b",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "record.rb",
+    "rubyName": "non_blocking_lock",
+    "digest": "7620ea39f36b93c7",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "autotrim?",
+    "digest": "6498257e6c549f97",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "cable_config",
+    "digest": "3bb1012810e7cade",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "connects_to",
+    "digest": "115398a11ea23a55",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "message_retention",
+    "digest": "3cab546691abe61b",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "parse_duration",
+    "digest": "0f74ecbd8ed2804d",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "polling_interval",
+    "digest": "d6e0a04540798ea0",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "silence_polling?",
+    "digest": "962d50be31529249",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "trim_batch_size",
+    "digest": "66305b1bc7cbd745",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "trim_chance",
+    "digest": "6b9b99eaa8fcfc15",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "solid_cable.rb",
+    "rubyName": "use_skip_locked",
+    "digest": "d0aa98d8d9c9fcfb",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "trim_job.rb",
+    "rubyName": "perform",
+    "digest": "ecb022e1a1047669",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "trim_job.rb",
+    "rubyName": "trim?",
+    "digest": "bcafab660b5428eb",
+    "ref": "v3.0.12"
+  },
+  {
+    "package": "solid-cable",
+    "rubyFile": "trim_job.rb",
+    "rubyName": "trim_batch_size",
+    "digest": "39c954b2c8241cb9",
+    "ref": "v3.0.7"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "build_result_set",
+    "digest": "38b871087ec7439e",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "busy_handler_timeout=",
+    "digest": "0e1fff3835e8b443",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "commit",
+    "digest": "d76174a4786b6ac0",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "encoding",
+    "digest": "6d236e7125bca9ff",
+    "ref": "v2.7.3"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "execute",
+    "digest": "ec647ca53f03bf93",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "execute_batch2",
+    "digest": "d09e768d649cc7fd",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "get_first_value",
+    "digest": "5854833ab46737eb",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "initialize",
+    "digest": "d3fee10e77b72376",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "initialize_extensions",
+    "digest": "4d2ea7cba8674bfd",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "load_extension",
+    "digest": "74802d20aabc20d7",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "prepare",
+    "digest": "5f3e0eaad49bab4d",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "query",
+    "digest": "dd7ca38ac32097e0",
+    "ref": "v2.6.0"
+  },
+  {
     "package": "sqlite3",
     "rubyFile": "database.rb",
     "rubyName": "quote",
@@ -92958,9 +94106,44 @@
   },
   {
     "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "readonly?",
+    "digest": "f824651053ceabcb",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "rollback",
+    "digest": "6f8e25401e209595",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "database.rb",
+    "rubyName": "transaction",
+    "digest": "e63c4523b64f2655",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
     "rubyFile": "errors.rb",
     "rubyName": "message",
     "digest": "837d384ad5a6f297",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "fork_safety.rb",
+    "rubyName": "suppress_warnings!",
+    "digest": "0cc9be46b842ffb3",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "fork_safety.rb",
+    "rubyName": "track",
+    "digest": "b751cd0b8656bdf0",
     "ref": "v2.6.0"
   },
   {
@@ -93191,8 +94374,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "encoding=",
-    "digest": "3c09c0d8954c47ab",
-    "ref": "v2.6.0"
+    "digest": "a2c2a1da9daca499",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -93338,8 +94521,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "journal_mode=",
-    "digest": "7450ecf7465af588",
-    "ref": "v2.6.0"
+    "digest": "811f973af3870a65",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -93380,8 +94563,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "locking_mode=",
-    "digest": "461cc4c6769a8db1",
-    "ref": "v2.6.0"
+    "digest": "c00e2f13d37a6262",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -93562,8 +94745,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "set_enum_pragma",
-    "digest": "e59f1523b5fe86d6",
-    "ref": "v2.6.0"
+    "digest": "0db9e909432f4181",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -93744,8 +94927,8 @@
     "package": "sqlite3",
     "rubyFile": "pragmas.rb",
     "rubyName": "wal_checkpoint=",
-    "digest": "43dc65baaa85eacd",
-    "ref": "v2.6.0"
+    "digest": "a26e1c22427230dd",
+    "ref": "v2.7.3"
   },
   {
     "package": "sqlite3",
@@ -93753,6 +94936,2827 @@
     "rubyName": "writable_schema=",
     "digest": "51486bc58a5f3af8",
     "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "close",
+    "digest": "6deb5c4d00604e42",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "closed?",
+    "digest": "5c2545024011cb90",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "columns",
+    "digest": "45a53e3f16a198cd",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "each",
+    "digest": "5f42b984547df0d2",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "each_hash",
+    "digest": "8c1c4b28de8a88eb",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "eof?",
+    "digest": "90e9b17bd9ba67da",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "initialize",
+    "digest": "4d5c1ee1cf982d80",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "next",
+    "digest": "a3db75894673ac87",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "next_hash",
+    "digest": "d8498e72ead72c86",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "resultset.rb",
+    "rubyName": "reset",
+    "digest": "bebdbb25517758eb",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "statement.rb",
+    "rubyName": "active?",
+    "digest": "5c1c57f82e6b4764",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "statement.rb",
+    "rubyName": "bind_params",
+    "digest": "a2e0bbc799b66f5e",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "statement.rb",
+    "rubyName": "columns",
+    "digest": "cb2455aeb8276a34",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "statement.rb",
+    "rubyName": "each",
+    "digest": "ada50b539469cc4b",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "statement.rb",
+    "rubyName": "execute",
+    "digest": "841f71cecba3b208",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "statement.rb",
+    "rubyName": "get_metadata",
+    "digest": "d392ecc71303dcd8",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "statement.rb",
+    "rubyName": "initialize",
+    "digest": "ff22f7d59d5cef25",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "statement.rb",
+    "rubyName": "must_be_open!",
+    "digest": "6fa0e2b5cc6050bf",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "sqlite3",
+    "rubyFile": "statement.rb",
+    "rubyName": "types",
+    "digest": "285559450389c92d",
+    "ref": "v2.6.0"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "_cleanup_options_and_set",
+    "digest": "cb75be33e7f92373",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "_shared_configuration",
+    "digest": "13555cc163c99cc5",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "action",
+    "digest": "83429f1276c87372",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "add_runtime_options!",
+    "digest": "fcd787da234ff877",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "apply",
+    "digest": "790ffc55d21e6ff0",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "destination_root",
+    "digest": "eb8dbb403260c992",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "destination_root=",
+    "digest": "03206084cf03ec68",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "find_in_source_paths",
+    "digest": "daf39a695c0fda34",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "in_root",
+    "digest": "e91f39a08e2f2c08",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "initialize",
+    "digest": "ca24de07e101bf1e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "inside",
+    "digest": "505976771ec69dc7",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "relative_to_original_destination_root",
+    "digest": "df25dffff7cea687",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "run",
+    "digest": "b24071c94bcd1c35",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "run_ruby_script",
+    "digest": "203bfef713ad857f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "source_paths",
+    "digest": "96152cc1f2aba73c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "source_paths_for_search",
+    "digest": "66f29b5ec67587ba",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "source_root",
+    "digest": "c3f9cd6c527fa5c0",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions.rb",
+    "rubyName": "thor",
+    "digest": "e55c75cdf4cee122",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_file.rb",
+    "rubyName": "create_file",
+    "digest": "57b19bfd04b8d172",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_file.rb",
+    "rubyName": "force_on_collision?",
+    "digest": "3c38573d344e265e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_file.rb",
+    "rubyName": "force_or_skip_or_conflict",
+    "digest": "660c460c6b7c8cf3",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_file.rb",
+    "rubyName": "identical?",
+    "digest": "ccd63b8590dcbdd9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_file.rb",
+    "rubyName": "initialize",
+    "digest": "ae2adb786cb881c2",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_file.rb",
+    "rubyName": "invoke!",
+    "digest": "84adabd7fc68ef8b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_file.rb",
+    "rubyName": "on_conflict_behavior",
+    "digest": "b5043a6d6260841a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_file.rb",
+    "rubyName": "render",
+    "digest": "cb377e9b8fcb805d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_link.rb",
+    "rubyName": "create_link",
+    "digest": "c0c35bfa3eb80b62",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_link.rb",
+    "rubyName": "exists?",
+    "digest": "b114fbe119e99cf7",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_link.rb",
+    "rubyName": "identical?",
+    "digest": "532ab63e05497c2a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/create_link.rb",
+    "rubyName": "invoke!",
+    "digest": "3262144978c866d6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/directory.rb",
+    "rubyName": "directory",
+    "digest": "bf58c842a6492a13",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/directory.rb",
+    "rubyName": "execute!",
+    "digest": "a7607d183eef023a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/directory.rb",
+    "rubyName": "file_level_lookup",
+    "digest": "318ce827e93aca3d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/directory.rb",
+    "rubyName": "files",
+    "digest": "3a2966c2879c285d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/directory.rb",
+    "rubyName": "initialize",
+    "digest": "3c6551bc16974e04",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/directory.rb",
+    "rubyName": "invoke!",
+    "digest": "7350444fed042c41",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/directory.rb",
+    "rubyName": "revoke!",
+    "digest": "e324bb206a48ebd9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "convert_encoded_instructions",
+    "digest": "8f9d573da5ec8c13",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "destination=",
+    "digest": "bd4bd96725652fcd",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "empty_directory",
+    "digest": "a1210e936b1c4a34",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "exists?",
+    "digest": "2a8af1e6c1b2ccd6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "initialize",
+    "digest": "3091eb901e59c121",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "invoke!",
+    "digest": "6725d844b910f4f3",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "invoke_with_conflict_check",
+    "digest": "777d907dcd740bc0",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "on_conflict_behavior",
+    "digest": "7781a0e6761b8949",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "on_file_clash_behavior",
+    "digest": "05fb7810988a08b8",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "pretend?",
+    "digest": "578dd7fb680bed70",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "revoke!",
+    "digest": "6615bb56cd26066b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/empty_directory.rb",
+    "rubyName": "say_status",
+    "digest": "943821c8e3b9e91a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "append_to_file",
+    "digest": "83c80c544f404122",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "capture",
+    "digest": "36a57a0c17a3373c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "chmod",
+    "digest": "ca6cc12022ab30a3",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "comment_lines",
+    "digest": "28b1e587e085f32e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "concat",
+    "digest": "5eb7631190871993",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "copy_file",
+    "digest": "e8fb16338fa3007d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "get",
+    "digest": "e652193f8fb06811",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "gsub_file",
+    "digest": "cf2dcd0975d903a6",
+    "ref": "v1.4.0"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "inject_into_class",
+    "digest": "1967e0cb835792f2",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "inject_into_module",
+    "digest": "56f04f2043f98746",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "link_file",
+    "digest": "d0cd996971adcfd6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "prepend_to_file",
+    "digest": "49a9eaec74ee6531",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "remove_file",
+    "digest": "73455540d3c38bbb",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "set_eoutvar",
+    "digest": "3f602daab25c22ee",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "template",
+    "digest": "3c9ef676329f76c9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "uncomment_lines",
+    "digest": "768bd6589d0936ca",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/file_manipulation.rb",
+    "rubyName": "with_output_buffer",
+    "digest": "4704776712c629db",
+    "ref": "v1.4.0"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/inject_into_file.rb",
+    "rubyName": "content",
+    "digest": "65d285db4231f883",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/inject_into_file.rb",
+    "rubyName": "initialize",
+    "digest": "9328e140056fb205",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/inject_into_file.rb",
+    "rubyName": "insert_into_file",
+    "digest": "c26902d483e97153",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/inject_into_file.rb",
+    "rubyName": "invoke!",
+    "digest": "864ce430e6dc7757",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/inject_into_file.rb",
+    "rubyName": "replace!",
+    "digest": "31f4c5a7da70ccab",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/inject_into_file.rb",
+    "rubyName": "replacement_present?",
+    "digest": "07632f279c8626f3",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/inject_into_file.rb",
+    "rubyName": "revoke!",
+    "digest": "0881854e2819baad",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "actions/inject_into_file.rb",
+    "rubyName": "say_status",
+    "digest": "8880a0e552346d46",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "all_commands",
+    "digest": "bde5956558800639",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "allow_incompatible_default_type!",
+    "digest": "09bed5ec3f6b7335",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "argument",
+    "digest": "c4d9ebaec43aaa24",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "arguments",
+    "digest": "77bdf63190fcbf89",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "attr_accessor",
+    "digest": "6e5807d5644fffb1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "attr_reader",
+    "digest": "6e5807d5644fffb1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "attr_writer",
+    "digest": "6e5807d5644fffb1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "baseclass",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "basename",
+    "digest": "c2890c9ea75b6159",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "build_option",
+    "digest": "113d9e34bc209775",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "build_options",
+    "digest": "b8d111a51d473adf",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "built_option_names",
+    "digest": "9ed744dcd4311348",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "check_default_type",
+    "digest": "684e81bc862f8fd6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "check_default_type!",
+    "digest": "6ab40677128781f7",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "check_unknown_options",
+    "digest": "cef409ed89895f83",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "check_unknown_options!",
+    "digest": "e759d68ab143d98b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "check_unknown_options?",
+    "digest": "d6d1e660b3600f77",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "class_at_least_one",
+    "digest": "306755741285b8b1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "class_at_least_one_option_names",
+    "digest": "a9cd6f2b6cdc22f3",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "class_exclusive",
+    "digest": "04875fcf189d1f67",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "class_exclusive_option_names",
+    "digest": "9c270714fa19bb3a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "class_option",
+    "digest": "afbdc5cd6319a7c0",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "class_options",
+    "digest": "5078661d51565192",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "class_options_help",
+    "digest": "5fc23e852e9e2d31",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "command_scope_member",
+    "digest": "94d6b7429e24a9b4",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "commands",
+    "digest": "63861a99c7bc287a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "create_command",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "deprecation_warning",
+    "digest": "0b64235abc09fda2",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "disable_required_check?",
+    "digest": "9583c381d896cc8b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "dispatch",
+    "digest": "c31fcdbafab9160f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "exit_on_failure?",
+    "digest": "a6edb5b751896b89",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "find_and_refresh_command",
+    "digest": "e4c7a1c51c2e44de",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "from_superclass",
+    "digest": "88120ddd24232582",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "group",
+    "digest": "0d3357d002933066",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "handle_argument_error",
+    "digest": "62ccce599875bee2",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "handle_no_command_error",
+    "digest": "a835ad0b36c915d8",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "initialize",
+    "digest": "2780ba1dcb3faeea",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "initialize_added",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "is_thor_reserved_word?",
+    "digest": "782300e40f62360c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "method_added",
+    "digest": "38f8901617a08b39",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "namespace",
+    "digest": "4ce3aa4509e750ab",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "no_commands",
+    "digest": "76dfadfd0b70f03f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "no_commands?",
+    "digest": "7d11a98d030b476b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "no_commands_context",
+    "digest": "c10caaaa316e7dc6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "print_options",
+    "digest": "580aab99b2d91c71",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "public_command",
+    "digest": "db6f0355e7088a37",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "register_klass_file",
+    "digest": "20de95991ed1a72e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "register_options_relation_for",
+    "digest": "c4085943fb85c35d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "remove_argument",
+    "digest": "1008e4e7a33e8f3c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "remove_class_option",
+    "digest": "6febc012c9e38b77",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "remove_command",
+    "digest": "df39409e81c171b6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "start",
+    "digest": "d0199f2b4dd0d771",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "stop_on_unknown_option?",
+    "digest": "9583c381d896cc8b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "strict_args_position",
+    "digest": "0359e2a326e0ff9f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "strict_args_position!",
+    "digest": "e906a98d7602edf9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "strict_args_position?",
+    "digest": "67b4c49a1e652f18",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "base.rb",
+    "rubyName": "subclasses",
+    "digest": "5afb14887279c9e6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "formatted_usage",
+    "digest": "6f05840b05be3c5d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "handle_argument_error?",
+    "digest": "45a15bb763feaf98",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "handle_no_method_error?",
+    "digest": "6fb9124cbcdd495d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "hidden?",
+    "digest": "9583c381d896cc8b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "initialize",
+    "digest": "3a1c5a3e04a573e9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "initialize_copy",
+    "digest": "5c9878e4a898f24d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "local_method?",
+    "digest": "ed1273125c825a70",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "method_at_least_one_option_names",
+    "digest": "876af0492ee567be",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "method_exclusive_option_names",
+    "digest": "c86878ef0dd5f4b4",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "not_debugging?",
+    "digest": "555a37a08a909ff2",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "private_method?",
+    "digest": "a94390fca4ed9f82",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "public_method?",
+    "digest": "0933a968840b29c7",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "required_arguments_for",
+    "digest": "a6a7845c0ac26bc1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "required_options",
+    "digest": "789b1b3897dc954d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "run",
+    "digest": "1d5b9ef9203044e7",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "command.rb",
+    "rubyName": "sans_backtrace",
+    "digest": "e45bcb49838f6633",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "[]",
+    "digest": "61d146231a826acf",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "[]=",
+    "digest": "e46db320d7807654",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "convert_key",
+    "digest": "5a49d3f8fcad4bde",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "delete",
+    "digest": "61d146231a826acf",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "except",
+    "digest": "4d4d1271126cc201",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "fetch",
+    "digest": "e2835f74e4141811",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "initialize",
+    "digest": "d4ce6a3eb01581f7",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "key?",
+    "digest": "61d146231a826acf",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "merge",
+    "digest": "310caff10c9fbc5c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "merge!",
+    "digest": "0f841ce743b9252f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "replace",
+    "digest": "f0dc01dbfdca2a96",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "reverse_merge",
+    "digest": "9a8ae4260fffcaec",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "reverse_merge!",
+    "digest": "52cbfc175aac9d1c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "slice",
+    "digest": "f7c3b67d93dfa079",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "to_hash",
+    "digest": "8b930cfa32052902",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "core_ext/hash_with_indifferent_access.rb",
+    "rubyName": "values_at",
+    "digest": "30db416cec5eb31c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "error.rb",
+    "rubyName": "corrections",
+    "digest": "d51257c844c9dd99",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "error.rb",
+    "rubyName": "initialize",
+    "digest": "c910c01f31e8b890",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "error.rb",
+    "rubyName": "spell_checker",
+    "digest": "e3afd0a2e8170ff7",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "error.rb",
+    "rubyName": "to_s",
+    "digest": "e7ef65ea6ec67f9f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "_invoke_for_class_method",
+    "digest": "7b68e5762ecb9d70",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "banner",
+    "digest": "7169155256153c09",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "baseclass",
+    "digest": "437e9027b6c6c507",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "class_options_help",
+    "digest": "0d462cf92b7ceef4",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "command_exists?",
+    "digest": "213230fcbe266b1f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "create_command",
+    "digest": "5bb4b99fb6aeee10",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "desc",
+    "digest": "a8a9655548bd49af",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "dispatch",
+    "digest": "dde20ec53fc2717d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "get_options_from_invocations",
+    "digest": "1a721fd4e2b53c3e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "handle_argument_error",
+    "digest": "947e950efc7d6070",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "help",
+    "digest": "ae40f1bb6609d9da",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "initialize",
+    "digest": "2780ba1dcb3faeea",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "invocation_blocks",
+    "digest": "0a7c93f20fe10551",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "invocations",
+    "digest": "5e1aac7ee1e321d4",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "invoke",
+    "digest": "6e133898c5bf41e9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "invoke_from_option",
+    "digest": "8e4b568ea626253a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "printable_commands",
+    "digest": "bdaaf02dfd18e156",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "remove_invocation",
+    "digest": "6d698aab74cdd2c0",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "group.rb",
+    "rubyName": "self_command",
+    "digest": "77cabad7360e565e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "_parse_initialization_options",
+    "digest": "d4b5a1849db3826e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "_retrieve_class_and_command",
+    "digest": "ec6d4372815c9cf8",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "_shared_configuration",
+    "digest": "6b530a14052fe010",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "current_command_chain",
+    "digest": "f896dfda5dd09204",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "initialize",
+    "digest": "76c0e37b1e3b1977",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "invoke",
+    "digest": "a85500c16f34ebf2",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "invoke_all",
+    "digest": "da388c75976d28ed",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "invoke_command",
+    "digest": "0ac5633a527a2b61",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "invoke_with_padding",
+    "digest": "7f80255a5282f7e3",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "invocation.rb",
+    "rubyName": "prepare_for_invocation",
+    "digest": "540c3bbc514949fa",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "line_editor.rb",
+    "rubyName": "best_available",
+    "digest": "f574a70c0b663f0d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "line_editor.rb",
+    "rubyName": "readline",
+    "digest": "31d17c70832cf292",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "line_editor/basic.rb",
+    "rubyName": "available?",
+    "digest": "357b923f2251ef17",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "line_editor/basic.rb",
+    "rubyName": "echo?",
+    "digest": "df2563c8ae7e6e11",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "line_editor/basic.rb",
+    "rubyName": "get_input",
+    "digest": "a92cbe4760a2fe88",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "line_editor/basic.rb",
+    "rubyName": "initialize",
+    "digest": "3e0fcd3544141b2f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "line_editor/basic.rb",
+    "rubyName": "readline",
+    "digest": "9447893507ff3df6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "nested_context.rb",
+    "rubyName": "enter",
+    "digest": "5d2f5d5bb4d22061",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "nested_context.rb",
+    "rubyName": "entered?",
+    "digest": "a9d09aad2e35a1b3",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "nested_context.rb",
+    "rubyName": "initialize",
+    "digest": "8c55bb1d4bfe0260",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "nested_context.rb",
+    "rubyName": "pop",
+    "digest": "77013e60158f815b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "nested_context.rb",
+    "rubyName": "push",
+    "digest": "3c60139a231f006e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/argument.rb",
+    "rubyName": "default_banner",
+    "digest": "254f389f2c1f377f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/argument.rb",
+    "rubyName": "enum_to_s",
+    "digest": "7ce01ba215970331",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/argument.rb",
+    "rubyName": "initialize",
+    "digest": "cb9f6bef0c8d3dff",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/argument.rb",
+    "rubyName": "print_default",
+    "digest": "13635823b0c1f3a8",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/argument.rb",
+    "rubyName": "required?",
+    "digest": "db4e1fd4b204ba50",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/argument.rb",
+    "rubyName": "show_default?",
+    "digest": "4cac0eb5859ec316",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/argument.rb",
+    "rubyName": "usage",
+    "digest": "c21cf56bc8946da1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/argument.rb",
+    "rubyName": "valid_type?",
+    "digest": "09503dfc76a51cb8",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/argument.rb",
+    "rubyName": "validate!",
+    "digest": "378ea76827e21305",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "check_requirement!",
+    "digest": "0d3bc35631e2a414",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "current_is_value?",
+    "digest": "35dc21383fff3259",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "initialize",
+    "digest": "a5f1eb5b2a042915",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "last?",
+    "digest": "0f088f9cd00133ed",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "no_or_skip?",
+    "digest": "552cf5debe78e509",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "parse",
+    "digest": "931a93db6352d52e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "parse_array",
+    "digest": "6f055faa77b7da09",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "parse_hash",
+    "digest": "adb5c1e873ca8388",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "parse_numeric",
+    "digest": "2fac8c590e283b61",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "parse_string",
+    "digest": "de48cfaef5ab4c37",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "peek",
+    "digest": "551d53889eb7edf9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "remaining",
+    "digest": "e8f61c7fe27dd6da",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "shift",
+    "digest": "71c97e26f22b14a5",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "split",
+    "digest": "e8bba5e4cce5b49a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "unshift",
+    "digest": "e76f354f5544805b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/arguments.rb",
+    "rubyName": "validate_enum_value!",
+    "digest": "bf71f2d50a3d5baf",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "aliases_for_usage",
+    "digest": "2582ce5b8963ea32",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "dasherize",
+    "digest": "21b7ed326b20a101",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "dasherized?",
+    "digest": "ea755496e6023e08",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "human_name",
+    "digest": "bb45dd864d6dcd75",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "initialize",
+    "digest": "1b7063760c666fd1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "normalize_aliases",
+    "digest": "2a4ab70caab1579f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "parse",
+    "digest": "ed32c942aabcf5ae",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "show_default?",
+    "digest": "8536d76c80af5c3c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "switch_name",
+    "digest": "70deee87ca8fa8b1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "undasherize",
+    "digest": "c27607756c2568de",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "usage",
+    "digest": "4da2305692beb07a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "validate!",
+    "digest": "f2aefee1dacd8db8",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/option.rb",
+    "rubyName": "validate_default_type!",
+    "digest": "4f673842b5dca0d5",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "assign_result!",
+    "digest": "4e5bfeb72c22ef45",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "check_at_least_one!",
+    "digest": "626d9c63807c029d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "check_exclusive!",
+    "digest": "91c64d630922176d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "check_unknown!",
+    "digest": "46139cc2e126da6c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "current_is_switch?",
+    "digest": "d92bf0cc7f8cc46e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "current_is_switch_formatted?",
+    "digest": "332f820c968b0800",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "current_is_value?",
+    "digest": "2bf5a73dc7eb828f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "initialize",
+    "digest": "dada91c786c5f1ab",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "names_to_switch_names",
+    "digest": "e0b416f6f52e6630",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "normalize_switch",
+    "digest": "7fd894983f631e4e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "parse",
+    "digest": "5b5b02fb674abb6e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "parse_boolean",
+    "digest": "946a87884de8ae34",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "parse_peek",
+    "digest": "c2de5dfe98c1e888",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "parsing_options?",
+    "digest": "4f327df2a27bd343",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "peek",
+    "digest": "eb8e7fdd9acf76dd",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "remaining",
+    "digest": "ae1554741aa9ef9c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "shift",
+    "digest": "f3934bbfcbc6d296",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "switch?",
+    "digest": "b4df12d518459ac4",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "switch_option",
+    "digest": "98299c7d0888c649",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "to_switches",
+    "digest": "45438ca9aca78fcd",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "parser/options.rb",
+    "rubyName": "unshift",
+    "digest": "cb774bc47befa16a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "_shared_configuration",
+    "digest": "b682752cb581ef03",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "ask",
+    "digest": "cb07b5018fe1f29c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "error",
+    "digest": "d30fabf547f3a173",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "file_collision",
+    "digest": "1fffc4e930339bce",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "initialize",
+    "digest": "d3ec107e68bc10f7",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "no?",
+    "digest": "bd237061376ec9dd",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "print_in_columns",
+    "digest": "3688814322cc9c2b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "print_table",
+    "digest": "139a43c4e6e2ef6b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "print_wrapped",
+    "digest": "9d697bf3560cfa2d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "say",
+    "digest": "d3171b1abe7d5097",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "say_error",
+    "digest": "c736791d8871b416",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "say_status",
+    "digest": "7443df896f821c35",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "set_color",
+    "digest": "592c6b52f5c2be5b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "shell",
+    "digest": "0ba613d54c1b3760",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "terminal_width",
+    "digest": "2904647b0ccc745d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "with_padding",
+    "digest": "58d426bf30b215a5",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell.rb",
+    "rubyName": "yes?",
+    "digest": "38c34011a14e9512",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "answer_match",
+    "digest": "63e6feedccb2fe5b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "ask",
+    "digest": "9597d7d4a68b322e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "ask_filtered",
+    "digest": "39fb383af2c32847",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "ask_simply",
+    "digest": "83310f20c4c35614",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "can_display_colors?",
+    "digest": "9583c381d896cc8b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "error",
+    "digest": "de3457664bb13893",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "file_collision",
+    "digest": "1835ee5af4cf473c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "file_collision_help",
+    "digest": "d22e7299a06fa4c1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "indent",
+    "digest": "091aa48334f8ec45",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "initialize",
+    "digest": "34727d2cd5e09dfd",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "is?",
+    "digest": "5ed94ade630e590e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "lookup_color",
+    "digest": "5fc65f7ea8a2472b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "merge",
+    "digest": "7c66bb3c3d1ab271",
+    "ref": "v1.4.0"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "merge_tool",
+    "digest": "b67108a2a6fba3e0",
+    "ref": "v1.4.0"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "mute",
+    "digest": "eefb951351138369",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "mute?",
+    "digest": "98fe04cd58c74af6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "no?",
+    "digest": "9f29890aeb71333e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "padding=",
+    "digest": "b667cee64357f2c5",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "prepare_message",
+    "digest": "8eaffab1c2b654de",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "print_in_columns",
+    "digest": "41e3a7e8a186b567",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "print_table",
+    "digest": "57896f5baf61bd0e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "print_wrapped",
+    "digest": "330c988ea2b56077",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "quiet?",
+    "digest": "6ea4a3f36531d9d1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "say",
+    "digest": "b229e9099d7024c3",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "say_error",
+    "digest": "6ed8bc2cc61489f9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "say_status",
+    "digest": "53b89dde8871639e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "set_color",
+    "digest": "cd8cf0e92b7aa526",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "show_diff",
+    "digest": "cc343b6a1dd96d38",
+    "ref": "v1.4.0"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "stderr",
+    "digest": "ed7686d02b36e8e3",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "stdout",
+    "digest": "d274107b57d7fc97",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "unix?",
+    "digest": "3d1a8336ff3d4bb7",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/basic.rb",
+    "rubyName": "yes?",
+    "digest": "d543f075db0246fc",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/color.rb",
+    "rubyName": "are_colors_disabled?",
+    "digest": "46ff68111ea8e25d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/color.rb",
+    "rubyName": "are_colors_supported?",
+    "digest": "de02da1dd23de7f0",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/color.rb",
+    "rubyName": "can_display_colors?",
+    "digest": "279bee64cfa29393",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/color.rb",
+    "rubyName": "set_color",
+    "digest": "c3b0e9732be73fd1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/column_printer.rb",
+    "rubyName": "initialize",
+    "digest": "b23f86054f06dad6",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/column_printer.rb",
+    "rubyName": "print",
+    "digest": "67a32fefdc6f8afa",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/table_printer.rb",
+    "rubyName": "format_cell",
+    "digest": "025eb0840a53b59b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/table_printer.rb",
+    "rubyName": "indentation",
+    "digest": "e998a19e29f8392e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/table_printer.rb",
+    "rubyName": "initialize",
+    "digest": "1e5c3d3f21f67ba1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/table_printer.rb",
+    "rubyName": "prepare",
+    "digest": "85ad378cac5d7293",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/table_printer.rb",
+    "rubyName": "print",
+    "digest": "84b870f7203a436a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/table_printer.rb",
+    "rubyName": "print_border_separator",
+    "digest": "a79195251391e487",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/table_printer.rb",
+    "rubyName": "truncate",
+    "digest": "e17790610929aabb",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/terminal.rb",
+    "rubyName": "dynamic_width",
+    "digest": "d08fe5eeea7a1177",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/terminal.rb",
+    "rubyName": "dynamic_width_stty",
+    "digest": "5fef5401e2cb8583",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/terminal.rb",
+    "rubyName": "dynamic_width_tput",
+    "digest": "ad0b5a99f4a7042b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/terminal.rb",
+    "rubyName": "terminal_width",
+    "digest": "5ffcdbbef01e678d",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/terminal.rb",
+    "rubyName": "unix?",
+    "digest": "ea21aef5f8e5f632",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "shell/wrapped_printer.rb",
+    "rubyName": "print",
+    "digest": "6fe4496fd7357403",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "banner",
+    "digest": "721af5410bc79e17",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "baseclass",
+    "digest": "7202ffdaea820a28",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "check_unknown_options!",
+    "digest": "46112669fd0a9de0",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "check_unknown_options?",
+    "digest": "7ed2541bdf20748c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "command_exists?",
+    "digest": "d551f512d04813e4",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "command_help",
+    "digest": "d5f3fb2912759ca9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "create_command",
+    "digest": "01436142f40b0734",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "default_command",
+    "digest": "d93e41d7336083b9",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "desc",
+    "digest": "eb5fd176706a35c1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "disable_required_check",
+    "digest": "a55bd54b420b3674",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "disable_required_check!",
+    "digest": "8a382175d6f0389c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "disable_required_check?",
+    "digest": "f52b5f7346feaa54",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "dispatch",
+    "digest": "cc4a95bc3e6fea64",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "dynamic_command_class",
+    "digest": "0984b72b2535811e",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "find_command_possibilities",
+    "digest": "b5ebbe987559d339",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "help",
+    "digest": "864795752e97e6c4",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "initialize",
+    "digest": "2780ba1dcb3faeea",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "initialize_added",
+    "digest": "c1e2d4fd7da1bd4a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "long_desc",
+    "digest": "0400691b77d70843",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "map",
+    "digest": "8cd2920d5f018181",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "method_at_least_one",
+    "digest": "1582ea0860f33445",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "method_at_least_one_option_names",
+    "digest": "77a028c954385816",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "method_exclusive",
+    "digest": "015a619958645b65",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "method_exclusive_option_names",
+    "digest": "f44d43c062ca3d5f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "method_option",
+    "digest": "a17f5dba16d7c141",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "method_options",
+    "digest": "0b14de03b21ca6d5",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "normalize_command_name",
+    "digest": "936511bf97d461af",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "package_name",
+    "digest": "79dfcc0e1b525fb4",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "print_at_least_one_required_options",
+    "digest": "7bf282b1990bc319",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "print_exclusive_options",
+    "digest": "e5dd9ed638d3818c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "printable_commands",
+    "digest": "540880cab2f6ef39",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "register",
+    "digest": "72674feb2b9588f0",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "retrieve_command_name",
+    "digest": "6385c9e0a5bf64eb",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "sort_commands!",
+    "digest": "bd000da5bc536e26",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "stop_on_unknown_option",
+    "digest": "c93af31b0f85815c",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "stop_on_unknown_option!",
+    "digest": "722f81d0f2f23d11",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "stop_on_unknown_option?",
+    "digest": "a3ca540ceafa98b1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "subcommand",
+    "digest": "6057170b92a1d752",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "subcommand_classes",
+    "digest": "16c07ce480665613",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "subcommand_help",
+    "digest": "8a1f9d6518c01412",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "thor.rb",
+    "rubyName": "subcommands",
+    "digest": "d260c3ece6bef631",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "util.rb",
+    "rubyName": "camel_case",
+    "digest": "601ac903cf1289a1",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "util.rb",
+    "rubyName": "escape_globs",
+    "digest": "8866f612bc78ae6a",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "util.rb",
+    "rubyName": "find_by_namespace",
+    "digest": "64c7e9ca7f2f728f",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "util.rb",
+    "rubyName": "find_class_and_command_by_namespace",
+    "digest": "a3c0b1cf028de958",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "util.rb",
+    "rubyName": "namespace_from_thor_class",
+    "digest": "e07b2387d7bbc123",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "util.rb",
+    "rubyName": "ruby_command",
+    "digest": "5e27a4fafca2856b",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "util.rb",
+    "rubyName": "snake_case",
+    "digest": "490fb125a5e90ced",
+    "ref": "v1.3.2"
+  },
+  {
+    "package": "thor",
+    "rubyFile": "util.rb",
+    "rubyName": "thor_classes_in",
+    "digest": "1fc09d54d8a8716f",
+    "ref": "v1.3.2"
   },
   {
     "package": "trailties",

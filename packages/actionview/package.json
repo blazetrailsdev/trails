@@ -58,8 +58,8 @@
     },
     {
       "source": "rails-dom-testing",
-      "ref": "v2.2.0",
-      "sha": "a14001a41d514ece1a7c4d03a1d9bc69edf677d1"
+      "ref": "v2.3.0",
+      "sha": "f8cb4b3964a4d8397ce29b0306cbaedea93150ca"
     }
   ]
 }

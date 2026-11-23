@@ -26,7 +26,7 @@ export function violation(rel, source) {
  * ESLint rule: thor-import-boundary
  *
  * `packages/thor/lib/` is the port of the thor gem, `@blazetrails/thor`. Thor depends on
- * nothing but Ruby's standard library (`vendor/thor/v1.3.2/thor.gemspec`), so
+ * nothing but Ruby's standard library (`vendor/thor/v1.4.0/thor.gemspec`), so
  * its port may reach only what stands in for that: `@blazetrails/ruby-compat`
  * and `@blazetrails/did-you-mean`. A relative import that leaves `thor/` would
  * make Thor depend on railties, the reverse of the gems' real edge.

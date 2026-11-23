@@ -20,6 +20,7 @@ import {
   type TSECompiler,
 } from "@blazetrails/ruby-compat";
 import type { ActionsHost } from "../actions.js";
+import { Error } from "../error.js";
 import { TEMPLATE_EXTNAME } from "../base.js";
 import type { createFile } from "./create-file.js";
 import type { createLink } from "./create-link.js";
@@ -214,6 +215,31 @@ export function injectIntoModule(
   return this.insertIntoFile(path, ...args, ...(block ? [block] : []));
 }
 
+export async function gsubFileBang(
+  this: ActionsHost,
+  path: string,
+  flag: RegExp | string,
+  ...args: unknown[]
+): Promise<void> {
+  const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
+    string,
+    unknown
+  >;
+
+  if (!(this.behavior === "invoke" || rtest(Object.hasOwn(config, "force") ? config.force : false)))
+    return;
+
+  path = File.expandPath(path, this.destinationRoot);
+  this.sayStatus(
+    "gsub",
+    this.relativeToOriginalDestinationRoot(path),
+    Object.hasOwn(config, "verbose") ? config.verbose : true,
+  );
+
+  if (!rtest(this.options["pretend"])) await actuallyGsubFile(path, flag, args, true, block);
+}
+
 export async function gsubFile(
   this: ActionsHost,
   path: string,
@@ -236,11 +262,7 @@ export async function gsubFile(
     Object.hasOwn(config, "verbose") ? config.verbose : true,
   );
 
-  if (!rtest(this.options["pretend"])) {
-    let content = strNew(Array.from(await getFs().readFile(path)));
-    [, content] = rbStrSend(content, "gsubBang", flag, ...args, ...(block ? [block] : []));
-    await File.writeAsync(path, Uint8Array.from(bytes(content)));
-  }
+  if (!rtest(this.options["pretend"])) await actuallyGsubFile(path, flag, args, false, block);
 }
 
 export function uncommentLines(
@@ -311,7 +333,7 @@ export function withOutputBuffer(
 ): string {
   let oldBuffer: StringIO | null = null;
   try {
-    if (Object.isFrozen(buf)) throw new ArgumentError("Buffer can not be a frozen object");
+    if (Object.isFrozen(buf)) throw new ArgumentError("Buffer cannot be a frozen object");
     oldBuffer = this.outputBuffer;
     this.outputBuffer = buf;
     block();
@@ -319,6 +341,29 @@ export function withOutputBuffer(
   } finally {
     this.outputBuffer = oldBuffer;
   }
+}
+
+/** @internal */
+async function actuallyGsubFile(
+  path: string,
+  flag: RegExp | string,
+  args: unknown[],
+  errorOnNoChange: boolean,
+  block?: unknown,
+): Promise<void> {
+  const [success, content] = rbStrSend(
+    strNew(Array.from(await getFs().readFile(path))),
+    "gsubBang",
+    flag,
+    ...args,
+    ...(block ? [block] : []),
+  );
+
+  if (success == null && errorOnNoChange) {
+    throw new Error(`The content of ${path} did not change`);
+  }
+
+  await File.writeAsync(path, Uint8Array.from(bytes(content)));
 }
 
 export class CapturableERB extends TSE {

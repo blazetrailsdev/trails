@@ -107,7 +107,7 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
  * The `File` predicates' rows name ruby-compat's async statics
  * (`packages/ruby-compat/lib/file.ts`), for the bodies that use async fs only:
  * `File.directory?` in `Thor::Actions::Directory#execute!`
- * (`vendor/thor/v1.3.2/lib/thor/actions/directory.rb:82`) is
+ * (`vendor/thor/v1.4.0/lib/thor/actions/directory.rb:82`) is
  * `File.isDirectoryAsync`.
  */
 export const FS_ADAPTER_ALIASES = new Map<string, string[]>([

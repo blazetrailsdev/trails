@@ -9,9 +9,9 @@ export class VERSION {
   static readonly [classModule] = true;
   static MAJOR: unknown = 5;
 
-  static MINOR: unknown = 2;
+  static MINOR: unknown = 3;
 
-  static TINY: unknown = 0;
+  static TINY: unknown = 1;
 
   static PRE: unknown = null;
 

@@ -47,8 +47,8 @@
   "mirrors": [
     {
       "source": "solid_cable",
-      "ref": "v3.0.7",
-      "sha": "f383a5816271dda411aa36099df5d236110e5600"
+      "ref": "v3.0.12",
+      "sha": "c6c10aa8aea136e849e9e80fc8af47e5bf39409e"
     }
   ]
 }

@@ -27,8 +27,8 @@
   "mirrors": [
     {
       "source": "rack-session",
-      "ref": "v2.1.0",
-      "sha": "8a021430d2238cc7a0a3b5dfcc8fe44c43b984ce"
+      "ref": "v2.1.1",
+      "sha": "96663ece1596a3462704c30f98b85cd7e0337d6e"
     }
   ]
 }

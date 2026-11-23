@@ -63,8 +63,8 @@
   "mirrors": [
     {
       "source": "racc",
-      "ref": "v1.8.0",
-      "sha": "8eeca623c95c77724d3b0856806d2f9fc82684b1"
+      "ref": "v1.8.1",
+      "sha": "5229883dca5b451c8bfd322272ccd2ca6d526695"
     },
     {
       "source": "ruby",

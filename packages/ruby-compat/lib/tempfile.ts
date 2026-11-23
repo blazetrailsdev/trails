@@ -87,18 +87,29 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile.open`
    * (`vendor/ruby/v3.3.11/lib/tempfile.rb:366`).
    */
-  static open(basename?: TempfileBasename, tmpdir?: string): Tempfile;
+  static open(basename?: TempfileBasename, tmpdir?: string, options?: TempfileOptions): Tempfile;
   static open<T>(
     basename: TempfileBasename | undefined,
     tmpdir: string | undefined,
     block: (tempfile: Tempfile) => T,
   ): T;
   static open<T>(
+    basename: TempfileBasename | undefined,
+    tmpdir: string | undefined,
+    options: TempfileOptions,
+    block: (tempfile: Tempfile) => T,
+  ): T;
+  static open<T>(
     basename?: TempfileBasename,
     tmpdir?: string,
+    options: TempfileOptions | ((tempfile: Tempfile) => T) = {},
     block?: (tempfile: Tempfile) => T,
   ): T | Tempfile {
-    const tempfile = Tempfile.new(basename, tmpdir);
+    if (typeof options === "function") {
+      block = options;
+      options = {};
+    }
+    const tempfile = Tempfile.new(basename, tmpdir, options);
 
     if (block) {
       return ensure(

@@ -81,16 +81,16 @@
       "sha": "76e2377d981e833717809cc311d034b4c11c6b29"
     },
     "mini_magick": {
-      "ref": "v5.2.0",
-      "sha": "34433dc21cd4df544b33e67c111ff0ea36312d34"
+      "ref": "v5.3.1",
+      "sha": "ddcbfe9632667876be10373e1e01252617e74057"
     },
     "mini_mime": {
       "ref": "v1.1.5",
       "sha": "ad29352bf7b8fa547ea3058f2e97f3e8496f034a"
     },
     "minitest": {
-      "ref": "v5.27.0",
-      "sha": "819e9b5f873d7ab6d4edfeaed48542279367ff93"
+      "ref": "v6.0.0",
+      "sha": "2f3d88eeed8a55ed504e362c42e150eaa623ecd5"
     },
     "msgpack": {
       "ref": "v1.8.0",
@@ -113,16 +113,16 @@
       "sha": "fd3ca2e22df67fd25fd5c25c466f6896b6547cb8"
     },
     "pg": {
-      "ref": "v1.5.9",
-      "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
+      "ref": "v1.6.2",
+      "sha": "c75ed8da19c356b52d83da2627295760780d3d36"
     },
     "raabro": {
       "ref": "v1.4.0",
       "sha": "aaf1aa27e7bfb86a63339f4ebf3938ff2e0c0258"
     },
     "racc": {
-      "ref": "v1.8.0",
-      "sha": "8eeca623c95c77724d3b0856806d2f9fc82684b1"
+      "ref": "v1.8.1",
+      "sha": "5229883dca5b451c8bfd322272ccd2ca6d526695"
     },
     "rack": {
       "ref": "v3.2.8",
@@ -141,8 +141,8 @@
       "sha": "1ca3d3dc9a2aaf730ed25aa9685924d3d12450f3"
     },
     "rack-session": {
-      "ref": "v2.1.0",
-      "sha": "8a021430d2238cc7a0a3b5dfcc8fe44c43b984ce"
+      "ref": "v2.1.1",
+      "sha": "96663ece1596a3462704c30f98b85cd7e0337d6e"
     },
     "rack-test": {
       "ref": "v2.2.0",
@@ -157,8 +157,8 @@
       "sha": "235c597b100321b6bd2d62f8df63707f42b25b2d"
     },
     "rails-dom-testing": {
-      "ref": "v2.2.0",
-      "sha": "a14001a41d514ece1a7c4d03a1d9bc69edf677d1"
+      "ref": "v2.3.0",
+      "sha": "f8cb4b3964a4d8397ce29b0306cbaedea93150ca"
     },
     "rails-html-sanitizer": {
       "ref": "v1.6.2",
@@ -173,8 +173,8 @@
       "sha": "1f2d15125a2dc701e1822ed2900eb17899500ec7"
     },
     "solid_cable": {
-      "ref": "v3.0.7",
-      "sha": "f383a5816271dda411aa36099df5d236110e5600"
+      "ref": "v3.0.12",
+      "sha": "c6c10aa8aea136e849e9e80fc8af47e5bf39409e"
     },
     "solid_cache": {
       "ref": "v1.0.9",
@@ -185,16 +185,16 @@
       "sha": "b9c646a8486ef3e76f70919568cac070276da0e1"
     },
     "sqlite3": {
-      "ref": "v2.6.0",
-      "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
+      "ref": "v2.7.3",
+      "sha": "0cfccfc91c93afb11769dc7b830cb5d7ae2addcc"
     },
     "stimulus-rails": {
       "ref": "v1.3.4",
       "sha": "8e34f2e4dd7716224317b635db1e5d9ed58324b1"
     },
     "thor": {
-      "ref": "v1.3.2",
-      "sha": "33b9682da680cda9404f9961a62ec208832cbff3"
+      "ref": "v1.4.0",
+      "sha": "518ae0f49bb1c3dc2226607c07da74b591759ed0"
     },
     "turbo-rails": {
       "ref": "v2.0.23",

@@ -236,7 +236,10 @@ export class Wrapper {
     return [this.status, this.headers, this];
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall include? — PERMANENT
+   */
   private assertRequired(key: string): any {
     if (!Object.hasOwn(this.env!, key)) throw new LintError(`env missing required key ${key}`);
 
@@ -390,7 +393,7 @@ export class Wrapper {
       if (
         !(
           rbObjRespondTo(session, "toHash") &&
-          rbObjIsKindOf(await (rbToHashType(session) as unknown), Hash) &&
+          rbObjIsKindOf(await rbToHashType(session), Hash) &&
           !Object.isFrozen(await (rbToHashType(session) as unknown))
         )
       ) {

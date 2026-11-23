@@ -1168,6 +1168,11 @@ class ApiExtractor
       # stay tagged public, causing them to be misclassified.
       if args.nil? || (args.is_a?(Array) && args[0] == :args_new)
         @visibility_stack[-1] = cmd_name.to_sym
+      elsif args.is_a?(Array) && args.flatten.include?(:def)
+        prev_vis = @visibility_stack[-1]
+        @visibility_stack[-1] = cmd_name.to_sym
+        walk(args)
+        @visibility_stack[-1] = prev_vis
       else
         names = extract_symbol_args(args)
         apply_visibility_to_named(names, cmd_name.to_sym) unless names.empty?

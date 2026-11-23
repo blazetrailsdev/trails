@@ -24,9 +24,14 @@ export type Assertions = ResponseAssertions &
   RoutingAssertions & {
     assertDomEqual: OmitThisParameter<typeof DomAssertions.assertDomEqual>;
     assertDomNotEqual: OmitThisParameter<typeof DomAssertions.assertDomNotEqual>;
+    refuteDomEqual: OmitThisParameter<typeof DomAssertions.refuteDomEqual>;
     cssSelect: OmitThisParameter<typeof SelectorAssertions.cssSelect>;
     assertDom: OmitThisParameter<typeof SelectorAssertions.assertDom>;
     assertSelect: OmitThisParameter<typeof SelectorAssertions.assertSelect>;
+    assertNotDom: OmitThisParameter<typeof SelectorAssertions.assertNotDom>;
+    refuteDom: OmitThisParameter<typeof SelectorAssertions.refuteDom>;
+    assertNotSelect: OmitThisParameter<typeof SelectorAssertions.assertNotSelect>;
+    refuteSelect: OmitThisParameter<typeof SelectorAssertions.refuteSelect>;
     assertDomEncoded: OmitThisParameter<typeof SelectorAssertions.assertDomEncoded>;
     assertSelectEncoded: OmitThisParameter<typeof SelectorAssertions.assertSelectEncoded>;
     assertDomEmail: OmitThisParameter<typeof SelectorAssertions.assertDomEmail>;

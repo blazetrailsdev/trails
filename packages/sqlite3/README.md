@@ -1,6 +1,6 @@
 # @blazetrails/sqlite3
 
-The SQLite client, mirroring Ruby's sqlite3 gem (`vendor/sqlite3/v2.6.0`).
+The SQLite client, mirroring Ruby's sqlite3 gem (`vendor/sqlite3/v2.7.3`).
 
 ## `SQLite3.Constants`
 

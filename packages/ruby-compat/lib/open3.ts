@@ -16,7 +16,7 @@ export class Open3 {
   /**
    * `Open3.capture2e` (`vendor/ruby/v3.3.11/lib/open3.rb:902`) for the
    * `capture2e([env, ] command_line)` form `Thor::Actions#run` calls under
-   * `capture: true` (`vendor/thor/v1.3.2/lib/thor/actions.rb:265`): the
+   * `capture: true` (`vendor/thor/v1.4.0/lib/thor/actions.rb:265`): the
    * command's stdout and stderr merged into one String, and its
    * `Process::Status`. The child reads an empty stdin, as it does once
    * `capture2e` has closed `i` with no `stdin_data` (`open3.rb:928`).

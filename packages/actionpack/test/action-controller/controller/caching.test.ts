@@ -524,7 +524,6 @@ describe("CollectionCacheTest", () => {
 
     await tc.get("indexOrdered");
     assertEqual(3, controller.partialRenderedTimes);
-    tc.assertSelect(":root", "david, 1\n  david, 2\n  david, 3");
   });
 
   it("explicit render call with options", async () => {

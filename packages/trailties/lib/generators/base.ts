@@ -1,5 +1,5 @@
 import "../constants.base.generated.js";
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Thor::Base includes Thor::Invocation and Thor::Shell (`thor/v1.3.2/lib/thor/base.rb:30-34`); the class/interface merge is how those mixins surface on the type side. */
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Thor::Base includes Thor::Invocation and Thor::Shell (`thor/v1.4.0/lib/thor/base.rb:30-34`); the class/interface merge is how those mixins surface on the type side. */
 import {
   camelize,
   underscore as _underscore,
@@ -129,7 +129,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
   /**
    * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.5.2/railties/lib/rails/generators/actions.rb:10-13
-   * @inlinedFrom Thor::Actions#initialize thor/v1.3.2/lib/thor/actions.rb:72-85
+   * @inlinedFrom Thor::Actions#initialize thor/v1.4.0/lib/thor/actions.rb:72-85
    */
   constructor(args: unknown[] = [], options: unknown = {}, config: GeneratorConfig = {}) {
     super(args, options, config);

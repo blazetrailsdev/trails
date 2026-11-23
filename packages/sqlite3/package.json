@@ -76,8 +76,8 @@
   "mirrors": [
     {
       "source": "sqlite3",
-      "ref": "v2.6.0",
-      "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
+      "ref": "v2.7.3",
+      "sha": "0cfccfc91c93afb11769dc7b830cb5d7ae2addcc"
     }
   ],
   "devDependencies": {

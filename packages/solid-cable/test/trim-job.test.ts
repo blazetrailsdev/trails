@@ -34,4 +34,24 @@ describe("TrimJobTest", () => {
       );
     });
   });
+
+  it("trims when out of band with autotrim disabled", async () => {
+    vi.spyOn(SolidCable, "trimChance").mockReturnValue(0);
+    await withCableConfig(
+      { autotrim: false, trimBatchSize: 2, messageRention: "1.second" },
+      async () => {
+        for (let i = 0; i < 4; i++) {
+          await Message.broadcast("foo", "bar");
+          await Message.updateAll({ created_at: days(2).ago() });
+        }
+
+        await assertDifference(
+          () => Message.count(),
+          -2,
+          null,
+          () => TrimJob.performNow(),
+        );
+      },
+    );
+  });
 });

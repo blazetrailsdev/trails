@@ -682,9 +682,7 @@ describe("Thor::Shell::Basic", () => {
       const block = () => "";
 
       const mergeTool = (value: string) =>
-        vi
-          .spyOn(shell() as unknown as { mergeTool(): Promise<string> }, "mergeTool")
-          .mockResolvedValue(value);
+        vi.spyOn(shell() as unknown as { mergeTool(): string }, "mergeTool").mockReturnValue(value);
 
       it("displays diff and merge options to the user", async () => {
         readline.mockResolvedValueOnce("s");
@@ -707,7 +705,7 @@ describe("Thor::Shell::Basic", () => {
         mergeTool("meld");
         readline.mockResolvedValueOnce("m");
         await capture("stdout", () => shell().fileCollision("foo", block));
-        expect(rbFSystem).toHaveBeenCalledWith(expect.stringMatching(/meld/));
+        expect(rbFSystem).toHaveBeenCalledWith("meld", expect.stringMatching(/foo/), "foo");
         expect(readline).toHaveBeenCalled();
       });
 
@@ -717,7 +715,7 @@ describe("Thor::Shell::Basic", () => {
         try {
           readline.mockResolvedValueOnce("m");
           await capture("stdout", () => shell().fileCollision("foo", block));
-          expect(rbFSystem).toHaveBeenCalledWith(expect.stringMatching(/meld/));
+          expect(rbFSystem).toHaveBeenCalledWith("meld", expect.stringMatching(/foo/), "foo");
           expect(readline).toHaveBeenCalled();
         } finally {
           setEnv("THOR_MERGE", thorMerge);

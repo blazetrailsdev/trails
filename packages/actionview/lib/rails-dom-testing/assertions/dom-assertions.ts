@@ -35,6 +35,8 @@ export function assertDomNotEqual(
   assertNot(compareDoms(expectedDom, actualDom, strict), message);
 }
 
+export const refuteDomEqual = assertDomNotEqual;
+
 function compareDoms(expected: Fragment, actual: Fragment, strict: boolean): boolean {
   const expectedChildren = extractChildren(expected, strict);
   const actualChildren = extractChildren(actual, strict);

@@ -275,7 +275,7 @@ export const stdin: ReadStream & {
    * (`io.c:4250-4258`), is not ported either.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`, which Thor calls on
-   * `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:25`).
+   * `$stdin` (`vendor/thor/v1.4.0/lib/thor/line_editor/basic.rb:25`).
    */
   async gets(...args: unknown[]) {
     let chomp = false;
@@ -354,7 +354,7 @@ export const stdin: ReadStream & {
    * `Errno::ENOTTY`.
    *
    * @noRailsEquivalent PERMANENT — `io/console`'s `IO#noecho`, which Thor
-   * calls on `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:29`).
+   * calls on `$stdin` (`vendor/thor/v1.4.0/lib/thor/line_editor/basic.rb:29`).
    */
   noecho<T>(block: (io: typeof stdin) => T): T {
     const io = requireAdapter().stdin;

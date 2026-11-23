@@ -212,7 +212,7 @@ describe("SQLite3Adapter pragmas option", () => {
         pragmas: { synchronous: "FULL; DROP TABLE sentinel" },
       });
       await expect(adapter.connectBang()).rejects.toThrow(
-        'unrecognized synchronous "FULL; DROP TABLE sentinel"',
+        'key not found: "full; drop table sentinel"',
       );
       const check = new SQLite3Adapter({ database: dbPath });
       await check.connectBang();

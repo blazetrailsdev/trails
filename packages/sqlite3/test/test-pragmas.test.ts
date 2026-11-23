@@ -5,6 +5,8 @@ import { type SyncSqliteConnection } from "../lib/driver.js";
 import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 import { Exception } from "../lib/errors.js";
 import { Pragmas } from "../lib/pragmas.js";
+import { engine } from "../lib/engine/better-sqlite3.js";
+import { Encoding } from "@blazetrails/ruby-compat";
 
 describe("TestPragmas", () => {
   const BIGENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
@@ -29,10 +31,31 @@ describe("TestPragmas", () => {
     db.close();
   });
 
+  it("temp store mode", async () => {
+    Pragmas.setTempStore.call(db, "memory");
+    expect(await Pragmas.tempStore.call(db)).toBe(2);
+    Pragmas.setTempStore.call(db, 1);
+    expect(await Pragmas.tempStore.call(db)).toBe(1);
+  });
+
+  it("encoding", async () => {
+    const database = new SQLite3.Database(":memory:", { engine });
+    try {
+      await database.setEncoding("utf-16le");
+      expect(await database.encoding()).toBe(Encoding.find("utf-16le"));
+    } finally {
+      await database.close();
+    }
+  });
+
   it("pragma errors", () => {
     expect(() => Pragmas.setEnumPragma.call(db, "foo", "bar", [])).toThrow(Exception);
     expect(() => Pragmas.setBooleanPragma.call(db, "read_uncommitted", "foo")).toThrow(Exception);
     expect(() => Pragmas.setBooleanPragma.call(db, "read_uncommitted", 42)).toThrow(Exception);
+  });
+
+  it("invalid pragma", () => {
+    expect(() => Pragmas.setJournalMode.call(db, 0)).toThrow(Exception);
   });
 
   it("get boolean pragma", async () => {

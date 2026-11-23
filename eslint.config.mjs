@@ -178,7 +178,7 @@ export default defineConfig(
       "packages/marcel/test/fixtures/**",
       // Generator destination fixtures, mirroring vendor/solid_cache/v1.0.9/test/fixtures/generators.
       "packages/solid-cache/test/fixtures/generators/**",
-      // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
+      // Byte-for-byte copies of vendor/mini_magick/v5.3.1/spec/fixtures.
       "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/stimulus-rails/v1.3.4/test/fixtures/controllers.
       "packages/stimulus/test/fixtures/**",

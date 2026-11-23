@@ -30,7 +30,7 @@ the `declare` / associations / enums / schema reference live in
 
 ## Porting a Minitest assertion
 
-A Minitest built-in assertion (`vendor/minitest/v5.27.0/lib/minitest/assertions.rb`)
+A Minitest built-in assertion (`vendor/minitest/v6.0.0/lib/minitest/assertions.rb`)
 ports as a Vitest `expect`, never as a helper. The built-in matcher is the
 default. A matcher from `@blazetrails/vitest-matchers` (loaded in every vitest
 project through `@blazetrails/vitest-matchers/setup`) is used only where the

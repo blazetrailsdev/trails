@@ -1,6 +1,16 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const actioncontroller: Record<string, AssertionReceipt[]> = {
+  "actioncontroller:controller/caching_test.rb › CollectionCacheTest › preserves order when reading from cache plus rendering":
+    [
+      {
+        kind: "assert_select",
+        value: "s::root",
+        as: null,
+        reason:
+          'controller/caching_test.rb:426 `assert_select ":root", html: "<body><p>david, 1\\n  david, 2\\n  david, 3\\n\\n</p></body>"` matches the HTML4 parser\'s tree (a `<p>` around the text, no `<head>`); trails parses HTML5 only (packages/actionpack/CLAUDE.md, "DOM testing is HTML5 only")',
+      },
+    ],
   "actioncontroller:controller/parameter_encoding_test.rb › ParameterEncodingTest › does not raise an error when passed a param declared as ASCII-8BIT that contains invalid bytes":
     [
       {

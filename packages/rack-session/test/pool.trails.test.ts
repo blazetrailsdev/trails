@@ -58,6 +58,7 @@ describe("Rack::Session::Pool", () => {
   it("write_session stores the session and answers the session id", async () => {
     const pool = new Pool();
     const sid = new SessionId("abcd");
+    pool.pool[sid.privateId] = {};
     expect(await pool.writeSession(stubRequest(), sid, { counter: 2 }, {})).toBe(sid);
     expect(pool.pool[sid.privateId]).toEqual({ counter: 2 });
   });
@@ -69,7 +70,7 @@ describe("Rack::Session::Pool", () => {
     pool.pool[sid.publicId] = { counter: 1 };
     const newSid = await pool.deleteSession(stubRequest(), sid, {});
     expect(newSid).toBeInstanceOf(SessionId);
-    expect(pool.pool).toEqual({});
+    expect(pool.pool).toEqual({ [newSid!.privateId]: {} });
   });
 
   it("delete_session answers nothing when :drop is set", async () => {

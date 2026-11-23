@@ -3126,6 +3126,23 @@ describe(
       expect(m["Shapes"].map((x) => x.params.length)).toEqual([0, 0, 1, 1]);
     });
 
+    it("records a command-form `private def` as a private method", () => {
+      const m = metaMethods(`
+      module Assertions
+        def assert_dom; end
+
+        private def dom_assertions(selector); end
+
+        def assert_not_dom; end
+      end
+    `);
+      expect(m["Assertions"].map((x) => [x.name, x.visibility])).toEqual([
+        ["assert_dom", "public"],
+        ["dom_assertions", "private"],
+        ["assert_not_dom", "public"],
+      ]);
+    });
+
     it("buckets a `class << self` define_method as a class method", () => {
       const m = metaMethods(`
       class Base

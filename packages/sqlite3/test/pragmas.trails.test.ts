@@ -55,4 +55,11 @@ describe("SQLite3::Pragmas getters on an async host", () => {
       db.close();
     }
   });
+
+  it("interpolates an Array-arm match as Ruby's Array#to_s does", () => {
+    const statements: string[] = [];
+    const host = { execute: (sql: string) => statements.push(sql), getFirstValue: () => null };
+    Pragmas.setEnumPragma.call(host, "synchronous", "FULL", [["full", 2]]);
+    expect(statements).toEqual([`PRAGMA synchronous='["full", 2]'`]);
+  });
 });

@@ -190,6 +190,19 @@ describe("loopedIncludeModules", () => {
 });
 
 describe("harvestObjectLiteralMethods", () => {
+  it("marks a generator method, whose yield stands in for a block", () => {
+    const methods = objectLiteralMethods(
+      `export const Helpers = {
+        *walkUp(abspath: string): Generator<string> { yield abspath; },
+        isHidden(basename: string): boolean { return false; },
+      };`,
+    );
+    expect(methods.map((m) => [m.name, m.generator === true])).toEqual([
+      ["walkUp", true],
+      ["isHidden", false],
+    ]);
+  });
+
   it("reads a method whose name is a string literal", () => {
     const methods = objectLiteralMethods(
       `export const ClassMethods = {

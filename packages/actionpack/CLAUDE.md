@@ -258,7 +258,7 @@ and parameters that serve them carry `@noRailsEquivalent PERMANENT` /
 
 rails-dom-testing picks `Nokogiri::HTML4` or `HTML5` parser classes by
 `default_html_version`, which defaults to `:html4`
-(`vendor/rails-dom-testing/v2.2.0/lib/rails/dom/testing.rb:12,19-48`). A Rails 7.1+
+(`vendor/rails-dom-testing/v2.3.0/lib/rails/dom/testing.rb:12,19-48`). A Rails 7.1+
 app sets it to `:html5` through the gem's railtie (`railtie.rb:7-10`,
 `railties/lib/rails/application/configuration.rb:276`). `@blazetrails/nokogiri` is
 backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
