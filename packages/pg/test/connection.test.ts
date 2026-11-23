@@ -268,9 +268,44 @@ describe("PG::Connection", () => {
       expect(conn.inspect()).toMatch(/ transaction_status=PQTRANS_ACTIVE/);
     });
 
+    it("should tell about nonblocking mode", () => {
+      conn.setnonblocking(true);
+      expect(conn.inspect()).toMatch(/ nonblocking=true/);
+      conn.setnonblocking(false);
+    });
+
     it("should tell about non UTF8 client encoding", async () => {
       await conn.setClientEncoding("ISO-8859-1");
       expect(conn.inspect()).toMatch(/ client_encoding=LATIN1/);
+    });
+  });
+
+  describe("in nonblocking mode", () => {
+    afterEach(() => {
+      conn.setnonblocking(false);
+    });
+
+    it("defaults to blocking", () => {
+      expect(conn.isnonblocking()).toBe(false);
+      expect(conn.isNonblocking()).toBe(false);
+    });
+
+    it("can set nonblocking", () => {
+      expect(conn.setnonblocking(true)).toBeNull();
+      expect(conn.isnonblocking()).toBe(true);
+      expect(conn.isNonblocking()).toBe(true);
+
+      expect(conn.setnonblocking(false)).toBeNull();
+      expect(conn.isnonblocking()).toBe(false);
+      expect(conn.isNonblocking()).toBe(false);
+    });
+
+    it("sets nonblocking for the connection only", async () => {
+      const co2 = await PG.connect(conninfo);
+      expect(co2.setnonblocking(true)).toBeNull();
+      expect(co2.isnonblocking()).toBe(true);
+      expect(conn.isnonblocking()).toBe(false);
+      await co2.finish();
     });
   });
 
