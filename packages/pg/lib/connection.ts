@@ -22,7 +22,11 @@ import type * as NodePg from "./engine/node-pg.js";
 
 let engine: typeof NodePg | null = null;
 
-/** @missingRailsCall put_copy_data — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs */
+/**
+ * @missingRailsCall put_copy_data — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs
+ * @missingRailsCall put_copy_end — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs
+ * @missingRailsCall flush — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs
+ */
 const REDIRECT_SEND_METHODS: Record<string, [string, string]> = {
   isnonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
   isNonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
