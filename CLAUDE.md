@@ -1087,6 +1087,12 @@ by a ruby-compat `Thread`.** There is no fifth shape and no receipt tag for one.
   `static new` move with them. There is no `ready` field, no `whenReady()`, no
   factory under another name and no lazy first-call initialisation.
 
+An `initialize` that is async on only some engines answers `T | Promise<T>`
+from `static new`: `SQLite3::Statement.new` (`packages/sqlite3/lib/statement.ts`;
+`vendor/sqlite3/v2.6.0/lib/sqlite3/statement.rb:28-37`), whose `prepare` is
+synchronous on better-sqlite3 and async on expo-sqlite. Ruled by the operator
+on 2026-11-22.
+
 Scope: only a class whose `initialize` does async work. `ActiveRecord::Base`,
 its models, and every class with a synchronous `initialize` keep a public
 constructor and `new Klass`

@@ -126,4 +126,12 @@ describe("SQLite3::Database over the expo-sqlite engine", () => {
     expect(error).toBeInstanceOf(SQLite3.SQLException);
     expect((error as InstanceType<typeof SQLite3.SQLException>).sql).toBe("SELECT * FROM nope");
   });
+
+  it("reads an INTEGER past 2^53 exactly as a bigint with read-bigints on", async () => {
+    const stmt = await db.prepare("SELECT 9007199254740993, 'x', 1.5, CAST(? AS INTEGER)");
+    stmt.setReadBigInts(true);
+    stmt.bindParam(1, 2);
+    expect(await stmt.step()).toEqual([9007199254740993n, "x", 1.5, 2n]);
+    await stmt.close();
+  });
 });
