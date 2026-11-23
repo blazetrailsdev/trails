@@ -44,17 +44,13 @@ export const Bundler = {
       dependencies?: object;
     };
     const names = groups.includes("default") ? Object.keys(dependencies ?? {}) : [];
-    for (const name of names) {
+    gems: for (const name of names) {
       if (!name.startsWith("@blazetrails/")) continue;
       let root = gemRoot;
       let dir = File.join(root, "node_modules", name);
       while (!(await File.isExistAsync(File.join(dir, "package.json")))) {
         const parent = File.dirname(root);
-        if (parent === root) {
-          const error = new LoadError(`cannot load such file -- ${name}`);
-          error.path = name;
-          throw error;
-        }
+        if (parent === root) continue gems;
         root = parent;
         dir = File.join(root, "node_modules", name);
       }
