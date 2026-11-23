@@ -17,7 +17,8 @@
   },
   "files": [
     "dist",
-    "templates"
+    "templates",
+    "!dist/**/*.d.ts.map"
   ],
   "scripts": {
     "build": "tsc"

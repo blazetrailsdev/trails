@@ -127,7 +127,8 @@
     "build": "tsc"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.d.ts.map"
   ],
   "license": "MIT",
   "devDependencies": {

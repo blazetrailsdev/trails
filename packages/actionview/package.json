@@ -28,7 +28,8 @@
   },
   "files": [
     "dist",
-    "types"
+    "types",
+    "!dist/**/*.d.ts.map"
   ],
   "license": "MIT",
   "dependencies": {

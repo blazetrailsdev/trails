@@ -120,7 +120,8 @@
   },
   "files": [
     "dist",
-    "bin"
+    "bin",
+    "!dist/**/*.d.ts.map"
   ],
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",

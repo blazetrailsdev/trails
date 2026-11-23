@@ -21,7 +21,8 @@
   },
   "files": [
     "dist",
-    "NOTICE"
+    "NOTICE",
+    "!dist/**/*.d.ts.map"
   ],
   "scripts": {
     "build": "tsc"
