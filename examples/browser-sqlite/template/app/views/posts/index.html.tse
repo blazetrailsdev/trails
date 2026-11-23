@@ -1,14 +1,15 @@
+<% contentFor("title", "Posts") %>
+
 <h1>Posts</h1>
-<ul>
-<% for (const post of posts) { %>
-  <li><%= linkTo(post.title, postPath(post)) %></li>
-<% } %>
-</ul>
-<% if (post.errors.isAny()) { %>
-  <p class="error"><%= post.errors.fullMessages.join(", ") %></p>
-<% } %>
-<%= formWith({ model: post }, (form) => { %>
-  <p><%= form.textField("title", { placeholder: "Title" }) %></p>
-  <p><%= form.textArea("body", { placeholder: "Body" }) %></p>
-  <%= form.submit("Create post") %>
-<% }) %>
+
+<p class="tabs meta">
+  <%= linkToUnlessCurrent("All", postsPath()) %> ·
+  <%= linkToUnlessCurrent("Published", postsPath({ filter: "published" })) %>
+</p>
+
+<div id="posts">
+  <% if (posts.length === 0) { %>
+    <p class="empty">No posts yet. <%= linkTo("Write the first one", newPostPath()) %>.</p>
+  <% } %>
+  <%= render({ partial: "posts/post", collection: posts }) %>
+</div>

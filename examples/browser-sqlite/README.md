@@ -10,11 +10,33 @@ pnpm dev     # Vite dev server; open the printed URL
 pnpm smoke   # headless Chromium: boot, create a post through the form, edit a view, restart
 ```
 
-The app (`template/`) is an ordinary trails app: `config/application.ts`, `config/routes.ts`
-(`resources("posts")`), a `PostsController` with `index` / `show` / `create` / `destroy`, a `Post`
-model with a presence validation, a layout and `.tse` views, and one migration. It boots through
-`Trails.initialize()`, autoloads through Zeitwerk, migrates through `MigrationContext`, and
-answers requests through `Trails.application.call`, as it would under Node.
+![The editor: file tree, source, the app in the preview, and its log in the console](docs/screenshots/index-editor.png)
+
+The app (`template/`) is a small blog, laid out the way `trails generate scaffold` lays one out
+and styled like the trails website. It runs unchanged under Node. It exercises:
+
+- **Routing**: `root`, `resources("posts")` with all seven actions, and `comments` nested under
+  posts (`only: ["create", "destroy"]`)
+- **Controllers**: a `beforeAction` loader, strong parameters (`params.expect`), flash notices
+  through `redirectTo(..., { notice })`, `render("new", { status: ":unprocessable_content" })`
+  for invalid input, and 303 redirects after a write
+- **Models**: `hasMany("comments", { dependent: "destroy" })`, `belongsTo("post", { counterCache:
+true })`, presence and length validations, a `beforeValidation` callback that squishes the
+  title, and two named scopes (`published`, `recent`)
+- **Views**: a layout with `contentFor("title")` and `csrfMetaTags`; `_form`, `_post` and
+  `_comment` partials, with collection rendering; `formWith` on a record and on a nested
+  `[post, comment]`; `linkTo`, `linkToUnlessCurrent`, `buttonTo` with `method: "delete"`, `domId`,
+  `pluralize`, `truncate`, `simpleFormat` and `timeAgoInWords`
+- **Migrations**: two, with a foreign key, a boolean default and a counter-cache column
+
+It boots through `Trails.initialize()`, autoloads through Zeitwerk, migrates through
+`MigrationContext`, and answers requests through `Trails.application.call`, as it would under
+Node. `pnpm smoke` walks the whole thing; `SCREENSHOTS=docs/screenshots pnpm smoke` refreshes
+the images here.
+
+| A failed validation                                           | A post and its comments                         |
+| ------------------------------------------------------------- | ----------------------------------------------- |
+| ![Validation errors](docs/screenshots/validation-preview.png) | ![Post page](docs/screenshots/show-preview.png) |
 
 ## How it fits together
 

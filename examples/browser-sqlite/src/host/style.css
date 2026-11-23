@@ -1,3 +1,17 @@
+:root {
+  --surface: #1c1916;
+  --raised: #272320;
+  --overlay: #353029;
+  --border: #4a433b;
+  --text: #e4ded4;
+  --muted: #a59d91;
+  --accent: #6b9e50;
+  --accent-hover: #7db060;
+  --info: #5b96b5;
+  --error: #d0654e;
+  --warning: #d4a04a;
+  --mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+}
 * {
   box-sizing: border-box;
 }
@@ -9,43 +23,67 @@ body {
 body {
   display: flex;
   flex-direction: column;
-  font:
-    13px system-ui,
-    sans-serif;
-  color: #222;
+  font: 13px var(--mono);
+  color: var(--text);
+  background: var(--surface);
+  overflow: hidden;
+}
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--accent);
+}
+#run {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
+  font-weight: 600;
+}
+#run:hover {
+  background: var(--accent-hover);
 }
 header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.4rem 0.75rem;
-  background: #1d1f27;
-  color: #eee;
+  padding: 0.45rem 0.75rem;
+  background: var(--raised);
+  border-bottom: 1px solid var(--border);
+}
+header strong {
+  color: var(--accent);
 }
 header .spacer {
   flex: 1;
 }
-header button {
-  font: inherit;
+header label {
+  color: var(--muted);
 }
 #status {
-  color: #9cf;
+  color: var(--info);
 }
 main {
   flex: 1;
   display: grid;
-  grid-template-columns: 220px 1fr 1fr;
+  grid-template-columns: 220px minmax(0, 1fr) minmax(0, 1fr);
   min-height: 0;
 }
 #tree {
   overflow: auto;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--border);
   padding: 0.5rem 0;
-  background: #f7f7f9;
+  background: var(--raised);
 }
 #tree .dir {
   padding: 0.15rem 0.75rem;
-  color: #777;
+  color: var(--muted);
 }
 #tree .file {
   padding: 0.15rem 0.75rem;
@@ -53,31 +91,34 @@ main {
   white-space: nowrap;
 }
 #tree .file:hover {
-  background: #e8eaf2;
+  background: var(--overlay);
 }
 #tree .file.active {
-  background: #d4dcf7;
+  background: var(--overlay);
+  box-shadow: inset 2px 0 var(--accent);
 }
 #editor-pane {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--border);
 }
-#editor-title {
+#editor-title,
+#address,
+#console-pane .bar {
   padding: 0.3rem 0.75rem;
-  background: #eee;
-  font-family: ui-monospace, monospace;
+  background: var(--raised);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
 }
 #editor {
   flex: 1;
   border: 0;
   resize: none;
   padding: 0.75rem;
-  font:
-    13px/1.5 ui-monospace,
-    Menlo,
-    monospace;
+  font: 13px/1.5 var(--mono);
+  color: var(--text);
+  background: var(--surface);
   tab-size: 2;
   outline: none;
 }
@@ -96,50 +137,51 @@ main {
   display: flex;
   gap: 0.25rem;
   padding: 0.3rem;
-  background: #eee;
 }
 #address input {
   flex: 1;
   font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1rem 0.5rem;
 }
 #preview {
   flex: 1;
   border: 0;
-  background: #fff;
+  background: var(--surface);
 }
 #console-pane {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-top: 1px solid #ddd;
+  border-top: 1px solid var(--border);
 }
 #console-pane .bar {
-  padding: 0.25rem 0.75rem;
-  background: #eee;
   display: flex;
   justify-content: space-between;
+  align-items: center;
 }
 #console {
   flex: 1;
   margin: 0;
   overflow: auto;
   padding: 0.5rem 0.75rem;
-  background: #111;
-  color: #ddd;
-  font:
-    12px/1.45 ui-monospace,
-    monospace;
+  background: #141210;
+  color: var(--text);
+  font: 12px/1.45 var(--mono);
   white-space: pre-wrap;
 }
 #console .warn {
-  color: #fd6;
+  color: var(--warning);
 }
 #console .error {
-  color: #f77;
+  color: var(--error);
 }
 #console .request {
-  color: #7df;
+  color: var(--info);
 }
 #console .system {
-  color: #8a8;
+  color: var(--accent);
 }

@@ -1,0 +1,14 @@
+<%= formWith({ model: [post, comment] }, (form) => { %>
+  <% if (comment.errors.isAny()) { %>
+    <div class="errors"><%= comment.errors.fullMessages.join(", ") %></div>
+  <% } %>
+  <div class="field">
+    <%= form.label("author", "Your name") %>
+    <%= form.textField("author") %>
+  </div>
+  <div class="field">
+    <%= form.label("body", "Comment") %>
+    <%= form.textArea("body", { rows: 3 }) %>
+  </div>
+  <%= form.submit("Add comment") %>
+<% }) %>

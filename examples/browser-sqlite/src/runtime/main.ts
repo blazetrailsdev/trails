@@ -208,7 +208,10 @@ try {
   await import(/* @vite-ignore */ `${moduleBase}config/environment.ts`);
   status("Running migrations…");
   const { Base } = await import("@blazetrails/activerecord");
-  await Base.connectionPool().migrationContext.migrate();
+  const pool = Base.connectionPool();
+  await pool.migrationContext.migrate();
+  pool.schemaReflection.clearBang();
+  await pool.schemaReflection.loadAllBang(pool);
   app = Trails.application;
   status("Running");
   post({ type: "booted" });

@@ -1,34 +1,68 @@
-import { ApplicationController } from "./application-controller.ts";
 import { Post } from "../models/post.ts";
+import { Comment } from "../models/comment.ts";
+import { ApplicationController } from "./application-controller.ts";
 
 export class PostsController extends ApplicationController {
+  static {
+    this.beforeAction(":_setPost", { only: ["show", "edit", "update", "destroy"] });
+  }
+
   declare posts: Post[];
   declare post: Post;
+  declare comment: Comment;
 
   async index(): Promise<void> {
-    console.log("Loading posts…");
-    this.posts = await Post.order({ id: "desc" }).toArray();
-    this.post = new Post();
+    const posts = this.params.get("filter") === "published" ? Post.published() : Post.recent();
+    this.posts = await posts.toArray();
   }
 
   async show(): Promise<void> {
-    this.post = await Post.find(this.params.get("id"));
+    this.comment = new Comment();
   }
 
+  async new(): Promise<void> {
+    this.post = new Post();
+  }
+
+  async edit(): Promise<void> {}
+
   async create(): Promise<void> {
-    this.post = new Post(this.params.expect({ post: ["title", "body"] }));
+    this.post = new Post(this._postParams());
     if (await this.post.save()) {
       console.log(`Created post #${this.post.id}`);
-      await this.redirectTo({ action: "index" }, { status: 303 });
+      await this.redirectTo(this.post, { notice: "Post was successfully created." });
     } else {
-      this.posts = await Post.order({ id: "desc" }).toArray();
-      await this.render("index", { status: 422 });
+      await this.render("new", { status: ":unprocessable_content" });
+    }
+  }
+
+  async update(): Promise<void> {
+    if (await this.post.update(this._postParams())) {
+      await this.redirectTo(this.post, {
+        notice: "Post was successfully updated.",
+        status: ":see_other",
+      });
+    } else {
+      await this.render("edit", { status: ":unprocessable_content" });
     }
   }
 
   async destroy(): Promise<void> {
-    const post = await Post.find(this.params.get("id"));
-    await post.destroy();
-    await this.redirectTo({ action: "index" }, { status: 303 });
+    await this.post.destroy();
+    await this.redirectTo(
+      { action: "index" },
+      {
+        notice: "Post was successfully destroyed.",
+        status: ":see_other",
+      },
+    );
+  }
+
+  private async _setPost(): Promise<void> {
+    this.post = await Post.find(this.params.expect("id"));
+  }
+
+  private _postParams() {
+    return this.params.expect({ post: ["title", "body", "published"] });
   }
 }
