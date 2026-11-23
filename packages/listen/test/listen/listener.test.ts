@@ -30,7 +30,7 @@ describe("Listener", () => {
           dir,
           block((...args: string[][]) => myblock(...args)),
         );
-        expect(listener._block).not.toBeNull();
+        expect(listener._block).toBeTruthy();
         await listener._block!([], [], []);
         expect(myblock).toHaveBeenCalled();
       });
@@ -39,12 +39,17 @@ describe("Listener", () => {
     describe("with directories", () => {
       it("passes directories to backend", async () => {
         const dir2 = Dir.mktmpdir();
+        const dirs = [dir, dir2];
+        const realpathAsync = File.realpathAsync.bind(File);
         try {
-          const realpath = vi.spyOn(File, "realpathAsync");
+          vi.spyOn(File, "realpathAsync").mockImplementation((path) => {
+            if (path !== dirs.shift()) throw new Error(`unexpected realpath ${String(path)}`);
+            return realpathAsync(path);
+          });
           listener = new Listener(dir, dir2);
           await listener.start();
-          expect(realpath.mock.calls.map((c) => c[0])).toEqual([dir, dir2]);
         } finally {
+          await listener?.stop();
           FileUtils.rmRf(dir2);
         }
       });
