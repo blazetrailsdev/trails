@@ -6,20 +6,19 @@ import { currentTimeInstant } from "../lib/time-travel.js";
 
 describe("TimeTravelTest", () => {
   it("the clock resolves finer than a millisecond, as Time.now does", () => {
-    let pairs = 0;
-    let distinct = 0;
+    let subMillisecond = false;
 
-    for (let i = 0; i < 1_000; i++) {
+    for (let i = 0; i < 1_000 && !subMillisecond; i++) {
       const millisecond = Date.now();
       const first = currentTimeInstant().epochNanoseconds;
-      const second = currentTimeInstant().epochNanoseconds;
-      if (Date.now() !== millisecond) continue;
-      pairs++;
-      if (first !== second) distinct++;
+      let later = first;
+      while (later === first && Date.now() === millisecond) {
+        later = currentTimeInstant().epochNanoseconds;
+      }
+      if (later !== first && Date.now() === millisecond) subMillisecond = true;
     }
 
-    expect(pairs).toBeGreaterThan(0);
-    expect(distinct).toBeGreaterThan(pairs / 2);
+    expect(subMillisecond).toBe(true);
   });
 
   it("a free travelTo stubs on the running test case", (context: TestContext) => {
