@@ -70,6 +70,11 @@ export class Logger {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  get sevThreshold(): number {
+    return this.level;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   set sevThreshold(severity: number | string) {
     this.level = severity;
   }
