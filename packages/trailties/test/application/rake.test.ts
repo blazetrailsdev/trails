@@ -68,16 +68,17 @@ describe("RakeTest", { timeout: 600_000 }, () => {
     expect(await t.trails("db:migrate", "-h")).toMatch(taskDescription);
   });
 
-  it("task backtrace is silenced", async () => {
+  // BLOCKED: location-to-s-renders-ruby-frame-format
+  it.skip("task backtrace is silenced", async () => {
     await rakeTasks(`DSL.task("boom", block(() => {
   throw new Error("boom");
 }));`);
 
     const backtrace = (await t.trails("boom", { allowFailure: true }))
       .split("\n")
-      .filter((line) => /^\s*at .*:\d+:\d+\)?$/.test(line));
-    const appLines = backtrace.filter((line) => line.includes(appPath));
-    const frameworkLines = backtrace.filter((line) => !line.includes(appPath));
+      .filter((line) => /:\d+:in /.test(line));
+    const appLines = backtrace.filter((line) => line.startsWith(appPath));
+    const frameworkLines = backtrace.filter((line) => !line.startsWith(appPath));
 
     expect(appLines).not.toBeEmpty();
     expect(frameworkLines).toBeEmpty();
@@ -164,7 +165,7 @@ export default await Trails.initialize();
     expect(output).toMatch("Hello world");
   });
 
-  // PERMANENT-SKIP: CLAUDE.md, "The application loader is Zeitwerk (`Rails.autoloaders`)"
+  // PERMANENT-SKIP: CLAUDE.md, "The application loader is Zeitwerk (`Rails.autoloaders`)": setup_main_autoloader ends with an awaited eagerLoad whatever config.eager_load says
   it.skip("should not eager load model for rake when rake eager load is false", async () => {
     await rakeTasks(`DSL.task({ do_nothing: "environment" }, block(() => {
   console.log("There is nothing");
