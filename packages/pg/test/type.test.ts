@@ -248,6 +248,31 @@ describe("PG::Type derivations", () => {
               textencStringArray.encode(["", [" ", ["{", "}", "\\", ",", '"', "\\t"]]]),
             ).toEqual(`{"",{" ",{"{","}","\\\\",",","\\"","\\\\t"}}}`);
           });
+
+          describe("with dimensions", () => {
+            const textencArray2dim = textencStringArray.dup();
+            textencArray2dim.setDimensions(2);
+
+            it("encodes text int array", () => {
+              expect(textencArray2dim.encode([[1]])).toEqual("{{1}}");
+            });
+
+            it("encodes text empty array", () => {
+              expect(textencArray2dim.encode([[]])).toEqual("{{}}");
+            });
+
+            it("raises an error on 1 dim text array input to int4", () => {
+              expect(() => textencArray2dim.encode([1])).toThrow(/less array dimensions.*1.*2/);
+            });
+
+            it("raises an error on 0 dim text array input to int4", () => {
+              expect(() => textencArray2dim.encode([])).toThrow(/less array dimensions.*1.*2/);
+            });
+
+            it("raises an error on 1 dim text array nil input", () => {
+              expect(() => textencArray2dim.encode([null])).toThrow(/less array dimensions.*1.*2/);
+            });
+          });
         });
 
         describe("one dimensional array", () => {
@@ -265,8 +290,28 @@ describe("PG::Type derivations", () => {
           it("respects a different delimiter", () => {
             expect(textencStringArrayWithDelimiter.encode(["a", "b,", "c"])).toEqual("{a;b,;c}");
           });
+
+          describe("with dimensions", () => {
+            const textencArray1dim = textencIntArray.dup();
+            textencArray1dim.setDimensions(1);
+
+            it("encodes an empty text array", () => {
+              expect(textencArray1dim.encode([])).toEqual("{}");
+            });
+          });
         });
       });
+    });
+
+    it("should have reasonable default values", () => {
+      const t = new PG.TextEncoder.Array();
+      expect(t.format).toBe(0);
+      expect(t.oid).toBe(0);
+      expect(t.name).toBeNull();
+      expect(t.isNeedsQuotation()).toBe(true);
+      expect(t.delimiter).toBe(",");
+      expect(t.elementsType).toBeNull();
+      expect(t.dimensions).toBeNull();
     });
   });
 });

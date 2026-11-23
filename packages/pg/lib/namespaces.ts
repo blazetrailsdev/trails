@@ -7,6 +7,7 @@ import type {
   UnableToSend,
 } from "./exceptions.js";
 import type { Coder, CompositeCoder } from "./coder.js";
+import type { SimpleCoder } from "./simple-coder.js";
 import type { Constants } from "./pg.js";
 import type { Result } from "./result.js";
 import type { Array as TextDecoderArray } from "./text-decoder/array.js";
@@ -51,6 +52,7 @@ export interface PGNamespace {
   ConnectionBad: typeof ConnectionBad;
   FeatureNotSupported: typeof FeatureNotSupported;
   Coder: typeof Coder;
+  SimpleCoder: typeof SimpleCoder;
   CompositeCoder: typeof CompositeCoder;
   SimpleEncoder: typeof SimpleEncoder;
   SimpleDecoder: typeof SimpleDecoder;

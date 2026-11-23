@@ -1101,7 +1101,7 @@
     }
   },
   "pg": {
-    "rows": 32,
+    "rows": 33,
     "excluded": ["pg.ts::Constants"],
     "unwalked": [],
     "residue": {
@@ -1116,6 +1116,7 @@
       "exceptions.ts::ServerError": "PG::ServerError",
       "exceptions.ts::UnableToSend": "PG::UnableToSend",
       "result.ts::Result": "PG::Result",
+      "simple-coder.ts::SimpleCoder": "PG::SimpleCoder",
       "simple-decoder.ts::SimpleDecoder": "PG::SimpleDecoder",
       "simple-encoder.ts::SimpleEncoder": "PG::SimpleEncoder",
       "text-decoder/array.ts::Array": "PG::TextDecoder::Array",
