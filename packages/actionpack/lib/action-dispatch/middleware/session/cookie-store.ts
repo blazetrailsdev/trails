@@ -53,7 +53,6 @@ export class SessionId {
   }
 }
 
-/** @internal */
 export interface CookieStoreSessionOptions {
   cookieOnly?: boolean;
   sameSite?: unknown;

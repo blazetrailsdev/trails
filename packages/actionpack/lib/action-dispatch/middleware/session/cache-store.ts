@@ -49,7 +49,7 @@ export class CacheStore extends AbstractSecureStore {
     if (sid && (session = await this.getSessionWithFallback(sid))) {
       req.setHeader(CacheStore.LOADED_SESSION_ID, sid.privateId);
     } else {
-      return [this.generateSid(), {}];
+      [sid, session] = [this.generateSid(), {}];
     }
     return [sid, session];
   }
