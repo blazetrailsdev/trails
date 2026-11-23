@@ -6,6 +6,7 @@ import {
   eachValue,
   Hash,
   KeyError,
+  TypeError as RubyTypeError,
   publicInstanceMethods,
   rbEqual,
   rbInspect,
@@ -560,9 +561,9 @@ describe("RackHeadersTest", () => {
     expect(fh.dig("3")).toBe("4");
     expect(fh.dig("4")).toBeUndefined();
 
-    expect(() => fh.dig("AB", 1)).toThrow(TypeError);
-    expect(() => fh.dig("cd", 2)).toThrow(TypeError);
-    expect(() => fh.dig("3", 3)).toThrow(TypeError);
+    expect(() => fh.dig("AB", 1)).toThrow(RubyTypeError);
+    expect(() => fh.dig("cd", 2)).toThrow(RubyTypeError);
+    expect(() => fh.dig("3", 3)).toThrow(RubyTypeError);
     expect(fh.dig("4", 5)).toBeNull();
   });
 

@@ -108,7 +108,6 @@ export {
   safeConstantize,
   foreignKey,
   humanize,
-  constRegexp,
   ordinal,
   ordinalize,
   upcaseFirst,

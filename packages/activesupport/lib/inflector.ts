@@ -1,6 +1,6 @@
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
-import { type ConstantTable, regexpEscape, constGet } from "@blazetrails/ruby-compat";
+import { type ConstantTable, constGet } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import * as Inflector from "./inflector.js";
 import { I18n } from "./i18n.js";
@@ -211,17 +211,6 @@ export function foreignKey(
   separateClassNameAndIdWithUnderscore: boolean = true,
 ): string {
   return underscore(demodulize(className)) + (separateClassNameAndIdWithUnderscore ? "_id" : "id");
-}
-
-export function constRegexp(camelCasedWord: string): string {
-  const parts = camelCasedWord.split("::");
-  while (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
-
-  if (parts.length === 0) return regexpEscape(camelCasedWord);
-
-  const last = parts.pop()!;
-
-  return parts.reverse().reduce((acc, part) => (part === "" ? acc : `${part}(::${acc})?`), last);
 }
 
 export function ordinal(number: number): string {

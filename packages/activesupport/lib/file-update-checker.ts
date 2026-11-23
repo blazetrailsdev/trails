@@ -79,8 +79,9 @@ export class FileUpdateChecker<R extends Promise<void> | void = Promise<void> | 
     return this.updatedAtMemo ?? this.maxMtime(paths) ?? new Date(0);
   }
 
+  /** @missingRailsCall at — CONVERGEABLE converge-code-generator-encrypted-config-file-update-checker-calls */
   private maxMtime(paths: string[]): Date | null {
-    // boundary: `Time.now` (`:119`), compared against `File.mtime`.
+    // boundary: `Time.at(0, Process.clock_gettime(Process::CLOCK_REALTIME, :nanosecond), :nanosecond)` (`:123`), held at a Date's millisecond and compared against `File.mtime`.
     const timeNow = new Date();
     let maxMtime: Date | null = null;
 

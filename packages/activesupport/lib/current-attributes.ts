@@ -81,6 +81,18 @@ export class CurrentAttributes {
       throw new ArgumentError(`Restricted attribute names: ${invalidAttributeNames.join(", ")}`);
     }
 
+    for (const name of names) {
+      Object.defineProperty(ctor, name, {
+        configurable: true,
+        get(this: typeof CurrentAttributes) {
+          return Reflect.get(this.instance(), name);
+        },
+        set(this: typeof CurrentAttributes, value: unknown) {
+          Reflect.set(this.instance(), name, value);
+        },
+      });
+    }
+
     CodeGenerator.batch(generatedAttributeMethods.call(ctor), __FILE__, __LINE__, (owner) => {
       for (const name of names) {
         owner.defineCachedMethod(name, { namespace: "current_attributes" }, (batch) => {
@@ -98,18 +110,6 @@ export class CurrentAttributes {
         });
       }
     });
-
-    for (const name of names) {
-      Object.defineProperty(ctor, name, {
-        configurable: true,
-        get(this: typeof CurrentAttributes) {
-          return Reflect.get(this.instance(), name);
-        },
-        set(this: typeof CurrentAttributes, value: unknown) {
-          Reflect.set(this.instance(), name, value);
-        },
-      });
-    }
 
     ctor.defaults = {
       ...ctor.defaults,

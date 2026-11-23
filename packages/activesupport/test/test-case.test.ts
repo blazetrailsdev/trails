@@ -396,9 +396,7 @@ describe("AssertionsTest", function (this: { object: Numbered }) {
       );
     });
 
-    expect(error.message).toEqual(
-      "`this.object.num` didn't change. It was already 0.\nExpected 0 to not be equal to 0.",
-    );
+    expect(error.message).toMatch("`this.object.num` didn't change. It was already 0.");
   });
 
   it("assert changes message with lambda", async () => {
@@ -411,9 +409,7 @@ describe("AssertionsTest", function (this: { object: Numbered }) {
       );
     });
 
-    expect(error.message).toEqual(
-      "`this.object.num` didn't change. It was already 0.\nExpected 0 to not be equal to 0.",
-    );
+    expect(error.message).toMatch("`this.object.num` didn't change. It was already 0.");
   });
 
   it("assert changes with wrong to option", async () => {

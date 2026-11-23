@@ -358,6 +358,7 @@ export async function withTransactionReturningStatus<T>(
       }
       return status;
     });
+    this._lastTransactionReturnStatus = status;
   });
 
   return status!;

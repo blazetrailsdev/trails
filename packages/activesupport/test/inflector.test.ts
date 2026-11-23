@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, it, expect } from "vitest";
 import {
-  constRegexp,
   pluralize,
   singularize,
   camelize,
@@ -1016,11 +1015,5 @@ describe("InflectorTest", () => {
   it("humanize with international characters", () => {
     expect(humanize("áÉÍÓÚ")).toBe("Áéíóú");
     expect(humanize("аБВГДЕ")).toBe("Абвгде");
-  });
-
-  it("const regexp", () => {
-    expect(constRegexp("Foo::Bar::Baz")).toBe("Foo(::Bar(::Baz)?)?");
-    expect(constRegexp("::")).toBe("::");
-    expect(constRegexp("Foo")).toBe("Foo");
   });
 });

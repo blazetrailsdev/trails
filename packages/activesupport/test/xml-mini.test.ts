@@ -83,7 +83,7 @@ describe("ParsingTest", () => {
     expect(String(parser("123,003"))).toBe(new BigDecimal("123").toString());
     expect(String(parser(""))).toBe(new BigDecimal("0").toString());
     expect(String(parser(123))).toBe(new BigDecimal("123").toString());
-    expect(() => parser(123.04)).toThrow(ArgumentError);
+    expect(String(parser(123.04))).toBe(new BigDecimal("123.04").toString());
     // @ts-expect-error Ruby Date.new takes at most four arguments
     expect(() => parser(RubyDate.civil(2013, 11, 12, 2, 11))).toThrow(ArgumentError);
   });

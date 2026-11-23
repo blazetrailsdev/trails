@@ -114,6 +114,7 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
       return new BigDecimal(number);
     }
     if (typeof number === "string" || number instanceof SafeBuffer) {
+      if (/[de]/i.test(String(number))) return null;
       return BIGDECIMAL_STRING.test(String(number)) ? new BigDecimal(String(number).trim()) : null;
     }
     if (number instanceof BigDecimal) return number;

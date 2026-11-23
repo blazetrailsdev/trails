@@ -36245,8 +36245,8 @@
     "package": "activerecord",
     "rubyFile": "attribute_methods.rb",
     "rubyName": "define_attribute_methods",
-    "digest": "b5e99a2a864126be",
-    "ref": "v8.0.2"
+    "digest": "6a6724f98dc6c45a",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -37526,8 +37526,8 @@
     "package": "activerecord",
     "rubyFile": "base.rb",
     "rubyName": "connected_to_many",
-    "digest": "877ab1abf4b7d812",
-    "ref": "v8.0.2"
+    "digest": "c06a69c5d0e9bddf",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -38222,8 +38222,8 @@
     "package": "activerecord",
     "rubyFile": "base.rb",
     "rubyName": "with_role_and_shard",
-    "digest": "b29ff6025b9873b5",
-    "ref": "v8.0.2"
+    "digest": "aafcdbf7f8bfc053",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -50310,8 +50310,8 @@
     "package": "activerecord",
     "rubyFile": "core.rb",
     "rubyName": "find",
-    "digest": "b9ed4d2220635027",
-    "ref": "v8.0.2"
+    "digest": "11bd7e4ceefa356f",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -63599,8 +63599,8 @@
     "package": "activerecord",
     "rubyFile": "transactions.rb",
     "rubyName": "init_internals",
-    "digest": "8bbb128c718dc10c",
-    "ref": "v8.0.2"
+    "digest": "245285f8cca5d3ee",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -63690,8 +63690,8 @@
     "package": "activerecord",
     "rubyFile": "transactions.rb",
     "rubyName": "with_transaction_returning_status",
-    "digest": "f782f8cbc3867ebd",
-    "ref": "v8.0.2"
+    "digest": "3b1082647f059263",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -67724,13 +67724,6 @@
   {
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
-    "rubyName": "add",
-    "digest": "ca8b0c919d224e27",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
     "rubyName": "broadcast_to",
     "digest": "cc66d54665409390",
     "ref": "v8.0.2"
@@ -67738,23 +67731,9 @@
   {
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
-    "rubyName": "close",
-    "digest": "e1ccf7913ad27183",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
-    "rubyName": "debug",
-    "digest": "35b051bb595e8d81",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
     "rubyName": "debug!",
-    "digest": "baf533a186c89ba5",
-    "ref": "v8.0.2"
+    "digest": "b869dd9ecd05f7d1",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -67767,22 +67746,15 @@
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
     "rubyName": "dispatch",
-    "digest": "ba1d8a5a6ec216d7",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
-    "rubyName": "error",
-    "digest": "bab341201addff35",
-    "ref": "v8.0.2"
+    "digest": "5c9e54859846319e",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
     "rubyName": "error!",
-    "digest": "6c78d6a2b417c6ea",
-    "ref": "v8.0.2"
+    "digest": "9228eac97299178a",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -67794,16 +67766,9 @@
   {
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
-    "rubyName": "fatal",
-    "digest": "bb1e15a226032b62",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
     "rubyName": "fatal!",
-    "digest": "daa8e664bccb791a",
-    "ref": "v8.0.2"
+    "digest": "106e6975e77ee2db",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -67815,23 +67780,9 @@
   {
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
-    "rubyName": "formatter=",
-    "digest": "e49d9318c676c5e3",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
-    "rubyName": "info",
-    "digest": "9e51a494b7d163fe",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
     "rubyName": "info!",
-    "digest": "c5b4e602ef2361c3",
-    "ref": "v8.0.2"
+    "digest": "ecf323d259b5a3db",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -67851,8 +67802,8 @@
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
     "rubyName": "initialize_copy",
-    "digest": "d9570f170208fb43",
-    "ref": "v8.0.2"
+    "digest": "87e9c53ca3b92c34",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -67864,23 +67815,16 @@
   {
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
-    "rubyName": "level=",
-    "digest": "048f7c50315a05ac",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
     "rubyName": "local_level",
-    "digest": "1d14d741a427ab0a",
-    "ref": "v8.0.2"
+    "digest": "a5bd9b89160db604",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
     "rubyName": "local_level=",
-    "digest": "155175b8658dae6d",
-    "ref": "v8.0.2"
+    "digest": "3fbcb4be14dacaa2",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -67892,23 +67836,9 @@
   {
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
-    "rubyName": "unknown",
-    "digest": "a59a9104e095bed6",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
-    "rubyName": "warn",
-    "digest": "8ed4903390240ab4",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
     "rubyName": "warn!",
-    "digest": "92052c44dd7be12b",
-    "ref": "v8.0.2"
+    "digest": "4fab44100fdd8871",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -72436,8 +72366,8 @@
     "package": "activesupport",
     "rubyFile": "current_attributes.rb",
     "rubyName": "attribute",
-    "digest": "851bc4f1d64554d4",
-    "ref": "v8.0.2"
+    "digest": "0ccdd02c9b105b4e",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -72562,15 +72492,15 @@
     "package": "activesupport",
     "rubyFile": "delegation.rb",
     "rubyName": "generate",
-    "digest": "736486b3df2f2c08",
-    "ref": "v8.0.2"
+    "digest": "50266fd2e6c091a7",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
     "rubyFile": "delegation.rb",
     "rubyName": "generate_method_missing",
-    "digest": "4972844183e197e9",
-    "ref": "v8.0.2"
+    "digest": "28ee03f2e611130b",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -73871,8 +73801,8 @@
     "package": "activesupport",
     "rubyFile": "file_update_checker.rb",
     "rubyName": "max_mtime",
-    "digest": "86e228839d06b1ed",
-    "ref": "v8.0.2"
+    "digest": "64d467599895a0ba",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -73996,6 +73926,13 @@
   {
     "package": "activesupport",
     "rubyFile": "hash_with_indifferent_access.rb",
+    "rubyName": "copy_defaults",
+    "digest": "4015b32a2a01e0f5",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "activesupport",
+    "rubyFile": "hash_with_indifferent_access.rb",
     "rubyName": "deep_symbolize_keys",
     "digest": "f64c5cc6c408a34b",
     "ref": "v8.0.2"
@@ -74025,8 +73962,8 @@
     "package": "activesupport",
     "rubyFile": "hash_with_indifferent_access.rb",
     "rubyName": "dup",
-    "digest": "d7b0995c5ddd0cda",
-    "ref": "v8.0.2"
+    "digest": "80b74d62829c77b8",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -74122,13 +74059,6 @@
   {
     "package": "activesupport",
     "rubyFile": "hash_with_indifferent_access.rb",
-    "rubyName": "set_defaults",
-    "digest": "0d66d486c76d5db7",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "hash_with_indifferent_access.rb",
     "rubyName": "slice",
     "digest": "88eb0ea3117362ee",
     "ref": "v8.0.2"
@@ -74151,8 +74081,8 @@
     "package": "activesupport",
     "rubyFile": "hash_with_indifferent_access.rb",
     "rubyName": "to_hash",
-    "digest": "9cf66091ef25ebb8",
-    "ref": "v8.0.2"
+    "digest": "34f445ab7e61279d",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -74172,15 +74102,15 @@
     "package": "activesupport",
     "rubyFile": "hash_with_indifferent_access.rb",
     "rubyName": "transform_keys",
-    "digest": "7280ed1fa6977a8b",
-    "ref": "v8.0.2"
+    "digest": "29f95e5d99041fdd",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
     "rubyFile": "hash_with_indifferent_access.rb",
     "rubyName": "transform_keys!",
-    "digest": "b64ae389547fa4e8",
-    "ref": "v8.0.2"
+    "digest": "ddc4f009f561d504",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -74277,8 +74207,8 @@
     "package": "activesupport",
     "rubyFile": "inflector/inflections.rb",
     "rubyName": "define_acronym_regex_patterns",
-    "digest": "75388a68b34da12b",
-    "ref": "v8.0.2"
+    "digest": "c8287e2f6f5e4c52",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -74395,13 +74325,6 @@
   {
     "package": "activesupport",
     "rubyFile": "inflector/methods.rb",
-    "rubyName": "const_regexp",
-    "digest": "8a9860c7a3b1f220",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "inflector/methods.rb",
     "rubyName": "constantize",
     "digest": "812a83b4fbfa951d",
     "ref": "v8.0.2"
@@ -74445,8 +74368,8 @@
     "package": "activesupport",
     "rubyFile": "inflector/methods.rb",
     "rubyName": "humanize",
-    "digest": "c82193cb86a9409c",
-    "ref": "v8.0.2"
+    "digest": "dcb754b828cf6653",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -74473,8 +74396,8 @@
     "package": "activesupport",
     "rubyFile": "inflector/methods.rb",
     "rubyName": "safe_constantize",
-    "digest": "fd0865c7c7fbf384",
-    "ref": "v8.0.2"
+    "digest": "5a13bb587a2618c9",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -74564,8 +74487,8 @@
     "package": "activesupport",
     "rubyFile": "isolated_execution_state.rb",
     "rubyName": "share_with",
-    "digest": "c5c66181ea484912",
-    "ref": "v8.0.2"
+    "digest": "db98e71e9a1ec58c",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -74955,6 +74878,13 @@
   {
     "package": "activesupport",
     "rubyFile": "logger_thread_safe_level.rb",
+    "rubyName": "initialize",
+    "digest": "fa999b4fdc9f1f97",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "activesupport",
+    "rubyFile": "logger_thread_safe_level.rb",
     "rubyName": "level",
     "digest": "17c099156dfffe45",
     "ref": "v8.0.2"
@@ -74971,13 +74901,6 @@
     "rubyFile": "logger_thread_safe_level.rb",
     "rubyName": "local_level=",
     "digest": "206fcc58518555f9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "logger_thread_safe_level.rb",
-    "rubyName": "local_level_key",
-    "digest": "1445482619d225ae",
     "ref": "v8.0.2"
   },
   {
@@ -76664,8 +76587,8 @@
     "package": "activesupport",
     "rubyFile": "number_helper/number_converter.rb",
     "rubyName": "valid_bigdecimal",
-    "digest": "e555e80b66f7ce23",
-    "ref": "v8.0.2"
+    "digest": "51b4808ce4acae9a",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -76706,8 +76629,8 @@
     "package": "activesupport",
     "rubyFile": "number_helper/number_to_delimited_converter.rb",
     "rubyName": "parts",
-    "digest": "db881383d0e8ce27",
-    "ref": "v8.0.2"
+    "digest": "98c53b6a1b8ca7bc",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -77504,8 +77427,8 @@
     "package": "activesupport",
     "rubyFile": "test_case.rb",
     "rubyName": "assert_changes",
-    "digest": "de3c27a691918c86",
-    "ref": "v8.0.2"
+    "digest": "b118c4c898eea597",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -77518,8 +77441,8 @@
     "package": "activesupport",
     "rubyFile": "test_case.rb",
     "rubyName": "assert_difference",
-    "digest": "6357a3e445d4f9a0",
-    "ref": "v8.0.2"
+    "digest": "18a2fdf72549c0a6",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -77532,8 +77455,8 @@
     "package": "activesupport",
     "rubyFile": "test_case.rb",
     "rubyName": "assert_no_changes",
-    "digest": "6231ac4735cb3272",
-    "ref": "v8.0.2"
+    "digest": "46afc865fe2f514e",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
@@ -77672,29 +77595,29 @@
     "package": "activesupport",
     "rubyFile": "testing/assertions.rb",
     "rubyName": "_callable_to_source_string",
-    "digest": "1ea59b724662e2c8",
-    "ref": "v8.0.2"
+    "digest": "4575e91d01ad0966",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
     "rubyFile": "testing/assertions.rb",
     "rubyName": "assert_changes",
-    "digest": "de3c27a691918c86",
-    "ref": "v8.0.2"
+    "digest": "b118c4c898eea597",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
     "rubyFile": "testing/assertions.rb",
     "rubyName": "assert_difference",
-    "digest": "6357a3e445d4f9a0",
-    "ref": "v8.0.2"
+    "digest": "18a2fdf72549c0a6",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
     "rubyFile": "testing/assertions.rb",
     "rubyName": "assert_no_changes",
-    "digest": "6231ac4735cb3272",
-    "ref": "v8.0.2"
+    "digest": "46afc865fe2f514e",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activesupport",
