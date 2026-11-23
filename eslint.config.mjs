@@ -239,6 +239,18 @@ export default defineConfig(
     },
   },
   {
+    files: ["examples/browser-sqlite/public/*.js", "examples/browser-sqlite/scripts/*.mjs"],
+    languageOptions: {
+      globals: {
+        self: "readonly",
+        Response: "readonly",
+        MessageChannel: "readonly",
+        document: "readonly",
+        localStorage: "readonly",
+      },
+    },
+  },
+  {
     files: [
       "examples/react-native-notes/*.config.js",
       "examples/react-native-notes/{babel,shims,headless}/*.js",

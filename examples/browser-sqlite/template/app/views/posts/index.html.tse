@@ -1,0 +1,14 @@
+<h1>Posts</h1>
+<ul>
+<% for (const post of posts) { %>
+  <li><%= linkTo(post.title, postPath(post)) %></li>
+<% } %>
+</ul>
+<% if (post.errors.isAny()) { %>
+  <p class="error"><%= post.errors.fullMessages.join(", ") %></p>
+<% } %>
+<%= formWith({ model: post }, (form) => { %>
+  <p><%= form.textField("title", { placeholder: "Title" }) %></p>
+  <p><%= form.textArea("body", { placeholder: "Body" }) %></p>
+  <%= form.submit("Create post") %>
+<% }) %>

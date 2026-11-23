@@ -1,0 +1,4 @@
+<h1><%= post.title %></h1>
+<p><%= post.body %></p>
+<%= buttonTo("Delete", postPath(post), { method: "delete" }) %>
+<p><%= linkTo("Back", postsPath()) %></p>

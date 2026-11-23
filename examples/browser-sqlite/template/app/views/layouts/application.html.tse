@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>trails in the browser</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+      .error { color: #b00; }
+      li { margin: .25rem 0; }
+    </style>
+  </head>
+  <body>
+    <%= yield %>
+  </body>
+</html>

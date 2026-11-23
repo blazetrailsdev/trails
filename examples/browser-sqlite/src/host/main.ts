@@ -1,0 +1,238 @@
+/**
+ * The editor: a file tree and editor over the app's files, the preview the
+ * app's pages render in, and the console its output goes to. The app itself
+ * runs in a hidden runtime iframe, recreated on every restart so each run
+ * evaluates a fresh module graph.
+ */
+const TEMPLATE = import.meta.glob("../../template/**/*", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+const FILES_KEY = "trails-browser:files";
+const DB_KEY = "trails-browser:db";
+const COOKIES_KEY = "trails-browser:cookies";
+
+function templateFiles(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(TEMPLATE).map(([key, source]) => [
+      key.replace(/^\.\.\/\.\.\/template/, ""),
+      source,
+    ]),
+  );
+}
+
+let files: Record<string, string> =
+  JSON.parse(localStorage.getItem(FILES_KEY) ?? "null") ?? templateFiles();
+let db: Uint8Array | null = loadDb();
+let cookies: Record<string, string> = JSON.parse(localStorage.getItem(COOKIES_KEY) ?? "{}");
+let current = "/app/controllers/posts-controller.ts";
+let session = 0;
+let runtime: HTMLIFrameElement | null = null;
+
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const tree = $<HTMLElement>("tree");
+const editor = $<HTMLTextAreaElement>("editor");
+const preview = $<HTMLIFrameElement>("preview");
+const consoleEl = $<HTMLPreElement>("console");
+const urlInput = $<HTMLInputElement>("url");
+const statusEl = $<HTMLElement>("status");
+
+function loadDb(): Uint8Array | null {
+  const stored = localStorage.getItem(DB_KEY);
+  if (!stored) return null;
+  return Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
+}
+
+function saveDb(bytes: Uint8Array | null): void {
+  db = bytes;
+  if (!bytes) return localStorage.removeItem(DB_KEY);
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  localStorage.setItem(DB_KEY, btoa(s));
+}
+
+const ANSI_COLORS = ["#666", "#f77", "#7d7", "#fd6", "#79f", "#d8f", "#7df", "#ddd"];
+
+/** Appends `text`, rendering the SGR colour and bold codes the Rails log writes. */
+function appendAnsi(parent: HTMLElement, text: string): void {
+  let color: string | null = null;
+  let bold = false;
+
+  // eslint-disable-next-line no-control-regex -- ESC opens an SGR sequence
+  for (const [i, part] of text.split(/\x1b\[([\d;]*)m/).entries()) {
+    if (i % 2 === 1) {
+      for (const code of part.split(";").map(Number)) {
+        if (code === 0) [color, bold] = [null, false];
+        else if (code === 1) bold = true;
+        else if (code >= 30 && code <= 37) color = ANSI_COLORS[code - 30];
+      }
+      continue;
+    }
+    if (!part) continue;
+    const span = document.createElement("span");
+    span.textContent = part;
+    if (color) span.style.color = color;
+    if (bold) span.style.fontWeight = "bold";
+    parent.append(span);
+  }
+}
+
+function log(level: string, text: string): void {
+  const line = document.createElement("div");
+  line.className = level;
+  appendAnsi(line, text);
+  consoleEl.append(line);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function renderTree(): void {
+  tree.replaceChildren();
+  let lastDirs: string[] = [];
+  for (const path of Object.keys(files).sort()) {
+    const parts = path.slice(1).split("/");
+    const dirs = parts.slice(0, -1);
+    dirs.forEach((dir, i) => {
+      if (lastDirs[i] === dir && dirs.slice(0, i).join("/") === lastDirs.slice(0, i).join("/"))
+        return;
+      const el = document.createElement("div");
+      el.className = "dir";
+      el.style.paddingLeft = `${0.75 + i}rem`;
+      el.textContent = `${dir}/`;
+      tree.append(el);
+    });
+    lastDirs = dirs;
+    const el = document.createElement("div");
+    el.className = `file${path === current ? " active" : ""}`;
+    el.style.paddingLeft = `${0.75 + dirs.length}rem`;
+    el.textContent = parts.at(-1)!;
+    el.onclick = () => open(path);
+    tree.append(el);
+  }
+}
+
+function open(path: string): void {
+  current = path;
+  editor.value = files[path] ?? "";
+  $("editor-title").textContent = path;
+  renderTree();
+}
+
+let restartTimer: ReturnType<typeof setTimeout> | undefined;
+editor.addEventListener("input", () => {
+  files[current] = editor.value;
+  localStorage.setItem(FILES_KEY, JSON.stringify(files));
+  clearTimeout(restartTimer);
+  if ($<HTMLInputElement>("autorun").checked) restartTimer = setTimeout(restart, 800);
+});
+editor.addEventListener("keydown", (e) => {
+  if (e.key === "Tab") {
+    e.preventDefault();
+    editor.setRangeText("  ", editor.selectionStart, editor.selectionEnd, "end");
+    editor.dispatchEvent(new Event("input"));
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    e.preventDefault();
+    clearTimeout(restartTimer);
+    restart();
+  }
+});
+
+function navigate(path: string): void {
+  const target = path.startsWith("/") ? path : `/${path}`;
+  preview.src = `/preview${target}`;
+}
+
+preview.addEventListener("load", () => {
+  try {
+    const loc = preview.contentWindow!.location;
+    if (loc.pathname.startsWith("/preview"))
+      urlInput.value = loc.pathname.slice(8) + loc.search || "/";
+  } catch {
+    /* cross-origin */
+  }
+});
+$<HTMLFormElement>("address").addEventListener("submit", (e) => {
+  e.preventDefault();
+  navigate(urlInput.value);
+});
+$("reload").onclick = () => preview.contentWindow?.location.reload();
+$("back").onclick = () => preview.contentWindow?.history.back();
+$("clear").onclick = () => consoleEl.replaceChildren();
+$("run").onclick = () => restart();
+$("reset-db").onclick = () => {
+  saveDb(null);
+  cookies = {};
+  localStorage.removeItem(COOKIES_KEY);
+  restart();
+};
+$("reset-files").onclick = () => {
+  if (!confirm("Replace every file with the example app's original?")) return;
+  files = templateFiles();
+  localStorage.removeItem(FILES_KEY);
+  open(current in files ? current : Object.keys(files)[0]);
+  restart();
+};
+
+addEventListener("message", (event: MessageEvent) => {
+  if (event.origin !== location.origin || event.source !== runtime?.contentWindow) return;
+  const data = event.data as {
+    type: string;
+    level?: string;
+    text?: string;
+    bytes?: Uint8Array;
+    cookies?: Record<string, string>;
+  };
+  switch (data.type) {
+    case "runtime:waiting":
+      runtime.contentWindow!.postMessage(
+        { type: "host:files", files, db, cookies },
+        location.origin,
+      );
+      break;
+    case "console":
+      log(data.level!, data.text!);
+      break;
+    case "request":
+      log("request", data.text!);
+      break;
+    case "status":
+      statusEl.textContent = data.text!;
+      break;
+    case "db":
+      saveDb(data.bytes!);
+      break;
+    case "cookies":
+      cookies = data.cookies!;
+      localStorage.setItem(COOKIES_KEY, JSON.stringify(cookies));
+      break;
+    case "booted":
+      navigate(urlInput.value || "/");
+      break;
+  }
+});
+
+function restart(): void {
+  session += 1;
+  log("system", `— starting trails (run ${session}) —`);
+  runtime?.remove();
+  runtime = document.createElement("iframe");
+  runtime.src = `/runtime.html?session=${session}`;
+  $("runtime-holder").append(runtime);
+}
+
+async function start(): Promise<void> {
+  await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  await navigator.serviceWorker.ready;
+  if (!navigator.serviceWorker.controller) {
+    await new Promise((resolve) =>
+      navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true }),
+    );
+  }
+  open(current in files ? current : Object.keys(files)[0]);
+  restart();
+}
+
+void start();

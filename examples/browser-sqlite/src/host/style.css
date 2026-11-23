@@ -1,0 +1,145 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  font:
+    13px system-ui,
+    sans-serif;
+  color: #222;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  background: #1d1f27;
+  color: #eee;
+}
+header .spacer {
+  flex: 1;
+}
+header button {
+  font: inherit;
+}
+#status {
+  color: #9cf;
+}
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr;
+  min-height: 0;
+}
+#tree {
+  overflow: auto;
+  border-right: 1px solid #ddd;
+  padding: 0.5rem 0;
+  background: #f7f7f9;
+}
+#tree .dir {
+  padding: 0.15rem 0.75rem;
+  color: #777;
+}
+#tree .file {
+  padding: 0.15rem 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#tree .file:hover {
+  background: #e8eaf2;
+}
+#tree .file.active {
+  background: #d4dcf7;
+}
+#editor-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid #ddd;
+}
+#editor-title {
+  padding: 0.3rem 0.75rem;
+  background: #eee;
+  font-family: ui-monospace, monospace;
+}
+#editor {
+  flex: 1;
+  border: 0;
+  resize: none;
+  padding: 0.75rem;
+  font:
+    13px/1.5 ui-monospace,
+    Menlo,
+    monospace;
+  tab-size: 2;
+  outline: none;
+}
+#right {
+  display: grid;
+  grid-template-rows: 3fr 2fr;
+  min-width: 0;
+  min-height: 0;
+}
+#browser {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+#address {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  background: #eee;
+}
+#address input {
+  flex: 1;
+  font: inherit;
+}
+#preview {
+  flex: 1;
+  border: 0;
+  background: #fff;
+}
+#console-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid #ddd;
+}
+#console-pane .bar {
+  padding: 0.25rem 0.75rem;
+  background: #eee;
+  display: flex;
+  justify-content: space-between;
+}
+#console {
+  flex: 1;
+  margin: 0;
+  overflow: auto;
+  padding: 0.5rem 0.75rem;
+  background: #111;
+  color: #ddd;
+  font:
+    12px/1.45 ui-monospace,
+    monospace;
+  white-space: pre-wrap;
+}
+#console .warn {
+  color: #fd6;
+}
+#console .error {
+  color: #f77;
+}
+#console .request {
+  color: #7df;
+}
+#console .system {
+  color: #8a8;
+}
