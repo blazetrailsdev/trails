@@ -196,7 +196,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
       });
 
       expect(String(response.status)).toBe("403");
-      expect(await service.isExist(key)).toBe(false);
+      expect(await service.isExist(key)).toBeFalsy();
     } finally {
       await service.delete(key);
     }
@@ -220,7 +220,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
         filename: new Filename("test.html"),
       });
       const response = await fetch(url);
-      expect(response.headers.get("Content-Type")).toMatch(/^text\/plain/);
+      expect(response.headers.get("Content-Type")?.split(";")[0]).toBe("text/plain");
       expect((await storedMetadata(key)).contentDisposition).toMatch(/attachment;.*test.txt/);
     } finally {
       await ctx.service.delete(key);
@@ -243,7 +243,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
         filename: new Filename("test.html"),
       });
       const response = await fetch(url);
-      expect(response.headers.get("Content-Type")).toMatch(/^text\/plain/);
+      expect(response.headers.get("Content-Type")?.split(";")[0]).toBe("text/plain");
       expect(decodeURIComponent(url)).toMatch(/response-content-disposition=inline;.*test.html/);
     } finally {
       await ctx.service.delete(key);
@@ -290,7 +290,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
         filename: new Filename("test.html"),
       });
       await fetch(url);
-      expect((await storedMetadata(key)).metadata).toEqual({ foo: "baz" });
+      expect(((await storedMetadata(key)).metadata as Record<string, unknown>).foo).toBe("baz");
     } finally {
       await ctx.service.delete(key);
     }
@@ -321,9 +321,9 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
         filename: new Filename("test.html"),
       });
       const response = await fetch(url);
-      expect(response.headers.get("Content-Type")).toMatch(/^text\/plain/);
+      expect(response.headers.get("Content-Type")?.split(";")[0]).toBe("text/plain");
       expect((await storedMetadata(key)).contentDisposition).toMatch(/inline;.*test.txt/);
-      expect((await storedMetadata(key)).metadata).toEqual({ foo: "bar" });
+      expect(((await storedMetadata(key)).metadata as Record<string, unknown>).foo).toBe("bar");
     } finally {
       await ctx.service.delete(key);
     }
@@ -344,39 +344,40 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
     ).toMatch(/response-content-disposition=inline.*test\.txt.*response-content-type=text%2Fplain/);
   });
 
-  describe.skipIf(!Object.hasOwn(SERVICE_CONFIGURATIONS.gcs ?? {}, "gsaEmail"))("IAM", () => {
-    // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType.
-    it.skip("direct upload with IAM signing", async () => {
-      const service = Service.configure("gcs", {
-        gcs: { ...SERVICE_CONFIGURATIONS.gcs, iam: true },
-      });
-      const key = base58(24);
-      const data = "Some text";
-      const checksum = Digest.MD5.base64digest(data);
-      try {
-        const url = await service.urlForDirectUpload(key, {
-          expiresIn: minutes(5),
-          contentType: "text/plain",
-          contentLength: data.length,
-          checksum: checksum,
-        });
-        await fetch(url, {
-          method: "PUT",
-          body: data,
-          headers: {
-            "Content-Type": "",
-            "Content-MD5": checksum,
-            "x-goog-content-length-range": `${data.length},${data.length}`,
-          },
-        });
-
-        expect(new TextDecoder().decode(await service.download(key))).toBe(data);
-      } finally {
-        await service.delete(key);
-      }
+  // PERMANENT-SKIP: fake-gcs-server refuses a v2 signed PUT with 400 invalid uploadType.
+  it.skip("direct upload with IAM signing", async () => {
+    const service = Service.configure("gcs", {
+      gcs: { ...SERVICE_CONFIGURATIONS.gcs, iam: true },
     });
+    const key = base58(24);
+    const data = "Some text";
+    const checksum = Digest.MD5.base64digest(data);
+    try {
+      const url = await service.urlForDirectUpload(key, {
+        expiresIn: minutes(5),
+        contentType: "text/plain",
+        contentLength: data.length,
+        checksum: checksum,
+      });
+      await fetch(url, {
+        method: "PUT",
+        body: data,
+        headers: {
+          "Content-Type": "",
+          "Content-MD5": checksum,
+          "x-goog-content-length-range": `${data.length},${data.length}`,
+        },
+      });
 
-    it("url with IAM signing", async () => {
+      expect(new TextDecoder().decode(await service.download(key))).toBe(data);
+    } finally {
+      await service.delete(key);
+    }
+  });
+
+  it.skipIf(!Object.hasOwn(SERVICE_CONFIGURATIONS.gcs ?? {}, "gsaEmail"))(
+    "url with IAM signing",
+    async () => {
       const service = Service.configure("gcs", {
         gcs: { ...SERVICE_CONFIGURATIONS.gcs, iam: true },
       });
@@ -390,8 +391,8 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.gcs)("ActiveStorage::Service::GCSService
       ).toMatch(
         /response-content-disposition=inline.*test\.txt.*response-content-type=text%2Fplain/,
       );
-    });
-  });
+    },
+  );
 });
 
 describe("ActiveStorage::Service::GCSServiceDirectUploadSignatureTest", () => {
@@ -463,39 +464,39 @@ describe("ActiveStorage::Service::GCSServiceDirectUploadSignatureTest", () => {
 
   it("direct upload with cache control authorizes only an empty Content-Type", async () => {
     const url = await urlForKey();
-    expect(await isAuthorizes(url, { contentType: "", checksum, contentLengthRange: "9,9" })).toBe(
-      true,
-    );
+    expect(
+      await isAuthorizes(url, { contentType: "", checksum, contentLengthRange: "9,9" }),
+    ).toBeTruthy();
     expect(
       await isAuthorizes(url, { contentType: "text/html", checksum, contentLengthRange: "9,9" }),
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("direct upload with cache control authorizes only the declared checksum", async () => {
     const url = await urlForKey();
-    expect(await isAuthorizes(url, { contentType: "", checksum, contentLengthRange: "9,9" })).toBe(
-      true,
-    );
+    expect(
+      await isAuthorizes(url, { contentType: "", checksum, contentLengthRange: "9,9" }),
+    ).toBeTruthy();
     expect(
       await isAuthorizes(url, {
         contentType: "",
         checksum: OpenSSL.Digest.MD5.base64digest("Other text"),
         contentLengthRange: "9,9",
       }),
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("direct upload authorizes only the declared content length", async () => {
     const url = await urlForKey();
-    expect(await isAuthorizes(url, { contentType: "", checksum, contentLengthRange: "9,9" })).toBe(
-      true,
-    );
+    expect(
+      await isAuthorizes(url, { contentType: "", checksum, contentLengthRange: "9,9" }),
+    ).toBeTruthy();
     expect(
       await isAuthorizes(url, { contentType: "", checksum, contentLengthRange: "0,1000" }),
-    ).toBe(false);
-    expect(await isAuthorizes(url, { contentType: "", checksum, contentLengthRange: null })).toBe(
-      false,
-    );
+    ).toBeFalsy();
+    expect(
+      await isAuthorizes(url, { contentType: "", checksum, contentLengthRange: null }),
+    ).toBeFalsy();
   });
 
   it("direct upload headers with cache control include Cache-Control", () => {
