@@ -64,6 +64,33 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
         package-manager-cache: false
+    # setup-node can report success after a download that never completed
+    # ("Attempting to download" with no "Acquiring"/"Extracting"), leaving the
+    # runner image's Node on PATH; Node 22 has no global Temporal, so the first
+    # module that reads it fails far from the cause. Check, retry once, assert.
+    - id: node-check
+      shell: bash
+      env:
+        EXPECTED: ${{ inputs.node-version }}
+      run: |
+        ACTUAL=$(node --version 2>/dev/null || true)
+        echo "node on PATH: ${ACTUAL:-none}"
+        if [ "$ACTUAL" = "v$EXPECTED" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; fi
+    - if: steps.node-check.outputs.ok != 'true'
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        package-manager-cache: false
+    - if: steps.node-check.outputs.ok != 'true'
+      shell: bash
+      env:
+        EXPECTED: ${{ inputs.node-version }}
+      run: |
+        ACTUAL=$(node --version 2>/dev/null || true)
+        if [ "$ACTUAL" != "v$EXPECTED" ]; then
+          echo "::error::setup-node left node ${ACTUAL:-none} on PATH; expected v$EXPECTED"
+          exit 1
+        fi
     - if: runner.environment != 'github-hosted'
       shell: bash
       env:
