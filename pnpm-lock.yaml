@@ -185,6 +185,9 @@ importers:
       path-browserify:
         specifier: ^1.0.1
         version: 1.0.1
+      shiki:
+        specifier: 2.5.0
+        version: 2.5.0
       sql.js:
         specifier: ^1.13.0
         version: 1.17.0

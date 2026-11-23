@@ -2,6 +2,7 @@ import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/fira-code";
 import { latin1 } from "../runtime/latin1.ts";
+import { highlight } from "./highlight.ts";
 
 const TEMPLATE = import.meta.glob<string>("../../template/**/*", {
   query: "?raw",
@@ -35,6 +36,26 @@ let runtime: HTMLIFrameElement | null = null;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const tree = $<HTMLElement>("tree");
 const editor = $<HTMLTextAreaElement>("editor");
+const backdrop = $("highlight");
+
+let painted = 0;
+function paint(): void {
+  const run = ++painted;
+  const source = editor.value;
+  highlight(source.endsWith("\n") ? `${source} ` : source, current).then(
+    (html) => {
+      if (run !== painted) return;
+      backdrop.innerHTML = html;
+      syncScroll();
+    },
+    (e: unknown) => console.error("highlighting failed:", e),
+  );
+}
+function syncScroll(): void {
+  backdrop.scrollTop = editor.scrollTop;
+  backdrop.scrollLeft = editor.scrollLeft;
+}
+editor.addEventListener("scroll", syncScroll);
 const preview = $<HTMLIFrameElement>("preview");
 const consoleEl = $<HTMLPreElement>("console");
 const urlInput = $<HTMLInputElement>("url");
@@ -115,10 +136,12 @@ function open(path: string): void {
   editor.value = files[path] ?? "";
   $("editor-title").textContent = path;
   renderTree();
+  paint();
 }
 
 let restartTimer: ReturnType<typeof setTimeout> | undefined;
 editor.addEventListener("input", () => {
+  paint();
   files[current] = editor.value;
   localStorage.setItem(FILES_KEY, JSON.stringify(files));
   clearTimeout(restartTimer);

@@ -17,6 +17,7 @@ if (process.env.VERBOSE) page.on("console", (m) => console.log(`[${m.type()}]`, 
 const frame = page.frameLocator("#preview");
 const shot = async (name) => {
   if (!shots) return;
+  await page.waitForTimeout(500);
   await page.evaluate(() => globalThis.scrollTo(0, 0));
   await page.screenshot({ path: `${shots}/${name}-editor-${colorScheme}.png` });
   await page
@@ -83,6 +84,11 @@ try {
 
   await frame.locator("nav a", { hasText: "All posts" }).click();
   await see("article", "Hello from the smoke test");
+
+  await page.locator("#tree .file", { hasText: "_form.html.tse" }).first().click();
+  await page.locator("#highlight .line").first().waitFor({ timeout: 30_000 });
+  console.log("the editor highlights a .tse view");
+  await shot("view");
 
   await page.locator("#tree .file", { hasText: "index.html.tse" }).click();
   const editor = page.locator("#editor");

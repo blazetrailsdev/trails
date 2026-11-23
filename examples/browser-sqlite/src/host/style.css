@@ -149,17 +149,48 @@ main {
   background: var(--raised);
   border-bottom: 1px solid var(--border);
 }
-#editor {
+#code {
+  position: relative;
   flex: 1;
-  border: 0;
-  resize: none;
+  min-height: 0;
+  background: var(--code-bg);
+}
+#editor,
+#highlight,
+#highlight pre {
+  margin: 0;
   padding: 0.75rem;
   font: 13px/1.6 var(--mono);
-  color: var(--code-text);
-  background: var(--code-bg);
-  caret-color: var(--mango);
   tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+#editor,
+#highlight {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+#highlight {
+  padding: 0;
+  pointer-events: none;
+  color: var(--code-text);
+  scrollbar-width: none;
+}
+#highlight pre {
+  background: transparent !important;
+  min-width: max-content;
+}
+#editor {
+  border: 0;
+  resize: none;
+  color: transparent;
+  background: transparent;
+  caret-color: var(--mango);
   outline: none;
+}
+#editor::selection {
+  background: rgb(242 176 30 / 0.3);
 }
 #right {
   display: grid;

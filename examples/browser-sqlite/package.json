@@ -28,6 +28,7 @@
     "@noble/hashes": "^2.0.0",
     "buffer": "^6.0.3",
     "path-browserify": "^1.0.1",
+    "shiki": "2.5.0",
     "sql.js": "^1.13.0",
     "typescript-5": "npm:typescript@5.9.3",
     "yaml": "^2.8.3"
