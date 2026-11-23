@@ -241,8 +241,8 @@ bump inside a line moves only `TINY` / `PRE`.
 1. **Resolve the target.** For Rails, check that the target line is inside Rails'
    maintenance window (<https://rubyonrails.org/maintenance>); a line past
    its security support takes its last release and no more.
-   A gem has no maintenance window; its target is the version step 1's
-   dependent-source rule names. `git ls-remote --tags <url> '<tag>*'`
+   A gem has no maintenance window; its target is the version the
+   dependent-source rule below names. `git ls-remote --tags <url> '<tag>*'`
    (for Rails, `'v<major>.<minor>*'`), and record the tag and
    its `^{}` commit SHA (the `^{}` line is the commit an annotated tag
    points at, and is what `sources.lock.json` locks). Read the tag's
