@@ -8,7 +8,12 @@ import { Filename } from "../../lib/filename.js";
 import { Service } from "../../lib/service.js";
 import "../../lib/service/configurator.js";
 import { S3Service } from "../../lib/service/s3-service.js";
-import { SERVICE_CONFIGURATIONS } from "../support/test-helper.js";
+import {
+  SERVICE_CONFIGURATIONS,
+  User,
+  directlyUploadFileBlob,
+  offlineServiceConfigurations,
+} from "../support/test-helper.js";
 import { SharedServiceTests } from "./shared-service-tests.js";
 
 const SERVICE = SERVICE_CONFIGURATIONS.s3
@@ -115,16 +120,26 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3)("ActiveStorage::Service::S3ServiceTe
     }
   });
 
+  it("upload a zero byte file", async () => {
+    const blob = await directlyUploadFileBlob({ filename: "empty_file.txt", contentType: null });
+    const user = await User.createBang({ name: "DHH", avatar: blob });
+
+    expect((await user.avatar.attachment)!.blob).toEqual(blob);
+  });
+
   it("signed URL generation", async () => {
-    const url = await ctx.service.url(ctx.key, {
-      expiresIn: minutes(5),
-      disposition: "inline",
-      filename: new Filename("avatar.png"),
-      contentType: "image/png",
-    });
+    const url = await (Service.configure("s3", offlineServiceConfigurations()) as S3Service).url(
+      ctx.key,
+      {
+        expiresIn: minutes(5),
+        disposition: "inline",
+        filename: new Filename("avatar.png"),
+        contentType: "image/png",
+      },
+    );
 
     expect(url).toMatch(
-      /response-content-disposition=inline.*avatar\.png.*response-content-type=image%2Fpng/,
+      /s3(-[-a-z0-9]+)?\.(\S+)?amazonaws.com.*response-content-disposition=inline.*avatar\.png.*response-content-type=image%2Fpng/,
     );
     expect(url).toMatch(String(SERVICE_CONFIGURATIONS.s3.bucket));
   });
@@ -211,6 +226,25 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3)("ActiveStorage::Service::S3ServiceTe
     const key = base58(24);
     try {
       const data = new Uint8Array(SecureRandom.bytes(8 * 1024 * 1024));
+
+      await service.upload(key, new StringIO(data), {
+        checksum: OpenSSL.Digest.MD5.base64digest(data),
+      });
+      const downloaded = await service.download(key);
+      expect(
+        downloaded.length === data.length && data.every((byte, i) => byte === downloaded[i]),
+      ).toBe(true);
+    } finally {
+      await service.delete(key);
+    }
+  });
+
+  it("uploading a small object with multipart_threshold configured", async () => {
+    const service = buildService({ upload: { multipartThreshold: 5 * 1024 * 1024 } });
+
+    const key = base58(24);
+    try {
+      const data = new Uint8Array(SecureRandom.bytes(3 * 1024 * 1024));
 
       await service.upload(key, new StringIO(data), {
         checksum: OpenSSL.Digest.MD5.base64digest(data),
