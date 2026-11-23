@@ -4,11 +4,12 @@ import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.j
 import mysql from "mysql2/promise";
 import { Mysql2, type Client } from "@blazetrails/mysql2";
 import type { Mysql2Result } from "@blazetrails/mysql2";
+import { withCoreQuery } from "../../support/mysql2-core-query.js";
 
 async function clientOn(connection: object): Promise<Client> {
   const createConnection = vi
     .spyOn(mysql, "createConnection")
-    .mockResolvedValue(connection as never);
+    .mockResolvedValue(withCoreQuery(connection) as never);
   try {
     return await Mysql2.Client.new({});
   } finally {
@@ -40,7 +41,7 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
   }
 
   async function makeAdapter(): Promise<Mysql2Adapter> {
-    const adapter = new Mysql2Adapter({ host: "localhost" } as never);
+    const adapter = new Mysql2Adapter({ host: "localhost" });
     const fakeConn = { query: driverQuery, end: () => Promise.resolve() };
     (adapter as unknown as { _rawConnection: unknown })._rawConnection = await clientOn(fakeConn);
     (adapter as unknown as { _verified: boolean })._verified = true;
