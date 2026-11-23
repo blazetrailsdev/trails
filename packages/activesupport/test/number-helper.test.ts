@@ -131,6 +131,8 @@ describe("NumberHelperTest", () => {
     expect(numberToDelimited(12345678)).toEqual("12,345,678");
     expect(numberToDelimited(0)).toEqual("0");
     expect(numberToDelimited(123)).toEqual("123");
+    expect(numberToDelimited(1234)).toEqual("1,234");
+    expect(numberToDelimited(12345)).toEqual("12,345");
     expect(numberToDelimited(123456)).toEqual("123,456");
     expect(numberToDelimited(123456.78)).toEqual("123,456.78");
     expect(numberToDelimited(123456.789)).toEqual("123,456.789");
@@ -467,6 +469,16 @@ describe("NumberHelperTest", () => {
     expect(numberToRounded("x")).toEqual("x");
     expect(numberToHumanSize("x")).toEqual("x");
     expect(numberToHuman("x")).toEqual("x");
+  });
+
+  it("number helpers with scientific notation", () => {
+    expect(numberToCurrency("123481223d98989")).toEqual("$123481223d98989");
+    expect(numberToCurrency("11288E822220222")).toEqual("$11288E822220222");
+    expect(numberToCurrency("-888E89789")).toEqual("-$888E89789");
+
+    expect(numberToPercentage("123481223d98989")).toEqual("123481223d98989%");
+    expect(numberToPercentage("11288E822220222")).toEqual("11288E822220222%");
+    expect(numberToPercentage("-888E89789")).toEqual("-888E89789%");
   });
 });
 

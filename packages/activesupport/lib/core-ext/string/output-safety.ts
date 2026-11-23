@@ -331,7 +331,9 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
         return String(escapedArgs[i++]);
       });
     }
-    return new SafeBuffer(result);
+    const newSafeBuffer = new SafeBuffer(result);
+    newSafeBuffer._htmlSafe = this._htmlSafe;
+    return newSafeBuffer;
   }
 
   get htmlSafe(): boolean {
@@ -546,7 +548,7 @@ export function isHtmlSafe(self: unknown): boolean {
   if (self instanceof SafeBuffer) return self.htmlSafe;
   if (typeof self === "number" || typeof self === "bigint") return Numeric.isHtmlSafe(self);
   if (self !== null && typeof self === "object" && "htmlSafe" in self) {
-    return (self as { htmlSafe: unknown }).htmlSafe === true;
+    return self.htmlSafe === true;
   }
   return Object.isHtmlSafe(self);
 }

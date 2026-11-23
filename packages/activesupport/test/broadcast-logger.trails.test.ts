@@ -52,16 +52,15 @@ describe("BroadcastLogger severity setters", () => {
 });
 
 describe("BroadcastLogger#log", () => {
-  it("is add's alias, dispatching each broadcast's add", () => {
+  it("dispatches each broadcast's log", () => {
     const calls: unknown[][] = [];
-    class AddRecorder extends Logger {
-      override add(...args: Parameters<Logger["add"]>): boolean {
+    class LogRecorder extends Logger {
+      override log: Logger["add"] = (...args) => {
         calls.push(args);
         return true;
-      }
+      };
     }
-    const logger = new BroadcastLogger(new AddRecorder({ write: () => {} }));
-    expect(BroadcastLogger.prototype.log).toBe(BroadcastLogger.prototype.add);
+    const logger = new BroadcastLogger(new LogRecorder({ write: () => {} }));
     logger.log(Logger.INFO, "hi");
     expect(calls).toEqual([[Logger.INFO, "hi"]]);
   });

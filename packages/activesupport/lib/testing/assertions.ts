@@ -34,6 +34,7 @@ import {
   verbose,
 } from "@blazetrails/ruby-compat";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
+import * as MinitestAssertions from "./assertions.js";
 
 /** @noRailsEquivalent PERMANENT */
 export class Assertion extends Error {
@@ -493,7 +494,9 @@ export async function assertDifference<T>(
     const actual = (await rbProcCall(exp)) as number;
     const richMessage = () => {
       const codeString = rbObjRespondTo(code, "call") ? _callableToSourceString(code) : code;
-      let error = `\`${codeString}\` didn't change by ${diff}, but by ${actual - beforeValue}`;
+      let error = `\`${codeString}\` didn't change by ${diff}, but by ${actual - beforeValue}.`;
+      if (Minitest.VERSION > "6")
+        error = `${error}\n${MinitestAssertions.diff(beforeValue + diff, actual)}`;
       if (message) error = `${message}.\n${error}`;
       return error;
     };
@@ -549,7 +552,7 @@ export async function assertChanges<T>(
       ? _callableToSourceString(expression)
       : expression;
     let error = `\`${codeString}\` didn't change`;
-    if (Object.is(before, to)) error = `${error}. It was already ${inspect(to)}`;
+    if (Object.is(before, to)) error = `${error}. It was already ${inspect(to)}.`;
     if (message) error = `${message}.\n${error}`;
     return error;
   };
@@ -595,8 +598,9 @@ export async function assertNoChanges<T>(
     const codeString = rbObjRespondTo(expression, "call")
       ? _callableToSourceString(expression)
       : expression;
-    let error = `\`${codeString}\` changed`;
+    let error = `\`${codeString}\` changed.`;
     if (message) error = `${message}.\n${error}`;
+    if (Minitest.VERSION > "6") error = `${error}\n${MinitestAssertions.diff(before, after)}`;
     return error;
   };
 

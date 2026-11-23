@@ -844,7 +844,33 @@ describe("HashWithIndifferentAccessTest", () => {
     expect([...hash.keys()]).toEqual(["A", "bbb"]);
     expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
 
+    hash = new HashWithIndifferentAccess(integers()).transformKeys(
+      (k) => ((k as unknown as number) + 1) as unknown as string,
+    );
+
+    expect([...hash.keys()]).toEqual([1, 2]);
+
+    const repeatingStrings = { a: 1, aa: 2, aaa: 3 };
+
+    hash = new HashWithIndifferentAccess(repeatingStrings).transformKeys((k) => `${k}a`);
+
+    expect([...hash.keys()]).toEqual(["aa", "aaa", "aaaa"]);
+
     await assertRaises([TypeError], {}, () => hash.transformKeys(null));
+
+    const hashWithDefault = new Hash<string, unknown>(":a");
+    hash = new HashWithIndifferentAccess(hashWithDefault).transformKeys((k) => String(k));
+    assertNil(hash.default());
+    hash = new HashWithIndifferentAccess(hashWithDefault).transformKeys((k) => String(k));
+    assertNil(hash.default());
+
+    const hashWithDefaultProc = new Hash<string, unknown>((h: Hash<string, unknown>, k: string) =>
+      h.set(k, ":b"),
+    );
+    hash = new HashWithIndifferentAccess(hashWithDefaultProc).transformKeys((k) => String(k));
+    assertNil(hash.defaultProc());
+    hash = new HashWithIndifferentAccess(hashWithDefaultProc).transformKeys((k) => String(k));
+    assertNil(hash.defaultProc());
   });
 
   it("indifferent deep transform keys", () => {
@@ -897,6 +923,25 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
 
     await assertRaises([TypeError], {}, () => hash.transformKeys(null));
+
+    const hashWithDefault = new Hash<string, unknown>(":a");
+    hash = new HashWithIndifferentAccess(hashWithDefault).transformKeysBang((k) => String(k));
+    expect(hash.default()).toBe(":a");
+    expect(hashWithDefault.default()).toBe(":a");
+
+    hash = new HashWithIndifferentAccess(hashWithDefault).transformKeysBang((k) => String(k));
+    expect(hash.default()).toBe(":a");
+    expect(hashWithDefault.default()).toBe(":a");
+
+    const hashWithDefaultProc = new Hash<string, unknown>((h: Hash<string, unknown>, k: string) =>
+      h.set(k, ":b"),
+    );
+    const defaultProc = hashWithDefaultProc.defaultProc();
+
+    hash = new HashWithIndifferentAccess(hashWithDefaultProc).transformKeysBang((k) => String(k));
+    expect(hash.defaultProc()).toBe(defaultProc);
+    hash = new HashWithIndifferentAccess(hashWithDefaultProc).transformKeysBang((k) => String(k));
+    expect(hash.defaultProc()).toBe(defaultProc);
   });
 
   it("indifferent deep transform keys bang", () => {

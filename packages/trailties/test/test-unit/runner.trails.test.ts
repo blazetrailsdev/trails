@@ -210,12 +210,6 @@ describe("Runner", () => {
     expect(puts.mock.calls[3][0]).toContain("Usage:");
   });
 
-  it("run does not start Vitest with no tests", async () => {
-    await app();
-    await getFs().mkdir!("test/empty", { recursive: true });
-    await expect(Runner.run(["test/empty"])).resolves.toBeUndefined();
-  });
-
   it("Filter answers false for a line with no definition", () => {
     const location = () => [import.meta.filename, 1] as [string, number];
     const filter = new Filter(

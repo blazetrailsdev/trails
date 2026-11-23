@@ -1,5 +1,6 @@
 import { ArgumentError } from "../lib/argument-error.js";
 import { Enumerator } from "../lib/enumerator.js";
+import { TypeError } from "../lib/type-error.js";
 import { describe, expect, it } from "vitest";
 import {
   Hash,
