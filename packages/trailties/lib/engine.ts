@@ -510,6 +510,12 @@ Engine.initializer("add_routing_paths", async function (this: Engine, ...args: u
   }
 });
 
+Engine.initializer("add_locales", function (this: Engine) {
+  (this.config as unknown as { i18n: { railtiesLoadPath: unknown[] } }).i18n.railtiesLoadPath.push(
+    this.paths().get("config/locales"),
+  );
+});
+
 Engine.initializer("add_view_paths", async function (this: Engine) {
   const views = this.paths().get("app/views")?.existent() ?? [];
   if (views.length === 0) return;
@@ -519,6 +525,15 @@ Engine.initializer("add_view_paths", async function (this: Engine) {
   onLoad("action_mailer", (base: ActionControllerBaseLike) => {
     base.prependViewPath!(views);
   });
+});
+
+Engine.initializer("add_mailer_preview_paths", function (this: Engine) {
+  const previews = this.paths().get("test/mailers/previews")!.existent();
+  if (previews.length > 0) {
+    onLoad("action_mailer", (base: { previewPaths: string[] }) => {
+      base.previewPaths = [...new Set([...base.previewPaths, ...previews])];
+    });
+  }
 });
 
 Engine.initializer("add_fixture_paths", async function (this: Engine) {

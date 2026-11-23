@@ -70,6 +70,9 @@ export class Trailtie extends BaseTrailtie {
   static async initializeI18n(app: Application): Promise<void> {
     if (this._i18nInited) return;
 
+    /** @inventedArm registerFileReader — PERMANENT */
+    I18n.registerFileReader((filename) => File.readAsync(filename));
+
     const fallbacks = app.config.i18n.delete("fallbacks") as I18nConfig["fallbacks"];
 
     let enforceAvailableLocales = app.config.i18n.delete("enforceAvailableLocales") as

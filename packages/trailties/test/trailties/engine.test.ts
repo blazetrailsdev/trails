@@ -24,6 +24,7 @@ import type { Bukkit, Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { Methods } from "@blazetrails/rack-test";
 import { Task } from "@blazetrails/rake";
+import { I18n } from "@blazetrails/activesupport";
 import { Engine } from "../../lib/engine.js";
 import { Trails } from "../../lib/trails.js";
 import { env, rbFSend, setEnv } from "@blazetrails/ruby-compat";
@@ -676,6 +677,226 @@ export class TestingController extends ActionController.Base {
     await plugin.write("app/anything/foo.ts", "export const Foo = {};\n");
     await t.bootTrails();
     expect(constGet(TopLevel, "Foo")).toBeTruthy();
+  });
+
+  it("routes are added to router", { timeout: 240_000 }, async () => {
+    await plugin.write(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+export class Sprokkit {
+  static async call() {
+    return [200, { "Content-Type": "text/html" }, ["I am a Sprokkit"]];
+  }
+}
+
+Trails.application!.routes().draw(function () {
+  this.get("/sprokkit", { to: Sprokkit });
+});
+`,
+    );
+
+    await t.bootTrails();
+
+    await t.get("/sprokkit");
+    expect(t.lastResponse().body).toBe("I am a Sprokkit");
+  });
+
+  it(
+    "routes in engines have lower priority than application ones",
+    { timeout: 240_000 },
+    async () => {
+      await t.controller(
+        "foo",
+        `import { ActionController } from "@blazetrails/actionpack";
+export class FooController extends ActionController.Base {
+  async index() {
+    await this.render({ plain: "foo" });
+  }
+}
+`,
+      );
+
+      await t.appFile(
+        "config/routes.ts",
+        `import { Trails } from "@blazetrails/trailties";
+Trails.application!.routes().draw(function () {
+  this.get("foo", { to: "foo#index" });
+});
+`,
+      );
+
+      await plugin.write(
+        "app/controllers/bar-controller.ts",
+        `import { ActionController } from "@blazetrails/actionpack";
+export class BarController extends ActionController.Base {
+  async index() {
+    await this.render({ plain: "bar" });
+  }
+}
+`,
+      );
+
+      await plugin.write(
+        "config/routes.ts",
+        `import { Trails } from "@blazetrails/trailties";
+Trails.application!.routes().draw(function () {
+  this.get("foo", { to: "bar#index" });
+  this.get("bar", { to: "bar#index" });
+});
+`,
+      );
+
+      await t.bootTrails();
+
+      await t.get("/foo");
+      expect(t.lastResponse().body).toBe("foo");
+
+      await t.get("/bar");
+      expect(t.lastResponse().body).toBe("bar");
+    },
+  );
+
+  it("rake tasks lib tasks are loaded", { timeout: 240_000 }, async () => {
+    globals.executed = false;
+    await plugin.write(
+      "lib/tasks/foo.rake.ts",
+      `import { DSL } from "@blazetrails/rake";
+import { TopLevel, block } from "@blazetrails/ruby-compat";
+DSL.task(
+  "foo",
+  block(() => {
+    (TopLevel as Record<string, unknown>).executed = true;
+  }),
+);
+`,
+    );
+
+    await t.bootTrails();
+    await Trails.application!.loadTasks();
+    await (await Task.get("foo")).invoke();
+    expect(globals.executed).toBeTruthy();
+  });
+
+  it("locales can be nested", { timeout: 240_000 }, async () => {
+    await t.appFile("config/locales/en/models.json", JSON.stringify({ en: { foo: "1" } }));
+
+    await t.appFile("config/locales/en/dates.json", JSON.stringify({ en: { bar: "1" } }));
+
+    await t.appFile(
+      "config/locales/extra/nested/folder/en.json",
+      JSON.stringify({ en: { baz: "1" } }),
+    );
+
+    await t.bootTrails();
+
+    const appPath = await t.appPath();
+    const expectedLocales = [
+      `${appPath}/config/locales/en/models.json`,
+      `${appPath}/config/locales/en/dates.json`,
+      `${appPath}/config/locales/extra/nested/folder/en.json`,
+    ].map((path) => File.expandPath(path));
+
+    const actualLocales = I18n.loadPath().map((path: unknown) => File.expandPath(String(path)));
+
+    for (const expectedLocale of expectedLocales) {
+      expect(actualLocales).toContain(expectedLocale);
+    }
+  });
+
+  it("namespaced controllers with namespaced routes", { timeout: 240_000 }, async () => {
+    await plugin.write(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.routes().draw(function () {
+  this.namespace("admin", () => {
+    this.namespace("foo", () => {
+      this.get("bar", { to: "bar#index" });
+    });
+  });
+});
+`,
+    );
+
+    await plugin.write(
+      "app/controllers/admin/foo/bar-controller.ts",
+      `import { ApplicationController } from "../../../../../../app/controllers/application-controller.js";
+export class BarController extends ApplicationController {
+  async index() {
+    await this.render({ plain: "Rendered from namespace" });
+  }
+}
+`,
+    );
+
+    await t.bootTrails();
+
+    await t.get("/admin/foo/bar");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toBe("Rendered from namespace");
+  });
+
+  it("middleware referenced in configuration", { timeout: 240_000 }, async () => {
+    await plugin.write(
+      "lib/bukkits.ts",
+      `export class Bukkits {
+  app: { call(env: unknown): unknown };
+  constructor(app: { call(env: unknown): unknown }) {
+    this.app = app;
+  }
+
+  call(env: unknown) {
+    return this.app.call(env);
+  }
+}
+`,
+    );
+
+    const application = await t.appPath("config", "application.ts");
+    await t.appFile(
+      "config/application.ts",
+      `import { Bukkits } from ${JSON.stringify(`${plugin.path}/lib/bukkits.ts`)};\n` +
+        (await getFs().readFile(application, "utf-8")),
+    );
+    await t.addToConfig("this.config.middleware.use(Bukkits);");
+    await t.bootTrails();
+
+    const { Bukkits } = (await import(`${plugin.path}/lib/bukkits.ts`)) as { Bukkits: unknown };
+    expect(
+      [...(Trails.application!.middleware as Iterable<{ klass: unknown }>)].map((m) => m.klass),
+      "Bukkits middleware should be in the middleware stack",
+    ).toContain(Bukkits);
+  });
+
+  it("adds its mailer previews to mailer preview paths", { timeout: 240_000 }, async () => {
+    await plugin.write(
+      "app/mailers/bukkit-mailer.ts",
+      `import { ActionMailer } from "@blazetrails/actionmailer";
+export class BukkitMailer extends ActionMailer.Base {
+  foo() {}
+}
+`,
+    );
+
+    await plugin.write(
+      "test/mailers/previews/bukkit-mailer-preview.ts",
+      `import { ActionMailer } from "@blazetrails/actionmailer";
+export class BukkitMailerPreview extends ActionMailer.Preview {
+  foo() {}
+}
+`,
+    );
+
+    await plugin.write("app/views/bukkit-mailer/foo.html.tse", "Bukkit");
+
+    await t.bootTrails();
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/bukkit_mailer">Bukkit Mailer</a></h3>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/bukkit_mailer/foo">foo</a></li>',
+    );
   });
 });
 
