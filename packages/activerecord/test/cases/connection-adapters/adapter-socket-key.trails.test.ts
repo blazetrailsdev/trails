@@ -56,7 +56,7 @@ describe("Mysql2Adapter socket key through buildAdapterArg", () => {
       socket: "/nonexistent/trails-socket-key.sock",
     });
     await expect(adapter.connect()).rejects.toThrow(
-      "connect ENOENT /nonexistent/trails-socket-key.sock",
+      "Can't connect to local server through socket '/nonexistent/trails-socket-key.sock' (2)",
     );
   });
 });

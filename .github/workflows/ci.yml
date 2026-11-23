@@ -2096,6 +2096,8 @@ jobs:
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
         ports:
           - 3306:3306
+        volumes:
+          - /tmp/mysqld:/run/mysqld
         options: >-
           --mount type=tmpfs,destination=/var/lib/mysql
           --health-cmd "healthcheck.sh --connect --innodb_initialized"
@@ -2143,6 +2145,7 @@ jobs:
         run: pnpm vitest run packages/mysql2
         env:
           MYSQL_HOST: localhost
+          MYSQL_SOCKET: /tmp/mysqld/mysqld.sock
           MYSQL_PORT: "3306"
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}

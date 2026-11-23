@@ -78,7 +78,19 @@ type ClientHandshake = {
 
 type Handshake = { _handshakePacket?: { serverVersion?: string } };
 
+const CR_CONNECTION_ERROR = 2002;
+const CR_CONN_HOST_ERROR = 2003;
+const CR_UNKNOWN_HOST = 2005;
 const CR_SERVER_GONE_ERROR = 2006;
+const CR_SERVER_LOST = 2013;
+
+const CLIENT_ERRORS: Record<number, string> = {
+  [CR_CONNECTION_ERROR]: "Can't connect to local server through socket '%-.100s' (%d)",
+  [CR_CONN_HOST_ERROR]: "Can't connect to MySQL server on '%-.100s' (%d)",
+  [CR_UNKNOWN_HOST]: "Unknown server host '%-.100s' (%d)",
+  [CR_SERVER_GONE_ERROR]: "MySQL server has gone away",
+  [CR_SERVER_LOST]: "Lost connection to MySQL server during query",
+};
 
 const MYSQL_ESCAPES: Record<string, string> = {
   "\0": "\\0",
@@ -171,15 +183,16 @@ async function myLoadDefaults(file: string, groups: string[]): Promise<Options> 
 }
 
 const CR_ERRNOS: Record<string, number> = {
-  ENOTFOUND: 2005,
-  ECONNREFUSED: 2003,
-  EHOSTUNREACH: 2003,
-  ENETUNREACH: 2003,
-  ETIMEDOUT: 2003,
-  ERR_SOCKET_BAD_PORT: 2003,
-  ECONNRESET: 2013,
-  PROTOCOL_CONNECTION_LOST: 2013,
-  PROTOCOL_SEQUENCE_TIMEOUT: 2013,
+  ENOENT: CR_CONNECTION_ERROR,
+  ENOTFOUND: CR_UNKNOWN_HOST,
+  ECONNREFUSED: CR_CONN_HOST_ERROR,
+  EHOSTUNREACH: CR_CONN_HOST_ERROR,
+  ENETUNREACH: CR_CONN_HOST_ERROR,
+  ETIMEDOUT: CR_CONN_HOST_ERROR,
+  ERR_SOCKET_BAD_PORT: CR_CONN_HOST_ERROR,
+  ECONNRESET: CR_SERVER_LOST,
+  PROTOCOL_CONNECTION_LOST: CR_SERVER_LOST,
+  PROTOCOL_SEQUENCE_TIMEOUT: CR_SERVER_LOST,
   EPIPE: CR_SERVER_GONE_ERROR,
   PROTOCOL_ENQUEUE_AFTER_QUIT: CR_SERVER_GONE_ERROR,
   PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR: CR_SERVER_GONE_ERROR,
@@ -263,7 +276,7 @@ type EofPacket = {
 };
 type NpmConnection = mysql.Connection & {
   connection?: Protocol;
-  config?: { typeCast?: unknown };
+  config?: { typeCast?: unknown; host?: string; socketPath?: string };
 } & Handshake;
 
 /** @internal */
@@ -892,6 +905,7 @@ export class Client {
     for (const key of [...NOT_DRIVER_OPTIONS, ...Object.keys(Client.defaultQueryOptions())]) {
       delete config[key];
     }
+    if (host != null && host !== "localhost") socket = null;
     const args = { user, password: pass, host, port, database, socketPath: socket };
     for (const [key, value] of Object.entries(args)) if (value != null) config[key] = value;
     if (this.connectTimeout != null) config.connectTimeout = this.connectTimeout * 1000;
@@ -992,7 +1006,7 @@ export class Client {
         delete config.ssl;
         return createConnection();
       })
-      .catch((e: unknown) => this.raiseMysql2Error(e))) as NpmConnection;
+      .catch((e: unknown) => this.raiseMysql2Error(e, config))) as NpmConnection;
     this.connection = connection;
     if (this.initCommand != null) {
       await connection.query(this.initCommand).catch((e: unknown) => this.raiseMysql2Error(e));
@@ -1005,7 +1019,7 @@ export class Client {
       const timeout = this.writeTimeout * 1000;
       stream!.write = (chunk, cb) => {
         const timer = setTimeout(() => {
-          const error = new globalThis.Error("Lost connection to MySQL server during query");
+          const error = new globalThis.Error(CLIENT_ERRORS[CR_SERVER_LOST]);
           stream!.destroy?.(
             Object.assign(error, { code: "PROTOCOL_CONNECTION_LOST", fatal: true }),
           );
@@ -1156,7 +1170,7 @@ export class Client {
     const rows = stream[Symbol.asyncIterator]();
     const protocol = this.connection.connection!;
     const lost = (e: { code?: unknown }) => {
-      const error = new globalThis.Error("Lost connection to MySQL server during query");
+      const error = new globalThis.Error(CLIENT_ERRORS[CR_SERVER_LOST]);
       stream.destroy(Object.assign(error, { code: e.code, cause: e }));
     };
     protocol.once?.("error", lost);
@@ -1403,7 +1417,10 @@ export class Client {
   }
 
   /** @internal */
-  raiseMysql2Error(e: unknown): never {
+  raiseMysql2Error(
+    e: unknown,
+    config: { host?: string; socketPath?: string } | undefined = this.connection?.config,
+  ): never {
     if (!(e instanceof globalThis.Error)) throw e;
     const { code, errno, sqlState } = e as { code?: unknown; errno?: unknown; sqlState?: string };
     if (code === "PROTOCOL_SEQUENCE_TIMEOUT" && this.readTimeout != null) {
@@ -1414,6 +1431,7 @@ export class Client {
       throw error;
     }
     let errorNumber: number | undefined;
+    let message = e.message;
     if (typeof errno === "number" && errno > 0) {
       errorNumber = errno;
     } else if (typeof code === "string" && Object.hasOwn(CR_ERRNOS, code)) {
@@ -1422,8 +1440,21 @@ export class Client {
       errorNumber = CR_SERVER_GONE_ERROR;
     }
     if (errorNumber === undefined) throw e;
+    const { hostname, address, port } = e as { hostname?: string; address?: string; port?: number };
+    if (errorNumber === CR_CONN_HOST_ERROR && config?.socketPath != null && port === undefined) {
+      errorNumber = CR_CONNECTION_ERROR;
+    }
+    const target =
+      errorNumber === CR_CONNECTION_ERROR
+        ? (config?.socketPath ?? address)
+        : (hostname ?? address ?? config?.host);
+    if (errorNumber !== errno) {
+      message = CLIENT_ERRORS[errorNumber]
+        .replace("%-.100s", String(target ?? "localhost").slice(0, 100))
+        .replace("%d", String(typeof errno === "number" ? Math.abs(errno) : 0));
+    }
     const error = Mysql2Error.newWithArgs(
-      e.message,
+      message,
       this.mysqlGetServerVersion(),
       errorNumber,
       sqlState ?? "HY000",

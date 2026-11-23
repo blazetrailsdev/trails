@@ -4,7 +4,11 @@ import { Mysql2, type Client } from "../lib/index.js";
 
 const ENV = TopLevel.ENV!;
 const DatabaseCredentials = {
-  root: { host: ENV["MYSQL_HOST"] ?? "localhost", port: Number(ENV["MYSQL_PORT"] ?? 3306) },
+  root: {
+    host: ENV["MYSQL_HOST"] ?? "localhost",
+    port: Number(ENV["MYSQL_PORT"] ?? 3306),
+    socket: ENV["MYSQL_SOCKET"],
+  },
 };
 
 let clients: Client[] = [];
