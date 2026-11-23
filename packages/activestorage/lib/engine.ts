@@ -36,6 +36,7 @@ import { ImageMagick } from "./analyzer/image-analyzer/image-magick.js";
 import { Vips } from "./analyzer/image-analyzer/vips.js";
 import { VideoAnalyzer } from "./analyzer/video-analyzer.js";
 import { AudioAnalyzer } from "./analyzer/audio-analyzer.js";
+import { Configurator } from "./service/configurator.js";
 import { Registry } from "./service/registry.js";
 import type { Blob } from "./blob.js";
 
@@ -228,6 +229,10 @@ export class Engine extends TrailsEngine {
         TopLevel.Trails!.configuration!.activeStorage.serviceConfigurations == null
           ? await loadIseqEval(configFile)
           : null;
+      /** @inventedArm load — PERMANENT */
+      await Configurator.load(
+        TopLevel.Trails!.configuration!.activeStorage.serviceConfigurations ?? mod?.default ?? {},
+      );
 
       onLoad("active_storage_blob", () => {
         const activeStorage = TopLevel.Trails!.configuration!.activeStorage;

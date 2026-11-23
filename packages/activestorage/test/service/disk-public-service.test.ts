@@ -18,8 +18,8 @@ const SERVICE = Service.configure("tmp_public", tmpConfig) as DiskService;
 describe("ActiveStorage::Service::DiskPublicServiceTest", () => {
   const ctx = SharedServiceTests(SERVICE);
 
-  it("public URL generation", () => {
-    const url = ctx.service.url(ctx.key, {
+  it("public URL generation", async () => {
+    const url = await ctx.service.url(ctx.key, {
       disposition: "inline",
       filename: new Filename("avatar.png"),
       contentType: "image/png",

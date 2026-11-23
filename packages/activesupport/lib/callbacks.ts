@@ -16,7 +16,8 @@ import {
 import { kernelArray } from "./array-utils.js";
 import { classAttribute } from "./class-attribute.js";
 import { Concern } from "./concern.js";
-import { ArgumentError, extractOptionsBang } from "./hash-utils.js";
+import { ArgumentError } from "./hash-utils.js";
+import { extractOptionsBang } from "./core-ext/array/extract-options.js";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { camelize } from "./inflector.js";
 import { isBlank, squish } from "./string-utils.js";

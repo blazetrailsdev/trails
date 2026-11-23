@@ -9,7 +9,7 @@ import { ActiveJob, performAllLater } from "@blazetrails/activejob";
 import {
   cattrAccessor,
   Notifications,
-  objectWith,
+  with as with_,
   seconds,
   sole,
 } from "@blazetrails/activesupport";
@@ -332,21 +332,17 @@ describe("SolidQueue::BatchTest", () => {
         expect(await nextJob.isBlocked()).toBeTruthy();
         vi.spyOn(Batch.prototype, "enqueueCallbackJobs").mockRejectedValue(callbackError);
 
-        await objectWith(
-          SolidQueue,
-          { preserveFinishedJobs: outcome !== "destroyed" },
-          async () => {
-            await Notifications.subscribed(
-              (event: unknown) => {
-                events.push(event as { payload: { [key: string]: unknown } });
-              },
-              "batch_progress_error.solid_queue",
-              async () => {
-                await performForOutcome(outcome, claimedExecution.perform());
-              },
-            );
-          },
-        );
+        await with_(SolidQueue, { preserveFinishedJobs: outcome !== "destroyed" }, async () => {
+          await Notifications.subscribed(
+            (event: unknown) => {
+              events.push(event as { payload: { [key: string]: unknown } });
+            },
+            "batch_progress_error.solid_queue",
+            async () => {
+              await performForOutcome(outcome, claimedExecution.perform());
+            },
+          );
+        });
 
         expect(await ClaimedExecution.isExists(claimedExecution.id)).toBeFalsy();
         await checkJobForOutcome(outcome, job);

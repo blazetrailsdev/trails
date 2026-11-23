@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
 import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "../database.js";
@@ -86,6 +86,12 @@ function open(file: string, mode: number, quirks = true): DatabaseSync {
     timeout: 0,
     allowExtension: true,
   });
+}
+
+/** @internal */
+interface SerializableDatabase {
+  serialize(): Uint8Array;
+  deserialize(image: Uint8Array): void;
 }
 
 /** @internal */
@@ -178,7 +184,6 @@ function prepareStatement(
 
 export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) => {
   let raw = open(file, mode);
-  let used = false;
   let handler: BusyHandler | null = null;
   let changesStmt: StatementSync | null = null;
   const db: EngineDatabase = {
@@ -187,7 +192,6 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     isDiscarded: () => false,
     close: () => raw.close(),
     changes: () => {
-      used = true;
       if (changesStmt === null) {
         changesStmt = raw.prepare("SELECT changes()");
         changesStmt.setReturnArrays(true);
@@ -195,13 +199,11 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       return Number((changesStmt.get() as unknown as [number])[0]);
     },
     disableQuirkMode: () => {
-      if (used) {
-        throw new RuntimeError(
-          "disable_quirk_mode after the handle is used is not supported by the node:sqlite driver",
-        );
-      }
+      const image =
+        raw.location() === null ? (raw as unknown as SerializableDatabase).serialize() : null;
       raw.close();
       raw = open(file, mode, false);
+      if (image !== null) (raw as unknown as SerializableDatabase).deserialize(image);
       changesStmt = null;
     },
     loadExtensionInternal: (file) => raw.loadExtension(file),
@@ -210,7 +212,6 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       handler = block;
     },
     execBatch(sql, resultsAsHash) {
-      used = true;
       const results: unknown[] = [];
       let rest = sql.trim();
       while (rest !== "") {
@@ -248,7 +249,6 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       return results;
     },
     prepare(sql) {
-      used = true;
       const [tail] = statementTail(sql);
       return [prepareStatement(raw, sql.slice(0, tail), () => handler), sql.slice(tail)];
     },

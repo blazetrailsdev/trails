@@ -460,6 +460,7 @@ const alias = {
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/lib/builder.ts"),
   "@blazetrails/marcel/magic": path.resolve(__dirname, "packages/marcel/lib/magic.ts"),
   "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/lib/marcel.ts"),
+  "@blazetrails/listen": path.resolve(__dirname, "packages/listen/lib/listen.ts"),
   "@blazetrails/mini-mime": path.resolve(__dirname, "packages/mini-mime/lib/mini-mime.ts"),
   "@blazetrails/net-smtp": path.resolve(__dirname, "packages/net-smtp/lib/smtp.ts"),
   "@blazetrails/rake": path.resolve(__dirname, "packages/rake/lib/rake.ts"),
@@ -479,6 +480,7 @@ const alias = {
   "@blazetrails/vite-trails/": path.resolve(__dirname, "packages/vite-trails/lib") + "/",
   "@blazetrails/vite-trails": path.resolve(__dirname, "packages/vite-trails/lib/index.ts"),
   "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/lib/fugit.ts"),
+  "@blazetrails/libxml-ruby": path.resolve(__dirname, "packages/libxml-ruby/lib/libxml-ruby.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/lib/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/lib/index.ts"),
 };

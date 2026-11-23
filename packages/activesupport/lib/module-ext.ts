@@ -10,7 +10,7 @@ import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
 import { callerLocations } from "./deprecation.js";
-import { extractOptionsBang } from "./hash-utils.js";
+import { extractOptionsBang } from "./core-ext/array/extract-options.js";
 
 export function delegate(this: object, ...methods: (string | DelegateOptions)[]): string[] {
   const options = extractOptionsBang(methods);

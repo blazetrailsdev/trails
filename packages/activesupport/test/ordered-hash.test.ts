@@ -4,7 +4,7 @@ import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { OrderedHash } from "../lib/ordered-hash.js";
 import { withIndifferentAccess } from "../lib/core-ext/hash/indifferent-access.js";
-import { extractOptionsBang } from "../lib/hash-utils.js";
+import { extractOptionsBang } from "../lib/core-ext/array/extract-options.js";
 
 const Enumerator = (globalThis as unknown as { Iterator: abstract new () => unknown }).Iterator;
 

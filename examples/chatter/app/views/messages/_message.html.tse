@@ -1,0 +1,53 @@
+<% const author = await message.user; %>
+<div class="message" id="<%= domId(message) %>">
+  <%= render({ partial: "shared/avatar", locals: { user: author } }) %>
+  <div class="message-body">
+    <div class="meta">
+      <span class="author"><%= author.displayName() %></span>
+      <time datetime="<%= message.created_at.iso8601() %>" data-controller="local-time"><%= message.created_at.strftime("%H:%M") %></time>
+    </div>
+    <% if (message.body) { %><div class="text"><%= formatMessage(message.body) %></div><% } %>
+
+    <% const attachments = await message.attachments.attachments; %>
+    <% if (attachments.length > 0) { %>
+      <div class="attachments">
+        <% for (const attachment of attachments) { %>
+          <% const blob = await attachment.blob; %>
+          <% if (blob.isImage()) { %>
+            <a href="<%= trailsBlobPath(blob) %>" target="_blank" data-turbo="false"><img class="attachment-image" loading="lazy" alt="<%= blob.filename %>" src="<%= trailsBlobPath(blob) %>"></a>
+          <% } else { %>
+            <%= linkTo(`📎 ${blob.filename} (${numberToHumanSize(blob.byte_size)})`, trailsBlobPath(blob, { disposition: "attachment" }), { class: "attachment-file", data: { turbo: false } }) %>
+          <% } %>
+        <% } %>
+      </div>
+    <% } %>
+
+    <% for (const preview of await message.linkPreviews.toArray()) { %>
+      <a class="preview" href="<%= preview.url %>" target="_blank" rel="noopener">
+        <div class="preview-text">
+          <div class="preview-site"><%= preview.site_name ?? preview.host() %></div>
+          <% if (preview.title) { %><div class="preview-title"><%= preview.title %></div><% } %>
+          <% if (preview.description) { %><div class="preview-description"><%= preview.description %></div><% } %>
+        </div>
+        <% if (preview.image_url) { %><img class="preview-image" src="<%= preview.image_url %>" loading="lazy" alt=""><% } %>
+      </a>
+    <% } %>
+
+    <div class="reactions">
+      <% for (const [emoji, userIds] of await message.reactionGroups()) { %>
+        <%= buttonTo(`${emoji} ${userIds.length}`, messageReactionsPath(message, { emoji }), { class: "reaction", form: { class: "inline", data: { turbo_stream: true } } }) %>
+      <% } %>
+      <details class="reaction-picker">
+        <summary title="Add reaction">☺︎+</summary>
+        <div class="picker">
+          <% for (const emoji of Reaction.EMOJI) { %>
+            <%= buttonTo(emoji, messageReactionsPath(message, { emoji }), { class: "emoji", form: { class: "inline", data: { turbo_stream: true } } }) %>
+          <% } %>
+        </div>
+      </details>
+      <% if (!message.isReply()) { %>
+        <%= linkTo(message.replies_count > 0 ? `💬 ${message.replies_count} ${message.replies_count === 1 ? "reply" : "replies"}` : "Reply in thread", messageThreadPath(message), { class: "thread-link", data: { turbo_frame: "thread" } }) %>
+      <% } %>
+    </div>
+  </div>
+</div>

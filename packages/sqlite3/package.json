@@ -30,6 +30,10 @@
       "types": "./dist/engine/better-sqlite3.d.ts",
       "default": "./dist/engine/better-sqlite3.js"
     },
+    "./engine/libsql": {
+      "types": "./dist/engine/libsql.d.ts",
+      "default": "./dist/engine/libsql.js"
+    },
     "./engine/node-sqlite": {
       "types": "./dist/engine/node-sqlite.d.ts",
       "default": "./dist/engine/node-sqlite.js"

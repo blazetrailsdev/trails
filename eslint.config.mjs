@@ -158,6 +158,7 @@ export default defineConfig(
   {
     ignores: [
       "vendor/**",
+      "examples/homepage/hero/**",
       "**/dist/**",
       "**/*.tt.js",
       "packages/thor/test/fixtures/doc/*.rb.js",
@@ -230,6 +231,12 @@ export default defineConfig(
   {
     files: [".pnpmfile.cjs"],
     languageOptions: { sourceType: "commonjs", globals: { module: "writable" } },
+  },
+  {
+    files: ["examples/chatter/app/javascript/**/*.js"],
+    languageOptions: {
+      globals: { document: "readonly", window: "readonly", MutationObserver: "readonly" },
+    },
   },
   {
     files: [
@@ -501,6 +508,7 @@ export default defineConfig(
       "packages/rack-cache/lib/**/*.ts",
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",
+      "packages/listen/lib/**/*.ts",
       "packages/mysql2/lib/**/*.ts",
       "packages/pg/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",

@@ -1,3 +1,4 @@
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Configuration } from "../../lib/application/configuration.js";
 import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
@@ -41,7 +42,11 @@ const blogApp = (): {
   config: Configuration;
   deprecators: Deprecators;
   credentials: typeof credentials;
+  executor: typeof Executor;
+  messageVerifier(name: string): MessageVerifier;
 } => ({
+  executor: class extends Executor {},
+  messageVerifier: (name: string) => new MessageVerifier(`secret-${name}`),
   deprecators: new Deprecators(),
   config: Object.assign(new Configuration("/nonexistent-app"), { filterParameters: [] }),
   credentials,
@@ -157,7 +162,10 @@ describe("RailtieTest", () => {
   it("runInitializers copies sqlite3 strict strings flag onto SQLite3Adapter", async () => {
     const cfg = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
     cfg.sqlite3AdapterStrictStringsByDefault = true;
-    await runTrailtieInitializers(Trailtie, blogApp());
+    const app = blogApp();
+    app.config.enableReloading = false;
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("after_initialize", app);
     expect(SQLite3Adapter.strictStringsByDefault).toBe(true);
   });
 
@@ -165,7 +173,10 @@ describe("RailtieTest", () => {
     const cfg = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
     cfg.postgresqlAdapterDecodeDates = true;
     PostgreSQLAdapter.decodeDates = false;
-    await runTrailtieInitializers(Trailtie, blogApp());
+    const app = blogApp();
+    app.config.enableReloading = false;
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("after_initialize", app);
     expect(PostgreSQLAdapter.decodeDates).toBe(true);
   });
 
@@ -173,8 +184,29 @@ describe("RailtieTest", () => {
     const cfg = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
     delete cfg.postgresqlAdapterDecodeDates;
     PostgreSQLAdapter.decodeDates = false;
-    await runTrailtieInitializers(Trailtie, blogApp());
+    const app = blogApp();
+    app.config.enableReloading = false;
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("after_initialize", app);
     expect(PostgreSQLAdapter.decodeDates).toBe(false);
+  });
+
+  it("runInitializers seats the app's active_record/token_for verifier on Base", async () => {
+    const saved = Base.generatedTokenVerifier;
+    Base.generatedTokenVerifier = null;
+    try {
+      const app = blogApp();
+      const verifier = new MessageVerifier("token-for");
+      const names: string[] = [];
+      app.messageVerifier = (name: string) => (names.push(name), verifier);
+      app.config.enableReloading = false;
+      await runTrailtieInitializers(Trailtie, app);
+      runLoadHooks("after_initialize", app);
+      expect(Base.generatedTokenVerifier).toBe(verifier);
+      expect(names).toEqual(["active_record/token_for"]);
+    } finally {
+      Base.generatedTokenVerifier = saved;
+    }
   });
 
   it("runInitializers forwards config.encryption to Encryption.Configurable", async () => {

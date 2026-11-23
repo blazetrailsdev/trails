@@ -1,0 +1,9 @@
+<header class="room-header"><h1>Your profile</h1></header>
+<div class="form-page">
+  <%= formWith({ model: user, url: profilePath(), method: "patch" }, (form) => { %>
+    <% if (user.errors.isAny()) { %><div class="flash alert"><%= user.errors.fullMessages.join(", ") %></div><% } %>
+    <label>Display name <%= form.textField("name", { placeholder: user.displayName() }) %></label>
+    <label>Avatar <%= form.fileField("avatar", { accept: "image/*" }) %></label>
+    <%= form.submit("Save", { class: "button" }) %>
+  <% }) %>
+</div>

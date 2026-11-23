@@ -1,0 +1,15 @@
+<% contentFor("title", `${await room.titleFor(Current.user!)} · Chatter`); %>
+<%= turboStreamFrom(room) %>
+<header class="room-header">
+  <h1><%= await room.titleFor(Current.user!) %></h1>
+  <% if (room.topic) { %><span class="topic"><%= room.topic %></span><% } %>
+</header>
+<div class="messages" id="messages" data-controller="scroll">
+  <% if (messages.length === 0) { %>
+    <p class="empty">This is the very beginning of <strong><%= await room.titleFor(Current.user!) %></strong>. Say hello 👋</p>
+  <% } %>
+  <% for (const message of messages) { %>
+    <%= render({ partial: "messages/message", locals: { message } }) %>
+  <% } %>
+</div>
+<%= render({ partial: "messages/composer", locals: { room, parent: null } }) %>

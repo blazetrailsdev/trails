@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["node", "@blazetrails/activestorage", "@blazetrails/actiontext", "@blazetrails/turbo"]
   },
-  "include": ["app"]
+  "include": ["app", "config"]
 }

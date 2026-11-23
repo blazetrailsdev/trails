@@ -1941,6 +1941,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   pg: "packages/pg/test/",
   mysql2: "packages/mysql2/test/",
   marcel: "packages/marcel/test/",
+  "libxml-ruby": "packages/libxml-ruby/test/",
   "mini-mime": "packages/mini-mime/test/",
   "net-smtp": "packages/net-smtp/test/",
   rake: "packages/rake/test/",

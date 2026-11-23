@@ -130,6 +130,13 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   assert_not_respond_to: "notRespondTo",
   refute_respond_to: "notRespondTo",
   assert_operator: "operator",
+  // `refute_operator` is `refute_predicate` without `o2`, else `refute
+  // o1.__send__(op, o2)` (minitest/lib/minitest/assertions.rb:771-775), and
+  // Rails aliases it `assert_not_operator` (active_support/test_case.rb:269).
+  assert_not_operator: "falsy",
+  refute_operator: "falsy",
+  // `assert_silent` is `assert_output "", ""` (minitest/lib/minitest/assertions.rb:491-495).
+  assert_silent: "equal",
   assert_in_delta: "inDelta",
   assert_in_epsilon: "inDelta",
   assert_queries_count: "queriesCount",
@@ -218,6 +225,7 @@ const RSPEC_MAP: Record<string, CanonicalKind> = {
   expect_to_match: "match",
   expect_not_to_match: "noMatch",
   expect_to_raise_error: "raises",
+  expect_to_raise_exception: "raises",
   expect_not_to_raise_error: "nothingRaised",
   "expect_to_be_==": "equal",
   "expect_to_be_>": "operator",

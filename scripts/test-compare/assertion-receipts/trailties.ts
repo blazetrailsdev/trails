@@ -1,6 +1,16 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const trailties: Record<string, AssertionReceipt[]> = {
+  "trailties:application/configuration_test.rb › ConfigurationTest › SQLite3Adapter.strict_strings_by_default is false by default for upgraded apps":
+    [
+      {
+        kind: "assert_nothing_raised",
+        value: null,
+        as: null,
+        reason:
+          'configuration_test.rb:2991 `assert_nothing_raised { add_index :posts, :non_existent }` passes only where SQLite re-enables double-quoted string literals; better-sqlite3 compiles SQLITE_DQS=0 (CLAUDE.md, "Runtime facts Node does not expose")',
+      },
+    ],
   "trailties:command/base_test.rb › Rails::Command::BaseTest › ::executable integrates ::bin": [
     {
       kind: "assert_equal",
@@ -10,6 +20,16 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         "command/base_test.rb:94 asserts the snake_case name; RFC 0171 decision 6 makes a command name kebab-case on the command line",
     },
   ],
+  "trailties:generators/action_text_install_generator_test.rb › ActionText::Generators::InstallGeneratorTest › uncomments image_processing gem":
+    [
+      {
+        kind: "assert_equal",
+        value: 's:gem "image_processing"',
+        as: "assert_equal",
+        reason:
+          'action_text_install_generator_test.rb:85 asserts the uncommented Gemfile line; the dependency is `@blazetrails/image-processing` in package.json (trailties CLAUDE.md, "A Gemfile is a package.json")',
+      },
+    ],
   "trailties:generators/api_app_generator_test.rb › ApiAppGeneratorTest › api modified files": [
     {
       kind: "assert_match",
@@ -234,6 +254,40 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         "app_generator_test.rb:865 asserts no .node-version and no node-gyp in the Dockerfile; a trails app is a Node app, so both are always written (packages/trailties/CLAUDE.md, A Gemfile is a package.json)",
     },
   ],
+  "trailties:generators/authentication_generator_test.rb › AuthenticationGeneratorTest › authentication generator":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:class ApplicationController < ActionController::Base\n",
+        as: "assert_equal",
+        reason:
+          "authentication_generator_test.rb:38 asserts the generated Ruby class line; the generator emits TypeScript, so the line is `export class ApplicationController extends ActionController.Base {`",
+      },
+      {
+        kind: "assert_equal",
+        value: "s:  include Authentication\n",
+        as: "assert_equal",
+        reason:
+          "authentication_generator_test.rb:39 asserts the Ruby `include` line; the TypeScript include is `include(this, Authentication)` in a static block, after the `declare static` surface line",
+      },
+    ],
+  "trailties:generators/authentication_generator_test.rb › AuthenticationGeneratorTest › authentication generator with api flag":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:class ApplicationController < ActionController::Base\n",
+        as: "assert_equal",
+        reason:
+          "authentication_generator_test.rb:83 asserts the generated Ruby class line; the generator emits TypeScript, so the line is `export class ApplicationController extends ActionController.Base {`",
+      },
+      {
+        kind: "assert_equal",
+        value: "s:  include Authentication\n",
+        as: "assert_equal",
+        reason:
+          "authentication_generator_test.rb:84 asserts the Ruby `include` line; the TypeScript include is `include(this, Authentication)` in a static block, after the `declare static` surface line",
+      },
+    ],
   "trailties:generators/benchmark_generator_test.rb › BenchmarkGeneratorTest › generate benchmark":
     [
       {

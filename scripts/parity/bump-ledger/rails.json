@@ -26,14 +26,6 @@
   {
     "package": "actioncable",
     "rubyFile": "subscription_adapter/redis.rb",
-    "rubyName": "ConnectionError",
-    "kind": "constant",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "actioncable",
-    "rubyFile": "subscription_adapter/redis.rb",
     "rubyName": "ensure_listener_running",
     "kind": "drift",
     "from": "v8.0.2",

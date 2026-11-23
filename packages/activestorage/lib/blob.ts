@@ -373,7 +373,7 @@ export class Blob extends Record {
     return this.content_type!.startsWith("text");
   }
 
-  url({
+  async url({
     expiresIn = ActiveStorage.serviceUrlsExpireIn,
     disposition = "inline",
     filename = null,
@@ -383,8 +383,8 @@ export class Blob extends Record {
     disposition?: string;
     filename?: Filename | string | null;
     [k: string]: unknown;
-  } = {}): string {
-    return this.service.url(this.key, {
+  } = {}): Promise<string> {
+    return await this.service.url(this.key, {
       expiresIn: expiresIn,
       filename: Filename.wrap(filename ?? this.filename),
       contentType: this.contentTypeForServing(),
@@ -393,10 +393,10 @@ export class Blob extends Record {
     });
   }
 
-  serviceUrlForDirectUpload({
+  async serviceUrlForDirectUpload({
     expiresIn = ActiveStorage.serviceUrlsExpireIn,
-  }: { expiresIn?: unknown } = {}): string {
-    return this.service.urlForDirectUpload(this.key, {
+  }: { expiresIn?: unknown } = {}): Promise<string> {
+    return await this.service.urlForDirectUpload(this.key, {
       expiresIn: expiresIn,
       contentType: this.content_type!,
       contentLength: this.byte_size!,

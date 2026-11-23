@@ -1,8 +1,8 @@
 import "@blazetrails/vitest-matchers";
-import { rbCFloat, rbCNilClass } from "@blazetrails/ruby-compat";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Time } from "@blazetrails/date";
-import { Mysql2, type Client } from "../lib/index.js";
+import { BigDecimal, rbCFloat, rbCNilClass, stderr } from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Date as RubyDate, Time } from "@blazetrails/date";
+import { Mysql2, type Client, type Mysql2StreamResult } from "../lib/index.js";
 import { lastIdTestLock, specHelper } from "./spec-helper.js";
 
 const testResult = async (client: Client) =>
@@ -70,25 +70,113 @@ describe("Mysql2::Statement", () => {
     result.each((r) => rows.push(r));
     expect(rows).toEqual([{ "1": 1 }]);
   });
-  // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-  it.skip("should handle booleans", () => {});
+  it("should handle booleans", async () => {
+    const stmt = await state.client.prepare("SELECT ? AS `true`, ? AS `false`");
+    const result = (await stmt.execute(true, false))!;
+    expect(result.toA()).toEqual([{ true: 1, false: 0 }]);
+  });
+  // PERMANENT-SKIP: the npm mysql2 driver's Execute toParameter binds a bigint as VAR_STRING, not
   it.skip("should handle bignum but in int64_t", () => {});
   it.skip("should handle bignum but beyond int64_t", () => {});
-  it.skip("should accept keyword arguments on statement execute", () => {});
-  it.skip("should accept bind arguments and keyword arguments on statement execute", () => {});
-  it.skip("should keep its result after other query", () => {});
-  it.skip("should be reusable 1000 times", () => {});
-  it.skip("should be reusable 10000 times", () => {});
-  it.skip("should handle comparisons and likes", () => {});
-  it.skip("should select dates", () => {});
-  it.skip("should prepare Date values", () => {});
+  it("should accept keyword arguments on statement execute", async () => {
+    const stmt = await state.client.prepare("SELECT 1 AS a");
+
+    expect((await stmt.execute({ as: "hash" }))!.toA()[0]).toEqual({ a: 1 });
+    expect((await stmt.execute({ as: "array" }))!.toA()[0]).toEqual([1]);
+  });
+  it("should accept bind arguments and keyword arguments on statement execute", async () => {
+    const stmt = await state.client.prepare("SELECT ? AS a");
+
+    expect((await stmt.execute(1, { as: "hash" }))!.toA()[0]).toEqual({ a: 1 });
+    expect((await stmt.execute(1, { as: "array" }))!.toA()[0]).toEqual([1]);
+  });
+  it("should keep its result after other query", async () => {
+    await state.client.query("CREATE TABLE IF NOT EXISTS mysql2_stmt_q(a int)");
+    await state.client.query("INSERT INTO mysql2_stmt_q (a) VALUES (1), (2)");
+    const stmt = await state.client.prepare("SELECT a FROM mysql2_stmt_q WHERE a = ?");
+    const result1 = (await stmt.execute(1))!;
+    const result2 = (await stmt.execute(2))!;
+    expect(result2.toA()[0]).toEqual({ a: 2 });
+    expect(result1.toA()[0]).toEqual({ a: 1 });
+    await state.client.query("DROP TABLE IF EXISTS mysql2_stmt_q");
+  });
+  it("should be reusable 1000 times", async () => {
+    const statement = await state.client.prepare("SELECT 1");
+    for (let i = 0; i < 1000; i++) {
+      const result = (await statement.execute())!;
+      expect(result.toA().length).toBe(1);
+    }
+  });
+  it("should be reusable 10000 times", async () => {
+    const statement = await state.client.prepare("SELECT 1");
+    for (let i = 0; i < 10000; i++) {
+      const result = (await statement.execute())!;
+      expect(result.toA().length).toBe(1);
+    }
+  }, 60_000);
+  it("should handle comparisons and likes", async () => {
+    await state.client.query("CREATE TABLE IF NOT EXISTS mysql2_stmt_q(a int, b varchar(10))");
+    await state.client.query('INSERT INTO mysql2_stmt_q (a, b) VALUES (1, "Hello"), (2, "World")');
+    let statement = await state.client.prepare("SELECT * FROM mysql2_stmt_q WHERE a < ?");
+    let results = (await statement.execute(2))!;
+    expect(results.toA()[0]).toEqual({ a: 1, b: "Hello" });
+
+    statement = await state.client.prepare("SELECT * FROM mysql2_stmt_q WHERE b LIKE ?");
+    results = (await statement.execute("%orld"))!;
+    expect(results.toA()[0]).toEqual({ a: 2, b: "World" });
+
+    await state.client.query("DROP TABLE IF EXISTS mysql2_stmt_q");
+  });
+  it("should select dates", async () => {
+    const statement = await state.client.prepare("SELECT NOW()");
+    const result = (await statement.execute())!;
+    expect(Object.values(result.toA()[0])[0]).toBeExactInstanceOf(Time);
+  });
+  it("should prepare Date values", async () => {
+    const now = RubyDate.today();
+    const statement = await state.client.prepare("SELECT ? AS a");
+    const result = (await statement.execute(now))!;
+    expect(String((result.toA()[0] as Record<string, unknown>)["a"])).toBe(now.toString());
+  });
+  // PERMANENT-SKIP: the npm mysql2 driver's Execute toParameter binds a time only as a JS Date,
   it.skip("should prepare Time values with microseconds", () => {});
   it.skip("should prepare DateTime values with microseconds", () => {});
-  it.skip("should tell us about the fields", () => {});
+  it("should tell us about the fields", async () => {
+    const statement = await state.client.prepare("SELECT 1 as foo, 2");
+    await statement.execute();
+    const list = statement.fields!;
+    expect(list.length).toBe(2);
+    expect(list[0]).toBe("foo");
+    expect(list[1]).toBe("2");
+  });
+  // PERMANENT-SKIP: the npm mysql2 driver's Execute toParameter binds a string as VAR_STRING, not
   it.skip("should handle as a decimal binding a BigDecimal", () => {});
-  it.skip("should update a DECIMAL value passing a BigDecimal", () => {});
-  // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
-  it.skip("should warn but still work if cache_rows is set to false", () => {});
+  it("should update a DECIMAL value passing a BigDecimal", async () => {
+    await state.client.query("DROP TABLE IF EXISTS mysql2_stmt_decimal_test");
+    await state.client.query("CREATE TABLE mysql2_stmt_decimal_test (decimal_test DECIMAL(10,3))");
+
+    await (
+      await state.client.prepare("INSERT INTO mysql2_stmt_decimal_test VALUES (?)")
+    ).execute(new BigDecimal("123.45"));
+
+    const test_result = (await state.client.query(
+      "SELECT * FROM mysql2_stmt_decimal_test",
+    ))!.toA()[0] as Record<string, BigDecimal>;
+    expect(test_result["decimal_test"].toF()).toBe(123.45);
+  });
+  it("should warn but still work if cache_rows is set to false", async () => {
+    const statement = await state.client.prepare("SELECT 1");
+    const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
+    try {
+      const result = (await statement.execute({ cacheRows: false }))!.toA();
+      expect(write).toHaveBeenCalledWith(
+        expect.stringMatching(/:cache_rows is forced for prepared statements/),
+      );
+      expect(result.length).toBe(1);
+    } finally {
+      write.mockRestore();
+    }
+  });
   describe("utf8_db", () => {
     // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either".
     it.skip("should be able to retrieve utf8 field names correctly", () => {});
@@ -96,8 +184,30 @@ describe("Mysql2::Statement", () => {
     it.skip("should be able to retrieve query with param in different encoding correctly", () => {});
   });
   describe("streaming result", () => {
-    // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
-    it.skip("should be able to stream query result", () => {});
+    it("should be able to stream query result", async () => {
+      let n = 1;
+      const stmt = await state.client.prepare("SELECT 1 UNION SELECT 2");
+      const result = (await stmt.execute({
+        stream: true,
+        cacheRows: false,
+        as: "array",
+      })) as unknown as Mysql2StreamResult<unknown[]>;
+      await result.each((r) => {
+        /* eslint-disable vitest/no-conditional-expect -- mirrors statement_spec.rb:266 `case n` */
+        switch (n) {
+          case 1:
+            expect(r).toEqual([1]);
+            break;
+          case 2:
+            expect(r).toEqual([2]);
+            break;
+          default:
+            expect.fail("returned more than two rows");
+        }
+        /* eslint-enable vitest/no-conditional-expect */
+        n += 1;
+      });
+    });
   });
   describe("#each", () => {
     it("should yield rows as hash's", async () => {
@@ -120,12 +230,37 @@ describe("Mysql2::Statement", () => {
         expect(row).toBeInstanceOf(Array);
       });
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should cache previously yielded results by default", () => {});
-    // PERMANENT-SKIP: streaming, cache_rows and async_result are outside the RFC 0254 surface (Non-goals).
-    it.skip("should yield different value for #first if streaming", () => {});
-    it.skip("should yield the same value for #first if streaming is disabled", () => {});
-    it.skip("should throw an exception if we try to iterate twice when streaming is enabled", () => {});
+    it("should cache previously yielded results by default", async () => {
+      const result = (await (await state.client.prepare("SELECT 1")).execute())!;
+      expect(result.toA()[0]).toBe(result.toA()[0]);
+    });
+    it("should yield different value for #first if streaming", async () => {
+      const result = (await (
+        await state.client.prepare("SELECT 1 UNION SELECT 2")
+      ).execute({
+        stream: true,
+        cacheRows: true,
+      })) as unknown as Mysql2StreamResult;
+      expect(await result.first()).not.toEqual(await result.first());
+    });
+    it("should yield the same value for #first if streaming is disabled", async () => {
+      const result = (await (
+        await state.client.prepare("SELECT 1 UNION SELECT 2")
+      ).execute({ stream: false }))!;
+      expect(result.toA()[0]).toEqual(result.toA()[0]);
+    });
+    it("should throw an exception if we try to iterate twice when streaming is enabled", async () => {
+      const result = (await (
+        await state.client.prepare("SELECT 1 UNION SELECT 2")
+      ).execute({
+        stream: true,
+        cacheRows: false,
+      })) as unknown as Mysql2StreamResult;
+      await expect(async () => {
+        await result.each(() => {});
+        await result.each(() => {});
+      }).rejects.toThrow(Mysql2.Error);
+    });
   });
   describe("#fields", () => {
     it("method should exist", async () => {
@@ -147,21 +282,78 @@ describe("Mysql2::Statement", () => {
       expect(test_result["null_test"]).toBeExactInstanceOf(rbCNilClass);
       expect(test_result["null_test"]).toBe(null);
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should return String for a BIT(64) value", () => {});
-    it.skip("should return String for a BIT(1) value", () => {});
+    it("should return String for a BIT(64) value", async () => {
+      const test_result = await testResult(state.client);
+      expect(test_result["bit_test"]).toBeInstanceOf(Uint8Array);
+      expect(Array.from(test_result["bit_test"] as Uint8Array)).toEqual([0, 0, 0, 0, 0, 0, 0, 5]);
+    });
+    it("should return String for a BIT(1) value", async () => {
+      const test_result = await testResult(state.client);
+      expect(test_result["single_bit_test"]).toBeInstanceOf(Uint8Array);
+      expect(Array.from(test_result["single_bit_test"] as Uint8Array)).toEqual([1]);
+    });
     it("should return Fixnum for a TINYINT value", async () => {
       const test_result = await testResult(state.client);
       expect(["number", "bigint"]).toContain(typeof test_result["tiny_int_test"]);
       expect(Number(test_result["tiny_int_test"])).toBe(1);
     });
     describe("cast booleans for TINYINT if :cast_booleans is enabled", () => {
-      // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-      it.skip("should return TrueClass or FalseClass for a TINYINT value if :cast_booleans is enabled", () => {});
+      let ids: number[] = [];
+      afterEach(async () => {
+        if (ids.length)
+          await state.client.query(`DELETE from mysql2_test WHERE id IN(${ids.join(",")})`);
+        ids = [];
+      });
+      it("should return TrueClass or FalseClass for a TINYINT value if :cast_booleans is enabled", async () => {
+        const id1 = await (await state.client.query(
+          "INSERT INTO mysql2_test (bool_cast_test) VALUES ( 1)",
+        ),
+        state.client.lastId!);
+        const id2 = await (await state.client.query(
+          "INSERT INTO mysql2_test (bool_cast_test) VALUES ( 0)",
+        ),
+        state.client.lastId!);
+        const id3 = await (await state.client.query(
+          "INSERT INTO mysql2_test (bool_cast_test) VALUES (-1)",
+        ),
+        state.client.lastId!);
+        ids = [id1, id2, id3];
+        const query = await state.client.prepare(
+          "SELECT bool_cast_test FROM mysql2_test WHERE id = ?",
+        );
+        const result1 = (await query.execute(id1, { castBooleans: true }))!;
+        const result2 = (await query.execute(id2, { castBooleans: true }))!;
+        const result3 = (await query.execute(id3, { castBooleans: true }))!;
+        expect((result1.toA()[0] as Record<string, unknown>)["bool_cast_test"]).toBe(true);
+        expect((result2.toA()[0] as Record<string, unknown>)["bool_cast_test"]).toBe(false);
+        expect((result3.toA()[0] as Record<string, unknown>)["bool_cast_test"]).toBe(true);
+      });
     });
     describe("cast booleans for BIT(1) if :cast_booleans is enabled", () => {
-      // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-      it.skip("should return TrueClass or FalseClass for a BIT(1) value if :cast_booleans is enabled", () => {});
+      let ids: number[] = [];
+      afterEach(async () => {
+        if (ids.length)
+          await state.client.query(`DELETE from mysql2_test WHERE id IN(${ids.join(",")})`);
+        ids = [];
+      });
+      it("should return TrueClass or FalseClass for a BIT(1) value if :cast_booleans is enabled", async () => {
+        const id1 = await (await state.client.query(
+          "INSERT INTO mysql2_test (single_bit_test) VALUES (1)",
+        ),
+        state.client.lastId!);
+        const id2 = await (await state.client.query(
+          "INSERT INTO mysql2_test (single_bit_test) VALUES (0)",
+        ),
+        state.client.lastId!);
+        ids = [id1, id2];
+        const query = await state.client.prepare(
+          "SELECT single_bit_test FROM mysql2_test WHERE id = ?",
+        );
+        const result1 = (await query.execute(id1, { castBooleans: true }))!;
+        const result2 = (await query.execute(id2, { castBooleans: true }))!;
+        expect((result1.toA()[0] as Record<string, unknown>)["single_bit_test"]).toBe(true);
+        expect((result2.toA()[0] as Record<string, unknown>)["single_bit_test"]).toBe(false);
+      });
     });
     it("should return Fixnum for a SMALLINT value", async () => {
       const test_result = await testResult(state.client);
@@ -188,8 +380,11 @@ describe("Mysql2::Statement", () => {
       expect(["number", "bigint"]).toContain(typeof test_result["year_test"]);
       expect(Number(test_result["year_test"])).toBe(2009);
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should return BigDecimal for a DECIMAL value", () => {});
+    it("should return BigDecimal for a DECIMAL value", async () => {
+      const test_result = await testResult(state.client);
+      expect(test_result["decimal_test"]).toBeExactInstanceOf(BigDecimal);
+      expect((test_result["decimal_test"] as BigDecimal).toF()).toBe(10.3);
+    });
     it("should return Float for a FLOAT value", async () => {
       const test_result = await testResult(state.client);
       expect(test_result["float_test"]).toBeExactInstanceOf(rbCFloat);
@@ -207,9 +402,18 @@ describe("Mysql2::Statement", () => {
         "2010-04-04 11:44:00",
       );
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should return Time when timestamp is < 1901-12-13 20:45:52", () => {});
-    it.skip("should return Time when timestamp is > 2038-01-19T03:14:07", () => {});
+    it("should return Time when timestamp is < 1901-12-13 20:45:52", async () => {
+      const r = (await (
+        await state.client.prepare("SELECT CAST('1901-12-13 20:45:51' AS DATETIME) as test")
+      ).execute())!;
+      expect((r.toA()[0] as Record<string, unknown>)["test"]).toBeExactInstanceOf(Time);
+    });
+    it("should return Time when timestamp is > 2038-01-19T03:14:07", async () => {
+      const r = (await (
+        await state.client.prepare("SELECT CAST('2038-01-19 03:14:08' AS DATETIME) as test")
+      ).execute())!;
+      expect((r.toA()[0] as Record<string, unknown>)["test"]).toBeExactInstanceOf(Time);
+    });
     it("should return Time for a TIMESTAMP value when within the supported range", async () => {
       const test_result = await testResult(state.client);
       expect(test_result["timestamp_test"]).toBeInstanceOf(Time);
@@ -224,15 +428,29 @@ describe("Mysql2::Statement", () => {
         "2000-01-01 11:44:00",
       );
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should return Date for a DATE value", () => {});
+    it("should return Date for a DATE value", async () => {
+      const test_result = await testResult(state.client);
+      expect(test_result["date_test"]).toBeExactInstanceOf(Temporal.PlainDate);
+      expect((test_result["date_test"] as Temporal.PlainDate).toString()).toBe("2010-04-04");
+    });
     it("should return String for an ENUM value", async () => {
       const test_result = await testResult(state.client);
       expect(test_result["enum_test"]).toBeExactInstanceOf(String);
       expect(test_result["enum_test"]).toBe("val1");
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should raise an error given an invalid DATETIME", () => {});
+    it("should raise an error given an invalid DATETIME", async () => {
+      const result = (await state.client.query(
+        "SELECT CAST('1972-00-27 00:00:00' AS DATETIME) as bad_datetime",
+      ))!;
+      expect(() => result.each()).toThrow(Mysql2.Error);
+      let message: string | null = null;
+      try {
+        result.each();
+      } catch (e) {
+        message = (e as Error).message;
+      }
+      expect(message).toBe("Invalid date in field 'bad_datetime': 1972-00-27 00:00:00");
+    });
     describe("string encoding for ENUM values", () => {
       // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either".
       it.skip("should default to the connection's encoding if Encoding.default_internal is nil", () => {});
@@ -248,15 +466,39 @@ describe("Mysql2::Statement", () => {
       it.skip("should default to the connection's encoding if Encoding.default_internal is nil", () => {});
       it.skip("should use Encoding.default_internal", () => {});
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should return String for a BINARY value", () => {});
+    it("should return String for a BINARY value", async () => {
+      const test_result = await testResult(state.client);
+      expect(test_result["binary_test"]).toBeInstanceOf(Uint8Array);
+      expect(Array.from(test_result["binary_test"] as Uint8Array)).toEqual([
+        116, 101, 115, 116, 0, 0, 0, 0, 0, 0,
+      ]);
+    });
     describe("string encoding for BINARY values", () => {
       // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either".
       it.skip("should default to binary if Encoding.default_internal is nil", () => {});
       it.skip("should not use Encoding.default_internal", () => {});
     });
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should return a String for #{type}", () => {});
+    it("should return a String for #{type}", async () => {
+      const test_result = await testResult(state.client);
+      for (const field of [
+        "char_test",
+        "varchar_test",
+        "varbinary_test",
+        "tiny_blob_test",
+        "tiny_text_test",
+        "blob_test",
+        "text_test",
+        "medium_blob_test",
+        "medium_text_test",
+        "long_blob_test",
+        "long_text_test",
+      ]) {
+        const value = test_result[field];
+        const text = value instanceof Uint8Array ? new TextDecoder().decode(value) : value;
+        expect(text).toBeExactInstanceOf(String);
+        expect(text).toBe("test");
+      }
+    });
     describe("string encoding for #{type} values", () => {
       // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either".
       it.skip("should default to binary if Encoding.default_internal is nil", () => {});
@@ -266,9 +508,30 @@ describe("Mysql2::Statement", () => {
     });
   });
   describe("last_id", () => {
-    // PERMANENT-SKIP: not in the RFC 0254 surface table (§ "The measured split").
-    it.skip("should return last insert id", () => {});
-    it.skip("should handle bigint ids", () => {});
+    lastIdTestLock(state);
+    beforeEach(async () => {
+      await state.client.query(
+        "CREATE TABLE IF NOT EXISTS lastIdTest (`id` BIGINT NOT NULL AUTO_INCREMENT, blah INT(11), PRIMARY KEY (`id`))",
+      );
+    });
+    afterEach(async () => {
+      await state.client.query("DROP TABLE lastIdTest");
+    });
+    it("should return last insert id", async () => {
+      const stmt = await state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
+      expect(stmt.lastId).toBe(0);
+      await stmt.execute(1);
+      expect(stmt.lastId).toBe(1);
+    });
+    it("should handle bigint ids", async () => {
+      let stmt = await state.client.prepare("INSERT INTO lastIdTest (id, blah) VALUES (?, ?)");
+      await stmt.execute(5000000000, 5000);
+      expect(stmt.lastId).toBe(5000000000);
+
+      stmt = await state.client.prepare("INSERT INTO lastIdTest (blah) VALUES (?)");
+      await stmt.execute(5001);
+      expect(stmt.lastId).toBe(5000000001);
+    });
   });
   describe("affected_rows", () => {
     lastIdTestLock(state);

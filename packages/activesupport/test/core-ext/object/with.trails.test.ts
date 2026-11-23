@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { objectWith } from "../../../lib/core-ext/object/with.js";
+import { with as with_ } from "../../../lib/core-ext/object/with.js";
 
-describe("objectWith with an async block", () => {
+describe("with with an async block", () => {
   it("restores after the awaited block settles", async () => {
-    const obj = { foo: "old" };
+    const obj = {
+      _foo: "old",
+      get foo() {
+        return this._foo;
+      },
+      set foo(value: string) {
+        this._foo = value;
+      },
+    };
     let during: string | undefined;
-    const done = objectWith(obj, { foo: "new" }, async () => {
+    const done = with_(obj, { foo: "new" }, async () => {
       await Promise.resolve();
       during = obj.foo;
     });
@@ -16,9 +24,17 @@ describe("objectWith with an async block", () => {
   });
 
   it("restores after the block rejects", async () => {
-    const obj = { foo: "old" };
+    const obj = {
+      _foo: "old",
+      get foo() {
+        return this._foo;
+      },
+      set foo(value: string) {
+        this._foo = value;
+      },
+    };
     await expect(
-      objectWith(obj, { foo: "new" }, async () => {
+      with_(obj, { foo: "new" }, async () => {
         await Promise.resolve();
         throw new Error("boom");
       }),

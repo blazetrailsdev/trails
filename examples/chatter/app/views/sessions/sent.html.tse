@@ -1,0 +1,3 @@
+<h1>Check your email</h1>
+<p>We sent a sign-in link to <strong><%= params.get("email_address") %></strong>. It expires in 15 minutes.</p>
+<p class="muted"><%= linkTo("Use a different email", newSessionPath()) %></p>

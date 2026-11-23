@@ -43,7 +43,7 @@ arguments can still be misread.
 ## Templates are precompiled (`Template#compile`'s `module_eval`)
 
 Rails compiles a template at its first render: `compiled_source`
-(`vendor/rails/v8.0.5.2/actionview/lib/action_view/template.rb:443-486`) wraps
+(`vendor/rails/v8.0.5.2/actionview/lib/action_view/template.rb:449-492`) wraps
 the handler's Ruby in a `def`, and `compile` (`:500-539`) hands it to
 `mod.module_eval(compiled_source, identifier, offset)`. JS can only evaluate
 source text through `eval`, `new Function` or `vm`, each of which runs code

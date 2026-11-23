@@ -450,7 +450,6 @@ export abstract class Base {
   ): unknown {
     if (Object.keys(values).length === 0) return data;
     if (typeof data === "string") return interpolateString(data, values);
-    if (Array.isArray(data)) return data.map((v) => this.deepInterpolate(locale, v, values));
     if (isHash(data)) {
       const result: TranslationData = new Hash();
       for (const [k, v] of data) {
@@ -458,6 +457,14 @@ export abstract class Base {
       }
       return result;
     }
+    if (isPlainHash(data)) {
+      const result: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(data)) {
+        result[k] = this.deepInterpolate(locale, v, values);
+      }
+      return result;
+    }
+    if (Array.isArray(data)) return data.map((v) => this.deepInterpolate(locale, v, values));
     return data;
   }
 

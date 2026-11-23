@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 
 import { getCrypto } from "@blazetrails/ruby-compat";
 import { InvalidMessage, MessageEncryptor } from "../../lib/message-encryptor.js";
-import { extractOptionsBang } from "../../lib/hash-utils.js";
+import { extractOptionsBang } from "../../lib/core-ext/array/extract-options.js";
 import {
   assertRotate,
   messageRotatorTests,

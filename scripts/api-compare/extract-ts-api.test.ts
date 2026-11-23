@@ -6812,6 +6812,23 @@ describe("typed first credit", () => {
   });
 });
 
+describe("typed chop credit", () => {
+  const forms = (body: string): Set<string> =>
+    nativeForms(
+      extractFromFiles("/p", {
+        "foo.ts": `export class Foo {
+          m(unit: "days" | "hours", s: string, crlf: "a\\r\\n") { ${body} }
+        }`,
+      }).classes["foo.ts:Foo"].instanceMethods.find((m) => m.name === "m")!,
+    );
+
+  it("credits chop@typed only on a literal union that cannot end in CRLF", () => {
+    expect(forms(`return unit.slice(0, -1);`).has("chop@typed")).toBe(true);
+    expect(forms(`return s.slice(0, -1);`).has("chop@typed")).toBe(false);
+    expect(forms(`return crlf.slice(0, -1);`).has("chop@typed")).toBe(false);
+  });
+});
+
 describe("typed fetch credit", () => {
   const forms = (body: string): Set<string> =>
     nativeForms(
@@ -8302,6 +8319,47 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
       "instance",
       "instance writer",
     ]);
+  });
+
+  it("credits an included block on a chained extend(X, Concern).included", () => {
+    const info = extractFromFiles("/p", {
+      "rescuable.ts": `
+        import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
+        export const Rescuable = { rescueWithHandler };
+        extend(Rescuable, Concern).included(null, function (this: object) {
+          classAttribute.call(this, "rescueHandlers", { default: [] });
+        });
+        export function rescueWithHandler() {}
+      `,
+    });
+    const members = Object.values(info.modules)
+      .filter((m) => m.name === "Rescuable")
+      .flatMap((m) => [...m.classMethods, ...m.instanceMethods]);
+    expect(members.some((m) => m.name === "rescueHandlers")).toBe(true);
+  });
+
+  it("credits a get/set accessor seated on a namespace object as the reader and writer", () => {
+    const info = extractFromFiles("/p", {
+      "namespaces.ts": `
+        export const ActiveSupport = { Cache: { name: "ActiveSupport::Cache" } as { name: string; _v: number } };
+      `,
+      "cache.ts": `
+        import { ActiveSupport } from "./namespaces.js";
+        export function lookupStore() {}
+        Object.defineProperty(ActiveSupport.Cache, "formatVersion", {
+          get(): number {
+            return ActiveSupport.Cache._v;
+          },
+          set(value: number) {
+            ActiveSupport.Cache._v = value;
+          },
+        });
+      `,
+    });
+    const seats = (info.fileFunctions?.["cache.ts"] ?? [])
+      .filter((m) => m.name === "formatVersion")
+      .map((m) => (m.writer ? "writer" : "reader"));
+    expect(seats).toEqual(["reader", "writer"]);
   });
 
   it("credits mattrReader / mattrAccessor with only the halves each macro installs, and no predicate", () => {

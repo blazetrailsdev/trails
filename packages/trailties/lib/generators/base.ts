@@ -19,6 +19,8 @@ import {
   constDefined,
   rbModName,
   rbClearMethodCache,
+  rbFBinding,
+  TSE,
 } from "@blazetrails/ruby-compat";
 import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
@@ -119,6 +121,11 @@ export abstract class Base extends (Group as unknown as (abstract new (
    * @noRailsEquivalent PERMANENT
    */
   _gemGroups: string[];
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  _githubRepos: { repo: string; options: Record<string, unknown> }[];
 
   /**
    * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.5.2/railties/lib/rails/generators/actions.rb:10-13
@@ -128,6 +135,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
     super(args, options, config);
     this._indentation = 0;
     this._gemGroups = [];
+    this._githubRepos = [];
   }
 
   static {
@@ -200,10 +208,13 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
     if (!Object.hasOwn(this, "_desc") || klass._desc == null) {
       const usagePath = await this.usagePath();
-      klass._desc =
-        usagePath != null
-          ? await getFs().readFile(usagePath, "utf-8")
-          : `Description:\n    Create ${humanize(this.baseName()!).toLowerCase()} files for ${this.generatorName()} generator.`;
+      if (usagePath != null) {
+        const erb = new TSE(await File.readAsync(usagePath));
+        erb.filename = usagePath;
+        klass._desc = await erb.result(rbFBinding(this));
+      } else {
+        klass._desc = `Description:\n    Create ${humanize(this.baseName()!).toLowerCase()} files for ${this.generatorName()} generator.`;
+      }
     }
     return klass._desc;
   }
@@ -282,6 +293,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
   application = Actions.application;
   gem = Actions.gem;
   gemGroup = Actions.gemGroup;
+  github = Actions.github;
   addSource = Actions.addSource;
   git = Actions.git;
   vendor = Actions.vendor;

@@ -54,13 +54,33 @@
   "devDependencies": {
     "@blazetrails/mini-magick": "workspace:*",
     "@blazetrails/image-processing": "workspace:*",
-    "@blazetrails/vitest-matchers": "workspace:*"
+    "@blazetrails/vitest-matchers": "workspace:*",
+    "@aws-sdk/client-s3": "3.1175.0",
+    "@aws-sdk/lib-storage": "3.1175.0",
+    "@aws-sdk/s3-request-presigner": "3.1175.0",
+    "@google-cloud/storage": "8.4.0"
   },
   "peerDependencies": {
-    "@blazetrails/image-processing": "workspace:*"
+    "@blazetrails/image-processing": "workspace:*",
+    "@aws-sdk/client-s3": "^3.1161.0",
+    "@aws-sdk/lib-storage": "^3.1161.0",
+    "@aws-sdk/s3-request-presigner": "^3.1161.0",
+    "@google-cloud/storage": "^8.4.0"
   },
   "peerDependenciesMeta": {
     "@blazetrails/image-processing": {
+      "optional": true
+    },
+    "@aws-sdk/client-s3": {
+      "optional": true
+    },
+    "@aws-sdk/lib-storage": {
+      "optional": true
+    },
+    "@aws-sdk/s3-request-presigner": {
+      "optional": true
+    },
+    "@google-cloud/storage": {
       "optional": true
     }
   },

@@ -188,20 +188,7 @@ export function status2klass(status: number): typeof Exception | null {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-libsql-engines */
-function nativeStatus(error: unknown): number | null {
-  const { rawCode } = (error ?? {}) as Record<string, unknown>;
-  if (typeof rawCode === "number") return rawCode & 0xff;
-  return null;
-}
-
-/** @noRailsEquivalent CONVERGEABLE sqlite3-libsql-engines */
-const nativeErrors: EngineErrors = {
-  errcode: nativeStatus,
-  errmsg: (error) => (error as { message: string }).message,
-};
-
-export function rbSqlite3Raise(error: unknown, db: EngineErrors = nativeErrors): never {
+export function rbSqlite3Raise(error: unknown, db: EngineErrors): never {
   const errcode = db.errcode(error);
   const status = errcode == null ? null : errcode & 0xff;
   const klass = status == null ? null : status2klass(status);
@@ -214,11 +201,7 @@ export function rbSqlite3Raise(error: unknown, db: EngineErrors = nativeErrors):
   throw exception;
 }
 
-export function rbSqlite3RaiseWithSql(
-  error: unknown,
-  sql: string | null,
-  db: EngineErrors = nativeErrors,
-): never {
+export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null, db: EngineErrors): never {
   const errcode = db.errcode(error);
   const status = errcode == null ? null : errcode & 0xff;
   const klass = status == null ? null : status2klass(status);

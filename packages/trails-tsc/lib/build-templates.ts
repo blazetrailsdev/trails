@@ -28,7 +28,7 @@ async function templatesIn(path: string): Promise<string[]> {
   for (const child of (await Dir.childrenAsync(path)).sort()) {
     const full = File.join(path, child);
     if ((await getFs().stat!(full)).isDirectory()) found.push(...(await templatesIn(full)));
-    else if (child.endsWith(".tt")) found.push(full);
+    else if (child.endsWith(".tt") || child === "USAGE") found.push(full);
   }
   return found;
 }

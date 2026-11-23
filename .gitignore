@@ -76,4 +76,5 @@ log/
 
 # precompiled generator templates (trails-tsc-views build-templates)
 *.tt.js
+USAGE.js
 packages/thor/test/fixtures/doc/*.rb.js

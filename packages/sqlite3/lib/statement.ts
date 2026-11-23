@@ -36,9 +36,16 @@ export class Statement {
   declare toA: () => unknown[][] | Promise<unknown[][]>;
   declare first: () => unknown[] | null | Promise<unknown[] | null>;
 
-  static async new(db: Database, sql: string): Promise<Statement> {
+  static new(db: Database, sql: string): Statement | Promise<Statement> {
     const stmt = rbClassNewInstance(this, db, sql);
-    stmt.remainder = await stmt.prepare(db, sql);
+    const remainder = stmt.prepare(db, sql);
+    if (remainder instanceof Promise) {
+      return remainder.then((r) => {
+        stmt.remainder = r;
+        return stmt;
+      });
+    }
+    stmt.remainder = remainder;
     return stmt;
   }
 
@@ -50,19 +57,56 @@ export class Statement {
     this.#types = null;
   }
 
-  async execute(...bindVars: unknown[]): Promise<ResultSet> {
+  execute(...bindVars: unknown[]): ResultSet | Promise<ResultSet> {
     const block = rbBlockGivenP(bindVars.at(-1))
       ? (bindVars.pop() as (results: ResultSet) => unknown)
       : undefined;
-    if (this.isActive() || this.isDone()) await this.resetBang();
+    const reset = (): ResultSet | Promise<ResultSet> => {
+      if (this.isActive() || this.isDone()) {
+        const r = this.resetBang();
+        if (r instanceof Promise) return r.then(bind);
+      }
+      return bind();
+    };
+    const bind = (): ResultSet | Promise<ResultSet> => {
+      if (bindVars.length !== 0) {
+        const r = this.bindParams(...bindVars);
+        if (r instanceof Promise) return r.then(buildResults);
+      }
+      return buildResults();
+    };
+    const buildResults = (): ResultSet | Promise<ResultSet> => {
+      const results = this.#connection.buildResultSet(this);
 
-    if (bindVars.length !== 0) await this.bindParams(...bindVars);
-    const results = this.#connection.buildResultSet(this);
+      const count = this.columnCount();
+      return count instanceof Promise
+        ? count.then((c) => stepIfNoColumns(c, results))
+        : stepIfNoColumns(count, results);
+    };
+    const stepIfNoColumns = (count: number, results: ResultSet): ResultSet | Promise<ResultSet> => {
+      if (count === 0) {
+        const r = this.step();
+        if (r instanceof Promise) return r.then(() => yieldResults(results));
+      }
+      return yieldResults(results);
+    };
+    const yieldResults = (results: ResultSet): ResultSet | Promise<ResultSet> => {
+      if (block) {
+        const r = block(results);
+        if (r instanceof Promise) return r.then(() => results);
+      }
+      return results;
+    };
 
-    if ((await this.columnCount()) === 0) await this.step();
+    return reset();
+  }
 
-    if (block) await block(results);
-    return results;
+  async executeBang(...bindVars: unknown[]): Promise<unknown[][] | this> {
+    const block = rbBlockGivenP(bindVars.at(-1))
+      ? (bindVars.pop() as (row: unknown[]) => void)
+      : undefined;
+    await this.execute(...bindVars);
+    return block ? this.each(block) : this.toA();
   }
 
   isActive(): boolean {
@@ -188,7 +232,14 @@ export class Statement {
     } catch (e) {
       rbSqlite3Raise(e, engine);
     }
-    return r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, engine)) : r;
+    return r instanceof Promise
+      ? r.then(
+          (list) => (list === null ? list : (Object.freeze(list) as unknown[])),
+          (e: unknown) => rbSqlite3Raise(e, engine),
+        )
+      : r === null
+        ? r
+        : (Object.freeze(r) as unknown[]);
   }
 
   isDone(): boolean {
@@ -217,15 +268,21 @@ export class Statement {
   }
 
   /** @internal */
-  private async prepare(db: Database, sql: string): Promise<string> {
-    let st: EngineStatement, remainder: string;
+  private prepare(db: Database, sql: string): string | Promise<string> {
+    let prepared: [EngineStatement, string] | Promise<[EngineStatement, string]>;
     try {
-      [st, remainder] = await db._engine.prepare(sql);
+      prepared = db._engine.prepare(sql);
     } catch (e) {
       rbSqlite3RaiseWithSql(e, sql, db._engine);
     }
-    this.#st = st;
-    return remainder;
+    const seat = ([st, remainder]: [EngineStatement, string]): string => {
+      this.#st = st;
+      return remainder;
+    };
+    if (prepared instanceof Promise) {
+      return prepared.then(seat, (e: unknown) => rbSqlite3RaiseWithSql(e, sql, db._engine));
+    }
+    return seat(prepared);
   }
 
   /** @internal */

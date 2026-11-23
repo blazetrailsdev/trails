@@ -136,6 +136,11 @@ describe("AuthenticationGenerator", () => {
     expect(exists("app/channels/application-cable/connection.ts")).toBe(false);
   });
 
+  it("includes Authentication in a static block of the default ApplicationController", async () => {
+    await makeGen().run();
+    expect(read(APP_CTRL_PATH)).toMatch(/static \{\n {4}include\(this, Authentication\);/);
+  });
+
   it("injects inside the class even when ApplicationController has a body", async () => {
     writeAC("{\n}", "{\n  async preexisting(): Promise<void> { return; }\n}");
     await makeGen().run();

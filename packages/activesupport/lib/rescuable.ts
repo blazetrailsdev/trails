@@ -11,7 +11,7 @@ import {
 import { Module, extend, rbObjIsKindOf, type Included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "./class-attribute.js";
 import { Concern } from "./concern.js";
-import { extractOptionsBang } from "./hash-utils.js";
+import { extractOptionsBang } from "./core-ext/array/extract-options.js";
 import { safeConstantize } from "./inflector.js";
 
 type ErrorHandler = ((this: never, error: never) => unknown) | string;
@@ -162,8 +162,7 @@ export const ClassMethods = {
 };
 
 export const Rescuable = { rescueWithHandler, handlerForRescue, ClassMethods };
-extend(Rescuable, Concern);
-Concern.included.call(Rescuable, null, function (this: object) {
+extend(Rescuable, Concern).included(null, function (this: object) {
   classAttribute.call(this, "rescueHandlers", { default: [] });
 });
 export type Rescuable = Included<typeof Rescuable>;

@@ -36,11 +36,11 @@ export class Variant {
     return `variants/${this.blob.key}/${OpenSSL.Digest.SHA256.hexdigest(this.variation.key)}`;
   }
 
-  url({
+  async url({
     expiresIn = ActiveStorage.serviceUrlsExpireIn,
     disposition = "inline",
-  }: { expiresIn?: unknown; disposition?: string } = {}): string {
-    return this.service.url(this.key, {
+  }: { expiresIn?: unknown; disposition?: string } = {}): Promise<string> {
+    return await this.service.url(this.key, {
       expiresIn: expiresIn,
       disposition: disposition,
       filename: this.filename,

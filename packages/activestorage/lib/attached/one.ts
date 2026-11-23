@@ -8,10 +8,31 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Attached } from "../attached.js";
 import type { Attachment } from "../attachment.js";
+import type { Blob } from "../blob.js";
 import type { CreateOne } from "./changes/create-one.js";
 import { DetachOne } from "./changes/detach-one.js";
 import { PurgeOne } from "./changes/purge-one.js";
 
+type OwnMember =
+  | keyof Attached
+  | "purge"
+  | "purgeLater"
+  | "detach"
+  | "attachment"
+  | "load"
+  | "isBlank"
+  | "attach"
+  | "isAttached"
+  | "loadedAttachment";
+
+type DelegatedAttachment = Partial<
+  Omit<Attachment, OwnMember> & Omit<Blob, keyof Attachment | OwnMember>
+>;
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
+export interface One extends DelegatedAttachment {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class One extends Attached {
   async purge(): Promise<void> {
     await (await this.purgeOne()).purge();

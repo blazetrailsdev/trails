@@ -64,7 +64,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
   it("resized variation of JPEG blob", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg" });
     const variant = await variantOf(blob, { resizeToLimit: [100, 100] }).processed();
-    expect(variant.url()).toMatch(/racecar\.jpg/);
+    expect(await variant.url()).toMatch(/racecar\.jpg/);
 
     const image = await readImage(variant);
     expect(await image.width()).toBe(100);
@@ -77,7 +77,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
       resizeToLimit: [100, 100],
       colourspace: "b-w",
     }).processed();
-    expect(variant.url()).toMatch(/racecar\.jpg/);
+    expect(await variant.url()).toMatch(/racecar\.jpg/);
 
     const image = await readImage(variant);
     expect(await image.width()).toBe(100);
@@ -98,7 +98,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
       resizeToLimit: [100, 100],
       colourspace: "srgb",
     }).processed();
-    expect(variant.url()).toMatch(/racecar\.jpg/);
+    expect(await variant.url()).toMatch(/racecar\.jpg/);
 
     const image = await readImage(variant);
     expect(await image.width()).toBe(100);
@@ -109,7 +109,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
   it("center-weighted crop of JPEG blob using :resize_to_fill", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg" });
     const variant = await variantOf(blob, { resizeToFill: [100, 100] }).processed();
-    expect(variant.url()).toMatch(/racecar\.jpg/);
+    expect(await variant.url()).toMatch(/racecar\.jpg/);
 
     const image = await readImage(variant);
     expect(await image.width()).toBe(100);
@@ -122,7 +122,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
       contentType: "image/vnd.adobe.photoshop",
     });
     const variant = await variantOf(blob, { resizeToLimit: [20, 20] }).processed();
-    expect(variant.url()).toMatch(/icon\.png/);
+    expect(await variant.url()).toMatch(/icon\.png/);
 
     const image = await readImage(variant);
     expect(await image.type()).toBe("PNG");
@@ -136,7 +136,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
       contentType: "image/vnd.microsoft.icon",
     });
     const variant = await variantOf(blob, { resizeToLimit: [20, 20] }).processed();
-    expect(variant.url()).toMatch(/icon\.png/);
+    expect(await variant.url()).toMatch(/icon\.png/);
 
     const image = await readImage(variant);
     expect(await image.type()).toBe("PNG");
@@ -147,7 +147,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
   it("resized variation of TIFF blob", async () => {
     const blob = await createFileBlob({ filename: "racecar.tif" });
     const variant = await variantOf(blob, { resizeToLimit: [50, 50] }).processed();
-    expect(variant.url()).toMatch(/racecar\.png/);
+    expect(await variant.url()).toMatch(/racecar\.png/);
 
     const image = await readImage(variant);
     expect(await image.type()).toBe("PNG");
@@ -158,7 +158,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
   it("resized variation of BMP blob", async () => {
     const blob = await createFileBlob({ filename: "colors.bmp", contentType: "image/bmp" });
     const variant = await variantOf(blob, { resizeToLimit: [15, 15] }).processed();
-    expect(variant.url()).toMatch(/colors\.png/);
+    expect(await variant.url()).toMatch(/colors\.png/);
 
     const image = await readImage(variant);
     expect(await image.type()).toBe("PNG");
@@ -169,7 +169,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
   it("resized variation of WEBP blob", async () => {
     const blob = await createFileBlob({ filename: "valley.webp" });
     const variant = await variantOf(blob, { resizeToLimit: [50, 50] }).processed();
-    expect(variant.url()).toMatch(/valley\.webp/);
+    expect(await variant.url()).toMatch(/valley\.webp/);
 
     const image = await readImage(variant);
     expect(await image.type()).toBe("WEBP");
@@ -224,7 +224,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     await processVariantsWith(ctx, "mini_magick", async () => {
       const blob = await createFileBlob({ filename: "racecar.jpg" });
       const variant = await variantOf(blob, { font: "a".repeat(10_000) }).processed();
-      expect(variant.url().length).toBeLessThan(785);
+      expect((await variant.url()).length).toBeLessThan(785);
     });
   });
 

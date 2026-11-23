@@ -60,6 +60,11 @@ export class Connection {
   ): Promise<R>;
   static async new<T extends Connection, R>(
     this: { prototype: T },
+    connParams?: Record<string, unknown>,
+    block?: (conn: T) => R | Promise<R>,
+  ): Promise<T | R>;
+  static async new<T extends Connection, R>(
+    this: { prototype: T },
     connParams: Record<string, unknown> = {},
     block?: (conn: T) => R | Promise<R>,
   ): Promise<T | R> {

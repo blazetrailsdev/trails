@@ -82,7 +82,14 @@ const LAZY_DIRS: Record<string, string[]> = {
   actionmailer: ["test-case.ts", "test-helper.ts"],
   actionview: ["test-case.ts", "testing/resolvers.ts"],
   activejob: ["test-case.ts", "test-helper.ts"],
-  activestorage: ["blob.ts", "blob/", "fixture-set.ts", "variant-record.ts"],
+  activestorage: [
+    "blob.ts",
+    "blob/",
+    "fixture-set.ts",
+    "service/gcs-service.ts",
+    "service/s3-service.ts",
+    "variant-record.ts",
+  ],
   activesupport: ["executor/test-helper.ts"],
   actiontext: ["encrypted-rich-text.ts", "rich-text.ts"],
   trailties: [
@@ -678,6 +685,12 @@ export const PACKAGE_CORE_CLASSES: readonly [string, string, string][] = [
  * `file::tsName` and the site relative to `vendor/`.
  */
 export const GEM_EXT_CLASSES: readonly [string, string, string, string][] = [
+  [
+    "libxml-ruby",
+    "parser/context.ts::Context",
+    "LibXML::XML::Parser::Context",
+    "libxml-ruby/5.0.5/ext/libxml/ruby_xml_parser_context.c:958",
+  ],
   ["sqlite3", "backup.ts::Backup", "SQLite3::Backup", "sqlite3/v2.6.0/ext/sqlite3/backup.c:180"],
   [
     "msgpack",

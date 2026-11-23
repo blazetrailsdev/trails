@@ -149,6 +149,8 @@ export const REQUIRED_TEST_MODULES: Record<string, string> = {
   localCacheBehavior: "packages/activesupport/test/cache/behaviors/local-cache-behavior.ts",
   testsBasics: "packages/i18n/test/support/tests/basics.ts",
   testsDefaults: "packages/i18n/test/support/tests/defaults.ts",
+  testsInterpolation: "packages/i18n/test/support/tests/interpolation.ts",
+  testsLink: "packages/i18n/test/support/tests/link.ts",
   testsLookup: "packages/i18n/test/support/tests/lookup.ts",
   testsPluralization: "packages/i18n/test/support/tests/pluralization.ts",
   testsProcs: "packages/i18n/test/support/tests/procs.ts",

@@ -176,6 +176,7 @@ export const ROWLESS_PACKAGES = [
   "zeitwerk",
   "fugit",
   "globalid",
+  "listen",
   "marcel",
   "mini-magick",
   "rack",

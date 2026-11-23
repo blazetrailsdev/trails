@@ -1,3 +1,4 @@
+import type { Connection } from "./connection.js";
 import { PG } from "./namespaces.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -31,5 +32,16 @@ export const Constants = {
 PG.Constants = Constants;
 Object.assign(PG, Constants);
 
-PG.connect = ((...args: Parameters<typeof PG.Connection.new>) =>
-  PG.Connection.new(...args)) as typeof PG.connect;
+export function connect(connParams?: Record<string, unknown>): Promise<Connection>;
+export function connect<R>(
+  connParams: Record<string, unknown>,
+  block: (conn: Connection) => R | Promise<R>,
+): Promise<R>;
+export function connect<R>(
+  connParams?: Record<string, unknown>,
+  block?: (conn: Connection) => R | Promise<R>,
+): Promise<Connection | R> {
+  return PG.Connection.new(connParams, block);
+}
+
+PG.connect = connect;

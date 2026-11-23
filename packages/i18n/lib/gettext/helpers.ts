@@ -3,7 +3,7 @@ import { EMPTY_HASH, t } from "../i18n.js";
 import type { TranslateOptions } from "../backend/base.js";
 import { Gettext } from "../gettext.js";
 
-const _Helpers = {
+export const Helpers = {
   N_(msgsid: string): string {
     return msgsid;
   },
@@ -11,17 +11,20 @@ const _Helpers = {
   gettext(msgid: string, options: TranslateOptions = EMPTY_HASH): unknown {
     return t(msgid, { ...{ default: msgid, separator: "|" }, ...options });
   },
+  _: undefined as unknown as (msgid: string, options?: TranslateOptions) => unknown,
 
   sgettext(msgid: string | undefined, separator = "|"): unknown {
     let scope: string[];
     [scope, msgid] = Gettext.extractScope(msgid, separator);
     return t(msgid, { scope, default: msgid, separator });
   },
+  s_: undefined as unknown as (msgid: string | undefined, separator?: string) => unknown,
 
   pgettext(msgctxt: string, msgid: string): unknown {
     const separator = Gettext.CONTEXT_SEPARATOR;
     return this.sgettext([msgctxt, msgid].join(separator), separator);
   },
+  p_: undefined as unknown as (msgctxt: string, msgid: string) => unknown,
 
   ngettext(
     msgid: string | string[],
@@ -30,6 +33,11 @@ const _Helpers = {
   ): unknown {
     return this.nsgettext(msgid, msgidPlural, n);
   },
+  n_: undefined as unknown as (
+    msgid: string | string[],
+    msgidPlural: string | number,
+    n?: number | string,
+  ) => unknown,
 
   nsgettext(
     msgid: string | string[] | undefined,
@@ -47,6 +55,12 @@ const _Helpers = {
     const default_ = new Hash<string, unknown>().set(":one", msgid).set(":other", msgidPlural);
     return t(msgid, { default: default_, count: n, scope, separator });
   },
+  ns_: undefined as unknown as (
+    msgid: string | string[] | undefined,
+    msgidPlural: string | number,
+    n?: number | string,
+    separator?: unknown,
+  ) => unknown,
 
   npgettext(
     msgctxt: string,
@@ -64,16 +78,19 @@ const _Helpers = {
 
     return this.nsgettext(msgid, msgidPlural, n, separator);
   },
+  np_: undefined as unknown as (
+    msgctxt: string,
+    msgid: string | string[],
+    msgidPlural: string | number,
+    n?: number | string,
+  ) => unknown,
 };
 
-export const Helpers = {
-  ..._Helpers,
-  _: _Helpers.gettext,
-  s_: _Helpers.sgettext,
-  p_: _Helpers.pgettext,
-  n_: _Helpers.ngettext,
-  ns_: _Helpers.nsgettext,
-  np_: _Helpers.npgettext,
-};
+Helpers._ = Helpers.gettext;
+Helpers.s_ = Helpers.sgettext;
+Helpers.p_ = Helpers.pgettext;
+Helpers.n_ = Helpers.ngettext;
+Helpers.ns_ = Helpers.nsgettext;
+Helpers.np_ = Helpers.npgettext;
 
 Gettext.Helpers = Helpers;

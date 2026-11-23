@@ -3,6 +3,7 @@ import {
   ArgumentError,
   Hash,
   hashDelete,
+  eachPair,
   isPlainHash,
   rbFSend,
   toI,
@@ -257,7 +258,11 @@ export class Response {
   private _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
   /** @inventedArm if — CONVERGEABLE rack-body-parts-are-safebuffer-objects */
-  constructor(body: any = null, status: number | string = 200, headers: RackHeaders = {}) {
+  constructor(
+    body: any = null,
+    status: number | string = 200,
+    headers: RackHeaders | Hash<string, any> = {},
+  ) {
     this.status = Number(toI(status));
 
     if (!(isPlainHash(headers) || (headers as unknown) instanceof Hash)) {
@@ -265,9 +270,9 @@ export class Response {
     }
 
     this.headers = {};
-    for (const [k, v] of Object.entries(headers)) {
+    eachPair(headers, (k, v) => {
       this.headers[k.toLowerCase()] = v;
-    }
+    });
     this._writer = this.append.bind(this);
     this._block = null;
 

@@ -1,4 +1,5 @@
 import { ArgumentError } from "./hash-utils.js";
+import { ActiveSupport } from "./namespaces.js";
 import { OpenSSL, rbObjAsString, type DigestClass } from "@blazetrails/ruby-compat";
 
 export class Digest {
@@ -21,3 +22,5 @@ export class Digest {
     return this.hashDigestClass.hexdigest(arg).slice(0, 32);
   }
 }
+
+ActiveSupport.Digest = Digest;

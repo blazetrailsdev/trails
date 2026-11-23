@@ -3,6 +3,7 @@ import type { MiddlewareFactory } from "@blazetrails/actionpack";
 import {
   ActionDispatch,
   ContentSecurityPolicy,
+  HostAuthorization,
   PermissionsPolicy,
   type NonceGenerator,
 } from "@blazetrails/actionpack";
@@ -27,7 +28,16 @@ import {
   rbInspect,
   SecureRandom,
 } from "@blazetrails/ruby-compat";
-import { FileUtils, isPlainHash, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  env as ENV,
+  FileUtils,
+  type IPAddr,
+  isPlainHash,
+  rbModName,
+  rbObjId,
+  RuntimeError,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 import { LogSubscriber, reverseMergeBang, wrap } from "@blazetrails/activesupport";
 import type { DatabaseConfigModule } from "../database.js";
 import { Configuration as EngineConfiguration } from "../engine/configuration.js";
@@ -67,7 +77,14 @@ export class Configuration extends EngineConfiguration {
   filterRedirect: Array<string | RegExp> = [];
   precompileFilterParameters: boolean | null = null;
   helpersPaths: string[] = [];
-  hosts: Array<string | RegExp | ((host: string) => boolean)> = [];
+  hosts: Array<string | RegExp | IPAddr | ((host: string) => boolean)> = Trails.env.isDevelopment()
+    ? [
+        ...HostAuthorization.ALLOWED_HOSTS_IN_DEVELOPMENT,
+        ...stringSplit(String(ENV["TRAILS_DEVELOPMENT_HOSTS"] ?? ""), ",").map((host) =>
+          host.trim(),
+        ),
+      ]
+    : [];
   hostAuthorization: Record<string, unknown> = {};
   publicFileServer: PublicFileServer = { enabled: true, indexName: "index", headers: null };
   assumeSsl = false;
@@ -76,12 +93,14 @@ export class Configuration extends EngineConfiguration {
   timeZone: string | null | false = "UTC";
   beginningOfWeek: WeekDay = ":monday";
   logger: unknown = null;
-  logLevel: LogLevel | number | string = "debug";
+  /** @internal */
+  private _logLevel: LogLevel | number | string = "debug";
   logFormatter: Logger["formatter"] = new SimpleFormatter();
   logTags: Tagger[] = [];
   logFileSize: number | null = null;
   autoflushLog = true;
-  broadcastLogLevel: LogLevel | number | string | null = null;
+  /** @internal */
+  private _broadcastLogLevel: LogLevel | number | string | null = null;
   silenceHealthcheckPath: string | null = null;
   cacheClasses: boolean | null = null;
   cacheStore: unknown = [":file_store", `${this.root ?? ""}/tmp/cache/`];
@@ -210,8 +229,8 @@ export class Configuration extends EngineConfiguration {
 
         if (this.isRespondTo("activeStorage")) {
           const activeStorage = this.get("activeStorage") as { queues: Record<string, unknown> };
-          activeStorage.queues.analysis = ":active_storage_analysis";
-          activeStorage.queues.purge = ":active_storage_purge";
+          activeStorage.queues.analysis = "active_storage_analysis";
+          activeStorage.queues.purge = "active_storage_purge";
         }
 
         if (this.isRespondTo("activeRecord")) {
@@ -466,7 +485,7 @@ export class Configuration extends EngineConfiguration {
   }
 
   inspect(): string {
-    return `#<${this.constructor.name}:0x${(rbObjId(this) * 2).toString(16).padStart(14, "0")}>`;
+    return `#<${rbModName(this.constructor)}:0x${(rbObjId(this) * 2).toString(16).padStart(14, "0")}>`;
   }
 
   /** @internal */
@@ -553,6 +572,19 @@ export class Configuration extends EngineConfiguration {
     this.generators().apiOnly = value;
 
     this._debugExceptionResponseFormat ??= "api";
+  }
+
+  get logLevel(): LogLevel | number | string {
+    return this._logLevel;
+  }
+
+  set logLevel(level: LogLevel | number | string) {
+    this._logLevel = level;
+    this._broadcastLogLevel = level;
+  }
+
+  get broadcastLogLevel(): LogLevel | number | string | null {
+    return this._broadcastLogLevel;
   }
 
   get debugExceptionResponseFormat(): "default" | "api" {
@@ -654,7 +686,7 @@ export class Configuration extends EngineConfiguration {
         const mod = (await import(
           `${getPath().pathToFileURL!(path).href}?loadDatabaseYaml=${Date.now()}`
         )) as { default?: unknown };
-        return (mod.default ?? mod) as Record<string, unknown>;
+        return (mod.default ?? {}) as Record<string, unknown>;
       } finally {
         Trails.application!.config = originalRailsConfig;
       }

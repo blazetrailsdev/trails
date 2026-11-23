@@ -45,3 +45,20 @@ mechanism"; its cross-table rules and
   attachment, as the entry above says. `attached/many.rb`'s `delegate_missing_to :attachments` needs no such
   guard: `attachments` is a collection proxy or the pending change's Array,
   and `then` is never forwarded, so awaiting a `Many` answers the `Many`.
+
+## A service URL is async (`Service#url`, `url_for_direct_upload`)
+
+Rails' `Service#url` (`vendor/rails/v8.0.5.2/activestorage/lib/active_storage/service.rb:134-143`)
+and `url_for_direct_upload` are synchronous, because the Ruby SDKs sign in
+process. The JS SDKs do not: `getSignedUrl` in `@aws-sdk/s3-request-presigner`
+and `File#getSignedUrl` in `@google-cloud/storage` are async with no sync
+form, S3's endpoint and credential providers are async, and GCS IAM signing
+(`gcs_service.rb:211-226`) is a network call. So `url` and
+`urlForDirectUpload` are async on every service, Disk and Mirror included,
+and so are `Blob#url`, `Blob#serviceUrlForDirectUpload`, `Variant#url` and
+`VariantWithRecord#url`; every caller awaits. `privateUrl` / `publicUrl` may
+answer a promise. `headersForDirectUpload` stays sync: no service does I/O
+for it. There is no `async_url` twin, as § "A job's `perform` and `enqueue`
+are async" has none. Ruled in RFC 0215-activestorage-cloud-services, decision
+5; this is a genuine language shortcoming, and a new instance is not a new
+decision to argue.

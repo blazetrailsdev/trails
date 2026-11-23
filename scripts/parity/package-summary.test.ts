@@ -13,6 +13,7 @@ import {
   main,
   permanentSkipsIn,
   railsCounterpartOf,
+  vendorSourceOf,
   summarize,
 } from "./package-summary.js";
 
@@ -270,6 +271,15 @@ describe("package-summary", () => {
   it("pairs tse-compiler with erubi", () => {
     expect(railsCounterpartOf("tse-compiler")).toBe("erubi");
     expect(compareKeysOf("tse-compiler")).toEqual(["erubi"]);
+  });
+
+  it("pairs each package of a monorepo source with its own gem", () => {
+    expect(railsCounterpartOf("vite-trails")).toBe("vite_rails");
+    expect(railsCounterpartOf("vite-assets")).toBe("vite_ruby");
+    expect(railsCounterpartOf("activerecord")).toBe("activerecord");
+    expect(railsCounterpartOf("rack-proxy")).toBe("rack-proxy");
+    expect(vendorSourceOf("vite-trails")).toBe("vite_ruby");
+    expect(vendorSourceOf("activerecord")).toBe("rails");
   });
 
   it("names a counterpart for every package but the trails-only ones", async () => {

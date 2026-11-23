@@ -1087,6 +1087,12 @@ by a ruby-compat `Thread`.** There is no fifth shape and no receipt tag for one.
   `static new` move with them. There is no `ready` field, no `whenReady()`, no
   factory under another name and no lazy first-call initialisation.
 
+An `initialize` that is async on only some engines answers `T | Promise<T>`
+from `static new`: `SQLite3::Statement.new` (`packages/sqlite3/lib/statement.ts`;
+`vendor/sqlite3/v2.6.0/lib/sqlite3/statement.rb:28-37`), whose `prepare` is
+synchronous on better-sqlite3 and async on expo-sqlite. Ruled by the operator
+on 2026-11-22.
+
 Scope: only a class whose `initialize` does async work. `ActiveRecord::Base`,
 its models, and every class with a synchronous `initialize` keep a public
 constructor and `new Klass`
@@ -1467,7 +1473,7 @@ Two fallbacks exist, and both are last resorts:
   which is why the collector is a Proxy in the first place (§ "Ruby protocol
   methods with a different JS mechanism"). `Channel::Base#dispatch_action`'s
   `public_send action, data`
-  (`vendor/rails/v8.0.5.2/actioncable/lib/action_cable/channel/base.rb:280-286`)
+  (`vendor/rails/v8.0.5.2/actioncable/lib/action_cable/channel/base.rb:286-292`)
   dispatches a client-supplied string gated by `action_methods`, which is the
   USER subclass's public instance methods less `Base`'s (`:128-134`) — a set
   the framework cannot see. A gate on a set application code supplies is not a
@@ -1841,6 +1847,12 @@ read is a plain `TypeError` at the call site.
 ## A variant's method names are camelCase (`ImageProcessingTransformer`)
 
 Moved to [packages/activestorage/CLAUDE.md](packages/activestorage/CLAUDE.md#a-variants-method-names-are-camelcase-imageprocessingtransformer); unchanged, heading kept for citations.
+
+## A service URL is async (`Service#url`, `url_for_direct_upload`)
+
+Moved to [packages/activestorage/CLAUDE.md](packages/activestorage/CLAUDE.md#a-service-url-is-async-serviceurl-url_for_direct_upload).
+The one-line rule: `url` and `urlForDirectUpload` are async on every service,
+and every caller awaits; `headersForDirectUpload` stays sync.
 
 ## A translation lookup is synchronous; the load is an awaited step (`I18n.translate`)
 

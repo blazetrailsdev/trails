@@ -47,6 +47,7 @@ export const ActiveSupport = {
 } as AutoloadModule & {
   Cache: { name: string } & Partial<typeof import("./cache.js")> & {
       _formatVersion: number;
+      formatVersion: number;
       MemoryStore?: typeof import("./cache/memory-store.js").MemoryStore;
       FileStore?: typeof import("./cache/file-store.js").FileStore;
       RedisCacheStore?: typeof import("./cache/redis-cache-store.js").RedisCacheStore;
@@ -71,6 +72,7 @@ export const ActiveSupport = {
   XmlMini: typeof import("./xml-mini.js");
   LazyLoadHooks: typeof import("./lazy-load-hooks.js");
   BroadcastLogger: typeof BroadcastLogger;
+  Digest?: typeof import("./digest.js").Digest;
   Logger: typeof Logger;
   Duration: typeof Duration;
   TimeWithZone?: typeof import("./time-with-zone.js").TimeWithZone;

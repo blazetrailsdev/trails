@@ -677,7 +677,7 @@
     }
   },
   "activestorage": {
-    "rows": 86,
+    "rows": 90,
     "excluded": [],
     "unwalked": [
       "attached/changes.ts::Changes",
@@ -692,12 +692,14 @@
       "reflection.ts::HasManyAttachedReflection": "ActiveStorage::Reflection::HasManyAttachedReflection",
       "reflection.ts::HasOneAttachedReflection": "ActiveStorage::Reflection::HasOneAttachedReflection",
       "reflection.ts::ReflectionExtension": "ActiveStorage::Reflection::ReflectionExtension",
+      "service/gcs-service.ts::MetadataServerError": "ActiveStorage::Service::GCSService::MetadataServerError",
+      "service/gcs-service.ts::MetadataServerNotFoundError": "ActiveStorage::Service::GCSService::MetadataServerNotFoundError",
       "transformers/image-processing-transformer.ts::UnsupportedImageProcessingArgument": "ActiveStorage::Transformers::ImageProcessingTransformer::UnsupportedImageProcessingArgument",
       "transformers/image-processing-transformer.ts::UnsupportedImageProcessingMethod": "ActiveStorage::Transformers::ImageProcessingTransformer::UnsupportedImageProcessingMethod"
     }
   },
   "activesupport": {
-    "rows": 200,
+    "rows": 201,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -805,6 +807,7 @@
       "dependencies/autoload.ts::Autoload": "ActiveSupport::Autoload",
       "deprecation/behaviors.ts::Behavior": "ActiveSupport::Deprecation::Behavior",
       "deprecation/behaviors.ts::DeprecationException": "ActiveSupport::DeprecationException",
+      "deprecation/method-wrappers.ts::MethodWrapper": "ActiveSupport::Deprecation::MethodWrapper",
       "deprecation/proxy-wrappers.ts::DeprecatedConstantProxy": "ActiveSupport::Deprecation::DeprecatedConstantProxy",
       "deprecation/proxy-wrappers.ts::DeprecatedInstanceVariableProxy": "ActiveSupport::Deprecation::DeprecatedInstanceVariableProxy",
       "deprecation/proxy-wrappers.ts::DeprecatedObjectProxy": "ActiveSupport::Deprecation::DeprecatedObjectProxy",
@@ -940,6 +943,28 @@
       "pipeline.ts::Pipeline": "ImageProcessing::Pipeline",
       "processor.ts::Processor": "ImageProcessing::Processor"
     }
+  },
+  "libxml-ruby": {
+    "rows": 9,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "attr.ts::Attr": "LibXML::XML::Attr",
+      "attributes.ts::Attributes": "LibXML::XML::Attributes",
+      "document.ts::Document": "LibXML::XML::Document",
+      "error.ts::Error": "LibXML::XML::Error",
+      "node.ts::Node": "LibXML::XML::Node",
+      "parser.ts::Parser": "LibXML::XML::Parser",
+      "parser/context.ts::Context": "LibXML::XML::Parser::Context",
+      "sax-callbacks.ts::Callbacks": "LibXML::XML::SaxParser::Callbacks",
+      "sax-parser.ts::SaxParser": "LibXML::XML::SaxParser"
+    }
+  },
+  "listen": {
+    "rows": 1,
+    "excluded": [],
+    "unwalked": [],
+    "residue": { "listener.ts::Listener": "Listen::Listener" }
   },
   "mail": {
     "rows": 132,
@@ -1135,12 +1160,13 @@
     }
   },
   "rack-cache": {
-    "rows": 19,
+    "rows": 20,
     "excluded": [],
     "unwalked": [],
     "residue": {
       "cache-control.ts::CacheControl": "Rack::Cache::CacheControl",
       "cache.ts::Cache": "Rack::Cache",
+      "context.ts::Context": "Rack::Cache::Context",
       "entity-store.ts::Body": "Rack::Cache::EntityStore::Disk::Body",
       "entity-store.ts::Dalli": "Rack::Cache::EntityStore::Dalli",
       "entity-store.ts::Disk": "Rack::Cache::EntityStore::Disk",

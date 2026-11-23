@@ -19,7 +19,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
     expect(ctx.service.name).toBe("tmp");
   });
 
-  it("url_for_direct_upload", () => {
+  it("url_for_direct_upload", async () => {
     const originalUrlOptions = { ...ctx.routes.defaultUrlOptions };
     Object.assign(ctx.routes.defaultUrlOptions, {
       protocol: "http",
@@ -33,7 +33,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
 
     try {
       expect(
-        ctx.service.urlForDirectUpload(key, {
+        await ctx.service.urlForDirectUpload(key, {
           expiresIn: minutes(5),
           contentType: "text/plain",
           contentLength: data.length,
@@ -45,7 +45,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
     }
   });
 
-  it("URL generation", () => {
+  it("URL generation", async () => {
     const originalUrlOptions = { ...ctx.routes.defaultUrlOptions };
     Object.assign(ctx.routes.defaultUrlOptions, {
       protocol: "http",
@@ -54,7 +54,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
     });
     try {
       expect(
-        ctx.service.url(ctx.key, {
+        await ctx.service.url(ctx.key, {
           expiresIn: minutes(5),
           disposition: "inline",
           filename: new Filename("avatar.png"),
@@ -66,22 +66,22 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
     }
   });
 
-  it("URL generation without ActiveStorage::Current.url_options set", () => {
+  it("URL generation without ActiveStorage::Current.url_options set", async () => {
     Current.urlOptions = null;
 
-    let error: unknown;
+    const error = await ctx.service
+      .url(ctx.key, {
+        expiresIn: minutes(5),
+        disposition: "inline",
+        filename: new Filename("avatar.png"),
+        contentType: "image/png",
+      })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
     expect(() => {
-      try {
-        ctx.service.url(ctx.key, {
-          expiresIn: minutes(5),
-          disposition: "inline",
-          filename: new Filename("avatar.png"),
-          contentType: "image/png",
-        });
-      } catch (e) {
-        error = e;
-        throw e;
-      }
+      throw error;
     }).toThrow(ArgumentError);
 
     expect((error as Error).message).toBe(
@@ -89,7 +89,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
     );
   });
 
-  it("URL generation keeps working with ActiveStorage::Current.host set", () => {
+  it("URL generation keeps working with ActiveStorage::Current.host set", async () => {
     Current.urlOptions = { host: "https://example.com" };
 
     const originalUrlOptions = { ...ctx.routes.defaultUrlOptions };
@@ -100,7 +100,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
     });
     try {
       expect(
-        ctx.service.url(ctx.key, {
+        await ctx.service.url(ctx.key, {
           expiresIn: minutes(5),
           disposition: "inline",
           filename: new Filename("avatar.png"),

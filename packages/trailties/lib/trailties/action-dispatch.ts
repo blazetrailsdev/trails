@@ -29,7 +29,7 @@ export interface ActionDispatchConfig {
   rescueTemplates: Record<string, string>;
   rescueResponses: Record<string, string>;
   defaultCharset: string | null;
-  rackCache: boolean;
+  rackCache: boolean | Record<string, unknown>;
   httpAuthSalt: string;
   signedCookieSalt: string;
   encryptedCookieSalt: string;

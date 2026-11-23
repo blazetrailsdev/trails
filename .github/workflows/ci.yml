@@ -1080,8 +1080,10 @@ jobs:
           packages/i18n
           packages/mail
           packages/actionmailer
+          packages/libxml-ruby
           packages/marcel
           packages/image-processing
+          packages/listen
           packages/mini-magick
           packages/mini-mime
           packages/msgpack
@@ -1336,8 +1338,10 @@ jobs:
           packages/i18n
           packages/mail
           packages/actionmailer
+          packages/libxml-ruby
           packages/marcel
           packages/image-processing
+          packages/listen
           packages/mini-magick
           packages/mini-mime
           packages/msgpack
@@ -1819,6 +1823,45 @@ jobs:
   # (actioncable/test/subscription_adapter/redis_test.rb). Gated like
   # actioncable-postgres-tests; vitest.config.ts excludes the file wherever
   # REDIS_URL is unset, so a missing service fails here rather than skipping.
+  # Active Storage's cloud services against local emulators, with no cloud
+  # credentials (RFC 0215-activestorage-cloud-services, decision 3). A service
+  # container takes no arguments and both emulators need them, so they start
+  # with docker run. SQLite-backed; gated as sqlite-tests' activestorage step is.
+  activestorage-cloud-tests:
+    name: Active Storage Cloud Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true' &&
+      (needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start SeaweedFS and fake-gcs-server
+        run: |
+          docker run -d --name seaweedfs -p 8333:8333 -e WEED_S3_SSE_KEY=trails-ci-not-a-secret \
+            chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15 \
+            server -dir=/data -s3 -s3.port=8333 -ip.bind=0.0.0.0
+          docker run -d --name fake-gcs-server -p 4443:4443 \
+            fsouza/fake-gcs-server:1.56.1@sha256:797ce226d62f947c009dc40246b30cfb456b8473d8241407f9d6f2c04e4d69ef \
+            -scheme http -port 4443
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - run: pnpm build
+      - name: Wait for the emulators
+        run: |
+          for _ in $(seq 60); do
+            curl -sf http://localhost:8333/healthz >/dev/null &&
+              curl -sf http://localhost:4443/storage/v1/b >/dev/null && exit 0
+            sleep 1
+          done
+          docker logs seaweedfs; docker logs fake-gcs-server; exit 1
+      - run: node packages/activestorage/test/support/emulators/create-buckets.ts
+      - uses: ./.github/actions/activestorage-media-binaries
+      - run: pnpm vitest run packages/activestorage/test/service/ packages/activestorage/test/controllers/ --project '!system'
+
   actioncable-redis-tests:
     name: Action Cable Redis Tests
     needs: changes
@@ -2181,6 +2224,8 @@ jobs:
         run: pnpm --filter @blazetrails/website exec vite build
       - name: Build docs (typedoc + VitePress)
         run: pnpm --filter @blazetrails/website run docs:build
+      - name: Check the home page hero's compiler errors
+        run: pnpm --filter @blazetrails/example-homepage check:hero
 
   rails-comparison:
     name: Rails API/Test Comparison
@@ -2906,6 +2951,7 @@ jobs:
       - actioncable-postgres-tests
       - trailties-postgres-tests
       - actioncable-redis-tests
+      - activestorage-cloud-tests
       - mysql-tests
       - maria-tests
       - website
@@ -2942,6 +2988,7 @@ jobs:
           ACTIONCABLE_ONLY: ${{ needs.changes.outputs.actioncable_only }}
           WEBSITE_ONLY: ${{ needs.changes.outputs.website_only }}
           ACTIONCABLE_AFFECTED: ${{ needs.changes.outputs.actioncable_affected }}
+          ACTIVESTORAGE_SCOPED_OUT: ${{ needs.changes.outputs.ar_scope != '' && !contains(needs.changes.outputs.ar_scope, 'packages/activestorage') }}
           WEBSITE_LABEL: ${{ needs.changes.outputs.website_label }}
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
@@ -3008,6 +3055,11 @@ jobs:
                   ;;
                 actioncable-postgres-tests|actioncable-redis-tests)
                   if [ "$ACTIONCABLE_AFFECTED" = "false" ]; then
+                    continue
+                  fi
+                  ;;
+                activestorage-cloud-tests)
+                  if [ "$AR_AFFECTED" = "false" ] || [ "$ACTIVESTORAGE_SCOPED_OUT" = "true" ]; then
                     continue
                   fi
                   ;;

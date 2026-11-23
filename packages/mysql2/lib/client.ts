@@ -30,6 +30,7 @@ export interface QueryOptions {
   cast?: boolean;
   castBooleans?: boolean;
   cacheRows?: boolean;
+  stream?: boolean;
   symbolizeKeys?: boolean;
   [key: string]: unknown;
 }
@@ -41,11 +42,31 @@ export interface Mysql2Result<
 > {
   readonly fields: string[];
   readonly size: number;
+  readonly serverFlags: { noGoodIndexUsed: boolean; noIndexUsed: boolean; queryWasSlow: boolean };
   toA(): Row[];
+  first(): Row | null;
   count(): number;
   each(opts?: QueryOptions | ((row: Row) => unknown), block?: (row: Row) => unknown): Row[];
+  fieldTypes(): Array<string | null>;
   free(): void;
 }
+
+export interface Mysql2StreamResult<
+  Row extends unknown[] | Record<string, unknown> = unknown[] | Record<string, unknown>,
+> extends Omit<Mysql2Result<Row>, "toA" | "first" | "each" | "free"> {
+  free(): Promise<void>;
+  toA(): Promise<Row[]>;
+  first(): Promise<Row | null>;
+  each(
+    opts?: QueryOptions | ((row: Row) => unknown),
+    block?: (row: Row) => unknown,
+  ): Promise<Row[]>;
+}
+
+type StreamCommand = {
+  once(event: string, listener: (arg: never) => void): unknown;
+  stream(): AsyncIterable<unknown[]>;
+};
 
 type ClientHandshake = {
   handshake: { authPluginName: string };
@@ -184,6 +205,8 @@ const COM_SET_OPTION = 0x1b;
 type Protocol = {
   clientEncoding: string;
   addCommand(command: object): void;
+  query(options: object): StreamCommand;
+  execute(options: object): StreamCommand;
   writePacket(packet: object): void;
   _resetSequenceId(): void;
   handlePacket?: (packet?: EofPacket) => unknown;
@@ -197,14 +220,26 @@ type Protocol = {
   _closing?: boolean;
 };
 type Packet = { isError(): boolean; asError(encoding: string): Error };
-type EofPacket = { offset: number; end: number; isEOF(): boolean; eofWarningCount(): number };
+type EofPacket = {
+  offset: number;
+  end: number;
+  isEOF(): boolean;
+  eofWarningCount(): number;
+  eofStatusFlags(): number;
+};
 type NpmConnection = mysql.Connection & {
   connection?: Protocol;
   config?: { typeCast?: unknown };
 } & Handshake;
 
-const MYSQL2_MAX_TIME = 315578267999;
-const MYSQL2_MIN_TIME = 2678400;
+/** @internal */
+export const MYSQL2_MAX_TIME = 315578267999;
+/** @internal */
+export const MYSQL2_MIN_TIME = 2678400;
+const CR_COMMANDS_OUT_OF_SYNC = 2014;
+const SERVER_QUERY_NO_GOOD_INDEX_USED = 16;
+const SERVER_QUERY_NO_INDEX_USED = 32;
+const SERVER_QUERY_WAS_SLOW = 2048;
 
 /** @internal */
 export type Field = {
@@ -345,12 +380,14 @@ function cast(
   }
 }
 
-function bind(value: unknown): unknown {
+/** @internal */
+export function bind(value: unknown): unknown {
   if (value instanceof Number) return value.valueOf();
   if (value instanceof Time || value instanceof DateTime) {
     return value.strftime("%Y-%m-%d %H:%M:%S.%6N");
   }
   if (value instanceof Temporal.PlainDate) return value.toString();
+  if (value instanceof BigDecimal) return value.toString();
   return value;
 }
 
@@ -388,6 +425,8 @@ export class Client {
   affectedRows = 0;
   lastId: number | undefined;
   private _warningCount = 0;
+  private serverStatus = 0;
+  private activeResult: Result | undefined;
   private _automaticClose = true;
   private connectTimeout: number | undefined;
   private writeTimeout: number | undefined;
@@ -739,7 +778,12 @@ export class Client {
     return hash;
   }
 
-  query(sql: string, options: QueryOptions = {}): Promise<Mysql2Result | null> {
+  query(sql: string, options: QueryOptions & { stream: true }): Promise<Mysql2StreamResult | null>;
+  query(sql: string, options?: QueryOptions): Promise<Mysql2Result | null>;
+  query(
+    sql: string,
+    options: QueryOptions = {},
+  ): Promise<Mysql2Result | Mysql2StreamResult | null> {
     return this._query(sql, { ...this.queryOptions, ...options });
   }
 
@@ -888,6 +932,7 @@ export class Client {
       protocol!.handlePacket = (packet) => {
         if (packet?.isEOF() && packet.end - packet.offset >= 5) {
           this._warningCount = packet.eofWarningCount();
+          this.serverStatus = packet.eofStatusFlags();
         }
         return handlePacket.call(protocol, packet);
       };
@@ -911,7 +956,10 @@ export class Client {
 
   private connectionTypeCast: TypeCast | undefined;
 
-  private async _query(sql: string, opts: QueryOptions): Promise<Mysql2Result | null> {
+  private async _query(
+    sql: string,
+    opts: QueryOptions,
+  ): Promise<Mysql2Result | Mysql2StreamResult | null> {
     if (
       this.reconnect === true &&
       this.connection.connection?._closing !== true &&
@@ -919,7 +967,18 @@ export class Client {
     ) {
       await this.connect(...this.connectArgs);
     }
+    if (this.activeResult) {
+      throw Mysql2Error.newWithArgs(
+        "Commands out of sync; you can't run this command now",
+        this.serverInfo().id,
+        CR_COMMANDS_OUT_OF_SYNC,
+        "HY000",
+      );
+    }
     const options = { ...this.options(sql, opts), typeCast: (field: Field) => field.string() };
+    if (opts.stream === true) {
+      return this.useResult(this.connection.connection!.query(options), opts);
+    }
     return this.storeResult(
       await (this.connection.query as unknown as (options: object) => Promise<Native>)
         .call(this.connection, options)
@@ -951,7 +1010,7 @@ export class Client {
     const error = this.INVALID_DATE;
     this.INVALID_DATE = undefined;
     if (Array.isArray(result)) {
-      return new Result(
+      const resultObj = new Result(
         (fields ?? []).map((field) => field.name),
         result,
         error,
@@ -959,11 +1018,56 @@ export class Client {
         queryOptions,
         fields,
       );
+      this.setServerQueryFlags(resultObj);
+      return resultObj as unknown as Mysql2Result;
     }
     this.affectedRows = result.affectedRows ?? 0;
     this._warningCount = result.warningStatus ?? 0;
     if (result.insertId !== undefined) this.lastId = result.insertId;
     return null;
+  }
+
+  /** @internal */
+  async useResult(
+    command: StreamCommand,
+    queryOptions: QueryOptions,
+  ): Promise<Mysql2StreamResult | null> {
+    const rows = command.stream()[Symbol.asyncIterator]();
+    const fields = await new Promise<mysql.FieldPacket[] | null>((resolve, reject) => {
+      command.once("fields", resolve);
+      command.once("end", () => resolve(null));
+      command.once("error", reject);
+    }).catch((e: unknown) => this.raiseMysql2Error(e));
+    if (fields == null) {
+      const header = await rows.next().catch((e: unknown) => this.raiseMysql2Error(e));
+      return this.storeResult([header.value, undefined]) as null;
+    }
+    const resultObj = new Result(
+      fields.map((field) => field.name),
+      [],
+      undefined,
+      this,
+      queryOptions,
+      fields,
+    );
+    resultObj.streamRows = rows;
+    this.setServerQueryFlags(resultObj);
+    this.activeResult = resultObj;
+    return resultObj as unknown as Mysql2StreamResult;
+  }
+
+  /** @internal */
+  setServerQueryFlags(result: Result): void {
+    result.serverFlags = {
+      noGoodIndexUsed: (this.serverStatus & SERVER_QUERY_NO_GOOD_INDEX_USED) !== 0,
+      noIndexUsed: (this.serverStatus & SERVER_QUERY_NO_INDEX_USED) !== 0,
+      queryWasSlow: (this.serverStatus & SERVER_QUERY_WAS_SLOW) !== 0,
+    };
+  }
+
+  /** @internal */
+  freeResult(result: Result): void {
+    if (this.activeResult === result) this.activeResult = undefined;
   }
 
   /** @internal */

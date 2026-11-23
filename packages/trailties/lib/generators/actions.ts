@@ -26,7 +26,9 @@ export interface ActionsHost {
   findInSourcePaths(file: string): Promise<string>;
   _indentation: number;
   _gemGroups: string[];
+  _githubRepos: { repo: string; options: Record<string, unknown> }[];
   prependFile(path: string, ...args: unknown[]): unknown;
+  trailsCommand: OmitThisParameter<typeof trailsCommand>;
 }
 
 export interface GemOptions {
@@ -40,6 +42,8 @@ export interface GemOptions {
  * @missingRailsCall quote — PERMANENT
  * @inventedArm writeAsync — PERMANENT
  * @inventedArm every — PERMANENT
+ * @inventedArm github — PERMANENT
+ * @inventedArm ref — PERMANENT
  */
 export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): Promise<void> {
   const options = (extractOptionsBang(args) ?? {}) as GemOptions;
@@ -61,6 +65,10 @@ export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): 
   log.call(this, "gemfile", message);
 
   const groups = [...this._gemGroups, ...[options.group ?? []].flat()];
+  const source =
+    options.github != null ? { repo: String(options.github), options } : this._githubRepos.at(-1);
+  const gitOptions = options.github != null ? options : (source?.options ?? {});
+  const ref = gitOptions.ref ?? gitOptions.branch ?? gitOptions.tag;
 
   await this.inRoot(async () => {
     const json = JSON.parse(await File.readAsync("package.json")) as Record<
@@ -73,7 +81,11 @@ export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): 
         : "dependencies";
     json[key] = {
       ...json[key],
-      [name]: options.git ? String(options.git) : _versions.join(" ") || "*",
+      [name]: options.git
+        ? String(options.git)
+        : source != null
+          ? `github:${source.repo}${ref != null ? `#${String(ref)}` : ""}`
+          : _versions.join(" ") || "*",
     };
     await File.writeAsync("package.json", `${JSON.stringify(json, null, 2)}\n`);
   });
@@ -98,6 +110,30 @@ export async function gemGroup(
       );
     } finally {
       this._gemGroups.length -= names.length;
+    }
+  });
+}
+
+/** @missingRailsCall appendFileWithNewline — PERMANENT */
+export async function github(
+  this: ActionsHost,
+  repo: string,
+  options: Record<string, unknown> = {},
+  block?: (this: ActionsHost) => unknown,
+): Promise<void> {
+  const str = [quote(repo)];
+  if (Object.keys(options).length > 0) str.push(quote(options));
+  log.call(this, "github", `github ${str.join(", ")}`);
+
+  await this.inRoot(async () => {
+    this._githubRepos.push({ repo, options });
+    try {
+      await withIndentation.call(
+        this,
+        block as (this: Pick<ActionsHost, "_indentation">) => unknown,
+      );
+    } finally {
+      this._githubRepos.pop();
     }
   });
 }
@@ -248,7 +284,7 @@ export function generate(
   const options = extractOptionsBang(args) as TrailsCommandOptions;
   options.abortOnFailure = !options.inline;
 
-  return trailsCommand.call(this, `generate ${what} ${args.join(" ")}`, options);
+  return this.trailsCommand(`generate ${what} ${args.join(" ")}`, options);
 }
 
 export interface RakeOptions {

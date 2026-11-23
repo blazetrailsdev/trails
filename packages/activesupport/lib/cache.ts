@@ -1,5 +1,6 @@
 import { constGet, LoadError, RuntimeError } from "@blazetrails/ruby-compat";
-import { extractOptionsBang, toParam } from "./hash-utils.js";
+import { toParam } from "./hash-utils.js";
+import { extractOptionsBang } from "./core-ext/array/extract-options.js";
 import { env } from "@blazetrails/ruby-compat";
 import { MemoryStore } from "./cache/memory-store.js";
 import { OrderedOptions } from "./ordered-options.js";
@@ -15,14 +16,6 @@ export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache
 export type { CacheLogger, StoreOptions } from "./cache/store.js";
 export { DeserializationError } from "./cache/deserialization-error.js";
 export { Entry } from "./cache/entry.js";
-
-export function formatVersion(): number {
-  return ActiveSupport.Cache._formatVersion;
-}
-
-export function setFormatVersion(value: number): void {
-  ActiveSupport.Cache._formatVersion = value;
-}
 
 export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheStore {
   if (typeof store === "string" && store.startsWith(":")) {
@@ -98,6 +91,15 @@ Object.assign(ActiveSupport.Cache, {
   DeserializationError,
   lookupStore,
   expandCacheKey,
-  formatVersion,
-  setFormatVersion,
+});
+
+Object.defineProperty(ActiveSupport.Cache, "formatVersion", {
+  get(): number {
+    return ActiveSupport.Cache._formatVersion;
+  },
+  set(value: number) {
+    ActiveSupport.Cache._formatVersion = value;
+  },
+  enumerable: true,
+  configurable: true,
 });

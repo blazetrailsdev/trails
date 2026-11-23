@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { seconds, type Duration } from "@blazetrails/activesupport";
+import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { ForkGuard, NullGuard } from "../lib/processes/runnable.js";
 import { SolidQueue } from "../lib/solid-queue.js";
-
-const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
 describe("BootGuardsTest", () => {
   let previousForkBootTimeout: Duration;
