@@ -6,7 +6,11 @@ import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
 import type { Blob } from "../../../lib/blob.js";
-import { createFileBlob } from "../../support/test-helper.js";
+import {
+  SERVICE_CONFIGURATIONS,
+  createFileBlob,
+  withRaiseOnOpenRedirects,
+} from "../../support/test-helper.js";
 import "../../../lib/blobs/redirect-controller.js";
 
 type Url = (...args: unknown[]) => string;
@@ -111,5 +115,32 @@ describe("ActiveStorage::Blobs::ExpiringRedirectControllerTest", () => {
     travel(Duration.minutes(2));
     await t.get(url);
     t.assertResponse(":not_found");
+  });
+});
+
+describe("ActiveStorage::Blobs::RedirectControllerWithOpenRedirectTest", () => {
+  let t: Session;
+
+  beforeEach(({ task }) => {
+    ActiveStorage.verifier = new MessageVerifier("Testing");
+    t = integrationTest(task.name);
+  });
+
+  it.skipIf(!SERVICE_CONFIGURATIONS.s3)("showing existing blob stored in s3", async () => {
+    await withRaiseOnOpenRedirects("s3", async () => {
+      const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "s3" });
+
+      await t.get(t.integrationSession.trailsStorageRedirectUrl(blob));
+      t.assertRedirectedTo(/racecar\.jpg/);
+    });
+  });
+
+  it.skipIf(!SERVICE_CONFIGURATIONS.gcs)("showing existing blob stored in gcs", async () => {
+    await withRaiseOnOpenRedirects("gcs", async () => {
+      const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "gcs" });
+
+      await t.get(t.integrationSession.trailsStorageRedirectUrl(blob));
+      t.assertRedirectedTo(/racecar\.jpg/);
+    });
   });
 });
