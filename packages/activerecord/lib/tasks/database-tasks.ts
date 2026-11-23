@@ -1,3 +1,4 @@
+import "../constants.database-tasks.generated.js";
 import type { DatabaseConfigOptions } from "../database-configurations/database-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
