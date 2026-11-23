@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, extend, included, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Application } from "./application.js";
 
 export type InitializerGroup = string;
@@ -104,80 +104,84 @@ export class Collection extends Array<Initializer> {
 }
 
 /** @internal */
-const OWN = new WeakMap<typeof Initializable, Collection>();
+const OWN = new WeakMap<object, Collection>();
 
-export class Initializable {
-  private _initializers?: Collection;
-  private _ran?: boolean;
+export interface InitializableClass {
+  readonly initializers: Collection;
+  initializersChain(): Collection;
+  initializersFor(binding: unknown): Collection;
+  initializer<C = unknown>(name: string, block: InitializerBlock<C>): void;
+  initializer<C = unknown>(
+    name: string,
+    opts: InitializerOptions,
+    block: InitializerBlock<C>,
+  ): void;
+}
 
-  /** @internal */
-  static _ownInitializers(): Collection {
+export const ClassMethods = {
+  get initializers(): Collection {
     let own = OWN.get(this);
     if (!own) {
       own = new Collection();
       OWN.set(this, own);
     }
     return own;
-  }
+  },
 
-  static get initializers(): Collection {
-    return this._ownInitializers();
-  }
-
-  static initializersChain(): Collection {
-    const classes: Array<typeof Initializable> = [this];
+  initializersChain(this: InitializableClass): Collection {
+    const ancestors: object[] = [this];
     for (
       let cursor: unknown = Object.getPrototypeOf(this);
       cursor && cursor !== Function.prototype && cursor !== Object.prototype;
       cursor = Object.getPrototypeOf(cursor)
     ) {
-      classes.unshift(cursor as typeof Initializable);
+      ancestors.unshift(cursor);
     }
-    let chain = new Collection();
-    for (const klass of classes) {
-      if (klass === Initializable || klass.prototype instanceof Initializable) {
-        chain = chain.plus(klass.initializers);
-      }
+    let initializers = new Collection();
+    for (const klass of ancestors) {
+      if (!rbObjRespondTo(klass, "initializers")) continue;
+      initializers = initializers.plus((klass as InitializableClass).initializers);
     }
-    return chain;
-  }
+    return initializers;
+  },
 
-  static initializersFor(binding: unknown): Collection {
+  initializersFor(this: InitializableClass, binding: unknown): Collection {
     return new Collection(...this.initializersChain().map((i) => i.bind(binding)));
-  }
+  },
 
-  static initializer<C = unknown>(name: string, block: InitializerBlock<C>): void;
-  static initializer<C = unknown>(
+  initializer<C = unknown>(
+    this: InitializableClass,
     name: string,
-    opts: InitializerOptions,
-    block: InitializerBlock<C>,
-  ): void;
-  static initializer<C = unknown>(
-    name: string,
-    optsOrBlock: InitializerOptions | InitializerBlock<C>,
-    maybeBlock?: InitializerBlock<C>,
+    opts: InitializerOptions | InitializerBlock<C> = {},
+    blk?: InitializerBlock<C>,
   ): void {
-    const block = typeof optsOrBlock === "function" ? optsOrBlock : maybeBlock;
-    const opts: InitializerOptions = typeof optsOrBlock === "function" ? {} : { ...optsOrBlock };
-    if (typeof block !== "function") {
+    if (typeof opts === "function") [opts, blk] = [{}, opts];
+    if (typeof blk !== "function") {
       throw new ArgumentError("A block must be passed when defining an initializer");
     }
-    const own = this._ownInitializers();
-    const referencedBefore = opts.before !== undefined && own.some((i) => i.name === opts.before);
-    if (own.length > 0 && !referencedBefore && opts.after === undefined) {
-      opts.after = own[own.length - 1].name;
+    opts = { ...opts };
+    if (
+      !(this.initializers.length === 0 || this.initializers.find((i) => i.name === opts.before))
+    ) {
+      opts.after ??= this.initializers.at(-1)!.name;
     }
-    own.push(new Initializer<C>(name, null, opts, block) as Initializer);
-  }
+    this.initializers.push(new Initializer<C>(name, null, opts, blk) as Initializer);
+  },
+};
 
-  get initializers(): Collection {
-    if (!this._initializers) {
-      this._initializers = (this.constructor as typeof Initializable).initializersFor(this);
-    }
-    return this._initializers;
-  }
+/** @internal */
+const INITIALIZERS = new WeakMap<object, Collection>();
 
-  async runInitializers(group: InitializerGroup = "default", ...args: unknown[]): Promise<void> {
+export const Initializable = {
+  Initializer,
+  Collection,
+  ClassMethods,
+
+  async runInitializers(
+    this: { initializers: Collection; _ran?: boolean },
+    group: InitializerGroup = "default",
+    ...args: unknown[]
+  ): Promise<void> {
     if (this._ran) return;
     let ran: Promise<unknown> = Promise.resolve();
     this.initializers.tsortEach((initializer) => {
@@ -185,5 +189,18 @@ export class Initializable {
     });
     await ran;
     this._ran = true;
-  }
-}
+  },
+
+  get initializers(): Collection {
+    let initializers = INITIALIZERS.get(this);
+    if (!initializers) {
+      initializers = (this.constructor as unknown as InitializableClass).initializersFor(this);
+      INITIALIZERS.set(this, initializers);
+    }
+    return initializers;
+  },
+
+  [included](base: object): void {
+    extend(base, ClassMethods);
+  },
+};

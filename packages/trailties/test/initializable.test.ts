@@ -1,12 +1,27 @@
 import { describe, expect, test } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
-import { Initializable } from "../lib/initializable.js";
+import { ArgumentError, include, type Included } from "@blazetrails/ruby-compat";
+import {
+  ClassMethods,
+  Initializable,
+  type Collection,
+  type InitializableClass,
+} from "../lib/initializable.js";
+
+type InitializableInstance = Included<typeof Initializable> & { readonly initializers: Collection };
 
 let arr: number[] = [];
 let withArg: unknown = null;
 const push = (n: number) => () => void arr.push(n);
 
-class Foo extends Initializable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface Foo extends InitializableInstance {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class Foo {
+  declare static initializer: InitializableClass["initializer"];
+  declare static readonly initializers: Collection;
+  static {
+    include(this, Initializable);
+  }
   foo?: number;
   bar?: number;
   static {
@@ -23,7 +38,15 @@ class Bar extends Foo {
   }
 }
 
-class Parent extends Initializable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface Parent extends InitializableInstance {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class Parent {
+  declare static initializer: InitializableClass["initializer"];
+  declare static readonly initializers: Collection;
+  static {
+    include(this, Initializable);
+  }
   static {
     Parent.initializer("one", {}, push(1));
     Parent.initializer("two", {}, push(2));
@@ -37,7 +60,15 @@ class Child extends Parent {
 }
 Parent.initializer("five", { before: "one" }, push(5));
 
-class Instance extends Initializable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface Instance extends InitializableInstance {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class Instance {
+  declare static initializer: InitializableClass["initializer"];
+  declare static readonly initializers: Collection;
+  static {
+    include(this, Initializable);
+  }
   static {
     Instance.initializer("one", { group: "assets" }, push(1));
     Instance.initializer("two", {}, push(2));
@@ -46,13 +77,29 @@ class Instance extends Initializable {
   }
 }
 
-class WithArgs extends Initializable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface WithArgs extends InitializableInstance {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class WithArgs {
+  declare static initializer: InitializableClass["initializer"];
+  declare static readonly initializers: Collection;
+  static {
+    include(this, Initializable);
+  }
   static {
     WithArgs.initializer("foo", {}, (arg: unknown) => void (withArg = arg));
   }
 }
 
-class MoreInitializers extends Initializable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface MoreInitializers extends InitializableInstance {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class MoreInitializers {
+  declare static initializer: InitializableClass["initializer"];
+  declare static readonly initializers: Collection;
+  static {
+    include(this, Initializable);
+  }
   static {
     MoreInitializers.initializer("startup", { before: "last" }, push(3));
     MoreInitializers.initializer(
@@ -67,30 +114,66 @@ class MoreInitializers extends Initializable {
     return 2;
   }
 }
-class OverriddenInitializer extends Initializable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface OverriddenInitializer extends InitializableInstance {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class OverriddenInitializer {
+  declare static initializer: InitializableClass["initializer"];
+  static {
+    include(this, Initializable);
+  }
   static {
     OverriddenInitializer.initializer("first", {}, push(1));
     OverriddenInitializer.initializer("last", {}, push(4));
   }
-  static override get initializers() {
-    return super.initializers.plus(new MoreInitializers().initializers);
+  declare static readonly initializers: Collection;
+  static {
+    Object.defineProperty(this, "initializers", {
+      get(this: typeof OverriddenInitializer): Collection {
+        const initializers: Collection = Reflect.get(ClassMethods, "initializers", this);
+        return initializers.plus(new MoreInitializers().initializers);
+      },
+    });
   }
 }
 
-class PluginA extends Initializable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface PluginA extends InitializableInstance {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class PluginA {
+  declare static initializer: InitializableClass["initializer"];
+  declare static readonly initializers: Collection;
+  static {
+    include(this, Initializable);
+  }
   static {
     PluginA.initializer("plugin_a.startup", {}, push(1));
     PluginA.initializer("plugin_a.terminate", {}, push(4));
   }
 }
-class PluginB extends Initializable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface PluginB extends InitializableInstance {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class PluginB {
+  declare static initializer: InitializableClass["initializer"];
+  declare static readonly initializers: Collection;
+  static {
+    include(this, Initializable);
+  }
   static {
     PluginB.initializer("plugin_b.startup", { after: "plugin_a.startup" }, push(2));
     PluginB.initializer("plugin_b.terminate", { before: "plugin_a.terminate" }, push(3));
   }
 }
-class InterdependentApplication extends Initializable {
-  static override get initializers() {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface InterdependentApplication extends InitializableInstance {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class InterdependentApplication {
+  declare static initializer: InitializableClass["initializer"];
+  static {
+    include(this, Initializable);
+  }
+  static get initializers(): Collection {
     return PluginB.initializers.plus(PluginA.initializers);
   }
 }
@@ -113,7 +196,15 @@ describe("Basic", () => {
     expect(foo.foo).toBe(1);
   });
   test("opts is optional (Rails initializer(name, opts = {}, &blk))", async () => {
-    class NoOpts extends Initializable {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+    interface NoOpts extends InitializableInstance {}
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    class NoOpts {
+      declare static initializer: InitializableClass["initializer"];
+      declare static readonly initializers: Collection;
+      static {
+        include(this, Initializable);
+      }
       static {
         NoOpts.initializer("only", () => void arr.push(7));
       }
@@ -125,7 +216,16 @@ describe("Basic", () => {
 
   test("creating initializer without a block raises an error", () => {
     expect(() => {
-      class Bad extends Initializable {}
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+      interface Bad extends InitializableInstance {}
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+      class Bad {
+        declare static initializer: InitializableClass["initializer"];
+        declare static readonly initializers: Collection;
+        static {
+          include(this, Initializable);
+        }
+      }
       // @ts-expect-error testing runtime guard
       Bad.initializer("foo", {});
     }).toThrow(ArgumentError);

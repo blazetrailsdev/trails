@@ -16,12 +16,13 @@ import {
   File,
   LoadError,
   constGet,
+  include,
   rbObjRespondTo,
   StandardError,
   STDERR,
 } from "@blazetrails/ruby-compat";
 import type { Autoloaders } from "../autoloaders.js";
-import { Initializable } from "../initializable.js";
+import { Initializable, type InitializableClass } from "../initializable.js";
 import { _registerAutoloaded } from "./finisher.js";
 
 export interface BootstrapConfig {
@@ -43,10 +44,8 @@ export interface BootstrapHost {
   autoloaders: Autoloaders;
 }
 
-export abstract class Bootstrap extends Initializable implements BootstrapHost {
-  abstract config: BootstrapConfig;
-  abstract autoloaders: Autoloaders;
-}
+export const Bootstrap = {} as InitializableClass;
+include(Bootstrap, Initializable);
 
 Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {});
 

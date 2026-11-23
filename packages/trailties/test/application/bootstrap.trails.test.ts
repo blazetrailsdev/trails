@@ -1,3 +1,5 @@
+import { include, type Included } from "@blazetrails/ruby-compat";
+import { Initializable, type Collection } from "../../lib/initializable.js";
 import { Autoloaders } from "../../lib/autoloaders.js";
 import {
   ActiveSupport,
@@ -28,11 +30,19 @@ const baseConfig = (): BootstrapConfig => ({
   middleware: new Configuration("/app").middleware,
 });
 
-class TestApp extends Bootstrap implements BootstrapHost {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface TestApp extends Included<typeof Initializable> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class TestApp implements BootstrapHost {
+  get initializers(): Collection {
+    return Bootstrap.initializersFor(this);
+  }
+
   logger: Logger | null = null;
   config: BootstrapConfig = { ...baseConfig() };
   autoloaders = new Autoloaders();
 }
+include(TestApp, Initializable);
 
 describe(":initialize_cache lookup_store arms", () => {
   beforeEach(() => {

@@ -1,3 +1,5 @@
+import { include, type Included } from "@blazetrails/ruby-compat";
+import { Initializable, type Collection } from "../../lib/initializable.js";
 import { Base as JobBase } from "@blazetrails/activejob";
 import { constantize, TopLevel } from "@blazetrails/activesupport";
 import { constSet } from "@blazetrails/ruby-compat";
@@ -45,7 +47,14 @@ import { Trailtie as GlobalIdTrailtie } from "../../lib/trailties/global-id.js";
 import { Trailtie as ActiveRecordTrailtie } from "../../lib/trailties/active-record.js";
 import { ActiveRecord, AssociationRelation } from "@blazetrails/activerecord";
 
-class TestApp extends Finisher {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface TestApp extends Included<typeof Initializable> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class TestApp {
+  get initializers(): Collection {
+    return Finisher.initializersFor(this);
+  }
+
   autoloaders = new Autoloaders();
   sessionStoreArgs: unknown[] | null = null;
   hooks: [unknown, { outer?: boolean } | undefined][] = [];
@@ -144,6 +153,7 @@ class TestApp extends Finisher {
     this.calls.push("middleware_stack");
   }
 }
+include(TestApp, Initializable);
 
 async function run(app: TestApp, name: string): Promise<void> {
   await app.initializers.find((i) => i.name === name)!.run();
@@ -159,7 +169,7 @@ describe("Finisher", () => {
   });
 
   it("registers the ported finisher initializers in Rails order", () => {
-    const names = Finisher._ownInitializers().map((i) => i.name);
+    const names = Finisher.initializers.map((i) => i.name);
     expect(names).toEqual([
       "add_generator_templates",
       "setup_main_autoloader",
@@ -178,7 +188,7 @@ describe("Finisher", () => {
   });
 
   it("does not register the intentionally skipped initializers", () => {
-    const names = Finisher._ownInitializers().map((i) => i.name);
+    const names = Finisher.initializers.map((i) => i.name);
     expect(names).not.toContain("enable_yjit");
   });
 
