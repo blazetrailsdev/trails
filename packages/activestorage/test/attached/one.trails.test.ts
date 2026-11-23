@@ -37,7 +37,7 @@ describe("ActiveStorage::Attached::One", () => {
     await user.avatar.load();
     expect(user.avatar.variant({ resizeToLimit: [1, 1] })).toBeNull();
     expect(user.avatar.blob).toBeNull();
-    expect((user.avatar as unknown as { [k: string]: unknown }).notAMethod).toBeUndefined();
+    expect((user.avatar as unknown as { [k: string]: () => unknown }).notAMethod()).toBeNull();
   });
 
   it("create awaits the attachment writer before saving", async () => {

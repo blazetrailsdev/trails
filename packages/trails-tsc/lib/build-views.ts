@@ -310,7 +310,9 @@ async function allMailers(mailersDir: string): Promise<Mailers> {
   for (const [name, { dir, superclass, layouts }] of classes) {
     if (!isMailer(superclass)) continue;
     const mailerPath = dasherize(underscore(name));
-    mailers.paths.push(dir === "." ? mailerPath : `${dir}/${mailerPath}`);
+    const controllerPath = dir === "." ? mailerPath : `${dir}/${mailerPath}`;
+    mailers.paths.push(controllerPath);
+    mailers.layouts.push(controllerPath);
     mailers.layouts.push(...layouts);
   }
   return mailers;

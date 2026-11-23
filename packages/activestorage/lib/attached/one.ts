@@ -140,8 +140,7 @@ Object.setPrototypeOf(
             answered = Object.getOwnPropertyDescriptor(p, prop);
           }
         }
-        if (answered === undefined) return value;
-        return typeof answered.value === "function" ? () => null : null;
+        return answered === undefined || typeof answered.value === "function" ? () => null : null;
       }
       const member = attachment[prop];
       return typeof member === "function" ? member.bind(attachment) : member;

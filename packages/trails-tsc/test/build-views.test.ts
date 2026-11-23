@@ -439,12 +439,13 @@ describe("buildViews", { timeout: 30_000 }, () => {
     );
     write(cwd, "app/views/layouts/notifications.html.tse", "<%= turboStreamFrom(1) %>");
     write(cwd, "app/views/notifier/welcome.html.tse", "<%= turboStreamFrom(1) %>");
+    write(cwd, "app/views/layouts/notifier.html.tse", "<%= turboStreamFrom(1) %>");
     write(cwd, "app/views/posts/show.html.tse", "<%= turboStreamFrom(1) %>");
     write(cwd, "app/views/layouts/application.html.tse", "<%= turboStreamFrom(1) %>");
     write(cwd, "app/views/shared/_banner.html.tse", "<%= turboStreamFrom(1) %>");
     await buildViews({ cwd });
     expect(viewDiagnostics(cwd)).toEqual(
-      ["layouts/notifications", "notifier/welcome"].map(
+      ["layouts/notifications", "layouts/notifier", "notifier/welcome"].map(
         (rel) =>
           `${rel}.html.tse.ts: This expression is not callable.\n  Type 'never' has no call signatures.`,
       ),
