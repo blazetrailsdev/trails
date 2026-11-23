@@ -12,8 +12,10 @@ import * as m9 from "./loader/helpers.js";
 import * as m10 from "./null-inflector.js";
 import * as m11 from "./real-mod-name.js";
 import * as m12 from "./registry.js";
-import * as m13 from "./registry/explicit-namespaces.js";
-import * as m14 from "./registry/inceptions.js";
+import * as m13 from "./registry/autoloads.js";
+import * as m14 from "./registry/explicit-namespaces.js";
+import * as m15 from "./registry/inceptions.js";
+import * as m16 from "./registry/loaders.js";
 
 defineConstants([
   [m0, "Cref", "Zeitwerk::Cref"],
@@ -30,8 +32,10 @@ defineConstants([
   [m10, "NullInflector", "Zeitwerk::NullInflector"],
   [m11, "RealModName", "Zeitwerk::RealModName"],
   [m12, "Registry", "Zeitwerk::Registry"],
-  [m13, "ExplicitNamespaces", "Zeitwerk::Registry::ExplicitNamespaces"],
-  [m14, "Inceptions", "Zeitwerk::Registry::Inceptions"],
+  [m13, "Autoloads", "Zeitwerk::Registry::Autoloads"],
+  [m14, "ExplicitNamespaces", "Zeitwerk::Registry::ExplicitNamespaces"],
+  [m15, "Inceptions", "Zeitwerk::Registry::Inceptions"],
+  [m16, "Loaders", "Zeitwerk::Registry::Loaders"],
   [m2, "ReloadingDisabledError", "Zeitwerk::ReloadingDisabledError"],
   [m2, "SetupRequired", "Zeitwerk::SetupRequired"],
 ]);

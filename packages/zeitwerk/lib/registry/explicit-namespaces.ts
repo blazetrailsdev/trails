@@ -1,50 +1,31 @@
-import { extend, type Extended } from "@blazetrails/ruby-compat";
-import { Internal } from "../internal.js";
 import type { Cref } from "../cref.js";
 import { Map } from "../cref/map.js";
 import type { Loader } from "../loader.js";
 
-export const ExplicitNamespaces = {
-  /** @internal */
-  loaders: new Map<Loader>(),
+export class ExplicitNamespaces {
+  private _loaders: Map<Loader>;
 
-  /** @internal */
+  constructor() {
+    this._loaders = new Map<Loader>();
+  }
+
   register(cref: Cref, loader: Loader): void {
-    this.loaders.set(cref, loader);
-  },
+    this._loaders.set(cref, loader);
+  }
 
-  /** @internal */
   loaderFor(mod: object, cname: string): Loader | null {
-    return this.loaders.deleteModCname(mod, cname);
-  },
+    return this._loaders.deleteModCname(mod, cname);
+  }
 
-  /** @internal */
   unregisterLoader(loader: Loader): void {
-    this.loaders.deleteByValue(loader);
-  },
+    this._loaders.deleteByValue(loader);
+  }
 
-  /** @internal */
   isRegistered(cref: Cref): Loader | null {
-    return this.loaders.get(cref);
-  },
+    return this._loaders.get(cref);
+  }
 
-  /** @internal */
   clear(): void {
-    this.loaders.clear();
-  },
-};
-
-extend(ExplicitNamespaces, Internal);
-/** @noRailsEquivalent PERMANENT */
-export type ExplicitNamespacesInternals = {
-  __register: (typeof ExplicitNamespaces)["register"];
-  __loaderFor: (typeof ExplicitNamespaces)["loaderFor"];
-  __unregisterLoader: (typeof ExplicitNamespaces)["unregisterLoader"];
-};
-
-const self = ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>;
-self.internal("register");
-self.internal("loaderFor");
-self.internal("unregisterLoader");
-self.internal("isRegistered");
-self.internal("clear");
+    this._loaders.clear();
+  }
+}

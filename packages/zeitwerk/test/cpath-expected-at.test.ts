@@ -1,6 +1,7 @@
 import { File, Pathname, constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Error as ZeitwerkError, NameError } from "../lib/error.js";
+import { Inflector } from "../lib/inflector.js";
 import type { Loader } from "../lib/loader.js";
 import { newLoader, teardown, withFiles, withSetup } from "./support/loader-test.js";
 
@@ -167,6 +168,18 @@ describe("TestCpathExpectedAtString", () => {
         `${M_REAL_NAME}::A::B::X`,
       );
       expect(await s.loader.cpathExpectedAt("a/b/collapsed")).toEqual(`${M_REAL_NAME}::A::B`);
+    });
+  });
+
+  it("passes directory paths to the inflector", async () => {
+    s.loader.inflector = new (class extends Inflector {
+      override camelize(_basename: string, abspath: string | null): string {
+        return super.camelize(File.basename(abspath!).replace(/\.ts$/, ""), abspath);
+      }
+    })();
+
+    await withSetup(s.loader, [["a/b/x.ts"]], {}, async () => {
+      expect(await s.loader.cpathExpectedAt("a/b")).toEqual("A::B");
     });
   });
 });

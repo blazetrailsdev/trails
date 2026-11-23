@@ -1,9 +1,9 @@
 import { autoloadGet } from "../lib/core-ext/kernel.js";
 import { FileUtils, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { Registry } from "../lib/registry.js";
 import { Cref } from "../lib/cref.js";
 import type { Loader } from "../lib/loader.js";
-import { ExplicitNamespaces } from "../lib/registry/explicit-namespaces.js";
 import {
   type Constants,
   newLoader,
@@ -86,7 +86,7 @@ describe("TestAutovivification", () => {
       ["rd2/admin/y.ts", "export const Y = true"],
     ];
     await withSetup(loader, files, {}, () => {
-      expect(!ExplicitNamespaces.isRegistered(new Cref(Object, "Admin"))).toBeTruthy();
+      expect(!Registry.explicitNamespaces.isRegistered(new Cref(Object, "Admin"))).toBeTruthy();
     });
   });
 

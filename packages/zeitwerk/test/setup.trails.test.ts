@@ -2,7 +2,6 @@ import { File, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "../lib/cref.js";
 import type { Loader } from "../lib/loader.js";
-import { ExplicitNamespaces } from "../lib/registry/explicit-namespaces.js";
 import { Registry } from "../lib/registry.js";
 import { newLoader, teardown, withFiles, withSetup } from "./support/loader-test.js";
 
@@ -26,7 +25,7 @@ describe("Loader#setup", () => {
       expect(loader.autoloads[File.expandPath("blog-post.ts")].path()).toEqual("BlogPost");
       expect(cref("M").isAutoload()).toEqual(m);
       expect(loader.namespaceDirs.get(cref("M"))).toEqual([m]);
-      expect(Registry.loaderFor(m)).toBe(loader);
+      expect(Registry.autoloads.isRegistered(m)).toBe(loader);
       expect(loader.autoloads[File.expandPath("m/y.ts")]).toBeUndefined();
     });
   });
@@ -37,9 +36,9 @@ describe("Loader#setup", () => {
       const dir = File.expandPath("m");
       expect(cref("M").isAutoload()).toEqual(file);
       expect(Object.keys(loader.autoloads)).toEqual([file]);
-      expect(Registry.loaderFor(dir)).toBeNull();
+      expect(Registry.autoloads.isRegistered(dir)).toBeNull();
       expect(loader.namespaceDirs.get(cref("M"))).toEqual([dir]);
-      expect(ExplicitNamespaces.isRegistered(cref("M"))).toBe(loader);
+      expect(Registry.explicitNamespaces.isRegistered(cref("M"))).toBe(loader);
     });
   });
 
@@ -50,7 +49,7 @@ describe("Loader#setup", () => {
       await loader.setup();
       expect(cref("M").isAutoload()).toEqual(File.expandPath("a/m.ts"));
       expect(loader.namespaceDirs.get(cref("M"))).toEqual([File.expandPath("b/m")]);
-      expect(ExplicitNamespaces.isRegistered(cref("M"))).toBe(loader);
+      expect(Registry.explicitNamespaces.isRegistered(cref("M"))).toBe(loader);
     });
   });
 

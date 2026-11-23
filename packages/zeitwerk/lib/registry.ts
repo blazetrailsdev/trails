@@ -1,43 +1,48 @@
-import { File, Mutex, aryDelete, deleteIf, getFs } from "@blazetrails/ruby-compat";
+import { File, Mutex, getFs } from "@blazetrails/ruby-compat";
 import type { Loader } from "./loader.js";
-import {
-  ExplicitNamespaces,
-  type ExplicitNamespacesInternals,
-} from "./registry/explicit-namespaces.js";
+import { Autoloads } from "./registry/autoloads.js";
+import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 import { Inceptions } from "./registry/inceptions.js";
+import { Loaders } from "./registry/loaders.js";
 
 /** @noRailsEquivalent PERMANENT */
 const PACKAGE_MUTEX = new Mutex();
 
-const loaders: Loader[] = [];
-const autoloads: Record<string, Loader> = {};
+const loaders = new Loaders();
+const autoloads = new Autoloads();
+const explicitNamespaces = new ExplicitNamespaces();
+const inceptions = new Inceptions();
 
 export const Registry = {
-  ExplicitNamespaces: ExplicitNamespaces as typeof ExplicitNamespaces & ExplicitNamespacesInternals,
+  Autoloads,
+  ExplicitNamespaces,
   Inceptions,
+  Loaders,
   Loader: undefined as typeof Loader | undefined,
 
-  get loaders(): Loader[] {
+  get loaders(): Loaders {
     return loaders;
   },
 
   /** @noRailsEquivalent PERMANENT */
   loadersByPackageFile: {} as Record<string, Loader>,
 
-  get autoloads(): Record<string, Loader> {
+  get autoloads(): Autoloads {
     return autoloads;
   },
 
-  registerLoader(loader: Loader): void {
-    this.loaders.push(loader);
+  get explicitNamespaces(): ExplicitNamespaces {
+    return explicitNamespaces;
+  },
+
+  get inceptions(): Inceptions {
+    return inceptions;
   },
 
   unregisterLoader(loader: Loader): void {
-    aryDelete(this.loaders, loader);
     for (const [packageFile, l] of Object.entries(this.loadersByPackageFile)) {
       if (l === loader) delete this.loadersByPackageFile[packageFile];
     }
-    deleteIf(this.autoloads, (_k, l) => l === loader);
   },
 
   /** @noRailsEquivalent PERMANENT */
@@ -61,21 +66,5 @@ export const Registry = {
       await loader.pushDir(rootDir, { namespace });
       return (this.loadersByPackageFile[packageFile] = loader);
     });
-  },
-
-  registerAutoload(loader: Loader, abspath: string): Loader {
-    return (this.autoloads[abspath] = loader);
-  },
-
-  unregisterAutoload(abspath: string): void {
-    delete this.autoloads[abspath];
-  },
-
-  loaderFor(path: string): Loader | null {
-    return this.autoloads[path] ?? null;
-  },
-
-  onUnload(loader: Loader): void {
-    deleteIf(this.autoloads, (_path, object) => object === loader);
   },
 };

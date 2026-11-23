@@ -1,6 +1,5 @@
 import { Dependencies, onLoad } from "@blazetrails/activesupport";
 import { DSL } from "@blazetrails/rake";
-import { Registry } from "@blazetrails/zeitwerk";
 import { Autoloaders } from "./autoloaders.js";
 import {
   dasherize,
@@ -325,7 +324,7 @@ export class Application extends Engine {
   }
 
   private _resetAutoloadState(): void {
-    _bootedAutoloaders?.each((loader) => Registry.unregisterLoader(loader));
+    _bootedAutoloaders?.each((loader) => loader.unregister());
     _bootedAutoloaders = this.autoloaders;
     Dependencies.autoloadPaths = [];
     Dependencies.autoloadOncePaths = [];

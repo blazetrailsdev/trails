@@ -1,11 +1,10 @@
 import { autoloadGet } from "../lib/core-ext/kernel.js";
 import { Kernel, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { Registry } from "../lib/registry.js";
 import { Cref } from "../lib/cref.js";
 import { NameError, SetupRequired } from "../lib/error.js";
 import { Loader } from "../lib/loader.js";
-import { Inceptions } from "../lib/registry/inceptions.js";
-import { ExplicitNamespaces } from "../lib/registry/explicit-namespaces.js";
 import {
   isRequired,
   newLoader,
@@ -157,15 +156,15 @@ describe("TestUnload", () => {
     await withFiles(files, async () => {
       const la = await newLoader({ dirs: "a" });
       const crefM = new Cref(Object, "M");
-      expect(ExplicitNamespaces.isRegistered(crefM) === la).toBeTruthy();
+      expect(Registry.explicitNamespaces.isRegistered(crefM) === la).toBeTruthy();
 
       const lb = await newLoader({ dirs: "b" });
       const crefX = new Cref(Object, "X");
-      expect(ExplicitNamespaces.isRegistered(crefX) === lb).toBeTruthy();
+      expect(Registry.explicitNamespaces.isRegistered(crefX) === lb).toBeTruthy();
 
       await la.unload();
-      expect(ExplicitNamespaces.isRegistered(crefM)).toBeNull();
-      expect(ExplicitNamespaces.isRegistered(crefX) === lb).toBeTruthy();
+      expect(Registry.explicitNamespaces.isRegistered(crefM)).toBeNull();
+      expect(Registry.explicitNamespaces.isRegistered(crefX) === lb).toBeTruthy();
     });
   });
 
@@ -221,13 +220,13 @@ describe("TestUnload", () => {
       const cref1 = new Cref(Object, "MyGem1");
       const cref2 = new Cref(Object, "MyGem2");
 
-      expect(Inceptions.isRegistered(cref1)).toBeTruthy();
-      expect(Inceptions.isRegistered(cref2)).toBeTruthy();
+      expect(Registry.inceptions.isRegistered(cref1)).toBeTruthy();
+      expect(Registry.inceptions.isRegistered(cref2)).toBeTruthy();
 
       await (g.$loader1 as Loader).unload();
 
-      expect(!Inceptions.isRegistered(cref1)).toBeTruthy();
-      expect(Inceptions.isRegistered(cref2)).toBeTruthy();
+      expect(!Registry.inceptions.isRegistered(cref1)).toBeTruthy();
+      expect(Registry.inceptions.isRegistered(cref2)).toBeTruthy();
     });
   });
 

@@ -71,7 +71,7 @@ function _loadingConstant(cpath: string): Promise<void> | undefined {
 }
 
 export async function require(path: string): Promise<boolean> {
-  const loader = Registry.loaderFor(path);
+  const loader = Registry.autoloads.isRegistered(path);
   if (loader == null) return false;
 
   const ruby = await loader.isRuby(path);
@@ -142,7 +142,7 @@ Kernel.zeitwerkOriginalRequire = zeitwerkOriginalRequire;
 
 /** @missingRailsCall __on_file_autoloaded — CONVERGEABLE zeitwerk-kernel-require-load-path-feature-arm */
 Kernel.require = async function (path: string): Promise<boolean> {
-  const loader = Registry.loaderFor(path);
+  const loader = Registry.autoloads.isRegistered(path);
   if (loader != null) {
     return require(path);
   } else {

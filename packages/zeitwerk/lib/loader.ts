@@ -110,7 +110,7 @@ export class Loader {
   /** @internal */ _generation: number;
   /** @internal */ _realRoots: Record<string, string>;
 
-  /** @inlinedFrom Zeitwerk::Loader::Config#initialize zeitwerk/v2.7.2/lib/zeitwerk/loader/config.rb:86-101 */
+  /** @inlinedFrom Zeitwerk::Loader::Config#initialize zeitwerk/v2.7.3/lib/zeitwerk/loader/config.rb:85-100 */
   constructor() {
     this.inflector = new Inflector();
     this.logger = (this.constructor as typeof Loader).defaultLogger;
@@ -148,7 +148,7 @@ export class Loader {
     this._generation = 1;
     this._realRoots = {};
 
-    Registry.registerLoader(this);
+    Registry.loaders.register(this);
   }
 
   /** @inventedArm if — PERMANENT */
@@ -221,7 +221,7 @@ export class Loader {
       this.unregisterInceptions();
       this.unregisterExplicitNamespaces();
 
-      Registry.onUnload(this);
+      Registry.autoloads.unregisterLoader(this);
 
       this._setup = false;
       this._eagerLoaded = false;
@@ -317,7 +317,7 @@ export class Loader {
       const basename = File.basename(dir);
       if (this.isHidden(basename)) return null;
 
-      if (!this.isCollapse(dir)) paths.push([basename.replaceAll("-", "_"), abspath]);
+      if (!this.isCollapse(dir)) paths.push([basename.replaceAll("-", "_"), dir]);
     }
 
     if (rootNamespace == null) return null;
@@ -326,7 +326,7 @@ export class Loader {
       return this.realModName(rootNamespace);
     } else {
       const cnames: string[] = [];
-      for (const [b, a] of paths.reverse()) cnames.push(await this.cnameFor(b, a));
+      for (const [_1, _2] of paths.reverse()) cnames.push(await this.cnameFor(_1, _2));
 
       if (rootNamespace === Object) {
         return cnames.join("::");
@@ -347,6 +347,8 @@ export class Loader {
   unregister(): void {
     this.unregisterInceptions();
     this.unregisterExplicitNamespaces();
+    Registry.loaders.unregister(this);
+    Registry.autoloads.unregisterLoader(this);
     Registry.unregisterLoader(this);
   }
 
@@ -379,7 +381,11 @@ export class Loader {
   }
 
   static allDirs(): readonly string[] {
-    return Object.freeze(Registry.loaders.flatMap((loader) => loader.dirs() as readonly string[]));
+    const dirs: string[] = [];
+    Registry.loaders.each((loader) => {
+      dirs.push(...(loader.dirs() as readonly string[]));
+    });
+    return Object.freeze(dirs);
   }
 
   private async _defineAutoloadsFromManifest(source: Manifest | string): Promise<void> {
@@ -546,7 +552,7 @@ export class Loader {
 
   /** @internal */
   private async autoloadFile(cref: Cref, file: string): Promise<void> {
-    const autoloadPath = cref.isAutoload() ?? Registry.Inceptions.isRegistered(cref);
+    const autoloadPath = cref.isAutoload() ?? Registry.inceptions.isRegistered(cref);
     if (autoloadPath != null) {
       if (await this.isRuby(autoloadPath)) {
         this.shadowedFiles.add(file);
@@ -577,7 +583,7 @@ export class Loader {
     cref: Cref;
   }): Promise<void> {
     delete this.autoloads[dir];
-    Registry.unregisterAutoload(dir);
+    Registry.autoloads.unregister(dir);
 
     if (this.logger != null) {
       this.log(
@@ -602,7 +608,7 @@ export class Loader {
     }
 
     this.autoloads[abspath] = cref;
-    Registry.registerAutoload(this, abspath);
+    Registry.autoloads.register(abspath, this);
 
     if (cref.isAutoload() == null) this.registerInception(cref, abspath);
   }
@@ -620,24 +626,24 @@ export class Loader {
 
   /** @internal */
   private registerExplicitNamespace(cref: Cref): void {
-    Registry.ExplicitNamespaces.__register(cref, this);
+    Registry.explicitNamespaces.register(cref, this);
   }
 
   /** @internal */
   private unregisterExplicitNamespaces(): void {
-    Registry.ExplicitNamespaces.__unregisterLoader(this);
+    Registry.explicitNamespaces.unregisterLoader(this);
   }
 
   /** @internal */
   private registerInception(cref: Cref, abspath: string): void {
     this.inceptions.set(cref, abspath);
-    Registry.Inceptions.register(cref, abspath);
+    Registry.inceptions.register(cref, abspath);
   }
 
   /** @internal */
   private unregisterInceptions(): void {
     this.inceptions.eachKey((cref) => {
-      Registry.Inceptions.unregister(cref);
+      Registry.inceptions.unregister(cref);
     });
     this.inceptions.clear();
   }
@@ -649,9 +655,9 @@ export class Loader {
       if (raised) return;
       const dirSlash = `${dir}/`;
 
-      for (const loader of Registry.loaders) {
-        if (loader === this) continue;
-        if (loader.__isIgnores(dir)) continue;
+      Registry.loaders.each((loader) => {
+        if (loader === this) return;
+        if (loader.__isIgnores(dir)) return;
 
         for (const rootDir of Object.keys(loader.__roots)) {
           if (this.isIgnores(rootDir)) continue;
@@ -664,7 +670,7 @@ export class Loader {
             );
           }
         }
-      }
+      });
     });
     if (synchronized instanceof Promise) {
       raised = true;

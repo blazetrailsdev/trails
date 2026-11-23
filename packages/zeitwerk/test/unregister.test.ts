@@ -16,32 +16,34 @@ describe("TestUnregister", () => {
     const registry = Registry;
     const loader1 = new Loader();
     const cref1 = new Cref(Object, "dummy1");
+    registry.loaders.register(loader1);
     registry.loadersByPackageFile["dummy1"] = loader1;
-    registry.registerAutoload(loader1, "dummy1");
-    Registry.ExplicitNamespaces.register(cref1, loader1);
+    registry.autoloads.register("dummy1", loader1);
+    registry.explicitNamespaces.register(cref1, loader1);
 
     const loader2 = new Loader();
     const cref2 = new Cref(Object, "dummy2");
+    registry.loaders.register(loader2);
     registry.loadersByPackageFile["dummy2"] = loader2;
-    registry.registerAutoload(loader2, "dummy2");
-    Registry.ExplicitNamespaces.register(cref2, loader2);
+    registry.autoloads.register("dummy2", loader2);
+    registry.explicitNamespaces.register(cref2, loader2);
 
     loader1.unregister();
 
-    expect(!registry.loaders.includes(loader1)).toBeTruthy();
+    expect(!registry.loaders.isRegistered(loader1)).toBeTruthy();
     expect(!Object.values(registry.loadersByPackageFile).includes(loader1)).toBeTruthy();
-    expect(!Object.values(registry.autoloads).includes(loader1)).toBeTruthy();
-    expect(!Registry.ExplicitNamespaces.isRegistered(cref1)).toBeTruthy();
-    expect(registry.loaders.includes(loader2)).toBeTruthy();
+    expect(!registry.autoloads.isRegistered("dummy1")).toBeTruthy();
+    expect(!registry.explicitNamespaces.isRegistered(cref1)).toBeTruthy();
+    expect(registry.loaders.isRegistered(loader2)).toBeTruthy();
     expect(Object.values(registry.loadersByPackageFile).includes(loader2)).toBeTruthy();
-    expect(Object.values(registry.autoloads).includes(loader2)).toBeTruthy();
-    expect(Registry.ExplicitNamespaces.isRegistered(cref2) === loader2).toBeTruthy();
+    expect(registry.autoloads.isRegistered("dummy2")).toBeTruthy();
+    expect(registry.explicitNamespaces.isRegistered(cref2) === loader2).toBeTruthy();
   });
 
   it("with_loader yields and unregisters", async () => {
     const unregister = vi.spyOn(Loader.prototype, "unregister");
     await withLoader((l) => {
-      expect(l).toBe(Registry.loaders.at(-1));
+      expect(l).toBe([...Registry.loaders].at(-1));
     });
     expect(unregister.mock.calls.length).toBeTruthy();
   });

@@ -167,8 +167,8 @@ describe("TestExplicitNamespace", () => {
       ["rd2/m.ts", "export class M {}"],
     ];
     await withSetup(loader, files, {}, () => {
-      expect(Registry.loaderFor(File.expandPath("rd1/m"))).toBeNull();
-      expect(Registry.loaderFor(File.expandPath("rd2/m.ts"))).toBe(loader);
+      expect(Registry.autoloads.isRegistered(File.expandPath("rd1/m"))).toBeNull();
+      expect(Registry.autoloads.isRegistered(File.expandPath("rd2/m.ts"))).toBe(loader);
     });
   });
 
