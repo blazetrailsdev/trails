@@ -8,7 +8,10 @@
     <link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
     <script>
       (() => {
-        const pref = localStorage.getItem("vitepress-theme-appearance") || "auto";
+        let pref = "auto";
+        try {
+          pref = localStorage.getItem("vitepress-theme-appearance") || "auto";
+        } catch {}
         const dark = pref === "dark" || (pref === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.classList.toggle("dark", dark);
       })();

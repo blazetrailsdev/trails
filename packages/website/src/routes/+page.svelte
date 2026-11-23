@@ -24,7 +24,9 @@
   function toggleTheme() {
     dark = !dark;
     document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("vitepress-theme-appearance", dark ? "dark" : "light");
+    try {
+      localStorage.setItem("vitepress-theme-appearance", dark ? "dark" : "light");
+    } catch {}
   }
 
   async function copy() {
@@ -274,7 +276,8 @@
   .pms { display: flex; gap: 4px; }
   .pms button { font: 600 14px var(--mono); color: var(--bt-text); background: none; border: 0; padding: 8px 14px; border-radius: 6px 6px 0 0; cursor: pointer; }
   .pms button[aria-pressed="true"] { background: var(--ink); color: #fff; }
-  :global(html.dark) .pms button[aria-pressed="true"] { background: var(--bt-code-bg); }
+  :global(html.dark) .pms button[aria-pressed="true"], :global(html.dark) .cmd { background: var(--bt-code-bg); }
+  :global(html.dark) .copy { background: var(--bt-code-bar); }
   .theme { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .cmd { display: flex; align-items: center; gap: 16px; background: var(--ink); color: #fbf1e4; border-radius: 0 8px 8px 8px; padding: 18px 20px; }
   .cmd code { flex: 1; font: 16px var(--mono); color: #fbf1e4; background: none; border: 0; padding: 0; overflow-x: auto; white-space: nowrap; }
