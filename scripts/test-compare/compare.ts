@@ -255,8 +255,6 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   }
 
   if (pkg === "listen") {
-    // Specs sit under `spec/lib/`, so `lib/listen/listener_spec.rb` lands on
-    // `listen/listener.test.ts` and `lib/listen_spec.rb` on `listen.test.ts`.
     const rest = rubyFile.replace(/^lib\//, "");
     const dir = path.dirname(rest).replace(/_/g, "-");
     const tsFile =

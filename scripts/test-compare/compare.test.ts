@@ -234,6 +234,13 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("cron_spec.rb", "fugit")).toBe("cron.test.ts");
   });
 
+  it("drops listen's spec lib root", () => {
+    expect(rubyToConventionTs("lib/listen/listener_spec.rb", "listen")).toBe(
+      "listen/listener.test.ts",
+    );
+    expect(rubyToConventionTs("lib/listen_spec.rb", "listen")).toBe("listen.test.ts");
+  });
+
   it("strips zeitwerk's test_ prefix", () => {
     expect(rubyToConventionTs("lib/test_null_inflector.rb", "zeitwerk")).toBe(
       "null-inflector.test.ts",
