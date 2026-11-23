@@ -1759,8 +1759,6 @@ class ApiExtractor
   # escape_html` off an `if defined?(ERB::Escape)` — and only one of the two is
   # ever live. The literal `def` wins: it carries the deps, calls and body
   # digest a metaprogrammed entry has no way to supply.
-  # A `define_method_macro` entry is a `define_method` reached through a
-  # class's own macro (`Rack::Cache::Options.option_accessor`).
   DEFINE_METHOD_NOTES = %w[define_method define_method_macro].freeze
 
   public def dedupe_define_methods!

@@ -2823,7 +2823,6 @@ class TestExtractor
       right = traverse_for_string(node[2])
       left && right ? left + right : nil
     when :binary
-      # `it 'a ' + 'b' do` (rack-cache/test/context_test.rb:292-293).
       return traverse_children_for_string(node) unless node[2] == :+
       left = traverse_for_string(node[1])
       right = traverse_for_string(node[3])
