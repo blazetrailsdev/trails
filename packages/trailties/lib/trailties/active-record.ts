@@ -416,6 +416,14 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
+    this.initializer("active_record.generated_token_verifier", () => {
+      this.config.afterInitialize((app: Application) => {
+        onLoad("active_record", function (this: typeof ActiveRecord.Base) {
+          this.generatedTokenVerifier ??= app.messageVerifier("active_record/token_for");
+        });
+      });
+    });
+
     this.initializer("active_record_encryption.configuration", async (app) => {
       const credentials = await app.credentials();
       onLoad("active_record_encryption", () => {

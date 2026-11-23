@@ -1,0 +1,5 @@
+export default {
+  development: { adapter: "async" },
+  test: { adapter: "test" },
+  production: { adapter: "async" },
+};

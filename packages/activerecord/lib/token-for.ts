@@ -1,22 +1,11 @@
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { fetch, rbEqual } from "@blazetrails/ruby-compat";
-import { asJson, classAttribute, getEnv, included, onLoad } from "@blazetrails/activesupport";
+import { asJson, classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import { UnknownPrimaryKey } from "./errors.js";
 
 export { InvalidSignature };
-
-function resolveSecret(): string | null {
-  const envSecret = getEnv("BLAZETRAILS_SECRET_KEY_BASE") ?? getEnv("BLAZETRAILS_SIGNED_ID_SECRET");
-  if (typeof envSecret === "string" && envSecret.length > 0) return envSecret;
-  return null;
-}
-
-onLoad("active_record", function (this: typeof Base) {
-  const secret = resolveSecret();
-  this.generatedTokenVerifier ??= secret === null ? null : new MessageVerifier(secret);
-});
 
 export const TokenFor = {
   [included](base: object): void {

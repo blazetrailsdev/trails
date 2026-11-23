@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Builds the chatter image on the Dokku host and deploys it with `git:from-image`.
+# Run from anywhere after `pnpm build` at the repo root (the image reuses each
+# package's dist/). Usage: bin/deploy [app-name]
+set -euo pipefail
+APP="${1:-chatter}"
+APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$APP_DIR/../.." && pwd)"
+STAGE="$(mktemp -d)"
+trap 'rm -rf "$STAGE"' EXIT
+
+cp "$ROOT"/{package.json,pnpm-lock.yaml,pnpm-workspace.yaml,.pnpmfile.cjs,tsconfig.json} "$STAGE/"
+# Every workspace importer's manifest, so the frozen lockfile resolves.
+(cd "$ROOT" && for m in packages/*/package.json examples/*/package.json scripts/guides-typecheck/package.json scripts/parity/package.json; do
+  mkdir -p "$STAGE/$(dirname "$m")" && cp "$m" "$STAGE/$m"; done)
+rsync -a --exclude node_modules --exclude test --exclude dist-test --exclude '*.tsbuildinfo' "$ROOT/packages/" "$STAGE/packages/"
+rsync -a --exclude node_modules --exclude tmp --exclude log --exclude storage --exclude .trails --exclude public/assets \
+  "$APP_DIR/" "$STAGE/examples/chatter/"
+
+TAG="dokku/$APP:$(date +%Y%m%d%H%M%S)"
+docker build -f "$STAGE/examples/chatter/Dockerfile" -t "$TAG" "$STAGE"
+[ "${NO_DEPLOY:-}" = 1 ] && { echo "built $TAG"; exit 0; }
+dokku git:from-image "$APP" "$TAG"

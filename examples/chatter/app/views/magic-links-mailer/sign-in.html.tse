@@ -1,0 +1,4 @@
+<p>Hi <%= user.displayName() %>,</p>
+<p>Click the button below to sign in to Chatter. The link works once and expires in 15 minutes.</p>
+<p><%= linkTo("Sign in to Chatter", magicLinkUrl(token), { style: "display:inline-block;padding:10px 18px;background:#4a154b;color:#fff;border-radius:6px;text-decoration:none;font-weight:bold" }) %></p>
+<p style="color:#666;font-size:13px">If you didn't ask for this, you can ignore this email.</p>

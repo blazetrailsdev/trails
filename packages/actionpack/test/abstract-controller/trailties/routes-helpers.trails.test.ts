@@ -5,11 +5,25 @@ import {
   RoutesHelpers,
   type RoutesHelpersControllerClass,
 } from "../../../lib/abstract-controller/trailties/routes-helpers.js";
-import { constSet, rbFSend, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, include, rbFSend, TopLevel } from "@blazetrails/ruby-compat";
 
 describe("RoutesHelpers.with (trails)", () => {
   it("accepts a real RouteSet with no cast", () => {
     expect(typeof RoutesHelpers.with(new RouteSet())).toBe("function");
+  });
+
+  it("the url helpers outrank a member an earlier include copied onto the class", () => {
+    const cls = class {};
+    const UrlFor = {
+      rootPath(): string {
+        throw new Error("include routing helpers explicitly");
+      },
+    };
+    include(cls, UrlFor);
+    RoutesHelpers.with({ urlHelpers: () => ({ rootPath: () => "/" }) })(cls);
+    expect((new (class extends cls {})() as unknown as { rootPath(): string }).rootPath()).toBe(
+      "/",
+    );
   });
 
   it("a later include outranks an earlier one", () => {

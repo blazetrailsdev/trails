@@ -29,7 +29,10 @@ export interface RoutesHelpersClassMethods extends HelpersClassMethods {
 }
 
 interface RoutesHelpersModule {
-  /** @inventedArm if — PERMANENT */
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm includedModules — PERMANENT
+   */
   with(
     routes: UrlHelpersRouteSet,
     includePathHelpers?: boolean,
@@ -97,10 +100,27 @@ Object.defineProperty(RoutesHelpers, "with", {
       const installed = new Map<string, PropertyDescriptor>();
       const inherited = (key: string, descriptor: PropertyDescriptor): PropertyDescriptor =>
         inheritedDescriptor(proto, key, descriptor);
+      const includedMembers = new Set<unknown>();
+      for (const m of includedModules(cls)) {
+        const source = typeof m === "function" ? (m as ClassModule).prototype : m;
+        if (source === null || typeof source !== "object") continue;
+        for (const member of Object.values(Object.getOwnPropertyDescriptors(source))) {
+          if (typeof member.value === "function") includedMembers.add(member.value);
+          if (member.get !== undefined) includedMembers.add(member.get);
+        }
+      }
+      const isCopiedFromIncludedModule = (key: string): boolean => {
+        const own = Object.getOwnPropertyDescriptor(proto, key)!;
+        return (
+          (own.value !== undefined && includedMembers.has(own.value)) ||
+          (own.get !== undefined && includedMembers.has(own.get))
+        );
+      };
       for (const [key, descriptor] of includedDescriptors(cls, mod)) {
         if (
           Object.hasOwn(proto, key) &&
-          !earlier.some((included) => isIncludedMember(proto, key, included))
+          !earlier.some((included) => isIncludedMember(proto, key, included)) &&
+          !isCopiedFromIncludedModule(key)
         ) {
           continue;
         }

@@ -1,0 +1,11 @@
+<header class="room-header"><h1>Create a channel</h1></header>
+<div class="form-page">
+  <%= formWith({ model: room }, (form) => { %>
+    <% if (room.errors.isAny()) { %>
+      <div class="flash alert"><%= room.errors.fullMessages.join(", ") %></div>
+    <% } %>
+    <label>Name <%= form.textField("name", { placeholder: "e.g. plan-budget", autofocus: true, required: true }) %></label>
+    <label>Topic <%= form.textField("topic", { placeholder: "What's this channel about?" }) %></label>
+    <%= form.submit("Create", { class: "button" }) %>
+  <% }) %>
+</div>

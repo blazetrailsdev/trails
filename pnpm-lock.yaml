@@ -129,6 +129,103 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.23.15)(yaml@2.8.3)
 
+  examples/chatter:
+    dependencies:
+      '@blazetrails/actioncable':
+        specifier: workspace:*
+        version: link:../../packages/actioncable
+      '@blazetrails/actionmailbox':
+        specifier: workspace:*
+        version: link:../../packages/actionmailbox
+      '@blazetrails/actionmailer':
+        specifier: workspace:*
+        version: link:../../packages/actionmailer
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../../packages/actionpack
+      '@blazetrails/actiontext':
+        specifier: workspace:*
+        version: link:../../packages/actiontext
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../../packages/actionview
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../../packages/activejob
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../../packages/activemodel
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../../packages/activerecord
+      '@blazetrails/activestorage':
+        specifier: workspace:*
+        version: link:../../packages/activestorage
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../../packages/activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../../packages/date
+      '@blazetrails/mysql2':
+        specifier: workspace:*
+        version: link:../../packages/mysql2
+      '@blazetrails/net-smtp':
+        specifier: workspace:*
+        version: link:../../packages/net-smtp
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../../packages/rack
+      '@blazetrails/rackup':
+        specifier: workspace:*
+        version: link:../../packages/rackup
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../../packages/ruby-compat
+      '@blazetrails/solid-cable':
+        specifier: workspace:*
+        version: link:../../packages/solid-cable
+      '@blazetrails/solid-cache':
+        specifier: workspace:*
+        version: link:../../packages/solid-cache
+      '@blazetrails/solid-queue':
+        specifier: workspace:*
+        version: link:../../packages/solid-queue
+      '@blazetrails/stimulus':
+        specifier: workspace:*
+        version: link:../../packages/stimulus
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../../packages/trailties
+      '@blazetrails/turbo':
+        specifier: workspace:*
+        version: link:../../packages/turbo
+      '@hotwired/stimulus':
+        specifier: ^3.2.2
+        version: 3.2.2
+      '@hotwired/turbo-rails':
+        specifier: ^8.0.12
+        version: 8.0.23
+      mysql2:
+        specifier: ^3.18.2
+        version: 3.19.0(@types/node@25.3.5)
+    devDependencies:
+      '@blazetrails/activerecord-cli':
+        specifier: workspace:*
+        version: link:../../packages/activerecord-cli
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../../packages/trails-tsc
+      '@types/node':
+        specifier: ^25.3.5
+        version: 25.3.5
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.23.15)(yaml@2.8.3)
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.23.15)(yaml@2.8.3)
+
   examples/cloudflare-worker:
     dependencies:
       '@blazetrails/actionpack':
@@ -3599,6 +3696,9 @@ packages:
   '@google-cloud/storage@8.4.0':
     resolution: {integrity: sha512-M3kA6UA2Tjp5aznCrgKcm9CzOjiQyRMnquqalqXAeS5wvkqqZxN8wpNjjHafOSYs6lQ82U7f2i8we4eTfIrpkA==}
     engines: {node: '>=22'}
+
+  '@hotwired/stimulus@3.2.2':
+    resolution: {integrity: sha512-eGeIqNOQpXoPAIP7tC1+1Yc1yl1xnwYqg+3mzqxyrbE5pg5YFBZcA6YoTiByJB6DKAEsiWtl6tjTJS4IYtbB7A==}
 
   '@hotwired/turbo-rails@8.0.23':
     resolution: {integrity: sha512-iBILwda3qmQC7FYM70+4s6kEQ7Fx9dJ6+yGxjPyrz9a5JDx1+y7OAA5TA7GGVOZJoicMLrKGdFDNorl40X35lw==}
@@ -9693,6 +9793,8 @@ snapshots:
       teeny-request: 11.1.1(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
+
+  '@hotwired/stimulus@3.2.2': {}
 
   '@hotwired/turbo-rails@8.0.23':
     dependencies:

@@ -1,0 +1,6 @@
+<h1>Sign in to Chatter</h1>
+<p class="muted">We'll email you a magic link — no password needed. New here? The same link creates your account.</p>
+<%= formWith({ url: sessionPath() }, (form) => { %>
+  <%= form.emailField("email_address", { required: true, autofocus: true, autocomplete: "username", placeholder: "you@example.com", value: params.get("email_address") }) %>
+  <%= form.submit("Email me a sign-in link", { class: "button" }) %>
+<% }) %>

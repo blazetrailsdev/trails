@@ -1,0 +1,7 @@
+Hi <%= user.displayName() %>,
+
+Sign in to Chatter with this link (it works once and expires in 15 minutes):
+
+<%= magicLinkUrl(token) %>
+
+If you didn't ask for this, you can ignore this email.

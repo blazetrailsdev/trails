@@ -1,0 +1,28 @@
+<% const me = Current.user!; %>
+<% const activeId = typeof room === "undefined" ? null : room?.id; %>
+<nav class="sidebar">
+  <div class="workspace">💬 Chatter</div>
+  <div class="section">
+    <div class="section-title">Channels <%= linkTo("+", newRoomPath(), { class: "add", title: "Create a channel" }) %></div>
+    <% for (const channel of channels) { %>
+      <%= linkTo(`# ${channel.name}`, roomPath(channel), { class: ["item", activeId === channel.id ? "active" : null].filter(Boolean).join(" ") }) %>
+    <% } %>
+  </div>
+  <div class="section">
+    <div class="section-title">Direct messages</div>
+    <% for (const direct of directs) { %>
+      <%= linkTo(await direct.titleFor(me), roomPath(direct), { class: ["item", activeId === direct.id ? "active" : null].filter(Boolean).join(" ") }) %>
+    <% } %>
+  </div>
+  <div class="section">
+    <div class="section-title">People</div>
+    <% for (const person of people) { %>
+      <%= buttonTo(person.id === me.id ? `${person.displayName()} (you)` : person.displayName(), directsPath({ user_id: person.id }), { class: "item person", form: { class: "inline" } }) %>
+    <% } %>
+  </div>
+  <div class="me">
+    <%= render({ partial: "shared/avatar", locals: { user: me } }) %>
+    <%= linkTo(me.displayName(), editProfilePath(), { class: "me-name" }) %>
+    <%= buttonTo("Sign out", sessionPath(), { method: "delete", class: "link" }) %>
+  </div>
+</nav>

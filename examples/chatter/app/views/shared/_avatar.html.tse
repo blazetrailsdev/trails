@@ -1,0 +1,7 @@
+<% await user.avatar.load(); %>
+<% const avatar = user.avatar.isAttached() ? await (await user.avatar.attachment)!.blob : null; %>
+<% if (avatar) { %>
+  <img class="avatar" alt="<%= user.displayName() %>" src="<%= trailsBlobPath(avatar) %>">
+<% } else { %>
+  <span class="avatar initials" style="background: hsl(<%= Number(user.id) * 67 % 360 %> 45% 45%)"><%= user.initials() %></span>
+<% } %>

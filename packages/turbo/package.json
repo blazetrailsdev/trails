@@ -20,11 +20,12 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    ".trails"
   ],
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "rm -rf dist/app && mkdir -p dist/app && cp -R app/views dist/app/ && trails-tsc-views build --views dist/app/views --in-place"
+    "build:templates": "rm -rf dist/app/views && mkdir -p dist/app && cp -R app/views dist/app/ && trails-tsc-views build --views dist/app/views --in-place && trails-tsc-views build --views app/views --in-place"
   },
   "dependencies": {
     "@blazetrails/actioncable": "workspace:*",

@@ -1,0 +1,3 @@
+web: bin/trails server
+views: pnpm exec trails-tsc-views dev --views app/views
+assets: pnpm exec vite build --watch

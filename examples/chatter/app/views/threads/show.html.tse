@@ -1,0 +1,17 @@
+<turbo-frame id="thread">
+  <% const room = await parent.room; %>
+  <%= turboStreamFrom(parent, "thread") %>
+  <div class="thread">
+    <header class="thread-header">
+      <strong>Thread</strong> <span class="muted">in <%= await room.titleFor(Current.user!) %></span>
+      <a href="#" class="close" data-action="click->thread#close" data-controller="thread">✕</a>
+    </header>
+    <%= render({ partial: "messages/message", locals: { message: parent } }) %>
+    <div class="replies" id="replies_<%= parent.id %>">
+      <% for (const message of replies) { %>
+        <%= render({ partial: "messages/message", locals: { message } }) %>
+      <% } %>
+    </div>
+    <%= render({ partial: "messages/composer", locals: { room, parent } }) %>
+  </div>
+</turbo-frame>
