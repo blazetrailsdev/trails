@@ -1,4 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Trailtie as I18nTrailtie } from "../../lib/trailties/i18n.js";
+
+beforeEach(() => {
+  I18nTrailtie._i18nInited = true;
+});
+
+afterEach(() => {
+  I18nTrailtie._i18nInited = false;
+});
 import { Deprecators, OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
 import { ActiveJob, Base, Serializers } from "@blazetrails/activejob";
 import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-after-transaction-commit";
@@ -39,7 +48,7 @@ describe("ActiveJob::Railtie", () => {
     };
 
     await runTrailtieInitializers(Trailtie, app);
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
     runLoadHooks("active_record", {});
 
     expect(Serializers.serializers().has(DummySerializer as never)).toBe(true);

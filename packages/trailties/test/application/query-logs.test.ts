@@ -1,4 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Trailtie as I18nTrailtie } from "../../lib/trailties/i18n.js";
+
+beforeEach(() => {
+  I18nTrailtie._i18nInited = true;
+});
+
+afterEach(() => {
+  I18nTrailtie._i18nInited = false;
+});
 import {
   Deprecators,
   EncryptedConfiguration,
@@ -55,7 +64,7 @@ describe("QueryLogsTest", () => {
         executor: { toRun() {} },
       };
       await runTrailtieInitializers(Trailtie, app);
-      runLoadHooks("after_initialize", app);
+      await runLoadHooks("after_initialize", app);
       return {
         transformers: [...queryTransformers()],
         disablePreparedStatements: disablePreparedStatements(),

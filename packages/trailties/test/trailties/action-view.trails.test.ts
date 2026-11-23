@@ -1,4 +1,13 @@
-import { describe, it, expect, afterAll, afterEach } from "vitest";
+import { describe, it, expect, afterAll, afterEach, beforeEach } from "vitest";
+import { Trailtie as I18nTrailtie } from "../../lib/trailties/i18n.js";
+
+beforeEach(() => {
+  I18nTrailtie._i18nInited = true;
+});
+
+afterEach(() => {
+  I18nTrailtie._i18nInited = false;
+});
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -54,7 +63,7 @@ describe("ActionView::Railtie view reloader (trails)", () => {
     });
   });
 
-  function bootApp(
+  async function bootApp(
     reloadingEnabled: boolean,
     cacheTemplateLoading?: boolean,
     fileWatcher: unknown = class {},
@@ -71,26 +80,26 @@ describe("ActionView::Railtie view reloader (trails)", () => {
       reloaders: [] as unknown[],
       reloader: class extends Reloader {},
     };
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
     return app;
   }
 
-  it("registers a ViewReloader when reloading is enabled", () => {
-    const app = bootApp(true);
+  it("registers a ViewReloader when reloading is enabled", async () => {
+    const app = await bootApp(true);
     expect(app.reloaders).toHaveLength(1);
     expect(app.reloaders[0]).toBeInstanceOf(ViewReloader);
     expect(PathRegistry.fileSystemResolverHooks).toHaveLength(1);
   });
 
-  it("registers nothing for a production-shaped config", () => {
-    const app = bootApp(false);
+  it("registers nothing for a production-shaped config", async () => {
+    const app = await bootApp(false);
     expect(app.reloaders).toEqual([]);
     expect(PathRegistry.fileSystemResolverHooks).toHaveLength(0);
   });
 
-  it("cache_template_loading overrides reloading_enabled?", () => {
-    expect(bootApp(true, true).reloaders).toEqual([]);
-    expect(bootApp(false, false).reloaders).toHaveLength(1);
+  it("cache_template_loading overrides reloading_enabled?", async () => {
+    expect((await bootApp(true, true)).reloaders).toEqual([]);
+    expect((await bootApp(false, false)).reloaders).toHaveLength(1);
   });
 
   it("an awaited reloader run clears the digest caches after a watched view is touched", async () => {
@@ -104,7 +113,7 @@ describe("ActionView::Railtie view reloader (trails)", () => {
       };
       touch(10);
       PathRegistry.castFileSystemResolvers([viewsDir]);
-      const app = bootApp(true, undefined, FileUpdateChecker);
+      const app = await bootApp(true, undefined, FileUpdateChecker);
       const viewReloader = app.reloaders[0] as ViewReloader;
       app.reloader.check = () => viewReloader.isUpdated();
       expect(viewReloader.isUpdated()).toBe(false);
@@ -135,7 +144,7 @@ describe("ActionView::Railtie asset tag wiring (trails)", () => {
     });
   });
 
-  it("after_initialize applies apply_stylesheet_media_default so stylesheet_link_tag emits media=screen", () => {
+  it("after_initialize applies apply_stylesheet_media_default so stylesheet_link_tag emits media=screen", async () => {
     const app = {
       config: Object.assign(Object.create(Trailtie.config), {
         isReloadingEnabled: () => false,
@@ -143,19 +152,19 @@ describe("ActionView::Railtie asset tag wiring (trails)", () => {
       }),
       reloaders: [],
     };
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
 
     expect(applyStylesheetMediaDefault).toBe(true);
     expect(String(stylesheetLinkTag.call(host, "style"))).toContain('media="screen"');
   });
 
-  it("after_initialize applies config.action_view.image_loading so image_tag emits it", () => {
+  it("after_initialize applies config.action_view.image_loading so image_tag emits it", async () => {
     Trailtie.config.set("actionView", {
       ...(Trailtie.config.get("actionView") as ActionViewConfig),
       imageLoading: "lazy",
     });
     const app = { config: Trailtie.config };
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
 
     expect(imageLoading).toBe("lazy");
     expect("imageLoading" in (Trailtie.config.get("actionView") as ActionViewConfig)).toBe(false);

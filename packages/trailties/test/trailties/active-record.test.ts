@@ -3,6 +3,15 @@ import { Configuration } from "../../lib/application/configuration.js";
 import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { Trailtie as I18nTrailtie } from "../../lib/trailties/i18n.js";
+
+beforeEach(() => {
+  I18nTrailtie._i18nInited = true;
+});
+
+afterEach(() => {
+  I18nTrailtie._i18nInited = false;
+});
 import { isModuleIncluded, setEnv } from "@blazetrails/ruby-compat";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { Trailtie, type ActiveRecordConfig } from "../../lib/trailties/active-record.js";
@@ -165,7 +174,7 @@ describe("RailtieTest", () => {
     const app = blogApp();
     app.config.enableReloading = false;
     await runTrailtieInitializers(Trailtie, app);
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
     expect(SQLite3Adapter.strictStringsByDefault).toBe(true);
   });
 
@@ -176,7 +185,7 @@ describe("RailtieTest", () => {
     const app = blogApp();
     app.config.enableReloading = false;
     await runTrailtieInitializers(Trailtie, app);
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
     expect(PostgreSQLAdapter.decodeDates).toBe(true);
   });
 
@@ -187,7 +196,7 @@ describe("RailtieTest", () => {
     const app = blogApp();
     app.config.enableReloading = false;
     await runTrailtieInitializers(Trailtie, app);
-    runLoadHooks("after_initialize", app);
+    await runLoadHooks("after_initialize", app);
     expect(PostgreSQLAdapter.decodeDates).toBe(false);
   });
 
@@ -201,7 +210,7 @@ describe("RailtieTest", () => {
       app.messageVerifier = (name: string) => (names.push(name), verifier);
       app.config.enableReloading = false;
       await runTrailtieInitializers(Trailtie, app);
-      runLoadHooks("after_initialize", app);
+      await runLoadHooks("after_initialize", app);
       expect(Base.generatedTokenVerifier).toBe(verifier);
       expect(names).toEqual(["active_record/token_for"]);
     } finally {

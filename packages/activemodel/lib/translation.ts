@@ -1,4 +1,4 @@
-import { humanize, include, isPresent } from "@blazetrails/activesupport";
+import { humanize, include, isPresent, runLoadHooks } from "@blazetrails/activesupport";
 import { classModule, rbModAncestors, toS } from "@blazetrails/ruby-compat";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
@@ -14,7 +14,7 @@ export class Translation {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
-  static raiseOnMissingTranslations = false;
+  static raiseOnMissingTranslations: boolean | string | null = false;
 
   get i18nScope(): string {
     return "activemodel";
@@ -82,6 +82,8 @@ export class Translation {
 }
 
 include(Translation, Naming);
+
+runLoadHooks("active_model_translation", Translation);
 
 export interface HumanAttributeNameOptions {
   default?: string | string[];
