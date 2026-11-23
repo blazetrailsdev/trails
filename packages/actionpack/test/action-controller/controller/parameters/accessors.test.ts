@@ -10,8 +10,10 @@ import {
   assertNotEmpty,
   assertNotPredicate,
   assertPredicate,
+  assertRaises,
   assertSame,
 } from "@blazetrails/activesupport/testing/assertions";
+import { ForbiddenAttributesError, Model } from "@blazetrails/activemodel";
 import { Enumerator, rbInspect } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../../../lib/action-controller/metal/strong-parameters.js";
 
@@ -51,6 +53,30 @@ describe("ParametersAccessorsTest", () => {
       params,
       params.eachValue((_) => _),
     );
+  });
+
+  it("each_key returns self", () => {
+    assertSame(
+      params,
+      params.eachKey((_) => _),
+    );
+  });
+
+  it("each_key yields each key", () => {
+    const keys: string[] = [];
+    params.eachKey((key) => {
+      keys.push(key);
+    });
+    assertEqual(params.keys, keys);
+  });
+
+  it("each_key return value is rejected by mass assignment", async () => {
+    const model = new (class extends Model {
+      person: unknown;
+    })();
+    await assertRaises([ForbiddenAttributesError], {}, async () => {
+      await model.assignAttributes(params.eachKey((_) => _));
+    });
   });
 
   it("[] retains permitted status", () => {

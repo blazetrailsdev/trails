@@ -13,16 +13,25 @@ import {
   assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { Base, TemplateError } from "@blazetrails/actionview";
+import {
+  Base,
+  MissingTemplate,
+  RawHandler,
+  Template,
+  TemplateError,
+} from "@blazetrails/actionview";
 import {
   block,
   CGI,
+  File,
   NameError,
+  Pathname,
   PP,
   RuntimeError,
   StandardError,
   StringIO,
   excSetupMessage,
+  rbInspect,
 } from "@blazetrails/ruby-compat";
 import { Lint } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
@@ -111,6 +120,15 @@ class Boomer {
   async call(env: RackEnv): Promise<RackResponse> {
     env["action_dispatch.show_detailed_exceptions"] = this.detailed;
     const req = new Request(env);
+    const template = new Template(
+      File.read(import.meta.filename),
+      import.meta.filename,
+      new RawHandler(),
+      {
+        format: "html",
+        locals: [],
+      },
+    );
 
     switch (req.path) {
       case "/pass":
@@ -137,7 +155,7 @@ class Boomer {
         try {
           throw new ActionNotFound();
         } catch (e) {
-          throw new TemplateError("template", e as Error);
+          throw new TemplateError(template, e as Error);
         }
       case "/cause_mapped_to_rescue_responses":
         try {
@@ -145,6 +163,8 @@ class Boomer {
         } catch (e) {
           throw excSetupMessage(new NameError("uninitialized constant Userr"), e);
         }
+      case "/missing_template":
+        throw new MissingTemplate(["foo"] as never, "foo/index", ["foo"], false, "mailer");
       case "/bad_request":
         throw new BadRequest();
       case "/missing_keys":
@@ -153,12 +173,25 @@ class Boomer {
         throw new ParameterMissing("invalid_param_key", ["valid_param_key"]);
       case "/original_syntax_error":
         throw new SyntaxError("syntax errors found");
+      case "/syntax_error_into_view":
+        try {
+          throw new SyntaxError("syntax errors found");
+        } catch (e) {
+          throw new TemplateError(template, e as Error);
+        }
       case "/framework_raises":
         return this.methodThatRaises();
       case "/nested_exceptions":
         return this.raiseNestedExceptions();
       default:
         if (/\/actionable_error/.test(req.path)) throw new CustomActionableError();
+        if (req.path === "/utf8_template_error") {
+          try {
+            throw new NameError("undefined local variable or method 'string”' for main");
+          } catch (e) {
+            throw new TemplateError(template, e as Error);
+          }
+        }
         throw new RuntimeError("puke!");
     }
   }
@@ -387,7 +420,7 @@ describe("DebugExceptionsTest", () => {
     assertMatch(/ActionDispatch::Http::MimeNegotiation::InvalidType/, body());
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
+  // BLOCKED: port-did-you-mean-correctable-onto-name-error
   it.skip("rescue with suggestions", async () => {
     t.app = DevelopmentApp;
     const tc = t as never as { assertSelect(...a: unknown[]): void };
@@ -445,8 +478,7 @@ describe("DebugExceptionsTest", () => {
     }
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("does not show filtered parameters", async () => {
+  it("does not show filtered parameters", async () => {
     t.app = DevelopmentApp;
 
     await t.get("/", {
@@ -458,11 +490,10 @@ describe("DebugExceptionsTest", () => {
     });
     t.assertResponse(500);
 
-    assertMatch(CGI.escapeHTML('"foo" => "[FILTERED]"'), body());
+    assertMatch(CGI.escapeHTML(rbInspect({ foo: "[FILTERED]" }).slice(1, -1)), body());
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("show registered original exception if the last exception is TemplateError", async () => {
+  it("show registered original exception if the last exception is TemplateError", async () => {
     t.app = DevelopmentApp;
 
     await t.get("/not_found_original_exception", {
@@ -473,8 +504,7 @@ describe("DebugExceptionsTest", () => {
     assertMatch(/Showing <i>.*dispatch\/debug-exceptions.test.ts<\/i>/, body());
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("show the last exception and cause even when the cause is mapped to resque_responses", async () => {
+  it("show the last exception and cause even when the cause is mapped to resque_responses", async () => {
     t.app = DevelopmentApp;
 
     await t.get("/cause_mapped_to_rescue_responses", {
@@ -861,8 +891,7 @@ describe("DebugExceptionsTest", () => {
     );
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("display backtrace on template missing errors", async () => {
+  it("display backtrace on template missing errors", async () => {
     t.app = DevelopmentApp;
     const tc = t as never as { assertSelect(...a: unknown[]): void };
 
@@ -879,8 +908,7 @@ describe("DebugExceptionsTest", () => {
     tc.assertSelect("h2", /Request/);
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("display backtrace when error type is SyntaxError wrapped by ActionView::Template::Error", async () => {
+  it("display backtrace when error type is SyntaxError wrapped by ActionView::Template::Error", async () => {
     t.app = DevelopmentApp;
     const tc = t as never as { assertSelect(...a: unknown[]): void };
 
@@ -898,51 +926,58 @@ describe("DebugExceptionsTest", () => {
     assertMatch(/Showing <i>.*dispatch\/debug-exceptions.test.ts<\/i>/, body());
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("debug exceptions app shows user code that caused the error in source view", async () => {
+  it("debug exceptions app shows user code that caused the error in source view", async () => {
     t.app = DevelopmentApp;
-    const tc = t as never as { assertSelect(...a: unknown[]): void };
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line) => /methodThatRaises/.test(line));
-    cleaner.addSilencer((line) => !/dispatch\/debug-exceptions.test.ts/.test(line));
+    const trails = TopLevel.Trails;
+    TopLevel.Trails = { root: () => new Pathname(".") } as never;
+    try {
+      const tc = t as never as { assertSelect(...a: unknown[]): void };
+      const cleaner = new BacktraceCleaner();
+      cleaner.addSilencer((line) => /methodThatRaises/.test(line));
+      cleaner.addSilencer((line) => !/dispatch\/debug-exceptions.test.ts/.test(line));
 
-    await t.get("/framework_raises", { headers: { "action_dispatch.backtrace_cleaner": cleaner } });
+      await t.get("/framework_raises", {
+        headers: { "action_dispatch.backtrace_cleaner": cleaner },
+      });
 
-    t.assertResponse(500);
-    tc.assertSelect(
-      "div.exception-message",
-      block(() => {
-        tc.assertSelect("div", /error in framework/);
-      }),
-    );
+      t.assertResponse(500);
+      tc.assertSelect(
+        "div.exception-message",
+        block(() => {
+          tc.assertSelect("div", /error in framework/);
+        }),
+      );
 
-    tc.assertSelect(
-      "div.source:not(.hidden)",
-      block(() => {
-        tc.assertSelect("pre .line.active", /methodThatRaises/);
-      }),
-    );
+      tc.assertSelect(
+        "div.source:not(.hidden)",
+        block(() => {
+          tc.assertSelect("pre .line.active", /methodThatRaises/);
+        }),
+      );
 
-    tc.assertSelect(
-      "div.source",
-      block(() => {
-        tc.assertSelect("pre .line.active", /throw new StandardError/);
-      }),
-    );
+      tc.assertSelect(
+        "div.source",
+        block(() => {
+          tc.assertSelect("pre .line.active", /throw new StandardError/);
+        }),
+      );
 
-    tc.assertSelect(
-      "#Application-Trace-0",
-      block(() => {
-        tc.assertSelect("code a:first", /dispatch\/debug-exceptions\.test\.ts:\d+/);
-      }),
-    );
+      tc.assertSelect(
+        "#Application-Trace-0",
+        block(() => {
+          tc.assertSelect("code a:first", /dispatch\/debug-exceptions\.test\.ts:\d+/);
+        }),
+      );
 
-    tc.assertSelect(
-      "#Framework-Trace-0",
-      block(() => {
-        tc.assertSelect("code a:first", /methodThatRaises/);
-      }),
-    );
+      tc.assertSelect(
+        "#Framework-Trace-0",
+        block(() => {
+          tc.assertSelect("code a:first", /methodThatRaises/);
+        }),
+      );
+    } finally {
+      TopLevel.Trails = trails;
+    }
   });
 
   it("invoke interceptors before rendering", async () => {
@@ -961,56 +996,60 @@ describe("DebugExceptionsTest", () => {
     assertMatch(/puke/, body());
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("debug exceptions app shows all the nested exceptions in source view", async () => {
+  it("debug exceptions app shows all the nested exceptions in source view", async () => {
     t.app = DevelopmentApp;
-    const tc = t as never as { assertSelect(...a: unknown[]): void };
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line) => !/dispatch\/debug-exceptions.test.ts/.test(line));
+    const trails = TopLevel.Trails;
+    TopLevel.Trails = { root: () => new Pathname(".") } as never;
+    try {
+      const tc = t as never as { assertSelect(...a: unknown[]): void };
+      const cleaner = new BacktraceCleaner();
+      cleaner.addSilencer((line) => !/dispatch\/debug-exceptions.test.ts/.test(line));
 
-    await t.get("/nested_exceptions", {
-      headers: { "action_dispatch.backtrace_cleaner": cleaner },
-    });
+      await t.get("/nested_exceptions", {
+        headers: { "action_dispatch.backtrace_cleaner": cleaner },
+      });
 
-    t.assertResponse(500);
-    tc.assertSelect(
-      "div.exception-message",
-      block(() => {
-        tc.assertSelect("div", /Third error/);
-      }),
-    );
+      t.assertResponse(500);
+      tc.assertSelect(
+        "div.exception-message",
+        block(() => {
+          tc.assertSelect("div", /Third error/);
+        }),
+      );
 
-    tc.assertSelect(
-      "div.source:not(.hidden)",
-      block(() => {
-        tc.assertSelect("pre .line.active", /Third error/);
-      }),
-    );
+      tc.assertSelect(
+        "div.source:not(.hidden)",
+        block(() => {
+          tc.assertSelect("pre .line.active", /Third error/);
+        }),
+      );
 
-    tc.assertSelect(
-      "#Application-Trace-0",
-      block(() => {
-        tc.assertSelect("code a:first", /raiseNestedExceptionsThird/);
-      }),
-    );
+      tc.assertSelect(
+        "#Application-Trace-0",
+        block(() => {
+          tc.assertSelect("code a:first", /raiseNestedExceptionsThird/);
+        }),
+      );
 
-    tc.assertSelect(
-      "#Application-Trace-1",
-      block(() => {
-        tc.assertSelect("code a:first", /raiseNestedExceptionsSecond/);
-      }),
-    );
+      tc.assertSelect(
+        "#Application-Trace-1",
+        block(() => {
+          tc.assertSelect("code a:first", /raiseNestedExceptionsSecond/);
+        }),
+      );
 
-    tc.assertSelect(
-      "#Application-Trace-2",
-      block(() => {
-        tc.assertSelect("code a:first", /raiseNestedExceptionsFirst/);
-      }),
-    );
+      tc.assertSelect(
+        "#Application-Trace-2",
+        block(() => {
+          tc.assertSelect("code a:first", /raiseNestedExceptionsFirst/);
+        }),
+      );
+    } finally {
+      TopLevel.Trails = trails;
+    }
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("shows a buttons for every action in an actionable error", async () => {
+  it("shows a buttons for every action in an actionable error", async () => {
     t.app = DevelopmentApp;
     const tc = t as never as { assertSelect(...a: unknown[]): void };
     const cleaner = new BacktraceCleaner();
@@ -1046,8 +1085,7 @@ describe("DebugExceptionsTest", () => {
     assertMatch("ActionController::BadRequest", body());
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("debug exceptions app shows diagnostics for template errors that contain UTF-8 characters", async () => {
+  it("debug exceptions app shows diagnostics for template errors that contain UTF-8 characters", async () => {
     t.app = DevelopmentApp;
     const tc = t as never as { assertSelect(...a: unknown[]): void };
 
