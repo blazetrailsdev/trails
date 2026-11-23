@@ -3,10 +3,15 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
-import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "../database.js";
+import type {
+  BusyHandler,
+  EngineErrors,
+  SyncEngineDatabase,
+  SyncEngineOpenV2,
+} from "../database.js";
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
-import { statementTail } from "./statement-tail.js";
+import { closedStatement, statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
@@ -111,6 +116,7 @@ function prepareStatement(
   raw: DatabaseSync,
   sql: string,
   handler: () => BusyHandler | null,
+  finalize: () => void,
 ): EngineStatement {
   const stmt: StatementSync = withBusyHandler(errors, handler, () => raw.prepare(sql));
   stmt.setAllowBareNamedParameters(true);
@@ -128,8 +134,10 @@ function prepareStatement(
   };
   return {
     close: () => {
+      if (closed) return;
       rows?.return?.();
       closed = true;
+      finalize();
     },
     isClosed: () => closed,
     bindParam(key, value) {
@@ -188,15 +196,24 @@ function prepareStatement(
   };
 }
 
-export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) => {
+export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: number) => {
   let raw = open(file, mode);
   let handler: BusyHandler | null = null;
   let changesStmt: StatementSync | null = null;
-  const db: EngineDatabase = {
+  let zombie = false;
+  let liveStatements = 0;
+  const finalize = () => {
+    liveStatements -= 1;
+    if (zombie && liveStatements === 0) raw.close();
+  };
+  const db: SyncEngineDatabase = {
     ...errors,
-    isClosed: () => !raw.isOpen,
+    isClosed: () => zombie || !raw.isOpen,
     isDiscarded: () => false,
-    close: () => raw.close(),
+    close: () => {
+      if (liveStatements === 0) raw.close();
+      else zombie = true;
+    },
     changes: () => {
       if (changesStmt === null) {
         changesStmt = raw.prepare("SELECT changes()");
@@ -255,8 +272,11 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       return results;
     },
     prepare(sql) {
-      const [tail] = statementTail(sql);
-      return [prepareStatement(raw, sql.slice(0, tail), () => handler), sql.slice(tail)];
+      const [tail, empty] = statementTail(sql);
+      if (empty) return [closedStatement, sql.slice(tail)];
+      const stmt = prepareStatement(raw, sql.slice(0, tail), () => handler, finalize);
+      liveStatements += 1;
+      return [stmt, sql.slice(tail)];
     },
   };
   return db;

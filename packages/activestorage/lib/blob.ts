@@ -343,11 +343,11 @@ export class Blob extends Record {
   }
 
   get customMetadata(): { [k: string]: unknown } {
-    return (
-      ((this.readAttribute("metadata") as HashWithIndifferentAccess).get("custom") as {
-        [k: string]: unknown;
-      }) ?? {}
-    );
+    return ((
+      (this.readAttribute("metadata") as HashWithIndifferentAccess).get("custom") as
+        | HashWithIndifferentAccess
+        | undefined
+    )?.toHash() ?? {}) as { [k: string]: unknown };
   }
 
   set customMetadata(metadata: { [k: string]: unknown }) {

@@ -104,8 +104,8 @@ describe("TestDatabaseFlags", () => {
     File.delete("test-flags.db");
     const flags = SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.CREATE;
     db = new SQLite3.Database("test-flags.db", { engine, flags: flags }, null, (db) => {
-      db.executeBatch2("CREATE TABLE foos (id integer)") as unknown[];
-      db.executeBatch2("INSERT INTO foos (id) VALUES (12)") as unknown[];
+      db.executeBatch2("CREATE TABLE foos (id integer)");
+      db.executeBatch2("INSERT INTO foos (id) VALUES (12)");
     });
     expect(File.isExist("test-flags.db")).toBeTruthy();
   });

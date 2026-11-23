@@ -2,10 +2,15 @@ import BetterSqlite3 from "better-sqlite3";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
-import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "../database.js";
+import type {
+  BusyHandler,
+  EngineErrors,
+  SyncEngineDatabase,
+  SyncEngineOpenV2,
+} from "../database.js";
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
-import { statementTail } from "./statement-tail.js";
+import { closedStatement, statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
@@ -63,20 +68,6 @@ function open(file: string, mode: number): BetterSqlite3.Database {
   }
   return new BetterSqlite3(file, opts);
 }
-
-const closedStatement: EngineStatement = {
-  close: () => {},
-  isClosed: () => true,
-  bindParam: () => {},
-  resetBang: () => {},
-  step: () => null,
-  isDone: () => true,
-  columnCount: () => 0,
-  columnName: () => null,
-  columnDecltype: () => null,
-  bindParameterCount: () => 0,
-  setReadBigInts: () => {},
-};
 
 /** @internal */
 function prepareStatement(
@@ -180,7 +171,7 @@ function prepareStatement(
   };
 }
 
-export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) => {
+export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: number) => {
   const raw = open(file, mode);
   let changes = 0;
   let handler: BusyHandler | null = null;
@@ -193,7 +184,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     liveStatements -= 1;
     if (zombie && liveStatements === 0) raw.close();
   };
-  const db: EngineDatabase = {
+  const db: SyncEngineDatabase = {
     ...errors,
     isClosed: () => zombie || !raw.open,
     isDiscarded: () => false,

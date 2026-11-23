@@ -17,17 +17,6 @@
   };
   let pm = $state("npm");
   let copied = $state(false);
-  let dark = $state(false);
-  $effect(() => {
-    dark = document.documentElement.classList.contains("dark");
-  });
-  function toggleTheme() {
-    dark = !dark;
-    document.documentElement.classList.toggle("dark", dark);
-    try {
-      localStorage.setItem("vitepress-theme-appearance", dark ? "dark" : "light");
-    } catch {}
-  }
 
   async function copy() {
     try {
@@ -78,7 +67,7 @@
       <span class="wm" aria-hidden="true"><span class="blaze">blaze</span><span class="trails">trails</span></span>
       <span class="sr-only">blazetrails</span>
     </a>
-    <ul class="right">{#each navRight as l}<li><a href={l.href}>{l.label}</a></li>{/each}<li><button class="theme" onclick={toggleTheme} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}>{dark ? "Light" : "Dark"}</button></li></ul>
+    <ul class="right">{#each navRight as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
   </nav>
 
   <header class="hero">
@@ -118,7 +107,10 @@
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
     <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby gem"} API</small>{/if}</a></li>{/each}</ul>
     <p class="small"><strong>And more.</strong> We&rsquo;re bringing all the friends along.</p>
-    <p class="fine">Each percentage is the share of the upstream gem's public API names (classes, modules, methods and constants) that have a matching name in the trails package. &ldquo;Rails API&rdquo; marks a gem the Rails project owns, such as Active Record, Solid Queue or thor; &ldquo;Ruby gem API&rdquo; marks one of the other gems Rails depends on, such as rack or i18n. &ldquo;Measured at {data.measuredAt}&rdquo; names the trails commit the figures were computed on. A trails app's client-side JavaScript, Turbo and Stimulus included, uses these same packages, so the code in the browser and on the server is all compatible.</p>
+    <p class="fine">Percentages count the upstream gem&rsquo;s public classes, modules, methods and constants that trails matches by name, measured at {data.measuredAt}.</p>
+    <p class="fine"><strong>Rails API:</strong> gems the Rails project owns, like Active Record or Solid Queue. <strong>Ruby gem API:</strong> gems Rails depends on, like rack or i18n.</p>
+    <h3 class="browser">The same code in the browser.</h3>
+    <p class="small">A trails app&rsquo;s client-side JavaScript, Turbo and Stimulus included, runs on these same packages. Browser and server share one codebase.</p>
   </section>
 
   <section class="band">
@@ -230,6 +222,7 @@
   .tabs button[aria-selected="true"] { background: #3a2a1f; color: #fff; box-shadow: inset 0 3px 0 var(--orange); margin-bottom: -1px; padding-bottom: 12px; }
   .note { margin: 0; padding: 0 22px 22px; font-size: 15px; color: #d9c6b0; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .browser { font-size: 40px; line-height: 1.1; color: var(--orange); font-weight: 800; letter-spacing: -0.02em; margin: 3rem auto 0; }
   .fine { font-size: 15px; line-height: 1.45; max-width: 760px; margin: 1.5rem auto 0; color: var(--bt-muted); }
   .pane { background: #3a2a1f; min-height: 380px; }
   .split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
@@ -278,7 +271,6 @@
   .pms button[aria-pressed="true"] { background: var(--ink); color: #fff; }
   :global(html.dark) .pms button[aria-pressed="true"], :global(html.dark) .cmd { background: var(--bt-code-bg); }
   :global(html.dark) .copy { background: var(--bt-code-bar); }
-  .theme { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .cmd { display: flex; align-items: center; gap: 16px; background: var(--ink); color: #fbf1e4; border-radius: 0 8px 8px 8px; padding: 18px 20px; }
   .cmd code { flex: 1; font: 16px var(--mono); color: #fbf1e4; background: none; border: 0; padding: 0; overflow-x: auto; white-space: nowrap; }
   .prompt { color: var(--mango); margin-right: 6px; }

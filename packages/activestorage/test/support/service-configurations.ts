@@ -44,6 +44,9 @@ export const SERVICE_CONFIGURATIONS: Record<string, Record<string, unknown>> = {
     ? {}
     : {
         gcs: gcsConfiguration("trails-private", gcsEndpoint),
-        gcs_public: { ...gcsConfiguration("trails-public", gcsEndpoint), public: true },
+        gcs_public: {
+          ...gcsConfiguration("trails-public", gcsEndpoint.replace("localhost", "127.0.0.1")),
+          public: true,
+        },
       }),
 };

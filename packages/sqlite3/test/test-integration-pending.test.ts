@@ -49,7 +49,7 @@ describe("IntegrationPendingTestCase", () => {
 
     db.busyHandler(() => {
       handlerCallCount += 1;
-      db2.executeBatch2("commit transaction") as unknown[];
+      db2.executeBatch2("commit transaction");
       return true;
     });
 
@@ -58,4 +58,7 @@ describe("IntegrationPendingTestCase", () => {
 
     await db2.close();
   });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" — a synchronous engine's busy wait holds the one JS thread, so no other work advances during it.
+  it.skip("busy handler timeout releases gvl", () => {});
 });

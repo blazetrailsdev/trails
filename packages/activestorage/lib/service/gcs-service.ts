@@ -2,12 +2,14 @@ import "../constants.gcs-service.generated.js";
 import { ApiError, Storage, type Bucket, type File } from "@google-cloud/storage";
 import { isPresent } from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
-import { fetch, type Range } from "@blazetrails/ruby-compat";
+import { env as ENV, fetch, type Range } from "@blazetrails/ruby-compat";
 import { Error as ActiveStorageError, FileNotFoundError, IntegrityError } from "../errors.js";
 import type { Filename } from "../filename.js";
 import { Service } from "../service.js";
 
 type UploadableIO = { read(): string | Uint8Array | null };
+type GoogleAuth = Storage["authClient"];
+type GoogleAuthClass = new (options: object) => GoogleAuth;
 
 export class MetadataServerError extends ActiveStorageError {}
 export class MetadataServerNotFoundError extends ActiveStorageError {}
@@ -22,6 +24,10 @@ export class GCSService extends Service {
   private _bucket: Bucket | undefined;
   /** @internal */
   private _client: Storage | undefined;
+  /** @internal */
+  private _issuer: string | undefined;
+  /** @internal */
+  private _iamBucket: Bucket | undefined;
 
   constructor({ public: public_ = false, ...config }: Record<string, unknown>) {
     super();
@@ -204,7 +210,12 @@ export class GCSService extends Service {
         version: "v2" as const,
       };
 
-      const [generatedUrl] = await this.bucket().file(key).getSignedUrl(args);
+      let bucket = this.bucket();
+      if (this.config.iam) {
+        bucket = this.iamBucket({ issuer: await this.issuer(), signer: this.signer() });
+      }
+
+      const [generatedUrl] = await bucket.file(key).getSignedUrl(args);
 
       payload.url = generatedUrl;
 
@@ -304,7 +315,12 @@ export class GCSService extends Service {
       action: "read" as const,
     };
 
-    const [url] = await (await this.fileFor(key))!.getSignedUrl(args);
+    let file = (await this.fileFor(key))!;
+    if (this.config.iam) {
+      file = this.iamBucket({ issuer: await this.issuer(), signer: this.signer() }).file(key);
+    }
+
+    const [url] = await file.getSignedUrl(args);
     return url;
   }
 
@@ -367,6 +383,85 @@ export class GCSService extends Service {
       });
     }
     return this._client;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  private iamBucket({
+    issuer,
+    signer,
+  }: {
+    issuer: string;
+    signer: (stringToSign: string) => Promise<string>;
+  }): Bucket {
+    if (this._iamBucket !== undefined) return this._iamBucket;
+    const GoogleAuth = this.client().authClient.constructor as new (options: object) => object;
+    const IamAuth = class extends GoogleAuth {
+      async getCredentials() {
+        return { client_email: issuer };
+      }
+
+      async sign(stringToSign: string) {
+        return await signer(stringToSign);
+      }
+    };
+    return (this._iamBucket = new Storage({
+      apiEndpoint: this.client().apiEndpoint,
+      projectId: this.client().projectId,
+      authClient: new IamAuth({}) as unknown as GoogleAuth,
+    }).bucket(fetch<string>(this.config, "bucket")));
+  }
+
+  /** @internal */
+  private async issuer(): Promise<string> {
+    return (this._issuer ??=
+      (isPresent(this.config.gsaEmail) ? (this.config.gsaEmail as string) : null) ??
+      (await this.emailFromMetadataServer()));
+  }
+
+  /** @internal */
+  private async emailFromMetadataServer(): Promise<string> {
+    const host = ENV["GCE_METADATA_HOST"] ?? "169.254.169.254";
+    const lookupMetadata = async (path: string) =>
+      await globalThis.fetch(`http://${host}/computeMetadata/v1/${path}`, {
+        headers: { "Metadata-Flavor": "Google" },
+      });
+    let isMetadata: boolean;
+    try {
+      isMetadata = (await lookupMetadata("")).headers.get("Metadata-Flavor") === "Google";
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      isMetadata = false;
+    }
+    if (!isMetadata) throw new MetadataServerNotFoundError();
+
+    const response = await lookupMetadata("instance/service-accounts/default/email");
+    const email = response.ok ? await response.text() : null;
+    if (isPresent(email)) return email!;
+    throw new MetadataServerError();
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs new — PERMANENT
+   */
+  private signer(): (stringToSign: string) => Promise<string> {
+    return async (stringToSign: string) => {
+      const GoogleAuth = this.client().authClient.constructor as GoogleAuthClass;
+      const scopes = ["https://www.googleapis.com/auth/iam"];
+      const iamClient = new GoogleAuth({ scopes: scopes });
+
+      const request = { payload: btoa(stringToSign) };
+      const resource = `projects/-/serviceAccounts/${await this.issuer()}`;
+      const response = await iamClient.request<{ signedBlob: string }>({
+        url: `https://iamcredentials.googleapis.com/v1/${resource}:signBlob`,
+        method: "POST",
+        data: request,
+      });
+      return response.data.signedBlob;
+    };
   }
 
   /** @internal */

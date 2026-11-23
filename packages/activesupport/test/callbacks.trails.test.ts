@@ -1237,10 +1237,10 @@ describe("CallbackObject dispatch", () => {
     const singleton = rbObjSingletonClass(object) as any;
     classAttribute.call(singleton, "settings", { instanceWriter: false, default: 1 });
     expect(singleton.settings).toBe(1);
-    expect(object.settings).toBeUndefined();
+    expect(object.settings).toBe(1);
     singleton.settings = 2;
     expect(singleton.settings).toBe(2);
-    expect(object.settings).toBeUndefined();
+    expect(object.settings).toBe(2);
   });
 
   it("a callback set on a parent after a child wrote its own chain reaches the child", () => {
