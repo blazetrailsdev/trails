@@ -898,6 +898,111 @@ export class BukkitMailerPreview extends ActionMailer.Preview {
       '<li><a href="/trails/mailers/bukkit_mailer/foo">foo</a></li>',
     );
   });
+
+  it("pass the value of the segment", { timeout: 240_000 }, async () => {
+    await t.controller(
+      "foo",
+      `import { ActionController } from "@blazetrails/actionpack";
+export class FooController extends ActionController.Base {
+  async index() {
+    await this.render({ plain: this.params.get("username") as string });
+  }
+}
+`,
+    );
+
+    await plugin.write(
+      "config/routes.ts",
+      `import { BukkitsEngine } from "../lib/bukkits.js";
+BukkitsEngine.routes().draw(function () {
+  this.root({ to: "foo#index" });
+});
+`,
+    );
+
+    await t.appFile(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+import { BukkitsEngine } from ${JSON.stringify(`${plugin.path}/lib/bukkits.ts`)};
+Trails.application!.routes().draw(function () {
+  this.mount(new Map([[BukkitsEngine, "/:username"]]));
+});
+`,
+    );
+
+    await t.bootTrails();
+
+    await t.get("/arunagw");
+    expect(t.lastResponse().body).toBe("arunagw");
+  });
+
+  it("it loads its environments file", { timeout: 240_000 }, async () => {
+    await plugin.write(
+      "lib/bukkits.ts",
+      `import { Engine } from "@blazetrails/trailties";
+export class BukkitsEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.config.paths().get("config/environments")!.push("config/environments/additional.ts");
+  }
+}
+`,
+    );
+
+    await plugin.write(
+      "config/environments/development.ts",
+      `import { BukkitsEngine } from "../../lib/bukkits.js";
+BukkitsEngine.configure(function () {
+  (this.config as unknown as Record<string, unknown>).environmentLoaded = true;
+});
+`,
+    );
+
+    await plugin.write(
+      "config/environments/additional.ts",
+      `import { BukkitsEngine } from "../../lib/bukkits.js";
+BukkitsEngine.configure(function () {
+  (this.config as unknown as Record<string, unknown>).additionalEnvironmentLoaded = true;
+});
+`,
+    );
+
+    await t.bootTrails();
+
+    const { BukkitsEngine } = (await import(`${plugin.path}/lib/bukkits.ts`)) as {
+      BukkitsEngine: typeof Engine;
+    };
+    const config = BukkitsEngine.config as unknown as Record<string, unknown>;
+    expect(config.environmentLoaded).toBeTruthy();
+    expect(config.additionalEnvironmentLoaded).toBeTruthy();
+  });
+
+  it("it passes router in env", { timeout: 240_000 }, async () => {
+    await plugin.write(
+      "lib/bukkits.ts",
+      `import { Engine } from "@blazetrails/trailties";
+export class BukkitsEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.endpoint(async () => [200, { "Content-Type": "text/html" }, ["hello"]]);
+  }
+}
+`,
+    );
+
+    await t.bootTrails();
+
+    const { BukkitsEngine } = (await import(`${plugin.path}/lib/bukkits.ts`)) as {
+      BukkitsEngine: typeof Engine;
+    };
+    let env = MockRequest.envFor("/");
+    await BukkitsEngine.call(env);
+    expect(env["action_dispatch.routes"]).toBe(BukkitsEngine.instance().routes());
+
+    env = MockRequest.envFor("/");
+    await Trails.application!.call(env);
+    expect(env["action_dispatch.routes"]).toBe(Trails.application!.routes());
+  });
 });
 
 const fixtureRoot = new URL("../fixtures/initializer-engine", import.meta.url).pathname;
