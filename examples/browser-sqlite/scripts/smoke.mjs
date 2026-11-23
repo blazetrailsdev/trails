@@ -51,6 +51,10 @@ try {
   await see("h1", "Hello from the smoke test");
   console.log("created a post; the beforeValidation callback squished its title");
 
+  await frame.locator("input[value='Add comment']").click();
+  await see(".errors", "Author can't be blank");
+  console.log("an invalid comment re-renders the post with its errors");
+
   await frame.locator("input[name='comment[author]']").fill("Ada");
   await frame.locator("textarea[name='comment[body]']").fill("Runs in a tab. Nice.");
   await frame.locator("input[value='Add comment']").click();

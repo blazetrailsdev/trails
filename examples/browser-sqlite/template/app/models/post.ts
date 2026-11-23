@@ -1,3 +1,4 @@
+import { squish } from "@blazetrails/activesupport";
 import type { CollectionProxy, Relation } from "@blazetrails/activerecord";
 import { ApplicationRecord } from "./application-record.ts";
 import type { Comment } from "./comment.ts";
@@ -23,7 +24,7 @@ export class Post extends ApplicationRecord {
     this.validates("title", { presence: true, length: { maximum: 80 } });
     this.validates("body", { length: { maximum: 2000 } });
     this.beforeValidation((post: Post) => {
-      post.title = post.title?.trim().replace(/\s+/g, " ");
+      post.title = post.title == null ? post.title : squish(post.title);
     });
   }
 }

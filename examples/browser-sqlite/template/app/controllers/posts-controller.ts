@@ -10,6 +10,7 @@ export class PostsController extends ApplicationController {
   declare posts: Post[];
   declare post: Post;
   declare comment: Comment;
+  declare postsPath: () => string;
 
   async index(): Promise<void> {
     const posts = this.params.get("filter") === "published" ? Post.published() : Post.recent();
