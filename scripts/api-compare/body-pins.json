@@ -100893,5 +100893,558 @@
     "rubyName": "check",
     "digest": "68fd87c065b44480",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref.rb",
+    "rubyName": "autoload",
+    "digest": "4bc0a4210dc6a217",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref.rb",
+    "rubyName": "autoload?",
+    "digest": "32fc786de078d55d",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref.rb",
+    "rubyName": "defined?",
+    "digest": "311fdda66d53eac2",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref.rb",
+    "rubyName": "get",
+    "digest": "627f9a01515afcd5",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref.rb",
+    "rubyName": "initialize",
+    "digest": "997fc83008af191d",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref.rb",
+    "rubyName": "path",
+    "digest": "8a53e46df70c71d5",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref.rb",
+    "rubyName": "remove",
+    "digest": "f80d0334caa92e83",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref.rb",
+    "rubyName": "set",
+    "digest": "7241233a376013d8",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref/map.rb",
+    "rubyName": "clear",
+    "digest": "54e8201f493e18a1",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref/map.rb",
+    "rubyName": "delete",
+    "digest": "4e09578a3b37dedc",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref/map.rb",
+    "rubyName": "delete_by_value",
+    "digest": "f713511d7d368827",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref/map.rb",
+    "rubyName": "delete_mod_cname",
+    "digest": "cf8ebf6d00405e66",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref/map.rb",
+    "rubyName": "each_key",
+    "digest": "80d437c761241b83",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref/map.rb",
+    "rubyName": "empty?",
+    "digest": "b390176e6bce0b6a",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref/map.rb",
+    "rubyName": "get_or_set",
+    "digest": "ac7a4f0eff143d55",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "cref/map.rb",
+    "rubyName": "initialize",
+    "digest": "d8452917f0ccb1a5",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "error.rb",
+    "rubyName": "initialize",
+    "digest": "4efe56ebf972dce5",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "inflector.rb",
+    "rubyName": "camelize",
+    "digest": "3999307a44588b67",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "inflector.rb",
+    "rubyName": "inflect",
+    "digest": "1fd64edef1b6a9a7",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "inflector.rb",
+    "rubyName": "overrides",
+    "digest": "27194a0a7dbed3a9",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "internal.rb",
+    "rubyName": "internal",
+    "digest": "010dd1cd9649c1f0",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "all_dirs",
+    "digest": "5b1b28f5d6bed5b3",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "all_expected_cpaths",
+    "digest": "5850cdc634b7e817",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "cpath_expected_at",
+    "digest": "af8c7bd942e71a09",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "eager_load_all",
+    "digest": "3ad6bad0e115fec3",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "eager_load_namespace",
+    "digest": "d44d48f2a967b193",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "initialize",
+    "digest": "c4ea5ad09ad99bf8",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "internal",
+    "digest": "010dd1cd9649c1f0",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "reload",
+    "digest": "cf433f80cd924b08",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "setup",
+    "digest": "bee92a7920c79410",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "shadowed_file?",
+    "digest": "234ff8353b089d00",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "unload",
+    "digest": "324528382359e5ab",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "unloadable_cpath?",
+    "digest": "7aef2727e216f8b1",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "unloadable_cpaths",
+    "digest": "12ce5de525504d8f",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader.rb",
+    "rubyName": "unregister",
+    "digest": "7aaf2d92e8069b10",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/callbacks.rb",
+    "rubyName": "internal",
+    "digest": "010dd1cd9649c1f0",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/callbacks.rb",
+    "rubyName": "on_dir_autoloaded",
+    "digest": "51764e6a74945a1c",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/callbacks.rb",
+    "rubyName": "on_file_autoloaded",
+    "digest": "40ccf2d3f2ecd6f7",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/callbacks.rb",
+    "rubyName": "on_namespace_loaded",
+    "digest": "6ee542b0a55de59a",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/callbacks.rb",
+    "rubyName": "run_on_load_callbacks",
+    "digest": "1804762a37210094",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "collapse",
+    "digest": "9320939a8da01062",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "dirs",
+    "digest": "0fe6b960e37cc5c8",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "do_not_eager_load",
+    "digest": "fd8a54f9007bf68e",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "enable_reloading",
+    "digest": "395418e1c27d4fae",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "ignore",
+    "digest": "afb291543e36f94d",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "ignores?",
+    "digest": "6f59bb84aef2cdca",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "initialize",
+    "digest": "ee4279bbfbf7f51d",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "internal",
+    "digest": "010dd1cd9649c1f0",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "log!",
+    "digest": "c520896151f54ede",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "on_load",
+    "digest": "025251cc94909fa4",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "on_setup",
+    "digest": "27b1bf92c3c081fa",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "on_unload",
+    "digest": "446a4fab446aa036",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "push_dir",
+    "digest": "35b448aa28707229",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "real_mod_name",
+    "digest": "05604d43c2c35633",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "reloading_enabled?",
+    "digest": "b9f02b43ee2e1771",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "tag",
+    "digest": "03c1ddc4489ecbe1",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/config.rb",
+    "rubyName": "tag=",
+    "digest": "f2d166a64fdf7a1b",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/eager_load.rb",
+    "rubyName": "eager_load",
+    "digest": "50ec78202cbd8179",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/eager_load.rb",
+    "rubyName": "eager_load_dir",
+    "digest": "68cfae9562116497",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/eager_load.rb",
+    "rubyName": "eager_load_namespace",
+    "digest": "d44d48f2a967b193",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "loader/eager_load.rb",
+    "rubyName": "load_file",
+    "digest": "55149414b203428d",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "null_inflector.rb",
+    "rubyName": "camelize",
+    "digest": "8aa42486aabc1491",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "real_mod_name.rb",
+    "rubyName": "real_mod_name",
+    "digest": "05604d43c2c35633",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry.rb",
+    "rubyName": "loader_for",
+    "digest": "5dc829b674fda6f6",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry.rb",
+    "rubyName": "on_unload",
+    "digest": "feb53e4ca311d8dd",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry.rb",
+    "rubyName": "register_autoload",
+    "digest": "484a8ef602a26357",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry.rb",
+    "rubyName": "register_loader",
+    "digest": "1b3a76b5809922f2",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry.rb",
+    "rubyName": "unregister_autoload",
+    "digest": "ca69095149ac049c",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry.rb",
+    "rubyName": "unregister_loader",
+    "digest": "34575b4988fb4aae",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry/explicit_namespaces.rb",
+    "rubyName": "clear",
+    "digest": "c1bdbe0d66f7e414",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry/explicit_namespaces.rb",
+    "rubyName": "loader_for",
+    "digest": "11b8e3c340916c31",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry/explicit_namespaces.rb",
+    "rubyName": "register",
+    "digest": "4feb33d23ad03049",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry/explicit_namespaces.rb",
+    "rubyName": "registered?",
+    "digest": "7545e5584abde201",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry/explicit_namespaces.rb",
+    "rubyName": "unregister_loader",
+    "digest": "e16d1d3f6977b70e",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry/inceptions.rb",
+    "rubyName": "clear",
+    "digest": "3ee0b1b46a987812",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry/inceptions.rb",
+    "rubyName": "register",
+    "digest": "f53cb7b9f32114d2",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry/inceptions.rb",
+    "rubyName": "registered?",
+    "digest": "3d948205f14e0831",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "registry/inceptions.rb",
+    "rubyName": "unregister",
+    "digest": "819d605fcad1aeb1",
+    "ref": "v2.7.2"
+  },
+  {
+    "package": "zeitwerk",
+    "rubyFile": "zeitwerk.rb",
+    "rubyName": "with_loader",
+    "digest": "492a231846e61fbd",
+    "ref": "v2.7.2"
   }
 ]
