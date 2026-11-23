@@ -4,7 +4,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { include } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import type { Blob } from "../../lib/blob.js";
+import type { Blob } from "../../lib/app/models/active-storage/blob.js";
 import { createFileBlob } from "../support/test-helper.js";
 
 type PathHelper = (model: unknown, options: { onlyPath: boolean }) => string;

@@ -6,10 +6,10 @@ import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
 import type { One } from "../../lib/attached/one.js";
-import type { Attachment } from "../../lib/attachment.js";
-import type { Blob } from "../../lib/blob.js";
+import type { Attachment } from "../../lib/app/models/active-storage/attachment.js";
+import type { Blob } from "../../lib/app/models/active-storage/blob.js";
 import { createBlob, createFileBlob } from "../support/test-helper.js";
-import { TransformJob } from "../../lib/transform-job.js";
+import { TransformJob } from "../../lib/app/jobs/active-storage/transform-job.js";
 
 class TransformJobTest extends TestCase {
   createsVariant(): void {}

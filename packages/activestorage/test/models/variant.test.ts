@@ -8,15 +8,15 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, type TestContext } from "vitest";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Current } from "../../lib/current.js";
-import { Blob } from "../../lib/blob.js";
+import { Current } from "../../lib/app/models/active-storage/current.js";
+import { Blob } from "../../lib/app/models/active-storage/blob.js";
 import { InvariableError } from "../../lib/errors.js";
 import {
   UnsupportedImageProcessingArgument,
   UnsupportedImageProcessingMethod,
 } from "../../lib/transformers/image-processing-transformer.js";
 import { createFileBlob, fileFixture, readImage } from "../support/test-helper.js";
-import type { Variant } from "../../lib/variant.js";
+import type { Variant } from "../../lib/app/models/active-storage/variant.js";
 
 describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
   let wasTracking: boolean;

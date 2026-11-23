@@ -457,4 +457,12 @@ Controller#Action | active_storage/direct_uploads#create
 Source Location   | ${trailsGemRoot}/activestorage/lib/config/routes.ts:XX
 `);
   });
+
+  it("trails routes with unused option", async () => {
+    await t.appFile("config/routes.ts", routes(""));
+
+    const output = await t.runRoutesCommand(["--unused"]);
+
+    expect(output).toContain("No unused routes found.");
+  });
 });

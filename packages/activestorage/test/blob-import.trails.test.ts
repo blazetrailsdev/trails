@@ -5,9 +5,9 @@ import type { ClassMethods } from "../lib/reflection.js";
 describe("importing an engine model before the engine's initializers run", () => {
   it("evaluates Blob, Attachment and VariantRecord on a fresh Base", async () => {
     vi.resetModules();
-    const { Blob } = await import("../lib/blob.js");
-    const { Attachment } = await import("../lib/attachment.js");
-    const { VariantRecord } = await import("../lib/variant-record.js");
+    const { Blob } = await import("../lib/app/models/active-storage/blob.js");
+    const { Attachment } = await import("../lib/app/models/active-storage/attachment.js");
+    const { VariantRecord } = await import("../lib/app/models/active-storage/variant-record.js");
     expect(
       (Blob as unknown as Extended<typeof ClassMethods>).reflectOnAttachment("previewImage"),
     ).not.toBeNull();
@@ -21,7 +21,7 @@ describe("importing an engine model before the engine's initializers run", () =>
     vi.resetModules();
     const { Base } = await import("@blazetrails/activerecord");
     const { include } = await import("@blazetrails/ruby-compat");
-    const { Blob } = await import("../lib/blob.js");
+    const { Blob } = await import("../lib/app/models/active-storage/blob.js");
     const { Model } = await import("../lib/attached/model.js");
     const { ActiveRecordExtensions } = await import("../lib/reflection.js");
     include(Base, Model);

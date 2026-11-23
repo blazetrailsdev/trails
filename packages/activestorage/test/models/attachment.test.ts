@@ -10,8 +10,8 @@ import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Attachment } from "../../lib/attachment.js";
-import { Blob } from "../../lib/blob.js";
+import { Attachment } from "../../lib/app/models/active-storage/attachment.js";
+import { Blob } from "../../lib/app/models/active-storage/blob.js";
 import type { MirrorService } from "../../lib/service/mirror-service.js";
 import {
   createBlob,

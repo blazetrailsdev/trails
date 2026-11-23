@@ -8,8 +8,8 @@ import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Blob } from "../../lib/blob.js";
-import { PurgeJob } from "../../lib/purge-job.js";
+import { Blob } from "../../lib/app/models/active-storage/blob.js";
+import { PurgeJob } from "../../lib/app/jobs/active-storage/purge-job.js";
 import { createBlob } from "../support/test-helper.js";
 
 class PurgeJobTest extends TestCase {

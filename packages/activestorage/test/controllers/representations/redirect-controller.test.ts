@@ -4,9 +4,9 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
-import type { Attachment } from "../../../lib/attachment.js";
-import type { Blob } from "../../../lib/blob.js";
-import { Variation } from "../../../lib/variation.js";
+import type { Attachment } from "../../../lib/app/models/active-storage/attachment.js";
+import type { Blob } from "../../../lib/app/models/active-storage/blob.js";
+import { Variation } from "../../../lib/app/models/active-storage/variation.js";
 import {
   SERVICE_CONFIGURATIONS,
   createFileBlob,
@@ -14,7 +14,7 @@ import {
   withRaiseOnOpenRedirects,
   withStrictLoadingByDefault,
 } from "../../support/test-helper.js";
-import "../../../lib/representations/redirect-controller.js";
+import "../../../lib/app/controllers/active-storage/representations/redirect-controller.js";
 
 type Url = (...args: unknown[]) => string;
 type Session = IntegrationTest & {

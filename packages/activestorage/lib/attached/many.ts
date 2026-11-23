@@ -1,8 +1,8 @@
 import { delegateMissingTo, isPresent } from "@blazetrails/activesupport";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Attached } from "../attached.js";
-import type { Attachment } from "../attachment.js";
-import type { Blob } from "../blob.js";
+import type { Attachment } from "../app/models/active-storage/attachment.js";
+import type { Blob } from "../app/models/active-storage/blob.js";
 import type { CreateMany } from "./changes/create-many.js";
 import { DetachMany } from "./changes/detach-many.js";
 import { PurgeMany } from "./changes/purge-many.js";

@@ -10,7 +10,7 @@
  * source.
  */
 import ts from "typescript-5";
-import { File, getFs } from "@blazetrails/ruby-compat";
+import { Dir, File, getFs } from "@blazetrails/ruby-compat";
 import { Inflector, NameError, Registry, type Loader } from "@blazetrails/zeitwerk";
 import {
   RUBY_FILE_TS_OVERRIDES,
@@ -135,6 +135,16 @@ async function buildLoader(dir: string): Promise<Loader> {
     ...fileInflections(dir),
   });
   loader.inflector = inflector;
+  // A package-shipped engine's `app/*` directories are roots of their own, as
+  // `Engine#config` hands them to the application's loader.
+  const app = File.join(srcRoot(dir), "app");
+  if (await File.isDirectoryAsync(app)) {
+    for (const child of (await Dir.childrenAsync(app)).sort()) {
+      for (const root of [File.join(app, child), File.join(app, child, "concerns")]) {
+        if (await File.isDirectoryAsync(root)) await loader.pushDir(root, { namespace: Object });
+      }
+    }
+  }
   if (collapse.length > 0) {
     await loader.collapse(...collapse.map((d) => File.join(srcRoot(dir), d)));
   }
@@ -235,6 +245,6 @@ export async function walkConstants(dir: string): Promise<Map<string, string>> {
       }
     });
   };
-  await walk(src);
+  for (const root of loader.dirs() as readonly string[]) await walk(root);
   return rows;
 }

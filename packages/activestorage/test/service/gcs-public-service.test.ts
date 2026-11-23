@@ -3,7 +3,7 @@ import { Storage } from "@google-cloud/storage";
 import { base58 } from "@blazetrails/activesupport";
 import { OpenSSL } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
-import { Filename } from "../../lib/filename.js";
+import { Filename } from "../../lib/app/models/active-storage/filename.js";
 import { Service } from "../../lib/service.js";
 import "../../lib/service/configurator.js";
 import type { GCSService } from "../../lib/service/gcs-service.js";

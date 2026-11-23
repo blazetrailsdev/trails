@@ -1,5 +1,5 @@
 import { Analyzer } from "../analyzer.js";
-import type { Blob } from "../blob.js";
+import type { Blob } from "../app/models/active-storage/blob.js";
 
 type Dimensions = { width: number; height: number };
 type Metadata = { [k: string]: unknown };

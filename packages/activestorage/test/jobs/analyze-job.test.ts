@@ -5,8 +5,8 @@ import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { AnalyzeJob } from "../../lib/analyze-job.js";
-import type { Blob } from "../../lib/blob.js";
+import { AnalyzeJob } from "../../lib/app/jobs/active-storage/analyze-job.js";
+import type { Blob } from "../../lib/app/models/active-storage/blob.js";
 import { createBlob } from "../support/test-helper.js";
 
 class AnalyzeJobTest extends TestCase {

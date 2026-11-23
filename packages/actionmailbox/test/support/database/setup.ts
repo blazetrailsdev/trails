@@ -20,8 +20,9 @@ const { CreateActiveStorageTables } =
   await import("@blazetrails/activestorage/db/migrate/20170806125915_create_active_storage_tables");
 const { CreateActionMailboxTables } =
   await import("../../../lib/db/migrate/20180917164000_create_action_mailbox_tables.js");
-const { Attachment } = await import("@blazetrails/activestorage/attachment");
-const { Blob } = await import("@blazetrails/activestorage/blob");
+const { Attachment } =
+  await import("@blazetrails/activestorage/app/models/active-storage/attachment");
+const { Blob } = await import("@blazetrails/activestorage/app/models/active-storage/blob");
 const { InboundEmail } = await import("../../../lib/inbound-email.js");
 
 await CreateActiveStorageTables.migrate("up");

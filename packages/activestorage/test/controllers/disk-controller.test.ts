@@ -6,8 +6,8 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { OpenSSL } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Current } from "../../lib/current.js";
-import "../../lib/disk-controller.js";
+import { Current } from "../../lib/app/models/active-storage/current.js";
+import "../../lib/app/controllers/active-storage/disk-controller.js";
 import {
   createBlob,
   createBlobBeforeDirectUpload,

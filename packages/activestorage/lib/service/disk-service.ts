@@ -11,9 +11,9 @@ import {
   type Range,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
-import { Current } from "../current.js";
+import { Current } from "../app/models/active-storage/current.js";
 import { FileNotFoundError, IntegrityError } from "../errors.js";
-import type { Filename } from "../filename.js";
+import type { Filename } from "../app/models/active-storage/filename.js";
 import { Service } from "../service.js";
 
 type UrlHelpers = Record<`${string}Url`, (...args: unknown[]) => string>;

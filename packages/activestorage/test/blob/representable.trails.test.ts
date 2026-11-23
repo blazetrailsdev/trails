@@ -1,10 +1,10 @@
 import "../support/database/setup.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Blob } from "../../lib/blob.js";
+import { Blob } from "../../lib/app/models/active-storage/blob.js";
 import { InvariableError } from "../../lib/errors.js";
-import { VariantWithRecord } from "../../lib/variant-with-record.js";
-import { Variant } from "../../lib/variant.js";
+import { VariantWithRecord } from "../../lib/app/models/active-storage/variant-with-record.js";
+import { Variant } from "../../lib/app/models/active-storage/variant.js";
 
 describe("Blob::Representable", () => {
   const trackVariantsWas = ActiveStorage.trackVariants;

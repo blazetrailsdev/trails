@@ -4,7 +4,7 @@ import { isPresent } from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import { env as ENV, fetch, type Range } from "@blazetrails/ruby-compat";
 import { Error as ActiveStorageError, FileNotFoundError, IntegrityError } from "../errors.js";
-import type { Filename } from "../filename.js";
+import type { Filename } from "../app/models/active-storage/filename.js";
 import { Service } from "../service.js";
 
 type UploadableIO = { read(): string | Uint8Array | null };

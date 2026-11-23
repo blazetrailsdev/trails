@@ -2,7 +2,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ActiveStorage } from "../lib/active-storage.js";
-import { Variation } from "../lib/variation.js";
+import { Variation } from "../lib/app/models/active-storage/variation.js";
 
 describe("Variation", () => {
   beforeAll(() => {

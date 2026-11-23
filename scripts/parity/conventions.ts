@@ -274,6 +274,46 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
     "app/controllers/trails/conductor/action-mailbox/incinerates-controller.ts",
   "actionmailbox:action_mailbox/reroutes_controller.rb":
     "app/controllers/trails/conductor/action-mailbox/reroutes-controller.ts",
+  "activestorage:analyze_job.rb": "app/jobs/active-storage/analyze-job.ts",
+  "activestorage:attachment.rb": "app/models/active-storage/attachment.ts",
+  "activestorage:base_controller.rb": "app/controllers/active-storage/base-controller.ts",
+  "activestorage:base_job.rb": "app/jobs/active-storage/base-job.ts",
+  "activestorage:blob.rb": "app/models/active-storage/blob.ts",
+  "activestorage:blob/analyzable.rb": "app/models/active-storage/blob/analyzable.ts",
+  "activestorage:blob/identifiable.rb": "app/models/active-storage/blob/identifiable.ts",
+  "activestorage:blob/representable.rb": "app/models/active-storage/blob/representable.ts",
+  "activestorage:blob/servable.rb": "app/models/active-storage/blob/servable.ts",
+  "activestorage:blobs/proxy_controller.rb":
+    "app/controllers/active-storage/blobs/proxy-controller.ts",
+  "activestorage:blobs/redirect_controller.rb":
+    "app/controllers/active-storage/blobs/redirect-controller.ts",
+  "activestorage:current.rb": "app/models/active-storage/current.ts",
+  "activestorage:direct_uploads_controller.rb":
+    "app/controllers/active-storage/direct-uploads-controller.ts",
+  "activestorage:disable_session.rb": "app/controllers/concerns/active-storage/disable-session.ts",
+  "activestorage:disk_controller.rb": "app/controllers/active-storage/disk-controller.ts",
+  "activestorage:file_server.rb": "app/controllers/concerns/active-storage/file-server.ts",
+  "activestorage:filename.rb": "app/models/active-storage/filename.ts",
+  "activestorage:mirror_job.rb": "app/jobs/active-storage/mirror-job.ts",
+  "activestorage:named_variant.rb": "app/models/active-storage/named-variant.ts",
+  "activestorage:preview.rb": "app/models/active-storage/preview.ts",
+  "activestorage:preview_image_job.rb": "app/jobs/active-storage/preview-image-job.ts",
+  "activestorage:purge_job.rb": "app/jobs/active-storage/purge-job.ts",
+  "activestorage:record.rb": "app/models/active-storage/record.ts",
+  "activestorage:representations/base_controller.rb":
+    "app/controllers/active-storage/representations/base-controller.ts",
+  "activestorage:representations/proxy_controller.rb":
+    "app/controllers/active-storage/representations/proxy-controller.ts",
+  "activestorage:representations/redirect_controller.rb":
+    "app/controllers/active-storage/representations/redirect-controller.ts",
+  "activestorage:set_blob.rb": "app/controllers/concerns/active-storage/set-blob.ts",
+  "activestorage:set_current.rb": "app/controllers/concerns/active-storage/set-current.ts",
+  "activestorage:streaming.rb": "app/controllers/concerns/active-storage/streaming.ts",
+  "activestorage:transform_job.rb": "app/jobs/active-storage/transform-job.ts",
+  "activestorage:variant.rb": "app/models/active-storage/variant.ts",
+  "activestorage:variant_record.rb": "app/models/active-storage/variant-record.ts",
+  "activestorage:variant_with_record.rb": "app/models/active-storage/variant-with-record.ts",
+  "activestorage:variation.rb": "app/models/active-storage/variation.ts",
   // Real ports that live under a different file name than the Ruby one, found
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.

@@ -5,13 +5,13 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
-import type { Blob } from "../../../lib/blob.js";
+import type { Blob } from "../../../lib/app/models/active-storage/blob.js";
 import {
   SERVICE_CONFIGURATIONS,
   createFileBlob,
   withRaiseOnOpenRedirects,
 } from "../../support/test-helper.js";
-import "../../../lib/blobs/redirect-controller.js";
+import "../../../lib/app/controllers/active-storage/blobs/redirect-controller.js";
 
 type Url = (...args: unknown[]) => string;
 type Session = IntegrationTest & {

@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { deepDup, TopLevel } from "@blazetrails/activesupport";
 import { Base, Migration, type DatabaseAdapter } from "@blazetrails/activerecord";
 import "./support/database/setup.js";
-import "../lib/attachment.js";
-import "../lib/blob.js";
-import { Record } from "../lib/record.js";
-import "../lib/variant-record.js";
+import "../lib/app/models/active-storage/attachment.js";
+import "../lib/app/models/active-storage/blob.js";
+import { Record } from "../lib/app/models/active-storage/record.js";
+import "../lib/app/models/active-storage/variant-record.js";
 import type { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { CreateActiveStorageTables } from "../lib/db/migrate/20170806125915_create_active_storage_tables.js";
 

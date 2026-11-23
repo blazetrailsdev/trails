@@ -5,10 +5,10 @@ import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ActiveStorage } from "../../lib/active-storage.js";
 import "../support/database/setup.js";
-import type { Blob } from "../../lib/blob.js";
-import { PreviewImageJob } from "../../lib/preview-image-job.js";
+import type { Blob } from "../../lib/app/models/active-storage/blob.js";
+import { PreviewImageJob } from "../../lib/app/jobs/active-storage/preview-image-job.js";
 import { createFileBlob } from "../support/test-helper.js";
-import { TransformJob } from "../../lib/transform-job.js";
+import { TransformJob } from "../../lib/app/jobs/active-storage/transform-job.js";
 
 class PreviewImageJobTest extends TestCase {
   previewImageJob(): void {}

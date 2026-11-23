@@ -4,9 +4,9 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import type { RouteSet } from "@blazetrails/actionpack";
 import { Digest, OpenSSL, Range, StringIO } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Current } from "../../lib/current.js";
+import { Current } from "../../lib/app/models/active-storage/current.js";
 import { FileNotFoundError, IntegrityError } from "../../lib/errors.js";
-import { Filename } from "../../lib/filename.js";
+import { Filename } from "../../lib/app/models/active-storage/filename.js";
 import type { Service } from "../../lib/service.js";
 import "../support/database/setup.js";
 

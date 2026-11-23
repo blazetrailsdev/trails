@@ -1,5 +1,5 @@
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import type { Attachment } from "../../attachment.js";
+import type { Attachment } from "../../app/models/active-storage/attachment.js";
 import type { AttachedRecord } from "../../attached.js";
 import { Changes } from "../changes.js";
 

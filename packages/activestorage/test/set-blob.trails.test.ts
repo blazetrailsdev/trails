@@ -3,12 +3,12 @@ import { include, isModuleIncluded } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import "./support/database/setup.js";
 import { ActiveStorage } from "../lib/active-storage.js";
-import { BaseController } from "../lib/base-controller.js";
-import { Current } from "../lib/current.js";
-import { DisableSession } from "../lib/disable-session.js";
-import { FileServer } from "../lib/file-server.js";
-import { SetBlob } from "../lib/set-blob.js";
-import { SetCurrent } from "../lib/set-current.js";
+import { BaseController } from "../lib/app/controllers/active-storage/base-controller.js";
+import { Current } from "../lib/app/models/active-storage/current.js";
+import { DisableSession } from "../lib/app/controllers/concerns/active-storage/disable-session.js";
+import { FileServer } from "../lib/app/controllers/concerns/active-storage/file-server.js";
+import { SetBlob } from "../lib/app/controllers/concerns/active-storage/set-blob.js";
+import { SetCurrent } from "../lib/app/controllers/concerns/active-storage/set-current.js";
 import { createBlob } from "./support/test-helper.js";
 
 describe("ActiveStorage::SetBlob", () => {

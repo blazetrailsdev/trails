@@ -1201,29 +1201,31 @@ describe("AppGeneratorTest", () => {
 
   it("skip javascript option with skip javascript argument", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-javascript"]);
-    await assertNoGem("@hotwired/stimulus");
-    await assertNoGem("@hotwired/turbo-rails");
-    await assertNoGem("vite-plugin-ruby");
+    await assertNoGem("@blazetrails/stimulus");
+    await assertNoGem("@blazetrails/turbo");
+    await assertNoGem("@blazetrails/vite-trails");
   });
 
   it("skip javascript option with J argument", async () => {
     await t.runGenerator([t.destinationRoot, "-J"]);
-    await assertNoGem("@hotwired/stimulus");
-    await assertNoGem("@hotwired/turbo-rails");
-    await assertNoGem("vite-plugin-ruby");
+    await assertNoGem("@blazetrails/stimulus");
+    await assertNoGem("@blazetrails/turbo");
+    await assertNoGem("@blazetrails/vite-trails");
   });
 
   it("skip javascript option with skip js argument", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-js"]);
-    await assertNoGem("@hotwired/stimulus");
-    await assertNoGem("@hotwired/turbo-rails");
-    await assertNoGem("vite-plugin-ruby");
+    await assertNoGem("@blazetrails/stimulus");
+    await assertNoGem("@blazetrails/turbo");
+    await assertNoGem("@blazetrails/vite-trails");
   });
 
   it("hotwire", async () => {
     const railsCommands = await runGeneratorInstance([t.destinationRoot]);
 
     expect(railsCommands).toContain("turbo:install stimulus:install");
+    await assertGem("@blazetrails/turbo");
+    await assertGem("@blazetrails/stimulus");
     await t.assertFile("app/views/layouts/application.html.tse", (content: string) => {
       expect(content).toMatch(/data-turbo-track/);
     });
@@ -1232,7 +1234,7 @@ describe("AppGeneratorTest", () => {
   it("skip hotwire", async () => {
     await runGeneratorInstance([t.destinationRoot, "--skip-hotwire"]);
 
-    await assertNoGem("@hotwired/turbo-rails");
+    await assertNoGem("@blazetrails/turbo");
     await t.assertFile("app/views/layouts/application.html.tse", (content: string) => {
       assertNoMatch(/data-turbo-track/, content);
     });

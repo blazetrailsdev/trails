@@ -3,8 +3,8 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActiveStorage } from "../lib/active-storage.js";
 import { createFileBlob } from "./support/test-helper.js";
-import { VariantWithRecord } from "../lib/variant-with-record.js";
-import { Variant } from "../lib/variant.js";
+import { VariantWithRecord } from "../lib/app/models/active-storage/variant-with-record.js";
+import { Variant } from "../lib/app/models/active-storage/variant.js";
 
 describe("Variant processing", () => {
   const trackVariantsWas = ActiveStorage.trackVariants;

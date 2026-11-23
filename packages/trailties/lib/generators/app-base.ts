@@ -8,7 +8,9 @@ import {
   Gem,
   LoadError,
   RuntimeError,
+  Shellwords,
   env,
+  exit,
   include,
   type Included,
   rbFBackquote,
@@ -93,6 +95,7 @@ export abstract class AppBase extends Base {
     this.noCommands(() => this.methodAdded("setDefaultAccessorsBang"));
     this.noCommands(() => this.methodAdded("reportImpliedOptions"));
     this.noCommands(() => this.methodAdded("createRoot"));
+    this.methodAdded("targetTrailsPrerelease");
   }
 
   static strictArgsPosition(): boolean {
@@ -519,6 +522,8 @@ ${requireStatements.join("\n")}`;
     return [
       this.trailsPackageEntry(),
       this.databasePackageEntry(),
+      this.javascriptPackageEntry(),
+      this.hotwirePackageEntry(),
       this.cssPackageEntry(),
       this.cablePackageEntry(),
     ]
@@ -591,6 +596,35 @@ ${requireStatements.join("\n")}`;
       }
       return entry;
     });
+  }
+
+  /** @internal */
+  protected javascriptPackageEntry(): PackageEntry | undefined {
+    if (this.options.skipJavascript) return;
+
+    if (this.options.javascript === "vite") {
+      return PackageEntry.floats(
+        "@blazetrails/vite-trails",
+        "Bundle and serve JavaScript with Vite [https://vite-ruby.netlify.app]",
+      );
+    }
+  }
+
+  /** @internal */
+  protected hotwirePackageEntry(): PackageEntry[] | undefined {
+    if (this.options.skipHotwire) return;
+
+    const turboTrailsEntry = PackageEntry.floats(
+      "@blazetrails/turbo",
+      "Hotwire's SPA-like page accelerator [https://turbo.hotwired.dev]",
+    );
+
+    const stimulusTrailsEntry = PackageEntry.floats(
+      "@blazetrails/stimulus",
+      "Hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]",
+    );
+
+    return [turboTrailsEntry, stimulusTrailsEntry];
   }
 
   /**
@@ -824,6 +858,32 @@ ${requireStatements.join("\n")}`;
   /** @internal */
   protected isInstall(): boolean {
     return !(this.options.skipInstall || this.options.pretend);
+  }
+
+  /** @internal */
+  async targetTrailsPrerelease(selfCommand = "new"): Promise<void> {
+    if (!(this.trailsPrerelease() && this.isInstall())) return;
+
+    if (!File.isExist(File.expandPath("package.json", this.destinationRoot))) {
+      await this.createFile(
+        "package.json",
+        `${JSON.stringify(
+          { private: true, dependencies: JSON.parse(`{${this.trailsPackageEntry().join(",")}}`) },
+          null,
+          2,
+        )}\n`,
+      );
+
+      await this.runInstall();
+
+      this._argv.splice(this._argv.indexOf(this.appPath), 1);
+      this._argv.unshift(this.destinationRoot);
+      await this.installCommand(`exec trails ${selfCommand} ${Shellwords.join(this._argv)}`);
+      exit();
+    } else {
+      await this.removeFile("package.json");
+      await this.removeFile("pnpm-lock.yaml");
+    }
   }
 
   /** @internal */

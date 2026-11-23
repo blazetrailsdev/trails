@@ -18,12 +18,12 @@ import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Blob } from "../../lib/blob.js";
-import { Current } from "../../lib/current.js";
+import { Blob } from "../../lib/app/models/active-storage/blob.js";
+import { Current } from "../../lib/app/models/active-storage/current.js";
 import { IntegrityError } from "../../lib/errors.js";
-import { Filename } from "../../lib/filename.js";
-import { PurgeJob } from "../../lib/purge-job.js";
-import type { VariantWithRecord } from "../../lib/variant-with-record.js";
+import { Filename } from "../../lib/app/models/active-storage/filename.js";
+import { PurgeJob } from "../../lib/app/jobs/active-storage/purge-job.js";
+import type { VariantWithRecord } from "../../lib/app/models/active-storage/variant-with-record.js";
 import { DiskService } from "../../lib/service/disk-service.js";
 import {
   buildBlobAfterUnfurling,
