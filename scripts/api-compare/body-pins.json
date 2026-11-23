@@ -30760,8 +30760,8 @@
     "package": "activemodel",
     "rubyFile": "secure_password.rb",
     "rubyName": "has_secure_password",
-    "digest": "ccd4c5f63f54815e",
-    "ref": "v8.0.2"
+    "digest": "01b203415638bc06",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activemodel",
