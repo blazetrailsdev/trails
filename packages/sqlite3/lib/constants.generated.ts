@@ -12,6 +12,7 @@ defineConstants([
   [m3, "AbortException", "SQLite3::AbortException"],
   [m3, "AuthorizationException", "SQLite3::AuthorizationException"],
   [m0, "Backup", "SQLite3::Backup"],
+  [m7, "Blob", "SQLite3::Blob"],
   [m3, "BusyException", "SQLite3::BusyException"],
   [m3, "CantOpenException", "SQLite3::CantOpenException"],
   [m1, "Constants", "SQLite3::Constants"],

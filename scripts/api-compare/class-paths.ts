@@ -692,6 +692,7 @@ export const GEM_EXT_CLASSES: readonly [string, string, string, string][] = [
     "libxml-ruby/5.0.5/ext/libxml/ruby_xml_parser_context.c:958",
   ],
   ["sqlite3", "backup.ts::Backup", "SQLite3::Backup", "sqlite3/v2.7.3/ext/sqlite3/backup.c:180"],
+  ["sqlite3", "statement.ts::Blob", "SQLite3::Blob", "sqlite3/v2.7.3/ext/sqlite3/sqlite3.c:187"],
   [
     "msgpack",
     "extension-value.ts::ExtensionValue",
