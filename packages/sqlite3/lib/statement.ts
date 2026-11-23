@@ -262,12 +262,12 @@ export class Statement {
     return this.#st.columnDecltype(index);
   }
 
-  /** @noRailsEquivalent PERMANENT */
   bindParameterCount(): number {
     this.mustBeOpenBang();
     return this.#st.bindParameterCount();
   }
 
+  /** @noRailsEquivalent PERMANENT */
   setReadBigInts(toggle: boolean): void {
     this.mustBeOpenBang();
     this.#st.setReadBigInts(toggle);

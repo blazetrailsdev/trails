@@ -39,8 +39,13 @@ export interface LibsqlReplicaOptions extends Database.Options {
 }
 
 /** @internal */
-function open(file: string, mode: number, options: Database.Options): Database.Database {
+function open(file: string, mode: number, options: LibsqlReplicaOptions): Database.Database {
   const { Open, ErrorCode } = SQLite3.Constants;
+  if (((1 << (mode & 7)) & 0x46) === 0) {
+    throw Object.assign(new Error("bad parameter or other API misuse"), {
+      rawCode: ErrorCode.MISUSE,
+    });
+  }
   if (
     (mode & Open.CREATE) === 0 &&
     file !== "" &&
@@ -58,7 +63,7 @@ function open(file: string, mode: number, options: Database.Options): Database.D
 }
 
 /** @internal */
-function openRemote(file: string, mode: number, options: Database.Options): Database.Database {
+function openRemote(file: string, mode: number, options: LibsqlReplicaOptions): Database.Database {
   if ((mode & SQLite3.Constants.Open.SHAREDCACHE) !== 0) {
     throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the libsql-remote driver");
   }
@@ -151,7 +156,7 @@ function prepareStatement(
 
 /** @internal */
 function openEngine(
-  options: Database.Options,
+  options: LibsqlReplicaOptions,
   replica: boolean,
   opener: typeof open = open,
 ): EngineOpenV2 {
@@ -233,6 +238,6 @@ export function replicaEngine(
 }
 
 /** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces */
-export function remoteEngine(options: { authToken?: string }): EngineOpenV2 {
-  return openEngine(options as Database.Options, false, openRemote);
+export function remoteEngine(options: Pick<LibsqlReplicaOptions, "authToken">): EngineOpenV2 {
+  return openEngine(options, false, openRemote);
 }

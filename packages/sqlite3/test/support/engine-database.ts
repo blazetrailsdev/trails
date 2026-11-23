@@ -4,6 +4,7 @@ import type { BusyHandler, EngineOpenV2, SyncCloseEngineDatabase } from "../../l
 import type { EngineStatement } from "../../lib/statement.js";
 import type { SqliteBindValue } from "../../lib/driver.js";
 import { statementTail } from "../../lib/engine/statement-tail.js";
+import { bindParameterNames } from "../../lib/engine/bind-parameter-index.js";
 
 export function engineDatabase(file = ":memory:"): SyncCloseEngineDatabase & {
   quirkModeDisabled: boolean;
@@ -98,7 +99,7 @@ export function engineDatabase(file = ":memory:"): SyncCloseEngineDatabase & {
         columnCount: () => (reader ? stmt.columns().length : 0),
         columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
         columnDecltype: (index) => (reader ? (stmt.columns()[index]?.type ?? null) : null),
-        bindParameterCount: () => stmt.source.split("?").length - 1,
+        bindParameterCount: () => bindParameterNames(stmt.source).length,
         setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
       };
       return [engine, remainder];

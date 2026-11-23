@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { File, getOs } from "@blazetrails/ruby-compat";
+import { File, RuntimeError, getOs } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../lib/index.js";
 import { engine, remoteEngine, replicaEngine } from "../lib/engine/libsql.js";
-import { RuntimeError } from "@blazetrails/ruby-compat";
 
 describe("SQLite3::Database over the libsql engine", () => {
   const paths: string[] = [];
@@ -174,5 +173,12 @@ describe("libsql engine binds", () => {
           flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.SHAREDCACHE,
         }),
     ).toThrow(RuntimeError);
+  });
+
+  it("raises MisuseException for READONLY | READWRITE, as sqlite3_open_v2 does", () => {
+    const { Open } = SQLite3.Constants;
+    expect(
+      () => new SQLite3.Database(":memory:", { engine, flags: Open.READONLY | Open.READWRITE }),
+    ).toThrow(SQLite3.MisuseException);
   });
 });

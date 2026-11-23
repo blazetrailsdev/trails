@@ -69,7 +69,12 @@ export function sharedCacheDatabase(database: string, flags: number): string {
 /** @internal */
 function open(file: string, mode: number, quirks = true): DatabaseSync {
   const { DatabaseSync } = loadNodeSqlite();
-  const { Open } = SQLite3.Constants;
+  const { Open, ErrorCode } = SQLite3.Constants;
+  if (((1 << (mode & 7)) & 0x46) === 0) {
+    throw Object.assign(new Error("bad parameter or other API misuse"), {
+      errcode: ErrorCode.MISUSE,
+    });
+  }
   let database = sharedCacheDatabase(file, mode);
   if ((mode & (Open.READWRITE | Open.CREATE)) === Open.READWRITE) {
     if (!database.startsWith("file:")) {
