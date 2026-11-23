@@ -21,7 +21,7 @@
     },
     scripts: {
       build: "trails-tsc --schema db/schema.ts",
-      test: "vitest run",
+      test: "vitest run --project unit",
       trails: "trails",
       dev: "trails server",
       "db:create": "trails db:create",
