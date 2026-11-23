@@ -11,8 +11,16 @@ class StubController extends ActionController.Base {
   }
 }
 
-function assertOperator(o1: object, operator: "respond_to?", o2: string): void {
-  expect(rbObjRespondTo(o1, o2), `Expected ${String(o1)} to be ${operator} ${o2}`).toBe(true);
+function assertOperator(o1: object, operator: "respond_to?", o2: string): void;
+function assertOperator(o1: string, operator: "in", o2: object): void;
+function assertOperator(
+  o1: object | string,
+  operator: "respond_to?" | "in",
+  o2: string | object,
+): void {
+  const result =
+    operator === "in" ? (o1 as string) in (o2 as object) : rbObjRespondTo(o1, o2 as string);
+  expect(result, `Expected ${String(o1)} to be ${operator} ${String(o2)}`).toBe(true);
 }
 
 function assertNotOperator(o1: string, operator: "in", o2: object): void {
@@ -147,7 +155,7 @@ describe("LazyRouteSet", () => {
     expect(appUrlHelpers.urlFor({ controller: "products", action: "index", onlyPath: true })).toBe(
       "/products",
     );
-    expect("productsPath" in appUrlHelpers).toBe(true);
+    assertOperator("productsPath", "in", appUrlHelpers);
   });
 
   it("new_with_config builds an instance of the receiving subclass", () => {
