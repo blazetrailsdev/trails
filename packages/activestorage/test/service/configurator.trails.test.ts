@@ -7,7 +7,7 @@ import { MirrorService } from "../../lib/service/mirror-service.js";
 describe("Configurator.load", () => {
   it("raises Missing service adapter for a service with no file", async () => {
     const configurations = { azure: { service: "AzureStorage", container: "container" } };
-    await Configurator.load(configurations);
+    await Configurator.load();
     expect(() => Configurator.build("azure", configurations)).toThrow(
       new RuntimeError('Missing service adapter for "AzureStorage"'),
     );
@@ -18,7 +18,7 @@ describe("Configurator.load", () => {
       local: { service: "Disk", root: "path" },
       mirror: { service: "Mirror", primary: "local", mirrors: ["local"] },
     };
-    await Configurator.load(configurations);
+    await Configurator.load();
     expect(Configurator.build("local", configurations)).toBeInstanceOf(DiskService);
     expect(Configurator.build("mirror", configurations)).toBeInstanceOf(MirrorService);
   });
