@@ -74,7 +74,6 @@
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
     <span class="pill">trails &mdash; pre-release &middot; measured at {data.measuredAt}</span>
     <div class="stage" id="caught">
-      <div class="tabs"><span class="tab">Caught by the compiler</span></div>
         <div class="pane">
           <div class="split">
             <div>
@@ -157,7 +156,6 @@
   </section>
 
   <section class="ai" id="ai">
-    <img class="meme" src="{base}/push-rails-over-there.jpg" width="500" height="880" alt="Put It Somewhere Else Patrick meme. Top panel: What if we took Rails. Bottom panel: and pushed it over there." />
     <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, working from the vendored Rails source under human direction and review, with code reviews from Copilot and Codex.</p>
   </section>
 
@@ -211,8 +209,6 @@
   .lede strong { display: block; }
   .pill { display: inline-block; background: var(--mango); border-radius: 6px; padding: 6px 14px; font-size: 15px; font-weight: 600; margin-bottom: 56px; }
   .stage { max-width: 1170px; margin: 0 auto; background: #211710; border-radius: 10px; overflow: hidden; text-align: left; box-shadow: 0 30px 60px rgb(0 0 0 / 0.2); }
-  .tabs { display: flex; gap: 6px; padding: 12px 12px 0; background: #2a1e16; border-bottom: 1px solid #4a3628; }
-  .tab { font: 600 16px var(--sans); background: #3a2a1f; color: #fff; border: 1px solid #4a3628; border-bottom: 0; border-radius: 8px 8px 0 0; box-shadow: inset 0 3px 0 var(--orange); margin-bottom: -1px; padding: 11px 22px 12px; }
   .note { margin: 0; padding: 0 22px 22px; font-size: 15px; color: #d9c6b0; }
   .note code { color: #fbf1e4; background: #2b1d14 !important; border-color: #4a3628 !important; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -223,9 +219,8 @@
   .split > div + div { border-left: 1px solid #4a3628; }
   .pane .file { text-align: left; padding: 8px 22px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
-  .ai { display: flex; align-items: center; justify-content: center; gap: 40px; padding: 0 24px 80px; text-align: left; }
-  .meme { display: block; width: 160px; height: auto; border-radius: 8px; }
-  .disclaimer { max-width: 560px; margin: 0; font-size: 17px; line-height: 1.5; color: var(--bt-muted); }
+  .ai { padding: 0 24px 80px; }
+  .disclaimer { max-width: 560px; margin: 0 auto; font-size: 17px; line-height: 1.5; color: var(--bt-muted); }
   .pane :global(.squiggle) { text-decoration: underline wavy #ff5d5d; text-underline-offset: 4px; }
   .pane :global(.tip) { display: block; width: max-content; max-width: 100%; margin: 6px 0 4px 2ch; padding: 8px 12px; white-space: pre-wrap; background: #2b1d14; border: 1px solid #ff5d5d; border-radius: 6px; color: #ffb4b4; font-size: 13px; }
 
@@ -287,7 +282,6 @@
     .tiles li:nth-last-child(2) { grid-column: auto; }
     .blocks, .cards, .split { grid-template-columns: 1fr; }
     .split > div + div { border-left: 0; border-top: 1px solid #4a3628; }
-    .ai { flex-direction: column; }
     .card { padding: 40px 24px; }
   }
 </style>
