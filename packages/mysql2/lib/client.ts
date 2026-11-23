@@ -84,8 +84,14 @@ const MYSQL_ESCAPES: Record<string, string> = {
   "\\": "\\\\",
   "'": "\\'",
   '"': '\\"',
-  "\x1a": "\\Z",
+  "\u001a": "\\Z",
 };
+
+function escapeStringForMysql(from: string): string {
+  let to = "";
+  for (const c of from) to += MYSQL_ESCAPES[c] ?? c;
+  return to.length === from.length ? from : to;
+}
 const CR_AUTH_PLUGIN_CANNOT_LOAD = 2059;
 
 const MY_CNF_KEYS: Record<string, string> = {
@@ -1167,8 +1173,7 @@ export class Client {
     if (typeof str !== "string") {
       throw new TypeError(`wrong argument type ${rbObjClassname(str)} (expected String)`);
     }
-    // eslint-disable-next-line no-control-regex -- \x1a (Ctrl-Z) is one of mysql_escape_string's escaped bytes
-    return str.replace(/[\0\n\r\\'"\x1a]/g, (c) => MYSQL_ESCAPES[c]);
+    return escapeStringForMysql(str);
   }
 
   escape(str: string): string {
@@ -1178,8 +1183,7 @@ export class Client {
     if (typeof str !== "string") {
       throw new TypeError(`wrong argument type ${rbObjClassname(str)} (expected String)`);
     }
-    // eslint-disable-next-line no-control-regex -- \x1a (Ctrl-Z) is one of mysql_escape_string's escaped bytes
-    return str.replace(/[\0\n\r\\'"\x1a]/g, (c) => MYSQL_ESCAPES[c]);
+    return escapeStringForMysql(str);
   }
 
   queryInfo(): Record<string, number> {
