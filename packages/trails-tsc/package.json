@@ -33,7 +33,8 @@
   },
   "files": [
     "dist",
-    "bin"
+    "bin",
+    "!dist/**/*.d.ts.map"
   ],
   "license": "MIT",
   "engines": {

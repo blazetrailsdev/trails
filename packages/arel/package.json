@@ -15,7 +15,8 @@
     "@blazetrails/date": "workspace:*"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.d.ts.map"
   ],
   "license": "MIT",
   "engines": {

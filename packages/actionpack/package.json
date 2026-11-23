@@ -29,7 +29,8 @@
     "build:templates": "cp -R lib/action-dispatch/journey/visualizer dist/action-dispatch/journey/ && cp -R lib/action-dispatch/middleware/templates dist/action-dispatch/middleware/ && trails-tsc-views build --views dist/action-dispatch/middleware/templates --in-place && trails-tsc-views build --views dist/action-dispatch/journey/visualizer --in-place"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.d.ts.map"
   ],
   "license": "MIT",
   "peerDependencies": {

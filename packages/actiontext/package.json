@@ -21,7 +21,8 @@
   },
   "files": [
     "dist",
-    "app"
+    "app",
+    "!dist/**/*.d.ts.map"
   ],
   "scripts": {
     "build": "tsc && pnpm build:templates",
