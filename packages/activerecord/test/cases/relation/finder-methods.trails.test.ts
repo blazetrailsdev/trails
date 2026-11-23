@@ -404,7 +404,7 @@ describe("finder not-found message fidelity", () => {
       const err = e as RecordNotFound;
       expect(err).toBeInstanceOf(RecordNotFound);
       expect(err.message).toBe(
-        "Couldn't find all MercedesCars with 'name': (Hello, World!) (found 0 results, but was looking for 2).",
+        `Couldn't find all MercedesCars with 'name': ("Hello", "World!") (found 0 results, but was looking for 2).`,
       );
       expect(err.model).toBe("MercedesCar");
       expect(err.primaryKey).toBe("name");
@@ -436,7 +436,7 @@ describe("raise_record_not_found_exception! — composite key id rendering", () 
     } catch (e) {
       const err = e as RecordNotFound;
       expect(err.message).toBe(
-        `Couldn't find all Orders with '["shop_id", "id"]': (1, 2, 3, 4) (found 0 results, but was looking for 2).`,
+        `Couldn't find all Orders with '["shop_id", "id"]': ([1, 2], [3, 4]) (found 0 results, but was looking for 2).`,
       );
     }
   });
@@ -454,7 +454,7 @@ describe("raise_record_not_found_exception! — composite key id rendering", () 
       expect.fail("should have thrown");
     } catch (e) {
       const err = e as RecordNotFound;
-      expect(err.message).toBe(`Couldn't find Order with '["shop_id", "id"]'=[[1, 2]]`);
+      expect(err.message).toBe(`Couldn't find Order with '["shop_id", "id"]'=[1, 2]`);
       expect(err.primaryKey).toEqual(["shop_id", "id"]);
     }
   });
