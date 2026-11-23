@@ -1100,8 +1100,14 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.expand_path`
    * (`vendor/ruby/v3.3.11/file.c:4126`).
    */
-  static expandPath(fileName: string, dirString?: string): string {
-    return getPath().resolve(dirString ?? getFs().cwd(), fileName);
+  static expandPath(
+    fileName: string | { toPath(): string },
+    dirString?: string | { toPath(): string } | null,
+  ): string {
+    return getPath().resolve(
+      dirString == null ? getFs().cwd() : rbGetPath(dirString),
+      rbGetPath(fileName),
+    );
   }
 
   /**

@@ -546,7 +546,8 @@ export class Loader {
       if (this.logger != null) {
         this.log(`the namespace ${cref} already exists, descending into ${subdir}`);
       }
-      await this.defineAutoloadsForDir(subdir, (await autoloadGet(cref)) as object);
+      const get = await autoloadGet(cref);
+      await this.defineAutoloadsForDir(subdir, get as object);
     }
   }
 
@@ -648,7 +649,11 @@ export class Loader {
     this.inceptions.clear();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall each_key — PERMANENT
+   * @missingRailsCall require — PERMANENT
+   */
   raiseIfConflictingDirectory(dir: string): void {
     let raised = false;
     const synchronized = MUTEX.synchronize(() => {
