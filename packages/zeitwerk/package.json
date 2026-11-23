@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/zeitwerk",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Build-time autoloader for Trails, mirroring Zeitwerk",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/zeitwerk"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/zeitwerk#readme",
   "type": "module",
   "main": "dist/zeitwerk.js",
   "types": "dist/zeitwerk.d.ts",
@@ -41,5 +47,8 @@
       "ref": "v2.7.3",
       "sha": "77c971c0f602bd0e5961d22dc7541d863737dbcb"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/rack",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Modular web server interface, mirroring Ruby's Rack",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/rack"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/rack#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +18,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
@@ -30,5 +35,8 @@
       "ref": "v3.2.8",
       "sha": "5f511d7d3d9d62becddcbd403dde813a67e10c81"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

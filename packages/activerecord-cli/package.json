@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/activerecord-cli",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Generators, migrator, and the `ar` CLI for standalone @blazetrails/activerecord projects",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/activerecord-cli"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/activerecord-cli#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -28,7 +34,6 @@
     "bin",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
@@ -43,5 +48,8 @@
   },
   "engines": {
     "node": ">=26"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

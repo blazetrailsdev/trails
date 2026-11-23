@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/activerecord",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "ORM layer mirroring Ruby's ActiveRecord, built on @blazetrails/arel and @blazetrails/activemodel",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/activerecord"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/activerecord#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -101,7 +107,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "devDependencies": {
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
@@ -123,5 +128,8 @@
       "ref": "v8.0.5.2",
       "sha": "235c597b100321b6bd2d62f8df63707f42b25b2d"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

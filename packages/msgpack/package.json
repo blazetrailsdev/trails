@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/msgpack",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "MessagePack serialization, mirroring Ruby's msgpack gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/msgpack"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/msgpack#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,7 +24,6 @@
   "scripts": {
     "build": "tsc"
   },
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
@@ -33,5 +38,8 @@
       "ref": "v1.8.0",
       "sha": "e4305b4b8a2506422bc78b6fab624907eb7e74a5"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

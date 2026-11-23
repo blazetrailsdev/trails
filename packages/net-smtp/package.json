@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/net-smtp",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "SMTP client for Trails, mirroring the net-smtp gem over nodemailer's SMTPConnection",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/net-smtp"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/net-smtp#readme",
   "type": "module",
   "main": "dist/smtp.js",
   "types": "dist/smtp.d.ts",
@@ -45,5 +51,8 @@
       "ref": "v0.5.1",
       "sha": "a0075eb8a74910bd05566f0a208589263bce7597"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

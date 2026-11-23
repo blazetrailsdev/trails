@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/mini-magick",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "ImageMagick command lines for Trails, mirroring the mini_magick gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/mini-magick"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/mini-magick#readme",
   "type": "module",
   "main": "dist/mini-magick.js",
   "types": "dist/mini-magick.d.ts",
@@ -41,5 +47,8 @@
       "ref": "v5.3.1",
       "sha": "ddcbfe9632667876be10373e1e01252617e74057"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

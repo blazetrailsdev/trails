@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/date",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Port of Ruby's date gem: the Temporal-backed Date/DateTime surface",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/date"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/date#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,5 +37,8 @@
       "ref": "v3.4.1",
       "sha": "a3295ad262773a80ad61526beb500b29e770b817"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

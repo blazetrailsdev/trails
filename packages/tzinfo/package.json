@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/tzinfo",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Time zone lookups for Trails, standing in for the tzinfo gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/tzinfo"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/tzinfo#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -37,5 +43,8 @@
       "ref": "v2.0.6",
       "sha": "d5893c99bbcd842af86023f02a84fac1659b3031"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

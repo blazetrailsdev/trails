@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/turbo",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Turbo for Trails, mirroring the turbo-rails gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/turbo"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/turbo#readme",
   "type": "module",
   "main": "dist/turbo-trails.js",
   "types": "dist/types/turbo-trails.d.ts",
@@ -58,5 +64,8 @@
       "ref": "v2.0.23",
       "sha": "435135b26a4b62e49d2f55bb4b1fd419e3bfb228"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

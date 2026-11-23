@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/did-you-mean",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Port of Ruby's did_you_mean: SpellChecker, Jaro/JaroWinkler, Levenshtein",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/did-you-mean"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/did-you-mean#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,5 +37,8 @@
       "ref": "v1.6.3",
       "sha": "f7703add765054b6e63ef581818a0c307fdd4abf"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

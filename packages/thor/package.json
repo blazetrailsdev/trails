@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/thor",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Port of the thor gem: a toolkit for building command-line interfaces",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/thor"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/thor#readme",
   "type": "module",
   "main": "dist/thor.js",
   "types": "dist/thor.d.ts",
@@ -45,5 +51,8 @@
       "ref": "v1.4.0",
       "sha": "518ae0f49bb1c3dc2226607c07da74b591759ed0"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

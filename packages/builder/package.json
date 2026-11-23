@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/builder",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "XML markup builder for Trails, mirroring the builder gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/builder"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/builder#readme",
   "type": "module",
   "main": "dist/builder.js",
   "types": "dist/builder.d.ts",
@@ -39,5 +45,8 @@
       "ref": "v3.3.0",
       "sha": "789896b306e36a5fe166388413b16e9323260601"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

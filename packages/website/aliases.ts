@@ -36,7 +36,6 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/actionpack", "../actionpack/lib/index.ts"],
   ["@blazetrails/trailties/all", "../trailties/lib/all.ts"],
   ["@blazetrails/trailties/generators", "../trailties/lib/generators/index.ts"],
-  ["@blazetrails/globalid/wire", "../globalid/lib/wire.ts"],
   ["@blazetrails/globalid/signed-global-id", "../globalid/lib/signed-global-id.ts"],
   ["@blazetrails/globalid", "../globalid/lib/index.ts"],
   ["@blazetrails/actioncable", "../actioncable/lib/index.ts"],

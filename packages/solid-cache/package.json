@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/solid-cache",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Database-backed Active Support cache store for Trails, mirroring the solid_cache gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/solid-cache"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/solid-cache#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -50,5 +56,8 @@
   ],
   "devDependencies": {
     "@blazetrails/trails-tsc": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

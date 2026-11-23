@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/rack-test",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Simple testing API built on Rack, mirroring Ruby's rack-test",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/rack-test"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/rack-test#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +18,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
@@ -28,5 +33,8 @@
       "ref": "v2.2.0",
       "sha": "8c0cfbac2b9874322d942428498a32c0489603f5"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

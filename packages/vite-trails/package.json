@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/vite-trails",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Vite tag helpers and engine for Trails, mirroring the vite_rails gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/vite-trails"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/vite-trails#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,7 +29,6 @@
   "scripts": {
     "build": "tsc"
   },
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
@@ -50,5 +55,8 @@
       "ref": "vite_ruby@3.11.1",
       "sha": "77de9ea2b94044d72622f72d44d392953843a1d7"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

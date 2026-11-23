@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/actionview",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "ActionView — mirroring Rails ActionView",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/actionview"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/actionview#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,7 +37,6 @@
     "types",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
@@ -61,5 +66,8 @@
       "ref": "v2.3.0",
       "sha": "f8cb4b3964a4d8397ce29b0306cbaedea93150ca"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/i18n",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Port of the Ruby i18n gem: Config, exceptions",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/i18n"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/i18n#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,5 +38,8 @@
       "ref": "v1.14.8",
       "sha": "f2fb6a5766dee835082eb74ee83f52e0a6479573"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

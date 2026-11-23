@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/rake",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Port of the rake gem: a make-like build utility",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/rake"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/rake#readme",
   "type": "module",
   "bin": {
     "rake": "./bin/rake.js"
@@ -46,5 +52,8 @@
       "ref": "v13.2.1",
       "sha": "d84f6ef7f3540a1d0e95fabe451ea3a16157791b"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -827,6 +827,33 @@ What the prose above means in practice:
   resource with passing tests, as the quickstart shows. A real app is most
   likely to hit unported ActionView helpers.
 
+## Versioning and releases
+
+Every public package is published at one version, as Rails versions its
+framework gems together from `RAILS_VERSION`. `@blazetrails/trails` is the
+`rails` meta-gem's counterpart: it depends on the frameworks at that version.
+A port of a third-party gem rides the trails version; the gem and version it
+ports are its `package.json` `mirrors` field. Internal dependencies are
+`workspace:*`, which pnpm publishes as an exact pin, so one install never holds
+two copies of `ruby-compat` or `activesupport`.
+
+Before 1.0, a minor bump may break; a patch does not.
+
+The first official release is `0.1.0-alpha1`. Until then the packages sit at
+`0.1.0-alpha0`, and practice releases go out as `0.1.0-alpha0.1`,
+`0.1.0-alpha0.2`, … under the npm dist-tag `practice`, so semver sorts every
+one of them below `0.1.0-alpha1` and `latest` never points at one.
+
+To release, run `pnpm release:version <version>`, merge it, and push the tag
+`v<version>`. `.github/workflows/release.yml` builds and publishes every public
+package with npm provenance; a rerun skips versions already on the registry.
+Pull requests that touch release config run it as a dry run.
+
+No real publish runs until RFC 0100's publish-shape stories land:
+`exclude-compiled-tests-from-published-dist`, `stop-publishing-sourcemaps`,
+`files-field-for-leaf-packages`, `unpublish-activerecord-test-harness`,
+`globalid-notice-file` and `package-size-budget-ci-gate`.
+
 ## Requirements
 
 - **Node >= 26**, enforced by `engines`. The repo and a generated app pin

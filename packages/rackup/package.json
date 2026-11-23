@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/rackup",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "A general server command for Rack applications, mirroring Ruby's rackup",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/rackup"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/rackup#readme",
   "type": "module",
   "bin": {
     "rackup": "./bin/rackup.js"
@@ -16,7 +22,6 @@
     "bin",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
@@ -34,5 +39,8 @@
       "ref": "v2.2.1",
       "sha": "e9814d3b5a55fd0134369ddfdefd90f1a9a0e6b9"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

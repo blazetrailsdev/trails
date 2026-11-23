@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/fugit",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Cron, duration and time parsing for Trails, mirroring the fugit gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/fugit"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/fugit#readme",
   "type": "module",
   "main": "dist/fugit.js",
   "types": "dist/fugit.d.ts",
@@ -46,5 +52,8 @@
       "ref": "v1.11.1",
       "sha": "228b53ded4be3d86412b6dd62c831a7a459d9ef4"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -80,7 +80,6 @@
       "@blazetrails/tzinfo": ["../../tzinfo/lib/index.ts"],
       "@blazetrails/did-you-mean": ["../../did-you-mean/lib/index.ts"],
       "@blazetrails/globalid": ["../../globalid/lib/index.ts"],
-      "@blazetrails/globalid/wire": ["../../globalid/lib/wire.ts"],
       "@blazetrails/globalid/signed-global-id": ["../../globalid/lib/signed-global-id.ts"],
       "@blazetrails/activejob": ["../../activejob/lib/index.ts"],
       "@blazetrails/activejob/*": ["../../activejob/lib/*.ts"],

@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/libxml-ruby",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "LibXML::XML parser, SAX parser and node surface for Trails, mirroring libxml-ruby",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/libxml-ruby"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/libxml-ruby#readme",
   "type": "module",
   "main": "dist/libxml-ruby.js",
   "types": "dist/libxml-ruby.d.ts",
@@ -32,5 +38,8 @@
       "ref": "5.0.5",
       "sha": "daa51c5174196516be6cd3cb05d4e1c8f9e11ea0"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

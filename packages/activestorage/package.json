@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/activestorage",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "File attachments for Trails models, mirroring the activestorage gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/activestorage"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/activestorage#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/types/index.d.ts",
@@ -91,5 +97,8 @@
       "ref": "v8.0.5.2",
       "sha": "235c597b100321b6bd2d62f8df63707f42b25b2d"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

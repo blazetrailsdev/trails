@@ -286,7 +286,7 @@ describe("package-summary", () => {
     const dirs = (await fs.readdir(path.join(ROOT_DIR, "packages"), { withFileTypes: true }))
       .filter((d) => d.isDirectory())
       .map((d) => d.name);
-    const tooling = ["activerecord-cli", "trails-tsc", "vitest-matchers", "website"];
+    const tooling = ["activerecord-cli", "trails", "trails-tsc", "vitest-matchers", "website"];
     expect(
       dirs.filter((dir) => railsCounterpartOf(dir) === null).sort(),
       "a new package that ports no gem belongs in `tooling` here; a gem port needs a vendor/sources.ts entry",

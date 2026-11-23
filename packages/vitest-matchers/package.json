@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/vitest-matchers",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "Vitest matchers for the Minitest assertions whose meaning turns on Ruby semantics",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/vitest-matchers"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/vitest-matchers#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,7 +28,6 @@
   "scripts": {
     "build": "tsc"
   },
-  "license": "MIT",
   "peerDependencies": {
     "vitest": ">=3.0.0"
   },
@@ -31,5 +36,8 @@
   },
   "engines": {
     "node": ">=26"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

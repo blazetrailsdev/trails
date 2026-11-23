@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/globalid",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "GlobalID support for Trails, mirroring the globalid gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/globalid"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/globalid#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,10 +15,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./wire": {
-      "types": "./dist/wire.d.ts",
-      "default": "./dist/wire.js"
     },
     "./signed-global-id": {
       "types": "./dist/signed-global-id.d.ts",
@@ -44,5 +46,8 @@
       "ref": "v1.3.0",
       "sha": "a10102196ceaa9ffec3744eda857ebe421a57134"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

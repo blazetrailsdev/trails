@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/rack-proxy",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "A request-proxying Rack app, mirroring Ruby's rack-proxy",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/rack-proxy"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/rack-proxy#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +18,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
@@ -30,5 +35,8 @@
       "ref": "v2.0.1",
       "sha": "1ca3d3dc9a2aaf730ed25aa9685924d3d12450f3"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

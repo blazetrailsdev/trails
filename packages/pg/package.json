@@ -1,7 +1,13 @@
 {
   "name": "@blazetrails/pg",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha0",
   "description": "The PostgreSQL client, mirroring Ruby's pg gem",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/pg"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/pg#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,7 +24,6 @@
   "scripts": {
     "build": "tsc"
   },
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
@@ -43,5 +48,8 @@
       "ref": "v1.6.2",
       "sha": "c75ed8da19c356b52d83da2627295760780d3d36"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
