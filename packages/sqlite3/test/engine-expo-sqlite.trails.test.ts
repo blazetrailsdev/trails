@@ -132,7 +132,7 @@ describe("SQLite3::Database over the expo-sqlite engine", () => {
       "SELECT 9007199254740993, 'x', 1.5, CAST(? AS INTEGER); -- c /* x */",
     );
     stmt.setReadBigInts(true);
-    stmt.bindParam(1, 2);
+    await stmt.bindParam(1, 2);
     expect(await stmt.step()).toEqual([9007199254740993n, "x", 1.5, 2n]);
     await stmt.close();
   });
