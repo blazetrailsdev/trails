@@ -77,7 +77,7 @@ export class Statement {
     const native = await this.client
       .execute(options, args)
       .catch((e: unknown) => this.client.raiseMysql2Error(e));
-    const result = this.client.storeResult(native, currentQueryOptions);
+    const result = this.client.mysqlResultToObj(native, currentQueryOptions);
     this.lastId = (native[0] as { insertId?: number }).insertId ?? 0;
     if (result) (result as Result).stmtWrapper = this;
     this.affectedRows = result?.size ?? this.client.affectedRows;

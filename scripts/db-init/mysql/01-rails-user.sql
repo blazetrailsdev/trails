@@ -35,6 +35,13 @@ CREATE USER IF NOT EXISTS 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON `activerecord\_unittest%`.* TO 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON inexistent_activerecord_unittest.* TO 'rails'@'localhost';
 GRANT ALL PRIVILEGES ON `ar\_cli\_e2e%`.* TO 'rails'@'localhost';
+-- The mysql2 gem's client_spec.rb runs as root and creates `test_selectdb_0`,
+-- `test_selectdb_1` (:1123-1136) and `1235` (:355-364); these grants are those
+-- databases and no others.
+GRANT ALL PRIVILEGES ON `test\_selectdb\_%`.* TO 'rails'@'%';
+GRANT ALL PRIVILEGES ON `test\_selectdb\_%`.* TO 'rails'@'localhost';
+GRANT ALL PRIVILEGES ON `1235`.* TO 'rails'@'%';
+GRANT ALL PRIVILEGES ON `1235`.* TO 'rails'@'localhost';
 GRANT SELECT ON performance_schema.* TO 'rails'@'%';
 GRANT SELECT ON performance_schema.* TO 'rails'@'localhost';
 FLUSH PRIVILEGES;

@@ -76,6 +76,26 @@ type ClientHandshake = {
 type Handshake = { _handshakePacket?: { serverVersion?: string } };
 
 const CR_SERVER_GONE_ERROR = 2006;
+
+const MYSQL_ESCAPES: Record<string, string> = {
+  "\0": "\\0",
+  "\n": "\\n",
+  "\r": "\\r",
+  "\\": "\\\\",
+  "'": "\\'",
+  '"': '\\"',
+  "\u001a": "\\Z",
+};
+
+function escapeQuotesForMysql(from: string): string {
+  return from.includes("'") ? from.replaceAll("'", "''") : from;
+}
+
+function escapeStringForMysql(from: string): string {
+  let to = "";
+  for (const c of from) to += MYSQL_ESCAPES[c] ?? c;
+  return to.length === from.length ? from : to;
+}
 const CR_AUTH_PLUGIN_CANNOT_LOAD = 2059;
 
 const MY_CNF_KEYS: Record<string, string> = {
@@ -200,6 +220,7 @@ const MYSQL2_MYSQL_ENC_NAME_TO_RB = new Set(
   ),
 );
 
+const COM_INIT_DB = 0x02;
 const COM_SET_OPTION = 0x1b;
 
 type Protocol = {
@@ -218,6 +239,8 @@ type Protocol = {
     destroy?(err: unknown): unknown;
   };
   _closing?: boolean;
+  _fatalError?: unknown;
+  _protocolError?: unknown;
 };
 type Packet = { isError(): boolean; asError(encoding: string): Error };
 type EofPacket = {
@@ -240,6 +263,7 @@ const CR_COMMANDS_OUT_OF_SYNC = 2014;
 const SERVER_QUERY_NO_GOOD_INDEX_USED = 16;
 const SERVER_QUERY_NO_INDEX_USED = 32;
 const SERVER_QUERY_WAS_SLOW = 2048;
+const SERVER_STATUS_NO_BACKSLASH_ESCAPES = 512;
 
 /** @internal */
 export type Field = {
@@ -417,14 +441,32 @@ export class Client {
   static readonly SSL_MODE_REQUIRED = 3;
   static readonly SSL_MODE_VERIFY_CA = 4;
   static readonly SSL_MODE_VERIFY_IDENTITY = 5;
+  static readonly SESSION_TRACK = CLIENT_FLAGS.SESSION_TRACK;
+  static readonly SESSION_TRACK_SYSTEM_VARIABLES = 0;
+  static readonly SESSION_TRACK_SCHEMA = 1;
+  static readonly SESSION_TRACK_STATE_CHANGE = 2;
+  static readonly SESSION_TRACK_GTIDS = 3;
+  static readonly SESSION_TRACK_TRANSACTION_CHARACTERISTICS = 4;
+  static readonly SESSION_TRACK_TRANSACTION_STATE = 5;
 
   private static _defaultQueryOptions: QueryOptions | undefined;
 
   queryOptions: QueryOptions;
   readTimeout: number | null;
   affectedRows = 0;
-  lastId: number | undefined;
+  lastId = 0;
   private _warningCount = 0;
+  private _info: string | null = null;
+  private stateChanges:
+    | {
+        systemVariables: Record<string, string>;
+        schema: string | null;
+        trackStateChange: string | null;
+      }
+    | undefined;
+  private currentQueryOptions: QueryOptions | undefined;
+  private nextResults: Native[] = [];
+  private currentResult: Native | undefined;
   private serverStatus = 0;
   private activeResult: Result | undefined;
   private _automaticClose = true;
@@ -865,6 +907,7 @@ export class Client {
     );
     if ((flags & CLIENT_FLAGS.IGNORE_SPACE) === 0) (config.flags as string[]).push("-IGNORE_SPACE");
     if ((flags & CLIENT_FLAGS.COMPRESS) !== 0) config.compress = true;
+    if (this.localInfile === false) (config.flags as string[]).push("-LOCAL_FILES");
 
     if (
       this.ssl === undefined &&
@@ -967,10 +1010,14 @@ export class Client {
     ) {
       await this.connect(...this.connectArgs);
     }
-    if (this.activeResult) {
+    if (typeof sql !== "string") {
+      throw new TypeError(`wrong argument type ${rbObjClassname(sql)} (expected String)`);
+    }
+    this.currentQueryOptions = opts;
+    if (this.activeResult || this.nextResults.length > 0) {
       throw Mysql2Error.newWithArgs(
         "Commands out of sync; you can't run this command now",
-        this.serverInfo().id,
+        this.mysqlGetServerVersion(),
         CR_COMMANDS_OUT_OF_SYNC,
         "HY000",
       );
@@ -979,12 +1026,12 @@ export class Client {
     if (opts.stream === true) {
       return this.useResult(this.connection.connection!.query(options), opts);
     }
-    return this.storeResult(
-      await (this.connection.query as unknown as (options: object) => Promise<Native>)
-        .call(this.connection, options)
-        .catch((e: unknown) => this.raiseMysql2Error(e)),
-      opts,
-    );
+    this.currentResult = await (
+      this.connection.query as unknown as (options: object) => Promise<Native>
+    )
+      .call(this.connection, options)
+      .catch((e: unknown) => this.raiseMysql2Error(e));
+    return this.storeResult();
   }
 
   /** @internal */
@@ -998,14 +1045,22 @@ export class Client {
   }
 
   /** @internal */
-  storeResult([rawResult, rawFields]: Native, queryOptions?: QueryOptions): Mysql2Result | null {
+  mysqlResultToObj(
+    [rawResult, rawFields]: Native,
+    queryOptions?: QueryOptions,
+  ): Mysql2Result | null {
     let result = rawResult as Array<unknown[] | Record<string, unknown>> | mysql.ResultSetHeader;
     let fields = rawFields;
-    if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
-      result = (rawResult as unknown[])[0] as Array<unknown[] | Record<string, unknown>>;
-      fields = rawFields[0] as mysql.FieldPacket[];
-    } else if (Array.isArray(rawFields) && rawFields[0] === undefined && Array.isArray(rawResult)) {
-      result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
+    if (
+      Array.isArray(rawFields) &&
+      (Array.isArray(rawFields[0]) || rawFields[0] === undefined) &&
+      Array.isArray(rawResult)
+    ) {
+      result = (rawResult as unknown[])[0] as typeof result;
+      fields = rawFields[0];
+      this.nextResults = (rawResult as unknown[])
+        .slice(1)
+        .map((r, i) => [r, rawFields[i + 1] as unknown as mysql.FieldPacket[] | undefined]);
     }
     const error = this.INVALID_DATE;
     this.INVALID_DATE = undefined;
@@ -1015,7 +1070,7 @@ export class Client {
         result,
         error,
         queryOptions && this,
-        queryOptions,
+        queryOptions && { ...queryOptions },
         fields,
       );
       this.setServerQueryFlags(resultObj);
@@ -1023,6 +1078,9 @@ export class Client {
     }
     this.affectedRows = result.affectedRows ?? 0;
     this._warningCount = result.warningStatus ?? 0;
+    this.serverStatus = result.serverStatus ?? this.serverStatus;
+    this._info = result.info || null;
+    this.stateChanges = (result as { stateChanges?: Client["stateChanges"] }).stateChanges;
     if (result.insertId !== undefined) this.lastId = result.insertId;
     return null;
   }
@@ -1040,7 +1098,7 @@ export class Client {
     }).catch((e: unknown) => this.raiseMysql2Error(e));
     if (fields == null) {
       const header = await rows.next().catch((e: unknown) => this.raiseMysql2Error(e));
-      return this.storeResult([header.value, undefined]) as null;
+      return this.mysqlResultToObj([header.value, undefined]) as null;
     }
     const resultObj = new Result(
       fields.map((field) => field.name),
@@ -1090,7 +1148,120 @@ export class Client {
     return new Statement(this, sql, stmt as unknown as ConstructorParameters<typeof Statement>[2]);
   }
 
-  abandonResultsBang(): void {}
+  abandonResultsBang(): void {
+    while (this.isMoreResults()) {
+      this.nextResult();
+      this.storeResult();
+    }
+  }
+
+  isMoreResults(): boolean {
+    return this.nextResults.length > 0;
+  }
+
+  nextResult(): boolean {
+    const next = this.nextResults.shift();
+    if (next === undefined) return false;
+    this.currentResult = next;
+    return true;
+  }
+
+  storeResult(): Mysql2Result | null {
+    const result = this.currentResult;
+    this.currentResult = undefined;
+    if (result === undefined) return null;
+    return this.mysqlResultToObj(result, this.currentQueryOptions);
+  }
+
+  static escape(str: string): string {
+    if (typeof str !== "string") {
+      throw new TypeError(`wrong argument type ${rbObjClassname(str)} (expected String)`);
+    }
+    return escapeStringForMysql(str);
+  }
+
+  escape(str: string): string {
+    this.requireConnected();
+    if (typeof str !== "string") {
+      throw new TypeError(`wrong argument type ${rbObjClassname(str)} (expected String)`);
+    }
+    if ((this.serverStatus & SERVER_STATUS_NO_BACKSLASH_ESCAPES) !== 0) {
+      return escapeQuotesForMysql(str);
+    }
+    return escapeStringForMysql(str);
+  }
+
+  queryInfo(): Record<string, number> {
+    const info = this.queryInfoString();
+    if (!info) return {};
+
+    const infoHash: Record<string, number> = {};
+    const s = info.split(/\s+/).filter((x) => x !== "");
+    for (let i = 0; i < s.length; i += 2) {
+      infoHash[s[i].toLowerCase().replaceAll(":", "")] = Number(toI(s[i + 1] ?? ""));
+    }
+    return infoHash;
+  }
+
+  queryInfoString(): string | null {
+    return this._info;
+  }
+
+  threadId(): number {
+    this.requireConnected();
+    return this.connection.threadId;
+  }
+
+  sslCipher(): string | null {
+    const stream = this.connection.connection?.stream as { getCipher?(): { name: string } };
+    return stream?.getCipher?.()?.name ?? null;
+  }
+
+  sessionTrack(type: number): string[] | null {
+    this.requireConnected();
+    const changes = this.stateChanges;
+    let rbAry: string[] = [];
+    if (changes !== undefined) {
+      if (type === Client.SESSION_TRACK_SYSTEM_VARIABLES) {
+        rbAry = Object.entries(changes.systemVariables).flat();
+      } else if (type === Client.SESSION_TRACK_SCHEMA && changes.schema != null) {
+        rbAry = [changes.schema];
+      } else if (type === Client.SESSION_TRACK_STATE_CHANGE && changes.trackStateChange != null) {
+        rbAry = [changes.trackStateChange];
+      }
+    }
+    return rbAry.length === 0 ? null : rbAry;
+  }
+
+  async selectDb(db: string): Promise<string> {
+    this.requireConnected();
+    if (typeof db !== "string") {
+      throw new TypeError(`no implicit conversion of ${rbObjClassname(db)} into String`);
+    }
+    await new Promise<void>((resolve, reject) => {
+      this.connection.connection!.addCommand({
+        onResult: reject,
+        execute(packet: Packet | undefined, connection: Protocol): boolean {
+          if (packet === undefined) {
+            const name = Buffer.from(db, "utf8");
+            const buffer = Buffer.concat([Buffer.from([0, 0, 0, 0, COM_INIT_DB]), name]);
+            buffer.writeUIntLE(name.length + 1, 0, 3);
+            connection._resetSequenceId();
+            connection.writePacket({
+              buffer,
+              length: () => buffer.length,
+              writeHeader: (sequenceId: number) => buffer.writeUInt8(sequenceId, 3),
+            });
+            return false;
+          }
+          if (packet.isError()) reject(packet.asError(connection.clientEncoding));
+          else resolve();
+          return true;
+        },
+      });
+    }).catch((e: unknown) => this.raiseMysql2Error(e));
+    return db;
+  }
 
   get warningCount(): number {
     return this._warningCount;
@@ -1100,9 +1271,9 @@ export class Client {
     return this._automaticClose;
   }
 
-  set automaticClose(value: boolean) {
-    this._automaticClose = value;
-    if (value) return;
+  set automaticClose(value: unknown) {
+    this._automaticClose = rtest(value);
+    if (this._automaticClose) return;
     const stream = this.connection?.connection?.stream;
     stream?.removeAllListeners?.();
     stream?.unref?.();
@@ -1113,26 +1284,56 @@ export class Client {
   }
 
   isClosed(): boolean {
-    const protocol = this.connection.connection;
-    return protocol?._closing === true || protocol?.stream?.destroyed === true;
-  }
-
-  async ping(): Promise<boolean> {
-    return await this.connection.ping().then(
-      () => true,
-      () => false,
+    const protocol = this.connection?.connection;
+    return (
+      protocol?._closing === true ||
+      protocol?._fatalError != null ||
+      protocol?._protocolError != null ||
+      protocol?.stream?.destroyed === true
     );
   }
 
+  async ping(): Promise<boolean> {
+    if (this.isClosed()) {
+      return false;
+    } else {
+      const alive = await this.connection.ping().then(
+        () => true,
+        () => false,
+      );
+      if (alive || this.reconnect !== true) return alive;
+      return await this.connect(...this.connectArgs).then(
+        () => true,
+        () => false,
+      );
+    }
+  }
+
   serverInfo(): { id: number; version: string | null } {
+    this.requireConnected();
+    return { id: this.mysqlGetServerVersion(), version: this.mysqlGetServerInfo() };
+  }
+
+  private requireConnected(): void {
+    if (this.isClosed() && this.reconnect !== true) {
+      throw new Mysql2Error("MySQL client is not connected");
+    }
+  }
+
+  private mysqlGetServerInfo(): string | null {
     const handshake = (this.connection?.connection as Handshake | undefined) ?? this.connection;
-    const version = handshake?._handshakePacket?.serverVersion ?? null;
+    return handshake?._handshakePacket?.serverVersion ?? null;
+  }
+
+  private mysqlGetServerVersion(): number {
     const [major, minor, patch] = (
-      /(\d+)\.(\d+)\.(\d+)/.exec((version ?? "").replace(/^5\.5\.5-/, "")) ?? [0, 0, 0, 0]
+      /(\d+)\.(\d+)\.(\d+)/.exec((this.mysqlGetServerInfo() ?? "").replace(/^5\.5\.5-/, "")) ?? [
+        0, 0, 0, 0,
+      ]
     )
       .slice(1)
       .map(Number);
-    return { id: major * 10000 + minor * 100 + patch, version };
+    return major * 10000 + minor * 100 + patch;
   }
 
   /** @internal */
@@ -1157,7 +1358,7 @@ export class Client {
     if (errorNumber === undefined) throw e;
     const error = Mysql2Error.newWithArgs(
       e.message,
-      this.serverInfo().id,
+      this.mysqlGetServerVersion(),
       errorNumber,
       sqlState ?? "HY000",
     );
@@ -1165,8 +1366,8 @@ export class Client {
     throw error;
   }
 
-  setServerOption(value: number): Promise<true> {
-    return new Promise<true>((resolve, reject) => {
+  setServerOption(value: number): Promise<boolean> {
+    return new Promise<boolean>((resolve, reject) => {
       this.connection.connection!.addCommand({
         onResult: reject,
         execute(packet: Packet | undefined, connection: Protocol): boolean {
@@ -1180,8 +1381,7 @@ export class Client {
             });
             return false;
           }
-          if (packet.isError()) reject(packet.asError(connection.clientEncoding));
-          else resolve(true);
+          resolve(!packet.isError());
           return true;
         },
       });
