@@ -64,7 +64,8 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3)("S3Service (trails)", () => {
     await service.compose(sourceKeys, destinationKey);
 
     expect(read).toBe(12 * chunk);
-    expect(held).toBeLessThanOrEqual(7 * chunk);
+    const queueSize = 4;
+    expect(held).toBeLessThanOrEqual((queueSize + 3) * chunk);
   });
 
   it(
