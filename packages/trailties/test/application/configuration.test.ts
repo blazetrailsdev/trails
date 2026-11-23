@@ -2417,7 +2417,7 @@ const POSTS_ROUTES = `
   });
 `;
 
-describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
+describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120_000 }, () => {
   useInMemoryDatabaseUrl();
   const activeSupport = { ...ActiveSupportTrailtie.config.activeSupport };
   const activeRecord = { ...ActiveRecordTrailtie.config.activeRecord };
@@ -2469,13 +2469,16 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
     });
   }
 
-  beforeEach(async () => {
-    t = new IsolatedConfigurationTest("test") as unknown as Host;
-    await t.buildApp();
-    await suppressDefaultConfig();
+  Object.assign(IsolatedConfigurationTest.prototype, {
+    async setup(): Promise<void> {
+      t = new IsolatedConfigurationTest("test") as unknown as Host;
+      await t.buildApp();
+      await suppressDefaultConfig();
+    },
+    teardown,
   });
 
-  afterEach(async () => {
+  async function teardown(): Promise<void> {
     await t.teardownApp();
     for (const key of Object.keys(ActiveSupportTrailtie.config.activeSupport)) {
       delete (ActiveSupportTrailtie.config.activeSupport as Record<string, unknown>)[key];
@@ -2501,7 +2504,7 @@ describe("ApplicationTests::ConfigurationTest", { timeout: 120_000 }, () => {
     I18nTrailtie.config.i18n.clear().update(i18nConfig);
     Trails.application = null;
     Application.appClass = null;
-  });
+  }
 
   it("config.paths can be mutated after accessing auto/eager load paths", async () => {
     await t.appDir("vendor/auto");
