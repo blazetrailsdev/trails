@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { Dir, File, FileUtils, include } from "@blazetrails/ruby-compat";
+import { File, FileUtils, include, rbFBackquote } from "@blazetrails/ruby-compat";
 import type { Generation } from "../../support/isolation/abstract-unit.js";
 import "../../support/isolation/abstract-unit.js";
 
@@ -28,23 +28,6 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   });
 
   afterEach(() => t.teardownApp());
-
-  async function oneAndTwo(first = "01_one_migration.ts"): Promise<void> {
-    await t.appFile(`db/migrate/${first}`, migration("OneMigration"));
-    await t.appFile("db/migrate/02_two_migration.ts", migration("TwoMigration"));
-  }
-
-  async function usersAndEmail(): Promise<void> {
-    await t.trails("generate", "model", "user", "username:string", "password:string");
-    await t.trails("generate", "migration", "add_email_to_users", "email:string");
-    await t.trails("db:migrate");
-  }
-
-  async function removeEmailMigration(): Promise<void> {
-    for (const f of await Dir.globAsync(`${appPath}/db/migrate/*email*.ts`)) {
-      await FileUtils.rmAsync(f);
-    }
-  }
 
   it("running migrations with given scope", async () => {
     await t.trails("generate", "model", "user", "username:string", "password:string");
@@ -83,7 +66,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   });
 
   it("migrate with specified VERSION in different formats", async () => {
-    await oneAndTwo();
+    await t.appFile("db/migrate/01_one_migration.ts", migration("OneMigration"));
+
+    await t.appFile("db/migrate/02_two_migration.ts", migration("TwoMigration"));
     await t.appFile("db/migrate/03_three_migration.ts", migration("ThreeMigration"));
 
     await t.trails("db:migrate");
@@ -113,7 +98,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   });
 
   it("migration with empty version", async () => {
-    await oneAndTwo();
+    await t.appFile("db/migrate/01_one_migration.ts", migration("OneMigration"));
+
+    await t.appFile("db/migrate/02_two_migration.ts", migration("TwoMigration"));
 
     await t.trails("db:migrate", "VERSION=");
 
@@ -142,7 +129,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   });
 
   it("rollback raises when VERSION is passed", async () => {
-    await oneAndTwo();
+    await t.appFile("db/migrate/01_one_migration.ts", migration("OneMigration"));
+
+    await t.appFile("db/migrate/02_two_migration.ts", migration("TwoMigration"));
 
     await t.trails("db:migrate");
 
@@ -155,7 +144,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   });
 
   it("migration with 0 version", async () => {
-    await oneAndTwo();
+    await t.appFile("db/migrate/01_one_migration.ts", migration("OneMigration"));
+
+    await t.appFile("db/migrate/02_two_migration.ts", migration("TwoMigration"));
 
     await t.trails("db:migrate");
 
@@ -194,7 +185,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
 
   it("migration status", async () => {
     await t.removeFromConfig("this\\.config\\.activeRecord\\.timestampedMigrations = false;");
-    await usersAndEmail();
+    await t.trails("generate", "model", "user", "username:string", "password:string");
+    await t.trails("generate", "migration", "add_email_to_users", "email:string");
+    await t.trails("db:migrate");
 
     let output = await t.trails("db:migrate:status");
 
@@ -210,7 +203,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
 
   it("migration status without timestamps", async () => {
     await t.removeFromConfig("this\\.config\\.activeRecord\\.timestampedMigrations = false;");
-    await usersAndEmail();
+    await t.trails("generate", "model", "user", "username:string", "password:string");
+    await t.trails("generate", "migration", "add_email_to_users", "email:string");
+    await t.trails("db:migrate");
 
     let output = await t.trails("db:migrate:status");
 
@@ -226,7 +221,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
 
   it("migration status after rollback and redo", async () => {
     await t.removeFromConfig("this\\.config\\.activeRecord\\.timestampedMigrations = false;");
-    await usersAndEmail();
+    await t.trails("generate", "model", "user", "username:string", "password:string");
+    await t.trails("generate", "migration", "add_email_to_users", "email:string");
+    await t.trails("db:migrate");
 
     let output = await t.trails("db:migrate:status");
 
@@ -248,7 +245,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
 
   it("migration status after rollback and forward", async () => {
     await t.removeFromConfig("this\\.config\\.activeRecord\\.timestampedMigrations = false;");
-    await usersAndEmail();
+    await t.trails("generate", "model", "user", "username:string", "password:string");
+    await t.trails("generate", "migration", "add_email_to_users", "email:string");
+    await t.trails("db:migrate");
 
     let output = await t.trails("db:migrate:status");
 
@@ -271,8 +270,10 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   it("raise error on any move when current migration does not exist", async () => {
     await t.removeFromConfig("this\\.config\\.activeRecord\\.timestampedMigrations = false;");
 
-    await usersAndEmail();
-    await removeEmailMigration();
+    await t.trails("generate", "model", "user", "username:string", "password:string");
+    await t.trails("generate", "migration", "add_email_to_users", "email:string");
+    await t.trails("db:migrate");
+    await rbFBackquote(`cd ${appPath}; rm db/migrate/*email*.ts`);
 
     let output = await t.trails("db:migrate:status");
     expect(output).toMatch(/up\s+\d{14}\s+Create users/);
@@ -298,7 +299,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   });
 
   it("raise error on any move when target migration does not exist", async () => {
-    await oneAndTwo();
+    await t.appFile("db/migrate/01_one_migration.ts", migration("OneMigration"));
+
+    await t.appFile("db/migrate/02_two_migration.ts", migration("TwoMigration"));
 
     await t.trails("db:migrate");
 
@@ -359,7 +362,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   });
 
   it("migration status after rollback and redo without timestamps", async () => {
-    await usersAndEmail();
+    await t.trails("generate", "model", "user", "username:string", "password:string");
+    await t.trails("generate", "migration", "add_email_to_users", "email:string");
+    await t.trails("db:migrate");
 
     let output = await t.trails("db:migrate:status");
 
@@ -380,7 +385,9 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   });
 
   it("running migrations with not timestamp head migration files", async () => {
-    await oneAndTwo("1_one_migration.ts");
+    await t.appFile("db/migrate/1_one_migration.ts", migration("OneMigration"));
+
+    await t.appFile("db/migrate/02_two_migration.ts", migration("TwoMigration"));
 
     await t.trails("db:migrate");
 
@@ -455,8 +462,10 @@ describe("RakeMigrationsTest", { timeout: 600_000 }, () => {
   it("migration status migrated file is deleted", async () => {
     await t.removeFromConfig("this\\.config\\.activeRecord\\.timestampedMigrations = false;");
 
-    await usersAndEmail();
-    await removeEmailMigration();
+    await t.trails("generate", "model", "user", "username:string", "password:string");
+    await t.trails("generate", "migration", "add_email_to_users", "email:string");
+    await t.trails("db:migrate");
+    await rbFBackquote(`cd ${appPath}; rm db/migrate/*email*.ts`);
 
     const output = await t.trails("db:migrate:status");
 

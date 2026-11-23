@@ -570,10 +570,11 @@ DSL.namespace("db", (dbNamespace) => {
       block(async () => {
         const baseDir = DatabaseTasks.fixturesPath;
 
-        const fixturesDir = ENV["FIXTURES_DIR"] ? File.join(baseDir, ENV["FIXTURES_DIR"]) : baseDir;
+        const fixturesDir =
+          ENV["FIXTURES_DIR"] != null ? File.join(baseDir, ENV["FIXTURES_DIR"]) : baseDir;
 
         let fixtureFiles: string[];
-        if (ENV["FIXTURES"]) {
+        if (ENV["FIXTURES"] != null) {
           fixtureFiles = ENV["FIXTURES"].split(",");
         } else {
           let files = await Dir.globAsync(File.join(fixturesDir, "**/*.{yml}"));
