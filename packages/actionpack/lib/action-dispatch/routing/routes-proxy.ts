@@ -24,6 +24,7 @@ import {
   objRespondToMissing,
   rbFSend,
   rbObjRespondTo,
+  chomp,
 } from "@blazetrails/ruby-compat";
 import { Routing } from "../../namespaces.js";
 
@@ -131,6 +132,7 @@ export class RoutesProxy implements UrlForHost {
     newScriptName: string,
   ): string {
     if (previousScriptName == null) return newScriptName;
+    newScriptName = chomp(newScriptName, "/");
 
     const resolvedParts = newScriptName.split("/").length - 1;
     const previousParts = previousScriptName.split("/").length - 1;

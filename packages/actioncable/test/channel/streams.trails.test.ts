@@ -38,6 +38,9 @@ class ChatChannel {
   constructor(public connection: ReturnType<typeof recordingConnection>["connection"]) {}
   declare runCallbacks: (kind: string, block?: () => unknown) => unknown;
   deferSubscriptionConfirmationBang(): void {}
+  isUnsubscribed(): boolean {
+    return false;
+  }
   ensureConfirmationSent(): void {
     this.confirmations++;
   }

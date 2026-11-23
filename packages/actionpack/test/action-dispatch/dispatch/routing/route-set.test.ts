@@ -2,10 +2,10 @@ import { constSetPath } from "../../../support/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { beforeAll, beforeEach, describe, it, expect } from "vitest";
 import {
+  assertEmpty,
   assertEqual,
   assertNil,
-  assertNot,
-  assertPredicate,
+  assertNotEmpty,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "@blazetrails/ruby-compat";
@@ -48,16 +48,15 @@ describe("RouteSetTest", () => {
   };
   const urlHelpers = (): Record<string, (...args: unknown[]) => string> =>
     set.urlHelpers() as unknown as Record<string, (...args: unknown[]) => string>;
-  const isEmpty = (): boolean => set.isEmpty();
 
   it("not being empty when route is added", () => {
-    assertPredicate(set, (set) => set.isEmpty());
+    assertEmpty(set);
 
     draw(function () {
       this.get("foo", { to: new SimpleApp("foo#index") });
     });
 
-    assertNot(isEmpty());
+    assertNotEmpty(set);
   });
 
   it("URL helpers are added when route is added", async () => {

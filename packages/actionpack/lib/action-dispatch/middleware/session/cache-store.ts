@@ -1,4 +1,4 @@
-import { hashAref } from "@blazetrails/ruby-compat";
+import { hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/rack";
 import type { CacheStore as CacheStoreLike } from "@blazetrails/activesupport";
 import { SessionId } from "@blazetrails/rack-session";
@@ -11,7 +11,14 @@ export interface CacheStoreSessionOptions {
   [key: string]: unknown;
 }
 
+interface CacheStoreRequest {
+  getHeader(name: string): unknown;
+  setHeader(name: string, value: unknown): unknown;
+}
+
 export class CacheStore extends AbstractSecureStore {
+  static readonly LOADED_SESSION_ID = "action_dispatch.session.cache_store.loaded_session_id";
+
   /** @internal */
   private readonly cache: CacheStoreLike;
   /** @internal */
@@ -34,27 +41,27 @@ export class CacheStore extends AbstractSecureStore {
   }
 
   async findSession(
-    _env: unknown,
+    req: CacheStoreRequest,
     sid: SessionId | null | undefined,
   ): Promise<[SessionId, Record<string, unknown>]> {
     let session: Record<string, unknown> | undefined;
-    if (sid) {
-      session = await this.getSessionWithFallback(sid);
-    }
-    if (!sid || !session) {
-      return [this.generateSid(), {}];
+    if (sid && (session = await this.getSessionWithFallback(sid))) {
+      req.setHeader(CacheStore.LOADED_SESSION_ID, sid.privateId);
+    } else {
+      [sid, session] = [this.generateSid(), {}];
     }
     return [sid, session];
   }
 
   async writeSession(
-    _env: unknown,
+    req: CacheStoreRequest,
     sid: SessionId,
     session: Record<string, unknown> | null,
     options?: object,
-  ): Promise<SessionId> {
+  ): Promise<SessionId | false> {
     const key = this.cacheKey(sid.privateId);
     if (session) {
+      if (await this.isDestroyedSinceLoaded(req, sid)) return false;
       const expireAfter = (options == null ? undefined : hashAref(options, "expireAfter")) as
         | number
         | null
@@ -86,6 +93,27 @@ export class CacheStore extends AbstractSecureStore {
     if (fromPrivate) return fromPrivate as Record<string, unknown>;
     const fromPublic = await this.cache.read(this.cacheKey(sid.publicId));
     return fromPublic ? (fromPublic as Record<string, unknown>) : undefined;
+  }
+
+  /** @internal */
+  private async isDestroyedSinceLoaded(req: CacheStoreRequest, sid: SessionId): Promise<boolean> {
+    return (
+      req.getHeader(CacheStore.LOADED_SESSION_ID) === sid.privateId &&
+      !(await this.isExistInBackend(this.cacheKey(sid.privateId))) &&
+      !(await this.isExistInBackend(this.cacheKey(sid.publicId)))
+    );
+  }
+
+  /** @internal */
+  private async isExistInBackend(key: string): Promise<boolean> {
+    const cache = this.cache as CacheStoreLike & {
+      withLocalCache<T>(block: () => Promise<T>): Promise<T>;
+    };
+    if (rbObjRespondTo(cache, "withLocalCache")) {
+      return await cache.withLocalCache(() => cache.isExist(key));
+    } else {
+      return await cache.isExist(key);
+    }
   }
 }
 

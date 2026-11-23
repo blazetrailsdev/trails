@@ -32,6 +32,7 @@ export interface StreamsChannel {
   streams: Record<string, Handler>;
   pubsub: PubSub;
   deferSubscriptionConfirmationBang(): unknown;
+  isUnsubscribed(): boolean;
   ensureConfirmationSent(): unknown;
   transmit(data: unknown, options: { via: string }): unknown;
   reject(): unknown;
@@ -61,6 +62,8 @@ function streamFrom(
     ({ coder = null } = callback);
     callback = null;
   }
+  if (this.isUnsubscribed()) return;
+
   broadcasting = String(broadcasting);
 
   this.deferSubscriptionConfirmationBang();
