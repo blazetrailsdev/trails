@@ -64,10 +64,6 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
         package-manager-cache: false
-    # setup-node can report success after a download that never completed
-    # ("Attempting to download" with no "Acquiring"/"Extracting"), leaving the
-    # runner image's Node on PATH; Node 22 has no global Temporal, so the first
-    # module that reads it fails far from the cause. Check, retry once, assert.
     - id: node-check
       shell: bash
       env:
