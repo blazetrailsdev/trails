@@ -50,6 +50,8 @@ function paint(): void {
       syncScroll();
     },
     (e: unknown) => {
+      if (run !== painted) return;
+      backdrop.replaceChildren();
       editor.classList.remove("highlighted");
       console.error("highlighting failed:", e);
     },
