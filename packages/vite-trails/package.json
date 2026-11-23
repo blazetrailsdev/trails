@@ -4,7 +4,6 @@
   "description": "Vite tag helpers and engine for Trails, mirroring the vite_rails gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/vite-trails"
   },

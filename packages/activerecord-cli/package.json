@@ -4,7 +4,6 @@
   "description": "Generators, migrator, and the `ar` CLI for standalone @blazetrails/activerecord projects",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/activerecord-cli"
   },

@@ -4,7 +4,6 @@
   "description": "XML markup builder for Trails, mirroring the builder gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/builder"
   },

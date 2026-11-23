@@ -4,7 +4,6 @@
   "description": "HTML sanitizer for Trails, mirroring rails-html-sanitizer",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/html-sanitizer"
   },

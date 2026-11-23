@@ -1,7 +1,5 @@
 name: Release
 
-# Publishes every public packages/* at the lockstep version in one run.
-# Prerequisites and the release procedure: README.md, "Releasing".
 on:
   push:
     tags: ["v*"]
@@ -32,8 +30,6 @@ jobs:
         run: |
           version="$(node -p 'require("./packages/trails/package.json").version')"
           test "v$version" = "$GITHUB_REF_NAME"
-      # `pnpm -r publish` skips every package whose version is already on the
-      # registry, so a rerun after a midway failure publishes only the rest.
       - name: Publish (dry run)
         if: github.event_name == 'pull_request'
         run: pnpm -r publish --dry-run --no-git-checks

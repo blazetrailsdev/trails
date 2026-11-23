@@ -4,7 +4,6 @@
   "description": "Integrated WebSockets for Trails, mirroring the actioncable gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/actioncable"
   },

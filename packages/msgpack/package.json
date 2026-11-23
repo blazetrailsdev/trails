@@ -4,7 +4,6 @@
   "description": "MessagePack serialization, mirroring Ruby's msgpack gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/msgpack"
   },

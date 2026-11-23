@@ -4,7 +4,6 @@
   "description": "MIME type lookup for Trails, mirroring the mini_mime gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/mini-mime"
   },

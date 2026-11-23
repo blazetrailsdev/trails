@@ -4,7 +4,6 @@
   "description": "Modular web server interface, mirroring Ruby's Rack",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/rack"
   },

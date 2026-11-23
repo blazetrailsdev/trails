@@ -4,7 +4,6 @@
   "description": "Port of the Ruby i18n gem: Config, exceptions",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/i18n"
   },

@@ -4,7 +4,6 @@
   "description": "Rack middleware for Cross-Origin Resource Sharing, mirroring Ruby's rack-cors",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/rack-cors"
   },

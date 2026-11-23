@@ -4,7 +4,6 @@
   "description": "Natural-language date parsing for Trails, mirroring the chronic gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/chronic"
   },

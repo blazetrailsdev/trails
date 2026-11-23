@@ -4,7 +4,6 @@
   "description": "Build-time autoloader for Trails, mirroring Zeitwerk",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/zeitwerk"
   },

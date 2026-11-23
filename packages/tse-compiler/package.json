@@ -4,7 +4,6 @@
   "description": "TSE (Trails Server Embedded) compiler — lexer, AST, JS emitter. Rails analogue: the erubi gem.",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/tse-compiler"
   },

@@ -4,7 +4,6 @@
   "description": "Full-stack web application framework for TypeScript, mirroring the rails gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/trails"
   },

@@ -4,7 +4,6 @@
   "description": "Zoned times for Trails, mirroring the et-orbi gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/et-orbi"
   },

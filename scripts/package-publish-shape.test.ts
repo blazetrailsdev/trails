@@ -3,11 +3,6 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/**
- * The publish shape every public package shares (RFC 0100): one lockstep
- * version, exact internal pins, no runtime dependency on a private package,
- * and the registry metadata a release needs.
- */
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGES = path.join(REPO_ROOT, "packages");
 

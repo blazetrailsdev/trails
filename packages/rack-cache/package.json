@@ -4,7 +4,6 @@
   "description": "HTTP caching for Rack, mirroring Ruby's rack-cache",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/rack-cache"
   },

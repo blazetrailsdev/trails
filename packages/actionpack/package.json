@@ -4,7 +4,6 @@
   "description": "ActionController and ActionDispatch — mirroring Rails ActionPack",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/actionpack"
   },

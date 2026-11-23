@@ -2,10 +2,6 @@ import { readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/**
- * Sets every public `packages/*` to one version, as Rails' `RAILS_VERSION`
- * versions every framework gem together. Usage: `pnpm release:version 0.2.0`.
- */
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PACKAGES = path.join(REPO_ROOT, "packages");
 

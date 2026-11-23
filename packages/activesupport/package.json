@@ -4,7 +4,6 @@
   "description": "Core utilities and inflection, mirroring Ruby's ActiveSupport",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/activesupport"
   },

@@ -4,7 +4,6 @@
   "description": "Port of Ruby's date gem: the Temporal-backed Date/DateTime surface",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/date"
   },

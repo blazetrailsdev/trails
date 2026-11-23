@@ -4,7 +4,6 @@
   "description": "LibXML::XML parser, SAX parser and node surface for Trails, mirroring libxml-ruby",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/libxml-ruby"
   },

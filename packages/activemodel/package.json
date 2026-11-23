@@ -4,7 +4,6 @@
   "description": "Attributes, validations, callbacks, and serialization, mirroring Ruby's ActiveModel",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/activemodel"
   },

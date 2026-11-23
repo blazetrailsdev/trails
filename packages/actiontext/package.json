@@ -4,7 +4,6 @@
   "description": "Rich text content and editing for Trails, mirroring the actiontext gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/actiontext"
   },

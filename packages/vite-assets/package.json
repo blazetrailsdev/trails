@@ -4,7 +4,6 @@
   "description": "Vite asset resolution for Trails, mirroring the vite_ruby gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/vite-assets"
   },

@@ -4,7 +4,6 @@
   "description": "Database-backed Action Cable backend for Trails, mirroring the solid_cable gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/solid-cable"
   },

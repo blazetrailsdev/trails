@@ -4,7 +4,6 @@
   "description": "File attachments for Trails models, mirroring the activestorage gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/activestorage"
   },

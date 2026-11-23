@@ -4,7 +4,6 @@
   "description": "Plugin-driven TypeScript compiler wrapper for trails framework packages",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/trails-tsc"
   },

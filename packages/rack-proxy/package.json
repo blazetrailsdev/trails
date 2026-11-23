@@ -4,7 +4,6 @@
   "description": "A request-proxying Rack app, mirroring Ruby's rack-proxy",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/rack-proxy"
   },

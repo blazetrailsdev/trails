@@ -4,7 +4,6 @@
   "description": "XML/SAX parsing for Trails, mirroring Nokogiri's XML surface",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/nokogiri"
   },

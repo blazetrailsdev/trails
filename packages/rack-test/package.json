@@ -4,7 +4,6 @@
   "description": "Simple testing API built on Rack, mirroring Ruby's rack-test",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/rack-test"
   },

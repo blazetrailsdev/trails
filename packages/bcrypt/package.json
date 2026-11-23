@@ -4,7 +4,6 @@
   "description": "bcrypt() password hashing, mirroring Ruby's bcrypt gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/bcrypt"
   },

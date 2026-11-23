@@ -4,7 +4,6 @@
   "description": "File system change notifications for Trails, mirroring the listen gem over @parcel/watcher",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/listen"
   },

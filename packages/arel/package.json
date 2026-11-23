@@ -4,7 +4,6 @@
   "description": "SQL AST builder and query generation, mirroring Ruby's Arel",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/arel"
   },

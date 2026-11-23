@@ -4,7 +4,6 @@
   "description": "ORM layer mirroring Ruby's ActiveRecord, built on @blazetrails/arel and @blazetrails/activemodel",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/activerecord"
   },

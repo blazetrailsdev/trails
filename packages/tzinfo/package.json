@@ -4,7 +4,6 @@
   "description": "Time zone lookups for Trails, standing in for the tzinfo gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/tzinfo"
   },

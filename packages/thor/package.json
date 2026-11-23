@@ -4,7 +4,6 @@
   "description": "Port of the thor gem: a toolkit for building command-line interfaces",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/thor"
   },

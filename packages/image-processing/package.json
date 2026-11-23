@@ -4,7 +4,6 @@
   "description": "Image processing pipelines for Trails, mirroring the image_processing gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/image-processing"
   },

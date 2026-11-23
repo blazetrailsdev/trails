@@ -4,7 +4,6 @@
   "description": "Ruby core/stdlib primitives that trails calls but Rails does not define: a leaf package with no workspace dependencies",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/ruby-compat"
   },

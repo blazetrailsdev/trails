@@ -4,7 +4,6 @@
   "description": "Cron, duration and time parsing for Trails, mirroring the fugit gem",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/fugit"
   },

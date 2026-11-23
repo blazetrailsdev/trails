@@ -4,7 +4,6 @@
   "description": "Port of the rake gem: a make-like build utility",
   "license": "MIT",
   "repository": {
-    "type": "git",
     "url": "git+https://github.com/blazetrailsdev/trails.git",
     "directory": "packages/rake"
   },
