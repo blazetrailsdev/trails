@@ -5,6 +5,7 @@ import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "..
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
+import { bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 
 /** @internal */
@@ -170,6 +171,7 @@ function prepareStatement(
         .map((v, i) => (r.value[n + i] != null ? BigInt(r.value[n + i] as string) : v));
     },
     isDone: () => done,
+    bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => (names !== null ? names.length : metadata().then((n) => n.length)),
     columnName: (index) =>
       names !== null ? (names[index] ?? null) : metadata().then((n) => n[index] ?? null),

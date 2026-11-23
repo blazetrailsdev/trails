@@ -43,6 +43,11 @@ function open(file: string, mode: number): BetterSqlite3.Database {
   if ((mode & Open.SHAREDCACHE) !== 0) {
     throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the better-sqlite3 driver");
   }
+  if (((1 << (mode & 7)) & 0x46) === 0) {
+    throw Object.assign(new Error("bad parameter or other API misuse"), {
+      code: "SQLITE_MISUSE",
+    });
+  }
   const opts: BetterSqlite3.Options = {
     readonly: (mode & Open.READONLY) !== 0,
     fileMustExist: (mode & Open.CREATE) === 0,
@@ -150,6 +155,7 @@ function prepareStatement(
       return r.value;
     },
     isDone: () => done,
+    bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => (reader ? stmt.columns().length : 0),
     columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
     columnDecltype: (index) => (reader ? (stmt.columns()[index]?.type ?? null) : null),

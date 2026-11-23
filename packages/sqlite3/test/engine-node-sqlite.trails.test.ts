@@ -150,4 +150,11 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
     await expect(db.execute('SELECT "nope"')).rejects.toThrow(SQLite3.SQLException);
     await db.close();
   });
+
+  it("raises MisuseException for READONLY | READWRITE, as sqlite3_open_v2 does", () => {
+    const { Open } = SQLite3.Constants;
+    expect(
+      () => new SQLite3.Database(":memory:", { engine, flags: Open.READONLY | Open.READWRITE }),
+    ).toThrow(SQLite3.MisuseException);
+  });
 });

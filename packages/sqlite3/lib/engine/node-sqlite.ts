@@ -8,7 +8,7 @@ import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
-import { bindParameterIndex } from "./bind-parameter-index.js";
+import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 
 /** @internal */
@@ -69,7 +69,12 @@ export function sharedCacheDatabase(database: string, flags: number): string {
 /** @internal */
 function open(file: string, mode: number, quirks = true): DatabaseSync {
   const { DatabaseSync } = loadNodeSqlite();
-  const { Open } = SQLite3.Constants;
+  const { Open, ErrorCode } = SQLite3.Constants;
+  if (((1 << (mode & 7)) & 0x46) === 0) {
+    throw Object.assign(new Error("bad parameter or other API misuse"), {
+      errcode: ErrorCode.MISUSE,
+    });
+  }
   let database = sharedCacheDatabase(file, mode);
   if ((mode & (Open.READWRITE | Open.CREATE)) === Open.READWRITE) {
     if (!database.startsWith("file:")) {
@@ -175,6 +180,7 @@ function prepareStatement(
       return r.value as unknown[];
     },
     isDone: () => done,
+    bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => columns.length,
     columnName: (index) => columns[index]?.name ?? null,
     columnDecltype: (index) => columns[index]?.type ?? null,
