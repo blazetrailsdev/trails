@@ -234,7 +234,7 @@ export class Core {
   }
 
   /** @internal */
-  deserializeTime(time: Time | string): Time {
+  private deserializeTime(time: Time | string): Time {
     if (time instanceof Time) {
       return time;
     } else {
