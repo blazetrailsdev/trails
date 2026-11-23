@@ -179,3 +179,19 @@ describe("Ruby extractor receiver expect", () => {
     expect(cases["receiver"].kinds).toEqual(["assert_equal"]);
   });
 });
+
+describe("Ruby extractor spec titles", () => {
+  it("joins a title built from string literals with +", () => {
+    const cases = rubyTestCases(`
+      describe Foo do
+        it 'reloads when no-cache present ' +
+           'when allow_reload is set true' do
+          assert true
+        end
+      end
+    `);
+    expect(Object.keys(cases)).toEqual([
+      "reloads when no-cache present when allow_reload is set true",
+    ]);
+  });
+});
