@@ -30,6 +30,8 @@ true })`, presence and length validations, a `beforeValidation` callback that sq
   `_comment` partials, with collection rendering; `formWith` on a record and on a nested
   `[post, comment]`; `linkTo`, `linkToUnlessCurrent`, `buttonTo` with `method: "delete"`, `domId`,
   `pluralize`, `truncate`, `simpleFormat` and `timeAgoInWords`
+- **Seeds**: `db/seeds.ts`, a trip-report blog with drafts and comment threads, loaded when the
+  database is first created, as `db:prepare` does. **Reset database** reseeds it
 - **Migrations**: two, with a foreign key, a boolean default and a counter-cache column
 
 It boots through `Trails.initialize()`, autoloads through Zeitwerk, migrates through

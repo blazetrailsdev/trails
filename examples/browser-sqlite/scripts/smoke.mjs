@@ -41,6 +41,14 @@ try {
   if ((await status.textContent()) !== "Running") throw new Error("the app did not boot");
 
   await see("h1", "Posts");
+  await see("article", "Three days on the Wonderland Trail");
+  await see("article", "Draft: winter trip planning");
+  console.log("db/seeds.ts seeded the new database");
+  await shot("index");
+
+  await frame.locator("article a", { hasText: "Wonderland Trail" }).click();
+  await see("h2", "3 comments");
+  await shot("show");
   await frame.locator("nav a", { hasText: "New post" }).click();
   await see("h1", "New post");
   await frame.locator("input[type=submit]").click();
@@ -65,7 +73,6 @@ try {
   await see(".notice", "Thanks for your comment.");
   await see("h2", "1 comment");
   console.log("commented through the nested resource; the counter cache counted it");
-  await shot("show");
 
   await frame.locator("a", { hasText: "Edit this post" }).click();
   await frame.locator("input[name='post[published]'][type=checkbox]").check();
@@ -76,7 +83,6 @@ try {
 
   await frame.locator("nav a", { hasText: "All posts" }).click();
   await see("article", "Hello from the smoke test");
-  await shot("index");
 
   await page.locator("#tree .file", { hasText: "index.html.tse" }).click();
   const editor = page.locator("#editor");

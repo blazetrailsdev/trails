@@ -207,11 +207,17 @@ try {
     (await import("@blazetrails/trailties")) as typeof import("@blazetrails/trailties");
   await import(/* @vite-ignore */ `${moduleBase}config/environment.ts`);
   status("Running migrations…");
-  const { Base } = await import("@blazetrails/activerecord");
+  const { Base, DatabaseTasks } = await import("@blazetrails/activerecord");
   const pool = Base.connectionPool();
   await pool.migrationContext.migrate();
   pool.schemaReflection.clearBang();
   await pool.schemaReflection.loadAllBang(pool);
+  if (files.db === null) {
+    status("Seeding the database…");
+    await DatabaseTasks.loadSeed();
+    const bytes = sqlite.exportDatabase("browser.db");
+    if (bytes) post({ type: "db", bytes }, [bytes.buffer]);
+  }
   app = Trails.application;
   status("Running");
   post({ type: "booted" });
