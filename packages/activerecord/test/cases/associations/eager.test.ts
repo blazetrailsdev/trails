@@ -1073,20 +1073,20 @@ describe("EagerAssociationTest", () => {
   it("preloading has_many with cpk", async () => {
     const order1 = await CpkOrder.createBang({ shop_id: 200 });
     const order2 = await CpkOrder.createBang({ shop_id: 300 });
-    const agreement1 = await (order1 as any).orderAgreements.createBang({ signature: "A" });
-    const agreement2 = await (order1 as any).orderAgreements.createBang({ signature: "Z" });
-    const agreement3 = await (order2 as any).orderAgreements.createBang({ signature: "A" });
-    const agreement4 = await (order2 as any).orderAgreements.createBang({ signature: "Z" });
+    const agreement1 = await order1.orderAgreements.createBang({ signature: "A" });
+    const agreement2 = await order1.orderAgreements.createBang({ signature: "Z" });
+    const agreement3 = await order2.orderAgreements.createBang({ signature: "A" });
+    const agreement4 = await order2.orderAgreements.createBang({ signature: "Z" });
 
     const relation = CpkOrder.where({ shop_id: [200, 300] }).eagerLoad(":orderAgreements");
-    const results = sortBy(await relation, (o: any) => o.shop_id) as any[];
+    const results = sortBy(await relation, (o) => o.shop_id);
 
     expect(results).toEqual([order1, order2]);
-    expect(sortBy(await results[0].orderAgreements, (a: any) => a.signature)).toEqual([
+    expect(sortBy(await results[0].orderAgreements, (a) => a.signature)).toEqual([
       agreement1,
       agreement2,
     ]);
-    expect(sortBy(await results.at(-1).orderAgreements, (a: any) => a.signature)).toEqual([
+    expect(sortBy(await results.at(-1)!.orderAgreements, (a) => a.signature)).toEqual([
       agreement3,
       agreement4,
     ]);

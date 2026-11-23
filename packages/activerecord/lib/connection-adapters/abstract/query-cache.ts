@@ -117,6 +117,7 @@ export class QueryCacheRegistry {
 }
 
 export interface QueryCachePool {
+  readonly queryCache?: Store | null;
   enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
   disableQueryCache<T>(fn: () => T | Promise<T>, opts?: { dirties?: boolean }): T | Promise<T>;
   enableQueryCacheBang(): void;
@@ -475,7 +476,7 @@ export const QueryCache: ThisType<QueryCacheHost> &
   } = {
   get queryCache(): Store | null {
     if (this.pinned && this.owner !== IsolatedExecutionState.context()) {
-      return (this.pool as unknown as { queryCache: Store | null }).queryCache;
+      return this.pool.queryCache ?? null;
     } else {
       return this._queryCache;
     }
