@@ -85,6 +85,7 @@ overrides, then install:
   for p in $TRAILS/packages/*; do
     echo "  \"$(node -p "require('$p/package.json').name")\": \"link:$p\""
   done
+  echo "  vitest: \"$(node -p "require('$TRAILS/node_modules/vitest/package.json').version")\""
   printf 'allowBuilds:\n  better-sqlite3: true\n  esbuild: true\n'
 } > pnpm-workspace.yaml
 pnpm install
@@ -340,6 +341,7 @@ export class PostsController extends ApplicationController {
 <!-- #region quickstart-server -->
 
 ```sh
+pnpm prepare                # builds app/views, the scaffold's views included
 bin/trails server -p 3927   # the default port is 3000; this run used 3927
 ```
 

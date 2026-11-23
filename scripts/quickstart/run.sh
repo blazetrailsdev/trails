@@ -143,6 +143,7 @@ expect_notice() {
 }
 
 echo "== server"
+pnpm --silent prepare >/dev/null
 start_server
 for path in /posts /posts/1 /posts/new /posts/1/edit; do expect_status 200 "$BASE$path"; done
 
