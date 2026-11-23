@@ -38,7 +38,7 @@ export default defineConfig({
       { text: "Packages", link: "/packages/" },
       { text: "Examples", link: "/examples" },
       { text: "Website", link: siteRoot, target: "_self" },
-      { text: "API Reference", link: "/api/@blazetrails/arel/README" },
+      { text: "API Reference", link: "/api/README" },
     ],
 
     sidebar: {

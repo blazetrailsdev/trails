@@ -1,0 +1,3 @@
+<%# locals: (author:) %>
+<%! types: { author: { email: string } } !%>
+<p class="byline">By <%= author.email %></p>

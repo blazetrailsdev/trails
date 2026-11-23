@@ -1,4 +1,4 @@
 {
-  "app/controllers/posts-controller.ts": "app/controllers/posts-controller.ts(7,16): error TS2551: Property 'destory' does not exist on type 'Post'. Did you mean 'destroy'?",
-  "app/views/posts/show.html.tse": "app/views/posts/show.html.tse(2,16): error TS2551: Property 'titel' does not exist on type 'Post'. Did you mean 'title'?"
+  "app/controllers/posts-controller.ts": "app/controllers/posts-controller.ts(8,21): error TS2551: Property 'udpate' does not exist on type 'Post'. Did you mean 'update'?",
+  "app/views/post-mailer/published.html.tse": "app/views/post-mailer/published.html.tse(2,30): error TS2769: No overload matches this call.\n  The last overload gave the following error.\n    Object literal may only specify known properties, and 'post' does not exist in type '{ author: { email: string; }; }'."
 }

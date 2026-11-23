@@ -7,7 +7,6 @@
   import { LANDING_TILES as tiles } from "$lib/landing-tiles";
 
   let { data } = $props();
-  let tab = $state("caught");
 
   const installs = {
     npm: "npm install -g @blazetrails/trails && trails new blog",
@@ -33,7 +32,7 @@
   const navLeft = [
     { label: "Source", href: repo },
     { label: "Docs", href: `${base}/docs/` },
-    { label: "API", href: `${base}/docs/api/@blazetrails/arel/README` },
+    { label: "API", href: `${base}/docs/api/README` },
   ];
   const navRight = [
     { label: "Guides", href: guides },
@@ -74,43 +73,32 @@
     <h1>Convention over configuration.<br />Now with types.</h1>
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
     <span class="pill">trails &mdash; pre-release &middot; measured at {data.measuredAt}</span>
-    <div class="stage">
-      <div class="tabs" role="tablist" aria-label="Examples">
-        <button role="tab" aria-selected={tab === "caught"} onclick={() => (tab = "caught")}>Caught by the compiler</button>
-        <button role="tab" aria-selected={tab === "ai"} onclick={() => (tab = "ai")}>AI disclaimer</button>
-      </div>
-      {#if tab === "caught"}
-        <div class="pane" role="tabpanel">
-          <div class="split">
-            <div>
-              <div class="file">app/controllers/posts-controller.ts &middot; tsc --noEmit</div>
-              {@html data.hero.check}
-            </div>
-            <div>
-              <div class="file">app/views/posts/show.html.tse &middot; trails-tsc-views build &amp;&amp; tsc</div>
-              {@html data.hero.view}
-            </div>
+    <div class="stage" id="caught">
+      <div class="pane">
+        <div class="split">
+          <div>
+            <div class="file">app/controllers/posts-controller.ts &middot; tsc --noEmit</div>
+            {@html data.hero.check}
           </div>
-          <p class="note">Typos in a controller and in a template, both caught before the app runs. Each error is the compiler's real output for a scratch edit of the <a href="{repo}/tree/{data.buildRef}/examples/homepage">home page example</a>.</p>
+          <div>
+            <div class="file">app/views/post-mailer/published.html.tse &middot; trails-tsc-views build &amp;&amp; tsc</div>
+            {@html data.hero.view}
+          </div>
         </div>
-      {:else}
-        <div class="pane ai" role="tabpanel">
-          <img class="meme" src="{base}/push-rails-over-there.jpg" width="500" height="880" alt="Put It Somewhere Else Patrick meme. Top panel: What if we took Rails. Bottom panel: and pushed it over there." />
-          <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, working from the vendored Rails source under human direction and review, with code reviews from Copilot and Codex.</p>
-        </div>
-      {/if}
+        <p class="note">A typo in the <code>publish</code> action, and an email template that passes its partial <code>post</code> where the partial declares <code>author:</code>. In Rails, the first is a <code>NoMethodError</code> when someone publishes a post, and the second an <code>ActionView::Template::Error</code> (missing local: <code>author</code>) when the email goes out. In trails, the compiler reports both before the app runs. Each error is the compiler's real output for a scratch edit of the <a href="{repo}/tree/{data.buildRef}/examples/homepage">home page example</a>.</p>
+      </div>
     </div>
   </header>
 
   <section class="company">
     <h2>All the familiar gems, dressed in TypeScript.</h2>
     <p class="intro">trails ports the Rails frameworks to TypeScript, one package per framework.</p>
-    <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby gem"} API</small>{/if}</a></li>{/each}</ul>
+    <ul class="tiles">{#each tiles as t}<li><a href="{base}/docs/packages/{t}"><span>{t}</span>{#if data.coverage[t] && data.coverage[t] !== "—"}<small>{data.coverage[t]} of the {railsGems.has(t) ? "Rails" : "Ruby gem"} API names</small>{/if}</a></li>{/each}</ul>
     <p class="small"><strong>And more.</strong> We&rsquo;re bringing all the friends along.</p>
     <p class="fine">Percentages count the upstream gem&rsquo;s public classes, modules, methods and constants that trails matches by name, measured at {data.measuredAt}.</p>
     <p class="fine"><strong>Rails API:</strong> gems the Rails project owns, like Active Record or Solid Queue. <strong>Ruby gem API:</strong> gems Rails depends on, like rack or i18n.</p>
-    <h3 class="browser">The same code in the browser.</h3>
-    <p class="small">A trails app&rsquo;s client-side JavaScript, Turbo and Stimulus included, runs on these same packages. Browser and server share one codebase.</p>
+    <h3 class="browser" id="browser">The same code in the browser.</h3>
+    <p class="small">A trails app&rsquo;s client-side JavaScript, Turbo and Stimulus included, is compatible with Rails frontend JS packages. Browser and server share one codebase.</p>
   </section>
 
   <section class="band">
@@ -122,8 +110,8 @@
   </section>
 
   <section class="band blocks">
-    {#each data.blocks as b}
-      <div class="block">
+    {#each data.blocks as b, i}
+      <div class="block" id="block-{i}">
         <div class="code">
           <a class="file" href={b.href}>examples/homepage/{b.file}</a>
           {@html b.html}
@@ -167,9 +155,14 @@
     <p class="small">Building interactive pages? trails ports <a href="{base}/docs/packages/turbo">Turbo</a> and <a href="{base}/docs/packages/stimulus">Stimulus</a>, so your app can update its pages over the wire with server-rendered HTML and little custom JavaScript.</p>
   </section>
 
+  <section class="ai" id="ai">
+    <p class="disclaimer"><strong>AI was used to build trails.</strong> Most of its code, tests and docs were written by Claude, working from the vendored Rails source under human direction and review, with code reviews from Copilot and Codex.</p>
+  </section>
+
   <footer class="foot">
     <ul>
       <li><a href={repo}>Source</a></li>
+      <li><a href="#ai">How trails was built</a></li>
       <li><a href="{repo}/blob/main/LICENSES.md">License</a></li>
     </ul>
     <p>trails is an independent TypeScript re-implementation of Ruby on Rails. The Rails trademarks are exclusively licensed to the Rails Foundation. Uses of ‘Rails’ and ‘Ruby on Rails’ in this website are for identification purposes only and do not imply an endorsement by or affiliation with Rails, the trademark owner, or the Rails Foundation.</p>
@@ -216,11 +209,8 @@
   .lede strong { display: block; }
   .pill { display: inline-block; background: var(--mango); border-radius: 6px; padding: 6px 14px; font-size: 15px; font-weight: 600; margin-bottom: 56px; }
   .stage { max-width: 1170px; margin: 0 auto; background: #211710; border-radius: 10px; overflow: hidden; text-align: left; box-shadow: 0 30px 60px rgb(0 0 0 / 0.2); }
-  .tabs { display: flex; gap: 6px; padding: 12px 12px 0; background: #2a1e16; border-bottom: 1px solid #4a3628; }
-  .tabs button { font: 600 16px var(--sans); color: #e4d2bc; background: #2f2219; border: 1px solid #4a3628; border-bottom: 0; padding: 11px 22px; border-radius: 8px 8px 0 0; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
-  .tabs button:hover { background: #3a2a1f; color: #fff; }
-  .tabs button[aria-selected="true"] { background: #3a2a1f; color: #fff; box-shadow: inset 0 3px 0 var(--orange); margin-bottom: -1px; padding-bottom: 12px; }
   .note { margin: 0; padding: 0 22px 22px; font-size: 15px; color: #d9c6b0; }
+  .note code { color: #fbf1e4; background: #2b1d14 !important; border-color: #4a3628 !important; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .browser { font-size: 40px; line-height: 1.1; color: var(--orange); font-weight: 800; letter-spacing: -0.02em; margin: 3rem auto 0; }
   .fine { font-size: 15px; line-height: 1.45; max-width: 760px; margin: 1.5rem auto 0; color: var(--bt-muted); }
@@ -229,11 +219,10 @@
   .split > div + div { border-left: 1px solid #4a3628; }
   .pane .file { text-align: left; padding: 8px 22px; }
   .pane :global(pre) { margin: 0; padding: 22px; font: 15px/1.65 var(--mono); background: transparent !important; overflow-x: auto; }
-  .ai { display: flex; align-items: center; justify-content: center; gap: 48px; padding: 32px 40px; }
-  .meme { display: block; width: 260px; height: auto; border-radius: 8px; }
-  .disclaimer { max-width: 560px; margin: 0; font-size: 19px; line-height: 1.5; color: #fbf1e4; }
+  .ai { padding: 0 24px 80px; }
+  .disclaimer { max-width: 560px; margin: 0 auto; font-size: 17px; line-height: 1.5; color: var(--bt-muted); }
   .pane :global(.squiggle) { text-decoration: underline wavy #ff5d5d; text-underline-offset: 4px; }
-  .pane :global(.tip) { display: block; width: max-content; max-width: 100%; margin: 6px 0 4px 2ch; padding: 8px 12px; background: #2b1d14; border: 1px solid #ff5d5d; border-radius: 6px; color: #ffb4b4; font-size: 13px; white-space: normal; }
+  .pane :global(.tip) { display: block; width: max-content; max-width: 100%; margin: 6px 0 4px 2ch; padding: 8px 12px; white-space: pre-wrap; background: #2b1d14; border: 1px solid #ff5d5d; border-radius: 6px; color: #ffb4b4; font-size: 13px; }
 
   .company { padding: 40px 24px 100px; }
   .tiles { display: grid; grid-template-columns: repeat(4, 220px); justify-content: center; gap: 18px; list-style: none; padding: 0; margin: 48px 0; }
@@ -251,6 +240,7 @@
   .band > .card:first-child { margin-top: 0; }
 
   .blocks { padding-top: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 560px)); justify-content: center; column-gap: 50px; }
+  .block:last-child:nth-child(odd) { grid-column: 1 / -1; width: min(100%, 560px); justify-self: center; }
   .block { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; padding-bottom: 60px; }
   .code { display: flex; flex-direction: column; }
   .code { background: #3a2a1f; border-radius: 6px; overflow: hidden; text-align: left; }
@@ -292,7 +282,6 @@
     .tiles li:nth-last-child(2) { grid-column: auto; }
     .blocks, .cards, .split { grid-template-columns: 1fr; }
     .split > div + div { border-left: 0; border-top: 1px solid #4a3628; }
-    .ai { flex-direction: column; }
     .card { padding: 40px 24px; }
   }
 </style>
