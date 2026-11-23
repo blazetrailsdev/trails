@@ -72,7 +72,7 @@ describe("SQLite3::Database over the libsql engine", () => {
   });
 
   it("calls the busy handler with a growing count until it answers false, as retries does", async () => {
-    const path = `${getOs().tmpdir()}/engine-busy-${Date.now()}.sqlite3`;
+    const path = `${getOs().tmpdir()}/engine-busy-${Date.now()}-${Math.random()}.sqlite3`;
     paths.push(path);
     const holder = new SQLite3.Database(path, { engine });
     await holder.executeBatch2("CREATE TABLE t (a); BEGIN EXCLUSIVE;");
@@ -88,7 +88,7 @@ describe("SQLite3::Database over the libsql engine", () => {
   });
 
   it("setBusyHandlerTimeout retries until the deadline, then raises BusyException", async () => {
-    const path = `${getOs().tmpdir()}/engine-busy-timeout-${Date.now()}.sqlite3`;
+    const path = `${getOs().tmpdir()}/engine-busy-timeout-${Date.now()}-${Math.random()}.sqlite3`;
     paths.push(path);
     const holder = new SQLite3.Database(path, { engine });
     await holder.executeBatch2("CREATE TABLE t (a); BEGIN EXCLUSIVE;");
