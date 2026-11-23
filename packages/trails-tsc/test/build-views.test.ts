@@ -387,6 +387,46 @@ describe("buildViews", { timeout: 30_000 }, () => {
     );
   });
 
+  it("scopes a controller's views to its _helpers and leaves other views without them", async () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "node_modules/@blazetrails/ruby-compat/package.json",
+      '{ "name": "@blazetrails/ruby-compat", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/ruby-compat/index.d.ts",
+      "export declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/package.json",
+      '{ "name": "@blazetrails/actionview", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/index.d.ts",
+      [
+        "export interface TemplateRegistry {}",
+        "export type TemplateLocals<T> = T;",
+        "export declare class Base { render(...args: unknown[]): string; }",
+        "export declare const TopLevel: {};",
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      "export class PostsController { declare static _helpers: { turboStreamFrom(x: unknown): string }; }",
+    );
+    write(cwd, "app/views/posts/show.html.tse", "<%= turboStreamFrom(1) %>");
+    write(cwd, "app/views/notifier-mailer/welcome.html.tse", "<%= turboStreamFrom(1) %>");
+    await buildViews({ cwd });
+    expect(viewDiagnostics(cwd)).toEqual([
+      "notifier-mailer/welcome.html.tse.ts: This expression is not callable.\n  Type 'never' has no call signatures.",
+    ]);
+  });
+
   it("types a template's instance assigns from every controller that renders it", async () => {
     const cwd = mkScratch();
     write(
