@@ -108,7 +108,7 @@ export function testSignature(tc: RubyTestCase): string {
   return stableJson(rest);
 }
 
-function testIndex(manifest: RubyTestManifest, pkg: string): Map<string, RubyTestCase> {
+export function testIndex(manifest: RubyTestManifest, pkg: string): Map<string, RubyTestCase> {
   const out = new Map<string, RubyTestCase>();
   for (const file of manifest.packages[pkg]?.files ?? []) {
     for (const tc of file.testCases) out.set(`${file.file} ${tc.path}`, tc);

@@ -87227,6 +87227,1336 @@
     "ref": "v1.14.8"
   },
   {
+    "package": "nokogiri",
+    "rubyFile": "css.rb",
+    "rubyName": "xpath_for",
+    "digest": "a5933e732f06afb2",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/node.rb",
+    "rubyName": "accept",
+    "digest": "1c3ee518b7198b11",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/node.rb",
+    "rubyName": "find_by_type",
+    "digest": "235bd9ad6c824fdb",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/node.rb",
+    "rubyName": "initialize",
+    "digest": "17f10d7156030536",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/node.rb",
+    "rubyName": "to_type",
+    "digest": "1af1622eb277dd25",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/node.rb",
+    "rubyName": "to_xpath",
+    "digest": "d7acf0aed6962088",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_1",
+    "digest": "2b08606bbab34e03",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_10",
+    "digest": "b2bf9587c230df37",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_11",
+    "digest": "96fb303a6fcd2354",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_13",
+    "digest": "55d73da5f778d297",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_14",
+    "digest": "55d73da5f778d297",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_15",
+    "digest": "51904b4deef90cf5",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_17",
+    "digest": "7c8469304c7f7c5b",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_18",
+    "digest": "9942d937b761148f",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_19",
+    "digest": "4079c1c2111656a9",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_2",
+    "digest": "5f5c17f77308f1bd",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_21",
+    "digest": "399aad136da79b25",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_23",
+    "digest": "26b615b39faf7a1e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_24",
+    "digest": "b85cf30c761d1172",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_25",
+    "digest": "819e06f0d789cdec",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_26",
+    "digest": "ae6ea3726d25a4c1",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_28",
+    "digest": "f2412a8eae0486d6",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_29",
+    "digest": "f2412a8eae0486d6",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_3",
+    "digest": "33160cb027466ca2",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_30",
+    "digest": "02f1fbefebaf931e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_31",
+    "digest": "bfce4092deb014de",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_32",
+    "digest": "b2bf9587c230df37",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_34",
+    "digest": "aa9dce799fd38854",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_35",
+    "digest": "16c60395e53996d8",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_36",
+    "digest": "16c60395e53996d8",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_37",
+    "digest": "16c60395e53996d8",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_38",
+    "digest": "16c60395e53996d8",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_39",
+    "digest": "d4a47b973981471c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_4",
+    "digest": "138de0cd6d4f8401",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_40",
+    "digest": "d4a47b973981471c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_41",
+    "digest": "d4a47b973981471c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_42",
+    "digest": "d4a47b973981471c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_45",
+    "digest": "a95cc324a0d8a032",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_47",
+    "digest": "c663e445347f8c2e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_48",
+    "digest": "9253631a50643496",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_49",
+    "digest": "b34531760cf38237",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_5",
+    "digest": "c480346781d835fa",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_50",
+    "digest": "1de24cff5e3e9a68",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_51",
+    "digest": "1de24cff5e3e9a68",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_54",
+    "digest": "bf33fd125f31dd7e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_55",
+    "digest": "bf33fd125f31dd7e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_56",
+    "digest": "bf33fd125f31dd7e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_57",
+    "digest": "bf33fd125f31dd7e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_58",
+    "digest": "bf33fd125f31dd7e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_6",
+    "digest": "a14d7435d6fba9ab",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_64",
+    "digest": "aea1611bc3d0b24a",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_65",
+    "digest": "c29a16747eb9fb4f",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_66",
+    "digest": "00a67f3198c6a255",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_67",
+    "digest": "769c3a2ae207699c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_69",
+    "digest": "92552423b26205f0",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_7",
+    "digest": "d76309c0d7429316",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_70",
+    "digest": "7ba510176e77a45b",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_71",
+    "digest": "3f78c41f791ba307",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_72",
+    "digest": "864b43e42a97f96f",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_73",
+    "digest": "9c1ee0e5d40c0f49",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_74",
+    "digest": "ace511731c19ac79",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_75",
+    "digest": "5bdbad410eb7bfd6",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_76",
+    "digest": "81d48f406a6b8eb7",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_8",
+    "digest": "c480346781d835fa",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_9",
+    "digest": "01278895c756cf6d",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "_reduce_none",
+    "digest": "46e89a507db9fbe6",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "unescape_css_identifier",
+    "digest": "4c9fbdd4b1866ac1",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser.rb",
+    "rubyName": "unescape_css_string",
+    "digest": "025eeadb1a4917a5",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser_extras.rb",
+    "rubyName": "initialize",
+    "digest": "365be8680e05d8bd",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser_extras.rb",
+    "rubyName": "next_token",
+    "digest": "e7765947e238a7d2",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser_extras.rb",
+    "rubyName": "on_error",
+    "digest": "11a04a30109fddef",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser_extras.rb",
+    "rubyName": "parse",
+    "digest": "d8f0c150357c3bbc",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/parser_extras.rb",
+    "rubyName": "xpath_for",
+    "digest": "576c00220fcee254",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/selector_cache.rb",
+    "rubyName": "clear_cache",
+    "digest": "2d8c3c1f52cf2f9e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/selector_cache.rb",
+    "rubyName": "key",
+    "digest": "37445272780ac34e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/tokenizer.rb",
+    "rubyName": "_next_token",
+    "digest": "2faf2c98328649ef",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/tokenizer.rb",
+    "rubyName": "action",
+    "digest": "0a252ca5c7e40056",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/tokenizer.rb",
+    "rubyName": "next_token",
+    "digest": "532f1b4957f9e3c7",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/tokenizer.rb",
+    "rubyName": "scan_setup",
+    "digest": "1474b32aa60d53a4",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "accept",
+    "digest": "cf4cc3e55131fa20",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "config",
+    "digest": "70ab3eba9b446a1f",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "css_class",
+    "digest": "126645171c6bb88e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "html5_element_name_needs_namespace_handling",
+    "digest": "e06bf82b8ed58db5",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "initialize",
+    "digest": "095f6da4ff02e1c7",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "is_of_type_pseudo_class?",
+    "digest": "05c60c125e8970b9",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "nth",
+    "digest": "09ec56285c363ebf",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "read_a_and_positive_b",
+    "digest": "5154da3f3400d43e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "validate_xpath_function_name",
+    "digest": "01586d247b99c2ef",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_attrib_name",
+    "digest": "aa557563d9dea4fa",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_attribute_condition",
+    "digest": "7301a169d1452bd4",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_class_condition",
+    "digest": "59ae7db40eac605b",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_combinator",
+    "digest": "8116b16265cc1f04",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_conditional_selector",
+    "digest": "cfb60a8fe7c40f70",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_element_name",
+    "digest": "805a4e8a60af5579",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_function",
+    "digest": "9c9a15c2a8231021",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_id",
+    "digest": "9e367b1d5c6633e5",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_not",
+    "digest": "db510f7c3d38a4ae",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "css/xpath_visitor.rb",
+    "rubyName": "visit_pseudo_class",
+    "digest": "7ffe6eeeec78de47",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/document.rb",
+    "rubyName": "do_parse",
+    "digest": "2ec2d629b653c945",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/document.rb",
+    "rubyName": "fragment",
+    "digest": "65480ed8b12c7a2e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/document.rb",
+    "rubyName": "initialize",
+    "digest": "f7001500b21a2d9f",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/document.rb",
+    "rubyName": "parse",
+    "digest": "def68a0649b94871",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/document.rb",
+    "rubyName": "to_xml",
+    "digest": "de7a04928a2b56b2",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/document.rb",
+    "rubyName": "xpath_doctype",
+    "digest": "5d90c1ce57066bf2",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/document_fragment.rb",
+    "rubyName": "initialize",
+    "digest": "2329b4cb3a8e0050",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/document_fragment.rb",
+    "rubyName": "parse",
+    "digest": "e176e63d385159b9",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/document_fragment.rb",
+    "rubyName": "serialize",
+    "digest": "e670128ca1a769a5",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/node.rb",
+    "rubyName": "add_child_node_and_reparent_attrs",
+    "digest": "36067a1ceb2737c8",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/node.rb",
+    "rubyName": "fragment",
+    "digest": "395ef85daaaaeea1",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/node.rb",
+    "rubyName": "inner_html",
+    "digest": "f09e302f8b614cc7",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "html5/node.rb",
+    "rubyName": "write_to",
+    "digest": "0d9581287c0ea320",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "version/info.rb",
+    "rubyName": "libxml2_patches",
+    "digest": "3cba049b1a3b4897",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "version/info.rb",
+    "rubyName": "uses_libxml?",
+    "digest": "c45d6ba2da43b4d5",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document.rb",
+    "rubyName": "document",
+    "digest": "832c7b33610d2135",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document.rb",
+    "rubyName": "empty_doc?",
+    "digest": "c7cb57efeec8f467",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document.rb",
+    "rubyName": "parse",
+    "digest": "4811cd6f39b479ba",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document.rb",
+    "rubyName": "xpath_doctype",
+    "digest": "3243ededefd1dd40",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document_fragment.rb",
+    "rubyName": "errors",
+    "digest": "8054fe143291be57",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document_fragment.rb",
+    "rubyName": "errors=",
+    "digest": "68e52fbb34ad8868",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document_fragment.rb",
+    "rubyName": "fragment",
+    "digest": "49d8c6fc8e4db6d2",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document_fragment.rb",
+    "rubyName": "initialize",
+    "digest": "43597aa01d66f19a",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document_fragment.rb",
+    "rubyName": "name",
+    "digest": "bce7e9741ccd1e9c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document_fragment.rb",
+    "rubyName": "parse",
+    "digest": "2c0213e8da3a2484",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document_fragment.rb",
+    "rubyName": "to_html",
+    "digest": "1e9f1d30f757e24e",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/document_fragment.rb",
+    "rubyName": "to_xml",
+    "digest": "0b603706d65a9156",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/namespace.rb",
+    "rubyName": "deconstruct_keys",
+    "digest": "7f7f66d09731add6",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "add_child_node_and_reparent_attrs",
+    "digest": "5523f96e2f208472",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "cdata?",
+    "digest": "fa2f9c60eabf9ec5",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "children=",
+    "digest": "5e5119bd1d8ea8d9",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "coerce",
+    "digest": "d90b4024974000ee",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "content=",
+    "digest": "ad3616a43c52b32d",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "document?",
+    "digest": "404710a202e8e483",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "element?",
+    "digest": "4015aa94ffba02de",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "fragment",
+    "digest": "d16e7fddd72dc805",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "fragment?",
+    "digest": "635416662e1f3b7f",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "initialize",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "inner_html",
+    "digest": "9f7c42dee254f93c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "inner_html=",
+    "digest": "08aae921b920bf3d",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "namespaces",
+    "digest": "9233d39ed6458890",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "serialize",
+    "digest": "e3601e8752fc55db",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "text?",
+    "digest": "f2ac931c4f0c6d1a",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "to_format",
+    "digest": "c90b53f8883f3b51",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "to_html",
+    "digest": "9fbf3bc265317e57",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "to_xml",
+    "digest": "60149d3af842e4b8",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "value?",
+    "digest": "846502404257b1ca",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "values",
+    "digest": "587f4752abce54bc",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node.rb",
+    "rubyName": "write_to",
+    "digest": "bc911c0a55cc0d5d",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node/save_options.rb",
+    "rubyName": "initialize",
+    "digest": "2e066eefee6ed8ce",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "at_css",
+    "digest": "9303280ca4f52289",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "css",
+    "digest": "361678a96bfda282",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "deconstruct",
+    "digest": "f9b85e59e2c7b6b8",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "each",
+    "digest": "fce56b899a176e4b",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "empty?",
+    "digest": "76ed5d5d0317af03",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "first",
+    "digest": "f104061ddf21cb00",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "initialize",
+    "digest": "98a2e2658a9c222d",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "last",
+    "digest": "a0a91b5edb1a10d8",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "to_html",
+    "digest": "ef416354ff31d6d2",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "to_s",
+    "digest": "57e1bff787e92e8d",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "to_xml",
+    "digest": "d76040fe94caa66b",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/node_set.rb",
+    "rubyName": "xpath",
+    "digest": "31f7a3c6df0ce582",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/parse_options.rb",
+    "rubyName": "initialize",
+    "digest": "2e066eefee6ed8ce",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/parse_options.rb",
+    "rubyName": "strict",
+    "digest": "eb44fd9cc4e9917d",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/parse_options.rb",
+    "rubyName": "strict?",
+    "digest": "7093a53563bbb5fd",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/sax/document.rb",
+    "rubyName": "cdata_block",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/sax/document.rb",
+    "rubyName": "characters",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/sax/document.rb",
+    "rubyName": "end_document",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/sax/document.rb",
+    "rubyName": "end_element",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/sax/document.rb",
+    "rubyName": "error",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/sax/document.rb",
+    "rubyName": "start_document",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/sax/document.rb",
+    "rubyName": "start_element",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/sax/parser.rb",
+    "rubyName": "initialize",
+    "digest": "73019f9358b85416",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/sax/parser.rb",
+    "rubyName": "parse",
+    "digest": "b3944963c9fac696",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "at",
+    "digest": "ed5a8e799ccd7515",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "at_css",
+    "digest": "9303280ca4f52289",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "at_xpath",
+    "digest": "4174adc64991586b",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "css",
+    "digest": "e19dd8d0827cb83d",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "css_internal",
+    "digest": "c628b65d77504d40",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "css_rules_to_xpath",
+    "digest": "37f76b1a7eb33e85",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "extract_params",
+    "digest": "28975f24a42451cd",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "search",
+    "digest": "8ce44319d094b726",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "xpath",
+    "digest": "14ea38f9d3fb4cf4",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "xpath_impl",
+    "digest": "d649481ee7ecebae",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "xpath_internal",
+    "digest": "7af423b1bb3941ef",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/searchable.rb",
+    "rubyName": "xpath_query_from_css_rule",
+    "digest": "a9e74fe81cdf69ad",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/syntax_error.rb",
+    "rubyName": "error?",
+    "digest": "fb745ee9e4d3c99d",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/syntax_error.rb",
+    "rubyName": "fatal?",
+    "digest": "a283ec65528f49f5",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/syntax_error.rb",
+    "rubyName": "none?",
+    "digest": "eabecf4a805115db",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/syntax_error.rb",
+    "rubyName": "warning?",
+    "digest": "06e015c87efe98dc",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/xpath_context.rb",
+    "rubyName": "register_namespaces",
+    "digest": "43d18854a9018ae0",
+    "ref": "v1.18.3"
+  },
+  {
+    "package": "nokogiri",
+    "rubyFile": "xml/xpath_context.rb",
+    "rubyName": "register_variables",
+    "digest": "f856643cc2ed8c1b",
+    "ref": "v1.18.3"
+  },
+  {
     "package": "rack",
     "rubyFile": "auth/abstract/handler.rb",
     "rubyName": "bad_request",
