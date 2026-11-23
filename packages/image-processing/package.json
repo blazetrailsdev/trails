@@ -2,6 +2,13 @@
   "name": "@blazetrails/image-processing",
   "version": "0.1.0",
   "description": "Image processing pipelines for Trails, mirroring the image_processing gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/image-processing"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/image-processing#readme",
   "type": "module",
   "main": "dist/image-processing.js",
   "types": "dist/image-processing.d.ts",
@@ -52,5 +59,8 @@
       "ref": "v1.14.0",
       "sha": "8185ea61518d8cf477594505cd4b5ab478b28aea"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

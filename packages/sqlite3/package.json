@@ -2,6 +2,13 @@
   "name": "@blazetrails/sqlite3",
   "version": "0.1.0",
   "description": "The SQLite client, mirroring Ruby's sqlite3 gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/sqlite3"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/sqlite3#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -50,7 +57,6 @@
   "scripts": {
     "build": "tsc"
   },
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*"
   },
@@ -82,5 +88,8 @@
   ],
   "devDependencies": {
     "@blazetrails/vitest-matchers": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -2507,8 +2507,6 @@ for (const [name, fn] of [
   rbClearMethodCache();
 }
 
-import "@blazetrails/globalid/wire";
-
 import { type LocatorModel as _LocatorModel } from "@blazetrails/globalid";
 type _ARBaseUnscopedWire =
   typeof Base extends Pick<Required<_LocatorModel>, "unscoped"> ? true : never;

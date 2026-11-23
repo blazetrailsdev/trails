@@ -2,6 +2,13 @@
   "name": "@blazetrails/trails-tsc",
   "version": "0.1.0",
   "description": "Plugin-driven TypeScript compiler wrapper for trails framework packages",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/trails-tsc"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/trails-tsc#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -36,11 +43,13 @@
     "bin",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "engines": {
     "node": ">=26"
   },
   "devDependencies": {
     "@types/node": "25.3.5"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

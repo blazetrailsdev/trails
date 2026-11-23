@@ -2,6 +2,13 @@
   "name": "@blazetrails/rack-session",
   "version": "0.1.0",
   "description": "A session implementation for Rack, mirroring Ruby's rack-session",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/rack-session"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/rack-session#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +19,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/date": "workspace:*",
     "@blazetrails/rack": "workspace:*",
@@ -30,5 +36,8 @@
       "ref": "v2.1.1",
       "sha": "96663ece1596a3462704c30f98b85cd7e0337d6e"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -2,6 +2,13 @@
   "name": "@blazetrails/actionpack",
   "version": "0.1.0",
   "description": "ActionController and ActionDispatch — mirroring Rails ActionPack",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/actionpack"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/actionpack#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,7 +39,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "peerDependencies": {
     "@blazetrails/rack-cache": "workspace:*",
     "playwright": ">=1.40.0",
@@ -83,5 +89,8 @@
       "ref": "v8.0.5.2",
       "sha": "235c597b100321b6bd2d62f8df63707f42b25b2d"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

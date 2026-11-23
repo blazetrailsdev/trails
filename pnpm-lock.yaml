@@ -1633,6 +1633,45 @@ importers:
         specifier: workspace:*
         version: link:../vitest-matchers
 
+  packages/trails:
+    dependencies:
+      '@blazetrails/actioncable':
+        specifier: workspace:*
+        version: link:../actioncable
+      '@blazetrails/actionmailbox':
+        specifier: workspace:*
+        version: link:../actionmailbox
+      '@blazetrails/actionmailer':
+        specifier: workspace:*
+        version: link:../actionmailer
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/actiontext':
+        specifier: workspace:*
+        version: link:../actiontext
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../actionview
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../activemodel
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+      '@blazetrails/activestorage':
+        specifier: workspace:*
+        version: link:../activestorage
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
+
   packages/trails-tsc:
     dependencies:
       '@blazetrails/actionview':

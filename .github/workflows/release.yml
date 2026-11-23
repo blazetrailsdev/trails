@@ -1,0 +1,47 @@
+name: Release
+
+# Publishes every public packages/* at the lockstep version in one run.
+# Prerequisites and the release procedure: README.md, "Releasing".
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "scripts/release/**"
+      - "packages/*/package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Tag matches the lockstep version
+        if: github.event_name == 'push'
+        run: |
+          version="$(node -p 'require("./packages/trails/package.json").version')"
+          test "v$version" = "$GITHUB_REF_NAME"
+      # `pnpm -r publish` skips every package whose version is already on the
+      # registry, so a rerun after a midway failure publishes only the rest.
+      - name: Publish (dry run)
+        if: github.event_name == 'pull_request'
+        run: pnpm -r publish --dry-run --no-git-checks
+      - name: Publish
+        if: github.event_name == 'push'
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          pnpm -r publish --no-git-checks --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"

@@ -2,6 +2,13 @@
   "name": "@blazetrails/mail",
   "version": "0.1.0",
   "description": "Email parsing and generation, mirroring Ruby's mail gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/mail"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/mail#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,7 +38,6 @@
     "build": "tsc && pnpm build:values",
     "build:values": "mkdir -p dist/values && cp lib/values/unicode_tables.dat dist/values/"
   },
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/date": "workspace:*",
     "@blazetrails/mini-mime": "workspace:*",
@@ -52,5 +58,8 @@
       "ref": "2.8.1",
       "sha": "b6b6cb737d47a85ddc720fda0e6b991e99224848"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

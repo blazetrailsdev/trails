@@ -2,6 +2,13 @@
   "name": "@blazetrails/tse-compiler",
   "version": "0.1.0",
   "description": "TSE (Trails Server Embedded) compiler — lexer, AST, JS emitter. Rails analogue: the erubi gem.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/tse-compiler"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/tse-compiler#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,7 +25,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "engines": {
     "node": ">=26"
   },
@@ -31,5 +37,8 @@
       "ref": "1.13.1",
       "sha": "f1a0fb5bfb2a2604c0cf850d3c960bfc458421b6"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

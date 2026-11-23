@@ -2,6 +2,13 @@
   "name": "@blazetrails/chronic",
   "version": "0.1.0",
   "description": "Natural-language date parsing for Trails, mirroring the chronic gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/chronic"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/chronic#readme",
   "type": "module",
   "main": "dist/chronic.js",
   "types": "dist/chronic.d.ts",
@@ -42,5 +49,8 @@
       "ref": "v0.10.2",
       "sha": "7d3d82d38c991955526d0a45bede462f3f598319"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

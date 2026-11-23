@@ -2,6 +2,13 @@
   "name": "@blazetrails/mysql2",
   "version": "0.1.0",
   "description": "The MySQL client, mirroring Ruby's mysql2 gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/mysql2"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/mysql2#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,7 +25,6 @@
   "scripts": {
     "build": "tsc"
   },
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
@@ -45,5 +51,8 @@
     "@types/node": "25.3.5",
     "mysql2": "^3.18.2",
     "@blazetrails/vitest-matchers": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

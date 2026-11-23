@@ -2,6 +2,13 @@
   "name": "@blazetrails/rack-cache",
   "version": "0.1.0",
   "description": "HTTP caching for Rack, mirroring Ruby's rack-cache",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/rack-cache"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/rack-cache#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +19,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/date": "workspace:*",
     "@blazetrails/rack": "workspace:*",
@@ -39,5 +45,8 @@
   "devDependencies": {
     "@blazetrails/vitest-matchers": "workspace:*",
     "memjs": "^1.3.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

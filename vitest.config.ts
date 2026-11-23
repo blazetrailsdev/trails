@@ -356,7 +356,6 @@ const alias = {
   ),
   "@blazetrails/actionpack/testing": path.resolve(__dirname, "packages/actionpack/lib/testing.ts"),
   "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/lib/index.ts"),
-  "@blazetrails/globalid/wire": path.resolve(__dirname, "packages/globalid/lib/wire.ts"),
   "@blazetrails/globalid/signed-global-id": path.resolve(
     __dirname,
     "packages/globalid/lib/signed-global-id.ts",

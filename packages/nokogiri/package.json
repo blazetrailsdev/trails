@@ -2,6 +2,13 @@
   "name": "@blazetrails/nokogiri",
   "version": "0.1.0",
   "description": "XML/SAX parsing for Trails, mirroring Nokogiri's XML surface",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/nokogiri"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/nokogiri#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,7 +25,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*",
     "libxml2-wasm": "^0.7.1",
@@ -33,5 +39,8 @@
       "ref": "v1.18.3",
       "sha": "fd3ca2e22df67fd25fd5c25c466f6896b6547cb8"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -2,6 +2,13 @@
   "name": "@blazetrails/bcrypt",
   "version": "0.1.0",
   "description": "bcrypt() password hashing, mirroring Ruby's bcrypt gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/bcrypt"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/bcrypt#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,7 +25,6 @@
   "scripts": {
     "build": "tsc"
   },
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
@@ -37,5 +43,8 @@
       "ref": "v3.1.20",
       "sha": "58f8afd33d8813e84706b938815bb1aa08d0b470"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

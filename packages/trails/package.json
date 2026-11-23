@@ -1,0 +1,36 @@
+{
+  "name": "@blazetrails/trails",
+  "version": "0.1.0",
+  "description": "Full-stack web application framework for TypeScript, mirroring the rails gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/trails"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/trails#readme",
+  "files": [
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/actionmailer": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/actioncable": "workspace:*",
+    "@blazetrails/activestorage": "workspace:*",
+    "@blazetrails/actionmailbox": "workspace:*",
+    "@blazetrails/actiontext": "workspace:*",
+    "@blazetrails/trailties": "workspace:*"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

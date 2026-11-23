@@ -2,6 +2,13 @@
   "name": "@blazetrails/listen",
   "version": "0.1.0",
   "description": "File system change notifications for Trails, mirroring the listen gem over @parcel/watcher",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/listen"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/listen#readme",
   "type": "module",
   "main": "dist/listen.js",
   "types": "dist/listen.d.ts",
@@ -49,5 +56,8 @@
   ],
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

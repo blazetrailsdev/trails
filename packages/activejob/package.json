@@ -2,6 +2,13 @@
   "name": "@blazetrails/activejob",
   "version": "0.1.0",
   "description": "Job framework with pluggable queue adapters for Trails, mirroring the activejob gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/activejob"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/activejob#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -45,5 +52,8 @@
       "ref": "v8.0.5.2",
       "sha": "235c597b100321b6bd2d62f8df63707f42b25b2d"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

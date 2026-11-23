@@ -1,6 +1,7 @@
 {
   "name": "@blazetrails/vitest-matchers",
   "version": "0.1.0",
+  "private": true,
   "description": "Vitest matchers for the Minitest assertions whose meaning turns on Ruby semantics",
   "type": "module",
   "main": "dist/index.js",

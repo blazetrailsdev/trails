@@ -2,6 +2,13 @@
   "name": "@blazetrails/rack-cors",
   "version": "0.1.0",
   "description": "Rack middleware for Cross-Origin Resource Sharing, mirroring Ruby's rack-cors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/rack-cors"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/rack-cors#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +19,6 @@
     "dist",
     "!dist/**/*.d.ts.map"
   ],
-  "license": "MIT",
   "dependencies": {
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
@@ -31,5 +37,8 @@
       "ref": "v3.0.0",
       "sha": "f73bcd39b91c19ffa3d059dccc5d6ae62f24340a"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

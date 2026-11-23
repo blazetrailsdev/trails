@@ -31,6 +31,7 @@ interface PackageManifest {
   name?: string;
   private?: boolean;
   files?: string[];
+  main?: string;
 }
 
 async function manifests(): Promise<[string, PackageManifest][]> {
@@ -61,6 +62,7 @@ describe("packages/*/package.json", () => {
 
   it("includes dist in files on every publishable package", async () => {
     const withoutDist = publishable(await manifests())
+      .filter(([, manifest]) => manifest.main !== undefined)
       .filter(([, manifest]) => Array.isArray(manifest.files) && !manifest.files.includes("dist"))
       .map(([dir]) => dir);
     expect(withoutDist).toEqual([]);

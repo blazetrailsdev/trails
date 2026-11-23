@@ -2,6 +2,13 @@
   "name": "@blazetrails/stimulus",
   "version": "0.1.0",
   "description": "Stimulus for Trails, mirroring the stimulus-rails gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/stimulus"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/stimulus#readme",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/types/index.d.ts",
@@ -46,5 +53,8 @@
   "devDependencies": {
     "@blazetrails/trails-tsc": "workspace:*",
     "@types/node": "25.3.5"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

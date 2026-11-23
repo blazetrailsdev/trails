@@ -2,6 +2,13 @@
   "name": "@blazetrails/et-orbi",
   "version": "0.1.0",
   "description": "Zoned times for Trails, mirroring the et-orbi gem",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blazetrailsdev/trails.git",
+    "directory": "packages/et-orbi"
+  },
+  "homepage": "https://github.com/blazetrailsdev/trails/tree/main/packages/et-orbi#readme",
   "type": "module",
   "main": "dist/et-orbi.js",
   "types": "dist/et-orbi.d.ts",
@@ -45,5 +52,8 @@
       "ref": "v1.2.11",
       "sha": "037e2074b009186d2da43e0e948069d874abe10c"
     }
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
