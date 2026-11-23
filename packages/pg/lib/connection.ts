@@ -211,35 +211,27 @@ export class Connection {
   }
 
   closePrepared(stmtName: string | null): Promise<Result> {
-    const stmt = stmtName == null ? "" : stringValue(stmtName);
-    return new Promise((resolve, reject) => {
-      const submittable = {
-        submit(connection: { close(msg: object): void; sync(): void }): null {
-          connection.close({ type: "S", name: stmt });
-          connection.sync();
-          return null;
-        },
-        handleError: (error: unknown) => reject(engine!.pgError(this, error)),
-        handleReadyForQuery: () => {
-          this.prepared.delete(stmt);
-          resolve(engine!.emptyResult());
-        },
-      };
-      engine!.submit(this, submittable).catch(reject);
-    });
+    return this._asyncDescribeClosePreparedPortal(stmtName, "S");
   }
 
   closePortal(portal: string | null): Promise<Result> {
-    const stmt = portal == null ? "" : stringValue(portal);
+    return this._asyncDescribeClosePreparedPortal(portal, "P");
+  }
+
+  /** @internal */
+  private _asyncDescribeClosePreparedPortal(name: string | null, type: "S" | "P"): Promise<Result> {
+    const stmt = name == null ? "" : stringValue(name);
     return new Promise((resolve, reject) => {
       const submittable = {
         submit(connection: { close(msg: object): void; sync(): void }): null {
-          connection.close({ type: "P", name: stmt });
+          connection.close({ type, name: stmt });
           connection.sync();
           return null;
         },
         handleError: (error: unknown) => reject(engine!.pgError(this, error)),
         handleReadyForQuery: () => {
+          /** @inventedArm if — PERMANENT */
+          if (type === "S") this.prepared.delete(stmt);
           resolve(engine!.emptyResult());
         },
       };

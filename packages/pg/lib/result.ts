@@ -78,6 +78,10 @@ export class Result {
     return (this.#native.rows ?? []).length;
   }
 
+  nfields(): number {
+    return (this.#native.fields ?? []).length;
+  }
+
   ftype(index: number): number {
     if (index < 0 || index >= this.fields().length) {
       throw new ArgumentError(`invalid field number ${index}`);

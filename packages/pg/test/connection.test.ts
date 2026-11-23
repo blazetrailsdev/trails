@@ -204,7 +204,7 @@ describe("PG::Connection", () => {
   it("should convert strings to #close_prepared", async () => {
     await conn.prepare("weiß5", "VALUES(123)");
     const r = await conn.closePrepared("weiß5");
-    expect(r.fields().length).toBe(0);
+    expect(r.nfields()).toBe(0);
     await conn.prepare("weiß5", "VALUES(123)");
     await conn.closePrepared("weiß5");
   });
@@ -212,7 +212,7 @@ describe("PG::Connection", () => {
   it("should convert strings to #close_portal", async () => {
     await conn.exec("DECLARE cörsör5 CURSOR FOR VALUES(1,2,3)");
     const r = await conn.closePortal("cörsör5");
-    expect(r.fields().length).toBe(0);
+    expect(r.nfields()).toBe(0);
     await conn.exec("DECLARE cörsör5 CURSOR FOR VALUES(1,2,3)");
     await conn.closePortal("cörsör5");
   });
