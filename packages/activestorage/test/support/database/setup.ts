@@ -104,7 +104,7 @@ await DatabaseTasks.purge(Base.configurations().configsFor({ envName, name: "pri
 
 await import("../../../lib/config/routes.js");
 
-runLoadHooks("after_initialize", app);
+await runLoadHooks("after_initialize", app);
 ActiveStorage.logger = new NullLogger();
 ActiveStorage.trackVariants = true;
 
