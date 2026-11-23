@@ -88,7 +88,6 @@ export class Runner {
     this.rejectUnknownOptions(argv);
     const name = this.nameFilter(argv);
     const locations = await this.testLocations(tests, name);
-    if (locations.length === 0) return;
 
     const lineFiltered = this.filters.some(([, lines]) => lines.length > 0);
     const verbose = argv.includes("-v") || argv.includes("--verbose");
@@ -96,7 +95,7 @@ export class Runner {
       verbose ? { TRAILS_TEST_VERBOSE: "1" } : {},
       "vitest",
       "run",
-      ...locations,
+      ...(locations.length > 0 ? locations : ["--passWithNoTests", "test/.none"]),
       ...(name != null && !lineFiltered ? ["-t", name.source] : []),
       ...(argv.includes("-f") || argv.includes("--fail-fast") ? ["--bail", "1"] : []),
       "--reporter",
