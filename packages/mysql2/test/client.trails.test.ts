@@ -417,7 +417,7 @@ describe("Mysql2::Client#initialize", () => {
       username: "rails",
       user: "driver",
       password: 1,
-      host: "db",
+      host: "localhost",
       port: "3307",
       database: "d",
       socket: "/tmp/s",
@@ -427,7 +427,7 @@ describe("Mysql2::Client#initialize", () => {
     expect(config).toMatchObject({
       user: "rails",
       password: "1",
-      host: "db",
+      host: "localhost",
       port: 3307,
       database: "d",
       socketPath: "/tmp/s",
