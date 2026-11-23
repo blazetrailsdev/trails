@@ -385,4 +385,312 @@ describe("PluginGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--full", "--skip-active-record"]);
     await t.assertFile(".github/workflows/ci.yml", /run: bin\/trails test/);
   });
+
+  it("creating engine with hyphenated name in full mode", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "hyphenated-name"), "--full"]);
+    t.assertNoFile("hyphenated-name/app/assets/javascripts/hyphenated/name");
+    await t.assertDirectory("hyphenated-name/app/assets/stylesheets/hyphenated/name");
+    await t.assertDirectory("hyphenated-name/app/assets/images/hyphenated/name");
+    await t.assertDirectory("hyphenated-name/app/models");
+    await t.assertDirectory("hyphenated-name/app/controllers");
+    await t.assertDirectory("hyphenated-name/app/views");
+    await t.assertDirectory("hyphenated-name/app/helpers");
+    await t.assertDirectory("hyphenated-name/app/mailers");
+    await t.assertDirectory("hyphenated-name/app/jobs");
+    await t.assertFile("hyphenated-name/bin/trails");
+    await t.assertFile(
+      "hyphenated-name/config/routes.ts",
+      /Trails\.application\.routes\(\)\.draw\(/,
+    );
+    await t.assertFile(
+      "hyphenated-name/lib/hyphenated/name/engine.ts",
+      /export namespace Hyphenated \{\n {2}export namespace Name \{\n {4}export class Engine extends Trails\.Engine \{\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile("hyphenated-name/lib/hyphenated/name.ts", /import "\.\/name\/engine\.js"/);
+    await t.assertFile("hyphenated-name/bin/trails", /\.\.\/lib\/hyphenated\/name\/engine/);
+  });
+
+  it("creating engine with hyphenated and underscored name in full mode", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "my_hyphenated-name"), "--full"]);
+    t.assertNoFile("my_hyphenated-name/app/assets/javascripts/my_hyphenated/name");
+    await t.assertDirectory("my_hyphenated-name/app/assets/stylesheets/my_hyphenated/name");
+    await t.assertDirectory("my_hyphenated-name/app/assets/images/my_hyphenated/name");
+    await t.assertDirectory("my_hyphenated-name/app/models");
+    await t.assertDirectory("my_hyphenated-name/app/controllers");
+    await t.assertDirectory("my_hyphenated-name/app/views");
+    await t.assertDirectory("my_hyphenated-name/app/helpers");
+    await t.assertDirectory("my_hyphenated-name/app/mailers");
+    await t.assertDirectory("my_hyphenated-name/app/jobs");
+    await t.assertFile("my_hyphenated-name/bin/trails");
+    await t.assertFile(
+      "my_hyphenated-name/config/routes.ts",
+      /Trails\.application\.routes\(\)\.draw\(/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/lib/my_hyphenated/name/engine.ts",
+      /export namespace MyHyphenated \{\n {2}export namespace Name \{\n {4}export class Engine extends Trails\.Engine \{\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/lib/my_hyphenated/name.ts",
+      /import "\.\/name\/engine\.js"/,
+    );
+    await t.assertFile("my_hyphenated-name/bin/trails", /\.\.\/lib\/my_hyphenated\/name\/engine/);
+  });
+
+  it("being quiet while creating dummy application", async () => {
+    assertNoMatch(/create\s+config\/application\.ts/, await t.runGenerator());
+  });
+
+  it("create mountable application with mountable option", async () => {
+    await t.runGenerator([t.destinationRoot, "--mountable"]);
+    t.assertNoFile("app/assets/javascripts/bukkits");
+    await t.assertDirectory("app/assets/stylesheets/bukkits");
+    await t.assertDirectory("app/assets/images/bukkits");
+    await t.assertFile("config/routes.ts", /Bukkits\.Engine\.instance\(\)\.routes\(\)\.draw\(/);
+    await t.assertFile(
+      "lib/bukkits/version.ts",
+      /export namespace Bukkits \{\n {2}export const VERSION = "0\.1\.0";\n\}/,
+    );
+    await t.assertFile(
+      "lib/bukkits/engine.ts",
+      /export namespace Bukkits \{\n {2}export class Engine extends Trails\.Engine \{\n {4}static \{ this\.isolateNamespace\(Bukkits\); \}\n {2}\}\n\}/,
+    );
+    await t.assertFile("lib/bukkits.ts", /import "\.\/bukkits\/engine\.js"/);
+    await t.assertFile(
+      "test/dummy/config/routes.ts",
+      /this\.mount\(Bukkits\.Engine, \{ at: "\/bukkits" \}\)/,
+    );
+    await t.assertFile(
+      "app/controllers/bukkits/application_controller.ts",
+      /export namespace Bukkits \{\n {2}export class ApplicationController extends ActionController\.Base \{\}\n\}\n/,
+    );
+    await t.assertFile(
+      "app/models/bukkits/application_record.ts",
+      /export namespace Bukkits \{\n {2}export class ApplicationRecord extends ActiveRecord\.Base \{\n {4}static \{\n {6}this\.abstractClass = true;\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "app/jobs/bukkits/application_job.ts",
+      /export namespace Bukkits \{\n {2}export class ApplicationJob extends ActiveJob\.Base/,
+    );
+    await t.assertFile(
+      "app/mailers/bukkits/application_mailer.ts",
+      /export namespace Bukkits \{\n {2}export class ApplicationMailer extends ActionMailer\.Base \{\n {4}static \{\n {6}this\.default\(\{ from: "from@example\.com" \}\);\n {6}this\.layout\("mailer"\);\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "app/helpers/bukkits/application_helper.ts",
+      /export namespace Bukkits \{\n {2}export const ApplicationHelper = \{\};\n\}/,
+    );
+    await t.assertFile("app/views/layouts/bukkits/application.html.tse", (contents: string) => {
+      expect(contents).toMatch("<title>Bukkits</title>");
+      expect(contents).toMatch(/stylesheetLinkTag\(\s*['"]bukkits\/application['"]/);
+      assertNoMatch(/javascriptIncludeTag\(\s*['"]bukkits\/application['"]/, contents);
+    });
+    await t.assertFile("test/test_helper.ts", (content: string) => {
+      expect(content).toMatch(/ActiveRecord\.Migrator\.migrationsPaths.+test\/dummy\/db\/migrate/);
+      expect(content).toMatch(/ActiveRecord\.Migrator\.migrationsPaths.+\.\.\/db\/migrate/);
+      expect(content).toMatch(
+        /ActionDispatch\.IntegrationTest\.fixturePaths = ActiveSupport\.TestCase\.fixturePat/,
+      );
+      assertNoMatch(/TestUnitReporter\.executable = "bin\/test"/, content);
+    });
+    t.assertNoFile("bin/test");
+  });
+
+  it("create mountable application with mountable option and hyphenated name", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "hyphenated-name"), "--mountable"]);
+    t.assertNoFile("hyphenated-name/app/assets/javascripts/hyphenated/name");
+    await t.assertDirectory("hyphenated-name/app/assets/stylesheets/hyphenated/name");
+    await t.assertDirectory("hyphenated-name/app/assets/images/hyphenated/name");
+    await t.assertFile(
+      "hyphenated-name/config/routes.ts",
+      /Hyphenated\.Name\.Engine\.instance\(\)\.routes\(\)\.draw\(/,
+    );
+    await t.assertFile(
+      "hyphenated-name/lib/hyphenated/name/version.ts",
+      /export namespace Hyphenated \{\n {2}export namespace Name \{\n {4}export const VERSION = "0\.1\.0";\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "hyphenated-name/lib/hyphenated/name/engine.ts",
+      /export namespace Hyphenated \{\n {2}export namespace Name \{\n {4}export class Engine extends Trails\.Engine \{\n {6}static \{ this\.isolateNamespace\(Hyphenated\.Name\); \}\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile("hyphenated-name/lib/hyphenated/name.ts", /import "\.\/name\/engine\.js"/);
+    await t.assertFile(
+      "hyphenated-name/test/dummy/config/routes.ts",
+      /this\.mount\(Hyphenated\.Name\.Engine, \{ at: "\/hyphenated-name" \}\)/,
+    );
+    await t.assertFile(
+      "hyphenated-name/app/controllers/hyphenated/name/application_controller.ts",
+      /export namespace Hyphenated \{\n {2}export namespace Name \{\n {4}export class ApplicationController extends ActionController\.Base \{\}\n {2}\}\n\}\n/,
+    );
+    await t.assertFile(
+      "hyphenated-name/app/models/hyphenated/name/application_record.ts",
+      /export namespace Hyphenated \{\n {2}export namespace Name \{\n {4}export class ApplicationRecord extends ActiveRecord\.Base \{\n {6}static \{\n {8}this\.abstractClass = true;\n {6}\}\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "hyphenated-name/app/jobs/hyphenated/name/application_job.ts",
+      /export namespace Hyphenated \{\n {2}export namespace Name \{\n {4}export class ApplicationJob extends ActiveJob\.Base/,
+    );
+    await t.assertFile(
+      "hyphenated-name/app/mailers/hyphenated/name/application_mailer.ts",
+      /export namespace Hyphenated \{\n {2}export namespace Name \{\n {4}export class ApplicationMailer extends ActionMailer\.Base \{\n {6}static \{\n {8}this\.default\(\{ from: "from@example\.com" \}\);\n {8}this\.layout\("mailer"\);\n {6}\}\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "hyphenated-name/app/helpers/hyphenated/name/application_helper.ts",
+      /export namespace Hyphenated \{\n {2}export namespace Name \{\n {4}export const ApplicationHelper = \{\};\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "hyphenated-name/app/views/layouts/hyphenated/name/application.html.tse",
+      (contents: string) => {
+        expect(contents).toMatch("<title>Hyphenated name</title>");
+        expect(contents).toMatch(/stylesheetLinkTag\(\s*['"]hyphenated\/name\/application['"]/);
+        assertNoMatch(/javascriptIncludeTag\(\s*['"]hyphenated\/name\/application['"]/, contents);
+      },
+    );
+  });
+
+  it("create mountable application with mountable option and hyphenated and underscored name", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "my_hyphenated-name"), "--mountable"]);
+    t.assertNoFile("my_hyphenated-name/app/assets/javascripts/my_hyphenated/name");
+    await t.assertDirectory("my_hyphenated-name/app/assets/stylesheets/my_hyphenated/name");
+    await t.assertDirectory("my_hyphenated-name/app/assets/images/my_hyphenated/name");
+    await t.assertFile(
+      "my_hyphenated-name/config/routes.ts",
+      /MyHyphenated\.Name\.Engine\.instance\(\)\.routes\(\)\.draw\(/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/lib/my_hyphenated/name/version.ts",
+      /export namespace MyHyphenated \{\n {2}export namespace Name \{\n {4}export const VERSION = "0\.1\.0";\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/lib/my_hyphenated/name/engine.ts",
+      /export namespace MyHyphenated \{\n {2}export namespace Name \{\n {4}export class Engine extends Trails\.Engine \{\n {6}static \{ this\.isolateNamespace\(MyHyphenated\.Name\); \}\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/lib/my_hyphenated/name.ts",
+      /import "\.\/name\/engine\.js"/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/test/dummy/config/routes.ts",
+      /this\.mount\(MyHyphenated\.Name\.Engine, \{ at: "\/my_hyphenated-name" \}\)/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/app/controllers/my_hyphenated/name/application_controller.ts",
+      /export namespace MyHyphenated \{\n {2}export namespace Name \{\n {4}export class ApplicationController extends ActionController\.Base \{\}\n {2}\}\n\}\n/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/app/models/my_hyphenated/name/application_record.ts",
+      /export namespace MyHyphenated \{\n {2}export namespace Name \{\n {4}export class ApplicationRecord extends ActiveRecord\.Base \{\n {6}static \{\n {8}this\.abstractClass = true;\n {6}\}\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/app/jobs/my_hyphenated/name/application_job.ts",
+      /export namespace MyHyphenated \{\n {2}export namespace Name \{\n {4}export class ApplicationJob extends ActiveJob\.Base/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/app/mailers/my_hyphenated/name/application_mailer.ts",
+      /export namespace MyHyphenated \{\n {2}export namespace Name \{\n {4}export class ApplicationMailer extends ActionMailer\.Base \{\n {6}static \{\n {8}this\.default\(\{ from: "from@example\.com" \}\);\n {8}this\.layout\("mailer"\);\n {6}\}\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/app/helpers/my_hyphenated/name/application_helper.ts",
+      /export namespace MyHyphenated \{\n {2}export namespace Name \{\n {4}export const ApplicationHelper = \{\};\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "my_hyphenated-name/app/views/layouts/my_hyphenated/name/application.html.tse",
+      (contents: string) => {
+        expect(contents).toMatch("<title>My hyphenated name</title>");
+        expect(contents).toMatch(/stylesheetLinkTag\(\s*['"]my_hyphenated\/name\/application['"]/);
+        assertNoMatch(
+          /javascriptIncludeTag\(\s*['"]my_hyphenated\/name\/application['"]/,
+          contents,
+        );
+      },
+    );
+  });
+
+  it("create mountable application with mountable option and multiple hyphenates in name", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "deep-hyphenated-name"), "--mountable"]);
+    t.assertNoFile("deep-hyphenated-name/app/assets/javascripts/deep/hyphenated/name");
+    await t.assertDirectory("deep-hyphenated-name/app/assets/stylesheets/deep/hyphenated/name");
+    await t.assertDirectory("deep-hyphenated-name/app/assets/images/deep/hyphenated/name");
+    await t.assertFile(
+      "deep-hyphenated-name/config/routes.ts",
+      /Deep\.Hyphenated\.Name\.Engine\.instance\(\)\.routes\(\)\.draw\(/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/lib/deep/hyphenated/name/version.ts",
+      /export namespace Deep \{\n {2}export namespace Hyphenated \{\n {4}export namespace Name \{\n {6}export const VERSION = "0\.1\.0";\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/lib/deep/hyphenated/name/engine.ts",
+      /export namespace Deep \{\n {2}export namespace Hyphenated \{\n {4}export namespace Name \{\n {6}export class Engine extends Trails\.Engine \{\n {8}static \{ this\.isolateNamespace\(Deep\.Hyphenated\.Name\); \}\n {6}\}\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/lib/deep/hyphenated/name.ts",
+      /import "\.\/name\/engine\.js"/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/test/dummy/config/routes.ts",
+      /this\.mount\(Deep\.Hyphenated\.Name\.Engine, \{ at: "\/deep-hyphenated-name" \}\)/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/app/controllers/deep/hyphenated/name/application_controller.ts",
+      /export namespace Deep \{\n {2}export namespace Hyphenated \{\n {4}export namespace Name \{\n {6}export class ApplicationController extends ActionController\.Base \{\}\n {4}\}\n {2}\}\n\}\n/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/app/models/deep/hyphenated/name/application_record.ts",
+      /export namespace Deep \{\n {2}export namespace Hyphenated \{\n {4}export namespace Name \{\n {6}export class ApplicationRecord extends ActiveRecord\.Base \{\n {8}static \{\n {10}this\.abstractClass = true;\n {8}\}\n {6}\}\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/app/jobs/deep/hyphenated/name/application_job.ts",
+      /export namespace Deep \{\n {2}export namespace Hyphenated \{\n {4}export namespace Name \{\n {6}export class ApplicationJob extends ActiveJob\.Base/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/app/mailers/deep/hyphenated/name/application_mailer.ts",
+      /export namespace Deep \{\n {2}export namespace Hyphenated \{\n {4}export namespace Name \{\n {6}export class ApplicationMailer extends ActionMailer\.Base \{\n {8}static \{\n {10}this\.default\(\{ from: "from@example\.com" \}\);\n {10}this\.layout\("mailer"\);\n {8}\}\n {6}\}\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/app/helpers/deep/hyphenated/name/application_helper.ts",
+      /export namespace Deep \{\n {2}export namespace Hyphenated \{\n {4}export namespace Name \{\n {6}export const ApplicationHelper = \{\};\n {4}\}\n {2}\}\n\}/,
+    );
+    await t.assertFile(
+      "deep-hyphenated-name/app/views/layouts/deep/hyphenated/name/application.html.tse",
+      (contents: string) => {
+        expect(contents).toMatch("<title>Deep hyphenated name</title>");
+        expect(contents).toMatch(
+          /stylesheetLinkTag\(\s*['"]deep\/hyphenated\/name\/application['"]/,
+        );
+        assertNoMatch(
+          /javascriptIncludeTag\(\s*['"]deep\/hyphenated\/name\/application['"]/,
+          contents,
+        );
+      },
+    );
+  });
+
+  it("creating dummy without tests but with dummy path", async () => {
+    await t.runGenerator([t.destinationRoot, "--dummy_path", "spec/dummy", "--skip-test"]);
+    await t.assertDirectory("spec/dummy");
+    await t.assertFile(
+      "spec/dummy/config/application.ts",
+      /\/\/\s*import\s+["']@blazetrails\/trailties\/test-unit\/trailtie["']/,
+    );
+    t.assertNoDirectory("test");
+    await t.assertFile(".gitignore", (contents: string) => {
+      expect(contents).toMatch(/spec\/dummy/);
+    });
+  });
+
+  it("ensure that gitignore can be generated from a template for dummy path", async () => {
+    await t.runGenerator([t.destinationRoot, "--dummy_path", "spec/dummy", "--skip-test"]);
+    await t.assertFile(".gitignore", (contents: string) => {
+      expect(contents).toMatch(/spec\/dummy/);
+    });
+  });
+
+  it("dummy api application for api plugins", async () => {
+    await t.runGenerator([t.destinationRoot, "--api"]);
+
+    await t.assertFile("test/dummy/config/application.ts", (content: string) => {
+      expect(content).toMatch("this.config.apiOnly = true");
+    });
+  });
 });
