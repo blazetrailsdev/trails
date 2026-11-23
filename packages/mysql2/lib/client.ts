@@ -19,6 +19,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Time } from "@blazetrails/date";
 import { Error as Mysql2Error } from "./error.js";
+import { mysql2SetLocalInfile } from "./infile.js";
 import { Mysql2 } from "./mysql2.js";
 import { Result } from "./result.js";
 import { Statement } from "./statement.js";
@@ -65,8 +66,10 @@ export interface Mysql2StreamResult<
 
 type StreamCommand = {
   once(event: string, listener: (arg: never) => void): unknown;
-  stream(): AsyncIterable<unknown[]>;
+  stream(): AsyncIterable<unknown[]> & { destroy(error: unknown): unknown };
 };
+
+type QueryCommand = { _rows: unknown[]; _fields: Array<mysql.FieldPacket[] | undefined> };
 
 type ClientHandshake = {
   handshake: { authPluginName: string };
@@ -226,11 +229,12 @@ const COM_SET_OPTION = 0x1b;
 type Protocol = {
   clientEncoding: string;
   addCommand(command: object): void;
-  query(options: object): StreamCommand;
+  query(options: object, onResult?: (this: QueryCommand, e?: unknown) => void): StreamCommand;
   execute(options: object): StreamCommand;
   writePacket(packet: object): void;
   _resetSequenceId(): void;
   handlePacket?: (packet?: EofPacket) => unknown;
+  _command?: { next?: unknown; resultsetHeader?: unknown; infileOk?: unknown };
   stream?: {
     destroyed?: boolean;
     removeAllListeners?(): unknown;
@@ -240,12 +244,19 @@ type Protocol = {
   };
   _closing?: boolean;
   _fatalError?: unknown;
+  once?(event: "error", listener: (e: { code?: unknown }) => void): unknown;
+  off?(event: "error", listener: (e: { code?: unknown }) => void): unknown;
   _protocolError?: unknown;
 };
 type Packet = { isError(): boolean; asError(encoding: string): Error };
 type EofPacket = {
   offset: number;
   end: number;
+  buffer: Uint8Array;
+  readInt8(): number;
+  readInt16(): number;
+  readLengthCodedNumber(): number;
+  readLengthCodedString(encoding: string): string;
   isEOF(): boolean;
   eofWarningCount(): number;
   eofStatusFlags(): number;
@@ -264,6 +275,42 @@ const SERVER_QUERY_NO_GOOD_INDEX_USED = 16;
 const SERVER_QUERY_NO_INDEX_USED = 32;
 const SERVER_QUERY_WAS_SLOW = 2048;
 const SERVER_STATUS_NO_BACKSLASH_ESCAPES = 512;
+const SERVER_SESSION_STATE_CHANGED = 1 << 14;
+
+/** @noRailsEquivalent PERMANENT */
+function readOkEx(packet: EofPacket, encoding: string): Array<[number, string]> | null {
+  const start = packet.offset;
+  try {
+    packet.offset += 1;
+    packet.readLengthCodedNumber();
+    packet.readLengthCodedNumber();
+    const serverStatus = packet.readInt16();
+    packet.readInt16();
+    if (packet.offset >= packet.end) return null;
+    packet.readLengthCodedString(encoding);
+    if ((serverStatus & SERVER_SESSION_STATE_CHANGED) === 0 || packet.offset >= packet.end) {
+      return null;
+    }
+    const info: Array<[number, string]> = [];
+    const length = packet.readLengthCodedNumber();
+    const end = packet.offset + length;
+    while (packet.offset < end) {
+      const type = packet.readInt8();
+      const itemLength = packet.readLengthCodedNumber();
+      const itemEnd = packet.offset + itemLength;
+      if (type === Client.SESSION_TRACK_SYSTEM_VARIABLES) {
+        info.push([type, packet.readLengthCodedString(encoding)]);
+      } else if (type === Client.SESSION_TRACK_GTIDS) {
+        packet.offset += 1;
+      }
+      info.push([type, packet.readLengthCodedString(encoding)]);
+      packet.offset = itemEnd;
+    }
+    return info;
+  } finally {
+    packet.offset = start;
+  }
+}
 
 /** @internal */
 export type Field = {
@@ -457,15 +504,9 @@ export class Client {
   lastId = 0;
   private _warningCount = 0;
   private _info: string | null = null;
-  private stateChanges:
-    | {
-        systemVariables: Record<string, string>;
-        schema: string | null;
-        trackStateChange: string | null;
-      }
-    | undefined;
+  private sessionTrackInfo: Array<[number, string]> | null = null;
   private currentQueryOptions: QueryOptions | undefined;
-  private nextResults: Native[] = [];
+  private nextResults: Array<Native | globalThis.Error> = [];
   private currentResult: Native | undefined;
   private serverStatus = 0;
   private activeResult: Result | undefined;
@@ -878,6 +919,7 @@ export class Client {
         },
       };
     }
+    config.infileStreamFactory = mysql2SetLocalInfile();
     if (this.localInfile === true) flags |= CLIENT_FLAGS.LOCAL_FILES;
     if (this.localInfile === false) flags &= ~CLIENT_FLAGS.LOCAL_FILES;
     if (
@@ -977,6 +1019,14 @@ export class Client {
           this._warningCount = packet.eofWarningCount();
           this.serverStatus = packet.eofStatusFlags();
         }
+        const command = protocol!._command;
+        if (
+          packet?.buffer[packet.offset] === 0 &&
+          command !== undefined &&
+          (command.next === command.resultsetHeader || command.next === command.infileOk)
+        ) {
+          this.sessionTrackInfo = readOkEx(packet, protocol!.clientEncoding);
+        }
         return handlePacket.call(protocol, packet);
       };
     }
@@ -1026,11 +1076,20 @@ export class Client {
     if (opts.stream === true) {
       return this.useResult(this.connection.connection!.query(options), opts);
     }
-    this.currentResult = await (
-      this.connection.query as unknown as (options: object) => Promise<Native>
-    )
-      .call(this.connection, options)
-      .catch((e: unknown) => this.raiseMysql2Error(e));
+    const results = await new Promise<Array<Native | globalThis.Error>>((resolve) => {
+      this.connection.connection!.query(options, function (this: QueryCommand, e?: unknown) {
+        const sets: Array<Native | globalThis.Error> = this._rows.map((rows, i) => [
+          rows,
+          this._fields[i],
+        ]);
+        if (e instanceof globalThis.Error) sets.push(e);
+        resolve(sets);
+      });
+    });
+    const first = results.shift();
+    if (first instanceof globalThis.Error) this.raiseMysql2Error(first);
+    this.currentResult = first;
+    this.nextResults = results;
     return this.storeResult();
   }
 
@@ -1080,7 +1139,6 @@ export class Client {
     this._warningCount = result.warningStatus ?? 0;
     this.serverStatus = result.serverStatus ?? this.serverStatus;
     this._info = result.info || null;
-    this.stateChanges = (result as { stateChanges?: Client["stateChanges"] }).stateChanges;
     if (result.insertId !== undefined) this.lastId = result.insertId;
     return null;
   }
@@ -1090,7 +1148,15 @@ export class Client {
     command: StreamCommand,
     queryOptions: QueryOptions,
   ): Promise<Mysql2StreamResult | null> {
-    const rows = command.stream()[Symbol.asyncIterator]();
+    const stream = command.stream();
+    const rows = stream[Symbol.asyncIterator]();
+    const protocol = this.connection.connection!;
+    const lost = (e: { code?: unknown }) => {
+      const error = new globalThis.Error("Lost connection to MySQL server during query");
+      stream.destroy(Object.assign(error, { code: e.code, cause: e }));
+    };
+    protocol.once?.("error", lost);
+    command.once("end", () => protocol.off?.("error", lost));
     const fields = await new Promise<mysql.FieldPacket[] | null>((resolve, reject) => {
       command.once("fields", resolve);
       command.once("end", () => resolve(null));
@@ -1162,6 +1228,10 @@ export class Client {
   nextResult(): boolean {
     const next = this.nextResults.shift();
     if (next === undefined) return false;
+    if (next instanceof globalThis.Error) {
+      this.nextResults = [];
+      this.raiseMysql2Error(next);
+    }
     this.currentResult = next;
     return true;
   }
@@ -1219,17 +1289,7 @@ export class Client {
 
   sessionTrack(type: number): string[] | null {
     this.requireConnected();
-    const changes = this.stateChanges;
-    let rbAry: string[] = [];
-    if (changes !== undefined) {
-      if (type === Client.SESSION_TRACK_SYSTEM_VARIABLES) {
-        rbAry = Object.entries(changes.systemVariables).flat();
-      } else if (type === Client.SESSION_TRACK_SCHEMA && changes.schema != null) {
-        rbAry = [changes.schema];
-      } else if (type === Client.SESSION_TRACK_STATE_CHANGE && changes.trackStateChange != null) {
-        rbAry = [changes.trackStateChange];
-      }
-    }
+    const rbAry = (this.sessionTrackInfo ?? []).filter(([t]) => t === type).map(([, data]) => data);
     return rbAry.length === 0 ? null : rbAry;
   }
 

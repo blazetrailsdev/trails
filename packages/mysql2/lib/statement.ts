@@ -58,7 +58,7 @@ export class Statement {
           case "DATETIME":
           case "TIMESTAMP":
           case "TIME":
-            return field.string();
+            return field.buffer();
           case "JSON":
             return field.string("utf8");
           default:
