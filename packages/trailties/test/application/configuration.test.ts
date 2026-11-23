@@ -3286,9 +3286,8 @@ I18n.setExceptionHandler((exception: unknown) => {
 });
 `;
 
-describe("ConfigurationTest part 8", () => {
+describe("ConfigurationTest part 8", { timeout: 120_000 }, () => {
   useInMemoryDatabaseUrl();
-  const trailsEnv = env.TRAILS_ENV;
   const activeSupport = { ...ActiveSupportTrailtie.config.activeSupport };
   const activeRecord = { ...ActiveRecordTrailtie.config.activeRecord };
   const isolationLevel = IsolatedExecutionState.isolationLevel;
@@ -3304,6 +3303,7 @@ describe("ConfigurationTest part 8", () => {
   const raiseOnMissingTranslations = TranslationHelper.raiseOnMissingTranslations();
   const i18nConfig = I18nTrailtie.config.i18n.toH();
   let trailsApplication: Application | null;
+  let t: Host;
 
   beforeAll(() => {
     trailsApplication = Trails.application;
@@ -3313,14 +3313,21 @@ describe("ConfigurationTest part 8", () => {
     Trails.application = trailsApplication;
   });
 
+  async function app(env = "development"): Promise<Application> {
+    return (await t.app(env)) as unknown as Application;
+  }
+
   beforeEach(async () => {
-    appPath = await mkdtemp(join(tmpdir(), "trails-config-for-"));
-    await mkdir(join(appPath, "config", "initializers"), { recursive: true });
-    await writeFile(join(appPath, "config", "storage.ts"), "export default {};\n");
-    await writeFile(join(appPath, "config.ts"), "");
+    t = new IsolatedConfigurationTest("test") as unknown as Host;
+    await t.buildApp();
+    await FileUtils.mvAsync(
+      `${await t.appPath()}/config/environments`,
+      `${await t.appPath()}/config/__environments__`,
+    );
   });
 
   afterEach(async () => {
+    await t.teardownApp();
     for (const key of Object.keys(ActiveSupportTrailtie.config.activeSupport)) {
       delete (ActiveSupportTrailtie.config.activeSupport as Record<string, unknown>)[key];
     }
@@ -3344,21 +3351,10 @@ describe("ConfigurationTest part 8", () => {
     I18nTrailtie._i18nInited = false;
     I18nTrailtie.config.i18n.clear().update(i18nConfig);
     Application.appClass = null;
-    setEnv("TRAILS_ENV", trailsEnv);
-    _resetTrailsEnv();
-    await rm(appPath, { recursive: true, force: true });
   });
 
-  async function newApp(trailsEnv: string, version: string | null = LOAD_DEFAULTS_VERSION) {
-    const application = await app(trailsEnv);
-    if (version) application.config.loadDefaults(version);
-    return application;
-  }
-
   it("Rails.application.deprecators includes framework deprecators", async () => {
-    const application = await newApp("production");
-    application.config.secretKeyBase = "secret";
-    await application.initializeBang();
+    await app("production");
 
     const deprecators = Trails.application!.deprecators;
     expect(toA(deprecators.each())).toContain(Deprecation._instance());
@@ -3379,10 +3375,9 @@ describe("ConfigurationTest part 8", () => {
   });
 
   it("can entirely opt out of deprecation warnings", async () => {
-    const application = await newApp("production");
-    application.config.secretKeyBase = "secret";
-    application.config.activeSupport.reportDeprecations = false;
-    await application.initializeBang();
+    await t.addToConfig("this.config.activeSupport.reportDeprecations = false;");
+
+    await app("production");
 
     const deprecators = toA(Trails.application!.deprecators.each());
     expect(deprecators.length).toBeTruthy();
@@ -3395,172 +3390,175 @@ describe("ConfigurationTest part 8", () => {
   });
 
   it("ParamsWrapper is enabled in a new app and uses JSON as the format", async () => {
-    const application = await newApp("production");
-    application.config.secretKeyBase = "secret";
-    await application.initializeBang();
-
-    expect(ActionController.Base._wrapperOptions.format).toEqual([":json"]);
-  });
-
-  it("ParamsWrapper is enabled in an upgrade and uses JSON as the format", async () => {
-    await writeFile(
-      join(appPath, "config", "initializers", "new_framework_defaults_7_0.ts"),
-      `import { Trails } from "@blazetrails/trailties";\nTrails.application!.config.actionController.wrapParametersByDefault = true;\n`,
-    );
-    const application = await newApp("production", "6.1");
-    application.config.secretKeyBase = "secret";
-    await application.initializeBang();
+    await app("production");
 
     expect(ActionController.Base._wrapperOptions.format).toEqual([":json"]);
   });
 
   it("ParamsWrapper can be changed from the default in the initializer that was created prior to Rails 7", async () => {
-    await writeFile(
-      join(appPath, "config", "initializers", "wrap_parameters.ts"),
+    await t.appFile(
+      "config/initializers/wrap_parameters.ts",
       `import { onLoad } from "@blazetrails/activesupport";\nonLoad("action_controller", function () {\n  this.wrapParameters({ format: [":xml"] });\n});\n`,
     );
-    const application = await newApp("production");
-    application.config.secretKeyBase = "secret";
-    await application.initializeBang();
+    await app("production");
 
     expect(ActionController.Base._wrapperOptions.format).toEqual([":xml"]);
   });
 
   it("ParamsWrapper can be turned off", async () => {
-    const application = await newApp("production");
-    application.config.secretKeyBase = "secret";
-    application.config.actionController.wrapParametersByDefault = false;
-    await application.initializeBang();
+    await t.addToConfig("this.config.actionController.wrapParametersByDefault = false;");
+
+    await app("production");
 
     expect(ActionController.Base._wrapperOptions.format).toEqual([]);
   });
 
   it("ActionController::Base.raise_on_missing_callback_actions is false by default for production", async () => {
-    const application = await newApp("production");
-    application.config.secretKeyBase = "secret";
-    await application.initializeBang();
+    await app("production");
 
     expect(ActionController.Base.raiseOnMissingCallbackActions).toBe(false);
   });
 
   it("ActionController::Base.raise_on_missing_callback_actions is false by default for upgraded apps", async () => {
-    await (await newApp("development", null)).initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+
+    await app("development");
 
     expect(ActionController.Base.raiseOnMissingCallbackActions).toBe(false);
   });
 
   it("isolation_level is :thread by default", async () => {
-    await (await newApp("development")).initializeBang();
+    await app("development");
     expect(IsolatedExecutionState.isolationLevel).toBe("thread");
   });
 
   it("isolation_level can be set in app config", async () => {
-    const application = await newApp("development");
-    application.config.activeSupport.isolationLevel = "fiber";
-    await application.initializeBang();
+    await t.addToConfig(`this.config.activeSupport.isolationLevel = "fiber";`);
+
+    await app("development");
 
     expect(IsolatedExecutionState.isolationLevel).toBe("fiber");
   });
 
   it("isolation_level can be set in initializer", async () => {
-    await writeFile(
-      join(appPath, "config", "initializers", "new_framework_defaults_7_0.ts"),
+    await t.appFile(
+      "config/initializers/new_framework_defaults_7_0.ts",
       `import { Trails } from "@blazetrails/trailties";\nTrails.application!.config.activeSupport.isolationLevel = "fiber";\n`,
     );
-    await (await newApp("development")).initializeBang();
+    await app("development");
 
     expect(IsolatedExecutionState.isolationLevel).toBe("fiber");
   });
 
   it("ActiveSupport::Cache.format_version is 7.1 by default for new apps", async () => {
-    await (await newApp("development")).initializeBang();
+    await app("development");
 
     expect(ActiveSupport.Cache.formatVersion).toBe(7.1);
   });
 
   it("ActiveSupport::Cache.format_version is 7.0 by default for upgraded apps", async () => {
-    await (await newApp("development", null)).initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+
+    await app("development");
 
     expect(ActiveSupport.Cache.formatVersion).toBe(7.0);
   });
 
   it("ActiveSupport::Cache.format_version can be configured via config.active_support.cache_format_version", async () => {
-    const application = await newApp("development", null);
-    (application.config.activeSupport as { cacheFormatVersion?: number }).cacheFormatVersion = 7.0;
-    await application.initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+
+    await app("development");
 
     expect(ActiveSupport.Cache.formatVersion).toBe(7.0);
   });
 
   it("raise_on_invalid_cache_expiration_time is false with 7.0 defaults", async () => {
-    await (await newApp("development", "7.0")).initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(`this.config.loadDefaults("7.0");`);
+
+    await app("development");
 
     expect(CacheStore.raiseOnInvalidCacheExpirationTime).toBe(false);
   });
 
   it("raise_on_invalid_cache_expiration_time is true with 7.1 defaults", async () => {
-    await (await newApp("development", "7.1")).initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(`this.config.loadDefaults("7.1");`);
+
+    await app("development");
 
     expect(CacheStore.raiseOnInvalidCacheExpirationTime).toBe(true);
   });
 
   it("raise_on_invalid_cache_expiration_time can be set via new framework defaults", async () => {
-    await writeFile(
-      join(appPath, "config", "initializers", "new_framework_defaults_7_1.ts"),
+    await t.appFile(
+      "config/initializers/new_framework_defaults_7_1.ts",
       `import { Trails } from "@blazetrails/trailties";\nTrails.application!.config.activeSupport.raiseOnInvalidCacheExpirationTime = true;\n`,
     );
-    await (await newApp("development", "7.0")).initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(`this.config.loadDefaults("7.0");`);
+
+    await app("development");
 
     expect(CacheStore.raiseOnInvalidCacheExpirationTime).toBe(true);
   });
 
   it("run_after_transaction_callbacks_in_order_defined is true in new apps", async () => {
-    await (await newApp("development")).initializeBang();
+    await app("development");
 
     expect(ActiveRecord.runAfterTransactionCallbacksInOrderDefined()).toBe(true);
   });
 
   it("run_after_transaction_callbacks_in_order_defined is false in upgrading apps", async () => {
-    await (await newApp("development", "7.0")).initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(`this.config.loadDefaults("7.0");`);
+
+    await app("development");
 
     expect(ActiveRecord.runAfterTransactionCallbacksInOrderDefined()).toBe(false);
   });
 
   it("run_after_transaction_callbacks_in_order_defined can be set via framework defaults", async () => {
-    await writeFile(
-      join(appPath, "config", "initializers", "new_framework_defaults_7_1.ts"),
+    await t.appFile(
+      "config/initializers/new_framework_defaults_7_1.ts",
       `import { Trails } from "@blazetrails/trailties";\nTrails.application!.config.activeRecord.runAfterTransactionCallbacksInOrderDefined = true;\n`,
     );
-    await (await newApp("development", "7.0")).initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(`this.config.loadDefaults("7.0");`);
+
+    await app("development");
 
     expect(ActiveRecord.runAfterTransactionCallbacksInOrderDefined()).toBe(true);
   });
 
   it("run_after_transaction_callbacks_in_order_defined can be set via framework defaults even if Active Record was previously loaded", async () => {
-    await writeFile(
-      join(appPath, "config", "initializers", "01_configure_database.ts"),
+    await t.appFile(
+      "config/initializers/01_configure_database.ts",
       `import { Base } from "@blazetrails/activerecord";\nBase.isConnected();\n`,
     );
-    await writeFile(
-      join(appPath, "config", "initializers", "new_framework_defaults_7_1.ts"),
+    await t.appFile(
+      "config/initializers/new_framework_defaults_7_1.ts",
       `import { Trails } from "@blazetrails/trailties";\nTrails.application!.config.activeRecord.runAfterTransactionCallbacksInOrderDefined = true;\n`,
     );
-    await (await newApp("development", "7.0")).initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(`this.config.loadDefaults("7.0");`);
+
+    await app("development");
 
     expect(ActiveRecord.runAfterTransactionCallbacksInOrderDefined()).toBe(true);
   });
 
   it("app attributes_for_inspect configuration takes precedence over default", async () => {
-    const application = await newApp("development");
-    application.config.activeRecord.attributesForInspect = ["foo"];
-    await application.initializeBang();
+    await t.addToConfig(`this.config.activeRecord.attributesForInspect = ["foo"];`);
+
+    await app("development");
 
     expect(ActiveRecord.Base.attributesForInspect).toEqual(["foo"]);
   });
   it("raise_on_missing_translations = true", async () => {
-    const application = await newApp("development");
-    application.config.i18n.raiseOnMissingTranslations = true;
-    await application.initializeBang();
+    await t.addToConfig(`this.config.i18n.raiseOnMissingTranslations = true;`);
+
+    await app("development");
 
     expect(Trails.application!.config.i18n.raiseOnMissingTranslations).toBe(true);
 
@@ -3568,9 +3566,9 @@ describe("ConfigurationTest part 8", () => {
   });
 
   it("raise_on_missing_translations = false", async () => {
-    const application = await newApp("development");
-    application.config.i18n.raiseOnMissingTranslations = false;
-    await application.initializeBang();
+    await t.addToConfig(`this.config.i18n.raiseOnMissingTranslations = false;`);
+
+    await app("development");
 
     expect(Trails.application!.config.i18n.raiseOnMissingTranslations).toBe(false);
 
@@ -3578,10 +3576,10 @@ describe("ConfigurationTest part 8", () => {
   });
 
   it("raise_on_missing_translations = true and custom exception handler in initializer", async () => {
-    await writeFile(join(appPath, "config", "initializers", "i18n.ts"), I18N_HANDLER);
-    const application = await newApp("development");
-    application.config.i18n.raiseOnMissingTranslations = true;
-    await application.initializeBang();
+    await t.appFile("config/initializers/i18n.ts", I18N_HANDLER);
+    await t.addToConfig(`this.config.i18n.raiseOnMissingTranslations = true;`);
+
+    await app("development");
 
     expect(Trails.application!.config.i18n.raiseOnMissingTranslations).toBe(true);
 
@@ -3592,10 +3590,10 @@ describe("ConfigurationTest part 8", () => {
   });
 
   it("raise_on_missing_translations = false and custom exception handler in initializer", async () => {
-    await writeFile(join(appPath, "config", "initializers", "i18n.ts"), I18N_HANDLER);
-    const application = await newApp("development");
-    application.config.i18n.raiseOnMissingTranslations = false;
-    await application.initializeBang();
+    await t.appFile("config/initializers/i18n.ts", I18N_HANDLER);
+    await t.addToConfig(`this.config.i18n.raiseOnMissingTranslations = false;`);
+
+    await app("development");
 
     expect(Trails.application!.config.i18n.raiseOnMissingTranslations).toBe(false);
 
@@ -3606,17 +3604,18 @@ describe("ConfigurationTest part 8", () => {
   });
 
   it("raises if configuration tries to assign to an actual method", async () => {
-    const application = await newApp("development", null);
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(
+      '(this.config as unknown as { loadDefaults: unknown }).loadDefaults = "7.0";',
+    );
 
-    const error = await assertRaises([NoMethodError], {}, () => {
-      (application.config as unknown as { loadDefaults: unknown }).loadDefaults = "7.0";
-    });
+    const error = await assertRaises([NoMethodError], {}, () => app("development"));
 
     expect(error.message).toMatch(/Cannot assign to `loadDefaults`, it is a configuration method/);
   });
 
   it("Action Text uses the best supported safe list sanitizer in new apps", async () => {
-    await (await newApp("development")).initializeBang();
+    await app("development");
 
     expect(ContentHelper.sanitizer).toBeInstanceOf(
       HTML.Sanitizer.bestSupportedVendor().safeListSanitizer,
@@ -3624,46 +3623,140 @@ describe("ConfigurationTest part 8", () => {
   });
 
   it("Action Text uses the HTML4 safe list sanitizer in upgraded apps", async () => {
-    await (await newApp("development", "7.0")).initializeBang();
+    await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+    await t.addToConfig(`this.config.loadDefaults("7.0");`);
+
+    await app("development");
 
     expect(ContentHelper.sanitizer).toBeInstanceOf(HTML4.Sanitizer.safeListSanitizer);
   });
 
   it("Action Text uses the specified vendor's safe list sanitizer", async () => {
     class MySafeListSanitizer extends HTML4.SafeListSanitizer {}
-    const MySanitizerVendor = { safeListSanitizer: MySafeListSanitizer };
-    const application = await newApp("development");
-    application.config.actionText.sanitizerVendor = MySanitizerVendor;
-    await application.initializeBang();
+    constSet(TopLevel, "MySafeListSanitizer", MySafeListSanitizer);
+    constSet(TopLevel, "MySanitizerVendor", { safeListSanitizer: MySafeListSanitizer });
+    onTestFinished(() => {
+      rbModRemoveConst(TopLevel, "MySanitizerVendor");
+      rbModRemoveConst(TopLevel, "MySafeListSanitizer");
+    });
+    await t.addToConfig("this.config.actionText.sanitizerVendor = TopLevel.MySanitizerVendor;");
+
+    await app("development");
 
     expect(ContentHelper.sanitizer).toBeInstanceOf(MySafeListSanitizer);
   });
-  it("raise_on_missing_translations = :strict affects human_attribute_name in model", async () => {
-    class Post extends ActiveRecord.Base {}
-    const application = await newApp("development");
-    application.config.i18n.raiseOnMissingTranslations = ":strict";
-    await application.initializeBang();
 
-    await assertRaises([I18n.MissingTranslationData], {}, () => Post.humanAttributeName("title"));
+  it("raise_on_missing_translations affects t in controllers and views", async () => {
+    await t.addToConfig("this.config.i18n.raiseOnMissingTranslations = true;");
+
+    await t.appFile(
+      "app/views/foo/view-test.html.tse",
+      `<%=
+  (() => {
+    try {
+      return t("missing.translation");
+    } catch (e) {
+      if (!(e instanceof I18n.MissingTranslationData)) throw e;
+      return "rescued missing translation error from view";
+    }
+  })()
+%>
+`,
+    );
+
+    await t.appFile(
+      "app/controllers/foo-controller.ts",
+      `import { I18n } from "@blazetrails/activesupport";
+import { ApplicationController } from "./application-controller.ts";
+export class FooController extends ApplicationController {
+  static {
+    this.layout(false);
+  }
+
+  async controllerTest() {
+    let response;
+    try {
+      response = this.t("missing.translation");
+    } catch (e) {
+      if (!(e instanceof I18n.MissingTranslationData)) throw e;
+      response = "rescued missing translation error from controller";
+    }
+    await this.render({ plain: response });
+  }
+
+  async viewTest() {
+    await this.render("view-test");
+  }
+}
+`,
+    );
+
+    await t.addToConfig(`
+      this.routes().prepend(function () {
+        this.get("foo/controller", { to: "foo#controllerTest" });
+        this.get("foo/view", { to: "foo#viewTest" });
+      });
+`);
+
+    await app("development");
+
+    await t.get("foo/controller");
+    expect(t.lastResponse().body).toBe("rescued missing translation error from controller");
+
+    await t.get("foo/view");
+    expect(t.lastResponse().body).toContain("rescued missing translation error from view");
+  });
+
+  it("raise_on_missing_translations = :strict affects human_attribute_name in model", async () => {
+    await t.addToConfig(`this.config.i18n.raiseOnMissingTranslations = ":strict";`);
+
+    await t.appFile(
+      "app/models/post.ts",
+      `import { Base } from "@blazetrails/activerecord";
+export class Post extends Base {}
+`,
+    );
+
+    await app("development");
+
+    await assertRaises([I18n.MissingTranslationData], {}, () =>
+      (constGet(TopLevel, "Post") as typeof ActiveRecord.Base).humanAttributeName("title"),
+    );
   });
 
   it("raise_on_missing_translations = true does not affect human_attribute_name in model", async () => {
-    class Post extends ActiveRecord.Base {}
-    const application = await newApp("development");
-    application.config.i18n.raiseOnMissingTranslations = true;
-    await application.initializeBang();
+    await t.addToConfig(`this.config.i18n.raiseOnMissingTranslations = true;`);
 
-    await assertNothingRaised(() => Post.humanAttributeName("title"));
+    await t.appFile(
+      "app/models/post.ts",
+      `import { Base } from "@blazetrails/activerecord";
+export class Post extends Base {}
+`,
+    );
+
+    await app("development");
+
+    await assertNothingRaised(() =>
+      (constGet(TopLevel, "Post") as typeof ActiveRecord.Base).humanAttributeName("title"),
+    );
   });
+
   it("model's attributes_for_inspect configuration takes precedence over default", async () => {
-    await (await newApp("development")).initializeBang();
+    await t.appFile(
+      "app/models/foo.ts",
+      `import { ApplicationRecord } from "./application-record.js";
+export class Foo extends ApplicationRecord {
+  static {
+    this.attributesForInspect = ["foo"];
+  }
+}
+`,
+    );
 
-    class Foo extends ActiveRecord.Base {
-      static {
-        this.attributesForInspect = ["foo"];
-      }
-    }
+    await app("development");
 
-    expect(Foo.attributesForInspect).toEqual(["foo"]);
+    expect((constGet(TopLevel, "Foo") as typeof ActiveRecord.Base).attributesForInspect).toEqual([
+      "foo",
+    ]);
   });
 });
