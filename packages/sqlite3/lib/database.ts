@@ -176,13 +176,19 @@ export class Database {
     });
   }
 
-  async executeBatch(sql: string, bindVars: unknown[] = []): Promise<unknown> {
+  async executeBatch(
+    sql: string,
+    bindVars: readonly unknown[] | Record<string, unknown> = [],
+  ): Promise<unknown> {
     sql = sql.trim();
     let result: unknown = null;
     while (sql !== "") {
       await this.prepare(sql, async (stmt) => {
         if (!stmt.isClosed()) {
-          if (bindVars.length === stmt.bindParameterCount()) {
+          if (
+            (Array.isArray(bindVars) ? bindVars.length : Object.keys(bindVars).length) ===
+            stmt.bindParameterCount()
+          ) {
             await stmt.bindParams(bindVars);
           }
           result = await stmt.step();

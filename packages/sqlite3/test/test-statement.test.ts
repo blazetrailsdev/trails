@@ -99,6 +99,22 @@ describe("TestStatement", () => {
     await stmt.close();
   });
 
+  it("prepare blob", async () => {
+    await db.execute("create table foo(text BLOB)");
+    const stmt = await db.prepare("insert into foo(text) values (?)");
+    await stmt.bindParam(1, new SQLite3.Blob("hello"));
+    await stmt.step();
+    await stmt.close();
+  });
+
+  it("select blob", async () => {
+    await db.execute("create table foo(text BLOB)");
+    await db.execute("insert into foo(text) values (?)", new SQLite3.Blob("hello"));
+    expect(
+      new Uint8Array(((await db.execute("select * from foo")) as unknown[][])[0][0] as Uint8Array),
+    ).toEqual(new TextEncoder().encode("hello"));
+  });
+
   it("new", async () => {
     expect(stmt).toBeTruthy();
   });
@@ -107,6 +123,15 @@ describe("TestStatement", () => {
     db = new SQLite3.Database(":memory:", { engine });
     await db.close();
     expect(() => SQLite3.Statement.new(db, 'select "foo"')).toThrow(ArgumentError);
+  });
+
+  it("closed db behavior", async () => {
+    await db.close();
+    let result = null;
+    expect(() => {
+      result = stmt.execute();
+    }).not.toThrow();
+    expect(result).not.toBeNull();
   });
 
   it("new with remainder", async () => {

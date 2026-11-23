@@ -124,6 +124,37 @@ describe("TestDatabase", () => {
     await db.close();
   });
 
+  it("changes", async () => {
+    await db.execute("CREATE TABLE items (id integer PRIMARY KEY AUTOINCREMENT, number integer)");
+    expect(await db.changes()).toBe(0);
+    await db.execute("INSERT INTO items (number) VALUES (10)");
+    expect(await db.changes()).toBe(1);
+    await db.executeBatch("UPDATE items SET number = (number + :nn) WHERE (number = :n)", {
+      nn: 20,
+      n: 10,
+    });
+    expect(await db.changes()).toBe(1);
+    expect(await db.execute("select number from items")).toEqual([[30]]);
+  });
+
+  it("batch last comment is processed", async () => {
+    expect(
+      await db.executeBatch(`
+        CREATE TABLE items (id integer PRIMARY KEY AUTOINCREMENT);
+        -- omg
+      `),
+    ).toBeNull();
+  });
+
+  it("batch last expression value is returned", async () => {
+    const batch = `
+        CREATE TABLE items (id integer PRIMARY KEY AUTOINCREMENT);
+        SELECT COUNT(*) FROM items;
+      `;
+
+    expect(await db.executeBatch(batch)).toEqual([0]);
+  });
+
   it("encoding", async () => {
     expect(await db.encoding()).toBeTruthy();
   });
