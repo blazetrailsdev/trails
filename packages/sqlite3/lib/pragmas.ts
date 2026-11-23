@@ -1,5 +1,5 @@
 import { SQLite3 } from "./namespaces.js";
-import { block, fetch, isSymbol, rbInspect, toI } from "@blazetrails/ruby-compat";
+import { block, fetch, isSymbol, rbInspect, rbObjAsString, toI } from "@blazetrails/ruby-compat";
 
 import type { SqliteBinds } from "./driver.js";
 import { Exception } from "./errors.js";
@@ -56,7 +56,7 @@ export interface PragmasHost {
 }
 
 function toS(value: unknown): string {
-  const str = String(value);
+  const str = rbObjAsString(value);
   return str.startsWith(":") ? str.slice(1) : str;
 }
 
