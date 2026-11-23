@@ -233,7 +233,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3)("ActiveStorage::Service::S3ServiceTe
       const downloaded = await service.download(key);
       expect(
         downloaded.length === data.length && data.every((byte, i) => byte === downloaded[i]),
-      ).toBe(true);
+      ).toBeTruthy();
     } finally {
       await service.delete(key);
     }
@@ -252,7 +252,7 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3)("ActiveStorage::Service::S3ServiceTe
       const downloaded = await service.download(key);
       expect(
         downloaded.length === data.length && data.every((byte, i) => byte === downloaded[i]),
-      ).toBe(true);
+      ).toBeTruthy();
     } finally {
       await service.delete(key);
     }
