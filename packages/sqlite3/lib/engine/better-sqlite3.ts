@@ -64,7 +64,6 @@ function open(file: string, mode: number): BetterSqlite3.Database {
   return new BetterSqlite3(file, opts);
 }
 
-/** @internal */
 const closedStatement: EngineStatement = {
   close: () => {},
   isClosed: () => true,
@@ -79,6 +78,7 @@ const closedStatement: EngineStatement = {
   setReadBigInts: () => {},
 };
 
+/** @internal */
 function prepareStatement(
   raw: BetterSqlite3.Database,
   sql: string,

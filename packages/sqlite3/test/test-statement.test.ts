@@ -128,9 +128,11 @@ describe("TestStatement", () => {
   it("closed db behavior", async () => {
     await db.close();
     let result = null;
-    expect(() => {
-      result = stmt.execute();
-    }).not.toThrow();
+    await expect(
+      (async () => {
+        result = await stmt.execute();
+      })(),
+    ).resolves.not.toThrow();
     expect(result).not.toBeNull();
   });
 
