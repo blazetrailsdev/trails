@@ -74,19 +74,19 @@
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
     <span class="pill">trails &mdash; pre-release &middot; measured at {data.measuredAt}</span>
     <div class="stage" id="caught">
-        <div class="pane">
-          <div class="split">
-            <div>
-              <div class="file">app/controllers/posts-controller.ts &middot; tsc --noEmit</div>
-              {@html data.hero.check}
-            </div>
-            <div>
-              <div class="file">app/views/post-mailer/published.html.tse &middot; trails-tsc-views build &amp;&amp; tsc</div>
-              {@html data.hero.view}
-            </div>
+      <div class="pane">
+        <div class="split">
+          <div>
+            <div class="file">app/controllers/posts-controller.ts &middot; tsc --noEmit</div>
+            {@html data.hero.check}
           </div>
-          <p class="note">A typo in the <code>publish</code> action, and an email template that passes its partial <code>post</code> where the partial declares <code>author:</code>. In Rails, the first is a <code>NoMethodError</code> when someone publishes a post, and the second an <code>ActionView::Template::Error</code> (missing local: <code>author</code>) when the email goes out. In trails, the compiler reports both before the app runs. Each error is the compiler's real output for a scratch edit of the <a href="{repo}/tree/{data.buildRef}/examples/homepage">home page example</a>.</p>
+          <div>
+            <div class="file">app/views/post-mailer/published.html.tse &middot; trails-tsc-views build &amp;&amp; tsc</div>
+            {@html data.hero.view}
+          </div>
         </div>
+        <p class="note">A typo in the <code>publish</code> action, and an email template that passes its partial <code>post</code> where the partial declares <code>author:</code>. In Rails, the first is a <code>NoMethodError</code> when someone publishes a post, and the second an <code>ActionView::Template::Error</code> (missing local: <code>author</code>) when the email goes out. In trails, the compiler reports both before the app runs. Each error is the compiler's real output for a scratch edit of the <a href="{repo}/tree/{data.buildRef}/examples/homepage">home page example</a>.</p>
+      </div>
     </div>
   </header>
 
