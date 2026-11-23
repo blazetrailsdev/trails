@@ -276,7 +276,7 @@ type EofPacket = {
 };
 type NpmConnection = mysql.Connection & {
   connection?: Protocol;
-  config?: { typeCast?: unknown; host?: string };
+  config?: { typeCast?: unknown; host?: string; socketPath?: string };
 } & Handshake;
 
 /** @internal */
@@ -905,6 +905,7 @@ export class Client {
     for (const key of [...NOT_DRIVER_OPTIONS, ...Object.keys(Client.defaultQueryOptions())]) {
       delete config[key];
     }
+    if (host != null && host !== "localhost") socket = null;
     const args = { user, password: pass, host, port, database, socketPath: socket };
     for (const [key, value] of Object.entries(args)) if (value != null) config[key] = value;
     if (this.connectTimeout != null) config.connectTimeout = this.connectTimeout * 1000;
@@ -1005,7 +1006,7 @@ export class Client {
         delete config.ssl;
         return createConnection();
       })
-      .catch((e: unknown) => this.raiseMysql2Error(e))) as NpmConnection;
+      .catch((e: unknown) => this.raiseMysql2Error(e, config))) as NpmConnection;
     this.connection = connection;
     if (this.initCommand != null) {
       await connection.query(this.initCommand).catch((e: unknown) => this.raiseMysql2Error(e));
@@ -1416,7 +1417,10 @@ export class Client {
   }
 
   /** @internal */
-  raiseMysql2Error(e: unknown): never {
+  raiseMysql2Error(
+    e: unknown,
+    config: { host?: string; socketPath?: string } | undefined = this.connection?.config,
+  ): never {
     if (!(e instanceof globalThis.Error)) throw e;
     const { code, errno, sqlState } = e as { code?: unknown; errno?: unknown; sqlState?: string };
     if (code === "PROTOCOL_SEQUENCE_TIMEOUT" && this.readTimeout != null) {
@@ -1437,15 +1441,16 @@ export class Client {
     }
     if (errorNumber === undefined) throw e;
     const { hostname, address, port } = e as { hostname?: string; address?: string; port?: number };
-    if (errorNumber === CR_CONN_HOST_ERROR && address !== undefined && port === undefined) {
+    if (errorNumber === CR_CONN_HOST_ERROR && config?.socketPath != null && port === undefined) {
       errorNumber = CR_CONNECTION_ERROR;
     }
+    const target =
+      errorNumber === CR_CONNECTION_ERROR
+        ? (config?.socketPath ?? address)
+        : (hostname ?? address ?? config?.host);
     if (errorNumber !== errno) {
       message = CLIENT_ERRORS[errorNumber]
-        .replace(
-          "%-.100s",
-          String(hostname ?? address ?? this.connection?.config?.host ?? "localhost").slice(0, 100),
-        )
+        .replace("%-.100s", String(target ?? "localhost").slice(0, 100))
         .replace("%d", String(typeof errno === "number" ? Math.abs(errno) : 0));
     }
     const error = Mysql2Error.newWithArgs(

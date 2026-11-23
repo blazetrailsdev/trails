@@ -261,8 +261,9 @@ describe("Mysql2::Result", () => {
         if (i > 0 && i % 1000 === 0) await new Promise((r) => setTimeout(r, 4000));
         i++;
       });
-      await expect(each).rejects.toThrow(Mysql2.Error);
-      await expect(each).rejects.toThrow(/Lost connection/);
+      await expect(each).rejects.toThrow(
+        expect.toSatisfy((e) => e instanceof Mysql2.Error && /Lost connection/.test(e.message)),
+      );
     }, 60000);
   });
   describe("row data type mapping", () => {
