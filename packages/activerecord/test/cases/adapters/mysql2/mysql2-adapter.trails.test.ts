@@ -111,11 +111,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       let driverErr: unknown;
       try {
         Mysql2.Client.prototype.raiseMysql2Error.call(
-          {
-            serverInfo: () => ({ id: 0, version: null }),
-            isClosed: () => false,
-            readTimeout: null,
-          } as never,
+          { mysqlGetServerVersion: () => 0, readTimeout: null } as never,
           Object.assign(new Error("connection lost"), { code }),
         );
       } catch (e) {

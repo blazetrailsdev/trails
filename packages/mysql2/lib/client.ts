@@ -87,6 +87,10 @@ const MYSQL_ESCAPES: Record<string, string> = {
   "\u001a": "\\Z",
 };
 
+function escapeQuotesForMysql(from: string): string {
+  return from.includes("'") ? from.replaceAll("'", "''") : from;
+}
+
 function escapeStringForMysql(from: string): string {
   let to = "";
   for (const c of from) to += MYSQL_ESCAPES[c] ?? c;
@@ -259,6 +263,7 @@ const CR_COMMANDS_OUT_OF_SYNC = 2014;
 const SERVER_QUERY_NO_GOOD_INDEX_USED = 16;
 const SERVER_QUERY_NO_INDEX_USED = 32;
 const SERVER_QUERY_WAS_SLOW = 2048;
+const SERVER_STATUS_NO_BACKSLASH_ESCAPES = 512;
 
 /** @internal */
 export type Field = {
@@ -1012,7 +1017,7 @@ export class Client {
     if (this.activeResult || this.nextResults.length > 0) {
       throw Mysql2Error.newWithArgs(
         "Commands out of sync; you can't run this command now",
-        this.serverInfo().id,
+        this.mysqlGetServerVersion(),
         CR_COMMANDS_OUT_OF_SYNC,
         "HY000",
       );
@@ -1064,7 +1069,7 @@ export class Client {
         result,
         error,
         queryOptions && this,
-        queryOptions,
+        queryOptions && { ...queryOptions },
         fields,
       );
       this.setServerQueryFlags(resultObj);
@@ -1072,6 +1077,7 @@ export class Client {
     }
     this.affectedRows = result.affectedRows ?? 0;
     this._warningCount = result.warningStatus ?? 0;
+    this.serverStatus = result.serverStatus ?? this.serverStatus;
     this._info = result.info || null;
     this.stateChanges = (result as { stateChanges?: Client["stateChanges"] }).stateChanges;
     if (result.insertId !== undefined) this.lastId = result.insertId;
@@ -1177,11 +1183,12 @@ export class Client {
   }
 
   escape(str: string): string {
-    if (this.isClosed() && this.reconnect !== true) {
-      throw new Mysql2Error("MySQL client is not connected");
-    }
+    this.requireConnected();
     if (typeof str !== "string") {
       throw new TypeError(`wrong argument type ${rbObjClassname(str)} (expected String)`);
+    }
+    if ((this.serverStatus & SERVER_STATUS_NO_BACKSLASH_ESCAPES) !== 0) {
+      return escapeQuotesForMysql(str);
     }
     return escapeStringForMysql(str);
   }
@@ -1203,9 +1210,7 @@ export class Client {
   }
 
   threadId(): number {
-    if (this.isClosed() && this.reconnect !== true) {
-      throw new Mysql2Error("MySQL client is not connected");
-    }
+    this.requireConnected();
     return this.connection.threadId;
   }
 
@@ -1215,9 +1220,7 @@ export class Client {
   }
 
   sessionTrack(type: number): string[] | null {
-    if (this.isClosed() && this.reconnect !== true) {
-      throw new Mysql2Error("MySQL client is not connected");
-    }
+    this.requireConnected();
     const changes = this.stateChanges;
     let rbAry: string[] = [];
     if (changes !== undefined) {
@@ -1233,15 +1236,16 @@ export class Client {
   }
 
   async selectDb(db: string): Promise<string> {
-    if (this.isClosed() && this.reconnect !== true) {
-      throw new Mysql2Error("MySQL client is not connected");
+    this.requireConnected();
+    if (typeof db !== "string") {
+      throw new TypeError(`no implicit conversion of ${rbObjClassname(db)} into String`);
     }
     await new Promise<void>((resolve, reject) => {
       this.connection.connection!.addCommand({
         onResult: reject,
         execute(packet: Packet | undefined, connection: Protocol): boolean {
           if (packet === undefined) {
-            const name = Buffer.from(String(db), "utf8");
+            const name = Buffer.from(db, "utf8");
             const buffer = Buffer.concat([Buffer.from([0, 0, 0, 0, COM_INIT_DB]), name]);
             buffer.writeUIntLE(name.length + 1, 0, 3);
             connection._resetSequenceId();
@@ -1291,12 +1295,14 @@ export class Client {
     );
   }
 
+  /** @inventedArm if — PERMANENT */
   async ping(): Promise<boolean> {
+    if (this.isClosed() && this.reconnect !== true) return false;
     const alive = await this.connection.ping().then(
       () => true,
       () => false,
     );
-    if (alive || this.reconnect !== true) return alive;
+    if (alive || this.reconnect !== true || !this.isClosed()) return alive;
     return await this.connect(...this.connectArgs).then(
       () => true,
       () => false,
@@ -1304,17 +1310,30 @@ export class Client {
   }
 
   serverInfo(): { id: number; version: string | null } {
+    this.requireConnected();
+    return { id: this.mysqlGetServerVersion(), version: this.mysqlGetServerInfo() };
+  }
+
+  private requireConnected(): void {
     if (this.isClosed() && this.reconnect !== true) {
       throw new Mysql2Error("MySQL client is not connected");
     }
+  }
+
+  private mysqlGetServerInfo(): string | null {
     const handshake = (this.connection?.connection as Handshake | undefined) ?? this.connection;
-    const version = handshake?._handshakePacket?.serverVersion ?? null;
+    return handshake?._handshakePacket?.serverVersion ?? null;
+  }
+
+  private mysqlGetServerVersion(): number {
     const [major, minor, patch] = (
-      /(\d+)\.(\d+)\.(\d+)/.exec((version ?? "").replace(/^5\.5\.5-/, "")) ?? [0, 0, 0, 0]
+      /(\d+)\.(\d+)\.(\d+)/.exec((this.mysqlGetServerInfo() ?? "").replace(/^5\.5\.5-/, "")) ?? [
+        0, 0, 0, 0,
+      ]
     )
       .slice(1)
       .map(Number);
-    return { id: major * 10000 + minor * 100 + patch, version };
+    return major * 10000 + minor * 100 + patch;
   }
 
   /** @internal */
@@ -1339,7 +1358,7 @@ export class Client {
     if (errorNumber === undefined) throw e;
     const error = Mysql2Error.newWithArgs(
       e.message,
-      this.isClosed() ? 0 : this.serverInfo().id,
+      this.mysqlGetServerVersion(),
       errorNumber,
       sqlState ?? "HY000",
     );
