@@ -5228,6 +5228,7 @@ export function harvestObjectLiteralMethods(
       ...(writer ? { writer: true } : {}),
       ...(bodyless ? { bodyless: true } : {}),
       ...(aliasOf !== undefined ? { aliasOf } : {}),
+      ...(ts.isMethodDeclaration(prop) && prop.asteriskToken ? { generator: true } : {}),
     });
   }
   return out.every((m) => slots.has(m.name)) ? [] : out;

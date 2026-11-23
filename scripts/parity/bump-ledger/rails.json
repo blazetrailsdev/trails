@@ -1569,6 +1569,22 @@
   },
   {
     "package": "activesupport",
+    "rubyFile": "core_ext/object/try.rb",
+    "rubyName": "try",
+    "kind": "signature",
+    "from": "v8.0.2",
+    "to": "v8.0.5.2"
+  },
+  {
+    "package": "activesupport",
+    "rubyFile": "core_ext/object/try.rb",
+    "rubyName": "try!",
+    "kind": "signature",
+    "from": "v8.0.2",
+    "to": "v8.0.5.2"
+  },
+  {
+    "package": "activesupport",
     "rubyFile": "current_attributes.rb",
     "rubyName": "attribute",
     "kind": "drift",
