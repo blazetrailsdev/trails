@@ -989,16 +989,6 @@
           "associationClass": ["NotImplementedError"]
         }
       },
-      "relation.ts": {
-        "*": {
-          "createOrFindBy": ["Rollback"],
-          "createOrFindByBang": ["Rollback"]
-        },
-        "Relation": {
-          "createOrFindBy": ["Rollback"],
-          "createOrFindByBang": ["Rollback"]
-        }
-      },
       "relation/query-methods.ts": {
         "*": {
           "assertModifiableBang": ["UnmodifiableRelation"]
@@ -1405,9 +1395,7 @@
     "rack-proxy": {},
     "rack-session": {},
     "rack-test": {},
-    "mysql2": {},
     "pg": {},
-    "sqlite3": {},
     "thor": {
       "base.ts": {
         "*": {
@@ -1447,9 +1435,7 @@
     "rack-proxy": [],
     "rack-session": [],
     "rack-test": [],
-    "mysql2": [],
     "pg": [],
-    "sqlite3": [],
     "thor": []
   }
 }
