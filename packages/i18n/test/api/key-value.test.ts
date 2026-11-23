@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { KeyValue } from "../../lib/backend/key-value.js";
 import { testsBasics } from "../support/tests/basics.js";
 import { testsDefaults } from "../support/tests/defaults.js";
+import { testsInterpolation } from "../support/tests/interpolation.js";
+import { testsLink } from "../support/tests/link.js";
 import { testsLookup } from "../support/tests/lookup.js";
 import { testsPluralization } from "../support/tests/pluralization.js";
 import { testsLocalizationDate } from "../support/tests/localization/date.js";
@@ -20,6 +22,8 @@ describe("I18nKeyValueApiTest", () => {
 
   testsBasics();
   testsDefaults();
+  testsInterpolation();
+  testsLink();
   testsLookup();
   testsPluralization();
   testsLocalizationDate();

@@ -7,7 +7,7 @@ import * as Utils from "../utils.js";
 import type { TranslationData } from "../utils.js";
 import { _readFile } from "./base.js";
 
-class PoData extends Hash<string, string> {
+export class PoData extends Hash<string, string> {
   setComment(_msgidOrSym: string, _comment: string): void {}
 }
 

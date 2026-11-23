@@ -7,6 +7,8 @@ import { Simple } from "../../lib/backend/simple.js";
 import { Memoize } from "../../lib/backend/memoize.js";
 import { testsBasics } from "../support/tests/basics.js";
 import { testsDefaults } from "../support/tests/defaults.js";
+import { testsInterpolation } from "../support/tests/interpolation.js";
+import { testsLink } from "../support/tests/link.js";
 import { testsLookup } from "../support/tests/lookup.js";
 import { testsPluralization } from "../support/tests/pluralization.js";
 import { testsProcs } from "../support/tests/procs.js";
@@ -28,6 +30,8 @@ describe("I18nMemoizeBackendWithSimpleApiTest", () => {
 
   testsBasics();
   testsDefaults();
+  testsInterpolation();
+  testsLink();
   testsLookup();
   testsPluralization();
   testsProcs();
@@ -53,6 +57,8 @@ describe("I18nMemoizeBackendWithKeyValueApiTest", () => {
 
   testsBasics();
   testsDefaults();
+  testsInterpolation();
+  testsLink();
   testsLookup();
   testsPluralization();
   testsLocalizationDate();

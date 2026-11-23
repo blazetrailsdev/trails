@@ -236,21 +236,6 @@
     "reason": "PERMANENT: includes I18n::Backend::Cache and Metadata \u2014 packages/i18n/CLAUDE.md \u00a7 \"A translation lookup is synchronous; the load is an awaited step\" and CLAUDE.md \u00a7 \"Ruby Strings are JS string primitives (no mutable String carrier)\"."
   },
   {
-    "testFile": "api/cascade_test.rb",
-    "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 cascading key lookup (`foo.bar.baz` \u2192 `foo.baz`)."
-  },
-  {
-    "testFile": "api/memoize_test.rb",
-    "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 memoizes lookups per locale."
-  },
-  {
-    "testFile": "api/pluralization_test.rb",
-    "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 pluralization via per-locale rule procs in the data."
-  },
-  {
     "testFile": "backend/transliterator_test.rb",
     "tests": ["default transliterator raises errors for invalid UTF-8"],
     "reason": "PERMANENT: CLAUDE.md \u00a7 \"A String has no encoding tag either\"."

@@ -85610,6 +85610,27 @@
   },
   {
     "package": "i18n",
+    "rubyFile": "backend/cache_file.rb",
+    "rubyName": "load_file",
+    "digest": "9c7654edd3935a10",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/cache_file.rb",
+    "rubyName": "normalized_path",
+    "digest": "bc99e42ba02d3d92",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/cascade.rb",
+    "rubyName": "lookup",
+    "digest": "8a241711e7e1d618",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
     "rubyFile": "backend/chain.rb",
     "rubyName": "_deep_merge",
     "digest": "e5ab9ddb5f3b0ca8",
@@ -85806,6 +85827,48 @@
   },
   {
     "package": "i18n",
+    "rubyFile": "backend/gettext.rb",
+    "rubyName": "load_po",
+    "digest": "238a26bce64acaa7",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/gettext.rb",
+    "rubyName": "normalize",
+    "digest": "8229a7fcbb01bca1",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/gettext.rb",
+    "rubyName": "normalize_pluralization",
+    "digest": "72ff6f1392ffe6b7",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/gettext.rb",
+    "rubyName": "parse",
+    "digest": "93d99c21854696de",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/gettext.rb",
+    "rubyName": "set_comment",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/key_value.rb",
+    "rubyName": "[]",
+    "digest": "63875e84328cb9f6",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
     "rubyFile": "backend/key_value.rb",
     "rubyName": "available_locales",
     "digest": "4ed9bda49ade6ddf",
@@ -85943,6 +86006,174 @@
     "rubyFile": "backend/key_value.rb",
     "rubyName": "translations",
     "digest": "fab2c45baccbf90b",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "assert_file_named_correctly!",
+    "digest": "b186ea7291c773bf",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "available_locales",
+    "digest": "c898912044d91b11",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "eager_load!",
+    "digest": "fbbb5c08ea51fa7a",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "filenames_for_current_locale",
+    "digest": "1d369673f35a0860",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "init_translations",
+    "digest": "e8edd6a65c429587",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "initialize",
+    "digest": "180737e565b80cfa",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "initialized?",
+    "digest": "4352824fed9635b8",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "initialized_locales",
+    "digest": "3115c6f24f8b4eb4",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "lazy_load?",
+    "digest": "e27d29d5b4d905c1",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "load_translations_and_collect_file_errors",
+    "digest": "5ee83e33906563cc",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "locale_from_path",
+    "digest": "66c6947c9a737935",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "lookup",
+    "digest": "5fc5455c523a21be",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/lazy_loadable.rb",
+    "rubyName": "reload!",
+    "digest": "64277a8aa553ac7a",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/memoize.rb",
+    "rubyName": "available_locales",
+    "digest": "614f84def316dc07",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/memoize.rb",
+    "rubyName": "eager_load!",
+    "digest": "ca1d0d22d12b2e44",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/memoize.rb",
+    "rubyName": "lookup",
+    "digest": "e1d210a0e53edddd",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/memoize.rb",
+    "rubyName": "memoized_lookup",
+    "digest": "bd44f65e61dc7d38",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/memoize.rb",
+    "rubyName": "reload!",
+    "digest": "f163652bc567c664",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/memoize.rb",
+    "rubyName": "reset_memoizations!",
+    "digest": "55d3b93e5b1e1eac",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/memoize.rb",
+    "rubyName": "store_translations",
+    "digest": "501ea8184e666765",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/pluralization.rb",
+    "rubyName": "pluralize",
+    "digest": "01aad2e9a6c30185",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/pluralization.rb",
+    "rubyName": "pluralizer",
+    "digest": "eea4db4bc146c635",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/pluralization.rb",
+    "rubyName": "pluralizers",
+    "digest": "799a67d497306e95",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/pluralization.rb",
+    "rubyName": "symbolic_count",
+    "digest": "7762e6c4a893f342",
     "ref": "v1.14.8"
   },
   {
@@ -86248,6 +86479,174 @@
   },
   {
     "package": "i18n",
+    "rubyFile": "gettext.rb",
+    "rubyName": "extract_scope",
+    "digest": "5eb420f2340433fd",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext.rb",
+    "rubyName": "plural_keys",
+    "digest": "0dac3093b5d36adb",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/helpers.rb",
+    "rubyName": "N_",
+    "digest": "aca63a7460aece94",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/helpers.rb",
+    "rubyName": "gettext",
+    "digest": "0e221013e34b1e6f",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/helpers.rb",
+    "rubyName": "ngettext",
+    "digest": "19309761554c515d",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/helpers.rb",
+    "rubyName": "npgettext",
+    "digest": "bcf967239232744d",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/helpers.rb",
+    "rubyName": "nsgettext",
+    "digest": "10be1de8292717eb",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/helpers.rb",
+    "rubyName": "pgettext",
+    "digest": "2237dc1b0bfabd87",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/helpers.rb",
+    "rubyName": "sgettext",
+    "digest": "658b738bf91ed9c5",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_",
+    "digest": "7dc806f79238f2ae",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_reduce_10",
+    "digest": "9786060568d0f9e0",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_reduce_12",
+    "digest": "2aeb611110c9a099",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_reduce_13",
+    "digest": "38a5d07bd5d60ca6",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_reduce_14",
+    "digest": "2b1f64f042a76588",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_reduce_15",
+    "digest": "ae6ea3726d25a4c1",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_reduce_5",
+    "digest": "863894be6a0ae978",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_reduce_8",
+    "digest": "efbc75a67598aea7",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_reduce_9",
+    "digest": "5710f6aa087cd8a8",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "_reduce_none",
+    "digest": "dcccf8f559b5ec6e",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "next_token",
+    "digest": "5db815a863fdec33",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "on_comment",
+    "digest": "0d7afcd13e76e095",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "on_message",
+    "digest": "c6210992671811c9",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "parse",
+    "digest": "a72dca66ea4975c1",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "gettext/po_parser.rb",
+    "rubyName": "unescape",
+    "digest": "0b796dc411794bd5",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
     "rubyFile": "i18n.rb",
     "rubyName": "available_locales",
     "digest": "968ca2875ead9390",
@@ -86529,6 +86928,13 @@
   {
     "package": "i18n",
     "rubyFile": "locale/fallbacks.rb",
+    "rubyName": "[]",
+    "digest": "1d617c79ff100eed",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "locale/fallbacks.rb",
     "rubyName": "compute",
     "digest": "0556b7066f4672ae",
     "ref": "v1.14.8"
@@ -86769,6 +87175,20 @@
     "rubyFile": "locale/tag/simple.rb",
     "rubyName": "to_sym",
     "digest": "fc39f2e3b00c3b4d",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "middleware.rb",
+    "rubyName": "call",
+    "digest": "5633da6fdfc8c5fa",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "middleware.rb",
+    "rubyName": "initialize",
+    "digest": "906bc9f4b7510ad3",
     "ref": "v1.14.8"
   },
   {
