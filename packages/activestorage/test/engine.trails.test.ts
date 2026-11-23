@@ -109,6 +109,28 @@ describe("ActiveStorage::Engine", () => {
     }
   });
 
+  it("active_storage.services fails at boot for a service adapter that will not load", async () => {
+    const activeStorage = (
+      TopLevel.Trails!.configuration as unknown as {
+        activeStorage: { serviceConfigurations?: unknown; service?: unknown };
+      }
+    ).activeStorage;
+    const { serviceConfigurations: configs, service } = activeStorage;
+    const services = Blob.services;
+    activeStorage.serviceConfigurations = { azure: { service: "AzureStorage" } };
+    activeStorage.service = "azure";
+    try {
+      const initializer = Engine.initializers.find((i) => i.name === "active_storage.services")!;
+      await expect(
+        Promise.resolve().then(() => initializer.bind(Engine.instance()).run(app)),
+      ).rejects.toThrow(new RuntimeError('Missing service adapter for "AzureStorage"'));
+    } finally {
+      activeStorage.serviceConfigurations = configs;
+      activeStorage.service = service;
+      Blob.services = services;
+    }
+  });
+
   it("active_storage.services reads config/storage.ts through the compiled-file map", async () => {
     const trails = TopLevel.Trails!;
     const activeStorage = (

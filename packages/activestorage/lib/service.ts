@@ -6,12 +6,16 @@ import { ActiveStorage } from "./active-storage.js";
 import type { Filename } from "./filename.js";
 import type { Configurator } from "./service/configurator.js";
 import type { DiskService } from "./service/disk-service.js";
+import type { GCSService } from "./service/gcs-service.js";
 import type { MirrorService } from "./service/mirror-service.js";
+import type { S3Service } from "./service/s3-service.js";
 
 export class Service {
   declare static Configurator: typeof Configurator;
   declare static DiskService: typeof DiskService;
   declare static MirrorService: typeof MirrorService;
+  declare static GCSService: typeof GCSService;
+  declare static S3Service: typeof S3Service;
 
   name: string | null = null;
   protected public: boolean | undefined;
