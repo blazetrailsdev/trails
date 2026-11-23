@@ -390,7 +390,7 @@ export class S3Service extends Service {
 
   /**
    * @internal
-   * @missingRailsCall public_url — PERMANENT
+   * @missingRailsCall object_for — PERMANENT
    */
   protected override async publicUrl(
     key: string,
