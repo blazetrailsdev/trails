@@ -57,8 +57,4 @@ describe("ActiveJob::ConfiguredJob", () => {
     expect(job.priority).toBe(3);
     expect(JobBuffer.lastValue()).toBe("Bo says hello");
   });
-
-  it("perform_all_later calls a class method Rails 8.0.2 does not define", async () => {
-    await expect(new ConfiguredJob(HelloJob).performAllLater([["a"]])).rejects.toThrow(TypeError);
-  });
 });

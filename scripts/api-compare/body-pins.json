@@ -27570,8 +27570,8 @@
     "package": "activejob",
     "rubyFile": "base.rb",
     "rubyName": "deserialize",
-    "digest": "feb791c50e26f2f4",
-    "ref": "v8.0.2"
+    "digest": "14e69fc6829e2ad0",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activejob",
@@ -27660,13 +27660,6 @@
   {
     "package": "activejob",
     "rubyFile": "configured_job.rb",
-    "rubyName": "perform_all_later",
-    "digest": "d735417cd9b6977f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activejob",
-    "rubyFile": "configured_job.rb",
     "rubyName": "perform_later",
     "digest": "2ee3bd28b2d6b568",
     "ref": "v8.0.2"
@@ -27689,8 +27682,8 @@
     "package": "activejob",
     "rubyFile": "core.rb",
     "rubyName": "deserialize",
-    "digest": "feb791c50e26f2f4",
-    "ref": "v8.0.2"
+    "digest": "14e69fc6829e2ad0",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activejob",
@@ -27709,6 +27702,13 @@
   {
     "package": "activejob",
     "rubyFile": "core.rb",
+    "rubyName": "deserialize_time",
+    "digest": "32aeb2b0a34d65f6",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "activejob",
+    "rubyFile": "core.rb",
     "rubyName": "initialize",
     "digest": "719a062d48128aa5",
     "ref": "v8.0.2"
@@ -27717,8 +27717,8 @@
     "package": "activejob",
     "rubyFile": "core.rb",
     "rubyName": "serialize",
-    "digest": "c0b478c4eeddeee4",
-    "ref": "v8.0.2"
+    "digest": "120773dc2ab61274",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activejob",
@@ -27836,8 +27836,8 @@
     "package": "activejob",
     "rubyFile": "exceptions.rb",
     "rubyName": "retry_job",
-    "digest": "3a9cce71b3af8e53",
-    "ref": "v8.0.2"
+    "digest": "ab66ef31980a3ff3",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activejob",
