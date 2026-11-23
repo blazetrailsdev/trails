@@ -1,4 +1,4 @@
-import { SimpleCoder } from "./coder.js";
+import { SimpleCoder } from "./simple-coder.js";
 import { PG } from "./namespaces.js";
 
 export abstract class SimpleDecoder extends SimpleCoder {

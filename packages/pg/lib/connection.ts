@@ -211,26 +211,35 @@ export class Connection {
   }
 
   closePrepared(stmtName: string | null): Promise<Result> {
-    return this.#sendClose("S", stmtName);
-  }
-
-  closePortal(portal: string | null): Promise<Result> {
-    return this.#sendClose("P", portal);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  #sendClose(type: "S" | "P", name: string | null): Promise<Result> {
-    const stmt = name == null ? "" : stringValue(name);
+    const stmt = stmtName == null ? "" : stringValue(stmtName);
     return new Promise((resolve, reject) => {
       const submittable = {
         submit(connection: { close(msg: object): void; sync(): void }): null {
-          connection.close({ type, name: stmt });
+          connection.close({ type: "S", name: stmt });
           connection.sync();
           return null;
         },
         handleError: (error: unknown) => reject(engine!.pgError(this, error)),
         handleReadyForQuery: () => {
-          if (type === "S") this.prepared.delete(stmt);
+          this.prepared.delete(stmt);
+          resolve(engine!.emptyResult());
+        },
+      };
+      engine!.submit(this, submittable).catch(reject);
+    });
+  }
+
+  closePortal(portal: string | null): Promise<Result> {
+    const stmt = portal == null ? "" : stringValue(portal);
+    return new Promise((resolve, reject) => {
+      const submittable = {
+        submit(connection: { close(msg: object): void; sync(): void }): null {
+          connection.close({ type: "P", name: stmt });
+          connection.sync();
+          return null;
+        },
+        handleError: (error: unknown) => reject(engine!.pgError(this, error)),
+        handleReadyForQuery: () => {
           resolve(engine!.emptyResult());
         },
       };

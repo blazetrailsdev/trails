@@ -99,8 +99,6 @@ export class Coder {
   }
 }
 
-export class SimpleCoder extends Coder {}
-
 export class CompositeCoder extends Coder {
   declare private _elem: Coder | null | undefined;
   declare private _needsQuotation: boolean | undefined;
@@ -170,5 +168,4 @@ export class CompositeCoder extends Coder {
 }
 
 PG.Coder = Coder;
-PG.SimpleCoder = SimpleCoder;
 PG.CompositeCoder = CompositeCoder;
