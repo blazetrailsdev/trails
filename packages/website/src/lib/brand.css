@@ -1,7 +1,3 @@
-/*
- * BlazeTrails brand tokens, shared by the landing page (src/routes/+page.svelte)
- * and the VitePress docs theme (docs/.vitepress/theme/custom.css).
- */
 :root {
   --bt-orange: #e8590c;
   --bt-orange-hover: #c94d0a;
