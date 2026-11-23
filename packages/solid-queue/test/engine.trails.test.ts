@@ -98,7 +98,7 @@ describe("SolidQueue::Engine solid_queue.time_zone", () => {
   });
 
   it("keeps an explicitly configured solid_queue.time_zone", async () => {
-    Engine.config.solidQueue.timeZone = "Tokyo";
+    Engine.config.solidQueue.set("timeZone", "Tokyo");
     SolidQueue.setTimeZone("Tokyo");
     const initializer = Engine.initializers.find((i) => i.name === "solid_queue.time_zone")!;
     await initializer.bind(Engine.instance()).run({ config: { timeZone: "UTC" } });
