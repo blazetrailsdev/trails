@@ -241,6 +241,7 @@ describe("Mysql2::Result", () => {
       await result.toA();
       expect(result.count()).toBe(0);
     });
+    // PERMANENT-SKIP: the 2.6 MB result fits in Linux's default TCP buffers (tcp_rmem max 6 MB), so the server never blocks on a write and `net_write_timeout` never fires; the Ruby gem does not raise on this host either.
     it.skip("should raise an exception if streaming ended due to a timeout", () => {});
   });
   describe("row data type mapping", () => {
@@ -287,15 +288,15 @@ describe("Mysql2::Result", () => {
         const id1 = await (await state.client.query(
           "INSERT INTO mysql2_test (bool_cast_test) VALUES ( 1)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         const id2 = await (await state.client.query(
           "INSERT INTO mysql2_test (bool_cast_test) VALUES ( 0)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         const id3 = await (await state.client.query(
           "INSERT INTO mysql2_test (bool_cast_test) VALUES (-1)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         ids = [id1, id2, id3];
         const result1 = (await state.client.query(
           `SELECT bool_cast_test FROM mysql2_test WHERE id = ${id1} LIMIT 1`,
@@ -325,11 +326,11 @@ describe("Mysql2::Result", () => {
         const id1 = await (await state.client.query(
           "INSERT INTO mysql2_test (single_bit_test) VALUES (1)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         const id2 = await (await state.client.query(
           "INSERT INTO mysql2_test (single_bit_test) VALUES (0)",
         ),
-        state.client.lastId!);
+        state.client.lastId);
         ids = [id1, id2];
         const result1 = (await state.client.query(
           `SELECT single_bit_test FROM mysql2_test WHERE id = ${id1}`,
