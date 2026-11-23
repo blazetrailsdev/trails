@@ -99,7 +99,6 @@
   },
   "files": [
     "dist",
-    "bin",
     "!dist/**/*.d.ts.map"
   ],
   "license": "MIT",
