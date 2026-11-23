@@ -1,3 +1,5 @@
+import { latin1 } from "../runtime/latin1.ts";
+
 const TEMPLATE = import.meta.glob<string>("../../template/**/*", {
   query: "?raw",
   import: "default",
@@ -7,6 +9,7 @@ const TEMPLATE = import.meta.glob<string>("../../template/**/*", {
 const FILES_KEY = "trails-browser:files";
 const DB_KEY = "trails-browser:db";
 const COOKIES_KEY = "trails-browser:cookies";
+const TMP_KEY = "trails-browser:tmp";
 
 function templateFiles(): Record<string, string> {
   return Object.fromEntries(
@@ -20,6 +23,7 @@ function templateFiles(): Record<string, string> {
 let files: Record<string, string> =
   JSON.parse(localStorage.getItem(FILES_KEY) ?? "null") ?? templateFiles();
 let db: Uint8Array | null = loadDb();
+let tmp: Record<string, string> = JSON.parse(localStorage.getItem(TMP_KEY) ?? "{}");
 let cookies: Record<string, string> = JSON.parse(localStorage.getItem(COOKIES_KEY) ?? "{}");
 let current = "/app/controllers/posts-controller.ts";
 let session = 0;
@@ -42,10 +46,7 @@ function loadDb(): Uint8Array | null {
 function saveDb(bytes: Uint8Array | null): void {
   db = bytes;
   if (!bytes) return localStorage.removeItem(DB_KEY);
-  let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000)
-    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  localStorage.setItem(DB_KEY, btoa(s));
+  localStorage.setItem(DB_KEY, btoa(latin1(bytes)));
 }
 
 const ANSI_COLORS = ["#666", "#f77", "#7d7", "#fd6", "#79f", "#d8f", "#7df", "#ddd"];
@@ -177,11 +178,12 @@ addEventListener("message", (event: MessageEvent) => {
     text?: string;
     bytes?: Uint8Array;
     cookies?: Record<string, string>;
+    path?: string;
   };
   switch (data.type) {
     case "runtime:waiting":
       runtime.contentWindow!.postMessage(
-        { type: "host:files", files, db, cookies },
+        { type: "host:files", files: { ...tmp, ...files }, db, cookies },
         location.origin,
       );
       break;
@@ -196,6 +198,10 @@ addEventListener("message", (event: MessageEvent) => {
       break;
     case "db":
       saveDb(data.bytes!);
+      break;
+    case "tmp":
+      tmp = { ...tmp, [data.path!]: data.text! };
+      localStorage.setItem(TMP_KEY, JSON.stringify(tmp));
       break;
     case "cookies":
       cookies = data.cookies!;

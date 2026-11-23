@@ -8,7 +8,6 @@ export class BrowserApp extends Application {
   static {
     Application.register(this, import.meta.dirname);
     this.config.loadDefaults("8.0");
-    this.config.secretKeyBase = "x".repeat(128);
     this.config.eagerLoad = false;
     this.config.considerAllRequestsLocal = true;
   }

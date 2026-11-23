@@ -1,3 +1,4 @@
+import { latin1 } from "./latin1.ts";
 import { cbc, gcm } from "@noble/ciphers/aes.js";
 import { hmac } from "@noble/hashes/hmac.js";
 import { md5, sha1 } from "@noble/hashes/legacy.js";
@@ -34,15 +35,12 @@ function encode(data: Uint8Array, encoding?: string): string {
     case "hex":
       return Array.from(data, (b) => b.toString(16).padStart(2, "0")).join("");
     case "base64":
-      return btoa(String.fromCharCode(...data));
+      return btoa(latin1(data));
     case "base64url":
-      return btoa(String.fromCharCode(...data))
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
+      return btoa(latin1(data)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     case "latin1":
     case "binary":
-      return String.fromCharCode(...data);
+      return latin1(data);
     default:
       return new TextDecoder().decode(data);
   }

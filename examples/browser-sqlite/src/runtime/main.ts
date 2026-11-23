@@ -67,6 +67,9 @@ const { VirtualFs } = await import("./vfs.ts");
 const vfs = new VirtualFs(files.files);
 const logOffsets = new Map<string, number>();
 vfs.onWrite = (path) => {
+  if (path.startsWith("/tmp/") && vfs.get(path)?.kind === "file") {
+    post({ type: "tmp", path, text: vfs.readText(path) });
+  }
   if (!path.startsWith("/log/") || !path.endsWith(".log")) return;
   const text = vfs.get(path) ? vfs.readText(path) : "";
   const from = logOffsets.get(path) ?? 0;
@@ -79,13 +82,11 @@ installHost(vfs, moduleBase, (level, text) => post({ type: "console", level, tex
 (await import("./crypto.ts")).installCrypto();
 
 status("Loading trails…");
-const { PACKAGES, loadPackages, packageShim, transpile } = await import("./modules.ts");
-await loadPackages();
+const { PACKAGES, packageShim, transpile } = await import("./modules.ts");
 await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
 const { installTemplateCompiler } = await import("./template-compiler.ts");
 installTemplateCompiler();
-const { requestToRackEnvWithBody, rackResponseToFetchResponse } =
-  await import("../../../serverless-lambda/serverless/rack-bridge.ts");
+const { rackEnv, rackResult } = await import("./rack-bridge.ts");
 
 const { CookieJar } = await import("./cookie-jar.ts");
 const cookies = new CookieJar(files.cookies ?? {});
@@ -111,11 +112,12 @@ function respond(
   port: MessagePort,
   status: number,
   headers: [string, string][],
-  body: ArrayBuffer | string | null,
+  body: ArrayBuffer | Uint8Array | string | null,
 ) {
   port.postMessage({ status, headers, body: NULL_BODY.has(status) ? null : body });
 }
 
+type RackResponse = Parameters<typeof rackResult>[0];
 let app: { call(env: unknown): Promise<unknown> } | null = null;
 let bootError: unknown = null;
 
@@ -151,28 +153,19 @@ async function handle(request: SwRequest, port: MessagePort): Promise<void> {
     respond(port, 503, [["content-type", "text/html; charset=utf-8"]], text);
     return;
   }
-  const fetchRequest = new Request(request.url, {
-    method: request.method,
-    headers: request.headers,
-    body: request.body,
-  });
   await serially(async () => {
     const started = performance.now();
     try {
-      const env = await requestToRackEnvWithBody(fetchRequest, "/preview");
-      env.REMOTE_ADDR = "127.0.0.1";
+      const env = rackEnv(request.method, request.url, request.headers, request.body, "/preview");
       const cookie = cookies.header();
       if (cookie) env.HTTP_COOKIE = cookie;
-      const rack = (await app!.call(env)) as Parameters<typeof rackResponseToFetchResponse>[0];
-      const setCookie = rack[1]["set-cookie"] ?? rack[1]["Set-Cookie"];
-      if (setCookie != null) {
-        for (const line of [setCookie].flat().flatMap((v) => String(v).split("\n")))
-          cookies.store(line);
+      const response = await rackResult((await app!.call(env)) as RackResponse);
+      const setCookies = response.headers.filter(([name]) => name.toLowerCase() === "set-cookie");
+      if (setCookies.length) {
+        for (const [, line] of setCookies) cookies.store(line);
         post({ type: "cookies", cookies: cookies.entries() });
       }
-      const response = await rackResponseToFetchResponse(rack);
-      const body = await response.arrayBuffer();
-      respond(port, response.status, [...response.headers], body);
+      respond(port, response.status, response.headers, response.body);
       post({
         type: "request",
         text: `${request.method} ${url.pathname.replace(/^\/preview/, "") || "/"}${url.search} → ${response.status} (${Math.round(performance.now() - started)}ms)`,
@@ -200,7 +193,7 @@ function escapeHtml(s: string): string {
 
 navigator.serviceWorker.addEventListener("message", (event) => {
   if (event.data?.type === "sw:request")
-    void handle(event.data as SwRequest, event.ports[0]).catch((e) => console.error(e));
+    handle(event.data as SwRequest, event.ports[0]).catch((e) => console.error(e));
 });
 await new Promise<void>((resolve) => {
   const channel = new MessageChannel();

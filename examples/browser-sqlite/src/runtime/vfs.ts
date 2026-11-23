@@ -1,3 +1,4 @@
+import { latin1 } from "./latin1.ts";
 import path from "path-browserify";
 import type { Bytes, FsAdapter, FsDirent, FsStatResult } from "@blazetrails/ruby-compat";
 
@@ -25,9 +26,7 @@ function asBytes(data: string | Uint8Array): Bytes {
   const bytes = typeof data === "string" ? encoder.encode(data) : data;
   const out = new Uint8Array(bytes) as Bytes;
   out.toString = (encoding?: string) =>
-    encoding === "latin1" || encoding === "binary"
-      ? String.fromCharCode(...out)
-      : decoder.decode(out);
+    encoding === "latin1" || encoding === "binary" ? latin1(out) : decoder.decode(out);
   return out;
 }
 

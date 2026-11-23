@@ -1,6 +1,7 @@
 import { builtinModules } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
+import { PACKAGE_NAMES } from "./src/runtime/package-names.ts";
 
 const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -37,8 +38,27 @@ function nodeBuiltinStubs(): Plugin {
   };
 }
 
+const PACKAGE_URLS = "\0trails-package-urls";
+
+function trailsPackageUrls(): Plugin {
+  return {
+    name: "trails-package-urls",
+    resolveId: (id) => (id === "virtual:trails-package-urls" ? PACKAGE_URLS : null),
+    async load(id) {
+      if (id !== PACKAGE_URLS) return null;
+      const importer = resolve("src/runtime/modules.ts");
+      const entries: Record<string, string> = {};
+      for (const name of PACKAGE_NAMES) {
+        const resolved = await this.resolve(name, importer);
+        if (resolved) entries[name] = `/@fs${resolved.id}`;
+      }
+      return `export default ${JSON.stringify(entries)};`;
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [nodeBuiltinStubs()],
+  plugins: [nodeBuiltinStubs(), trailsPackageUrls()],
   resolve: {
     alias: [
       { find: /^node:buffer$/, replacement: "buffer" },

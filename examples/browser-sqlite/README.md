@@ -18,17 +18,20 @@ answers requests through `Trails.application.call`, as it would under Node.
 
 ## How it fits together
 
-| Piece                                                  | What it does                                                                                                                                                                                                                                 |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Editor (`index.html`, `src/host/`)                     | Holds the files and the database bytes (both kept in `localStorage`), and recreates the runtime iframe on every restart, so each run evaluates a fresh module graph                                                                          |
-| Runtime iframe (`runtime.html`, `src/runtime/main.ts`) | Loads the framework packages, registers the browser host adapters, boots the app, runs pending migrations, and answers requests                                                                                                              |
-| Virtual filesystem (`src/runtime/vfs.ts`)              | An in-memory ruby-compat `FsAdapter`. Zeitwerk, the template resolver and the migrator read the app's files from it; the app's `log/development.log` is written to it and tailed into the console                                            |
-| Service worker (`public/sw.js`)                        | Sends the preview's `/preview/*` requests to the runtime, which hands them to the Rack app with `SCRIPT_NAME=/preview`, and serves the app's modules: `pathToFileURL("/app/models/post.ts")` is a `/rt/<run>/vfs/...` URL the worker answers |
-| Module loading (`src/runtime/modules.ts`)              | Transpiles an app file with TypeScript's `transpileModule`, and points its `@blazetrails/*` imports at shims that re-export the runtime's single copy of each package                                                                        |
-| Templates (`src/runtime/template-compiler.ts`)         | A trails app precompiles `.tse` with `trails-tsc-views build`; here the source is in the editor, so `setTemplateCompiler` builds the same stand-in module from it at first render                                                            |
-| SQLite (`src/runtime/expo-sqlite-sqljs.ts`)            | The app's `database.ts` says `adapter: "expo-sqlite"`; the runtime answers expo-sqlite's async API with sql.js, so the stock `SQLite3Adapter` runs unchanged                                                                                 |
+| Piece                                                  | What it does                                                                                                                                                                                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Editor (`index.html`, `src/host/`)                     | Holds the files and the database bytes (both kept in `localStorage`), and recreates the runtime iframe on every restart, so each run evaluates a fresh module graph                                                                                    |
+| Runtime iframe (`runtime.html`, `src/runtime/main.ts`) | Loads the framework packages, registers the browser host adapters, boots the app, runs pending migrations, and answers requests                                                                                                                        |
+| Virtual filesystem (`src/runtime/vfs.ts`)              | An in-memory ruby-compat `FsAdapter`. Zeitwerk, the template resolver and the migrator read the app's files from it; the app's `log/development.log` is written to it and tailed into the console                                                      |
+| Service worker (`public/sw.js`)                        | Sends the preview's `/preview/*` requests to the runtime, which hands them to the Rack app with `SCRIPT_NAME=/preview`, and serves the app's modules: `pathToFileURL("/app/models/post.ts")` is a `/rt/<run>/vfs/...` URL the worker answers           |
+| Module loading (`src/runtime/modules.ts`)              | Transpiles an app file with TypeScript's `transpileModule`, and points its `@blazetrails/*` imports at shims that `export *` from the URL the dev server serves each package at, so app code shares the framework's module instances and live bindings |
+| Templates (`src/runtime/template-compiler.ts`)         | A trails app precompiles `.tse` with `trails-tsc-views build`; here the source is in the editor, so `setTemplateCompiler` builds the same stand-in module from it at first render                                                                      |
+| SQLite (`src/runtime/expo-sqlite-sqljs.ts`)            | The app's `database.ts` says `adapter: "expo-sqlite"`; the runtime answers expo-sqlite's async API with sql.js, so the stock `SQLite3Adapter` runs unchanged                                                                                           |
 
 ## What a browser needs that Node does not
+
+`config/application.ts` sets no `secretKeyBase`: in development trails generates
+`tmp/local_secret.txt`, as Rails does, and the editor keeps `tmp/` across restarts.
 
 Each was hit booting this app in Chromium, and each is handled in this example rather than in
 trails:
