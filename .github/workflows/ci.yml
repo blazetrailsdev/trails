@@ -1228,19 +1228,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, mailer-previews]
+        shard: [1, 2, 3, 4, mailer-previews, configuration]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
       - run: pnpm build
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard != 'mailer-previews'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard != 'mailer-previews' && matrix.shard != 'configuration'
         env:
-          TRAILTIES_EXCLUDE: packages/trailties/test/application/mailer-previews.test.ts
+          TRAILTIES_EXCLUDE: packages/trailties/test/application/mailer-previews.test.ts,packages/trailties/test/application/configuration.test.ts
         run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ env.TRAILTIES_SHARD_TOTAL }}
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 'mailer-previews'
         run: pnpm vitest run packages/trailties/test/application/mailer-previews.test.ts
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 'configuration'
+        run: pnpm vitest run packages/trailties/test/application/configuration.test.ts
       - if: needs.changes.outputs.actioncable_only == 'true' && matrix.shard == 1
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
