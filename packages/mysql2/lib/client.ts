@@ -1026,12 +1026,12 @@ export class Client {
     if (opts.stream === true) {
       return this.useResult(this.connection.connection!.query(options), opts);
     }
-    return this.storeResult(
-      await (this.connection.query as unknown as (options: object) => Promise<Native>)
-        .call(this.connection, options)
-        .catch((e: unknown) => this.raiseMysql2Error(e)),
-      opts,
-    );
+    this.currentResult = await (
+      this.connection.query as unknown as (options: object) => Promise<Native>
+    )
+      .call(this.connection, options)
+      .catch((e: unknown) => this.raiseMysql2Error(e));
+    return this.storeResult();
   }
 
   /** @internal */
@@ -1044,7 +1044,8 @@ export class Client {
       : { sql, rowsAsArray, typeCast };
   }
 
-  private _storeResult(
+  /** @internal */
+  mysqlResultToObj(
     [rawResult, rawFields]: Native,
     queryOptions?: QueryOptions,
   ): Mysql2Result | null {
@@ -1097,7 +1098,7 @@ export class Client {
     }).catch((e: unknown) => this.raiseMysql2Error(e));
     if (fields == null) {
       const header = await rows.next().catch((e: unknown) => this.raiseMysql2Error(e));
-      return this.storeResult([header.value, undefined]) as null;
+      return this.mysqlResultToObj([header.value, undefined]) as null;
     }
     const resultObj = new Result(
       fields.map((field) => field.name),
@@ -1165,14 +1166,11 @@ export class Client {
     return true;
   }
 
-  /** @internal */
-  storeResult(
-    native: Native | undefined = this.currentResult,
-    queryOptions: QueryOptions | undefined = this.currentQueryOptions,
-  ): Mysql2Result | null {
+  storeResult(): Mysql2Result | null {
+    const result = this.currentResult;
     this.currentResult = undefined;
-    if (native === undefined) return null;
-    return this._storeResult(native, queryOptions);
+    if (result === undefined) return null;
+    return this.mysqlResultToObj(result, this.currentQueryOptions);
   }
 
   static escape(str: string): string {
@@ -1297,16 +1295,19 @@ export class Client {
 
   /** @inventedArm if — PERMANENT */
   async ping(): Promise<boolean> {
-    if (this.isClosed() && this.reconnect !== true) return false;
-    const alive = await this.connection.ping().then(
-      () => true,
-      () => false,
-    );
-    if (alive || this.reconnect !== true || !this.isClosed()) return alive;
-    return await this.connect(...this.connectArgs).then(
-      () => true,
-      () => false,
-    );
+    if (this.isClosed()) {
+      return false;
+    } else {
+      const alive = await this.connection.ping().then(
+        () => true,
+        () => false,
+      );
+      if (alive || this.reconnect !== true) return alive;
+      return await this.connect(...this.connectArgs).then(
+        () => true,
+        () => false,
+      );
+    }
   }
 
   serverInfo(): { id: number; version: string | null } {
