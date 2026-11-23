@@ -96,7 +96,7 @@
     <p class="small"><strong>And more.</strong> We&rsquo;re bringing all the friends along.</p>
     <p class="fine">Percentages count the upstream gem&rsquo;s public classes, modules, methods and constants that trails matches by name, measured at {data.measuredAt}.</p>
     <p class="fine"><strong>Rails API:</strong> gems the Rails project owns, like Active Record or Solid Queue. <strong>Ruby gem API:</strong> gems Rails depends on, like rack or i18n.</p>
-    <h3 class="rails-compat" id="rails-compat">Play nice with Rails.</h3>
+    <h3 class="rails-compat" id="rails-compat">Plays nice with Rails.</h3>
     <p class="small"><strong>Compatibility is the goal.</strong> A trails app is compatible with Rails frontend JavaScript dependencies. Turbo, Hotwire, Stimulus, and Action Text all use Rails&rsquo; JS packages directly.</p>
     <p class="small"><strong>trails and Rails apps can work side by side.</strong> In live demos, a trails app and a Rails app read each other&rsquo;s encrypted passwords and exchange Active Job messages across the two languages in real time.</p>
   </section>
