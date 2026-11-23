@@ -1,94 +1,123 @@
-/*
- * Frontier color palette for VitePress.
- * Mirrors the website's earth/forest theme from app.css.
- *
- * VitePress dark mode = frontier dark (default)
- * VitePress light mode = frontier light
- */
+@import "../../../src/lib/brand.css";
 
 :root {
-  /* Brand / accent — forest green */
-  --vp-c-brand-1: #6b9e50;
-  --vp-c-brand-2: #7db060;
-  --vp-c-brand-3: #5a8a42;
-  --vp-c-brand-soft: rgba(107, 158, 80, 0.14);
+  --vp-c-brand-1: var(--bt-orange);
+  --vp-c-brand-2: var(--bt-orange-hover);
+  --vp-c-brand-3: var(--bt-orange);
+  --vp-c-brand-soft: rgba(232, 89, 12, 0.12);
 
-  /* Tip/info/warning/danger mapped to frontier palette */
-  --vp-c-tip-1: #5b96b5;
-  --vp-c-tip-soft: rgba(91, 150, 181, 0.14);
-  --vp-c-warning-1: #d4a04a;
-  --vp-c-warning-soft: rgba(212, 160, 74, 0.14);
-  --vp-c-danger-1: #d0654e;
-  --vp-c-danger-soft: rgba(208, 101, 78, 0.14);
+  --vp-c-bg: var(--bt-bg);
+  --vp-c-bg-alt: var(--bt-tint);
+  --vp-c-bg-elv: var(--bt-surface);
+  --vp-c-bg-soft: var(--bt-tint);
 
-  /* Fonts */
-  --vp-font-family-base: "Inter", system-ui, -apple-system, sans-serif;
-  --vp-font-family-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --vp-c-border: var(--bt-tint-border);
+  --vp-c-divider: var(--bt-tint-border);
+  --vp-c-gutter: var(--bt-tint);
+
+  --vp-c-text-1: var(--bt-text);
+  --vp-c-text-2: var(--bt-muted);
+  --vp-c-text-3: var(--bt-muted);
+
+  --vp-c-default-soft: rgba(242, 176, 30, 0.14);
+  --vp-c-tip-1: var(--bt-orange);
+  --vp-c-tip-soft: rgba(232, 89, 12, 0.08);
+  --vp-c-warning-1: #a8740a;
+  --vp-c-warning-soft: rgba(242, 176, 30, 0.18);
+
+  --vp-font-family-base: var(--bt-font-sans);
+  --vp-font-family-mono: var(--bt-font-mono);
+
+  --vp-code-bg: var(--bt-tint);
+  --vp-code-color: var(--bt-text);
+  --vp-code-block-bg: var(--bt-code-bg);
+  --vp-code-block-color: #fbf1e4;
+  --vp-code-block-divider-color: var(--bt-code-border);
+  --vp-code-copy-code-bg: var(--bt-code-bar);
+  --vp-code-lang-color: #e4d2bc;
+  --vp-code-line-highlight-color: rgba(255, 255, 255, 0.06);
+
+  --vp-button-brand-bg: var(--bt-orange);
+  --vp-button-brand-hover-bg: var(--bt-orange-hover);
+  --vp-button-brand-active-bg: var(--bt-orange-hover);
+
+  --vp-home-hero-name-color: var(--bt-orange);
+  --vp-sidebar-bg-color: var(--bt-tint);
 }
 
-/* ── Dark mode (frontier default) ── */
-.dark {
-  --vp-c-bg: #1c1916;
-  --vp-c-bg-alt: #272320;
-  --vp-c-bg-elv: #353029;
-  --vp-c-bg-soft: #272320;
-
-  --vp-c-border: #4a433b;
-  --vp-c-divider: #4a433b;
-  --vp-c-gutter: #272320;
-
-  --vp-c-text-1: #e4ded4;
-  --vp-c-text-2: #a59d91;
-  --vp-c-text-3: #7a7268;
-
-  --vp-c-default-1: #4a433b;
-  --vp-c-default-2: #353029;
-  --vp-c-default-3: #272320;
-  --vp-c-default-soft: rgba(74, 67, 59, 0.16);
-
-  --vp-code-bg: #272320;
-
-  --vp-c-brand-1: #7db060;
-  --vp-c-brand-2: #6b9e50;
-  --vp-c-brand-3: #5a8a42;
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.VPHero .name,
+.VPHero .text {
+  font-family: var(--bt-font-display);
+  letter-spacing: -0.03em;
+}
+.vp-doc h1,
+.vp-doc h2 {
+  color: var(--bt-orange);
+  font-weight: 800;
+}
+.vp-doc h2 {
+  border-top-color: var(--bt-tint-border);
+}
+.vp-doc a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--bt-orange);
+  text-underline-offset: 3px;
+}
+.vp-doc a:hover {
+  color: var(--bt-orange);
+}
+.vp-doc :not(pre) > code {
+  border: 1px solid var(--bt-tint-border);
+  border-radius: 4px;
 }
 
-/* ── Light mode (frontier light) ── */
-:root:not(.dark) {
-  --vp-c-bg: #f3eee8;
-  --vp-c-bg-alt: #eae4db;
-  --vp-c-bg-elv: #faf8f5;
-  --vp-c-bg-soft: #eae4db;
-
-  --vp-c-border: #cfc7bb;
-  --vp-c-divider: #cfc7bb;
-  --vp-c-gutter: #eae4db;
-
-  --vp-c-text-1: #2a2520;
-  --vp-c-text-2: #6b6055;
-  --vp-c-text-3: #8a7f72;
-
-  --vp-c-default-1: #cfc7bb;
-  --vp-c-default-2: #eae4db;
-  --vp-c-default-3: #f3eee8;
-  --vp-c-default-soft: rgba(207, 199, 187, 0.16);
-
-  --vp-code-bg: #eae4db;
-
-  --vp-c-brand-1: #3d6e28;
-  --vp-c-brand-2: #4a7a34;
-  --vp-c-brand-3: #5a8a42;
+.vp-doc div[class*="language-"] {
+  border-radius: 6px;
 }
 
-/* ── Home hero styling ── */
-.VPHero .name {
-  background: linear-gradient(135deg, #6b9e50, #5b96b5) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
+.VPNav,
+.VPNavBar,
+.VPNavBar:not(.home) .content-body,
+.VPLocalNav {
+  background: var(--bt-bg) !important;
+}
+.VPNavBar .divider-line,
+.VPNavBar.has-sidebar .divider-line {
+  background-color: var(--bt-tint-border) !important;
+}
+.VPNavBarMenuLink {
+  font-weight: 600;
 }
 
-/* ── Nav bar blends with surface ── */
-.VPNav {
-  border-bottom-color: var(--vp-c-border) !important;
+.bt-wm {
+  font: 800 26px/1 var(--bt-font-display);
+  letter-spacing: -0.045em;
+  color: var(--bt-text);
+}
+.bt-wm .blaze {
+  color: var(--bt-orange);
+}
+.bt-wm .trails {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.16em;
+}
+.bt-wm .trails::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0.04em;
+  bottom: -0.02em;
+  height: 0.16em;
+  background: var(--bt-mango);
+  -webkit-mask: var(--bt-wordmark-underline) center / 100% 100% no-repeat;
+  mask: var(--bt-wordmark-underline) center / 100% 100% no-repeat;
+}
+
+html.dark {
+  --vp-c-warning-1: var(--bt-mango);
 }

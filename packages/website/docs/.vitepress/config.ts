@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 import { publishedPackages } from "../../src/lib/parity.js";
 
 const siteBase = process.env.SITE_BASE ?? "";
-const siteRoot = process.env.SITE_ROOT || `${siteBase}/`;
+const siteRoot = process.env.SITE_ROOT || `https://blazetrails.dev${siteBase}/`;
 const packages = await publishedPackages();
 
 const railsGuideSections = [
@@ -23,15 +23,20 @@ export default defineConfig({
   base: `${siteBase}/docs/`,
   outDir: "../build/docs",
   cleanUrls: true,
+  head: [
+    ["link", { rel: "icon", href: `${siteBase}/favicon.png`, type: "image/png" }],
+    ["link", { rel: "apple-touch-icon", href: `${siteBase}/apple-touch-icon.png` }],
+  ],
+  markdown: { theme: "github-dark" },
 
   themeConfig: {
-    siteTitle: "BlazeTrails",
+    siteTitle: false,
     nav: [
       { text: "Docs", link: "/" },
       { text: "Guides", link: "/guides/" },
       { text: "Packages", link: "/packages/" },
       { text: "Examples", link: "/examples" },
-      { text: "Website", link: siteRoot },
+      { text: "Website", link: siteRoot, target: "_self" },
       { text: "API Reference", link: "/api/@blazetrails/arel/README" },
     ],
 

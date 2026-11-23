@@ -2,6 +2,7 @@
   import "@fontsource-variable/bricolage-grotesque";
   import "@fontsource-variable/instrument-sans";
   import "@fontsource-variable/jetbrains-mono";
+  import "$lib/brand.css";
   import { base } from "$app/paths";
   import { LANDING_TILES as tiles } from "$lib/landing-tiles";
 
@@ -16,6 +17,17 @@
   };
   let pm = $state("npm");
   let copied = $state(false);
+  let dark = $state(false);
+  $effect(() => {
+    dark = document.documentElement.classList.contains("dark");
+  });
+  function toggleTheme() {
+    dark = !dark;
+    document.documentElement.classList.toggle("dark", dark);
+    try {
+      localStorage.setItem("vitepress-theme-appearance", dark ? "dark" : "light");
+    } catch {}
+  }
 
   async function copy() {
     try {
@@ -66,7 +78,7 @@
       <span class="wm" aria-hidden="true"><span class="blaze">blaze</span><span class="trails">trails</span></span>
       <span class="sr-only">blazetrails</span>
     </a>
-    <ul class="right">{#each navRight as l}<li><a href={l.href}>{l.label}</a></li>{/each}</ul>
+    <ul class="right">{#each navRight as l}<li><a href={l.href}>{l.label}</a></li>{/each}<li><button class="theme" onclick={toggleTheme} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}>{dark ? "Light" : "Dark"}</button></li></ul>
   </nav>
 
   <header class="hero">
@@ -174,20 +186,20 @@
 
 <style>
   .page {
-    --orange: #e8590c;
-    --mango: #f2b01e;
-    --ink: #2b1d14;
-    --tint: #fdf1d6;
-    --display: "Bricolage Grotesque Variable", "Helvetica Neue", Arial, sans-serif;
-    --sans: "Instrument Sans Variable", "Helvetica Neue", Arial, system-ui, sans-serif;
-    --mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    background: #fff;
-    color: var(--ink);
+    --orange: var(--bt-orange);
+    --mango: var(--bt-mango);
+    --ink: var(--bt-ink);
+    --tint: var(--bt-tint);
+    --display: var(--bt-font-display);
+    --sans: var(--bt-font-sans);
+    --mono: var(--bt-font-mono);
+    background: var(--bt-bg);
+    color: var(--bt-text);
     font: 21px/1.45 var(--sans);
     text-align: center;
   }
   a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
-  .page :global(:not(pre, .cmd) > code) { font: 0.9em var(--mono); background: var(--tint); border: 1px solid #ecd9b0; border-radius: 4px; padding: 0.05em 0.35em; }
+  .page :global(:not(pre, .cmd) > code) { font: 0.9em var(--mono); background: var(--tint); border: 1px solid var(--bt-tint-border); border-radius: 4px; padding: 0.05em 0.35em; }
   h1, h2, h3 { font-family: var(--display); }
   h1, h2 { color: var(--orange); font-weight: 800; letter-spacing: -0.035em; margin: 0 auto 1.5rem; }
   h1 { font-size: 78px; line-height: 72px; max-width: 1200px; }
@@ -202,10 +214,10 @@
   .nav ul { display: flex; gap: 36px; list-style: none; margin: 0; padding: 0; font-size: 16px; font-weight: 600; }
   .left { justify-content: flex-end; }
   .mark { text-decoration: none; }
-  .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--ink); }
+  .wm { font: 800 44px/1 var(--display); letter-spacing: -0.045em; color: var(--bt-text); }
   .blaze { color: var(--orange); }
   .trails { position: relative; display: inline-block; padding-bottom: 0.16em; }
-  .trails::after { content: ""; position: absolute; left: 0; right: 0.04em; bottom: -0.02em; height: 0.16em; background: var(--mango); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 20 1, 32 9, 50 5 S 82 1, 98 6 S 114 7, 118 3' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 20 1, 32 9, 50 5 S 82 1, 98 6 S 114 7, 118 3' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
+  .trails::after { content: ""; position: absolute; left: 0; right: 0.04em; bottom: -0.02em; height: 0.16em; background: var(--mango); -webkit-mask: var(--bt-wordmark-underline) center / 100% 100% no-repeat; mask: var(--bt-wordmark-underline) center / 100% 100% no-repeat; }
 
   .hero { padding: 40px 24px 80px; }
   .lede { font-size: 30px; line-height: 1.3; max-width: 700px; margin: 0 auto 1.5rem; }
@@ -218,7 +230,7 @@
   .tabs button[aria-selected="true"] { background: #3a2a1f; color: #fff; box-shadow: inset 0 3px 0 var(--orange); margin-bottom: -1px; padding-bottom: 12px; }
   .note { margin: 0; padding: 0 22px 22px; font-size: 15px; color: #d9c6b0; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  .fine { font-size: 15px; line-height: 1.45; max-width: 760px; margin: 1.5rem auto 0; color: #7a6450; }
+  .fine { font-size: 15px; line-height: 1.45; max-width: 760px; margin: 1.5rem auto 0; color: var(--bt-muted); }
   .pane { background: #3a2a1f; min-height: 380px; }
   .split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
   .split > div + div { border-left: 1px solid #4a3628; }
@@ -236,13 +248,13 @@
   .tiles a:hover, .tiles a:focus-visible { background: var(--orange); color: #fff; transform: translateY(-2px); box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); }
   .tiles a:hover small, .tiles a:focus-visible small { color: rgb(255 255 255 / 0.85); }
   .tiles li:nth-last-child(2) { grid-column: 2; }
-  .tiles small { font-size: 13px; font-weight: 500; color: #7a6450; }
+  .tiles small { font-size: 13px; font-weight: 500; color: var(--bt-muted); }
 
   .band { background: var(--tint); padding: 90px 24px; }
   .company + .band { clip-path: polygon(0 0, 100% 3vw, 100% 100%, 0 100%); padding-top: calc(90px + 3vw); }
   .band:has(+ .start) { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - 7vw)); padding-bottom: calc(90px + 7vw); }
   .foot { clip-path: polygon(0 4.5vw, 38% 0, 100% 1.5vw, 100% 100%, 0 100%); padding-top: calc(60px + 4.5vw) !important; }
-  .card { background: #fff; max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px rgb(0 0 0 / 0.08); }
+  .card { background: var(--bt-surface); max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px var(--bt-shadow); }
   .band > .card:first-child { margin-top: 0; }
 
   .blocks { padding-top: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 560px)); justify-content: center; column-gap: 50px; }
@@ -256,21 +268,24 @@
 
   .start { padding: 90px 24px; }
   .cards { display: grid; grid-template-columns: repeat(2, 340px); justify-content: center; gap: 30px; margin-top: 40px; }
-  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); text-decoration: none; font-size: 18px; line-height: 23px; }
+  .start-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 40px 24px 28px; border-radius: 8px; box-shadow: 0 6px 24px var(--bt-shadow); text-decoration: none; font-size: 18px; line-height: 23px; }
   .start-card strong { font-size: 26px; line-height: 31px; text-decoration: underline; text-underline-offset: 3px; }
   .tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--mango); color: var(--ink); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 10px; border-radius: 3px; }
 
   .install { max-width: 760px; margin: 56px auto 0; text-align: left; }
   .pms { display: flex; gap: 4px; }
-  .pms button { font: 600 14px var(--mono); color: var(--ink); background: none; border: 0; padding: 8px 14px; border-radius: 6px 6px 0 0; cursor: pointer; }
+  .pms button { font: 600 14px var(--mono); color: var(--bt-text); background: none; border: 0; padding: 8px 14px; border-radius: 6px 6px 0 0; cursor: pointer; }
   .pms button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  :global(html.dark) .pms button[aria-pressed="true"], :global(html.dark) .cmd { background: var(--bt-code-bg); }
+  :global(html.dark) .copy { background: var(--bt-code-bar); }
+  .theme { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .cmd { display: flex; align-items: center; gap: 16px; background: var(--ink); color: #fbf1e4; border-radius: 0 8px 8px 8px; padding: 18px 20px; }
   .cmd code { flex: 1; font: 16px var(--mono); color: #fbf1e4; background: none; border: 0; padding: 0; overflow-x: auto; white-space: nowrap; }
   .prompt { color: var(--mango); margin-right: 6px; }
   .copy { font: 600 13px var(--sans); background: #3a2a1f; color: #fff; border: 0; border-radius: 5px; padding: 6px 12px; cursor: pointer; }
   .foot { background: var(--tint); padding: 60px 24px; font-size: 14px; }
   .foot ul { display: flex; justify-content: center; gap: 28px; list-style: none; margin: 0 0 12px; padding: 0; }
-  .foot p { margin: 0; color: #7a6450; }
+  .foot p { margin: 0; color: var(--bt-muted); }
 
   @media (max-width: 900px) {
     h1 { font-size: 44px; line-height: 1.05; }
