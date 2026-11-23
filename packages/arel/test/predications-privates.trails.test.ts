@@ -24,19 +24,6 @@ describe("Predications.groupingAny / groupingAll", () => {
     expect(out).toBeInstanceOf(Nodes.Grouping);
   });
 
-  it("groups an empty `others` as Grouping(Or([])) / Grouping(And([]))", () => {
-    const attr = users.get("id");
-    const any = Predications.groupingAny.call(attr, "eq", []);
-    expect(any.expr).toBeInstanceOf(Nodes.Or);
-    expect((any.expr as Nodes.Or).children).toHaveLength(0);
-    expect(attr.eqAny([])).toEqual(any);
-
-    const all = Predications.groupingAll.call(attr, "eq", []);
-    expect(all.expr).toBeInstanceOf(Nodes.And);
-    expect((all.expr as Nodes.And).children).toHaveLength(0);
-    expect(attr.eqAll([])).toEqual(all);
-  });
-
   it("threads *extras through to the dispatched predicate", () => {
     const attr = users.get("name");
 
@@ -235,5 +222,18 @@ describe("HomogeneousIn#ivars (Rails-fidelity helper)", () => {
     expect(ivars[0]).toBe(attr);
     expect(ivars[1]).toEqual([1, 2, 3]);
     expect(ivars[2]).toBe("in");
+  });
+
+  it("groupingAny of an empty `others` is Grouping(Or([]))", () => {
+    const attr = users.get("id");
+    const any = Predications.groupingAny.call(attr, "eq", []);
+    expect(any.expr).toBeInstanceOf(Nodes.Or);
+    expect((any.expr as Nodes.Or).children).toHaveLength(0);
+    expect(attr.eqAny([])).toEqual(any);
+
+    const all = Predications.groupingAll.call(attr, "eq", []);
+    expect(all.expr).toBeInstanceOf(Nodes.And);
+    expect((all.expr as Nodes.And).children).toHaveLength(0);
+    expect(attr.eqAll([])).toEqual(all);
   });
 });

@@ -112,11 +112,6 @@ describe("PredicationsMixin", () => {
   describe("edge cases (via the mixin, not Attribute's inline predications)", () => {
     const bn = new Nodes.BitwiseNot(users.get("flags"));
 
-    it("eqAny([]) does not crash and renders as an empty grouped OR", () => {
-      const sql = new Visitors.ToSql(fakeRecordConnection).compile(bn.eqAny([]));
-      expect(sql).toBe("()");
-    });
-
     it("eqAll([]) does not crash and renders as an empty grouped AND", () => {
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(bn.eqAll([]));
       expect(sql).toBe("()");
@@ -125,6 +120,11 @@ describe("PredicationsMixin", () => {
     it("in(scalar) wraps the scalar (Rails quoted_node fallthrough)", () => {
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(bn.in(7));
       expect(sql).toBe(' ~ "users"."flags" IN (7)');
+    });
+
+    it("eqAny([]) renders as an empty grouped OR", () => {
+      const sql = new Visitors.ToSql(fakeRecordConnection).compile(bn.eqAny([]));
+      expect(sql).toBe("()");
     });
   });
 
