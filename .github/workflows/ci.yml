@@ -1223,7 +1223,7 @@ jobs:
       (needs.changes.outputs.trailties_affected == 'true' ||
       needs.changes.outputs.actioncable_only == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
-    timeout-minutes: ${{ matrix.shard == 'configuration' && 50 || 30 }}
+    timeout-minutes: 30
     env:
       TRAILTIES_SHARD_TOTAL: 4
     strategy:
