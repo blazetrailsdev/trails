@@ -666,16 +666,28 @@ export class TagBuilder {
     let output = "";
     const sep = " ";
     eachPair(options!, (key: string, value: unknown) => {
+      if (isBlank(key)) return;
+
+      const name = String(key);
+      if (isBlank(name)) return;
+
       const type = hashAref(TAG_TYPES, key);
       if (type === "data" && (isPlainObject(value) || value instanceof Hash)) {
         eachPair(value, (k: string, v: unknown) => {
-          if (isNil(v)) return;
+          if (isBlank(k) || isNil(v)) return;
+
+          const nestedName = String(k);
+          if (isBlank(nestedName)) return;
+
           output += sep;
-          output += this.prefixTagOption(key, k, v, escape);
+          output += this.prefixTagOption(name, nestedName, v, escape);
         });
       } else if (type === "aria" && (isPlainObject(value) || value instanceof Hash)) {
         eachPair(value, (k: string, v: unknown) => {
-          if (isNil(v)) return;
+          if (isBlank(k) || isNil(v)) return;
+
+          const nestedName = String(k);
+          if (isBlank(nestedName)) return;
 
           if (Array.isArray(v) || isPlainObject(v) || v instanceof Hash) {
             const tokens = buildTagValues(v);
@@ -687,16 +699,16 @@ export class TagBuilder {
           }
 
           output += sep;
-          output += this.prefixTagOption(key, k, v, escape);
+          output += this.prefixTagOption(name, nestedName, v, escape);
         });
       } else if (type === "boolean") {
         if (value != null && value !== false) {
           output += sep;
-          output += this.booleanTagOption(key);
+          output += this.booleanTagOption(name);
         }
       } else if (!isNil(value)) {
         output += sep;
-        output += this.tagOption(key, value, escape);
+        output += this.tagOption(name, value, escape);
       }
     });
     return output === "" ? null : output;

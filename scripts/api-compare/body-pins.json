@@ -19814,8 +19814,8 @@
     "package": "actionview",
     "rubyFile": "helpers.rb",
     "rubyName": "distance_of_time_in_words",
-    "digest": "118d4829360fac47",
-    "ref": "v8.0.2"
+    "digest": "12a40d6de64f857d",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -19870,8 +19870,8 @@
     "package": "actionview",
     "rubyFile": "helpers.rb",
     "rubyName": "excerpt",
-    "digest": "1cdd09c17ea2c8d0",
-    "ref": "v8.0.2"
+    "digest": "9706e35bfbba1a6b",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -20003,8 +20003,8 @@
     "package": "actionview",
     "rubyFile": "helpers.rb",
     "rubyName": "highlight",
-    "digest": "d476236abdd49d27",
-    "ref": "v8.0.2"
+    "digest": "584dfc9eedb1b443",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -20423,15 +20423,15 @@
     "package": "actionview",
     "rubyFile": "helpers.rb",
     "rubyName": "strip_tags",
-    "digest": "b567d1bb21a48441",
-    "ref": "v8.0.2"
+    "digest": "21c6887f3f6698a0",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
     "rubyFile": "helpers.rb",
     "rubyName": "stylesheet_link_tag",
-    "digest": "ca8994be963141ad",
-    "ref": "v8.0.2"
+    "digest": "4cd3e31d141f0c03",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -20857,8 +20857,8 @@
     "package": "actionview",
     "rubyFile": "helpers/asset_tag_helper.rb",
     "rubyName": "javascript_include_tag",
-    "digest": "d31cfb9dc9855b42",
-    "ref": "v8.0.2"
+    "digest": "2bd68cb45c3cf6d4",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -20892,8 +20892,8 @@
     "package": "actionview",
     "rubyFile": "helpers/asset_tag_helper.rb",
     "rubyName": "preload_link_tag",
-    "digest": "e0c2010a49eb9fa4",
-    "ref": "v8.0.2"
+    "digest": "f5f704dabd71daed",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -20941,8 +20941,8 @@
     "package": "actionview",
     "rubyFile": "helpers/asset_tag_helper.rb",
     "rubyName": "stylesheet_link_tag",
-    "digest": "ca8994be963141ad",
-    "ref": "v8.0.2"
+    "digest": "4cd3e31d141f0c03",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -21375,8 +21375,8 @@
     "package": "actionview",
     "rubyFile": "helpers/date_helper.rb",
     "rubyName": "distance_of_time_in_words",
-    "digest": "118d4829360fac47",
-    "ref": "v8.0.2"
+    "digest": "12a40d6de64f857d",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -21900,8 +21900,8 @@
     "package": "actionview",
     "rubyFile": "helpers/form_helper.rb",
     "rubyName": "excerpt",
-    "digest": "1cdd09c17ea2c8d0",
-    "ref": "v8.0.2"
+    "digest": "9706e35bfbba1a6b",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -22026,8 +22026,8 @@
     "package": "actionview",
     "rubyFile": "helpers/form_helper.rb",
     "rubyName": "highlight",
-    "digest": "d476236abdd49d27",
-    "ref": "v8.0.2"
+    "digest": "584dfc9eedb1b443",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -22355,8 +22355,8 @@
     "package": "actionview",
     "rubyFile": "helpers/form_helper.rb",
     "rubyName": "strip_tags",
-    "digest": "b567d1bb21a48441",
-    "ref": "v8.0.2"
+    "digest": "21c6887f3f6698a0",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -22621,8 +22621,8 @@
     "package": "actionview",
     "rubyFile": "helpers/form_options_helper.rb",
     "rubyName": "excerpt",
-    "digest": "1cdd09c17ea2c8d0",
-    "ref": "v8.0.2"
+    "digest": "9706e35bfbba1a6b",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -22656,8 +22656,8 @@
     "package": "actionview",
     "rubyFile": "helpers/form_options_helper.rb",
     "rubyName": "highlight",
-    "digest": "d476236abdd49d27",
-    "ref": "v8.0.2"
+    "digest": "584dfc9eedb1b443",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -22789,8 +22789,8 @@
     "package": "actionview",
     "rubyFile": "helpers/form_options_helper.rb",
     "rubyName": "strip_tags",
-    "digest": "b567d1bb21a48441",
-    "ref": "v8.0.2"
+    "digest": "21c6887f3f6698a0",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -22985,8 +22985,8 @@
     "package": "actionview",
     "rubyFile": "helpers/form_tag_helper.rb",
     "rubyName": "excerpt",
-    "digest": "1cdd09c17ea2c8d0",
-    "ref": "v8.0.2"
+    "digest": "9706e35bfbba1a6b",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -23055,8 +23055,8 @@
     "package": "actionview",
     "rubyFile": "helpers/form_tag_helper.rb",
     "rubyName": "highlight",
-    "digest": "d476236abdd49d27",
-    "ref": "v8.0.2"
+    "digest": "584dfc9eedb1b443",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -23272,8 +23272,8 @@
     "package": "actionview",
     "rubyFile": "helpers/form_tag_helper.rb",
     "rubyName": "strip_tags",
-    "digest": "b567d1bb21a48441",
-    "ref": "v8.0.2"
+    "digest": "21c6887f3f6698a0",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -23727,8 +23727,8 @@
     "package": "actionview",
     "rubyFile": "helpers/tag_helper.rb",
     "rubyName": "tag_options",
-    "digest": "f4fc79e048bf9618",
-    "ref": "v8.0.2"
+    "digest": "8e105fa01482d841",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -23742,20 +23742,6 @@
     "rubyFile": "helpers/tag_helper.rb",
     "rubyName": "token_list",
     "digest": "8697bbe5615fc7d2",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/tags/base.rb",
-    "rubyName": "add_default_name_and_id",
-    "digest": "159e6bf5ec6f3bf6",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/tags/base.rb",
-    "rubyName": "add_default_name_and_id_for_value",
-    "digest": "984a4c7da566ac02",
     "ref": "v8.0.2"
   },
   {
@@ -23888,8 +23874,8 @@
     "package": "actionview",
     "rubyFile": "helpers/tags/check_box.rb",
     "rubyName": "render",
-    "digest": "6be74395b1dec44f",
-    "ref": "v8.0.2"
+    "digest": "2cd66be134b4bb50",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -24154,8 +24140,8 @@
     "package": "actionview",
     "rubyFile": "helpers/tags/file_field.rb",
     "rubyName": "render",
-    "digest": "f5131ed5b2683518",
-    "ref": "v8.0.2"
+    "digest": "9b5e130b6be3cd73",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -24189,8 +24175,8 @@
     "package": "actionview",
     "rubyFile": "helpers/tags/label.rb",
     "rubyName": "render",
-    "digest": "89467e46727d087c",
-    "ref": "v8.0.2"
+    "digest": "5fcd37293c34c705",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -24266,8 +24252,8 @@
     "package": "actionview",
     "rubyFile": "helpers/tags/radio_button.rb",
     "rubyName": "render",
-    "digest": "bfef3677db0fa7d0",
-    "ref": "v8.0.2"
+    "digest": "262a64637084a80c",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -24315,8 +24301,8 @@
     "package": "actionview",
     "rubyFile": "helpers/tags/select_renderer.rb",
     "rubyName": "select_content_tag",
-    "digest": "25b42106673c6cdd",
-    "ref": "v8.0.2"
+    "digest": "80be7bd3dfcb752e",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -24329,8 +24315,8 @@
     "package": "actionview",
     "rubyFile": "helpers/tags/text_area.rb",
     "rubyName": "render",
-    "digest": "d52964b31f4c32e4",
-    "ref": "v8.0.2"
+    "digest": "961543107608232e",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -24350,8 +24336,8 @@
     "package": "actionview",
     "rubyFile": "helpers/tags/text_field.rb",
     "rubyName": "render",
-    "digest": "206f94061436d1a7",
-    "ref": "v8.0.2"
+    "digest": "6b96cec9aa6983c6",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -25897,8 +25883,8 @@
     "package": "actionview",
     "rubyFile": "renderer/partial_renderer.rb",
     "rubyName": "fetch_or_cache_partial",
-    "digest": "724eda146ddf7f28",
-    "ref": "v8.0.2"
+    "digest": "35e93a7e089c4bda",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -25974,8 +25960,8 @@
     "package": "actionview",
     "rubyFile": "renderer/partial_renderer/collection_caching.rb",
     "rubyName": "fetch_or_cache_partial",
-    "digest": "724eda146ddf7f28",
-    "ref": "v8.0.2"
+    "digest": "35e93a7e089c4bda",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -26086,8 +26072,8 @@
     "package": "actionview",
     "rubyFile": "renderer/streaming_template_renderer.rb",
     "rubyName": "render_template",
-    "digest": "40b702a61d606a01",
-    "ref": "v8.0.2"
+    "digest": "47de2d373d2f4c74",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -26471,8 +26457,8 @@
     "package": "actionview",
     "rubyFile": "template.rb",
     "rubyName": "strict_locals!",
-    "digest": "d04496089b2bf833",
-    "ref": "v8.0.2"
+    "digest": "adf32995a1ecc3ba",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -107347,5 +107333,33 @@
     "rubyName": "with_loader",
     "digest": "492a231846e61fbd",
     "ref": "v2.7.2"
+  },
+  {
+    "package": "actionview",
+    "rubyFile": "helpers.rb",
+    "rubyName": "atom_feed",
+    "digest": "34e57e1ce68adb60",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "actionview",
+    "rubyFile": "helpers/tags/base.rb",
+    "rubyName": "add_default_name_and_field",
+    "digest": "da8a809609335cd8",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "actionview",
+    "rubyFile": "helpers/tags/base.rb",
+    "rubyName": "add_default_name_and_field_for_value",
+    "digest": "52991f9b17e5c996",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "actionview",
+    "rubyFile": "renderer/streaming_template_renderer.rb",
+    "rubyName": "body",
+    "digest": "4ed5b6b83a422353",
+    "ref": "v8.0.5.2"
   }
 ]

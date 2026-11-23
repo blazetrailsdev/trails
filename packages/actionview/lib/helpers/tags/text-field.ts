@@ -46,7 +46,7 @@ export class TextField extends Base {
         block(() => this.valueBeforeTypeCast()),
       );
     }
-    this.addDefaultNameAndId(options);
+    this.addDefaultNameAndField(options);
     return this.tag("input", options);
   }
 

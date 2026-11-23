@@ -1,6 +1,6 @@
-import { MemoryStore, SafeBuffer, indexWith } from "@blazetrails/activesupport";
+import { MemoryStore, SafeBuffer, indexWith, isPlainObject } from "@blazetrails/activesupport";
 import type { CacheStore } from "@blazetrails/activesupport";
-import { Hash, hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash, hasKey, hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { OutputBuffer } from "../../buffers.js";
 import type { SameCollectionIterator } from "../collection-renderer.js";
@@ -161,7 +161,15 @@ export async function fetchOrCachePartial(
   });
 
   if (entriesToWrite.size !== 0) {
-    await collectionCache().writeMulti(entriesToWrite);
+    const cached = this.options.cached;
+    type WriteOptions = NonNullable<Parameters<CacheStore["writeMulti"]>[1]>;
+    if ((isPlainObject(cached) || cached instanceof Hash) && hasKey(cached, "expiresIn")) {
+      await collectionCache().writeMulti(entriesToWrite, {
+        expiresIn: hashAref(cached, "expiresIn") as WriteOptions["expiresIn"],
+      });
+    } else {
+      await collectionCache().writeMulti(entriesToWrite);
+    }
   }
 
   return keyedPartials;

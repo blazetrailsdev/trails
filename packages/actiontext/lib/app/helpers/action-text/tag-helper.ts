@@ -127,7 +127,7 @@ export class ActionText extends Base {
 
   override async render(): Promise<unknown> {
     const options = stringifyKeys(this._options);
-    this.addDefaultNameAndId(options);
+    this.addDefaultNameAndField(options);
     if (this.object != null && this.object !== false) {
       if (options["input"] == null || options["input"] === false) {
         options["input"] = this.domId(

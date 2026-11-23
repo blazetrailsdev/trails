@@ -5,7 +5,7 @@ import { ArgumentError, block, fetch, hashDelete, rtest, toI } from "@blazetrail
 import type { TagBuilder } from "../tag-helper.js";
 
 interface SelectRendererHost {
-  addDefaultNameAndId(options: Record<string, unknown>): void;
+  addDefaultNameAndField(options: Record<string, unknown>): void;
   contentTag(name: string, content: unknown, options: Record<string, unknown>): unknown;
   tag(name: string, options: Record<string, unknown>): unknown;
   tagBuilder(): TagBuilder;
@@ -28,7 +28,7 @@ export const SelectRenderer = {
       if (prop in options && !(prop in htmlOptions)) htmlOptions[prop] = hashDelete(options, prop);
     }
 
-    this.addDefaultNameAndId(htmlOptions);
+    this.addDefaultNameAndField(htmlOptions);
 
     if (this.isPlaceholderRequired(htmlOptions)) {
       if (options["includeBlank"] === false)
