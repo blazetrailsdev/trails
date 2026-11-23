@@ -239,6 +239,9 @@ describe("rubyToConventionTs", () => {
       "listen/listener.test.ts",
     );
     expect(rubyToConventionTs("lib/listen_spec.rb", "listen")).toBe("listen.test.ts");
+    expect(rubyToConventionTs("acceptance/listen_spec.rb", "listen")).toBe(
+      "acceptance/listen.test.ts",
+    );
   });
 
   it("strips zeitwerk's test_ prefix", () => {
