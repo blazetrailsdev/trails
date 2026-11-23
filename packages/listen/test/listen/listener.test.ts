@@ -30,7 +30,7 @@ describe("Listener", () => {
           dir,
           block((...args: string[][]) => myblock(...args)),
         );
-        expect(listener._block).toBeTruthy();
+        expect(listener._block).not.toBeNull();
         await listener._block!([], [], []);
         expect(myblock).toHaveBeenCalled();
       });
@@ -45,7 +45,6 @@ describe("Listener", () => {
           await listener.start();
           expect(realpath.mock.calls.map((c) => c[0])).toEqual([dir, dir2]);
         } finally {
-          await listener?.stop();
           FileUtils.rmRf(dir2);
         }
       });
