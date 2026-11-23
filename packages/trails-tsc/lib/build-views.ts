@@ -248,14 +248,18 @@ interface Controller {
 }
 
 interface Mailers {
+  classes: Controller[];
   paths: string[];
   layouts: string[];
 }
 
 async function allMailers(mailersDir: string): Promise<Mailers> {
-  const mailers: Mailers = { paths: [], layouts: [] };
+  const mailers: Mailers = { classes: [], paths: [], layouts: [] };
   if (!(await exists(mailersDir))) return mailers;
-  const classes = new Map<string, { dir: string; superclass: string; layouts: string[] }>();
+  const classes = new Map<
+    string,
+    { file: string; dir: string; superclass: string; layouts: string[] }
+  >();
   const framework = new Set<string>();
   for (const file of await fs.readdir(mailersDir, { recursive: true, encoding: "utf8" })) {
     if (!file.endsWith(".ts")) continue;
@@ -297,7 +301,12 @@ async function allMailers(mailersDir: string): Promise<Mailers> {
       };
       ts.forEachChild(statement, visit);
       const dir = path.posix.dirname(file.split(path.sep).join("/"));
-      classes.set(statement.name.text, { dir, superclass: superclass.getText(source), layouts });
+      classes.set(statement.name.text, {
+        file: path.join(mailersDir, file),
+        dir,
+        superclass: superclass.getText(source),
+        layouts,
+      });
     }
   }
   const isMailer = (name: string, seen = new Set<string>()): boolean => {
@@ -307,10 +316,11 @@ async function allMailers(mailersDir: string): Promise<Mailers> {
     seen.add(name);
     return isMailer(klass.superclass, seen);
   };
-  for (const [name, { dir, superclass, layouts }] of classes) {
+  for (const [name, { file, dir, superclass, layouts }] of classes) {
     if (!isMailer(superclass)) continue;
     const mailerPath = dasherize(underscore(name));
     const controllerPath = dir === "." ? mailerPath : `${dir}/${mailerPath}`;
+    mailers.classes.push({ file, name, path: controllerPath });
     mailers.paths.push(controllerPath);
     mailers.layouts.push(controllerPath);
     mailers.layouts.push(...layouts);
@@ -631,7 +641,10 @@ function bindCheckedTypes(
   const members = new Map<Controller, Map<string, string>>();
   const layouts = new Map<Controller, Set<string> | "every">();
   const existing = new Set(views.flatMap((v) => (v.layout === undefined ? [] : [v.layout])));
-  for (const controller of controllers) {
+  for (const controller of new Set([
+    ...controllers,
+    ...views.flatMap((v) => (v.controller ? [v.controller] : [])),
+  ])) {
     const klass = controllerClass(program, controller);
     if (!klass) continue;
     members.set(controller, controllerMembers(checker, klass, typeText));
@@ -1049,10 +1062,13 @@ async function templateScope(
   );
   const prefix = path.posix.dirname(rel);
   const layout = /^layouts\/((?:[^/]+\/)*[^_/][^/.]*)\./u.exec(rel)?.[1];
-  const controller =
+  const ownController =
     layout === undefined ? controllers.find((c) => dasherize(c.path) === prefix) : undefined;
+  const controller =
+    ownController ??
+    (layout === undefined ? mailers.classes.find((m) => m.path === prefix) : undefined);
   const helpersFrom =
-    controller ??
+    ownController ??
     (isMailerView(rel, layout, mailers)
       ? undefined
       : controllers.find((c) => c.path === "application"));

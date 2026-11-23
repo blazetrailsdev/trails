@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repo = path.resolve(root, "../..");
 const expected = JSON.parse(fs.readFileSync(path.join(root, "hero/errors.json"), "utf8"));
 const controller = "app/controllers/posts-controller.ts";
-const view = "app/views/posts/show.html.tse";
+const view = "app/views/post-mailer/published.html.tse";
 
 function compile(name, edits) {
   const scratch = path.join(root, `.hero-check-${name}`);
@@ -20,7 +20,7 @@ function compile(name, edits) {
     for (const [from, to] of edits) fs.copyFileSync(path.join(root, from), path.join(scratch, to));
     fs.writeFileSync(
       path.join(scratch, "tsconfig.json"),
-      JSON.stringify({ extends: "../tsconfig.json", include: ["app", "gen/views"] }),
+      JSON.stringify({ extends: "../tsconfig.json", include: ["app", "gen"] }),
     );
     execFileSync(
       process.execPath,
@@ -50,7 +50,14 @@ function compile(name, edits) {
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
-  return out.split("\n").filter((line) => /^.+?\(\d+,\d+\): /.test(line));
+  const errors = [];
+  for (const line of out.split("\n")) {
+    if (/^.+?\(\d+,\d+\): /.test(line)) errors.push(line);
+    else if (/^\s+\S/.test(line) && errors.length > 0 && !/^\s+in </.test(line)) {
+      errors[errors.length - 1] += `\n${line}`;
+    }
+  }
+  return errors;
 }
 
 const unedited = compile("unedited", []);
@@ -61,7 +68,7 @@ if (unedited.length > 0) {
 
 const runs = {
   [controller]: compile("controller", [["hero/posts-controller.ts", controller]]),
-  [view]: compile("view", [["hero/show.html.tse", view]]),
+  [view]: compile("view", [["hero/published.html.tse", view]]),
 };
 
 let failed = false;

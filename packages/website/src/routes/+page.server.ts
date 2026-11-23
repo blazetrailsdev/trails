@@ -33,6 +33,12 @@ const blocks = [
     title: "Views are typed templates.",
     body: "TSE (TypeScript Embedded) is trails' replacement for ERB (Embedded RuBy): the same `<% %>` and `<%= %>` tags, with TypeScript inside. Helpers such as `imageTag` and `turboStreamFrom` keep their Rails names.",
   },
+  {
+    file: "app/views/post-mailer/published.html.tse",
+    lang: "erb",
+    title: "Typed templates, even in email.",
+    body: "A mailer view is checked like any other: `post` has the type `PostMailer` declares, and `render` checks the partial's locals against its `locals:` signature.",
+  },
 ];
 
 const HERO = path.join(EXAMPLE_ROOT, "hero");
@@ -42,7 +48,8 @@ async function heroPane(file: string, source: string, lang: string) {
     await fs.readFile(path.join(HERO, "errors.json"), "utf8"),
   );
   const error = errors[file];
-  const [, line, col, name] = /\((\d+),(\d+)\): .*?Property '([^']+)'/.exec(error)!;
+  const [, line, col] = /\((\d+),(\d+)\): /.exec(error)!;
+  const [, name] = /'([^']+)' does not exist/.exec(error)!;
   const code = (await fs.readFile(path.join(HERO, source), "utf8")).trimEnd();
   const from = Number(col) - 1;
   return withError(code, lang, Number(line), from, from + name.length, error);
@@ -91,7 +98,7 @@ export async function load() {
     coverage: Object.fromEntries(parity.packages.map((p) => [p.name, percent(p.api)])),
     hero: {
       check: await heroPane("app/controllers/posts-controller.ts", "posts-controller.ts", "ts"),
-      view: await heroPane("app/views/posts/show.html.tse", "show.html.tse", "erb"),
+      view: await heroPane("app/views/post-mailer/published.html.tse", "published.html.tse", "erb"),
     },
     blocks: await Promise.all(
       blocks.map(async ({ lang, ...rest }) => ({
