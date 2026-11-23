@@ -312,4 +312,11 @@ export class Statement {
 
 include(Statement, Enumerable);
 
+export class Blob extends Uint8Array {
+  constructor(string: string) {
+    super(new TextEncoder().encode(string));
+  }
+}
+
 SQLite3.Statement = Statement;
+SQLite3.Blob = Blob;
