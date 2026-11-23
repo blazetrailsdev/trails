@@ -565,12 +565,7 @@ DSL.namespace("db", (dbNamespace) => {
     DSL.task(
       { dump: "load_config" },
       block(async () => {
-        await DatabaseTasks.withTemporaryPoolForEach({}, async (pool) => {
-          const dbConfig = pool.dbConfig;
-          const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
-            ActiveRecord.schemaFormat()) as SchemaFormat;
-          await DatabaseTasks.dumpSchema(dbConfig, schemaFormat);
-        });
+        await DatabaseTasks.dumpAll();
 
         dbNamespace.get("schema:dump")!.reenable();
       }),
@@ -582,7 +577,10 @@ DSL.namespace("db", (dbNamespace) => {
     DSL.task(
       { load: ["load_config", "check_protected_environments"] },
       block(async () => {
-        await DatabaseTasks.loadSchemaCurrent(ActiveRecord.schemaFormat(), ENV["SCHEMA"]);
+        await DatabaseTasks.loadSchemaCurrent(
+          ENV["SCHEMA_FORMAT"] as SchemaFormat | undefined,
+          ENV["SCHEMA"],
+        );
       }),
     );
 

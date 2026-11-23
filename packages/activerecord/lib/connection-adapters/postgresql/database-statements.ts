@@ -12,7 +12,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { aryJoin, b, count, eachWithIndex, fetch, rbRegMatchP } from "@blazetrails/ruby-compat";
+import { aryJoin, b, eachWithIndex, fetch, rbRegMatchP } from "@blazetrails/ruby-compat";
 import type { ConnectionPool, NullPool } from "../abstract/connection-pool.js";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
@@ -256,6 +256,7 @@ const IDLE_TRANSACTION_STATUSES = [PG.PQTRANS_IDLE, PG.PQTRANS_INTRANS, PG.PQTRA
 /**
  * @internal
  * @missingRailsCall library_version — PERMANENT
+ * @missingRailsCall new — PERMANENT
  */
 export async function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): Promise<void> {
   try {
@@ -343,7 +344,7 @@ export async function performQuery(
 
   this.verifiedBang();
   this.handleWarnings(result);
-  notificationPayload.row_count = count(result);
+  notificationPayload.row_count = result.ntuples();
   return result;
 }
 

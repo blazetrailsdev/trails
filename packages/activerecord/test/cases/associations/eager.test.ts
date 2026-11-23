@@ -1,4 +1,4 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, sortBy, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, AssociationNotFoundError, EagerLoadPolymorphicError } from "../../../lib/index.js";
 import { Notifications } from "@blazetrails/activesupport";
@@ -132,6 +132,8 @@ describe("EagerAssociationTest", () => {
     "pets",
     "references",
     "taggings",
+    "cpkOrders",
+    "cpkOrderAgreements",
   ]);
   beforeAll(async () => {
     constSet(TopLevel, "PostWithDefaultScope", PostWithDefaultScope);
@@ -1069,15 +1071,25 @@ describe("EagerAssociationTest", () => {
   });
 
   it("preloading has_many with cpk", async () => {
-    const order = await CpkOrder.create({ id: [2, 2] });
-    const orderId = (order as any).id[1];
-    const orderAgreement = await CpkOrderAgreement.create({ order_id: orderId });
+    const order1 = await CpkOrder.createBang({ shop_id: 200 });
+    const order2 = await CpkOrder.createBang({ shop_id: 300 });
+    const agreement1 = await (order1 as any).orderAgreements.createBang({ signature: "A" });
+    const agreement2 = await (order1 as any).orderAgreements.createBang({ signature: "Z" });
+    const agreement3 = await (order2 as any).orderAgreements.createBang({ signature: "A" });
+    const agreement4 = await (order2 as any).orderAgreements.createBang({ signature: "Z" });
 
-    const found = (await CpkOrder.all()
-      .eagerLoad(":orderAgreements")
-      .findBy({ id: orderId })) as any;
-    const agreements = found.association("orderAgreements").target;
-    expect(agreements.map((a: any) => a.id)).toEqual([orderAgreement.id]);
+    const relation = CpkOrder.where({ shop_id: [200, 300] }).eagerLoad(":orderAgreements");
+    const results = sortBy(await relation, (o: any) => o.shop_id) as any[];
+
+    expect(results).toEqual([order1, order2]);
+    expect(sortBy(await results[0].orderAgreements, (a: any) => a.signature)).toEqual([
+      agreement1,
+      agreement2,
+    ]);
+    expect(sortBy(await results.at(-1).orderAgreements, (a: any) => a.signature)).toEqual([
+      agreement3,
+      agreement4,
+    ]);
   });
 
   it("preloading has_one with cpk", async () => {

@@ -55,7 +55,9 @@ export class Column extends BaseColumn {
     return (
       other instanceof Column &&
       super.equals(other) &&
-      this.isAutoIncrement() === other.isAutoIncrement()
+      this.isAutoIncrement() === other.isAutoIncrement() &&
+      this.rowid === other.rowid &&
+      this.generatedType === other.generatedType
     );
   }
 
@@ -65,8 +67,17 @@ export class Column extends BaseColumn {
 
   override hash(): number {
     return (
-      rbHash(Column) ^ rbHash(super.hash()) ^ rbHash(this.isAutoIncrement()) ^ rbHash(this.rowid)
+      rbHash(Column) ^
+      rbHash(super.hash()) ^
+      rbHash(this.isAutoIncrement()) ^
+      rbHash(this.rowid) ^
+      rbHash(this.isVirtual())
     );
+  }
+
+  /** @internal */
+  protected get generatedType(): "stored" | "virtual" | null {
+    return this._generatedType;
   }
 
   override initWith(coder: ColumnCoder): void {

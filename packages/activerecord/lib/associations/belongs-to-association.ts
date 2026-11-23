@@ -146,9 +146,16 @@ export class BelongsToAssociation extends SingularAssociation {
       _readAttribute(n: string, block: (n: string) => unknown): unknown;
       missingAttribute(n: string, stack: string[]): never;
     };
-    return owner._readAttribute(this.reflection.foreignKey() as string, (n) =>
-      owner.missingAttribute(n, rbFCaller()),
-    );
+    const foreignKey = this.reflection.foreignKey();
+    if (Array.isArray(foreignKey)) {
+      const attributes = foreignKey.map((fk) =>
+        owner._readAttribute(fk, (n) => owner.missingAttribute(n, rbFCaller())),
+      );
+      if (attributes.some((a) => a != null && a !== false)) return attributes;
+      return null;
+    } else {
+      return owner._readAttribute(foreignKey, (n) => owner.missingAttribute(n, rbFCaller()));
+    }
   }
 
   /** @internal */
@@ -188,7 +195,9 @@ export class BelongsToAssociation extends SingularAssociation {
           targetKeyValues,
         )
       ) {
+        const ownerPk = kernelArray(this.owner.constructor.primaryKey);
         eachWithIndex(reflectionFk, (key, index) => {
+          if (record == null && ownerPk.includes(key)) return;
           this.owner.set(key, targetKeyValues[index]);
         });
       }

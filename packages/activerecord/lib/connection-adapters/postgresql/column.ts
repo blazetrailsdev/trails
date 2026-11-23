@@ -85,7 +85,8 @@ export class Column extends BaseColumn {
       other instanceof Column &&
       super.equals(other) &&
       this.isIdentity() === other.isIdentity() &&
-      this.isSerial() === other.isSerial()
+      this.isSerial() === other.isSerial() &&
+      this.isVirtual() === other.isVirtual()
     );
   }
 
@@ -95,7 +96,11 @@ export class Column extends BaseColumn {
 
   override hash(): number {
     return (
-      rbHash(Column) ^ rbHash(super.hash()) ^ rbHash(this.isIdentity()) ^ rbHash(this.isSerial())
+      rbHash(Column) ^
+      rbHash(super.hash()) ^
+      rbHash(this.isIdentity()) ^
+      rbHash(this.isSerial()) ^
+      rbHash(this.isVirtual())
     );
   }
 
