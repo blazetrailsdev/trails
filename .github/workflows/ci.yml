@@ -1223,7 +1223,9 @@ jobs:
       (needs.changes.outputs.trailties_affected == 'true' ||
       needs.changes.outputs.actioncable_only == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
-    timeout-minutes: 30
+    # configuration.test.ts runs ~97 Isolation tests, each in its own
+    # `vitest run` child (activesupport/lib/testing/isolation.ts), ~27 min.
+    timeout-minutes: ${{ matrix.shard == 'configuration' && 50 || 30 }}
     env:
       TRAILTIES_SHARD_TOTAL: 4
     strategy:
