@@ -12,7 +12,7 @@ export const Listen = {
   Listener,
 
   to(...args: (string | ListenerOptions | ListenerBlock)[]): Listener {
-    const listener = new Listener(...args);
+    const listener = new Listen.Listener(...args);
     listeners.push(new WeakRef(listener));
     return listener;
   },
