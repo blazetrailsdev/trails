@@ -1,4 +1,4 @@
-import { constSet, exitBang, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, exitBang, rbFSleep, TopLevel } from "@blazetrails/ruby-compat";
 import { include, type Included } from "@blazetrails/activesupport";
 import { GlobalID, Identification } from "@blazetrails/globalid";
 import { ApplicationRecord } from "./application-record.js";
