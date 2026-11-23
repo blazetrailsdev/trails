@@ -98,7 +98,7 @@ describe("LazyRouteSet", () => {
       if (loaded) return null;
       loaded = true;
       routes.draw(function () {
-        this.root({ to: "posts#index" });
+        this.root({ to: () => [200, {}, []] });
       });
       return true;
     });
@@ -118,6 +118,36 @@ describe("LazyRouteSet", () => {
 
     assertNotOperator("rootPath", "in", appUrlHelpers);
     assertOperator(appUrlHelpers, "respond_to?", "rootPath");
+  });
+
+  it("app lazily loads routes when making a request", async () => {
+    loadRoutesLazily();
+    const appUrlHelpers = routes.urlHelpers();
+
+    assertNotOperator("rootPath", "in", appUrlHelpers);
+    const response = await routes.call(MockRequest.envFor("/"));
+    expect(response[0]).toBe(200);
+  });
+
+  it("app lazily loads routes when url_for is used", () => {
+    let loaded = false;
+    reload.mockImplementation(() => {
+      if (loaded) return null;
+      loaded = true;
+      routes.draw(function () {
+        this.resources("products");
+      });
+      return true;
+    });
+    const appUrlHelpers = routes.urlHelpers() as unknown as {
+      urlFor(o: Record<string, unknown>): string;
+    };
+
+    assertNotOperator("productsPath", "in", appUrlHelpers);
+    expect(appUrlHelpers.urlFor({ controller: "products", action: "index", onlyPath: true })).toBe(
+      "/products",
+    );
+    expect("productsPath" in appUrlHelpers).toBe(true);
   });
 
   it("new_with_config builds an instance of the receiving subclass", () => {
