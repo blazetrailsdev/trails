@@ -15,7 +15,7 @@ export class NumberToDelimitedConverter extends NumberConverter<NumberWithDelimi
 
   /** @missingRailsCall times — PERMANENT */
   private parts(): string[] {
-    // eslint-disable-next-line prefer-const -- Ruby `left, right = number.to_s.split(".")` (`number_to_delimited_converter.rb:18`) reassigns only `left`.
+    // eslint-disable-next-line prefer-const
     let [left, right] = String(this.number).split(".");
     if (this.delimiterPattern() != null) {
       left = left.replace(
