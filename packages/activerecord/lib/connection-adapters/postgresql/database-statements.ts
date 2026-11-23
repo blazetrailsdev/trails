@@ -255,7 +255,6 @@ const IDLE_TRANSACTION_STATUSES = [PG.PQTRANS_IDLE, PG.PQTRANS_INTRANS, PG.PQTRA
 
 /**
  * @internal
- * @missingRailsCall library_version — PERMANENT
  * @missingRailsCall new — PERMANENT
  */
 export async function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): Promise<void> {
