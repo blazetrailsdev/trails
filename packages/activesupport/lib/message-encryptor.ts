@@ -86,8 +86,8 @@ export class MessageEncryptor extends Codec {
 
   /** @inlinedFrom ActiveSupport::Messages::Rotator#initialize rails/v8.0.5.2/activesupport/lib/active_support/messages/rotator.rb:6-12 */
   constructor(
-    secret: string | Buffer,
-    signSecret: string | Buffer | null = null,
+    secret: string | Uint8Array,
+    signSecret: string | Uint8Array | null = null,
     options: MessageEncryptorOptions = {},
   ) {
     const { onRotation = null, ...rest } = options;
@@ -99,7 +99,7 @@ export class MessageEncryptor extends Codec {
       forceLegacyMetadataSerializer: options.forceLegacyMetadataSerializer,
     });
 
-    this.secret = typeof secret === "string" ? Buffer.from(secret) : secret;
+    this.secret = Buffer.from(secret);
     this.cipher = options.cipher ?? (this.constructor as typeof MessageEncryptor).defaultCipher();
     this.aeadMode = this.newCipher().authenticated();
     this.verifier = !this.aeadMode
