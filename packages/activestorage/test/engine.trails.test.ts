@@ -131,6 +131,37 @@ describe("ActiveStorage::Engine", () => {
     }
   });
 
+  it("active_storage.services resolves configurations assigned after the initializer", async () => {
+    const activeStorage = (
+      TopLevel.Trails!.configuration as unknown as {
+        activeStorage: { serviceConfigurations?: unknown; service?: unknown };
+      }
+    ).activeStorage;
+    const { serviceConfigurations: configs, service } = activeStorage;
+    const { services, service: blobService } = Blob;
+    activeStorage.serviceConfigurations = { local: { service: "Disk", root: "tmp/storage" } };
+    activeStorage.service = "local";
+    try {
+      const initializer = Engine.initializers.find((i) => i.name === "active_storage.services")!;
+      await initializer.bind(Engine.instance()).run(app);
+      activeStorage.serviceConfigurations = {
+        s3: { service: "S3", bucket: "bucket", region: "us-east-1" },
+        gcs: { service: "GCS", bucket: "bucket", project: "project" },
+      };
+      activeStorage.service = "s3";
+      runLoadHooks("active_storage_blob", Blob);
+      expect(Blob.service!.constructor).toBe(constantize("ActiveStorage::Service::S3Service"));
+      expect(Blob.services.fetch("gcs").constructor).toBe(
+        constantize("ActiveStorage::Service::GCSService"),
+      );
+    } finally {
+      activeStorage.serviceConfigurations = configs;
+      activeStorage.service = service;
+      Blob.services = services;
+      Blob.service = blobService;
+    }
+  });
+
   it("active_storage.services reads config/storage.ts through the compiled-file map", async () => {
     const trails = TopLevel.Trails!;
     const activeStorage = (

@@ -1867,6 +1867,10 @@ jobs:
         env:
           ACTIVE_STORAGE_S3_ENDPOINT: http://localhost:8333
           ACTIVE_STORAGE_GCS_ENDPOINT: http://localhost:4443
+      - name: Boot with the cloud SDKs uninstalled
+        run: |
+          rm packages/activestorage/node_modules/@aws-sdk/client-s3 packages/activestorage/node_modules/@google-cloud/storage
+          node packages/activestorage/test/support/missing-cloud-sdk/boot.ts
 
   actioncable-redis-tests:
     name: Action Cable Redis Tests

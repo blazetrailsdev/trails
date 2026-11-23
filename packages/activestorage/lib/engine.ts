@@ -230,9 +230,7 @@ export class Engine extends TrailsEngine {
           ? await loadIseqEval(configFile)
           : null;
       /** @inventedArm load — PERMANENT */
-      await Configurator.load(
-        TopLevel.Trails!.configuration!.activeStorage.serviceConfigurations ?? mod?.default ?? {},
-      );
+      await Configurator.load();
 
       onLoad("active_storage_blob", () => {
         const activeStorage = TopLevel.Trails!.configuration!.activeStorage;

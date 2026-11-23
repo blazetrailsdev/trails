@@ -12,16 +12,15 @@ import { Service } from "../service.js";
 type ServiceClass = { build(config: { configurator: Configurator; name: string }): Service };
 
 const loadErrors = new Map<string, unknown>();
+const cloudServices = ["S3", "GCS"];
 
 /** @internal */
 export class Configurator {
   readonly configurations: Record<string, Record<string, unknown>>;
 
   /** @noRailsEquivalent PERMANENT */
-  static async load(configurations: Record<string, Record<string, unknown>>): Promise<void> {
-    for (const config of Object.values(configurations)) {
-      if (config.service == null) continue;
-      const className = String(config.service);
+  static async load(): Promise<void> {
+    for (const className of cloudServices) {
       loadErrors.delete(className);
       if (constDefined(Service, `${camelize(className)}Service`)) continue;
       try {

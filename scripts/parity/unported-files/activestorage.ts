@@ -52,11 +52,6 @@ export const ACTIVESTORAGE_UNPORTED_FILES: UnportedFile[] = [
     reason: CLOUD_SERVICE,
   },
   {
-    testFile: "service/gcs_service_test.rb",
-    package: "activestorage",
-    reason: CLOUD_SERVICE,
-  },
-  {
     testFile: "service/gcs_public_service_test.rb",
     package: "activestorage",
     reason: CLOUD_SERVICE,
