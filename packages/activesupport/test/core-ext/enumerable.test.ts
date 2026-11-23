@@ -490,9 +490,7 @@ describe("EnumerableTests", () => {
     expect(sole([1])).toBe(1);
     expect(() => sole([1, 2])).toThrow();
     expect(() => sole([1, null])).toThrow();
-    expect(() =>
-      sole(new GenericEnumerable(new Range(1, null) as unknown as Iterable<number>)),
-    ).toThrow();
+    expect(() => sole(new GenericEnumerable(new Range(1, null)))).toThrow();
   });
 
   it("sole returns same value as first for tuples", () => {
