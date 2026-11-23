@@ -7,8 +7,9 @@ import { Process, Shellwords, env as ENV, include, setEnv } from "@blazetrails/r
 import { camelize } from "@blazetrails/activesupport";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
+import { EnvHelpers } from "../support/env-helpers.js";
 
-type Host = Generation & TestRunnerTest;
+type Host = Generation & EnvHelpers & TestRunnerTest;
 
 class TestRunnerTest extends TestCase {
   runTestCommand(
@@ -46,6 +47,7 @@ class TestRunnerTest extends TestCase {
   }
 }
 include(TestRunnerTest, Isolation);
+include(TestRunnerTest, EnvHelpers);
 registerSpecType(/^TestRunnerTest$/, TestRunnerTest);
 
 function it(name: string, block: (t: Host) => Promise<void>): void {
@@ -208,5 +210,38 @@ describe("AccountsTest", () => {
     const output = await t.runTestCommand("test/models/account.test.ts");
     expect(output).toMatch("cannot load such file -- does-not-exist");
     expect(Process.lastStatus!.isSuccess()).toBeFalsy();
+  });
+
+  it("system tests are not run with the default test command", async (t) => {
+    await t.appFile(
+      "test/system/dummy.test.ts",
+      `
+        import "../application-system-test-case.ts";
+        import { describe, it, expect } from "vitest";
+
+        describe("DummyTest", () => {
+          it("something", () => {
+            expect(true).toBe(true);
+          });
+        });
+`,
+    );
+
+    const output = await t.runTestCommand("");
+    expect(output).toMatch("0 runs, 0 failures, 0 errors, 0 skips");
+  });
+
+  it("run does not load file from the fixture folder", async (t) => {
+    await t.createTestFile("fixtures", "smoke_foo");
+
+    expect(await t.runTestCommand("")).toMatch("0 runs, 0 failures, 0 errors, 0 skips");
+  });
+
+  it("can exclude files from being tested via default trails command by setting DEFAULT_TEST_EXCLUDE env var", async (t) => {
+    await t.createTestFile("smoke", "smoke_foo");
+
+    await t.switchEnv("DEFAULT_TEST_EXCLUDE", "test/smoke/**/*.test.ts", async () => {
+      expect(await t.runTestCommand("")).toMatch("0 runs, 0 failures, 0 errors, 0 skips");
+    });
   });
 });
