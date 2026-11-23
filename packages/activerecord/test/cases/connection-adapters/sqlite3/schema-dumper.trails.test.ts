@@ -25,7 +25,7 @@ const dumper = await SchemaDumper.create({
   quote: (v: string) => `'${v}'`,
   queryValue: async () => 'CREATE TABLE "t" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL)',
 } as any);
-(dumper as any).tableName = "t";
+dumper.tableName = "t";
 
 describe("SQLite3::SchemaDumper", () => {
   it("isDefaultPrimaryKey: true for integer columns", async () => {
