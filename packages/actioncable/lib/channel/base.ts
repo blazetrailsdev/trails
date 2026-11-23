@@ -101,6 +101,7 @@ export class Base {
   private _rejectSubscription: boolean | null;
   /** @internal */
   private _subscriptionConfirmationSent: boolean | null;
+  /** @internal */
   private _unsubscribed: boolean;
   /** @internal */
   private _parameterFilter?: ParameterFilter;
@@ -180,12 +181,12 @@ export class Base {
   }
 
   /** @internal */
-  protected unsubscribed(): unknown {
+  protected subscribed(): unknown {
     return null;
   }
 
   /** @internal */
-  protected subscribed(): unknown {
+  protected unsubscribed(): unknown {
     return null;
   }
 
