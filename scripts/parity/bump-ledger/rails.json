@@ -1161,14 +1161,6 @@
   },
   {
     "package": "activerecord",
-    "rubyFile": "tasks/database_tasks.rb",
-    "rubyName": "schema_up_to_date?",
-    "kind": "signature",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activerecord",
     "rubyFile": "tasks/postgresql_database_tasks.rb",
     "rubyName": "remove_sql_header_comments",
     "kind": "drift",

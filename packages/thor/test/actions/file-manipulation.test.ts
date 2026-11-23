@@ -146,6 +146,7 @@ describe("Thor::Actions", () => {
 
         readline.mockResolvedValueOnce("d").mockResolvedValueOnce("y");
         await action("copyFile", "encoding_with_utf8.thor");
+        expect(readline).toHaveBeenCalledTimes(2);
         expect(rbFSystem).toHaveBeenCalledWith(expect.stringMatching(/diff -u/));
 
         isExistsAndIdentical("encoding_with_utf8.thor", "encoding_with_utf8.thor");
