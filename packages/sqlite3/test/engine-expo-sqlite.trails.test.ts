@@ -134,4 +134,23 @@ describe("SQLite3::Database over the expo-sqlite engine", () => {
     expect(await stmt.step()).toEqual([9007199254740993n, "x", 1.5, 2n]);
     await stmt.close();
   });
+
+  it("reads a negative INTEGER past -2^53 exactly, and honors a toggle between executions", async () => {
+    const stmt = await db.prepare("SELECT -9007199254740993");
+    expect(await stmt.step()).toEqual([-9007199254740992]);
+    await stmt.resetBang();
+    stmt.setReadBigInts(true);
+    expect(await stmt.step()).toEqual([-9007199254740993n]);
+    await stmt.resetBang();
+    stmt.setReadBigInts(false);
+    expect(await stmt.step()).toEqual([-9007199254740992]);
+    await stmt.close();
+  });
+
+  it("falls back to number reads for a statement a CTE cannot wrap", async () => {
+    const stmt = await db.prepare("INSERT INTO t VALUES (9007199254740993, 'r') RETURNING a");
+    stmt.setReadBigInts(true);
+    expect(await stmt.step()).toEqual([9007199254740992]);
+    await stmt.close();
+  });
 });

@@ -99,6 +99,7 @@ function prepareStatement(
   let closed = false;
   let readBigInts = false;
   let typed: Promise<ExpoStatement | null> | null = null;
+  let wide = false;
 
   const stmt = (): Promise<ExpoStatement> =>
     (prepared ??= opening().then((db) => db.prepareAsync(sql)));
@@ -143,8 +144,9 @@ function prepareStatement(
       }
       if (rows === null) {
         const cols = (await metadata()).map((_, i) => `c${i}`);
-        const st =
-          (readBigInts && cols.length !== 0 && (await (typed ??= intText(cols)))) || (await stmt());
+        const wider = readBigInts && cols.length !== 0 ? await (typed ??= intText(cols)) : null;
+        wide = wider !== null;
+        const st = wider ?? (await stmt());
         const result = await withBusyHandler(handler, () => st.executeForRawResultAsync(params()));
         setChanges(result.changes);
         if (cols.length === 0) {
@@ -159,7 +161,7 @@ function prepareStatement(
         return null;
       }
       const n = names!.length;
-      if (r.value.length === n) return r.value;
+      if (!wide) return r.value;
       return r.value
         .slice(0, n)
         .map((v, i) => (r.value[n + i] != null ? BigInt(r.value[n + i] as string) : v));
