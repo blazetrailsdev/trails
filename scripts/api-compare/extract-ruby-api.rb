@@ -1741,6 +1741,8 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
   end
 
+  DEFINE_METHOD_NOTES = %w[define_method define_method_macro].freeze
+
   # Resolve the two ways one bucket can end up holding the same name twice.
   #
   # A `Struct.new(...)` accessor lives on the anonymous struct SUPERCLASS, so
@@ -1759,8 +1761,6 @@ class ApiExtractor
   # escape_html` off an `if defined?(ERB::Escape)` — and only one of the two is
   # ever live. The literal `def` wins: it carries the deps, calls and body
   # digest a metaprogrammed entry has no way to supply.
-  DEFINE_METHOD_NOTES = %w[define_method define_method_macro].freeze
-
   public def dedupe_define_methods!
     (@classes.to_a + @modules.to_a).each do |_fqn, info|
       [:instanceMethods, :classMethods].each do |bucket|
