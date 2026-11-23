@@ -79,7 +79,6 @@ export const Bundler = {
         throw error;
       }
       const requiredFile = File.expandPath(entry, dir);
-      // vendor/ruby/v3.3.11/lib/bundler/runtime.rb:68: a gem with no file of its own name (the `rails` meta-gem) loads nothing.
       if (!(await File.isExistAsync(requiredFile))) continue;
       await import(new URL(`file://${requiredFile}`).href);
     }
