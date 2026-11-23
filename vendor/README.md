@@ -185,124 +185,191 @@ The JavaScript these gems ship (`turbo-rails/app/javascript/turbo/`, the npm
 dependency, not a port. `compareApi` and `compareTests` are off until the RFC
 creates each `packages/<name>`.
 
-## Scoping a Rails bump (drift report)
+## Scoping a Rails bump (dry run)
 
-We pin `rails` to one tag in `sources.ts` (today `v8.0.2`) while upstream moves
-on. Before bumping that pin, run the cross-version API drift report to scope the
-work:
+Scope any bump, Rails or a gem, with the dry run (RFC 0191 § 7):
 
 ```sh
-pnpm parity:api             # builds output/rails-api.json (base) + output/ts-api.json (ported)
-pnpm parity:api:drift --ref v8.1.3
+pnpm parity:bump:dry-run --source <name> --ref <tag>
 ```
 
-`parity:api:drift` fetches the target ref reproducibly into `output/drift-src-<ref>/`
-(its own lock entry in `output/drift.lock.json`, plus the resolved
-`targetSha` in the report — the canonical pin in `sources.ts` stays the single
-active source), extracts its Ruby API to `output/rails-api@<ref>.json`, diffs it
-against the pinned surface, and writes `output/version-drift.json`: classes
-added/removed, per-method signature changes, visibility flips, and call-set
-(body) deltas. Signature deltas include changes to non-primitive default values
-(e.g. `{}` → `{ a: 1 }`), not just primitive literals.
+It fetches the candidate beside the active version, runs every gating step of
+ci.yml's `rails-comparison` job against the active manifests and then against
+the candidate's, and writes the versioned report to
+`scripts/parity/bump-ledger/reports/<source>-<from>-<to>.<date>.json` (commit
+it), plus the ledger seed, the attribution of every new gate row and the size
+tables under `scripts/parity/output/bump-dry-run/<source>@<ref>/`. It needs a
+clean tracked tree, restores every tracked file from `HEAD` when it finishes,
+and refuses a run that left one changed. Commit or set aside your work before
+starting it.
 
-**Package granularity:** the class/method diff only covers packages both
-manifests carry. Both extractions run over the same `sources.ts` rails package
-set, so a one-sided package is an extraction asymmetry (the base manifest also
-holds non-rails gems like rack/globalid), not real drift — it's skipped at that
-level. To catch whole-gem add/remove without manual `Gemfile` eyeballing, the
-report also carries `addedPackages`/`removedPackages`: the delta of the rails
-monorepo subgem list (each ref's `*/*.gemspec` plus the root `rails.gemspec`)
-between the base pin and the target ref. Gems outside the monorepo (rack,
-globalid) never appear in either list, so they're not reported as removed.
-Auto-adding a discovered gem to `sources.ts` stays a manual decision.
-
-Each entry carries a `ported` flag (from `output/ts-api.json`) so drift in
-surface **we ported** is separable from churn we never touched.
-`summary.portedAffected` counts the items landing on our ported surface, each at
-its own granularity: an added/removed class we have; an added/removed method on
-a class we have (the method is new/gone upstream, so class membership is the
-test); and a changed method we have (matched by name). A changed method we never
-ported doesn't count — that drift isn't ours to act on. The diff core lives in
-`scripts/api-compare/version-diff.ts` (pure, unit-tested).
-
-Bumping the pin itself (editing `sources.ts` to the new tag) is a separate
-decision, not something the report does.
-
-Re-pinning the body-hash floor is a step of **every** bump — see step 6 of
-[Upgrading a source](#upgrading-a-source-bumping-ref) below.
+The dry run supersedes hand-running `parity:api:drift` for scoping. The drift
+report (`pnpm parity:api:drift --ref <tag>`, writing
+`output/version-drift.json`) is still there for a method-level read of the
+Rails API alone: classes added and removed, signature, visibility and call-set
+deltas, each flagged `ported`, and the `addedPackages` / `removedPackages`
+delta of the monorepo's gemspecs. The diff core is
+`scripts/api-compare/version-diff.ts`.
 
 ## Upgrading a source (bumping `ref`)
 
 Each source's clones live in version directories (`vendor/<source>/<version>/`,
 RFC 0159), so a candidate version can sit on disk beside the active one while
 the upgrade is scoped. The active version is always `versionDir(ref)` of the
-`ref` in `sources.ts`; nothing else is. In order:
+`ref` in `sources.ts`; nothing else is.
 
-1. **Fetch the candidate beside the active version.**
-   `pnpm vendor:fetch --source <name> --ref <new-tag>` clones the tag into
-   `vendor/<name>/<versionDir(new-tag)>/`. It never reads or writes
-   `sources.lock.json`, and no `--print-*` manifest ever answers it, so every
-   gate keeps measuring the active version while the candidate is on disk.
-2. **Diff the two trees.** For example
-   `git diff --no-index --stat vendor/rails/v8.0.2/activerecord/lib vendor/rails/v8.1.0/activerecord/lib`,
-   narrowed to the files trails ports; for Rails, the drift report above scopes
-   the same diff at method granularity.
-3. **Bump `ref` in `sources.ts`.** That one edit moves the active version for
-   every consumer — `fetch.ts`, the `--print-*` manifests, the compare tooling,
-   the citation gate and `vendor:recite`.
-4. **Re-fetch.** `pnpm vendor:fetch --source <name>`. The lockfile entry still
-   names the old `ref`, so the fetch treats it as the pin being bumped: it
-   adopts the candidate clone from step 1 (or clones the tag) and re-locks
-   `sources.lock.json` to the new SHA. Commit the lockfile with the `ref`.
-   Then run `pnpm vendor:mirrors`, which rewrites the `mirrors` field in the
-   `package.json` of every package ported from the source, and commit those
-   files in the same PR. Preflight's "Package mirrors fields" step
-   (`scripts/vendor-mirrors.ts --check`) fails a bump that skips this; never
-   switch it off. `mirrors` names the ref the gates measure the package
-   against, not a finished burn-down: the source's bump ledger says what is
-   still open.
-5. **Rewrite the citations.** Save the stale list first —
-   `pnpm vendor:recite --check` prints every file carrying a
-   `vendor/<name>/<old-version>/…` citation, the same set
-   `scripts/vendor-citations.test.ts` now fails on — then run
-   `pnpm vendor:recite` to rewrite them to the new version. Make this sweep its
-   own commit, separate from any port changes, so a reviewer can read it as the
-   mechanical rewrite it is.
-6. **Read both worklists, then re-verify and re-pin.**
-   - **The citation gate's stale list** (step 5) answers _did the path move?_
-     `vendor:recite` rewrites only the version segment, so each rewritten
-     citation still has to name a file and line that exist, and hold the same
-     code, in the new tree. For `vendor/ruby/` the
-     `ruby-compat-needs-mri-citation` lint checks the file and line range
-     mechanically (`unknownFile` / `lineOutOfRange`); elsewhere it is a read.
-   - **`pnpm parity:api:pins`** (`scripts/api-compare/lint-body-pins.ts`)
-     answers _did the body change?_ Its DRIFT rows are the pinned, ported pairs
-     whose normalized Ruby body no longer matches its pin. Re-verify each TS
-     port against the new body, fix it, then re-pin with
-     `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>` (or
-     `pnpm parity:api:pins:all` once the list is burnt down). See
-     CONTRIBUTING.md "Body pins".
+### Minor and patch bumps
 
-   **A green citation gate is not evidence a port is still faithful.** It goes
-   green the moment `vendor:recite` runs, and a citation that still resolves
-   can point at a body that changed under it. The DRIFT list is the fidelity
-   worklist; the citation list only keeps the pointers honest.
+A patch bump (`v8.0.2` → `v8.0.5.2`) and a minor bump (`v8.0` → `v8.1`) run
+the same nine steps. They differ in size, and size decides the shape:
 
-7. **Prune.** `pnpm vendor:fetch --prune` (optionally `--source <name>`)
-   deletes every inactive version directory. It is manual — nothing prunes on
-   its own, so the old tree stays on disk until you run it.
+- **Fits one PR.** If the dry run's seed and the fixes for every red fit the
+  PR ceiling, the bump is one PR with no ledger file: pin floor, flip, recite,
+  converge and re-pin every drifted body, in separate commits (zeitwerk
+  `v2.7.3`, trails#10621). Most gem patch bumps are this shape.
+- **Does not fit.** The flip PR seeds a bump ledger, and burn-down stories in
+  their own RFC clear it, one PR per package (rails `v8.0.5.2`,
+  trails#10554). A minor Rails bump is always this shape: `v8.1.4` moves 187
+  arel tests on its own.
+
+A minor bump also moves Rails' version constants and usually adds or removes
+whole gems (`addedPackages` / `removedPackages` in the drift report); a patch
+bump inside a line moves only `TINY` / `PRE`.
+
+### The runbook
+
+1. **Resolve the target.** For Rails, check that the target line is inside Rails'
+   maintenance window (<https://rubyonrails.org/maintenance>); a line past
+   its security support takes its last release and no more.
+   A gem has no maintenance window; its target is the version the
+   dependent-source rule below names. `git ls-remote --tags <url> '<tag>*'`
+   (for Rails, `'v<major>.<minor>*'`), and record the tag and
+   its `^{}` commit SHA (the `^{}` line is the commit an annotated tag
+   points at, and is what `sources.lock.json` locks). Read the tag's
+   `Gemfile.lock` and every `*.gemspec` diff against
+   `vendor/sources.lock.json`.
+   **The dependent-source rule:** every other source moves to what the target
+   Rails `Gemfile.lock` resolves, unless the pin is already at or past it.
+   **Gemspec floors are the one way a gem is forced to move with Rails**: a
+   `Gemfile.lock` version is a convenience, but a runtime-dependency floor
+   (`rails-html-sanitizer >= 1.7.2`, which in turn forces
+   `loofah >= 2.25.3` and `nokogiri >= 1.19.5`) is a requirement. Note every
+   forced gem; it is bumped first in step 9.
+2. **Fetch beside and dry-run.**
+   `pnpm vendor:fetch --source <name> --ref <tag>` clones
+   `vendor/<name>/<versionDir(tag)>/` without touching the lockfile, and no
+   `--print-*` manifest answers it, so every gate keeps measuring the active
+   version. Then `pnpm parity:bump:dry-run --source <name> --ref <tag>`
+   ([above](#scoping-a-rails-bump-dry-run)). Put its tables in the upgrade
+   RFC and commit its report. For a hand read,
+   `git diff --no-index --stat vendor/<name>/<old>/<lib> vendor/<name>/<new>/<lib>`,
+   narrowed to the files trails ports.
+3. **Entry.** For Rails, RFC 0191 § 4's criteria: the dry run reports no red
+   outside the ledger, every gate is green on `main`, zero unpinned matched
+   bodies. **Retake the pin floor on the old ref**, as late as possible:
+   For Rails, `pnpm parity:api:pins:all`. For a gem, `body-pins.ts` has no
+   per-source filter, so copy `body-pins.json` aside, run
+   `pnpm parity:api:pins:all`, then rebuild the file as the copy plus the
+   new run's rows whose `package` is the gem's (a short `node -e` filter,
+   sorted by `package rubyFile rubyName` in code-point order), and
+   `git checkout` every other file the run rewrote, such as
+   `bump-ledger/rails.json`. `git diff --stat` should show only
+   `body-pins.json`, with additions only. **If the bump will need a
+   ledger, the floor merges in its own PR before the flip**:
+   `parity:api:pins:ledger` recomputes the seed from the base branch's pins,
+   so a floor and a ledger seed in one PR do not agree
+   (`lint-bump-ledger.ts`, trails#10577). A bump with no ledger carries the
+   floor as its first commit.
+4. **Flip PR**, in separate commits:
+   - `ref: "<tag>"` in `vendor/sources.ts`, then
+     `pnpm vendor:fetch --source <name>`, which adopts the candidate from
+     step 2 and re-locks `vendor/sources.lock.json` to the new SHA. Run
+     `pnpm vendor:mirrors` and commit the rewritten `mirrors` fields;
+     Preflight's "Package mirrors fields" step fails a bump that skips it.
+     `mirrors` names the ref the gates measure against, not a finished
+     burn-down.
+   - The dry-run report and, if one is needed, the seeded ledger
+     (`scripts/parity/bump-ledger/<source>.json` and `<source>.tests.json`).
+   - `pnpm vendor:recite --check`, saved as
+     `bump-ledger/reports/<source>-<from>-<to>.recite-check.txt`, then
+     `pnpm vendor:recite`, as its own commit, so a reviewer reads it as the
+     mechanical rewrite it is.
+   - `pnpm parity:api:inlined:fix`.
+   - Rows the bump makes stale on units outside the ledger, deleted by hand,
+     with each gate's `:tighten` command. No reseed, no wider baseline.
+   - Regenerated artifacts: the rails-private, deprecation, method-order and
+     test-name manifests, the conventions doc, the schema-parity `Gemfile`.
+   - Version constants Rails states as literals (each package's
+     `gem-version.ts`).
+   - Anything a gate still reports on a unit outside the ledger is fixed in
+     this PR.
+5. **Tag** the flip commit's parent `rails-<old>` (annotated, with the parity
+   summary in its message), once the flip has merged; trails squash-merges,
+   so the flip has one parent. Tags only: no stable branch until a published
+   line needs a backport (RFC 0191 § 5). Gems are not tagged.
+6. **Generate** the burn-down stories:
+   `pnpm parity:bump:stories --source <name> --from <old> --to <new> --from-tests … --rfc <rfc> --out <dir>`
+   writes one story per package, split where a package is too large, into a
+   new burn-down RFC. Write the story ids into the ledger rows.
+7. **Burn down.** Each story re-verifies its ledgered bodies against the new
+   tree, fixes the port, and runs
+   `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>`, which
+   deletes the rows it clears; `pnpm parity:api:pins` shows what is left. Port
+   what is new, delete what is gone, and re-read each recited citation from
+   the saved `--check` list: `vendor:recite` rewrites only the version
+   segment, so a citation that still resolves can name a line whose code
+   moved. For `vendor/ruby/`, `ruby-compat-needs-mri-citation` checks the
+   file and line range mechanically.
+   **A green citation gate is not evidence a port is still faithful**; the
+   ledger is the fidelity worklist.
+8. **Close.** The ledger is empty and deleted, `pnpm parity:api:pins` shows 0
+   DRIFT and 0 STALE, `pnpm vendor:fetch --prune --source <name>` deletes the
+   inactive version directory (nothing prunes on its own), the retrospective
+   is written and the RFC closes.
+9. **Dependent sources** by the same steps, gemspec-forced ones first, in
+   dependency order (nokogiri before loofah before rails-html-sanitizer),
+   then smallest first. Each gem retakes its own floor.
 
 ### What the parity gates do across a bump
 
-- `parity:api` / `parity:test` deltas move, in both directions: upstream adds,
-  removes and renames methods and tests, so a bump PR reports movement it did
-  not port.
-- The call, argument, parameter, predicate and extra-surface baselines stay
-  **only-shrink**. A row a bump makes stale is deleted by hand (and the mark
-  tightened); a bump never licenses a reseed or a wider baseline.
-- A method new upstream surfaces as **missing** — a Ruby name with no TS
-  counterpart — never as extra surface; `parity:api:extra` moves only when a
-  method trails already ports is removed upstream.
+Without a ledger, a `ref` move reds the per-unit ratchets on every unit whose
+upstream changed. The ledger scopes those ratchets off its units, and nothing
+else:
+
+| Gate                                                         | Across a bump                                                        |
+| ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Body-pins gate                                               | ledgered DRIFT / STALE pairs reported as `ledger` and passed         |
+| Bump-ledger gate (`parity:api:pins:ledger`)                  | reds a stale row, a row added without a `ref` move, a seed mismatch  |
+| Call, call-argument, ruby-compat-call, receipt-audit ratchet | rows on a ledgered pair not counted                                  |
+| Missing-throw arm, extra-surface, parameter, block ratchet   | rows on a ledgered pair not counted                                  |
+| Test comparison (gate-mismatch), assertion ratchet           | a ledgered test (`<source>.tests.json`) not counted                  |
+| Vendor citations, inlined-from spans                         | made green mechanically in the flip (`vendor:recite`, `inlined:fix`) |
+| Rails-private JSDoc, method-order lint                       | made green mechanically in the flip (regenerated manifests, autofix) |
+| `parity:api` / `parity:test`                                 | move both ways: upstream adds, removes and renames methods and tests |
+
+The ledger rules:
+
+1. **Seeded once, mechanically, by the PR that moves the `ref`**, from the dry
+   run's output for the two refs. Row kinds are `drift`, `removed`,
+   `signature` and `constant` for pairs, `changed` and `moved` for tests.
+   Nobody authors a row.
+2. **Only-shrink.** A row may be added only by a commit that also moves that
+   source's `ref`.
+3. **A row leaves when its unit is re-verified**: `--pin` (or `--prune` for a
+   confirmed removal) deletes it, and from that commit every ratchet applies
+   to the unit at full strength. A row whose pin already matches is stale,
+   and stale is red.
+4. **A straddling PR is refused**: one forked before the `ref` move that
+   edits `body-pins.json` fails until rebased.
+5. **Empty means deleted**, and no trails release is tagged while a ledger
+   has rows.
+
+A row is "not yet re-verified", never "accepted" (CLAUDE.md § "A documented
+deviation is debt, not permission"). Every other baseline stays
+**only-shrink** across a bump: a row the bump makes stale is deleted by hand
+and its mark tightened. A method new upstream surfaces as **missing**, never
+as extra surface; `parity:api:extra` moves only when a method trails ports is
+removed upstream.
 
 ### Disk cost
 
@@ -317,16 +384,3 @@ for `ruby`, under 3 MiB for each gem. Nothing reclaims it until `--prune` runs.
 (or spawns `pnpm vendor:fetch --print-paths`). Never write a
 `vendor/<source>/<version>` literal into code: it silently keeps reading the
 old tree after a bump.
-
-## Status
-
-| Wave | Status  | What landed                                                                                 |
-| ---- | ------- | ------------------------------------------------------------------------------------------- |
-| 1    | merged  | schema + rails-only `SOURCES` list (#1559)                                                  |
-| 2a   | merged  | `fetch.ts` + lockfile + rack entry + parallel fetch (#1561)                                 |
-| 2b   | merged  | consumers cut over; old `.rails-source/.rack-source` retired (#1563)                        |
-| 3    | merged  | globalid entry (git clone of `rails/globalid`); `scripts/globalid-source/` deleted (#1578)  |
-| 4    | merged  | `api-compare` derives `PACKAGES` from `SOURCES` (#1579)                                     |
-| 5    | merged  | `test-compare` reads from `vendor/sources.ts` via `--print-test-paths` (#1586)              |
-| 6    | merged  | rack + globalid + abstractcontroller wired into api-compare via `--print-lib-paths` (#1589) |
-| 7    | this PR | parity-schema Gemfile generated from `vendor/sources.ts`; plan complete                     |
