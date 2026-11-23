@@ -100,6 +100,6 @@ describe("OrderedOptions#fetch", () => {
     }
     expect(error).toBeInstanceOf(KeyError);
     expect((error as KeyError).message).toBe("key not found: :nothing");
-    expect((error as KeyError).key()).toBe("nothing");
+    expect((error as KeyError).key()).toBe(":nothing");
   });
 });
