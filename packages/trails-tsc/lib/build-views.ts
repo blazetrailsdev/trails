@@ -84,6 +84,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const appDir = path.dirname(viewsDir);
   const helpers = await allHelpersFromPath(path.join(appDir, "helpers"));
   const controllers = await allControllers(path.join(appDir, "controllers"));
+  const mailers = await allMailers(path.join(appDir, "mailers"));
   const views: ViewShim[] = [];
   const handled: HandlerShim[] = [];
   for (const rel of files) {
@@ -121,7 +122,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
       }),
       strictLocals: ast.localsSignature !== null,
       resolved: false,
-      ...(await templateScope(appDir, rel, path.dirname(outBase), helpers, controllers)),
+      ...(await templateScope(appDir, rel, path.dirname(outBase), helpers, controllers, mailers)),
     });
     await writeShim(views[views.length - 1], viewsDir);
     const registryKey = partialRegistryKey(rel);
@@ -244,6 +245,23 @@ interface Controller {
   file: string;
   name: string;
   path: string;
+}
+
+async function allMailers(mailersDir: string): Promise<string[]> {
+  if (!(await exists(mailersDir))) return [];
+  return (await fs.readdir(mailersDir, { recursive: true, encoding: "utf8" }))
+    .map((file) => file.split(path.sep).join("/"))
+    .filter((file) => file.endsWith("-mailer.ts"))
+    .map((file) => file.slice(0, -".ts".length));
+}
+
+function isMailerView(
+  rel: string,
+  layout: string | undefined,
+  mailers: readonly string[],
+): boolean {
+  if (layout !== undefined) return /(?:^|[/-])mailer$/u.test(layout);
+  return mailers.includes(path.posix.dirname(rel));
 }
 
 async function allControllers(controllersDir: string): Promise<Controller[]> {
@@ -957,6 +975,7 @@ async function templateScope(
   shimDir: string,
   helpers: readonly string[],
   controllers: readonly Controller[],
+  mailers: readonly string[],
 ): Promise<Pick<ViewShim, "view" | "locals" | "model" | "base" | "controller" | "layout">> {
   const view = ['import("@blazetrails/actionview").Base'];
   for (const file of helpers) {
@@ -973,6 +992,16 @@ async function templateScope(
   const layout = /^layouts\/((?:[^/]+\/)*[^_/][^/.]*)\./u.exec(rel)?.[1];
   const controller =
     layout === undefined ? controllers.find((c) => dasherize(c.path) === prefix) : undefined;
+  const helpersFrom =
+    controller ??
+    (isMailerView(rel, layout, mailers)
+      ? undefined
+      : controllers.find((c) => c.path === "application"));
+  if (helpersFrom !== undefined) {
+    view.push(
+      `((typeof import(${importPath(shimDir, helpersFrom.file)}))[${JSON.stringify(helpersFrom.name)}] extends { _helpers: infer H } ? H : unknown)`,
+    );
+  }
   const locals = new Map<string, Set<string>>();
   let modelClass: ViewShim["model"];
   const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));

@@ -54,9 +54,9 @@ type EngineHelpers = typeof DriveHelper &
   typeof StreamsHelper &
   typeof ActionHelper;
 
-declare module "@blazetrails/actionview" {
+declare module "@blazetrails/actionpack" {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  interface Base extends EngineHelpers {}
+  interface BaseHelpers extends EngineHelpers {}
 }
 
 declare module "@blazetrails/trailties/trailtie/configuration" {

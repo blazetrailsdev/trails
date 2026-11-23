@@ -331,8 +331,10 @@ function gateRegex(yml: string, name: string): RegExp {
  *
  *  WEBSITE_PKGS_RE
  *  website_affected gates the Website build (SvelteKit + typedoc +
- *  VitePress). Scoped narrowly to packages/website/ — package-source
- *  changes alone don't trigger it. To run the site build on a PR
+ *  VitePress) and the home page hero check. Scoped to packages/website/,
+ *  examples/homepage/, and the two compilers whose output the hero
+ *  check reads (packages/trails-tsc/, packages/tse-compiler/) — other
+ *  package-source changes alone don't trigger it. To run the site build on a PR
  *  that touches package sources, apply the `website` label (or the
  *  `release` label, which always runs it). The job is also
  *  exercised post-merge by push-to-main.
@@ -1438,6 +1440,15 @@ describe("CI runs every tooling test suite", () => {
       expect(withPackage.website_only).toBe("false");
 
       expect((await runGate("packages/websites/x.ts")).website_only).toBe("false");
+
+      for (const hero of [
+        "examples/homepage/app/models/post.ts",
+        "packages/trails-tsc/lib/build-views.ts",
+        "packages/tse-compiler/src/index.ts",
+      ]) {
+        expect((await runGate(hero)).website_affected).toBe("true");
+      }
+      expect((await runGate("packages/activerecord/src/base.ts")).website_affected).toBe("false");
     },
   );
 
