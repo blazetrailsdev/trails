@@ -437,9 +437,7 @@ export const Predications: PredicationsModule = {
     ...extras: unknown[]
   ): Grouping {
     const nodes = others.map(predicationDispatch(this, methodId, extras));
-    if (nodes.length === 0)
-      return new Nodes.Grouping(new Nodes.SqlLiteral("NULL", { retryable: true }));
-    return new Nodes.Grouping(nodes.reduce((memo, node) => new Nodes.Or([memo, node])));
+    return new Nodes.Grouping(new Nodes.Or(nodes));
   },
 
   groupingAll<T extends PredicationHost>(

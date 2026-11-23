@@ -79065,8 +79065,8 @@
     "package": "arel",
     "rubyFile": "attributes/attribute.rb",
     "rubyName": "grouping_any",
-    "digest": "6d8df06200978ba5",
-    "ref": "v8.0.2"
+    "digest": "4c9a89509396d3bd",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -79513,8 +79513,8 @@
     "package": "arel",
     "rubyFile": "crud.rb",
     "rubyName": "compile_delete",
-    "digest": "15058ba334c91881",
-    "ref": "v8.0.2"
+    "digest": "cb3a0faa2a6df61f",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -79527,8 +79527,8 @@
     "package": "arel",
     "rubyFile": "crud.rb",
     "rubyName": "compile_update",
-    "digest": "c41fc2bb14af2158",
-    "ref": "v8.0.2"
+    "digest": "2097c4532b3a0a87",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -80215,24 +80215,24 @@
     "package": "arel",
     "rubyFile": "nodes/delete_statement.rb",
     "rubyName": "eql?",
-    "digest": "1c81a5dca8e164b6",
-    "ref": "v8.0.2",
+    "digest": "4d34f83823bc7af4",
+    "ref": "v8.0.5.2",
     "reason": "arel-verify-and-pin-eql-hash-bodies"
   },
   {
     "package": "arel",
     "rubyFile": "nodes/delete_statement.rb",
     "rubyName": "hash",
-    "digest": "924b255a59ec4efc",
-    "ref": "v8.0.2",
+    "digest": "c58a6cdf6171a46b",
+    "ref": "v8.0.5.2",
     "reason": "arel-verify-and-pin-eql-hash-bodies"
   },
   {
     "package": "arel",
     "rubyFile": "nodes/delete_statement.rb",
     "rubyName": "initialize",
-    "digest": "a121a2adee0b7066",
-    "ref": "v8.0.2"
+    "digest": "567adcfbfd61ea28",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -80647,8 +80647,8 @@
     "package": "arel",
     "rubyFile": "nodes/infix_operation.rb",
     "rubyName": "grouping_any",
-    "digest": "6d8df06200978ba5",
-    "ref": "v8.0.2"
+    "digest": "4c9a89509396d3bd",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -81290,8 +81290,8 @@
     "package": "arel",
     "rubyFile": "nodes/node_expression.rb",
     "rubyName": "grouping_any",
-    "digest": "6d8df06200978ba5",
-    "ref": "v8.0.2"
+    "digest": "4c9a89509396d3bd",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -81819,8 +81819,8 @@
     "package": "arel",
     "rubyFile": "nodes/sql_literal.rb",
     "rubyName": "grouping_any",
-    "digest": "6d8df06200978ba5",
-    "ref": "v8.0.2"
+    "digest": "4c9a89509396d3bd",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -82231,24 +82231,24 @@
     "package": "arel",
     "rubyFile": "nodes/update_statement.rb",
     "rubyName": "eql?",
-    "digest": "1b004720b33eaa79",
-    "ref": "v8.0.2",
+    "digest": "8c7fa580b30c8ff2",
+    "ref": "v8.0.5.2",
     "reason": "arel-verify-and-pin-eql-hash-bodies"
   },
   {
     "package": "arel",
     "rubyFile": "nodes/update_statement.rb",
     "rubyName": "hash",
-    "digest": "75bd01fd583b9517",
-    "ref": "v8.0.2",
+    "digest": "42b8e62b7b316944",
+    "ref": "v8.0.5.2",
     "reason": "arel-verify-and-pin-eql-hash-bodies"
   },
   {
     "package": "arel",
     "rubyFile": "nodes/update_statement.rb",
     "rubyName": "initialize",
-    "digest": "78dc5da10351ee43",
-    "ref": "v8.0.2"
+    "digest": "f808d79560ba0501",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -82418,8 +82418,8 @@
     "package": "arel",
     "rubyFile": "predications.rb",
     "rubyName": "grouping_any",
-    "digest": "6d8df06200978ba5",
-    "ref": "v8.0.2"
+    "digest": "4c9a89509396d3bd",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -82684,15 +82684,15 @@
     "package": "arel",
     "rubyFile": "select_manager.rb",
     "rubyName": "comment",
-    "digest": "e5f51f69fcd8ffa8",
-    "ref": "v8.0.2"
+    "digest": "2a27a6c4fcb6f105",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
     "rubyFile": "select_manager.rb",
     "rubyName": "compile_delete",
-    "digest": "15058ba334c91881",
-    "ref": "v8.0.2"
+    "digest": "cb3a0faa2a6df61f",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -82705,8 +82705,8 @@
     "package": "arel",
     "rubyFile": "select_manager.rb",
     "rubyName": "compile_update",
-    "digest": "c41fc2bb14af2158",
-    "ref": "v8.0.2"
+    "digest": "2097c4532b3a0a87",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -83505,8 +83505,8 @@
     "package": "arel",
     "rubyFile": "visitors/dot.rb",
     "rubyName": "visit_Arel_Nodes_DeleteStatement",
-    "digest": "5c083b67cc8490e0",
-    "ref": "v8.0.2"
+    "digest": "621bbf80a4029d61",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -83610,8 +83610,8 @@
     "package": "arel",
     "rubyFile": "visitors/dot.rb",
     "rubyName": "visit_Arel_Nodes_UpdateStatement",
-    "digest": "dc6c3b6219a8491d",
-    "ref": "v8.0.2"
+    "digest": "1f36d5c1c84b48b7",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -84233,8 +84233,8 @@
     "package": "arel",
     "rubyFile": "visitors/to_sql.rb",
     "rubyName": "visit_Arel_Nodes_DeleteStatement",
-    "digest": "42b3ff71e0d23149",
-    "ref": "v8.0.2"
+    "digest": "a4ff2631dfbe3069",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",
@@ -84695,8 +84695,8 @@
     "package": "arel",
     "rubyFile": "visitors/to_sql.rb",
     "rubyName": "visit_Arel_Nodes_UpdateStatement",
-    "digest": "46577ee0c30ca854",
-    "ref": "v8.0.2"
+    "digest": "65b752730ec35e1d",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "arel",

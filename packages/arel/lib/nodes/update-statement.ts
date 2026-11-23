@@ -14,6 +14,7 @@ export class UpdateStatement extends Node {
   havings: (ArelNode | string)[];
   limit: Node | null;
   offset: Node | null;
+  comment: Node | null;
   key: ArelNode | ArelNode[] | null;
 
   constructor(relation: ArelNode | Table | null = null) {
@@ -26,6 +27,7 @@ export class UpdateStatement extends Node {
     this.havings = [];
     this.limit = null;
     this.offset = null;
+    this.comment = null;
     this.key = null;
   }
 
@@ -37,6 +39,7 @@ export class UpdateStatement extends Node {
       this.orders,
       this.limit,
       this.offset,
+      this.comment,
       this.key,
     ]);
   }
@@ -53,6 +56,7 @@ export class UpdateStatement extends Node {
       rbEqual(this.orders, other.orders) &&
       rbEqual(this.limit, other.limit) &&
       rbEqual(this.offset, other.offset) &&
+      rbEqual(this.comment, other.comment) &&
       rbEqual(this.key, other.key)
     );
   }

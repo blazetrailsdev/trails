@@ -291,9 +291,15 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this.ctx.source;
   }
 
-  comment(...values: string[]): this {
-    this.ctx.comment = new Comment(values);
-    return this;
+  comment(): Node | null;
+  comment(...values: string[]): this;
+  comment(...values: string[]): this | Node | null {
+    if (values.length > 0) {
+      this.ctx.comment = new Comment(values);
+      return this;
+    } else {
+      return this.ctx.comment;
+    }
   }
 
   protected collapse(exprs: unknown[]): ArelNode {

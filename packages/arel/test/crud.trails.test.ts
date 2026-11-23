@@ -23,4 +23,22 @@ describe("crud (trails)", () => {
       expect(setKey).toHaveBeenCalledWith(null);
     });
   });
+
+  describe("compileUpdate / compileDelete comment", () => {
+    it("compileUpdate carries the select comment into the UPDATE", () => {
+      const mgr = new SelectManager(users);
+      mgr.where(users.get("id").eq(1)).comment("x");
+      const um = mgr.compileUpdate([[users.get("name"), "a"]], null);
+      expect(um.ast.comment).toBe(mgr.comment());
+      expect(um.toSql()).toMatch(/ \/\* x \*\/$/);
+    });
+
+    it("compileDelete carries the select comment into the DELETE", () => {
+      const mgr = new SelectManager(users);
+      mgr.where(users.get("id").eq(1)).comment("x");
+      const dm = mgr.compileDelete(null);
+      expect(dm.ast.comment).toBe(mgr.comment());
+      expect(dm.toSql()).toMatch(/ \/\* x \*\/$/);
+    });
+  });
 });

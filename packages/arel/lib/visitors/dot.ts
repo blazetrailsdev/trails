@@ -157,6 +157,7 @@ export class Dot extends Visitor {
     this.visitEdge(o, "orders");
     this.visitEdge(o, "limit");
     this.visitEdge(o, "offset");
+    this.visitEdge(o, "comment");
     this.visitEdge(o, "key");
   }
 
@@ -166,6 +167,7 @@ export class Dot extends Visitor {
     this.visitEdge(o, "orders");
     this.visitEdge(o, "limit");
     this.visitEdge(o, "offset");
+    this.visitEdge(o, "comment");
     this.visitEdge(o, "key");
   }
 
