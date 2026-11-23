@@ -24,7 +24,7 @@ inputs:
     required: false
     default: "12.3.4"
   node-version:
-    description: Node.js version for setup-node.
+    description: Exact Node.js version (X.Y.Z) for setup-node; checked against node --version.
     required: false
     default: "26.13.0"
   store-dir:
@@ -72,6 +72,11 @@ runs:
         ACTUAL=$(node --version 2>/dev/null || true)
         echo "node on PATH: ${ACTUAL:-none}"
         if [ "$ACTUAL" = "v$EXPECTED" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; fi
+    - if: steps.node-check.outputs.ok != 'true'
+      shell: bash
+      env:
+        EXPECTED: ${{ inputs.node-version }}
+      run: rm -rf "$RUNNER_TOOL_CACHE/node/$EXPECTED"
     - if: steps.node-check.outputs.ok != 'true'
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
