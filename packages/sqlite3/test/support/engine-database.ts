@@ -98,6 +98,7 @@ export function engineDatabase(file = ":memory:"): SyncCloseEngineDatabase & {
         columnCount: () => (reader ? stmt.columns().length : 0),
         columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
         columnDecltype: (index) => (reader ? (stmt.columns()[index]?.type ?? null) : null),
+        bindParameterCount: () => stmt.source.split("?").length - 1,
         setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
       };
       return [engine, remainder];

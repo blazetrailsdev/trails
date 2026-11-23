@@ -1,5 +1,5 @@
 import Database from "libsql";
-import { File } from "@blazetrails/ruby-compat";
+import { File, RuntimeError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
 import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "../database.js";
@@ -55,6 +55,14 @@ function open(file: string, mode: number, options: Database.Options): Database.D
   const raw = new Database(file, { ...options, timeout: 0 });
   if ((mode & Open.READONLY) !== 0) raw.pragma("query_only = ON");
   return raw;
+}
+
+/** @internal */
+function openRemote(file: string, mode: number, options: Database.Options): Database.Database {
+  if ((mode & SQLite3.Constants.Open.SHAREDCACHE) !== 0) {
+    throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the libsql-remote driver");
+  }
+  return new Database(file, options);
 }
 
 /** @internal */
@@ -133,6 +141,7 @@ function prepareStatement(
       return r.value;
     },
     isDone: () => done,
+    bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => (reader ? stmt.columns().length : 0),
     columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
     columnDecltype: (index) => (reader ? (stmt.columns()[index]?.type ?? null) : null),
@@ -141,9 +150,13 @@ function prepareStatement(
 }
 
 /** @internal */
-function openEngine(options: Database.Options, replica: boolean): EngineOpenV2 {
+function openEngine(
+  options: Database.Options,
+  replica: boolean,
+  opener: typeof open = open,
+): EngineOpenV2 {
   return Object.assign((file: string, mode: number) => {
-    const raw = open(file, mode, options);
+    const raw = opener(file, mode, options);
     let changes = 0;
     let handler: BusyHandler | null = null;
     const setChanges = (n: number) => {
@@ -217,4 +230,9 @@ export function replicaEngine(
   options: LibsqlReplicaOptions,
 ): (...args: Parameters<EngineOpenV2>) => EngineDatabase & { sync(): Promise<void> } {
   return openEngine(options, true) as ReturnType<typeof replicaEngine>;
+}
+
+/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces */
+export function remoteEngine(options: { authToken?: string }): EngineOpenV2 {
+  return openEngine(options as Database.Options, false, openRemote);
 }

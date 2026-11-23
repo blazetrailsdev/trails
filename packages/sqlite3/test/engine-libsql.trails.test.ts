@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { File, getOs } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../lib/index.js";
-import { engine, replicaEngine } from "../lib/engine/libsql.js";
+import { engine, remoteEngine, replicaEngine } from "../lib/engine/libsql.js";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 
 describe("SQLite3::Database over the libsql engine", () => {
   const paths: string[] = [];
@@ -154,5 +155,24 @@ describe("libsql engine binds", () => {
     expect(await db.execute("SELECT ?, :named", [1, 2])).toEqual([[1, 2]]);
     expect(await db.execute("SELECT ?, :named", [1])).toEqual([[1, null]]);
     await db.close();
+  });
+
+  it("remoteEngine opens a URL without touching the network, as libsql connects lazily", async () => {
+    const db = new SQLite3.Database("http://127.0.0.1:1", {
+      engine: remoteEngine({ authToken: "token" }),
+      flags: SQLite3.Constants.Open.READWRITE,
+    });
+    expect(db.isClosed()).toBe(false);
+    await db.close();
+  });
+
+  it("remoteEngine refuses SHAREDCACHE", () => {
+    expect(
+      () =>
+        new SQLite3.Database("http://127.0.0.1:1", {
+          engine: remoteEngine({}),
+          flags: SQLite3.Constants.Open.READWRITE | SQLite3.Constants.Open.SHAREDCACHE,
+        }),
+    ).toThrow(RuntimeError);
   });
 });

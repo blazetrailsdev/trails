@@ -8,7 +8,7 @@ import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
-import { bindParameterIndex } from "./bind-parameter-index.js";
+import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 
 /** @internal */
@@ -175,6 +175,7 @@ function prepareStatement(
       return r.value as unknown[];
     },
     isDone: () => done,
+    bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => columns.length,
     columnName: (index) => columns[index]?.name ?? null,
     columnDecltype: (index) => columns[index]?.type ?? null,

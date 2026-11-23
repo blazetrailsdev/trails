@@ -22,6 +22,7 @@ export interface EngineStatement {
   columnCount(): number | Promise<number>;
   columnName(index: number): string | null | Promise<string | null>;
   columnDecltype(index: number): string | null | Promise<string | null>;
+  bindParameterCount(): number;
   /** @noRailsEquivalent PERMANENT */
   setReadBigInts(toggle: boolean): void;
 }
@@ -262,6 +263,11 @@ export class Statement {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  bindParameterCount(): number {
+    this.mustBeOpenBang();
+    return this.#st.bindParameterCount();
+  }
+
   setReadBigInts(toggle: boolean): void {
     this.mustBeOpenBang();
     this.#st.setReadBigInts(toggle);

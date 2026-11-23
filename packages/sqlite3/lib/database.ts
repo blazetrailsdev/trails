@@ -178,6 +178,24 @@ export class Database {
     });
   }
 
+  async executeBatch(sql: string, bindVars: unknown[] = []): Promise<unknown> {
+    sql = sql.trim();
+    let result: unknown = null;
+    while (sql !== "") {
+      await this.prepare(sql, async (stmt) => {
+        if (!stmt.isClosed()) {
+          if (bindVars.length === stmt.bindParameterCount()) {
+            await stmt.bindParams(bindVars);
+          }
+          result = await stmt.step();
+        }
+        sql = stmt.remainder.trim();
+      });
+    }
+
+    return result;
+  }
+
   executeBatch2(sql: string, block?: (val: unknown) => unknown): unknown[] | Promise<unknown[]> {
     if (block) {
       const result = this.execBatch(sql, this.resultsAsHash);
