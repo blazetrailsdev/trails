@@ -35,10 +35,8 @@
     "byFile": {}
   },
   "activesupport": {
-    "total": 4,
-    "byFile": {
-      "core_ext/object/try.rb": 4
-    }
+    "total": 0,
+    "byFile": {}
   },
   "arel": {
     "total": 0,

@@ -39,5 +39,6 @@ describe("ExtractTest", () => {
     expect(newEmptyArray).toEqual([]);
     expect(emptyArray).toEqual([]);
     expect(emptyArray).toBe(arrayId);
+    expect(newEmptyArray).not.toBe(emptyArray);
   });
 });
