@@ -308,10 +308,7 @@ export class S3Service extends Service {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsCall upload_stream — PERMANENT
-   */
+  /** @internal */
   private async uploadStream(
     {
       key,
