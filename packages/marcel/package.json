@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/marcel",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "MIME type detection for Trails, mirroring the marcel gem",
   "license": "MIT",
   "repository": {

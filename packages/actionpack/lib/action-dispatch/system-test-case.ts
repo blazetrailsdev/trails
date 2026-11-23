@@ -50,7 +50,7 @@ export class SystemTestCase extends TestCase {
   /** @internal */
   declare _screenshotCounter?: number;
   /** @internal */
-  declare private _urlHelpers?: object | null;
+  private _urlHelpers?: object | null = undefined;
 
   static {
     classAttribute.call(this, "driver", { instanceAccessor: false });

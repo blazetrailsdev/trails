@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/actionmailbox",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "Inbound email routing for Trails, mirroring the actionmailbox gem",
   "license": "MIT",
   "repository": {

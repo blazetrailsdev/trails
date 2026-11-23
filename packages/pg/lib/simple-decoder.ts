@@ -1,7 +1,7 @@
-import { Coder } from "./coder.js";
+import { SimpleCoder } from "./simple-coder.js";
 import { PG } from "./namespaces.js";
 
-export abstract class SimpleDecoder extends Coder {
+export abstract class SimpleDecoder extends SimpleCoder {
   /** @noRailsEquivalent PERMANENT */
   abstract decode(string: string, tuple?: number | null, field?: number | null): unknown;
 }

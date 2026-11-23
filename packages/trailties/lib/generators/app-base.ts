@@ -583,7 +583,7 @@ ${requireStatements.join("\n")}`;
         entry = PackageEntry.version(
           name,
           this.trailsVersionSpecifier(),
-          'Bundle edge Trails instead: "@blazetrails/trailties": "github:blazetrailsdev/trails#main"',
+          'Bundle edge Trails instead: "@blazetrails/trails": "github:blazetrailsdev/trails#main"',
         );
       }
       if (this.packageManager === "pnpm" && entry.options.github != null) {
@@ -967,25 +967,11 @@ type TrailsPackage = [name: string, skip?: (generator: AppBase) => unknown];
 
 /** @noRailsEquivalent PERMANENT */
 const TRAILS_PACKAGES: TrailsPackage[] = [
-  ["@blazetrails/activerecord"],
-  ["@blazetrails/activemodel"],
-  ["@blazetrails/date"],
-  ["@blazetrails/activesupport"],
-  ["@blazetrails/rack"],
+  ["@blazetrails/trails"],
   ["@blazetrails/rackup"],
-  ["@blazetrails/ruby-compat"],
-  ["@blazetrails/actionpack"],
-  ["@blazetrails/actionview"],
-  ["@blazetrails/trailties"],
-  ["@blazetrails/activejob", (g) => g.options.skipActiveJob],
-  ["@blazetrails/actionmailer", (g) => g.options.skipActionMailer],
-  ["@blazetrails/activestorage", (g) => g.options.skipActiveStorage],
-  ["@blazetrails/actionmailbox", (g) => g.options.skipActionMailbox],
-  ["@blazetrails/actiontext", (g) => g.options.skipActionText],
   ["@blazetrails/solid-cache", (g) => g.options.skipSolid],
   ["@blazetrails/solid-queue", (g) => g.options.skipSolid],
   ["@blazetrails/solid-cable", (g) => g.options.skipSolid || g.options.skipActionCable],
-  ["@blazetrails/actioncable", (g) => g.options.skipActionCable],
   ["@blazetrails/activerecord-cli"],
   ["@blazetrails/trails-tsc"],
 ];
