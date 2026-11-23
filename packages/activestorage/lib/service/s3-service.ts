@@ -173,13 +173,21 @@ export class S3Service extends Service {
             ContinuationToken: continuationToken,
           }),
         );
-        if (page.Contents?.length)
-          await this.client.send(
+        if (page.Contents?.length) {
+          const { Errors } = await this.client.send(
             new DeleteObjectsCommand({
               Bucket: this.bucket,
               Delete: { Objects: page.Contents.map((object) => ({ Key: object.Key })) },
             }),
           );
+          if (Errors?.length)
+            throw new S3ServiceException({
+              name: Errors[0].Code!,
+              $fault: "server",
+              $metadata: {},
+              message: Errors[0].Message,
+            });
+        }
         continuationToken = page.NextContinuationToken;
       } while (continuationToken != null);
     });
@@ -225,11 +233,11 @@ export class S3Service extends Service {
           ContentLength: contentLength,
           ContentMD5: checksum,
           Metadata: customMetadata as Record<string, string>,
-          ...this.uploadParams(),
+          ...this.uploadParams(this.uploadOptions),
         }),
         {
           expiresIn: Math.trunc(Number(expiresIn)),
-          signableHeaders: new Set(["content-length", "content-type"]),
+          signableHeaders: new Set(["content-length"]),
         },
       );
 
@@ -297,6 +305,7 @@ export class S3Service extends Service {
         contentDisposition: contentDisposition,
         partSize: MINIMUM_UPLOAD_PART_SIZE,
         metadata: customMetadata as Record<string, string>,
+        ...this.uploadOptions,
       },
       async (out) => {
         for (const sourceKey of sourceKeys) {
@@ -316,12 +325,14 @@ export class S3Service extends Service {
       contentDisposition,
       partSize,
       metadata = {},
+      ...options
     }: {
       key: string;
       contentType?: string | null;
       contentDisposition?: string;
       partSize: number;
       metadata?: Record<string, string>;
+      [k: string]: unknown;
     },
     block: (out: WritableStreamDefaultWriter<Uint8Array>) => Promise<void>,
   ): Promise<void> {
@@ -335,7 +346,7 @@ export class S3Service extends Service {
         ContentType: contentType ?? undefined,
         ContentDisposition: contentDisposition,
         Metadata: metadata,
-        ...this.uploadParams(),
+        ...this.uploadParams(options),
       },
     });
     const out = writable.getWriter();
@@ -349,7 +360,14 @@ export class S3Service extends Service {
           throw error;
         }
       })(),
-      upload.done(),
+      (async () => {
+        try {
+          await upload.done();
+        } catch (error) {
+          await out.abort(error);
+          throw error;
+        }
+      })(),
     ]);
     if (written.status === "rejected") throw written.reason;
     if (uploaded.status === "rejected") throw uploaded.reason;
@@ -401,7 +419,7 @@ export class S3Service extends Service {
     }
     const endpoint = await this.client.config.endpoint();
     const port = endpoint.port == null ? "" : `:${endpoint.port}`;
-    const base = `${endpoint.protocol}//${endpoint.hostname}${port}${endpoint.path.replace(/\/$/, "")}`;
+    const base = `${endpoint.protocol}//${endpoint.hostname}${port}${endpoint.path.endsWith("/") ? endpoint.path.slice(0, -1) : endpoint.path}`;
     return this.client.config.forcePathStyle
       ? `${base}/${this.bucket}/${path}`
       : `${endpoint.protocol}//${this.bucket}.${endpoint.hostname}${port}/${path}`;
@@ -435,7 +453,7 @@ export class S3Service extends Service {
           ContentType: contentType ?? undefined,
           ContentDisposition: contentDisposition,
           Metadata: customMetadata,
-          ...this.uploadParams(),
+          ...this.uploadParams(this.uploadOptions),
         }),
       );
     } catch (error) {
@@ -471,6 +489,7 @@ export class S3Service extends Service {
         contentDisposition: contentDisposition,
         partSize: partSize,
         metadata: customMetadata,
+        ...this.uploadOptions,
       },
       async (out) => {
         let chunk: string | Uint8Array | null;
@@ -481,9 +500,9 @@ export class S3Service extends Service {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  private uploadParams(): Record<string, unknown> {
+  private uploadParams(options: Record<string, unknown>): Record<string, unknown> {
     return Object.fromEntries(
-      Object.entries(this.uploadOptions).map(([k, v]) => [
+      Object.entries(options).map(([k, v]) => [
         UPLOAD_OPTION_KEYS[k] ?? k[0].toUpperCase() + k.slice(1),
         v,
       ]),

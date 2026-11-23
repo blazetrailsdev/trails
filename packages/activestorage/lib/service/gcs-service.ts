@@ -299,7 +299,7 @@ export class GCSService extends Service {
           type: disposition,
           filename: filename!,
         }),
-        "response-content-type": contentType ?? "",
+        ...(contentType == null ? {} : { "response-content-type": contentType }),
       },
       action: "read" as const,
     };
