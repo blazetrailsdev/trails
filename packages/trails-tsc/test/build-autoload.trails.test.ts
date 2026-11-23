@@ -19,7 +19,7 @@ describe("buildAutoload", () => {
   afterEach(() => {
     Dir.chdir(pwd);
     delete seats.Trails;
-    Registry.loaders.length = 0;
+    Registry.loaders.clear();
   });
 
   it("boots through setup_main_autoloader and writes the walk it set up", async () => {

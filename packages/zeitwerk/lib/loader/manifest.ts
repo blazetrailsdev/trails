@@ -1,6 +1,5 @@
 import { Digest, Dir, File, getFs, getPath, rbObjClassname } from "@blazetrails/ruby-compat";
 import type { Loader } from "../loader.js";
-import { ExplicitNamespaces } from "../registry/explicit-namespaces.js";
 import { Registry } from "../registry.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -79,7 +78,7 @@ export async function buildManifest(loader: Loader): Promise<Manifest> {
           export: file ? cref.cname : null,
           kind: !file
             ? "implicit"
-            : ExplicitNamespaces.isRegistered(cref) === loader
+            : Registry.explicitNamespaces.isRegistered(cref) === loader
               ? "explicit"
               : "file",
           ...(dirs != null ? { dirs: dirs.map(relative) } : {}),
@@ -118,8 +117,8 @@ export async function buildManifest(loader: Loader): Promise<Manifest> {
     loader.autoloads = {};
     loader.namespaceDirs.clear();
     loader.shadowedFiles.clear();
-    Registry.onUnload(loader);
-    ExplicitNamespaces.unregisterLoader(loader);
+    Registry.autoloads.unregisterLoader(loader);
+    Registry.explicitNamespaces.unregisterLoader(loader);
   }
 }
 

@@ -34,7 +34,7 @@ describe("Zeitwerk::Registry.loaderForPackage", () => {
       ]);
 
       expect(first).toBe(second);
-      expect(Registry.loaders).toEqual([first]);
+      expect([...Registry.loaders]).toEqual([first]);
     });
   });
 });

@@ -20,7 +20,7 @@ export const EagerLoad = {
       }
 
       for (const autoloadedDir of this.autoloadedDirs) {
-        Registry.unregisterAutoload(autoloadedDir);
+        Registry.autoloads.unregister(autoloadedDir);
       }
       this.autoloadedDirs.length = 0;
 

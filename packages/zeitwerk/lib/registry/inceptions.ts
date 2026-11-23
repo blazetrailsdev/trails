@@ -1,22 +1,26 @@
 import type { Cref } from "../cref.js";
 import { Map } from "../cref/map.js";
 
-const inceptions = new Map<string>();
+export class Inceptions {
+  private _inceptions: Map<string>;
 
-export const Inceptions = {
-  register(cref: Cref, autoloadPath: string): void {
-    inceptions.set(cref, autoloadPath);
-  },
+  constructor() {
+    this._inceptions = new Map<string>();
+  }
+
+  register(cref: Cref, abspath: string): void {
+    this._inceptions.set(cref, abspath);
+  }
 
   isRegistered(cref: Cref): string | null {
-    return inceptions.get(cref);
-  },
+    return this._inceptions.get(cref);
+  }
 
   unregister(cref: Cref): void {
-    inceptions.delete(cref);
-  },
+    this._inceptions.delete(cref);
+  }
 
   clear(): void {
-    inceptions.clear();
-  },
-};
+    this._inceptions.clear();
+  }
+}

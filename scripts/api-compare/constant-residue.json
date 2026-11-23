@@ -1624,5 +1624,5 @@
       "tag-helpers.ts::TagHelpers": "ViteTrails::TagHelpers"
     }
   },
-  "zeitwerk": { "rows": 18, "excluded": [], "unwalked": [], "residue": {} }
+  "zeitwerk": { "rows": 20, "excluded": [], "unwalked": [], "residue": {} }
 }

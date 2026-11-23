@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Dependencies } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
-import { buildManifest, Cref, Registry } from "@blazetrails/zeitwerk";
+import { buildManifest, Cref } from "@blazetrails/zeitwerk";
 import { Autoloaders } from "../../lib/autoloaders.js";
 import { Configuration as EngineConfiguration } from "../../lib/engine/configuration.js";
 import { Root } from "../../lib/paths.js";
@@ -38,7 +38,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
   });
 
   afterEach(() => {
-    autoloaders.each((loader) => Registry.unregisterLoader(loader));
+    autoloaders.each((loader) => loader.unregister());
     Dependencies.autoloadPaths = [];
     Dependencies.autoloadOncePaths = [];
     Dependencies._eagerLoadPaths = new Set();
@@ -84,7 +84,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
       builder.manifestRoot = root;
       await builder.pushDir(app);
       const manifest = await buildManifest(builder);
-      Registry.unregisterLoader(builder);
+      builder.unregister();
       Dependencies[paths] = [app];
       autoloaders[loader].manifest = manifest;
 

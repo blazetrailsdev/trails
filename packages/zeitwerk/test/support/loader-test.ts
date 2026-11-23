@@ -11,7 +11,6 @@ import { autoloadGet } from "../../lib/core-ext/kernel.js";
 import { Cref } from "../../lib/cref.js";
 import { SetupRequired } from "../../lib/error.js";
 import { Loader } from "../../lib/loader.js";
-import { ExplicitNamespaces } from "../../lib/registry/explicit-namespaces.js";
 import { Registry } from "../../lib/registry.js";
 
 export const get = (mod: object, cname: string) =>
@@ -67,13 +66,14 @@ export async function resetConstants(): Promise<void> {
 }
 
 function resetRegistry(): void {
-  Registry.loaders.length = 0;
+  Registry.loaders.clear();
   Registry.loadersByPackageFile = {};
-  for (const k of Object.keys(Registry.autoloads)) delete Registry.autoloads[k];
+  Registry.autoloads.clear();
+  Registry.inceptions.clear();
 }
 
 function resetExplicitNamespace(): void {
-  ExplicitNamespaces.clear();
+  Registry.explicitNamespaces.clear();
 }
 
 export async function teardown(): Promise<void> {

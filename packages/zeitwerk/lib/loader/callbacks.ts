@@ -14,7 +14,7 @@ export const Callbacks = {
     const cref = this.autoloads[file];
     delete this.autoloads[file];
 
-    Registry.unregisterAutoload(file);
+    Registry.autoloads.unregister(file);
 
     if (Object.hasOwn(exports, cref.cname)) {
       cref.set(exports[cref.cname]);
@@ -44,8 +44,7 @@ export const Callbacks = {
       delete this.autoloads[dir];
       if (cref != null) {
         const implicitNamespace = cref.set({});
-        const cpath = cref.path();
-        if (this.logger != null) this.log(`module ${cpath} autovivified from directory ${dir}`);
+        if (this.logger != null) this.log(`module ${cref} autovivified from directory ${dir}`);
 
         if (this.isReloadingEnabled()) this.toUnload[dir] = cref;
 
@@ -54,7 +53,7 @@ export const Callbacks = {
         await this.onNamespaceLoaded(cref, implicitNamespace);
 
         if (Object.keys(this.onLoadCallbacks).length !== 0) {
-          await this.runOnLoadCallbacks(cpath, implicitNamespace, dir);
+          await this.runOnLoadCallbacks(cref.path(), implicitNamespace, dir);
         }
       }
     });

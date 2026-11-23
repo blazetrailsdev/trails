@@ -150,12 +150,12 @@ describe("TestReloading", () => {
       const other = await newLoader({ dirs: ".", enableReloading: false });
 
       expect(Object.keys(other.autoloads).length !== 0).toBeTruthy();
-      expect(Object.keys(Registry.autoloads).length !== 0).toBeTruthy();
+      expect(!Registry.autoloads.isEmpty()).toBeTruthy();
 
       await other.eagerLoad();
 
       expect(Object.keys(other.autoloads).length === 0).toBeTruthy();
-      expect(Object.keys(Registry.autoloads).length === 0).toBeTruthy();
+      expect(Registry.autoloads.isEmpty()).toBeTruthy();
       expect(Object.keys(other.toUnload).length === 0).toBeTruthy();
     });
   });

@@ -11,17 +11,17 @@ export function _isModule(x: unknown): x is object {
 }
 
 export async function constAdded(mod: object, cname: string): Promise<void> {
-  const loader = Registry.ExplicitNamespaces.__loaderFor(mod, cname);
+  const loader = Registry.explicitNamespaces.loaderFor(mod, cname);
   if (loader != null) {
     const namespace = new Cref(mod, cname).get();
+    const cref = new Cref(mod, cname);
 
     if (!_isModule(namespace)) {
-      const cref = new Cref(mod, cname);
       throw new ZeitwerkError(
         `${cref} is expected to be a namespace, should be a class or module (got ${rbObjClassname(namespace)})`,
       );
     }
 
-    await loader.__onNamespaceLoaded(new Cref(mod, cname), namespace);
+    await loader.__onNamespaceLoaded(cref, namespace);
   }
 }

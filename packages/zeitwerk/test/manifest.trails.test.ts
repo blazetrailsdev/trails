@@ -17,7 +17,6 @@ import {
   writeArtifacts,
   type Manifest,
 } from "../lib/loader/manifest.js";
-import { ExplicitNamespaces } from "../lib/registry/explicit-namespaces.js";
 import { Registry } from "../lib/registry.js";
 import { newLoader, teardown, withFiles } from "./support/loader-test.js";
 
@@ -56,7 +55,7 @@ describe("autoload artifacts", () => {
   const cref = (cname: string) => new Cref(Object, cname);
 
   const fresh = async () => {
-    Registry.unregisterLoader(loader);
+    loader.unregister();
     const reader = await newLoader({ setup: false });
     await reader.pushDir(".");
     return reader;
@@ -127,7 +126,7 @@ describe("autoload artifacts", () => {
       );
       expect(cref("X").isAutoload()).toEqual(File.expandPath("x.ts"));
       expect(reader.namespaceDirs.get(cref("Admin"))).toEqual([File.expandPath("admin")]);
-      expect(ExplicitNamespaces.isRegistered(cref("M"))).toBe(reader);
+      expect(Registry.explicitNamespaces.isRegistered(cref("M"))).toBe(reader);
     });
   });
 
@@ -247,7 +246,7 @@ describe("autoload artifacts", () => {
       const dir = await writeArtifacts(loader);
       const manifest = JSON.parse(await getFs().readFile(`${dir}/manifest.json`, "utf8"));
       const { imports } = await import(`${dir}/imports.generated.js`);
-      Registry.unregisterLoader(loader);
+      loader.unregister();
 
       const previous = raiseOnEveryRead();
       try {
@@ -290,7 +289,7 @@ describe("autoload artifacts", () => {
       const dir = await writeArtifacts(loader);
       const manifest = JSON.parse(await getFs().readFile(`${dir}/manifest.json`, "utf8"));
       const { imports } = await import(`${dir}/imports.generated.js`);
-      Registry.unregisterLoader(loader);
+      loader.unregister();
       const expand = (path: string) => File.expandPath(path);
 
       const previous = raiseOnEveryRead();
@@ -345,7 +344,7 @@ describe("autoload artifacts", () => {
       loader.ignore("skip.js");
       const manifest = await buildManifest(loader);
       expect(manifest.ignored).toEqual(["skip.js"]);
-      Registry.unregisterLoader(loader);
+      loader.unregister();
 
       const previous = raiseOnEveryRead();
       try {
@@ -375,7 +374,7 @@ describe("autoload artifacts", () => {
       await loader.pushDir(".");
       loader.ignore("ignored_dir");
       const manifest = await buildManifest(loader);
-      Registry.unregisterLoader(loader);
+      loader.unregister();
 
       const previous = raiseOnEveryRead();
       try {
@@ -404,7 +403,7 @@ describe("autoload artifacts", () => {
         const manifest = await buildManifest(loader);
         expect(Object.keys(manifest.constants)).toEqual(["Root::Y"]);
         const reader = await newLoader({ setup: false });
-        Registry.unregisterLoader(loader);
+        loader.unregister();
         await reader.pushDir(".", { namespace: root });
         reader.manifest = {
           ...manifest,
