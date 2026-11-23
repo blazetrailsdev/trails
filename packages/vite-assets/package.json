@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/vite-assets",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "Vite asset resolution for Trails, mirroring the vite_ruby gem",
   "license": "MIT",
   "repository": {

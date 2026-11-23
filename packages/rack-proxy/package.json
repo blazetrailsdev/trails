@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/rack-proxy",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "A request-proxying Rack app, mirroring Ruby's rack-proxy",
   "license": "MIT",
   "repository": {

@@ -138,7 +138,10 @@ export async function linkFrameworkPackages(appRoot: string): Promise<void> {
     const frameworkRoot = File.expandPath("../..", import.meta.dirname);
     await FileUtils.mkdirPAsync("node_modules/@blazetrails");
     const manifest = JSON.parse(await File.readAsync("package.json")) as { dependencies?: object };
-    const ports = Object.keys(manifest.dependencies ?? {})
+    const meta = JSON.parse(
+      await File.readAsync(File.join(frameworkRoot, "..", "trails", "package.json")),
+    ) as { dependencies: object };
+    const ports = [...Object.keys(manifest.dependencies ?? {}), ...Object.keys(meta.dependencies)]
       .filter((name) => name.startsWith("@blazetrails/") && name !== "@blazetrails/trailties")
       .map((name) => File.join(frameworkRoot, "..", name.slice("@blazetrails/".length)));
     await FileUtils.lnSfAsync(
