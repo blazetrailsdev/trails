@@ -150,7 +150,7 @@ describe("ActiveStorage::Engine", () => {
       };
       activeStorage.service = "s3";
       runLoadHooks("active_storage_blob", Blob);
-      expect(Blob.service.constructor).toBe(constantize("ActiveStorage::Service::S3Service"));
+      expect(Blob.service!.constructor).toBe(constantize("ActiveStorage::Service::S3Service"));
       expect(Blob.services.fetch("gcs").constructor).toBe(
         constantize("ActiveStorage::Service::GCSService"),
       );
