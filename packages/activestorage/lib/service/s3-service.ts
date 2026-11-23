@@ -15,13 +15,7 @@ import { FileNotFoundError, IntegrityError } from "../errors.js";
 import type { Filename } from "../filename.js";
 import { Service } from "../service.js";
 
-const UPLOAD_OPTION_KEYS: Record<string, string> = {
-  acl: "ACL",
-  serverSideEncryption: "ServerSideEncryption",
-  sseKmsKeyId: "SSEKMSKeyId",
-  storageClass: "StorageClass",
-  cacheControl: "CacheControl",
-};
+const UPLOAD_OPTION_KEYS: Record<string, string> = { acl: "ACL", sseKmsKeyId: "SSEKMSKeyId" };
 
 type UploadableIO = { size(): number; read(): string | Uint8Array | null };
 
@@ -141,7 +135,7 @@ export class S3Service extends Service {
         const object = await this.client.send(
           new GetObjectCommand({
             ...this.objectFor(key),
-            Range: `bytes=${range.begin}-${range.excludeEnd ? range.end! - 1 : range.end}`,
+            Range: `bytes=${range.begin}-${range.end == null ? "" : range.excludeEnd ? range.end - 1 : range.end}`,
           }),
         );
         return await object.Body!.transformToByteArray();
@@ -202,7 +196,10 @@ export class S3Service extends Service {
           ContentDisposition: contentDisposition,
           Metadata: customMetadata,
           ...Object.fromEntries(
-            Object.entries(this.uploadOptions).map(([k, v]) => [UPLOAD_OPTION_KEYS[k] ?? k, v]),
+            Object.entries(this.uploadOptions).map(([k, v]) => [
+              UPLOAD_OPTION_KEYS[k] ?? k[0].toUpperCase() + k.slice(1),
+              v,
+            ]),
           ),
         }),
       );

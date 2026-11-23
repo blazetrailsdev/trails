@@ -229,6 +229,7 @@ export class Engine extends TrailsEngine {
         TopLevel.Trails!.configuration!.activeStorage.serviceConfigurations == null
           ? await loadIseqEval(configFile)
           : null;
+      /** @inventedArm load — PERMANENT */
       await Configurator.load(
         TopLevel.Trails!.configuration!.activeStorage.serviceConfigurations ?? mod?.default ?? {},
       );

@@ -106,11 +106,11 @@ export class GCSService extends Service {
       filename = null,
       customMetadata = {},
     }: {
-      contentType?: string;
+      contentType: string;
       disposition?: string | null;
       filename?: Filename | null;
       customMetadata?: Record<string, string>;
-    } = {},
+    },
   ): Promise<void> {
     await this.instrument(
       "update_metadata",
@@ -135,7 +135,7 @@ export class GCSService extends Service {
       try {
         const [contents] = await (await this.fileFor(key))!.download({
           start: range.begin!,
-          end: range.excludeEnd ? range.end! - 1 : range.end!,
+          ...(range.end == null ? {} : { end: range.excludeEnd ? range.end - 1 : range.end }),
         });
         return new Uint8Array(contents);
       } catch (error) {
