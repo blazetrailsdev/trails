@@ -360,7 +360,6 @@ export class Response {
     cattrAccessor.call(this, "defaultHeaders");
   }
 
-  /** @internal */
   static rackStatusCode(status: number | string): number {
     if (UNPROCESSABLE_CONTENT === ":unprocessable_content") {
       if (status === ":unprocessable_entity") status = ":unprocessable_content";

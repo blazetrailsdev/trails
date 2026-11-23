@@ -17,7 +17,6 @@ interface CacheStoreRequest {
 }
 
 export class CacheStore extends AbstractSecureStore {
-  /** @internal */
   static readonly LOADED_SESSION_ID = "action_dispatch.session.cache_store.loaded_session_id";
 
   /** @internal */

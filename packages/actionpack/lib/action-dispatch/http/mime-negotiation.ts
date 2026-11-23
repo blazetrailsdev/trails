@@ -130,7 +130,6 @@ export class MimeNegotiation {
     return !this.isParamsReadable();
   }
 
-  /** @internal */
   varyHeaders(): string[] {
     if (this.useAcceptHeader()) {
       const headers = ["Accept", "X-Requested-With"];
