@@ -837,7 +837,7 @@ export default defineConfig({
             "packages/stimulus/test/generator.test.ts",
           ],
           exclude: process.env.TRAILTIES_EXCLUDE
-            ? [...SHARED_EXCLUDE, process.env.TRAILTIES_EXCLUDE]
+            ? [...SHARED_EXCLUDE, ...process.env.TRAILTIES_EXCLUDE.split(",")]
             : SHARED_EXCLUDE,
           globalSetup: [
             "./packages/trailties/test/support/build-templates.ts",
