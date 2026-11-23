@@ -184,10 +184,10 @@ export class RecordNotDestroyed extends ActiveRecordError {
 export type { RecordInvalid } from "./validations.js";
 
 export class SoleRecordExceeded extends ActiveRecordError {
-  readonly record?: unknown;
+  readonly record: { readonly name?: unknown } | null;
 
-  constructor(record?: unknown) {
-    super(`Wanted only one ${(record as { name?: string } | undefined)?.name ?? "record"}`);
+  constructor(record: { readonly name?: unknown } | null = null) {
+    super(`Wanted only one ${record?.name ?? "record"}`);
     this.name = "ActiveRecord::SoleRecordExceeded";
     this.record = record;
   }

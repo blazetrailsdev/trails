@@ -1,6 +1,9 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   AUDITED_PACKAGES,
+  REPO_ROOT,
   auditPackage,
   hasModuleSideEffects,
   readSideEffects,
@@ -32,6 +35,14 @@ describe("hasModuleSideEffects", () => {
 
 describe("package.json sideEffects", () => {
   for (const pkg of AUDITED_PACKAGES) {
+    it(`${pkg} emits lib/**.ts to dist/**.js, as the audit's ./dist paths assume`, async () => {
+      const tsconfig = JSON.parse(
+        await readFile(path.join(REPO_ROOT, "packages", pkg, "tsconfig.json"), "utf8"),
+      ) as { compilerOptions?: { rootDir?: string; outDir?: string } };
+      expect(tsconfig.compilerOptions?.rootDir).toBe("lib");
+      expect(tsconfig.compilerOptions?.outDir).toBe("dist");
+    });
+
     it(`${pkg} declares exactly the audited side-effecting modules`, async () => {
       const listed = await auditPackage(pkg);
       expect(await readSideEffects(pkg)).toEqual(listed.length === 0 ? false : listed);

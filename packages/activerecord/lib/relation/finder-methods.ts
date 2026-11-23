@@ -23,6 +23,7 @@ import {
 } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
+import type { RelationName } from "../relation.js";
 import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors.js";
 import { ActiveRecord } from "../namespaces.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
@@ -31,6 +32,7 @@ import { defineModule, stripThenable } from "@blazetrails/activesupport";
 export const ONE_AS_ONE = "1 AS one";
 
 interface FinderRelation {
+  readonly name: RelationName;
   table: Table;
   primaryKey: string | string[];
   model: {
