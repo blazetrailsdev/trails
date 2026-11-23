@@ -164,7 +164,7 @@ class Boomer {
           throw excSetupMessage(new NameError("uninitialized constant Userr"), e);
         }
       case "/missing_template":
-        throw new MissingTemplate(["foo"], "foo/index", ["foo"], false, "mailer");
+        throw new MissingTemplate(["foo"] as never, "foo/index", ["foo"], false, "mailer");
       case "/bad_request":
         throw new BadRequest();
       case "/missing_keys":
