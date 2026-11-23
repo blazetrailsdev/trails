@@ -104,13 +104,13 @@ deploy. Uploads are stored on the mounted `storage/` volume (Active Storage's Di
 
 ### Production configuration
 
-| Variable           | Set by       | Purpose                                         |
-| ------------------ | ------------ | ----------------------------------------------- |
-| `DATABASE_URL`     | `mysql:link` | MySQL connection, merged over `config/database` |
-| `SMTP_HOST`/`PORT` | `mail:link`  | outgoing mail relay                             |
-| `SECRET_KEY_BASE`  | `config:set` | cookies, magic-link tokens, signed stream names |
-| `APP_HOST`         | `config:set` | host used in emailed links                      |
-| `MAILER_FROM`      | `config:set` | sender address (optional)                       |
-| `FORCE_SSL`        | `config:set` | set to `false` to serve over plain HTTP         |
+| Variable           | Set by       | Purpose                                                                                          |
+| ------------------ | ------------ | ------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`     | `mysql:link` | MySQL connection, merged over `config/database`                                                  |
+| `SMTP_HOST`/`PORT` | `mail:link`  | outgoing mail relay                                                                              |
+| `SECRET_KEY_BASE`  | `config:set` | cookies, magic-link tokens, signed stream names                                                  |
+| `APP_HOST`         | `config:set` | host used in emailed links                                                                       |
+| `MAILER_FROM`      | `config:set` | sender address; its domain must be verified with the mail relay (Resend rejects others with 550) |
+| `FORCE_SSL`        | `config:set` | set to `false` to serve over plain HTTP                                                          |
 
 Jobs and Action Cable use the in-process `async` adapters, so run a single web process.
