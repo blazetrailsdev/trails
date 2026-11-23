@@ -13,7 +13,8 @@ type Listener = (arg?: unknown) => void;
 
 function strerror(e: unknown): string {
   const klass = Errno[(e as { code?: string } | null)?.code as keyof typeof Errno];
-  if (klass === undefined) throw e;
+  if (klass === undefined)
+    return `Unknown error ${(e as { errno?: unknown } | null)?.errno ?? ""}`.trim();
   return new klass().message;
 }
 

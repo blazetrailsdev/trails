@@ -299,11 +299,15 @@ function readOkEx(packet: EofPacket, encoding: string): Array<[number, string]> 
       const itemLength = packet.readLengthCodedNumber();
       const itemEnd = packet.offset + itemLength;
       if (type === Client.SESSION_TRACK_SYSTEM_VARIABLES) {
-        info.push([type, packet.readLengthCodedString(encoding)]);
+        const name = packet.readLengthCodedString(encoding);
+        const value = packet.readLengthCodedString(encoding);
+        info.push([type, name], [type, value]);
       } else if (type === Client.SESSION_TRACK_GTIDS) {
         packet.offset += 1;
+        info.push([type, packet.readLengthCodedString(encoding)]);
+      } else {
+        info.push([type, packet.readLengthCodedString(encoding)]);
       }
-      info.push([type, packet.readLengthCodedString(encoding)]);
       packet.offset = itemEnd;
     }
     return info;
@@ -1082,12 +1086,12 @@ export class Client {
           rows,
           this._fields[i],
         ]);
-        if (e instanceof globalThis.Error) sets.push(e);
+        if (e != null) sets.push(e as globalThis.Error);
         resolve(sets);
       });
     });
     const first = results.shift();
-    if (first instanceof globalThis.Error) this.raiseMysql2Error(first);
+    if (first !== undefined && !Array.isArray(first)) this.raiseMysql2Error(first);
     this.currentResult = first;
     this.nextResults = results;
     return this.storeResult();
@@ -1156,7 +1160,9 @@ export class Client {
       stream.destroy(Object.assign(error, { code: e.code, cause: e }));
     };
     protocol.once?.("error", lost);
-    command.once("end", () => protocol.off?.("error", lost));
+    const unbind = () => protocol.off?.("error", lost);
+    command.once("end", unbind);
+    command.once("error", unbind);
     const fields = await new Promise<mysql.FieldPacket[] | null>((resolve, reject) => {
       command.once("fields", resolve);
       command.once("end", () => resolve(null));
@@ -1228,7 +1234,7 @@ export class Client {
   nextResult(): boolean {
     const next = this.nextResults.shift();
     if (next === undefined) return false;
-    if (next instanceof globalThis.Error) {
+    if (!Array.isArray(next)) {
       this.nextResults = [];
       this.raiseMysql2Error(next);
     }
