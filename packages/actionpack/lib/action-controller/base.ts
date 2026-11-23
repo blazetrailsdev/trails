@@ -215,6 +215,10 @@ import {
 
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
 
+/** @noRailsEquivalent PERMANENT */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface BaseHelpers {}
+
 export interface RenderOptions {
   json?: unknown;
   js?: unknown;
@@ -407,8 +411,8 @@ export class Base extends Metal {
   declare static raiseOnOpenRedirects: boolean;
   declare static isIncludeAllHelpers: boolean;
 
-  declare static _helpers: HelperMethodsModule;
-  declare readonly _helpers: HelperMethodsModule;
+  declare static _helpers: HelperMethodsModule & BaseHelpers;
+  declare readonly _helpers: HelperMethodsModule & BaseHelpers;
   declare static _helperMethods: string[];
   declare static helperMethod: HelpersClass["helperMethod"];
   declare static helper: HelpersClass["helper"];

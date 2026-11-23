@@ -973,6 +973,11 @@ async function templateScope(
   const layout = /^layouts\/((?:[^/]+\/)*[^_/][^/.]*)\./u.exec(rel)?.[1];
   const controller =
     layout === undefined ? controllers.find((c) => dasherize(c.path) === prefix) : undefined;
+  if (controller !== undefined) {
+    view.push(
+      `((typeof import(${importPath(shimDir, controller.file)}))["${controller.name}"] extends { _helpers: infer H } ? H : unknown)`,
+    );
+  }
   const locals = new Map<string, Set<string>>();
   let modelClass: ViewShim["model"];
   const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));

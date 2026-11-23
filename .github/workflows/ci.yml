@@ -146,7 +146,7 @@ jobs:
           UNIT_TESTS_PKGS_RE='^(packages/|scripts/|eslint/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch(\.test)?\.ts)$)'
           GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|actionpack|actioncable|bcrypt|activesupport|arel|globalid|date|did-you-mean|trails-tsc|actionmailer|actionmailbox|actiontext|actionview|i18n|activejob|activestorage|solid-queue|trailties|ruby-compat|rake|rack)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
           GUIDES_EXCL_RE='(/(src|lib)/test-helpers(/|\.ts$)|^packages/[^/]+/test/|/test-fixtures?(/|\.ts$)|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
-          WEBSITE_PKGS_RE='^packages/website/'
+          WEBSITE_PKGS_RE='^(packages/(website|trails-tsc|tse-compiler)/|examples/homepage/)'
           # Files that make a scoped ESLint run unsound, so the whole tree is
           # linted instead. Three classes, all "the changed file is an INPUT to
           # a rule rather than a file the rule reports on":
