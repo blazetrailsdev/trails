@@ -13,6 +13,7 @@ import {
   rbFSend,
   rbClassNewInstance,
   rbObjRespondTo,
+  rbProcCall,
   strNew,
   stringSplit,
   Struct,
@@ -293,9 +294,7 @@ export class RackBody {
   }
 
   call(...arguments_: RubyArgs): unknown {
-    return (this._response.stream as unknown as { call(...a: RubyArgs): unknown }).call(
-      ...arguments_,
-    );
+    return rbProcCall(this._response.stream, ...arguments_);
   }
 
   toPath(): string {
@@ -475,17 +474,21 @@ export class Response {
 
   get body(): string {
     if (rbObjRespondTo(this.stream, "toAry")) {
-      return aryJoin((this.stream as { toAry(): unknown[] }).toAry());
+      return aryJoin(
+        (this.stream as { toAry(): unknown[] })
+          .toAry()
+          .map((part) => (part instanceof Uint8Array ? strNew(Array.from(part)) : part)),
+      );
     } else if (rbObjRespondTo(this.stream, "body")) {
       return (this.stream as { body: string }).body;
     } else {
-      return this.stream as unknown as string;
+      return this.stream as never;
     }
   }
 
   /** @inventedArm or — CONVERGEABLE response-body-setter-stores-each-only-body-raw */
   async setBody(body: unknown): Promise<void> {
-    if (typeof body === "string") {
+    if (typeof body === "string" || body instanceof Uint8Array) {
       this.stream = await this.buildBuffer(this, [body]);
     } else if (rbObjRespondTo(body, "toPath")) {
       this.stream = body as { toPath(): string };

@@ -243,7 +243,7 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
 
     locals.forEach(([k, v]) => t2.set(k, v));
     IsolatedExecutionState.shareWith(t1, {
-      except: (this.constructor as unknown as { liveStreamingExcludedKeys: string[] })
+      except: (this.constructor as typeof Base & { liveStreamingExcludedKeys: string[] })
         .liveStreamingExcludedKeys,
     });
 
@@ -391,7 +391,7 @@ mattrAccessor.call(Live, "liveStreamingExcludedKeys", { default: [] });
 Concern.included.call(Live, null, function (this: object) {
   classAttribute.call(this, "liveStreamingExcludedKeys", {
     instanceAccessor: false,
-    default: (Live as unknown as { liveStreamingExcludedKeys: unknown[] })
+    default: (Live as typeof Live & { liveStreamingExcludedKeys: string[] })
       .liveStreamingExcludedKeys,
   });
 });

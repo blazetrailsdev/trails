@@ -8809,13 +8809,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/response.rb",
-    "rubyName": "munge_body_object",
-    "digest": "1c445a4805fda9d4",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/response.rb",
     "rubyName": "parameter_filtered_location",
     "digest": "15735e2d6f068625",
     "ref": "v8.0.2"

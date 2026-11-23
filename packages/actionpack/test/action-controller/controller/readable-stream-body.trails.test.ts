@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Handler } from "@blazetrails/rackup";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
@@ -62,7 +63,7 @@ describe("a ReadableStream response body", () => {
       unknown,
       AsyncIterable<unknown> & { toAry(): unknown; close(): unknown },
     ];
-    expect(Array.isArray(body.toAry())).toBe(false);
+    expect(rbObjRespondTo(body, "toAry")).toBe(false);
     const chunks = body[Symbol.asyncIterator]();
     expect((await chunks.next()).value).toEqual(new Uint8Array([1]));
     const parked = chunks.next();
