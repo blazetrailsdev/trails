@@ -5,6 +5,7 @@ import {
   IndexError,
   rbNum2Int,
   include,
+  rbAnyToS,
   toEnum,
   type Enumerator,
 } from "@blazetrails/ruby-compat";
@@ -48,6 +49,8 @@ export class Result {
   #typemap: TypeMapByOid | null = null;
 
   readonly #error: DatabaseErrorFields | null;
+  /** @internal */
+  private _cleared = false;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(native: pg.QueryResult, error: DatabaseErrorFields | null = null) {
@@ -61,7 +64,45 @@ export class Result {
   }
 
   clear(): null {
+    this._cleared = true;
     return null;
+  }
+
+  isCleared(): boolean {
+    return this._cleared;
+  }
+
+  resultStatus(): number {
+    if (this.#error != null) return PGConstants.PGRES_FATAL_ERROR;
+    return this.nfields() > 0 ? PGConstants.PGRES_TUPLES_OK : PGConstants.PGRES_COMMAND_OK;
+  }
+
+  static resStatus(status: unknown): string {
+    return (
+      Object.keys(PGConstants).find(
+        (c) =>
+          c.startsWith("PGRES_") &&
+          PGConstants[c as keyof typeof PGConstants] === rbNum2Int(status),
+      ) ?? "invalid ExecStatusType code"
+    );
+  }
+
+  resStatus(...args: unknown[]): string {
+    if (args.length == 0) {
+      return Result.resStatus(this.resultStatus());
+    } else if (args.length == 1) {
+      return Result.resStatus(args[0]);
+    } else {
+      throw new ArgumentError("only 0 or 1 arguments expected");
+    }
+  }
+
+  inspect(): string {
+    const str = rbAnyToS(this);
+    const stats = this.isCleared()
+      ? " cleared"
+      : ` status=${this.resStatus(this.resultStatus())} ntuples=${this.ntuples()} nfields=${this.nfields()} cmd_tuples=${this.cmdTuples()}`;
+    return `${str.slice(0, -1)}${stats}${str.slice(-1)}`;
   }
 
   errorField(fieldcode: number): string | null {

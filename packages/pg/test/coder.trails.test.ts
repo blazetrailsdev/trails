@@ -10,3 +10,16 @@ describe("PG::CompositeCoder#dup", () => {
     expect(copy.toH()).toEqual(array.toH());
   });
 });
+
+describe("PG::Coder#inspect", () => {
+  it("shows name, oid and format", () => {
+    const coder = new PG.TextEncoder.Integer(undefined, { name: "int4", oid: 23 });
+    expect(coder.inspect()).toMatch(/^#<PG::TextEncoder::Integer:0x[0-9a-f]+ "int4" {2}oid=23>$/);
+    expect(coder.inspectShort()).toBe("int4:TE");
+  });
+
+  it("appends composite details", () => {
+    const array = new PG.TextEncoder.Array(undefined, { dimensions: 2 });
+    expect(array.inspect()).toMatch(/ elements_type=nil needs quotation 2 dimensions>$/);
+  });
+});
