@@ -53610,8 +53610,8 @@
     "package": "activerecord",
     "rubyFile": "future_result.rb",
     "rubyName": "execute_or_skip",
-    "digest": "fa1ceb418b7b77df",
-    "ref": "v8.0.2"
+    "digest": "5dadb3af4705adb4",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -53893,8 +53893,8 @@
     "package": "activerecord",
     "rubyFile": "insert_all.rb",
     "rubyName": "execute",
-    "digest": "18cfe735739b2486",
-    "ref": "v8.0.2"
+    "digest": "1953fe09da53b8d5",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -53928,8 +53928,8 @@
     "package": "activerecord",
     "rubyFile": "insert_all.rb",
     "rubyName": "initialize",
-    "digest": "1b4952c8e3cc020b",
-    "ref": "v8.0.2"
+    "digest": "d77df93c2035b74c",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -58216,15 +58216,15 @@
     "package": "activerecord",
     "rubyFile": "relation.rb",
     "rubyName": "create_or_find_by",
-    "digest": "12dab06cd7dc3bc1",
-    "ref": "v8.0.2"
+    "digest": "73e5f6eb9e5b525e",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
     "rubyFile": "relation.rb",
     "rubyName": "create_or_find_by!",
-    "digest": "b7f854e2910d17cc",
-    "ref": "v8.0.2"
+    "digest": "7a2f7ea342678236",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -59422,8 +59422,8 @@
     "package": "activerecord",
     "rubyFile": "relation/finder_methods.rb",
     "rubyName": "raise_record_not_found_exception!",
-    "digest": "db5632b0a0195b33",
-    "ref": "v8.0.2"
+    "digest": "dbe217254551bc60",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -59457,8 +59457,8 @@
     "package": "activerecord",
     "rubyFile": "relation/finder_methods.rb",
     "rubyName": "sole",
-    "digest": "0a5ef2d8e5891e05",
-    "ref": "v8.0.2"
+    "digest": "0f42c113746e2e6e",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -59716,8 +59716,8 @@
     "package": "activerecord",
     "rubyFile": "relation/predicate_builder/array_handler.rb",
     "rubyName": "call",
-    "digest": "fccf8887c0f3d95d",
-    "ref": "v8.0.2"
+    "digest": "731e05c8e37a506c",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -60151,8 +60151,8 @@
     "package": "activerecord",
     "rubyFile": "relation/query_methods.rb",
     "rubyName": "build_with_expression_from_value",
-    "digest": "ce3324f4d3147211",
-    "ref": "v8.0.2"
+    "digest": "4e30fc25b93a7818",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
@@ -60949,15 +60949,15 @@
     "package": "activerecord",
     "rubyFile": "relation/where_clause.rb",
     "rubyName": "except_predicates",
-    "digest": "fc878645f3fd0faf",
-    "ref": "v8.0.2"
+    "digest": "9b254f7464bb85d4",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",
     "rubyFile": "relation/where_clause.rb",
     "rubyName": "extract_attribute",
-    "digest": "0dbb7e3e990c7aab",
-    "ref": "v8.0.2"
+    "digest": "8d0accb7ae54f8cc",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activerecord",

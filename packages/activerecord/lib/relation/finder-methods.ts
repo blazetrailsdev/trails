@@ -13,6 +13,7 @@ import {
   cmp,
   numericMinus,
   rbCmpint,
+  rbInspect,
 } from "@blazetrails/ruby-compat";
 import { inOrderOf, isPlainObject, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
@@ -203,7 +204,7 @@ export async function sole(this: FinderRelation): Promise<any> {
   } else if (undesired == null) {
     return found;
   } else {
-    throw new SoleRecordExceeded(this.model);
+    throw new SoleRecordExceeded(this);
   }
 }
 
@@ -379,8 +380,9 @@ export function raiseRecordNotFoundExceptionBang(
   }
 
   if (wrap(ids).length === 1) {
+    const id = wrap(ids)[0];
     throw new RecordNotFound(
-      `Couldn't find ${name} with '${rbObjAsString(key)}'=${rbObjAsString(ids)}${conditions}`,
+      `Couldn't find ${name} with '${rbObjAsString(key)}'=${rbInspect(id)}${conditions}`,
       name,
       key,
       ids,
@@ -388,11 +390,11 @@ export function raiseRecordNotFoundExceptionBang(
   }
 
   let error = `Couldn't find all ${pluralize(name)} with '${rbObjAsString(key)}': `;
-  error += `(${(ids as unknown[]).flat(Infinity).join(", ")})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
+  error += `(${(ids as unknown[]).map((id) => rbInspect(id)).join(", ")})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
   if (notFoundIds) {
     error +=
       ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
-      ` with ${pluralize(rbObjAsString(key), notFoundIds.length)} ${notFoundIds.flat(Infinity).join(", ")}.`;
+      ` with ${pluralize(rbObjAsString(key), notFoundIds.length)} ${notFoundIds.map((id) => rbInspect(id)).join(", ")}.`;
   }
   throw new RecordNotFound(error, name, key, ids);
 }
