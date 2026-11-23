@@ -8,8 +8,11 @@ import {
   rbNum2Int,
   rbObjClassname,
   rbObjRespondTo,
+  rbObjSingletonClass,
+  TypeError,
   stringValue,
 } from "@blazetrails/ruby-compat";
+import { Coder } from "./coder.js";
 import { ConnectionBad, Error as PgError, UnableToSend } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { Result } from "./result.js";
@@ -47,10 +50,22 @@ export class Connection {
   parameterStatuses: Record<string, string> = {};
   sversion = 0;
   noticeReceiver: ((result: Result) => void) | null = null;
-  declare isnonblocking?: () => boolean;
   declare pipelineStatus?: () => number;
-  declare encoderForPutCopyData?: () => object | null;
-  declare decoderForGetCopyData?: () => object | null;
+  /** @internal */
+  _nonblocking = false;
+  /** @internal */
+  _encoderForPutCopyData: Coder | null = null;
+  /** @internal */
+  _decoderForGetCopyData: Coder | null = null;
+  declare asyncIsnonblocking: Connection["isnonblocking"];
+  declare isNonblocking: Connection["isnonblocking"];
+  declare asyncSetnonblocking: Connection["setnonblocking"];
+
+  static setAsyncSendApi(this: { prototype: Connection }, enable: boolean): void {
+    const proto = this.prototype;
+    proto.isnonblocking = enable ? proto.asyncIsnonblocking : proto.syncIsnonblocking;
+    proto.isNonblocking = enable ? proto.asyncIsnonblocking : proto.syncIsnonblocking;
+  }
 
   static conndefaultsHash = conndefaultsHash;
   static escapeString = escapeString;
@@ -194,9 +209,8 @@ export class Connection {
           ` transaction_status=${Object.keys(PG.Constants).find((c) => c.startsWith("PQTRANS_") && PG.Constants[c as keyof typeof PG.Constants] == this.transactionStatus())}`,
         );
       }
-      /** @inventedArm if — CONVERGEABLE pg-connection-nonblocking-and-copy-data-coders */
-      if (rbObjRespondTo(this, "isnonblocking") && this.isnonblocking!()) {
-        parts.push(` nonblocking=${this.isnonblocking!()}`);
+      if (this.isnonblocking()) {
+        parts.push(` nonblocking=${this.isnonblocking()}`);
       }
       if (rbObjRespondTo(this, "pipelineStatus") && this.pipelineStatus!() != PG.PQ_PIPELINE_OFF) {
         parts.push(
@@ -212,13 +226,11 @@ export class Connection {
       if (!(this.typeMapForQueries instanceof TypeMapAllStrings)) {
         parts.push(` type_map_for_queries=${rbAnyToS(this.typeMapForQueries)}`);
       }
-      /** @inventedArm if — CONVERGEABLE pg-connection-nonblocking-and-copy-data-coders */
-      if (rbObjRespondTo(this, "encoderForPutCopyData") && this.encoderForPutCopyData!() != null) {
-        parts.push(` encoder_for_put_copy_data=${rbAnyToS(this.encoderForPutCopyData!()!)}`);
+      if (this.encoderForPutCopyData != null) {
+        parts.push(` encoder_for_put_copy_data=${rbAnyToS(this.encoderForPutCopyData)}`);
       }
-      /** @inventedArm if — CONVERGEABLE pg-connection-nonblocking-and-copy-data-coders */
-      if (rbObjRespondTo(this, "decoderForGetCopyData") && this.decoderForGetCopyData!() != null) {
-        parts.push(` decoder_for_get_copy_data=${rbAnyToS(this.decoderForGetCopyData!()!)}`);
+      if (this.decoderForGetCopyData != null) {
+        parts.push(` decoder_for_get_copy_data=${rbAnyToS(this.decoderForGetCopyData)}`);
       }
       stats = ` host=${this.host()} port=${this.port()} user=${this.user()}${parts.join("")}`;
     }
@@ -227,6 +239,66 @@ export class Connection {
 
   flush(): boolean {
     return true;
+  }
+
+  syncSetnonblocking(state: unknown): null {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
+    let arg: boolean;
+    if (state === true) arg = true;
+    else if (state === false) arg = false;
+    else throw new ArgumentError("Boolean value expected");
+    this._nonblocking = arg;
+    return null;
+  }
+
+  syncIsnonblocking(): boolean {
+    return this._nonblocking;
+  }
+
+  /** @missingRailsCall flush_data= — CONVERGEABLE pg-connection-connect-poll-c-primitives */
+  setnonblocking(enabled: boolean): null {
+    (rbObjSingletonClass(this) as unknown as typeof Connection).setAsyncSendApi(!enabled);
+    return this.syncSetnonblocking(true);
+  }
+
+  isnonblocking(): boolean {
+    return false;
+  }
+
+  set encoderForPutCopyData(encoder: Coder | null) {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
+    if (encoder != null && !(encoder instanceof Coder)) {
+      throw new TypeError(`wrong argument type ${rbObjClassname(encoder)} (expected PG::Coder)`);
+    }
+    this._encoderForPutCopyData = encoder;
+  }
+
+  get encoderForPutCopyData(): Coder | null {
+    return this._encoderForPutCopyData;
+  }
+
+  set decoderForGetCopyData(decoder: Coder | null) {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
+    if (decoder != null && !(decoder instanceof Coder)) {
+      throw new TypeError(`wrong argument type ${rbObjClassname(decoder)} (expected PG::Coder)`);
+    }
+    this._decoderForGetCopyData = decoder;
+  }
+
+  get decoderForGetCopyData(): Coder | null {
+    return this._decoderForGetCopyData;
   }
 
   syncPipelineSync(): null {
@@ -328,15 +400,23 @@ export class Connection {
   }
 
   closePrepared(stmtName: string | null): Promise<Result> {
-    return this._asyncDescribeClosePreparedPortal(stmtName, "S");
+    return this._syncDescribeClosePreparedPortal(stmtName, "S");
   }
 
   closePortal(portal: string | null): Promise<Result> {
-    return this._asyncDescribeClosePreparedPortal(portal, "P");
+    return this._syncDescribeClosePreparedPortal(portal, "P");
+  }
+
+  syncClosePrepared(stmtName: string | null): Promise<Result> {
+    return this._syncDescribeClosePreparedPortal(stmtName, "S");
+  }
+
+  syncClosePortal(stmtName: string | null): Promise<Result> {
+    return this._syncDescribeClosePreparedPortal(stmtName, "P");
   }
 
   /** @internal */
-  private _asyncDescribeClosePreparedPortal(name: string | null, type: "S" | "P"): Promise<Result> {
+  private _syncDescribeClosePreparedPortal(name: string | null, type: "S" | "P"): Promise<Result> {
     const stmt = name == null ? "" : stringValue(name);
     return new Promise((resolve, reject) => {
       const submittable = {
@@ -357,9 +437,7 @@ export class Connection {
   }
 
   declare asyncClosePrepared: Connection["closePrepared"];
-  declare syncClosePrepared: Connection["closePrepared"];
   declare asyncClosePortal: Connection["closePortal"];
-  declare syncClosePortal: Connection["closePortal"];
 
   execPrepared(stmtName: string, params: unknown[]): Promise<Result> {
     return engine!.execute(this, this.prepared.get(stmtName), params, stmtName);
@@ -664,9 +742,10 @@ export function conndefaultsHash(): Record<string, string | null> {
 Connection.prototype.exec = Connection.prototype.asyncExec;
 Connection.prototype.query = Connection.prototype.asyncExec;
 Connection.prototype.asyncClosePrepared = Connection.prototype.closePrepared;
-Connection.prototype.syncClosePrepared = Connection.prototype.closePrepared;
 Connection.prototype.asyncClosePortal = Connection.prototype.closePortal;
-Connection.prototype.syncClosePortal = Connection.prototype.closePortal;
+Connection.prototype.asyncIsnonblocking = Connection.prototype.isnonblocking;
+Connection.prototype.isNonblocking = Connection.prototype.isnonblocking;
+Connection.prototype.asyncSetnonblocking = Connection.prototype.setnonblocking;
 Connection.prototype.asyncPipelineSync = Connection.prototype.pipelineSync;
 Connection.prototype.escapeString = escapeString;
 Connection.prototype.escape = escapeString;

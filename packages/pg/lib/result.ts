@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import type pg from "pg";
 import { Constants as PGConstants } from "./pg.js";
+import { Error as PgError } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { TypeMapByOid } from "./type-map-by-oid.js";
 
@@ -58,6 +59,11 @@ export class Result {
     this.#error = error;
   }
 
+  #pgresultGet(): pg.QueryResult {
+    if (this._cleared) throw new PgError("result has been cleared");
+    return this.#native;
+  }
+
   mapTypesBang(typeMap: TypeMapByOid): this {
     this.typeMap = typeMap;
     return this;
@@ -73,6 +79,7 @@ export class Result {
   }
 
   resultStatus(): number {
+    this.#pgresultGet();
     if (this.#error != null) return PGConstants.PGRES_FATAL_ERROR;
     return this.nfields() > 0 ? PGConstants.PGRES_TUPLES_OK : PGConstants.PGRES_COMMAND_OK;
   }
@@ -88,6 +95,7 @@ export class Result {
   }
 
   resStatus(...args: unknown[]): string {
+    this.#pgresultGet();
     if (args.length == 0) {
       return Result.resStatus(this.resultStatus());
     } else if (args.length == 1) {
@@ -106,6 +114,7 @@ export class Result {
   }
 
   errorField(fieldcode: number): string | null {
+    this.#pgresultGet();
     const name = _ERROR_FIELDS[fieldcode];
     const fieldstr = name == null || this.#error == null ? null : this.#error[name];
     return fieldstr == null ? null : String(fieldstr);
@@ -116,25 +125,25 @@ export class Result {
   }
 
   ntuples(): number {
-    return (this.#native.rows ?? []).length;
+    return (this.#pgresultGet().rows ?? []).length;
   }
 
   nfields(): number {
-    return (this.#native.fields ?? []).length;
+    return (this.#pgresultGet().fields ?? []).length;
   }
 
   ftype(index: number): number {
     if (index < 0 || index >= this.fields().length) {
       throw new ArgumentError(`invalid field number ${index}`);
     }
-    return this.#native.fields[index].dataTypeID;
+    return this.#pgresultGet().fields[index].dataTypeID;
   }
 
   fmod(columnNumber: number): number {
     if (columnNumber < 0 || columnNumber >= this.fields().length) {
       throw new ArgumentError(`Column number is out of range: ${columnNumber}`);
     }
-    return this.#native.fields[columnNumber].dataTypeModifier;
+    return this.#pgresultGet().fields[columnNumber].dataTypeModifier;
   }
 
   getvalue(tupNum: number, fieldNum: number): unknown {
@@ -148,15 +157,15 @@ export class Result {
   }
 
   cmdTuples(): number {
-    return this.#native.rowCount ?? 0;
+    return this.#pgresultGet().rowCount ?? 0;
   }
 
   fields(): string[] {
-    return (this.#native.fields ?? []).map((f) => f.name);
+    return (this.#pgresultGet().fields ?? []).map((f) => f.name);
   }
 
   values(): unknown[][] {
-    return ((this.#native.rows ?? []) as unknown[][]).map((row, i) =>
+    return ((this.#pgresultGet().rows ?? []) as unknown[][]).map((row, i) =>
       row.map((_, j) => this.#typecastResultValue(i, j)),
     );
   }
