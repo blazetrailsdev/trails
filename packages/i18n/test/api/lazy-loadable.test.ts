@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { LazyLoadable } from "../../lib/backend/lazy-loadable.js";
 import { testsBasics } from "../support/tests/basics.js";
 import { testsDefaults } from "../support/tests/defaults.js";
+import { testsInterpolation } from "../support/tests/interpolation.js";
+import { testsLink } from "../support/tests/link.js";
 import { testsLookup } from "../support/tests/lookup.js";
 import { testsPluralization } from "../support/tests/pluralization.js";
 import { testsProcs } from "../support/tests/procs.js";
@@ -22,6 +24,8 @@ describe("I18nLazyLoadableBackendApiTest", () => {
 
   testsBasics();
   testsDefaults();
+  testsInterpolation();
+  testsLink();
   testsLookup();
   testsPluralization();
   testsProcs();

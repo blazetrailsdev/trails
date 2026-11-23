@@ -39,22 +39,6 @@ export const I18N_UNPORTED_FILES: UnportedFile[] = [
     reason:
       'PERMANENT: includes I18n::Backend::Cache and Metadata — packages/i18n/CLAUDE.md \u00a7 "A translation lookup is synchronous; the load is an awaited step" and CLAUDE.md \u00a7 "Ruby Strings are JS string primitives (no mutable String carrier)".',
   },
-  {
-    testFile: "api/cascade_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
-  },
-  {
-    testFile: "api/memoize_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend mixin — memoizes lookups per locale.",
-  },
-  {
-    testFile: "api/pluralization_test.rb",
-    package: "i18n",
-    reason:
-      "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data.",
-  },
   // --- i18n: gem surface trails has no counterpart for ---
   {
     pattern: "tests/",
