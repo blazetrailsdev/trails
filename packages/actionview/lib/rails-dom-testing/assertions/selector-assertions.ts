@@ -54,9 +54,7 @@ export function assertDom(
   this: SelectorAssertionsHost,
   ...args: AssertDomArgument[] | [...AssertDomArgument[], AssertDomBlock]
 ): NodeSet | undefined {
-  const block = rbBlockGivenP(args.at(-1))
-    ? (args.pop() as unknown as (s: NodeSet | Html5DocumentFragment) => void)
-    : null;
+  const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as AssertDomBlock) : null;
   this.selected ??= null;
 
   const selector = new HTMLSelector(args, this.selected, () => nodeset(this.documentRootElement()));
@@ -69,9 +67,7 @@ export function assertNotDom(
   this: SelectorAssertionsHost,
   ...args: AssertDomArgument[] | [...AssertDomArgument[], AssertDomBlock]
 ): NodeSet | undefined {
-  const block = rbBlockGivenP(args.at(-1))
-    ? (args.pop() as unknown as (s: NodeSet | Html5DocumentFragment) => void)
-    : null;
+  const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as AssertDomBlock) : null;
   this.selected ??= null;
 
   const selector = new HTMLSelector(args, this.selected, { refute: true }, () =>
@@ -88,7 +84,7 @@ export const refuteSelect = assertNotDom;
 function domAssertions(
   this: SelectorAssertionsHost,
   selector: HTMLSelector,
-  block: ((s: NodeSet | Html5DocumentFragment) => void) | null,
+  block: AssertDomBlock | null,
 ): NodeSet | undefined {
   if (selector.isSelectingNoBody()) {
     assert(true);
@@ -107,7 +103,12 @@ function domAssertions(
       );
     }
 
-    if (!matches.isEmpty()) nestSelection.call(this, matches, block);
+    if (!matches.isEmpty())
+      nestSelection.call(
+        this,
+        matches,
+        block as unknown as (s: NodeSet | Html5DocumentFragment) => void,
+      );
   }
   return matches;
 }
