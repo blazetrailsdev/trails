@@ -57,22 +57,6 @@
   },
   {
     "package": "activesupport",
-    "rubyFile": "core_ext/array/extract_test.rb",
-    "path": "ExtractTest > extract on empty array",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "core_ext/enumerable_test.rb",
-    "path": "EnumerableTests > sole",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "activesupport",
     "rubyFile": "hash_with_indifferent_access_test.rb",
     "path": "HashWithIndifferentAccessTest > indifferent transform keys",
     "kind": "changed",

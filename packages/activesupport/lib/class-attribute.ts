@@ -5,6 +5,7 @@ import {
   rbClassAttachedObject,
   rbObjIsKindOf,
   rbModSingletonP,
+  rbObjSingletonClass,
   rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
@@ -108,7 +109,11 @@ export function classAttribute(this: object, ...attrs: (string | ClassAttributeO
     Object.defineProperty(this, name, delegators);
     const methods: PropertyDescriptor = { configurable: true, enumerable: false };
     if (rbModSingletonP(this)) {
-      Object.assign(methods, delegators);
+      if (instanceReader) {
+        methods.get = function (this: object) {
+          return (rbObjSingletonClass(this) as Slots)[name];
+        };
+      }
     } else if (instanceReader) {
       methods.get = function (this: AttributeInstance) {
         if (Object.hasOwn(this, `@${name}`)) {

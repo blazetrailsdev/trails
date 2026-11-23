@@ -28,6 +28,7 @@ import {
   rbObjClassname,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
+import { first } from "@blazetrails/ruby-compat/enumerable";
 import { assertEqual, assertRaise, assertRaises } from "../../lib/testing/assertions.js";
 import "../../lib/core-ext/enumerable.js";
 
@@ -66,10 +67,16 @@ class Money {
 }
 
 class GenericEnumerable<T> implements Iterable<T> {
-  constructor(private values: T[] = [1, 2, 3] as T[]) {}
+  constructor(private values: Iterable<T> = [1, 2, 3] as T[]) {}
 
   *[Symbol.iterator](): Iterator<T> {
     yield* this.values;
+  }
+}
+
+class KeywordYielder {
+  each(block: (...args: unknown[]) => void): void {
+    block(1, { two: 3 });
   }
 }
 
@@ -471,6 +478,26 @@ describe("EnumerableTests", () => {
     expect(sole([1])).toBe(1);
     expect(() => sole([1, 2])).toThrow();
     expect(() => sole([1, null])).toThrow();
+    expect(() =>
+      sole(new GenericEnumerable(new Range(1, null) as unknown as Iterable<number>)),
+    ).toThrow();
+  });
+
+  it("sole returns same value as first for tuples", () => {
+    const enumerable = {
+      each(yielder: (...args: unknown[]) => void) {
+        yielder(1, "one");
+      },
+    };
+    expect(sole(enumerable)).toEqual([1, "one"]);
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- dispatches to the receiver's each
+    expect(sole(enumerable)).toEqual(first(enumerable));
+  });
+
+  it("sole keyword arguments", () => {
+    const yielder = new KeywordYielder();
+    expect(sole(yielder)).toEqual([1, { two: 3 }]);
+    expect(sole(yielder)).toEqual(first(yielder));
   });
 
   it("index by", () => {

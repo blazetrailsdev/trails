@@ -1,14 +1,16 @@
 import { rbBlockGivenP, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
+type TryBlock = (this: unknown, self?: unknown) => unknown;
+
 export interface Tryable {
-  try(method: string, ...args: unknown[]): unknown;
-  tryBang(method: string, ...args: unknown[]): unknown;
+  try(...args: unknown[] | [TryBlock]): unknown;
+  tryBang(...args: unknown[] | [TryBlock]): unknown;
 }
 
 export const Tryable = {
-  try(obj: unknown, ...args: unknown[]): unknown {
+  try(obj: unknown, ...args: unknown[] | [TryBlock]): unknown {
     if (obj == null) return null;
-    const block = args.at(-1) as ((this: unknown, self?: unknown) => unknown) | undefined;
+    const block = args.at(-1) as TryBlock | undefined;
     if (args.length === 1 && rbBlockGivenP(block)) {
       if (block.length === 0) {
         return Reflect.apply(block, obj, []);
@@ -21,9 +23,9 @@ export const Tryable = {
     return null;
   },
 
-  tryBang(obj: unknown, ...args: unknown[]): unknown {
+  tryBang(obj: unknown, ...args: unknown[] | [TryBlock]): unknown {
     if (obj == null) return null;
-    const block = args.at(-1) as ((this: unknown, self?: unknown) => unknown) | undefined;
+    const block = args.at(-1) as TryBlock | undefined;
     if (args.length === 1 && rbBlockGivenP(block)) {
       if (block.length === 0) {
         return Reflect.apply(block, obj, []);
@@ -43,11 +45,13 @@ export class Delegator implements Tryable {
     this._delegate = delegate;
   }
 
-  try(method: string, ...args: unknown[]): unknown {
-    return Tryable.try(method in this ? this : this._delegate, method, ...args);
+  try(...args: unknown[] | [TryBlock]): unknown {
+    const method = args[0] as string;
+    return Tryable.try(method in this ? this : this._delegate, ...args);
   }
 
-  tryBang(method: string, ...args: unknown[]): unknown {
-    return Tryable.tryBang(method in this ? this : this._delegate, method, ...args);
+  tryBang(...args: unknown[] | [TryBlock]): unknown {
+    const method = args[0] as string;
+    return Tryable.tryBang(method in this ? this : this._delegate, ...args);
   }
 }

@@ -29,7 +29,7 @@ import {
   toEnum,
   type Enumerator,
 } from "@blazetrails/ruby-compat";
-import { count, first, isInclude, reject, toA } from "@blazetrails/ruby-compat/enumerable";
+import { first, isInclude, reject, toA } from "@blazetrails/ruby-compat/enumerable";
 import { sum as enumerableSum } from "../enumerable-utils.js";
 import { isPlainObject, valuesAt } from "../hash-utils.js";
 import { isBlank } from "../string-utils.js";
@@ -225,13 +225,27 @@ export function pick<T, K extends keyof T>(
 }
 
 export function sole<T>(collection: Iterable<T> | Each<T>): T {
-  switch (count(collection)) {
-    case 1:
-      return first(collection) as T;
-    case 0:
-      throw new SoleItemExpectedError("no item found");
-    default:
+  let result: unknown = null;
+  let found = false;
+
+  const block = (...element: unknown[]): void => {
+    if (found) {
       throw new SoleItemExpectedError("multiple items found");
+    }
+
+    result = element.length === 1 ? element[0] : element;
+    found = true;
+  };
+  if (typeof (collection as Partial<Each<T>>).each === "function") {
+    (collection as Each<T>).each(block);
+  } else {
+    for (const elem of collection as Iterable<T>) block(elem);
+  }
+
+  if (found) {
+    return result as T;
+  } else {
+    throw new SoleItemExpectedError("no item found");
   }
 }
 
