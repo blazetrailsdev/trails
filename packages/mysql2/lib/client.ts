@@ -273,7 +273,7 @@ type EofPacket = {
 };
 type NpmConnection = mysql.Connection & {
   connection?: Protocol;
-  config?: { typeCast?: unknown };
+  config?: { typeCast?: unknown; host?: string };
 } & Handshake;
 
 /** @internal */
@@ -1436,7 +1436,10 @@ export class Client {
     if (errorNumber !== errno) {
       const { hostname, address } = e as { hostname?: string; address?: string };
       message = CLIENT_ERRORS[errorNumber]
-        .replace("%-.100s", String(hostname ?? address ?? "localhost").slice(0, 100))
+        .replace(
+          "%-.100s",
+          String(hostname ?? address ?? this.connection?.config?.host).slice(0, 100),
+        )
         .replace("%d", String(typeof errno === "number" ? Math.abs(errno) : 0));
     }
     const error = Mysql2Error.newWithArgs(

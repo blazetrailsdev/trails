@@ -2096,8 +2096,6 @@ jobs:
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
         ports:
           - 3306:3306
-        # The mysql2 gem's spec runs reach `localhost` over the server's unix
-        # socket; result.test.ts' streaming-timeout spec only fires there.
         volumes:
           - /tmp/mysqld:/run/mysqld
         options: >-
