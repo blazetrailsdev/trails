@@ -32,7 +32,7 @@ export class User extends Base {
   declare callbackCounter: number | undefined;
   notificationSent: boolean | undefined;
 
-  declare avatar: One & Pick<Attachment, "signedId">;
+  declare avatar: One & Pick<Attachment, "signedId" | "blob">;
   declare coverPhoto: One;
   declare avatarAttachment: Attachment | null | Promise<Attachment | null>;
   declare avatarBlob: Blob | null | Promise<Blob | null>;

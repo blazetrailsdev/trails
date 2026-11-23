@@ -124,24 +124,22 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3)("ActiveStorage::Service::S3ServiceTe
     const blob = await directlyUploadFileBlob({ filename: "empty_file.txt", contentType: null });
     const user = await User.createBang({ name: "DHH", avatar: blob });
 
-    expect((await user.avatar.attachment)!.blob).toEqual(blob);
+    expect(user.avatar.blob).toEqual(blob);
   });
 
   it("signed URL generation", async () => {
-    const url = await (Service.configure("s3", offlineServiceConfigurations()) as S3Service).url(
-      ctx.key,
-      {
-        expiresIn: minutes(5),
-        disposition: "inline",
-        filename: new Filename("avatar.png"),
-        contentType: "image/png",
-      },
-    );
+    const configurations = offlineServiceConfigurations();
+    const url = await (Service.configure("s3", configurations) as S3Service).url(ctx.key, {
+      expiresIn: minutes(5),
+      disposition: "inline",
+      filename: new Filename("avatar.png"),
+      contentType: "image/png",
+    });
 
     expect(url).toMatch(
       /s3(-[-a-z0-9]+)?\.(\S+)?amazonaws.com.*response-content-disposition=inline.*avatar\.png.*response-content-type=image%2Fpng/,
     );
-    expect(url).toMatch(String(SERVICE_CONFIGURATIONS.s3.bucket));
+    expect(url).toMatch(String(configurations.s3.bucket));
   });
 
   it("uploading with server-side encryption", async () => {
