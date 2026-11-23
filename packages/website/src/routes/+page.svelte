@@ -97,7 +97,7 @@
     <p class="fine">Percentages count the upstream gem&rsquo;s public classes, modules, methods and constants that trails matches by name, measured at {data.measuredAt}.</p>
     <p class="fine"><strong>Rails API:</strong> gems the Rails project owns, like Active Record or Solid Queue. <strong>Ruby gem API:</strong> gems Rails depends on, like rack or i18n.</p>
     <h3 class="rails-compat" id="rails-compat">Plays nice with Rails.</h3>
-    <p class="small"><strong>Compatibility is the goal.</strong> A trails app is compatible with Rails frontend JavaScript dependencies. Turbo, Hotwire, Stimulus, and Action Text all use Rails&rsquo; JS packages directly.</p>
+    <p class="small"><strong>Compatibility is the goal.</strong> A trails app is compatible with Rails frontend JavaScript dependencies. Hotwire&rsquo;s Turbo and Stimulus, and Action Text, all use Rails&rsquo; JS packages directly.</p>
     <p class="small"><strong>trails and Rails apps can work side by side.</strong> In live demos, a trails app and a Rails app read each other&rsquo;s encrypted passwords and exchange Active Job messages across the two languages in real time.</p>
   </section>
 
@@ -238,7 +238,7 @@
   .card { background: var(--bt-surface); max-width: 1170px; margin: 90px auto 0; padding: 60px 80px; border-radius: 10px; box-shadow: 0 10px 40px var(--bt-shadow); }
   .band > .card:first-child { margin-top: 0; }
 
-  .blocks { padding-top: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 560px)); justify-content: center; column-gap: 50px; }
+  .blocks { padding-top: 0; padding-bottom: 30px; display: grid; grid-template-columns: repeat(2, minmax(0, 560px)); justify-content: center; column-gap: 50px; }
   .block:last-child:nth-child(odd) { grid-column: 1 / -1; width: min(100%, 560px); justify-self: center; }
   .block { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; padding-bottom: 60px; }
   .code { display: flex; flex-direction: column; }
