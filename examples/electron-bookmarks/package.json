@@ -19,7 +19,7 @@
     "db:prepare": "trails db:prepare",
     "start": "electron .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@blazetrails/actioncable": "workspace:*",
