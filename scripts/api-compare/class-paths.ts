@@ -555,7 +555,11 @@ const ENTRY_FIRST = new Set(["i18n", "solid-queue"]);
  * `entry` is the package entry an `ENTRY_FIRST` table imports first: entered at
  * the table, the entry's own order still runs, so no `extends` meets a class in TDZ.
  */
-export function renderClassPaths(entries: readonly ClassPathEntry[], entry?: string): string {
+export function renderClassPaths(
+  entries: readonly ClassPathEntry[],
+  entry?: string,
+  lazy = false,
+): string {
   const sorted = [...entries].sort((a, b) => a.fqn.localeCompare(b.fqn));
   const files = [...new Set(sorted.map((e) => e.file))].sort();
   const alias = new Map<string, string>();
@@ -572,7 +576,7 @@ export function renderClassPaths(entries: readonly ClassPathEntry[], entry?: str
     "defineConstants([",
     ...sorted.map(
       (e) =>
-        `  [${alias.get(e.file)}, ${e.namespace ? "null" : JSON.stringify(e.tsName)}, ${JSON.stringify(e.fqn)}],`,
+        `  [${lazy ? `() => ${alias.get(e.file)}` : alias.get(e.file)}, ${e.namespace ? "null" : JSON.stringify(e.tsName)}, ${JSON.stringify(e.fqn)}],`,
     ),
     "]);",
     "",
@@ -1160,7 +1164,7 @@ async function main(): Promise<void> {
       table === GENERATED && ENTRY_FIRST.has(dir)
         ? (await entryFile(path.join(ROOT_DIR, "packages", dir))).replace(/^\.\/dist\//, "")
         : undefined;
-    const next = await prettier.format(renderClassPaths(entries, entry), {
+    const next = await prettier.format(renderClassPaths(entries, entry, table !== GENERATED), {
       ...(await prettier.resolveConfig(target)),
       filepath: target,
     });

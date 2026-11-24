@@ -28,11 +28,15 @@ const tableClasses = new Map<string, () => unknown>();
  * imported last by its package entry, after every module it names has been
  * evaluated, so a thunk still in TDZ then is retried on the next registration,
  * or by a lookup of a class bearing the entry's last path segment, or of a
- * plain-object module, which bears no name.
+ * plain-object module, which bears no name. A per-file table names its own
+ * importer, so it passes each namespace as a thunk: a bundler that splits the
+ * two into chunks would otherwise read the namespace in TDZ.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function defineConstants(entries: readonly [object, string | null, string][]): void {
+export function defineConstants(
+  entries: readonly [object | (() => object), string | null, string][],
+): void {
   for (const [namespace, name, path] of entries) {
     const klass = _readConstantsRow(namespace, name);
     pendingClassPaths.push([klass, path]);
@@ -42,13 +46,14 @@ export function defineConstants(entries: readonly [object, string | null, string
 }
 
 /** @perf 10ms — PERMANENT */
-function _readConstantsRow(namespace: object, name: string | null): () => unknown {
-  if (name === null) return () => namespace;
+function _readConstantsRow(namespace: object | (() => object), name: string | null): () => unknown {
+  const read = typeof namespace === "function" ? (namespace as () => object) : () => namespace;
+  if (name === null) return read;
   const segments = name.split(".");
   return () =>
     segments.reduce<unknown>(
       (owner, segment) => (owner as Record<string, unknown>)[segment],
-      namespace,
+      read(),
     );
 }
 

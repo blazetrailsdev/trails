@@ -1,5 +1,6 @@
-import { kernelCatch, kernelThrow, rbEnsure, Thread } from "@blazetrails/ruby-compat";
+import { kernelCatch, kernelThrow, rbEnsure, Thread, TopLevel } from "@blazetrails/ruby-compat";
 import * as I18n from "./i18n.js";
+import * as I18nModule from "./index.js";
 import type { ExceptionHandlerLike } from "./config.js";
 import type { Base } from "./backend/base.js";
 import { Config } from "./config.js";
@@ -381,5 +382,13 @@ function interpolationKeysFromTranslation(translation: unknown): unknown[] {
     return translation.map((element) => interpolationKeysFromTranslation(element));
   } else {
     return [];
+  }
+}
+
+TopLevel.I18n = I18nModule;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    I18n?: typeof import("./index.js");
   }
 }
