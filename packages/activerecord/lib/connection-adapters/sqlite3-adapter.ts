@@ -1082,7 +1082,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
       const retries = SQLite3Adapter.typeCastConfigToInteger(this._config["retries"]) as number;
-      this._rawConnection!.busyHandler((count) => count <= retries);
+      (await this.rawConnection())!.busyHandler((count) => count <= retries);
     }
 
     await super.configureConnection();

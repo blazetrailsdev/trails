@@ -526,7 +526,7 @@ describe("SQLite adapter driver binding", () => {
 
   it("encoding reads a non-UTF-8 database's encoding through an async-only driver", async () => {
     const utf16Driver = asyncDriver((...args) => {
-      const conn = openVia(...args);
+      const conn = engine(...args);
       conn.execBatch('PRAGMA encoding = "UTF-16le"', null);
       return conn;
     });
