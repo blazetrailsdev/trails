@@ -237,7 +237,7 @@ export function pinPairs(
 // Drop pins whose pair no longer resolves (the STALE set the gate fails on).
 // Hand-deleting them from a manifest seeded at the `--pin-all` floor means
 // editing a ~9k-entry generated file, so removals get a command instead.
-// `pkg` limits pruning to that package's pins; every other pin is kept as is.
+/** `pkg` limits pruning to that package's pins; every other pin is kept as is. */
 export function prunePins(records: BodyHashRecord[], pins: BodyPin[], pkg?: string): BodyPin[] {
   const current = currentDigests(records);
   return sortPins(
@@ -245,8 +245,10 @@ export function prunePins(records: BodyHashRecord[], pins: BodyPin[], pkg?: stri
   );
 }
 
-// The packages whose matched pairs include `rubyFile`. `rubyFile` is
-// package-relative, so a bare `base.rb` names one file in many packages.
+/**
+ * The packages whose matched pairs include `rubyFile`. `rubyFile` is
+ * package-relative, so a bare `base.rb` names one file in many packages.
+ */
 export function packagesOfRubyFile(records: BodyHashRecord[], rubyFile: string): string[] {
   return [...new Set(records.filter((r) => r.rubyFile === rubyFile).map((r) => r.package))].sort();
 }
