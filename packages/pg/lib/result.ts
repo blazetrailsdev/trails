@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import type pg from "pg";
 import { Constants as PGConstants } from "./pg.js";
-import { Error as PgError, ERROR_CLASSES, ServerError, UnableToSend } from "./exceptions.js";
+import { Error as PgError, lookupErrorClass } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { TypeMapByOid } from "./type-map-by-oid.js";
 
@@ -158,20 +158,7 @@ export class Result {
         error = "internal error : unknown result status.";
     }
     const sqlstate = this.errorField(PGConstants.PG_DIAG_SQLSTATE);
-    let klass: typeof PgError | undefined;
-    if (sqlstate != null) {
-      klass = Object.hasOwn(ERROR_CLASSES, sqlstate) ? ERROR_CLASSES[sqlstate] : undefined;
-      if (klass == null) {
-        klass = Object.hasOwn(ERROR_CLASSES, sqlstate.slice(0, 2))
-          ? ERROR_CLASSES[sqlstate.slice(0, 2)]
-          : undefined;
-        if (klass == null) {
-          klass = ServerError;
-        }
-      }
-    } else {
-      klass = UnableToSend;
-    }
+    const klass = lookupErrorClass(sqlstate);
     throw new klass(error, { connection: this._connection, result: this });
   }
 
