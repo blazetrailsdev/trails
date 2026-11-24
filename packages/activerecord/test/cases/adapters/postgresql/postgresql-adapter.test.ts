@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { Date as RubyDate } from "@blazetrails/date";
+import { TypeError } from "@blazetrails/ruby-compat";
 import { Base } from "../../../../lib/base.js";
 import { UrlConfig } from "../../../../lib/database-configurations/url-config.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, PG_TEST_CONFIG } from "./test-helper.js";

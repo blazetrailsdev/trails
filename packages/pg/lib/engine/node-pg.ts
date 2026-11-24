@@ -304,7 +304,10 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
         return;
       }
       deliver(emptyResult(error));
-      if (!pipelined()) return;
+      if (!pipelined()) {
+        reseat();
+        return;
+      }
       conn._pipelineStatus = Constants.PQ_PIPELINE_ABORTED;
       endCommand();
       while (conn._cmdQueue[0] === "query") {

@@ -99,8 +99,8 @@ describe("PG::Connection against a server", () => {
     expect(conn.status()).toBe(PG.CONNECTION_BAD);
 
     const second = await conn.exec("SELECT 1").catch((e: unknown) => e);
-    expect(second).toBeInstanceOf(PG.ConnectionBad);
-    expect((second as Error).message).toBe("no connection to the server\n");
+    expect(second).toBeInstanceOf(PG.UnableToSend);
+    expect((second as Error).message).toBe("PQsendQuery no connection to the server\n");
     expect(conn.status()).toBe(PG.CONNECTION_BAD);
   });
 
