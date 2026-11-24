@@ -190,9 +190,9 @@ describe("savepoint statements dirty the current transaction (trails ensure relo
       await tm.materializeTransactions();
       expect(tm.isRestorable()).toBe(true);
       const driver = (
-        adapter as unknown as { _rawConnection: { exec: (s: string) => Promise<unknown> } }
+        adapter as unknown as { _rawConnection: { prepare: (s: string) => Promise<unknown> } }
       )._rawConnection;
-      vi.spyOn(driver, "exec").mockRejectedValueOnce(
+      vi.spyOn(driver, "prepare").mockRejectedValueOnce(
         new Error("server closed the connection unexpectedly"),
       );
       await expect(adapter.rollbackToSavepoint("sp_x")).rejects.toThrow();

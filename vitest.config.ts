@@ -437,6 +437,22 @@ const alias = {
   "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/lib/index.ts"),
   "@blazetrails/pg": path.resolve(__dirname, "packages/pg/lib/index.ts"),
   "@blazetrails/mysql2": path.resolve(__dirname, "packages/mysql2/lib/index.ts"),
+  "@blazetrails/sqlite3/engine/better-sqlite3": path.resolve(
+    __dirname,
+    "packages/sqlite3/lib/engine/better-sqlite3.ts",
+  ),
+  "@blazetrails/sqlite3/engine/libsql": path.resolve(
+    __dirname,
+    "packages/sqlite3/lib/engine/libsql.ts",
+  ),
+  "@blazetrails/sqlite3/engine/node-sqlite": path.resolve(
+    __dirname,
+    "packages/sqlite3/lib/engine/node-sqlite.ts",
+  ),
+  "@blazetrails/sqlite3/engine/expo-sqlite": path.resolve(
+    __dirname,
+    "packages/sqlite3/lib/engine/expo-sqlite.ts",
+  ),
   "@blazetrails/sqlite3/better-sqlite3": path.resolve(
     __dirname,
     "packages/sqlite3/lib/better-sqlite3.ts",

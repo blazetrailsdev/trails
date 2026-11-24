@@ -3,9 +3,12 @@ import "../constants.sqlite3-adapter.generated.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { sortByBang, anybits, fetch, rbRegMatchP, rbObjAsString } from "@blazetrails/ruby-compat";
-import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
+import type {
+  DatabaseOptions,
+  EngineOpenV2,
+  Statement as SQLite3Statement,
+} from "@blazetrails/sqlite3";
 import { Pragmas } from "@blazetrails/sqlite3";
-import { retryBusy, setBusyHandlerTimeout } from "@blazetrails/sqlite3";
 import { BusyException } from "@blazetrails/sqlite3";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
@@ -128,6 +131,7 @@ function isStructuredDefault(value: unknown): boolean {
 
 type SQLite3ConnectionParameters = SQLite3Config & {
   database: string;
+  engine?: EngineOpenV2;
   resultsAsHash: true;
   defaultTransactionMode: "immediate";
 };
@@ -138,22 +142,12 @@ let sqlite3TypeMap: TypeMap | undefined;
 export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   static override readonly ADAPTER_NAME = "SQLite";
 
-  static async newClient(
+  static newClient(
     this: typeof SQLite3Adapter,
     config: SQLite3ConnectionParameters,
-  ): Promise<SqliteConnection> {
+  ): InstanceType<typeof SQLite3.Database> {
     try {
-      return await (
-        await this.resolveDriverFactory(config)
-      ).open({
-        ...config,
-        database: String(config.database),
-        readOnly: config.readonly ?? false,
-        strict: config.strict,
-        flags: config.flags,
-        noMutex: (config as { noMutex?: boolean }).noMutex,
-        driverOptions: config.driverOptions,
-      });
+      return new SQLite3.Database(String(config.database), config as DatabaseOptions);
     } catch (error) {
       if (!(error instanceof Errno.ENOENT)) throw error;
       if (error.message.includes("No such file or directory")) {
@@ -260,7 +254,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   _lastAffectedRows = 0;
 
   /** @internal */
-  _sharedLockHeld = false;
   /** @internal */
   _memoryDatabase: boolean;
   /** @internal */
@@ -351,7 +344,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override isConnected(): boolean {
-    return this._rawConnection?.isOpen() ?? false;
+    return !(this._rawConnection == null || this._rawConnection.isClosed());
   }
 
   isActive(): boolean | undefined {
@@ -387,11 +380,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return SQLite3Adapter.NATIVE_DATABASE_TYPES;
   }
 
-  /** @inventedArm retryBusy — PERMANENT */
   async encoding(): Promise<string> {
-    const rawConnection = (await this.anyRawConnection()) as SqliteConnection;
-    return SQLite3Adapter.parseEncoding(
-      await retryBusy(rawConnection, () => rawConnection.pragma("encoding")),
+    return String(
+      await ((await this.anyRawConnection()) as InstanceType<typeof SQLite3.Database>).encoding(),
     );
   }
 
@@ -1051,10 +1042,12 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /**
    * @internal
    * @missingRailsName connectionParameters — PERMANENT
+   * @inventedArm resolveEngine — PERMANENT
    */
   private async connect(): Promise<void> {
+    this._connectionParameters.engine ??= await SQLite3Adapter.resolveEngine(this._config);
     try {
-      this._rawConnection = await (this.constructor as typeof SQLite3Adapter).newClient(
+      this._rawConnection = (this.constructor as typeof SQLite3Adapter).newClient(
         this._connectionParameters,
       );
     } catch (ex) {
@@ -1063,25 +1056,18 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  /**
-   * @internal
-   * @inventedArm retryBusy — PERMANENT
-   */
+  /** @internal */
   override async reconnect(): Promise<void> {
     if (await this.active()) {
       try {
-        await retryBusy(this._rawConnection!, () => this._rawConnection!.rollback());
+        await this._rawConnection!.rollback();
       } catch {}
     } else {
       await this.connect();
     }
   }
 
-  /**
-   * @internal
-   * @inventedArm setBusyTimeout — PERMANENT
-   * @inventedArm retryBusy — PERMANENT
-   */
+  /** @internal */
   override async configureConnection(): Promise<void> {
     if (rtest(this._config["timeout"]) && rtest(this._config["retries"])) {
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
@@ -1090,15 +1076,15 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
         throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
       }
-      setBusyHandlerTimeout(this._rawConnection!, timeout);
+      this._rawConnection!.setBusyHandlerTimeout(timeout);
     } else if (rtest(this._config["retries"])) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
       const retries = SQLite3Adapter.typeCastConfigToInteger(this._config["retries"]) as number;
-      this._rawConnection!.busyHandler = (count) => count <= retries;
+      this._rawConnection!.busyHandler((count) => count <= retries);
     }
-    await Pragmas.setBusyTimeout.call(this._rawConnection!, 0);
+
     await super.configureConnection();
 
     const pragmas = fetch<Record<string, string | number | boolean>>(this._config, "pragmas", {});
@@ -1113,12 +1099,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         setter !== "setEnumPragma" &&
         setter !== "setIntPragma"
       ) {
-        await retryBusy(this._rawConnection!, () =>
-          (Pragmas[setter as keyof typeof Pragmas] as (value: unknown) => unknown).call(
-            this._rawConnection!,
-            value,
-          ),
-        );
+        await (
+          this._rawConnection![setter as keyof typeof this._rawConnection] as (
+            value: unknown,
+          ) => unknown
+        ).call(this._rawConnection!, value);
       } else {
         console.warn(`Unknown SQLite pragma: ${pragma}`);
       }
@@ -1152,56 +1137,33 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   static override quoteTableName = quoteTableName;
 
   /** @internal */
-  declare _rawConnection: SqliteConnection | null;
+  declare _rawConnection: InstanceType<typeof SQLite3.Database> | null;
 
   /** @internal */
   get _strictStrings(): boolean {
     return this._config.strict as boolean;
   }
 
-  async _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {
-    const stmt = await rawConnection.prepare(sql);
-    this._maybeEnableReadBigInts(sql, stmt);
-    return stmt;
-  }
-
-  async _cachedStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {
-    if (!this.preparedStatements) {
-      const stmt = await rawConnection.prepare(sql);
-      this._maybeEnableReadBigInts(sql, stmt);
-      return stmt;
-    }
-    let stmt = this._statements.get(sql);
-    if (!stmt) {
-      stmt = await rawConnection.prepare(sql);
-      this._maybeEnableReadBigInts(sql, stmt);
-      await this._statements.set(sql, stmt);
-    }
-    return stmt;
-  }
-
-  private _maybeEnableReadBigInts(sql: string, stmt: SqliteStatement): void {
-    if (this.isWriteQuery(sql) || !stmt.reader) return;
-    const cols = stmt.columns();
-    if (cols.some((c) => c.type !== null && /bigint/i.test(c.type))) {
+  /** @internal */
+  async _maybeEnableReadBigInts(sql: string, stmt: SQLite3Statement): Promise<void> {
+    if (this.isWriteQuery(sql) || stmt.columnCount() === 0) return;
+    if ((await stmt.types()).some((t) => t != null && /bigint/i.test(t))) {
       stmt.setReadBigInts(true);
     }
   }
 
-  _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void {
-    if (!stmt.columns().some((c) => c.type !== null && /bigint/i.test(c.type))) return;
-    for (const row of rows) {
-      for (let i = 0; i < row.length; i++) {
-        const value = row[i];
-        if (
-          typeof value === "bigint" &&
-          value >= BigInt(Number.MIN_SAFE_INTEGER) &&
-          value <= BigInt(Number.MAX_SAFE_INTEGER)
-        ) {
-          row[i] = Number(value);
-        }
-      }
-    }
+  /** @internal */
+  async _narrowSpilledBigInts(stmt: SQLite3Statement, rows: unknown[][]): Promise<unknown[][]> {
+    if (!(await stmt.types()).some((t) => t != null && /bigint/i.test(t))) return rows;
+    return rows.map((row) =>
+      row.map((value) =>
+        typeof value === "bigint" &&
+        value >= BigInt(Number.MIN_SAFE_INTEGER) &&
+        value <= BigInt(Number.MAX_SAFE_INTEGER)
+          ? Number(value)
+          : value,
+      ),
+    );
   }
 
   private static readonly FK_REGEX =
@@ -1212,12 +1174,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     if (!sqlType || !isStructuredDefault(value)) return value;
     const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
     return typeof castType.serialize === "function" ? castType.serialize(value) : value;
-  }
-
-  /** @internal */
-  private static parseEncoding(result: unknown): string {
-    const rows = result as Array<{ encoding: string }> | undefined;
-    return rows?.[0]?.encoding ?? "UTF-8";
   }
 
   private static readonly UNQUOTED_OPEN_PARENS_REGEX = /\((?![^'"]*['"][^'"]*$)/;
@@ -1235,34 +1191,33 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return `'${sqliteQuoteString(String(value))}'`;
   }
 
-  /** @internal */
-  private static async resolveDriverFactory(config: SQLite3Config): Promise<SqliteDriver> {
-    const driverOpt = config.driver;
-    if (driverOpt != null) {
-      if (typeof driverOpt.name !== "string" || typeof driverOpt.open !== "function") {
-        throw new TypeError(
-          "config.driver must be a SqliteDriver " +
-            "(object with `name: string` and `open(config)` function).",
-        );
-      }
-      return driverOpt;
-    }
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  private static async resolveEngine(config: SQLite3Config): Promise<EngineOpenV2> {
     switch (config.adapter ?? "sqlite3") {
       case "sqlite3":
-        return (await import("@blazetrails/sqlite3/better-sqlite3")).betterSqlite3Driver;
+        return (await import("@blazetrails/sqlite3/engine/better-sqlite3")).engine;
       case "node-sqlite":
-        return (await import("@blazetrails/sqlite3/node-sqlite")).nodeSqliteDriver;
+        return (await import("@blazetrails/sqlite3/engine/node-sqlite")).engine;
       case "expo-sqlite":
-        return (await import("@blazetrails/sqlite3/expo-sqlite")).expoSqliteDriver;
+        return (await import("@blazetrails/sqlite3/engine/expo-sqlite")).engine;
       case "libsql":
-        return (await import("@blazetrails/sqlite3/libsql")).libsqlDriver;
+        return (await import("@blazetrails/sqlite3/engine/libsql")).engine;
       case "libsql-remote":
-        return (await import("@blazetrails/sqlite3/libsql")).libsqlRemoteDriver;
-      case "libsql-replica":
-        return (await import("@blazetrails/sqlite3/libsql")).libsqlReplicaDriver;
+        return (await import("@blazetrails/sqlite3/engine/libsql")).remoteEngine({
+          ...config.driverOptions,
+          ...(config.authToken !== undefined ? { authToken: config.authToken } : {}),
+        });
+      case "libsql-replica": {
+        const { replicaEngine } = await import("@blazetrails/sqlite3/engine/libsql");
+        const { buildReplicaOptions } = await import("@blazetrails/sqlite3/libsql");
+        return replicaEngine(buildReplicaOptions(config as never));
+      }
       default:
         throw new LoadError(
-          `No SQLite driver is registered for the '${config.adapter}' adapter. Pass a \`driver\` in the adapter config.`,
+          `No SQLite engine is registered for the '${config.adapter}' adapter. Pass an \`engine\` in the adapter config.`,
         );
     }
   }
@@ -1280,14 +1235,14 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   > = new Concurrent.Map();
 }
 
-export class StatementPool extends GenericStatementPool<SqliteStatement> {
+export class StatementPool extends GenericStatementPool<SQLite3Statement> {
   override async reset(): Promise<void> {
     return this.clear();
   }
 
   /** @internal */
-  protected override async dealloc(stmt: SqliteStatement): Promise<void> {
-    if (!stmt.closed) await stmt.close();
+  protected override async dealloc(stmt: SQLite3Statement): Promise<void> {
+    if (!stmt.isClosed()) await stmt.close();
   }
 }
 

@@ -93,28 +93,22 @@ describe("SQLite3Adapter pragmas option", () => {
   it("applies a valid numeric pragma on connect", async () => {
     adapter = new SQLite3Adapter({ database: ":memory:", pragmas: { cache_size: 500 } });
     await adapter.connectBang();
-    const result = (
-      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
-    ).pragma("cache_size") as Array<{ cache_size: number }>;
-    expect(result[0]?.cache_size).toBe(500);
+    const result = await (await adapter.rawConnection())!.getFirstValue("PRAGMA cache_size");
+    expect(result).toBe(500);
   });
 
   it("applies a valid string enum pragma", async () => {
     adapter = new SQLite3Adapter({ database: ":memory:", pragmas: { synchronous: "FULL" } });
     await adapter.connectBang();
-    const result = (
-      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
-    ).pragma("synchronous") as Array<{ synchronous: number }>;
-    expect(result[0]?.synchronous).toBe(2);
+    const result = await (await adapter.rawConnection())!.getFirstValue("PRAGMA synchronous");
+    expect(result).toBe(2);
   });
 
   it("converts boolean true to 1 for pragma", async () => {
     adapter = new SQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: true } });
     await adapter.connectBang();
-    const result = (
-      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
-    ).pragma("foreign_keys") as Array<{ foreign_keys: number }>;
-    expect(result[0]?.foreign_keys).toBe(1);
+    const result = await (await adapter.rawConnection())!.getFirstValue("PRAGMA foreign_keys");
+    expect(result).toBe(1);
   });
 
   it("raises SQLite3::CantOpenException opening a missing database file readonly", async () => {
@@ -137,11 +131,8 @@ describe("SQLite3Adapter pragmas option", () => {
       Promise.resolve().then(() =>
         SQLite3Adapter.newClient({
           database: ":memory:",
-          driver: {
-            name: "raising",
-            open: async () => {
-              throw error;
-            },
+          engine: () => {
+            throw error;
           },
         } as never),
       );
@@ -171,10 +162,8 @@ describe("SQLite3Adapter pragmas option", () => {
   it("converts boolean false to 0 for pragma", async () => {
     adapter = new SQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: false } });
     await adapter.connectBang();
-    const result = (
-      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
-    ).pragma("foreign_keys") as Array<{ foreign_keys: number }>;
-    expect(result[0]?.foreign_keys).toBe(0);
+    const result = await (await adapter.rawConnection())!.getFirstValue("PRAGMA foreign_keys");
+    expect(result).toBe(0);
   });
 
   it("warns and skips an invalid pragma name", async () => {
@@ -216,10 +205,10 @@ describe("SQLite3Adapter pragmas option", () => {
       );
       const check = new SQLite3Adapter({ database: dbPath });
       await check.connectBang();
-      const rows = ((await check.rawConnection())!.raw as import("better-sqlite3").Database)
-        .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'sentinel'")
-        .get();
-      expect(rows).toEqual({ c: 1 });
+      const rows = await (await check.rawConnection())!.getFirstValue(
+        "SELECT count(*) FROM sqlite_master WHERE name = 'sentinel'",
+      );
+      expect(rows).toBe(1);
       await check.dropTable("sentinel", { ifExists: true });
       await check.disconnectBang();
     } finally {
@@ -230,10 +219,8 @@ describe("SQLite3Adapter pragmas option", () => {
   it("applies DEFAULT_PRAGMAS when no pragmas option is given", async () => {
     adapter = new SQLite3Adapter({ database: ":memory:" });
     await adapter.connectBang();
-    const result = (
-      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
-    ).pragma("cache_size") as Array<{ cache_size: number }>;
-    expect(result[0]?.cache_size).toBe(2000);
+    const result = await (await adapter.rawConnection())!.getFirstValue("PRAGMA cache_size");
+    expect(result).toBe(2000);
   });
 });
 

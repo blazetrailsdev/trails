@@ -1,3 +1,4 @@
+import { bindValue } from "./bind-value.js";
 import BetterSqlite3 from "better-sqlite3";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
@@ -75,7 +76,6 @@ function prepareStatement(
   raw: BetterSqlite3.Database,
   sql: string,
   handler: () => BusyHandler | null,
-  setChanges: (n: number) => void,
   finalize: () => void,
 ): EngineStatement {
   const stmt = withBusyHandler(errors, handler, () => raw.prepare(sql));
@@ -120,14 +120,14 @@ function prepareStatement(
     isClosed: () => closed,
     bindParam(key, value) {
       if (typeof key === "number") {
-        positional[key - 1] = value;
+        positional[key - 1] = bindValue(value);
         return;
       }
       const name = key.replace(/^[:@$]/, "");
       if (bindParameterIndex(sql, name) === 0) {
         throw new SQLite3.Exception("no such bind parameter");
       }
-      named[name] = value;
+      named[name] = bindValue(value);
     },
     resetBang() {
       rows?.return?.();
@@ -137,9 +137,7 @@ function prepareStatement(
     step() {
       if (done) return null;
       if (!reader) {
-        setChanges(
-          withBusyHandler(errors, handler, () => bound((args) => stmt.run(...args)).changes),
-        );
+        withBusyHandler(errors, handler, () => bound((args) => stmt.run(...args)));
         done = true;
         return null;
       }
@@ -174,17 +172,14 @@ function prepareStatement(
 
 export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: number) => {
   const raw = open(file, mode);
-  let changes = 0;
   let handler: BusyHandler | null = null;
-  const setChanges = (n: number) => {
-    changes = n;
-  };
   let zombie = false;
   let liveStatements = 0;
   const finalize = () => {
     liveStatements -= 1;
     if (zombie && liveStatements === 0) raw.close();
   };
+  let changesStmt: ReturnType<typeof raw.prepare> | null = null;
   const db: SyncEngineDatabase = {
     ...errors,
     isClosed: () => zombie || !raw.open,
@@ -193,7 +188,8 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
       if (liveStatements === 0) raw.close();
       else zombie = true;
     },
-    changes: () => changes,
+    changes: () =>
+      ((changesStmt ??= raw.prepare("SELECT changes() AS v")).get() as { v: number }).v,
     disableQuirkMode: () => {},
     loadExtensionInternal: (file) => void raw.loadExtension(file),
     enableLoadExtension: () => {},
@@ -229,10 +225,10 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
           () => raw.prepare(head),
         );
         if (!stmt.reader) {
-          changes = withBusyHandler(
+          withBusyHandler(
             errors,
             () => handler,
-            () => stmt.run().changes,
+            () => stmt.run(),
           );
         } else {
           stmt.safeIntegers(true).raw(true);
@@ -254,7 +250,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
     prepare(sql) {
       const [tail, empty] = statementTail(sql);
       if (empty) return [closedStatement, sql.slice(tail)];
-      const stmt = prepareStatement(raw, sql.slice(0, tail), () => handler, setChanges, finalize);
+      const stmt = prepareStatement(raw, sql.slice(0, tail), () => handler, finalize);
       liveStatements += 1;
       return [stmt, sql.slice(tail)];
     },

@@ -1,3 +1,4 @@
+import { bindValue } from "./bind-value.js";
 import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
@@ -136,8 +137,8 @@ function prepareStatement(
     },
     isClosed: () => closed,
     bindParam(key, value) {
-      if (typeof key === "number") positional[key - 1] = value;
-      else named[/^[$:@]/.test(key) ? key : `$${key}`] = value;
+      if (typeof key === "number") positional[key - 1] = bindValue(value);
+      else named[/^[$:@]/.test(key) ? key : `$${key}`] = bindValue(value);
     },
     async resetBang() {
       await rows?.return?.();

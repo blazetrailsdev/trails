@@ -42,8 +42,8 @@ import { ConnectionAdapters } from "../../../lib/namespaces.js";
 import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
 import { assertCalledOnInstanceOf } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { adapterType } from "../../support/test-adapter.js";
-import { Backup } from "@blazetrails/sqlite3";
-import { betterSqlite3Driver } from "@blazetrails/sqlite3/better-sqlite3";
+import { Backup, SQLite3 } from "@blazetrails/sqlite3";
+import { engine } from "@blazetrails/sqlite3/engine/better-sqlite3";
 import type { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { inMemoryDb } from "../../support/adapter-helper.js";
 import { fixtures } from "../../support/use-fixtures.js";
@@ -1086,7 +1086,7 @@ function databaseTasksMigrationTestCase(folderName = "valid"): {
       database: ":memory:",
       migrationsPaths: migrationsPath,
     });
-    const sourceDb = await betterSqlite3Driver.open({ database: file! });
+    const sourceDb = new SQLite3.Database(file!, { engine });
     const destDb = (await ((await Base.leaseConnection()) as SQLite3Adapter).rawConnection())!;
     const backup = new Backup(destDb, "main", sourceDb, "main");
     await backup.step(-1);

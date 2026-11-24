@@ -1,3 +1,4 @@
+import { bindValue } from "./bind-value.js";
 import { createRequire } from "node:module";
 import type { AggregateOptions, DatabaseSync, SQLInputValue, StatementSync } from "node:sqlite";
 import { LoadError } from "@blazetrails/ruby-compat";
@@ -103,13 +104,6 @@ function open(file: string, mode: number, quirks = true): DatabaseSync {
 interface SerializableDatabase {
   serialize(): Uint8Array;
   deserialize(image: Uint8Array): void;
-}
-
-/** @internal */
-function bindValue(value: SqliteBindValue): SqliteBindValue {
-  if ((value as unknown) instanceof Number) return (value as unknown as number).valueOf();
-  if (typeof value === "number" && Number.isInteger(value)) return BigInt(value);
-  return value === undefined ? null : value;
 }
 
 /** @internal */
