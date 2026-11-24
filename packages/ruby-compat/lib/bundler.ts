@@ -75,7 +75,7 @@ export const Bundler = {
         throw error;
       }
       const requiredFile = File.expandPath(entry, dir);
-      if (!(await File.isExistAsync(requiredFile))) continue;
+      if (!(await File.isFileAsync(requiredFile))) continue;
       await import(new URL(`file://${requiredFile}`).href);
     }
   },
