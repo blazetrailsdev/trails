@@ -1,6 +1,8 @@
 import { DSL } from "@blazetrails/rake";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
+import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 import {
+  Dir,
   File,
   RuntimeError,
   STDOUT,
@@ -15,6 +17,7 @@ import {
 import { Base } from "../base.js";
 import { EnvironmentStorageError, Migration, Migrator, type MigrationProxy } from "../migration.js";
 import { Schema } from "../schema.js";
+import { FixtureSet } from "../fixtures.js";
 import { DatabaseTasks, type SchemaFormat } from "../tasks/database-tasks.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import * as ActiveRecord from "../active-record.js";
@@ -556,6 +559,60 @@ DSL.namespace("db", (dbNamespace) => {
   DSL.namespace("seed", () => {
     DSL.desc("Truncate tables of each database for current environment and load the seeds");
     DSL.task({ replant: ["load_config", "truncate_all", "seed"] });
+  });
+
+  DSL.namespace("fixtures", () => {
+    DSL.desc(
+      "Load fixtures into the current environment's database. To load specific fixtures, use FIXTURES=x,y. To load from subdirectory in test/fixtures, use FIXTURES_DIR=z. To specify an alternative path (e.g. spec/fixtures), use FIXTURES_PATH=spec/fixtures.",
+    );
+    DSL.task(
+      { load: "load_config" },
+      block(async () => {
+        const baseDir = DatabaseTasks.fixturesPath;
+
+        const fixturesDir =
+          ENV["FIXTURES_DIR"] != null ? File.join(baseDir, ENV["FIXTURES_DIR"]) : baseDir;
+
+        let fixtureFiles: string[];
+        if (ENV["FIXTURES"] != null) {
+          fixtureFiles = ENV["FIXTURES"].split(",");
+        } else {
+          let files = await Dir.globAsync(File.join(fixturesDir, "**/*.{yml}"));
+          files = files.filter((f) => !f.startsWith(File.join(fixturesDir, "files")));
+          fixtureFiles = files.map((f) => f.slice(fixturesDir.length, -4).replace(/^\//, ""));
+        }
+
+        await FixtureSet.createFixtures(fixturesDir, fixtureFiles);
+      }),
+    );
+
+    DSL.task(
+      { identify: "load_config" },
+      block(async () => {
+        const label = ENV["LABEL"];
+        const id = ENV["ID"];
+        if (isBlank(label) && isBlank(id)) throw new RuntimeError("LABEL or ID required");
+
+        if (label != null) {
+          STDOUT.puts(`The fixture ID for "${label}" is ${FixtureSet.identify(label)}.`);
+        }
+
+        const baseDir = DatabaseTasks.fixturesPath;
+
+        for (const file of await Dir.globAsync(`${baseDir}/**/*.yml`)) {
+          const data = ConfigurationFile.parse(file) as Record<string, unknown> | null;
+          if (data != null) {
+            for (const key of Object.keys(data)) {
+              const keyId = FixtureSet.identify(key);
+
+              if (key === label || keyId === rbStrToI(id ?? "")) {
+                STDOUT.puts(`${file}: ${key} (${keyId})`);
+              }
+            }
+          }
+        }
+      }),
+    );
   });
 
   DSL.namespace("schema", () => {
