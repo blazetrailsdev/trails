@@ -18897,8 +18897,8 @@
     "package": "actiontext",
     "rubyFile": "tag_helper.rb",
     "rubyName": "render",
-    "digest": "dacc0a1ef599ad3e",
-    "ref": "v8.0.2"
+    "digest": "59db0095fecdf926",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actiontext",

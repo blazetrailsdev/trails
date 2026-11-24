@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { assertDomEqual } from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
 import { createFileBlob, fixturesAll } from "../test-helper.js";
 import { Attachment } from "../../lib/attachment.js";
 import { ContentAttachment } from "../../lib/attachables/content-attachment.js";
@@ -137,8 +138,9 @@ describe("ActionText::AttachmentTest", () => {
       '<action-text-attachment content-type="text/html" content="<img src=. onerror=\'alert(location)\' />"></action-text-attachment>',
     );
 
-    expect(await attachment.toTrixHtml()).toBe(
+    assertDomEqual(
       '<figure data-trix-attachment="{&quot;contentType&quot;:&quot;text/html&quot;,&quot;content&quot;:&quot;<img src=\\&quot;.\\&quot;>&quot;}"></figure>',
+      await attachment.toTrixHtml(),
     );
   });
 
