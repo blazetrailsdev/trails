@@ -3,6 +3,7 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { type BodyPin, serializeShard } from "./body-pins.js";
 import {
   findEmptyBaselines,
   findNonCanonicalBaselines,
@@ -131,10 +132,17 @@ describe("committed api-compare baselines", () => {
   it("are all written in canonical form", async () => {
     const files = [
       ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-exclude"))),
-      path.join(HERE, "body-pins.json"),
       ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-unreviewed"))),
     ];
     expect(await findNonCanonicalBaselines(files)).toEqual([]);
+  });
+
+  it("body-pins shards are one pin per line, in pin order", async () => {
+    const dir = path.join(HERE, "body-pins");
+    for (const name of await fs.readdir(dir)) {
+      const text = await fs.readFile(path.join(dir, name), "utf-8");
+      expect(text, name).toBe(serializeShard(JSON.parse(text) as BodyPin[]));
+    }
   });
 
   // An empty shard is deleted by every reseed, so committing one makes the

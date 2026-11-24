@@ -1,7 +1,7 @@
 /**
  * The one canonical on-disk form for the hand-editable JSON baselines the
  * api-compare gates own (the split
- * call-mismatches-exclude/ tree, body-pins.json): 2-space
+ * call-mismatches-exclude/ tree, body-pins/<package>.json): 2-space
  * `JSON.stringify` plus a trailing newline, with non-ASCII written LITERALLY
  * as UTF-8 — never as `\uXXXX` escapes.
  *

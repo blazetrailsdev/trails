@@ -60,7 +60,7 @@
  * body digest is written to output/body-hashes.json, and the summary reports
  * pinned/unpinned counts per package (advisory; parity % unchanged). The pin
  * lifecycle is: port → verify → pin → (Rails bump) → drift report → re-verify
- * → re-pin. A committed manifest (body-pins.json) opts specific pairs in;
+ * → re-pin. A committed manifest (body-pins/<package>.json) opts specific pairs in;
  * `tsx body-pins.ts --pin <ruby-file>` (or `--pin-all` for the bulk floor)
  * pins/re-pins them at the current digest, and lint-body-pins.ts (CI gate)
  * fails on DRIFT (pinned digest ≠ current vendored digest — upstream Rails
@@ -1886,7 +1886,7 @@ interface PackageResult {
 
 // Source-hash pinning (RFC 0025): the current normalized Ruby body digest for
 // one name-matched (Ruby, TS) pair. Keyed by (package, rubyFile, rubyName) —
-// the same identity the pin manifest (body-pins.json) uses. Written to
+// the same identity the pin manifest (body-pins/<package>.json) uses. Written to
 // output/body-hashes.json; lint-body-pins.ts diffs the committed pins against
 // it to report upstream body drift. Advisory — never affects the parity %.
 interface BodyHashRecord {
@@ -6239,7 +6239,7 @@ export function main() {
       // option-key check, which shares the same matched (ruby, ts) pairs.
       // Source-hash pinning (RFC 0025): record the current normalized Ruby body
       // digest for this matched pair, keyed by (rubyFile, rubyName). The pin
-      // manifest (body-pins.json) opts specific pairs in; lint-body-pins.ts
+      // manifest (body-pins/<package>.json) opts specific pairs in; lint-body-pins.ts
       // diffs the pinned digests against this artifact to flag upstream drift.
       const checkBody = (rubyName: string, tsName: string, tsFile: string) => {
         const digest = rubyBodyDigestByName.get(rubyName);
@@ -7398,7 +7398,7 @@ export function main() {
 
   // Source-hash pinning artifact (RFC 0025) — the current normalized Ruby body
   // digest for every name-matched pair, flat across packages. lint-body-pins.ts
-  // diffs the committed pins (body-pins.json) against this to report drift and
+  // diffs the committed pins (body-pins/<package>.json) against this to report drift and
   // stale pins. Always written; not emitted for the privates-only variant
   // (private-method bodies carry no public-contract obligation, matching the
   // call-set gate). Parity % is unchanged.
@@ -7412,7 +7412,7 @@ export function main() {
       JSON.stringify(
         {
           generatedAt: new Date().toISOString(),
-          note: "Source-hash pinning (RFC 0025). Normalized Ruby body digest per name-matched pair. lint-body-pins.ts diffs body-pins.json against this to detect upstream Rails body drift.",
+          note: "Source-hash pinning (RFC 0025). Normalized Ruby body digest per name-matched pair. lint-body-pins.ts diffs body-pins/<package>.json against this to detect upstream Rails body drift.",
           packages: [...new Set(results.map((r) => r.package))].sort(),
           hashes: bodyHashesFlat,
         },
@@ -7445,13 +7445,19 @@ export function main() {
 // (pinning is opt-in; a run without a manifest simply reports every pair as
 // unpinned). Sync fs matches this script's existing IO style.
 function loadPinnedKeys(): Set<string> {
-  const pinsPath = path.join(SCRIPT_DIR, "body-pins.json");
+  const pinsDir = path.join(SCRIPT_DIR, "body-pins");
   try {
-    const pins = JSON.parse(fs.readFileSync(pinsPath, "utf-8")) as Array<{
-      package: string;
-      rubyFile: string;
-      rubyName: string;
-    }>;
+    const pins = fs
+      .readdirSync(pinsDir)
+      .filter((n) => n.endsWith(".json"))
+      .flatMap(
+        (n) =>
+          JSON.parse(fs.readFileSync(path.join(pinsDir, n), "utf-8")) as Array<{
+            package: string;
+            rubyFile: string;
+            rubyName: string;
+          }>,
+      );
     return new Set(pins.map((p) => `${p.package} ${p.rubyFile} ${p.rubyName}`));
   } catch {
     return new Set();

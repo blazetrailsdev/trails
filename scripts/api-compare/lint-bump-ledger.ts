@@ -12,7 +12,7 @@
  *     `pairSeed`), less what the PR re-pinned or pruned. The base's pins were
  *     taken at the old ref, so no old tree is fetched;
  *   - a PR forked before the `ref` it is tested against that edits
- *     `scripts/api-compare/body-pins.json`: its pins were taken at the old ref.
+ *     `scripts/api-compare/body-pins/`: its pins were taken at the old ref.
  *
  * The artifact, pins and ledger are the tested tree's; which rows and pins the
  * PR adds is read between the revisions `resolveRevisions` names, and a

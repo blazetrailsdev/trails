@@ -27,6 +27,8 @@ packages/activerecord/test/support/yaml_compatibility_fixtures/
 # verify byte-for-byte). Prettier collapses a short `rubyArgs` array onto one
 # line, which that serializer never emits, so the two formatters fight.
 scripts/api-compare/call-mismatches-exclude/
+# One pin per line (body-pins.ts#serializeShard), which Prettier would expand.
+scripts/api-compare/body-pins/
 
 # The Journey visualizer's shipped assets, read off disk by
 # TransitionTable#visualizer (transition_table.rb:128-131). fsm.js and fsm.css are

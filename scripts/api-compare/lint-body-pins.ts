@@ -6,7 +6,7 @@
  *     digest changed (upstream Rails moved; re-verify the port, then re-pin
  *     with `tsx body-pins.ts --pin <ruby-file>`);
  *   - STALE — a pinned pair no longer resolves (the method was removed/renamed
- *     or the pair stopped matching; drop the entry from body-pins.json);
+ *     or the pair stopped matching; drop the entry from body-pins/<package>.json);
  *   - DUPLICATE — two manifest entries share one (package, rubyFile, rubyName)
  *     key (the manifest must be a clean 1:1 record).
  *

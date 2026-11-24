@@ -1,0 +1,12 @@
+[
+{"package":"pg","rubyFile":"coder.rb","rubyName":"initialize","digest":"73710061e9200179","ref":"v1.5.9"},
+{"package":"pg","rubyFile":"coder.rb","rubyName":"to_h","digest":"5ffb07fbcc0e2316","ref":"v1.5.9"},
+{"package":"pg","rubyFile":"connection.rb","rubyName":"cancel","digest":"990d94119edb5281","ref":"v1.6.2"},
+{"package":"pg","rubyFile":"connection.rb","rubyName":"conndefaults_hash","digest":"73814af9098f0803","ref":"v1.5.9"},
+{"package":"pg","rubyFile":"connection.rb","rubyName":"reset","digest":"eb8ee2ba979943e4","ref":"v1.5.9"},
+{"package":"pg","rubyFile":"exceptions.rb","rubyName":"initialize","digest":"89675d7305b65d70","ref":"v1.5.9"},
+{"package":"pg","rubyFile":"pg.rb","rubyName":"connect","digest":"f3afe39b1296f90f","ref":"v1.5.9"},
+{"package":"pg","rubyFile":"result.rb","rubyName":"map_types!","digest":"bdf40d23001a73cc","ref":"v1.5.9"},
+{"package":"pg","rubyFile":"text_decoder/date.rb","rubyName":"decode","digest":"31e9868564807a37","ref":"v1.5.9"},
+{"package":"pg","rubyFile":"text_decoder/timestamp.rb","rubyName":"initialize","digest":"fbb019fa1e5ba7e0","ref":"v1.5.9"}
+]
