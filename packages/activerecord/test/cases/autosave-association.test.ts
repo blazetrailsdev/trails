@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, rbModName, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "../../lib/associations/collection-association.js";
 import {
   indexNestedAttributeErrors,
@@ -3131,17 +3131,14 @@ describe("TestAutosaveAssociationWithNestedAttributes", () => {
       this.tableName = "ship_parts";
     }
   }
+  constSet(TestAutosaveAssociationWithNestedAttributes, "Part", Part);
 
   class Ship extends Base {
     declare parts: AssociationProxy<Part>;
 
     static {
-      Object.defineProperty(Part, "name", {
-        value: "TestAutosaveAssociationWithNestedAttributes::Part",
-      });
-      constSet(TestAutosaveAssociationWithNestedAttributes, "Part", Part);
       this.tableName = "ships";
-      this.hasMany("parts", { className: Part.name });
+      this.hasMany("parts", { className: rbModName(Part)! });
       this.acceptsNestedAttributesFor("parts", { allowDestroy: true });
 
       this.validate(":hasAtLeastTwoParts");
@@ -3152,21 +3149,21 @@ describe("TestAutosaveAssociationWithNestedAttributes", () => {
       if (currentParts.length < 2) this.errors.add("parts", "must have at least two parts");
     }
   }
+  constSet(TestAutosaveAssociationWithNestedAttributes, "Ship", Ship);
 
   class Pirate extends Base {
+    declare ships: AssociationProxy<Ship>;
+
     static {
-      Object.defineProperty(Ship, "name", {
-        value: "TestAutosaveAssociationWithNestedAttributes::Ship",
-      });
-      constSet(TestAutosaveAssociationWithNestedAttributes, "Ship", Ship);
       this.tableName = "pirates";
-      this.hasMany("ships", { className: Ship.name });
+      this.hasMany("ships", { className: rbModName(Ship)! });
       this.acceptsNestedAttributesFor("ships", { allowDestroy: true });
     }
   }
+  constSet(TestAutosaveAssociationWithNestedAttributes, "Pirate", Pirate);
 
   it("should be invalid when nested attributes deletion breaks validation", async () => {
-    const pirate = (await Pirate.createBang()) as any;
+    const pirate = await Pirate.createBang();
     const ship = pirate.ships.new();
     for (let i = 0; i < 2; i++) {
       ship.parts.build();
