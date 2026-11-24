@@ -21,6 +21,7 @@ import {
   rbFSend,
   rbObjSingletonClass,
   stderr,
+  rbInspect,
 } from "@blazetrails/ruby-compat";
 import { HTML5, XML } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
@@ -1380,6 +1381,10 @@ describe("IntegrationRequestEncodersTest", () => {
       await this.render({ plain: "ok" });
     }
 
+    async foos_html(): Promise<void> {
+      await this.render({ inline: '<code><%= params.permit("foo") %></code>\n' });
+    }
+
     async foos_json(): Promise<void> {
       await this.render({ json: this.params.permit("foo") });
     }
@@ -1429,6 +1434,17 @@ describe("IntegrationRequestEncodersTest", () => {
 
       assertResponse(":success");
       assertEqual({ foo: "fighters" }, t.response.parsedBody);
+    });
+  });
+
+  it("encoding as html", async () => {
+    await postToFoos(":html", () => {
+      assertResponse(":success");
+      expect(t.request.mediaType).toBe("application/x-www-form-urlencoded");
+      expect(t.request.accepts[0].toString()).toBe("text/html");
+      expect(t.request.format().ref()).toBe(":html");
+      expect(t.request.requestParameters).toEqual({ foo: "fighters" });
+      expect(t.response.parsedBody.at("code").text).toBe(rbInspect({ foo: "fighters" }));
     });
   });
 

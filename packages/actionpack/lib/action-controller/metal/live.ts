@@ -36,7 +36,16 @@ export class ClientDisconnected extends RuntimeError {}
 type ErrorCallback = () => unknown;
 
 export class Buffer extends ResponseBuffer<Queue<string | null>> {
-  static queueSize: number | null = 10;
+  /** @internal */
+  static _queueSize: number | null = 10;
+
+  static get queueSize(): number | null {
+    return this._queueSize;
+  }
+
+  static set queueSize(value: number | null) {
+    this._queueSize = value;
+  }
 
   ignoreDisconnect: boolean;
 
