@@ -1133,7 +1133,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
     const conn = new SQLite3Adapter({ database: ":memory:", readonly: false });
     await conn.connectBang();
 
-    expect((await conn.rawConnection())!.isReadonly()).toBe(false);
+    expect((await conn.rawConnection())!.isReadonly()).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -1141,7 +1141,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
     const conn = new SQLite3Adapter({ database: ":memory:" });
     await conn.connectBang();
 
-    expect((await conn.rawConnection())!.isReadonly()).toBe(false);
+    expect((await conn.rawConnection())!.isReadonly()).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -1149,7 +1149,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
     const conn = new SQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 
-    expect((await conn.rawConnection())!.isReadonly()).toBe(true);
+    expect((await conn.rawConnection())!.isReadonly()).toBeTruthy();
     await conn.disconnectBang();
   });
 

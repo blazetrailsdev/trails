@@ -309,6 +309,11 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     return result;
   }
 
+  executeBatch2(
+    this: Database<SyncEngineDatabase>,
+    sql: string,
+    block?: (val: unknown) => unknown,
+  ): unknown[];
   executeBatch2(sql: string, block?: (val: unknown) => unknown): unknown[] | Promise<unknown[]>;
   executeBatch2(sql: string, block?: (val: unknown) => unknown): unknown[] | Promise<unknown[]> {
     if (block) {
