@@ -169,7 +169,7 @@ async function handle(request: SwRequest, port: MessagePort): Promise<void> {
       respond(port, response.status, response.headers, response.body);
       post({
         type: "request",
-        text: `${request.method} ${url.pathname.replace(previewPath, "") || "/"}${url.search} → ${response.status} (${Math.round(performance.now() - started)}ms)`,
+        text: `${request.method} ${(url.pathname.startsWith(previewPath) ? url.pathname.slice(previewPath.length) : url.pathname) || "/"}${url.search} → ${response.status} (${Math.round(performance.now() - started)}ms)`,
       });
     } catch (e) {
       console.error(e);

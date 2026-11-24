@@ -176,7 +176,7 @@ function navigate(path: string): void {
 preview.addEventListener("load", () => {
   try {
     const loc = preview.contentWindow!.location;
-    if (loc.pathname.startsWith(previewPath))
+    if (loc.pathname === previewPath || loc.pathname.startsWith(`${previewPath}/`))
       urlInput.value = loc.pathname.slice(previewPath.length) + loc.search || "/";
   } catch {
     /* cross-origin */
