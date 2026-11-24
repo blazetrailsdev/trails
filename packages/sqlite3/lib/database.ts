@@ -2,6 +2,7 @@ import {
   ArgumentError,
   Encoding,
   NotImplementedError,
+  Process,
   Thread,
   RuntimeError,
   TypeError,
@@ -10,6 +11,7 @@ import {
   rbEnsure,
   rbObjClone,
   rbInspect,
+  rbFSleep,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import type { Included } from "@blazetrails/ruby-compat";
@@ -538,13 +540,13 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     const timeoutSeconds = milliseconds / 1000;
 
     return this.busyHandler((count) => {
-      const now = performance.now() / 1000;
+      const now = Process.clockGettime(Process.CLOCK_MONOTONIC);
       if (count === 0) {
         return (this.#timeoutDeadline = now + timeoutSeconds);
       } else if (now > this.#timeoutDeadline) {
         return false;
       } else {
-        return new Promise((resolve) => setTimeout(resolve, 1)).then(() => 0);
+        return rbFSleep(0.001);
       }
     });
   }

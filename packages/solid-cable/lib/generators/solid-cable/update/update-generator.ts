@@ -1,3 +1,4 @@
+import "../../../constants.solid-cable-update-update-generator.generated.js";
 import { File, extend, include, type Extended, type Included } from "@blazetrails/ruby-compat";
 import {
   Base,

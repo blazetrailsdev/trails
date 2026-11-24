@@ -1,3 +1,4 @@
+import "../../../constants.solid-cable-install-install-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "@blazetrails/trailties/generators";
 
@@ -9,6 +10,7 @@ export class InstallGenerator extends Base {
     this.methodAdded("copyFiles");
   }
 
+  /** @missingRailsArgs template — CONVERGEABLE solid-cable-install-generator-writes-cable-yml */
   async copyFiles(): Promise<void> {
     await this.template("db/cable_schema.ts");
     await this.template("config/cable.ts", { force: true });

@@ -1,3 +1,4 @@
+import "../../../constants.solid-queue-install-install-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { chmod, gsubFile, prependToFile } from "@blazetrails/thor/actions/file-manipulation";
 import { Base } from "@blazetrails/trailties/generators";
@@ -19,6 +20,7 @@ export class InstallGenerator extends Base {
     await chmod.call(this as never, "bin/jobs", 0o755 & ~File.umask(), { verbose: false });
   }
 
+  /** @missingRailsArgs join — PERMANENT */
   async configureAdapterAndDatabase(): Promise<void> {
     await prependToFile.call(
       this as never,

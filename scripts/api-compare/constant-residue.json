@@ -1249,10 +1249,13 @@
     }
   },
   "solid-cable": {
-    "rows": 4,
+    "rows": 6,
     "excluded": ["action-cable/subscription-adapter/solid-cable.ts::Listener"],
     "unwalked": [],
-    "residue": {}
+    "residue": {
+      "generators/solid-cable/install/install-generator.ts::InstallGenerator": "SolidCable::InstallGenerator",
+      "generators/solid-cable/update/update-generator.ts::UpdateGenerator": "SolidCable::UpdateGenerator"
+    }
   },
   "solid-cache": {
     "rows": 26,
@@ -1265,7 +1268,7 @@
     }
   },
   "solid-queue": {
-    "rows": 100,
+    "rows": 102,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1273,6 +1276,8 @@
       "active-job/concurrency-controls.ts::ClassMethods": "ActiveJob::ConcurrencyControls::ClassMethods",
       "active-job/concurrency-controls.ts::ConcurrencyControls": "ActiveJob::ConcurrencyControls",
       "active-job/queue-adapters/solid-queue-adapter.ts::SolidQueueAdapter": "ActiveJob::QueueAdapters::SolidQueueAdapter",
+      "generators/solid-queue/install/install-generator.ts::InstallGenerator": "SolidQueue::InstallGenerator",
+      "generators/solid-queue/update/update-generator.ts::UpdateGenerator": "SolidQueue::UpdateGenerator",
       "processes/runnable.ts::BootGuards": "SolidQueue::Processes::BootGuards",
       "processes/runnable.ts::ForkGuard": "SolidQueue::Processes::BootGuards::ForkGuard",
       "processes/runnable.ts::NullGuard": "SolidQueue::Processes::BootGuards::NullGuard"
