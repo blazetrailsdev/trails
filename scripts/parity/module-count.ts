@@ -3,7 +3,7 @@
  *
  * Counts, per package outside ruby-compat, the `new Module` expressions,
  * `superMethod(` calls, and `import` / `export … from` statements naming
- * `Module` from `@blazetrails/ruby-compat` in the `.ts` files under its `src`
+ * `Module` from `@blazetrails/ruby-compat` or one of its subpaths in the `.ts` files under its `src`
  * (tests included), and fails when any count is above its mark in
  * `module-count-mark.json`, or below it (a stale mark). The marks only go down: `--tighten`
  * writes each one DOWN to the current count and never up, and there is no
@@ -29,7 +29,7 @@ export type Marks = Record<string, Counts>;
 const NEW_MODULE_RE = /\bnew\s+Module\b/g;
 const SUPER_METHOD_RE = /\bsuperMethod\s*\(/g;
 const IMPORT_RE =
-  /(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s*"@blazetrails\/ruby-compat"/g;
+  /(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s*"@blazetrails\/ruby-compat(?:\/[^"]+)?"/g;
 const MODULE_SPECIFIER_RE = /^(?:type\s+)?Module(?:\s+as\s+\w+)?$/;
 
 export function countText(text: string): Counts {
