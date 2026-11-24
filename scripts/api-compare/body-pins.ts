@@ -328,6 +328,10 @@ async function main(args: string[]): Promise<number> {
     console.error("body-pins: --package needs a package name");
     return 1;
   }
+  if (packageName !== undefined && !artifact.hashes.some((r) => r.package === packageName)) {
+    console.error(`body-pins: unknown package ${packageName}`);
+    return 1;
+  }
 
   if (args.includes("--prune")) {
     const next = prunePins(artifact.hashes, pins, packageName);
@@ -363,9 +367,16 @@ async function main(args: string[]): Promise<number> {
     console.error("body-pins: --package applies only to --pin <ruby-file> or --prune");
     return 1;
   }
-  if (pinFile !== undefined && packageName === undefined) {
+  if (pinFile !== undefined) {
     const matches = packagesOfRubyFile(artifact.hashes, pinFile);
-    if (matches.length > 1) {
+    if (packageName !== undefined ? !matches.includes(packageName) : matches.length === 0) {
+      console.error(
+        `body-pins: ${pinFile} has no matched pair` +
+          (packageName === undefined ? "" : ` in ${packageName}`),
+      );
+      return 1;
+    }
+    if (packageName === undefined && matches.length > 1) {
       console.error(
         `body-pins: ${pinFile} matches ${matches.length} packages (${matches.join(", ")}); ` +
           "pass --package <pkg>",

@@ -7,7 +7,7 @@ import {
 } from "../../lib/active-record.js";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import { SingularAssociation } from "../../lib/associations/singular-association.js";
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import { Base, RecordInvalid } from "../../lib/index.js";
 import { Associations } from "../../lib/associations.js";
@@ -3115,14 +3115,31 @@ describe("TestAutosaveAssociationOnAHasManyAssociation", () => {
 describe("TestAutosaveAssociationWithNestedAttributes", () => {
   fixtures([], { useTransactionalTests: true });
 
+  const TestAutosaveAssociationWithNestedAttributes = {
+    name: "TestAutosaveAssociationWithNestedAttributes",
+  };
+  constSet(
+    TopLevel,
+    "TestAutosaveAssociationWithNestedAttributes",
+    TestAutosaveAssociationWithNestedAttributes,
+  );
+
   class Part extends Base {
+    declare markedForDestruction: () => boolean;
+
     static {
       this.tableName = "ship_parts";
     }
   }
 
   class Ship extends Base {
+    declare parts: AssociationProxy<Part>;
+
     static {
+      Object.defineProperty(Part, "name", {
+        value: "TestAutosaveAssociationWithNestedAttributes::Part",
+      });
+      constSet(TestAutosaveAssociationWithNestedAttributes, "Part", Part);
       this.tableName = "ships";
       this.hasMany("parts", { className: Part.name });
       this.acceptsNestedAttributesFor("parts", { allowDestroy: true });
@@ -3131,31 +3148,22 @@ describe("TestAutosaveAssociationWithNestedAttributes", () => {
     }
 
     async hasAtLeastTwoParts() {
-      const currentParts = (await (this as any).parts.toArray()).filter(
-        (p: any) => !p.markedForDestruction(),
-      );
+      const currentParts = (await this.parts).filter((p) => !p.markedForDestruction());
       if (currentParts.length < 2) this.errors.add("parts", "must have at least two parts");
     }
   }
 
   class Pirate extends Base {
     static {
+      Object.defineProperty(Ship, "name", {
+        value: "TestAutosaveAssociationWithNestedAttributes::Ship",
+      });
+      constSet(TestAutosaveAssociationWithNestedAttributes, "Ship", Ship);
       this.tableName = "pirates";
       this.hasMany("ships", { className: Ship.name });
       this.acceptsNestedAttributesFor("ships", { allowDestroy: true });
     }
   }
-
-  beforeAll(() => {
-    constSet(TopLevel, "Part", Part);
-    constSet(TopLevel, "Ship", Ship);
-    constSet(TopLevel, "Pirate", Pirate);
-  });
-
-  afterAll(() => {
-    constSet(TopLevel, "Ship", CanonicalShip);
-    constSet(TopLevel, "Pirate", CanonicalPirate);
-  });
 
   it("should be invalid when nested attributes deletion breaks validation", async () => {
     const pirate = (await Pirate.createBang()) as any;
