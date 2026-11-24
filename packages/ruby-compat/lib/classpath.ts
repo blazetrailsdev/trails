@@ -28,11 +28,10 @@ const tableClasses = new Map<string, () => unknown>();
  * imported last by its package entry, after every module it names has been
  * evaluated, so a thunk still in TDZ then is retried on the next registration,
  * or by a lookup of a class bearing the entry's last path segment, or of a
- * plain-object module, which bears no name. A per-file table names its own
- * importer, so it passes each namespace as an arrow-function thunk: a bundler
- * that splits the two into chunks would otherwise read the namespace in TDZ.
- * A class has a `prototype` and an arrow function has none, so a class-valued
- * namespace is never called.
+ * plain-object module, which bears no name. A table and the modules it
+ * names import each other, so each namespace is passed as an arrow-function
+ * thunk: a bundler that splits them into cyclic chunks would otherwise read the
+ * namespace in TDZ.
  *
  * @noRailsEquivalent PERMANENT
  */
