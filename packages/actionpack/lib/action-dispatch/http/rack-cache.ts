@@ -1,5 +1,6 @@
 import { EntityStore, MetaStore } from "@blazetrails/rack-cache";
-import { Marshal, TopLevel } from "@blazetrails/ruby-compat";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 
 type Store = {
   read(key: unknown): unknown;

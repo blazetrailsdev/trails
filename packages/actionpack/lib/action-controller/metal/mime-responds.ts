@@ -3,7 +3,11 @@ import { Collector as AbstractCollector } from "../../abstract-controller/collec
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { NullType } from "../../action-dispatch/http/mime-type.js";
 import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
-import { ArgumentError, fetch, include, rbEqual, rbFSend } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 
 export type FormatHandler = () => unknown;
 type VariantBlock = (variant: VariantCollector) => unknown;

@@ -1,5 +1,6 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper, rtest } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rtest } from "@blazetrails/ruby-compat/object";
 import { Concern, Rescuable, extend, include } from "@blazetrails/activesupport";
 
 export const Rescue = { isShowDetailedExceptions, processAction };

@@ -1,13 +1,6 @@
-import {
-  block,
-  deleteIf,
-  fetch,
-  hashReplace,
-  KeyError,
-  rbModName,
-  rbObjId,
-  rbObjInspect,
-} from "@blazetrails/ruby-compat";
+import { block, deleteIf, fetch, hashReplace } from "@blazetrails/ruby-compat/hash";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { rbModName, rbObjId, rbObjInspect } from "@blazetrails/ruby-compat/object";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 import type { Request as Req } from "../http/request.js";

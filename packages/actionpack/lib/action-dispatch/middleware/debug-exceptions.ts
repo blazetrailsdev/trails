@@ -1,12 +1,12 @@
+import { fetch } from "@blazetrails/ruby-compat/hash";
 import {
-  fetch,
   rbInspect,
   rbFSend,
   rbObjRespondTo,
   rtest,
-  stderr,
   rbProcCall,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
 import {
   camelize,
   ActiveSupportJSON,

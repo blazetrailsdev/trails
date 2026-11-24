@@ -1,4 +1,5 @@
-import { Enumerable, rbCallSuper } from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import {
   extractOptionsBang,
   mattrAccessor,

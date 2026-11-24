@@ -1,7 +1,8 @@
 import { cattrAccessor } from "@blazetrails/activesupport";
 import { deprecator } from "../deprecator.js";
 import { QueryParser as RackQueryParser } from "@blazetrails/rack";
-import { toEnum, URI, type Enumerator } from "@blazetrails/ruby-compat";
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
 
 const DEFAULT_SEP = /& */;
 const COMPAT_SEP = /[&;] */;

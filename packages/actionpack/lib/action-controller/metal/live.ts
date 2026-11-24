@@ -6,25 +6,20 @@ import {
   Response as DispatchResponse,
   Buffer as ResponseBuffer,
 } from "../../action-dispatch/http/response.js";
-import {
-  CachedThreadPool,
-  ClosedQueueError,
-  IOError,
-  File,
-  Queue,
-  RuntimeError,
-  SizedQueue,
-  Thread,
-  ThreadError,
-  excBacktrace,
-  isSymbol,
-  rbCallSuper,
-  rbObjClassname,
-  rbObjRespondTo,
-  stringDelete,
-  toEnum,
-  toS,
-} from "@blazetrails/ruby-compat";
+import { excBacktrace } from "@blazetrails/ruby-compat/backtrace-location";
+import { ClosedQueueError } from "@blazetrails/ruby-compat/closed-queue-error";
+import { toEnum } from "@blazetrails/ruby-compat/enumerator";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { IOError } from "@blazetrails/ruby-compat/io-error";
+import { rbObjClassname, rbObjRespondTo, toS } from "@blazetrails/ruby-compat/object";
+import { Queue, SizedQueue } from "@blazetrails/ruby-compat/queue";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { stringDelete } from "@blazetrails/ruby-compat/string/delete";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { ThreadError } from "@blazetrails/ruby-compat/thread-error";
+import { CachedThreadPool } from "@blazetrails/ruby-compat/thread-pool-executor";
 import {
   Concern,
   IsolatedExecutionState,

@@ -1,4 +1,4 @@
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import {
   Notifications,
   IsolatedExecutionState,

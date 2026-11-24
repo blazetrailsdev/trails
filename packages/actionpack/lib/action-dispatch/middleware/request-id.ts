@@ -1,4 +1,5 @@
-import { SecureRandom, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
 

@@ -7,7 +7,9 @@ import { expandCacheKey } from "@blazetrails/activesupport/cache";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { Base } from "./base.js";
 import { ExceptionWrapper } from "../action-dispatch/middleware/exception-wrapper.js";
-import { isSymbol, rbInspect, rbObjAsString, round, symbolToS } from "@blazetrails/ruby-compat";
+import { round } from "@blazetrails/ruby-compat/numeric";
+import { rbInspect, rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 
 const INTERNAL_PARAMS = ["controller", "action", "format", "_method", "only_path"];
 

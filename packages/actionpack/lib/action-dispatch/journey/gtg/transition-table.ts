@@ -5,7 +5,10 @@ import {
   type SafeBuffer,
 } from "@blazetrails/activesupport";
 import { Base, Template, TseHandler } from "@blazetrails/actionview";
-import { ArgumentError, File, getChildProcess, rbObjClassname } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { getChildProcess } from "@blazetrails/ruby-compat/child-process-adapter";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
 import { toDot, type DotHost, type DotTransition } from "../nfa/dot.js";
 import { Symbol as SymbolNode, Terminal, type Node } from "../nodes/node.js";
 import type { GtgState, TransitionTableLike } from "./simulator.js";

@@ -1,4 +1,4 @@
-import type { Pathname } from "@blazetrails/ruby-compat";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
 import {
   Concern,
   extractOptionsBang,
@@ -8,22 +8,28 @@ import {
   toParam,
 } from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
 import {
-  chomp,
   eachKey,
   except,
-  extend,
   type Hash,
-  include,
-  type Included,
-  InvalidURIError,
   merge,
   block,
   mergeBang,
-  URI,
+  update,
+} from "@blazetrails/ruby-compat/hash";
+import {
+  extend,
+  include,
+  type Included,
+  rbObjClone,
+  included,
+  includedModules,
+} from "@blazetrails/ruby-compat/include";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import {
   rbAnyToS,
   rbInspect,
-  rbObjClone,
   rbDeclareIvar,
   rbObjIvarGet,
   rbObjIvarSet,
@@ -31,13 +37,9 @@ import {
   rbModMethodDefined,
   rbModDefineMethod,
   rbModUndefMethod,
-  included,
-  update,
-  RFC2396_PARSER,
-  classModule,
-  rbClearMethodCache,
-  includedModules,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
+import { InvalidURIError, URI, RFC2396_PARSER } from "@blazetrails/ruby-compat/uri/common";
 import { Routing } from "../../namespaces.js";
 import { Mapper, type Mapping } from "./mapper.js";
 import { isIncludedMember } from "../../abstract-controller/trailties/routes-helpers.js";

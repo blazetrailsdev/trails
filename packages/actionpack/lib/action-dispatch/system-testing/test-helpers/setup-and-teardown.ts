@@ -1,4 +1,4 @@
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { takeFailedScreenshot, type ScreenshotHelperHost } from "./screenshot-helper.js";
 
 export interface SetupAndTeardownHost extends ScreenshotHelperHost {

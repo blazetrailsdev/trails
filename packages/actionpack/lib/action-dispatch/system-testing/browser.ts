@@ -1,5 +1,6 @@
 import type { BrowserType, LaunchOptions } from "playwright";
-import { File, Gem } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Gem } from "@blazetrails/ruby-compat/gem";
 import { requirePlaywright } from "./driver.js";
 
 /** @noRailsEquivalent PERMANENT */

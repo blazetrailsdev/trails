@@ -1,6 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { Concern, extend, include } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 import { ConditionalGet, type Etagger } from "./conditional-get.js";
 

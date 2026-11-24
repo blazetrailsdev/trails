@@ -1,6 +1,9 @@
 import { ActionController } from "../../namespaces.js";
 import { Concern, extend } from "@blazetrails/activesupport";
-import { Encoding, extended, Hash, rbModSingletonP, toS } from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { extended } from "@blazetrails/ruby-compat/include";
+import { rbModSingletonP, toS } from "@blazetrails/ruby-compat/object";
 import type { EncodingTemplate } from "../../action-dispatch/http/param-builder.js";
 
 export interface ParameterEncodingHost {

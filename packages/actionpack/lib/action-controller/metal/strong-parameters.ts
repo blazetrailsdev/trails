@@ -3,44 +3,41 @@
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { toH } from "@blazetrails/ruby-compat/array";
+import { Enumerable, filterMap } from "@blazetrails/ruby-compat/enumerable";
+import { type Enumerator, toEnum } from "@blazetrails/ruby-compat/enumerator";
 import {
   block as rbBlock,
   Hash,
-  IO,
-  Rational,
-  StringIO,
-  KeyError,
-  Enumerable,
   type ConflictBlock,
   eachKey,
   eachPair,
-  type Enumerator,
   hashAset,
   hashDelete,
   keys as hashKeys,
   merge,
-  isEmpty,
-  isModuleIncluded,
   rbBlockGivenP,
-  rbEql,
-  rbEqq,
-  rbEqual,
+  transformValues,
+} from "@blazetrails/ruby-compat/hash";
+import { isModuleIncluded, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { IndexError } from "@blazetrails/ruby-compat/index-error";
+import { IO } from "@blazetrails/ruby-compat/io";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import {
   rbFSend,
-  rbHash,
   rbInspect,
   rbModName,
   rbObjClass,
   rbObjClassname,
-  rbObjDup,
   rbObjRespondTo,
   rbSetClassPathString,
-  toEnum,
-  toH,
-  transformValues,
-  filterMap,
-  ArgumentError,
-  IndexError,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { rbEql, rbEqq, rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import {

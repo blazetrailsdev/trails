@@ -1,4 +1,5 @@
-import { RuntimeError, constSet, rbCallSuper } from "@blazetrails/ruby-compat";
+import { constSet, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { Concern, extend, include } from "@blazetrails/activesupport";
 import { UrlFor as RoutingUrlFor } from "../action-dispatch/routing/url-for.js";
 import { AbstractController } from "../namespaces.js";

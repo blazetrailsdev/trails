@@ -1,6 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { included } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { CookieJar } from "../../action-dispatch/middleware/cookies.js";
 

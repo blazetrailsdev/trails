@@ -1,6 +1,9 @@
 import type { RackEnv, RackHeaders, RackResponse } from "@blazetrails/rack";
 import { CONTENT_TYPE, RELEASE, SET_COOKIE } from "@blazetrails/rack";
-import { fetch, Gem, toI, rbProcCall } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import { LOCATION, STRICT_TRANSPORT_SECURITY } from "../constants.js";
 import { Request } from "../http/request.js";
 

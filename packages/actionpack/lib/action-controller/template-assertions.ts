@@ -1,4 +1,4 @@
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { ActionController } from "../namespaces.js";
 
 export function assertTemplate(options: Record<string, unknown> = {}, message?: string): never {

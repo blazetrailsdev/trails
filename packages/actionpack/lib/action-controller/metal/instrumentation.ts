@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import {
   attrInternal,
   Benchmark,
@@ -14,7 +14,10 @@ import { Logger } from "../../abstract-controller/logger.js";
 import { ExceptionWrapper } from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
-import { Exception, StandardError, rbObjClassname, throwDataP } from "@blazetrails/ruby-compat";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { throwDataP } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import type { DataStreamingHost, SendDataOptions, SendFileOptions } from "./data-streaming.js";
 import type { redirectTo as flashRedirectTo } from "./flash.js";
 

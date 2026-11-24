@@ -1,5 +1,7 @@
 import { isPlainObject, underscore } from "@blazetrails/activesupport";
-import { ArgumentError, hashDelete, rbInspect, rbObjAsString } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rbInspect, rbObjAsString } from "@blazetrails/ruby-compat/object";
 import { Mime, type MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Metal } from "../metal.js";
 

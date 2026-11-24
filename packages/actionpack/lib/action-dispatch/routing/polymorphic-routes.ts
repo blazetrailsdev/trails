@@ -1,16 +1,9 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { ModelName } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
-import {
-  block as rbBlock,
-  fetch,
-  hashDelete,
-  isSymbol,
-  rbFSend,
-  rbModName,
-  rbObjClass,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { block as rbBlock, fetch, hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rbFSend, rbModName, rbObjClass } from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 
 import { Routing } from "../../namespaces.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";

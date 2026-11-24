@@ -1,10 +1,7 @@
-import {
-  bytes,
-  forceEncoding,
-  isValidEncoding,
-  Encoding,
-  type Hash,
-} from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
+import { bytes } from "@blazetrails/ruby-compat/string/bytes";
+import { forceEncoding, isValidEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 import { cattrAccessor } from "@blazetrails/activesupport";
 import { deprecator } from "../deprecator.js";
 import { UploadedFile } from "./upload.js";

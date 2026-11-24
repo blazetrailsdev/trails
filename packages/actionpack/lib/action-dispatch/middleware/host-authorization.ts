@@ -2,7 +2,10 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { isBlank, type Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import { Request } from "../http/request.js";
-import { IPAddr, regexpEscape, rbEqq, rtest, rbProcCall } from "@blazetrails/ruby-compat";
+import { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
+import { rtest, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { DebugView } from "./debug-view.js";
 
 /** @internal */

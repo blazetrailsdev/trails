@@ -1,13 +1,11 @@
 import { presence, TopLevel } from "@blazetrails/activesupport";
 import { Minitest } from "@blazetrails/activesupport/testing/assertions";
-import {
-  defineModule,
-  Encoding,
-  File,
-  getFs,
-  Pathname,
-  rbModMethodDefined,
-} from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import { rbModMethodDefined } from "@blazetrails/ruby-compat/object";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { vite } from "../server.js";
 
 declare module "vitest" {

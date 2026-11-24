@@ -6,7 +6,9 @@ import {
   kernelArray,
   underscore,
 } from "@blazetrails/activesupport";
-import { flatten, rtest, symbolToS } from "@blazetrails/ruby-compat";
+import { flatten } from "@blazetrails/ruby-compat/array";
+import { rtest } from "@blazetrails/ruby-compat/object";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 
 export interface TranslationHost {
   actionName: string;

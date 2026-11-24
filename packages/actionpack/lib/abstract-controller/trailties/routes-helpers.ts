@@ -6,9 +6,9 @@ import {
   includedModules,
   isModuleIncluded,
   constSet,
-  rbClearMethodCache,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/include";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { moduleParents } from "@blazetrails/activesupport";
 
 import { AbstractController } from "../../namespaces.js";

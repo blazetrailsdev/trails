@@ -1,4 +1,5 @@
-import { URI, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
 import { ActionableError, cattrAccessor } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";

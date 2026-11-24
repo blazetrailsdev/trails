@@ -11,7 +11,10 @@ import {
   Unary,
 } from "../nodes/node.js";
 import { TransitionTable, type Edge } from "./transition-table.js";
-import { ArgumentError, Hash, groupBy, uniq } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { uniq } from "@blazetrails/ruby-compat/array";
+import { groupBy } from "@blazetrails/ruby-compat/enumerable";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 
 const DUMMY_END_NODE = new Dummy("<end>");
 

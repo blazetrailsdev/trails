@@ -13,13 +13,9 @@ import {
   SafeBuffer,
   underscore,
 } from "@blazetrails/activesupport";
-import {
-  rbCheckArrayType,
-  rbProcCall,
-  rbModSingletonP,
-  rbObjDup,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { rbCheckArrayType } from "@blazetrails/ruby-compat/array";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbProcCall, rbModSingletonP, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   Middleware as AbstractMiddleware,

@@ -1,4 +1,5 @@
-import { hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import type { RackApp } from "@blazetrails/rack";
 import type { CacheStore as CacheStoreLike } from "@blazetrails/activesupport";
 import { SessionId } from "@blazetrails/rack-session";

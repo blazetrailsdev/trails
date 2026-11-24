@@ -1,4 +1,4 @@
-import { StringScanner } from "@blazetrails/ruby-compat";
+import { StringScanner } from "@blazetrails/ruby-compat/string-scanner";
 
 export type GtgState = ReadonlyArray<readonly [state: number, dataIndex: number | null]>;
 

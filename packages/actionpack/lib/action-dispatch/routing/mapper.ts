@@ -1,4 +1,4 @@
-import type { Pathname } from "@blazetrails/ruby-compat";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { Redirect, Redirection } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
 import { Dispatcher, StaticDispatcher, type DrawCallback, type RouteSet } from "./route-set.js";
@@ -27,43 +27,36 @@ import {
   transformKeys,
   underscore,
 } from "@blazetrails/activesupport";
+import { rbFArray } from "@blazetrails/ruby-compat/array";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
 import {
-  Enumerable,
-  extend,
-  loadedFileExports,
   hashAref,
   hashAset,
-  include,
-  rbCallSuper,
-  RFC2396_PARSER,
-  rbFArray,
-  rbInspect,
-  RuntimeError,
-  rbFSend,
   slice,
+  rbBlockGivenP,
+  type Block,
+} from "@blazetrails/ruby-compat/hash";
+import { extend, include, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { loadedFileExports } from "@blazetrails/ruby-compat/load";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import {
+  rbInspect,
+  rbFSend,
   rbModMethodDefined,
   rbObjRespondTo,
   rtest,
-  stringSplit,
-  Thread,
-  rbIterBreakValue,
-  rbBlockGivenP,
-  type Block,
   rbProcCall,
   rbObjIsProc,
-  rbObjMethod,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import { Thread, rbIterBreakValue } from "@blazetrails/ruby-compat/thread";
+import { RFC2396_PARSER } from "@blazetrails/ruby-compat/uri/common";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  fetch,
-  File,
-  groupBy,
-  hashDelete,
-  isSymbol,
-  keepIf,
-  merge,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { groupBy } from "@blazetrails/ruby-compat/enumerable";
+import { File } from "@blazetrails/ruby-compat/file";
+import { fetch, hashDelete, keepIf, merge } from "@blazetrails/ruby-compat/hash";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { deprecator } from "../deprecator.js";
 
 export interface RouteConstraints {

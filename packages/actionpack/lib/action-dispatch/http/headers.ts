@@ -1,5 +1,7 @@
 import { Request } from "./request.js";
-import { KeyError, eachPair, rbObjDup } from "@blazetrails/ruby-compat";
+import { eachPair } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
 
 const CGI_VARIABLES = new Set([
   "AUTH_TYPE",

@@ -1,17 +1,11 @@
 import { Response } from "../http/response.js";
 import { UNPROCESSABLE_CONTENT } from "../constants.js";
-import {
-  DelegateClass,
-  excBacktraceLocations,
-  File,
-  Location,
-  Pathname,
-  rbInspect,
-  rbObjClassname,
-  rbObjRespondTo,
-  toEnum,
-  type Enumerator,
-} from "@blazetrails/ruby-compat";
+import { excBacktraceLocations, Location } from "@blazetrails/ruby-compat/backtrace-location";
+import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbInspect, rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 
 import {
   ActionableError,

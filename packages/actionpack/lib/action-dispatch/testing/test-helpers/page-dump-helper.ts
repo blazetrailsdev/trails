@@ -1,11 +1,9 @@
-import {
-  File,
-  FileUtils,
-  LoadError,
-  RUBY_PLATFORM,
-  getChildProcessAsync,
-  warn,
-} from "@blazetrails/ruby-compat";
+import { getChildProcessAsync } from "@blazetrails/ruby-compat/child-process-adapter";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { RUBY_PLATFORM } from "@blazetrails/ruby-compat/ruby-platform";
 import { TopLevel } from "@blazetrails/activesupport";
 import { current } from "@blazetrails/activesupport/core-ext/date-time/calculations";
 import { toI } from "@blazetrails/activesupport/core-ext/date-time/conversions";

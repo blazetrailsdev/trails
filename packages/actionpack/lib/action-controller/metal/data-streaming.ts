@@ -1,6 +1,9 @@
 import { ActionController } from "../../namespaces.js";
 import { Concern, extend } from "@blazetrails/activesupport";
-import { ArgumentError, File, slice, stringDelete } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { slice } from "@blazetrails/ruby-compat/hash";
+import { stringDelete } from "@blazetrails/ruby-compat/string/delete";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Base, RenderOptions } from "../base.js";

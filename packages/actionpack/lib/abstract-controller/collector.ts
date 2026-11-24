@@ -1,13 +1,9 @@
 import { Module, camelize, underscore } from "@blazetrails/activesupport";
-import {
-  KERNEL_METHODS,
-  NoMethodError,
-  PROTOCOL_PROBES,
-  included,
-  rbFSend,
-  rbObjClassname,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { included } from "@blazetrails/ruby-compat/include";
+import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbFSend, rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 
 const spliced = new WeakSet<object>();

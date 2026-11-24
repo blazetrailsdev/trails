@@ -1,5 +1,5 @@
 import { Dependencies, type ShareLockThreadInfo } from "@blazetrails/activesupport";
-import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat/object";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";

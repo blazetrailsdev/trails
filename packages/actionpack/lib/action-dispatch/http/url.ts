@@ -1,7 +1,10 @@
 import { isBlank, mattrAccessor, presence, toParam, toQuery } from "@blazetrails/activesupport";
 import { Utils } from "../journey/router/utils.js";
 import { Utils as RackUtils } from "@blazetrails/rack";
-import { ArgumentError, fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const HOST_REGEXP = /(^[^:]+:\/\/)?(\[[^\]]+\]|[^:]+)(?::(\d+$))?/;

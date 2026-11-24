@@ -4,7 +4,7 @@ import {
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRemoveInstanceVariable,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
 import { ActionController } from "../../namespaces.js";
 import type { Metal } from "../metal.js";
 

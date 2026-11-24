@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 
 /** @internal */
 export interface BasicImplicitRenderHost {

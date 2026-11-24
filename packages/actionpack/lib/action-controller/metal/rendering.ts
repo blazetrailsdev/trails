@@ -8,7 +8,7 @@ import {
   isPresent,
   Module,
 } from "@blazetrails/activesupport";
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
 import {
   DoubleRenderError,

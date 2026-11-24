@@ -13,7 +13,8 @@ import {
   type Included,
   type Rescuable,
 } from "@blazetrails/activesupport";
-import { isModuleIncluded, constGet } from "@blazetrails/ruby-compat";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { ActionController } from "../namespaces.js";
 import { Caching } from "./caching.js";
 import { ConditionalGet } from "./metal/conditional-get.js";

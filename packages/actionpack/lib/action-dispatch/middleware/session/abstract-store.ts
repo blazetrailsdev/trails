@@ -1,12 +1,10 @@
 import { constantize, include as includeMixin } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  LoadError,
-  NameError,
-  SecureRandom,
-  hashDelete,
-  rbCallSuper,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";

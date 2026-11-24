@@ -1,5 +1,6 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { hashAref, hashAset, rbEqual } from "@blazetrails/ruby-compat";
+import { hashAref, hashAset } from "@blazetrails/ruby-compat/hash";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 
 import { Request } from "../action-dispatch/http/request.js";
 import type { Response } from "../action-dispatch/http/response.js";

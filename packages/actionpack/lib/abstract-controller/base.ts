@@ -1,6 +1,8 @@
 import { Configurable, include, underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { StandardError, rbFSend, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { rbFSend, rbModName, rbObjId } from "@blazetrails/ruby-compat/object";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
   if (!proto) return [];

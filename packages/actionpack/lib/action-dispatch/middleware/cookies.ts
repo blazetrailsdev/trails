@@ -10,18 +10,12 @@
  *   `ActiveSupport::TimeWithZone` Rails stores.
  */
 
-import {
-  fetch,
-  Enumerable,
-  include,
-  isSymbol,
-  rbEqual,
-  symbolToS,
-  rbFSend,
-  type Block,
-  rbProcCall,
-  update,
-} from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { fetch, type Block, update } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import {
   extractOptionsBang,
   isPlainObject,

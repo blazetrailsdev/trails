@@ -1,6 +1,6 @@
 import type { HelpersClass, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import { moduleParents } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { helpersPath } from "../metal/helpers.js";
 import { Base } from "../base.js";
 

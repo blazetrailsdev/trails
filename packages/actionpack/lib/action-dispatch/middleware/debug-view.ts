@@ -1,11 +1,6 @@
-import {
-  PP,
-  rbInspect,
-  rbObjIvarGet,
-  rbObjRespondTo,
-  rtest,
-  StringIO,
-} from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjIvarGet, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
+import { PP } from "@blazetrails/ruby-compat/pp";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { isPresent, type Logger } from "@blazetrails/activesupport";
 import { Base, LookupContext } from "@blazetrails/actionview";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";

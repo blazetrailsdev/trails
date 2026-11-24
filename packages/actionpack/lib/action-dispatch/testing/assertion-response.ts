@@ -1,6 +1,7 @@
 import { ActionDispatch } from "../../namespaces.js";
 import { Response } from "../http/response.js";
-import { ArgumentError, stringToSym } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { stringToSym } from "@blazetrails/ruby-compat/symbol";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 
 const GENERIC_RESPONSE_CODES: Record<string, string> = {

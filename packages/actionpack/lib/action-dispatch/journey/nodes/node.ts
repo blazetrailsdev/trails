@@ -1,5 +1,6 @@
 import { any } from "@blazetrails/activesupport";
-import { Enumerable, include } from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { include } from "@blazetrails/ruby-compat/include";
 import * as Visitors from "../visitors.js";
 
 export type NodeType = "LITERAL" | "SLASH" | "DOT" | "SYMBOL" | "GROUP" | "STAR" | "CAT" | "OR";

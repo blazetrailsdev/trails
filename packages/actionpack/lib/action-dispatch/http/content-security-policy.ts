@@ -1,10 +1,7 @@
-import {
-  ArgumentError,
-  RuntimeError,
-  hashDelete,
-  rbInspect,
-  rbProcCall,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import type { RackApp, RackEnv, RackHeaders, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";

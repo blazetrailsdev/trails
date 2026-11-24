@@ -1,6 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { Concern, extend, include } from "@blazetrails/activesupport";
-import { rbObjClone } from "@blazetrails/ruby-compat";
+import { rbObjClone } from "@blazetrails/ruby-compat/include";
 import { Callbacks, type CallbackOptions } from "../../abstract-controller/callbacks.js";
 import { Helpers, type HelpersClass } from "../../abstract-controller/helpers.js";
 import { ContentSecurityPolicy as Policy } from "../../action-dispatch/http/content-security-policy.js";

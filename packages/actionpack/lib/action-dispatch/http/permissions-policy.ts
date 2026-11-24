@@ -1,4 +1,6 @@
-import { ArgumentError, hashDelete, rbInspect, rbProcCall } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat/object";
 import type { RackApp, RackEnv, RackHeaders, RackResponse } from "@blazetrails/rack";
 import { FEATURE_POLICY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";

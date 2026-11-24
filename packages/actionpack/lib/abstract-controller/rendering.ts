@@ -1,6 +1,9 @@
 import { ViewPaths } from "@blazetrails/actionview";
 import { Concern, extend, include, isPlainObject } from "@blazetrails/activesupport";
-import { ArgumentError, Hash, Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { Module } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { Error } from "./error.js";
 

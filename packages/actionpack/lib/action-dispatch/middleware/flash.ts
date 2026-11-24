@@ -1,16 +1,10 @@
 import type { RackApp, RackEnv } from "@blazetrails/rack";
 import { exceptBang, isPlainObject, stringifyKeys } from "@blazetrails/activesupport";
-import {
-  hashAref,
-  Enumerable,
-  Set,
-  except,
-  hashReplace,
-  include,
-  rbDeclareIvar,
-  rbObjDup,
-  rbObjIvarGet,
-} from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { hashAref, except, hashReplace } from "@blazetrails/ruby-compat/hash";
+import { include, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbDeclareIvar, rbObjIvarGet } from "@blazetrails/ruby-compat/object";
+import { Set } from "@blazetrails/ruby-compat/set";
 
 /** @internal */
 export const KEY = "action_dispatch.request.flash_hash";

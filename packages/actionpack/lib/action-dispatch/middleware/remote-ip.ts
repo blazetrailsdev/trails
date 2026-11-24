@@ -1,5 +1,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { ArgumentError, IPAddr, rbInspect, rbProcCall } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
+import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat/object";
 import { Request } from "../http/request.js";
 import { ActionDispatch } from "../../namespaces.js";
 
