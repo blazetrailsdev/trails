@@ -255,9 +255,6 @@ function restart(): void {
 }
 
 async function start(): Promise<void> {
-  // WebKit can leave a worker in `installing` forever when the page reloads
-  // mid-install; neither `register` nor `ready` settles, and `unregister`
-  // queues behind it. Only a new tab recovers, so say so instead of hanging.
   const ready = await Promise.race([
     navigator.serviceWorker
       .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
