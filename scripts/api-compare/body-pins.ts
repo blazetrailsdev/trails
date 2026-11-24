@@ -70,10 +70,6 @@ export const ARTIFACT_PATH = path.join(OUTPUT_DIR, "body-hashes.json");
 /** One shard per package, `body-pins/<package>.json`, one pin per line. */
 export const MANIFEST_PATH = path.join(SCRIPT_DIR, "body-pins");
 
-export function shardPathOf(packageName: string): string {
-  return path.join(MANIFEST_PATH, `${packageName}.json`);
-}
-
 // One name-matched pair's current normalized Ruby body digest, as written to
 // output/body-hashes.json by compare.ts.
 export interface BodyHashRecord {
@@ -310,7 +306,7 @@ export async function saveManifest(pins: BodyPin[]): Promise<void> {
     }
   }
   for (const [pkg, shard] of byPackage) {
-    const file = shardPathOf(pkg);
+    const file = path.join(MANIFEST_PATH, `${pkg}.json`);
     const next = serializeShard(shard);
     if ((await fs.readFile(file, "utf-8").catch(() => null)) !== next)
       await fs.writeFile(file, next);
