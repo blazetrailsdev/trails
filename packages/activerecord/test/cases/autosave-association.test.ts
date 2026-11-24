@@ -1455,7 +1455,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     assertNotPredicate(await ship.isValid(), (v) => v);
   });
 
-  it("recognises inverse polymorphic association changes with same foreign key", async () => {
+  it("recognizes inverse polymorphic association changes with same foreign key", async () => {
     const chefA = chefs("gordon_ramsay");
     const chefB = chefs("marco_pierre_white");
 

@@ -105,6 +105,10 @@ export class NullPool implements AbstractPool {
     return null;
   }
 
+  get queryCache(): null {
+    return null;
+  }
+
   get connectionDescriptor(): undefined {
     return undefined;
   }
@@ -344,15 +348,17 @@ export class ConnectionPool implements ReapablePool {
   /** @inventedArm if — CONVERGEABLE with-connection-pending-checkout-join-needs-ruling */
   async leaseConnection(): Promise<DatabaseAdapter> {
     const lease = this.connectionLease();
-    lease.sticky = true;
-    if (lease.connection) return lease.connection;
-    const checkout = pendingLeases.get(lease) ?? this.checkout();
-    pendingLeases.set(lease, checkout);
-    try {
-      return (lease.connection ||= await checkout);
-    } finally {
-      if (pendingLeases.get(lease) === checkout) pendingLeases.delete(lease);
+    if (!lease.connection) {
+      const checkout = pendingLeases.get(lease) ?? this.checkout();
+      pendingLeases.set(lease, checkout);
+      try {
+        lease.connection ||= await checkout;
+      } finally {
+        if (pendingLeases.get(lease) === checkout) pendingLeases.delete(lease);
+      }
     }
+    lease.sticky = true;
+    return lease.connection;
   }
 
   isPermanentLease(): boolean {
@@ -374,6 +380,7 @@ export class ConnectionPool implements ReapablePool {
     }
 
     if (lockThread) this._pinnedConnection.setLockThread(IsolatedExecutionState.context());
+    this._pinnedConnection.pinned = true;
     const pinnedConnection = this._pinnedConnection;
     await pinnedConnection.verifyBang();
     await pinnedConnection.beginTransaction({ joinable: false, _lazy: false });
@@ -398,6 +405,7 @@ export class ConnectionPool implements ReapablePool {
       }
 
       if (this._pinnedConnection == null) {
+        connection.pinned = false;
         connection.stealBang();
         connection.setLockThread(null);
         this.checkin(connection);
@@ -484,7 +492,7 @@ export class ConnectionPool implements ReapablePool {
           }
           await conn.disconnectBang();
         }
-        this._connections = [];
+        this._connections = this._pinnedConnection ? [this._pinnedConnection] : [];
         this._leases!.clear();
         this._available!.clear();
       }),

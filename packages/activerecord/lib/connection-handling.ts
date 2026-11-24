@@ -124,24 +124,20 @@ export function connectedToMany<T>(this: typeof Base, ...classes: unknown[]): T 
   let { preventWrites = false } = options;
   classes = classes.flat();
 
-  let entry: Parameters<typeof appendToConnectedToStack>[0] | undefined;
+  if (this !== ActiveRecord.Base || classes.includes(ActiveRecord.Base)) {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:169 cluster=connection-pool
+    throw new NotImplementedError("connected_to_many can only be called on ActiveRecord::Base.");
+  }
+
+  if (role === readingRole()) preventWrites = true;
+
+  let entry: Parameters<typeof appendToConnectedToStack>[0];
+  appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: classes }));
   return rbEnsure(
-    () => {
-      if (this !== ActiveRecord.Base || classes.includes(ActiveRecord.Base)) {
-        // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:169 cluster=connection-pool
-        throw new NotImplementedError(
-          "connected_to_many can only be called on ActiveRecord::Base.",
-        );
-      }
-
-      if (role === readingRole()) preventWrites = true;
-
-      appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: classes }));
-      return block();
-    },
+    () => block(),
     () => {
       const stack = connectedToStack();
-      stack.splice(stack.lastIndexOf(entry as never), 1);
+      stack.splice(stack.lastIndexOf(entry), 1);
     },
   );
 }
@@ -342,12 +338,12 @@ export function withRoleAndShard<T>(
   preventWrites: boolean,
   fn: () => T,
 ): T {
-  let entry: Parameters<typeof appendToConnectedToStack>[0] | undefined;
+  if (role === readingRole()) preventWrites = true;
+
+  let entry: Parameters<typeof appendToConnectedToStack>[0];
+  appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: [this] }));
   return rbEnsure(
     () => {
-      if (role === readingRole()) preventWrites = true;
-
-      appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: [this] }));
       const load = (returnValue: unknown) => {
         if (returnValue instanceof Relation) return returnValue.load();
         return returnValue;
@@ -357,7 +353,7 @@ export function withRoleAndShard<T>(
     },
     () => {
       const stack = connectedToStack();
-      stack.splice(stack.lastIndexOf(entry as never), 1);
+      stack.splice(stack.lastIndexOf(entry), 1);
     },
   );
 }

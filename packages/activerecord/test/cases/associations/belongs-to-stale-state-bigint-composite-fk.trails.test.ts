@@ -42,7 +42,7 @@ describe("belongs_to composite-FK staleState with a BigInt component", () => {
     expect(() => {
       state = holder.staleState();
     }).not.toThrow();
-    expect(state).toBeNull();
+    expect(state).toEqual([1, 9007199254740993n]);
   });
 
   it("preserves a deterministic key across reads", () => {
@@ -51,24 +51,6 @@ describe("belongs_to composite-FK staleState with a BigInt component", () => {
       staleState(): unknown;
     };
 
-    expect(holder.staleState()).toBe(holder.staleState());
-  });
-
-  it("never marks a loaded composite-FK belongs_to stale on FK change", () => {
-    const post = new BigIntCpkBlogPost({ blog_id: 1 });
-    const comment = new BigIntCpkComment({ blog_id: 1, blog_post_id: 1n });
-    const holder = comment.association("blogPostWithInverse") as unknown as {
-      target: unknown;
-      loadedBang(): void;
-      isStaleTarget(): boolean;
-      readonly reader: unknown;
-    };
-    holder.target = post;
-    holder.loadedBang();
-    expect(holder.isStaleTarget()).toBe(false);
-
-    (comment as unknown as Record<string, unknown>).blog_post_id = 2n;
-    expect(holder.isStaleTarget()).toBe(false);
-    expect(holder.reader).toBe(post);
+    expect(holder.staleState()).toEqual(holder.staleState());
   });
 });
