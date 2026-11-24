@@ -31,9 +31,8 @@ describe("Router", () => {
       expect(Utils.normalizePath("/foo%aabar%aabaz")).toBe("/foo%AAbar%AAbaz");
     });
 
-    it.skip("normalize path maintains string encoding", () => {
-      // PERMANENT-SKIP: asserts Ruby's per-String Encoding tag — `"...".b` returns an ASCII-8BIT copy and `normalize_path(path).encoding` must preserve it; a JS string carries no encoding tag to preserve.
-    });
+    // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the test asserts `normalize_path(path).encoding` keeps ASCII-8BIT.
+    it.skip("normalize path maintains string encoding", () => {});
 
     it("normalize path with nil", () => {
       expect(Utils.normalizePath(null)).toBe("/");

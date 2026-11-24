@@ -253,6 +253,15 @@ describe("DebugExceptionsTest", () => {
     assert(boomer.closed, "Expected to close the response body");
   });
 
+  it("returns empty body on HEAD cascade pass", async () => {
+    t.app = DevelopmentApp;
+
+    await t.head("/pass");
+
+    t.assertResponse(404);
+    assertEqual("", body());
+  });
+
   it("displays routes in a table when a RoutingError occurs", async () => {
     t.app = DevelopmentApp;
     await t.get("/pass", { headers: { "action_dispatch.show_exceptions": "all" } });

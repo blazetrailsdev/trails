@@ -107,6 +107,38 @@ describe("ShowExceptionsTest", () => {
     assertEqual("", testCase.body);
   });
 
+  it("rescue with no body for HEAD requests", async () => {
+    await testCase.head("/", { env: { "action_dispatch.show_exceptions": "all" } });
+    testCase.assertResponse(500);
+    assertEqual("", testCase.body);
+
+    await testCase.head("/bad_params", { env: { "action_dispatch.show_exceptions": "all" } });
+    testCase.assertResponse(400);
+    assertEqual("", testCase.body);
+
+    await testCase.head("/not_found", { env: { "action_dispatch.show_exceptions": "all" } });
+    testCase.assertResponse(404);
+    assertEqual("", testCase.body);
+
+    await testCase.head("/method_not_allowed", {
+      env: { "action_dispatch.show_exceptions": "all" },
+    });
+    testCase.assertResponse(405);
+    assertEqual("", testCase.body);
+
+    await testCase.head("/unknown_http_method", {
+      env: { "action_dispatch.show_exceptions": "all" },
+    });
+    testCase.assertResponse(405);
+    assertEqual("", testCase.body);
+
+    await testCase.head("/invalid_mimetype", {
+      headers: { Accept: "text/html,*", "action_dispatch.show_exceptions": "all" },
+    });
+    testCase.assertResponse(406);
+    assertEqual("", testCase.body);
+  });
+
   it("localize rescue error page", async () => {
     const oldLocale = I18n.locale();
     I18n.setLocale("da");

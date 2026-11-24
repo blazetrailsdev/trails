@@ -5,7 +5,9 @@ import {
   assertNotEqual,
   assertRaise,
 } from "@blazetrails/activesupport/testing/assertions";
-import type { RackEnv } from "@blazetrails/rack";
+import { MockRequest, MockResponse, type RackEnv } from "@blazetrails/rack";
+import { Cookies } from "../../../../lib/action-dispatch/middleware/cookies.js";
+import { CookieAssertions } from "../../../support/abstract-unit.js";
 import { AbstractStore } from "../../../../lib/action-dispatch/middleware/session/abstract-store.js";
 import { Request } from "../../../../lib/action-dispatch/http/request.js";
 import { Session } from "../../../../lib/action-dispatch/request/session.js";
@@ -39,6 +41,9 @@ class MemoryStore extends AbstractStore {
 }
 
 describe("AbstractStoreTest", () => {
+  const cookieAssertions = { ...CookieAssertions } as unknown as {
+    assertSetCookieAttributes(name: string, attributes: string, header: unknown): void;
+  };
   let env: RackEnv | null = null;
   function app() {
     env = null;
@@ -55,6 +60,25 @@ describe("AbstractStoreTest", () => {
 
     assert(env);
     assert(Session.find(new Request(env!)));
+  });
+
+  it("session cookie gets same site from env", async () => {
+    const writeSession = async (env: RackEnv) => {
+      await new Request(env).session.set("foo", "bar");
+      return [200, {}, []];
+    };
+    const stack = new Cookies(new MemoryStore(writeSession));
+    const env = MockRequest.envFor("/", {
+      "action_dispatch.cookies_same_site_protection": () => ":strict",
+    });
+
+    const response = new MockResponse(...((await stack.call(env)) as [number, never, never]));
+
+    cookieAssertions.assertSetCookieAttributes(
+      "_session_id",
+      "SameSite=Strict",
+      response.headers["set-cookie"],
+    );
   });
 
   it("new session object is merged with old", async () => {
