@@ -21,6 +21,7 @@ import { HTML } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
 import {
   ArgumentError,
+  Encoding,
   File,
   getPath,
   loadIseqEval,
@@ -121,7 +122,7 @@ export class Configuration extends EngineConfiguration {
   console: { start(): unknown } | null = null;
   disableSandbox = false;
   sandboxByDefault = false;
-  encoding = "utf-8";
+  private _encoding!: Encoding | string;
   private _apiOnly = false;
   eagerLoad: boolean | null = null;
   addAutoloadPathsToLoadPath = true;
@@ -563,6 +564,20 @@ export class Configuration extends EngineConfiguration {
   }
   set sessionOptions(value: Record<string, unknown>) {
     this._sessionOptions = value;
+  }
+
+  constructor(root: string | null = null) {
+    super(root);
+    this.encoding = Encoding.UTF_8;
+  }
+
+  get encoding(): Encoding | string {
+    return this._encoding;
+  }
+  set encoding(value: Encoding | string) {
+    this._encoding = value;
+    Encoding.defaultExternal = value;
+    Encoding.defaultInternal = value;
   }
 
   get apiOnly(): boolean {

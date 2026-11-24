@@ -128,7 +128,7 @@ export class Trailtie extends BaseTrailtie {
       });
 
       onLoad("action_dispatch_response", function (this: typeof Response) {
-        this.defaultCharset = app.config.actionDispatch.defaultCharset || app.config.encoding;
+        this.defaultCharset = app.config.actionDispatch.defaultCharset || `${app.config.encoding}`;
         this.defaultHeaders = app.config.actionDispatch.defaultHeaders;
       });
 

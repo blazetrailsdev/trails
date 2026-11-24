@@ -100,6 +100,8 @@ export interface MailConstants {
   unregisterInterceptor(interceptor: DeliveryInterceptor): void;
   informObservers(mail: Message): void;
   informInterceptors(mail: Message): void;
+  _deliveryNotificationObservers: DeliveryObserver[];
+  _deliveryInterceptors: DeliveryInterceptor[];
   registerAutoload(name: string, path: string): void;
   eagerAutoloadBang(): Promise<void>;
 }
@@ -115,8 +117,6 @@ export interface DeliveryInterceptor {
 const LIB = File.expandPath(decodeURIComponent(new URL(".", import.meta.url).pathname));
 if (!LOAD_PATH.includes(LIB)) LOAD_PATH.push(LIB);
 
-const deliveryNotificationObservers: DeliveryObserver[] = [];
-const deliveryInterceptors: DeliveryInterceptor[] = [];
 const autoloads: Record<string, string> = {};
 
 export const Mail: MailConstants = {
@@ -130,6 +130,9 @@ export const Mail: MailConstants = {
   },
 
   RANDOM_TAG: "%x%x_%x%x%d%x",
+
+  _deliveryNotificationObservers: [],
+  _deliveryInterceptors: [],
 
   new(...args: unknown[]) {
     const block = typeof args.at(-1) === "function" ? args.pop() : undefined;
@@ -192,37 +195,37 @@ export const Mail: MailConstants = {
   },
 
   registerObserver(observer: DeliveryObserver) {
-    if (!deliveryNotificationObservers.includes(observer)) {
-      deliveryNotificationObservers.push(observer);
+    if (!Mail._deliveryNotificationObservers.includes(observer)) {
+      Mail._deliveryNotificationObservers.push(observer);
     }
   },
 
   unregisterObserver(observer: DeliveryObserver) {
-    for (let i = deliveryNotificationObservers.indexOf(observer); i !== -1; ) {
-      deliveryNotificationObservers.splice(i, 1);
-      i = deliveryNotificationObservers.indexOf(observer);
+    for (let i = Mail._deliveryNotificationObservers.indexOf(observer); i !== -1; ) {
+      Mail._deliveryNotificationObservers.splice(i, 1);
+      i = Mail._deliveryNotificationObservers.indexOf(observer);
     }
   },
 
   registerInterceptor(interceptor: DeliveryInterceptor) {
-    if (!deliveryInterceptors.includes(interceptor)) {
-      deliveryInterceptors.push(interceptor);
+    if (!Mail._deliveryInterceptors.includes(interceptor)) {
+      Mail._deliveryInterceptors.push(interceptor);
     }
   },
 
   unregisterInterceptor(interceptor: DeliveryInterceptor) {
-    for (let i = deliveryInterceptors.indexOf(interceptor); i !== -1; ) {
-      deliveryInterceptors.splice(i, 1);
-      i = deliveryInterceptors.indexOf(interceptor);
+    for (let i = Mail._deliveryInterceptors.indexOf(interceptor); i !== -1; ) {
+      Mail._deliveryInterceptors.splice(i, 1);
+      i = Mail._deliveryInterceptors.indexOf(interceptor);
     }
   },
 
   informObservers(mail: Message) {
-    for (const observer of deliveryNotificationObservers) observer.deliveredEmail(mail);
+    for (const observer of Mail._deliveryNotificationObservers) observer.deliveredEmail(mail);
   },
 
   informInterceptors(mail: Message) {
-    for (const interceptor of deliveryInterceptors) interceptor.deliveringEmail(mail);
+    for (const interceptor of Mail._deliveryInterceptors) interceptor.deliveringEmail(mail);
   },
 
   randomTag(): string {
