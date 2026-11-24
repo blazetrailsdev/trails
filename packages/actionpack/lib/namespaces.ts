@@ -78,6 +78,7 @@ import type { Streaming } from "./action-controller/metal/streaming.js";
 import type { MimeResponds } from "./action-controller/metal/mime-responds.js";
 import type { Renderers } from "./action-controller/metal/renderers.js";
 import type { MemCacheStore } from "./action-dispatch/middleware/session/mem-cache-store.js";
+import * as Constants from "./action-dispatch/constants.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -119,6 +120,7 @@ export const ActionDispatch = {
   Session: typeof Session;
   Http: typeof Http;
   Journey: typeof Journey;
+  Constants: typeof Constants;
   TestHelpers: { name: string; PageDumpHelper: typeof PageDumpHelper };
   testApp: unknown;
   deprecator: () => Deprecation;
@@ -164,6 +166,7 @@ export const Http = { name: "ActionDispatch::Http" } as {
 Http.Cache = Cache;
 ActionDispatch.Http = Http;
 ActionDispatch.Journey = Journey;
+ActionDispatch.Constants = Constants;
 
 export const ActionPack = { name: "ActionPack", VERSION: ActionPackGemVersion.VERSION };
 

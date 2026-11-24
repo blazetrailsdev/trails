@@ -16524,8 +16524,8 @@
     "package": "actionmailbox",
     "rubyFile": "ingresses/mailgun/inbound_emails_controller.rb",
     "rubyName": "recent?",
-    "digest": "44acd2de25a6616c",
-    "ref": "v8.0.2"
+    "digest": "e510796494abcaee",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionmailbox",
@@ -16552,8 +16552,8 @@
     "package": "actionmailbox",
     "rubyFile": "ingresses/mandrill/inbound_emails_controller.rb",
     "rubyName": "create",
-    "digest": "27f97b940c81f080",
-    "ref": "v8.0.2"
+    "digest": "4a4149db0e653845",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionmailbox",
@@ -16615,8 +16615,8 @@
     "package": "actionmailbox",
     "rubyFile": "ingresses/postmark/inbound_emails_controller.rb",
     "rubyName": "create",
-    "digest": "7f8c1f09a22a60cf",
-    "ref": "v8.0.2"
+    "digest": "38164623a2599f79",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionmailbox",
@@ -16629,8 +16629,8 @@
     "package": "actionmailbox",
     "rubyFile": "ingresses/relay/inbound_emails_controller.rb",
     "rubyName": "create",
-    "digest": "c8d7b3e9987cdf2c",
-    "ref": "v8.0.2"
+    "digest": "d1194bd7feea347a",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionmailbox",
@@ -16643,8 +16643,8 @@
     "package": "actionmailbox",
     "rubyFile": "ingresses/sendgrid/inbound_emails_controller.rb",
     "rubyName": "create",
-    "digest": "23bbbad212ed3b9f",
-    "ref": "v8.0.2"
+    "digest": "7c8b6ca06e8cfce5",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionmailbox",

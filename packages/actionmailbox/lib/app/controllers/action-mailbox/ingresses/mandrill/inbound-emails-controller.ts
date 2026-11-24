@@ -1,5 +1,5 @@
 import { constSet } from "@blazetrails/ruby-compat";
-import type { Request } from "@blazetrails/actionpack";
+import { ActionDispatch, type Request } from "@blazetrails/actionpack";
 import {
   SecurityUtils,
   TopLevel,
@@ -25,7 +25,7 @@ export class InboundEmailsController extends BaseController {
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       (this as unknown as { logger?: Logger }).logger?.error(error.message);
-      await this.head(":unprocessable_entity");
+      await this.head(ActionDispatch.Constants.UNPROCESSABLE_CONTENT);
     }
   }
 

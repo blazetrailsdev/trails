@@ -1,5 +1,5 @@
 import { constSet } from "@blazetrails/ruby-compat";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, ActionDispatch } from "@blazetrails/actionpack";
 import type { Logger } from "@blazetrails/activesupport";
 import { Encoding, rbStrPlus } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../../../../action-mailbox.js";
@@ -21,7 +21,7 @@ export class InboundEmailsController extends BaseController {
 When configuring your Postmark inbound webhook, be sure to check the box
 labeled "Include raw email content in JSON payload".
 `);
-      return this.head(":unprocessable_entity");
+      return this.head(ActionDispatch.Constants.UNPROCESSABLE_CONTENT);
     }
   }
 

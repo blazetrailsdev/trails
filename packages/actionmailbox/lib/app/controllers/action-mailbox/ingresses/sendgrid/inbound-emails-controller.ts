@@ -1,3 +1,4 @@
+import { ActionDispatch } from "@blazetrails/actionpack";
 import { constSet } from "@blazetrails/ruby-compat";
 import type { Logger } from "@blazetrails/activesupport";
 import { Encoding, JSON, rbStrPlus } from "@blazetrails/ruby-compat";
@@ -16,7 +17,7 @@ export class InboundEmailsController extends BaseController {
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       (this as unknown as { logger?: Logger }).logger?.error(error.message);
-      return this.head(":unprocessable_entity");
+      return this.head(ActionDispatch.Constants.UNPROCESSABLE_CONTENT);
     }
   }
 

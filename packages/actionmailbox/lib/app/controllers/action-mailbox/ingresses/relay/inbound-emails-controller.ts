@@ -1,3 +1,4 @@
+import { ActionDispatch } from "@blazetrails/actionpack";
 import { constSet } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../../../../action-mailbox.js";
 import { BaseController } from "../../base-controller.js";
@@ -13,7 +14,7 @@ export class InboundEmailsController extends BaseController {
         await this.request.body.read(),
       );
     } else {
-      return this.head(":unprocessable_entity");
+      return this.head(ActionDispatch.Constants.UNPROCESSABLE_CONTENT);
     }
   }
 
