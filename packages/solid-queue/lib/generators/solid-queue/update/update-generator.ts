@@ -1,3 +1,4 @@
+import "../../../constants.solid-queue-update-update-generator.generated.js";
 import { Dir, File, extend, include, type Included } from "@blazetrails/ruby-compat";
 import {
   ActiveRecordMigration,
@@ -27,6 +28,10 @@ export class UpdateGenerator extends Base {
     this.methodAdded("copyNewMigrations");
   }
 
+  /**
+   * @missingRailsArgs basename — PERMANENT
+   * @missingRailsArgs join — PERMANENT
+   */
   async copyNewMigrations(): Promise<void> {
     const sourceRoot = (await (this.constructor as typeof UpdateGenerator).sourceRoot())!;
     for (const migrationFile of await Dir.globAsync(File.join(sourceRoot, "db", "*.ts.tt"))) {

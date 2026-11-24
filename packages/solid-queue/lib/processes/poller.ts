@@ -61,7 +61,10 @@ export class Poller extends Base {
     throw new NotImplementedError();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs silence — CONVERGEABLE logger-silence-takes-block-without-severity
+   */
   async withPollingVolume<T>(block: () => Promise<T>): Promise<T> {
     return await SolidQueue.instrument("polling", {}, async () => {
       if (SolidQueue.isSilencePolling() && ActiveRecord.Base.logger) {

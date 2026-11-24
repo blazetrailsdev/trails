@@ -1017,7 +1017,12 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "solid-queue",
         libPath: "lib/solid_queue",
         libEntryFile: "lib/solid_queue.rb",
-        extraLibPaths: ["app/models/solid_queue", "app/jobs/solid_queue", "lib/./active_job"],
+        extraLibPaths: [
+          "app/models/solid_queue",
+          "app/jobs/solid_queue",
+          "lib/./active_job",
+          "lib/./generators",
+        ],
         testPath: "test",
         compareApi: true,
         compareTests: true,
