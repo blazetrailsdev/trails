@@ -64981,8 +64981,8 @@
     "package": "activestorage",
     "rubyFile": "analyzer/image_analyzer/image_magick.rb",
     "rubyName": "read_image",
-    "digest": "c2002c22866e281a",
-    "ref": "v8.0.2"
+    "digest": "108fa4112a099993",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "activestorage",

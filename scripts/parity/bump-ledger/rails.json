@@ -78,13 +78,5 @@
     "kind": "drift",
     "from": "v8.0.2",
     "to": "v8.0.5.2"
-  },
-  {
-    "package": "activestorage",
-    "rubyFile": "analyzer/image_analyzer/image_magick.rb",
-    "rubyName": "read_image",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
   }
 ]
