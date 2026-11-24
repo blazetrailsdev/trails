@@ -10,6 +10,7 @@ import {
   rbEnsure,
   rbObjClone,
   rbInspect,
+  rbFSleep,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import type { Included } from "@blazetrails/ruby-compat";
@@ -544,7 +545,7 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
       } else if (now > this.#timeoutDeadline) {
         return false;
       } else {
-        return new Promise((resolve) => setTimeout(resolve, 1)).then(() => 0);
+        return rbFSleep(0.001);
       }
     });
   }
