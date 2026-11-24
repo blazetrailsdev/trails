@@ -1838,6 +1838,9 @@ importers:
       '@blazetrails/html-sanitizer':
         specifier: workspace:*
         version: link:../html-sanitizer
+      '@blazetrails/mail':
+        specifier: workspace:*
+        version: link:../mail
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../nokogiri
@@ -1890,9 +1893,6 @@ importers:
       '@blazetrails/et-orbi':
         specifier: workspace:*
         version: link:../et-orbi
-      '@blazetrails/mail':
-        specifier: workspace:*
-        version: link:../mail
       '@blazetrails/rack-cache':
         specifier: workspace:*
         version: link:../rack-cache

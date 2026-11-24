@@ -1875,8 +1875,8 @@ Trilogy's are. Ruled by the operator on 2026-11-19.
 
 Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#an-adapter-file-is-loaded-by-an-awaited-step-connectionadaptersresolves-require).
 The one-line rule: ESM has no synchronous `require`, so
-`ConnectionAdapters.load` awaits the adapter's `import()` before `resolve`. Two
-other `require`s are ported that way, both awaited at boot:
+`ConnectionAdapters.load` awaits the adapter's `import()` before `resolve`. Three
+other reads are ported that way, all awaited at boot:
 `active_support/message_pack`
 ([packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#active_supportmessage_pack-is-loaded-by-an-awaited-step-at-boot-serializerwithfallbacks-require)),
 and `nokogiri/extension.rb`'s load of the native extension,
@@ -1886,6 +1886,17 @@ bindings on `Nokogiri.LibXml2` so no top-level await sits in the boot graph
 html-sanitizer, actiontext or turbo used as a library among it, awaits that
 load itself before its first parse, as tests do in a setup file; an unawaited
 read is a plain `TypeError` at the call site.
+
+The third is the `File.open(filename, 'rb')` read in mail's
+`UnicodeDatabase#load` (`vendor/mail/2.8.1/lib/mail/multibyte/unicode.rb:354-358`):
+`Mail.loadPath["mail/multibyte/unicode_tables"]` reads `unicode_tables.dat`
+once and seats the bytes, and `load` stays synchronous
+(`action_mailer.require_mail_unicode_tables`). A module-level `await` in
+actionpack's cyclic graph never settled in Safari 18. `@blazetrails/mail`
+used outside a booted application awaits that load before its first
+`Mail::Multibyte` call, as its test setup file does; unawaited, `load` raises
+Rails' `IOError` "Couldn't load the Unicode tables for UTF8Handler".
+Ruled by the operator on 2026-11-24 (trails#10721).
 
 ## A variant's method names are camelCase (`ImageProcessingTransformer`)
 

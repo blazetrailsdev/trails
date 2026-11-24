@@ -5,7 +5,7 @@ import type { Base } from "@blazetrails/actionmailer";
 import { ActionMailer } from "@blazetrails/actionmailer/namespaces";
 import { deprecator } from "@blazetrails/actionmailer/deprecator";
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import type {} from "@blazetrails/mail";
+import { Mail } from "@blazetrails/mail";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionMailerConfig extends OrderedOptions {
@@ -47,7 +47,7 @@ export class Trailtie extends BaseTrailtie {
       "action_mailer.require_mail_unicode_tables",
       { before: "load_environment_config" },
       async () => {
-        await TopLevel.Mail!.loadPath["mail/multibyte/unicode_tables"]();
+        await Mail.loadPath["mail/multibyte/unicode_tables"]();
       },
     );
 
