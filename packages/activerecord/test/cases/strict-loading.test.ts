@@ -668,6 +668,14 @@ describe("StrictLoadingTest", () => {
     });
   });
 
+  it("does not raise when checking if new record included in eager loaded habtm relation", async () => {
+    await (await Developer.first())!.projects.concat((await Project.first())!);
+
+    const developer = (await Developer.all().includes(":projects").strictLoading().first())!;
+
+    await expect(developer.projects.isInclude(new Project())).resolves.not.toThrow();
+  });
+
   it("strict loading violation raises by default", async () => {
     expect(actionOnStrictLoadingViolation()).toBe("raise");
 
