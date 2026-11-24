@@ -1976,7 +1976,7 @@ describe("RelationTest", () => {
         const car = await BrokenCar.createOrFindBy({ name: "Civic" });
 
         assertInstanceOf(BrokenCar, car);
-        assertNotPredicate(car, (c) => c.isPersisted());
+        assertNotPredicate(car!, (c) => c.isPersisted());
       },
     );
   });
@@ -1989,7 +1989,7 @@ describe("RelationTest", () => {
         const car = await BrokenCar.createOrFindByBang({ name: "Civic" });
 
         assertInstanceOf(BrokenCar, car);
-        assertNotPredicate(car, (c) => c.isPersisted());
+        assertNotPredicate(car!, (c) => c.isPersisted());
       },
     );
   });
