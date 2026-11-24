@@ -384,7 +384,8 @@ export class Processor extends BaseProcessor {
     { mode = "over", gravity = "north-west", offset = null, ...options }: Options = {},
   ): Image {
     if (_mode != null && typeof _mode === "object" && !Array.isArray(_mode)) {
-      ({ mode = "over", gravity = "north-west", offset = null, ...options } = _mode);
+      const modeOptions: Options = _mode as Options;
+      ({ mode = "over", gravity = "north-west", offset = null, ...options } = modeOptions);
       _mode = null;
     }
     const image = this.image as Image;
