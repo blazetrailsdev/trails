@@ -3636,7 +3636,7 @@ Trails.application!.config.afterInitialize(() => {
 
     await app("development");
 
-    expect(isModuleIncluded(I18n.backend().constructor, I18n.Pluralization)).toBe(true);
+    expect(isModuleIncluded(I18n.backend().constructor, I18n.Pluralization)).toBeTruthy();
     expect(I18n.t(":apples", { count: 0 })).toBe("one or none");
     await assertRaises([I18n.InvalidPluralizationData], {}, () => {
       expect(I18n.t(":pears", { count: 0 })).toBe("pears");

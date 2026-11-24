@@ -1,5 +1,5 @@
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
-import { assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
+import { assertMatch, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -289,10 +289,12 @@ describe("PluginGeneratorTest", () => {
   it("dummy application uses dynamic rails version number", async () => {
     await t.runGenerator();
 
-    await t.assertFile(
-      "test/dummy/config/application.ts",
-      /^\s*this\.config\.loadDefaults\(rbStrToF\(Trails\.VERSION\.STRING\)\)/m,
-    );
+    await t.assertFile("test/dummy/config/application.ts", (contents: string) => {
+      assertMatch(
+        /^\s*this\.config\.loadDefaults\(rbStrToF\(Trails\.VERSION\.STRING\)\)/m,
+        contents,
+      );
+    });
   });
 
   it("dummy application does not set include all helpers for regular", async () => {
