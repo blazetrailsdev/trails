@@ -13,6 +13,7 @@ import {
   keys,
   rbEqual,
   rbObjInspect,
+  rbObjInstanceVariables,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
@@ -87,6 +88,11 @@ export class Serialized extends DelegateClass(ValueType) {
 
   override isSerialized(): boolean {
     return true;
+  }
+
+  /** @internal */
+  protected instanceVariablesToInspect(): string[] {
+    return rbObjInstanceVariables(this);
   }
 
   private isDefaultValue(value: unknown): boolean {
