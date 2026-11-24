@@ -161,7 +161,10 @@ export class Engine extends TrailsEngine {
       app.deprecators.set("activeStorage", ActiveStorage.deprecator());
     });
 
-    this.initializer("active_storage.configs", () => {
+    this.initializer("active_storage.configs", async () => {
+      await ActiveStorage.loadPath["active_storage/image_magick"]();
+      await ActiveStorage.loadPath["active_storage/vips"]();
+
       this.config.beforeInitialize((app) => {
         ActiveStorage.touchAttachmentRecords =
           app.config.activeStorage.touchAttachmentRecords !== false;
@@ -173,6 +176,15 @@ export class Engine extends TrailsEngine {
         ActiveStorage.variantProcessor = activeStorage.variantProcessor || "mini_magick";
         ActiveStorage.previewers = activeStorage.previewers || [];
         ActiveStorage.analyzers = activeStorage.analyzers || [];
+
+        if (ActiveStorage.MINIMAGICK_AVAILABLE && !ActiveStorage.MINIMAGICK_UNSECURABLE) {
+          ActiveStorage.ImageMagick!.applyPolicy();
+        }
+
+        if (ActiveStorage.variantProcessor === "mini_magick") {
+          ActiveStorage.requireSecurableMiniMagick();
+        }
+
         ActiveStorage.paths = (activeStorage.paths || {}) as Record<string, unknown>;
         ActiveStorage.routesPrefix = activeStorage.routesPrefix || "/trails/active_storage";
         ActiveStorage.drawRoutes = activeStorage.drawRoutes !== false;

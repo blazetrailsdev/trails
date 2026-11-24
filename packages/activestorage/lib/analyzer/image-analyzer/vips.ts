@@ -14,10 +14,14 @@ export class Vips extends ImageAnalyzer<ReadImage> {
     return super.isAccept(blob) && ActiveStorage.variantProcessor === "vips";
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm loadPath — PERMANENT
+   */
   protected override async readImage(
     block: (image: ReadImage) => Promise<Metadata>,
   ): Promise<Metadata> {
+    await ActiveStorage.loadPath["active_storage/vips"]();
     let vips;
     try {
       vips = (await import("@blazetrails/image-processing/vips")).vips;

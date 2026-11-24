@@ -7,6 +7,8 @@ import {
   createFileBlob,
   extractMetadataFrom,
   subscribeEventsFrom,
+  VIPS_SVG_LOADERS,
+  withVipsLoadersEnabled,
 } from "../../support/test-helper.js";
 
 describe("ActiveStorage::Analyzer::ImageAnalyzer::VipsTest", () => {
@@ -39,6 +41,25 @@ describe("ActiveStorage::Analyzer::ImageAnalyzer::VipsTest", () => {
 
     expect(metadata.get("width")).toBe(2736);
     expect(metadata.get("height")).toBe(4104);
+  });
+
+  it("analyzing an SVG image without an XML declaration is skipped because the SVG loader is disabled by default", async () => {
+    const blob = await createFileBlob({ filename: "icon.svg", contentType: "image/svg+xml" });
+    const metadata = await extractMetadataFrom(blob);
+
+    expect(metadata.get("width")).toBeUndefined();
+    expect(metadata.get("height")).toBeUndefined();
+  });
+
+  it("analyzing an SVG image without an XML declaration when the SVG loader is enabled", async () => {
+    const blob = await createFileBlob({ filename: "icon.svg", contentType: "image/svg+xml" });
+
+    await withVipsLoadersEnabled(VIPS_SVG_LOADERS, async () => {
+      const metadata = await extractMetadataFrom(blob);
+
+      expect(metadata.get("width")).toBe(792);
+      expect(metadata.get("height")).toBe(584);
+    });
   });
 
   it("analyzing an unsupported image type", async () => {

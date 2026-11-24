@@ -29,6 +29,8 @@ export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
   "active_storage/fixture_set": () => import("@blazetrails/activestorage/testing/fixture-set"),
+  "active_storage/image_magick": () => import("./image-magick.js"),
+  "active_storage/vips": () => import("./vips.js"),
 };
 
 export const ActiveStorage = {
@@ -92,6 +94,11 @@ export const ActiveStorage = {
   streamingMaxRanges: number;
   ffmpegAllowedFormats: string[] | null;
   ffmpegFormatWhitelistArguments(): string[] | null;
+  ImageMagick?: typeof import("./image-magick.js").ImageMagick;
+  MINIMAGICK_AVAILABLE?: boolean;
+  MINIMAGICK_UNSECURABLE?: boolean;
+  requireSecurableMiniMagick(): void;
+  VIPS_AVAILABLE?: boolean;
 };
 extend(ActiveStorage, Autoload);
 constSet(ActiveStorage, "Blobs", {});
