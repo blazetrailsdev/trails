@@ -1,6 +1,6 @@
 import "./boot.ts";
 
-import { Bundler, constSet, <%= this.options.dummyApp ? "rbStrToF, " : "" %>TopLevel } from "@blazetrails/ruby-compat";
+import { Bundler, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 
 <%= this.trailsRequireStatement() %>
@@ -21,12 +21,8 @@ export class Application extends Trails.Application {
     constSet(<%= this.appConstBase() %>, "Application", this);
     Trails.Application.register(this, import.meta.dirname);
 
-<% if (!this.options.dummyApp) { -%>
     // Initialize configuration defaults for originally generated trails version.
     this.config.loadDefaults("<%= this.build("configTargetVersion") %>");
-<% } else { -%>
-    this.config.loadDefaults(rbStrToF(Trails.VERSION.STRING));
-<% } -%>
 
     // Please, add to the `ignore` list any other `lib` subdirectories that do
     // not contain `.ts` files, or that should not be reloaded or eager loaded.

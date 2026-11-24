@@ -446,7 +446,7 @@ export class Configuration extends EngineConfiguration {
         break;
       }
       default:
-        throw new RuntimeError(`Unknown version "${rbObjAsString(targetVersion)}"`);
+        throw new RuntimeError(`Unknown version ${rbInspect(rbObjAsString(targetVersion))}`);
     }
 
     this._loadedConfigVersion = targetVersion;
