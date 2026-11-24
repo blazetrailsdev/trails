@@ -182,8 +182,11 @@ describe("import-cycles namespace reads", () => {
     expect([...e.evalNames]).toEqual([]);
   });
 
-  it("does not count a namespace import placed in a defineConstants row", () => {
-    const [e] = scanA([`import * as B from "./b.js";`, `defineConstants([[B, "y", "B::Y"]]);`]);
+  it("does not count a namespace import thunked in a defineConstants row", () => {
+    const [e] = scanA([
+      `import * as B from "./b.js";`,
+      `defineConstants([[() => B, "y", "B::Y"]]);`,
+    ]);
     expect([...e.evalNames]).toEqual([]);
   });
 
