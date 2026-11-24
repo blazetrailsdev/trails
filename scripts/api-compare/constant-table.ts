@@ -135,8 +135,6 @@ async function buildLoader(dir: string): Promise<Loader> {
     ...fileInflections(dir),
   });
   loader.inflector = inflector;
-  // A package-shipped engine's `app/*` directories are roots of their own, as
-  // `Engine#config` hands them to the application's loader.
   const app = File.join(srcRoot(dir), "app");
   if (await File.isDirectoryAsync(app)) {
     for (const child of (await Dir.childrenAsync(app)).sort()) {
