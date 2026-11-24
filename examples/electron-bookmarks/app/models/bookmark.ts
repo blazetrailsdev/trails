@@ -29,6 +29,7 @@ export class Bookmark extends ApplicationRecord {
     this.normalizes("url", { with: (url: string) => url.trim() });
     this.beforeValidation(async function (this: Bookmark) {
       if (this.title?.trim() || !/^https?:\/\/\S+$/.test(this.url ?? "")) return;
+      if (!URL.canParse(this.url)) return;
       this.title = (await fetchTitle(this.url)) ?? new URL(this.url).host;
     });
     this.validates("title", { presence: true, length: { maximum: 200 } });
@@ -118,7 +119,7 @@ export class Bookmark extends ApplicationRecord {
         continue;
       }
       const bookmark = new Bookmark({
-        title: row.title,
+        title: row.title?.trim() || (URL.canParse(url) ? new URL(url).host : ""),
         url: row.url,
         notes: row.notes ?? null,
         read_at: row.read_at ? new Date(row.read_at) : null,
@@ -171,10 +172,12 @@ async function fetchTitle(url: string): Promise<string | null> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let html = "";
+  let bytes = 0;
   let match: RegExpMatchArray | null = null;
-  while (html.length < MAX_TITLE_BYTES && !(match = html.match(/<title[^>]*>([^<]*)<\/title>/i))) {
+  while (bytes < MAX_TITLE_BYTES && !(match = html.match(/<title[^>]*>([^<]*)<\/title>/i))) {
     const { done, value } = await reader.read();
     if (done) break;
+    bytes += value.byteLength;
     html += decoder.decode(value, { stream: true });
   }
   await reader.cancel();

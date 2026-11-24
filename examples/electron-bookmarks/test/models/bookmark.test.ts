@@ -3,9 +3,10 @@ import { resetDatabase } from "../test-helper.ts";
 import { Bookmark } from "../../app/models/bookmark.ts";
 import { Tag } from "../../app/models/tag.ts";
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("BookmarkTest", () => {
   beforeEach(resetDatabase);
-  afterEach(() => vi.unstubAllGlobals());
 
   it("requires an http(s) URL and a title", async () => {
     const bookmark = new Bookmark({ title: "", url: "ftp://example.com" });
@@ -156,5 +157,20 @@ describe("BookmarkImportTest", () => {
     const bookmark = await Bookmark.createBang({ title: "Mine", url: "https://x.example" });
     expect(bookmark.title).toBe("Mine");
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("titles an untitled import row with its host without fetching the page", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const result = await Bookmark.importRows([{ title: "", url: "https://untitled.example/x" }]);
+    expect(result).toEqual({ imported: 1, skipped: 0 });
+    expect(((await Bookmark.first()) as Bookmark).title).toBe("untitled.example");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("reports an unparseable URL as invalid instead of raising", async () => {
+    const bookmark = new Bookmark({ url: "http://[" });
+    expect(await bookmark.save()).toBe(false);
+    expect(bookmark.errors.fullMessages).toContain("Title can't be blank");
   });
 });
