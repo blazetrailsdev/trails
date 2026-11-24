@@ -1,11 +1,11 @@
 import "./constants.autoloaders.generated.js";
 import { Loader } from "@blazetrails/zeitwerk";
 import { include } from "@blazetrails/activesupport";
-import { Enumerable, type Included } from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat";
 import { Inflector } from "./autoloaders/inflector.js";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface Autoloaders extends Included<typeof Enumerable> {}
+export interface Autoloaders extends Enumerable<Loader, void> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Autoloaders {

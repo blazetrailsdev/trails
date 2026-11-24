@@ -195,7 +195,7 @@ export class DevcontainerGenerator extends Base {
       this._features["ghcr.io/rails/devcontainer/features/activestorage"] = {};
     if (options.node) this._features["ghcr.io/devcontainers/features/node:1"] = {};
     if (options.kamal)
-      this._features["ghcr.io/devcontainers/features/docker-outside-of-docker:1"] = {};
+      this._features["ghcr.io/devcontainers/features/docker-outside-of-docker:1"] = { moby: false };
 
     const includeDb =
       this.opts.database !== "sqlite3" || this.opts.sqliteDriver === "better-sqlite3";

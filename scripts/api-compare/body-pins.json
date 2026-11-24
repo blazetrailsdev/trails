@@ -19596,6 +19596,13 @@
   {
     "package": "actionview",
     "rubyFile": "helpers.rb",
+    "rubyName": "atom_feed",
+    "digest": "34e57e1ce68adb60",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "actionview",
+    "rubyFile": "helpers.rb",
     "rubyName": "audio_path",
     "digest": "6a2c3bc2930c076d",
     "ref": "v8.0.2"
@@ -23796,6 +23803,20 @@
   {
     "package": "actionview",
     "rubyFile": "helpers/tags/base.rb",
+    "rubyName": "add_default_name_and_field",
+    "digest": "da8a809609335cd8",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "actionview",
+    "rubyFile": "helpers/tags/base.rb",
+    "rubyName": "add_default_name_and_field_for_value",
+    "digest": "52991f9b17e5c996",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "actionview",
+    "rubyFile": "helpers/tags/base.rb",
     "rubyName": "generate_ids?",
     "digest": "424c1238b2bcdda2",
     "ref": "v8.0.2"
@@ -26088,6 +26109,13 @@
     "rubyName": "render_to_object",
     "digest": "0492a1eb046f4ce6",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "actionview",
+    "rubyFile": "renderer/streaming_template_renderer.rb",
+    "rubyName": "body",
+    "digest": "4ed5b6b83a422353",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "actionview",
@@ -98175,8 +98203,8 @@
     "package": "trailties",
     "rubyFile": "application.rb",
     "rubyName": "reload_routes!",
-    "digest": "50ff1951d32eb71e",
-    "ref": "v8.0.2"
+    "digest": "95d1f95fdbfa9ee9",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -99435,8 +99463,8 @@
     "package": "trailties",
     "rubyFile": "commands/console/irb_console.rb",
     "rubyName": "start",
-    "digest": "df7f0b5f281acac2",
-    "ref": "v8.0.2"
+    "digest": "02c99f59b0d59210",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -100932,16 +100960,9 @@
   {
     "package": "trailties",
     "rubyFile": "engine/lazy_route_set.rb",
-    "rubyName": "polymorphic_path",
+    "rubyName": "polymorphic_mappings",
     "digest": "d68a2602be77d7d9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "engine/lazy_route_set.rb",
-    "rubyName": "polymorphic_url",
-    "digest": "d68a2602be77d7d9",
-    "ref": "v8.0.2"
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -101709,13 +101730,6 @@
   {
     "package": "trailties",
     "rubyFile": "generators/app_base.rb",
-    "rubyName": "bundle_command",
-    "digest": "0164e5c3e7661324",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "generators/app_base.rb",
     "rubyName": "bundle_install?",
     "digest": "81ec8edb5173ea27",
     "ref": "v8.0.2"
@@ -101780,8 +101794,8 @@
     "package": "trailties",
     "rubyFile": "generators/app_base.rb",
     "rubyName": "depend_on_bootsnap?",
-    "digest": "d8a179496b6a5426",
-    "ref": "v8.0.2"
+    "digest": "faaeb8d68991eaf4",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -101851,13 +101865,6 @@
     "rubyFile": "generators/app_base.rb",
     "rubyName": "empty_directory_with_keep_file",
     "digest": "f8616b658b438466",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "generators/app_base.rb",
-    "rubyName": "exec_bundle_command",
-    "digest": "29df05cc02b865b1",
     "ref": "v8.0.2"
   },
   {
@@ -102566,6 +102573,20 @@
     "rubyName": "wrap_with_namespace",
     "digest": "2d69d7edc45d5e34",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators/bundle_helper.rb",
+    "rubyName": "bundle_command",
+    "digest": "3068648acfcd15fe",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators/bundle_helper.rb",
+    "rubyName": "exec_bundle_command",
+    "digest": "b78e2f9b6aa4a692",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -103852,8 +103873,8 @@
     "package": "trailties",
     "rubyFile": "generators/rails/app/app_generator.rb",
     "rubyName": "devcontainer",
-    "digest": "c553a705924eb539",
-    "ref": "v8.0.2"
+    "digest": "abb7ee3522b77e6c",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -104160,15 +104181,15 @@
     "package": "trailties",
     "rubyFile": "generators/rails/authentication/authentication_generator.rb",
     "rubyName": "create_authentication_files",
-    "digest": "8edae99f01561424",
-    "ref": "v8.0.2"
+    "digest": "ff19ef1b5c55d8bd",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
     "rubyFile": "generators/rails/authentication/authentication_generator.rb",
     "rubyName": "enable_bcrypt",
-    "digest": "550172f729a90f4b",
-    "ref": "v8.0.2"
+    "digest": "395a73ad0cd97368",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -104461,8 +104482,8 @@
     "package": "trailties",
     "rubyFile": "generators/rails/devcontainer/devcontainer_generator.rb",
     "rubyName": "features",
-    "digest": "961cf24e3da54f07",
-    "ref": "v8.0.2"
+    "digest": "3ed7209e8d003a54",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -106470,8 +106491,8 @@
     "package": "trailties",
     "rubyFile": "source_annotation_extractor.rb",
     "rubyName": "display",
-    "digest": "6f15cdd23b8545e8",
-    "ref": "v8.0.2"
+    "digest": "45296ea0c4eef797",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -106561,8 +106582,8 @@
     "package": "trailties",
     "rubyFile": "test_unit/reporter.rb",
     "rubyName": "app_root",
-    "digest": "26c626cc25b25811",
-    "ref": "v8.0.2"
+    "digest": "2c87d5f38e468484",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -106631,8 +106652,8 @@
     "package": "trailties",
     "rubyFile": "test_unit/reporter.rb",
     "rubyName": "relative_path_for",
-    "digest": "23502ba6f48e9380",
-    "ref": "v8.0.2"
+    "digest": "878905126cb23d02",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -107424,33 +107445,5 @@
     "rubyName": "with_loader",
     "digest": "492a231846e61fbd",
     "ref": "v2.7.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers.rb",
-    "rubyName": "atom_feed",
-    "digest": "34e57e1ce68adb60",
-    "ref": "v8.0.5.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/tags/base.rb",
-    "rubyName": "add_default_name_and_field",
-    "digest": "da8a809609335cd8",
-    "ref": "v8.0.5.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/tags/base.rb",
-    "rubyName": "add_default_name_and_field_for_value",
-    "digest": "52991f9b17e5c996",
-    "ref": "v8.0.5.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "renderer/streaming_template_renderer.rb",
-    "rubyName": "body",
-    "digest": "4ed5b6b83a422353",
-    "ref": "v8.0.5.2"
   }
 ]
