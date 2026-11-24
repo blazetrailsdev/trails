@@ -117,7 +117,6 @@ export interface SQLite3Config extends TrailsAdapterOptions {
   flags?: number;
   /** @noRailsEquivalent PERMANENT */
   engine?: import("@blazetrails/sqlite3").EngineOpenV2;
-  authToken?: string;
   pragmas?: Record<string, string | number | boolean>;
   strict?: boolean;
   timeout?: number | string | false;

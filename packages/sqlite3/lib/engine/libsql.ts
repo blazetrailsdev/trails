@@ -260,3 +260,32 @@ export function replicaEngine(
 export function remoteEngine(options: Pick<LibsqlReplicaOptions, "authToken">): EngineOpenV2 {
   return openEngine(options, false, openRemote);
 }
+
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE sqlite3-libsql-replica-sync-reaches-the-engine
+ */
+export function buildReplicaOptions(
+  options: Record<string, unknown> | undefined,
+): LibsqlReplicaOptions {
+  const opts = { ...options } as LibsqlReplicaOptions;
+  if (typeof opts.syncUrl !== "string" || opts.syncUrl.length === 0) {
+    throw new RuntimeError(
+      "libsql embedded-replica mode requires a non-empty `syncUrl` in " +
+        "driverOptions (alongside the local replica path); none was provided.",
+    );
+  }
+  if (opts.syncPeriod !== undefined) {
+    if (
+      typeof opts.syncPeriod !== "number" ||
+      !Number.isFinite(opts.syncPeriod) ||
+      opts.syncPeriod <= 0
+    ) {
+      throw new RuntimeError(
+        "libsql embedded-replica `syncPeriod` must be a positive number of " +
+          `seconds (got ${String(opts.syncPeriod)}); omit it for caller-driven sync.`,
+      );
+    }
+  }
+  return opts;
+}

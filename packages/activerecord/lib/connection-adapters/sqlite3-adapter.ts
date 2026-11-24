@@ -254,7 +254,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   _lastAffectedRows = 0;
 
   /** @internal */
-  /** @internal */
   _memoryDatabase: boolean;
   /** @internal */
   declare _statements: StatementPool;
@@ -1208,12 +1207,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       case "libsql-remote":
         return (await import("@blazetrails/sqlite3/engine/libsql")).remoteEngine({
           ...config.driverOptions,
-          ...(config.authToken !== undefined ? { authToken: config.authToken } : {}),
         });
       case "libsql-replica": {
-        const { replicaEngine } = await import("@blazetrails/sqlite3/engine/libsql");
-        const { buildReplicaOptions } = await import("@blazetrails/sqlite3/libsql");
-        return replicaEngine(buildReplicaOptions(config as never));
+        const { replicaEngine, buildReplicaOptions } =
+          await import("@blazetrails/sqlite3/engine/libsql");
+        return replicaEngine(buildReplicaOptions(config.driverOptions));
       }
       default:
         throw new LoadError(

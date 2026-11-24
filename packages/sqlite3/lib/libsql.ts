@@ -1,3 +1,4 @@
+import { buildReplicaOptions as buildEngineReplicaOptions } from "./engine/libsql.js";
 import { SQLite3 } from "./namespaces.js";
 import "./constants.js";
 import Database from "libsql";
@@ -302,30 +303,11 @@ export type { LibsqlReplicaOptions } from "./engine/libsql.js";
 
 /** @internal */
 export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOptions {
-  if (!isReplicaConfig(config)) {
-    throw new RuntimeError(
-      "libsql embedded-replica mode requires a non-empty `syncUrl` in " +
-        "driverOptions (alongside the local replica path); none was provided.",
-    );
-  }
-  const opts: LibsqlReplicaOptions = {
+  return buildEngineReplicaOptions({
     ...(config.driverOptions as LibsqlReplicaOptions | undefined),
-  };
-  if (config.syncUrl !== undefined) opts.syncUrl = config.syncUrl;
-  if (config.authToken !== undefined) opts.authToken = config.authToken;
-  if (opts.syncPeriod !== undefined) {
-    if (
-      typeof opts.syncPeriod !== "number" ||
-      !Number.isFinite(opts.syncPeriod) ||
-      opts.syncPeriod <= 0
-    ) {
-      throw new RuntimeError(
-        "libsql embedded-replica `syncPeriod` must be a positive number of " +
-          `seconds (got ${String(opts.syncPeriod)}); omit it for caller-driven sync.`,
-      );
-    }
-  }
-  return opts;
+    ...(config.syncUrl !== undefined ? { syncUrl: config.syncUrl } : {}),
+    ...(config.authToken !== undefined ? { authToken: config.authToken } : {}),
+  });
 }
 
 /** @internal */

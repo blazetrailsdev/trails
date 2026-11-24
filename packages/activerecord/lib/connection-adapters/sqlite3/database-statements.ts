@@ -191,7 +191,7 @@ export async function performQuery(
   rawConnection: SQLite3Database,
   sql: string,
   binds: unknown[],
-  typeCastedBinds: unknown,
+  typeCastedBinds: unknown[] | Record<string, unknown>,
   {
     prepare,
     notificationPayload,
@@ -201,11 +201,10 @@ export async function performQuery(
     notificationPayload?: Record<string, unknown>;
     batch?: boolean;
   },
-): Promise<Result> {
-  let result: Result;
+): Promise<Result | null> {
+  let result: Result | null = null;
   if (batch) {
     await rawConnection.executeBatch2(sql);
-    result = Result.empty();
   } else if (prepare) {
     let stmt = this._statements.get(sql);
     if (stmt == null) {
