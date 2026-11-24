@@ -33,7 +33,7 @@ class TestRunnerTest extends TestCase {
     return this.appFile(
       `test/${path}/${name.replaceAll("_", "-")}.test.ts`,
       `
-        import "../test-helper.ts";
+        import "${"../".repeat(path.split("/").length)}test-helper.ts";
         import { describe, it, expect } from "vitest";
 
         describe("${camelize(name)}Test", () => {
@@ -49,6 +49,36 @@ class TestRunnerTest extends TestCase {
 include(TestRunnerTest, Isolation);
 include(TestRunnerTest, EnvHelpers);
 registerSpecType(/^TestRunnerTest$/, TestRunnerTest);
+
+const chu2Koi = `import "../test-helper.ts";
+import { describe, it } from "vitest";
+
+describe("Chu2KoiTest", () => {
+  it("test_rikka", () => {
+    console.log("Rikka");
+  });
+
+  it("test_sanae", () => {
+    console.log("Sanae");
+  });
+});
+`;
+
+function createEnvTest(t: Host): Promise<string> {
+  return t.appFile(
+    "test/unit/env.test.ts",
+    `import "../test-helper.ts";
+import { describe, it } from "vitest";
+import { Trails } from "@blazetrails/trailties";
+
+describe("EnvTest", () => {
+  it("test_env", () => {
+    console.log(\`Current Environment: \${Trails.env}\`);
+  });
+});
+`,
+  );
+}
 
 function it(name: string, block: (t: Host) => Promise<void>): void {
   test(name, async () => {
@@ -183,6 +213,149 @@ describe.concurrent("TestRunnerTest", { timeout: 600_000 }, () => {
     const output = await t.runTestCommand("");
     for (const suite of suites) expect(output).toMatch(`Foo${camelize(suite)}Test`);
     expect(output).toMatch("10 runs, 0 failures");
+  });
+
+  it("run units", async (t) => {
+    await t.createTestFile("models", "foo");
+    await t.createTestFile("helpers", "bar_helper");
+    await t.createTestFile("unit", "baz_unit");
+    await t.createTestFile("controllers", "foobar_controller");
+
+    const output = await t.trails("test:units", { allowFailure: true });
+    expect(output).toMatch("FooTest");
+    expect(output).toMatch("BarHelperTest");
+    expect(output).toMatch("BazUnitTest");
+    expect(output).toMatch("3 runs, 0 failures");
+  });
+
+  it("run all takes options", async (t) => {
+    await t.createTestFile("system", "foo");
+    expect(await t.trails("test:all", "--verbose", { allowFailure: true })).toMatch("FooTest");
+  });
+
+  it("run system takes options", async (t) => {
+    await t.createTestFile("system", "foo");
+    expect(await t.trails("test:system", "--verbose", { allowFailure: true })).toMatch("FooTest");
+  });
+
+  it("run generators takes options", async (t) => {
+    await t.createTestFile("lib/generators", "foo");
+    expect(await t.trails("test:generators", "--verbose", { allowFailure: true })).toMatch(
+      "FooTest",
+    );
+  });
+
+  it("run channels", async (t) => {
+    await t.createTestFile("channels", "foo_channel");
+    await t.createTestFile("channels", "bar_channel");
+
+    const output = await t.trails("test:channels", { allowFailure: true });
+    expect(output).toMatch("FooChannelTest");
+    expect(output).toMatch("BarChannelTest");
+    expect(output).toMatch("2 runs, 0 failures");
+  });
+
+  it("run mailboxes", async (t) => {
+    await t.createTestFile("mailboxes", "foo_mailbox");
+    await t.createTestFile("mailboxes", "bar_mailbox");
+    await t.createTestFile("models", "foo");
+
+    const output = await t.trails("test:mailboxes", { allowFailure: true });
+    expect(output).toMatch("FooMailboxTest");
+    expect(output).toMatch("BarMailboxTest");
+    expect(output).toMatch("2 runs, 0 failures");
+  });
+
+  it("run functionals", async (t) => {
+    await t.createTestFile("mailers", "foo_mailer");
+    await t.createTestFile("controllers", "bar_controller");
+    await t.createTestFile("functional", "baz_functional");
+    await t.createTestFile("models", "foo");
+
+    const output = await t.trails("test:functionals", { allowFailure: true });
+    expect(output).toMatch("FooMailerTest");
+    expect(output).toMatch("BarControllerTest");
+    expect(output).toMatch("BazFunctionalTest");
+    expect(output).toMatch("3 runs, 0 failures");
+  });
+
+  it("run named test", async (t) => {
+    await t.appFile("test/unit/chu-2-koi.test.ts", chu2Koi);
+
+    const output = await t.runTestCommand("-n test_rikka test/unit/chu-2-koi.test.ts");
+    expect(output).toMatch("Rikka");
+    expect(output).not.toMatch("Sanae");
+  });
+
+  it("run matched test", async (t) => {
+    await t.appFile("test/unit/chu-2-koi.test.ts", chu2Koi);
+
+    const output = await t.runTestCommand("-n /rikka/ test/unit/chu-2-koi.test.ts");
+    expect(output).toMatch("Rikka");
+    expect(output).not.toMatch("Sanae");
+  });
+
+  it("run in test environment by default", async (t) => {
+    await createEnvTest(t);
+
+    expect(await t.runTestCommand("test/unit/env.test.ts")).toMatch("Current Environment: test");
+  });
+
+  it("run different environment", async (t) => {
+    await createEnvTest(t);
+
+    expect(await t.runTestCommand("-e development test/unit/env.test.ts")).toMatch(
+      "Current Environment: development",
+    );
+  });
+
+  it("run multiple folders", async (t) => {
+    await t.createTestFile("models", "account");
+    await t.createTestFile("controllers", "accounts_controller");
+
+    const output = await t.runTestCommand("test/models test/controllers");
+    expect(output).toMatch("AccountTest");
+    expect(output).toMatch("AccountsControllerTest");
+    expect(output).toMatch("2 runs, 0 failures, 0 errors, 0 skips");
+  });
+
+  it("run multiple folders with absolute paths", async (t) => {
+    await t.createTestFile("models", "account");
+    await t.createTestFile("controllers", "accounts_controller");
+    await t.createTestFile("helpers", "foo_helper");
+
+    const appPath = await t.appPath();
+    const output = await t.runTestCommand(`${appPath}/test/models ${appPath}/test/controllers`);
+    expect(output).toMatch("AccountTest");
+    expect(output).toMatch("AccountsControllerTest");
+    expect(output).toMatch("2 runs, 0 failures, 0 errors, 0 skips");
+  });
+
+  it("run relative path with trailing slash", async (t) => {
+    await t.createTestFile("models", "account");
+    await t.createTestFile("controllers", "accounts_controller");
+
+    const output = await t.runTestCommand("test/models/");
+    expect(output).toMatch("AccountTest");
+    expect(output).toMatch("1 runs, 0 failures, 0 errors, 0 skips");
+  });
+
+  it("run relative path with leading dot slash", async (t) => {
+    await t.createTestFile("models", "account");
+    await t.createTestFile("models", "post");
+
+    const output = await t.runTestCommand("./test/models/account.test.ts");
+    expect(output).toMatch("AccountTest");
+    expect(output).toMatch("1 runs, 0 failures, 0 errors, 0 skips");
+  });
+
+  it("run windows style path", async (t) => {
+    await t.createTestFile("models", "account");
+    await t.createTestFile("controllers", "accounts_controller");
+
+    const output = await t.runTestCommand("test\\\\models");
+    expect(output).toMatch("AccountTest");
+    expect(output).toMatch("1 runs, 0 failures, 0 errors, 0 skips");
   });
 
   it("raise error when specified file does not exist", async (t) => {
