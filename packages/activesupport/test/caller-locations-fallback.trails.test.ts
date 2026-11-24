@@ -64,7 +64,7 @@ describe("callerLocations on a runtime with no V8 stack positions", () => {
           value:
             "callerLocations@https://x.test/a.js:1:1\n" +
             "delegate@https://x.test/b.js:2:3\n" +
-            "@https://x.test/models/post.js:7:9\n",
+            "@https://x.test/models/post.js:7\n",
         });
       }
     } as ErrorConstructor;

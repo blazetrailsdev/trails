@@ -41,11 +41,11 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
   }
   if (stack == null) return callerLocationsViaCallSites(start, length);
   const lines = stack.split("\n");
-  const v8 = lines[0]?.trim().startsWith("Error") ?? false;
+  const v8 = lines[1]?.startsWith("    at ") ?? false;
   const locations = lines.slice((v8 ? 2 : 1) + start).flatMap((line, i) => {
     const m = v8
       ? /\((.*):(\d+):\d+\)$|at (.*):(\d+):\d+$/.exec(line.trim())
-      : /^[^@]*@(.*):(\d+):\d+$/.exec(line.trim());
+      : /^[^@]*@(.*):(\d+)(?::\d+)?$/.exec(line.trim());
     if (!m) return [];
     const raw = m[1] ?? m[3];
     const path = raw.startsWith("file://") ? decodeURIComponent(raw.slice("file://".length)) : raw;
