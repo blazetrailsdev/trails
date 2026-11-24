@@ -12,7 +12,7 @@ import type {
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { closedStatement, statementTail } from "./statement-tail.js";
-import { withBusyHandler } from "./busy-handler.js";
+import { drive, withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 import { aggregateOptions, databaseListFilename, libversionNumber } from "./aggregator.js";
@@ -75,10 +75,9 @@ function open(file: string, mode: number): BetterSqlite3.Database {
 function prepareStatement(
   raw: BetterSqlite3.Database,
   sql: string,
-  handler: () => BusyHandler | null,
   finalize: () => void,
 ): EngineStatement {
-  const stmt = withBusyHandler(errors, handler, () => raw.prepare(sql));
+  const stmt = raw.prepare(sql);
   const reader = stmt.reader;
   if (reader) stmt.raw(true);
   const names = bindParameterNames(sql);
@@ -137,14 +136,14 @@ function prepareStatement(
     step() {
       if (done) return null;
       if (!reader) {
-        withBusyHandler(errors, handler, () => bound((args) => stmt.run(...args)));
+        bound((args) => stmt.run(...args));
         done = true;
         return null;
       }
       const r =
         rows !== null
           ? rows.next()
-          : withBusyHandler(errors, handler, () => {
+          : (() => {
               const started = bound((args) => stmt.iterate(...args)) as Iterator<unknown[]>;
               try {
                 const first = started.next();
@@ -154,7 +153,7 @@ function prepareStatement(
                 started.return?.();
                 throw e;
               }
-            });
+            })();
       if (r.done) {
         done = true;
         return null;
@@ -212,45 +211,51 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
       handler = block;
     },
     execBatch(sql, resultsAsHash) {
-      const results: unknown[] = [];
-      let rest = sql.trim();
-      while (rest !== "") {
-        const [tail, empty] = statementTail(rest);
-        const head = rest.slice(0, tail);
-        rest = rest.slice(tail).trim();
-        if (empty) continue;
-        const stmt = withBusyHandler(
-          errors,
-          () => handler,
-          () => raw.prepare(head),
-        );
-        if (!stmt.reader) {
-          withBusyHandler(
-            errors,
-            () => handler,
-            () => stmt.run(),
-          );
-        } else {
-          stmt.safeIntegers(true).raw(true);
-          const names = stmt.columns().map((c) => c.name);
-          for (const row of withBusyHandler(
-            errors,
-            () => handler,
-            () => stmt.all() as unknown[][],
-          )) {
-            const vals = row.map(columnText);
-            results.push(
-              resultsAsHash ? Object.fromEntries(names.map((name, i) => [name, vals[i]])) : vals,
-            );
+      return drive(
+        (function* () {
+          const results: unknown[] = [];
+          let rest = sql.trim();
+          while (rest !== "") {
+            const [tail, empty] = statementTail(rest);
+            const head = rest.slice(0, tail);
+            rest = rest.slice(tail).trim();
+            if (empty) continue;
+            const stmt = (yield withBusyHandler(
+              errors,
+              () => handler,
+              () => raw.prepare(head),
+            )) as BetterSqlite3.Statement;
+            if (!stmt.reader) {
+              yield withBusyHandler(
+                errors,
+                () => handler,
+                () => stmt.run(),
+              );
+            } else {
+              stmt.safeIntegers(true).raw(true);
+              const names = stmt.columns().map((c) => c.name);
+              for (const row of (yield withBusyHandler(
+                errors,
+                () => handler,
+                () => stmt.all() as unknown[][],
+              )) as unknown[][]) {
+                const vals = row.map(columnText);
+                results.push(
+                  resultsAsHash
+                    ? Object.fromEntries(names.map((name, i) => [name, vals[i]]))
+                    : vals,
+                );
+              }
+            }
           }
-        }
-      }
-      return results;
+          return results;
+        })(),
+      );
     },
     prepare(sql) {
       const [tail, empty] = statementTail(sql);
       if (empty) return [closedStatement, sql.slice(tail)];
-      const stmt = prepareStatement(raw, sql.slice(0, tail), () => handler, finalize);
+      const stmt = prepareStatement(raw, sql.slice(0, tail), finalize);
       liveStatements += 1;
       return [stmt, sql.slice(tail)];
     },
