@@ -38,20 +38,18 @@ async function replay(
       },
     ),
   );
-  {
-    const res = (await query({ text, rowMode: "array" })) as {
-      fields?: unknown[];
-      rows?: unknown[][];
-      command?: string;
-      rowCount?: number | null;
-    } | null;
-    const rows = res?.rows ?? [];
-    submittable.handleRowDescription?.({ fields: res?.fields ?? [] });
-    for (const row of rows) submittable.handleDataRow?.({ fields: row });
-    submittable.handleCommandComplete?.({
-      text: `${res?.command ?? "SELECT"} ${res?.rowCount ?? rows.length}`,
-    });
-  }
+  const res = (await query({ text, rowMode: "array" })) as {
+    fields?: unknown[];
+    rows?: unknown[][];
+    command?: string;
+    rowCount?: number | null;
+  } | null;
+  const rows = res?.rows ?? [];
+  submittable.handleRowDescription?.({ fields: res?.fields ?? [] });
+  for (const row of rows) submittable.handleDataRow?.({ fields: row });
+  submittable.handleCommandComplete?.({
+    text: `${res?.command ?? "SELECT"} ${res?.rowCount ?? rows.length}`,
+  });
   submittable.handleReadyForQuery?.();
 }
 
