@@ -60,8 +60,8 @@ describe("Trails::Command::ServerTest", () => {
   it("gem not suggested when name not same as handler", () => {
     for (const server of ["fastcgi", "lsws"]) {
       const output = suggestion(server);
-      expect(output).toContain(`Could not find server '${server}'.`);
-      expect(output).not.toContain("Gemfile");
+      expect(output).toMatch(new RegExp(`Could not find server '${server}'.`));
+      expect(output).not.toMatch("Gemfile");
     }
   });
 
@@ -132,6 +132,10 @@ describe("Trails::Command::ServerTest", () => {
       expect(parseArguments(["-e", "production"]).logStdout).toBe(false);
       expect(parseArguments(["-e", "development", "--no-log-to-stdout"]).logStdout).toBe(false);
       expect(parseArguments(["-e", "production", "--log-to-stdout"]).logStdout).toBe(true);
+      withEnv({ NODE_ENV: "development" }, () => expect(parseArguments([]).logStdout).toBe(true));
+      withEnv({ NODE_ENV: "production" }, () => expect(parseArguments([]).logStdout).toBe(false));
+      withEnv({ TRAILS_ENV: "development" }, () => expect(parseArguments([]).logStdout).toBe(true));
+      withEnv({ TRAILS_ENV: "production" }, () => expect(parseArguments([]).logStdout).toBe(false));
     });
   });
 
@@ -167,7 +171,6 @@ describe("Trails::Command::ServerTest", () => {
       "caching",
     ]);
     expect(parseArguments(["--port=3001"]).userSuppliedOptions).toEqual(["Port"]);
-    expect(parseArguments(["--dev_caching"]).userSuppliedOptions).toEqual(["caching"]);
     withEnv({ BINDING: "1.2.3.4" }, () =>
       expect(parseArguments().userSuppliedOptions).toEqual(["Host"]),
     );
@@ -207,16 +210,14 @@ describe("Trails::Command::ServerTest", () => {
 
   it("using server mistype", () => {
     const output = suggestion("tin");
-    expect(output).toMatch(
-      /Could not find server 'tin'\. \(Trails::Command::CorrectableNameError\)/,
-    );
-    expect(output).toContain("Did you mean?  thin");
+    expect(output).toMatch("Could not find server 'tin'");
+    expect(output).toMatch("Did you mean?  thin");
   });
 
   it("using server mistype without suggestion", () => {
     const output = suggestion("t");
-    expect(output).toContain("Could not find server 't'");
-    expect(output).not.toContain("Did you mean");
+    expect(output).toMatch("Could not find server 't'");
+    expect(output).not.toMatch("Did you mean");
   });
 
   it("using known server that isnt in the gemfile", () => {

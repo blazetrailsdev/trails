@@ -3,38 +3,38 @@ import { TestParser } from "../../lib/test-unit/test-parser.js";
 
 describe("TestParserTestFixture", () => {
   it("method", () => {
-    expect(true).toBe(true);
+    expect(true).toBeTruthy();
 
-    expect(true).toBe(true);
+    expect(true).toBeTruthy();
   });
 
   // prettier-ignore
-  it("oneline", () => { expect(true).toBe(true); });
+  it("oneline", () => { expect(true).toBeTruthy(); });
 
   test("declarative", () => {
-    expect(true).toBe(true);
+    expect(true).toBeTruthy();
 
-    expect(true).toBe(true);
+    expect(true).toBeTruthy();
   });
 
   test("declarative w/parens", () => {
-    expect(true).toBe(true);
+    expect(true).toBeTruthy();
   });
 
   test("declarative explicit receiver", () => {
-    expect(true).toBe(true);
+    expect(true).toBeTruthy();
 
-    expect(true).toBe(true);
+    expect(true).toBeTruthy();
   });
 
-  test("declarative oneline", () => expect(true).toBe(true));
+  test("declarative oneline", () => expect(true).toBeTruthy());
 
   // prettier-ignore
-  test("declarative oneline do", function () { expect(true).toBe(true); });
+  test("declarative oneline do", function () { expect(true).toBeTruthy(); });
 
   test("declarative multiline w/ braces", () => {
-    expect(true).toBe(true);
-    expect(false).toBe(false);
+    expect(true).toBeTruthy();
+    expect(false).toBeFalsy();
   });
 });
 

@@ -35,7 +35,7 @@ describe("RackupTest", { timeout: 120_000 }, () => {
   });
 
   it("Trails app is present", async () => {
-    expect(await File.isExistAsync(await t.appPath("config"))).toBe(true);
+    expect(await File.isExistAsync(await t.appPath("config"))).toBeTruthy();
   });
 
   it("config.ru can be racked up", async () => {
