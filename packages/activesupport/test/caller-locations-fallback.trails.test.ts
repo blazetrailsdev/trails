@@ -54,4 +54,28 @@ describe("callerLocations on a runtime with no V8 stack positions", () => {
     const direct = callerLocations(0, 1);
     expect(direct[0].path).toMatch(/caller-locations-fallback\.trails\.test\.ts$/);
   });
+
+  it("parses a SpiderMonkey / JavaScriptCore stack", () => {
+    const RealError = Error;
+    globalThis.Error = class extends RealError {
+      constructor() {
+        super();
+        Object.defineProperty(this, "stack", {
+          value:
+            "callerLocations@https://x.test/a.js:1:1\n" +
+            "delegate@https://x.test/b.js:2:3\n" +
+            "@https://x.test/models/post.js:7:9\n",
+        });
+      }
+    } as ErrorConstructor;
+    let location;
+    try {
+      [location] = callerLocations(1, 1);
+    } finally {
+      globalThis.Error = RealError;
+    }
+    expect(location.path).toBe("https://x.test/models/post.js");
+    expect(location.lineno).toBe(7);
+    expect(location.label).toBe("");
+  });
 });

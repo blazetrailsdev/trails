@@ -40,31 +40,32 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
     Error.stackTraceLimit = stackTraceLimit;
   }
   if (stack == null) return callerLocationsViaCallSites(start, length);
-  const locations = stack
-    .split("\n")
-    .slice(2 + start)
-    .flatMap((line, i) => {
-      const m = /\((.*):(\d+):\d+\)$|at (.*):(\d+):\d+$/.exec(line.trim());
-      if (!m) return [];
-      const raw = m[1] ?? m[3];
-      const path = raw.startsWith("file://")
-        ? decodeURIComponent(raw.slice("file://".length))
-        : raw;
-      const callSite = sites[1 + start + i];
-      const absolutePath = callSite?.isEval() ? undefined : path;
-      const lineno = Number(m[2] ?? m[4]);
-      const label = /at ([^ (]+)/.exec(line.trim())?.[1] ?? "";
-      return [
-        {
-          path,
-          absolutePath,
-          lineno,
-          label,
-          callSite,
-          toString: () => `${path}:${lineno}:in '${label}'`,
-        },
-      ];
-    });
+  const lines = stack.split("\n");
+  const v8 = lines[0]?.trim().startsWith("Error") ?? false;
+  const locations = lines.slice((v8 ? 2 : 1) + start).flatMap((line, i) => {
+    const m = v8
+      ? /\((.*):(\d+):\d+\)$|at (.*):(\d+):\d+$/.exec(line.trim())
+      : /^[^@]*@(.*):(\d+):\d+$/.exec(line.trim());
+    if (!m) return [];
+    const raw = m[1] ?? m[3];
+    const path = raw.startsWith("file://") ? decodeURIComponent(raw.slice("file://".length)) : raw;
+    const callSite = sites[1 + start + i];
+    const absolutePath = callSite?.isEval() ? undefined : path;
+    const lineno = Number(m[2] ?? m[4]);
+    const label = v8
+      ? (/at ([^ (]+)/.exec(line.trim())?.[1] ?? "")
+      : line.trim().slice(0, line.trim().indexOf("@"));
+    return [
+      {
+        path,
+        absolutePath,
+        lineno,
+        label,
+        callSite,
+        toString: () => `${path}:${lineno}:in '${label}'`,
+      },
+    ];
+  });
   if (locations.length === 0) return callerLocationsViaCallSites(start, length);
   return length == null ? locations : locations.slice(0, length);
 }
