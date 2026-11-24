@@ -7,7 +7,7 @@ import {
 } from "../../lib/active-record.js";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import { SingularAssociation } from "../../lib/associations/singular-association.js";
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import { Base, RecordInvalid } from "../../lib/index.js";
 import { Associations } from "../../lib/associations.js";
@@ -52,6 +52,8 @@ import { TuningPeg } from "../models/tuning-peg.js";
 import { Squeak } from "../models/squeak.js";
 import { CpkBook, CpkOrder, CpkOrderWithPrimaryKeyAssociatedBook } from "../models/cpk.js";
 import { ShipPart } from "../models/ship-part.js";
+import { Face } from "../models/face.js";
+import { SuperHuman } from "../models/human.js";
 import { Parrot as CanonicalParrot } from "../models/parrot.js";
 import { Bird as CanonicalBird } from "../models/bird.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "../models/eye.js";
@@ -1453,6 +1455,49 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     ship.parts.build().markForDestruction();
 
     assertNotPredicate(await ship.isValid(), (v) => v);
+  });
+
+  it("should not saved for unchanged sti type on polymorphic association", async () => {
+    const face = class extends Face {
+      static {
+        this.afterSave(":countSaves");
+      }
+
+      countSaves() {
+        (this as any)._count ??= 0;
+        (this as any)._count += 1;
+      }
+    };
+    Object.defineProperty(face, "name", { value: "Face" });
+
+    const superHuman = class extends SuperHuman {
+      static {
+        this.tableName = "humans";
+
+        this.attribute("name", "string");
+
+        this.hasOne("polymorphicFace", {
+          className: "Face",
+          as: "polymorphicHuman",
+          inverseOf: "polymorphicHuman",
+        });
+      }
+    };
+    Object.defineProperty(superHuman, "name", { value: "SuperHuman" });
+
+    const faceRecord = (await face.createBang()) as any;
+
+    const superHumanRecord = (await superHuman.createBang({
+      name: "S. Human",
+      polymorphicFace: faceRecord,
+    })) as any;
+
+    await superHumanRecord.updateBang({ name: "Super Human" });
+
+    expect(faceRecord.polymorphic_human_type).toBe("Human");
+    expect(faceRecord.polymorphic_human_id).toBe(superHumanRecord.id);
+
+    expect(faceRecord._count).toBe(2);
   });
 
   it("recognizes inverse polymorphic association changes with same foreign key", async () => {
@@ -3064,5 +3109,82 @@ describe("TestAutosaveAssociationOnAHasManyAssociation", () => {
       });
       await pirate.saveBang();
     });
+  });
+});
+
+describe("TestAutosaveAssociationWithNestedAttributes", () => {
+  fixtures([], { useTransactionalTests: true });
+
+  class Part extends Base {
+    static {
+      this.tableName = "ship_parts";
+    }
+  }
+
+  class Ship extends Base {
+    static {
+      this.tableName = "ships";
+      this.hasMany("parts", { className: Part.name });
+      this.acceptsNestedAttributesFor("parts", { allowDestroy: true });
+
+      this.validate(":hasAtLeastTwoParts");
+    }
+
+    async hasAtLeastTwoParts() {
+      const currentParts = (await (this as any).parts.toArray()).filter(
+        (p: any) => !p.markedForDestruction(),
+      );
+      if (currentParts.length < 2) this.errors.add("parts", "must have at least two parts");
+    }
+  }
+
+  class Pirate extends Base {
+    static {
+      this.tableName = "pirates";
+      this.hasMany("ships", { className: Ship.name });
+      this.acceptsNestedAttributesFor("ships", { allowDestroy: true });
+    }
+  }
+
+  beforeAll(() => {
+    constSet(TopLevel, "Part", Part);
+    constSet(TopLevel, "Ship", Ship);
+    constSet(TopLevel, "Pirate", Pirate);
+  });
+
+  afterAll(() => {
+    constSet(TopLevel, "Ship", CanonicalShip);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+  });
+
+  it("should be invalid when nested attributes deletion breaks validation", async () => {
+    const pirate = (await Pirate.createBang()) as any;
+    const ship = pirate.ships.new();
+    for (let i = 0; i < 2; i++) {
+      ship.parts.build();
+    }
+    const part = await ship.parts.first();
+    await ship.saveBang();
+
+    const deletionParams = {
+      ships_attributes: {
+        "0": {
+          id: ship.id,
+          parts_attributes: {
+            "0": {
+              id: part.id,
+              _destroy: "1",
+            },
+          },
+        },
+      },
+    };
+
+    assertNot(await pirate.update(deletionParams));
+    await assertNothingRaised(async () => {
+      await part.reload();
+    });
+    expect(pirate.errors.get("ships.parts")).toContain("must have at least two parts");
+    expect(ship.errors.get("parts")).toContain("must have at least two parts");
   });
 });

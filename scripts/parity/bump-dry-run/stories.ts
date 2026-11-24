@@ -237,7 +237,7 @@ export function renderStory(input: StoryInput, s: Story, cluster: string): strin
     ...[...s.libFiles.keys()].map(
       (f) =>
         `- [ ] \`${f}\` re-verified against ${input.to}, then ` +
-        `\`pnpm tsx scripts/api-compare/body-pins.ts --pin ${f}\`.`,
+        `\`pnpm tsx scripts/api-compare/body-pins.ts --pin ${f} --package ${s.package}\`.`,
     ),
     `- [ ] \`scripts/parity/bump-ledger/${input.source}.json\` and \`${input.source}.tests.json\` ` +
       `hold no row for ${s.package} in this story's files.`,

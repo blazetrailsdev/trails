@@ -46,10 +46,11 @@
  * is a step of every bump. See CONTRIBUTING.md "Body pins".
  *
  * Usage:
- *   tsx body-pins.ts --pin <ruby-file>   # pin/re-pin all pairs in one Ruby file
+ *   tsx body-pins.ts --pin <ruby-file> --package <pkg>  # pin/re-pin all pairs in one Ruby file
+ *                                         (--package required when the file is in several packages)
  *   tsx body-pins.ts --pin-all           # pin/re-pin every matched pair (floor)
  *   tsx body-pins.ts --pin-all --source <name>  # only that vendor source's pairs (a gem floor)
- *   tsx body-pins.ts --prune             # drop pins whose pair no longer matches
+ *   tsx body-pins.ts --prune [--package <pkg>]  # drop pins whose pair no longer matches
  *   tsx body-pins.ts                      # list pin/unpinned counts (no writes)
  *
  * (Run `pnpm parity:api` first so output/body-hashes.json is fresh.)
@@ -208,11 +209,13 @@ function sortPins(pins: BodyPin[]): BodyPin[] {
 export function pinPairs(
   records: BodyHashRecord[],
   pins: BodyPin[],
-  select: { rubyFile: string } | { all: true; packages?: ReadonlySet<string> },
+  select: { rubyFile: string; package?: string } | { all: true; packages?: ReadonlySet<string> },
 ): BodyPin[] {
   const byKey = new Map<string, BodyPin>(pins.map((p) => [keyOf(p), p]));
   for (const r of records) {
     if ("rubyFile" in select && r.rubyFile !== select.rubyFile) continue;
+    if ("rubyFile" in select && select.package !== undefined && r.package !== select.package)
+      continue;
     if ("all" in select && select.packages && !select.packages.has(r.package)) continue;
     const key = keyOf(r);
     // Records dedupe to one pin per key (a Ruby method can appear under several
@@ -234,9 +237,18 @@ export function pinPairs(
 // Drop pins whose pair no longer resolves (the STALE set the gate fails on).
 // Hand-deleting them from a manifest seeded at the `--pin-all` floor means
 // editing a ~9k-entry generated file, so removals get a command instead.
-export function prunePins(records: BodyHashRecord[], pins: BodyPin[]): BodyPin[] {
+// `pkg` limits pruning to that package's pins; every other pin is kept as is.
+export function prunePins(records: BodyHashRecord[], pins: BodyPin[], pkg?: string): BodyPin[] {
   const current = currentDigests(records);
-  return sortPins(pins.filter((p) => current.has(keyOf(p))));
+  return sortPins(
+    pins.filter((p) => (pkg !== undefined && p.package !== pkg) || current.has(keyOf(p))),
+  );
+}
+
+// The packages whose matched pairs include `rubyFile`. `rubyFile` is
+// package-relative, so a bare `base.rb` names one file in many packages.
+export function packagesOfRubyFile(records: BodyHashRecord[], rubyFile: string): string[] {
+  return [...new Set(records.filter((r) => r.rubyFile === rubyFile).map((r) => r.package))].sort();
 }
 
 export async function readJson<T>(file: string): Promise<T> {
@@ -308,8 +320,15 @@ async function main(args: string[]): Promise<number> {
     return 1;
   }
 
+  const packageIdx = args.indexOf("--package");
+  const packageName = packageIdx >= 0 ? args[packageIdx + 1] : undefined;
+  if (packageIdx >= 0 && (packageName === undefined || packageName.startsWith("--"))) {
+    console.error("body-pins: --package needs a package name");
+    return 1;
+  }
+
   if (args.includes("--prune")) {
-    const next = prunePins(artifact.hashes, pins);
+    const next = prunePins(artifact.hashes, pins, packageName);
     await saveManifest(next);
     await clearLedgerRows(pins, next, artifact.hashes);
     console.log(
@@ -338,13 +357,28 @@ async function main(args: string[]): Promise<number> {
     return 1;
   }
 
+  if (packageName !== undefined && (pinAll || pinFile === undefined)) {
+    console.error("body-pins: --package applies only to --pin <ruby-file> or --prune");
+    return 1;
+  }
+  if (pinFile !== undefined && packageName === undefined) {
+    const matches = packagesOfRubyFile(artifact.hashes, pinFile);
+    if (matches.length > 1) {
+      console.error(
+        `body-pins: ${pinFile} matches ${matches.length} packages (${matches.join(", ")}); ` +
+          "pass --package <pkg>",
+      );
+      return 1;
+    }
+  }
+
   if (pinAll || pinFile) {
     const next = pinAll
       ? pinPairs(artifact.hashes, pins, {
           all: true,
           packages: source && new Set(source.packages.map((p) => p.name)),
         })
-      : pinPairs(artifact.hashes, pins, { rubyFile: pinFile! });
+      : pinPairs(artifact.hashes, pins, { rubyFile: pinFile!, package: packageName });
     await saveManifest(next);
     await clearLedgerRows(pins, next, artifact.hashes, source?.name);
     console.log(
