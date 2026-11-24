@@ -278,9 +278,7 @@ describe("ActiveStorage::ImageMagickTest", { timeout: 60_000 }, () => {
   });
 
   it("every Ghostscript-backed coder is denied by coder", async () => {
-    expect((await gsBackedCoders()).filter((coder) => !DENIED_CODERS.includes(coder))).toHaveLength(
-      0,
-    );
+    expect((await gsBackedCoders()).filter((coder) => !DENIED_CODERS.includes(coder))).toBeEmpty();
   });
 
   for (const coder of DENIED_CODERS) {
