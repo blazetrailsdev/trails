@@ -43,8 +43,12 @@ export class BookmarksController extends ApplicationController {
   async create(): Promise<void> {
     this.bookmark = new Bookmark(this._bookmarkParams());
     this.tagList = (this.params.get("tag_list") as string | undefined) ?? "";
-    if (await this.bookmark.save()) {
+    const saved = await Bookmark.transaction(async () => {
+      if (!(await this.bookmark.save())) return false;
       await this.bookmark.setTagList(this.tagList);
+      return true;
+    });
+    if (saved) {
       await this.redirectTo(this.bookmarkPath(this.bookmark), { notice: "Bookmark saved." });
     } else {
       await this.render("new", { status: ":unprocessable_entity" });
@@ -57,8 +61,12 @@ export class BookmarksController extends ApplicationController {
 
   async update(): Promise<void> {
     this.tagList = (this.params.get("tag_list") as string | undefined) ?? "";
-    if (await this.bookmark.update(this._bookmarkParams())) {
+    const updated = await Bookmark.transaction(async () => {
+      if (!(await this.bookmark.update(this._bookmarkParams()))) return false;
       await this.bookmark.setTagList(this.tagList);
+      return true;
+    });
+    if (updated) {
       await this.redirectTo(this.bookmarkPath(this.bookmark), { notice: "Bookmark updated." });
     } else {
       await this.render("edit", { status: ":unprocessable_entity" });

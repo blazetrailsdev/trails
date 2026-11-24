@@ -16,7 +16,7 @@
   <ul class="attachments">
     <% for (const attachment of attachments) { %>
       <li>
-        <%= buttonTo(attachment.name, bookmarkAttachmentPath(bookmark, attachment), { method: "get", class: "link", form: { "data-turbo": "false" } }) %>
+        <%= buttonTo(attachment.name, openBookmarkAttachmentPath(bookmark, attachment), { class: "link" }) %>
         <span class="meta"><%= numberToHumanSize(attachment.byte_size) %></span>
         <%= buttonTo("Remove", bookmarkAttachmentPath(bookmark, attachment), { method: "delete", class: "link danger" }) %>
       </li>

@@ -99,3 +99,30 @@ describe("BookmarkReminderTimeZoneTest", () => {
     expect(bookmark.remind_at!.getTime()).toBe(new Date(2026, 5, 1, 9, 30).getTime());
   });
 });
+
+describe("BookmarkImportTest", () => {
+  beforeEach(resetDatabase);
+
+  it("skips rows with no URL without querying for one", async () => {
+    const rows = [{ title: "no url" }, { title: "blank", url: "  " }] as never;
+    expect(await Bookmark.importRows(rows)).toEqual({ imported: 0, skipped: 2 });
+  });
+
+  it("rolls back a bookmark whose tags fail to save", async () => {
+    const long = "x".repeat(41);
+    const result = await Bookmark.importRows([
+      { title: "A", url: "https://a.example", tags: [long] },
+    ]).catch((error: unknown) => error);
+    expect(result).toBeInstanceOf(Error);
+    expect(await Bookmark.count()).toBe(0);
+  });
+
+  it("neutralizes spreadsheet formulas in a CSV export and restores them on import", async () => {
+    await Bookmark.createBang({ title: "=HYPERLINK(1)", url: "https://a.example" });
+    const csv = await Bookmark.exportCsv();
+    expect(csv.split("\n")[1]).toBe("'=HYPERLINK(1),https://a.example,,,,");
+    await resetDatabase();
+    await Bookmark.importRows(Bookmark.parseExport(csv, "b.csv"));
+    expect(((await Bookmark.first()) as Bookmark).title).toBe("=HYPERLINK(1)");
+  });
+});

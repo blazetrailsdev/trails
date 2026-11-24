@@ -106,7 +106,8 @@ export class Bookmark extends ApplicationRecord {
     let imported = 0;
     let skipped = 0;
     for (const row of rows) {
-      if (await Bookmark.isExists({ url: row.url?.trim() })) {
+      const url = typeof row.url === "string" ? row.url.trim() : "";
+      if (url === "" || (await Bookmark.isExists({ url }))) {
         skipped++;
         continue;
       }
@@ -117,12 +118,13 @@ export class Bookmark extends ApplicationRecord {
         read_at: row.read_at ? new Date(row.read_at) : null,
         remind_at: row.remind_at ? new Date(row.remind_at) : null,
       });
-      if (!(await bookmark.save())) {
-        skipped++;
-        continue;
-      }
-      await bookmark.setTagList((row.tags ?? []).join(","));
-      imported++;
+      const saved = await Bookmark.transaction(async () => {
+        if (!(await bookmark.save())) return false;
+        await bookmark.setTagList((row.tags ?? []).join(","));
+        return true;
+      });
+      if (saved) imported++;
+      else skipped++;
     }
     return { imported, skipped };
   }
@@ -137,7 +139,8 @@ export class Bookmark extends ApplicationRecord {
 }
 
 function csvCell(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[",\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
 function parseCsv(text: string): BookmarkRow[] {
@@ -169,7 +172,10 @@ function parseCsv(text: string): BookmarkRow[] {
   const [header, ...body] = records.filter((r) => r.some((cell) => cell !== ""));
   if (!header) return [];
   return body.map((cells) => {
-    const get = (name: string) => cells[header.indexOf(name)] ?? "";
+    const get = (name: string) => {
+      const cell = cells[header.indexOf(name)] ?? "";
+      return /^'[=+\-@\t\r]/.test(cell) ? cell.slice(1) : cell;
+    };
     return {
       title: get("title"),
       url: get("url"),

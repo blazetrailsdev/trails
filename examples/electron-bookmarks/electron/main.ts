@@ -1,4 +1,10 @@
 import { app, BrowserWindow, dialog, Menu, nativeImage, Notification, shell, Tray } from "electron";
+import type {
+  OpenDialogOptions,
+  OpenDialogReturnValue,
+  SaveDialogOptions,
+  SaveDialogReturnValue,
+} from "electron";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -37,6 +43,20 @@ const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 let win: BrowserWindow | null = null;
 
 /** Electron callbacks can't await; their failures are logged here. */
+function parentWindow(): BrowserWindow | null {
+  return win && !win.isDestroyed() ? win : null;
+}
+
+function showOpenDialog(options: OpenDialogOptions): Promise<OpenDialogReturnValue> {
+  const parent = parentWindow();
+  return parent ? dialog.showOpenDialog(parent, options) : dialog.showOpenDialog(options);
+}
+
+function showSaveDialog(options: SaveDialogOptions): Promise<SaveDialogReturnValue> {
+  const parent = parentWindow();
+  return parent ? dialog.showSaveDialog(parent, options) : dialog.showSaveDialog(options);
+}
+
 function report(promise: Promise<unknown>): void {
   promise.catch((error: unknown) => console.error(error));
 }
@@ -87,14 +107,14 @@ async function submit(action: string): Promise<void> {
 
 Desktop.shell = {
   async pickFiles() {
-    const result = await dialog.showOpenDialog(win!, {
+    const result = await showOpenDialog({
       title: "Attach files",
       properties: ["openFile", "multiSelections"],
     });
     return result.canceled ? [] : result.filePaths;
   },
   async pickImportFile() {
-    const result = await dialog.showOpenDialog(win!, {
+    const result = await showOpenDialog({
       title: "Import bookmarks",
       properties: ["openFile"],
       filters: [{ name: "Bookmark exports", extensions: ["json", "csv"] }],
@@ -102,7 +122,7 @@ Desktop.shell = {
     return result.canceled ? null : result.filePaths[0];
   },
   async pickExportPath(defaultName) {
-    const result = await dialog.showSaveDialog(win!, {
+    const result = await showSaveDialog({
       title: "Export bookmarks",
       defaultPath: join(app.getPath("documents"), defaultName),
       filters: [
@@ -193,7 +213,7 @@ async function sendReminders(): Promise<void> {
     const notification = new Notification({ title: "Time to read", body: bookmark.title });
     notification.on("click", () => openWindow(`/bookmarks/${bookmark.id}`));
     notification.show();
-    await bookmark.update({ reminded_at: new Date() });
+    await bookmark.updateColumn("reminded_at", new Date());
   }
 }
 

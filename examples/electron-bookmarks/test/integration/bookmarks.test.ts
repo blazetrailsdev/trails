@@ -77,8 +77,22 @@ describe("BookmarksFlowTest", () => {
 
     await t.get(`/bookmarks/${bookmark.id}`);
     expect(t.response.body).toContain("paper.pdf");
-    await t.get(`/bookmarks/${bookmark.id}/attachments/${attachment.id}`);
+    await t.post(`/bookmarks/${bookmark.id}/attachments/${attachment.id}/open`);
     expect(t.response.status).toBe(204);
     expect(calls.opened).toEqual([file]);
+  });
+});
+
+describe("BookmarksAtomicSaveTest", () => {
+  beforeEach(resetDatabase);
+
+  it("does not save the bookmark when its tags fail validation", async () => {
+    const t = new ApplicationIntegrationTest("atomic");
+    await t
+      .post("/bookmarks", {
+        params: { bookmark: { title: "A", url: "https://a.example" }, tag_list: "x".repeat(41) },
+      })
+      .catch(() => null);
+    expect(await Bookmark.count()).toBe(0);
   });
 });

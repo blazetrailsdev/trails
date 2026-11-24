@@ -24,7 +24,7 @@ export class AttachmentsController extends ApplicationController {
   }
 
   /** Opens the attached file in its default application. */
-  async show(): Promise<void> {
+  async open(): Promise<void> {
     const desktop = this._desktop();
     if (desktop == null) return this._redirectWithoutDesktop();
     const attachment = (await this.bookmark.attachments.find(this.params.get("id"))) as Attachment;
