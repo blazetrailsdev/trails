@@ -78,6 +78,7 @@ import type { Streaming } from "./action-controller/metal/streaming.js";
 import type { MimeResponds } from "./action-controller/metal/mime-responds.js";
 import type { Renderers } from "./action-controller/metal/renderers.js";
 import type { MemCacheStore } from "./action-dispatch/middleware/session/mem-cache-store.js";
+import * as Constants from "./action-dispatch/constants.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -97,8 +98,6 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_dispatch/middleware/session/cache_store": () =>
     import("./action-dispatch/middleware/session/cache-store.js"),
 };
-
-import * as Constants from "./action-dispatch/constants.js";
 
 export const ActionDispatch = {
   name: "ActionDispatch",

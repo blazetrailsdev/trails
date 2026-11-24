@@ -1,6 +1,5 @@
-import { ActionDispatch } from "@blazetrails/actionpack";
 import { constSet } from "@blazetrails/ruby-compat";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, ActionDispatch } from "@blazetrails/actionpack";
 import type { Logger } from "@blazetrails/activesupport";
 import { Encoding, rbStrPlus } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../../../../action-mailbox.js";

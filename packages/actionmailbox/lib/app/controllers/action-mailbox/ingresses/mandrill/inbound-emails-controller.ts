@@ -1,6 +1,5 @@
-import { ActionDispatch } from "@blazetrails/actionpack";
 import { constSet } from "@blazetrails/ruby-compat";
-import type { Request } from "@blazetrails/actionpack";
+import { ActionDispatch, type Request } from "@blazetrails/actionpack";
 import {
   SecurityUtils,
   TopLevel,
