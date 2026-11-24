@@ -1,5 +1,7 @@
 import adapter from "@sveltejs/adapter-static";
 
+const siteBase = process.env.SITE_BASE ?? "";
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
   kit: {
@@ -7,12 +9,12 @@ const config = {
       fallback: "404.html",
     }),
     paths: {
-      base: process.env.SITE_BASE ?? "",
+      base: siteBase,
     },
     prerender: {
       handleHttpError: ({ path, message }) => {
-        const docs = `${process.env.SITE_BASE ?? ""}/docs/`;
-        if (path === `${process.env.SITE_BASE ?? ""}/playground/`) return;
+        const docs = `${siteBase}/docs/`;
+        if (path === `${siteBase}/playground/`) return;
         if (
           ["", "guides/", "guides/idioms", "guides/getting-started", "api/README"].some(
             (p) => path === docs + p,
