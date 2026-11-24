@@ -1,6 +1,10 @@
 import { I18n } from "@blazetrails/activemodel";
+import { File } from "@blazetrails/ruby-compat";
 import { en } from "./locale/en.js";
 
-const enPath = new URL("./locale/en.js", import.meta.url).pathname;
+const enPath = File.expandPath(
+  "active-record/locale/en.js",
+  File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)),
+);
 I18n.registerLocaleModule(enPath, { en });
 I18n.loadPath().push(enPath);
