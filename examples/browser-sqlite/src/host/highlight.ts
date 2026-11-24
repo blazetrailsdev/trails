@@ -25,7 +25,7 @@ let highlighter: Promise<HighlighterCore> | undefined;
 
 function load(): Promise<HighlighterCore> {
   return (highlighter ??= createHighlighterCore({
-    themes: [import("shiki/themes/github-dark.mjs")],
+    themes: [import("shiki/themes/github-light.mjs"), import("shiki/themes/github-dark.mjs")],
     langs: [
       import("shiki/langs/typescript.mjs"),
       import("shiki/langs/html.mjs"),
@@ -44,8 +44,11 @@ function language(path: string): string {
   return "text";
 }
 
-/** The source as highlighted HTML for the editor's backdrop, in the website's `github-dark` theme. */
+/** The source as highlighted HTML for the editor's backdrop, in `github-light`, with `github-dark` as `--shiki-dark`. */
 export async function highlight(source: string, path: string): Promise<string> {
   const shiki = await load();
-  return shiki.codeToHtml(source, { lang: language(path), theme: "github-dark" });
+  return shiki.codeToHtml(source, {
+    lang: language(path),
+    themes: { light: "github-light", dark: "github-dark" },
+  });
 }

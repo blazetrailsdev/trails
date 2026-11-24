@@ -36,7 +36,6 @@
   const navRight = [
     { label: "Docs", href: `${base}/docs/` },
     { label: "Guides", href: guides },
-    { label: "Playground", href: `${base}/playground/` },
   ];
 
   const railsGems = new Set([

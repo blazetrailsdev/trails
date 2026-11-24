@@ -79,8 +79,6 @@ function saveDb(bytes: Uint8Array | null): void {
   localStorage.setItem(DB_KEY, btoa(latin1(bytes)));
 }
 
-const ANSI_COLORS = ["#666", "#f77", "#7d7", "#fd6", "#79f", "#d8f", "#7df", "#ddd"];
-
 function appendAnsi(parent: HTMLElement, text: string): void {
   let color: string | null = null;
   let bold = false;
@@ -91,7 +89,7 @@ function appendAnsi(parent: HTMLElement, text: string): void {
       for (const code of part.split(";").map(Number)) {
         if (code === 0) [color, bold] = [null, false];
         else if (code === 1) bold = true;
-        else if (code >= 30 && code <= 37) color = ANSI_COLORS[code - 30];
+        else if (code >= 30 && code <= 37) color = `var(--ansi-${code - 30})`;
       }
       continue;
     }

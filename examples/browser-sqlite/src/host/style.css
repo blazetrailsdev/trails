@@ -13,10 +13,23 @@
   --info: #2e6b85;
   --error: #c0392b;
   --warning: #a07830;
-  --code-bg: #3a2a1f;
-  --code-bar: #2a1e16;
-  --code-border: #4a3628;
-  --code-text: #f3e6d6;
+  --code-bg: #fffaf0;
+  --code-bar: #f7e4bb;
+  --code-border: #ecd9b0;
+  --code-text: #2b1d14;
+  --code-muted: #6b5440;
+  --caret: var(--orange);
+  --console-error: #b3261e;
+  --console-request: #2e6b85;
+  --console-system: #9a5b00;
+  --ansi-0: #6b5440;
+  --ansi-1: #b3261e;
+  --ansi-2: #2f7a32;
+  --ansi-3: #8a6100;
+  --ansi-4: #2453b8;
+  --ansi-5: #8a3fa8;
+  --ansi-6: #1f7480;
+  --ansi-7: #2b1d14;
   --sans: "Instrument Sans Variable", "Helvetica Neue", Arial, system-ui, sans-serif;
   --display: "Bricolage Grotesque Variable", "Helvetica Neue", Arial, sans-serif;
   --mono: "Fira Code Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -32,6 +45,23 @@
     --info: #7fb3d0;
     --error: #e8735e;
     --warning: #f2b01e;
+    --code-bg: #3a2a1f;
+    --code-bar: #2a1e16;
+    --code-border: #4a3628;
+    --code-text: #f3e6d6;
+    --code-muted: #d9c6b0;
+    --caret: var(--mango);
+    --console-error: #ff8a70;
+    --console-request: #7fb3d0;
+    --console-system: var(--mango);
+    --ansi-0: #666;
+    --ansi-1: #f77;
+    --ansi-2: #7d7;
+    --ansi-3: #fd6;
+    --ansi-4: #79f;
+    --ansi-5: #d8f;
+    --ansi-6: #7df;
+    --ansi-7: #ddd;
     color-scheme: dark;
   }
 }
@@ -110,6 +140,7 @@ main {
 #tree .dir {
   padding: 0.15rem 0.75rem;
   color: var(--muted);
+  font-weight: 600;
 }
 #tree .file {
   padding: 0.15rem 0.75rem;
@@ -137,11 +168,11 @@ main {
   padding: 0.3rem 0.75rem;
   background: var(--code-bar);
   border-bottom: 1px solid var(--code-border);
-  color: #d9c6b0;
+  color: var(--code-muted);
   font-family: var(--mono);
 }
 #console-pane .bar button {
-  color: #d9c6b0;
+  color: var(--code-muted);
   background: var(--code-bg);
   border-color: var(--code-border);
 }
@@ -186,11 +217,16 @@ main {
   resize: none;
   color: var(--code-text);
   background: transparent;
-  caret-color: var(--mango);
+  caret-color: var(--caret);
   outline: none;
 }
 #editor.highlighted {
   color: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  #highlight span {
+    color: var(--shiki-dark) !important;
+  }
 }
 #editor::selection {
   background: rgb(242 176 30 / 0.3);
@@ -248,14 +284,14 @@ main {
   white-space: pre-wrap;
 }
 #console .warn {
-  color: var(--mango);
+  color: var(--warning);
 }
 #console .error {
-  color: #ff8a70;
+  color: var(--console-error);
 }
 #console .request {
-  color: #7fb3d0;
+  color: var(--console-request);
 }
 #console .system {
-  color: var(--mango);
+  color: var(--console-system);
 }
