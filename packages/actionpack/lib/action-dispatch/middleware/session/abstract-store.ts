@@ -29,7 +29,6 @@ export class SessionRestoreError extends Error {
 }
 
 export const Compatibility = {
-  /** @internal */
   DEFAULT_SAME_SITE: (request: Request): unknown => request.cookiesSameSiteProtection(),
 
   generateSid(this: unknown): string {
