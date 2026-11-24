@@ -202,7 +202,7 @@ async function rcLoaded(modules: Set<string>): Promise<number> {
 }
 
 const RC_IMPORT =
-  /(?:import|export)\s*(?:(?:\w+\s*,\s*)?(\*\s*as\s+\w+|\{[^}]*\})\s*from\s*)?["']@blazetrails\/ruby-compat(\/[^"']+)?["']/g;
+  /(?:import|export)\s*(?:(?:\w+\s*,\s*)?(\*(?:\s*as\s+\w+)?|\{[^}]*\})\s*from\s*)?["']@blazetrails\/ruby-compat(\/[^"']+)?["']/g;
 
 async function unionTarget(app: Measurement, map: Awaited<ReturnType<typeof sccMap>>) {
   const modules = new Set<string>();
@@ -214,7 +214,9 @@ async function unionTarget(app: Measurement, map: Awaited<ReturnType<typeof sccM
     for (const m of src.matchAll(RC_IMPORT)) {
       if (m[2]) {
         const target =
-          exportsMap[`.${m[2]}`]?.default ?? exportsMap["./*"].default.replace("*", m[2].slice(1));
+          exportsMap[`.${m[2]}`]?.default ??
+          exportsMap["./*"]?.default.replace("*", m[2].slice(1)) ??
+          `./dist${m[2]}.js`;
         const module = relative(RC_DIST, resolve(RC_DIST, "..", target));
         if (!(await stat(join(RC_DIST, module)).catch(() => null))) {
           throw new Error(
@@ -298,8 +300,17 @@ async function main(): Promise<void> {
     const now = baseline.packages[pkg] ?? 0;
     if (was !== now) diffs.push(`  ${pkg}: ${was} → ${now}`);
   }
-  if (committed.total !== baseline.total)
-    diffs.push(`  total: ${committed.total} → ${baseline.total}`);
+  for (const key of [
+    "total",
+    "rubyCompatTarget",
+    "rubyCompatTargetWithWholeBarrelImports",
+    "appTarget",
+    "wholeBarrelImports",
+  ] as const) {
+    const was = JSON.stringify(committed[key]);
+    const now = JSON.stringify(baseline[key]);
+    if (was !== now) diffs.push(`  ${key}: ${was} → ${now}`);
+  }
   console.log(
     diffs.length
       ? `\nDiff against baseline.json:\n${diffs.join("\n")}`
