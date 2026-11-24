@@ -5,7 +5,8 @@
 //   node scripts/ci/ar-shard-durations.mjs <run-id>
 //
 // <run-id> is a green `CI` run on main. Every leg of the SQLite, PostgreSQL,
-// MariaDB and numbered Trailties lanes is read, so each adapter's table covers every file once.
+// MariaDB and numbered Trailties lanes is read, so each table covers every
+// file once.
 // A file vitest reports with no time (a skipped file) is recorded as 0; the
 // sequencer adds its per-file overhead to every file either way.
 import { execFile } from "node:child_process";
