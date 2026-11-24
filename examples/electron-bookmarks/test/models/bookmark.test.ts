@@ -108,13 +108,14 @@ describe("BookmarkImportTest", () => {
     expect(await Bookmark.importRows(rows)).toEqual({ imported: 0, skipped: 2 });
   });
 
-  it("rolls back a bookmark whose tags fail to save", async () => {
-    const long = "x".repeat(41);
+  it("rolls back and skips a row whose tags fail to save, keeping the rest", async () => {
     const result = await Bookmark.importRows([
-      { title: "A", url: "https://a.example", tags: [long] },
-    ]).catch((error: unknown) => error);
-    expect(result).toBeInstanceOf(Error);
-    expect(await Bookmark.count()).toBe(0);
+      { title: "A", url: "https://a.example", tags: ["x".repeat(41)] },
+      { title: "B", url: "https://b.example", tags: ["ok"] },
+    ]);
+    expect(result).toEqual({ imported: 1, skipped: 1 });
+    const urls = (await Bookmark.order({ id: "asc" }).toArray()).map((b) => b.url);
+    expect(urls).toEqual(["https://b.example"]);
   });
 
   it("neutralizes spreadsheet formulas in a CSV export and restores them on import", async () => {

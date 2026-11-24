@@ -1,3 +1,4 @@
+import { RecordInvalid } from "@blazetrails/activerecord";
 import { ApplicationRecord } from "./application-record.ts";
 import { Tag } from "./tag.ts";
 
@@ -100,7 +101,8 @@ export class Bookmark extends ApplicationRecord {
 
   /**
    * Creates a bookmark for each row whose URL is not already saved, and answers
-   * how many were imported and how many skipped.
+   * how many were imported and how many skipped. A row that fails validation,
+   * its tags included, is rolled back and skipped.
    */
   static async importRows(rows: BookmarkRow[]): Promise<{ imported: number; skipped: number }> {
     let imported = 0;
@@ -118,11 +120,17 @@ export class Bookmark extends ApplicationRecord {
         read_at: row.read_at ? new Date(row.read_at) : null,
         remind_at: row.remind_at ? new Date(row.remind_at) : null,
       });
-      const saved = await Bookmark.transaction(async () => {
-        if (!(await bookmark.save())) return false;
-        await bookmark.setTagList((row.tags ?? []).join(","));
-        return true;
-      });
+      let saved: boolean | undefined;
+      try {
+        saved = await Bookmark.transaction(async () => {
+          if (!(await bookmark.save())) return false;
+          await bookmark.setTagList((row.tags ?? []).join(","));
+          return true;
+        });
+      } catch (error) {
+        if (!(error instanceof RecordInvalid)) throw error;
+        saved = false;
+      }
       if (saved) imported++;
       else skipped++;
     }

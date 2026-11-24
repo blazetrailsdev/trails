@@ -42,7 +42,6 @@ const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
 let win: BrowserWindow | null = null;
 
-/** Electron callbacks can't await; their failures are logged here. */
 function parentWindow(): BrowserWindow | null {
   return win && !win.isDestroyed() ? win : null;
 }
@@ -57,6 +56,7 @@ function showSaveDialog(options: SaveDialogOptions): Promise<SaveDialogReturnVal
   return parent ? dialog.showSaveDialog(parent, options) : dialog.showSaveDialog(options);
 }
 
+/** Electron callbacks can't await; their failures are logged here. */
 function report(promise: Promise<unknown>): void {
   promise.catch((error: unknown) => console.error(error));
 }
