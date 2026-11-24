@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/activerecord";
 import {
   constGet,
+  publicInstanceMethods,
   rbFRequireFile,
   Dir,
   File,
@@ -1003,6 +1004,544 @@ export class BukkitsEngine extends Engine {
     await Trails.application!.call(env);
     expect(env["action_dispatch.routes"]).toBe(Trails.application!.routes());
   });
+
+  const isolatedBukkits = (extra = ""): string => `
+import { Engine } from "@blazetrails/trailties";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+export const Bukkits = { name: "Bukkits"${extra} };
+constSet(TopLevel, "Bukkits", Bukkits);
+export class BukkitsEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.isolateNamespace(Bukkits);
+  }
+}
+`;
+
+  const bukkitsImport = (): string =>
+    `import { BukkitsEngine } from ${JSON.stringify(`${plugin.path}/lib/bukkits.ts`)};`;
+
+  it(
+    "isolated engine should set correct route module prefix for nested namespace",
+    { timeout: 240_000 },
+    async () => {
+      await plugin.write(
+        "lib/bukkits.ts",
+        `import { Engine } from "@blazetrails/trailties";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+export const Bukkits = constSet(TopLevel, "Bukkits", { name: "Bukkits" });
+export const Awesome = constSet(Bukkits, "Awesome", {} as { name: string });
+export class AwesomeEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.isolateNamespace(Awesome);
+  }
+}
+`,
+      );
+
+      await t.appFile(
+        "config/routes.ts",
+        `import { Trails } from "@blazetrails/trailties";
+import { AwesomeEngine } from ${JSON.stringify(`${plugin.path}/lib/bukkits.ts`)};
+Trails.application!.routes().draw(function () {
+  this.mount(new Map<unknown, unknown>([[AwesomeEngine, "/bukkits"], ["as", "bukkits"]]));
+});
+`,
+      );
+
+      await plugin.write(
+        "config/routes.ts",
+        `import { AwesomeEngine } from "../lib/bukkits.js";
+AwesomeEngine.routes().draw(function () {
+  this.get("/foo", { to: "foo#index" });
+});
+`,
+      );
+
+      await plugin.write(
+        "app/controllers/bukkits/awesome/foo-controller.ts",
+        `import { ActionController } from "@blazetrails/actionpack";
+export class FooController extends ActionController.Base {
+  async index() {
+    await this.render({ plain: "ok" });
+  }
+}
+`,
+      );
+
+      await t.addToConfig('this.config.actionDispatch.showExceptions = "none";');
+
+      await t.bootTrails();
+
+      await t.get("/bukkits/foo");
+      expect(t.lastResponse().body).toBe("ok");
+    },
+  );
+
+  it("properly reload routes", { timeout: 240_000 }, async () => {
+    await plugin.write("lib/bukkits.ts", isolatedBukkits());
+
+    const application = await t.appPath("config", "application.ts");
+    await t.appFile(
+      "config/application.ts",
+      `${bukkitsImport()}\n` + (await getFs().readFile(application, "utf-8")),
+    );
+    await t.addToConfig(`
+    this.routes(function () {
+      this.mount(new Map<unknown, unknown>([[async () => [200, {}, ["foo"]], "/foo"]]));
+      this.mount(new Map<unknown, unknown>([[BukkitsEngine, "/bukkits"]]));
+    });
+`);
+
+    await FileUtils.rmAsync(File.join(await t.appPath(), "config/routes.ts"));
+
+    await plugin.write(
+      "config/routes.ts",
+      `import { BukkitsEngine } from "../lib/bukkits.js";
+BukkitsEngine.routes().draw(function () {
+  this.mount(new Map<unknown, unknown>([[async () => [200, {}, ["bar"]], "/bar"]]));
+});
+`,
+    );
+
+    await t.bootTrails();
+
+    await t.get("/foo");
+    expect(t.lastResponse().body).toBe("foo");
+
+    await t.get("/bukkits/bar");
+    expect(t.lastResponse().body).toBe("bar");
+  });
+
+  it(
+    "setting generators for engine and overriding app generator's",
+    { timeout: 240_000 },
+    async () => {
+      await plugin.write(
+        "lib/bukkits.ts",
+        `import { Engine } from "@blazetrails/trailties";
+export class BukkitsEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    this.config.generators((g) => {
+      const configured = g as unknown as Record<string, (value: string) => void>;
+      configured.orm("data_mapper");
+      configured.templateEngine("haml");
+      configured.testFramework("rspec");
+    });
+
+    this.config.appGenerators((g) => {
+      const configured = g as unknown as Record<string, (value: string) => void>;
+      configured.orm("mongoid");
+      configured.templateEngine("liquid");
+      configured.testFramework("shoulda");
+    });
+  }
+}
+`,
+      );
+
+      await t.addToConfig(`
+    this.config.generators((g) => {
+      (g as unknown as Record<string, (value: string) => void>).testFramework("test_unit");
+    });
+`);
+
+      await t.bootTrails();
+
+      const appGenerators = Trails.application!.config.generators() as unknown as Record<
+        string,
+        () => unknown
+      >;
+      expect(appGenerators.orm()).toBe("mongoid");
+      expect(appGenerators.templateEngine()).toBe("liquid");
+      expect(appGenerators.testFramework()).toBe("test_unit");
+
+      const { BukkitsEngine } = (await import(`${plugin.path}/lib/bukkits.ts`)) as {
+        BukkitsEngine: typeof Engine;
+      };
+      const generators = BukkitsEngine.config.generators() as unknown as Record<
+        string,
+        () => unknown
+      >;
+      expect(generators.orm()).toBe("data_mapper");
+      expect(generators.templateEngine()).toBe("haml");
+      expect(generators.testFramework()).toBe("rspec");
+    },
+  );
+
+  it(
+    "engine should get default generators with ability to overwrite them",
+    { timeout: 240_000 },
+    async () => {
+      await plugin.write(
+        "lib/bukkits.ts",
+        `import { Engine } from "@blazetrails/trailties";
+export class BukkitsEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+    (this.config.generators() as unknown as Record<string, (value: string) => void>).testFramework(
+      "rspec",
+    );
+  }
+}
+`,
+      );
+
+      await t.bootTrails();
+
+      const { BukkitsEngine } = (await import(`${plugin.path}/lib/bukkits.ts`)) as {
+        BukkitsEngine: typeof Engine;
+      };
+      const generators = BukkitsEngine.config.generators() as unknown as Record<
+        string,
+        () => unknown
+      >;
+      expect(generators.orm()).toBe("active_record");
+      expect(generators.testFramework()).toBe("rspec");
+
+      const appGenerators = Trails.application!.config.generators() as unknown as Record<
+        string,
+        () => unknown
+      >;
+      expect(appGenerators.testFramework()).toBe("test_unit");
+    },
+  );
+
+  it("fetching engine by path", { timeout: 240_000 }, async () => {
+    await plugin.write("lib/bukkits.ts", engineSource("bukkits", "Bukkits"));
+
+    await t.bootTrails();
+
+    const { BukkitsEngine } = (await import(`${plugin.path}/lib/bukkits.ts`)) as {
+      BukkitsEngine: typeof Engine;
+    };
+    expect(await Engine.find(plugin.path)).toBe(BukkitsEngine.instance());
+
+    const engineDir = plugin.path.replace(/\/$/, "").split("/").at(-1)!;
+    const enginePath = File.join(plugin.path, "..", engineDir);
+    expect(await Engine.find(enginePath)).toBe(BukkitsEngine.instance());
+  });
+
+  it("gather isolated engine's helpers in Engine#helpers", { timeout: 240_000 }, async () => {
+    await plugin.write("lib/bukkits.ts", isolatedBukkits());
+
+    await t.appFile(
+      "app/helpers/some-helper.ts",
+      `export const SomeHelper = {
+  foo() {
+    return "foo";
+  },
+};
+`,
+    );
+
+    await plugin.write(
+      "app/helpers/bukkits/engine-helper.ts",
+      `export const EngineHelper = {
+  bar() {
+    return "bar";
+  },
+};
+`,
+    );
+
+    await plugin.write(
+      "app/helpers/engine-helper.ts",
+      `export const EngineHelper = {
+  baz() {
+    return "baz";
+  },
+};
+`,
+    );
+
+    await t.addToConfig('this.config.actionDispatch.showExceptions = "none";');
+
+    await t.bootTrails();
+
+    const { BukkitsEngine } = (await import(`${plugin.path}/lib/bukkits.ts`)) as {
+      BukkitsEngine: typeof Engine;
+    };
+    expect(publicInstanceMethods(await BukkitsEngine.instance().helpers()).sort()).toEqual([
+      "bar",
+      "baz",
+    ]);
+  });
+
+  it("engine can be properly mounted at root", { timeout: 240_000 }, async () => {
+    await t.addToConfig('this.config.actionDispatch.showExceptions = "none";');
+    await t.addToConfig("this.config.publicFileServer.enabled = false;");
+
+    await plugin.write("lib/bukkits.ts", isolatedBukkits());
+
+    await plugin.write(
+      "config/routes.ts",
+      `import { BukkitsEngine } from "../lib/bukkits.js";
+BukkitsEngine.routes().draw(function () {
+  this.root("foo#index");
+});
+`,
+    );
+
+    await plugin.write(
+      "app/controllers/bukkits/foo-controller.ts",
+      `import { ActionController } from "@blazetrails/actionpack";
+export class FooController extends ActionController.Base {
+  async index() {
+    const text = \`
+                script_name: \${this.request.scriptName}
+                fullpath: \${this.request.fullpath}
+                path: \${this.request.path}
+\`;
+    await this.render({ plain: text });
+  }
+}
+`,
+    );
+
+    await t.appFile(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+${bukkitsImport()}
+Trails.application!.routes().draw(function () {
+  this.mount(new Map([[BukkitsEngine, "/"]]));
+});
+`,
+    );
+
+    await t.bootTrails();
+
+    const expected = `
+        script_name:
+        fullpath: /
+        path: /
+`;
+
+    await t.get("/");
+    expect(
+      t
+        .lastResponse()
+        .body.split("\n")
+        .map((line) => line.trim()),
+    ).toEqual(expected.split("\n").map((line) => line.trim()));
+  });
+
+  it(
+    "paths are properly generated when application is mounted at sub-path",
+    { timeout: 240_000 },
+    async () => {
+      await plugin.write("lib/bukkits.ts", isolatedBukkits());
+
+      await t.appFile(
+        "app/controllers/bar-controller.ts",
+        `import { ApplicationController } from "./application-controller.js";
+export class BarController extends ApplicationController {
+  async index() {
+    await this.render({ plain: (this as any).bukkits.bukkitPath() });
+  }
+}
+`,
+      );
+
+      await t.appFile(
+        "config/routes.ts",
+        `import { Trails } from "@blazetrails/trailties";
+${bukkitsImport()}
+Trails.application!.routes().draw(function () {
+  this.get("/bar", { to: "bar#index", as: "bar" });
+  this.mount(new Map<unknown, unknown>([[BukkitsEngine, "/bukkits"], ["as", "bukkits"]]));
+});
+`,
+      );
+
+      await plugin.write(
+        "config/routes.ts",
+        `import { BukkitsEngine } from "../lib/bukkits.js";
+BukkitsEngine.routes().draw(function () {
+  this.get("/bukkit", { to: "bukkit#index" });
+});
+`,
+      );
+
+      await plugin.write(
+        "app/controllers/bukkits/bukkit-controller.ts",
+        `import { ActionController } from "@blazetrails/actionpack";
+export class BukkitController extends ActionController.Base {
+  async index() {
+    await this.render({ plain: (this as any).mainApp.barPath() });
+  }
+}
+`,
+      );
+
+      await t.bootTrails();
+
+      await t.get("/bukkits/bukkit", {}, { SCRIPT_NAME: "/foo" });
+      expect(t.lastResponse().body).toBe("/foo/bar");
+
+      await t.get("/bar", {}, { SCRIPT_NAME: "/foo" });
+      expect(t.lastResponse().body).toBe("/foo/bukkits/bukkit");
+    },
+  );
+
+  it(
+    "isolated engine can be mounted under multiple static locations",
+    { timeout: 240_000 },
+    async () => {
+      await t.appFile(
+        "app/controllers/foos-controller.ts",
+        `import { ApplicationController } from "./application-controller.js";
+export class FoosController extends ApplicationController {
+  async throughFruits() {
+    await this.render({ plain: (this as any).fruitBukkits.postsPath() });
+  }
+
+  async throughVegetables() {
+    await this.render({ plain: (this as any).vegetableBukkits.postsPath() });
+  }
+}
+`,
+      );
+
+      await t.appFile(
+        "config/routes.ts",
+        `import { Trails } from "@blazetrails/trailties";
+${bukkitsImport()}
+Trails.application!.routes().draw(function () {
+  this.scope("/fruits", () => {
+    this.mount(new Map<unknown, unknown>([[BukkitsEngine, "/bukkits"], ["as", "fruit_bukkits"]]));
+  });
+
+  this.scope("/vegetables", () => {
+    this.mount(new Map<unknown, unknown>([[BukkitsEngine, "/bukkits"], ["as", "vegetable_bukkits"]]));
+  });
+
+  this.get("/through_fruits", { to: "foos#throughFruits" });
+  this.get("/through_vegetables", { to: "foos#throughVegetables" });
+});
+`,
+      );
+
+      await plugin.write(
+        "config/routes.ts",
+        `import { BukkitsEngine } from "../lib/bukkits.js";
+BukkitsEngine.routes().draw(function () {
+  this.resources("posts", { only: "index" });
+});
+`,
+      );
+
+      await t.bootTrails();
+
+      await t.get("/through_fruits");
+      expect(t.lastResponse().body).toBe("/fruits/bukkits/posts");
+
+      await t.get("/through_vegetables");
+      expect(t.lastResponse().body).toBe("/vegetables/bukkits/posts");
+    },
+  );
+
+  it(
+    "isolated engine can be mounted under multiple dynamic locations",
+    { timeout: 240_000 },
+    async () => {
+      await t.appFile(
+        "app/controllers/foos-controller.ts",
+        `import { ApplicationController } from "./application-controller.js";
+export class FoosController extends ApplicationController {
+  async throughFruits() {
+    await this.render({ plain: (this as any).fruitBukkits.postsPath({ fruit_id: 1 }) });
+  }
+
+  async throughVegetables() {
+    await this.render({ plain: (this as any).vegetableBukkits.postsPath({ vegetable_id: 1 }) });
+  }
+}
+`,
+      );
+
+      await t.appFile(
+        "config/routes.ts",
+        `import { Trails } from "@blazetrails/trailties";
+${bukkitsImport()}
+Trails.application!.routes().draw(function () {
+  this.resources("fruits", () => {
+    this.mount(new Map([[BukkitsEngine, "/bukkits"]]));
+  });
+
+  this.resources("vegetables", () => {
+    this.mount(new Map([[BukkitsEngine, "/bukkits"]]));
+  });
+
+  this.get("/through_fruits", { to: "foos#throughFruits" });
+  this.get("/through_vegetables", { to: "foos#throughVegetables" });
+});
+`,
+      );
+
+      await plugin.write(
+        "config/routes.ts",
+        `import { BukkitsEngine } from "../lib/bukkits.js";
+BukkitsEngine.routes().draw(function () {
+  this.resources("posts", { only: "index" });
+});
+`,
+      );
+
+      await t.bootTrails();
+
+      await t.get("/through_fruits");
+      expect(t.lastResponse().body).toBe("/fruits/1/bukkits/posts");
+
+      await t.get("/through_vegetables");
+      expect(t.lastResponse().body).toBe("/vegetables/1/bukkits/posts");
+    },
+  );
+
+  it(
+    "route helpers resolve script name correctly when called with different script name from current one",
+    { timeout: 240_000 },
+    async () => {
+      await plugin.write(
+        "app/controllers/posts-controller.ts",
+        `import { ActionController } from "@blazetrails/actionpack";
+export class PostsController extends ActionController.Base {
+  async index() {
+    await this.render({ plain: (this as any).fruitBukkits.postsPath({ fruit_id: 2 }) });
+  }
+}
+`,
+      );
+
+      await t.appFile(
+        "config/routes.ts",
+        `import { Trails } from "@blazetrails/trailties";
+${bukkitsImport()}
+Trails.application!.routes().draw(function () {
+  this.resources("fruits", () => {
+    this.mount(new Map([[BukkitsEngine, "/bukkits"]]));
+  });
+});
+`,
+      );
+
+      await plugin.write(
+        "config/routes.ts",
+        `import { BukkitsEngine } from "../lib/bukkits.js";
+BukkitsEngine.routes().draw(function () {
+  this.resources("posts", { only: "index" });
+});
+`,
+      );
+
+      await t.bootTrails();
+
+      await t.get("/fruits/1/bukkits/posts");
+      expect(t.lastResponse().body).toBe("/fruits/2/bukkits/posts");
+    },
+  );
 });
 
 const fixtureRoot = new URL("../fixtures/initializer-engine", import.meta.url).pathname;

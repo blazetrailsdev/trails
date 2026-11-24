@@ -18,6 +18,7 @@ import {
   LOAD_PATH,
   rbFLoad,
   rbFRequireFile,
+  rbModName,
   rbObjRespondTo,
   rbProcCall,
   block,
@@ -49,7 +50,6 @@ import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 const generators = "./generators.js";
 
 type IsolatedNamespace = {
-  name: string;
   railtieNamespace?: () => typeof Engine;
   tableNamePrefix?: string;
   isUseRelativeModelNaming?: () => boolean;
@@ -112,9 +112,9 @@ export class Engine extends Trailtie {
   }
 
   static isolateNamespace(mod: IsolatedNamespace): void {
-    this.engineName(generateRailtieName(mod.name));
+    this.engineName(generateRailtieName(rbModName(mod)!));
 
-    this.config.defaultScope = { module: underscore(mod.name) };
+    this.config.defaultScope = { module: underscore(rbModName(mod)!) };
 
     this.isolated(true);
 
