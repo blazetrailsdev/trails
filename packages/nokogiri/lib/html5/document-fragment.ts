@@ -5,6 +5,7 @@ import { childNodes, Node } from "./node.js";
 import { NodeSet } from "../xml/node-set.js";
 import { DocumentFragment as XmlDocumentFragment } from "../xml/document-fragment.js";
 import { HTML5 } from "../namespaces.js";
+import { readAndEncode } from "../html5.js";
 
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 
@@ -21,7 +22,7 @@ export class DocumentFragment extends XmlDocumentFragment {
   /** @missingRailsCall fragment — CONVERGEABLE nokogiri-html5-document-fragment-gumbo-fragment */
   constructor(
     document: Document,
-    input: string | null = null,
+    input: unknown = null,
     context: Node | string | null = null,
     _options: Record<string, unknown> = {},
   ) {
@@ -30,24 +31,27 @@ export class DocumentFragment extends XmlDocumentFragment {
     this.errors = [];
     if (input == null) return;
 
+    input = readAndEncode(input, null);
+
     if (typeof context === "string") {
       context = new Node(defaultTreeAdapter.createElement(context, html.NS.HTML, []), document);
     }
     (this as { _node: Parse5Parent })._node =
       context !== null && context.isElement()
-        ? parseFragment(context._node as DefaultTreeAdapterMap["element"], input, {})
-        : parseFragment(input);
+        ? parseFragment(context._node as DefaultTreeAdapterMap["element"], input as string, {})
+        : parseFragment(input as string);
   }
 
   static parse(
-    input: string,
-    _encoding: string | null = null,
+    input: unknown,
+    encoding: string | null = null,
     options: { context?: Node | string | null } = {},
   ): DocumentFragment {
     const { context = null, ...rest } = options;
 
     const document = new Document();
     document.encoding = "UTF-8";
+    input = readAndEncode(input, encoding);
 
     return new DocumentFragment(document, input, context, rest);
   }

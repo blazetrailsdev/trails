@@ -18,7 +18,7 @@
  */
 
 import { DateTime, Time as RubyTime } from "@blazetrails/date";
-import { actsLike, BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
+import { actsLike, BigDecimal, Chars, SafeBuffer, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
 import {
   rbFSend,
@@ -85,7 +85,7 @@ export type TemporalDateLike =
   | Temporal.PlainDate;
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  if (typeof value === "string" || value instanceof Chars) {
+  if (typeof value === "string" || value instanceof SafeBuffer || value instanceof Chars) {
     return `'${this.quoteString(rbObjAsString(value))}'`;
   }
   if (value === true) return this.quotedTrue();
@@ -120,7 +120,9 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (value instanceof Chars || value instanceof BinaryData) return rbObjAsString(value);
+  if (value instanceof SafeBuffer || value instanceof Chars || value instanceof BinaryData) {
+    return rbObjAsString(value);
+  }
   if (value === true) return this.unquotedTrue();
   if (value === false) return this.unquotedFalse();
   if (value instanceof BigDecimal) return value.toString("F");

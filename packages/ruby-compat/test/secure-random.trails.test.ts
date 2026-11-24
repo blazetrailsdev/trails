@@ -50,4 +50,27 @@ describe("SecureRandom", () => {
       cryptoAdapterConfig.adapter = null;
     }
   });
+
+  it("alphanumeric", () => {
+    for (let n = 0; n < 65; n++) {
+      const an = SecureRandom.alphanumeric(n);
+      expect(an).toMatch(/^[0-9a-zA-Z]*$/);
+      expect(an.length).toBe(n);
+    }
+  });
+
+  it("alphanumeric chars", () => {
+    const cases: [string[], RegExp][] = [
+      [[..."0123456789"], /^\d*$/],
+      [[..."abcdefghijklmnopqrst"], /^[a-t]*$/],
+      [[..."一二三四五六七八九十"], /^[一二三四五六七八九十]*$/],
+    ];
+    for (const [chars, pattern] of cases) {
+      for (let n = 0; n < 10; n++) {
+        const an = SecureRandom.alphanumeric(n, { chars });
+        expect(an).toMatch(pattern);
+        expect([...an].length).toBe(n);
+      }
+    }
+  });
 });

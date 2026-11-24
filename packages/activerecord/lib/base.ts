@@ -431,7 +431,8 @@ export class Base extends Model {
 
   declare static signedIdVerifierSecret:
     | string
-    | (() => string | null | undefined)
+    | Uint8Array
+    | (() => string | Uint8Array | null | undefined)
     | null
     | undefined;
   declare static isSignedIdVerifierSecret: boolean;
