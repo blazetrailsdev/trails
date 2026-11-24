@@ -12,7 +12,9 @@ export type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
  * An immutable query. Each builder call returns a new relation holding SQL
  * fragments and binds, so compiling is a string join: there is no node tree.
  * The compiled text, binds left as `?`, is the relation's shape, and the
- * connection keeps one prepared statement per shape.
+ * connection keeps one prepared statement per shape. LIMIT is written into
+ * the text as a literal: SQLite answers a primary-key lookup about ten times
+ * slower when its LIMIT is bound (README, "Known differences").
  */
 export class Relation<T extends Base> {
   readonly klass: ModelClass<T>;
@@ -132,8 +134,6 @@ export class Relation<T extends Base> {
   private compile(): string {
     let sql = this.klass.schema.selectSql + this.whereSql();
     if (this.orders.length > 0) sql += ` ORDER BY ${this.orders.join(", ")}`;
-    // A literal, not a bind: SQLite answers a primary-key lookup about ten
-    // times slower when its LIMIT is bound. See the README, "Known differences".
     if (this.limitValue !== null) sql += ` LIMIT ${this.limitValue}`;
     return sql;
   }

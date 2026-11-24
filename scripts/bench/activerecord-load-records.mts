@@ -19,7 +19,6 @@ const SEED =
 const RESET = `DELETE FROM stories WHERE id > ${ROWS}`;
 const WRITTEN = { c0: 7, c1: "written", c2: "2026-10-12 12:00:00" };
 
-// Every row's c3 is 3, so `parent` is the story with id 3 for all of them.
 class Story extends Base {
   static {
     this.tableName = "stories";
@@ -37,12 +36,10 @@ class SpikeStory extends SpikeBase {
 
 type Row = Record<string, unknown>;
 
-/** A record read by column name, as the driver's row objects are. */
 function asRows(records: Promise<object[]>): Promise<Row[]> {
   return records as Promise<Row[]>;
 }
 
-/** One way of reaching the table. Every method does the same work on its own database. */
 interface Side {
   load(): Promise<Row[]>;
   loadWithParent(): Promise<Row[]>;
@@ -152,7 +149,6 @@ async function time(body: () => Promise<unknown>): Promise<number> {
   return performance.now() - start;
 }
 
-/** Microseconds per row for each measure, the median of RUNS runs after one discarded run. */
 async function measure(side: Side): Promise<Record<string, number>> {
   const samples: Record<string, number[]> = {};
   const record = (name: string, ms: number): void => void (samples[name] ??= []).push(ms);
@@ -194,7 +190,6 @@ async function measure(side: Side): Promise<Record<string, number>> {
   return medians;
 }
 
-/** Heap bytes one loaded row keeps alive, or null when the process cannot force a collection. */
 async function retained(side: Side): Promise<number | null> {
   const collect = (globalThis as { gc?: () => void }).gc;
   if (collect === undefined) return null;

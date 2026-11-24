@@ -14,8 +14,6 @@ function readerFor({ index, type }: Column): (this: Base) => unknown {
     };
   }
   if (type === "datetime") {
-    // The database hands a datetime back as a string, so a string in the slot
-    // is the one value still waiting for its cast.
     return function () {
       const value = this._row[index];
       if (typeof value !== "string") return value;

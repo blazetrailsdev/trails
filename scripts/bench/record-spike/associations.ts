@@ -21,11 +21,6 @@ function setTarget(record: Base, name: string, value: Base | null): void {
   (record._associationCache ??= new Map()).set(name, value);
 }
 
-/**
- * The reader answers the loaded record, or `null` for a null foreign key,
- * without a promise; only an unloaded association costs one. That is
- * ActiveRecord's return type, kept so the spike measures the drop-in shape.
- */
 function reader(record: Base, reflection: Reflection): Base | null | Promise<Base | null> {
   const loaded = target(record, reflection.name);
   if (loaded !== undefined) return loaded;
@@ -46,7 +41,11 @@ function writer(record: Base, reflection: Reflection, value: Base | null): void 
   setTarget(record, reflection.name, value);
 }
 
-/** Defines the reader and writer when the class body runs, before any schema is known. */
+/**
+ * Defines the reader and writer when the class body runs, before any schema
+ * is known. The reader answers the loaded record, or `null` for a null
+ * foreign key, without a promise; only an unloaded association costs one.
+ */
 export function belongsTo(klass: typeof Base, name: string, options: BelongsToOptions): void {
   const reflection: Reflection = { name, ...options };
   if (!Object.hasOwn(klass, "_reflections")) klass._reflections = new Map(klass._reflections);
