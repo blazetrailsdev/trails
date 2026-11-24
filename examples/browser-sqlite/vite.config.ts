@@ -41,8 +41,12 @@ function nodeBuiltinStubs(): Plugin {
 const PACKAGE_URLS = "\0trails-package-urls";
 
 function trailsPackageUrls(): Plugin {
+  let build = false;
   return {
     name: "trails-package-urls",
+    configResolved(config) {
+      build = config.command === "build";
+    },
     resolveId: (id) => (id === "virtual:trails-package-urls" ? PACKAGE_URLS : null),
     async load(id) {
       if (id !== PACKAGE_URLS) return null;
@@ -50,9 +54,16 @@ function trailsPackageUrls(): Plugin {
       const entries: Record<string, string> = {};
       for (const name of PACKAGE_NAMES) {
         const resolved = await this.resolve(name, importer);
-        if (resolved) entries[name] = `/@fs${resolved.id}`;
+        if (!resolved) continue;
+        if (!build) {
+          entries[name] = JSON.stringify(`/@fs${resolved.id}`);
+          continue;
+        }
+        const ref = this.emitFile({ type: "chunk", id: resolved.id, preserveSignature: "strict" });
+        entries[name] = `import.meta.ROLLUP_FILE_URL_${ref}`;
       }
-      return `export default ${JSON.stringify(entries)};`;
+      const body = Object.entries(entries).map(([k, v]) => `${JSON.stringify(k)}: ${v}`);
+      return `export default {${body.join(", ")}};`;
     },
   };
 }
@@ -73,6 +84,13 @@ export default defineConfig({
     ],
   },
   esbuild: { keepNames: true },
+  build: {
+    target: "esnext",
+    rollupOptions: {
+      input: { index: resolve("index.html"), runtime: resolve("runtime.html") },
+      preserveEntrySignatures: "strict",
+    },
+  },
   optimizeDeps: {
     include: ["sql.js", "path-browserify", "@js-temporal/polyfill", "yaml", "buffer"],
     esbuildOptions: { keepNames: true },

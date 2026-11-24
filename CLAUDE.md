@@ -1848,7 +1848,9 @@ Ruled by the operator on 2026-11-13.
 
 trails ports racc's runtime, `racc/parser.rb`
 (`packages/ruby-compat/lib/racc/parser.ts`), and ships the parsers racc
-generated. It never runs `racc`. The grammar compiler (`grammarfileparser.rb`,
+generated. On each racc version bump, every grammar a ported gem
+ships is regenerated with Ruby's `racc` and the generated parser is ported;
+trails itself never runs `racc`. The grammar compiler (`grammarfileparser.rb`,
 `grammar.rb`, `state.rb`, `iset.rb`, `statetransitiontable.rb`,
 `parserfilegenerator.rb`, `logfilegenerator.rb`, `sourcetext.rb`,
 `debugflags.rb`, `info.rb`, `static.rb` under

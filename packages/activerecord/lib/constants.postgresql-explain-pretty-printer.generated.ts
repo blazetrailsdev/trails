@@ -3,7 +3,7 @@ import * as m0 from "./connection-adapters/postgresql/explain-pretty-printer.js"
 
 defineConstants([
   [
-    m0,
+    () => m0,
     "ExplainPrettyPrinter",
     "ActiveRecord::ConnectionAdapters::PostgreSQL::ExplainPrettyPrinter",
   ],
