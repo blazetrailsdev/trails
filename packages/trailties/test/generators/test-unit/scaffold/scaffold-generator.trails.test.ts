@@ -28,7 +28,7 @@ describe("TestUnit::Generators::ScaffoldGenerator", () => {
     );
     expect(test).toContain('import { Bukkits } from "../../../lib/bukkits/engine.js";');
     expect(test).toContain(
-      'import { ProductLine } from "../../../app/models/bukkits/product_line.js";',
+      'import { ProductLine } from "../../../app/models/bukkits/product-line.js";',
     );
     expect(test).toContain(
       'constSet(constGet(Object, "Bukkits") as object, "ProductLinesControllerTest", this);',

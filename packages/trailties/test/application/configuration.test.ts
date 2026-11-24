@@ -48,6 +48,7 @@ import { days, Logger } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   constGet,
+  Encoding,
   FileUtils,
   rbInspect,
   rbObjRespondTo,
@@ -90,7 +91,12 @@ import { Engine as ActionTextEngine } from "@blazetrails/actiontext/engine";
 import { Attachment } from "@blazetrails/actiontext";
 import { ActiveStorage } from "@blazetrails/activestorage";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { Base as ActionMailerBase, MailDeliveryJob } from "@blazetrails/actionmailer";
+import {
+  Base as ActionMailerBase,
+  InlinePreviewInterceptor,
+  MailDeliveryJob,
+} from "@blazetrails/actionmailer";
+import { Mail } from "@blazetrails/mail";
 import { Base as ActiveRecordBase, SchemaReflection } from "@blazetrails/activerecord";
 import { DestroyAssociationAsyncJob } from "@blazetrails/activerecord/destroy-association-async-job";
 import { CacheRequest } from "@blazetrails/actionpack";
@@ -138,6 +144,35 @@ import { deprecator as activeStorageDeprecator } from "@blazetrails/activestorag
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 
 const envHelpers = new EnvHelpers();
+
+class MyMailInterceptor {
+  static deliveringEmail(email: unknown) {
+    return email;
+  }
+}
+class MyOtherMailInterceptor extends MyMailInterceptor {}
+class MyPreviewMailInterceptor {
+  static previewingEmail(email: unknown) {
+    return email;
+  }
+}
+class MyOtherPreviewMailInterceptor extends MyPreviewMailInterceptor {}
+class MyMailObserver {
+  static deliveredEmail(email: unknown) {
+    return email;
+  }
+}
+class MyOtherMailObserver extends MyMailObserver {}
+for (const klass of [
+  MyMailInterceptor,
+  MyOtherMailInterceptor,
+  MyPreviewMailInterceptor,
+  MyOtherPreviewMailInterceptor,
+  MyMailObserver,
+  MyOtherMailObserver,
+]) {
+  constSet(TopLevel, klass.name, klass);
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface ConfigurationTest extends Generation {
@@ -2515,6 +2550,23 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
     Application.appClass = null;
   }
 
+  function assertUtf8() {
+    expect(Encoding.defaultExternal).toBe(Encoding.UTF_8);
+    expect(Encoding.defaultInternal).toBe(Encoding.UTF_8);
+  }
+
+  it("skipping config.encoding still results in 'utf-8' as the default", async () => {
+    await app("development");
+    assertUtf8();
+  });
+
+  it("config.encoding sets the default encoding", async () => {
+    await t.addToConfig(`this.config.encoding = "utf-8";`);
+
+    await app("development");
+    assertUtf8();
+  });
+
   it("config.paths can be mutated after accessing auto/eager load paths", async () => {
     await t.appDir("vendor/auto");
     await t.appDir("vendor/once");
@@ -2918,6 +2970,73 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
     });
 
     expect(Response.defaultCharset).toBe("utf-16");
+  });
+
+  it("registers interceptors with ActionMailer", async () => {
+    await t.addToConfig(`this.config.actionMailer.interceptors = TopLevel.MyMailInterceptor;`);
+    onTestFinished(() => void Mail._deliveryInterceptors.splice(0));
+
+    await app("development");
+
+    expect(Mail._deliveryInterceptors).toEqual([MyMailInterceptor]);
+  });
+
+  it("registers multiple interceptors with ActionMailer", async () => {
+    await t.addToConfig(
+      `this.config.actionMailer.interceptors = [TopLevel.MyMailInterceptor, "MyOtherMailInterceptor"];`,
+    );
+    onTestFinished(() => void Mail._deliveryInterceptors.splice(0));
+
+    await app("development");
+
+    expect(Mail._deliveryInterceptors).toEqual([MyMailInterceptor, MyOtherMailInterceptor]);
+  });
+
+  it("registers preview interceptors with ActionMailer", async () => {
+    await t.addToConfig(
+      `this.config.actionMailer.previewInterceptors = TopLevel.MyPreviewMailInterceptor;`,
+    );
+
+    await app("development");
+
+    expect(ActionMailerBase.previewInterceptors).toEqual([
+      InlinePreviewInterceptor,
+      MyPreviewMailInterceptor,
+    ]);
+  });
+
+  it("registers multiple preview interceptors with ActionMailer", async () => {
+    await t.addToConfig(
+      `this.config.actionMailer.previewInterceptors = [TopLevel.MyPreviewMailInterceptor, "MyOtherPreviewMailInterceptor"];`,
+    );
+
+    await app("development");
+
+    expect(ActionMailerBase.previewInterceptors).toEqual([
+      InlinePreviewInterceptor,
+      MyPreviewMailInterceptor,
+      MyOtherPreviewMailInterceptor,
+    ]);
+  });
+
+  it("registers observers with ActionMailer", async () => {
+    await t.addToConfig(`this.config.actionMailer.observers = TopLevel.MyMailObserver;`);
+    onTestFinished(() => void Mail._deliveryNotificationObservers.splice(0));
+
+    await app("development");
+
+    expect(Mail._deliveryNotificationObservers).toEqual([MyMailObserver]);
+  });
+
+  it("registers multiple observers with ActionMailer", async () => {
+    await t.addToConfig(
+      `this.config.actionMailer.observers = [TopLevel.MyMailObserver, "MyOtherMailObserver"];`,
+    );
+    onTestFinished(() => void Mail._deliveryNotificationObservers.splice(0));
+
+    await app("development");
+
+    expect(Mail._deliveryNotificationObservers).toEqual([MyMailObserver, MyOtherMailObserver]);
   });
 
   it("default preview interceptor can be removed", async () => {

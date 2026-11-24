@@ -48,7 +48,7 @@ describe("NamedBaseTest", () => {
     assertName(g, "admin.foos", "controllerI18nScope");
     assertName(g, "admin_foo", "singularRouteName");
     assertName(g, "admin_foos", "pluralRouteName");
-    assertName(g, "this.admin_foo", "redirectResourceName");
+    assertName(g, "this.adminFoo", "redirectResourceName");
     assertName(g, "admin_foo", "modelResourceName");
     assertName(g, "adminFoos", "indexHelper");
   });
@@ -73,7 +73,7 @@ describe("NamedBaseTest", () => {
     assertName(g, "admin.foos", "controllerI18nScope");
     assertName(g, "admin_foo", "singularRouteName");
     assertName(g, "admin_foos", "pluralRouteName");
-    assertName(g, "this.admin_foo", "redirectResourceName");
+    assertName(g, "this.adminFoo", "redirectResourceName");
     assertName(g, "admin_foo", "modelResourceName");
     assertName(g, "adminFoos", "indexHelper");
   });

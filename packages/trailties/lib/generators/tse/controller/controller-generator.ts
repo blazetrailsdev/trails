@@ -35,7 +35,3 @@ export class ControllerGenerator extends Base {
     }
   }
 }
-
-Object.defineProperty(ControllerGenerator, "name", {
-  value: "Tse::Generators::ControllerGenerator",
-});

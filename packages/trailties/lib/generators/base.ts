@@ -226,10 +226,12 @@ export abstract class Base extends (Group as unknown as (abstract new (
   static override namespace(name: string | null = null): string {
     if (name != null) return super.namespace(name);
     if (Object.hasOwn(this, "_namespace") && this._namespace != null) return this._namespace;
-    return (this._namespace = super
-      .namespace()
-      .replace(/_generator$/, "")
-      .replace(/:generators:/, ":"));
+    return (this._namespace = _dasherize(
+      super
+        .namespace()
+        .replace(/_generator$/, "")
+        .replace(/:generators:/, ":"),
+    ));
   }
 
   static async defaultSourceRoot(): Promise<string | undefined> {

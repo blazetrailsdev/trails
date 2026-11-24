@@ -416,11 +416,13 @@ Trails.application.configure(function () {
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > global-setup.ts 1`] = `
 "import { Base } from "@blazetrails/activerecord";
+import { buildViews } from "@blazetrails/trails-tsc";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 
 export async function setup(): Promise<void> {
   if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
   await import("../config/environment.ts");
+  await buildViews();
   await import("@blazetrails/trailties/testing/maintain-test-schema");
 }
 

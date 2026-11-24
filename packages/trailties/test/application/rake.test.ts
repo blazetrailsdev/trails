@@ -250,8 +250,7 @@ Trails.application.routes().draw(function () {
     await t.trails("db:fixtures:load");
   });
 
-  // BLOCKED: trailties-scaffold-views-precompiled-for-trails-test
-  it.skip("scaffold tests pass by default", async () => {
+  it("scaffold tests pass by default", async () => {
     await t.trails("generate", "scaffold", "user", "username:string", "password:string");
     await t.withTrailsEnv("test", () => t.trails("db:migrate"));
     const output = await t.trails("test");
@@ -279,8 +278,7 @@ export class ApplicationController extends ActionController.API {}
     expect(output).not.toMatch(/Errors running/);
   });
 
-  // BLOCKED: trailties-references-scaffold-model-file-loads
-  it.skip("scaffold with references columns tests pass by default", async () => {
+  it("scaffold with references columns tests pass by default", async () => {
     await t.trails("generate", "model", "Product");
     await t.trails("generate", "model", "Cart");
     await t.trails("generate", "scaffold", "LineItems", "product:references", "cart:belongs_to");

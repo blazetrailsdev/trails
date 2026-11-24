@@ -1,4 +1,4 @@
-import { camelize, humanize, pluralize } from "@blazetrails/activesupport";
+import { camelize, dasherize, humanize, pluralize } from "@blazetrails/activesupport";
 import type { ScaffoldGenerator } from "./scaffold-generator.js";
 
 type Template = (this: ScaffoldGenerator) => string;
@@ -31,7 +31,7 @@ import { ${namespace.split("::")[0]} } from "../${root}lib/${namespaceDirs.join(
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
-${engineImport}import { ${modelClassName} } from "../${root}app/models/${[...namespaceDirs, this.filePath()].join("/")}.js";
+${engineImport}import { ${modelClassName} } from "../${root}app/models/${[...namespaceDirs, ...this["classPath"](), dasherize(this.fileName)].join("/")}.js";
 import "${root}test-helper.js";
 
 export class ${testClassName} extends IntegrationTest {
@@ -154,7 +154,7 @@ const systemTest: Template = function () {
   const namespaceDirs = this["isNamespaced"]() ? this["namespaceDirs"]() : [];
   return `import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApplicationSystemTestCase } from "${root}application-system-test-case${this.ext()}";
-import { ${modelClassName} } from "../${root}app/models/${[...namespaceDirs, this.filePath()].join("/")}.js";
+import { ${modelClassName} } from "../${root}app/models/${[...namespaceDirs, ...this["classPath"](), dasherize(this.fileName)].join("/")}.js";
 
 export class ${testClassName} extends ApplicationSystemTestCase {
   declare "@${singular}": ${modelClassName};

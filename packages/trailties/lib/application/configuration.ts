@@ -21,6 +21,7 @@ import { HTML } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
 import {
   ArgumentError,
+  Encoding,
   File,
   getPath,
   loadIseqEval,
@@ -71,6 +72,11 @@ type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 export const LOAD_DEFAULTS_VERSION = "8.0";
 
 export class Configuration extends EngineConfiguration {
+  constructor(root: string | null = null) {
+    super(root);
+    this.encoding = Encoding.UTF_8;
+  }
+
   allowConcurrency: boolean | "unsafe" | null = null;
   assetHost: string | null = null;
   considerAllRequestsLocal = false;
@@ -121,7 +127,7 @@ export class Configuration extends EngineConfiguration {
   console: { start(): unknown } | null = null;
   disableSandbox = false;
   sandboxByDefault = false;
-  encoding = "utf-8";
+  private _encoding!: Encoding | string;
   private _apiOnly = false;
   eagerLoad: boolean | null = null;
   addAutoloadPathsToLoadPath = true;
@@ -563,6 +569,15 @@ export class Configuration extends EngineConfiguration {
   }
   set sessionOptions(value: Record<string, unknown>) {
     this._sessionOptions = value;
+  }
+
+  get encoding(): Encoding | string {
+    return this._encoding;
+  }
+  set encoding(value: Encoding | string) {
+    this._encoding = value;
+    Encoding.defaultExternal = value;
+    Encoding.defaultInternal = value;
   }
 
   get apiOnly(): boolean {

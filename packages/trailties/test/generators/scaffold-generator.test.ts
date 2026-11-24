@@ -59,33 +59,33 @@ describe("ScaffoldGeneratorTest", () => {
       expect(content).toMatch(/class ProductLinesController extends ApplicationController/);
 
       await t.assertInstanceMethod("index", content, (m) => {
-        expect(m).toMatch(/this\.product_lines = await ProductLine\.all\(\)/);
+        expect(m).toMatch(/this\.productLines = await ProductLine\.all\(\)/);
       });
 
       await t.assertInstanceMethod("show", content);
 
       await t.assertInstanceMethod("new", content, (m) => {
-        expect(m).toMatch(/this\.product_line = new ProductLine\(\)/);
+        expect(m).toMatch(/this\.productLine = new ProductLine\(\)/);
       });
 
       await t.assertInstanceMethod("edit", content);
 
       await t.assertInstanceMethod("create", content, (m) => {
-        expect(m).toMatch(/this\.product_line = new ProductLine\(this\._productLineParams\(\)\)/);
-        expect(m).toMatch(/this\.product_line\.save\(\)/);
+        expect(m).toMatch(/this\.productLine = new ProductLine\(this\._productLineParams\(\)\)/);
+        expect(m).toMatch(/this\.productLine\.save\(\)/);
       });
 
       await t.assertInstanceMethod("update", content, (m) => {
-        expect(m).toMatch(/this\.product_line\.update\(this\._productLineParams\(\)\)/);
+        expect(m).toMatch(/this\.productLine\.update\(this\._productLineParams\(\)\)/);
       });
 
       await t.assertInstanceMethod("destroy", content, (m) => {
-        expect(m).toMatch(/this\.product_line\.destroyBang\(\)/);
+        expect(m).toMatch(/this\.productLine\.destroyBang\(\)/);
       });
 
       await t.assertInstanceMethod("_setProductLine", content, (m) => {
         expect(m).toMatch(
-          /this\.product_line = await ProductLine\.find\(this\.params\.expect\("id"\)\)/,
+          /this\.productLine = await ProductLine\.find\(this\.params\.expect\("id"\)\)/,
         );
       });
     });
@@ -119,13 +119,13 @@ describe("ScaffoldGeneratorTest", () => {
     for (const view of ["edit", "new"]) {
       await t.assertFile(
         `app/views/product-lines/${view}.html.tse`,
-        /render\("form", \{ product_line: this\.product_line \}\)/,
+        /render\("form", \{ product_line: this\.productLine \}\)/,
       );
     }
 
     await t.assertFile("app/views/product-lines/_form.html.tse", (test) => {
       expect(test).toMatch("product_line");
-      expect(test).not.toMatch("this.product_line");
+      expect(test).not.toMatch("this.productLine");
     });
 
     await t.assertFile("app/helpers/product-lines-helper.ts");
@@ -162,27 +162,27 @@ describe("ScaffoldGeneratorTest", () => {
       );
 
       await t.assertInstanceMethod("index", content, (m) => {
-        expect(m).toMatch(/this\.product_lines = await ProductLine\.all\(\)/);
-        expect(m).toMatch(/render\(\{ json: this\.product_lines \}\)/);
+        expect(m).toMatch(/this\.productLines = await ProductLine\.all\(\)/);
+        expect(m).toMatch(/render\(\{ json: this\.productLines \}\)/);
       });
 
       await t.assertInstanceMethod("show", content, (m) => {
-        expect(m).toMatch(/render\(\{ json: this\.product_line \}\)/);
+        expect(m).toMatch(/render\(\{ json: this\.productLine \}\)/);
       });
 
       await t.assertInstanceMethod("create", content, (m) => {
-        expect(m).toMatch(/this\.product_line = new ProductLine\(this\._productLineParams\(\)\)/);
-        expect(m).toMatch(/this\.product_line\.save\(\)/);
-        expect(m).toMatch(/this\.product_line\.errors/);
+        expect(m).toMatch(/this\.productLine = new ProductLine\(this\._productLineParams\(\)\)/);
+        expect(m).toMatch(/this\.productLine\.save\(\)/);
+        expect(m).toMatch(/this\.productLine\.errors/);
       });
 
       await t.assertInstanceMethod("update", content, (m) => {
-        expect(m).toMatch(/this\.product_line\.update\(this\._productLineParams\(\)\)/);
-        expect(m).toMatch(/this\.product_line\.errors/);
+        expect(m).toMatch(/this\.productLine\.update\(this\._productLineParams\(\)\)/);
+        expect(m).toMatch(/this\.productLine\.errors/);
       });
 
       await t.assertInstanceMethod("destroy", content, (m) => {
-        expect(m).toMatch(/this\.product_line\.destroyBang\(\)/);
+        expect(m).toMatch(/this\.productLine\.destroyBang\(\)/);
       });
     });
 
@@ -268,32 +268,32 @@ describe("ScaffoldGeneratorTest", () => {
       expect(content).toMatch(/class RolesController extends ApplicationController/);
 
       await t.assertInstanceMethod("index", content, (m) => {
-        expect(m).toMatch(/this\.admin_roles = await Role\.all\(\)/);
+        expect(m).toMatch(/this\.adminRoles = await Role\.all\(\)/);
       });
 
       await t.assertInstanceMethod("show", content);
 
       await t.assertInstanceMethod("new", content, (m) => {
-        expect(m).toMatch(/this\.admin_role = new Role\(\)/);
+        expect(m).toMatch(/this\.adminRole = new Role\(\)/);
       });
 
       await t.assertInstanceMethod("edit", content);
 
       await t.assertInstanceMethod("create", content, (m) => {
-        expect(m).toMatch(/this\.admin_role = new Role\(this\._adminRoleParams\(\)\)/);
-        expect(m).toMatch(/this\.admin_role\.save\(\)/);
+        expect(m).toMatch(/this\.adminRole = new Role\(this\._adminRoleParams\(\)\)/);
+        expect(m).toMatch(/this\.adminRole\.save\(\)/);
       });
 
       await t.assertInstanceMethod("update", content, (m) => {
-        expect(m).toMatch(/this\.admin_role\.update\(this\._adminRoleParams\(\)\)/);
+        expect(m).toMatch(/this\.adminRole\.update\(this\._adminRoleParams\(\)\)/);
       });
 
       await t.assertInstanceMethod("destroy", content, (m) => {
-        expect(m).toMatch(/this\.admin_role\.destroyBang\(\)/);
+        expect(m).toMatch(/this\.adminRole\.destroyBang\(\)/);
       });
 
       await t.assertInstanceMethod("_setAdminRole", content, (m) => {
-        expect(m).toMatch(/this\.admin_role = await Role\.find\(this\.params\.expect\("id"\)\)/);
+        expect(m).toMatch(/this\.adminRole = await Role\.find\(this\.params\.expect\("id"\)\)/);
       });
     });
 
@@ -308,17 +308,17 @@ describe("ScaffoldGeneratorTest", () => {
     );
 
     await t.assertFile("app/views/admin/roles/index.html.tse", (content) => {
-      expect(content).toMatch("for (const admin_role of this.admin_roles)");
+      expect(content).toMatch("for (const admin_role of this.adminRoles)");
       expect(content).toMatch("render(admin_role)");
       expect(content).toMatch('"Show this role", admin_role');
       expect(content).toMatch('"New role", newAdminRolePath()');
     });
 
     await t.assertFile("app/views/admin/roles/show.html.tse", (content) => {
-      expect(content).toMatch("render(this.admin_role)");
-      expect(content).toMatch('"Edit this role", editAdminRolePath(this.admin_role)');
+      expect(content).toMatch("render(this.adminRole)");
+      expect(content).toMatch('"Edit this role", editAdminRolePath(this.adminRole)');
       expect(content).toMatch('"Back to roles", adminRolesPath()');
-      expect(content).toMatch('"Destroy this role", this.admin_role');
+      expect(content).toMatch('"Destroy this role", this.adminRole');
     });
 
     await t.assertFile("app/views/admin/roles/_role.html.tse", (content) => {
@@ -327,13 +327,13 @@ describe("ScaffoldGeneratorTest", () => {
     });
 
     await t.assertFile("app/views/admin/roles/new.html.tse", (content) => {
-      expect(content).toMatch('render("form", { admin_role: this.admin_role })');
+      expect(content).toMatch('render("form", { admin_role: this.adminRole })');
       expect(content).toMatch('"Back to roles", adminRolesPath()');
     });
 
     await t.assertFile("app/views/admin/roles/edit.html.tse", (content) => {
-      expect(content).toMatch('render("form", { admin_role: this.admin_role })');
-      expect(content).toMatch('"Show this role", this.admin_role');
+      expect(content).toMatch('render("form", { admin_role: this.adminRole })');
+      expect(content).toMatch('"Show this role", this.adminRole');
       expect(content).toMatch('"Back to roles", adminRolesPath()');
     });
 

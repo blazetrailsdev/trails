@@ -152,7 +152,7 @@ export class Generators {
             }
           }
           if (found === undefined) throw new LoadError(`cannot load such file -- ${path}`);
-          await requireGenerator(found, base, File.join(found, `${path}${EXTENSION}`));
+          await requireGenerator(File.join(found, `${path}${EXTENSION}`));
           return;
         } catch (e) {
           if (e instanceof LoadError) {
@@ -174,7 +174,7 @@ export class Generators {
         const base = Generators.lookupPaths().find((b) =>
           path.startsWith(File.join(dir, b) + "/"),
         )!;
-        await requireGenerator(dir, base, path).catch(() => undefined);
+        await requireGenerator(path).catch(() => undefined);
       }
     }
   }
@@ -390,16 +390,13 @@ export class Generators {
   }
 }
 
-async function requireGenerator(dir: string, base: string, path: string): Promise<void> {
+async function requireGenerator(path: string): Promise<void> {
   if (!File.isExist(path)) throw new LoadError(`cannot load such file -- ${path}`);
   const { Base } = await import("./generators/base.js");
   const mod = (await import(getPath().pathToFileURL!(path).href)) as Record<string, unknown>;
-  const dirname = getPath().dirname(path.slice(File.join(dir, base).length + 1));
-  const namespace = dirname.split(/[\\/]/);
   for (const value of Object.values(mod)) {
     if (typeof value === "function" && value.prototype instanceof Base) {
       const klass = value as unknown as GeneratorClass;
-      if (dirname !== ".") klass.namespace(namespace.join(":"));
       _subclasses ??= [];
       if (!_subclasses.includes(klass)) _subclasses.push(klass);
       return;

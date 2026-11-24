@@ -1,10 +1,10 @@
 <p style="color: green"><%%= notice %></p>
 
-<%%= render(this.<%= this.singularTableName() %>) %>
+<%%= render(this.<%= ActiveSupport.Inflector.camelize(this.singularTableName(), false) %>) %>
 
 <div>
   <%%= linkTo("Edit this <%= this.humanName().toLowerCase() %>", <%= this.editHelper(undefined, { type: "path" }) %>) %> |
   <%%= linkTo("Back to <%= ActiveSupport.Inflector.pluralize(this.humanName()).toLowerCase() %>", <%= this.indexHelper({ type: "path" }) %>()) %>
 
-  <%%= buttonTo("Destroy this <%= this.humanName().toLowerCase() %>", <%= this.modelResourceName(undefined, { prefix: "this." }) %>, { method: "delete" }) %>
+  <%%= buttonTo("Destroy this <%= this.humanName().toLowerCase() %>", <%= this.modelResourceName(ActiveSupport.Inflector.camelize(this.singularTableName(), false), { prefix: "this." }) %>, { method: "delete" }) %>
 </div>

@@ -200,14 +200,13 @@ async function testProjectFiles(dir: string): Promise<string[]> {
 /**
  * trails spells a renamed token its own way in a constant too: `Handlers::ERB`
  * is `Handlers::TSE`, and a `TS_CLASS_RENAMES` segment is renamed as
- * `parity:api` matches it, so `Rails::Railtie` is `Rails::Trailtie`. The
- * `Erb` namespace is the TSE brand, so `Erb::Generators` is `TSE::Generators`.
+ * `parity:api` matches it, so `Rails::Railtie` is `Rails::Trailtie`, and
+ * `Erb::Generators` is `Tse::Generators`, so `Base.namespace` answers `tse:`.
  */
 function renameTokens(fqn: string): string {
   let out = fqn
     .split("::")
     .map((seg) => (BRAND_RENAMES.includes(seg) ? TS_CLASS_RENAMES[seg] : seg))
-    .map((seg) => (seg === "Erb" ? TOKEN_RENAMES.ERB : seg))
     .join("::");
   for (const [tok, to] of Object.entries(TOKEN_RENAMES)) {
     const cap = (s: string) => s[0].toUpperCase() + s.slice(1);

@@ -66,5 +66,3 @@ export class MailerGenerator extends Base {
     return (this.__fileName ??= super.fileName.replace(/_mailer$/i, ""));
   }
 }
-
-Object.defineProperty(MailerGenerator, "name", { value: "Tse::Generators::MailerGenerator" });
