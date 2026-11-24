@@ -31,6 +31,21 @@ describe("PG::Connection", () => {
     await conn.finish();
   });
 
+  it("#get_result should send remaining data before waiting", async () => {
+    const str = "abcd".repeat(2000) + "\n";
+    await conn.exec("CREATE TEMP TABLE copytable2 (col1 TEXT)");
+    conn.sendQuery("COPY copytable2 FROM STDOUT");
+    expect((await conn.getLastResult())!.resultStatus()).toBe(PG.PGRES_COPY_IN);
+
+    for (let i = 0; i < 1000; i++) {
+      conn.syncPutCopyData(str);
+    }
+    conn.syncPutCopyEnd();
+    const res = await conn.getLastResult();
+    expect(res!.resultStatus()).toBe(PG.PGRES_COMMAND_OK);
+    await conn.exec("DROP TABLE IF EXISTS copytable2");
+  });
+
   it("supports explicitly calling #exec_params", async () => {
     await conn.exec("CREATE TABLE students ( name TEXT, age INTEGER )");
     await conn.execParams("INSERT INTO students VALUES( $1, $2 )", ["Wally", 8]);

@@ -12,6 +12,9 @@ export type Protocol = pg.Connection & {
   bind(config: object): void;
   describe(msg: object): void;
   execute(config: object): void;
+  sendCopyFromChunk(chunk: string | Uint8Array): void;
+  endCopyFrom(): void;
+  sendCopyFail(msg: string): void;
 };
 
 type NativeResult = pg.QueryResult & {
@@ -285,6 +288,9 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
     handleEmptyQuery(): void {
       deliver(new Result({ ...native }, null, Constants.PGRES_EMPTY_QUERY));
       endCommand();
+    },
+    handleCopyInResponse(): void {
+      deliver(new Result({ ...native }, null, Constants.PGRES_COPY_IN));
     },
     handleParseComplete(): void {},
     handlePortalSuspended(): void {},

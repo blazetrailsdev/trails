@@ -23,14 +23,12 @@ import type * as NodePg from "./engine/node-pg.js";
 
 let engine: typeof NodePg | null = null;
 
-/**
- * @missingRailsCall put_copy_data — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs
- * @missingRailsCall put_copy_end — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs
- * @missingRailsCall flush — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs
- */
 const REDIRECT_SEND_METHODS: Record<string, [string, string]> = {
   isnonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
   isNonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
+  putCopyData: ["asyncPutCopyData", "syncPutCopyData"],
+  putCopyEnd: ["asyncPutCopyEnd", "syncPutCopyEnd"],
+  flush: ["asyncFlush", "syncFlush"],
   pipelineSync: ["asyncPipelineSync", "syncPipelineSync"],
 };
 
@@ -79,6 +77,8 @@ export class Connection {
   _decoderForGetCopyData: Coder | null = null;
   /** @internal */
   _flushData = false;
+  /** @internal */
+  _callsToPutCopyData = 0;
   /** @internal */
   _errorMessage = "";
   /** @internal */
@@ -442,9 +442,83 @@ export class Connection {
     return `${str.slice(0, -1)}${stats}${str.slice(-1)}`;
   }
 
-  flush(): boolean {
+  syncFlush(): boolean {
     return true;
   }
+
+  flush(): boolean {
+    while (this.syncFlush() === false);
+    return true;
+  }
+
+  declare asyncFlush: Connection["flush"];
+
+  syncPutCopyData(value: unknown, encoder: Coder | null = null): boolean {
+    let buffer: unknown = null;
+    let pCoder: Coder | null = null;
+    if (encoder == null) {
+      if (this.encoderForPutCopyData == null) {
+        buffer = value;
+      } else {
+        pCoder = this.encoderForPutCopyData;
+      }
+    } else {
+      if (!(encoder instanceof Coder)) {
+        throw new TypeError(`wrong argument type ${rbObjClassname(encoder)} (expected PG::Coder)`);
+      }
+      pCoder = encoder;
+    }
+
+    if (pCoder != null) {
+      buffer = (pCoder as Coder & { encode(value: unknown): unknown }).encode(value);
+    }
+
+    if (typeof buffer !== "string" && !(buffer instanceof Uint8Array)) {
+      throw new TypeError(`wrong argument type ${rbObjClassname(buffer)} (expected String)`);
+    }
+
+    const chunk: string | Uint8Array = buffer;
+    engine!.dispatch(this, (connection) => connection.sendCopyFromChunk(chunk), []);
+    return true;
+  }
+
+  syncPutCopyEnd(str?: string): boolean {
+    const errorMessage = str === undefined ? null : stringValue(str);
+    engine!.dispatch(
+      this,
+      (connection) => {
+        if (errorMessage == null) connection.endCopyFrom();
+        else connection.sendCopyFail(errorMessage);
+      },
+      [],
+    );
+    return true;
+  }
+
+  putCopyData(buffer: unknown, encoder: Coder | null = null): boolean {
+    let res: boolean;
+    while (!(res = this.syncPutCopyData(buffer, encoder))) {
+      this.flush();
+    }
+
+    if ((this._callsToPutCopyData += 1) > 100) {
+      this._callsToPutCopyData = 0;
+      res = this.flush();
+    }
+    return res;
+  }
+
+  declare asyncPutCopyData: Connection["putCopyData"];
+
+  putCopyEnd(...args: [string?]): boolean {
+    while (!this.syncPutCopyEnd(...args)) {
+      this.flush();
+    }
+    this._callsToPutCopyData = 0;
+    return this.flush();
+  }
+
+  declare asyncPutCopyEnd: Connection["putCopyEnd"];
 
   syncSetnonblocking(state: unknown): null {
     if (Object.isFrozen(this)) {
@@ -1239,6 +1313,9 @@ Connection.prototype.asyncIsnonblocking = Connection.prototype.isnonblocking;
 Connection.prototype.isNonblocking = Connection.prototype.isnonblocking;
 Connection.prototype.asyncSetnonblocking = Connection.prototype.setnonblocking;
 Connection.prototype.asyncPipelineSync = Connection.prototype.pipelineSync;
+Connection.prototype.asyncFlush = Connection.prototype.flush;
+Connection.prototype.asyncPutCopyData = Connection.prototype.putCopyData;
+Connection.prototype.asyncPutCopyEnd = Connection.prototype.putCopyEnd;
 Connection.prototype.escapeString = escapeString;
 Connection.prototype.escape = escapeString;
 Connection.prototype.escapeBytea = escapeBytea;
