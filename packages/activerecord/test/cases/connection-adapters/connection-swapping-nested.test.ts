@@ -246,6 +246,49 @@ describe("ConnectionSwappingNestedTest", () => {
     });
   });
 
+  it("shard swapping prohibition exception recovery", async () => {
+    Base.configurations({
+      default_env: {
+        primary: sqliteDb("primary"),
+        primary_shard_one: sqliteDb("primary_shard_one"),
+        primary_shard_two: sqliteDb("primary_shard_two"),
+      },
+    });
+
+    await PrimaryBase.connectsTo({
+      shards: {
+        default: { writing: ":primary" },
+        shard_one: { writing: ":primary_shard_one" },
+      },
+    });
+
+    const globalRole = "writing";
+
+    Base.connectedTo({ role: globalRole, shard: "default" }, () => {
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+
+      PrimaryBase.connectedTo({ shard: "shard_one" }, () => {
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+
+        PrimaryBase.prohibitShardSwapping(() => {
+          expect(() => PrimaryBase.connectedTo({ shard: "shard_two" }, () => {})).toThrow(
+            /cannot swap/,
+          );
+        });
+
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+
+        PrimaryBase.prohibitShardSwapping(() => {
+          expect(() =>
+            Base.connectedToMany([PrimaryBase], { shard: "shard_two", role: "writing" }, () => {}),
+          ).toThrow(/cannot swap/);
+        });
+
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+      });
+    });
+  });
+
   it("roles and shards can be swapped granularly", async () => {
     Base.configurations({
       default_env: {
