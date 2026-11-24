@@ -28,7 +28,7 @@ import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { SOURCES } from "../../vendor/sources.js";
 import { ROOT_DIR } from "./config.js";
-import { type BodyPin, MANIFEST_PATH, keyOf, loadArtifact, loadManifest } from "./body-pins.js";
+import { MANIFEST_PATH, keyOf, loadArtifact, loadManifest, loadManifestAt } from "./body-pins.js";
 import {
   type LedgerProblem,
   type LedgerRow,
@@ -130,7 +130,7 @@ async function main(baseBranch: string): Promise<number> {
     }
     const { from, to } = bump;
     const names = new Set(s.packages.map((p) => p.name));
-    const basePins = (await showJson<BodyPin[]>(revs.base, PINS, [])).filter((p) =>
+    const basePins = (await loadManifestAt(git, revs.base, PINS)).filter((p) =>
       names.has(p.package),
     );
     const hashes = artifact.hashes.filter((h) => names.has(h.package));

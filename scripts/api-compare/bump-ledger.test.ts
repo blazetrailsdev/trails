@@ -1,7 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { describe, expect, it } from "vitest";
-import type { BodyHashRecord, BodyPin } from "./body-pins.js";
+import { type BodyHashRecord, type BodyPin, loadManifestAt } from "./body-pins.js";
 import {
   type LedgerRow,
   type Lock,
@@ -556,5 +556,34 @@ describe("summaryLine", () => {
     expect(summaryLine("rails", [row, { ...row, rubyName: "y" }])).toBe(
       "bump-ledger rows: rails arel:drift=2",
     );
+  });
+});
+
+describe("loadManifestAt", () => {
+  it("reads every body-pins shard committed at a revision", async () => {
+    const pin = (pkg: string, rubyName: string): BodyPin => ({
+      package: pkg,
+      rubyFile: "base.rb",
+      rubyName,
+      digest: "d",
+    });
+    const blobs: Record<string, BodyPin[]> = {
+      "rev:pins/b.json": [pin("b", "y")],
+      "rev:pins/a.json": [pin("a", "z"), pin("a", "x")],
+    };
+    const git = async (args: string[]): Promise<string | null> => {
+      if (args[0] === "ls-tree") return "pins/b.json\npins/a.json\n";
+      const blob = blobs[args[1]];
+      return blob ? JSON.stringify(blob) : null;
+    };
+    expect(await loadManifestAt(git, "rev", "pins")).toEqual([
+      pin("a", "x"),
+      pin("a", "z"),
+      pin("b", "y"),
+    ]);
+  });
+
+  it("answers no pins where the revision has no shards", async () => {
+    expect(await loadManifestAt(async () => null, "rev", "pins")).toEqual([]);
   });
 });

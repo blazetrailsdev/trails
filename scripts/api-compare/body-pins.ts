@@ -61,6 +61,7 @@
  */
 
 import * as fs from "fs/promises";
+import { readdirSync, readFileSync } from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { SOURCES } from "../../vendor/sources.js";
@@ -257,14 +258,38 @@ export async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as T;
 }
 
-export async function loadManifest(): Promise<BodyPin[]> {
-  const names = await fs.readdir(MANIFEST_PATH).catch(() => [] as string[]);
-  const shards = await Promise.all(
+/** Synchronous `loadManifest`, for compare.ts's synchronous report. */
+export function loadManifestSync(): BodyPin[] {
+  let names: string[];
+  try {
+    names = readdirSync(MANIFEST_PATH);
+  } catch {
+    return [];
+  }
+  return sortPins(
     names
       .filter((n) => n.endsWith(".json"))
-      .map((n) => readJson<BodyPin[]>(path.join(MANIFEST_PATH, n))),
+      .flatMap((n) => JSON.parse(readFileSync(path.join(MANIFEST_PATH, n), "utf-8")) as BodyPin[]),
   );
-  return sortPins(shards.flat());
+}
+
+export async function loadManifest(): Promise<BodyPin[]> {
+  return loadManifestSync();
+}
+
+/**
+ * The manifest as committed at `rev`, read through `git` (which answers
+ * `null` for a failed command): every shard `ls-tree` lists under `dir`.
+ */
+export async function loadManifestAt(
+  git: (args: string[]) => Promise<string | null>,
+  rev: string,
+  dir: string,
+): Promise<BodyPin[]> {
+  const listing = await git(["ls-tree", "--name-only", rev, "--", `${dir}/`]);
+  const files = (listing ?? "").split("\n").filter((f) => f.endsWith(".json"));
+  const shards = await Promise.all(files.map((f) => git(["show", `${rev}:${f}`])));
+  return sortPins(shards.flatMap((t) => (t === null ? [] : (JSON.parse(t) as BodyPin[]))));
 }
 
 export async function loadArtifact(): Promise<Artifact> {

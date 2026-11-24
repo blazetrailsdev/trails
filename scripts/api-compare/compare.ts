@@ -97,7 +97,6 @@ import {
   PACKAGE_DIR_OVERRIDES,
   PACKAGES,
   ROOT_DIR,
-  SCRIPT_DIR,
   isTestHelperFile,
   packageSrcDir,
 } from "./config.js";
@@ -150,6 +149,7 @@ import {
 } from "./call-args.js";
 import { callOf } from "./call-mismatch-baseline.js";
 import { differingRefPairs } from "./naming-taxonomy.js";
+import { loadManifestSync } from "./body-pins.js";
 import {
   compareDefaults,
   compareLiteral,
@@ -7445,20 +7445,8 @@ export function main() {
 // (pinning is opt-in; a run without a manifest simply reports every pair as
 // unpinned). Sync fs matches this script's existing IO style.
 function loadPinnedKeys(): Set<string> {
-  const pinsDir = path.join(SCRIPT_DIR, "body-pins");
   try {
-    const pins = fs
-      .readdirSync(pinsDir)
-      .filter((n) => n.endsWith(".json"))
-      .flatMap(
-        (n) =>
-          JSON.parse(fs.readFileSync(path.join(pinsDir, n), "utf-8")) as Array<{
-            package: string;
-            rubyFile: string;
-            rubyName: string;
-          }>,
-      );
-    return new Set(pins.map((p) => `${p.package} ${p.rubyFile} ${p.rubyName}`));
+    return new Set(loadManifestSync().map((p) => `${p.package} ${p.rubyFile} ${p.rubyName}`));
   } catch {
     return new Set();
   }
