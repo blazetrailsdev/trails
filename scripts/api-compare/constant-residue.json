@@ -1343,7 +1343,7 @@
     }
   },
   "trailties": {
-    "rows": 170,
+    "rows": 171,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "commands/build.ts::BuildCommand",
