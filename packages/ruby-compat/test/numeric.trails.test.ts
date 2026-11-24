@@ -5,9 +5,9 @@ import { NoMethodError } from "../lib/no-method-error.js";
 import { NameError } from "../lib/name-error.js";
 import { TypeError } from "../lib/type-error.js";
 import { ArgumentError } from "../lib/argument-error.js";
-import { MathDomainError } from "../lib/math-domain-error.js";
 import {
   intDigits,
+  MathDomainError,
   intXor,
   anybits,
   fixDiv,

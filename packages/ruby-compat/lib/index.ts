@@ -209,7 +209,6 @@ export type {
   WaitStatus,
 } from "./child-process-adapter.js";
 export { FloatDomainError } from "./float-domain-error.js";
-export { MathDomainError } from "./math-domain-error.js";
 export { BigDecimal, toD } from "./big-decimal.js";
 export { registerHttpAdapter, getHttpAsync, httpAdapterConfig } from "./http-adapter.js";
 export type {
@@ -370,6 +369,7 @@ export {
   fixDiv,
   fixMod,
   intDigits,
+  MathDomainError,
   isFinite,
   isNan,
   numStep,
