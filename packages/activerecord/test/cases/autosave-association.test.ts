@@ -1459,18 +1459,24 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("should not saved for unchanged sti type on polymorphic association", async () => {
     const face = class extends Face {
+      declare _count: number | undefined;
+      declare polymorphic_human_type: string;
+      declare polymorphic_human_id: number;
+
       static {
         this.afterSave(":countSaves");
       }
 
       countSaves() {
-        (this as any)._count ??= 0;
-        (this as any)._count += 1;
+        this._count ??= 0;
+        this._count += 1;
       }
     };
     Object.defineProperty(face, "name", { value: "Face" });
 
     const superHuman = class extends SuperHuman {
+      declare polymorphicFace: Face | null;
+
       static {
         this.tableName = "humans";
 
@@ -1485,12 +1491,12 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     };
     Object.defineProperty(superHuman, "name", { value: "SuperHuman" });
 
-    const faceRecord = (await face.createBang()) as any;
+    const faceRecord = await face.createBang();
 
-    const superHumanRecord = (await superHuman.createBang({
+    const superHumanRecord = await superHuman.createBang({
       name: "S. Human",
       polymorphicFace: faceRecord,
-    })) as any;
+    });
 
     await superHumanRecord.updateBang({ name: "Super Human" });
 
