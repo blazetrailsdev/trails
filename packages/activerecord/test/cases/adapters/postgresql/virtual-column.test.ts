@@ -125,5 +125,38 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       expect(fixtures.size()).toBe(2);
     });
+
+    itIfSupports(
+      "virtual_columns",
+      "virtual column does not deduplicate with regular column",
+      async () => {
+        await adapter.createTable("regular_columns", { force: true }, (t) => {
+          t.string("name");
+        });
+        try {
+          class RegularModel extends Base {
+            static {
+              this.tableName = "regular_columns";
+            }
+          }
+
+          VirtualColumn.columnsHash();
+          await RegularModel.loadSchema();
+
+          const regularCol = RegularModel.columnsHash()["name"] as any;
+          const virtualCol = VirtualColumn.columnsHash()["upper_name"];
+
+          expect(virtualCol.isVirtual()).toBe(true);
+          expect(regularCol.isVirtual()).toBe(false);
+          expect(regularCol.equals(virtualCol)).toBe(false);
+
+          const record = (await RegularModel.createBang({ name: "hello" })) as any;
+          await record.reload();
+          expect(record.name).toBe("hello");
+        } finally {
+          await adapter.dropTable("regular_columns", { ifExists: true });
+        }
+      },
+    );
   });
 });

@@ -461,6 +461,14 @@ describe("MergingDifferentRelationsTest", () => {
     expect(await ids((dev as any).ratings)).toEqual([rating1.id]);
   });
 
+  it("merging where relation having arel equality with null relation", () => {
+    const arelPredicate = new Nodes.NamedFunction("ABS", [Post.arelTable.get("tags_count")]).eq(0);
+    const arelRelation = Post.where(arelPredicate);
+    const relation = arelRelation.merge(arelRelation.none());
+    const sql = relation.toSql();
+    expect(sql).toMatch("AND");
+  });
+
   itIfSupports(
     "common_table_expressions",
     "merging relation with common table expression",

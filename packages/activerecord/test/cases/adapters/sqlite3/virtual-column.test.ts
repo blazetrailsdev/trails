@@ -60,7 +60,6 @@ function columnFor(name: string): Column {
 async function reloadColumnInformation(): Promise<void> {
   adapter.schemaCache.clearBang();
   await VirtualColumn.resetColumnInformation();
-  await VirtualColumn.loadSchema();
 }
 
 describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3VirtualColumnTest", () => {
@@ -158,4 +157,43 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3VirtualColumnTest", () 
     });
     expect(fixtures.size()).toBe(2);
   });
+
+  itIfSupports(
+    "virtual_columns",
+    "virtual column does not deduplicate with regular column",
+    async () => {
+      await adapter.createTable("regular_columns", { force: true }, (t) => {
+        t.string("name");
+      });
+      try {
+        class RegularModel extends Base {
+          static {
+            this.tableName = "regular_columns";
+          }
+        }
+
+        await VirtualColumn.loadSchema();
+        VirtualColumn.columnsHash();
+        await RegularModel.loadSchema();
+
+        const regularCol = RegularModel.columnsHash()["name"] as unknown as Column;
+        const virtualCol = VirtualColumn.columnsHash()["upper_name"] as unknown as Column;
+
+        expect(virtualCol.isVirtual()).toBe(true);
+        expect(regularCol.isVirtual()).toBe(false);
+        expect(regularCol.equals(virtualCol)).toBe(false);
+
+        FixtureFile.registerModule(
+          `${TS_FIXTURES_ROOT}/virtual_columns.ts`,
+          virtualColumnFixtureData,
+        );
+        const [fixtures] = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "virtual_columns", {
+          virtual_columns: VirtualColumn,
+        });
+        expect(fixtures.size()).toBe(2);
+      } finally {
+        await adapter.dropTable("regular_columns", { ifExists: true });
+      }
+    },
+  );
 });
