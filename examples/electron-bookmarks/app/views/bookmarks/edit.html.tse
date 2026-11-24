@@ -1,0 +1,3 @@
+<h1>Edit bookmark</h1>
+<%= render({ partial: "bookmarks/form", locals: { bookmark, tagList } }) %>
+<%= linkTo("Back", bookmarkPath(bookmark)) %>

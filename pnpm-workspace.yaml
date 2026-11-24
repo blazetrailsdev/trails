@@ -10,6 +10,7 @@ packages:
 allowBuilds:
   "@parcel/watcher": false
   bcrypt: true
+  electron: true
   better-sqlite3: true
   esbuild: true
   libsql: true

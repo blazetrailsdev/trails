@@ -1,0 +1,12 @@
+<li class="bookmark <%= bookmark.isRead() ? "read" : "" %>" id="<%= domId(bookmark) %>">
+  <%= buttonTo(bookmark.isRead() ? "✓" : "○", toggleReadBookmarkPath(bookmark), { method: "patch", class: "toggle", title: bookmark.isRead() ? "Mark unread" : "Mark read" }) %>
+  <div class="body">
+    <%= linkTo(bookmark.title, bookmarkPath(bookmark), { class: "title" }) %>
+    <a class="url" href="<%= bookmark.url %>" target="_blank" rel="noopener"><%= bookmark.url %></a>
+    <div class="tags">
+      <% for (const name of await bookmark.tagNames()) { %>
+        <%= linkTo(`#${name}`, bookmarksPath({ tag: name }), { class: "tag" }) %>
+      <% } %>
+    </div>
+  </div>
+</li>

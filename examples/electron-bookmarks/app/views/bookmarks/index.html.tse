@@ -1,0 +1,17 @@
+<% contentFor("title", "Reading List") %>
+<div class="filters">
+  <%= linkTo("All", bookmarksPath({ tag: currentTag }), { class: filter === "all" ? "chip active" : "chip" }) %>
+  <%= linkTo("Unread", bookmarksPath({ filter: "unread", tag: currentTag }), { class: filter === "unread" ? "chip active" : "chip" }) %>
+  <span class="spacer"></span>
+  <% for (const t of tags) { %>
+    <%= linkTo(`#${t.name}`, bookmarksPath({ filter: filter === "unread" ? "unread" : null, tag: t.name === currentTag ? null : t.name }), { class: t.name === currentTag ? "chip active" : "chip" }) %>
+  <% } %>
+</div>
+<% if (bookmarks.length === 0) { %>
+  <p class="empty">Nothing here yet. Add a bookmark, or import an export file.</p>
+<% } %>
+<ul class="bookmarks" id="bookmarks">
+  <% for (const bookmark of bookmarks) { %>
+    <%= render({ partial: "bookmarks/bookmark", locals: { bookmark } }) %>
+  <% } %>
+</ul>

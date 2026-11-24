@@ -1,0 +1,32 @@
+<% contentFor("title", bookmark.title) %>
+<article class="detail">
+  <h1><%= bookmark.title %></h1>
+  <p><a href="<%= bookmark.url %>" target="_blank" rel="noopener"><%= bookmark.url %></a></p>
+  <p class="tags">
+    <% for (const name of await bookmark.tagNames()) { %>
+      <%= linkTo(`#${name}`, bookmarksPath({ tag: name }), { class: "tag" }) %>
+    <% } %>
+  </p>
+  <% if (bookmark.notes) { %><p class="notes"><%= bookmark.notes %></p><% } %>
+  <% if (bookmark.remind_at != null) { %>
+    <p class="meta">Reminder: <%= bookmark.remind_at.toLocaleString() %><%= bookmark.reminded_at != null ? " (sent)" : "" %></p>
+  <% } %>
+
+  <h2>Files</h2>
+  <ul class="attachments">
+    <% for (const attachment of attachments) { %>
+      <li>
+        <%= buttonTo(attachment.name, bookmarkAttachmentPath(bookmark, attachment), { method: "get", class: "link", form: { "data-turbo": "false" } }) %>
+        <span class="meta"><%= numberToHumanSize(attachment.byte_size) %></span>
+        <%= buttonTo("Remove", bookmarkAttachmentPath(bookmark, attachment), { method: "delete", class: "link danger" }) %>
+      </li>
+    <% } %>
+  </ul>
+  <%= buttonTo("Attach files…", bookmarkAttachmentsPath(bookmark), { class: "button secondary" }) %>
+
+  <div class="actions">
+    <%= buttonTo(bookmark.isRead() ? "Mark unread" : "Mark read", toggleReadBookmarkPath(bookmark), { method: "patch", class: "button" }) %>
+    <%= linkTo("Edit", editBookmarkPath(bookmark), { class: "button secondary" }) %>
+    <%= buttonTo("Delete", bookmarkPath(bookmark), { method: "delete", class: "button danger", form: { "data-turbo-confirm": "Delete this bookmark?" } }) %>
+  </div>
+</article>
