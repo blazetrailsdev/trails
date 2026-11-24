@@ -236,7 +236,7 @@ export class Statement {
     const engine = this.#connection._engine;
     let r: unknown[] | null | Promise<unknown[] | null>;
     try {
-      r = this.#st.step();
+      r = this.#connection._busyRetry(() => this.#st.step()) as typeof r;
     } catch (e) {
       rbSqlite3Raise(e, engine);
     }
@@ -309,7 +309,7 @@ export class Statement {
   private prepare(db: Database, sql: string): string | Promise<string> {
     let prepared: [EngineStatement, string] | Promise<[EngineStatement, string]>;
     try {
-      prepared = db._engine.prepare(sql);
+      prepared = db._busyRetry(() => db._engine.prepare(sql)) as typeof prepared;
     } catch (e) {
       rbSqlite3RaiseWithSql(e, sql, db._engine);
     }

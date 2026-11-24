@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { File, getOs } from "@blazetrails/ruby-compat";
-import type { SyncableSqliteConnection } from "@blazetrails/sqlite3/libsql";
 import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js";
 
 const tursoUrl = typeof process !== "undefined" ? process.env["TURSO_DATABASE_URL"] : undefined;
@@ -130,14 +129,14 @@ describe.skipIf(!hasCredentials)(
 
     it("reflects a remote write after syncReplica()", async () => {
       await replica.withRawConnection({ materializeTransactions: false }, (raw: unknown) =>
-        (raw as SyncableSqliteConnection).sync(),
+        (raw as { _engine: { sync(): Promise<void> } })._engine.sync(),
       );
       const rows = (await replica.execute(`SELECT label FROM ${table} WHERE id = 1`))!;
       expect((rows[0] as { label: string }).label).toBe("remote");
 
       await primary.execute(`INSERT INTO ${table} (id, label) VALUES (2, 'later')`);
       await replica.withRawConnection({ materializeTransactions: false }, (raw: unknown) =>
-        (raw as SyncableSqliteConnection).sync(),
+        (raw as { _engine: { sync(): Promise<void> } })._engine.sync(),
       );
       const after = (await replica.execute(`SELECT count(*) AS c FROM ${table}`))!;
       expect(Number((after[0] as { c: number }).c)).toBe(2);

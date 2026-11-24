@@ -1,10 +1,12 @@
 import * as Arel from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { b, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";
-import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
+import type {
+  Database as SQLite3Database,
+  Statement as SQLite3Statement,
+} from "@blazetrails/sqlite3";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
-import { execBatch, retryBusy } from "@blazetrails/sqlite3";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import {
   combineMultiStatements,
@@ -121,14 +123,14 @@ interface InternalBeginTransactionHost {
 }
 
 interface PerformQueryHost {
-  _cachedStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
-  _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
-  _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void;
+  _statements: {
+    get(sql: string): SQLite3Statement | null | undefined;
+    set(sql: string, stmt: SQLite3Statement): unknown;
+  };
+  _maybeEnableReadBigInts(sql: string, stmt: SQLite3Statement): Promise<void>;
+  _narrowSpilledBigInts(stmt: SQLite3Statement, rows: unknown[][]): Promise<unknown[][]>;
   verifiedBang(): void;
   _lastAffectedRows: number;
-  _sharedLockHeld: boolean;
-  isWriteQuery(sql: string): boolean;
-  isTransactionOpen(): boolean;
 }
 
 interface ExecuteBatchHost {
@@ -179,13 +181,17 @@ export async function internalBeginTransaction(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm _maybeEnableReadBigInts — PERMANENT
+ * @inventedArm _narrowSpilledBigInts — PERMANENT
+ */
 export async function performQuery(
   this: PerformQueryHost,
-  rawConnection: SqliteConnection,
+  rawConnection: SQLite3Database,
   sql: string,
   binds: unknown[],
-  typeCastedBinds: SqliteBinds,
+  typeCastedBinds: unknown[] | Record<string, unknown>,
   {
     prepare,
     notificationPayload,
@@ -195,52 +201,53 @@ export async function performQuery(
     notificationPayload?: Record<string, unknown>;
     batch?: boolean;
   },
-): Promise<Result> {
-  const sharedLockHeld = this._sharedLockHeld && this.isTransactionOpen() && this.isWriteQuery(sql);
-  const retry = <T>(step: () => T | Promise<T>) => retryBusy(rawConnection, step, sharedLockHeld);
-  let result: Result;
+): Promise<Result | null> {
+  let result: Result | null = null;
   if (batch) {
-    await execBatch(rawConnection, sql, sharedLockHeld);
-    result = Result.empty();
+    await rawConnection.executeBatch2(sql);
   } else if (prepare) {
-    const stmt = await retry(() => this._cachedStatement(rawConnection, sql));
-    stmt.bindParams(typeCastedBinds);
+    let stmt = this._statements.get(sql);
+    if (stmt == null) {
+      stmt = await rawConnection.prepare(sql);
+      await this._maybeEnableReadBigInts(sql, stmt);
+      await this._statements.set(sql, stmt);
+    }
+    await stmt.resetBang();
+    await stmt.bindParams(typeCastedBinds);
 
-    if (!stmt.reader) {
-      await retry(() => stmt.step());
+    if (stmt.columnCount() === 0) {
+      await stmt.step();
       result = Result.empty();
     } else {
-      const columns = stmt.columns().map((c) => c.name);
-      const toA = await retry(() => stmt.toA());
-      result = new Result(columns, toA);
-      this._narrowSpilledBigInts(stmt, result.rows);
+      result = new Result(
+        (await stmt.columns()) as string[],
+        await this._narrowSpilledBigInts(stmt, await stmt.toA()),
+      );
     }
   } else {
-    const stmt = await retry(() => this._freshStatement(rawConnection, sql));
+    const stmt = await rawConnection.prepare(sql);
     try {
       if (!(binds == null || binds.length === 0)) {
-        stmt.bindParams(typeCastedBinds);
+        await stmt.bindParams(typeCastedBinds);
       }
-      if (!stmt.reader) {
-        await retry(() => stmt.step());
+      await this._maybeEnableReadBigInts(sql, stmt);
+      if (stmt.columnCount() === 0) {
+        await stmt.step();
         result = Result.empty();
       } else {
-        const columns = stmt.columns().map((c) => c.name);
-        const toA = await retry(() => stmt.toA());
-        result = new Result(columns, toA);
-        this._narrowSpilledBigInts(stmt, result.rows);
+        result = new Result(
+          (await stmt.columns()) as string[],
+          await this._narrowSpilledBigInts(stmt, await stmt.toA()),
+        );
       }
     } finally {
       await stmt.close();
     }
   }
-  this._sharedLockHeld =
-    /^(?:\s|\/\*[\s\S]*?\*\/)*(?:SELECT|WITH)\b/i.test(sql) &&
-    !this.isWriteQuery(sql) &&
-    this.isTransactionOpen();
   this._lastAffectedRows = await rawConnection.changes();
   this.verifiedBang();
-  if (notificationPayload) notificationPayload.row_count = result.length;
+
+  if (notificationPayload) notificationPayload.row_count = result?.length ?? 0;
   return result;
 }
 

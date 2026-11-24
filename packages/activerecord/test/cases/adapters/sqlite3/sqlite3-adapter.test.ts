@@ -9,7 +9,6 @@ import { inMemoryDb } from "../../../support/adapter-helper.js";
 import { itIfSupports } from "../../../support/supports.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { Notifications, indexBy } from "@blazetrails/activesupport";
-import type { Database } from "better-sqlite3";
 
 import { QueryAttribute } from "../../../../lib/relation/query-attribute.js";
 import { ValueType, IntegerType } from "@blazetrails/activemodel";
@@ -65,10 +64,6 @@ async function withFileConnection(
   } finally {
     await conn.disconnectBang();
   }
-}
-
-async function rawConnectionOf(conn: SQLite3Adapter): Promise<Database> {
-  return (await conn.rawConnection())!.raw as Database;
 }
 
 async function withStrictStringsByDefault(fn: () => Promise<void>): Promise<void> {
@@ -1116,8 +1111,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
     const step = () => {
       throw new BusyException("busy");
     };
-    const all = vi.spyOn(statement, "all").mockImplementation(step);
-    const run = vi.spyOn(statement, "run").mockImplementation(step);
+    const stepSpy = vi.spyOn(statement, "step").mockImplementation(step);
     try {
       await assertCalled(statement, "close", null, {}, async () => {
         const prepare = vi.spyOn(rawConnection, "prepare").mockImplementation(() => statement);
@@ -1131,8 +1125,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
         }
       });
     } finally {
-      all.mockRestore();
-      run.mockRestore();
+      stepSpy.mockRestore();
     }
   });
 
@@ -1140,7 +1133,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
     const conn = new SQLite3Adapter({ database: ":memory:", readonly: false });
     await conn.connectBang();
 
-    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
+    expect((await conn.rawConnection())!.isReadonly()).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -1148,7 +1141,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
     const conn = new SQLite3Adapter({ database: ":memory:" });
     await conn.connectBang();
 
-    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
+    expect((await conn.rawConnection())!.isReadonly()).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -1156,7 +1149,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
     const conn = new SQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 
-    expect((await rawConnectionOf(conn)).readonly).toBeTruthy();
+    expect((await conn.rawConnection())!.isReadonly()).toBeTruthy();
     await conn.disconnectBang();
   });
 

@@ -20,6 +20,7 @@ import { ForkSafety } from "./fork-safety.js";
 import { Statement, type EngineStatement } from "./statement.js";
 import { HashResultSet, ResultSet } from "./resultset.js";
 import { rbSqlite3Raise } from "./errors.js";
+import { withBusyHandler } from "./engine/busy-handler.js";
 
 export type BusyHandler = (count: number) => unknown;
 
@@ -68,9 +69,8 @@ export interface EngineDatabase extends EngineErrors {
 export type EngineOpenV2 = ((file: string, mode: number, zvfs: string | null) => EngineDatabase) &
   Partial<EngineErrors>;
 
-export type SyncEngineDatabase = Omit<EngineDatabase, "close" | "execBatch"> & {
+export type SyncEngineDatabase = Omit<EngineDatabase, "close"> & {
   close(): void;
-  execBatch(sql: string, resultsAsHash: boolean | null): unknown[];
 };
 
 export type SyncEngineOpenV2 = ((
@@ -151,6 +151,7 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
   #defaultTransactionMode: string;
   #timeoutDeadline = 0;
   #authorizer: Authorizer | null;
+  #busyHandler: BusyHandler | null = null;
   #functions: Record<string, unknown>;
 
   constructor(file: string, options: DatabaseOptions<E>, zvfs?: string | null);
@@ -203,7 +204,7 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     if (block) {
       let result: unknown;
       try {
-        result = block(this as Database<E & SyncEngineDatabase>);
+        result = block(this);
       } finally {
         (this as Database<E & SyncEngineDatabase>).close();
       }
@@ -543,8 +544,7 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
       } else if (now > this.#timeoutDeadline) {
         return false;
       } else {
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1);
-        return 0;
+        return new Promise((resolve) => setTimeout(resolve, 1)).then(() => 0);
       }
     });
   }
@@ -613,8 +613,17 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
   }
 
   busyHandler(block: BusyHandler | null = null): this {
+    this.#busyHandler = block;
     this._engine.busyHandler(block);
     return this;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  _busyRetry<T>(attempt: () => T): T | Promise<T> {
+    return withBusyHandler(this._engine, () => this.#busyHandler, attempt);
   }
 
   loadExtension(extensionSpecifier: unknown): void {

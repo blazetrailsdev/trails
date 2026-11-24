@@ -1,3 +1,4 @@
+import { bindValue } from "./bind-value.js";
 import Database from "libsql";
 import { File, RuntimeError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
@@ -6,7 +7,7 @@ import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "..
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { closedStatement, statementTail } from "./statement-tail.js";
-import { withBusyHandler } from "./busy-handler.js";
+import { drive, withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
 import { databaseListFilename, libversionNumber } from "./aggregator.js";
@@ -75,11 +76,9 @@ function openRemote(file: string, mode: number, options: LibsqlReplicaOptions): 
 function prepareStatement(
   raw: Database.Database,
   sql: string,
-  handler: () => BusyHandler | null,
-  setChanges: (n: number) => void,
   finalize: () => void,
 ): EngineStatement {
-  const stmt = withBusyHandler(errors, handler, () => raw.prepare(sql));
+  const stmt = raw.prepare(sql);
   const reader = stmt.reader;
   if (reader) stmt.raw(true);
   const positional: SqliteBindValue[] = [];
@@ -108,14 +107,14 @@ function prepareStatement(
     isClosed: () => closed,
     bindParam(key, value) {
       if (typeof key === "number") {
-        positional[key - 1] = value;
+        positional[key - 1] = bindValue(value);
         return;
       }
       const name = key.replace(/^[:@$]/, "");
       if (bindParameterIndex(sql, name) === 0) {
         throw new SQLite3.Exception("no such bind parameter");
       }
-      named[name] = value;
+      named[name] = bindValue(value);
     },
     resetBang() {
       rows?.return?.();
@@ -125,14 +124,14 @@ function prepareStatement(
     step() {
       if (done) return null;
       if (!reader) {
-        setChanges(withBusyHandler(errors, handler, () => stmt.run(...args()).changes));
+        stmt.run(...args());
         done = true;
         return null;
       }
       const r =
         rows !== null
           ? rows.next()
-          : withBusyHandler(errors, handler, () => {
+          : (() => {
               const started = stmt.iterate(...args()) as Iterator<unknown[]>;
               try {
                 const first = started.next();
@@ -142,7 +141,7 @@ function prepareStatement(
                 started.return?.();
                 throw e;
               }
-            });
+            })();
       if (r.done) {
         done = true;
         return null;
@@ -166,17 +165,14 @@ function openEngine(
 ): EngineOpenV2 {
   return Object.assign((file: string, mode: number) => {
     const raw = opener(file, mode, options);
-    let changes = 0;
     let handler: BusyHandler | null = null;
-    const setChanges = (n: number) => {
-      changes = n;
-    };
     let zombie = false;
     let liveStatements = 0;
     const finalize = () => {
       liveStatements -= 1;
       if (zombie && liveStatements === 0) raw.close();
     };
+    let changesStmt: ReturnType<typeof raw.prepare> | null = null;
     const db: EngineDatabase = {
       ...errors,
       isClosed: () => zombie || !raw.open,
@@ -185,7 +181,8 @@ function openEngine(
         if (liveStatements === 0) raw.close();
         else zombie = true;
       },
-      changes: () => changes,
+      changes: () =>
+        ((changesStmt ??= raw.prepare("SELECT changes() AS v")).get() as { v: number }).v,
       disableQuirkMode: () => {},
       loadExtensionInternal: (file) => void raw.loadExtension(file),
       enableLoadExtension: () => {},
@@ -201,45 +198,51 @@ function openEngine(
         handler = block;
       },
       execBatch(sql, resultsAsHash) {
-        const results: unknown[] = [];
-        let rest = sql.trim();
-        while (rest !== "") {
-          const [tail, empty] = statementTail(rest);
-          const head = rest.slice(0, tail);
-          rest = rest.slice(tail).trim();
-          if (empty) continue;
-          const stmt = withBusyHandler(
-            errors,
-            () => handler,
-            () => raw.prepare(head),
-          );
-          if (!stmt.reader) {
-            changes = withBusyHandler(
-              errors,
-              () => handler,
-              () => stmt.run().changes,
-            );
-          } else {
-            stmt.safeIntegers(true).raw(true);
-            const names = stmt.columns().map((c) => c.name);
-            for (const row of withBusyHandler(
-              errors,
-              () => handler,
-              () => stmt.all() as unknown[][],
-            )) {
-              const vals = row.map(columnText);
-              results.push(
-                resultsAsHash ? Object.fromEntries(names.map((name, i) => [name, vals[i]])) : vals,
-              );
+        return drive(
+          (function* () {
+            const results: unknown[] = [];
+            let rest = sql.trim();
+            while (rest !== "") {
+              const [tail, empty] = statementTail(rest);
+              const head = rest.slice(0, tail);
+              rest = rest.slice(tail).trim();
+              if (empty) continue;
+              const stmt = (yield withBusyHandler(
+                errors,
+                () => handler,
+                () => raw.prepare(head),
+              )) as Database.Statement;
+              if (!stmt.reader) {
+                yield withBusyHandler(
+                  errors,
+                  () => handler,
+                  () => stmt.run(),
+                );
+              } else {
+                stmt.safeIntegers(true).raw(true);
+                const names = stmt.columns().map((c) => c.name);
+                for (const row of (yield withBusyHandler(
+                  errors,
+                  () => handler,
+                  () => stmt.all() as unknown[][],
+                )) as unknown[][]) {
+                  const vals = row.map(columnText);
+                  results.push(
+                    resultsAsHash
+                      ? Object.fromEntries(names.map((name, i) => [name, vals[i]]))
+                      : vals,
+                  );
+                }
+              }
             }
-          }
-        }
-        return results;
+            return results;
+          })(),
+        );
       },
       prepare(sql) {
         const [tail, empty] = statementTail(sql);
         if (empty) return [closedStatement, sql.slice(tail)];
-        const stmt = prepareStatement(raw, sql.slice(0, tail), () => handler, setChanges, finalize);
+        const stmt = prepareStatement(raw, sql.slice(0, tail), finalize);
         liveStatements += 1;
         return [stmt, sql.slice(tail)];
       },
@@ -261,4 +264,33 @@ export function replicaEngine(
 /** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces */
 export function remoteEngine(options: Pick<LibsqlReplicaOptions, "authToken">): EngineOpenV2 {
   return openEngine(options, false, openRemote);
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE sqlite3-libsql-replica-sync-reaches-the-engine
+ */
+export function buildReplicaOptions(
+  options: Record<string, unknown> | undefined,
+): LibsqlReplicaOptions {
+  const opts = { ...options } as LibsqlReplicaOptions;
+  if (typeof opts.syncUrl !== "string" || opts.syncUrl.length === 0) {
+    throw new RuntimeError(
+      "libsql embedded-replica mode requires a non-empty `syncUrl` in " +
+        "driverOptions (alongside the local replica path); none was provided.",
+    );
+  }
+  if (opts.syncPeriod !== undefined) {
+    if (
+      typeof opts.syncPeriod !== "number" ||
+      !Number.isFinite(opts.syncPeriod) ||
+      opts.syncPeriod <= 0
+    ) {
+      throw new RuntimeError(
+        "libsql embedded-replica `syncPeriod` must be a positive number of " +
+          `seconds (got ${String(opts.syncPeriod)}); omit it for caller-driven sync.`,
+      );
+    }
+  }
+  return opts;
 }

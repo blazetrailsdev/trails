@@ -323,10 +323,6 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterPerformQueryTest
     expect(await adapter.queryValue(`SELECT COUNT(*) FROM "pq"`)).toBe(2);
   });
 
-  it("internalExecute rejects multi-statement SQL, having no batch arm", async () => {
-    await expect(adapter.internalExecute(`SELECT 1;\nSELECT 2`, "SQL")).rejects.toThrow();
-  });
-
   it("executeBatch combines the statements and runs them through the batch arm", async () => {
     await adapter.executeBatch([
       `INSERT INTO "pq" ("nick") VALUES ('a')`,

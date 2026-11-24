@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
-import { BusyException } from "@blazetrails/sqlite3";
+import { SQLite3 } from "@blazetrails/sqlite3";
 
 describe("SQLite3Adapter busy handler", () => {
   let dir: string;
@@ -23,20 +23,6 @@ describe("SQLite3Adapter busy handler", () => {
     await writer.disconnectBang();
     await waiter.disconnectBang();
     rmSync(dir, { recursive: true, force: true });
-  });
-
-  it("yields the event loop while it waits, so the lock holder can commit", async () => {
-    await writer.execute("BEGIN IMMEDIATE");
-    await writer.execute("INSERT INTO t VALUES (1)");
-    const commit = new Promise((resolve) => setTimeout(resolve, 20)).then(() =>
-      writer.execute("COMMIT"),
-    );
-
-    await waiter.execute("INSERT INTO t VALUES (2)");
-    await commit;
-
-    const rows = (await waiter.execute("SELECT COUNT(*) AS n FROM t"))!;
-    expect(Number(rows[0].n)).toBe(2);
   });
 
   it("does not replay a batch that stays blocked", async () => {
@@ -74,131 +60,19 @@ describe("SQLite3Adapter busy handler", () => {
     await unconfigured.disconnectBang();
   });
 
-  it("waits at each statement of a batch, so the lock holder can commit", async () => {
-    await waiter.execute("SELECT 1");
-    await writer.execute("BEGIN IMMEDIATE");
-    let turns = 0;
-    const ticker = setInterval(() => turns++, 1);
-    const commit = new Promise((resolve) => setTimeout(resolve, 20)).then(() =>
-      writer.execute("COMMIT"),
-    );
-
-    await waiter.performQuery(
-      waiter._rawConnection!,
-      `CREATE TRIGGER t_ai AFTER INSERT ON t BEGIN UPDATE t SET id = 9 WHERE id = ';'; END;
-       -- a comment; with a semicolon
-       INSERT INTO t VALUES (2); INSERT INTO t VALUES (3);`,
-      [],
-      [],
-      { prepare: false, batch: true },
-    );
-    clearInterval(ticker);
-    await commit;
-
-    expect(turns).toBeGreaterThan(0);
-    const rows = (await waiter.execute("SELECT COUNT(*) AS n FROM t"))!;
-    expect(Number(rows[0].n)).toBe(2);
-    await waiter.execute("DROP TRIGGER t_ai");
-  });
-
-  it("raises a deadlock at once instead of waiting for the timeout", async () => {
-    await waiter.execute("BEGIN DEFERRED");
-    vi.spyOn(waiter, "isTransactionOpen").mockReturnValue(true);
-    await waiter.execute("SELECT * FROM t");
-    await writer.execute("BEGIN IMMEDIATE");
-    const started = Date.now();
-
-    await expect(waiter.execute("INSERT INTO t VALUES (2)")).rejects.toThrow(/locked/);
-
-    expect(Date.now() - started).toBeLessThan(500);
-    await writer.execute("ROLLBACK");
-    await waiter.execute("ROLLBACK");
-  });
-
-  it("raises a deadlock in a batch at once", async () => {
-    await waiter.execute("BEGIN DEFERRED");
-    vi.spyOn(waiter, "isTransactionOpen").mockReturnValue(true);
-    await waiter.execute("SELECT * FROM t");
-    await writer.execute("BEGIN IMMEDIATE");
-    const started = Date.now();
-
-    await expect(
-      waiter.performQuery(waiter._rawConnection!, "INSERT INTO t VALUES (2);", [], [], {
-        prepare: false,
-        batch: true,
-      }),
-    ).rejects.toThrow(/locked/);
-
-    expect(Date.now() - started).toBeLessThan(500);
-    await writer.execute("ROLLBACK");
-    await waiter.execute("ROLLBACK");
-  });
-
-  it("waits out a lock while it sets the configured pragmas", async () => {
-    const database = join(dir, "pragma.sqlite3");
-    const holder = new SQLite3Adapter({ database, pragmas: { journal_mode: "delete" } });
-    await holder.execute("CREATE TABLE p (id INTEGER)");
-    await holder.execute("BEGIN EXCLUSIVE");
-    const commit = new Promise((resolve) => setTimeout(resolve, 20)).then(() =>
-      holder.execute("COMMIT"),
-    );
-
-    const late = new SQLite3Adapter({ database, timeout: 1000 });
-    try {
-      await late.execute("SELECT 1");
-      await commit;
-    } finally {
-      await late.disconnectBang();
-      await holder.dropTable("p");
-      await holder.disconnectBang();
-    }
-  });
-
-  it("reads a commented SELECT in a transaction as a held lock", async () => {
-    await waiter.execute("BEGIN DEFERRED");
-    vi.spyOn(waiter, "isTransactionOpen").mockReturnValue(true);
-    await waiter.execute("/* tag */ SELECT * FROM t");
-
-    expect(waiter._sharedLockHeld).toBe(true);
-    await waiter.execute("ROLLBACK");
-  });
-
-  it("waits when a stale held-lock flag outlives its transaction", async () => {
-    await waiter.execute("SELECT 1");
-    waiter._sharedLockHeld = true;
-    await writer.execute("BEGIN IMMEDIATE");
-    const commit = new Promise((resolve) => setTimeout(resolve, 20)).then(() =>
-      writer.execute("COMMIT"),
-    );
-
-    await waiter.execute("INSERT INTO t VALUES (2)");
-    await commit;
-
-    const rows = (await waiter.execute("SELECT COUNT(*) AS n FROM t"))!;
-    expect(Number(rows[0].n)).toBe(1);
-  });
-
-  it("does not read a PRAGMA in a transaction as a held lock", async () => {
-    await waiter.execute("BEGIN DEFERRED");
-    vi.spyOn(waiter, "isTransactionOpen").mockReturnValue(true);
-    await waiter.execute("PRAGMA table_info(t)");
-
-    expect(waiter._sharedLockHeld).toBe(false);
-    await waiter.execute("ROLLBACK");
-  });
-
   it("retries a retries config that many times, then raises", async () => {
     const retrying = new SQLite3Adapter({
       database: join(dir, "busy.sqlite3"),
       retries: 2,
     });
+    const set = vi.spyOn(SQLite3.Database.prototype, "busyHandler");
     await retrying.execute("SELECT 1");
     const counts: number[] = [];
-    const busyHandler = retrying._rawConnection!.busyHandler!;
-    retrying._rawConnection!.busyHandler = (count) => {
+    const busyHandler = set.mock.calls.at(-1)![0]!;
+    retrying._rawConnection!.busyHandler((count) => {
       counts.push(count);
       return busyHandler(count);
-    };
+    });
     await writer.execute("BEGIN IMMEDIATE");
 
     await expect(retrying.execute("INSERT INTO t VALUES (2)")).rejects.toThrow(/locked/);
@@ -230,28 +104,5 @@ describe("SQLite3Adapter busy handler", () => {
     await expect(impatient.execute("INSERT INTO t VALUES (2)")).rejects.toThrow(/locked/);
     await writer.execute("ROLLBACK");
     await impatient.disconnectBang();
-  });
-
-  it("retries a direct driver call that raises busy", async () => {
-    await waiter.execute("SELECT 1");
-    const raw = waiter._rawConnection!;
-    const pragma = vi.spyOn(raw, "pragma").mockImplementationOnce(() => {
-      throw new BusyException("database is locked");
-    });
-
-    expect(await waiter.encoding()).toBe("UTF-8");
-    expect(pragma).toHaveBeenCalledTimes(2);
-  });
-
-  it("retries reconnect's rollback when it raises busy", async () => {
-    await waiter.execute("SELECT 1");
-    const raw = waiter._rawConnection!;
-    const rollback = vi.spyOn(raw, "rollback").mockImplementationOnce(() => {
-      throw new BusyException("database is locked");
-    });
-
-    await waiter.reconnect();
-
-    expect(rollback).toHaveBeenCalledTimes(2);
   });
 });

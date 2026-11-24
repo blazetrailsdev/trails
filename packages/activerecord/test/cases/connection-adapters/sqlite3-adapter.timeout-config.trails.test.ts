@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { deprecator } from "../../../lib/deprecator.js";
+import { SQLite3 } from "@blazetrails/sqlite3";
 
 describe("SQLite3Adapter timeout config coercion", () => {
   let adapter: SQLite3Adapter | undefined;
@@ -13,8 +14,9 @@ describe("SQLite3Adapter timeout config coercion", () => {
 
   it("casts a string timeout to an integer", async () => {
     adapter = new SQLite3Adapter({ database: ":memory:", timeout: "5000" });
+    const set = vi.spyOn(SQLite3.Database.prototype, "setBusyHandlerTimeout");
     await adapter.connectBang();
-    expect(adapter["_rawConnection"]!.busyHandlerTimeout).toBe(5000);
+    expect(set).toHaveBeenCalledWith(5000);
   });
 
   it("raises TypeError when the timeout does not cast to an integer", async () => {
@@ -40,8 +42,9 @@ describe("SQLite3Adapter timeout config coercion", () => {
 
   it("treats a zero timeout as set", async () => {
     adapter = new SQLite3Adapter({ database: ":memory:", timeout: 0 });
+    const set = vi.spyOn(SQLite3.Database.prototype, "setBusyHandlerTimeout");
     await adapter.connectBang();
-    expect(adapter["_rawConnection"]!.busyHandlerTimeout).toBe(0);
+    expect(set).toHaveBeenCalledWith(0);
   });
 
   it("deprecates the retries option", async () => {

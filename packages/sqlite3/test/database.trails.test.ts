@@ -80,7 +80,7 @@ describe("SQLite3::Database over a fake engine", () => {
     db.setBusyHandlerTimeout(50);
     expect(fake.handler!(0)).toBeTruthy();
     const started = performance.now();
-    expect(fake.handler!(1)).toBe(0);
+    expect(await fake.handler!(1)).toBe(0);
     expect(performance.now() - started).toBeGreaterThanOrEqual(0.9);
     db.setBusyHandlerTimeout(0);
     fake.handler!(0);

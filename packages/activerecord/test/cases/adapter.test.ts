@@ -101,18 +101,14 @@ async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
       return false;
     }
   }
-  const raw = (conn as unknown as { _rawConnection: { exec(sql: string): Promise<void> } | null })
-    ._rawConnection;
-  if (!raw) return false;
   try {
-    await raw.exec("BEGIN");
+    await (
+      conn as unknown as { _rawConnection: { transaction(mode: null, block: () => null): unknown } }
+    )._rawConnection.transaction(null, () => null);
+    return false;
   } catch {
     return true;
   }
-  try {
-    await raw.exec("ROLLBACK");
-  } catch {}
-  return false;
 }
 
 function sleep(ms: number): Promise<void> {

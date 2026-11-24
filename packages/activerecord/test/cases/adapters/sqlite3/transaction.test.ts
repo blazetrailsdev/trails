@@ -29,11 +29,8 @@ async function withConnection(
   }
 }
 
-function readUncommitted(conn: SQLite3Adapter): boolean {
-  const row = (conn as any)._rawConnection.prepare("PRAGMA read_uncommitted").get() as {
-    read_uncommitted: number;
-  };
-  return row.read_uncommitted !== 0;
+async function readUncommitted(conn: SQLite3Adapter): Promise<boolean> {
+  return (await (conn as any)._rawConnection.getFirstValue("PRAGMA read_uncommitted")) !== 0;
 }
 
 describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3TransactionTest", () => {
@@ -102,35 +99,35 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3TransactionTest", () =>
 
   it("reset the read_uncommitted PRAGMA when a transaction is rolled back", async () => {
     await withConnection({ flags: sharedCacheFlags() }, async (conn) => {
-      expect(readUncommitted(conn)).toBeFalsy();
+      expect(await readUncommitted(conn)).toBeFalsy();
       await conn.beginIsolatedDbTransaction(":read_uncommitted");
-      expect(readUncommitted(conn)).toBeTruthy();
+      expect(await readUncommitted(conn)).toBeTruthy();
       await conn.rollbackDbTransaction();
       await conn.resetIsolationLevel();
-      expect(readUncommitted(conn)).toBeFalsy();
+      expect(await readUncommitted(conn)).toBeFalsy();
     });
   });
 
   it("reset the read_uncommitted PRAGMA when a transaction is committed", async () => {
     await withConnection({ flags: sharedCacheFlags() }, async (conn) => {
-      expect(readUncommitted(conn)).toBeFalsy();
+      expect(await readUncommitted(conn)).toBeFalsy();
       await conn.beginIsolatedDbTransaction(":read_uncommitted");
-      expect(readUncommitted(conn)).toBeTruthy();
+      expect(await readUncommitted(conn)).toBeTruthy();
       await conn.commitDbTransaction();
       await conn.resetIsolationLevel();
-      expect(readUncommitted(conn)).toBeFalsy();
+      expect(await readUncommitted(conn)).toBeFalsy();
     });
   });
 
   it("set the read_uncommitted PRAGMA to its previous value", async () => {
     await withConnection({ flags: sharedCacheFlags() }, async (conn) => {
-      (conn as any)._rawConnection.exec("PRAGMA read_uncommitted=ON");
-      expect(readUncommitted(conn)).toBeTruthy();
+      await (conn as any)._rawConnection.setReadUncommitted(true);
+      expect(await readUncommitted(conn)).toBeTruthy();
       await conn.beginIsolatedDbTransaction(":read_uncommitted");
-      expect(readUncommitted(conn)).toBeTruthy();
+      expect(await readUncommitted(conn)).toBeTruthy();
       await conn.commitDbTransaction();
       await conn.resetIsolationLevel();
-      expect(readUncommitted(conn)).toBeTruthy();
+      expect(await readUncommitted(conn)).toBeTruthy();
     });
   });
 });
