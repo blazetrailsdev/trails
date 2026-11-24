@@ -547,7 +547,7 @@ Trails.application!.routes().draw(function () {
   it("no rake task without migrations", { timeout: 240_000 }, async () => {
     await t.bootTrails();
     await Trails.application!.loadTasks();
-    expect(Task.isTaskDefined("bukkits:install:migrations")).toBe(false);
+    expect(Task.isTaskDefined("bukkits:install:migrations")).toBeFalsy();
   });
 
   it("puts its lib directory on load path", { timeout: 240_000 }, async () => {

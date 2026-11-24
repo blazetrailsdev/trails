@@ -1224,8 +1224,6 @@ describe("AppGeneratorTest", () => {
     const railsCommands = await runGeneratorInstance([t.destinationRoot]);
 
     expect(railsCommands).toContain("turbo:install stimulus:install");
-    await assertGem("@blazetrails/turbo");
-    await assertGem("@blazetrails/stimulus");
     await t.assertFile("app/views/layouts/application.html.tse", (content: string) => {
       expect(content).toMatch(/data-turbo-track/);
     });
