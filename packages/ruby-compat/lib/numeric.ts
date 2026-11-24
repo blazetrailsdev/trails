@@ -766,3 +766,23 @@ export function rubyNumIntervalStepSize(
   }
   return rubyFloatStepSize(Number(from), Number(to), 1, excl);
 }
+
+/**
+ * `Integer#digits` (`rb_int_digits` / `rb_fix_digits`, `vendor/ruby/v3.3.11/numeric.c:5435-5556`)
+ * for a Fixnum receiver and radix.
+ * @noRailsEquivalent PERMANENT
+ */
+export function intDigits(num: number, base: number = 10): number[] {
+  if (num < 0) throw new ArgumentError("out of domain");
+  if (base < 0) throw new ArgumentError("negative radix");
+  else if (base < 2) throw new ArgumentError(`invalid radix ${base}`);
+
+  if (num === 0) return [0];
+
+  const digits: number[] = [];
+  while (num > 0) {
+    digits.push(num % base);
+    num = Math.floor(num / base);
+  }
+  return digits;
+}

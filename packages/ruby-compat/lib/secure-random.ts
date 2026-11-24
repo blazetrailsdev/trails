@@ -1,4 +1,5 @@
 import { getCrypto } from "./crypto-adapter.js";
+import { intDigits } from "./numeric.js";
 import type { Bytes } from "./fs-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { strDelete, trTrans } from "./string/tr.js";
@@ -82,7 +83,7 @@ export const SecureRandom = {
     return SecureRandom.choose(chars, n);
   },
 
-  /** @internal */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:314 */
   choose(source: readonly string[], n: number): string {
     const size = source.length;
     let m = 1;
@@ -93,13 +94,13 @@ export const SecureRandom = {
     }
     let result = "";
     while (m <= n) {
-      const is = digits(SecureRandom.randomNumber(limit), size);
+      const is = intDigits(SecureRandom.randomNumber(limit), size);
       while (is.length < m) is.push(0);
       result += is.map((i) => source[i]).join("");
       n -= m;
     }
     if (0 < n) {
-      const is = digits(SecureRandom.randomNumber(limit), size);
+      const is = intDigits(SecureRandom.randomNumber(limit), size);
       if (is.length < n) {
         while (is.length < n) is.push(0);
       } else {
@@ -146,13 +147,3 @@ export const SecureRandom = {
     return `${hex(ary[0], 8)}-${hex(ary[1], 4)}-${hex(ary[2], 4)}-${hex(ary[3], 4)}-${hex(ary[4], 4)}${hex(ary[5], 8)}`;
   },
 };
-
-/** @noRailsEquivalent PERMANENT — `Integer#digits`, vendor/ruby/v3.3.11/numeric.c:5527 */
-function digits(value: number, base: number): number[] {
-  const out: number[] = [];
-  do {
-    out.push(value % base);
-    value = Math.floor(value / base);
-  } while (value > 0);
-  return out;
-}
