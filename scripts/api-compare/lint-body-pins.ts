@@ -121,7 +121,7 @@ async function main(scope: string | null): Promise<number> {
   }
 
   let red = stale;
-  if (scope !== null && !process.env.CI && stale.length > 0) {
+  if (scope !== null && stale.length > 0) {
     const tags = await inlinedFromOutside(scope);
     const outside = stale.filter((s) =>
       tags.some((t) => t.method === s.rubyName && t.file.endsWith(`/${s.rubyFile}`)),
@@ -130,7 +130,7 @@ async function main(scope: string | null): Promise<number> {
     if (outside.length > 0) {
       console.log(
         `body-pins gate: ${outside.length} pin(s) credited through an @inlinedFrom tag outside ` +
-          `scope ${scope}, left to the unscoped run:`,
+          `scope ${scope}, judged by the run that changes that package:`,
       );
       for (const s of outside.sort((a, b) => keyOf(a).localeCompare(keyOf(b)))) {
         console.log(`  outside  ${s.package}  ${s.rubyFile}:${s.rubyName}`);

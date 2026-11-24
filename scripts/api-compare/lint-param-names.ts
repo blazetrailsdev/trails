@@ -93,7 +93,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const staleSignatures = staleSignatureRows(
     [...(await loadLedgers()).values()]
       .flat()
-      .filter((r) => (GATED_PACKAGES as readonly string[]).includes(r.package)),
+      .filter((r) => (gated as readonly string[]).includes(r.package)),
     [...artifact.mismatches, ...blocks.mismatches],
   );
   if (staleSignatures.length > 0) {
