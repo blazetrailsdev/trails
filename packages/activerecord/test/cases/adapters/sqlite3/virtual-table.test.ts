@@ -39,7 +39,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3VirtualTableTest", () =
   it("schema dump ignores virtual tables in ignore tables", async () => {
     const output = await dumpAllTableSchema(["searchables"]);
 
-    expect(output).not.toContain('createVirtualTable("searchables"');
+    expect(output).not.toContain(`createVirtualTable(${JSON.stringify("searchables")}`);
   });
 
   it("schema load", async () => {

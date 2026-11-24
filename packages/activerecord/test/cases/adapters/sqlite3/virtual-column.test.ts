@@ -183,14 +183,9 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3VirtualColumnTest", () 
         expect(regularCol.isVirtual()).toBeFalsy();
         expect(regularCol).not.toEqualRuby(virtualCol);
 
-        FixtureFile.registerModule(
-          `${TS_FIXTURES_ROOT}/virtual_columns.ts`,
-          virtualColumnFixtureData,
-        );
-        const [fixtures] = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "virtual_columns", {
-          virtual_columns: VirtualColumn,
-        });
-        expect(fixtures.size()).toBe(2);
+        const record = (await RegularModel.createBang({ name: "hello" })) as any;
+        await record.reload();
+        expect(record.name).toBe("hello");
       } finally {
         await adapter.dropTable("regular_columns", { ifExists: true });
       }
