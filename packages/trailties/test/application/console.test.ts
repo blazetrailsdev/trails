@@ -13,6 +13,7 @@ import {
   getProcessAdapter,
   rbModRemoveConst,
   File,
+  TSREPL,
   registerReplAdapter,
   replAdapterConfig,
 } from "@blazetrails/ruby-compat";
@@ -77,6 +78,7 @@ async function spawnConsole(
   }: { waitForPrompt?: boolean; env?: Record<string, string> } = {},
 ): Promise<void> {
   env = { TERM: "dumb", ...env };
+  TSREPL._existingRcNameGenerators = null;
   for (const [key, value] of Object.entries(env)) setEnv(key, value);
   spawnedEnv.push(...Object.keys(env));
   const { environment } = new ConsoleCommand([], options.split(" ")).options;

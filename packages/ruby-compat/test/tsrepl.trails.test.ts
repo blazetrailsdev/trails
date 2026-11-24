@@ -57,6 +57,7 @@ describe("TSREPL", () => {
 
   afterEach(() => {
     for (const key of Object.keys(TSREPL.conf)) delete TSREPL.conf[key];
+    TSREPL._existingRcNameGenerators = null;
     replAdapterConfig.adapter = "node";
     exit.mockRestore();
   });
@@ -149,6 +150,44 @@ describe("TSREPL", () => {
       autoloadDelete(Object, "IrbOther");
       delete (TopLevel as Record<string, unknown>).IrbLazy;
     }
+  });
+
+  it("evaluates the next statement after one the REPL reports through _handleError", async () => {
+    const handled: unknown[] = [];
+    const results: unknown[] = [];
+    registerReplAdapter("fake-handle-error", {
+      start() {
+        let onExit = () => {};
+        const server: ReplServerLike = {
+          context: {},
+          on(_event: "exit", listener: () => void) {
+            onExit = listener;
+          },
+          close: () => onExit(),
+          setPrompt() {},
+          _handleError: (error) => handled.push(error),
+          eval(cmd, _ctx, _file, cb) {
+            if (cmd === "reject") server._handleError!(new Error("rejected"));
+            else cb(null, cmd);
+          },
+        };
+        queueMicrotask(() => {
+          server.eval("reject", server.context, "repl", () => results.push("reject"));
+          server.eval("2", server.context, "repl", (_e, r) => {
+            results.push(r);
+            server.close();
+          });
+        });
+        return server;
+      },
+    });
+    replAdapterConfig.adapter = "fake-handle-error";
+    await TSREPL.setup(null);
+
+    await new TSREPL.Tsrepl().run(TSREPL.conf);
+
+    expect(handled).toHaveLength(1);
+    expect(results).toEqual(["2"]);
   });
 
   it("run returns on EOF without exiting", async () => {

@@ -10,6 +10,7 @@ import { File } from "./file.js";
 import { STDIN, STDOUT, STDERR } from "./io.js";
 import { rbFLoad } from "./load.js";
 import { Dir } from "./dir.js";
+import { RUBY_PLATFORM } from "./ruby-platform.js";
 
 export interface ReplServerLike {
   context: Record<string, unknown>;
@@ -223,23 +224,20 @@ export class Tsrepl {
       }
       const [statement, file, callback] = next;
       let result: unknown;
+      let error: unknown = null;
       try {
         result = await this.evaluate(statement, file);
-      } catch (error) {
-        if (throwDataP(error)) {
+      } catch (e) {
+        if (throwDataP(e)) {
           server.close();
-          throw error;
+          throw e;
         }
-        if (error instanceof ReportedError) {
-          server.setPrompt(this.prompt());
-          continue;
-        }
-        server.setPrompt(this.prompt());
-        callback(error as Error);
-        continue;
+        error = e;
       }
       server.setPrompt(this.prompt());
-      callback(null, result);
+      if (error instanceof ReportedError) continue;
+      if (error != null) callback(error as Error);
+      else callback(null, result);
     }
   }
 
@@ -335,8 +333,8 @@ export class Tsrepl {
 }
 
 /**
- * `IRB::Color.colorable?` and `.colorize`
- * (`vendor/ruby/v3.3.11/lib/irb/color.rb:81-91`, `:119-123`).
+ * `IRB::Color.colorable?`, `.clear` and `.colorize`
+ * (`vendor/ruby/v3.3.11/lib/irb/color.rb:81-91`, `:113-123`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -345,6 +343,7 @@ export const Color: {
   RED: number;
   CLEAR: number;
   isColorable(): boolean;
+  clear(opts?: { colorable?: boolean }): string;
   colorize(text: string, seq: Array<"BLUE" | "RED">, opts?: { colorable?: boolean }): string;
 } = {
   BLUE: 34,
@@ -353,10 +352,20 @@ export const Color: {
 
   /** @noRailsEquivalent PERMANENT */
   isColorable(): boolean {
-    const supported = STDOUT.isTty() && Object.hasOwn(env, "TERM") && env.TERM !== "dumb";
-    return (
-      supported && !!(Object.hasOwn(TSREPL.conf, "USE_COLORIZE") ? TSREPL.conf.USE_COLORIZE : true)
-    );
+    const supported =
+      STDOUT.isTty() &&
+      (/mswin|mingw/.test(RUBY_PLATFORM()) || (Object.hasOwn(env, "TERM") && env.TERM !== "dumb"));
+
+    const useColorize = Object.hasOwn(TSREPL.conf, "USE_COLORIZE")
+      ? TSREPL.conf.USE_COLORIZE
+      : true;
+    return supported && useColorize != null && useColorize !== false;
+  },
+
+  /** @noRailsEquivalent PERMANENT */
+  clear({ colorable = Color.isColorable() }: { colorable?: boolean } = {}): string {
+    if (!colorable) return "";
+    return `\u001b[${Color.CLEAR}m`;
   },
 
   /** @noRailsEquivalent PERMANENT */
@@ -367,7 +376,7 @@ export const Color: {
   ): string {
     if (!colorable) return text;
     const prefix = seq.map((s) => `\u001b[${Color[s]}m`).join("");
-    return `${prefix}${text}\u001b[${Color.CLEAR}m`;
+    return `${prefix}${text}${Color.clear({ colorable })}`;
   },
 };
 
@@ -407,12 +416,14 @@ export const TSREPL = {
    * @noRailsEquivalent PERMANENT
    */
   async runConfig(): Promise<void> {
-    if (TSREPL.conf.RC) {
+    if (TSREPL.conf.RC != null && TSREPL.conf.RC !== false) {
       for (const rc of await TSREPL.irbrcFiles()) {
         try {
           await rbFLoad(rc);
         } catch (e) {
-          if (!(e instanceof Error)) throw e;
+          if (!(e instanceof StandardError || e instanceof LoadError || e instanceof SyntaxError)) {
+            throw e;
+          }
           STDERR.puts(`Error loading RC file '${rc}':\n${e.stack ?? e.message}`);
         }
       }
@@ -422,23 +433,43 @@ export const TSREPL = {
   /** @noRailsEquivalent PERMANENT */
   IRBRC_EXT: "rc",
 
+  /** @noRailsEquivalent PERMANENT */
+  _existingRcNameGenerators: null as Array<(rc: string) => string> | null,
+  /** @noRailsEquivalent PERMANENT */
+  _irbrcFiles: [] as string[],
+
   /**
-   * `IRB.irbrc_files` and `prepare_irbrc_name_generators`
-   * (`vendor/ruby/v3.3.11/lib/irb/init.rb:425-460`). `File.exist?` is
-   * awaited, so the list is computed on each call rather than memoized.
+   * `IRB.irbrc_files` (`vendor/ruby/v3.3.11/lib/irb/init.rb:425-428`).
    *
    * @noRailsEquivalent PERMANENT
    */
   async irbrcFiles(): Promise<string[]> {
-    const irbrcFiles: string[] = [];
+    await TSREPL.prepareIrbrcNameGenerators();
+    return TSREPL._irbrcFiles;
+  },
+
+  /**
+   * `IRB.prepare_irbrc_name_generators`
+   * (`vendor/ruby/v3.3.11/lib/irb/init.rb:444-460`). `File.exist?` is awaited.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async prepareIrbrcNameGenerators(): Promise<void> {
+    if (TSREPL._existingRcNameGenerators != null) return;
+
+    TSREPL._existingRcNameGenerators = [];
+    TSREPL._irbrcFiles = [];
     for await (const rcgen of TSREPL.rcFileGenerators()) {
       const irbrc = rcgen(TSREPL.IRBRC_EXT);
-      if (await File.isExistAsync(irbrc)) irbrcFiles.push(irbrc);
+      if (await File.isExistAsync(irbrc)) {
+        TSREPL._irbrcFiles.push(irbrc);
+        TSREPL._existingRcNameGenerators.push(rcgen);
+      }
     }
     for (const irbrc of TSREPL.generateCurrentDirIrbrcFiles()) {
-      if (await File.isExistAsync(irbrc)) irbrcFiles.push(irbrc);
+      if (await File.isExistAsync(irbrc)) TSREPL._irbrcFiles.push(irbrc);
     }
-    return [...new Set(irbrcFiles)];
+    TSREPL._irbrcFiles = [...new Set(TSREPL._irbrcFiles)];
   },
 
   /**
