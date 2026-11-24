@@ -1,19 +1,3 @@
-/**
- * Boot-graph harness (RFC 0192, boot-graph-measurement-harness).
- *
- * For an entry — a bare specifier or a path to an app file — runs a fresh
- * `node` with `register.mjs` installed through `--import`, imports the entry
- * from `probe.mjs`, and buckets every resolved file URL by owning package.
- * Shipped counts are `dist/**\/*.js` per workspace package.
- *
- *   pnpm tsx scripts/boot-graph/measure.mts                 # report + check baseline
- *   pnpm tsx scripts/boot-graph/measure.mts --write         # rewrite baseline.json + scc-map.json
- *   pnpm tsx scripts/boot-graph/measure.mts --entry @blazetrails/ruby-compat [--runs 5]
- *
- * The check fails only when ruby-compat's loaded count on the app boot rises
- * above the baseline; every other package is report-only (RFC 0192, Open
- * question 2).
- */
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -79,8 +63,7 @@ async function probe(entry: string, cwd: string): Promise<{ urls: string[]; ms: 
   }
 }
 
-/** One cold run to warm the OS cache, then the median of `runs` warm runs. */
-export async function measure(entry: string, runs: number, cwd = ROOT): Promise<Measurement> {
+async function measure(entry: string, runs: number, cwd = ROOT): Promise<Measurement> {
   const target = entry.startsWith("@") ? entry : pathToFileURL(resolve(ROOT, entry)).href;
   const first = await probe(target, cwd);
   const times: number[] = [];
@@ -114,8 +97,6 @@ function table(m: Measurement): string {
   return lines.join("\n");
 }
 
-// ── ruby-compat binding → owning module → in-SCC? ─────────────────────────
-
 const VALUE_EDGE = /(?:^|\n)\s*(?:import|export)\s*(?:[^'"`;]*?\sfrom\s*)?["'](\.[^"']+)["']/g;
 
 async function rcGraph(): Promise<Map<string, string[]>> {
@@ -130,7 +111,6 @@ async function rcGraph(): Promise<Map<string, string[]>> {
   return graph;
 }
 
-/** Tarjan's strongly-connected components; returns only the cycles (size > 1). */
 function sccs(graph: Map<string, string[]>): string[][] {
   let index = 0;
   const idx = new Map<string, number>();
@@ -188,11 +168,6 @@ async function sccMap() {
   };
 }
 
-/**
- * The bindings the app's loaded consumers import from the ruby-compat barrel,
- * mapped to their owning modules: importing just those modules is what the
- * app would load from ruby-compat once Phase 2 migrates every call site.
- */
 async function unionTarget(app: Measurement, map: Awaited<ReturnType<typeof sccMap>>) {
   const modules = new Set<string>();
   const consumers = Object.keys(app.packages).filter((p) => p !== "ruby-compat");
