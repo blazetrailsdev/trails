@@ -1,13 +1,10 @@
 import { ActiveSupportJSON, Logger } from "@blazetrails/activesupport";
-import {
-  EOFError,
-  Exception,
-  StandardError,
-  excSetupMessage,
-  stderr,
-} from "@blazetrails/ruby-compat";
+import { EOFError } from "@blazetrails/ruby-compat/eof-error";
+import { Exception, excSetupMessage } from "@blazetrails/ruby-compat/exception";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 
-import { block, fetch, type Hash } from "@blazetrails/ruby-compat";
+import { block, fetch, type Hash } from "@blazetrails/ruby-compat/hash";
 import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
 import { Mime, MimeType } from "./mime-type.js";
 import type { ParamHash } from "../request/utils.js";

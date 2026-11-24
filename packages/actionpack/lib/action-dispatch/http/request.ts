@@ -6,19 +6,17 @@ import {
   underscore,
   type Logger,
 } from "@blazetrails/activesupport";
-import {
-  EOFError,
-  b,
-  Encoding,
-  StringIO,
-  forceEncoding,
-  rbRegMatchP,
-  rbStrDump,
-  toI,
-  excSetupMessage,
-  rbObjDup,
-  rbModName,
-} from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { EOFError } from "@blazetrails/ruby-compat/eof-error";
+import { excSetupMessage } from "@blazetrails/ruby-compat/exception";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { rbModName } from "@blazetrails/ruby-compat/object";
+import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { rbStrDump } from "@blazetrails/ruby-compat/string/convert";
+import { forceEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 import { MissingController } from "../action-dispatch.js";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {

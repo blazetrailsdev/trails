@@ -3,6 +3,7 @@ import { beforeEach, describe, it } from "vitest";
 import { MissingTemplate } from "@blazetrails/actionview";
 import {
   CurrentAttributes,
+  with as with_,
   include,
   IsolatedExecutionState,
   Logger,
@@ -10,13 +11,16 @@ import {
 } from "@blazetrails/activesupport";
 import {
   assert,
+  assertEmpty,
   assertEqual,
+  assertInstanceOf,
   assertMatch,
   assertNil,
   assertNot,
   assertPredicate,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
+import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Digest } from "@blazetrails/activesupport/digest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import {
@@ -40,7 +44,9 @@ import { BadRequest } from "../../../lib/action-controller/metal/exceptions.js";
 import type { Parameters } from "../../../lib/action-controller/metal/strong-parameters.js";
 import {
   Buffer,
+  ClientDisconnected,
   Live,
+  Response as LiveResponse,
   SSE,
   type LiveControllerHost,
 } from "../../../lib/action-controller/metal/live.js";
@@ -308,6 +314,11 @@ describe("LiveStreamTest", () => {
       await this.render({ plain: rbInspect(IsolatedExecutionState.get("raw_isolated_state")) });
     }
 
+    async connectedToStackNotInherited(): Promise<void> {
+      const stack = IsolatedExecutionState.get("active_record_connected_to_stack");
+      await this.render({ plain: rbInspect(stack) });
+    }
+
     async withStale(): Promise<void> {
       if (await this.isStale(null, { etag: "123", template: false })) {
         await this.render({ plain: "stale" });
@@ -525,9 +536,8 @@ describe("LiveStreamTest", () => {
     assertEqual("text/csv", contentType);
   });
 
-  it.skip("delayed autoload after write within interlock hook", () => {
-    // PERMANENT-SKIP: the action autoloads `::LoadMe` through a `Zeitwerk` loader while holding `ActiveSupport::Dependencies.interlock`; a JS constant read cannot run a load (CLAUDE.md, "`Module#autoload` is a build step"), so no load runs inside the action to deadlock against.
-  });
+  // PERMANENT-SKIP: the action autoloads `::LoadMe` through a `Zeitwerk` loader while holding `ActiveSupport::Dependencies.interlock`; a JS constant read cannot run a load (CLAUDE.md, "`Module#autoload` is a build step"), so no load runs inside the action to deadlock against.
+  it.skip("delayed autoload after write within interlock hook", () => {});
 
   it("async stream", async () => {
     tc.controller.latch = new Concurrent.CountDownLatch();
@@ -654,6 +664,38 @@ describe("LiveStreamTest", () => {
     await tc.get("isolatedState");
     assertEqual(rbInspect(null), tc.response.body);
     assertStreamClosed();
+  });
+
+  it("connected to stack not inherited", async () => {
+    const klass = tc.controller.constructor as unknown as { liveStreamingExcludedKeys: string[] };
+    const original = klass.liveStreamingExcludedKeys;
+    klass.liveStreamingExcludedKeys = ["active_record_connected_to_stack"];
+    try {
+      const stack = [{ role: "reading", shard: "default", preventWrites: true, klasses: [] }];
+      IsolatedExecutionState.set("active_record_connected_to_stack", stack);
+
+      await tc.get("connectedToStackNotInherited");
+
+      assertEqual("nil", tc.response.body);
+      assertStreamClosed();
+    } finally {
+      klass.liveStreamingExcludedKeys = original;
+      IsolatedExecutionState.delete("active_record_connected_to_stack");
+    }
+  });
+
+  it("live streaming doesnt exclude by default", async () => {
+    try {
+      const stack = [{ role: "reading", shard: "default", preventWrites: true, klasses: [] }];
+      IsolatedExecutionState.set("active_record_connected_to_stack", stack);
+
+      await tc.get("connectedToStackNotInherited");
+
+      assertMatch(/role.*reading/, tc.response.body);
+      assertStreamClosed();
+    } finally {
+      IsolatedExecutionState.delete("active_record_connected_to_stack");
+    }
   });
 
   it("live stream default header", async () => {
@@ -792,6 +834,136 @@ describe("BufferTest", () => {
   it("nil callback", () => {
     const buf = new Buffer(null);
     assert(buf.callOnError());
+  });
+
+  async function buildResponse(): Promise<LiveResponse> {
+    const response = await LiveResponse.new();
+    response.request = Request.empty();
+    return response;
+  }
+
+  it("abort terminates a reader blocked on the buffer", async () => {
+    const response = await buildResponse();
+    const buf = response.stream as Buffer;
+
+    const received: unknown[] = [];
+    const reader = new Thread(async () => {
+      for await (const chunk of buf) received.push(chunk);
+    });
+
+    try {
+      await buf.write("hello");
+      await Timeout.timeout(5, null, null, async () => {
+        while (received.length === 0) await Thread.pass();
+      });
+
+      buf.abort();
+
+      assert(await reader.join(5), "#abort did not release a reader blocked in each_chunk");
+      assertEqual(["hello"], received);
+    } finally {
+      reader.kill();
+    }
+  });
+
+  it("close then abort still terminates the reader", async () => {
+    const response = await buildResponse();
+    const buf = response.stream as Buffer;
+
+    await buf.write("final");
+    await buf.close();
+    buf.abort();
+
+    const reader = new Thread(async () => {
+      await response.each(() => {});
+    });
+
+    try {
+      assert(await reader.join(5), "#abort after #close left the reader blocked in each_chunk");
+    } finally {
+      reader.kill();
+    }
+  });
+
+  it("close with a full buffer does not wait for a reader", async () => {
+    await with_(Buffer, { queueSize: 1 }, async () => {
+      const response = await buildResponse();
+      const buf = response.stream as Buffer;
+      await buf.write("final");
+
+      const closer = new Thread(() => buf.close());
+      try {
+        assert(await closer.join(1), "#close waited for a reader to drain the full buffer");
+        const chunks: unknown[] = [];
+        await response.each((chunk) => {
+          chunks.push(chunk);
+        });
+        assertEqual(["final"], chunks);
+      } finally {
+        closer.kill();
+      }
+    });
+  });
+
+  it("close and abort finish when a single slot buffer is full", async () => {
+    await with_(Buffer, { queueSize: 1 }, async () => {
+      const response = await buildResponse();
+      const buf = response.stream as Buffer;
+      await buf.write("queued");
+
+      const start = new Concurrent.CountDownLatch();
+      const closer = new Thread(async () => {
+        await start.wait();
+        await buf.close();
+      });
+      const aborter = new Thread(async () => {
+        await start.wait();
+        buf.abort();
+      });
+      start.countDown();
+
+      const chunks: unknown[] = [];
+      let reader: Thread | undefined;
+      try {
+        assert(await closer.join(1), "#close remained blocked when raced with #abort");
+        assert(await aborter.join(1), "#abort remained blocked when raced with #close");
+
+        reader = new Thread(async () => {
+          await response.each((chunk) => {
+            chunks.push(chunk);
+          });
+        });
+        assert(await reader.join(1), "the aborted buffer did not terminate its reader");
+        assertEmpty(chunks);
+      } finally {
+        closer.kill();
+        aborter.kill();
+        reader?.kill();
+      }
+    });
+  });
+
+  it("write after abort does not block on the terminator", async () => {
+    await with_(Buffer, { queueSize: 1 }, async () => {
+      const response = await buildResponse();
+      const buf = response.stream as Buffer;
+      buf.abort();
+
+      const writer = new Thread(async () => {
+        try {
+          await buf.write("late");
+        } catch (error) {
+          return error;
+        }
+      });
+
+      try {
+        assert(await writer.join(1), "#write blocked after the buffer was aborted");
+        assertInstanceOf(ClientDisconnected, await writer.value());
+      } finally {
+        writer.kill();
+      }
+    });
   });
 });
 

@@ -1,6 +1,7 @@
 import { ActionController } from "../../namespaces.js";
 import { dasherize, underscore } from "@blazetrails/activesupport";
-import { include, rbCallSuper, rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { include, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat/object";
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
 

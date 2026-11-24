@@ -2,7 +2,8 @@ import type { LaunchOptions } from "playwright";
 import { compact } from "@blazetrails/activesupport";
 import type { RackMiddleware } from "@blazetrails/rack";
 import { Session } from "@blazetrails/rack-test";
-import { hashDelete, NotImplementedError } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { Browser } from "./browser.js";
 import { vite } from "./server.js";
 

@@ -1,17 +1,12 @@
 import { ActionController } from "../../namespaces.js";
 /* eslint-disable @typescript-eslint/no-namespace -- `HttpAuthentication::Basic`, `Digest` and `Token` each nest a `ControllerMethods` and share `authenticate` / `encode_credentials` / `authentication_request` (`action_controller/metal/http_authentication.rb:69,189,425`); nested namespaces keep every one at its Rails name. */
-import {
-  ArgumentError,
-  Base64,
-  forceEncoding,
-  isValidEncoding,
-  rbStrToI,
-  OpenSSL,
-  rbFSend,
-  rbInspect,
-  rbObjClassname,
-  stringSplit,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import { rbFSend, rbInspect, rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { rbStrToI } from "@blazetrails/ruby-compat/string/convert";
+import { forceEncoding, isValidEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 import { extend, included, type Included } from "@blazetrails/ruby-compat/include";
 import {
   HashWithIndifferentAccess,

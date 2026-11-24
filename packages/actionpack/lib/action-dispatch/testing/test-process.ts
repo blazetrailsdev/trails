@@ -1,4 +1,6 @@
-import { File, NoMethodError, type Pathname } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
 
 export { NoMethodError };
 

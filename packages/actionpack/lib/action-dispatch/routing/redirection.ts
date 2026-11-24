@@ -5,15 +5,11 @@ import { URL as UrlHelpers } from "../http/url.js";
 import { Utils } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
-import {
-  ArgumentError,
-  hashDelete,
-  isEmpty,
-  rbObjIsProc,
-  rbObjRespondTo,
-  URI,
-  rbProcCall,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rbObjIsProc, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
 
 export { Endpoint } from "./endpoint.js";
 

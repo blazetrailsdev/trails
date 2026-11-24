@@ -8,7 +8,7 @@ import {
   tryCall,
 } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { hashDelete, hashReplace, mergeBang } from "@blazetrails/ruby-compat";
+import { hashDelete, hashReplace, mergeBang } from "@blazetrails/ruby-compat/hash";
 import type { Metal } from "../metal.js";
 import { Head, type head } from "./head.js";
 import type { CacheControlHash } from "../../action-dispatch/http/cache.js";

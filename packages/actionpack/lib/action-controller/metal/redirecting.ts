@@ -1,6 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { Response } from "../../action-dispatch/http/response.js";
-import { hashDelete } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
 import { type StatusSymbol } from "@blazetrails/rack";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import type { UrlForHashOptions } from "../../action-dispatch/routing/url-for.js";
@@ -16,14 +16,11 @@ import {
   presence,
   truncate,
 } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  Error as URIError,
-  URI,
-  rbCheckStringType,
-  rbInspect,
-  stringDelete,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { stringDelete } from "@blazetrails/ruby-compat/string/delete";
+import { rbCheckStringType } from "@blazetrails/ruby-compat/string/support";
+import { Error as URIError, URI } from "@blazetrails/ruby-compat/uri/common";
 import { Logger } from "../../abstract-controller/logger.js";
 import { UrlFor } from "./url-for.js";
 

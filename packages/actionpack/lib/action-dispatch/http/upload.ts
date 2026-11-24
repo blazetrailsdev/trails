@@ -1,10 +1,7 @@
-import {
-  ArgumentError,
-  hashAref,
-  type File,
-  type Hash,
-  type Tempfile,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import type { File } from "@blazetrails/ruby-compat/file";
+import { hashAref, type Hash } from "@blazetrails/ruby-compat/hash";
+import type { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 
 /** @noRailsEquivalent PERMANENT */
 export interface UploadedFileOptions {

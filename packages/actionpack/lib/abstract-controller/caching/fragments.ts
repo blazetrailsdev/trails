@@ -1,6 +1,7 @@
 /** @internal */
 
-import { NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import {
   classAttribute,
   Concern,

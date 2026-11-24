@@ -1,5 +1,7 @@
 import { I18n, camelize } from "@blazetrails/activesupport";
-import { fetch, File, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";

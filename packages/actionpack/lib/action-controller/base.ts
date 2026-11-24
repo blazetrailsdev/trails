@@ -12,7 +12,8 @@ import type { Callbacks as ASCallbacks, Extended } from "@blazetrails/activesupp
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
-import { isModuleIncluded, constGet } from "@blazetrails/ruby-compat";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
 import type { FlashHash } from "../action-dispatch/middleware/flash.js";

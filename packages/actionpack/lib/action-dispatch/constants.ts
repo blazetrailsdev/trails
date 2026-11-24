@@ -1,5 +1,5 @@
 import { RELEASE } from "@blazetrails/rack";
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
 
 export let VARY: string;
 export let CONTENT_ENCODING: string;

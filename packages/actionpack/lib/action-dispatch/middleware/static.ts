@@ -1,6 +1,8 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Files, Mime, Request, Utils } from "@blazetrails/rack";
-import { chomp, File, rbProcCall } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 

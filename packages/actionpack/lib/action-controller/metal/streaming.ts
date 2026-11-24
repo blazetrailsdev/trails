@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import type { Base as ActionViewBase, Renderer, RenderToBodyHost } from "@blazetrails/actionview";
 import type { Response } from "../../action-dispatch/http/response.js";
 

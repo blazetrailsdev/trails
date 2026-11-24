@@ -23,18 +23,15 @@ import {
 } from "@blazetrails/activesupport";
 import { ConstantLookup } from "@blazetrails/activesupport/testing/constant-lookup";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import {
-  ArgumentError,
-  b,
-  KeyError,
-  rbModAttrReader,
-  rbObjIvarSet,
-  RuntimeError,
-  SecureRandom,
-  StringIO,
-  verbose,
-  warn,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { rbModAttrReader, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { verbose } from "@blazetrails/ruby-compat/verbose";
 import { DEFAULT_OPTIONS, SecureSessionHash, SessionId } from "@blazetrails/rack-session";
 import {
   MULTIPART_BOUNDARY,

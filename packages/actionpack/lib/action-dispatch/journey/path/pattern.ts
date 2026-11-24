@@ -1,4 +1,4 @@
-import { regexpEscape, rbRegSUnion, rbRegToS } from "@blazetrails/ruby-compat";
+import { regexpEscape, rbRegSUnion, rbRegToS } from "@blazetrails/ruby-compat/regexp";
 import { Ast } from "../nodes/node.js";
 import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";

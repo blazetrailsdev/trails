@@ -1,4 +1,5 @@
-import { format, strNew } from "@blazetrails/ruby-compat";
+import { format } from "@blazetrails/ruby-compat/kernel-format";
+import { strNew } from "@blazetrails/ruby-compat/string/bytes";
 
 export class UriEncoder {
   static readonly ENCODE = "%%%02X";

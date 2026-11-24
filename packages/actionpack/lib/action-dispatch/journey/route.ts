@@ -1,13 +1,8 @@
 import { dasherize, isBlank, isPresent } from "@blazetrails/activesupport";
-import {
-  block,
-  deleteIf,
-  fetch,
-  isSymbol,
-  rbEqq,
-  rbFSend,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { block, deleteIf, fetch } from "@blazetrails/ruby-compat/hash";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import type { Pattern } from "./path/pattern.js";
 import type { Node } from "./nodes/node.js";
 import type { Format } from "./visitors.js";

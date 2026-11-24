@@ -1,7 +1,7 @@
 import type { createServer, InlineConfig, ViteDevServer } from "vite";
 import { type RackMiddleware } from "@blazetrails/rack";
 import { Handler } from "@blazetrails/rackup";
-import type { HttpRequest, HttpSocket } from "@blazetrails/ruby-compat";
+import type { HttpRequest, HttpSocket } from "@blazetrails/ruby-compat/http-adapter";
 
 /** @noRailsEquivalent PERMANENT */
 export const vite: {

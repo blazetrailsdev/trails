@@ -1,6 +1,9 @@
 import { underscore, type SafeBuffer } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
-import { IO, RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
+import { SimpleDelegator } from "@blazetrails/ruby-compat/delegate";
+import { IO } from "@blazetrails/ruby-compat/io";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { RFC2396_PARSER } from "@blazetrails/ruby-compat/uri/common";
 import type { Endpoint } from "./endpoint.js";
 import type { Route } from "../journey/route.js";
 import { RouteSet } from "./route-set.js";

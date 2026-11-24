@@ -1,10 +1,7 @@
-import {
-  RuntimeError,
-  deleteAt,
-  rbInspect,
-  rbBlockGivenP,
-  rbProcCall,
-} from "@blazetrails/ruby-compat";
+import { deleteAt } from "@blazetrails/ruby-compat/array";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { Notifications } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 

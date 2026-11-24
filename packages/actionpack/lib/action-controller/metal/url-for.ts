@@ -1,7 +1,7 @@
 import { ActionController } from "../../namespaces.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import { Concern, extend } from "@blazetrails/activesupport";
-import { include, rbCallSuper } from "@blazetrails/ruby-compat";
+import { include, rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { UrlFor as AbstractControllerUrlFor } from "../../action-dispatch/routing/url-for.js";
 import type { UrlForHost as RoutingUrlForHost } from "../../action-dispatch/routing/url-for.js";
 

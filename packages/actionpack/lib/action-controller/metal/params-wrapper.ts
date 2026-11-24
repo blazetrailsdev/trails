@@ -1,18 +1,11 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
-import {
-  deleteAt,
-  except,
-  flatten,
-  rbFArray,
-  rbObjDup,
-  rbObjRespondTo,
-  rbStrSend,
-  rtest,
-  slice,
-  Struct,
-  toS,
-} from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { deleteAt, flatten, rbFArray } from "@blazetrails/ruby-compat/array";
+import { except, slice } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo, rtest, toS } from "@blazetrails/ruby-compat/object";
+import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
+import { Struct } from "@blazetrails/ruby-compat/struct";
 
 import {
   Concern,

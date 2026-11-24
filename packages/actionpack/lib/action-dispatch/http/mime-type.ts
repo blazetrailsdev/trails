@@ -1,22 +1,16 @@
 import { registerDefaultMimeTypes } from "./mime-types.js";
-import {
-  aryDelete,
-  Enumerable,
-  include,
-  isSymbol,
-  KERNEL_METHODS,
-  KeyError,
-  NoMethodError,
-  objRespondToMissing,
-  PROTOCOL_PROBES,
-  rbInspect,
-  regexpEscape,
-  rbEqual,
-  rbHash,
-  StandardError,
-  stringToSym,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { aryDelete } from "@blazetrails/ruby-compat/array";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { include } from "@blazetrails/ruby-compat/include";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { objRespondToMissing, rbInspect } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { isSymbol, stringToSym, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { underscore } from "@blazetrails/activesupport";
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (`actionpack/lib/action_dispatch/http/mime_type.rb:11`); the class/interface merge is how a mixin surfaces on the type side. */

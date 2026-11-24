@@ -1,5 +1,5 @@
 import type { ParameterFilter } from "@blazetrails/activesupport";
-import { Error as URIError, URI } from "@blazetrails/ruby-compat";
+import { Error as URIError, URI } from "@blazetrails/ruby-compat/uri/common";
 
 /** @internal */
 export const FILTERED = "[FILTERED]";

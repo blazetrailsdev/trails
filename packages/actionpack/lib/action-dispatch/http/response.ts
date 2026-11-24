@@ -1,25 +1,24 @@
 import type { Time } from "@blazetrails/date";
 import { cattrAccessor, include, presence, runLoadHooks } from "@blazetrails/activesupport";
+import { aryJoin, rbCheckArrayType } from "@blazetrails/ruby-compat/array";
+import { toEnum } from "@blazetrails/ruby-compat/enumerator";
+import { File } from "@blazetrails/ruby-compat/file";
+import { hashAset } from "@blazetrails/ruby-compat/hash";
+import { rbClassNewInstance } from "@blazetrails/ruby-compat/include";
+import { IO } from "@blazetrails/ruby-compat/io";
+import { IOError } from "@blazetrails/ruby-compat/io-error";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 import {
-  aryJoin,
-  hashAset,
-  File,
-  IO,
-  IOError,
-  RuntimeError,
   basicObjRespondTo,
-  rbCheckArrayType,
   rbObjAsString,
   rbFSend,
-  rbClassNewInstance,
   rbObjRespondTo,
   rbProcCall,
-  strNew,
-  stringSplit,
-  Struct,
-  toEnum,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { strNew } from "@blazetrails/ruby-compat/string/bytes";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import { Struct } from "@blazetrails/ruby-compat/struct";
 import {
   deleteSetCookieHeaderBang,
   Headers,

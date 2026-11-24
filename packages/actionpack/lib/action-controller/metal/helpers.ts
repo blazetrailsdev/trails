@@ -1,5 +1,5 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import {
   classAttribute,
   Concern,
@@ -8,7 +8,8 @@ import {
   type InheritableOptions,
 } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
-import { aryDelete, rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import { aryDelete } from "@blazetrails/ruby-compat/array";
+import { rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
 import {
   Helpers as AbstractHelpers,
   Resolution,

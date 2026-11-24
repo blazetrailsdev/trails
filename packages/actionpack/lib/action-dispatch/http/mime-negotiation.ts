@@ -2,7 +2,8 @@ import { ArrayInquirer, included, isBlank, mattrAccessor } from "@blazetrails/ac
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
-import { ArgumentError, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { ActionDispatch } from "../../namespaces.js";
 
 /** @internal */

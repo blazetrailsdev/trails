@@ -1,4 +1,4 @@
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 
 export class AssumeSSL {

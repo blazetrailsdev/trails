@@ -4,7 +4,7 @@ import {
   NotificationEvent as Event,
   TopLevel,
 } from "@blazetrails/activesupport";
-import { rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
 
 export class LogSubscriber extends BaseLogSubscriber {
   redirect(event: Event): void {

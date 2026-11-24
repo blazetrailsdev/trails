@@ -1,5 +1,6 @@
 import { isPlainObject, isPresent, symbolizeKeys, toParam } from "@blazetrails/activesupport";
-import { block, fetch, rbInspect, toSym } from "@blazetrails/ruby-compat";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { rbInspect, toSym } from "@blazetrails/ruby-compat/object";
 import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import type { Route } from "./route.js";
 

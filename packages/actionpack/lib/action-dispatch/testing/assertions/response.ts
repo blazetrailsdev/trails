@@ -4,7 +4,7 @@ import {
   assertEqual,
   UnexpectedError,
 } from "@blazetrails/activesupport/testing/assertions";
-import { rbEqq } from "@blazetrails/ruby-compat";
+import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
 import { AssertionResponse } from "../assertion-response.js";
 import { Redirecting, type RedirectingHost } from "../../../action-controller/metal/redirecting.js";
 

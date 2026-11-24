@@ -1,5 +1,6 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";

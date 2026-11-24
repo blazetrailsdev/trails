@@ -1,17 +1,14 @@
 import { ActionController } from "../../namespaces.js";
 import type { Callbacks as ASCallbacks, Extended } from "@blazetrails/activesupport";
-import { TypeError } from "@blazetrails/ruby-compat";
-import {
-  ArgumentError,
-  Base64,
-  chomp,
-  OpenSSL,
-  rbObjRespondTo,
-  rtest,
-  SecureRandom,
-  URI,
-  type Bytes,
-} from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
 import {
   ActiveSupportJSON,
   extend,

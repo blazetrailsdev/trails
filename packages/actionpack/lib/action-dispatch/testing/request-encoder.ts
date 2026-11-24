@@ -1,4 +1,7 @@
-import { ArgumentError, JSON, rbFSend, symbolToS } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { JSON } from "@blazetrails/ruby-compat/json";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 import {
   HashWithIndifferentAccess,
   ToJsonWithActiveSupportEncoder,

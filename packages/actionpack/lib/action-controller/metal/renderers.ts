@@ -9,7 +9,7 @@ import {
   removePossibleMethod,
   type ToJsonWithActiveSupportEncoderHost,
 } from "@blazetrails/activesupport";
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
 
 export function addRenderer<Host extends object>(key: string, block: RendererProc<Host>): void {

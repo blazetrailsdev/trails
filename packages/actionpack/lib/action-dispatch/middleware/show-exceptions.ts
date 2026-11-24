@@ -1,4 +1,7 @@
-import { excBacktrace, stderr, rbObjDup, rbProcCall } from "@blazetrails/ruby-compat";
+import { excBacktrace } from "@blazetrails/ruby-compat/backtrace-location";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
 import type { BacktraceCleaner } from "@blazetrails/activesupport";

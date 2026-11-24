@@ -6,19 +6,12 @@ import {
   reverseMergeBang,
   transformKeys,
 } from "@blazetrails/activesupport";
-import {
-  classModule,
-  extend,
-  Hash,
-  dup,
-  hashDelete,
-  include,
-  isSymbol,
-  rbFSend,
-  rbModMethodDefined,
-  symbolToS,
-  toH,
-} from "@blazetrails/ruby-compat";
+import { toH } from "@blazetrails/ruby-compat/array";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { Hash, dup, hashDelete } from "@blazetrails/ruby-compat/hash";
+import { extend, include } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rbModMethodDefined } from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import type { UrlOptions } from "../http/url.js";
 import {

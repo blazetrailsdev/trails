@@ -1,19 +1,14 @@
+import { deleteIf } from "@blazetrails/ruby-compat/hash";
+import { extend, include, Module, rbObjClone } from "@blazetrails/ruby-compat/include";
+import { rbObjMethod, type Method } from "@blazetrails/ruby-compat/method";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import {
-  deleteIf,
-  extend,
-  include,
-  InvalidURIError,
-  Module,
-  NoMethodError,
   rbFSend,
   rbObjClassname,
-  rbObjClone,
-  rbObjMethod,
   rbObjRespondTo,
   rbObjSingletonClass,
-  URI,
-  type Method,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { InvalidURIError, URI } from "@blazetrails/ruby-compat/uri/common";
 import { Concern } from "@blazetrails/activesupport";
 import { Assertion, assertEqual, message } from "@blazetrails/activesupport/testing/assertions";
 import { RouteSet, type Config } from "../../routing/route-set.js";

@@ -19,13 +19,9 @@ import {
   type UrlForRoutes,
 } from "./url-for.js";
 import { extractOptionsBang, include } from "@blazetrails/activesupport";
-import {
-  NoMethodError,
-  objRespondToMissing,
-  rbFSend,
-  rbObjRespondTo,
-  chomp,
-} from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { objRespondToMissing, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
 import { Routing } from "../../namespaces.js";
 
 export type RoutesProxyHelpers = Record<string, unknown>;

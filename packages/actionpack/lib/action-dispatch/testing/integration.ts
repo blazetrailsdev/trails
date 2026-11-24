@@ -2,22 +2,15 @@ import { Request } from "../http/request.js";
 import { Headers } from "../http/headers.js";
 import { Mime } from "../http/mime-type.js";
 import { isPresent, reverseMergeBang, runLoadHooks } from "@blazetrails/activesupport";
-import {
-  HTTPS,
-  NoMethodError,
-  RuntimeError,
-  URI,
-  include,
-  rbFSend,
-  rbObjClassname,
-  rbObjDup,
-  Module,
-  rbObjRespondTo,
-  stringSplit,
-  type Generic,
-  type Included,
-  type StringIO,
-} from "@blazetrails/ruby-compat";
+import { include, rbObjDup, Module, type Included } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbFSend, rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import type { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
+import type { Generic } from "@blazetrails/ruby-compat/uri/generic";
+import { HTTPS } from "@blazetrails/ruby-compat/uri/https";
 import { TestResponse } from "./test-response.js";
 import { Buffer } from "../http/response.js";
 import { Buffer as LiveBuffer } from "../../action-controller/metal/live.js";

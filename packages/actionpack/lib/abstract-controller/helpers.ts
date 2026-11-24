@@ -9,27 +9,28 @@ import {
   kernelArray,
   NameError,
 } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Dir } from "@blazetrails/ruby-compat/dir";
 import {
-  ArgumentError,
-  Dir,
   include,
   isModuleIncluded,
-  isPlainHash,
-  isSymbol,
   Module,
+  constDefined,
+  constSet,
+  rbObjIsKindOf,
+} from "@blazetrails/ruby-compat/include";
+import {
+  isPlainHash,
   rbClassSuperclass,
   rbDeclareIvar,
   rbFSend,
-  constDefined,
-  constGet,
-  constSet,
   rbModName,
   rbModSingletonP,
-  rbObjIsKindOf,
   rbObjIvarDefined,
   rbObjIvarGet,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 
 export type HelperMethodsModule = object;
 

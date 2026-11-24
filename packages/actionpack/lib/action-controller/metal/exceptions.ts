@@ -1,6 +1,8 @@
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { toSentence } from "@blazetrails/activesupport";
-import { StandardError, excBacktrace, excSetBacktrace, include } from "@blazetrails/ruby-compat";
+import { excBacktrace, excSetBacktrace } from "@blazetrails/ruby-compat/backtrace-location";
+import { include } from "@blazetrails/ruby-compat/include";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 

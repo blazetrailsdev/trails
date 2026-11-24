@@ -6,6 +6,7 @@
     "paths": {
       "@blazetrails/rack": ["../lib/index.ts"],
       "@blazetrails/ruby-compat/racc/parser": ["../../ruby-compat/lib/racc/parser.ts"],
+      "@blazetrails/ruby-compat/*": ["../../ruby-compat/lib/*.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/lib/index.ts"],
       "@blazetrails/date": ["../../date/lib/index.ts"]
     }

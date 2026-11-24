@@ -1,4 +1,4 @@
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import { BodyProxy } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import type { BacktraceCleaner } from "@blazetrails/activesupport";

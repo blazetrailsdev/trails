@@ -4,7 +4,7 @@ import { Testing } from "@blazetrails/actionview/rails-dom-testing/testing";
 import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
 import type * as DomAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
 import type * as SelectorAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/selector-assertions";
-import { extend, include } from "@blazetrails/ruby-compat";
+import { extend, include } from "@blazetrails/ruby-compat/include";
 import { ActionDispatch } from "../../namespaces.js";
 import { ResponseAssertions } from "./assertions/response.js";
 import { RoutingAssertions } from "./assertions/routing.js";

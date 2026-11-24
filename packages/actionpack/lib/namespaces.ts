@@ -7,7 +7,11 @@ import {
   type Deprecation,
   type Extended,
 } from "@blazetrails/activesupport";
-import { NameError, RuntimeError, rbInspect, constGet, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import * as Journey from "./action-dispatch/journey/index.js";

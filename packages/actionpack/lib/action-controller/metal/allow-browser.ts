@@ -8,7 +8,8 @@ import {
   extend,
   type Included,
 } from "@blazetrails/activesupport";
-import { File, rbFSend } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { CallbackOptions, beforeAction } from "../../abstract-controller/callbacks.js";
