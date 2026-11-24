@@ -781,6 +781,7 @@ export default defineConfig({
             "scripts/sync-stats/*.test.ts",
             "scripts/layout/*.test.ts",
             "scripts/package-size/*.test.ts",
+            "scripts/bench/**/*.test.ts",
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],

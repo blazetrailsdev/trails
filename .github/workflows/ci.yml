@@ -994,6 +994,7 @@ jobs:
           scripts/sync-stats
           scripts/parity
           scripts/layout
+          scripts/bench
           eslint/
           scripts/strip-asany.test.ts
           scripts/tasks-shim.test.ts
