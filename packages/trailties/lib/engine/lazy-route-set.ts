@@ -47,26 +47,6 @@ export class LazyRouteSet extends RouteSet {
       TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
       return rbCallSuper(this, LazyRouteSet.ProxyUrlHelpers.optimizeRoutesGeneration);
     },
-
-    polymorphicUrl(this: object, recordOrHashOrArray: unknown, options: unknown = {}): unknown {
-      TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-      return rbCallSuper(
-        this,
-        LazyRouteSet.ProxyUrlHelpers.polymorphicUrl,
-        recordOrHashOrArray,
-        options,
-      );
-    },
-
-    polymorphicPath(this: object, recordOrHashOrArray: unknown, options: unknown = {}): unknown {
-      TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-      return rbCallSuper(
-        this,
-        LazyRouteSet.ProxyUrlHelpers.polymorphicPath,
-        recordOrHashOrArray,
-        options,
-      );
-    },
   };
 
   constructor(config?: ConstructorParameters<typeof RouteSet>[0]) {
@@ -115,6 +95,11 @@ export class LazyRouteSet extends RouteSet {
   override async call(req: RackEnv): Promise<RackResponse> {
     TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.call(req);
+  }
+
+  override get polymorphicMappings(): RouteSet["polymorphicMappings"] {
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return super.polymorphicMappings;
   }
 
   override draw(callback: DrawCallback): void {

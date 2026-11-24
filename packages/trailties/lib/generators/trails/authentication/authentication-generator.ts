@@ -59,8 +59,6 @@ export class AuthenticationGenerator extends Base {
 
     await this.template("app/views/passwords-mailer/reset.html.tse");
     await this.template("app/views/passwords-mailer/reset.text.tse");
-
-    await this.template("test/mailers/previews/passwords-mailer-preview.ts");
   }
 
   configureApplicationController(): void {

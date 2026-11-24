@@ -8,6 +8,7 @@ import { AuthenticationGenerator } from "../../../../lib/generators/trails/authe
 import { Application } from "../../../../lib/application.js";
 import { Trails } from "../../../../lib/trails.js";
 import "../../../../lib/trailties/active-record.js";
+import "../../../../lib/trailties/action-mailer.js";
 
 class AuthenticationGeneratorApp extends Application {}
 

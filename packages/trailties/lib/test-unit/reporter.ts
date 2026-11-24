@@ -1,5 +1,8 @@
 import { classAttribute } from "@blazetrails/activesupport";
 import {
+  Dir,
+  File,
+  env as ENV,
   Interrupt,
   STDOUT,
   rbObjMethod,
@@ -31,8 +34,15 @@ export class TestUnitReporter {
   declare static executable: string;
 
   static {
-    classAttribute.call(this, "appRoot", { instanceAccessor: false });
-    classAttribute.call(this, "executable", { default: "bin/trails test" });
+    classAttribute.call(this, "appRoot", {
+      instanceAccessor: false,
+      default: ENV["TRAILS_TEST_PWD"],
+    });
+    classAttribute.call(this, "executable", {
+      default: Object.hasOwn(ENV, "TRAILS_TEST_EXECUTABLE")
+        ? ENV["TRAILS_TEST_EXECUTABLE"]
+        : "bin/trails test",
+    });
   }
 
   io: Io;
@@ -101,7 +111,7 @@ export class TestUnitReporter {
   relativePathFor(file: string): string {
     const appRoot = this.appRoot();
     if (appRoot != null) {
-      return file.replace(new RegExp(`^${appRoot}/?`), "");
+      return File.expandPath(file).replace(new RegExp(`^${appRoot}/?`), "");
     } else {
       return file;
     }
@@ -135,8 +145,13 @@ export class TestUnitReporter {
   private appRoot(): string | null | undefined {
     return (this._appRoot ??=
       (this.constructor as typeof TestUnitReporter).appRoot ??
-      ENGINE_ROOT ??
-      Trails.root()?.toString());
+      (ENV["TRAILS_TEST_PWD"] != null
+        ? ENV["TRAILS_TEST_PWD"]
+        : ENGINE_ROOT != null
+          ? ENGINE_ROOT
+          : rbObjRespondTo(Trails, "root")
+            ? Trails.root()?.toString()
+            : Dir.pwd()));
   }
 
   /** @internal */
