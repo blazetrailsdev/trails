@@ -118,13 +118,31 @@ function rootNamespace(root: string | undefined): object {
   return namespace;
 }
 
+/**
+ * Rails' template-engine generators live under `module Erb`
+ * (`railties/lib/rails/generators/erb.rb`), not the `ERB` class, so trails'
+ * `generators/tse` is `Tse` where every other `tse` basename is `TSE`.
+ */
+class GeneratorsInflector extends Inflector {
+  override camelize(basename: string, abspath: string | null): string {
+    if (
+      basename === "tse" &&
+      abspath !== null &&
+      File.basename(File.dirname(abspath)) === "generators"
+    ) {
+      return "Tse";
+    }
+    return super.camelize(basename, abspath);
+  }
+}
+
 async function buildLoader(dir: string): Promise<Loader> {
   const { root, collapse = [] } = PACKAGE_LAYOUTS[dir] ?? {};
   const packageFile = File.join(ROOT_DIR, "packages", dir, "package.json");
   const loader = await Registry.loaderForPackage(packageFile, {
     namespace: rootNamespace(root),
   });
-  const inflector = new Inflector();
+  const inflector = new GeneratorsInflector();
   inflector.inflect({
     gem_version: "VERSION",
     ...Object.fromEntries(
