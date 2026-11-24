@@ -5,6 +5,7 @@ import { env, exit } from "./process-adapter.js";
 import { extend } from "./include.js";
 import { StandardError } from "./standard-error.js";
 import { LoadError } from "./load-error.js";
+import { NotImplementedError } from "./not-implemented-error.js";
 import { kernelCatch, throwDataP } from "./kernel-catch.js";
 import { File } from "./file.js";
 import { STDIN, STDOUT, STDERR } from "./io.js";
@@ -421,7 +422,14 @@ export const TSREPL = {
         try {
           await rbFLoad(rc);
         } catch (e) {
-          if (!(e instanceof StandardError || e instanceof LoadError || e instanceof SyntaxError)) {
+          if (
+            !(
+              e instanceof StandardError ||
+              e instanceof LoadError ||
+              e instanceof NotImplementedError ||
+              e instanceof SyntaxError
+            )
+          ) {
             throw e;
           }
           STDERR.puts(`Error loading RC file '${rc}':\n${e.stack ?? e.message}`);
