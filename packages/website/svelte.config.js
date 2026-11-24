@@ -12,6 +12,7 @@ const config = {
     prerender: {
       handleHttpError: ({ path, message }) => {
         const docs = `${process.env.SITE_BASE ?? ""}/docs/`;
+        if (path === `${process.env.SITE_BASE ?? ""}/playground/`) return;
         if (
           ["", "guides/", "guides/idioms", "guides/getting-started", "api/README"].some(
             (p) => path === docs + p,

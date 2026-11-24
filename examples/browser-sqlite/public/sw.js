@@ -1,4 +1,6 @@
 let runtimeId = null;
+const base = new URL("./", self.location.href).pathname;
+const previewPath = `${base}preview`;
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
@@ -11,19 +13,19 @@ self.addEventListener("message", (event) => {
 });
 
 function underPreview(url) {
-  return url.pathname === "/preview" || url.pathname.startsWith("/preview/");
+  return url.pathname === previewPath || url.pathname.startsWith(`${previewPath}/`);
 }
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  if (underPreview(url) || url.pathname.startsWith("/rt/")) {
+  if (underPreview(url) || url.pathname.startsWith(`${base}rt/`)) {
     event.respondWith(forward(event.request, url));
     return;
   }
   const referrer = event.request.referrer ? new URL(event.request.referrer) : null;
   if (referrer && referrer.origin === url.origin && underPreview(referrer)) {
-    const moved = new URL(`/preview${url.pathname}${url.search}`, url.origin);
+    const moved = new URL(`${previewPath}${url.pathname}${url.search}`, url.origin);
     event.respondWith(
       event.request.mode === "navigate"
         ? Response.redirect(moved.href, 302)

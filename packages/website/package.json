@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --host",
-    "build": "vite build && pnpm run docs:build",
+    "build": "pnpm run playground:build && vite build && pnpm run docs:build",
+    "playground:build": "tsc --build ../../tsconfig.json && pnpm --filter @blazetrails/example-browser-sqlite exec vite build --base \"${SITE_BASE:-}/playground/\" --outDir \"$PWD/static/playground\" --emptyOutDir",
     "preview": "vite preview",
     "pretest": "svelte-kit sync",
     "test": "vitest run",

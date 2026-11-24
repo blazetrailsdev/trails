@@ -166,16 +166,18 @@ editor.addEventListener("keydown", (e) => {
   }
 });
 
+const previewPath = `${import.meta.env.BASE_URL}preview`;
+
 function navigate(path: string): void {
   const target = path.startsWith("/") ? path : `/${path}`;
-  preview.src = `/preview${target}`;
+  preview.src = `${previewPath}${target}`;
 }
 
 preview.addEventListener("load", () => {
   try {
     const loc = preview.contentWindow!.location;
-    if (loc.pathname.startsWith("/preview"))
-      urlInput.value = loc.pathname.slice(8) + loc.search || "/";
+    if (loc.pathname.startsWith(previewPath))
+      urlInput.value = loc.pathname.slice(previewPath.length) + loc.search || "/";
   } catch {
     /* cross-origin */
   }
@@ -250,12 +252,14 @@ function restart(): void {
   log("system", `— starting trails (run ${session}) —`);
   runtime?.remove();
   runtime = document.createElement("iframe");
-  runtime.src = `/runtime.html?session=${session}`;
+  runtime.src = `${import.meta.env.BASE_URL}runtime.html?session=${session}`;
   $("runtime-holder").append(runtime);
 }
 
 async function start(): Promise<void> {
-  await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
+    scope: import.meta.env.BASE_URL,
+  });
   await navigator.serviceWorker.ready;
   if (!navigator.serviceWorker.controller) {
     const claimed = await new Promise<boolean>((resolve) => {
