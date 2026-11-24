@@ -17,7 +17,7 @@
  *      its current Ruby body digest to output/body-hashes.json.
  *   2. VERIFY the port is faithful (a convergence story, review, or test).
  *   3. PIN it: `tsx body-pins.ts --pin <ruby-file>` records the current digest
- *      into body-pins.json. `--pin-all` pins every matched pair at once (the
+ *      into body-pins/<package>.json. `--pin-all` pins every matched pair at once (the
  *      bulk floor — the current vendored tree is the de-facto baseline).
  *   4. On a RAILS BUMP the vendored body changes → its digest changes →
  *      lint-body-pins.ts reports DRIFT for that pin (pinned ≠ current).
@@ -61,14 +61,15 @@
  */
 
 import * as fs from "fs/promises";
+import { readdirSync, readFileSync } from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { SOURCES } from "../../vendor/sources.js";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR, SCRIPT_DIR } from "./config.js";
-import { serializeBaseline } from "./baseline-json.js";
 
 export const ARTIFACT_PATH = path.join(OUTPUT_DIR, "body-hashes.json");
-export const MANIFEST_PATH = path.join(SCRIPT_DIR, "body-pins.json");
+/** One shard per package, `body-pins/<package>.json`, one pin per line. */
+export const MANIFEST_PATH = path.join(SCRIPT_DIR, "body-pins");
 
 // One name-matched pair's current normalized Ruby body digest, as written to
 // output/body-hashes.json by compare.ts.
@@ -257,13 +258,38 @@ export async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as T;
 }
 
-export async function loadManifest(): Promise<BodyPin[]> {
-  const exists = await fs.access(MANIFEST_PATH).then(
-    () => true,
-    () => false,
+/** Synchronous `loadManifest`, for compare.ts's synchronous report. */
+export function loadManifestSync(): BodyPin[] {
+  let names: string[];
+  try {
+    names = readdirSync(MANIFEST_PATH);
+  } catch {
+    return [];
+  }
+  return sortPins(
+    names
+      .filter((n) => n.endsWith(".json"))
+      .flatMap((n) => JSON.parse(readFileSync(path.join(MANIFEST_PATH, n), "utf-8")) as BodyPin[]),
   );
-  if (!exists) return [];
-  return readJson<BodyPin[]>(MANIFEST_PATH);
+}
+
+export async function loadManifest(): Promise<BodyPin[]> {
+  return loadManifestSync();
+}
+
+/**
+ * The manifest as committed at `rev`, read through `git` (which answers
+ * `null` for a failed command): every shard `ls-tree` lists under `dir`.
+ */
+export async function loadManifestAt(
+  git: (args: string[]) => Promise<string | null>,
+  rev: string,
+  dir: string,
+): Promise<BodyPin[]> {
+  const listing = await git(["ls-tree", "--name-only", rev, "--", `${dir}/`]);
+  const files = (listing ?? "").split("\n").filter((f) => f.endsWith(".json"));
+  const shards = await Promise.all(files.map((f) => git(["show", `${rev}:${f}`])));
+  return sortPins(shards.flatMap((t) => (t === null ? [] : (JSON.parse(t) as BodyPin[]))));
 }
 
 export async function loadArtifact(): Promise<Artifact> {
@@ -280,8 +306,36 @@ export async function loadArtifact(): Promise<Artifact> {
   return readJson<Artifact>(ARTIFACT_PATH);
 }
 
+/**
+ * A shard is a JSON array with one compact pin per line, so two PRs re-pinning
+ * neighbouring methods edit different lines and git merges them.
+ */
+export function serializeShard(pins: BodyPin[]): string {
+  return `[\n${sortPins(pins)
+    .map((p) => JSON.stringify(p))
+    .join(",\n")}\n]\n`;
+}
+
+/** Writes only the shards whose content changed, and deletes emptied ones. */
 export async function saveManifest(pins: BodyPin[]): Promise<void> {
-  await fs.writeFile(MANIFEST_PATH, serializeBaseline(sortPins(pins)));
+  const byPackage = new Map<string, BodyPin[]>();
+  for (const p of pins) {
+    const shard = byPackage.get(p.package) ?? [];
+    shard.push(p);
+    byPackage.set(p.package, shard);
+  }
+  await fs.mkdir(MANIFEST_PATH, { recursive: true });
+  for (const name of await fs.readdir(MANIFEST_PATH)) {
+    if (name.endsWith(".json") && !byPackage.has(name.slice(0, -5))) {
+      await fs.rm(path.join(MANIFEST_PATH, name));
+    }
+  }
+  for (const [pkg, shard] of byPackage) {
+    const file = path.join(MANIFEST_PATH, `${pkg}.json`);
+    const next = serializeShard(shard);
+    if ((await fs.readFile(file, "utf-8").catch(() => null)) !== next)
+      await fs.writeFile(file, next);
+  }
 }
 
 /**

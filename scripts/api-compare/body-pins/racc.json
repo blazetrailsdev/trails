@@ -1,0 +1,12 @@
+[
+{"package":"racc","rubyFile":"parser.rb","rubyName":"_racc_do_reduce","digest":"37f08926adf9a0c1","ref":"v1.8.0"},
+{"package":"racc","rubyFile":"parser.rb","rubyName":"_racc_evalact","digest":"4957ec2dba5884aa","ref":"v1.8.0"},
+{"package":"racc","rubyFile":"parser.rb","rubyName":"_racc_init_sysvars","digest":"c6b7fd9bf977cfee","ref":"v1.8.0"},
+{"package":"racc","rubyFile":"parser.rb","rubyName":"_racc_setup","digest":"97bfb3d50ea95a85","ref":"v1.8.0"},
+{"package":"racc","rubyFile":"parser.rb","rubyName":"next_token","digest":"161763220299254a","ref":"v1.8.0"},
+{"package":"racc","rubyFile":"parser.rb","rubyName":"on_error","digest":"99fd280c39588ea1","ref":"v1.8.0"},
+{"package":"racc","rubyFile":"parser.rb","rubyName":"token_to_str","digest":"94666e4fcd93a02d","ref":"v1.8.0"},
+{"package":"racc","rubyFile":"parser.rb","rubyName":"yyaccept","digest":"b829128f2e73ac75","ref":"v1.8.0"},
+{"package":"racc","rubyFile":"parser.rb","rubyName":"yyerrok","digest":"6ee8c1f3427fa8f3","ref":"v1.8.0"},
+{"package":"racc","rubyFile":"parser.rb","rubyName":"yyerror","digest":"05ae230497375f78","ref":"v1.8.0"}
+]

@@ -271,7 +271,7 @@ bump inside a line moves only `TINY` / `PRE`.
    `pnpm tsx scripts/api-compare/body-pins.ts --pin-all --source <name>`,
    which pins only that source's packages and touches no other source's
    pins or bump ledger. `git diff --stat` should show only
-   `body-pins.json`, with additions only. **If the bump will need a
+   `body-pins/<package>.json`, with additions only. **If the bump will need a
    ledger, the floor merges in its own PR before the flip**:
    `parity:api:pins:ledger` recomputes the seed from the base branch's pins,
    so a floor and a ledger seed in one PR do not agree
@@ -357,7 +357,7 @@ The ledger rules:
    to the unit at full strength. A row whose pin already matches is stale,
    and stale is red.
 4. **A straddling PR is refused**: one forked before the `ref` move that
-   edits `body-pins.json` fails until rebased.
+   edits `body-pins/<package>.json` fails until rebased.
 5. **Empty means deleted**, and no trails release is tagged while a ledger
    has rows.
 

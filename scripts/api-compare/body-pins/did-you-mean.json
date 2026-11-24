@@ -1,0 +1,17 @@
+[
+{"package":"did-you-mean","rubyFile":"did_you_mean.rb","rubyName":"[]=","digest":"23ca3d1732dae8b8","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"did_you_mean.rb","rubyName":"correct_error","digest":"4c5751c7b08cab4d","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"did_you_mean.rb","rubyName":"formatter","digest":"2caa99ff485b2ae4","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"did_you_mean.rb","rubyName":"formatter=","digest":"1cafa7a2f82010d9","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"did_you_mean.rb","rubyName":"merge!","digest":"01c45289ca19565c","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"did_you_mean.rb","rubyName":"spell_checkers","digest":"116ae8c7cc618438","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"formatter.rb","rubyName":"message_for","digest":"00a5808a45178bbd","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"jaro_winkler.rb","rubyName":"distance","digest":"5eca4fe4122b3e62","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"levenshtein.rb","rubyName":"distance","digest":"6e28dda1d961e9fe","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"levenshtein.rb","rubyName":"min3","digest":"a2906211712422fb","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"spell_checker.rb","rubyName":"correct","digest":"7d74e9a1ae68c0e1","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"spell_checker.rb","rubyName":"initialize","digest":"fccb95c32dfd4dbc","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"spell_checker.rb","rubyName":"normalize","digest":"33d9fc51c894a452","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"spell_checkers/null_checker.rb","rubyName":"corrections","digest":"f49f8cbb9e96d0da","ref":"v1.6.3"},
+{"package":"did-you-mean","rubyFile":"spell_checkers/null_checker.rb","rubyName":"initialize","digest":"c379738c3a38aa9c","ref":"v1.6.3"}
+]

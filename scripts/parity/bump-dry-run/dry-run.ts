@@ -55,7 +55,6 @@ import {
   type HashRecord,
   type PairKey,
   type PairSeedRow,
-  type Pin,
   type RubyTestManifest,
 } from "./ledger.js";
 import {
@@ -96,6 +95,7 @@ const { SOURCES, testPathsManifest, vendoredRoot } = await import("../../../vend
 const { extractTargetApi } = await import("../../api-compare/drift.js");
 const { compareArms } = await import("../../api-compare/report-arms.js");
 const { buildReport, loadConcernHooks } = await import("../../api-compare/extra-surface.js");
+const { loadManifest } = await import("../../api-compare/body-pins.js");
 const { rubyFileToTs } = await import("../conventions.js");
 
 type Env = Record<string, string | undefined>;
@@ -368,9 +368,7 @@ async function main(argv: string[], env: Env): Promise<number> {
     await must("pnpm", extractTs, { ...childEnv, API_COMPARE_FORCE: "1" });
     candidateSteps = await runSteps(childEnv, "candidate");
     await snapshot(path.join(outDir, "candidate"));
-    const seedPins = (
-      await readJson<Pin[]>(path.join(ROOT, "scripts/api-compare/body-pins.json"))
-    ).filter((p) => packages.includes(p.package));
+    const seedPins = (await loadManifest()).filter((p) => packages.includes(p.package));
     const bodySeed = pairSeed(
       seedPins,
       (await readJson<{ hashes: HashRecord[] }>(path.join(API_OUT, "body-hashes.json"))).hashes,
@@ -458,9 +456,7 @@ async function main(argv: string[], env: Env): Promise<number> {
 
   const a = <T>(f: string) => readJson<T>(path.join(outDir, "active", f));
   const c = <T>(f: string) => readJson<T>(path.join(outDir, "candidate", f));
-  const pins = (
-    await readJson<Pin[]>(path.join(ROOT, "scripts/api-compare/body-pins.json"))
-  ).filter((p) => packages.includes(p.package));
+  const pins = (await loadManifest()).filter((p) => packages.includes(p.package));
   const activeHashes: HashRecord[] = (await a<{ hashes: HashRecord[] }>("api/body-hashes.json"))
     .hashes;
   const candidateHashes: HashRecord[] = (await c<{ hashes: HashRecord[] }>("api/body-hashes.json"))

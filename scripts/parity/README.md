@@ -84,7 +84,7 @@ hand.
 | ----------------------------------------- | ----------------- | --------------------------- |
 | `api-compare/call-mismatches-exclude/`    | exclude (sharded) | `lint-call-mismatches.ts`   |
 | `api-compare/call-mismatches-unreviewed/` | mark (sharded)    | `lint-call-mismatches.ts`   |
-| `api-compare/body-pins.json`              | pin               | `lint-body-pins.ts`         |
+| `api-compare/body-pins/<package>.json`    | pin               | `lint-body-pins.ts`         |
 | `schema-compare/invented-baseline.json`   | baseline          | `schema-compare/compare.ts` |
 
 **Do not move these files.** They are referenced by path from CI workflow steps

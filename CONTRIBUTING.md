@@ -390,7 +390,7 @@ drifts, so it is always current — never hand-edit it, change the rule in
 
 ### Body pins (source-hash pinning)
 
-`scripts/api-compare/body-pins.json` records, per name-matched pair, the
+`scripts/api-compare/body-pins/<package>.json` records, per name-matched pair, the
 normalized digest of the vendored Rails body the TS method was ported against.
 `pnpm parity:api:pins` (CI: `Body-pins gate`) then reports **DRIFT** when a bump to
 `vendor/rails` changes a pinned body, and **STALE** when a pinned method is
@@ -433,7 +433,7 @@ drifted or removed pair, seeded in the PR that moves the source's `ref`. The
 body-pins gate reports a ledgered pair and passes it; `pnpm
 parity:api:pins:ledger` (CI: `Bump-ledger gate`) reds a row that no longer
 names a live DRIFT or STALE pin, a row added without a `ref` move, a bump PR's
-ledger that differs from the recomputed seed, and a `body-pins.json` edit
+ledger that differs from the recomputed seed, and a `body-pins/<package>.json` edit
 forked before a `ref` move. `--pin <ruby-file>` and `--prune` delete the rows
 they clear; the ledger only shrinks.
 
