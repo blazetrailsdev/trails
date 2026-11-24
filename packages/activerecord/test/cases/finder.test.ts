@@ -4,6 +4,7 @@ import {
   IrreversibleOrderError,
   Range,
   RecordNotFound,
+  Relation,
   SoleRecordExceeded,
 } from "../../lib/index.js";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -106,6 +107,25 @@ describe("FinderTest", () => {
   it("sole failing many", async () => {
     await expect(Topic.where("author_name = 'Carl'").sole()).rejects.toThrow(SoleRecordExceeded);
     await expect(Topic.findSoleBy("author_name = 'Carl'")).rejects.toThrow(SoleRecordExceeded);
+  });
+
+  it("sole record exceeded record accessor", async () => {
+    const relation = Topic.where("author_name = 'Carl'");
+    const error = await assertRaises([SoleRecordExceeded], { match: "Wanted only one Topic" }, () =>
+      relation.sole(),
+    );
+
+    expect(error.record).toBeInstanceOf(Relation);
+    expect(await (error.record as typeof relation).count()).toBe(await relation.count());
+  });
+
+  it("sole on loaded relation", async () => {
+    const relation = await Topic.where("title = 'The First Topic'").load();
+    const expectedTopic = topics("first");
+
+    await assertNoQueries(async () => {
+      expect(await relation.sole()).toEqual(expectedTopic);
+    });
   });
 
   it("first", async () => {
@@ -827,7 +847,7 @@ describe("FinderTest", () => {
     await expect(MercedesCar.find("Hello", "World!")).rejects.toThrow(RecordNotFound);
     const e = await MercedesCar.find("Hello", "World!").catch((err: unknown) => err);
     expect((e as Error).message).toBe(
-      "Couldn't find all MercedesCars with 'name': (Hello, World!) (found 0 results, but was looking for 2).",
+      'Couldn\'t find all MercedesCars with \'name\': ("Hello", "World!") (found 0 results, but was looking for 2).',
     );
   });
 

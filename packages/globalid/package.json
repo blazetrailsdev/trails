@@ -26,6 +26,16 @@
     "NOTICE",
     "!dist/**/*.d.ts.map"
   ],
+  "sideEffects": [
+    "./dist/constants.generated.js",
+    "./dist/global-id.js",
+    "./dist/identification.js",
+    "./dist/index.js",
+    "./dist/locator.js",
+    "./dist/signed-global-id.js",
+    "./dist/uri/gid.js",
+    "./dist/verifier.js"
+  ],
   "scripts": {
     "build": "tsc"
   },

@@ -26,7 +26,7 @@ import type { Psych } from "@blazetrails/ruby-compat/psych";
 import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { ActiveRecordError, RecordNotUnique } from "./errors.js";
+import { ActiveRecordError, RecordNotUnique, Rollback } from "./errors.js";
 import { groupBy, max, min } from "@blazetrails/ruby-compat";
 import { ArgumentError, awaitingAssignment } from "@blazetrails/activemodel";
 import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
@@ -956,9 +956,15 @@ export class Relation<T extends Base, G extends boolean = false> {
   ): Promise<T | undefined> {
     return this.withConnection(async (connection) => {
       try {
-        return await this.transaction(() => this.create(attributes, block), {
-          requiresNew: true,
-        });
+        let record: T | undefined = undefined;
+        await this.transaction(
+          async () => {
+            record = await this.create(attributes, block);
+            if (!rtest(record._lastTransactionReturnStatus)) throw new Rollback();
+          },
+          { requiresNew: true },
+        );
+        return record;
       } catch (e) {
         if (!(e instanceof RecordNotUnique)) throw e;
         if (connection.isTransactionOpen()) {
@@ -975,9 +981,15 @@ export class Relation<T extends Base, G extends boolean = false> {
   ): Promise<T | undefined> {
     return this.withConnection(async (connection) => {
       try {
-        return await this.transaction(() => this.createBang(attributes, block), {
-          requiresNew: true,
-        });
+        let record: T | undefined = undefined;
+        await this.transaction(
+          async () => {
+            record = await this.createBang(attributes, block);
+            if (!rtest(record._lastTransactionReturnStatus)) throw new Rollback();
+          },
+          { requiresNew: true },
+        );
+        return record;
       } catch (e) {
         if (!(e instanceof RecordNotUnique)) throw e;
         if (connection.isTransactionOpen()) {
