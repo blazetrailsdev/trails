@@ -33,16 +33,16 @@ describe("ruby-compat entry modules", () => {
     expect(failures).toEqual([]);
   }, 300_000);
 
-  it("answers String's ancestors with Comparable after any one module is imported alone", async () => {
+  it("serves the readers of include.js's load-time mixins only from include.js", async () => {
     const files = (await readdir(DIST, { recursive: true })).filter((f) => f.endsWith(".js"));
     const failures: string[] = [];
     for (const f of files) {
       const script = [
-        `await import(${JSON.stringify(`./${f}`)});`,
-        `const { rbModAncestors } = await import("./include.js");`,
-        `const { rbCString, rbModName } = await import("./object.js");`,
-        `const names = rbModAncestors(rbCString).map((m) => rbModName(m));`,
-        `if (!names.includes("Comparable")) throw new Error(names.join(","));`,
+        `const ns = await import(${JSON.stringify(`./${f}`)});`,
+        `const readers = ["rbModAncestors", "rbObjIsKindOf", "rbClassInheritedP"];`,
+        `const seen = readers.filter((r) => r in ns).map((r) => [r, ns[r]]);`,
+        `const inc = await import("./include.js");`,
+        `for (const [r, fn] of seen) if (fn !== inc[r]) throw new Error(r + " is not include.js's");`,
       ].join("\n");
       await promisify(execFile)(process.execPath, ["--input-type=module", "-e", script], {
         cwd: DIST,
