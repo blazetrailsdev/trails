@@ -1,5 +1,5 @@
 import type { RackResponse } from "@blazetrails/rack";
-import { publicInstanceMethods, rbFSend, StringIO } from "@blazetrails/ruby-compat";
+import { Encoding, publicInstanceMethods, rbFSend, StringIO } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import {
   BroadcastLogger,
@@ -640,7 +640,7 @@ describe("Application::Configuration", () => {
     expect(c.disableSandbox).toBe(false);
     expect(c.sandboxByDefault).toBe(false);
     expect(c.addAutoloadPathsToLoadPath).toBe(true);
-    expect(c.encoding).toBe("utf-8");
+    expect(c.encoding).toBe(Encoding.UTF_8);
     expect(c.requireMasterKey).toBe(false);
   });
 

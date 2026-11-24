@@ -99,7 +99,7 @@ describe("ActionDispatch::Trailtie", () => {
     Response.defaultCharset = "stale";
     cfg().defaultCharset = null;
     await runTrailtieInitializers(Trailtie, app);
-    expect(Response.defaultCharset).toBe("utf-8");
+    expect(Response.defaultCharset).toBe("UTF-8");
   });
 
   it("runInitializers copies ignoreLeadingBrackets onto ParamBuilder", async () => {
