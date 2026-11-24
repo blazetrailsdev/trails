@@ -1227,22 +1227,24 @@ jobs:
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 30
     env:
-      TRAILTIES_SHARD_TOTAL: 7
+      TRAILTIES_SHARD_TOTAL: 6
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, configuration]
+        shard: [1, 2, 3, 4, 5, 6, concurrent, configuration]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
       - run: pnpm build
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard != 'configuration'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard != 'configuration' && matrix.shard != 'concurrent'
         env:
-          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts
+          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts,packages/trailties/test/application/routing.test.ts,packages/trailties/test/application/initializers/frameworks.test.ts,packages/trailties/test/application/middleware/exceptions.test.ts,packages/trailties/test/application/mailer-previews.test.ts
           VITEST_SHARD_DURATIONS: trailties
         run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ env.TRAILTIES_SHARD_TOTAL }}
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 'concurrent'
+        run: pnpm vitest run packages/trailties/test/application/routing.test.ts packages/trailties/test/application/initializers/frameworks.test.ts packages/trailties/test/application/middleware/exceptions.test.ts packages/trailties/test/application/mailer-previews.test.ts
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 'configuration'
         run: pnpm vitest run packages/trailties/test/application/configuration.test.ts
       - if: needs.changes.outputs.actioncable_only == 'true' && matrix.shard == 1
