@@ -119,10 +119,9 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   throw new TypeError(`can't quote ${rbObjClassname(value)}`);
 }
 
+/** @inventedArm if — PERMANENT */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (value instanceof SafeBuffer || value instanceof Chars || value instanceof BinaryData) {
-    return rbObjAsString(value);
-  }
+  if (value instanceof Chars || value instanceof BinaryData) return rbObjAsString(value);
   if (value === true) return this.unquotedTrue();
   if (value === false) return this.unquotedFalse();
   if (value instanceof BigDecimal) return value.toString("F");
@@ -137,6 +136,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   ) {
     return value;
   }
+  if (value instanceof SafeBuffer) return rbObjAsString(value);
   if (value instanceof TimeValue) return this.quotedTime(value);
   if (
     value instanceof TimeWithZone ||

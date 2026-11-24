@@ -82,7 +82,7 @@ export const SecureRandom = {
     return SecureRandom.choose(chars, n);
   },
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:314 */
+  /** @internal */
   choose(source: readonly string[], n: number): string {
     const size = source.length;
     let m = 1;
@@ -116,7 +116,7 @@ export const SecureRandom = {
    * drawn from `gen_random` bytes and retried over the biased tail the way
    * `random_ulong_limited` retries (`vendor/ruby/v3.3.11/random.c:1190`).
    *
-   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/random.c:1606
+   * @noRailsEquivalent CONVERGEABLE secure-random-random-number-remaining-arms
    */
   randomNumber(limit: number): number {
     const range = 0x100000000;
@@ -147,6 +147,7 @@ export const SecureRandom = {
   },
 };
 
+/** @noRailsEquivalent PERMANENT — `Integer#digits`, vendor/ruby/v3.3.11/numeric.c:5527 */
 function digits(value: number, base: number): number[] {
   const out: number[] = [];
   do {

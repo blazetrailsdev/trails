@@ -5,7 +5,7 @@ import { childNodes, Node } from "./node.js";
 import { NodeSet } from "../xml/node-set.js";
 import { DocumentFragment as XmlDocumentFragment } from "../xml/document-fragment.js";
 import { HTML5 } from "../namespaces.js";
-import { readAndEncode } from "../html5.js";
+import "../html5.js";
 
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 
@@ -31,15 +31,15 @@ export class DocumentFragment extends XmlDocumentFragment {
     this.errors = [];
     if (input == null) return;
 
-    input = readAndEncode(input, null);
+    const string = HTML5.readAndEncode(input, null);
 
     if (typeof context === "string") {
       context = new Node(defaultTreeAdapter.createElement(context, html.NS.HTML, []), document);
     }
     (this as { _node: Parse5Parent })._node =
       context !== null && context.isElement()
-        ? parseFragment(context._node as DefaultTreeAdapterMap["element"], input as string, {})
-        : parseFragment(input as string);
+        ? parseFragment(context._node as DefaultTreeAdapterMap["element"], string, {})
+        : parseFragment(string);
   }
 
   static parse(
@@ -51,7 +51,7 @@ export class DocumentFragment extends XmlDocumentFragment {
 
     const document = new Document();
     document.encoding = "UTF-8";
-    input = readAndEncode(input, encoding);
+    input = HTML5.readAndEncode(input, encoding);
 
     return new DocumentFragment(document, input, context, rest);
   }

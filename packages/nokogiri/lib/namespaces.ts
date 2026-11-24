@@ -39,6 +39,7 @@ export const HTML5 = { name: "Nokogiri::HTML5" } as {
   Node: typeof Node;
   DocumentFragment: typeof Html5DocumentFragment;
   Document: typeof Html5Document;
+  readAndEncode(string: unknown, encoding: string | null): string;
 };
 
 export const XPath = { name: "Nokogiri::XML::XPath" } as { name: string; [name: string]: unknown };

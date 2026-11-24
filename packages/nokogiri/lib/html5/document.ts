@@ -2,7 +2,7 @@ import { defaultTreeAdapter, html, parse, type DefaultTreeAdapterMap } from "par
 import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import type { Readable } from "../readable.js";
-import { readAndEncode } from "../html5.js";
+import "../html5.js";
 import { childNodes, Node } from "./node.js";
 import { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
@@ -60,7 +60,7 @@ export class Document extends Node {
     encoding: string | null,
     _options: Record<string, unknown>,
   ): Document {
-    const string = readAndEncode(stringOrIo, encoding);
+    const string = HTML5.readAndEncode(stringOrIo, encoding);
 
     const doc = new Document(parse(string));
     doc.url = url;
