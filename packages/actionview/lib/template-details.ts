@@ -1,6 +1,6 @@
 import type { TemplateHandler } from "./template/handlers.js";
 import { Template } from "./template.js";
-import { symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { symbolToS } from "@blazetrails/ruby-compat";
 
 export type DetailKey = string | symbol | null;
 

@@ -17,6 +17,7 @@ export interface RenderContext {
 export interface TemplateHandler {
   call(template: unknown, source: string): string;
   handlesEncoding?(): boolean;
+  defaultFormat?: string;
 }
 
 const handlers = new Map<string, TemplateHandler>();

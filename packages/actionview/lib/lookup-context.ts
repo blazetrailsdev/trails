@@ -22,9 +22,9 @@ const REGISTERED_DETAILS: string[] = [];
 
 type DetailWriter = DetailValue | string | symbol | null | undefined;
 
-export const Accessors = Object.assign(new Module(), {
-  DEFAULT_PROCS: {},
-});
+const DEFAULT_PROCS: Record<string, DefaultProc> = {};
+
+export const Accessors = Object.assign(new Module(), { DEFAULT_PROCS });
 
 interface Accessors {
   defaultLocale(): DetailValue;
