@@ -1231,22 +1231,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, concurrent, configuration]
+        shard: [1, 2, 3, 4, 5, 6]
+        include:
+          - shard: configuration
+            files: packages/trailties/test/application/configuration.test.ts
+          - shard: routing
+            files: packages/trailties/test/application/routing.test.ts
+          - shard: mailer-previews
+            files: packages/trailties/test/application/mailer-previews.test.ts
+          - shard: frameworks-exceptions
+            files: packages/trailties/test/application/initializers/frameworks.test.ts packages/trailties/test/application/middleware/exceptions.test.ts
+          - shard: multi-dbs
+            files: packages/trailties/test/application/rake/multi-dbs.test.ts
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
       - run: pnpm build
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard != 'configuration' && matrix.shard != 'concurrent'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && !matrix.files
         env:
-          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts,packages/trailties/test/application/routing.test.ts,packages/trailties/test/application/initializers/frameworks.test.ts,packages/trailties/test/application/middleware/exceptions.test.ts,packages/trailties/test/application/mailer-previews.test.ts
+          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts,packages/trailties/test/application/routing.test.ts,packages/trailties/test/application/mailer-previews.test.ts,packages/trailties/test/application/initializers/frameworks.test.ts,packages/trailties/test/application/middleware/exceptions.test.ts,packages/trailties/test/application/rake/multi-dbs.test.ts
           VITEST_SHARD_DURATIONS: trailties
         run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ env.TRAILTIES_SHARD_TOTAL }}
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 'concurrent'
-        run: pnpm vitest run packages/trailties/test/application/routing.test.ts packages/trailties/test/application/initializers/frameworks.test.ts packages/trailties/test/application/middleware/exceptions.test.ts packages/trailties/test/application/mailer-previews.test.ts
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 'configuration'
-        run: pnpm vitest run packages/trailties/test/application/configuration.test.ts
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.files
+        run: pnpm vitest run ${{ matrix.files }}
       - if: needs.changes.outputs.actioncable_only == 'true' && matrix.shard == 1
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
