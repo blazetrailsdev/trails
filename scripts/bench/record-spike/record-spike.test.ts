@@ -358,6 +358,17 @@ describe("record spike", () => {
       );
     });
 
+    it("compares cast values, so a stored value that casts to null is not a change to null", async () => {
+      await faithful.Post.create({ title: "a", body: "b" });
+      const created = await Post.create({ title: "a", body: "b" });
+      Base.connection.raw.exec(`UPDATE posts SET tags_count = 'x' WHERE id = ${created.id}`);
+      const post = await Post.find(created.id);
+      post.tags_count = null;
+      expect(post.isChanged).toBe(false);
+      post.tags_count = 3;
+      expect(post.changes).toEqual({ tags_count: [null, 3] });
+    });
+
     it("assigns by name through the model's table and rejects an unknown name", () => {
       expect(() => new Post({ nope: 1 })).toThrow(UnknownAttributeError);
       const post = new Post();

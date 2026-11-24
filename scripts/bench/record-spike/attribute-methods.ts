@@ -89,12 +89,17 @@ export function changedIndexes(record: Base): number[] {
   const { types } = record._schema;
   const changed: number[] = [];
   for (let i = 0; i < types.length; i++) {
-    if (original[i] === record._row[i]) continue;
-    if (original[i] === null || record._row[i] === null) {
+    const before = original[i];
+    const after = record._row[i];
+    if (before === after) continue;
+    if (before === null || after === null) {
+      const value = before === null ? after : before;
+      const present =
+        (types[i] === "datetime" && isDatabaseDatetime(value)) || cast(types[i], value) !== null;
+      if (present) changed.push(i);
+    } else if (!isEqual(cast(types[i], before), cast(types[i], after))) {
       changed.push(i);
-      continue;
     }
-    if (!isEqual(cast(types[i], original[i]), cast(types[i], record._row[i]))) changed.push(i);
   }
   return changed;
 }
