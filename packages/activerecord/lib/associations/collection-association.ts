@@ -411,10 +411,10 @@ export abstract class CollectionAssociation extends Association {
     const klass = this.klass;
     if (!(record instanceof klass)) return false;
 
-    if (record.isNewRecord()) {
-      return await this.isIncludeInMemory(record);
-    } else if (this.isLoaded()) {
+    if (this.isLoaded()) {
       return this.target.some((r) => r.equals(record));
+    } else if (record.isNewRecord()) {
+      return await this.isIncludeInMemory(record);
     } else {
       const recordId = klass.isCompositePrimaryKey()
         ? Object.fromEntries(

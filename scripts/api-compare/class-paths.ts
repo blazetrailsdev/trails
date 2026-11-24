@@ -58,6 +58,9 @@ const SUBPATH_ENTRIES: Record<string, string | string[]> = {
 /** A subpath entry that must not load another subpath's table, so its table is named for it. */
 const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = {};
 
+/** A directory whose files carry their own table even though the package entry re-exports them, so the entry's table does not pin them. */
+const REEXPORTED_LAZY_DIRS: Record<string, string[]> = { activerecord: ["tasks/"] };
+
 /** A directory or file whose files load one at a time, so each carries its own table and loads no sibling. */
 const LAZY_DIRS: Record<string, string[]> = {
   turbo: ["app/channels/turbo/streams-channel.ts", "app/jobs/turbo/streams/"],
@@ -134,7 +137,9 @@ function seatedFqn(source: string, tsName: string, fqns: string[]): string | und
  * A file under `testing/` keeps that segment, so its table is a testing export (RFC 0223).
  */
 function lazyTable(dir: string, file: string): string {
-  const prefix = (LAZY_DIRS[dir] ?? []).find((p) => p.endsWith("/") && file.startsWith(p));
+  const prefix = [...(LAZY_DIRS[dir] ?? []), ...(REEXPORTED_LAZY_DIRS[dir] ?? [])].find(
+    (p) => p.endsWith("/") && file.startsWith(p),
+  );
   const rel = prefix
     ? file.slice(prefix.length)
     : file.startsWith("testing/")
@@ -316,6 +321,7 @@ async function placement(dir: string) {
     const lazy =
       lazyOk &&
       (((LAZY_DIRS[dir] ?? []).some((prefix) => file.startsWith(prefix)) && !reachable.has(file)) ||
+        (REEXPORTED_LAZY_DIRS[dir] ?? []).some((prefix) => file.startsWith(prefix)) ||
         (SUBPATH_EXPORT_TABLES[dir] ?? []).includes(file));
     const ownTable =
       excluded.includes(rel) ||
@@ -802,7 +808,11 @@ async function lazyTablesOnDisk(dir: string): Promise<string[]> {
 
 /** A lazy file is outside the entry graph, so only its own import loads its table. */
 async function lazyFilesMissingTable(dir: string, entries: ClassPathEntry[]): Promise<string[]> {
-  const prefixes = [...(LAZY_DIRS[dir] ?? []), ...(SUBPATH_EXPORT_TABLES[dir] ?? [])];
+  const prefixes = [
+    ...(LAZY_DIRS[dir] ?? []),
+    ...(REEXPORTED_LAZY_DIRS[dir] ?? []),
+    ...(SUBPATH_EXPORT_TABLES[dir] ?? []),
+  ];
   if (prefixes.length === 0) return [];
   const missing = new Set<string>();
   for (const { file, table } of entries) {

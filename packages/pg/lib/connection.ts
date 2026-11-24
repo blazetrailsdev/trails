@@ -1,17 +1,37 @@
 import {
   ArgumentError,
+  FrozenError,
   LoadError,
+  rbAnyToS,
   rbClassNewInstance,
+  rbInspect,
+  rbNum2Int,
+  rbObjClassname,
+  rbObjRespondTo,
+  rbObjSingletonClass,
+  TypeError,
   stringValue,
 } from "@blazetrails/ruby-compat";
+import { Coder } from "./coder.js";
 import { ConnectionBad, Error as PgError, UnableToSend } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { Result } from "./result.js";
-import { _pgTypemapAllStrings } from "./type-map-all-strings.js";
+import { _pgTypemapAllStrings, TypeMapAllStrings } from "./type-map-all-strings.js";
 import type { TypeMap } from "./type-map.js";
 import type * as NodePg from "./engine/node-pg.js";
 
 let engine: typeof NodePg | null = null;
+
+/**
+ * @missingRailsCall put_copy_data — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs
+ * @missingRailsCall put_copy_end — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs
+ * @missingRailsCall flush — CONVERGEABLE pg-put-copy-data-and-flush-sync-async-pairs
+ */
+const REDIRECT_SEND_METHODS: Record<string, [string, string]> = {
+  isnonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
+  isNonblocking: ["asyncIsnonblocking", "syncIsnonblocking"],
+  pipelineSync: ["asyncPipelineSync", "syncPipelineSync"],
+};
 
 /** @noRailsEquivalent PERMANENT */
 async function _requireEngine(): Promise<typeof NodePg> {
@@ -41,6 +61,20 @@ export class Connection {
   parameterStatuses: Record<string, string> = {};
   sversion = 0;
   noticeReceiver: ((result: Result) => void) | null = null;
+  declare pipelineStatus?: () => number;
+  _nonblocking = false;
+  _encoderForPutCopyData: Coder | null = null;
+  _decoderForGetCopyData: Coder | null = null;
+  declare asyncIsnonblocking: Connection["isnonblocking"];
+  declare isNonblocking: Connection["isnonblocking"];
+  declare asyncSetnonblocking: Connection["setnonblocking"];
+
+  static setAsyncSendApi(this: { prototype: Connection }, enable: boolean): void {
+    const proto = this.prototype as unknown as Record<string, unknown>;
+    for (const [ali, [async, sync]] of Object.entries(REDIRECT_SEND_METHODS)) {
+      proto[ali] = proto[enable ? async : sync];
+    }
+  }
 
   static conndefaultsHash = conndefaultsHash;
   static escapeString = escapeString;
@@ -140,6 +174,170 @@ export class Connection {
     return serverVersion;
   }
 
+  protocolVersion(): number {
+    if (this.isFinished()) throw new ConnectionBad("connection is closed", { connection: this });
+    const protocolVersion = this.status() === PG.CONNECTION_BAD ? 0 : 3;
+    if (protocolVersion == 0) {
+      throw new ConnectionBad("PQprotocolVersion() can't get protocol version", {
+        connection: this,
+      });
+    }
+    return protocolVersion;
+  }
+
+  host(): string | null {
+    return this.client.host ?? null;
+  }
+
+  port(): number {
+    return Number(this.client.port);
+  }
+
+  user(): string | null {
+    return this.client.user ?? null;
+  }
+
+  getClientEncoding(): string {
+    return this.parameterStatuses["client_encoding"] ?? "";
+  }
+
+  inspect(): string {
+    const str = rbAnyToS(this);
+    let stats: string;
+    if (this.isFinished()) {
+      stats = " finished";
+    } else {
+      const parts: string[] = [];
+      if (this.status() != PG.CONNECTION_OK) {
+        parts.push(
+          ` status=${Object.keys(PG.Constants).find((c) => c.startsWith("CONNECTION_") && PG.Constants[c as keyof typeof PG.Constants] == this.status())}`,
+        );
+      }
+      if (this.transactionStatus() != PG.PQTRANS_IDLE) {
+        parts.push(
+          ` transaction_status=${Object.keys(PG.Constants).find((c) => c.startsWith("PQTRANS_") && PG.Constants[c as keyof typeof PG.Constants] == this.transactionStatus())}`,
+        );
+      }
+      if (this.isnonblocking()) {
+        parts.push(` nonblocking=${this.isnonblocking()}`);
+      }
+      if (rbObjRespondTo(this, "pipelineStatus") && this.pipelineStatus!() != PG.PQ_PIPELINE_OFF) {
+        parts.push(
+          ` pipeline_status=${Object.keys(PG.Constants).find((c) => c.startsWith("PQ_PIPELINE_") && PG.Constants[c as keyof typeof PG.Constants] == this.pipelineStatus!())}`,
+        );
+      }
+      if (this.getClientEncoding() != "UTF8") {
+        parts.push(` client_encoding=${this.getClientEncoding()}`);
+      }
+      if (!(this.typeMapForResults instanceof TypeMapAllStrings)) {
+        parts.push(` type_map_for_results=${rbAnyToS(this.typeMapForResults)}`);
+      }
+      if (!(this.typeMapForQueries instanceof TypeMapAllStrings)) {
+        parts.push(` type_map_for_queries=${rbAnyToS(this.typeMapForQueries)}`);
+      }
+      if (this.encoderForPutCopyData != null) {
+        parts.push(` encoder_for_put_copy_data=${rbAnyToS(this.encoderForPutCopyData)}`);
+      }
+      if (this.decoderForGetCopyData != null) {
+        parts.push(` decoder_for_get_copy_data=${rbAnyToS(this.decoderForGetCopyData)}`);
+      }
+      stats = ` host=${this.host()} port=${this.port()} user=${this.user()}${parts.join("")}`;
+    }
+    return `${str.slice(0, -1)}${stats}${str.slice(-1)}`;
+  }
+
+  flush(): boolean {
+    return true;
+  }
+
+  syncSetnonblocking(state: unknown): null {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
+    let arg: boolean;
+    if (state === true) arg = true;
+    else if (state === false) arg = false;
+    else throw new ArgumentError("Boolean value expected");
+    this._nonblocking = arg;
+    return null;
+  }
+
+  syncIsnonblocking(): boolean {
+    return this._nonblocking;
+  }
+
+  /** @missingRailsCall flush_data= — CONVERGEABLE pg-connection-connect-poll-c-primitives */
+  setnonblocking(enabled: boolean): null {
+    (rbObjSingletonClass(this) as unknown as typeof Connection).setAsyncSendApi(!enabled);
+    return this.syncSetnonblocking(true);
+  }
+
+  isnonblocking(): boolean {
+    return false;
+  }
+
+  set encoderForPutCopyData(encoder: Coder | null) {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
+    if (encoder != null && !(encoder instanceof Coder)) {
+      throw new TypeError(`wrong argument type ${rbObjClassname(encoder)} (expected PG::Coder)`);
+    }
+    this._encoderForPutCopyData = encoder;
+  }
+
+  get encoderForPutCopyData(): Coder | null {
+    return this._encoderForPutCopyData;
+  }
+
+  set decoderForGetCopyData(decoder: Coder | null) {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
+    if (decoder != null && !(decoder instanceof Coder)) {
+      throw new TypeError(`wrong argument type ${rbObjClassname(decoder)} (expected PG::Coder)`);
+    }
+    this._decoderForGetCopyData = decoder;
+  }
+
+  get decoderForGetCopyData(): Coder | null {
+    return this._decoderForGetCopyData;
+  }
+
+  syncPipelineSync(): null {
+    throw new PgError("cannot send pipeline when not in pipeline mode\n", { connection: this });
+  }
+
+  sendPipelineSync(): null {
+    throw new PgError("cannot send pipeline when not in pipeline mode\n", { connection: this });
+  }
+
+  pipelineSync(): boolean {
+    this.sendPipelineSync();
+    return this.flush();
+  }
+
+  declare asyncPipelineSync: Connection["pipelineSync"];
+
+  setChunkedRowsMode(chunkSize: unknown): this {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
+    const size = rbNum2Int(chunkSize);
+    if (size <= 0 || this.pendingResult == null || this.pendingResultTaken) {
+      throw new PgError("PQsetChunkedRowsMode ", { connection: this });
+    }
+    return this;
+  }
+
   connect(): Promise<unknown> {
     return this.client.connect().catch((error: unknown) => {
       throw engine!.pgError(this, error, ConnectionBad);
@@ -218,6 +416,45 @@ export class Connection {
     return this._asyncDescribeClosePreparedPortal(portal, "P");
   }
 
+  syncClosePrepared(stmtName: string | null): Promise<Result> {
+    return this._syncDescribeClosePreparedPortal(stmtName, "S");
+  }
+
+  syncClosePortal(stmtName: string | null): Promise<Result> {
+    return this._syncDescribeClosePreparedPortal(stmtName, "P");
+  }
+
+  /** @internal */
+  private async _syncDescribeClosePreparedPortal(
+    name: string | null,
+    type: "S" | "P",
+  ): Promise<Result> {
+    const stmt = name == null ? "" : stringValue(name);
+    let result: unknown = null;
+    await new Promise<void>((resolve) => {
+      const submittable = {
+        submit(connection: { close(msg: object): void; sync(): void }): null {
+          connection.close({ type, name: stmt });
+          connection.sync();
+          return null;
+        },
+        handleError: (error: unknown) => {
+          result = error;
+        },
+        handleReadyForQuery: () => resolve(),
+      };
+      engine!.submit(this, submittable).catch((error: unknown) => {
+        result = error;
+        resolve();
+      });
+    });
+    const rbPgresult = engine!.emptyResult(result);
+    if (rbPgresult.resultStatus() === PG.PGRES_FATAL_ERROR) throw engine!.pgError(this, result);
+    /** @inventedArm if — PERMANENT */
+    if (type === "S") this.prepared.delete(stmt);
+    return rbPgresult;
+  }
+
   /** @internal */
   private _asyncDescribeClosePreparedPortal(name: string | null, type: "S" | "P"): Promise<Result> {
     const stmt = name == null ? "" : stringValue(name);
@@ -240,9 +477,7 @@ export class Connection {
   }
 
   declare asyncClosePrepared: Connection["closePrepared"];
-  declare syncClosePrepared: Connection["closePrepared"];
   declare asyncClosePortal: Connection["closePortal"];
-  declare syncClosePortal: Connection["closePortal"];
 
   execPrepared(stmtName: string, params: unknown[]): Promise<Result> {
     return engine!.execute(this, this.prepared.get(stmtName), params, stmtName);
@@ -547,9 +782,11 @@ export function conndefaultsHash(): Record<string, string | null> {
 Connection.prototype.exec = Connection.prototype.asyncExec;
 Connection.prototype.query = Connection.prototype.asyncExec;
 Connection.prototype.asyncClosePrepared = Connection.prototype.closePrepared;
-Connection.prototype.syncClosePrepared = Connection.prototype.closePrepared;
 Connection.prototype.asyncClosePortal = Connection.prototype.closePortal;
-Connection.prototype.syncClosePortal = Connection.prototype.closePortal;
+Connection.prototype.asyncIsnonblocking = Connection.prototype.isnonblocking;
+Connection.prototype.isNonblocking = Connection.prototype.isnonblocking;
+Connection.prototype.asyncSetnonblocking = Connection.prototype.setnonblocking;
+Connection.prototype.asyncPipelineSync = Connection.prototype.pipelineSync;
 Connection.prototype.escapeString = escapeString;
 Connection.prototype.escape = escapeString;
 Connection.prototype.escapeBytea = escapeBytea;

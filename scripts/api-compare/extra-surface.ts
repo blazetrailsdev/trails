@@ -1235,6 +1235,8 @@ function walkTsFileSurface(
  * column come from). A member named there is a faithful port whose `@internal`
  * `rails-private-jsdoc` requires, so it is not counted: the mark measures the
  * unbacked internals RFC 0121 receipts, not ported Rails privates.
+ *
+ * A `#`-private field is a Ruby ivar, not surface, so it is not counted either.
  */
 export function countTsInternalNames(
   file: string,
@@ -1249,6 +1251,7 @@ export function countTsInternalNames(
     m.internal === true &&
     m.declaredIn === undefined &&
     !m.name.startsWith("_") &&
+    !m.name.startsWith("#") &&
     m.name !== "constructor" &&
     !railsPrivate.has(m.name);
   const functionNames = new Set((fileFunctions ?? []).map((fn) => fn.name));

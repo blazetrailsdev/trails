@@ -459,6 +459,7 @@ export class AppBuilder {
       node: this.usingNode(),
       appName: this.appName(),
       skipSolid: this.options.skipSolid,
+      pretend: this.options.pretend,
     };
 
     await new DevcontainerGenerator([], devcontainerOptions).invokeAll();

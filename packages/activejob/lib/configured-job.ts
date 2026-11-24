@@ -23,13 +23,5 @@ export class ConfiguredJob {
   async performLater(...args: unknown[]): Promise<unknown> {
     return await new this._jobClass(...args).enqueue(this._options);
   }
-
-  async performAllLater(multiArgs: unknown): Promise<unknown> {
-    return await (
-      this._jobClass as unknown as {
-        performAllLater(multiArgs: unknown, options: { options: unknown }): Promise<unknown>;
-      }
-    ).performAllLater(multiArgs, { options: this._options });
-  }
 }
 ActiveJob.ConfiguredJob = ConfiguredJob;

@@ -1,0 +1,109 @@
+{
+  "activerecord": {
+    "tarball": {
+      "value": 950598
+    },
+    "unpacked": {
+      "value": 5041770
+    },
+    "entries": {
+      "value": 1149
+    }
+  },
+  "activemodel": {
+    "tarball": {
+      "value": 110015
+    },
+    "unpacked": {
+      "value": 557993
+    },
+    "entries": {
+      "value": 227
+    }
+  },
+  "activesupport": {
+    "tarball": {
+      "value": 450598
+    },
+    "unpacked": {
+      "value": 2255610
+    },
+    "entries": {
+      "value": 737
+    }
+  },
+  "arel": {
+    "tarball": {
+      "value": 76233
+    },
+    "unpacked": {
+      "value": 438920
+    },
+    "entries": {
+      "value": 261
+    }
+  },
+  "date": {
+    "tarball": {
+      "value": 213753
+    },
+    "unpacked": {
+      "value": 1630101
+    },
+    "entries": {
+      "value": 29
+    }
+  },
+  "i18n": {
+    "tarball": {
+      "value": 53953
+    },
+    "unpacked": {
+      "value": 264097
+    },
+    "entries": {
+      "value": 98
+    }
+  },
+  "globalid": {
+    "tarball": {
+      "value": 15787
+    },
+    "unpacked": {
+      "value": 68122
+    },
+    "entries": {
+      "value": 29
+    }
+  },
+  "did-you-mean": {
+    "tarball": {
+      "value": 7884
+    },
+    "unpacked": {
+      "value": 27348
+    },
+    "entries": {
+      "value": 29
+    }
+  },
+  "ruby-compat": {
+    "tarball": {
+      "value": 914222
+    },
+    "unpacked": {
+      "value": 4389809
+    },
+    "entries": {
+      "value": 621
+    }
+  },
+  "bundle:Base": {
+    "minified": {
+      "value": 4223944
+    },
+    "gzip": {
+      "value": 1306047
+    }
+  }
+}

@@ -1276,12 +1276,12 @@ export class SchemaStatements {
     let nonCombinableOperations: Array<() => Promise<void>> = [];
 
     for (const [command, args] of operations) {
-      const [table, ...arguments_] = args as [string, ...unknown[]];
+      args.shift();
       const method = `${command}ForAlter`;
 
       if (typeof (this as any)[method] === "function") {
         const [sqls, procs] = partition(
-          wrap(await (this as any)[method](table, ...arguments_)),
+          wrap(await (this as any)[method](tableName, ...args)),
           (v) => typeof v === "string",
         ) as [string[], Array<() => Promise<void>>];
         for (const sql of sqls) sqlFragments.push(sql);
@@ -1295,7 +1295,7 @@ export class SchemaStatements {
         for (const proc of nonCombinableOperations) await proc();
         sqlFragments = [];
         nonCombinableOperations = [];
-        await (this as any)[command](table, ...arguments_);
+        await (this as any)[command](tableName, ...args);
       }
     }
 

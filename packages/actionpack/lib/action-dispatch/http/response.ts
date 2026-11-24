@@ -1,6 +1,7 @@
 import type { Time } from "@blazetrails/date";
 import { cattrAccessor, include, presence, runLoadHooks } from "@blazetrails/activesupport";
 import {
+  aryJoin,
   hashAset,
   File,
   IO,
@@ -12,6 +13,7 @@ import {
   rbFSend,
   rbClassNewInstance,
   rbObjRespondTo,
+  rbProcCall,
   strNew,
   stringSplit,
   Struct,
@@ -27,6 +29,7 @@ import {
   statusCode,
   unescape,
 } from "@blazetrails/rack";
+import { UNPROCESSABLE_CONTENT } from "../constants.js";
 import type { CookieExpires, SetCookieOptions } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
 import type { MimeType } from "./mime-type.js";
@@ -92,11 +95,22 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     this._buf = buf;
   }
 
+  static BODY_METHODS = { toAry: true } as const;
+
+  isRespondTo(method: string, includePrivate = false): boolean {
+    if (Object.hasOwn(Buffer.BODY_METHODS, method)) {
+      return rbObjRespondTo(this._buf, method);
+    } else {
+      return basicObjRespondTo(this, method);
+    }
+  }
+
   toAry(): unknown {
-    if (this._buf instanceof ReadableStream) return this.eachChunk();
-    return rbObjRespondTo(this._buf, "toAry")
-      ? rbCheckArrayType(this._buf)
-      : (this._buf as unknown as { each(): unknown }).each();
+    if (this._strBody !== null) {
+      return [this.body];
+    } else {
+      return (this._buf = rbCheckArrayType(this._buf) as unknown as Buf);
+    }
   }
 
   get body(): string {
@@ -280,9 +294,7 @@ export class RackBody {
   }
 
   call(...arguments_: RubyArgs): unknown {
-    return (this._response.stream as unknown as { call(...a: RubyArgs): unknown }).call(
-      ...arguments_,
-    );
+    return rbProcCall(this._response.stream, ...arguments_);
   }
 
   toPath(): string {
@@ -348,6 +360,15 @@ export class Response {
     cattrAccessor.call(this, "defaultHeaders");
   }
 
+  static rackStatusCode(status: number | string): number {
+    if (UNPROCESSABLE_CONTENT === ":unprocessable_content") {
+      if (status === ":unprocessable_entity") status = ":unprocessable_content";
+    } else {
+      if (status === ":unprocessable_content") status = ":unprocessable_entity";
+    }
+    return statusCode(status);
+  }
+
   private _status!: number;
   private _headers: Headers;
   private _committed = false;
@@ -389,7 +410,7 @@ export class Response {
     return this._status;
   }
   set status(status: number | string) {
-    this._status = statusCode(status);
+    this._status = Response.rackStatusCode(status);
   }
 
   get code(): string {
@@ -451,14 +472,32 @@ export class Response {
   }
 
   get body(): string {
-    return (this.stream as { body: string }).body;
+    if (rbObjRespondTo(this.stream, "toAry")) {
+      return aryJoin(
+        (this.stream as { toAry(): unknown[] })
+          .toAry()
+          .map((part) => (part instanceof Uint8Array ? strNew(Array.from(part)) : part)),
+      );
+    } else if (rbObjRespondTo(this.stream, "body")) {
+      return (this.stream as { body: string }).body;
+    } else {
+      return this.stream as never;
+    }
   }
 
   async setBody(body: unknown): Promise<void> {
-    if (rbObjRespondTo(body, "toPath")) {
+    if (typeof body === "string" || body instanceof Uint8Array) {
+      this.stream = await this.buildBuffer(this, [body]);
+    } else if (rbObjRespondTo(body, "toPath")) {
       this.stream = body as { toPath(): string };
+    } else if (
+      rbObjRespondTo(body, "toAry") ||
+      rbObjRespondTo(body, "each") ||
+      body instanceof ReadableStream
+    ) {
+      this.stream = await this.buildBuffer(this, body);
     } else {
-      this.stream = await this.buildBuffer(this, this.mungeBodyObject(body));
+      this.stream = body as Response["stream"];
     }
   }
 
@@ -704,11 +743,6 @@ export class Response {
     body: unknown,
   ): Buffer<{ push(obj: unknown): unknown }> | Promise<Buffer<{ push(obj: unknown): unknown }>> {
     return new Buffer(response as Response, body as { push(obj: unknown): unknown });
-  }
-
-  /** @internal */
-  mungeBodyObject(body: unknown): unknown {
-    return rbObjRespondTo(body, "each") || body instanceof ReadableStream ? body : [body];
   }
 
   /** @internal */

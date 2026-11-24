@@ -22,6 +22,15 @@
     "NOTICE",
     "!dist/**/*.d.ts.map"
   ],
+  "sideEffects": [
+    "./dist/acts-like.js",
+    "./dist/constants.generated.js",
+    "./dist/date.js",
+    "./dist/index.js",
+    "./dist/time.js",
+    "./dist/tzdata-abbreviations.js",
+    "./dist/tzdata-isdst.js"
+  ],
   "scripts": {
     "build": "tsc"
   },

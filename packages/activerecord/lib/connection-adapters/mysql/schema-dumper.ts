@@ -42,8 +42,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override isDefaultPrimaryKey(column: MysqlColumn): boolean {
-    return super.isDefaultPrimaryKey(column) && column.isAutoIncrement() && !column.isUnsigned();
+  protected override async isDefaultPrimaryKey(column: MysqlColumn): Promise<boolean> {
+    return (
+      (await super.isDefaultPrimaryKey(column)) && column.isAutoIncrement() && !column.isUnsigned()
+    );
   }
 
   /** @internal */

@@ -117,6 +117,7 @@ export class QueryCacheRegistry {
 }
 
 export interface QueryCachePool {
+  readonly queryCache?: Store | null;
   enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
   disableQueryCache<T>(fn: () => T | Promise<T>, opts?: { dirties?: boolean }): T | Promise<T>;
   enableQueryCacheBang(): void;
@@ -127,6 +128,10 @@ export interface QueryCachePool {
 
 export interface QueryCacheHost extends DatabaseStatementsHost {
   _queryCache: Store | null;
+  readonly queryCache: Store | null;
+  readonly queryCacheEnabled: boolean | undefined;
+  pinned: boolean;
+  readonly owner: unknown;
   pool: DatabaseStatementsHost["pool"] & QueryCachePool;
   /** @internal */
   cacheNotificationInfo(
@@ -322,8 +327,7 @@ export function selectAll(
   binds = resolvedBinds;
   const resolvedPreparable = compiledPreparable ?? opts?.preparable;
   const forwardOpts = { ...opts, preparable: resolvedPreparable, allowRetry: compiledAllowRetry };
-  const qc = this._queryCache;
-  if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
+  if (this.queryCacheEnabled && !LOCKED_QUERY.test(sql)) {
     if (opts?.async) {
       const result =
         this.lookupSqlCache(sql, name, binds ?? []) ??
@@ -362,7 +366,7 @@ function lookupSqlCache(
   name: string | null | undefined,
   binds: unknown[],
 ): Result | undefined {
-  const qc = this._queryCache;
+  const qc = this.queryCache;
   if (!qc) return undefined;
   const key = sqlCacheKey(sql, binds);
   const result = qc.get(key);
@@ -383,7 +387,7 @@ function cacheSql(
   binds: unknown[],
   block: () => Promise<Result>,
 ): Promise<Result> {
-  const qc = this._queryCache;
+  const qc = this.queryCache;
   if (!qc) return block();
   const key = sqlCacheKey(sql, binds);
   let hit = true;
@@ -471,13 +475,17 @@ export const QueryCache: ThisType<QueryCacheHost> &
     }) => void;
   } = {
   get queryCache(): Store | null {
-    return this._queryCache;
+    if (this.pinned && this.owner !== IsolatedExecutionState.context()) {
+      return this.pool.queryCache ?? null;
+    } else {
+      return this._queryCache;
+    }
   },
   set queryCache(value: Store | null) {
     this._queryCache = value;
   },
   get queryCacheEnabled(): boolean | undefined {
-    return this._queryCache?.enabled;
+    return this.queryCache?.enabled;
   },
   cache,
   enableQueryCacheBang,

@@ -18,6 +18,24 @@ describe("PG::Result", () => {
     expect(enumerator.toA()).toEqual([{ n: "1" }, { n: "2" }]);
   });
 
+  it("raises result has been cleared from a reader after clear", () => {
+    const res = new PG.Result(native);
+    res.clear();
+    expect(res.isCleared()).toBe(true);
+    for (const read of [
+      () => res.ntuples(),
+      () => res.nfields(),
+      () => res.values(),
+      () => res.fields(),
+      () => res.getvalue(0, 0),
+      () => res.get(0),
+      () => res.resultStatus(),
+    ]) {
+      expect(read).toThrow(new PG.Error("result has been cleared"));
+    }
+    expect(res.inspect()).toMatch(/cleared/);
+  });
+
   it("keeps one TextEncoder and TextDecoder module object", () => {
     const textEncoder = PG.TextEncoder;
     expect(PG.TextEncoder).toBe(textEncoder);

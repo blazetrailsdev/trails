@@ -287,13 +287,9 @@ class IntegrationController extends Base {
     });
   }
 
-  async getWithVarySetXRequestedWith(): Promise<void> {
-    await this.respondTo((format) => {
-      format.json(() => {
-        this.response.headers.set("Vary", "X-Requested-With");
-        return this.render({ json: "JSON OK", status: 200 });
-      });
-    });
+  async getWithVary(): Promise<void> {
+    this.response.headers.set("Vary", this.params.get("vary") as string);
+    await this.get();
   }
 
   async getWithParams(): Promise<void> {
@@ -748,7 +744,41 @@ describe("IntegrationProcessTest", () => {
   it("setting vary header when request is xhr with accept header", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/get", { headers: { Accept: "application/json" }, xhr: true });
-      expect(t.response.headers.get("Vary")).toBe("Accept");
+      expect(t.response.headers.get("Vary")).toBe("Accept, X-Requested-With");
+    });
+  });
+
+  it("setting vary header when request has no accept header", async () => {
+    await t.withTestRouteSet(async () => {
+      await t.get("/get", { headers: { Accept: null } });
+      expect(t.response.mediaType).toBe("text/html");
+      expect(t.response.headers.get("Vary")).toBe("Accept, X-Requested-With");
+
+      await t.get("/get", { headers: { Accept: null, "X-Requested-With": "XMLHttpRequest" } });
+      expect(t.response.mediaType).toBe("text/javascript");
+      expect(t.response.headers.get("Vary")).toBe("Accept, Content-Type, X-Requested-With");
+    });
+  });
+
+  it("setting vary header when xhr format depends on content type", async () => {
+    await t.withTestRouteSet(async () => {
+      await t.get("/get", {
+        headers: {
+          Accept: null,
+          "Content-Type": "application/xml",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+      expect(t.response.mediaType).toBe("application/xml");
+      expect(t.response.headers.get("Vary")).toBe("Accept, Content-Type, X-Requested-With");
+    });
+  });
+
+  it("setting vary header when request has a browser like accept header", async () => {
+    await t.withTestRouteSet(async () => {
+      await t.get("/get", { headers: { Accept: "application/json, */*" } });
+      expect(t.response.mediaType).toBe("text/html");
+      expect(t.response.headers.get("Vary")).toBe("Accept, X-Requested-With");
     });
   });
 
@@ -759,24 +789,60 @@ describe("IntegrationProcessTest", () => {
     });
   });
 
-  it("not setting vary header when it has already been set", async () => {
+  it("appending to vary header when it has already been set", async () => {
     await t.withTestRouteSet(async () => {
-      await t.get("/getWithVarySetXRequestedWith", {
+      await t.get("/getWithVary", {
+        params: { vary: "Accept-Language" },
         headers: { Accept: "application/json" },
-        xhr: true,
       });
-      expect(t.response.headers.get("Vary")).toBe("X-Requested-With");
+      expect(t.response.headers.get("Vary")).toBe("Accept-Language, Accept, X-Requested-With");
     });
   });
 
-  it("not setting vary header when ignore accept header is set", async () => {
+  it("not appending fields already in vary header case insensitively", async () => {
+    await t.withTestRouteSet(async () => {
+      const existing = "accept, CONTENT-type, x-requested-with";
+      await t.get("/getWithVary", {
+        params: { vary: existing },
+        headers: {
+          Accept: null,
+          "Content-Type": "application/xml",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+      expect(t.response.mediaType).toBe("application/xml");
+      expect(t.response.headers.get("Vary")).toBe(existing);
+    });
+  });
+
+  it("not appending to wildcard vary header", async () => {
+    await t.withTestRouteSet(async () => {
+      await t.get("/getWithVary", {
+        params: { vary: "*" },
+        headers: {
+          Accept: null,
+          "Content-Type": "application/xml",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+      expect(t.response.mediaType).toBe("application/xml");
+      expect(t.response.headers.get("Vary")).toBe("*");
+    });
+  });
+
+  it("not setting accept in vary header when ignore accept header is set", async () => {
     const originalIgnoreAcceptHeader = Request.ignoreAcceptHeader;
     Request.ignoreAcceptHeader = true;
 
     try {
       await t.withTestRouteSet(async () => {
+        await t.get("/get", { headers: { Accept: "application/json" } });
+        expect(t.response.mediaType).toBe("text/html");
+        expect(t.response.headers.get("Vary")).toBe("X-Requested-With");
+
         await t.get("/get", { headers: { Accept: "application/json" }, xhr: true });
-        expect(t.response.headers.get("Vary")).toBeUndefined();
+        expect(t.response.mediaType).toBe("text/javascript");
+        expect(t.response.headers.get("Vary")).toBe("X-Requested-With");
       });
     } finally {
       Request.ignoreAcceptHeader = originalIgnoreAcceptHeader;

@@ -1435,6 +1435,7 @@
       "generators/app-name.ts::AppName": "Trails::Generators::AppName",
       "generators/base.ts::Base": "Trails::Generators::Base",
       "generators/base.ts::Error": "Trails::Generators::Error",
+      "generators/bundle-helper.ts::BundleHelper": "Trails::Generators::BundleHelper",
       "generators/database.ts::Database": "Trails::Generators::Database",
       "generators/database.ts::MariaDBMySQL2": "Trails::Generators::Database::MariaDBMySQL2",
       "generators/database.ts::MySQL2": "Trails::Generators::Database::MySQL2",

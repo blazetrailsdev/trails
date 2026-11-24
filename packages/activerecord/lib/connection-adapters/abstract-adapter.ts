@@ -828,6 +828,7 @@ export class AbstractAdapter implements Quoting {
   /** @internal */
   _rawConnection: unknown = null;
   private _owner: Thread | Fiber | null = null;
+  pinned = false;
   private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
   private _idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
@@ -1409,47 +1410,52 @@ export class AbstractAdapter implements Quoting {
         : null;
 
     return this.lock.synchronize(async () => {
-      for (;;) {
-        try {
-          await this.reconnect();
+      await this.attemptConfigureConnection(async () => {
+        for (;;) {
+          try {
+            await this.reconnect();
 
-          this.enableLazyTransactionsBang();
-          this._rawConnectionDirty = false;
-          this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
-          this._verified = true;
+            this.enableLazyTransactionsBang();
+            this._rawConnectionDirty = false;
+            this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
+            this._verified = true;
 
-          await this.resetTransaction({ restore: opts.restoreTransactions ?? false }, async () => {
-            await this.clearCacheBang({ newConnection: true });
-            await this.attemptConfigureConnection();
-          });
-          return;
-        } catch (originalException) {
-          const translatedException = await this.translateExceptionClass(
-            originalException,
-            undefined,
-            undefined,
-          );
-          const retryDeadlineExceeded =
-            deadline !== null && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
+            await this.resetTransaction(
+              { restore: opts.restoreTransactions ?? false },
+              async () => {
+                await this.clearCacheBang({ newConnection: true });
+                await this.configureConnection();
+              },
+            );
+            return;
+          } catch (originalException) {
+            const translatedException = await this.translateExceptionClass(
+              originalException,
+              undefined,
+              undefined,
+            );
+            const retryDeadlineExceeded =
+              deadline !== null && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
 
-          if (!retryDeadlineExceeded && retriesAvailable > 0) {
-            retriesAvailable -= 1;
-            if (this.isRetryableConnectionError(translatedException)) {
-              await this.backoff(this.connectionRetries - retriesAvailable);
-              continue;
+            if (!retryDeadlineExceeded && retriesAvailable > 0) {
+              retriesAvailable -= 1;
+              if (this.isRetryableConnectionError(translatedException)) {
+                await this.backoff(this.connectionRetries - retriesAvailable);
+                continue;
+              }
             }
-          }
 
-          this._lastActivity = 0;
-          this._verified = false;
-          throw excSetupMessage(translatedException, originalException);
+            throw excSetupMessage(translatedException, originalException);
+          }
         }
-      }
+      });
     });
   }
 
   async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
+      this._lastActivity = 0;
+      this._verified = false;
       await this.clearCacheBang({ newConnection: true });
       this.resetTransaction();
       this._rawConnectionDirty = false;
@@ -1459,9 +1465,11 @@ export class AbstractAdapter implements Quoting {
   async discardBang(): Promise<void> {}
 
   async resetBang(): Promise<void> {
-    await this.clearCacheBang({ newConnection: true });
-    this.resetTransaction();
-    await this.attemptConfigureConnection();
+    await this.attemptConfigureConnection(async () => {
+      await this.clearCacheBang({ newConnection: true });
+      this.resetTransaction();
+      await this.configureConnection();
+    });
   }
 
   async throwAwayBang(): Promise<void> {
@@ -1491,11 +1499,13 @@ export class AbstractAdapter implements Quoting {
     if (!(await this.active())) {
       await this.lock.synchronize(async () => {
         if (this._unconfiguredConnection) {
-          this._rawConnection = this._unconfiguredConnection;
-          this._unconfiguredConnection = null;
-          await this.attemptConfigureConnection();
-          this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
-          this._verified = true;
+          await this.attemptConfigureConnection(async () => {
+            this._rawConnection = this._unconfiguredConnection;
+            this._unconfiguredConnection = null;
+            await this.configureConnection();
+            this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
+            this._verified = true;
+          });
           return;
         }
 
@@ -1944,9 +1954,9 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  async attemptConfigureConnection(): Promise<void> {
+  async attemptConfigureConnection(block: () => Promise<void>): Promise<void> {
     try {
-      await this.configureConnection();
+      await block();
     } catch (e) {
       await this.disconnectBang();
       throw e;

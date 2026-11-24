@@ -418,9 +418,35 @@ describe("InsertAllTest", () => {
           });
         },
       );
+    },
+  );
 
-      const error = await assertRaises([ArgumentError], {}, () =>
-        Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart" }]),
+  itIfSupports(
+    "insert_conflict_target",
+    "insert all bang does not require unique index",
+    async () => {
+      await assertDifference(
+        () => Cart.count(),
+        +1,
+        null,
+        async () => {
+          await Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart" }]);
+        },
+      );
+    },
+  );
+
+  itIfSupports(
+    "insert_conflict_target",
+    "insert all and upsert all raises when no unique index found for composite primary key",
+    async () => {
+      let error = await assertRaises([ArgumentError], {}, () =>
+        Cart.insertAll([{ id: 2, shop_id: 1, title: "My cart" }]),
+      );
+      expect(error.message).toMatch("No unique index found for id");
+
+      error = await assertRaises([ArgumentError], {}, () =>
+        Cart.upsertAll([{ id: 2, shop_id: 1, title: "My cart" }]),
       );
       expect(error.message).toMatch("No unique index found for id");
     },
@@ -449,6 +475,23 @@ describe("InsertAllTest", () => {
       expect(output.string()).toMatch("Book Insert");
     });
   });
+
+  itIfSupports(
+    "insert_conflict_target",
+    "insert logs message including model name from anonymous class",
+    async () => {
+      const anonymousBookKlass = class extends Book {
+        static override get name(): string {
+          return "AnonymousBook";
+        }
+      };
+
+      await captureLogOutput(async (output) => {
+        await anonymousBookKlass.insert({ name: "Rework", author_id: 1 });
+        expect(output.string()).toMatch("AnonymousBook Insert");
+      });
+    },
+  );
 
   itIfSupports(
     "insert_conflict_target",

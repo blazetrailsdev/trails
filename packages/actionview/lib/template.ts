@@ -46,7 +46,7 @@ type TypesImplementation = {
   get(type: string | null): { readonly symbol: string | null; toString(): string } | undefined;
 };
 
-const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*)\)/;
+const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*?)\)(?=\s*-?%>|\s*$)/ms;
 const LEADING_ENCODING_REGEXP = new RegExp(`^${ENCODING_FLAG}`);
 const VARIABLE_FROM_BASENAME = /^_?(.*?)(?:\.\w+)*$/;
 const NONE = Symbol("Template::NONE");
@@ -265,7 +265,7 @@ export class Template {
         if (typeof this._source === "string") {
           this._source = source.replace(STRICT_LOCALS_REGEX, "");
         }
-        const sig = m[1].trim();
+        const sig = m[1].trimEnd();
         this._strictLocals = sig === "" ? "**nil" : sig;
       } else {
         this._strictLocals = null;

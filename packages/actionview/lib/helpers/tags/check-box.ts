@@ -38,10 +38,10 @@ export class CheckBox extends Base {
     if (this.isInputChecked(options)) options["checked"] = "checked";
 
     if (options["multiple"] != null && options["multiple"] !== false) {
-      this.addDefaultNameAndIdForValue(this._checkedValue, options);
+      this.addDefaultNameAndFieldForValue(this._checkedValue, options);
       delete options["multiple"];
     } else {
-      this.addDefaultNameAndId(options);
+      this.addDefaultNameAndField(options);
     }
 
     const includeHidden = hashDelete(options, "includeHidden", () => true);

@@ -32,6 +32,14 @@ export class Body {
     return this;
   }
 
+  async body(): Promise<string> {
+    let buffer = "";
+    await this.each((part) => {
+      buffer += part;
+    });
+    return buffer;
+  }
+
   /** @internal */
   private logError(exception: Error & { annotatedSourceCode?(): unknown }): void {
     const logger = Base.logger as { fatal(message: string): unknown } | null;
@@ -57,7 +65,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
     layoutName: RenderOptions["layout"] = null,
     locals: Record<string, unknown> = {},
   ): Promise<Body | (string | SafeBuffer | Uint8Array | null)[]> {
-    if (!(layoutName != null && layoutName !== false && template.supportsStreaming?.())) {
+    if (!template.supportsStreaming?.()) {
       const rendered = await super.renderTemplate(view, template, layoutName, locals);
       return [(rendered as unknown as RenderedTemplate).body];
     }

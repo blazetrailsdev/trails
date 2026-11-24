@@ -89,7 +89,7 @@ describe("_processVariant", () => {
   test("copies present variant onto options; ignores absent/empty", () => {
     const opts: Record<string, unknown> = {};
     const request = (variant: unknown) => ({
-      request: { variant, shouldApplyVaryHeader: () => true },
+      request: { variant, shouldApplyVaryHeader: () => true, varyHeaders: () => ["Accept"] },
     });
     _processVariant.call(request(":mobile"), opts);
     expect(opts.variant).toBe(":mobile");
@@ -139,7 +139,10 @@ describe("_setVaryHeader", () => {
     return {
       headers,
       host: {
-        request: { shouldApplyVaryHeader: () => shouldApply },
+        request: {
+          shouldApplyVaryHeader: () => shouldApply,
+          varyHeaders: () => ["Accept", "X-Requested-With"],
+        },
         response: { headers },
       },
     };
@@ -148,11 +151,11 @@ describe("_setVaryHeader", () => {
   test("sets Vary: Accept when missing and request opts in; preserves existing or opt-out", () => {
     const a = makeHost();
     _setVaryHeader.call(a.host);
-    expect(a.headers.get("Vary")).toBe("Accept");
+    expect(a.headers.get("Vary")).toBe("Accept, X-Requested-With");
 
     const b = makeHost("Cookie");
     _setVaryHeader.call(b.host);
-    expect(b.headers.get("Vary")).toBe("Cookie");
+    expect(b.headers.get("Vary")).toBe("Cookie, Accept, X-Requested-With");
 
     const c = makeHost(undefined, false);
     _setVaryHeader.call(c.host);

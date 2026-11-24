@@ -22,6 +22,11 @@
     "NOTICE",
     "!dist/**/*.d.ts.map"
   ],
+  "sideEffects": [
+    "./dist/constants.generated.js",
+    "./dist/did-you-mean.js",
+    "./dist/index.js"
+  ],
   "scripts": {
     "build": "tsc"
   },

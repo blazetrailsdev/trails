@@ -1,5 +1,5 @@
 import "../../constants.sqlite3-schema-dumper.generated.js";
-import type { IO, StringIO } from "@blazetrails/ruby-compat";
+import { toS, type IO, type StringIO } from "@blazetrails/ruby-compat";
 import type { Column } from "./column.js";
 import type { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
@@ -11,7 +11,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected override async virtualTables(
     stream: IO | StringIO,
   ): Promise<Array<[string, [string, string]]> | undefined> {
-    const virtualTables: Array<[string, [string, string]]> = await this.connection.virtualTables();
+    const virtualTables: Array<[string, [string, string]]> = (
+      await this.connection.virtualTables()
+    ).filter(([name]) => !this.isIgnored(name));
     if (virtualTables.length > 0) {
       stream.puts("");
       stream.puts("  // Virtual tables defined in this database.");
@@ -31,13 +33,31 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override isDefaultPrimaryKey(column: Column): boolean {
-    return this.schemaType(column) === ":integer";
+  protected override async isDefaultPrimaryKey(column: Column): Promise<boolean> {
+    return this.schemaType(column) === ":integer" && (await this.isPrimaryKeyHasAutoincrement());
   }
 
   /** @internal */
-  protected override isExplicitPrimaryKeyDefault(column: Column): boolean {
-    return this.isBigint(column);
+  protected override async isExplicitPrimaryKeyDefault(column: Column): Promise<boolean> {
+    return (
+      this.isBigint(column) ||
+      (column.type === "integer" && !(await this.isPrimaryKeyHasAutoincrement()))
+    );
+  }
+
+  /** @internal */
+  protected async isPrimaryKeyHasAutoincrement(): Promise<boolean> {
+    if (this.tableName == null) return false;
+
+    const tableSql = await this.connection.queryValue(
+      `SELECT sql FROM sqlite_master WHERE name = ${this.connection.quote(this.tableName)} AND type = 'table'
+UNION ALL
+SELECT sql FROM sqlite_temp_master WHERE name = ${this.connection.quote(this.tableName)} AND type = 'table'
+`,
+      "SCHEMA",
+    );
+
+    return /\bAUTOINCREMENT\b/i.test(toS(tableSql));
   }
 
   /** @internal */

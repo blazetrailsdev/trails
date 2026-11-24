@@ -1,3 +1,4 @@
+import "../constants.database-tasks.generated.js";
 import type { DatabaseConfigOptions } from "../database-configurations/database-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
@@ -37,7 +38,7 @@ import {
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
-import { dumpSchemaAfterMigration, schemaFormat } from "../active-record.js";
+import { dumpSchemaAfterMigration } from "../active-record.js";
 import { ActiveRecord } from "../namespaces.js";
 
 export class DatabaseNotSupported extends StandardError {}
@@ -506,7 +507,7 @@ export class DatabaseTasks {
 
   static schemaDumpPath(
     dbConfig: HashConfig,
-    format: SchemaFormat = schemaFormat(),
+    format: SchemaFormat = dbConfig.schemaFormat(),
   ): string | null {
     const envSchema = getEnv("SCHEMA");
     if (envSchema !== undefined) return envSchema;
@@ -521,7 +522,7 @@ export class DatabaseTasks {
   /** @missingRailsArgs dump — PERMANENT */
   static async dumpSchema(
     dbConfig: HashConfig,
-    format: SchemaFormat = schemaFormat(),
+    format: SchemaFormat = dbConfig.schemaFormat(),
   ): Promise<void> {
     if (dbConfig.schemaDump() == null) return;
 
@@ -557,7 +558,7 @@ export class DatabaseTasks {
 
   static async loadSchema(
     dbConfig: HashConfig,
-    format: SchemaFormat = schemaFormat(),
+    format: SchemaFormat = dbConfig.schemaFormat(),
     file?: string,
   ): Promise<void> {
     let verboseWas: boolean | undefined;
@@ -591,13 +592,13 @@ export class DatabaseTasks {
   }
 
   static async loadSchemaCurrent(
-    format: SchemaFormat = schemaFormat(),
+    format: SchemaFormat | null = null,
     file?: string,
     environment: string | StringInquirer = DatabaseTasks.env,
   ): Promise<void> {
     await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.withTemporaryConnection(dbConfig, async () => {
-        await this.loadSchema(dbConfig, format, file);
+        await this.loadSchema(dbConfig, format ?? dbConfig.schemaFormat(), file);
       });
     });
   }
@@ -776,7 +777,7 @@ export class DatabaseTasks {
 
   static async schemaUpToDate(
     configuration: unknown,
-    format: SchemaFormat = schemaFormat(),
+    _: unknown = null,
     file?: string,
   ): Promise<boolean> {
     const dbConfig = this.resolveConfiguration(configuration)!;
@@ -849,12 +850,8 @@ export class DatabaseTasks {
     });
   }
 
-  static async reconstructFromSchema(
-    dbConfig: HashConfig,
-    format: SchemaFormat = schemaFormat(),
-    file?: string,
-  ): Promise<void> {
-    file ??= this.schemaDumpPath(dbConfig, format) ?? undefined;
+  static async reconstructFromSchema(dbConfig: HashConfig, file?: string): Promise<void> {
+    file ??= this.schemaDumpPath(dbConfig, dbConfig.schemaFormat()) ?? undefined;
     if (file !== undefined) this.checkSchemaFile(file);
 
     const { NoDatabaseError } = await import("../errors.js");
@@ -862,22 +859,32 @@ export class DatabaseTasks {
       dbConfig,
       async () => {
         try {
-          if (await this.schemaUpToDate(dbConfig, format, file)) {
+          if (await this.schemaUpToDate(dbConfig, null, file)) {
             if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
               await this.truncateTables(dbConfig);
             }
           } else {
             await this.purge(dbConfig);
-            await this.loadSchema(dbConfig, format, file);
+            await this.loadSchema(dbConfig, dbConfig.schemaFormat(), file);
           }
         } catch (error) {
           if (!(error instanceof NoDatabaseError)) throw error;
           await this.create(dbConfig);
-          await this.loadSchema(dbConfig, format, file);
+          await this.loadSchema(dbConfig, dbConfig.schemaFormat(), file);
         }
       },
       { clobber: true },
     );
+  }
+
+  static async dumpAll(): Promise<void> {
+    await this.withTemporaryPoolForEach({}, async (pool) => {
+      const dbConfig = pool.dbConfig;
+      await DatabaseTasks.dumpSchema(
+        dbConfig,
+        (getEnv("SCHEMA_FORMAT") as SchemaFormat | undefined) || dbConfig.schemaFormat(),
+      );
+    });
   }
 }
 
@@ -963,7 +970,7 @@ export async function initializeDatabase(dbConfig: HashConfig): Promise<boolean>
     if (!alreadyInitialized) {
       const schemaDumpPath = DatabaseTasks.schemaDumpPath(dbConfig);
       if (schemaDumpPath != null && File.isExist(schemaDumpPath)) {
-        await DatabaseTasks.loadSchema(dbConfig, schemaFormat(), undefined);
+        await DatabaseTasks.loadSchema(dbConfig);
       }
     }
     return !alreadyInitialized;

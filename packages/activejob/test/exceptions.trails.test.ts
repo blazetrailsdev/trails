@@ -4,6 +4,7 @@ import { Base } from "../lib/base.js";
 import "./helper.js";
 import { JobBuffer } from "./support/job-buffer.js";
 import { FirstRetryableErrorOfTwo, RetryJob, SecondRetryableErrorOfTwo } from "./jobs/retry-job.js";
+import { HelloJob } from "./jobs/hello-job.js";
 import { RescueJob } from "./jobs/rescue-job.js";
 
 describe("Exceptions", () => {
@@ -21,6 +22,18 @@ describe("Exceptions", () => {
     expect(() =>
       job.determineDelay({ secondsOrDurationOrAlgorithm: "nope", executions: 1 }),
     ).toThrow(`Couldn't determine a delay based on "nope"`);
+  });
+
+  it("retry_job enqueues a dup and leaves the original job untouched", async () => {
+    const job = new HelloJob("david");
+    const priority = job.priority;
+    const queueName = job.queueName;
+    const retried = (await job.retryJob({ priority: 7, queue: "retries" })) as HelloJob;
+    expect(retried).not.toBe(job);
+    expect(retried.priority).toBe(7);
+    expect(retried.queueName).toBe("retries");
+    expect(job.priority).toBe(priority);
+    expect(job.queueName).toBe(queueName);
   });
 
   it("retry_job from a rescue_from handler", async () => {

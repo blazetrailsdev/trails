@@ -72,7 +72,7 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
   });
 
   it("calls the busy handler with a growing count until it answers false, as retries does", async () => {
-    const path = `${getOs().tmpdir()}/engine-busy-${Date.now()}.sqlite3`;
+    const path = `${getOs().tmpdir()}/engine-busy-${Date.now()}-${Math.random()}.sqlite3`;
     paths.push(path);
     const holder = new SQLite3.Database(path, { engine });
     await holder.executeBatch2("CREATE TABLE t (a); BEGIN EXCLUSIVE;");
@@ -88,7 +88,7 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
   });
 
   it("setBusyHandlerTimeout retries until the deadline, then raises BusyException", async () => {
-    const path = `${getOs().tmpdir()}/engine-busy-timeout-${Date.now()}.sqlite3`;
+    const path = `${getOs().tmpdir()}/engine-busy-timeout-${Date.now()}-${Math.random()}.sqlite3`;
     paths.push(path);
     const holder = new SQLite3.Database(path, { engine });
     await holder.executeBatch2("CREATE TABLE t (a); BEGIN EXCLUSIVE;");
@@ -152,7 +152,7 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
   });
 
   it("opens READWRITE without CREATE only on an existing file", async () => {
-    const path = `${getOs().tmpdir()}/sqlite3-no-create-${Date.now()}.db`;
+    const path = `${getOs().tmpdir()}/sqlite3-no-create-${Date.now()}-${Math.random()}.db`;
     paths.push(path);
     const flags = SQLite3.Constants.Open.READWRITE;
     expect(() => new SQLite3.Database(path, { engine, flags })).toThrow(SQLite3.CantOpenException);
