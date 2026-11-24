@@ -143,14 +143,18 @@ describeIfPg("PostgreSQLAdapter", () => {
           VirtualColumn.columnsHash();
           await RegularModel.loadSchema();
 
-          const regularCol = RegularModel.columnsHash()["name"] as any;
+          const regularCol = RegularModel.columnsHash()["name"] as unknown as {
+            isVirtual(): boolean;
+          };
           const virtualCol = VirtualColumn.columnsHash()["upper_name"];
 
           expect(virtualCol.isVirtual()).toBeTruthy();
           expect(regularCol.isVirtual()).toBeFalsy();
           expect(regularCol).not.toEqualRuby(virtualCol);
 
-          const record = (await RegularModel.createBang({ name: "hello" })) as any;
+          const record = (await RegularModel.createBang({ name: "hello" })) as unknown as Base & {
+            name: string;
+          };
           await record.reload();
           expect(record.name).toBe("hello");
         } finally {

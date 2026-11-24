@@ -218,7 +218,7 @@ describe("LoadAsyncTest", () => {
       scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void;
     };
     const oldScheduleQuery = pool.scheduleQuery;
-    let executed: Promise<void> | void;
+    let executed: Promise<void> | void = undefined;
     try {
       pool.scheduleQuery = (futureResult) => {
         executed = futureResult.executeOrSkip();

@@ -699,17 +699,18 @@ describe("BelongsToAssociationsTest", () => {
     await chapter.updateBang({ book: null });
 
     expect(chapter.id).toEqual([1, 2]);
-    expect((chapter as any).book_id).toBeNull();
-    expect(book.author_id).toBe((chapter as any).author_id);
+    const chapterIds = chapter as unknown as { book_id: unknown; author_id: unknown };
+    expect(chapterIds.book_id).toBeNull();
+    expect(book.author_id).toBe(chapterIds.author_id);
   });
 
   it("should reload association on model with query constraints when foreign key changes", async () => {
     const blog = await ShardedBlog.createBang();
     const blogPost = await ShardedBlogPost.createBang({ blog });
-    const comment = (await ShardedComment.createBang({ blog })) as any;
+    const comment = await ShardedComment.createBang({ blog });
 
     await comment.blogPost;
-    comment.blog_post_id = blogPost.id;
+    comment.blog_post_id = blogPost.id as number;
 
     expect(await comment.blogPost).toEqualRuby(blogPost);
   });

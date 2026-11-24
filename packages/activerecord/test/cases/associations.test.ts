@@ -1327,10 +1327,10 @@ describe("PreloaderTest", () => {
     const result = (await Author.includes({
       books: [],
       publishedAuthor: { books: [] },
-    }).last()) as any;
-    expect(
-      (await (await result.publishedAuthor).books.toArray()).map((b: Base) => b.constructor),
-    ).toEqual([PublishedBook]);
+    }).last()) as AuthorT;
+    expect((await (await result.publishedAuthor)!.books).map((b: Base) => b.constructor)).toEqual([
+      PublishedBook,
+    ]);
   });
 });
 

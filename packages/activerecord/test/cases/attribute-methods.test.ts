@@ -1189,11 +1189,14 @@ describe("AttributeMethodsTest", () => {
     expect((p as any).id_value).toBe(1);
   });
   it("#id_value returns the value in the id_value column, when id_value column exists", async () => {
-    let bookIdentifier = new BookIdentifier() as any;
+    type IdValue = { id_value: unknown };
+    let bookIdentifier = new BookIdentifier() as unknown as IdValue;
     expect(bookIdentifier.id_value).toBeNull();
 
-    bookIdentifier = (await BookIdentifier.find(1)) as any;
-    expect(bookIdentifier.id_value).toBe((bookIdentifiers("awdr_isbn13") as any).id_value);
+    bookIdentifier = (await BookIdentifier.find(1)) as unknown as IdValue;
+    expect(bookIdentifier.id_value).toBe(
+      (bookIdentifiers("awdr_isbn13") as unknown as IdValue).id_value,
+    );
   });
   it("attribute_for_inspect with a string", () => {
     const t = topics("first") as any;

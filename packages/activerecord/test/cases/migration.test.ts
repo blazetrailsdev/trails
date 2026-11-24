@@ -1795,7 +1795,7 @@ AND query LIKE '%${lockId}%'`;
           write(_text = ""): void {}
 
           async change() {
-            await this.changeTable("testings", { bulk: true }, (t: any) => {
+            await this.changeTable("testings", { bulk: true }, (t) => {
               t.column("foo", "string");
               t.column("bar", "string");
               t.index("foo");

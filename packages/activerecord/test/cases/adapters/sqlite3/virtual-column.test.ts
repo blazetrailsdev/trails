@@ -183,7 +183,9 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3VirtualColumnTest", () 
         expect(regularCol.isVirtual()).toBeFalsy();
         expect(regularCol).not.toEqualRuby(virtualCol);
 
-        const record = (await RegularModel.createBang({ name: "hello" })) as any;
+        const record = (await RegularModel.createBang({ name: "hello" })) as unknown as Base & {
+          name: string;
+        };
         await record.reload();
         expect(record.name).toBe("hello");
       } finally {
