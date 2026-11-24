@@ -38,21 +38,24 @@ describe("ZeitwerkCheckerTest", { timeout: 120_000 }, () => {
   it("returns an empty list for a default application", async () => {
     await boot();
 
-    expect(await ZeitwerkChecker.check()).toEqual([]);
+    expect(await ZeitwerkChecker.check()).toBeEmpty();
   });
 
   it("raises if there is a missing constants in autoload_paths", async () => {
     await t.appFile("app/models/user.ts", "");
 
-    const e = await (async () => {
-      try {
-        await boot();
-        await ZeitwerkChecker.check();
-      } catch (error) {
-        return error;
-      }
-    })();
-    expect(e).toBeInstanceOf(ZeitwerkNameError);
+    let e: unknown;
+    await expect(
+      (async () => {
+        try {
+          await boot();
+          await ZeitwerkChecker.check();
+        } catch (error) {
+          e = error;
+          throw error;
+        }
+      })(),
+    ).rejects.toThrow(ZeitwerkNameError);
     expect((e as Error).message).toContain(
       `expected file ${await t.appPath()}/app/models/user.ts to define constant User`,
     );
@@ -65,15 +68,18 @@ describe("ZeitwerkCheckerTest", { timeout: 120_000 }, () => {
     await t.addToConfig("this.config.autoloadOncePaths.push(`${Trails.root()}/extras`);");
     await t.addToConfig("this.config.eagerLoadPaths.push(`${Trails.root()}/extras`);");
 
-    const e = await (async () => {
-      try {
-        await boot();
-        await ZeitwerkChecker.check();
-      } catch (error) {
-        return error;
-      }
-    })();
-    expect(e).toBeInstanceOf(ZeitwerkNameError);
+    let e: unknown;
+    await expect(
+      (async () => {
+        try {
+          await boot();
+          await ZeitwerkChecker.check();
+        } catch (error) {
+          e = error;
+          throw error;
+        }
+      })(),
+    ).rejects.toThrow(ZeitwerkNameError);
     expect((e as Error).message).toContain(
       `expected file ${await t.appPath()}/extras/x.ts to define constant X`,
     );
@@ -85,7 +91,7 @@ describe("ZeitwerkCheckerTest", { timeout: 120_000 }, () => {
 
     await boot();
 
-    expect(await ZeitwerkChecker.check()).toEqual([]);
+    expect(await ZeitwerkChecker.check()).toBeEmpty();
   });
 
   it("returns an empty list if unchecked directories are empty", async () => {
@@ -97,7 +103,7 @@ describe("ZeitwerkCheckerTest", { timeout: 120_000 }, () => {
 
     await boot();
 
-    expect(await ZeitwerkChecker.check()).toEqual([]);
+    expect(await ZeitwerkChecker.check()).toBeEmpty();
   });
 
   it("returns unchecked directories", async () => {

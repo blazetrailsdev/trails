@@ -89,11 +89,11 @@ describe("AuthenticationGenerator enable_bcrypt", () => {
     const commands: string[] = [];
     registerChildProcessAdapter("trailties-auth-bcrypt-test", {
       spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
-      system: async () => ({ pid: 1, status: 0, signal: null }),
-      capture2e: async (...args: unknown[]) => {
-        commands.push(args.flat().join(" "));
-        return ["", { pid: 1, status: 0, signal: null }];
+      system: async (command: string) => {
+        commands.push(command);
+        return { pid: 1, status: 0, signal: null };
       },
+      capture2e: async () => ["", { pid: 1, status: 0, signal: null }],
     });
     childProcessAdapterConfig.adapter = "trailties-auth-bcrypt-test";
     const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-bcrypt-"));

@@ -18,7 +18,6 @@ export class AuthenticationGenerator extends Base {
     await this.template("test/models/user.test.ts");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async createMailerPreviewFiles(): Promise<void> {
     if (constDefined(TopLevel, "ActionMailer::Railtie"))
       await this.template("test/mailers/previews/passwords-mailer-preview.ts");

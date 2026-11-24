@@ -45,7 +45,7 @@ describe("ZeitwerkIntegrationTest", { timeout: 120_000 }, () => {
   it("The integration is minimally looking good", async () => {
     await boot();
 
-    expect(Trails.autoloaders.isZeitwerkEnabled()).toBe(true);
+    expect(Trails.autoloaders.isZeitwerkEnabled()).toBeTruthy();
     expect(Trails.autoloaders.main).toBeInstanceOf(Loader);
     expect(Trails.autoloaders.once).toBeInstanceOf(Loader);
     expect(Trails.autoloaders.toA()).toEqual([Trails.autoloaders.main, Trails.autoloaders.once]);
@@ -70,8 +70,8 @@ export class Post {}
 
     await boot("production");
 
-    expect(globals.zeitwerkIntegrationTestUser).toBe(true);
-    expect(globals.zeitwerkIntegrationTestPost).toBe(true);
+    expect(globals.zeitwerkIntegrationTestUser).toBeTruthy();
+    expect(globals.zeitwerkIntegrationTestPost).toBeTruthy();
   });
 
   it("reloading is enabled if config.enable_reloading is true", async () => {
@@ -79,8 +79,8 @@ export class Post {}
 
     await boot();
 
-    expect(Trails.autoloaders.main.isReloadingEnabled()).toBe(true);
-    expect(Trails.autoloaders.once.isReloadingEnabled()).toBe(false);
+    expect(Trails.autoloaders.main.isReloadingEnabled()).toBeTruthy();
+    expect(Trails.autoloaders.once.isReloadingEnabled()).toBeFalsy();
   });
 
   it("reloading is disabled if config.enable_reloading is false", async () => {
@@ -88,8 +88,8 @@ export class Post {}
 
     await boot();
 
-    expect(Trails.autoloaders.main.isReloadingEnabled()).toBe(false);
-    expect(Trails.autoloaders.once.isReloadingEnabled()).toBe(false);
+    expect(Trails.autoloaders.main.isReloadingEnabled()).toBeFalsy();
+    expect(Trails.autoloaders.once.isReloadingEnabled()).toBeFalsy();
   });
 
   it("autoload_paths not in autoload_once_paths are set as root dirs of main, and in the same order", async () => {
@@ -117,9 +117,9 @@ export class Post {}
     }
 
     const onceDirs = Trails.autoloaders.once.dirs() as readonly string[];
-    const e1Index = onceDirs.indexOf(extras[0]);
-    expect(e1Index).not.toBe(-1);
-    expect(onceDirs.slice(e1Index, e1Index + extras.length)).toEqual(extras);
+    const e1Index = onceDirs.includes(extras[0]) ? onceDirs.indexOf(extras[0]) : null;
+    expect(e1Index).toBeRubyTruthy();
+    expect(onceDirs.slice(e1Index!, e1Index! + extras.length)).toEqual(extras);
   });
 
   it("clear reloads the main autoloader, and does not reload the once one", async () => {

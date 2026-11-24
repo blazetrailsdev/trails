@@ -100925,20 +100925,6 @@
   {
     "package": "trailties",
     "rubyFile": "engine/lazy_route_set.rb",
-    "rubyName": "polymorphic_path",
-    "digest": "d68a2602be77d7d9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "engine/lazy_route_set.rb",
-    "rubyName": "polymorphic_url",
-    "digest": "d68a2602be77d7d9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "engine/lazy_route_set.rb",
     "rubyName": "recognize_path",
     "digest": "d68a2602be77d7d9",
     "ref": "v8.0.2"
@@ -101702,13 +101688,6 @@
   {
     "package": "trailties",
     "rubyFile": "generators/app_base.rb",
-    "rubyName": "bundle_command",
-    "digest": "3068648acfcd15fe",
-    "ref": "v8.0.5.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "generators/app_base.rb",
     "rubyName": "bundle_install?",
     "digest": "81ec8edb5173ea27",
     "ref": "v8.0.2"
@@ -101845,13 +101824,6 @@
     "rubyName": "empty_directory_with_keep_file",
     "digest": "f8616b658b438466",
     "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "generators/app_base.rb",
-    "rubyName": "exec_bundle_command",
-    "digest": "b78e2f9b6aa4a692",
-    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
@@ -102559,6 +102531,20 @@
     "rubyName": "wrap_with_namespace",
     "digest": "2d69d7edc45d5e34",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators/bundle_helper.rb",
+    "rubyName": "bundle_command",
+    "digest": "3068648acfcd15fe",
+    "ref": "v8.0.5.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators/bundle_helper.rb",
+    "rubyName": "exec_bundle_command",
+    "digest": "b78e2f9b6aa4a692",
+    "ref": "v8.0.5.2"
   },
   {
     "package": "trailties",
