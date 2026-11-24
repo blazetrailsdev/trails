@@ -286,6 +286,15 @@ describe("PluginGeneratorTest", () => {
     await t.assertFile("test/dummy/config/application.ts", /includeAllHelpers/);
   });
 
+  it("dummy application uses dynamic rails version number", async () => {
+    await t.runGenerator();
+
+    await t.assertFile(
+      "test/dummy/config/application.ts",
+      /^\s*this\.config\.loadDefaults\(rbStrToF\(Trails\.VERSION\.STRING\)\)/m,
+    );
+  });
+
   it("dummy application does not set include all helpers for regular", async () => {
     await t.runGenerator();
 

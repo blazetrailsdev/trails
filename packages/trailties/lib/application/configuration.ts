@@ -34,6 +34,7 @@ import {
   type IPAddr,
   isPlainHash,
   rbModName,
+  rbObjAsString,
   rbObjId,
   RuntimeError,
   stringSplit,
@@ -144,7 +145,7 @@ export class Configuration extends EngineConfiguration {
   }
 
   loadDefaults(targetVersion: string | number): void {
-    switch (String(targetVersion)) {
+    switch (rbObjAsString(targetVersion)) {
       case "5.0": {
         if (this.isRespondTo("actionController")) {
           const actionController = this.get("actionController") as Record<string, unknown>;
@@ -445,7 +446,7 @@ export class Configuration extends EngineConfiguration {
         break;
       }
       default:
-        throw new RuntimeError(`Unknown version "${String(targetVersion)}"`);
+        throw new RuntimeError(`Unknown version "${rbObjAsString(targetVersion)}"`);
     }
 
     this._loadedConfigVersion = targetVersion;
