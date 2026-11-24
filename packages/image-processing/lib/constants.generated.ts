@@ -6,9 +6,9 @@ import * as m3 from "./pipeline.js";
 import * as m4 from "./processor.js";
 
 defineConstants([
-  [m0, "Builder", "ImageProcessing::Builder"],
-  [m1, "Chainable", "ImageProcessing::Chainable"],
-  [m2, "Error", "ImageProcessing::Error"],
-  [m3, "Pipeline", "ImageProcessing::Pipeline"],
-  [m4, "Processor", "ImageProcessing::Processor"],
+  [() => m0, "Builder", "ImageProcessing::Builder"],
+  [() => m1, "Chainable", "ImageProcessing::Chainable"],
+  [() => m2, "Error", "ImageProcessing::Error"],
+  [() => m3, "Pipeline", "ImageProcessing::Pipeline"],
+  [() => m4, "Processor", "ImageProcessing::Processor"],
 ]);

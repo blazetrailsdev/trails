@@ -6,9 +6,9 @@ import * as m3 from "./cors/resources/cors-misconfiguration-error.js";
 import * as m4 from "./cors/result.js";
 
 defineConstants([
-  [m0, "Cors", "Rack::Cors"],
-  [m1, "Resource", "Rack::Cors::Resource"],
-  [m3, "CorsMisconfigurationError", "Rack::Cors::Resource::CorsMisconfigurationError"],
-  [m2, "Resources", "Rack::Cors::Resources"],
-  [m4, "Result", "Rack::Cors::Result"],
+  [() => m0, "Cors", "Rack::Cors"],
+  [() => m1, "Resource", "Rack::Cors::Resource"],
+  [() => m3, "CorsMisconfigurationError", "Rack::Cors::Resource::CorsMisconfigurationError"],
+  [() => m2, "Resources", "Rack::Cors::Resources"],
+  [() => m4, "Result", "Rack::Cors::Result"],
 ]);

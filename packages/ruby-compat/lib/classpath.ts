@@ -36,9 +36,7 @@ const tableClasses = new Map<string, () => unknown>();
  *
  * @noRailsEquivalent PERMANENT
  */
-export function defineConstants(
-  entries: readonly [object | (() => object), string | null, string][],
-): void {
+export function defineConstants(entries: readonly [() => object, string | null, string][]): void {
   for (const [namespace, name, path] of entries) {
     const klass = _readConstantsRow(namespace, name);
     pendingClassPaths.push([klass, path]);
@@ -48,17 +46,13 @@ export function defineConstants(
 }
 
 /** @perf 10ms — PERMANENT */
-function _readConstantsRow(namespace: object | (() => object), name: string | null): () => unknown {
-  const read =
-    typeof namespace === "function" && !Object.hasOwn(namespace, "prototype")
-      ? (namespace as () => object)
-      : () => namespace;
-  if (name === null) return read;
+function _readConstantsRow(namespace: () => object, name: string | null): () => unknown {
+  if (name === null) return namespace;
   const segments = name.split(".");
   return () =>
     segments.reduce<unknown>(
       (owner, segment) => (owner as Record<string, unknown>)[segment],
-      read(),
+      namespace(),
     );
 }
 
