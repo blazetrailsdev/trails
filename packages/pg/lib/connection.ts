@@ -1,4 +1,5 @@
 import {
+  Addrinfo,
   ArgumentError,
   FrozenError,
   LoadError,
@@ -145,10 +146,14 @@ export class Connection {
   /**
    * @internal
    * @missingRailsArgs split — PERMANENT
+   * @missingRailsArgs getaddrinfo — PERMANENT
    */
-  private static resolveHosts(iopts: Record<string, unknown>): Record<string, unknown> {
+  private static async resolveHosts(
+    iopts: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
     const ihosts = String(iopts.host).split(",");
-    let iports: (string | null)[] = String(iopts.port ?? "").split(",");
+    const port = String(iopts.port);
+    let iports: (string | null)[] = port === "" ? [] : port.split(",");
     if (iports.length == 0) iports = [null];
     if (iports.length == 1) iports = ihosts.map(() => iports[0]);
     if (iports.length != ihosts.length) {
@@ -157,15 +162,22 @@ export class Connection {
       );
     }
 
-    const dests = ihosts.flatMap((mhost, idx) => {
-      let hostaddrs: (string | null)[];
-      if (!Connection.isHostIsNamedPipe(mhost)) {
-        hostaddrs = [""];
-      } else {
-        hostaddrs = [null];
-      }
-      return hostaddrs.map((hostaddr) => [hostaddr, mhost, iports[idx]] as const);
-    });
+    const dests = (
+      await Promise.all(
+        ihosts.map(async (mhost, idx) => {
+          let hostaddrs: (string | null)[];
+          if (!Connection.isHostIsNamedPipe(mhost)) {
+            hostaddrs = await Addrinfo.getaddrinfo(mhost, 0).then(
+              (ais) => ais.map((ai) => ai.ipAddress),
+              () => [""],
+            );
+          } else {
+            hostaddrs = [null];
+          }
+          return hostaddrs.map((hostaddr) => [hostaddr, mhost, iports[idx]] as const);
+        }),
+      )
+    ).flat();
     return {
       ...iopts,
       hostaddr: dests.map((d) => d[0] ?? "").join(","),
@@ -206,7 +218,7 @@ export class Connection {
       })();
 
     if (conn.status() == PG.CONNECTION_BAD) {
-      throw new ConnectionBad(conn.errorMessage() ?? "", { connection: conn });
+      throw new ConnectionBad(conn.errorMessage() ?? "");
     }
 
     conn._ioptsForReset = ioptsForReset;
@@ -891,7 +903,14 @@ export class Connection {
 
       let event: boolean | undefined;
       if (timeout === undefined || timeout >= 0) {
-        event = await _waitConnecting(this._connecting, timeout);
+        switch (pollStatus) {
+          case PG.PGRES_POLLING_READING:
+            event = await _waitConnecting(this._connecting, timeout);
+            break;
+          case PG.PGRES_POLLING_WRITING:
+            event = await _waitConnecting(this._connecting, timeout);
+            break;
+        }
       }
 
       if (!event) {
