@@ -41,6 +41,11 @@
     "ua-parser-js": 4,
     "mini-mime": 3
   },
-  "rubyCompatTarget": 205,
-  "appTarget": 1890
+  "rubyCompatTarget": 180,
+  "rubyCompatTargetWithWholeBarrelImports": 205,
+  "wholeBarrelImports": [
+    "packages/activerecord/dist/relation/spawn-methods.js",
+    "packages/rack-session/dist/cookie.js"
+  ],
+  "appTarget": 1865
 }

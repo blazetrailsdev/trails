@@ -19,12 +19,14 @@ pnpm tsx scripts/boot-graph/measure.mts --entry @blazetrails/ruby-compat --runs 
 - `baseline.json` holds the app's per-package loaded counts, plus
   `rubyCompatTarget`: the ruby-compat modules loaded by importing only the
   owning modules of every barrel binding the app's loaded packages import
-  (the union a Phase 2 migration ends at), and `appTarget`, the app total with
+  (the union a Phase 2 migration ends at, with every file that imports the whole
+  barrel by namespace or side effect listed in `wholeBarrelImports` and counted
+  only in `rubyCompatTargetWithWholeBarrelImports`), and `appTarget`, the app total with
   ruby-compat at that target.
 - `scc-map.json` maps every value export of the ruby-compat barrel to its owning
   `dist` module and the index of its strongly-connected component in `sccs`
   (`null` when outside every cycle). Phase 2 codemods read it to pick subpaths.
 
-CI (`Build & Type Check`) prints the table and fails only when ruby-compat's
-loaded count exceeds `baseline.json`; every other package is report-only. When a
+CI (`Build & Type Check`) prints the table and fails when ruby-compat's
+loaded count exceeds `baseline.json` or `scc-map.json` is stale; every other package is report-only. When a
 migration lowers the count, rerun with `--write` and commit the new baseline.

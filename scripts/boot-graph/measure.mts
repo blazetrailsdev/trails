@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -181,31 +181,7 @@ async function sccMap() {
   };
 }
 
-async function unionTarget(app: Measurement, map: Awaited<ReturnType<typeof sccMap>>) {
-  const modules = new Set<string>();
-  const exportsMap = JSON.parse(await readFile(join(RC_DIST, "../package.json"), "utf8")).exports;
-  for (const file of app.files) {
-    if (owner(file) === "ruby-compat" || !file.endsWith(".js")) continue;
-    const src = stripComments(await readFile(file, "utf8"));
-    for (const m of src.matchAll(
-      /(?:import|export)\s*(\*\s*as\s+\w+|\{[^}]*\})\s*from\s*["']@blazetrails\/ruby-compat(\/[^"']+)?["']/g,
-    )) {
-      if (m[2]) {
-        const target =
-          exportsMap[`.${m[2]}`]?.default ?? exportsMap["./*"].default.replace("*", m[2].slice(1));
-        modules.add(relative(RC_DIST, resolve(RC_DIST, "..", target)));
-      } else if (m[1].startsWith("*")) {
-        modules.add("index.js");
-        console.log(`whole ruby-compat barrel via namespace import: ${relative(ROOT, file)}`);
-      } else {
-        for (const spec of m[1].slice(1, -1).split(",")) {
-          const name = spec.trim().split(/\s+as\s+/)[0];
-          const owning = map.bindings[name]?.module;
-          if (owning) modules.add(owning);
-        }
-      }
-    }
-  }
+async function rcLoaded(modules: Set<string>): Promise<number> {
   const dir = await mkdtemp(join(tmpdir(), "boot-graph-union-"));
   const entry = join(dir, "union.mjs");
   try {
@@ -223,6 +199,45 @@ async function unionTarget(app: Measurement, map: Awaited<ReturnType<typeof sccM
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+const RC_IMPORT =
+  /(?:import|export)\s*(?:(?:\w+\s*,\s*)?(\*\s*as\s+\w+|\{[^}]*\})\s*from\s*)?["']@blazetrails\/ruby-compat(\/[^"']+)?["']/g;
+
+async function unionTarget(app: Measurement, map: Awaited<ReturnType<typeof sccMap>>) {
+  const modules = new Set<string>();
+  const wholeBarrel = new Set<string>();
+  const exportsMap = JSON.parse(await readFile(join(RC_DIST, "../package.json"), "utf8")).exports;
+  for (const file of app.files) {
+    if (owner(file) === "ruby-compat" || !file.endsWith(".js")) continue;
+    const src = stripComments(await readFile(file, "utf8"));
+    for (const m of src.matchAll(RC_IMPORT)) {
+      if (m[2]) {
+        const target =
+          exportsMap[`.${m[2]}`]?.default ?? exportsMap["./*"].default.replace("*", m[2].slice(1));
+        const module = relative(RC_DIST, resolve(RC_DIST, "..", target));
+        if (!(await stat(join(RC_DIST, module)).catch(() => null))) {
+          throw new Error(
+            `${relative(ROOT, file)}: @blazetrails/ruby-compat${m[2]} resolves to missing dist/${module}`,
+          );
+        }
+        modules.add(module);
+      } else if (!m[1] || m[1].startsWith("*")) {
+        wholeBarrel.add(relative(ROOT, file));
+      } else {
+        for (const spec of m[1].slice(1, -1).split(",")) {
+          const name = spec.trim().split(/\s+as\s+/)[0];
+          const owning = map.bindings[name]?.module;
+          if (owning) modules.add(owning);
+        }
+      }
+    }
+  }
+  return {
+    target: await rcLoaded(modules),
+    withWholeBarrelImports: await rcLoaded(new Set([...modules, "index.js"])),
+    wholeBarrelImports: [...wholeBarrel].sort(),
+  };
 }
 
 async function main(): Promise<void> {
@@ -248,18 +263,23 @@ async function main(): Promise<void> {
   const app = await measure(APP_ENTRY, runs, join(ROOT, APP));
   console.log(table(app));
   const map = await sccMap();
-  const rcTarget = await unionTarget(app, map);
+  const union = await unionTarget(app, map);
+  const rcTarget = union.target;
   const rcLoaded = app.packages["ruby-compat"]?.loaded ?? 0;
   const baseline = {
     app: APP_ENTRY,
     total: app.total,
     packages: Object.fromEntries(Object.entries(app.packages).map(([p, v]) => [p, v.loaded])),
     rubyCompatTarget: rcTarget,
+    rubyCompatTargetWithWholeBarrelImports: union.withWholeBarrelImports,
+    wholeBarrelImports: union.wholeBarrelImports,
     appTarget: app.total - (rcLoaded - rcTarget),
   };
   console.log(
     `\nruby-compat target (union of owning modules the app's consumers import): ${rcTarget}` +
-      `; derived full-app target: ${baseline.appTarget}`,
+      `; derived full-app target: ${baseline.appTarget}` +
+      `\nwith the whole-barrel importers left as they are: ${union.withWholeBarrelImports}` +
+      union.wholeBarrelImports.map((f) => `\n  whole barrel: ${f}`).join(""),
   );
 
   if (flag("--write")) {
