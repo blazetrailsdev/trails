@@ -33,6 +33,8 @@ export function engineDatabase(file = ":memory:"): SyncEngineDatabase & {
     enableLoadExtension: (onoff: boolean) => {
       db.loadExtensionToggles.push(onoff);
     },
+    dbFilename: () => null,
+    libversion: () => 3045001,
     execBatch(sql: string, resultsAsHash: boolean): unknown[] {
       const stmt = raw.prepare(sql);
       if (!stmt.reader) {

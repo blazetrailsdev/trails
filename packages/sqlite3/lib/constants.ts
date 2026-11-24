@@ -6,6 +6,21 @@ const LIMIT_ANALYZE = 0x00010;
 const CHECK_ALL_TABLES = 0x10000;
 
 export const Constants = {
+  TextRep: {
+    UTF8: 1,
+    UTF16LE: 2,
+    UTF16BE: 3,
+    UTF16: 4,
+    ANY: 5,
+    DETERMINISTIC: 0x800,
+  },
+  ColumnType: {
+    INTEGER: 1,
+    FLOAT: 2,
+    TEXT: 3,
+    BLOB: 4,
+    NULL: 5,
+  },
   Open: {
     READONLY: 0x00000001,
     READWRITE: 0x00000002,

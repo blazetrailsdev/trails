@@ -1,11 +1,14 @@
 import {
   ArgumentError,
   Encoding,
+  NotImplementedError,
   Thread,
   RuntimeError,
   TypeError,
   include,
+  rbBlockGivenP,
   rbEnsure,
+  rbObjClone,
   rbInspect,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -19,6 +22,21 @@ import { HashResultSet, ResultSet } from "./resultset.js";
 import { rbSqlite3Raise } from "./errors.js";
 
 export type BusyHandler = (count: number) => unknown;
+
+export type Authorizer = (
+  action: number,
+  a: string | null,
+  b: string | null,
+  c: string | null,
+  d: string | null,
+) => unknown;
+
+/** @noRailsEquivalent PERMANENT */
+export interface Aggregator {
+  new (): { step(...args: unknown[]): unknown; finalize(): unknown };
+  readonly name: string;
+  readonly arity: number;
+}
 
 export interface EngineErrors {
   errcode(error: unknown): number | null;
@@ -36,6 +54,15 @@ export interface EngineDatabase extends EngineErrors {
   busyHandler(handler: BusyHandler | null): void;
   loadExtensionInternal(file: string): void;
   enableLoadExtension(onoff: boolean): void;
+  dbFilename(dbName: string): string | null | Promise<string | null>;
+  libversion(): number | Promise<number>;
+  setAuthorizer?(callback: ((action: number, ...args: (string | null)[]) => number) | null): void;
+  defineFunctionWithFlags?(
+    name: string,
+    flags: number,
+    block: (...args: unknown[]) => unknown,
+  ): void;
+  defineAggregator2?(aggregator: Aggregator, name: string): void;
 }
 
 export type EngineOpenV2 = ((file: string, mode: number, zvfs: string | null) => EngineDatabase) &
@@ -65,18 +92,56 @@ export interface DatabaseOptions<E extends EngineDatabase = EngineDatabase> {
   engine: ((file: string, mode: number, zvfs: string | null) => E) & Partial<EngineErrors>;
 }
 
+export class FunctionProxy {
+  result: unknown;
+  #context: Record<string, unknown>;
+
+  constructor() {
+    this.result = null;
+    this.#context = {};
+  }
+
+  get(key: string): unknown {
+    return this.#context[key];
+  }
+
+  set(key: string, value: unknown): unknown {
+    return (this.#context[key] = value);
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Database<E extends EngineDatabase = EngineDatabase> extends Omit<
   Included<typeof Pragmas>,
-  "encoding"
+  "encoding" | "busyTimeout"
 > {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Database<E extends EngineDatabase = EngineDatabase> {
+  static readonly FunctionProxy = FunctionProxy;
+
+  static open<D extends Database>(
+    this: new (...args: never[]) => D,
+    ...args: unknown[]
+  ): D | unknown {
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (database: D) => unknown) : undefined;
+    const database = new this(...(args as never[]));
+
+    if (block) {
+      return rbEnsure(
+        () => block(database),
+        () => database.close(),
+      );
+    } else {
+      return database;
+    }
+  }
+
   static quote(string: string): string {
     return string.replace(/'/g, "''");
   }
 
+  readonly collations: Record<string, unknown>;
   resultsAsHash: boolean | null;
 
   /** @internal */
@@ -85,6 +150,8 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
   #readonly: boolean;
   #defaultTransactionMode: string;
   #timeoutDeadline = 0;
+  #authorizer: Authorizer | null;
+  #functions: Record<string, unknown>;
 
   constructor(file: string, options: DatabaseOptions<E>, zvfs?: string | null);
   constructor(
@@ -122,6 +189,9 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
       this.disableQuirkMode();
     }
 
+    this.#authorizer = null;
+    this.collations = {};
+    this.#functions = {};
     this.resultsAsHash = options.resultsAsHash ?? null;
     this.#readonly = (mode & Constants.Open.READONLY) !== 0;
     this.#defaultTransactionMode = options.defaultTransactionMode ?? "deferred";
@@ -148,6 +218,10 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     return Encoding.find(String(await Pragmas.encoding.call(this)));
   }
 
+  authorizer(block: Authorizer | null): this {
+    return this.setAuthorizer(block);
+  }
+
   prepare(sql: string): Statement | Promise<Statement>;
   prepare<T>(sql: string, block: (stmt: Statement) => T): T | Promise<Awaited<T>>;
   prepare<T>(
@@ -170,6 +244,10 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
       : yieldStmt(stmt);
   }
 
+  filename(dbName = "main"): string | null | Promise<string | null> {
+    return this.dbFilename(dbName);
+  }
+
   async execute(
     sql: string,
     bindVars: unknown = [],
@@ -183,6 +261,25 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
         return rs.each((row) => block(row));
       } else {
         return Object.freeze(await rs.toA());
+      }
+    });
+  }
+
+  async execute2(sql: string, ...bindVars: unknown[]): Promise<unknown> {
+    const block = rbBlockGivenP(bindVars.at(-1))
+      ? (bindVars.pop() as (row: unknown) => unknown)
+      : undefined;
+    return this.prepare(sql, async (stmt) => {
+      const result = await stmt.execute(...bindVars);
+      if (block) {
+        await block(await stmt.columns());
+        return result.each((row) => block(row));
+      } else {
+        const arr: unknown[] = [await stmt.columns()];
+        await result.each((row) => {
+          arr.push(row);
+        });
+        return arr;
       }
     });
   }
@@ -244,6 +341,14 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     }
   }
 
+  async getFirstRow(sql: string, ...bindVars: unknown[]): Promise<unknown> {
+    const rows = (await this.execute(
+      sql,
+      ...(bindVars as [unknown?, ((row: unknown) => unknown)?]),
+    )) as unknown[];
+    return rows[0] ?? null;
+  }
+
   async getFirstValue(sql: string, ...bindVars: unknown[]): Promise<unknown> {
     return this.query(sql, bindVars, async (rs) => {
       const row = (await rs.next()) as Record<string | number, unknown> | null;
@@ -252,6 +357,144 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
       }
       return null;
     });
+  }
+
+  /** @missingRailsCall get_int_pragma — PERMANENT */
+  busyTimeout(milliseconds: unknown): unknown {
+    return this.setBusyTimeout(milliseconds);
+  }
+
+  createFunction(
+    name: string,
+    arity: number,
+    textRep: number | ((fp: FunctionProxy, ...args: unknown[]) => unknown) = Constants.TextRep.UTF8,
+    block?: (fp: FunctionProxy, ...args: unknown[]) => unknown,
+  ): this {
+    if (typeof textRep === "function") {
+      block = textRep;
+      textRep = Constants.TextRep.UTF8;
+    }
+    this.defineFunctionWithFlags(name, textRep, (...args: unknown[]) => {
+      const fp = new FunctionProxy();
+      block!(fp, ...args);
+      return fp.result;
+    });
+    return this;
+  }
+
+  createAggregate(
+    name: string,
+    arity: number,
+    step: ((ctx: FunctionProxy, ...args: unknown[]) => unknown) | null = null,
+    finalize: ((ctx: FunctionProxy) => unknown) | null = null,
+    textRep: number = Constants.TextRep.ANY,
+    block?: (this: {
+      step(block: (ctx: FunctionProxy, ...args: unknown[]) => unknown): void;
+      finalize(block: (ctx: FunctionProxy) => unknown): void;
+    }) => unknown,
+  ): this {
+    const proxy = class {
+      static step(block: (ctx: FunctionProxy, ...args: unknown[]) => unknown): void {
+        proxy.prototype.stepWithCtx = block;
+      }
+
+      static finalize(block: (ctx: FunctionProxy) => unknown): void {
+        proxy.prototype.finalizeWithCtx = block;
+      }
+
+      static arity: number;
+
+      declare stepWithCtx: (ctx: FunctionProxy, ...args: unknown[]) => unknown;
+      declare finalizeWithCtx: (ctx: FunctionProxy) => unknown;
+      #ctx: FunctionProxy;
+
+      constructor() {
+        this.#ctx = new FunctionProxy();
+      }
+
+      step(...args: unknown[]): unknown {
+        return this.stepWithCtx(this.#ctx, ...args);
+      }
+
+      finalize(): unknown {
+        this.finalizeWithCtx(this.#ctx);
+        return this.#ctx.result;
+      }
+    };
+
+    if (block) {
+      block.call(proxy);
+    } else {
+      proxy.prototype.stepWithCtx = step!;
+      proxy.prototype.finalizeWithCtx = finalize!;
+    }
+
+    Object.defineProperty(proxy, "name", { value: name });
+    proxy.arity = arity;
+    return this.defineAggregator2(proxy, name);
+  }
+
+  createAggregateHandler(handler: {
+    new (): {
+      step(ctx: FunctionProxy, ...args: unknown[]): unknown;
+      finalize(ctx: FunctionProxy): unknown;
+    };
+    readonly name: string;
+    readonly arity: number;
+  }): this {
+    const proxy = class extends handler {
+      #fp: FunctionProxy;
+
+      constructor() {
+        super();
+        this.#fp = new FunctionProxy();
+      }
+
+      override step(...args: unknown[]): unknown {
+        return super.step(this.#fp, ...args);
+      }
+
+      override finalize(): unknown {
+        super.finalize(this.#fp);
+        return this.#fp.result;
+      }
+    };
+    delete (proxy as { name?: string }).name;
+    this.defineAggregator2(proxy, proxy.name);
+    return this;
+  }
+
+  defineAggregator(
+    name: string,
+    aggregator: { step(...args: unknown[]): unknown; finalize(): unknown },
+  ): this {
+    const proxy = class {
+      static template = aggregator;
+
+      /** @inventedArm if — PERMANENT */
+      static get arity(): number {
+        const arity = proxy.template.step.length;
+        if (arity === 0) return -1;
+        return arity;
+      }
+
+      #klass: typeof aggregator;
+
+      constructor() {
+        this.#klass = rbObjClone(proxy.template);
+      }
+
+      step(...args: unknown[]): unknown {
+        return this.#klass.step(...args);
+      }
+
+      finalize(): unknown {
+        return this.#klass.finalize();
+      }
+    };
+    Object.defineProperty(proxy, "name", { value: name });
+    this.defineAggregator2(proxy, name);
+    return this;
   }
 
   async transaction<T>(
@@ -331,6 +574,44 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     return this._engine.changes();
   }
 
+  setAuthorizer(authorizer: Authorizer | null): this {
+    if (!this._engine.setAuthorizer) {
+      throw new NotImplementedError("authorizer=() function is unimplemented on this machine");
+    }
+    this._engine.setAuthorizer(
+      authorizer == null
+        ? null
+        : (action, a = null, b = null, c = null, d = null) => {
+            const result = this.#authorizer!(action, a, b, c, d);
+
+            if (typeof result === "number" && Number.isInteger(result)) return result;
+            if (result === true) return Constants.ErrorCode.OK;
+            if (result === false) return SQLITE_DENY;
+
+            return SQLITE_IGNORE;
+          },
+    );
+
+    this.#authorizer = authorizer;
+
+    return this;
+  }
+
+  defineFunctionWithFlags(
+    name: string,
+    flags: number,
+    block: (...args: unknown[]) => unknown,
+  ): this {
+    if (!this._engine.defineFunctionWithFlags) {
+      throw new NotImplementedError(
+        "define_function_with_flags() function is unimplemented on this machine",
+      );
+    }
+    this.#functions[name] = block;
+    this._engine.defineFunctionWithFlags(name, flags, block);
+    return this;
+  }
+
   busyHandler(block: BusyHandler | null = null): this {
     this._engine.busyHandler(block);
     return this;
@@ -387,6 +668,23 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
   }
 
   /** @internal */
+  private defineAggregator2(aggregator: Aggregator, name: string): this {
+    if (!this._engine.defineAggregator2) {
+      throw new NotImplementedError(
+        "define_aggregator2() function is unimplemented on this machine",
+      );
+    }
+    this.#functions[name] = aggregator;
+    this._engine.defineAggregator2(aggregator, name);
+    return this;
+  }
+
+  /** @internal */
+  private dbFilename(dbName: string): string | null | Promise<string | null> {
+    return this._engine.dbFilename(dbName);
+  }
+
+  /** @internal */
   private disableQuirkMode(): void {
     this._engine.disableQuirkMode();
   }
@@ -411,6 +709,9 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     return r instanceof Promise ? r.catch((e: unknown) => rbSqlite3Raise(e, this._engine)) : r;
   }
 }
+
+const SQLITE_DENY = 1;
+const SQLITE_IGNORE = 2;
 
 include(Database, Pragmas);
 

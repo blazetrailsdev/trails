@@ -1285,13 +1285,14 @@
     }
   },
   "sqlite3": {
-    "rows": 36,
+    "rows": 39,
     "excluded": [],
     "unwalked": [],
     "residue": {
       "backup.ts::Backup": "SQLite3::Backup",
       "constants.ts::Constants": "SQLite3::Constants",
       "database.ts::Database": "SQLite3::Database",
+      "database.ts::FunctionProxy": "SQLite3::Database::FunctionProxy",
       "errors.ts::AbortException": "SQLite3::AbortException",
       "errors.ts::AuthorizationException": "SQLite3::AuthorizationException",
       "errors.ts::BusyException": "SQLite3::BusyException",
@@ -1319,12 +1320,14 @@
       "errors.ts::SchemaChangedException": "SQLite3::SchemaChangedException",
       "errors.ts::TooBigException": "SQLite3::TooBigException",
       "errors.ts::UnsupportedException": "SQLite3::UnsupportedException",
+      "fork-safety.ts::CoreExt": "SQLite3::ForkSafety::CoreExt",
       "fork-safety.ts::ForkSafety": "SQLite3::ForkSafety",
       "pragmas.ts::Pragmas": "SQLite3::Pragmas",
       "resultset.ts::HashResultSet": "SQLite3::HashResultSet",
       "resultset.ts::ResultSet": "SQLite3::ResultSet",
       "statement.ts::Blob": "SQLite3::Blob",
-      "statement.ts::Statement": "SQLite3::Statement"
+      "statement.ts::Statement": "SQLite3::Statement",
+      "value.ts::Value": "SQLite3::Value"
     }
   },
   "stimulus": {

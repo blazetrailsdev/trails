@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import type { DatabaseSync, StatementSync } from "node:sqlite";
+import type { AggregateOptions, DatabaseSync, SQLInputValue, StatementSync } from "node:sqlite";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
@@ -15,6 +15,7 @@ import { closedStatement, statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
+import { aggregateOptions, databaseListFilename, libversionNumber } from "./aggregator.js";
 
 /** @internal */
 type NodeSqliteModule = typeof import("node:sqlite");
@@ -231,6 +232,26 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
     },
     loadExtensionInternal: (file) => raw.loadExtension(file),
     enableLoadExtension: (onoff) => raw.enableLoadExtension(onoff),
+    libversion: () =>
+      libversionNumber(
+        (raw.prepare("select sqlite_version() v").get() as unknown as { v: string }).v,
+      ),
+    dbFilename: (dbName) =>
+      databaseListFilename(
+        raw.prepare("PRAGMA database_list").all() as unknown as { name: string; file: string }[],
+        dbName,
+      ),
+    defineFunctionWithFlags: (name, flags, block) =>
+      raw.function(
+        name,
+        { varargs: true, deterministic: (flags & SQLite3.Constants.TextRep.DETERMINISTIC) !== 0 },
+        (...args) => (block(...args) ?? null) as SQLInputValue,
+      ),
+    defineAggregator2: (aggregator, name) =>
+      raw.aggregate(name, aggregateOptions(aggregator) as unknown as AggregateOptions),
+    setAuthorizer: (callback) =>
+      raw.setAuthorizer(callback === null ? null : (action, ...args) => callback(action, ...args)),
+
     busyHandler: (block) => {
       handler = block;
     },

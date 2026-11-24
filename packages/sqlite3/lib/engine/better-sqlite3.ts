@@ -14,6 +14,7 @@ import { closedStatement, statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
+import { aggregateOptions, databaseListFilename, libversionNumber } from "./aggregator.js";
 
 const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
 
@@ -196,6 +197,21 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
     disableQuirkMode: () => {},
     loadExtensionInternal: (file) => void raw.loadExtension(file),
     enableLoadExtension: () => {},
+    libversion: () =>
+      libversionNumber((raw.prepare("select sqlite_version() v").get() as { v: string }).v),
+    dbFilename: (dbName) =>
+      databaseListFilename(
+        raw.prepare("PRAGMA database_list").all() as { name: string; file: string }[],
+        dbName,
+      ),
+    defineFunctionWithFlags: (name, flags, block) =>
+      void raw.function(
+        name,
+        { varargs: true, deterministic: (flags & SQLite3.Constants.TextRep.DETERMINISTIC) !== 0 },
+        (...args: unknown[]) => block(...args) ?? null,
+      ),
+    defineAggregator2: (aggregator, name) => void raw.aggregate(name, aggregateOptions(aggregator)),
+
     busyHandler: (block) => {
       handler = block;
     },
