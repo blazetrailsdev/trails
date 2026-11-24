@@ -29,8 +29,10 @@ const tableClasses = new Map<string, () => unknown>();
  * evaluated, so a thunk still in TDZ then is retried on the next registration,
  * or by a lookup of a class bearing the entry's last path segment, or of a
  * plain-object module, which bears no name. A per-file table names its own
- * importer, so it passes each namespace as a thunk: a bundler that splits the
- * two into chunks would otherwise read the namespace in TDZ.
+ * importer, so it passes each namespace as an arrow-function thunk: a bundler
+ * that splits the two into chunks would otherwise read the namespace in TDZ.
+ * A class has a `prototype` and an arrow function has none, so a class-valued
+ * namespace is never called.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -47,7 +49,10 @@ export function defineConstants(
 
 /** @perf 10ms — PERMANENT */
 function _readConstantsRow(namespace: object | (() => object), name: string | null): () => unknown {
-  const read = typeof namespace === "function" ? (namespace as () => object) : () => namespace;
+  const read =
+    typeof namespace === "function" && !Object.hasOwn(namespace, "prototype")
+      ? (namespace as () => object)
+      : () => namespace;
   if (name === null) return read;
   const segments = name.split(".");
   return () =>
