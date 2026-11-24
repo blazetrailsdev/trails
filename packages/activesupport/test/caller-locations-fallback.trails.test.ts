@@ -64,18 +64,23 @@ describe("callerLocations on a runtime with no V8 stack positions", () => {
           value:
             "callerLocations@https://x.test/a.js:1:1\n" +
             "delegate@https://x.test/b.js:2:3\n" +
-            "@https://x.test/models/post.js:7\n",
+            "@https://x.test/models/post.js:7:5\n" +
+            "load@https://x.test/app.js:12\n",
         });
       }
     } as ErrorConstructor;
-    let location;
+    let locations: ReturnType<typeof callerLocations>;
     try {
-      [location] = callerLocations(1, 1);
+      locations = callerLocations(1, 2);
     } finally {
       globalThis.Error = RealError;
     }
-    expect(location.path).toBe("https://x.test/models/post.js");
-    expect(location.lineno).toBe(7);
-    expect(location.label).toBe("");
+    expect(locations).toHaveLength(2);
+    expect(locations[0].path).toBe("https://x.test/models/post.js");
+    expect(locations[0].lineno).toBe(7);
+    expect(locations[0].label).toBe("");
+    expect(locations[1].path).toBe("https://x.test/app.js");
+    expect(locations[1].lineno).toBe(12);
+    expect(locations[1].label).toBe("load");
   });
 });
