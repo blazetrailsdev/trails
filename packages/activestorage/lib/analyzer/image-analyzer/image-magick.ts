@@ -1,5 +1,5 @@
 import { ActiveStorage } from "../../active-storage.js";
-import type { Blob } from "../../blob.js";
+import type { Blob } from "../../app/models/active-storage/blob.js";
 import { ImageAnalyzer } from "../image-analyzer.js";
 
 type Metadata = { [k: string]: unknown };

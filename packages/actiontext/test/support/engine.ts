@@ -29,7 +29,7 @@ onLoad("active_record", (base: typeof Base) => {
   prepend(base, Encryption);
 });
 
-await import("@blazetrails/activestorage/blob");
+await import("@blazetrails/activestorage/app/models/active-storage/blob");
 include(ActiveStorage.Blob!, Attachable);
 await import("../../lib/rich-text.js");
 await import("../../lib/encrypted-rich-text.js");

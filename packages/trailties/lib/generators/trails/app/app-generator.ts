@@ -554,6 +554,7 @@ export class AppGenerator extends AppBase {
     this.publicCommand("reportImpliedOptions");
     this.methodAdded("setDefaultAccessorsBang");
     this.publicCommand("createRoot");
+    this.publicCommand("targetTrailsPrerelease");
     this.methodAdded("createRootFiles");
     this.methodAdded("createAppFiles");
     this.methodAdded("createBinFiles");

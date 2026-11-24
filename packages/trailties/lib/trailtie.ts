@@ -5,11 +5,13 @@ import {
   NoMethodError,
   RuntimeError,
   extend,
+  include,
   rbFSend,
   rbObjRespondTo,
+  type Included,
 } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { Initializable } from "./initializable.js";
+import { Initializable, type Collection, type InitializableClass } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 import { assertNotSealed } from "./trailtie/configurable.js";
@@ -26,7 +28,18 @@ export function generateRailtieName(string: string): string {
 export type BlockRunnerKind = "rakeTasks" | "console" | "runner" | "generators" | "server";
 export type TrailtieBlock = (this: Trailtie, app: unknown) => unknown;
 
-export class Trailtie extends Initializable {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Trailtie extends Included<typeof Initializable> {
+  get initializers(): Collection;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Trailtie {
+  declare static readonly initializers: Collection;
+  declare static initializersChain: InitializableClass["initializersChain"];
+  declare static initializersFor: InitializableClass["initializersFor"];
+  declare static initializer: InitializableClass["initializer"];
+
   /** @internal */
   static readonly _registry: Array<typeof Trailtie> = [];
 
@@ -34,7 +47,6 @@ export class Trailtie extends Initializable {
   private _railtieNamespace?: { readonly name: string };
 
   constructor() {
-    super();
     const klass = this.constructor as typeof Trailtie;
     if (klass.isAbstractRailtie()) {
       throw new RuntimeError(`${klass.name} is abstract, you cannot instantiate it directly.`);
@@ -174,6 +186,8 @@ export class Trailtie extends Initializable {
     for (const b of blocks) await b.call(this, app);
   }
 }
+
+include(Trailtie, Initializable);
 
 function blockKey(kind: BlockRunnerKind): string {
   return `_blocks_${kind}`;

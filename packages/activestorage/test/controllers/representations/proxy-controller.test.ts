@@ -6,15 +6,15 @@ import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import { StandardError } from "@blazetrails/ruby-compat";
 import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
-import type { Blob } from "../../../lib/blob.js";
+import type { Blob } from "../../../lib/app/models/active-storage/blob.js";
 import { FileNotFoundError } from "../../../lib/errors.js";
-import { Variation } from "../../../lib/variation.js";
+import { Variation } from "../../../lib/app/models/active-storage/variation.js";
 import {
   createFileBlob,
   withoutVariantTracking,
   withStrictLoadingByDefault,
 } from "../../support/test-helper.js";
-import "../../../lib/representations/proxy-controller.js";
+import "../../../lib/app/controllers/active-storage/representations/proxy-controller.js";
 
 type Url = (...args: unknown[]) => string;
 type Session = IntegrationTest & {

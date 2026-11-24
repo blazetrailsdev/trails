@@ -5,7 +5,7 @@ import { Utils } from "@blazetrails/rack";
 import { Digest, OpenSSL, StringIO } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { FileNotFoundError } from "../../lib/errors.js";
-import { Filename } from "../../lib/filename.js";
+import { Filename } from "../../lib/app/models/active-storage/filename.js";
 import { Service } from "../../lib/service.js";
 import "../../lib/service/configurator.js";
 import { GCSService } from "../../lib/service/gcs-service.js";

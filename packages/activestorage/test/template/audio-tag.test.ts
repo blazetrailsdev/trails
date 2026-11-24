@@ -3,8 +3,8 @@ import { TestCase } from "@blazetrails/actionview/test-case";
 import { AssetTagHelper } from "@blazetrails/actionview/helpers/asset-tag-helper";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
-import { Attachment } from "../../lib/attachment.js";
-import type { Blob } from "../../lib/blob.js";
+import { Attachment } from "../../lib/app/models/active-storage/attachment.js";
+import type { Blob } from "../../lib/app/models/active-storage/blob.js";
 import { User, createFileBlob } from "../support/test-helper.js";
 
 type Tc = TestCase & {

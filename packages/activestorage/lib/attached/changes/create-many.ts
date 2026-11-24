@@ -1,8 +1,8 @@
 import { rbFArray, rbFSend } from "@blazetrails/ruby-compat";
-import type { Attachment } from "../../attachment.js";
+import type { Attachment } from "../../app/models/active-storage/attachment.js";
 import type { AssociationWriter, AttachedRecord } from "../../attached.js";
 import { ActiveStorage } from "../../active-storage.js";
-import type { Blob } from "../../blob.js";
+import type { Blob } from "../../app/models/active-storage/blob.js";
 import type { Relation } from "@blazetrails/activerecord";
 import { Changes } from "../changes.js";
 import { CreateOneOfMany } from "./create-one-of-many.js";

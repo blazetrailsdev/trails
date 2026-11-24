@@ -10,7 +10,7 @@ import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
 import { FileNotFoundError } from "../../../lib/errors.js";
 import { createBlob, createFileBlob } from "../../support/test-helper.js";
-import { ProxyController } from "../../../lib/blobs/proxy-controller.js";
+import { ProxyController } from "../../../lib/app/controllers/active-storage/blobs/proxy-controller.js";
 
 type Url = (...args: unknown[]) => string;
 type Session = IntegrationTest & {

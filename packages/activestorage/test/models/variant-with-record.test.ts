@@ -12,13 +12,13 @@ import {
 } from "@blazetrails/activerecord/testing/query-assertions";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import type { Attachment } from "../../lib/attachment.js";
-import type { Blob } from "../../lib/blob.js";
-import { Current } from "../../lib/current.js";
-import { PurgeJob } from "../../lib/purge-job.js";
+import type { Attachment } from "../../lib/app/models/active-storage/attachment.js";
+import type { Blob } from "../../lib/app/models/active-storage/blob.js";
+import { Current } from "../../lib/app/models/active-storage/current.js";
+import { PurgeJob } from "../../lib/app/jobs/active-storage/purge-job.js";
 import { User, createFileBlob, directlyUploadFileBlob, readImage } from "../support/test-helper.js";
-import { VariantRecord } from "../../lib/variant-record.js";
-import type { VariantWithRecord } from "../../lib/variant-with-record.js";
+import { VariantRecord } from "../../lib/app/models/active-storage/variant-record.js";
+import type { VariantWithRecord } from "../../lib/app/models/active-storage/variant-with-record.js";
 
 type Rep = {
   processed(): Promise<unknown>;

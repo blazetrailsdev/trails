@@ -5,7 +5,7 @@ import {
   type Tempfile,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
-import type { Blob } from "../blob.js";
+import type { Blob } from "../app/models/active-storage/blob.js";
 import { Previewer } from "../previewer.js";
 
 export class VideoPreviewer extends Previewer {

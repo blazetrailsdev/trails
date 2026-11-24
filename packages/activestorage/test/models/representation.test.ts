@@ -3,7 +3,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Current } from "../../lib/current.js";
+import { Current } from "../../lib/app/models/active-storage/current.js";
 import { UnrepresentableError } from "../../lib/errors.js";
 import { createBlob, createFileBlob, readImage } from "../support/test-helper.js";
 

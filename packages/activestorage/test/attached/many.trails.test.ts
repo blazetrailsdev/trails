@@ -5,8 +5,8 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { StringIO } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Blob } from "../../lib/blob.js";
-import { Attachment } from "../../lib/attachment.js";
+import { Blob } from "../../lib/app/models/active-storage/blob.js";
+import { Attachment } from "../../lib/app/models/active-storage/attachment.js";
 import { createBlob, User } from "../support/test-helper.js";
 import { Many } from "../../lib/attached/many.js";
 

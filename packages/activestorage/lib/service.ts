@@ -3,7 +3,7 @@ import { ContentDisposition } from "@blazetrails/actionpack";
 import { NotImplementedError, rbModName, type Tempfile } from "@blazetrails/ruby-compat";
 import { Downloader } from "./downloader.js";
 import { ActiveStorage } from "./active-storage.js";
-import type { Filename } from "./filename.js";
+import type { Filename } from "./app/models/active-storage/filename.js";
 import type { Configurator } from "./service/configurator.js";
 import type { DiskService } from "./service/disk-service.js";
 import type { GCSService } from "./service/gcs-service.js";

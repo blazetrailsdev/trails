@@ -66,6 +66,13 @@ export default class VitestReporter implements Reporter {
   }
 
   onTestCaseResult(testCase: TestCase): void {
+    if (
+      env.TRAILS_TEST_FILTERED != null &&
+      testCase.result().state === "skipped" &&
+      testCase.diagnostic() == null
+    ) {
+      return;
+    }
     const result = new VitestResult(testCase);
     this.results.push(result);
     this.reporter.prerecord({ name: result.klass }, result.name);

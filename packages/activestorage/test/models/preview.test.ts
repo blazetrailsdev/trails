@@ -6,11 +6,11 @@ import { assertChanges, assertRaises } from "@blazetrails/activesupport/testing/
 import { freezeTime, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import type { Attachment } from "../../lib/attachment.js";
-import type { Blob } from "../../lib/blob.js";
-import { Current } from "../../lib/current.js";
+import type { Attachment } from "../../lib/app/models/active-storage/attachment.js";
+import type { Blob } from "../../lib/app/models/active-storage/blob.js";
+import { Current } from "../../lib/app/models/active-storage/current.js";
 import { UnpreviewableError } from "../../lib/errors.js";
-import { Preview } from "../../lib/preview.js";
+import { Preview } from "../../lib/app/models/active-storage/preview.js";
 import "../support/database/setup.js";
 import { createFileBlob, readImage } from "../support/test-helper.js";
 

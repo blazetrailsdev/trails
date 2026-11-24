@@ -1,6 +1,6 @@
 import { delegate } from "@blazetrails/activesupport";
 import { ThreadPoolExecutor } from "@blazetrails/ruby-compat";
-import { MirrorJob } from "../mirror-job.js";
+import { MirrorJob } from "../app/jobs/active-storage/mirror-job.js";
 import { Service } from "../service.js";
 import type { Configurator } from "./configurator.js";
 

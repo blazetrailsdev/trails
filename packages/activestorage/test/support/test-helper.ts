@@ -11,10 +11,10 @@ import {
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import type { Attachment } from "../../lib/attachment.js";
+import type { Attachment } from "../../lib/app/models/active-storage/attachment.js";
 import type { Many } from "../../lib/attached/many.js";
 import type { One } from "../../lib/attached/one.js";
-import { Blob } from "../../lib/blob.js";
+import { Blob } from "../../lib/app/models/active-storage/blob.js";
 import { FixtureSet } from "../../lib/fixture-set.js";
 import { Service } from "../../lib/service.js";
 import type { DiskService } from "../../lib/service/disk-service.js";

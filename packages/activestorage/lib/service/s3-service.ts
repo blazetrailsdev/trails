@@ -16,7 +16,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import type { Range } from "@blazetrails/ruby-compat";
 import { FileNotFoundError, IntegrityError } from "../errors.js";
-import type { Filename } from "../filename.js";
+import type { Filename } from "../app/models/active-storage/filename.js";
 import { Service } from "../service.js";
 
 const UPLOAD_OPTION_KEYS: Record<string, string> = { acl: "ACL", sseKmsKeyId: "SSEKMSKeyId" };

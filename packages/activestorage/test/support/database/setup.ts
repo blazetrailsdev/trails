@@ -26,10 +26,10 @@ import { AudioAnalyzer } from "../../../lib/analyzer/audio-analyzer.js";
 import { MuPDFPreviewer } from "../../../lib/previewer/mupdf-previewer.js";
 import { PopplerPDFPreviewer } from "../../../lib/previewer/poppler-pdf-previewer.js";
 import { VideoPreviewer } from "../../../lib/previewer/video-previewer.js";
-import { Attachment } from "../../../lib/attachment.js";
+import { Attachment } from "../../../lib/app/models/active-storage/attachment.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
 import { Engine } from "../../../lib/engine.js";
-import { Current } from "../../../lib/current.js";
+import { Current } from "../../../lib/app/models/active-storage/current.js";
 import "../../../lib/service/configurator.js";
 import { SERVICE_CONFIGURATIONS } from "../service-configurations.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
@@ -104,6 +104,8 @@ for (const railtie of [
 DatabaseTasks.root = TopLevel.Trails!.root()!;
 await DatabaseTasks.purge(Base.configurations().configsFor({ envName, name: "primary" })!);
 
+await import("../../../lib/app/models/active-storage/blob.js");
+await import("../../../lib/app/models/active-storage/variant-record.js");
 await import("../../../lib/config/routes.js");
 
 await runLoadHooks("after_initialize", app);

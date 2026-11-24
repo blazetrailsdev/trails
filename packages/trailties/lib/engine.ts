@@ -18,6 +18,7 @@ import {
   LOAD_PATH,
   rbFLoad,
   rbFRequireFile,
+  rbModName,
   rbObjRespondTo,
   rbProcCall,
   block,
@@ -36,6 +37,7 @@ import {
 } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Root } from "./paths.js";
+import type {} from "./trailties/i18n.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
 import { generateRailtieName, Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
@@ -49,7 +51,7 @@ import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 const generators = "./generators.js";
 
 type IsolatedNamespace = {
-  name: string;
+  name?: string;
   railtieNamespace?: () => typeof Engine;
   tableNamePrefix?: string;
   isUseRelativeModelNaming?: () => boolean;
@@ -112,9 +114,9 @@ export class Engine extends Trailtie {
   }
 
   static isolateNamespace(mod: IsolatedNamespace): void {
-    this.engineName(generateRailtieName(mod.name));
+    this.engineName(generateRailtieName(rbModName(mod)!));
 
-    this.config.defaultScope = { module: underscore(mod.name) };
+    this.config.defaultScope = { module: underscore(rbModName(mod)!) };
 
     this.isolated(true);
 
@@ -226,6 +228,18 @@ export class Engine extends Trailtie {
     const newCfg = new EngineConfiguration(klass.findRoot(calledFrom));
     if (calledFrom !== undefined && !File.isExist(File.join(newCfg.root!, "lib"))) {
       newCfg.paths().add("lib", { with: calledFrom, loadPath: true });
+    }
+    if (calledFrom !== undefined && File.isDirectory(File.join(calledFrom, "app"))) {
+      for (const path of [
+        "app",
+        "app/controllers",
+        "app/channels",
+        "app/helpers",
+        "app/models",
+        "app/mailers",
+      ]) {
+        newCfg.paths().get(path)!.push(File.join(calledFrom, path));
+      }
     }
     this._config = newCfg;
     return newCfg;
@@ -498,6 +512,10 @@ Engine.initializer("add_routing_paths", async function (this: Engine, ...args: u
   }
 });
 
+Engine.initializer("add_locales", function (this: Engine) {
+  this.config.i18n.railtiesLoadPath.push(this.paths().get("config/locales"));
+});
+
 Engine.initializer("add_view_paths", async function (this: Engine) {
   const views = this.paths().get("app/views")?.existent() ?? [];
   if (views.length === 0) return;
@@ -507,6 +525,15 @@ Engine.initializer("add_view_paths", async function (this: Engine) {
   onLoad("action_mailer", (base: ActionControllerBaseLike) => {
     base.prependViewPath!(views);
   });
+});
+
+Engine.initializer("add_mailer_preview_paths", function (this: Engine) {
+  const previews = this.paths().get("test/mailers/previews")!.existent();
+  if (previews.length > 0) {
+    onLoad("action_mailer", (base: { previewPaths: string[] }) => {
+      base.previewPaths = [...new Set([...base.previewPaths, ...previews])];
+    });
+  }
 });
 
 Engine.initializer("add_fixture_paths", async function (this: Engine) {

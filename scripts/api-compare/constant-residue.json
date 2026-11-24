@@ -38,19 +38,15 @@
   },
   "actionmailbox": {
     "rows": 31,
-    "excluded": ["base-controller.ts::BaseController"],
+    "excluded": ["app/controllers/action-mailbox/base-controller.ts::BaseController"],
     "unwalked": [
+      "app/controllers/action-mailbox/ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
+      "app/controllers/action-mailbox/ingresses/mandrill/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
       "gem-version.ts::VERSION",
-      "ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
-      "ingresses/mandrill/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
       "relayer.ts::Relayer.Result",
       "router.ts::Router.RoutingError"
     ],
     "residue": {
-      "action-mailbox/inbound-emails-controller.ts::InboundEmailsController": "Trails::Conductor::ActionMailbox::InboundEmailsController",
-      "action-mailbox/inbound-emails/sources-controller.ts::SourcesController": "Trails::Conductor::ActionMailbox::InboundEmails::SourcesController",
-      "action-mailbox/incinerates-controller.ts::IncineratesController": "Trails::Conductor::ActionMailbox::IncineratesController",
-      "action-mailbox/reroutes-controller.ts::ReroutesController": "Trails::Conductor::ActionMailbox::ReroutesController",
       "callbacks.ts::ClassMethods": "ActionMailbox::Callbacks::ClassMethods",
       "inbound-email/message-id.ts::ClassMethods": "ActionMailbox::InboundEmail::MessageId::ClassMethods",
       "routing.ts::ClassMethods": "ActionMailbox::Routing::ClassMethods"
@@ -234,9 +230,7 @@
     "excluded": [],
     "unwalked": [],
     "residue": {
-      "app/helpers/action-text/content-helper.ts::ContentHelper": "ActionText::ContentHelper",
       "app/helpers/action-text/tag-helper.ts::ActionText": "ActionView::Helpers::Tags::ActionText",
-      "app/helpers/action-text/tag-helper.ts::TagHelper": "ActionText::TagHelper",
       "attachable.ts::Attachable": "ActionText::Attachable",
       "attachable.ts::Attachable.ClassMethods": "ActionText::Attachable::ClassMethods",
       "attachables/content-attachment.ts::ContentAttachment": "ActionText::Attachables::ContentAttachment",
@@ -1354,7 +1348,7 @@
     }
   },
   "trailties": {
-    "rows": 170,
+    "rows": 171,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "commands/build.ts::BuildCommand",
@@ -1515,6 +1509,7 @@
       "health-controller.ts::HealthController": "Trails::HealthController",
       "info-controller.ts::InfoController": "Trails::InfoController",
       "info.ts::Info": "Trails::Info",
+      "initializable.ts::ClassMethods": "Trails::Initializable::ClassMethods",
       "initializable.ts::Collection": "Trails::Initializable::Collection",
       "initializable.ts::Initializable": "Trails::Initializable",
       "initializable.ts::Initializer": "Trails::Initializable::Initializer",
@@ -1537,17 +1532,7 @@
       "zeitwerk-checker.ts::ZeitwerkChecker": "Trails::ZeitwerkChecker"
     }
   },
-  "turbo": {
-    "rows": 4,
-    "excluded": [],
-    "unwalked": [],
-    "residue": {
-      "app/channels/turbo/streams-channel.ts::StreamsChannel": "Turbo::StreamsChannel",
-      "app/jobs/turbo/streams/action-broadcast-job.ts::ActionBroadcastJob": "Turbo::Streams::ActionBroadcastJob",
-      "app/jobs/turbo/streams/broadcast-job.ts::BroadcastJob": "Turbo::Streams::BroadcastJob",
-      "app/jobs/turbo/streams/broadcast-stream-job.ts::BroadcastStreamJob": "Turbo::Streams::BroadcastStreamJob"
-    }
-  },
+  "turbo": { "rows": 4, "excluded": [], "unwalked": [], "residue": {} },
   "tzinfo": {
     "rows": 50,
     "excluded": [],

@@ -95,6 +95,23 @@ async function runGeneratorInstance(
   return railsCommands;
 }
 
+async function runGeneratorUsingPrerelease(args: string[]): Promise<void> {
+  const projectPath = File.expandPath(
+    args.find((arg) => !arg.startsWith("--"))!,
+    t.destinationRoot,
+  );
+  const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+    for (const file of ["package.json", "pnpm-lock.yaml"]) {
+      if (File.isExist(File.join(projectPath, file))) File.delete(File.join(projectPath, file));
+    }
+  }) as never);
+  try {
+    await runGeneratorInstance(args);
+  } finally {
+    exit.mockRestore();
+  }
+}
+
 function json(content: string) {
   return JSON.parse(content);
 }
@@ -1201,23 +1218,23 @@ describe("AppGeneratorTest", () => {
 
   it("skip javascript option with skip javascript argument", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-javascript"]);
-    await assertNoGem("@hotwired/stimulus");
-    await assertNoGem("@hotwired/turbo-rails");
-    await assertNoGem("vite-plugin-ruby");
+    await assertNoGem("@blazetrails/stimulus");
+    await assertNoGem("@blazetrails/turbo");
+    await assertNoGem("@blazetrails/vite-trails");
   });
 
   it("skip javascript option with J argument", async () => {
     await t.runGenerator([t.destinationRoot, "-J"]);
-    await assertNoGem("@hotwired/stimulus");
-    await assertNoGem("@hotwired/turbo-rails");
-    await assertNoGem("vite-plugin-ruby");
+    await assertNoGem("@blazetrails/stimulus");
+    await assertNoGem("@blazetrails/turbo");
+    await assertNoGem("@blazetrails/vite-trails");
   });
 
   it("skip javascript option with skip js argument", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-js"]);
-    await assertNoGem("@hotwired/stimulus");
-    await assertNoGem("@hotwired/turbo-rails");
-    await assertNoGem("vite-plugin-ruby");
+    await assertNoGem("@blazetrails/stimulus");
+    await assertNoGem("@blazetrails/turbo");
+    await assertNoGem("@blazetrails/vite-trails");
   });
 
   it("hotwire", async () => {
@@ -1232,7 +1249,7 @@ describe("AppGeneratorTest", () => {
   it("skip hotwire", async () => {
     await runGeneratorInstance([t.destinationRoot, "--skip-hotwire"]);
 
-    await assertNoGem("@hotwired/turbo-rails");
+    await assertNoGem("@blazetrails/turbo");
     await t.assertFile("app/views/layouts/application.html.tse", (content: string) => {
       assertNoMatch(/data-turbo-track/, content);
     });
@@ -2168,7 +2185,7 @@ describe("AppGeneratorTest", () => {
   });
 
   it("devcontainer dev flag mounts local trails repo", async () => {
-    await runGeneratorInstance([t.destinationRoot, "--devcontainer", "--dev"]);
+    await runGeneratorUsingPrerelease([t.destinationRoot, "--devcontainer", "--dev"]);
 
     await assertDevcontainerJsonFile.call(t, (devcontainerConfig) => {
       const [trailsMount] = devcontainerConfig.mounts;

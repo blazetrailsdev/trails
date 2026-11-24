@@ -1,7 +1,7 @@
 import { MacroReflection, Reflection, type Base } from "@blazetrails/activerecord";
 import { classAttribute, Concern, extend, onLoad } from "@blazetrails/activesupport";
 import { include, prepend, rbCallSuper, rbObjSingletonClass } from "@blazetrails/ruby-compat";
-import { NamedVariant } from "./named-variant.js";
+import { NamedVariant } from "./app/models/active-storage/named-variant.js";
 
 export class HasAttachedReflection extends MacroReflection {
   private _namedVariants?: { [k: string]: NamedVariant };

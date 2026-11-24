@@ -1,5 +1,5 @@
 import { Analyzer } from "../analyzer.js";
-import type { Blob } from "../blob.js";
+import type { Blob } from "../app/models/active-storage/blob.js";
 
 export class NullAnalyzer extends Analyzer {
   static override isAccept(_blob: Blob): boolean {

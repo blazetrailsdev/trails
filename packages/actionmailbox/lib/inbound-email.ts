@@ -8,7 +8,7 @@ import {
 } from "@blazetrails/activesupport";
 import type { ClassMethods as AttachedClassMethods } from "@blazetrails/activestorage/attached/model";
 import type { One } from "@blazetrails/activestorage/attached/one";
-import type { Blob } from "@blazetrails/activestorage/blob";
+import type { Blob } from "@blazetrails/activestorage/app/models/active-storage/blob";
 import { Mail, type Message } from "@blazetrails/mail";
 import { ActionMailbox } from "./action-mailbox.js";
 import { Incineratable } from "./inbound-email/incineratable.js";

@@ -1,3 +1,4 @@
+import { include, type Included } from "@blazetrails/ruby-compat";
 import { Autoloaders } from "../../lib/autoloaders.js";
 import {
   BroadcastLogger,
@@ -8,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Errno, STDERR } from "@blazetrails/ruby-compat";
-import { Initializable } from "../../lib/initializable.js";
+import { Initializable, type Collection } from "../../lib/initializable.js";
 import {
   Bootstrap,
   type BootstrapConfig,
@@ -27,10 +28,18 @@ const baseConfig = (): BootstrapConfig => ({
   middleware: new Configuration("/app").middleware,
 });
 
-class TestApp extends Bootstrap implements BootstrapHost {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface TestApp extends Included<typeof Initializable> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class TestApp implements BootstrapHost {
+  get initializers(): Collection {
+    return Bootstrap.initializersFor(this);
+  }
+
   config: BootstrapConfig = { ...baseConfig() };
   autoloaders = new Autoloaders();
 }
+include(TestApp, Initializable);
 
 describe("Bootstrap", () => {
   beforeEach(() => {
@@ -42,12 +51,6 @@ describe("Bootstrap", () => {
     resetLoadHooks();
     Trails.cache = null;
     Trails.logger = null;
-  });
-
-  describe("class shape", () => {
-    it("extends Initializable", () => {
-      expect(new TestApp()).toBeInstanceOf(Initializable);
-    });
   });
 
   describe(":initialize_logger", () => {
@@ -156,7 +159,7 @@ describe("Bootstrap", () => {
     ];
 
     it("declares the four initializers in Rails order", () => {
-      expect(Bootstrap._ownInitializers().map((i) => i.name)).toEqual(expected);
+      expect(Bootstrap.initializers.map((i) => i.name)).toEqual(expected);
     });
 
     it("tsorts to the same Rails order via implicit chaining", () => {
@@ -165,7 +168,7 @@ describe("Bootstrap", () => {
     });
 
     it("places every initializer in the :all group", () => {
-      for (const init of Bootstrap._ownInitializers()) {
+      for (const init of Bootstrap.initializers) {
         if (init.name === "setup_once_autoloader") continue;
         expect(init.belongsTo("all")).toBe(true);
       }

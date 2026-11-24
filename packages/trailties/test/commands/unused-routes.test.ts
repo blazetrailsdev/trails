@@ -41,6 +41,11 @@ const routes = (body: string): string => `
   });
 `;
 
+const myController = `
+  import { ActionController } from "@blazetrails/actionpack";
+  export class MyController extends ActionController.Base {}
+`;
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 interface UnusedRoutesTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -61,6 +66,71 @@ describe("Trails::Command::UnusedRoutesTest", { timeout: 120_000 }, () => {
 
   afterEach(() => t.teardownApp());
 
+  it("no results", async () => {
+    await t.appFile("config/routes.ts", routes(""));
+
+    expect(await t.runUnusedRoutesCommand()).toContain("No unused routes found.");
+  });
+
+  it("no controller", async () => {
+    await t.appFile(
+      "config/routes.ts",
+      routes(`this.get("/", { to: "my#index", as: "my_route" });`),
+    );
+
+    expect(await t.runUnusedRoutesCommand([], { allowFailure: true })).toContain(
+      `Found 1 unused route:
+
+  Prefix Verb URI Pattern Controller#Action
+my_route GET  /           my#index
+`,
+    );
+  });
+
+  it("no action", async () => {
+    await t.appFile("app/controllers/my-controller.ts", myController);
+    await t.appFile(
+      "config/routes.ts",
+      routes(`this.get("/", { to: "my#index", as: "my_route" });`),
+    );
+
+    expect(await t.runUnusedRoutesCommand([], { allowFailure: true })).toContain(
+      `Found 1 unused route:
+
+  Prefix Verb URI Pattern Controller#Action
+my_route GET  /           my#index
+`,
+    );
+  });
+
+  it("implicit render", async () => {
+    await t.appFile("app/controllers/my-controller.ts", myController);
+    await t.appFile("app/views/my/index.html.tse", "<h1>Hello world</h1>\n");
+    await t.appFile(
+      "config/routes.ts",
+      routes(`this.get("/", { to: "my#index", as: "my_route" });`),
+    );
+
+    expect(await t.runUnusedRoutesCommand()).toContain("No unused routes found.");
+  });
+
+  it("multiple unused routes", async () => {
+    await t.appFile(
+      "config/routes.ts",
+      routes(`this.get("/one", { to: "action#one" });
+    this.get("/two", { to: "action#two" });`),
+    );
+
+    expect(await t.runUnusedRoutesCommand([], { allowFailure: true })).toContain(
+      `Found 2 unused routes:
+
+Prefix Verb URI Pattern    Controller#Action
+   one GET  /one(.:format) action#one
+   two GET  /two(.:format) action#two
+`,
+    );
+  });
+
   it("filter by grep", async () => {
     await t.appFile(
       "config/routes.ts",
@@ -77,6 +147,14 @@ Prefix Verb URI Pattern    Controller#Action
     );
   });
 
+  it("filter by grep no results", async () => {
+    await t.appFile("config/routes.ts", routes(""));
+
+    expect(await t.runUnusedRoutesCommand(["-g", "one"])).toContain(
+      "No unused routes found for this grep pattern.\n",
+    );
+  });
+
   it("filter by controller", async () => {
     await t.appFile(
       "config/routes.ts",
@@ -90,6 +168,14 @@ Prefix Verb URI Pattern    Controller#Action
 Prefix Verb URI Pattern    Controller#Action
    one GET  /one(.:format) posts#one
 `,
+    );
+  });
+
+  it("filter by controller no results", async () => {
+    await t.appFile("config/routes.ts", routes(""));
+
+    expect(await t.runUnusedRoutesCommand(["-c", "posts"])).toContain(
+      "No unused routes found for this controller.\n",
     );
   });
 });

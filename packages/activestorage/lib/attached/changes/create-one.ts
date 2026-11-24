@@ -12,10 +12,10 @@ import {
   rbObjRespondTo,
   rbProcCall,
 } from "@blazetrails/ruby-compat";
-import { Attachment } from "../../attachment.js";
+import { Attachment } from "../../app/models/active-storage/attachment.js";
 import { Attached, type AssociationWriter, type AttachedRecord } from "../../attached.js";
 import { ActiveStorage } from "../../active-storage.js";
-import type { Blob } from "../../blob.js";
+import type { Blob } from "../../app/models/active-storage/blob.js";
 import { Changes } from "../changes.js";
 
 type BlobIo = Parameters<typeof Blob.buildAfterUnfurling>[0]["io"];

@@ -170,6 +170,13 @@ async function app(trailsEnv: string): Promise<Application> {
   return application;
 }
 
+function resetLoadPaths(): void {
+  LOAD_PATH.splice(0, LOAD_PATH.length, ...LOAD_PATH.filter((p) => !/\/lib\/app\//.test(p)));
+  for (const engine of [ActionMailboxEngine, ActiveStorageEngine, ActionTextEngine]) {
+    delete (engine.instance() as unknown as { _allLoadPathsCache?: string[] })._allLoadPathsCache;
+  }
+}
+
 describe("ConfigurationTest", () => {
   useInMemoryDatabaseUrl();
   const trailsEnv = env.TRAILS_ENV;
@@ -1288,6 +1295,7 @@ Trails.application!.configure(function () {
   });
 
   it("autoload paths are not added to $LOAD_PATH if opted-in", async () => {
+    resetLoadPaths();
     await mkdir(join(appPath, "lib"), { recursive: true });
     const application = await app("development");
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
@@ -1310,6 +1318,7 @@ Trails.application!.configure(function () {
   });
 
   it("autoload paths are not added to $LOAD_PATH by default, except for lib", async () => {
+    resetLoadPaths();
     await mkdir(join(appPath, "lib"), { recursive: true });
     const application = await app("development");
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);

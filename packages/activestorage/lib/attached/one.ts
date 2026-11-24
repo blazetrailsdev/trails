@@ -8,8 +8,8 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { Attached } from "../attached.js";
-import type { Attachment } from "../attachment.js";
-import type { Blob } from "../blob.js";
+import type { Attachment } from "../app/models/active-storage/attachment.js";
+import type { Blob } from "../app/models/active-storage/blob.js";
 import type { CreateOne } from "./changes/create-one.js";
 import { DetachOne } from "./changes/detach-one.js";
 import { PurgeOne } from "./changes/purge-one.js";

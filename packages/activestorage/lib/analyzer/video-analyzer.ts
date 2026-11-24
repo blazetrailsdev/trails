@@ -14,7 +14,7 @@ import {
 import type { Tempfile } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { Analyzer } from "../analyzer.js";
-import type { Blob } from "../blob.js";
+import type { Blob } from "../app/models/active-storage/blob.js";
 
 type Stream = { [k: string]: unknown };
 type Probe = { streams?: Stream[] | null; format?: Stream | null; [k: string]: unknown };

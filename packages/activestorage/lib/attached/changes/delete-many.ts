@@ -1,5 +1,5 @@
 import type { AssociationWriter, AttachedRecord } from "../../attached.js";
-import { Attachment } from "../../attachment.js";
+import { Attachment } from "../../app/models/active-storage/attachment.js";
 import { ActiveStorage } from "../../active-storage.js";
 import { Changes } from "../changes.js";
 

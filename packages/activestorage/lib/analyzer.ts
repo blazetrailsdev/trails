@@ -1,7 +1,7 @@
 import { Notifications } from "@blazetrails/activesupport";
 import { Dir, NotImplementedError, type Tempfile } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
-import type { Blob } from "./blob.js";
+import type { Blob } from "./app/models/active-storage/blob.js";
 
 export class Analyzer {
   readonly blob: Blob;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Dir, File } from "@blazetrails/ruby-compat";
-import { Filename } from "../../lib/filename.js";
+import { Filename } from "../../lib/app/models/active-storage/filename.js";
 import { Service } from "../../lib/service.js";
 import "../../lib/service/configurator.js";
 import type { DiskService } from "../../lib/service/disk-service.js";

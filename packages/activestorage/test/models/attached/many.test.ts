@@ -14,14 +14,14 @@ import { ArgumentError, RuntimeError, StringIO } from "@blazetrails/ruby-compat"
 import { Base, type Relation } from "@blazetrails/activerecord";
 import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
-import type { Attachment } from "../../../lib/attachment.js";
-import { Blob } from "../../../lib/blob.js";
-import type { Preview } from "../../../lib/preview.js";
-import type { Variant } from "../../../lib/variant.js";
-import type { VariantWithRecord } from "../../../lib/variant-with-record.js";
-import { PreviewImageJob } from "../../../lib/preview-image-job.js";
-import { PurgeJob } from "../../../lib/purge-job.js";
-import { TransformJob } from "../../../lib/transform-job.js";
+import type { Attachment } from "../../../lib/app/models/active-storage/attachment.js";
+import { Blob } from "../../../lib/app/models/active-storage/blob.js";
+import type { Preview } from "../../../lib/app/models/active-storage/preview.js";
+import type { Variant } from "../../../lib/app/models/active-storage/variant.js";
+import type { VariantWithRecord } from "../../../lib/app/models/active-storage/variant-with-record.js";
+import { PreviewImageJob } from "../../../lib/app/jobs/active-storage/preview-image-job.js";
+import { PurgeJob } from "../../../lib/app/jobs/active-storage/purge-job.js";
+import { TransformJob } from "../../../lib/app/jobs/active-storage/transform-job.js";
 import { DiskService } from "../../../lib/service/disk-service.js";
 import { MirrorService } from "../../../lib/service/mirror-service.js";
 import {

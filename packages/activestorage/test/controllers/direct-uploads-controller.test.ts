@@ -8,13 +8,13 @@ import { isPresent } from "@blazetrails/activesupport";
 import { OpenSSL } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Blob } from "../../lib/blob.js";
-import { Current } from "../../lib/current.js";
+import { Blob } from "../../lib/app/models/active-storage/blob.js";
+import { Current } from "../../lib/app/models/active-storage/current.js";
 import { Service } from "../../lib/service.js";
 import "../../lib/service/configurator.js";
 import { Registry } from "../../lib/service/registry.js";
 import { SERVICE_CONFIGURATIONS, offlineServiceConfigurations } from "../support/test-helper.js";
-import "../../lib/direct-uploads-controller.js";
+import "../../lib/app/controllers/active-storage/direct-uploads-controller.js";
 
 const routes = TopLevel.Trails!.application!.routes() as unknown as RouteSet;
 let session: IntegrationTest;

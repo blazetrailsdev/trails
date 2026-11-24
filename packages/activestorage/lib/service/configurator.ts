@@ -12,7 +12,7 @@ import { Service } from "../service.js";
 type ServiceClass = { build(config: { configurator: Configurator; name: string }): Service };
 
 const loadErrors = new Map<string, unknown>();
-const cloudServices = ["S3", "GCS"];
+const services = ["Disk", "Mirror", "S3", "GCS"];
 
 /** @internal */
 export class Configurator {
@@ -20,7 +20,7 @@ export class Configurator {
 
   /** @noRailsEquivalent PERMANENT */
   static async load(): Promise<void> {
-    for (const className of cloudServices) {
+    for (const className of services) {
       loadErrors.delete(className);
       if (constDefined(Service, `${camelize(className)}Service`)) continue;
       try {

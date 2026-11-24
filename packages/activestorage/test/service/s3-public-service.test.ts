@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { base58, minutes } from "@blazetrails/activesupport";
 import { OpenSSL } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
-import { Filename } from "../../lib/filename.js";
+import { Filename } from "../../lib/app/models/active-storage/filename.js";
 import { Service } from "../../lib/service.js";
 import "../../lib/service/configurator.js";
 import type { S3Service } from "../../lib/service/s3-service.js";

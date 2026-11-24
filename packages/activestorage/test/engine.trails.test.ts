@@ -14,8 +14,8 @@ import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { Engine } from "../lib/engine.js";
 import { Model } from "../lib/attached/model.js";
 import { app } from "./support/database/setup.js";
-import { Blob } from "../lib/blob.js";
-import { VariantRecord } from "../lib/variant-record.js";
+import { Blob } from "../lib/app/models/active-storage/blob.js";
+import { VariantRecord } from "../lib/app/models/active-storage/variant-record.js";
 import { ActiveRecordExtensions } from "../lib/reflection.js";
 import { ActiveStorage } from "../lib/active-storage.js";
 import { TopLevel, constantize } from "@blazetrails/activesupport";
@@ -64,14 +64,14 @@ describe("ActiveStorage::Engine", () => {
     const saved = ActiveStorage.VariantRecord;
     const savedBlob = ActiveStorage.Blob;
     try {
-      const late: typeof import("../lib/variant-record.js") =
+      const late: typeof import("../lib/app/models/active-storage/variant-record.js") =
         // @ts-expect-error a query string forces a fresh evaluation
-        await import("../lib/variant-record.js?late");
+        await import("../lib/app/models/active-storage/variant-record.js?late");
       expect(late.VariantRecord).not.toBe(VariantRecord);
       expect(late.VariantRecord.reflectOnAssociation("imageAttachment")).not.toBeNull();
-      const lateBlob: typeof import("../lib/blob.js") =
+      const lateBlob: typeof import("../lib/app/models/active-storage/blob.js") =
         // @ts-expect-error a query string forces a fresh evaluation
-        await import("../lib/blob.js?late");
+        await import("../lib/app/models/active-storage/blob.js?late");
       expect(lateBlob.Blob).not.toBe(Blob);
       expect(lateBlob.Blob.reflectOnAssociation("previewImageAttachment")).not.toBeNull();
     } finally {
@@ -206,37 +206,5 @@ describe("ActiveStorage::Engine", () => {
     const { ActiveStorage: fresh } = await import("../lib/active-storage.js");
     await import("../lib/engine.js");
     expect(fresh.Blob).toBeUndefined();
-  });
-
-  it("seats the engine's models and controllers before the application's autoloader", async () => {
-    vi.resetModules();
-    const { ActiveStorage: fresh } = await import("../lib/active-storage.js");
-    const { Engine: freshEngine } = await import("../lib/engine.js");
-    const initializer = freshEngine.initializers.find((i) => i.name === "active_storage.app")!;
-    expect(initializer.before).toBe("setup_main_autoloader");
-    expect(initializer.after).toBe("active_storage.reflection");
-    for (const name of ["active_storage.attached", "active_storage.reflection"]) {
-      await freshEngine.initializers
-        .find((i) => i.name === name)!
-        .bind(freshEngine.instance())
-        .run(app);
-    }
-    await initializer.bind(freshEngine.instance()).run(app);
-    expect(fresh.Blob).toBeDefined();
-    expect(fresh.Attachment).toBeDefined();
-    expect(fresh.VariantRecord).toBeDefined();
-    expect(fresh.Representations.RedirectController).toBeDefined();
-    expect(fresh.Representations.ProxyController).toBeDefined();
-    for (const name of [
-      "Blobs::RedirectController",
-      "Blobs::ProxyController",
-      "DirectUploadsController",
-      "DiskController",
-    ]) {
-      expect(constantize(`ActiveStorage::${name}`)).toBeDefined();
-    }
-    expect(
-      (constantize("ActiveStorage::Representations::RedirectController") as { name: string }).name,
-    ).toBe("RedirectController");
   });
 });

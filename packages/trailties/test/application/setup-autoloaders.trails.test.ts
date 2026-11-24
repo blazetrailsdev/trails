@@ -25,7 +25,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
       paths: () => new Root(root),
       credentials: async () => null,
     };
-    const initializer = klass._ownInitializers().find((i) => i.name === name)!;
+    const initializer = klass.initializers.find((i) => i.name === name)!;
     await initializer.bind(host).run();
   };
 

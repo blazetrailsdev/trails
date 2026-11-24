@@ -4,7 +4,7 @@ import { FileFixtures } from "@blazetrails/activesupport/testing/file-fixtures";
 import { Base } from "@blazetrails/activerecord";
 import { include, type Included, type Pathname } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
-import type { Blob } from "./blob.js";
+import type { Blob } from "./app/models/active-storage/blob.js";
 
 type Attributes = { [k: string]: unknown };
 

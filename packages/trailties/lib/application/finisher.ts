@@ -7,6 +7,7 @@ import {
 import {
   File,
   LoadError,
+  include,
   Monitor,
   rbClassSuperclass,
   rbFRequire,
@@ -14,7 +15,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Loader } from "@blazetrails/zeitwerk";
 import type { Autoloaders } from "../autoloaders.js";
-import { Initializable } from "../initializable.js";
+import { Initializable, type InitializableClass } from "../initializable.js";
 import { Trails } from "../trails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
@@ -83,7 +84,8 @@ export interface FinisherHost {
   buildMiddlewareStack(): void;
 }
 
-export class Finisher extends Initializable {}
+export const Finisher = {} as InitializableClass;
+include(Finisher, Initializable);
 
 Finisher.initializer("add_generator_templates", async function (this: FinisherHost) {
   await this.ensureGeneratorTemplatesAdded();

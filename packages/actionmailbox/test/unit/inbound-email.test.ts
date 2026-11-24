@@ -4,7 +4,7 @@ import { assertNoDifference } from "@blazetrails/activesupport/testing/assertion
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Mail } from "@blazetrails/mail";
 import "../test-helper.js";
-import { Blob } from "@blazetrails/activestorage/blob";
+import { Blob } from "@blazetrails/activestorage/app/models/active-storage/blob";
 import { ActionMailbox } from "../../lib/action-mailbox.js";
 import { InboundEmail } from "../../lib/inbound-email.js";
 import { TestCase } from "../../lib/test-case.js";

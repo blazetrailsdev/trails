@@ -11,7 +11,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { AppGenerator } from "../app/app-generator.js";
-import { AppBase, type AppBaseOptions } from "../../app-base.js";
+import { AppBase, PackageEntry, type AppBaseOptions } from "../../app-base.js";
 import { AppName } from "../../app-name.js";
 import { Error } from "../../base.js";
 import { Trails } from "../../../trails.js";
@@ -309,6 +309,7 @@ export class PluginGenerator extends AppBase {
     this.publicCommand("reportImpliedOptions");
     this.publicCommand("setDefaultAccessorsBang");
     this.publicCommand("createRoot");
+    this.publicCommand("targetTrailsPrerelease");
     this.methodAdded("createRootFiles");
     this.methodAdded("createAppFiles");
     this.methodAdded("createEslintFile");
@@ -327,6 +328,8 @@ export class PluginGenerator extends AppBase {
     this.noCommands(() => this.methodAdded("underscoredName"));
     this.noCommands(() => this.methodAdded("namespacedName"));
     this.noCommands(() => this.methodAdded("pluginPath"));
+    this.methodAdded("targetTrailsPrerelease");
+    this.methodAdded("packageEntries");
   }
 
   private _dummyPath: string | null;
@@ -364,6 +367,10 @@ export class PluginGenerator extends AppBase {
     if (!this.isEngine() || !this.isWithDummyApp()) {
       this.options = Object.freeze({ ...this.options, skipAssetPipeline: true });
     }
+  }
+
+  override targetTrailsPrerelease(): Promise<void> {
+    return super.targetTrailsPrerelease("plugin new");
   }
 
   async createRootFiles(): Promise<void> {
@@ -445,6 +452,26 @@ export class PluginGenerator extends AppBase {
 
   namespacedName(): string {
     return (this._namespacedName ??= this.name().replaceAll("-", "/"));
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs simplify_gemfile_entries — PERMANENT
+   */
+  override packageEntries(): PackageEntry[] {
+    return [this.trailsPackageEntry(), this.simplifyPackageEntries(this.databasePackageEntry())]
+      .flat()
+      .filter((entry) => entry != null);
+  }
+
+  /** @internal */
+  protected simplifyPackageEntries(
+    ...packageEntries: Array<PackageEntry | PackageEntry[] | undefined>
+  ): PackageEntry[] {
+    return packageEntries
+      .flat()
+      .filter((entry) => entry != null)
+      .map((entry) => PackageEntry.floats(entry.name));
   }
 
   /** @internal */

@@ -2,9 +2,9 @@ import type { Mapper, RouteSet } from "@blazetrails/actionpack";
 import { TopLevel } from "@blazetrails/activesupport";
 import { hashDelete, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
-import type { Attachment } from "../attachment.js";
-import type { Blob } from "../blob.js";
-import type { Variant } from "../variant.js";
+import type { Attachment } from "../app/models/active-storage/attachment.js";
+import type { Blob } from "../app/models/active-storage/blob.js";
+import type { Variant } from "../app/models/active-storage/variant.js";
 
 type Host = { routeFor(name: string, ...args: unknown[]): string };
 type Options = Record<string, unknown>;

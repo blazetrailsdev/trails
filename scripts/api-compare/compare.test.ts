@@ -1314,6 +1314,11 @@ describe("nameMatches", () => {
     expect(nameMatches("ERB", "TSE")).toBe(true);
   });
 
+  it("matches a TS_CLASS_RENAMES spelling of the Ruby superclass", () => {
+    expect(nameMatches("Railtie", "Trailtie")).toBe(true);
+    expect(nameMatches("Railtie", "Engine")).toBe(false);
+  });
+
   it("matches Ruby error builtins against JS Error", () => {
     expect(nameMatches("StandardError", "Error")).toBe(true);
     expect(nameMatches("ArgumentError", "Error")).toBe(true);

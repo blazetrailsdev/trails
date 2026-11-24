@@ -8,8 +8,8 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, type TestContext } from "vitest";
 import { ActiveStorage } from "../../lib/active-storage.js";
-import { Current } from "../../lib/current.js";
-import { Blob } from "../../lib/blob.js";
+import { Current } from "../../lib/app/models/active-storage/current.js";
+import { Blob } from "../../lib/app/models/active-storage/blob.js";
 import { InvariableError } from "../../lib/errors.js";
 import {
   UnsupportedImageProcessingArgument,
@@ -22,7 +22,7 @@ import {
   VIPS_MAGICK_LOADERS,
   withVipsLoadersEnabled,
 } from "../support/test-helper.js";
-import type { Variant } from "../../lib/variant.js";
+import type { Variant } from "../../lib/app/models/active-storage/variant.js";
 
 const VipsError = WebAssembly.Exception as unknown as typeof Error;
 

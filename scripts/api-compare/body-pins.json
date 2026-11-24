@@ -98341,20 +98341,6 @@
   },
   {
     "package": "trailties",
-    "rubyFile": "application/bootstrap.rb",
-    "rubyName": "initializers",
-    "digest": "60dc3085ab8261fd",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "application/bootstrap.rb",
-    "rubyName": "run_initializers",
-    "digest": "5524deebf4bc4983",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
     "rubyFile": "application/configuration.rb",
     "rubyName": "annotations",
     "digest": "9bbbe7b1e58e4cb2",
@@ -98601,22 +98587,8 @@
   {
     "package": "trailties",
     "rubyFile": "application/finisher.rb",
-    "rubyName": "initializers",
-    "digest": "60dc3085ab8261fd",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "application/finisher.rb",
     "rubyName": "run",
     "digest": "8795a5fffe3ced3d",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "application/finisher.rb",
-    "rubyName": "run_initializers",
-    "digest": "5524deebf4bc4983",
     "ref": "v8.0.2"
   },
   {
@@ -106345,13 +106317,6 @@
     "rubyFile": "railtie.rb",
     "rubyName": "run_generators_blocks",
     "digest": "b63b8a4ba8103343",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "trailties",
-    "rubyFile": "railtie.rb",
-    "rubyName": "run_initializers",
-    "digest": "5524deebf4bc4983",
     "ref": "v8.0.2"
   },
   {

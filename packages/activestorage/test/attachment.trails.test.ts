@@ -4,9 +4,9 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
 import "./support/database/setup.js";
 import { ActiveStorage } from "../lib/active-storage.js";
-import { Attachment } from "../lib/attachment.js";
-import { Blob } from "../lib/blob.js";
-import { VariantWithRecord } from "../lib/variant-with-record.js";
+import { Attachment } from "../lib/app/models/active-storage/attachment.js";
+import { Blob } from "../lib/app/models/active-storage/blob.js";
+import { VariantWithRecord } from "../lib/app/models/active-storage/variant-with-record.js";
 import { createBlob, User } from "./support/test-helper.js";
 
 describe("Attachment", () => {

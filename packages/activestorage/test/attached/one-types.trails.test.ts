@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { Attachment } from "../../lib/attachment.js";
+import type { Attachment } from "../../lib/app/models/active-storage/attachment.js";
 import type { One } from "../../lib/attached/one.js";
-import type { Blob } from "../../lib/blob.js";
+import type { Blob } from "../../lib/app/models/active-storage/blob.js";
 
 describe("Attached::One types", () => {
   it("answers the members delegate_missing_to forwards to the attachment", () => {

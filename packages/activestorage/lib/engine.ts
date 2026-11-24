@@ -26,6 +26,7 @@ import "@blazetrails/trailties/trailties/action-controller";
 import "@blazetrails/trailties/trailties/active-job";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
+import "./constants.generated.js";
 import { ActiveStorage } from "./active-storage.js";
 import "./deprecator.js";
 import { Model } from "./attached/model.js";
@@ -39,7 +40,7 @@ import { VideoAnalyzer } from "./analyzer/video-analyzer.js";
 import { AudioAnalyzer } from "./analyzer/audio-analyzer.js";
 import { Configurator } from "./service/configurator.js";
 import { Registry } from "./service/registry.js";
-import type { Blob } from "./blob.js";
+import type { Blob } from "./app/models/active-storage/blob.js";
 
 export interface ActiveStorageConfig extends OrderedOptions {
   logger?: (typeof ActiveStorage)["logger"];
@@ -286,12 +287,6 @@ export class Engine extends TrailsEngine {
         prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
         runLoadHooks("active_storage_reflection", Reflection);
       });
-    });
-
-    this.initializer("active_storage.app", { before: "setup_main_autoloader" }, async () => {
-      await import("./index.js");
-      await import("./blob.js");
-      await import("./variant-record.js");
     });
 
     this.initializer("action_view.configuration", () => {

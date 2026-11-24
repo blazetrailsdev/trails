@@ -1555,7 +1555,7 @@ describe("CI runs every tooling test suite", () => {
     { timeout: 60_000 },
     async () => {
       const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
-      const storage = await runGate("packages/activestorage/lib/blob.ts");
+      const storage = await runGate("packages/activestorage/lib/app/models/active-storage/blob.ts");
       expect(storage.activerecord_affected).toBe("true");
       expect(storage.ar_scope).toBe("packages/activestorage");
       expect(storage.sqlite_only).toBe("false");
@@ -1570,8 +1570,11 @@ describe("CI runs every tooling test suite", () => {
           .sqlite_only,
       ).toBe("false");
       expect(
-        (await runGate("packages/activestorage/lib/blob.ts\nscripts/api-compare/config.ts"))
-          .ar_scope,
+        (
+          await runGate(
+            "packages/activestorage/lib/app/models/active-storage/blob.ts\nscripts/api-compare/config.ts",
+          )
+        ).ar_scope,
       ).toBe("packages/activestorage");
     },
   );

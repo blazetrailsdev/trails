@@ -4,7 +4,7 @@ import { base58, deepMerge, minutes } from "@blazetrails/activesupport";
 import { Digest, OpenSSL, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { FileNotFoundError } from "../../lib/errors.js";
-import { Filename } from "../../lib/filename.js";
+import { Filename } from "../../lib/app/models/active-storage/filename.js";
 import { Service } from "../../lib/service.js";
 import "../../lib/service/configurator.js";
 import { S3Service } from "../../lib/service/s3-service.js";

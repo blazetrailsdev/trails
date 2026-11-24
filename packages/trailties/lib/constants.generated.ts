@@ -38,6 +38,7 @@ defineConstants([
   [m9, "LazyRouteSet.ProxyUrlHelpers", "Trails::Engine::LazyRouteSet::ProxyUrlHelpers"],
   [m10, "Trailties", "Trails::Engine::Trailties"],
   [m12, "Initializable", "Trails::Initializable"],
+  [m12, "ClassMethods", "Trails::Initializable::ClassMethods"],
   [m12, "Collection", "Trails::Initializable::Collection"],
   [m12, "Initializer", "Trails::Initializable::Initializer"],
   [m13, "Path", "Trails::Paths::Path"],
