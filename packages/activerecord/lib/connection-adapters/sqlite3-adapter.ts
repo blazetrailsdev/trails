@@ -198,7 +198,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     } else if (/^(libsql|https?|wss?):/.test(database)) {
     } else {
       if (trailsRoot() != null) {
-        this._config.database = File.expandPath(this._config.database as string, trailsRoot()!);
+        this._config.database = File.expandPath(this._config.database as string, trailsRoot());
       }
       const dirname = File.dirname(this._config.database as string);
       if (!File.isDirectory(dirname)) {
@@ -806,8 +806,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       if (block) block(definition);
     };
 
-    await this.transaction(async () => {
-      await this.disableReferentialIntegrity(async () => {
+    await this.disableReferentialIntegrity(async () => {
+      await this.transaction(async () => {
         await this.moveTable(tableName, alteredTableName, { ...options, temporary: true });
         await this.moveTable(alteredTableName, tableName, {}, caller);
       });
@@ -1125,7 +1125,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
+  static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.*)\)/i;
 
   static columnNameMatcher(): RegExp {
     const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;

@@ -15,12 +15,12 @@ export class OrderedOptions {
   }
 
   protected _get(key: string): unknown {
-    if (this.data.has(key)) return this.data.get(key);
+    if (this.data.has(`:${key}`)) return this.data.get(`:${key}`);
     return this.defaultBlock?.(key);
   }
 
   set(key: string, value: unknown): this {
-    this.data.set(String(key), value);
+    this.data.set(`:${String(key)}`, value);
     return this;
   }
 
@@ -76,15 +76,12 @@ export class OrderedOptions {
   /**
    * `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`), which `OrderedOptions < Hash`
    * (`ordered_options.rb:32`) inherits: the stored value, else the block's or
-   * the default's, else `KeyError`. The default block is not consulted. A key
-   * is a Symbol's name (`ordered_options.rb:37-43`), so a miss inspects it as
-   * `:name`, which the Map arm's string inspect cannot.
+   * the default's, else `KeyError`. The default block is not consulted. `[]=`
+   * stores `key.to_sym` (`ordered_options.rb:37-43`), so `data` holds each key
+   * in its Symbol form and a miss inspects as `:name`.
    */
   fetch(key: string, ...rest: [] | [unknown]): unknown {
-    if (rest.length === 0 && !this.data.has(String(key))) {
-      throw new KeyError(`key not found: :${String(key)}`, { receiver: this, key: String(key) });
-    }
-    return fetch(this.data, String(key), ...rest);
+    return fetch(this.data, `:${String(key)}`, ...rest);
   }
 
   respondToMissing(name: string, includePrivate: boolean): boolean {
@@ -100,16 +97,16 @@ export class OrderedOptions {
   }
 
   toString(): string {
-    const pairs = [...this.data.entries()].map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+    const pairs = [...this.data.entries()].map(([k, v]) => `${k.slice(1)}: ${JSON.stringify(v)}`);
     return `{${pairs.join(", ")}}`;
   }
 
   isKey(key: string): boolean {
-    return key.startsWith(":") && this.data.has(key.slice(1));
+    return key.startsWith(":") && this.data.has(key);
   }
 
   key(value: unknown): string | undefined {
-    for (const [k, v] of this.data) if (v === value) return k;
+    for (const [k, v] of this.data) if (v === value) return k.slice(1);
     return undefined;
   }
 
@@ -119,8 +116,8 @@ export class OrderedOptions {
   }
 
   delete(key: string): unknown {
-    const value = this.data.get(String(key));
-    this.data.delete(String(key));
+    const value = this.data.get(`:${String(key)}`);
+    this.data.delete(`:${String(key)}`);
     return value ?? null;
   }
 
@@ -130,7 +127,7 @@ export class OrderedOptions {
   }
 
   keys(): string[] {
-    return [...this.data.keys()];
+    return [...this.data.keys()].map((k) => k.slice(1));
   }
 
   values(): unknown[] {
@@ -144,7 +141,7 @@ export class OrderedOptions {
   }
 
   toH(): Record<string, unknown> {
-    return Object.fromEntries(this.data);
+    return Object.fromEntries([...this.data].map(([k, v]) => [k.slice(1), v]));
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -157,7 +154,7 @@ export class OrderedOptions {
   }
 
   each(fn: (key: string, value: unknown) => void): this {
-    for (const [k, v] of this.data) fn(k, v);
+    for (const [k, v] of this.data) fn(k.slice(1), v);
     return this;
   }
 
@@ -173,7 +170,7 @@ export class OrderedOptions {
     const copy = new (this.constructor as new (parent?: unknown) => this)(
       (this as unknown as { parent?: unknown }).parent,
     );
-    for (const [key, value] of this.data) copy.set(key, value);
+    for (const [key, value] of this.data) copy.set(key.slice(1), value);
     if (copy.defaultBlock === undefined) copy.defaultBlock = this.defaultBlock;
     return copy;
   }

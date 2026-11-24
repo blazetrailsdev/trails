@@ -870,9 +870,14 @@ export class RouteSet {
   private readonly _append: DrawCallback[] = [];
   private readonly _prepend: DrawCallback[] = [];
   private _finalized = false;
-  readonly polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
+  /** @internal */
+  private readonly _polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
   /** @internal */
   _routes: UrlForRoutes = this;
+
+  get polymorphicMappings(): Map<string, PolymorphicMappingEntry> {
+    return this._polymorphicMappings;
+  }
 
   static defaultResourcesPathNames(): Record<string, string> {
     return { new: "new", edit: "edit" };
@@ -1195,7 +1200,7 @@ export class RouteSet {
     this.namedRoutes.clear();
     this.set.clear();
     this.formatter.clear();
-    this.polymorphicMappings.clear();
+    this._polymorphicMappings.clear();
     this._defaultEnv = undefined;
     for (const blk of this._prepend) this.evalBlock(blk);
   }
@@ -1253,7 +1258,7 @@ export class RouteSet {
     options: Record<string, unknown>,
     block: (this: CustomUrlHelperHost, ...args: unknown[]) => object | string,
   ): void {
-    this.polymorphicMappings.set(klass, new CustomUrlHelper(klass, options, block));
+    this._polymorphicMappings.set(klass, new CustomUrlHelper(klass, options, block));
   }
 
   addUrlHelper(

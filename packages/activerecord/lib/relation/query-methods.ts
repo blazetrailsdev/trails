@@ -1959,7 +1959,8 @@ export function buildWithExpressionFromValue(
   value: unknown,
   nested = false,
 ): unknown {
-  if (value instanceof Nodes.SqlLiteral) return new Nodes.Grouping(value);
+  if (value instanceof Nodes.SqlLiteral || value instanceof Nodes.BoundSqlLiteral)
+    return new Nodes.Grouping(value);
   if (value !== null && typeof value === "object" && "arel" in value) {
     if (nested) {
       return (value as { arel(): SelectManager }).arel().ast;

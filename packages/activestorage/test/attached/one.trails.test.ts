@@ -33,6 +33,15 @@ describe("ActiveStorage::Attached::One", () => {
     user = await Member.createBang({ name: "Josh" });
   });
 
+  it("reads nil for an attribute reader on an unattached attachment", async () => {
+    await user.avatar.load();
+    const avatar = user.avatar as unknown as { [k: string]: unknown };
+    expect(avatar.blob_id).toBeNull();
+    expect(avatar.record_type).toBeNull();
+    expect(avatar.key).toBeNull();
+    expect(avatar.byte_size).toBeNull();
+  });
+
   it("answers nil for a delegated call on an unattached attachment", async () => {
     await user.avatar.load();
     expect(user.avatar.variant({ resizeToLimit: [1, 1] })).toBeNull();

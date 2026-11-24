@@ -164,13 +164,24 @@ const pushMethod = (
     ORDER_ONLY_CANDIDATES[name] ??
     operatorCandidates;
   if (!candidates || candidates.length === 0) return;
+  const fromPredicate = predicateEntries.get(list) ?? new Set<string>();
+  predicateEntries.set(list, fromPredicate);
   for (const ts of candidates) {
     const entry = isStatic ? `static ${ts}` : ts;
-    if (seen.has(entry)) continue;
+    if (seen.has(entry)) {
+      // A predicate's alternate spelling (`unsubscribed?` → `unsubscribed`)
+      // must not hold the slot of a real method of that bare name.
+      if (name.endsWith("?") || !fromPredicate.has(entry)) continue;
+      list.splice(list.indexOf(entry), 1);
+      fromPredicate.delete(entry);
+    }
     seen.add(entry);
     list.push(entry);
+    if (name.endsWith("?")) fromPredicate.add(entry);
   }
 };
+
+const predicateEntries = new WeakMap<string[], Set<string>>();
 
 // A TS container: `{ file, key }` where `key` is a class name or the sentinel
 // `FUNCTIONS_KEY` for the file's top-level functions. Ruby methods are bucketed

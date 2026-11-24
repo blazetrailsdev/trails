@@ -411,7 +411,11 @@ export class Application extends Engine {
   /** @inventedArm prefetchBang — PERMANENT */
   async reloadRoutesBang(): Promise<void> {
     await this.routesReloader().prefetchBang();
-    this.routesReloader().reloadBang();
+    if (this.routesReloader().executeUnlessLoaded()) {
+      this.routesReloader().loaded = false;
+    } else {
+      this.routesReloader().reloadBang();
+    }
   }
 
   reloadRoutesUnlessLoaded(): boolean | null {

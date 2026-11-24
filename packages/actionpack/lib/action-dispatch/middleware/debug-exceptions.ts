@@ -228,7 +228,9 @@ export class DebugExceptions {
         contentType = Mime.get("text")!;
       }
 
-      if (this.isApiRequest(contentType)) {
+      if (request.rawRequestMethod === "HEAD") {
+        return this.render(wrapper.statusCode, "", contentType);
+      } else if (this.isApiRequest(contentType)) {
         return this.renderForApiRequest(contentType, wrapper);
       } else {
         return this.renderForBrowserRequest(request, wrapper);

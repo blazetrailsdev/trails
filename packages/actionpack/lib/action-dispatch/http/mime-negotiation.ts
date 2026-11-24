@@ -1,4 +1,4 @@
-import { ArrayInquirer, included, mattrAccessor } from "@blazetrails/activesupport";
+import { ArrayInquirer, included, isBlank, mattrAccessor } from "@blazetrails/activesupport";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
@@ -127,7 +127,17 @@ export class MimeNegotiation {
 
   /** @internal */
   shouldApplyVaryHeader(): boolean {
-    return !this.isParamsReadable() && this.useAcceptHeader() && this.validAcceptHeader();
+    return !this.isParamsReadable();
+  }
+
+  varyHeaders(): string[] {
+    if (this.useAcceptHeader()) {
+      const headers = ["Accept", "X-Requested-With"];
+      if (this.isXhr() && isBlank(this.accept)) headers.splice(1, 0, "Content-Type");
+      return headers;
+    } else {
+      return ["X-Requested-With"];
+    }
   }
 
   /** @internal */

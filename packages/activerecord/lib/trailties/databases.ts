@@ -622,12 +622,7 @@ DSL.namespace("db", (dbNamespace) => {
     DSL.task(
       { dump: "load_config" },
       block(async () => {
-        await DatabaseTasks.withTemporaryPoolForEach({}, async (pool) => {
-          const dbConfig = pool.dbConfig;
-          const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
-            ActiveRecord.schemaFormat()) as SchemaFormat;
-          await DatabaseTasks.dumpSchema(dbConfig, schemaFormat);
-        });
+        await DatabaseTasks.dumpAll();
 
         dbNamespace.get("schema:dump")!.reenable();
       }),
@@ -639,7 +634,10 @@ DSL.namespace("db", (dbNamespace) => {
     DSL.task(
       { load: ["load_config", "check_protected_environments"] },
       block(async () => {
-        await DatabaseTasks.loadSchemaCurrent(ActiveRecord.schemaFormat(), ENV["SCHEMA"]);
+        await DatabaseTasks.loadSchemaCurrent(
+          ENV["SCHEMA_FORMAT"] as SchemaFormat | undefined,
+          ENV["SCHEMA"],
+        );
       }),
     );
 
@@ -653,9 +651,10 @@ DSL.namespace("db", (dbNamespace) => {
           block(async () => {
             await DatabaseTasks.withTemporaryPoolForEach({ name }, async (pool) => {
               const dbConfig = pool.dbConfig;
-              const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
-                ActiveRecord.schemaFormat()) as SchemaFormat;
-              await DatabaseTasks.dumpSchema(dbConfig, schemaFormat);
+              await DatabaseTasks.dumpSchema(
+                dbConfig,
+                (ENV["SCHEMA_FORMAT"] as SchemaFormat | undefined) || dbConfig.schemaFormat(),
+              );
             });
 
             dbNamespace.get(`schema:dump:${name}`)!.reenable();
@@ -674,9 +673,10 @@ DSL.namespace("db", (dbNamespace) => {
           block(async () => {
             await DatabaseTasks.withTemporaryPoolForEach({ name }, async (pool) => {
               const dbConfig = pool.dbConfig;
-              const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
-                ActiveRecord.schemaFormat()) as SchemaFormat;
-              await DatabaseTasks.loadSchema(dbConfig, schemaFormat);
+              await DatabaseTasks.loadSchema(
+                dbConfig,
+                (ENV["SCHEMA_FORMAT"] as SchemaFormat | undefined) || dbConfig.schemaFormat(),
+              );
             });
           }),
         );
@@ -719,9 +719,10 @@ DSL.namespace("db", (dbNamespace) => {
         await DatabaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
           const dbConfig = pool.dbConfig;
           Schema.verbose = false;
-          const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
-            ActiveRecord.schemaFormat()) as SchemaFormat;
-          await DatabaseTasks.loadSchema(dbConfig, schemaFormat);
+          await DatabaseTasks.loadSchema(
+            dbConfig,
+            (ENV["SCHEMA_FORMAT"] as SchemaFormat | undefined) || dbConfig.schemaFormat(),
+          );
         });
       }),
     );
@@ -752,9 +753,10 @@ DSL.namespace("db", (dbNamespace) => {
             await DatabaseTasks.withTemporaryPoolForEach({ env: "test", name }, async (pool) => {
               const dbConfig = pool.dbConfig;
               Schema.verbose = false;
-              const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
-                ActiveRecord.schemaFormat()) as SchemaFormat;
-              await DatabaseTasks.loadSchema(dbConfig, schemaFormat);
+              await DatabaseTasks.loadSchema(
+                dbConfig,
+                (ENV["SCHEMA_FORMAT"] as SchemaFormat | undefined) || dbConfig.schemaFormat(),
+              );
             });
           }),
         );

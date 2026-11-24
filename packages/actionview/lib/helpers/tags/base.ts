@@ -135,20 +135,26 @@ export class Base {
     }
   }
 
-  protected addDefaultNameAndIdForValue(tagValue: unknown, options: Record<string, unknown>): void {
+  protected addDefaultNameAndFieldForValue(
+    tagValue: unknown,
+    options: Record<string, unknown>,
+    field: string = "id",
+  ): void {
     if (tagValue == null) {
-      this.addDefaultNameAndId(options);
+      this.addDefaultNameAndField(options, field);
     } else {
-      const specifiedId = options["id"];
-      this.addDefaultNameAndId(options);
+      const specifiedField = options[field];
+      this.addDefaultNameAndField(options, field);
 
-      if (isBlank(specifiedId) && isPresent(options["id"])) {
-        options["id"] += `_${this.sanitizedValue(tagValue)}`;
+      if (isBlank(specifiedField) && isPresent(options[field])) {
+        options[field] += `_${this.sanitizedValue(tagValue)}`;
       }
     }
   }
 
-  protected addDefaultNameAndId(options: Record<string, unknown>): void {
+  declare protected addDefaultNameAndIdForValue: Base["addDefaultNameAndFieldForValue"];
+
+  protected addDefaultNameAndField(options: Record<string, unknown>, field: string = "id"): void {
     const index = this.nameAndIdIndex(options);
     options["name"] = fetch(
       options,
@@ -157,19 +163,26 @@ export class Base {
     );
 
     if (this.isGenerateIds()) {
-      options["id"] = fetch(
+      options[field] = fetch(
         options,
-        "id",
+        field,
         block(() => this.tagId(index, hashDelete(options, "namespace"))),
       );
       const namespace = hashDelete(options, "namespace");
       if (namespace != null && namespace !== false) {
-        options["id"] =
-          options["id"] != null && options["id"] !== false
-            ? `${namespace}_${options["id"]}`
+        options[field] =
+          options[field] != null && options[field] !== false
+            ? `${namespace}_${options[field]}`
             : namespace;
       }
     }
+  }
+
+  declare protected addDefaultNameAndId: Base["addDefaultNameAndField"];
+
+  static {
+    this.prototype.addDefaultNameAndIdForValue = this.prototype.addDefaultNameAndFieldForValue;
+    this.prototype.addDefaultNameAndId = this.prototype.addDefaultNameAndField;
   }
 
   protected tagName(multiple: unknown = false, index: unknown = null): string {

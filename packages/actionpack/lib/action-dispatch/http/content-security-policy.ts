@@ -37,6 +37,8 @@ export type CSPSource = CspSymbol | (string & {}) | ((request?: unknown) => stri
 
 export type CSPSourceOrClear = CSPSource | null | false;
 
+export const HASH_SOURCE_ALGORITHM_PREFIXES = ["sha256-", "sha384-", "sha512-"] as const;
+
 export const DEFAULT_NONCE_DIRECTIVES = ["script-src", "style-src"] as const;
 
 type DirectiveName = string;
@@ -313,7 +315,14 @@ export class ContentSecurityPolicy {
       if (typeof source === "string" && source.startsWith(":")) {
         return this.applyMapping(source);
       }
-      if (typeof source === "string" || typeof source === "function") {
+      if (typeof source === "string") {
+        if (this.isHashSource(source)) {
+          return `'${source}'`;
+        } else {
+          return source;
+        }
+      }
+      if (typeof source === "function") {
         return source;
       }
       throw new ArgumentError(`Invalid content security policy source: ${rbInspect(source)}`);
@@ -402,6 +411,11 @@ export class ContentSecurityPolicy {
   /** @internal */
   private isNonceDirective(directive: string, nonceDirectives: readonly string[]): boolean {
     return nonceDirectives.includes(directive);
+  }
+
+  /** @internal */
+  private isHashSource(source: string): boolean {
+    return HASH_SOURCE_ALGORITHM_PREFIXES.some((prefix) => source.startsWith(prefix));
   }
 }
 

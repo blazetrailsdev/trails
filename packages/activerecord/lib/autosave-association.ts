@@ -440,7 +440,7 @@ export async function isAssociationValid(
   if (await record.isValid(context)) return true;
 
   let associatedErrors: any[];
-  if (record.isChanged || record.isNewRecord() || context) {
+  if (context || record.changedForAutosave()) {
     associatedErrors = record.errors.objects;
   } else {
     associatedErrors = record.errors.objects.filter(
@@ -514,7 +514,7 @@ export function isInversePolymorphicAssociationChanged(
   if (!reflection.inverseOf()?.isPolymorphic()) return false;
 
   const className = record._readAttribute(reflection.inverseOf()!.foreignType!);
-  return reflection.activeRecord !== record.constructor.polymorphicClassFor(className as string);
+  return reflection.activeRecord.polymorphicName() !== className;
 }
 
 /** @internal */

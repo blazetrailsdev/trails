@@ -22,19 +22,22 @@ const dumper = await SchemaDumper.create({
   tables: () => [],
   columns: () => [],
   indexes: () => [],
+  quote: (v: string) => `'${v}'`,
+  queryValue: async () => 'CREATE TABLE "t" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL)',
 } as any);
+dumper.tableName = "t";
 
 describe("SQLite3::SchemaDumper", () => {
-  it("isDefaultPrimaryKey: true for integer columns", () => {
-    expect((dumper as any).isDefaultPrimaryKey(col("id", "integer"))).toBe(true);
+  it("isDefaultPrimaryKey: true for integer columns", async () => {
+    expect(await (dumper as any).isDefaultPrimaryKey(col("id", "integer"))).toBe(true);
   });
 
-  it("isDefaultPrimaryKey: false for bigint columns", () => {
-    expect((dumper as any).isDefaultPrimaryKey(col("id", "bigint"))).toBe(false);
+  it("isDefaultPrimaryKey: false for bigint columns", async () => {
+    expect(await (dumper as any).isDefaultPrimaryKey(col("id", "bigint"))).toBe(false);
   });
 
-  it("isExplicitPrimaryKeyDefault: true for bigint columns", () => {
-    expect((dumper as any).isExplicitPrimaryKeyDefault(col("id", "bigint"))).toBe(true);
+  it("isExplicitPrimaryKeyDefault: true for bigint columns", async () => {
+    expect(await (dumper as any).isExplicitPrimaryKeyDefault(col("id", "bigint"))).toBe(true);
   });
 
   it("prepareColumnOptions adds as/stored for virtual columns", async () => {

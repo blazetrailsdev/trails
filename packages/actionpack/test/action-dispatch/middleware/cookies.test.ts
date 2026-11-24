@@ -224,7 +224,11 @@ describe("ChainedCookieJars predicates", () => {
 
 function serializedHost(env: Record<string, unknown> = {}): SerializedCookieJarsHost {
   const jar = new CookieJar(cookieRequest(env));
-  return { request: jar.request, set: (name, options) => jar.set(name, options as never) };
+  return {
+    request: jar.request,
+    set: (name, options) => jar.set(name, options as never),
+    upgraded: (name) => jar.upgraded(name),
+  };
 }
 
 describe("SerializedCookieJars", () => {

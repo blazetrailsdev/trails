@@ -5,11 +5,13 @@ import {
   IndexError,
   rbNum2Int,
   include,
+  rbAnyToS,
   toEnum,
   type Enumerator,
 } from "@blazetrails/ruby-compat";
 import type pg from "pg";
 import { Constants as PGConstants } from "./pg.js";
+import { Error as PgError } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { TypeMapByOid } from "./type-map-by-oid.js";
 
@@ -48,11 +50,19 @@ export class Result {
   #typemap: TypeMapByOid | null = null;
 
   readonly #error: DatabaseErrorFields | null;
+  /** @internal */
+  private _cleared = false;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(native: pg.QueryResult, error: DatabaseErrorFields | null = null) {
     this.#native = native;
     this.#error = error;
+  }
+
+  /** @internal */
+  private _pgresultGet(): pg.QueryResult {
+    if (this._cleared) throw new PgError("result has been cleared");
+    return this.#native;
   }
 
   mapTypesBang(typeMap: TypeMapByOid): this {
@@ -61,10 +71,51 @@ export class Result {
   }
 
   clear(): null {
+    this._cleared = true;
     return null;
   }
 
+  isCleared(): boolean {
+    return this._cleared;
+  }
+
+  resultStatus(): number {
+    this._pgresultGet();
+    if (this.#error != null) return PGConstants.PGRES_FATAL_ERROR;
+    return this.nfields() > 0 ? PGConstants.PGRES_TUPLES_OK : PGConstants.PGRES_COMMAND_OK;
+  }
+
+  static resStatus(status: unknown): string {
+    return (
+      Object.keys(PGConstants).find(
+        (c) =>
+          c.startsWith("PGRES_") &&
+          PGConstants[c as keyof typeof PGConstants] === rbNum2Int(status),
+      ) ?? "invalid ExecStatusType code"
+    );
+  }
+
+  resStatus(...args: unknown[]): string {
+    this._pgresultGet();
+    if (args.length == 0) {
+      return Result.resStatus(this.resultStatus());
+    } else if (args.length == 1) {
+      return Result.resStatus(args[0]);
+    } else {
+      throw new ArgumentError("only 0 or 1 arguments expected");
+    }
+  }
+
+  inspect(): string {
+    const str = rbAnyToS(this);
+    const stats = this.isCleared()
+      ? " cleared"
+      : ` status=${this.resStatus(this.resultStatus())} ntuples=${this.ntuples()} nfields=${this.nfields()} cmd_tuples=${this.cmdTuples()}`;
+    return `${str.slice(0, -1)}${stats}${str.slice(-1)}`;
+  }
+
   errorField(fieldcode: number): string | null {
+    this._pgresultGet();
     const name = _ERROR_FIELDS[fieldcode];
     const fieldstr = name == null || this.#error == null ? null : this.#error[name];
     return fieldstr == null ? null : String(fieldstr);
@@ -75,25 +126,25 @@ export class Result {
   }
 
   ntuples(): number {
-    return (this.#native.rows ?? []).length;
+    return (this._pgresultGet().rows ?? []).length;
   }
 
   nfields(): number {
-    return (this.#native.fields ?? []).length;
+    return (this._pgresultGet().fields ?? []).length;
   }
 
   ftype(index: number): number {
     if (index < 0 || index >= this.fields().length) {
       throw new ArgumentError(`invalid field number ${index}`);
     }
-    return this.#native.fields[index].dataTypeID;
+    return this._pgresultGet().fields[index].dataTypeID;
   }
 
   fmod(columnNumber: number): number {
     if (columnNumber < 0 || columnNumber >= this.fields().length) {
       throw new ArgumentError(`Column number is out of range: ${columnNumber}`);
     }
-    return this.#native.fields[columnNumber].dataTypeModifier;
+    return this._pgresultGet().fields[columnNumber].dataTypeModifier;
   }
 
   getvalue(tupNum: number, fieldNum: number): unknown {
@@ -107,15 +158,15 @@ export class Result {
   }
 
   cmdTuples(): number {
-    return this.#native.rowCount ?? 0;
+    return this._pgresultGet().rowCount ?? 0;
   }
 
   fields(): string[] {
-    return (this.#native.fields ?? []).map((f) => f.name);
+    return (this._pgresultGet().fields ?? []).map((f) => f.name);
   }
 
   values(): unknown[][] {
-    return ((this.#native.rows ?? []) as unknown[][]).map((row, i) =>
+    return ((this._pgresultGet().rows ?? []) as unknown[][]).map((row, i) =>
       row.map((_, j) => this.#typecastResultValue(i, j)),
     );
   }

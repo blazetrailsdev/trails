@@ -174,12 +174,14 @@ describe("ActionController::Live::Buffer", () => {
       static override queueSize: number | null = 2;
     }
     const buf = new SmallBuffer(await makeResponse());
-    const writes = [buf.write("one"), buf.write("two"), buf.write("three")];
+    const writes = [buf.write("one"), buf.write("two")];
+    const held = buf.write("three");
     const closed = buf.close();
     const parts: unknown[] = [];
     buf.each((part) => parts.push(part));
-    expect(parts).toEqual(["one", "two", "three"]);
+    expect(parts).toEqual(["one", "two"]);
     await Promise.all([...writes, closed]);
+    await expect(held).rejects.toThrow(IOError);
   });
 
   it("a sync read of a live buffer raises rather than blocking before close", async () => {

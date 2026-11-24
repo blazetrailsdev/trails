@@ -440,6 +440,10 @@ jobs:
       - uses: ./.github/actions/cache-build
       - run: pnpm build
       - run: pnpm typecheck
+      # RFC 0100: package-size / bundle-size budget (~30s on the build above)
+      # and the minified-bundle runtime smoke for the sideEffects arrays.
+      - run: pnpm tsx scripts/package-size/measure.ts
+      - run: pnpm tsx scripts/package-size/bundle-smoke.ts
   lint:
     name: Lint (${{ matrix.shard }})
     needs: changes
@@ -1003,6 +1007,7 @@ jobs:
           scripts/non-transactional-row-writes.test.ts
           scripts/package-files-field.test.ts
           scripts/package-publish-shape.test.ts
+          scripts/package-size/side-effects.test.ts
           scripts/require-canonical-rebuild-directives.test.ts
           scripts/ruby-compat-leaf.test.ts
           scripts/ruby-compat-entry-modules.test.ts

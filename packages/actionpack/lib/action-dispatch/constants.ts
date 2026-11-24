@@ -35,3 +35,11 @@ if (new Gem.Version(RELEASE).compare(new Gem.Version("3"))! < 0) {
   SERVER_TIMING = "server-timing";
   STRICT_TRANSPORT_SECURITY = "strict-transport-security";
 }
+
+export let UNPROCESSABLE_CONTENT: string;
+
+if (new Gem.Version(RELEASE).compare(new Gem.Version("3.1"))! < 0) {
+  UNPROCESSABLE_CONTENT = ":unprocessable_entity";
+} else {
+  UNPROCESSABLE_CONTENT = ":unprocessable_content";
+}

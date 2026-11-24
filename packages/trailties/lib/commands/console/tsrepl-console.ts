@@ -85,7 +85,7 @@ export class TSREPLConsole {
 
     const env = this.colorizedEnv();
     const promptPrefix = `%N(${env})`;
-    TSREPL.conf.TSREPL_NAME = this.app.name();
+    if (TSREPL.conf.TSREPL_NAME === "tsrepl") TSREPL.conf.TSREPL_NAME = this.app.name();
 
     (TSREPL.conf.PROMPT as Record<string, unknown>).RAILS_PROMPT = {
       PROMPT_I: `${promptPrefix}> `,

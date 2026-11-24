@@ -1,7 +1,9 @@
 import {
   ArgumentError,
   FrozenError,
+  rbAnyToS,
   rbInspect,
+  rbModName,
   rbFCaller,
   rbFSend,
   rbObjClassname,
@@ -89,6 +91,32 @@ export class Coder {
     );
   }
 
+  inspect(): string {
+    const str = rbAnyToS(this);
+    const oidStr = this.oid == 0 ? "" : ` oid=${this.oid}`;
+    const formatStr = this.format == 0 ? "" : ` format=${this.format}`;
+    const nameStr = this.name != null ? ` ${rbInspect(this.name)}` : "";
+    return `${str.slice(0, -1)}${nameStr} ${oidStr}${formatStr}${str.slice(-1)}`;
+  }
+
+  inspectShort(): string {
+    let str: string;
+    switch (this.format) {
+      case 0:
+        str = "T";
+        break;
+      case 1:
+        str = "B";
+        break;
+      default:
+        str = String(this.format);
+    }
+    if (typeof (this as { encode?: unknown }).encode === "function") str += "E";
+    if (typeof (this as { decode?: unknown }).decode === "function") str += "D";
+
+    return `${this.name ?? rbModName(this.constructor)}:${str}`;
+  }
+
   toH(): Record<string, unknown> {
     return {
       oid: this.oid,
@@ -114,6 +142,12 @@ export class CompositeCoder extends Coder {
     };
     if (this.dimensions != null) h.dimensions = this.dimensions;
     return h;
+  }
+
+  inspect(): string {
+    const str = super.inspect();
+    const dimensions = this.dimensions;
+    return `${str.slice(0, -1)} elements_type=${rbInspect(this.elementsType)} ${this.isNeedsQuotation() ? "needs" : "no"} quotation${dimensions != null ? ` ${dimensions} dimensions` : ""}${str.slice(-1)}`;
   }
 
   set elementsType(elemType: Coder | null) {

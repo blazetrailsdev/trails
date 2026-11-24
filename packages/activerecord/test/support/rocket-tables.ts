@@ -39,7 +39,7 @@ export async function withCompositeRocketTables(
   try {
     await body();
   } finally {
-    await conn.dropTable("astronauts", { ifExists: true });
-    await conn.dropTable("rockets", { ifExists: true });
+    await conn.dropTable("astronauts", { ifExists: true }).catch(() => null);
+    await conn.dropTable("rockets", { ifExists: true }).catch(() => null);
   }
 }

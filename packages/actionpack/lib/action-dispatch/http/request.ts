@@ -287,6 +287,7 @@ export class Request {
   declare hasContentType: () => unknown;
   declare negotiateMime: (order: (MimeType | undefined)[]) => MimeType | NullType | null;
   declare shouldApplyVaryHeader: () => boolean;
+  declare varyHeaders: () => string[];
 
   declare static ignoreAcceptHeader: boolean;
   declare ignoreAcceptHeader: boolean;

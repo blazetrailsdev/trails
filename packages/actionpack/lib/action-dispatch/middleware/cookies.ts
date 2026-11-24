@@ -171,6 +171,7 @@ export class CookieJar implements Iterable<[string, string | null]> {
   private _cookies: Map<string, string | null> = new Map();
   private _setCookies: Map<string, SetCookieOptions> = new Map();
   private _deletedCookies: Map<string, Partial<SetCookieOptions>> = new Map();
+  private _upgradedCookies: Set<string> = new Set();
   private _committed = false;
   private _request: RequestCookieMethodsHost;
 
@@ -252,6 +253,7 @@ export class CookieJar implements Iterable<[string, string | null]> {
       options = { value };
     }
     this.handleOptions(options as SetCookieOptions);
+    this._upgradedCookies.delete(String(name));
 
     if (this._cookies.get(name) !== value || (options as SetCookieOptions).expires) {
       this._cookies.set(name, value);
@@ -340,8 +342,14 @@ export class CookieJar implements Iterable<[string, string | null]> {
     return this._cookies[Symbol.iterator]();
   }
 
+  upgraded(name: string): void {
+    this._upgradedCookies.add(String(name));
+  }
+
   write(response: CookieResponse): void {
     for (const [name, value] of this._setCookies) {
+      if (this._upgradedCookies.has(name) && this.request.sessionOptions?.skip) continue;
+
       if (this.isWriteCookie(value)) {
         response.setCookie(name, value);
       }
@@ -423,6 +431,10 @@ export class AbstractCookieJar {
     this.commit(name, options as SerializedSetOptions);
     this.parentJar.set(name, options as SetCookieOptions);
     return options as SerializedSetOptions;
+  }
+
+  upgraded(name: string): void {
+    this.parentJar.upgraded(name);
   }
 
   /** @internal */
@@ -659,6 +671,7 @@ export interface RequestCookieMethodsHost {
   setHeader(name: string, value: unknown): unknown;
   cookies: Record<string, string>;
   cookiesSameSiteProtection?(): unknown;
+  sessionOptions?: Record<string, unknown>;
   host?: string | null;
   ssl?: boolean;
 }
@@ -768,6 +781,7 @@ export interface CookieSerializer {
 export interface SerializedCookieJarsHost {
   request: RequestCookieMethodsHost;
   set(name: string, options: SerializedSetOptions): unknown;
+  upgraded(name: string): void;
   _serializer?: CookieSerializer;
 }
 
@@ -822,6 +836,7 @@ export function parse(
 
     if (forceReserialize || isReserialize.call(this, dumped as string | Uint8Array)) {
       this.set(name, { value });
+      this.upgraded(name);
     }
 
     return value;

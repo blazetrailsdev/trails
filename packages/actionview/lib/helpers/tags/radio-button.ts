@@ -25,7 +25,7 @@ export class RadioButton extends Base {
     options["type"] = "radio";
     options["value"] = this._tagValue;
     if (this.isInputChecked(options)) options["checked"] = "checked";
-    this.addDefaultNameAndIdForValue(this._tagValue, options);
+    this.addDefaultNameAndFieldForValue(this._tagValue, options);
     return this.tag("input", options);
   }
 

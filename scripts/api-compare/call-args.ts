@@ -171,7 +171,7 @@ const KERNEL_CONVERSION_METHODS = new Set([
  */
 function normalizeRef(rawName: string): string {
   if (rawName === "new") return "constructor";
-  const name = rawName.replace(/^[@$]+/, "");
+  const name = rawName.replace(/^[@$#]+/, "");
   if (name === "self") return "this";
   if (KERNEL_CONVERSION_METHODS.has(name)) return `${name[0].toLowerCase()}${name.slice(1)}`;
   return /[?!=]$/.test(name) ? name : snakeToCamel(name);

@@ -1773,8 +1773,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const e = await assertRaises([RecordNotFound], {}, () =>
       (author as any).association("essayCategories").idsWriter(ids),
     );
-    const msg =
-      "Couldn't find all Categories with 'name': (General, Unknown) (found 1 results, but was looking for 2). Couldn't find Category with name Unknown.";
+    const msg = `Couldn't find all Categories with 'name': ("General", "Unknown") (found 1 results, but was looking for 2). Couldn't find Category with name "Unknown".`;
     expect(e.message).toEqual(msg);
   });
 

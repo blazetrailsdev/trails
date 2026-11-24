@@ -1075,7 +1075,7 @@ async function templateScope(
   const helpersFrom =
     ownController ??
     (isMailerView(rel, layout, mailers)
-      ? undefined
+      ? controller
       : controllers.find((c) => c.path === "application"));
   if (helpersFrom !== undefined) {
     view.push(

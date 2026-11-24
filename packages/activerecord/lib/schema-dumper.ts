@@ -402,10 +402,10 @@ export abstract class SchemaDumper {
   protected abstract prepareColumnOptions(column: Column): Promise<Record<string, unknown>>;
 
   /** @internal */
-  protected abstract isDefaultPrimaryKey(column: Column): boolean;
+  protected abstract isDefaultPrimaryKey(column: Column): boolean | Promise<boolean>;
 
   /** @internal */
-  protected abstract isExplicitPrimaryKeyDefault(column: Column): boolean;
+  protected abstract isExplicitPrimaryKeyDefault(column: Column): boolean | Promise<boolean>;
 
   /** @internal */
   protected abstract schemaTypeWithVirtual(column: Column): Promise<string>;
