@@ -1036,7 +1036,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "solid-cable",
         libPath: "lib/solid_cable",
         libEntryFile: "lib/solid_cable.rb",
-        extraLibPaths: ["app/models/solid_cable", "app/jobs/solid_cable"],
+        extraLibPaths: ["app/models/solid_cable", "app/jobs/solid_cable", "lib/./generators"],
         testPath: "test",
         compareApi: true,
         compareTests: true,

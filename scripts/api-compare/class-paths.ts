@@ -96,6 +96,7 @@ const LAZY_DIRS: Record<string, string[]> = {
   ],
   activesupport: ["executor/test-helper.ts"],
   actiontext: ["encrypted-rich-text.ts", "rich-text.ts"],
+  "solid-cable": ["generators/"],
   trailties: [
     "application-controller.ts",
     "commands/",

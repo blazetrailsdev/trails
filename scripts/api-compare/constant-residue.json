@@ -1249,10 +1249,13 @@
     }
   },
   "solid-cable": {
-    "rows": 4,
+    "rows": 6,
     "excluded": ["action-cable/subscription-adapter/solid-cable.ts::Listener"],
     "unwalked": [],
-    "residue": {}
+    "residue": {
+      "generators/solid-cable/install/install-generator.ts::InstallGenerator": "SolidCable::InstallGenerator",
+      "generators/solid-cable/update/update-generator.ts::UpdateGenerator": "SolidCable::UpdateGenerator"
+    }
   },
   "solid-cache": {
     "rows": 26,
