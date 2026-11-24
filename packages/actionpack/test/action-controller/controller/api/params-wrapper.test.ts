@@ -1,6 +1,8 @@
 import { type HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
-import { constSet, constGet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { beforeEach, describe, it } from "vitest";
 import { API } from "../../../../lib/action-controller/api.js";
 import { TestCase } from "../../../../lib/action-controller/test-case.js";

@@ -15,18 +15,12 @@ import {
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Time } from "@blazetrails/date";
 import { Utils } from "@blazetrails/rack";
-import {
-  type Hash,
-  include,
-  Marshal,
-  rbInspect,
-  rbModToS,
-  rbObjClass,
-  slice,
-  type Included,
-  TopLevel,
-  constSet,
-} from "@blazetrails/ruby-compat";
+import { slice } from "@blazetrails/ruby-compat/hash";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
+import type { Included } from "@blazetrails/ruby-compat/include";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbInspect, rbModToS, rbObjClass, TopLevel } from "@blazetrails/ruby-compat/object";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { deprecator } from "../../../../lib/action-dispatch/deprecator.js";
 import { Session } from "../../../../lib/action-dispatch/request/session.js";

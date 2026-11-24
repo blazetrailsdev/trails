@@ -1,6 +1,7 @@
 import { Conversion, Naming } from "@blazetrails/activemodel";
 import { extend, include, isPresent } from "@blazetrails/activesupport";
-import { rbInspect, Struct } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { Struct } from "@blazetrails/ruby-compat/struct";
 import type { ToModel } from "../../../../lib/action-dispatch/routing/polymorphic-routes.js";
 
 export class Customer extends Struct.new("name", "id") {

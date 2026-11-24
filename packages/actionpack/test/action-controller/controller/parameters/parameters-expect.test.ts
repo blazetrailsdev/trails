@@ -1,5 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
-import { File, StringIO, type Tempfile } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import type { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
 import { BigDecimal } from "@blazetrails/activesupport";

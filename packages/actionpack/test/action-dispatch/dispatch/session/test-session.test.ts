@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SessionId } from "@blazetrails/rack-session";
 import { assertEqual, assertInstanceOf } from "@blazetrails/activesupport/testing/assertions";
-import { rbCString } from "@blazetrails/ruby-compat";
+import { rbCString } from "@blazetrails/ruby-compat/object";
 import { TestSession } from "../../../../lib/action-controller/test-case.js";
 
 describe("ActionController::TestSessionTest", () => {

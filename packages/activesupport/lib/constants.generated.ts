@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./actionable-error.js";
 import * as m1 from "./array-inquirer.js";
 import * as m2 from "./backtrace-cleaner.js";

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ActiveSupportJSON, toXml } from "@blazetrails/activesupport";
-import { rbObjIvarGet, rbObjIvarSet, stderr } from "@blazetrails/ruby-compat";
+import { rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
 import { IntegrationTest } from "../../../lib/action-dispatch/testing/integration.js";
 import { DebugExceptions } from "../../../lib/action-dispatch/middleware/debug-exceptions.js";
 import { PublicExceptions } from "../../../lib/action-dispatch/middleware/public-exceptions.js";

@@ -23,15 +23,10 @@ import {
   assertEmpty,
   assertNothingRaised,
 } from "@blazetrails/activesupport/testing/assertions";
-import {
-  ArgumentError,
-  JSON,
-  Marshal,
-  block,
-  hashDelete,
-  hashAset,
-  hashReplace,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { block, hashDelete, hashAset, hashReplace } from "@blazetrails/ruby-compat/hash";
+import { JSON } from "@blazetrails/ruby-compat/json";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
 import { escape } from "@blazetrails/rack";
 import { CookieAssertions } from "../../support/abstract-unit.js";
 import { TestRequest } from "../../../lib/action-dispatch/testing/test-request.js";

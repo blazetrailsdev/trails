@@ -1,5 +1,8 @@
 import { describe, it, afterEach, beforeEach, vi } from "vitest";
-import { stderr, StringIO, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Logger } from "@blazetrails/activesupport";
 import { assert, assertEqual, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../../../lib/action-controller/base.js";

@@ -1,13 +1,10 @@
 import { describe, it, expect } from "vitest";
 import type { RackEnv } from "@blazetrails/rack";
-import {
-  Encoding,
-  StringIO,
-  constDefined,
-  rbModRemoveConst,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { constDefined, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { Base } from "../../../lib/action-controller/base.js";
 import { ParamBuilder } from "../../../lib/action-dispatch/http/param-builder.js";
 import { InvalidParameterError } from "@blazetrails/rack";

@@ -2332,7 +2332,6 @@ export const Kernel = {
 
 classpaths.set(Kernel, { path: "Kernel", permanent: true });
 Kernel.abort = abort;
-classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
 
 // `rb_mComparable` (`vendor/ruby/v3.3.11/compar.c:315`).
 const rbMComparable = {};
@@ -2348,7 +2347,6 @@ Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
 
 rbDefineAllocFunc(Rational, (klass) => new klass(0, 1));
 rbDefineAllocFunc(Hash, (klass) => new klass());
-classpaths.set(Rational, { path: "Rational", permanent: true });
 rbSetClassPathString(Rational.compatible, Rational, "compatible");
 for (const klass of [Rational, Complex, BigDecimal]) {
   Object.setPrototypeOf(klass, rbCNumeric);

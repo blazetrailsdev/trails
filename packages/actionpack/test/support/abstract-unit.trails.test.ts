@@ -3,7 +3,7 @@
    `include()` surfaces those members on the type side. */
 import { beforeEach, describe, expect, it } from "vitest";
 import { include, type Included } from "@blazetrails/activesupport";
-import { URI } from "@blazetrails/ruby-compat";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
 
 import { Base } from "../../lib/action-controller/base.js";
 import { Request } from "../../lib/action-dispatch/http/request.js";

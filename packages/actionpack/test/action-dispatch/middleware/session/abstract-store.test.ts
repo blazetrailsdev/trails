@@ -1,6 +1,6 @@
 import { Time } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 
 import { Request as RackRequest, Raw } from "@blazetrails/rack";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";

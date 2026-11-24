@@ -1,4 +1,4 @@
-import { hashAset } from "@blazetrails/ruby-compat";
+import { hashAset } from "@blazetrails/ruby-compat/hash";
 import { include } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { beforeEach, describe, it } from "vitest";

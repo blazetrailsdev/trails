@@ -3,10 +3,10 @@ import {
   extend,
   include,
   isModuleIncluded,
-  NoMethodError,
   publicInstanceMethods,
-  rbModName,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 
 import { helperMethod, Helpers, type HelpersClass } from "../../lib/abstract-controller/helpers.js";
 

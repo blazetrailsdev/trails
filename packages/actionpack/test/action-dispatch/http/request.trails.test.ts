@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ENV_METHODS, Request } from "../../../lib/action-dispatch/http/request.js";
 import { BadRequest } from "../../../lib/action-controller/metal/exceptions.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Request as CacheRequest } from "../../../lib/action-dispatch/http/cache.js";
 
 describe("Request#GET / #POST", () => {

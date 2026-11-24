@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { URL } from "../../../lib/action-dispatch/http/url.js";
 
 beforeEach(() => {

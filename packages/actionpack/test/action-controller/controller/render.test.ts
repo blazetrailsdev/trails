@@ -15,22 +15,18 @@ import {
 import { FormBuilder } from "@blazetrails/actionview";
 import { Utils } from "@blazetrails/rack";
 import { Time } from "@blazetrails/date";
-import {
-  ArgumentError,
-  File,
-  maxBy,
-  rbFSend,
-  constSet,
-  rbObjIvarGet,
-  RuntimeError,
-  stringToSym,
-  Struct,
-  type StructInstance,
-  Tempfile,
-  Thread,
-  toI,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { maxBy } from "@blazetrails/ruby-compat/enumerable";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { rbFSend, rbObjIvarGet, TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Struct } from "@blazetrails/ruby-compat/struct";
+import type { StructInstance } from "@blazetrails/ruby-compat/struct";
+import { stringToSym } from "@blazetrails/ruby-compat/symbol";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Rendering as AbstractControllerRendering } from "../../../lib/abstract-controller/rendering.js";
 import { deprecator } from "../../../lib/action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";

@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ModelName } from "@blazetrails/activemodel";
 
-import { type Hash, include, RuntimeError } from "@blazetrails/ruby-compat";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 
 import { UrlFor as AbstractControllerUrlFor } from "../../../lib/abstract-controller/url-for.js";
 import { Parameters } from "../../../lib/action-controller/metal/strong-parameters.js";

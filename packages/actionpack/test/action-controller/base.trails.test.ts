@@ -3,14 +3,9 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { Base as ViewBase, MissingTemplate, Template } from "@blazetrails/actionview";
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { Model } from "@blazetrails/activemodel";
-import {
-  extend,
-  rbObjRespondTo,
-  TopLevel,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { extend, constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo, TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 
 import { include } from "@blazetrails/activesupport";
 

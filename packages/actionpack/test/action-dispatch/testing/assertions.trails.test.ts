@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { HTML5 } from "@blazetrails/nokogiri";
-import { include, isModuleIncluded, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
+import { include, isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
 import "../../../lib/testing.js";

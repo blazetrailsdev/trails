@@ -1,4 +1,6 @@
-import { RuntimeError, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { describe, it, expect, beforeEach } from "vitest";
 import { isPresent } from "@blazetrails/activesupport";
 import {

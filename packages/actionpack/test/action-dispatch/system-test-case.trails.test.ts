@@ -1,6 +1,6 @@
 import { afterAll, describe, it, expect } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
-import { getFs } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
 import { requirePlaywright } from "../../lib/action-dispatch/system-testing/driver.js";
 import { SystemTestCase } from "../../lib/action-dispatch/system-test-case.js";
 import { Server, vite } from "../../lib/action-dispatch/system-testing/server.js";

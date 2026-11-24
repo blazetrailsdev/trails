@@ -20,19 +20,17 @@ import {
   Template,
   TemplateError,
 } from "@blazetrails/actionview";
-import {
-  block,
-  CGI,
-  File,
-  NameError,
-  Pathname,
-  PP,
-  RuntimeError,
-  StandardError,
-  StringIO,
-  excSetupMessage,
-  rbInspect,
-} from "@blazetrails/ruby-compat";
+import { CGI } from "@blazetrails/ruby-compat/cgi";
+import { excSetupMessage } from "@blazetrails/ruby-compat/exception";
+import { File } from "@blazetrails/ruby-compat/file";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { PP } from "@blazetrails/ruby-compat/pp";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Lint } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ActionNotFound } from "../../../lib/abstract-controller/base.js";

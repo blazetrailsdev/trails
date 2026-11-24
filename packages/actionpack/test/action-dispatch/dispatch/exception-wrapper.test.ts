@@ -5,7 +5,8 @@ import { RoutingError } from "../../../lib/action-controller/metal/exceptions.js
 import { BacktraceCleaner } from "@blazetrails/activesupport";
 import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
-import { excBacktrace, excBacktraceLocations, type Location } from "@blazetrails/ruby-compat";
+import { excBacktrace, excBacktraceLocations } from "@blazetrails/ruby-compat/backtrace-location";
+import type { Location } from "@blazetrails/ruby-compat/backtrace-location";
 import { ExceptionWrapper } from "../../../lib/action-dispatch/middleware/exception-wrapper.js";
 
 const BACKTRACE =

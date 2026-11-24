@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./app/controllers/action-mailbox/ingresses/mailgun/inbound-emails-controller.js";
 import * as m1 from "./app/controllers/action-mailbox/ingresses/mandrill/inbound-emails-controller.js";
 import * as m2 from "./app/controllers/action-mailbox/ingresses/postmark/inbound-emails-controller.js";

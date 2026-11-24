@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
 import { Browser, serviceDriverPath } from "../../../lib/action-dispatch/system-testing/browser.js";
 import { requirePlaywright } from "../../../lib/action-dispatch/system-testing/driver.js";
 

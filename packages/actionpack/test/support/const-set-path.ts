@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 
 export function constSetPath<T>(path: string, value: T): T {
   const segments = path.split("::");

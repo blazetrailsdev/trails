@@ -1,4 +1,5 @@
-import { publicInstanceMethods, rbFSend, rbModAncestors, rbModToS } from "@blazetrails/ruby-compat";
+import { publicInstanceMethods, rbModAncestors } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rbModToS } from "@blazetrails/ruby-compat/object";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   include,
@@ -7,13 +8,10 @@ import {
   NameError,
   type InheritableOptions,
 } from "@blazetrails/activesupport";
-import {
-  excBacktraceLocations,
-  File,
-  Module,
-  constSet,
-  rbObjMethods,
-} from "@blazetrails/ruby-compat";
+import { excBacktraceLocations } from "@blazetrails/ruby-compat/backtrace-location";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Module, constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjMethods } from "@blazetrails/ruby-compat/method";
 import type { RackResponse } from "@blazetrails/rack";
 import { TemplateError } from "@blazetrails/actionview";
 import type { HelperMethodsModule } from "../../../lib/abstract-controller/helpers.js";

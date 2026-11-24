@@ -14,13 +14,13 @@ import {
   Assertion,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
 import {
-  hashDelete,
   rbFSend,
   rbInspect,
   rbObjClassname,
   rbObjSingletonClass,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
 import {
   AccountsController,
   CommentsController,

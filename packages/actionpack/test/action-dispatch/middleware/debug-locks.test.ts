@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Dependencies, type ShareLockThreadInfo } from "@blazetrails/activesupport";
-import type { Thread } from "@blazetrails/ruby-compat";
+import type { Thread } from "@blazetrails/ruby-compat/thread";
 import { DebugLocks } from "../../../lib/action-dispatch/middleware/debug-locks.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
 

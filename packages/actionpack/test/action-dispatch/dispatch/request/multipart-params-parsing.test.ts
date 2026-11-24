@@ -1,13 +1,11 @@
 import { constSetPath } from "../../../support/const-set-path.js";
 import { describe, it, afterEach, beforeEach } from "vitest";
-import {
-  Encoding,
-  EOFError,
-  File,
-  rbObjEncoding,
-  TopLevel,
-  constSet,
-} from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { EOFError } from "@blazetrails/ruby-compat/eof-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbObjEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 import { assert, assertEqual, assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { deprecator } from "../../../../lib/action-dispatch/deprecator.js";

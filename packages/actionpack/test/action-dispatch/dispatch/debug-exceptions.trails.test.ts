@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { DebugExceptions } from "../../../lib/action-dispatch/middleware/debug-exceptions.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { NotImplemented } from "../../../lib/action-controller/metal/exceptions.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { MimeType } from "../../../lib/action-dispatch/http/mime-type.js";
 import { Logger, TaggedLogging } from "@blazetrails/activesupport";
-import { Hash as RubyHash, rbModDefineMethod, rbModUndefMethod } from "@blazetrails/ruby-compat";
+import { Hash as RubyHash } from "@blazetrails/ruby-compat/hash";
+import { rbModDefineMethod, rbModUndefMethod } from "@blazetrails/ruby-compat/object";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const errorApp = async (_env: RackEnv): Promise<RackResponse> => {

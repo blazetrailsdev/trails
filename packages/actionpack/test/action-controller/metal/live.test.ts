@@ -13,7 +13,11 @@ import {
   sendStream,
   type LiveControllerHost,
 } from "../../../lib/action-controller/metal/live.js";
-import { IOError, RuntimeError, SizedQueue, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import { IOError } from "@blazetrails/ruby-compat/io-error";
+import { SizedQueue } from "@blazetrails/ruby-compat/queue";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { ThreadError } from "@blazetrails/ruby-compat/thread-error";
 import { include } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../../../lib/action-dispatch/http/request.js";

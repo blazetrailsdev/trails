@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { BrowserType } from "playwright";
 import { Session } from "@blazetrails/rack-test";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { serviceDriverPath } from "../../../../lib/action-dispatch/system-testing/browser.js";
 import {
   Driver,

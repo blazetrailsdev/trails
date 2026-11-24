@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat/http-adapter";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Handler } from "@blazetrails/rackup";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";

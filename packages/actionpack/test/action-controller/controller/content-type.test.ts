@@ -1,7 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { Logger } from "@blazetrails/activesupport";
 import { assertEqual, assertNil } from "@blazetrails/activesupport/testing/assertions";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

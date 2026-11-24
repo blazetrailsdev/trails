@@ -5,7 +5,9 @@ import { Base, DoubleRenderError } from "../../lib/action-controller/base.js";
 import { API } from "../../lib/action-controller/api.js";
 import { Metal } from "../../lib/action-controller/metal.js";
 import { Head } from "../../lib/action-controller/metal/head.js";
-import { ArgumentError, include, type Included } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { include } from "@blazetrails/ruby-compat/include";
+import type { Included } from "@blazetrails/ruby-compat/include";
 import { Request } from "../../lib/action-dispatch/http/request.js";
 import { Response } from "../../lib/action-dispatch/http/response.js";
 

@@ -1,6 +1,9 @@
 import { constSetPath } from "../../../support/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
-import { File, Pathname, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { Rack } from "../../../support/abstract-unit.js";
 

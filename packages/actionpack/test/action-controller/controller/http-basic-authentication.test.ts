@@ -1,5 +1,6 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { Base64, rbInspect } from "@blazetrails/ruby-compat";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { Base } from "../../../lib/action-controller/base.js";
 import { HttpAuthentication } from "../../../lib/action-controller/metal/http-authentication.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

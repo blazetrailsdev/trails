@@ -15,7 +15,8 @@ import {
   assertOperator,
   assertRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
-import { rbInspect, symbolToS } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 
 describe("MimeTypeTest", () => {
   it("parse single", () => {

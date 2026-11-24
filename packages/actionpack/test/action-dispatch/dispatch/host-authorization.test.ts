@@ -3,7 +3,8 @@ import {
   HostAuthorization,
   type HostPermission,
 } from "../../../lib/action-dispatch/middleware/host-authorization.js";
-import { IPAddr, StringIO } from "@blazetrails/ruby-compat";
+import { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Logger } from "@blazetrails/activesupport";
 import {
   assertEmpty,

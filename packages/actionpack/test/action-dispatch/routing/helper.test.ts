@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { UrlGenerationError } from "../../../lib/action-controller/metal/exceptions.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 

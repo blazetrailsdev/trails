@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import { ActionDispatch } from "../lib/namespaces.js";
 import "../lib/testing.js";
 

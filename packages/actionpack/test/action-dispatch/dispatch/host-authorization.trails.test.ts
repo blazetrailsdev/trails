@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { HostAuthorization } from "../../../lib/action-dispatch/middleware/host-authorization.js";
-import { IPAddr } from "@blazetrails/ruby-compat";
+import { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [

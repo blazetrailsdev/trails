@@ -1,15 +1,10 @@
 import { beforeEach, describe, it } from "vitest";
-import {
-  Hash,
-  KeyError,
-  STDOUT,
-  StringIO,
-  block,
-  fetch,
-  mergeBang,
-  rbInspect,
-  type Tempfile,
-} from "@blazetrails/ruby-compat";
+import { Hash, block, fetch, mergeBang } from "@blazetrails/ruby-compat/hash";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import type { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
 import { BigDecimal, HashWithIndifferentAccess } from "@blazetrails/activesupport";

@@ -3,7 +3,7 @@ import { Parser } from "../../../lib/action-dispatch/journey/parser.js";
 import { Ast } from "../../../lib/action-dispatch/journey/nodes/node.js";
 import { Pattern } from "../../../lib/action-dispatch/journey/path/pattern.js";
 import { Request } from "@blazetrails/rack";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { Route, VerbMatchers } from "../../../lib/action-dispatch/journey/route.js";
 
 const SEPARATORS = "/.?";

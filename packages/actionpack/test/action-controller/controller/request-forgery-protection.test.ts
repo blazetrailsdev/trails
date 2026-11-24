@@ -21,14 +21,12 @@ import {
   embedAuthenticityTokenInRemoteForms,
   setEmbedAuthenticityTokenInRemoteForms,
 } from "@blazetrails/actionview";
-import {
-  Base64,
-  SecureRandom,
-  binaryBytes,
-  block,
-  rbFSend,
-  type Bytes,
-} from "@blazetrails/ruby-compat";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { binaryBytes } from "@blazetrails/ruby-compat/io";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import type { NodeSet } from "@blazetrails/nokogiri";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase, TestSession } from "../../../lib/action-controller/test-case.js";
@@ -700,7 +698,7 @@ function RequestForgeryProtectionTests(
   it("should block post with origin checking and wrong origin", async () => {
     const oldLogger = Base.logger;
     const logger = new MockLogger();
-    Base.logger = logger as never;
+    Base.logger = logger;
     try {
       await forgeryProtectionOriginCheck(async () => {
         await initializeCsrfToken();
@@ -729,7 +727,7 @@ function RequestForgeryProtectionTests(
   it("should warn on missing csrf token", async () => {
     const oldLogger = Base.logger;
     const logger = new MockLogger();
-    Base.logger = logger as never;
+    Base.logger = logger;
 
     try {
       await assertBlocked(() => tc.post("index"));
@@ -744,7 +742,7 @@ function RequestForgeryProtectionTests(
   it("should not warn if csrf logging disabled", async () => {
     const oldLogger = Base.logger;
     const logger = new MockLogger();
-    Base.logger = logger as never;
+    Base.logger = logger;
     Base.logWarningOnCsrfFailure = false;
 
     try {
@@ -781,7 +779,7 @@ function RequestForgeryProtectionTests(
   it("should warn on not same origin js", async () => {
     const oldLogger = Base.logger;
     const logger = new MockLogger();
-    Base.logger = logger as never;
+    Base.logger = logger;
 
     try {
       await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
@@ -798,7 +796,7 @@ function RequestForgeryProtectionTests(
   it("should not warn if csrf logging disabled and not same origin js", async () => {
     const oldLogger = Base.logger;
     const logger = new MockLogger();
-    Base.logger = logger as never;
+    Base.logger = logger;
     Base.logWarningOnCsrfFailure = false;
 
     try {
@@ -1100,7 +1098,7 @@ describe("CustomAuthenticityParamControllerTest", () => {
   });
 
   it("should not warn if form authenticity param matches form authenticity token", async () => {
-    Base.logger = logger as never;
+    Base.logger = logger;
     const stub = vi
       .spyOn(
         CustomAuthenticityParamController.prototype as unknown as {
@@ -1118,7 +1116,7 @@ describe("CustomAuthenticityParamControllerTest", () => {
   });
 
   it("should warn if form authenticity param does not match form authenticity token", async () => {
-    Base.logger = logger as never;
+    Base.logger = logger;
     await tc.post("index", { params: { custom_token_name: "bazqux" } });
     expect(logger.logged(":warn").length).toBe(1);
   });

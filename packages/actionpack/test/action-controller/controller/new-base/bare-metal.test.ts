@@ -1,4 +1,4 @@
-import { rbFSend, TopLevel } from "@blazetrails/ruby-compat";
+import { rbFSend, TopLevel } from "@blazetrails/ruby-compat/object";
 import {
   assert,
   assertEmpty,
@@ -9,7 +9,9 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { MockRequest, Response as RackResponseObject } from "@blazetrails/rack";
 import type { RackResponse as RackTriplet } from "@blazetrails/rack";
-import { include, type Included, constGet, constSet } from "@blazetrails/ruby-compat";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
+import type { Included } from "@blazetrails/ruby-compat/include";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { beforeEach, describe, it } from "vitest";
 import { Metal } from "../../../../lib/action-controller/metal.js";
 import { Head } from "../../../../lib/action-controller/metal/head.js";

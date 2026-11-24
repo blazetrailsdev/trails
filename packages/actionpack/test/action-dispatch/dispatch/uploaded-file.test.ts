@@ -1,4 +1,7 @@
-import { b, rbObjEncoding, StringIO, Tempfile } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { rbObjEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 import { describe, expect, it } from "vitest";
 
 import { UploadedFile } from "../../../lib/action-dispatch/http/upload.js";

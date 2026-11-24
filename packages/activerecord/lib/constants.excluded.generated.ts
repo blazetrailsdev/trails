@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./fixture-set/file.js";
 import * as m1 from "./fixture-set/model-metadata.js";
 import * as m2 from "./fixture-set/render-context.js";

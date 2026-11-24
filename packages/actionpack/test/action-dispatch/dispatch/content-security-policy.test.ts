@@ -29,15 +29,11 @@ import {
   assertNothingRaised,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import {
-  ArgumentError,
-  RuntimeError,
-  rbObjDup,
-  TopLevel,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbObjDup, constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 

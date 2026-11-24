@@ -1,7 +1,8 @@
 import { constSetPath } from "../../support/const-set-path.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ActiveSupportJSON, withIndifferentAccess } from "@blazetrails/activesupport";
-import { Interrupt, StringIO } from "@blazetrails/ruby-compat";
+import { Interrupt } from "@blazetrails/ruby-compat/signal-exception";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { IntegrationTest } from "../../../lib/action-dispatch/testing/integration.js";
 import { Mime } from "../../../lib/action-dispatch/http/mime-type.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";

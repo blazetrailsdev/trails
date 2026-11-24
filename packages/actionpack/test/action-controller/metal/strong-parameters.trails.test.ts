@@ -1,5 +1,8 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import { ArgumentError, Hash, NoMethodError, rbObjDup } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";

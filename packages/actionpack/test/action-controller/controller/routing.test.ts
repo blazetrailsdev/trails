@@ -6,14 +6,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ActiveSupportJSON, include, type Included, isPresent } from "@blazetrails/activesupport";
 import { assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { Utils } from "@blazetrails/rack";
-import {
-  RFC2396_PARSER,
-  URI,
-  first,
-  constDefined,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { first } from "@blazetrails/ruby-compat/array";
+import { constDefined, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { RFC2396_PARSER, URI } from "@blazetrails/ruby-compat/uri/common";
 import { Base } from "../../../lib/action-controller/base.js";
 import { deprecator } from "../../../lib/action-dispatch/deprecator.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";

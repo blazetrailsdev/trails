@@ -10,7 +10,7 @@ import {
   TemplateError,
   TseHandler,
 } from "@blazetrails/actionview";
-import { rbObjClassname } from "@blazetrails/ruby-compat";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
 import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
 import { ActionNotFound } from "../../../lib/abstract-controller/base.js";
 import {

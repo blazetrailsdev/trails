@@ -1,8 +1,8 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { describe, expect, it, beforeEach } from "vitest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { MockRequest } from "@blazetrails/rack";
-import { block } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
 import { Metal } from "../../../../lib/action-controller/metal.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { include } from "@blazetrails/activesupport";
 import { Base } from "../../lib/abstract-controller/base.js";
 import { UrlFor, type RouteSetLike } from "../../lib/abstract-controller/url-for.js";

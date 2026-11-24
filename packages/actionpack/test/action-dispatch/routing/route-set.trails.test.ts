@@ -1,6 +1,7 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, vi } from "vitest";
-import { include, rbModMethodDefined, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbModMethodDefined, rbObjIvarGet } from "@blazetrails/ruby-compat/object";
 import {
   RouteSet,
   StaticDispatcher,

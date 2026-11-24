@@ -5,18 +5,15 @@ import { emptyRackBody } from "../../../lib/action-dispatch/http/request.js";
 import { Session } from "../../../lib/action-dispatch/request/session.js";
 import { Mime, MimeType, NullType } from "../../../lib/action-dispatch/http/mime-type.js";
 import { BadRequest, UnknownHttpMethod } from "../../../lib/action-controller/metal/exceptions.js";
-import {
-  ArgumentError,
-  Encoding,
-  bytes,
-  Hash,
-  StringIO,
-  excBacktrace,
-  isValidEncoding,
-  rbFSend,
-  rbObjMethod,
-  hashAref,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { excBacktrace } from "@blazetrails/ruby-compat/backtrace-location";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { Hash, hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { bytes } from "@blazetrails/ruby-compat/string/bytes";
+import { isValidEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 import {
   I18n,
   Logger,

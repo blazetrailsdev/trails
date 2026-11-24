@@ -1,7 +1,7 @@
 import { describe, it, afterEach, beforeEach } from "vitest";
 import { assertEqual, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
-import { rbConstGet } from "@blazetrails/ruby-compat";
+import { rbConstGet } from "@blazetrails/ruby-compat/variable";
 import { Parameters } from "../../../../lib/action-controller/metal/strong-parameters.js";
 
 describe("AlwaysPermittedParametersTest", () => {

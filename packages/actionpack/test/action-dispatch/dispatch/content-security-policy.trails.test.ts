@@ -9,7 +9,7 @@ import {
   CONTENT_SECURITY_POLICY,
   CONTENT_SECURITY_POLICY_REPORT_ONLY,
 } from "../../../lib/action-dispatch/constants.js";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 
 describe("ContentSecurityPolicyTest", () => {
   it("dup keeps a dynamic source callable", () => {

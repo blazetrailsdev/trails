@@ -5,7 +5,8 @@ import {
   type RackEnv,
   type RackResponse,
 } from "@blazetrails/rack";
-import { rbFSend, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbFSend, TopLevel } from "@blazetrails/ruby-compat/object";
 import { Request } from "../../../../lib/action-dispatch/http/request.js";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { deprecator } from "../../../../lib/action-dispatch/deprecator.js";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RackBody, Response } from "../../../lib/action-dispatch/http/response.js";
-import { bytes } from "@blazetrails/ruby-compat";
+import { bytes } from "@blazetrails/ruby-compat/string/bytes";
 
 describe("ActionDispatch::Response#location", () => {
   it("is nil when no Location header is set, as Rack's get_header answers", async () => {

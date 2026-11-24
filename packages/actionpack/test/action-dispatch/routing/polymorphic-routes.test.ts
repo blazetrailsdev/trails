@@ -10,7 +10,8 @@ import {
   type PolymorphicHost,
   type PolymorphicMappingEntry,
 } from "../../../lib/action-dispatch/routing/polymorphic-routes.js";
-import { include, NoMethodError } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { RoutesProxy } from "../../../lib/action-dispatch/routing/routes-proxy.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import {

@@ -3,16 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import {
-  ArgumentError,
   extend,
   include,
   publicInstanceMethods,
-  TopLevel,
   constSet,
   constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 
 import {
   Helpers,

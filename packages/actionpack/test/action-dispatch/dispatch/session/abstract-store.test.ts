@@ -5,7 +5,8 @@ import {
   assertNotEqual,
   assertRaise,
 } from "@blazetrails/activesupport/testing/assertions";
-import { include, type Included } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import type { Included } from "@blazetrails/ruby-compat/include";
 import { MockRequest, MockResponse, type RackEnv } from "@blazetrails/rack";
 import { Cookies } from "../../../../lib/action-dispatch/middleware/cookies.js";
 import { CookieAssertions } from "../../../support/abstract-unit.js";

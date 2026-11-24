@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { Base } from "../../../lib/action-controller/base.js";
 import { Metal } from "../../../lib/action-controller/metal.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";

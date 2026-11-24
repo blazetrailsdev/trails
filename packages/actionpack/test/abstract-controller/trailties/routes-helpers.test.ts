@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { constSet, include, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, include } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import { UrlFor } from "../../../lib/action-dispatch/routing/url-for.js";

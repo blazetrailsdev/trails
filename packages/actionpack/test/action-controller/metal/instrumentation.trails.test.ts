@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { isSymbol } from "@blazetrails/ruby-compat";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
 import { Base } from "../../../lib/action-controller/base.js";
 import { API } from "../../../lib/action-controller/api.js";
 import { logProcessAction } from "../../../lib/action-controller/metal/instrumentation.js";

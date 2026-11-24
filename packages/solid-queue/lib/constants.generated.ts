@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import "./index.js";
 import * as m0 from "./active-job/batch-id.js";
 import * as m1 from "./active-job/concurrency-controls.js";

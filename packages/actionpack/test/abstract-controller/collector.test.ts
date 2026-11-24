@@ -1,4 +1,6 @@
-import { NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { describe, expect, it } from "vitest";
 import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { Mime, MimeType } from "../../lib/action-dispatch/http/mime-type.js";

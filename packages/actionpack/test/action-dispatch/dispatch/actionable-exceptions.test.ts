@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ActionableError, NonActionable } from "@blazetrails/activesupport";
 import { assertEmpty, assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ActionableExceptions } from "../../../lib/action-dispatch/middleware/actionable-exceptions.js";
 

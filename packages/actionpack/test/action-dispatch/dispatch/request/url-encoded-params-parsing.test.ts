@@ -1,5 +1,6 @@
 import { describe, it, afterEach, beforeEach } from "vitest";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { deprecator } from "../../../../lib/action-dispatch/deprecator.js";

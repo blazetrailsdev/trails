@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { regexpEscape, rbRegToS } from "@blazetrails/ruby-compat";
+import { regexpEscape, rbRegToS } from "@blazetrails/ruby-compat/regexp";
 import { Parser } from "../../../../lib/action-dispatch/journey/parser.js";
 import { Ast } from "../../../../lib/action-dispatch/journey/nodes/node.js";
 import { Pattern } from "../../../../lib/action-dispatch/journey/path/pattern.js";

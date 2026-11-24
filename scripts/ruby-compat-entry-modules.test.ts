@@ -32,4 +32,24 @@ describe("ruby-compat entry modules", () => {
     }
     expect(failures).toEqual([]);
   }, 300_000);
+
+  it("answers String's ancestors with Comparable after any one module is imported alone", async () => {
+    const files = (await readdir(DIST, { recursive: true })).filter((f) => f.endsWith(".js"));
+    const failures: string[] = [];
+    for (const f of files) {
+      const script = [
+        `await import(${JSON.stringify(`./${f}`)});`,
+        `const { rbModAncestors } = await import("./include.js");`,
+        `const { rbCString, rbModName } = await import("./object.js");`,
+        `const names = rbModAncestors(rbCString).map((m) => rbModName(m));`,
+        `if (!names.includes("Comparable")) throw new Error(names.join(","));`,
+      ].join("\n");
+      await promisify(execFile)(process.execPath, ["--input-type=module", "-e", script], {
+        cwd: DIST,
+      }).catch((e: { stderr: string }) => {
+        failures.push(`${f}: ${e.stderr.split("\n").find((l) => /Error/.test(l))}`);
+      });
+    }
+    expect(failures).toEqual([]);
+  }, 300_000);
 });
