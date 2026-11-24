@@ -1,6 +1,6 @@
 {
   "app": "examples/serverless-lambda/config/environment.ts",
-  "total": 1891,
+  "total": 1890,
   "packages": {
     "activerecord": 343,
     "ruby-compat": 205,
@@ -16,7 +16,7 @@
     "rake": 38,
     "rack": 37,
     "tzinfo": 37,
-    "nokogiri": 34,
+    "nokogiri": 33,
     "i18n": 29,
     "pg": 28,
     "html-sanitizer": 22,
@@ -47,5 +47,5 @@
     "packages/activerecord/dist/relation/spawn-methods.js",
     "packages/rack-session/dist/cookie.js"
   ],
-  "appTarget": 1866
+  "appTarget": 1865
 }

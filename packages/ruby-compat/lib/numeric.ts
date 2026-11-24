@@ -1,5 +1,4 @@
 import { ArgumentError } from "./argument-error.js";
-import { StandardError } from "./standard-error.js";
 import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NameError } from "./name-error.js";
@@ -7,6 +6,7 @@ import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
 import { rbBuiltinClassName, rbInspect, rbObjClassname, toS } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
+import { StandardError } from "./standard-error.js";
 import { TypeError } from "./type-error.js";
 import { rbStrToF, rbStrToI } from "./string/convert.js";
 import { isSymbol } from "./symbol.js";
@@ -792,7 +792,6 @@ export function intDigits(num: number, base: number = 10): number[] {
  * Ruby's core `Math::DomainError` (`vendor/ruby/v3.3.11/math.c:1094`
  * `rb_define_class_under(rb_mMath, "DomainError", rb_eStandardError)`).
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Math::DomainError`, which Rails
- * inherits rather than defines.
+ * @noRailsEquivalent PERMANENT
  */
 export class MathDomainError extends StandardError {}

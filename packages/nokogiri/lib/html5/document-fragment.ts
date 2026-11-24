@@ -5,7 +5,6 @@ import { childNodes, Node } from "./node.js";
 import { NodeSet } from "../xml/node-set.js";
 import { DocumentFragment as XmlDocumentFragment } from "../xml/document-fragment.js";
 import { HTML5 } from "../namespaces.js";
-import "../html5.js";
 
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 

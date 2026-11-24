@@ -2,7 +2,6 @@ import { defaultTreeAdapter, html, parse, type DefaultTreeAdapterMap } from "par
 import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import type { Readable } from "../readable.js";
-import "../html5.js";
 import { childNodes, Node } from "./node.js";
 import { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
