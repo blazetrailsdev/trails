@@ -29,6 +29,8 @@ export class SessionRestoreError extends Error {
 }
 
 export const Compatibility = {
+  DEFAULT_SAME_SITE: (request: Request): unknown => request.cookiesSameSiteProtection(),
+
   generateSid(this: unknown): string {
     return SecureRandom.hex(16);
   },
@@ -124,6 +126,9 @@ export const SessionObject = {
 export class AbstractStore extends Persisted {
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
     if (options.key == null || options.key === false) options.key = "_session_id";
+    if (!("sameSite" in options || "sameSite" in new.target.DEFAULT_OPTIONS)) {
+      options = { ...options, sameSite: Compatibility.DEFAULT_SAME_SITE };
+    }
     super(app, options);
   }
 
@@ -143,6 +148,9 @@ includeMixin(AbstractStore, SessionObject);
 export class AbstractSecureStore extends PersistedSecure {
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
     if (options.key == null || options.key === false) options.key = "_session_id";
+    if (!("sameSite" in options || "sameSite" in new.target.DEFAULT_OPTIONS)) {
+      options = { ...options, sameSite: Compatibility.DEFAULT_SAME_SITE };
+    }
     super(app, options);
   }
 

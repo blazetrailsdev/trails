@@ -5,7 +5,10 @@ import {
   assertNotEqual,
   assertRaise,
 } from "@blazetrails/activesupport/testing/assertions";
-import type { RackEnv } from "@blazetrails/rack";
+import { include, type Included } from "@blazetrails/ruby-compat";
+import { MockRequest, MockResponse, type RackEnv } from "@blazetrails/rack";
+import { Cookies } from "../../../../lib/action-dispatch/middleware/cookies.js";
+import { CookieAssertions } from "../../../support/abstract-unit.js";
 import { AbstractStore } from "../../../../lib/action-dispatch/middleware/session/abstract-store.js";
 import { Request } from "../../../../lib/action-dispatch/http/request.js";
 import { Session } from "../../../../lib/action-dispatch/request/session.js";
@@ -38,7 +41,14 @@ class MemoryStore extends AbstractStore {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class AbstractStoreTest {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface AbstractStoreTest extends Included<typeof CookieAssertions> {}
+include(AbstractStoreTest, CookieAssertions);
+
 describe("AbstractStoreTest", () => {
+  const t = new AbstractStoreTest();
   let env: RackEnv | null = null;
   function app() {
     env = null;
@@ -55,6 +65,25 @@ describe("AbstractStoreTest", () => {
 
     assert(env);
     assert(Session.find(new Request(env!)));
+  });
+
+  it("session cookie gets same site from env", async () => {
+    const writeSession = async (env: RackEnv) => {
+      await new Request(env).session.set("foo", "bar");
+      return [200, {}, []];
+    };
+    const stack = new Cookies(new MemoryStore(writeSession));
+    const env = MockRequest.envFor("/", {
+      "action_dispatch.cookies_same_site_protection": () => ":strict",
+    });
+
+    const response = new MockResponse(...((await stack.call(env)) as [number, never, never]));
+
+    t.assertSetCookieAttributes(
+      "_session_id",
+      "SameSite=Strict",
+      response.headers["set-cookie"] as string,
+    );
   });
 
   it("new session object is merged with old", async () => {

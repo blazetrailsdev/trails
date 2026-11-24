@@ -325,6 +325,14 @@ describe("ContentSecurityPolicyTest", () => {
     expect(policy.build()).not.toContain("plugin-types");
   });
 
+  it("hash sources", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.scriptSrc("sha256-hash", "sha384-hash", "sha512-hash", "invalid-hash", "sha256hash");
+    expect(policy.build()).toBe(
+      "script-src 'sha256-hash' 'sha384-hash' 'sha512-hash' invalid-hash sha256hash",
+    );
+  });
+
   it("multiple sources", () => {
     const policy = new ContentSecurityPolicy();
     policy.scriptSrc(":self", ":https");

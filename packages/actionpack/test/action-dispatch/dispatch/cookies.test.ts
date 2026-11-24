@@ -951,6 +951,114 @@ describe("CookiesTest", () => {
     assertEqual("bar", encryptor.decryptAndVerify(tc.response.cookies["foo"]!));
   });
 
+  it("signed cookie rotating secret is not rewritten when session is skipped", async () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+
+    tc.request.env["action_dispatch.signed_cookie_digest"] = "SHA256";
+    (tc.request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate(
+      "signed",
+      secret,
+      { digest: "SHA1" },
+    );
+
+    const oldMessage = new MessageVerifier(secret, {
+      digest: "SHA1",
+      serializer: Marshal,
+    }).generate(45);
+    tc.request.headers.set("Cookie", `user_id=${oldMessage}`);
+
+    await tc.get("getSignedCookieWithSessionSkipped");
+    assertEqual(45, controllerCookies().signed.get("user_id"));
+    assertNil(tc.response.headers.get("Set-Cookie"));
+  });
+
+  it("signed cookie read before the session is skipped is not rewritten", async () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+
+    tc.request.env["action_dispatch.signed_cookie_digest"] = "SHA256";
+    (tc.request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate(
+      "signed",
+      secret,
+      { digest: "SHA1" },
+    );
+
+    const oldMessage = new MessageVerifier(secret, {
+      digest: "SHA1",
+      serializer: Marshal,
+    }).generate(45);
+    tc.request.headers.set("Cookie", `user_id=${oldMessage}`);
+
+    await tc.get("getSignedCookieBeforeSkippingSession");
+    assertNil(tc.response.headers.get("Set-Cookie"));
+  });
+
+  it("rotated signed cookie set after reading is written when session is skipped", async () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+
+    tc.request.env["action_dispatch.signed_cookie_digest"] = "SHA256";
+    (tc.request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate(
+      "signed",
+      secret,
+      { digest: "SHA1" },
+    );
+
+    const oldMessage = new MessageVerifier(secret, {
+      digest: "SHA1",
+      serializer: Marshal,
+    }).generate(45);
+    tc.request.headers.set("Cookie", `user_id=${oldMessage}`);
+
+    await tc.get("resetSignedCookieWithSessionSkipped");
+    assertEqual(46, controllerCookies().signed.get("user_id"));
+    assertNotNil(tc.response.cookies["user_id"]);
+  });
+
+  it("encrypted cookie rotating secret is not rewritten when session is skipped", async () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+
+    tc.request.env["action_dispatch.encrypted_cookie_cipher"] = "aes-256-gcm";
+    (tc.request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate(
+      "encrypted",
+      secret,
+      { digest: "SHA1" },
+    );
+
+    const oldMessage = new MessageEncryptor(secret, undefined, {
+      cipher: "aes-256-gcm",
+      serializer: Marshal,
+    }).encryptAndSign(45);
+    tc.request.headers.set("Cookie", `foo=${escape(oldMessage)}`);
+
+    await tc.get("getEncryptedCookieWithSessionSkipped");
+    assertEqual(45, controllerCookies().encrypted.get("foo"));
+    assertNil(tc.response.headers.get("Set-Cookie"));
+  });
+
+  it("encrypted cookie using hybrid serializer is not rewritten when session is skipped", async () => {
+    tc.request.env["action_dispatch.cookies_serializer"] = ":hybrid";
+
+    const secret = (tc.request.env["action_dispatch.key_generator"] as KeyGenerator).generateKey(
+      tc.request.env["action_dispatch.authenticated_encrypted_cookie_salt"] as string,
+      32,
+    ) as Buffer;
+
+    const marshalValue = new MessageEncryptor(secret, undefined, {
+      cipher: "aes-256-gcm",
+      serializer: Marshal,
+    }).encryptAndSign("bar");
+    tc.request.headers.set("Cookie", `foo=${escape(marshalValue)}`);
+
+    await tc.get("getEncryptedCookieWithSessionSkipped");
+    assertEqual("bar", controllerCookies().encrypted.get("foo"));
+    assertNil(tc.response.headers.get("Set-Cookie"));
+  });
+
+  it("signed cookie is set when session is skipped", async () => {
+    await tc.get("setSignedCookieWithSessionSkipped");
+    assertEqual(45, controllerCookies().signed.get("user_id"));
+    assertNotNil(tc.response.cookies["user_id"]);
+  });
+
   it("cookie with hash value not modified by rotation", async () => {
     tc.request.env["action_dispatch.signed_cookie_digest"] = "SHA256";
     (tc.request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate(
@@ -1060,6 +1168,37 @@ describe("CookiesTest", () => {
 
     async getEncryptedCookie(): Promise<void> {
       this.cookies().encrypted.get("foo");
+      await this.head(":ok");
+    }
+
+    async getSignedCookieWithSessionSkipped(): Promise<void> {
+      this.request.sessionOptions.skip = true;
+      this.cookies().signed.get("user_id");
+      await this.head(":ok");
+    }
+
+    async getEncryptedCookieWithSessionSkipped(): Promise<void> {
+      this.request.sessionOptions.skip = true;
+      this.cookies().encrypted.get("foo");
+      await this.head(":ok");
+    }
+
+    async getSignedCookieBeforeSkippingSession(): Promise<void> {
+      this.cookies().signed.get("user_id");
+      this.request.sessionOptions.skip = true;
+      await this.head(":ok");
+    }
+
+    async resetSignedCookieWithSessionSkipped(): Promise<void> {
+      this.request.sessionOptions.skip = true;
+      this.cookies().signed.get("user_id");
+      this.cookies().signed.set("user_id", 46);
+      await this.head(":ok");
+    }
+
+    async setSignedCookieWithSessionSkipped(): Promise<void> {
+      this.request.sessionOptions.skip = true;
+      this.cookies().signed.set("user_id", 45);
       await this.head(":ok");
     }
 
