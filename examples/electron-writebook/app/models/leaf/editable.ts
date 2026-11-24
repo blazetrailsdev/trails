@@ -1,5 +1,6 @@
 import { defineModule, included, isPresent, minutes } from "@blazetrails/activesupport";
 import type { Base } from "@blazetrails/activerecord";
+import { merge } from "@blazetrails/ruby-compat";
 import type { Leaf } from "../leaf.ts";
 import type { Leafable } from "../leafable.ts";
 
@@ -84,9 +85,7 @@ export const Editable = defineModule(
         await newLeafable.updateBang(leafableParams);
 
         await this.edits.revision().createBang({ leafable });
-        await this.updateBang(
-          (leafParams as unknown as { merge(o: object): Params }).merge({ leafable: newLeafable }),
-        );
+        await this.updateBang(merge(leafParams, { leafable: newLeafable }));
       });
     },
 
@@ -109,7 +108,7 @@ export const Editable = defineModule(
     },
 
     isWasTrashed(this: Host): boolean {
-      return this.isTrashed() && Object.hasOwn(this.previousChanges, "status");
+      return this.isTrashed() && this.previousChanges.isInclude("status");
     },
   },
 );

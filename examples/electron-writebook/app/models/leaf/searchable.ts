@@ -145,7 +145,7 @@ export const Searchable = defineModule(
       const connection = await klass.leaseConnection();
       await connection.execute(klass.sanitizeSql(statement as [string, ...unknown[]]));
 
-      return ((await connection.rawConnection()).changes ?? 0) !== 0;
+      return (await (await connection.rawConnection()).changes()) !== 0;
     },
 
     uniqueMatchingTerms(this: Host, content: string): string[] {

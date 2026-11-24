@@ -1,4 +1,4 @@
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError, merge } from "@blazetrails/ruby-compat";
 import type { Parameters } from "@blazetrails/actionpack";
 import { include, type Included } from "@blazetrails/activesupport";
 import { ApplicationController } from "./application-controller.ts";
@@ -59,10 +59,14 @@ export class LeafablesController extends ApplicationController {
     });
   }
 
-  protected async leafParams(): Promise<Parameters> {
-    return (this.params.fetch("leaf", {}) as Parameters)
-      .permit("title")
-      .reverseMerge(await this.defaultLeafParams());
+  protected async leafParams(): Promise<Record<string, unknown>> {
+    return merge(
+      await this.defaultLeafParams(),
+      (this.params.fetch("leaf", {}) as Parameters).permit("title").toHash() as Record<
+        string,
+        unknown
+      >,
+    );
   }
 
   protected async defaultLeafParams(): Promise<Record<string, unknown>> {

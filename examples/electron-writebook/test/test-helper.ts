@@ -40,6 +40,47 @@ export async function resetDatabase(): Promise<void> {
   await (await Base.leaseConnection()).execute("delete from leaf_search_index");
 }
 
+const { FixtureSet } = await import("@blazetrails/activerecord/fixtures.js");
+const { fileURLToPath } = await import("node:url");
+
+const FIXTURES = fileURLToPath(new URL("fixtures", import.meta.url));
+const FIXTURE_SETS = [
+  "accounts",
+  "users",
+  "books",
+  "accesses",
+  "sections",
+  "pages",
+  "pictures",
+  "leaves",
+  "action_text/markdowns",
+];
+
+/** Writebook's `fixtures :all`, loaded onto a blank database. */
+export async function loadFixtures(): Promise<void> {
+  await resetDatabase();
+  FixtureSet.resetCache();
+  await FixtureSet.createFixtures(FIXTURES, FIXTURE_SETS);
+}
+
+const FIXTURE_CLASSES = {
+  accounts: Account,
+  users: User,
+  books: Book,
+  accesses: Access,
+  sections: Section,
+  pages: Page,
+  pictures: Picture,
+  leaves: Leaf,
+};
+
+/** The record a fixture label names, as Rails' `books(:handbook)` reads it. */
+export async function fixture<T>(set: keyof typeof FIXTURE_CLASSES, label: string): Promise<T> {
+  return (await (FIXTURE_CLASSES[set] as unknown as typeof Base).find(
+    FixtureSet.identify(label),
+  )) as T;
+}
+
 const { IntegrationTest } = await import("@blazetrails/actionpack/testing");
 const { ActionDispatch } = await import("@blazetrails/actionpack");
 

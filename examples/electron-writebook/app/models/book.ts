@@ -1,4 +1,5 @@
 import { include, type Included } from "@blazetrails/activesupport";
+import { merge } from "@blazetrails/ruby-compat";
 import type { CollectionProxy, Relation } from "@blazetrails/activerecord";
 import { ApplicationRecord } from "./application-record.ts";
 import { Accessable, type ClassMethods as AccessableClassMethods } from "./book/accessable.ts";
@@ -54,8 +55,8 @@ export class Book extends ApplicationRecord {
     });
   }
 
-  async press(leafable: Leafable, leafParams: { merge(other: object): object }): Promise<Leaf> {
-    return await this.leaves.createBang(leafParams.merge({ leafable }));
+  async press(leafable: Leafable, leafParams: Record<string, unknown>): Promise<Leaf> {
+    return await this.leaves.createBang(merge(leafParams, { leafable }));
   }
 
   async markable(): Promise<string> {
