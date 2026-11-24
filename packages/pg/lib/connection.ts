@@ -89,6 +89,8 @@ export class Connection {
   /** @internal */
   _connecting: Promise<void> | null = null;
   /** @internal */
+  _connectError: unknown = null;
+  /** @internal */
   _ioptsForReset: Record<string, unknown> | null = null;
   declare asyncIsnonblocking: Connection["isnonblocking"];
   declare isNonblocking: Connection["isnonblocking"];
@@ -757,13 +759,14 @@ export class Connection {
    */
   _connectStart(): void {
     this._errorMessage = "";
+    this._connectError = null;
     this._pollStatus = PG.PGRES_POLLING_WRITING;
     this._connecting = this.client.connect().then(
       () => {
         this._pollStatus = PG.PGRES_POLLING_OK;
       },
       (error: unknown) => {
-        this.bad = true;
+        this._connectError = error;
         this._errorMessage = `${(error as { message?: string })?.message ?? String(error)}\n`;
         this._pollStatus = PG.PGRES_POLLING_FAILED;
       },
@@ -771,6 +774,11 @@ export class Connection {
   }
 
   connectPoll(): number {
+    if (this._pollStatus === PG.PGRES_POLLING_FAILED) {
+      this.bad = true;
+      if (this._connectError != null)
+        throw engine!.pgError(this, this._connectError, ConnectionBad);
+    }
     if (this._pollStatus === PG.PGRES_POLLING_WRITING) return PG.PGRES_POLLING_READING;
     return this._pollStatus;
   }
@@ -853,12 +861,6 @@ export class Connection {
       });
     }
     return null;
-  }
-
-  connect(): Promise<unknown> {
-    return this.client.connect().catch((error: unknown) => {
-      throw engine!.pgError(this, error, ConnectionBad);
-    });
   }
 
   status(): number {
