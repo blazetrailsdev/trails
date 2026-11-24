@@ -3168,7 +3168,7 @@ describe("TestAutosaveAssociationWithNestedAttributes", () => {
     for (let i = 0; i < 2; i++) {
       ship.parts.build();
     }
-    const part = await ship.parts.first();
+    const part = (await ship.parts.first())!;
     await ship.saveBang();
 
     const deletionParams = {
