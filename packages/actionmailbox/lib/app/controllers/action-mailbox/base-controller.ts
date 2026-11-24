@@ -78,20 +78,18 @@ export class BaseController extends ActionController.Base {
 
 constSet(ActionMailbox, "BaseController", BaseController);
 
-constSet(
-  Trails.Conductor,
-  "BaseController",
-  class BaseController extends ActionController.Base {
-    declare readonly mainApp: Record<string, (...args: unknown[]) => string>;
+Trails.Conductor.BaseController = class BaseController extends ActionController.Base {
+  declare readonly mainApp: Record<string, (...args: unknown[]) => string>;
 
-    static {
-      this.layout("trails/conductor");
-      this.beforeAction(":ensureDevelopmentEnv");
-    }
+  static {
+    this.layout("trails/conductor");
+    this.beforeAction(":ensureDevelopmentEnv");
+  }
 
-    /** @internal */
-    private async ensureDevelopmentEnv(): Promise<void> {
-      if (!Trails.env.isDevelopment()) await this.head(":forbidden");
-    }
-  },
-);
+  /** @internal */
+  private async ensureDevelopmentEnv(): Promise<void> {
+    if (!Trails.env.isDevelopment()) await this.head(":forbidden");
+  }
+};
+
+constSet(Trails.Conductor, "BaseController", Trails.Conductor.BaseController);

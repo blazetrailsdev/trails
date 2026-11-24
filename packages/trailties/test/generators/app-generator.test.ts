@@ -95,6 +95,23 @@ async function runGeneratorInstance(
   return railsCommands;
 }
 
+async function runGeneratorUsingPrerelease(args: string[]): Promise<void> {
+  const projectPath = File.expandPath(
+    args.find((arg) => !arg.startsWith("--"))!,
+    t.destinationRoot,
+  );
+  const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+    for (const file of ["package.json", "pnpm-lock.yaml"]) {
+      if (File.isExist(File.join(projectPath, file))) File.delete(File.join(projectPath, file));
+    }
+  }) as never);
+  try {
+    await runGeneratorInstance(args);
+  } finally {
+    exit.mockRestore();
+  }
+}
+
 function json(content: string) {
   return JSON.parse(content);
 }
@@ -2168,7 +2185,7 @@ describe("AppGeneratorTest", () => {
   });
 
   it("devcontainer dev flag mounts local trails repo", async () => {
-    await runGeneratorInstance([t.destinationRoot, "--devcontainer", "--dev"]);
+    await runGeneratorUsingPrerelease([t.destinationRoot, "--devcontainer", "--dev"]);
 
     await assertDevcontainerJsonFile.call(t, (devcontainerConfig) => {
       const [trailsMount] = devcontainerConfig.mounts;

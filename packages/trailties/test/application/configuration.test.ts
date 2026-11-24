@@ -1292,6 +1292,14 @@ Trails.application!.configure(function () {
     const application = await app("development");
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
     application.config.addAutoloadPathsToLoadPath = true;
+    const loadPath = [...LOAD_PATH];
+    onTestFinished(() => {
+      LOAD_PATH.splice(0, LOAD_PATH.length, ...loadPath);
+      for (const engine of [ActionMailboxEngine, ActiveStorageEngine, ActionTextEngine]) {
+        delete (engine.instance() as unknown as { _allLoadPathsCache?: string[] })
+          ._allLoadPathsCache;
+      }
+    });
     await application.initializeBang();
 
     const autoloadPaths = Dependencies.autoloadPaths;
