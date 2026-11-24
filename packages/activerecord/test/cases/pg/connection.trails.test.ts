@@ -448,7 +448,7 @@ describe("PG::Connection#finished?", () => {
 describe("PG::Connection.new and its connect alias", () => {
   it("connect builds the receiver's class, as alias connect new does", async () => {
     class Sub extends Connection {}
-    const spy = vi.spyOn(Connection.prototype, "connect").mockResolvedValue(undefined);
+    const spy = vi.spyOn(pg.Client.prototype, "connect").mockResolvedValue(undefined);
     try {
       expect(await Sub.connect({})).toBeInstanceOf(Sub);
     } finally {
@@ -457,7 +457,7 @@ describe("PG::Connection.new and its connect alias", () => {
   });
 
   it("yields the connection to a block and closes it after", async () => {
-    const connect = vi.spyOn(Connection.prototype, "connect").mockResolvedValue(undefined);
+    const connect = vi.spyOn(pg.Client.prototype, "connect").mockResolvedValue(undefined);
     const close = vi.spyOn(Connection.prototype, "finish").mockResolvedValue(undefined);
     try {
       expect(await Connection.new({}, (conn) => conn instanceof Connection)).toBe(true);

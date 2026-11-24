@@ -1,4 +1,5 @@
 import {
+  Addrinfo,
   ArgumentError,
   FrozenError,
   LoadError,
@@ -87,6 +88,10 @@ export class Connection {
   _pollStatus: number = PG.PGRES_POLLING_OK;
   /** @internal */
   _connecting: Promise<void> | null = null;
+  /** @internal */
+  _connectError: unknown = null;
+  /** @internal */
+  _ioptsForReset: Record<string, unknown> | null = null;
   declare asyncIsnonblocking: Connection["isnonblocking"];
   declare isNonblocking: Connection["isnonblocking"];
   declare asyncSetnonblocking: Connection["setnonblocking"];
@@ -126,8 +131,7 @@ export class Connection {
     block?: (conn: T) => R | Promise<R>,
   ): Promise<T | R> {
     await _requireEngine();
-    const conn = rbClassNewInstance(this, connParams);
-    await conn.connect();
+    const conn = (await (this as unknown as typeof Connection).connectToHosts(connParams)) as T;
 
     if (block !== undefined) {
       try {
@@ -140,6 +144,94 @@ export class Connection {
   }
 
   static connect = Connection.new;
+
+  /**
+   * @internal
+   * @missingRailsArgs split — PERMANENT
+   * @missingRailsArgs getaddrinfo — PERMANENT
+   */
+  private static async resolveHosts(
+    iopts: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const ihosts = String(iopts.host).split(",");
+    const port = String(iopts.port);
+    let iports: (string | null)[] = port === "" ? [] : port.split(",");
+    if (iports.length == 0) iports = [null];
+    if (iports.length == 1) iports = ihosts.map(() => iports[0]);
+    if (iports.length != ihosts.length) {
+      throw new ConnectionBad(
+        `could not match ${iports.length} port numbers to ${ihosts.length} hosts`,
+      );
+    }
+
+    const dests = (
+      await Promise.all(
+        ihosts.map(async (mhost, idx) => {
+          let hostaddrs: (string | null)[];
+          if (!Connection.isHostIsNamedPipe(mhost)) {
+            hostaddrs = await Addrinfo.getaddrinfo(mhost, 0).then(
+              (ais) => ais.map((ai) => ai.ipAddress),
+              () => [""],
+            );
+          } else {
+            hostaddrs = [null];
+          }
+          return hostaddrs.map((hostaddr) => [hostaddr, mhost, iports[idx]] as const);
+        }),
+      )
+    ).flat();
+    return {
+      ...iopts,
+      hostaddr: dests.map((d) => d[0] ?? "").join(","),
+      host: dests.map((d) => d[1]).join(","),
+      port: dests.map((d) => d[2] ?? "").join(","),
+    };
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall resolve_hosts — PERMANENT
+   */
+  private static async connectToHosts<T extends Connection>(
+    this: { prototype: T } & typeof Connection,
+    ...args: unknown[]
+  ): Promise<T> {
+    const optionString = this.parseConnectArgs(...args);
+    let iopts: Record<string, unknown> = {};
+    for (const h of Connection.conninfoParse(optionString))
+      if (h.val != null) iopts[h.keyword] = h.val;
+    const defaults: Record<string, unknown> = {};
+    for (const h of Connection.conndefaults()) if (h.val != null) defaults[h.keyword] = h.val;
+    iopts = { ...defaults, ...iopts };
+
+    if (
+      PG.BUNDLED_LIBPQ_WITH_UNIXSOCKET &&
+      String(iopts.host ?? "") === "" &&
+      String(iopts.hostaddr ?? "") === ""
+    ) {
+      iopts.host = "/var/run/postgresql" + ",/run/postgresql" + ",/tmp";
+    }
+
+    const ioptsForReset = iopts;
+    const conn =
+      ((await this.connectStart(iopts)) as T | null) ??
+      (() => {
+        throw new PgError("Unable to create a new connection");
+      })();
+
+    if (conn.status() == PG.CONNECTION_BAD) {
+      throw new ConnectionBad(conn.errorMessage() ?? "");
+    }
+
+    conn._ioptsForReset = ioptsForReset;
+    await conn.asyncConnectOrReset("connectPoll");
+    return conn;
+  }
+
+  /** @internal */
+  private static isHostIsNamedPipe(hostString: string): boolean {
+    return hostString === "" || hostString.startsWith("/") || hostString.startsWith("@");
+  }
 
   static conninfoParse(
     conninfo: string,
@@ -238,7 +330,7 @@ export class Connection {
   }
 
   static quoteConnstr(value: unknown): string {
-    return "'" + String(value).replace(/[\\']/g, (m) => "\\" + m) + "'";
+    return "'" + (value == null ? "" : String(value)).replace(/[\\']/g, (m) => "\\" + m) + "'";
   }
 
   static connectHashToString(hash: Record<string, unknown>): string {
@@ -667,13 +759,14 @@ export class Connection {
    */
   _connectStart(): void {
     this._errorMessage = "";
+    this._connectError = null;
     this._pollStatus = PG.PGRES_POLLING_WRITING;
     this._connecting = this.client.connect().then(
       () => {
         this._pollStatus = PG.PGRES_POLLING_OK;
       },
       (error: unknown) => {
-        this.bad = true;
+        this._connectError = error;
         this._errorMessage = `${(error as { message?: string })?.message ?? String(error)}\n`;
         this._pollStatus = PG.PGRES_POLLING_FAILED;
       },
@@ -681,6 +774,9 @@ export class Connection {
   }
 
   connectPoll(): number {
+    if (this._pollStatus === PG.PGRES_POLLING_FAILED) {
+      this.bad = true;
+    }
     if (this._pollStatus === PG.PGRES_POLLING_WRITING) return PG.PGRES_POLLING_READING;
     return this._pollStatus;
   }
@@ -765,12 +861,6 @@ export class Connection {
     return null;
   }
 
-  connect(): Promise<unknown> {
-    return this.client.connect().catch((error: unknown) => {
-      throw engine!.pgError(this, error, ConnectionBad);
-    });
-  }
-
   status(): number {
     const { _ending, _ended, _queryable } = this.client;
     return this.bad || _ending === true || _ended === true || _queryable === false
@@ -778,37 +868,120 @@ export class Connection {
       : PG.CONNECTION_OK;
   }
 
-  /**
-   * @missingRailsCall parse_connect_args — CONVERGEABLE pg-connection-connect-and-reset-private-helpers
-   * @missingRailsCall reset_start2 — CONVERGEABLE pg-connection-connect-and-reset-private-helpers
-   */
   async reset(): Promise<this> {
-    const client = this.client;
-    const iopts = engine!._clientConfig(this.connParams);
-    const conn = new (client.constructor as new (config: typeof iopts) => NodePg.Client)(iopts);
-    for (const event of client.eventNames()) {
-      for (const listener of client.rawListeners(event)) {
-        conn.on(event as "error", listener as () => void);
-      }
-    }
-    engine!.listen(this, conn);
-    this.prepared.clear();
-    this.readyForQuery = "I";
-    this.bad = false;
-    this._pipelineStatus = PG.PQ_PIPELINE_OFF;
-    this._cmdQueue = [];
-    this._results = [];
-    this._submittable = null;
-    this._sendError = null;
-    this._chunkSize = 0;
-    await client
-      .end()
-      .then(() => conn.connect())
-      .catch((error: unknown) => {
-        throw engine!.pgError(this, error, ConnectionBad);
-      });
-    this.client = conn;
+    const iopts: Record<string, unknown> = this._ioptsForReset ?? _compact(this.conninfoHash());
+    const conninfo = (this.constructor as typeof Connection).parseConnectArgs(iopts);
+    await this.resetStart2(conninfo);
+    await this.asyncConnectOrReset("resetPoll");
     return this;
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs join — PERMANENT
+   * @inventedArm throw — PERMANENT
+   */
+  private async pollingLoop(pollMeth: "connectPoll" | "resetPoll"): Promise<void> {
+    const connectTimeout = this.conninfoHash().connectTimeout;
+    const timeo = Number.parseInt(connectTimeout ?? "0", 10) || 0;
+    let stopTime: number | undefined;
+    if (timeo > 0) {
+      const info = this.conninfoHash();
+      const hostCount = String(
+        (info.hostaddr ?? "") === "" ? (info.host ?? "") : info.hostaddr,
+      ).split(",").length;
+      stopTime = timeo * hostCount + performance.now() / 1000;
+    }
+    const iopts = _compact(this.conninfoHash());
+    const connectionErrors: string[] = [];
+    let pollStatus: number = PG.PGRES_POLLING_WRITING;
+
+    while (!(pollStatus == PG.PGRES_POLLING_OK || pollStatus == PG.PGRES_POLLING_FAILED)) {
+      const timeout =
+        stopTime === undefined ? undefined : Math.min(timeo, stopTime - performance.now() / 1000);
+
+      const hostcnt = this.removeCurrentHost(iopts);
+
+      let event: boolean | undefined;
+      if (timeout === undefined || timeout >= 0) {
+        switch (pollStatus) {
+          case PG.PGRES_POLLING_READING:
+            event = await _waitConnecting(this._connecting, timeout);
+            break;
+          case PG.PGRES_POLLING_WRITING:
+            event = await _waitConnecting(this._connecting, timeout);
+            break;
+        }
+      }
+
+      if (!event) {
+        connectionErrors.push((this.errorMessage() ?? "") + "timeout expired");
+        if (hostcnt > 0) {
+          await this.resetStart2(Connection.parseConnectArgs(iopts));
+          pollStatus = PG.PGRES_POLLING_WRITING;
+          continue;
+        } else {
+          await this.finish();
+          throw new ConnectionBad(connectionErrors.join("\n"), { connection: this });
+        }
+      }
+
+      pollStatus = this[pollMeth]();
+    }
+
+    if (this.status() != PG.CONNECTION_OK) {
+      const msg = this.errorMessage() ?? "";
+      await this.finish();
+      if (this._connectError != null && connectionErrors.length == 0)
+        throw engine!.pgError(this, this._connectError, ConnectionBad);
+      throw new ConnectionBad(connectionErrors.map((e) => e + "\n").join("") + msg, {
+        connection: this,
+      });
+    }
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs split — PERMANENT
+   */
+  private removeCurrentHost(iopts: Record<string, unknown>): number {
+    const ihosts = iopts.host == null ? undefined : String(iopts.host).split(",");
+    const ihostaddrs = iopts.hostaddr == null ? undefined : String(iopts.hostaddr).split(",");
+    let iports = iopts.port == null ? undefined : String(iopts.port).split(",");
+    if (iports?.length == 1) {
+      const n = (ihosts ?? ihostaddrs ?? [1]).length;
+      iports = Array.from({ length: n }, () => iports![0]);
+    }
+
+    const list = (ihosts ?? ihostaddrs ?? iports)!;
+    const found = list.findIndex(
+      (_, i) =>
+        (ihosts ? ihosts[i] == this.host() : true) &&
+        (ihostaddrs ? ihostaddrs[i] == this.hostaddr() : true) &&
+        (iports ? Number.parseInt(iports[i], 10) == this.port() : true),
+    );
+    const idx = found < 0 ? null : found;
+
+    if (idx != null) {
+      ihosts?.splice(idx, 1);
+      ihostaddrs?.splice(idx, 1);
+      iports?.splice(idx, 1);
+
+      if (ihosts) Object.assign(iopts, { host: ihosts.join(",") });
+      if (ihostaddrs) Object.assign(iopts, { hostaddr: ihostaddrs.join(",") });
+      if (iports) Object.assign(iopts, { port: iports.join(",") });
+    }
+
+    return (ihosts ?? ihostaddrs ?? iports)!.length;
+  }
+
+  /** @internal */
+  private async asyncConnectOrReset(pollMeth: "connectPoll" | "resetPoll"): Promise<void> {
+    await this.pollingLoop(pollMeth);
+
+    this.syncSetnonblocking(true);
+    this.flushData = true;
+    this.setDefaultEncoding();
   }
 
   transactionStatus(): number {
@@ -1298,6 +1471,34 @@ function conndefaults(): { keyword: string; compiled: string | null; val: string
     compiled: COMPILED_DEFAULTS[keyword] ?? null,
     val: COMPILED_DEFAULTS[keyword] ?? null,
   }));
+}
+
+/** @noRailsEquivalent PERMANENT */
+function _compact(hash: Record<string, string | null>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(hash)) if (v != null) out[k] = v;
+  return out;
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function _waitConnecting(
+  connecting: Promise<void> | null,
+  timeout: number | undefined,
+): Promise<boolean> {
+  if (connecting == null) return true;
+  if (timeout === undefined) {
+    await connecting;
+    return true;
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), timeout * 1000);
+  });
+  try {
+    return await Promise.race([connecting.then(() => true), expired]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** @noRailsEquivalent PERMANENT */
