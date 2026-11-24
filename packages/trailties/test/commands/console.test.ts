@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { TSREPL, env, setEnv } from "@blazetrails/ruby-compat";
 import { Trails } from "../../lib/trails.js";
 import { Console, ConsoleCommand } from "../../lib/commands/console.js";
 import { TSREPLConsole } from "../../lib/commands/console/tsrepl-console.js";
@@ -100,6 +100,7 @@ describe("Trails::ConsoleTest", () => {
 
   it("prompt env colorization", async () => {
     const tsreplConsole = (await Console.new(buildApp(null))).console as TSREPLConsole;
+    vi.spyOn(TSREPL.Color, "isColorable").mockReturnValue(true);
     const red = "\u001b[31m";
     const blue = "\u001b[34m";
     const clear = "\u001b[0m";
