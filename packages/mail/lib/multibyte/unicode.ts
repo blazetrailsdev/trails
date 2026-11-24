@@ -4,7 +4,6 @@ import {
   File,
   Hash,
   hashAref,
-  IO,
   IOError,
   Marshal,
   NoMethodError,
@@ -172,9 +171,14 @@ export class UnicodeDatabase {
   }
 }
 
-const _unicodeTables: Uint8Array | Error = await IO.binreadAsync(UnicodeDatabase.filename()).catch(
-  (e: Error) => e,
+let _unicodeTables: Uint8Array | Error = new IOError(
+  `${UnicodeDatabase.filename()} was not read: await Mail.loadPath["mail/multibyte/unicode_tables"]()`,
 );
+
+/** @internal */
+export function _setUnicodeTables(tables: Uint8Array | Error): void {
+  _unicodeTables = tables;
+}
 
 let _defaultNormalizationForm = ":kc";
 

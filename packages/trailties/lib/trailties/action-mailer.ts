@@ -5,6 +5,7 @@ import type { Base } from "@blazetrails/actionmailer";
 import { ActionMailer } from "@blazetrails/actionmailer/namespaces";
 import { deprecator } from "@blazetrails/actionmailer/deprecator";
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import type {} from "@blazetrails/mail";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionMailerConfig extends OrderedOptions {
@@ -41,6 +42,14 @@ export class Trailtie extends BaseTrailtie {
     this.config.set("actionMailer", new OrderedOptions());
     this.config.actionMailer.previewPaths = [];
     this.config.eagerLoadNamespaces.push(ActionMailer);
+
+    this.initializer(
+      "action_mailer.require_mail_unicode_tables",
+      { before: "load_environment_config" },
+      async () => {
+        await TopLevel.Mail!.loadPath["mail/multibyte/unicode_tables"]();
+      },
+    );
 
     this.initializer("action_mailer.deprecator", { before: "load_environment_config" }, (app) => {
       app.deprecators.set("actionMailer", deprecator());
