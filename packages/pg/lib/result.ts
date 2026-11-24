@@ -124,6 +124,19 @@ export class Result {
     return `${str.slice(0, -1)}${stats}${str.slice(-1)}`;
   }
 
+  errorMessage(): string {
+    this._pgresultGet();
+    if (this.#error?.message == null) return "";
+    let msg = `${this.#error.severity ?? "ERROR"}:  ${this.#error.message}\n`;
+    if (this.#error.detail != null) msg += `DETAIL:  ${this.#error.detail}\n`;
+    if (this.#error.hint != null) msg += `HINT:  ${this.#error.hint}\n`;
+    return msg;
+  }
+
+  resultErrorMessage(): string {
+    return this.errorMessage();
+  }
+
   errorField(fieldcode: number): string | null {
     this._pgresultGet();
     const name = _ERROR_FIELDS[fieldcode];
@@ -152,7 +165,7 @@ export class Result {
       case PGConstants.PGRES_FATAL_ERROR:
       case PGConstants.PGRES_NONFATAL_ERROR:
       case PGConstants.PGRES_PIPELINE_ABORTED:
-        error = this.#error?.message == null ? "" : String(this.#error.message);
+        error = this.errorMessage();
         break;
       default:
         error = "internal error : unknown result status.";

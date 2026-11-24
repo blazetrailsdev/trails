@@ -59,7 +59,7 @@ export class Connection {
   /** @internal */
   _results: (Result | null)[] = [];
   /** @internal */
-  _resultWaiter: (() => void) | null = null;
+  _resultWaiters: (() => void)[] = [];
   /** @internal */
   _submittable: NodePg.PgconnSubmittable | null = null;
   /** @internal */
@@ -601,10 +601,12 @@ export class Connection {
       throw new ConnectionBad("connection is closed", { connection: this });
     }
     if (this.bad) {
-      throw new UnableToSend("no connection to the server\n", { connection: this });
+      throw new UnableToSend("PQsendQuery no connection to the server\n", { connection: this });
     }
     if (this._cmdQueue.length > 0 || this._results.length > 0) {
-      throw new UnableToSend("another command is already in progress\n", { connection: this });
+      throw new UnableToSend("PQsendQuery another command is already in progress\n", {
+        connection: this,
+      });
     }
     engine!.dispatch(this, (connection) => connection.query(sql), ["query"]);
   }
@@ -701,15 +703,16 @@ export class Connection {
       this._results.length > 0 || this._cmdQueue.length === 0 || this._sendError != null;
     if (!ready()) {
       const ret = await new Promise<boolean>((resolve) => {
+        const waiter = (): void => {
+          if (ready()) done(true);
+        };
         const done = (r: boolean): void => {
           clearTimeout(timer);
-          this._resultWaiter = null;
+          this._resultWaiters = this._resultWaiters.filter((w) => w !== waiter);
           resolve(r);
         };
         const timer = timeout == null ? undefined : setTimeout(() => done(false), timeout * 1000);
-        this._resultWaiter = () => {
-          if (ready()) done(true);
-        };
+        this._resultWaiters.push(waiter);
       });
       if (!ret) return false;
     }

@@ -218,7 +218,7 @@ export interface PgconnSubmittable {
 export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" | "sync")[]): void {
   conn._cmdQueue.push(...cmds);
   const current = conn._submittable;
-  if (current?.submitted) {
+  if (current?.submitted || (current == null && cmds.length === 0)) {
     write(conn.client.connection!);
     return;
   }
@@ -231,7 +231,7 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
   const deliver = (res: Result | null): void => {
     if (res != null) res._connection = conn;
     conn._results.push(res);
-    conn._resultWaiter?.();
+    for (const waiter of [...conn._resultWaiters]) waiter();
   };
   const pipelined = (): boolean => conn._pipelineStatus !== Constants.PQ_PIPELINE_OFF;
   const endCommand = (): void => {
@@ -274,6 +274,10 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
       }
     },
     handleCommandComplete(msg: object): void {
+      if (conn._chunkSize > 0 && native.rows.length > 0) {
+        deliver(new Result({ ...native }, null, Constants.PGRES_TUPLES_CHUNK));
+        native.rows = [];
+      }
       native.addCommandComplete(msg);
       deliver(new Result({ ...native }));
       endCommand();
@@ -289,7 +293,7 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
         conn._sendError = pgError(conn, error);
         conn._cmdQueue.length = 0;
         if (conn._submittable === submittable) conn._submittable = null;
-        conn._resultWaiter?.();
+        for (const waiter of [...conn._resultWaiters]) waiter();
         return;
       }
       deliver(emptyResult(error));
@@ -325,7 +329,7 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
     conn._sendError = error;
     conn._cmdQueue.length = 0;
     if (conn._submittable === submittable) conn._submittable = null;
-    conn._resultWaiter?.();
+    for (const waiter of [...conn._resultWaiters]) waiter();
   });
 }
 

@@ -30,3 +30,10 @@ node-pg links no libpq. So it is skipped, and
 is omitted under `@missingRailsCall library_version — PERMANENT`.
 
 Ruled by the operator on 2026-11-22 (trails#10601).
+
+On 2026-11-23 the operator widened the rule to the whole scored denominator:
+every gem method `parity:api` scores, and every spec example `parity:test`
+scores, is ported, pg 1.6's additions included (`close_prepared` /
+`close_portal`, pipeline mode, chunked rows, `inspect`, the connect helpers).
+A method or example kept out of scoring by its `SCOPED_SKIP_GROUPS` entry or
+an unported-files row stays unported.
