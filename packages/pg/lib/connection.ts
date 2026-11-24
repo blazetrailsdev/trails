@@ -80,6 +80,8 @@ export class Connection {
   /** @internal */
   _callsToPutCopyData = 0;
   /** @internal */
+  _copyIn = false;
+  /** @internal */
   _errorMessage = "";
   /** @internal */
   _pollStatus: number = PG.PGRES_POLLING_OK;
@@ -478,12 +480,19 @@ export class Connection {
     }
 
     const chunk: string | Uint8Array = buffer;
-    engine!.dispatch(this, (connection) => connection.sendCopyFromChunk(chunk), []);
+    if (!this._copyIn) {
+      throw new PgError("no COPY in progress\n", { connection: this });
+    }
+    engine!.dispatch(this, (connection) => connection.sendCopyFromChunk(Buffer.from(chunk)), []);
     return true;
   }
 
   syncPutCopyEnd(str?: string): boolean {
     const errorMessage = str === undefined ? null : stringValue(str);
+    if (!this._copyIn) {
+      throw new PgError("no COPY in progress\n", { connection: this });
+    }
+    this._copyIn = false;
     engine!.dispatch(
       this,
       (connection) => {
@@ -699,6 +708,7 @@ export class Connection {
     this._submittable = null;
     this._sendError = null;
     this._chunkSize = 0;
+    this._copyIn = false;
     this._connectStart();
 
     if (this.status() == PG.CONNECTION_BAD) {
