@@ -85,3 +85,17 @@ describe("BookmarkTest", () => {
     expect(ids).toEqual([due.id]);
   });
 });
+
+describe("BookmarkReminderTimeZoneTest", () => {
+  beforeEach(resetDatabase);
+
+  it("reads a datetime-local reminder as the machine's wall-clock time", async () => {
+    const bookmark = await Bookmark.createBang({
+      title: "A",
+      url: "https://a.example",
+      remind_at: "2026-06-01T09:30",
+    });
+    await bookmark.reload();
+    expect(bookmark.remind_at!.getTime()).toBe(new Date(2026, 5, 1, 9, 30).getTime());
+  });
+});

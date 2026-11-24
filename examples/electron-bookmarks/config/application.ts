@@ -35,7 +35,9 @@ export class Application extends Trails.Application {
     // These settings can be overridden in specific environments using the files
     // in config/environments, which are processed later.
     //
-    // config.timeZone = "Central Time (US & Canada)";
+    // A desktop app's times are the user's wall-clock times: a "Remind me"
+    // datetime-local value means local time, not UTC.
+    this.config.timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     // config.eagerLoadPaths.push("extras");
   }
 }

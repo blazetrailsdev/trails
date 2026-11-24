@@ -49,8 +49,9 @@ export class Bookmark extends ApplicationRecord {
   }
 
   async tagNames(): Promise<string[]> {
-    const tags = (await this.tags.order({ name: "asc" }).toArray()) as Tag[];
-    return tags.map((tag) => tag.name);
+    // Sorted here rather than in SQL, so a preloaded `tags` (`includes("tags")`) needs no query.
+    const tags = (await this.tags.toArray()) as Tag[];
+    return tags.map((tag) => tag.name).sort();
   }
 
   /** Replaces the bookmark's tags with the comma-separated names in `list`. */
@@ -62,6 +63,7 @@ export class Bookmark extends ApplicationRecord {
     for (const name of names) tags.push((await Tag.findOrCreateByBang({ name })) as Tag);
     await this.taggings.destroyAll();
     for (const tag of tags) await this.taggings.createBang({ tag });
+    this.tags.reset();
   }
 
   async toRow(): Promise<BookmarkRow> {

@@ -23,7 +23,7 @@ if (process.env.TRAILS_ENV === "production") {
 }
 
 // One window per app: a second launch focuses the first.
-if (!app.requestSingleInstanceLock()) app.quit();
+if (!app.requestSingleInstanceLock()) app.exit(0);
 
 await app.whenReady();
 
@@ -85,6 +85,8 @@ async function visit(path: string): Promise<void> {
 /** Submits one of the toolbar's button forms (Import…, Export…), CSRF token included. */
 async function submit(action: string): Promise<void> {
   const w = openWindow();
+  if (w.webContents.isLoading())
+    await new Promise<void>((resolve) => w.webContents.once("did-finish-load", () => resolve()));
   await w.webContents.executeJavaScript(
     `document.querySelector(${JSON.stringify(`form[action="${action}"]`)})?.requestSubmit()`,
   );
