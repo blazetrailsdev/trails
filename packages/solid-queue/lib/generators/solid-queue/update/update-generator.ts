@@ -29,8 +29,8 @@ export class UpdateGenerator extends Base {
   }
 
   /**
-   * @missingRailsArgs basename — PERMANENT
-   * @missingRailsArgs join — PERMANENT
+   * @missingRailsArgs basename — CONVERGEABLE solid-queue-update-generator-migration-templates-are-plain-ts
+   * @missingRailsArgs join — CONVERGEABLE solid-queue-update-generator-migration-templates-are-plain-ts
    */
   async copyNewMigrations(): Promise<void> {
     const sourceRoot = (await (this.constructor as typeof UpdateGenerator).sourceRoot())!;
