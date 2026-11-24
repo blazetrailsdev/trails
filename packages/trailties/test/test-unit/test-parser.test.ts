@@ -1,13 +1,50 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, test } from "vitest";
 import { TestParser } from "../../lib/test-unit/test-parser.js";
 
-const FILE = new URL("../fixtures/test-unit/test-parser-fixture.ts", import.meta.url).pathname;
+describe("TestParserTestFixture", () => {
+  it("method", () => {
+    expect(true).toBe(true);
+
+    expect(true).toBe(true);
+  });
+
+  // prettier-ignore
+  it("oneline", () => { expect(true).toBe(true); });
+
+  test("declarative", () => {
+    expect(true).toBe(true);
+
+    expect(true).toBe(true);
+  });
+
+  test("declarative w/parens", () => {
+    expect(true).toBe(true);
+  });
+
+  test("declarative explicit receiver", () => {
+    expect(true).toBe(true);
+
+    expect(true).toBe(true);
+  });
+
+  test("declarative oneline", () => expect(true).toBe(true));
+
+  // prettier-ignore
+  test("declarative oneline do", function () { expect(true).toBe(true); });
+
+  test("declarative multiline w/ braces", () => {
+    expect(true).toBe(true);
+    expect(false).toBe(false);
+  });
+});
+
+const FILE = new URL(import.meta.url).pathname;
 
 describe("TestParserTest", () => {
   beforeAll(() => TestParser.requireParser());
 
   it("parser", () => {
-    const actual = [8, 15, 18, 24, 28, 34, 37, 39, 44].map((startLine) => {
+    const actual = [5, 12, 14, 20, 24, 30, 33, 35].map((startLine) => {
       const [path, range] = TestParser.definitionFor({
         sourceLocation: () => [FILE, startLine],
       })!;
@@ -15,15 +52,14 @@ describe("TestParserTest", () => {
     });
 
     expect(actual).toEqual([
-      [FILE, 8, 12],
-      [FILE, 15, 15],
-      [FILE, 18, 22],
-      [FILE, 24, 26],
-      [FILE, 28, 32],
-      [FILE, 34, 34],
-      [FILE, 37, 37],
-      [FILE, 39, 42],
-      [FILE, 44, 44],
+      [FILE, 5, 9],
+      [FILE, 12, 12],
+      [FILE, 14, 18],
+      [FILE, 20, 22],
+      [FILE, 24, 28],
+      [FILE, 30, 30],
+      [FILE, 33, 33],
+      [FILE, 35, 38],
     ]);
   });
 });
