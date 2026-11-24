@@ -879,7 +879,7 @@ export class Connection {
   /**
    * @internal
    * @missingRailsArgs join — PERMANENT
-   * @inventedArm if — PERMANENT
+   * @inventedArm throw — PERMANENT
    */
   private async pollingLoop(pollMeth: "connectPoll" | "resetPoll"): Promise<void> {
     const connectTimeout = this.conninfoHash().connectTimeout;
