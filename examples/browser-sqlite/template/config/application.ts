@@ -10,6 +10,7 @@ export class BrowserApp extends Application {
     this.config.loadDefaults("8.0");
     this.config.eagerLoad = false;
     this.config.considerAllRequestsLocal = true;
+    this.config.hosts.push(location.hostname);
   }
 }
 
