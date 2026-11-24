@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
 import { quoteColumnName } from "./connection-handling.js";
 import { AssociationNotFoundError } from "./errors.js";
-import { lookupModel } from "./model-schema.js";
+import { lookupModel, primaryKeyBang } from "./model-schema.js";
 import { instantiate } from "./persistence.js";
 
 export interface BelongsToOptions {
@@ -30,6 +30,7 @@ function reader(record: Base, reflection: Reflection): Base | null | Promise<Bas
     return null;
   }
   const klass = lookupModel(reflection.className);
+  primaryKeyBang(klass.schema);
   const row = klass.connection.selectRow(klass.schema.findSql, [foreignKey]);
   const found = row === undefined ? null : instantiate(klass.schema, row);
   setTarget(record, reflection.name, found);
@@ -89,7 +90,7 @@ export function preload(
 
     const targetClass = lookupModel(reflection.className);
     const { schema } = targetClass;
-    const column = `${schema.quotedTableName}.${quoteColumnName(schema.primaryKey)}`;
+    const column = `${schema.quotedTableName}.${quoteColumnName(primaryKeyBang(schema))}`;
     const ids = [...owners.keys()];
     const predicate = ids.length === 1 ? "= ?" : `IN (${ids.map(() => "?").join(", ")})`;
     const rows = targetClass.connection.selectRows(

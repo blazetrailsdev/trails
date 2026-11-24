@@ -3,6 +3,7 @@ import type { Base, ModelClass } from "./base.js";
 import { quote, quoteColumnName } from "./connection-handling.js";
 import type { Attributes } from "./attribute-methods.js";
 import { ActiveRecordError } from "./errors.js";
+import { primaryKeyBang } from "./model-schema.js";
 import { instantiate } from "./persistence.js";
 import { cast, serialize } from "./type.js";
 
@@ -75,11 +76,12 @@ export class Relation<T extends Base> {
     return this.spawn({ orders });
   }
 
-  limit(value: number | null): Relation<T> {
-    if (value !== null && !Number.isInteger(value)) {
+  limit(value: number | string | null): Relation<T> {
+    const limitValue = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
+    if (limitValue !== null && !Number.isInteger(limitValue)) {
       throw new ActiveRecordError(`limit takes an integer, not ${String(value)}`);
     }
-    return this.spawn({ limitValue: value });
+    return this.spawn({ limitValue: limitValue as number | null });
   }
 
   includes(...names: string[]): Relation<T> {
@@ -96,12 +98,12 @@ export class Relation<T extends Base> {
   }
 
   async first(): Promise<T | null> {
-    const { quotedTableName, primaryKey } = this.klass.schema;
-    const ordered =
-      this.orders.length > 0
-        ? this
-        : this.spawn({ orders: [`${quotedTableName}.${quoteColumnName(primaryKey)} ASC`] });
-    return ordered.limit(1).take();
+    if (this.orders.length > 0) return this.limit(1).take();
+    const { quotedTableName } = this.klass.schema;
+    const primaryKey = quoteColumnName(primaryKeyBang(this.klass.schema));
+    return this.spawn({ orders: [`${quotedTableName}.${primaryKey} ASC`] })
+      .limit(1)
+      .take();
   }
 
   async findBy(conditions: Attributes): Promise<T | null> {
@@ -110,13 +112,19 @@ export class Relation<T extends Base> {
 
   async count(): Promise<number> {
     const { quotedTableName } = this.klass.schema;
-    const sql = `SELECT COUNT(*) FROM ${quotedTableName}${this.whereSql()}`;
+    const sql =
+      this.limitValue === null
+        ? `SELECT COUNT(*) FROM ${quotedTableName}${this.whereSql()}`
+        : `SELECT COUNT(*) FROM (SELECT 1 AS one FROM ${quotedTableName}${this.whereSql()}` +
+          ` LIMIT ${this.limitValue}) subquery_for_count`;
     return this.klass.connection.selectRow(sql, this.binds)![0] as number;
   }
 
   toSql(): string {
     let i = 0;
-    return this.compile().replaceAll("?", () => quote(this.binds[i++]));
+    return this.compile().replace(/"(?:[^"]|"")*"|\?/g, (token) =>
+      token === "?" ? quote(this.binds[i++]) : token,
+    );
   }
 
   private take(): T | null {

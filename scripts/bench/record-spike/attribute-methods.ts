@@ -1,11 +1,11 @@
 import type { Base } from "./base.js";
 import { UnknownAttributeError } from "./errors.js";
-import type { AttributeWriter, Column, ModelSchema } from "./model-schema.js";
-import { cast, isEqual } from "./type.js";
+import type { AttributeReader, AttributeWriter, Column, ModelSchema } from "./model-schema.js";
+import { cast, isDatabaseDatetime, isEqual } from "./type.js";
 
 export type Attributes = Record<string, unknown>;
 
-function readerFor({ index, type }: Column): (this: Base) => unknown {
+function readerFor({ index, type }: Column): AttributeReader {
   if (type === "integer") {
     return function () {
       const value = this._row[index];
@@ -28,7 +28,8 @@ function readerFor({ index, type }: Column): (this: Base) => unknown {
 function writerFor({ index, type }: Column): AttributeWriter {
   return (record, value) => {
     if (record._original === null) record._original = record._row.slice();
-    record._row[index] = cast(type, value);
+    record._row[index] =
+      type === "datetime" && isDatabaseDatetime(value) ? value : cast(type, value);
   };
 }
 
@@ -40,12 +41,14 @@ function writerFor({ index, type }: Column): AttributeWriter {
 export function defineAttributeMethods(schema: ModelSchema): void {
   const prototype = schema.klass.prototype as object;
   for (const column of schema.columns) {
+    const read = readerFor(column);
     const write = writerFor(column);
+    schema.readers[column.index] = read;
     schema.writers.set(column.name, write);
     if (column.name in prototype) continue;
     Object.defineProperty(prototype, column.name, {
       configurable: true,
-      get: readerFor(column),
+      get: read,
       set(this: Base, value: unknown) {
         write(this, value);
       },
@@ -55,8 +58,7 @@ export function defineAttributeMethods(schema: ModelSchema): void {
 
 export function readAttribute(record: Base, name: string): unknown {
   const index = record._schema.columnIndex.get(name);
-  if (index === undefined) return null;
-  return (record._row[index] = cast(record._schema.types[index], record._row[index]));
+  return index === undefined ? null : record._schema.readers[index].call(record);
 }
 
 export function writeAttribute(record: Base, name: string, value: unknown): void {
@@ -88,6 +90,10 @@ export function changedIndexes(record: Base): number[] {
   const changed: number[] = [];
   for (let i = 0; i < types.length; i++) {
     if (original[i] === record._row[i]) continue;
+    if (original[i] === null || record._row[i] === null) {
+      changed.push(i);
+      continue;
+    }
     if (!isEqual(cast(types[i], original[i]), cast(types[i], record._row[i]))) changed.push(i);
   }
   return changed;

@@ -18,6 +18,16 @@ function castInteger(value: unknown): number | null {
   return null;
 }
 
+const DATABASE_DATETIME = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/;
+
+/**
+ * True for a string already in the form the database stores, which can sit in
+ * a record's slot uncast, as a loaded value does, and be bound as it is.
+ */
+export function isDatabaseDatetime(value: unknown): value is string {
+  return typeof value === "string" && DATABASE_DATETIME.test(value);
+}
+
 const HAS_ZONE = /(?:Z|[+-]\d\d(?::?\d\d)?)$/;
 
 function castDatetime(value: unknown): Temporal.Instant | null {

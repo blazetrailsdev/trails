@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { quoteColumnName, quote } from "./connection-handling.js";
-import { ActiveRecordError } from "./errors.js";
+import { ActiveRecordError, UnknownPrimaryKey } from "./errors.js";
 import { lookupCastType, type ColumnType } from "./type.js";
 
 export interface Column {
@@ -9,6 +9,7 @@ export interface Column {
   readonly index: number;
 }
 
+export type AttributeReader = (this: Base) => unknown;
 export type AttributeWriter = (record: Base, value: unknown) => void;
 
 /**
@@ -23,8 +24,9 @@ export interface ModelSchema {
   readonly columns: readonly Column[];
   readonly types: readonly ColumnType[];
   readonly columnIndex: ReadonlyMap<string, number>;
-  readonly primaryKey: string;
+  readonly primaryKey: string | null;
   readonly primaryKeyIndex: number;
+  readonly readers: AttributeReader[];
   readonly writers: Map<string, AttributeWriter>;
   readonly blankRow: readonly null[];
   readonly selectSql: string;
@@ -64,7 +66,8 @@ export function loadSchema(klass: typeof Base): ModelSchema {
     type: lookupCastType(row.type),
     index,
   }));
-  const primaryKey = info.find((row) => row.pk === 1)?.name ?? "id";
+  const primaryKey =
+    info.find((row) => row.pk === 1)?.name ?? (info.some((row) => row.name === "id") ? "id" : null);
   const quotedTableName = quoteColumnName(tableName);
   const selectSql = `SELECT ${quotedTableName}.* FROM ${quotedTableName}`;
   const columnIndex = new Map(columns.map((column) => [column.name, column.index]));
@@ -76,10 +79,17 @@ export function loadSchema(klass: typeof Base): ModelSchema {
     types: columns.map((column) => column.type),
     columnIndex,
     primaryKey,
-    primaryKeyIndex: columnIndex.get(primaryKey) ?? -1,
+    primaryKeyIndex: primaryKey === null ? -1 : columnIndex.get(primaryKey)!,
+    readers: [],
     writers: new Map(),
     blankRow: columns.map(() => null),
     selectSql,
-    findSql: `${selectSql} WHERE ${quotedTableName}.${quoteColumnName(primaryKey)} = ? LIMIT 1`,
+    findSql: `${selectSql} WHERE ${quotedTableName}.${quoteColumnName(primaryKey ?? "id")} = ? LIMIT 1`,
   };
+}
+
+/** The primary key's name, raising as ActiveRecord does for a table that has none. */
+export function primaryKeyBang(schema: ModelSchema): string {
+  if (schema.primaryKey === null) throw new UnknownPrimaryKey(schema.klass);
+  return schema.primaryKey;
 }

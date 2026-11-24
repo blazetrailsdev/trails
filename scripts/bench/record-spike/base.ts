@@ -98,7 +98,7 @@ export class Base {
     return new Relation(this).order(ordering);
   }
 
-  static limit<T extends Base>(this: ModelClass<T>, value: number | null): Relation<T> {
+  static limit<T extends Base>(this: ModelClass<T>, value: number | string | null): Relation<T> {
     return new Relation(this).limit(value);
   }
 
@@ -120,12 +120,11 @@ export class Base {
 
   static async find<T extends Base>(this: ModelClass<T>, id: unknown): Promise<T> {
     const schema = this.schema;
+    const primaryKey = ModelSchema.primaryKeyBang(schema);
     const key = cast(schema.types[schema.primaryKeyIndex], id);
     const row = this.connection.selectRow(schema.findSql, [key]);
     if (row === undefined) {
-      throw new RecordNotFound(
-        `Couldn't find ${this.name} with '${schema.primaryKey}'=${String(id)}`,
-      );
+      throw new RecordNotFound(`Couldn't find ${this.name} with '${primaryKey}'=${String(id)}`);
     }
     return Persistence.instantiate(schema, row) as T;
   }

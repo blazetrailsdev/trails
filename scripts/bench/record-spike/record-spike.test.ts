@@ -5,7 +5,7 @@ import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
 import { Notifications } from "../../../packages/activesupport/lib/index.js";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Base, RecordNotFound, UnknownAttributeError } from "./index.js";
+import { Base, RecordNotFound, UnknownAttributeError, UnknownPrimaryKey } from "./index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TABLES = ["authors", "posts", "tasks"];
@@ -42,7 +42,7 @@ interface Model extends Row {
 interface Query {
   where(conditions: Row): Query;
   order(ordering: Record<string, string>): Query;
-  limit(value: number): Query;
+  limit(value: number | string): Query;
   includes(...names: string[]): Query;
   toArray(): Promise<Model[]>;
   first(): Promise<Model | null>;
@@ -146,8 +146,9 @@ beforeEach(async () => {
 });
 
 function literalLimit([sql, binds]: Statement): Statement {
-  if (!sql.endsWith(" LIMIT ?")) return [sql, binds];
-  return [sql.replace(/\?$/, String(binds.at(-1))), binds.slice(0, -1)];
+  const bound = / LIMIT \?(\) subquery_for_count)?$/;
+  if (!bound.test(sql)) return [sql, binds];
+  return [sql.replace(bound, ` LIMIT ${String(binds.at(-1))}$1`), binds.slice(0, -1)];
 }
 
 async function onBoth<T>(body: (models: Models) => Promise<T> | T): Promise<[T, T]> {
@@ -205,6 +206,9 @@ describe("record spike", () => {
       "first keeps an order": ({ Post }) => Post.order({ tags_count: "desc" }).first(),
       count: ({ Post }) => Post.count(),
       "count on a relation": ({ Post }) => Post.where({ title: "two" }).count(),
+      "count with a limit": ({ Post }) => Post.where({ body: "b" }).limit(2).count(),
+      "count with an order": ({ Post }) => Post.order({ id: "desc" }).count(),
+      "toArray with a string limit": ({ Post }) => Post.limit("2").toArray(),
       toArray: ({ Post }) =>
         Post.where({ tags_count: [1, 2] })
           .order({ id: "desc" })
@@ -322,6 +326,36 @@ describe("record spike", () => {
       expect(task.starting).toBeInstanceOf(Temporal.Instant);
       expect(String(task.starting)).toBe("2026-10-12T12:00:00Z");
       expect(task.starting).toBe(task.starting);
+    });
+
+    it("raises UnknownPrimaryKey for a table with no primary key", async () => {
+      Base.connection.raw.exec(`CREATE TABLE IF NOT EXISTS "edges" ("source_id" integer)`);
+      class Edge extends Base {
+        static {
+          this.tableName = "edges";
+        }
+        declare source_id: number | null;
+      }
+      const edge = await Edge.create({ source_id: 1 });
+      edge.source_id = 2;
+      await expect(edge.save()).rejects.toThrow(UnknownPrimaryKey);
+      await expect(edge.destroy()).rejects.toThrow(UnknownPrimaryKey);
+      await expect(Edge.find(1)).rejects.toThrow(
+        "Unknown primary key for table edges in model Edge.",
+      );
+      await expect(Edge.first()).rejects.toThrow(UnknownPrimaryKey);
+      expect(await Edge.count()).toBe(1);
+    });
+
+    it("rejects a limit that is not an integer, since it is written into the SQL", () => {
+      expect(() => Post.limit("1; DROP TABLE posts")).toThrow("limit takes an integer");
+      expect(() => Post.limit(1.5)).toThrow("limit takes an integer");
+    });
+
+    it("leaves a question mark inside a quoted name alone in toSql", () => {
+      expect(Post.where({ "odd?": "x" }).toSql()).toBe(
+        `SELECT "posts".* FROM "posts" WHERE "posts"."odd?" = 'x'`,
+      );
     });
 
     it("assigns by name through the model's table and rejects an unknown name", () => {

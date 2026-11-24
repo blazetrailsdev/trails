@@ -6,4 +6,5 @@ export {
   ConnectionNotEstablished,
   RecordNotFound,
   UnknownAttributeError,
+  UnknownPrimaryKey,
 } from "./errors.js";

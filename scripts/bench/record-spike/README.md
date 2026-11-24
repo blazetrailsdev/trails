@@ -68,14 +68,14 @@ inside one transaction on every side.
 
 | Measure                       | driver | spike | activerecord | spike / driver | activerecord / driver |
 | ----------------------------- | -----: | ----: | -----------: | -------------: | --------------------: |
-| load                          |   2.54 |  2.67 |        13.02 |            1.1 |                   5.1 |
-| load, then read every column  |   2.93 | 12.85 |        83.08 |            4.4 |                  28.4 |
-| find by id                    |   4.97 |  4.46 |       226.95 |            0.9 |                  45.6 |
-| belongsTo, unloaded           |   4.04 |  4.40 |       338.23 |            1.1 |                  83.7 |
-| load with belongsTo preloaded |   2.47 |  3.74 |        17.14 |            1.5 |                   6.9 |
-| insert                        |   3.60 | 15.49 |       647.28 |            4.3 |                 180.0 |
-| update one column             |   2.09 |  5.00 |       376.58 |            2.4 |                 180.6 |
-| heap bytes retained per row   |    736 |   854 |        1,302 |            1.2 |                   1.8 |
+| load                          |   2.90 |  2.44 |        16.03 |            0.8 |                   5.5 |
+| load, then read every column  |   3.95 | 12.21 |        83.12 |            3.1 |                  21.0 |
+| find by id                    |   5.20 |  4.49 |       231.85 |            0.9 |                  44.6 |
+| belongsTo, unloaded           |   4.92 |  5.39 |       348.07 |            1.1 |                  70.8 |
+| load with belongsTo preloaded |   3.57 |  2.91 |        17.39 |            0.8 |                   4.9 |
+| insert                        |   3.88 |  8.87 |       607.67 |            2.3 |                 156.6 |
+| update one column             |   2.31 |  5.57 |       345.93 |            2.4 |                 149.9 |
+| heap bytes retained per row   |    738 |   853 |        1,302 |            1.2 |                   1.8 |
 
 The driver column returns plain row objects and casts nothing, so its
 datetime columns stay strings. The host is shared: between runs the absolute
@@ -95,15 +95,22 @@ loader, and its 38 ms includes transpiling its TypeScript on import.
 ActiveRecord's figure does not include a driver, which it loads when it
 connects.
 
-Two costs stand out in the spike's column:
+The cost that stands out in the spike's column is datetime. On this Node,
+`Temporal.Instant.from` costs about 0.8 µs and `Instant#toString` about
+1.0 µs, and building any `Temporal.Instant` costs about 0.5 µs however it is
+parsed. The spike pays that only when a datetime is read:
 
-- **Datetime.** On this Node, `Temporal.Instant.from` costs about 0.8 µs and
-  `Instant#toString` about 1.0 µs. Eight of the 24 columns are datetimes, and
-  that is nearly all of the gap between "load" and "load, then read every
-  column". The insert writes one datetime, parsed on assignment and formatted
-  again for the bind.
-- **Insert.** The statement text is rebuilt from the changed columns on each
-  insert before the statement cache is consulted.
+- **A loaded datetime stays a string until its reader is called.** "load"
+  builds no `Temporal` value. "load, then read every column" builds eight per
+  row, and that is nearly all of the gap between the two rows.
+- **An assigned string already in the database's form stays a string too.**
+  `YYYY-MM-DD HH:MM:SS` is bound as it is, so an insert that never reads the
+  column back builds no `Temporal` value either. Any other value is cast on
+  assignment.
+- **A change against `null` is decided without a cast.** The dirty check
+  compares raw slots first and casts only when both sides hold a value.
+
+Before the last two, the insert row was 4.3 times the driver.
 
 ## Known differences from ActiveRecord
 
@@ -114,6 +121,9 @@ Two costs stand out in the spike's column:
   the integer into the SQL. The test rewrites ActiveRecord's trailing
   `LIMIT ?` the same way before comparing; every other statement is compared
   as sent.
+- **`limit` takes an integer or a string of digits, and nothing else.**
+  ActiveRecord accepts whatever `Integer()` casts. Because the spike writes
+  the limit into the SQL text, that check is what keeps other text out of it.
 - **A datetime is a `Temporal.Instant`.** ActiveRecord answers
   `TimeWithZone` or `@blazetrails/date`'s `Time`, both of which import
   ruby-compat.
