@@ -39,20 +39,8 @@ describe("RakeMultiDbsTest", { timeout: 600_000 }, () => {
   const exists = async (path: string) => File.isExistAsync(`${await t.appPath()}/${path}`);
   const read = async (path: string) => File.readAsync(`${await t.appPath()}/${path}`);
   const configsFor = () => Base.configurations().configsFor({ envName: Trails.env.toString() });
-  const migration = (
-    name: string,
-    body = "",
-  ) => `import { Migration } from "@blazetrails/activerecord";
-export class ${name} extends Migration.Current {${body}}
-`;
-  const tables = (klass: string, ...envArgs: string[]) =>
-    t
-      .trails(
-        "runner",
-        ...envArgs,
-        `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect((await (await ${klass}.leaseConnection()).tables()).sort()))`,
-      )
-      .then((out) => out.trim());
+  const migration = (name: string, body = "") =>
+    `import { Migration } from "@blazetrails/activerecord";\nexport class ${name} extends Migration.Current {${body}}\n`;
   const versions = (output: string) =>
     [...output.matchAll(/^== (\d+).+migrated/gm)].map((m) => Number(m[1]));
 
@@ -120,12 +108,23 @@ export class ${name} extends Migration.Current {${body}}
 
     await t.trails("db:schema:load");
 
-    expect(await tables("ActiveRecord.Base")).toBe(
-      '["ar_internal_metadata", "books", "schema_migrations"]',
-    );
-    expect(await tables("AnimalsBase")).toBe(
-      '["ar_internal_metadata", "dogs", "schema_migrations"]',
-    );
+    const arTables = async () =>
+      (
+        await t.trails(
+          "runner",
+          `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect((await (await ActiveRecord.Base.leaseConnection()).tables()).sort()))`,
+        )
+      ).trim();
+    const animalsTables = async () =>
+      (
+        await t.trails(
+          "runner",
+          `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect((await (await AnimalsBase.leaseConnection()).tables()).sort()))`,
+        )
+      ).trim();
+
+    expect(await arTables()).toBe('["ar_internal_metadata", "books", "schema_migrations"]');
+    expect(await animalsTables()).toBe('["ar_internal_metadata", "dogs", "schema_migrations"]');
   }
 
   async function dbMigrateAndSchemaDumpAndLoadOneDatabase(database: string, schemaFormat: string) {
@@ -158,16 +157,27 @@ export class ${name} extends Migration.Current {${body}}
 
     await t.trails(`db:schema:load:${database}`);
 
+    const arTables = async () =>
+      (
+        await t.trails(
+          "runner",
+          `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect((await (await ActiveRecord.Base.leaseConnection()).tables()).sort()))`,
+        )
+      ).trim();
+    const animalsTables = async () =>
+      (
+        await t.trails(
+          "runner",
+          `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect((await (await AnimalsBase.leaseConnection()).tables()).sort()))`,
+        )
+      ).trim();
+
     if (database === "primary") {
-      expect(await tables("ActiveRecord.Base")).toBe(
-        '["ar_internal_metadata", "books", "schema_migrations"]',
-      );
-      expect(await tables("AnimalsBase")).toBe("[]");
+      expect(await arTables()).toBe('["ar_internal_metadata", "books", "schema_migrations"]');
+      expect(await animalsTables()).toBe("[]");
     } else {
-      expect(await tables("ActiveRecord.Base")).toBe("[]");
-      expect(await tables("AnimalsBase")).toBe(
-        '["ar_internal_metadata", "dogs", "schema_migrations"]',
-      );
+      expect(await arTables()).toBe("[]");
+      expect(await animalsTables()).toBe('["ar_internal_metadata", "dogs", "schema_migrations"]');
     }
   }
 
@@ -217,16 +227,31 @@ export class ${name} extends Migration.Current {${body}}
     const output = await t.trails(`db:test:prepare:${name}`, "--trace");
     expect(output).toMatch(`Execute db:test:load_schema:${name}`);
 
+    const arTables = async () =>
+      (
+        await t.trails(
+          "runner",
+          "-e",
+          "test",
+          `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect((await (await ActiveRecord.Base.leaseConnection()).tables()).sort()))`,
+        )
+      ).trim();
+    const animalsTables = async () =>
+      (
+        await t.trails(
+          "runner",
+          "-e",
+          "test",
+          `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect((await (await AnimalsBase.leaseConnection()).tables()).sort()))`,
+        )
+      ).trim();
+
     if (name === "primary") {
-      expect(await tables("ActiveRecord.Base", "-e", "test")).toBe(
-        '["ar_internal_metadata", "books", "schema_migrations"]',
-      );
-      expect(await tables("AnimalsBase", "-e", "test")).toBe("[]");
+      expect(await arTables()).toBe('["ar_internal_metadata", "books", "schema_migrations"]');
+      expect(await animalsTables()).toBe("[]");
     } else {
-      expect(await tables("ActiveRecord.Base", "-e", "test")).toBe("[]");
-      expect(await tables("AnimalsBase", "-e", "test")).toBe(
-        '["ar_internal_metadata", "dogs", "schema_migrations"]',
-      );
+      expect(await arTables()).toBe("[]");
+      expect(await animalsTables()).toBe('["ar_internal_metadata", "dogs", "schema_migrations"]');
     }
   }
 
