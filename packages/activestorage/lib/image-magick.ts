@@ -1,5 +1,5 @@
 import { presence, squish } from "@blazetrails/activesupport";
-import { File, RuntimeError, TopLevel, rbFArray } from "@blazetrails/ruby-compat";
+import { File, RuntimeError, TopLevel, rbFArray, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 
 type MiniMagickModule = typeof import("@blazetrails/mini-magick").MiniMagick;
@@ -18,7 +18,6 @@ export const ImageMagick = {
 
   POLICY_DIRECTORY: File.expandPath("image-magick", import.meta.dirname),
 
-  /** @internal */
   applyPolicy(): void {
     const operatorPaths =
       presence(
@@ -49,9 +48,8 @@ export const ImageMagick = {
 ActiveStorage.ImageMagick = ImageMagick;
 
 ActiveStorage.MINIMAGICK_UNSECURABLE =
-  ActiveStorage.MINIMAGICK_AVAILABLE && !("cliEnv" in MiniMagick!);
+  ActiveStorage.MINIMAGICK_AVAILABLE && !rbObjRespondTo(MiniMagick!, "cliEnv=");
 
-/** @internal */
 ActiveStorage.requireSecurableMiniMagick = function requireSecurableMiniMagick(): void {
   if (ActiveStorage.MINIMAGICK_UNSECURABLE) {
     throw new RuntimeError(

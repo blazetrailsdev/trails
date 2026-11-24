@@ -2,6 +2,7 @@ import { squish } from "@blazetrails/activesupport";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 
+/** @missingRailsCall require — PERMANENT */
 let Vips: { blockUntrusted?: (state: boolean) => void } | undefined;
 try {
   ({ vips: Vips } = await import("@blazetrails/image-processing/vips"));

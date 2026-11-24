@@ -452,7 +452,6 @@ mattrAccessor.call(ActiveStorage, "ffmpegAllowedFormats", {
   ]),
 });
 
-/** @internal */
 ActiveStorage.ffmpegFormatWhitelistArguments = function ffmpegFormatWhitelistArguments() {
   return this.ffmpegAllowedFormats != null
     ? ["-format_whitelist", Array.from(this.ffmpegAllowedFormats).join(",")]
