@@ -911,7 +911,7 @@ export class Connection {
 
     if (this.status() != PG.CONNECTION_OK) {
       const msg = this.errorMessage() ?? "";
-      await this.finish().catch(() => null);
+      await this.finish();
       throw new ConnectionBad(connectionErrors.map((e) => e + "\n").join("") + msg, {
         connection: this,
       });
