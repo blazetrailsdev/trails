@@ -50,7 +50,7 @@ export class ${name} extends Migration.Current {${body}}
       .trails(
         "runner",
         ...envArgs,
-        `console.log(JSON.stringify((await (await ${klass}.leaseConnection()).tables()).sort()))`,
+        `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect((await (await ${klass}.leaseConnection()).tables()).sort()))`,
       )
       .then((out) => out.trim());
   const versions = (output: string) =>
@@ -60,12 +60,12 @@ export class ${name} extends Migration.Current {${body}}
     let output = await t.trails(`db:create:${namespace}`);
     expect(output).toMatch(/Created database/);
     assertMatchNamespace(namespace, output);
-    expect(await exists(expectedDatabase)).toBe(true);
+    expect(await exists(expectedDatabase)).toBeTruthy();
 
     output = await t.trails(`db:drop:${namespace}`);
     expect(output).toMatch(/Dropped database/);
     assertMatchNamespace(namespace, output);
-    expect(await exists(expectedDatabase)).toBe(false);
+    expect(await exists(expectedDatabase)).toBeFalsy();
   }
 
   function assertMatchNamespace(namespace: string, output: string): void {
@@ -88,8 +88,8 @@ export class ${name} extends Migration.Current {${body}}
     await generateModelsForAnimals();
     await t.trails("db:migrate", "--trace");
     await t.trails("db:schema:cache:dump", "--trace");
-    expect(await exists("db/schema_cache.yml")).toBe(true);
-    expect(await exists("db/animals_schema_cache.yml")).toBe(true);
+    expect(await exists("db/schema_cache.yml")).toBeTruthy();
+    expect(await exists("db/animals_schema_cache.yml")).toBeTruthy();
   }
 
   async function dbMigrateAndSchemaCacheDumpAndSchemaCacheClear(): Promise<void> {
@@ -97,8 +97,8 @@ export class ${name} extends Migration.Current {${body}}
     await t.trails("db:migrate");
     await t.trails("db:schema:cache:dump");
     await t.trails("db:schema:cache:clear");
-    expect(await exists("db/schema_cache.yml")).toBe(false);
-    expect(await exists("db/animals_schema_cache.yml")).toBe(false);
+    expect(await exists("db/schema_cache.yml")).toBeFalsy();
+    expect(await exists("db/animals_schema_cache.yml")).toBeFalsy();
   }
 
   async function dbMigrateAndSchemaDumpAndLoad(schemaFormat = "ts"): Promise<void> {
@@ -121,9 +121,11 @@ export class ${name} extends Migration.Current {${body}}
     await t.trails("db:schema:load");
 
     expect(await tables("ActiveRecord.Base")).toBe(
-      '["ar_internal_metadata","books","schema_migrations"]',
+      '["ar_internal_metadata", "books", "schema_migrations"]',
     );
-    expect(await tables("AnimalsBase")).toBe('["ar_internal_metadata","dogs","schema_migrations"]');
+    expect(await tables("AnimalsBase")).toBe(
+      '["ar_internal_metadata", "dogs", "schema_migrations"]',
+    );
   }
 
   async function dbMigrateAndSchemaDumpAndLoadOneDatabase(database: string, schemaFormat: string) {
@@ -132,38 +134,40 @@ export class ${name} extends Migration.Current {${body}}
 
     await generateModelsForAnimals();
     await t.trails(`db:migrate:${database}`, `db:schema:dump:${database}`);
-    await assertSchemaDumpedFor(database, schemaFormat);
+    if (schemaFormat === "ts") {
+      if (database === "primary") {
+        const schemaDump = await read("db/schema.ts");
+        expect(await exists("db/animals_schema.ts")).toBeFalsy();
+        expect(schemaDump).toMatch(/createTable\("books"/);
+      } else {
+        expect(await exists("db/schema.ts")).toBeFalsy();
+        const schemaDumpAnimals = await read("db/animals_schema.ts");
+        expect(schemaDumpAnimals).toMatch(/createTable\("dogs"/);
+      }
+    } else {
+      if (database === "primary") {
+        const schemaDump = await read("db/structure.sql");
+        expect(await exists("db/animals_structure.sql")).toBeFalsy();
+        expect(schemaDump).toMatch(/CREATE TABLE (?:IF NOT EXISTS )?"books"/);
+      } else {
+        expect(await exists("db/structure.sql")).toBeFalsy();
+        const schemaDumpAnimals = await read("db/animals_structure.sql");
+        expect(schemaDumpAnimals).toMatch(/CREATE TABLE (?:IF NOT EXISTS )?"dogs"/);
+      }
+    }
 
     await t.trails(`db:schema:load:${database}`);
 
     if (database === "primary") {
       expect(await tables("ActiveRecord.Base")).toBe(
-        '["ar_internal_metadata","books","schema_migrations"]',
+        '["ar_internal_metadata", "books", "schema_migrations"]',
       );
       expect(await tables("AnimalsBase")).toBe("[]");
     } else {
       expect(await tables("ActiveRecord.Base")).toBe("[]");
       expect(await tables("AnimalsBase")).toBe(
-        '["ar_internal_metadata","dogs","schema_migrations"]',
+        '["ar_internal_metadata", "dogs", "schema_migrations"]',
       );
-    }
-  }
-
-  async function assertSchemaDumpedFor(name: string, schemaFormat: string): Promise<void> {
-    const [primary, animals] =
-      schemaFormat === "ts"
-        ? ["db/schema.ts", "db/animals_schema.ts"]
-        : ["db/structure.sql", "db/animals_structure.sql"];
-    const [books, dogs] =
-      schemaFormat === "ts"
-        ? [/createTable\("books"/, /createTable\("dogs"/]
-        : [/CREATE TABLE (?:IF NOT EXISTS )?"books"/, /CREATE TABLE (?:IF NOT EXISTS )?"dogs"/];
-    if (name === "primary") {
-      expect(await exists(animals)).toBe(false);
-      expect(await read(primary)).toMatch(books);
-    } else {
-      expect(await exists(primary)).toBe(false);
-      expect(await read(animals)).toMatch(dogs);
     }
   }
 
@@ -173,13 +177,33 @@ export class ${name} extends Migration.Current {${body}}
 
     await generateModelsForAnimals();
 
-    expect(await exists("db/schema.ts")).toBe(false);
-    expect(await exists("db/animals_schema.ts")).toBe(false);
-    expect(await exists("db/structure.sql")).toBe(false);
-    expect(await exists("db/animals_structure.sql")).toBe(false);
+    expect(await exists("db/schema.ts")).toBeFalsy();
+    expect(await exists("db/animals_schema.ts")).toBeFalsy();
+    expect(await exists("db/structure.sql")).toBeFalsy();
+    expect(await exists("db/animals_structure.sql")).toBeFalsy();
 
     await t.trails(`db:migrate:${name}`);
-    await assertSchemaDumpedFor(name, schemaFormat);
+    if (schemaFormat === "ts") {
+      if (name === "primary") {
+        const schemaDump = await read("db/schema.ts");
+        expect(await exists("db/animals_schema.ts")).toBeFalsy();
+        expect(schemaDump).toMatch(/createTable\("books"/);
+      } else {
+        expect(await exists("db/schema.ts")).toBeFalsy();
+        const schemaDumpAnimals = await read("db/animals_schema.ts");
+        expect(schemaDumpAnimals).toMatch(/createTable\("dogs"/);
+      }
+    } else {
+      if (name === "primary") {
+        const schemaDump = await read("db/structure.sql");
+        expect(await exists("db/animals_structure.sql")).toBeFalsy();
+        expect(schemaDump).toMatch(/CREATE TABLE (?:IF NOT EXISTS )?"books"/);
+      } else {
+        expect(await exists("db/structure.sql")).toBeFalsy();
+        const schemaDumpAnimals = await read("db/animals_structure.sql");
+        expect(schemaDumpAnimals).toMatch(/CREATE TABLE (?:IF NOT EXISTS )?"dogs"/);
+      }
+    }
   }
 
   async function dbTestPrepareName(name: string, schemaFormat: string): Promise<void> {
@@ -195,13 +219,13 @@ export class ${name} extends Migration.Current {${body}}
 
     if (name === "primary") {
       expect(await tables("ActiveRecord.Base", "-e", "test")).toBe(
-        '["ar_internal_metadata","books","schema_migrations"]',
+        '["ar_internal_metadata", "books", "schema_migrations"]',
       );
       expect(await tables("AnimalsBase", "-e", "test")).toBe("[]");
     } else {
       expect(await tables("ActiveRecord.Base", "-e", "test")).toBe("[]");
       expect(await tables("AnimalsBase", "-e", "test")).toBe(
-        '["ar_internal_metadata","dogs","schema_migrations"]',
+        '["ar_internal_metadata", "dogs", "schema_migrations"]',
       );
     }
   }
@@ -233,7 +257,7 @@ export class ${name} extends Migration.Current {${body}}
     expect(output).toMatch(/Created database/);
     for (const dbConfig of configsFor()) {
       assertMatchNamespace(dbConfig.name, output);
-      expect(await exists(dbConfig.database!)).toBe(true);
+      expect(await exists(dbConfig.database!)).toBeTruthy();
     }
   }
 
@@ -244,7 +268,7 @@ export class ${name} extends Migration.Current {${body}}
     expect(output).toMatch(/Created database/);
     for (const dbConfig of configsFor()) {
       assertMatchNamespace(dbConfig.name, output);
-      expect(await exists(dbConfig.database!)).toBe(true);
+      expect(await exists(dbConfig.database!)).toBeTruthy();
     }
   }
 
@@ -254,7 +278,7 @@ export class ${name} extends Migration.Current {${body}}
     expect(output).toMatch(/Dropped database/);
     expect(output).toMatch(/Created database/);
     assertMatchNamespace(namespace, output);
-    expect(await exists(expectedDatabase)).toBe(true);
+    expect(await exists(expectedDatabase)).toBeTruthy();
   }
 
   async function dbUpAndDown(version: string, namespace: string | null = null): Promise<void> {
@@ -450,8 +474,8 @@ export class AnimalsBase extends Base {
 
     await t.trails("db:prepare");
 
-    expect(await exists("db/schema.ts")).toBe(true);
-    expect(await exists("db/animals_schema.ts")).toBe(true);
+    expect(await exists("db/schema.ts")).toBeTruthy();
+    expect(await exists("db/animals_schema.ts")).toBeTruthy();
 
     expect(await read("db/schema.ts")).not.toEqual(await read("db/animals_schema.ts"));
 
@@ -598,11 +622,11 @@ export class AnimalsBase extends Base {
     await t.trails("db:migrate:up:primary", "VERSION=01");
     await t.trails("db:migrate:down:primary", "VERSION=01");
 
-    expect(await exists("db/schema.ts"), "should dump schema for primary database").toBe(true);
+    expect(await exists("db/schema.ts"), "should dump schema for primary database").toBeTruthy();
     expect(
       await exists("db/animals_schema.ts"),
       "should not dump schema for animals database",
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("db:migrate:redo raises in a multi-db application", async () => {
@@ -646,11 +670,11 @@ export class AnimalsBase extends Base {
 
     await t.trails("db:rollback:primary");
 
-    expect(await exists("db/schema.ts"), "should dump schema for primary database").toBe(true);
+    expect(await exists("db/schema.ts"), "should dump schema for primary database").toBeTruthy();
     expect(
       await exists("db/animals_schema.ts"),
       "should not dump schema for animals database",
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("db:migrate:status works on all databases", async () => {
@@ -874,13 +898,14 @@ export default { development };
     await t.trails("generate", "model", "book", "title:string");
     await t.trails("db:migrate");
 
-    expect(await exists("db/schema.ts"), "should not dump schema when configured not to").toBe(
-      false,
-    );
+    expect(
+      await exists("db/schema.ts"),
+      "should not dump schema when configured not to",
+    ).toBeFalsy();
     expect(
       await exists("db/secondary_schema.ts"),
       "should not dump schema when configured not to",
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("schema generation when dump_schema_after_migration is false and schema_dump is true", async () => {
@@ -900,13 +925,14 @@ export default { development };
     await t.trails("generate", "model", "book", "title:string");
     await t.trails("db:migrate");
 
-    expect(await exists("db/schema.ts"), "should not dump schema when configured not to").toBe(
-      false,
-    );
+    expect(
+      await exists("db/schema.ts"),
+      "should not dump schema when configured not to",
+    ).toBeFalsy();
     expect(
       await exists("db/secondary_schema.ts"),
       "should not dump schema when configured not to",
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("schema generation with schema dump only for primary", async () => {
@@ -924,13 +950,14 @@ export default { development };
     await t.trails("generate", "model", "book", "title:string");
     await t.trails("db:migrate:primary", "db:migrate:secondary");
 
-    expect(await exists("db/schema.ts"), "should not dump schema when configured not to").toBe(
-      true,
-    );
+    expect(
+      await exists("db/schema.ts"),
+      "should not dump schema when configured not to",
+    ).toBeTruthy();
     expect(
       await exists("db/secondary_schema.ts"),
       "should not dump schema when configured not to",
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("schema generation with schema dump only for secondary", async () => {
@@ -948,12 +975,14 @@ export default { development };
     await t.trails("generate", "model", "book", "title:string");
     await t.trails("db:migrate:primary", "db:migrate:secondary");
 
-    expect(await exists("db/schema.ts"), "should not dump schema when configured not to").toBe(
-      false,
-    );
-    expect(await exists("db/secondary_schema.ts"), "should dump schema when configured to").toBe(
-      true,
-    );
+    expect(
+      await exists("db/schema.ts"),
+      "should not dump schema when configured not to",
+    ).toBeFalsy();
+    expect(
+      await exists("db/secondary_schema.ts"),
+      "should dump schema when configured to",
+    ).toBeTruthy();
   });
 
   it("schema generation when dump_schema_after_migration and schema_dump are true", async () => {
@@ -971,10 +1000,11 @@ export default { development };
     await t.trails("generate", "model", "book", "title:string");
     await t.trails("db:migrate");
 
-    expect(await exists("db/schema.ts"), "should dump schema when configured to").toBe(true);
-    expect(await exists("db/secondary_schema.ts"), "should dump schema when configured to").toBe(
-      true,
-    );
+    expect(await exists("db/schema.ts"), "should dump schema when configured to").toBeTruthy();
+    expect(
+      await exists("db/secondary_schema.ts"),
+      "should dump schema when configured to",
+    ).toBeTruthy();
   });
 
   it("db:test:prepare don't raise errors when schema_dump is false", async () => {
