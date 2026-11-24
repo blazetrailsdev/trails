@@ -2,6 +2,7 @@ import {
   ArgumentError,
   Encoding,
   NotImplementedError,
+  Process,
   Thread,
   RuntimeError,
   TypeError,
@@ -539,7 +540,7 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     const timeoutSeconds = milliseconds / 1000;
 
     return this.busyHandler((count) => {
-      const now = performance.now() / 1000;
+      const now = Process.clockGettime(Process.CLOCK_MONOTONIC);
       if (count === 0) {
         return (this.#timeoutDeadline = now + timeoutSeconds);
       } else if (now > this.#timeoutDeadline) {
