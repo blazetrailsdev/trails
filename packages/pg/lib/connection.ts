@@ -9,6 +9,7 @@ import {
   rbObjClassname,
   rbObjRespondTo,
   rbObjSingletonClass,
+  rbProgname,
   TypeError,
   stringValue,
 } from "@blazetrails/ruby-compat";
@@ -76,6 +77,14 @@ export class Connection {
   _nonblocking = false;
   _encoderForPutCopyData: Coder | null = null;
   _decoderForGetCopyData: Coder | null = null;
+  /** @internal */
+  _flushData = false;
+  /** @internal */
+  _errorMessage = "";
+  /** @internal */
+  _pollStatus: number = PG.PGRES_POLLING_OK;
+  /** @internal */
+  _connecting: Promise<void> | null = null;
   declare asyncIsnonblocking: Connection["isnonblocking"];
   declare isNonblocking: Connection["isnonblocking"];
   declare asyncSetnonblocking: Connection["setnonblocking"];
@@ -87,6 +96,7 @@ export class Connection {
     }
   }
 
+  static conndefaults = conndefaults;
   static conndefaultsHash = conndefaultsHash;
   static escapeString = escapeString;
   static escape = escapeString;
@@ -128,6 +138,181 @@ export class Connection {
   }
 
   static connect = Connection.new;
+
+  static conninfoParse(
+    conninfo: string,
+  ): { keyword: string; compiled: string | null; val: string | null }[] {
+    const vals: Record<string, string> = {};
+    const uri = /^postgres(?:ql)?:\/\//.test(conninfo);
+    const set = (key: string, val: string): void => {
+      const keyword = key.replace(/_([a-z])/g, (_m: string, c: string) => c.toUpperCase());
+      if (/[A-Z]/.test(key) || !CONNINFO_KEYWORDS.includes(keyword)) {
+        throw new PgError(
+          uri ? `invalid URI query parameter: "${key}"\n` : `invalid connection option "${key}"\n`,
+        );
+      }
+      vals[keyword] = val;
+    };
+    const dec = (token: string): string => {
+      try {
+        return decodeURIComponent(token);
+      } catch {
+        throw new PgError(`invalid percent-encoded token: "${token}"\n`);
+      }
+    };
+    if (uri) {
+      const m = /^[^:]*:\/\/(?:([^:@/]*)(?::([^@/]*))?@)?([^/?]*)(?:\/([^?]*))?(?:\?(.*))?$/.exec(
+        conninfo,
+      )!;
+      const [, userinfo, password, hostPart, path, query] = m;
+      if (userinfo) set("user", dec(userinfo));
+      if (password) set("password", dec(password));
+      const hosts = hostPart.split(",").map((h) => /^(\[[^\]]*\]|[^:]*)(?::(.*))?$/.exec(h)!);
+      if (hosts.some((h) => h[1])) {
+        set("host", hosts.map((h) => dec(h[1].replace(/^\[|\]$/g, ""))).join(","));
+      }
+      if (hosts.some((h) => h[2])) set("port", hosts.map((h) => h[2] ?? "").join(","));
+      if (path) set("dbname", dec(path));
+      for (const pair of query ? query.split("&") : []) {
+        const eq = pair.indexOf("=");
+        if (eq < 0) {
+          throw new PgError(`missing key/value separator "=" in URI query parameter: "${pair}"\n`);
+        }
+        if (pair.indexOf("=", eq + 1) >= 0) {
+          throw new PgError(`extra key/value separator "=" in URI query parameter: "${pair}"\n`);
+        }
+        set(dec(pair.slice(0, eq)), dec(pair.slice(eq + 1)));
+      }
+    } else {
+      let cp = 0;
+      const isspace = (c: string | undefined): boolean => c != null && /\s/.test(c);
+      while (cp < conninfo.length) {
+        if (isspace(conninfo[cp])) {
+          cp++;
+          continue;
+        }
+        let pname = "";
+        while (cp < conninfo.length && conninfo[cp] !== "=" && !isspace(conninfo[cp])) {
+          pname += conninfo[cp++];
+        }
+        while (isspace(conninfo[cp])) cp++;
+        if (conninfo[cp] !== "=") {
+          throw new PgError(`missing "=" after "${pname}" in connection info string\n`);
+        }
+        cp++;
+        while (isspace(conninfo[cp])) cp++;
+        let pval = "";
+        if (conninfo[cp] !== "'") {
+          while (cp < conninfo.length && !isspace(conninfo[cp])) {
+            if (conninfo[cp] === "\\" && cp + 1 < conninfo.length) cp++;
+            pval += conninfo[cp++];
+          }
+        } else {
+          cp++;
+          for (;;) {
+            if (cp >= conninfo.length) {
+              throw new PgError("unterminated quoted string in connection info string\n");
+            }
+            if (conninfo[cp] === "\\" && cp + 1 < conninfo.length) {
+              cp++;
+              pval += conninfo[cp++];
+              continue;
+            }
+            if (conninfo[cp] === "'") {
+              cp++;
+              break;
+            }
+            pval += conninfo[cp++];
+          }
+        }
+        set(pname, pval);
+      }
+    }
+    return CONNINFO_KEYWORDS.map((keyword) => ({
+      keyword,
+      compiled: COMPILED_DEFAULTS[keyword] ?? null,
+      val: vals[keyword] ?? null,
+    }));
+  }
+
+  static quoteConnstr(value: unknown): string {
+    return "'" + String(value).replace(/[\\']/g, (m) => "\\" + m) + "'";
+  }
+
+  static connectHashToString(hash: Record<string, unknown>): string {
+    return Object.entries(hash)
+      .map(
+        ([k, v]) =>
+          `${k.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase())}=${Connection.quoteConnstr(v)}`,
+      )
+      .join(" ");
+  }
+
+  static parseConnectArgs(...args: unknown[]): string {
+    const last = args.at(-1);
+    const hashArg =
+      typeof last === "object" && last !== null && Object.getPrototypeOf(last) === Object.prototype
+        ? (args.pop() as Record<string, unknown>)
+        : {};
+    let iopts: Record<string, unknown> = {};
+
+    if (args.length == 1) {
+      const first = String(args[0]);
+      if (/=/.test(first) || /:\/\//.test(first)) {
+        const connString = first;
+        for (const h of Connection.conninfoParse(connString))
+          if (h.val != null) iopts[h.keyword] = h.val;
+      } else {
+        iopts[CONNECT_ARGUMENT_ORDER[0]] = args[0];
+      }
+    } else {
+      const max = CONNECT_ARGUMENT_ORDER.length;
+      if (args.length > max) {
+        throw new ArgumentError(`Extra positional parameter ${max + 1}: ${rbInspect(args[max])}`);
+      }
+      CONNECT_ARGUMENT_ORDER.forEach((k, i) => {
+        const v = args[i];
+        if (v != null && v !== false) iopts[k] = v;
+      });
+      delete iopts.tty;
+    }
+
+    iopts = Object.assign(iopts, hashArg);
+
+    if (iopts.fallbackApplicationName == null || iopts.fallbackApplicationName === false) {
+      iopts.fallbackApplicationName = PROGRAM_NAME.replace(
+        /^(.{30}).{4,}(.{30})$/,
+        (_m, a: string, b: string) => a + "..." + b,
+      );
+    }
+
+    return Connection.connectHashToString(iopts);
+  }
+
+  static async connectStart<T extends Connection>(
+    this: { prototype: T; parseConnectArgs(...args: unknown[]): string },
+    ...args: unknown[]
+  ): Promise<T> {
+    await _requireEngine();
+    const block =
+      typeof args.at(-1) === "function" ? (args.pop() as (conn: T) => unknown) : undefined;
+    const conninfo = this.parseConnectArgs(...args);
+    const rbConn = rbClassNewInstance(this, _conninfoHashOf(conninfo));
+    rbConn._connectStart();
+
+    if (rbConn.status() == PG.CONNECTION_BAD) {
+      throw new ConnectionBad(rbConn._errorMessage, { connection: rbConn });
+    }
+
+    if (block !== undefined) {
+      try {
+        return (await block(rbConn)) as T;
+      } finally {
+        await rbConn.finish();
+      }
+    }
+    return rbConn;
+  }
 
   protected constructor(connParams: Record<string, unknown> = {}) {
     this.connParams = connParams;
@@ -279,9 +464,9 @@ export class Connection {
     return this._nonblocking;
   }
 
-  /** @missingRailsCall flush_data= — CONVERGEABLE pg-connection-connect-poll-c-primitives */
   setnonblocking(enabled: boolean): null {
     (rbObjSingletonClass(this) as unknown as typeof Connection).setAsyncSendApi(!enabled);
+    this.flushData = !enabled;
     return this.syncSetnonblocking(true);
   }
 
@@ -393,6 +578,109 @@ export class Connection {
     return this;
   }
 
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  _connectStart(): void {
+    this._errorMessage = "";
+    this._pollStatus = PG.PGRES_POLLING_WRITING;
+    this._connecting = this.client.connect().then(
+      () => {
+        this._pollStatus = PG.PGRES_POLLING_OK;
+      },
+      (error: unknown) => {
+        this.bad = true;
+        this._errorMessage = `${(error as { message?: string })?.message ?? String(error)}\n`;
+        this._pollStatus = PG.PGRES_POLLING_FAILED;
+      },
+    );
+  }
+
+  connectPoll(): number {
+    if (this._pollStatus === PG.PGRES_POLLING_WRITING) return PG.PGRES_POLLING_READING;
+    return this._pollStatus;
+  }
+
+  /** @internal */
+  async resetStart2(conninfo: string): Promise<null> {
+    const client = this.client;
+    await client.end().catch(() => null);
+
+    const conn = engine!.newClient(_conninfoHashOf(conninfo));
+    for (const event of client.eventNames()) {
+      for (const listener of client.rawListeners(event)) {
+        conn.on(event as "error", listener as () => void);
+      }
+    }
+    engine!.listen(this, conn);
+    this.connParams = _conninfoHashOf(conninfo);
+    this.client = conn;
+    this.prepared.clear();
+    this.readyForQuery = "I";
+    this.bad = false;
+    this._pipelineStatus = PG.PQ_PIPELINE_OFF;
+    this._cmdQueue = [];
+    this._results = [];
+    this._submittable = null;
+    this._sendError = null;
+    this._chunkSize = 0;
+    this._connectStart();
+
+    if (this.status() == PG.CONNECTION_BAD) {
+      throw new ConnectionBad(this._errorMessage, { connection: this });
+    }
+    return null;
+  }
+
+  resetPoll(): number {
+    return this.connectPoll();
+  }
+
+  errorMessage(): string | null {
+    return this._errorMessage;
+  }
+
+  hostaddr(): string | null {
+    const stream = (
+      this.client as unknown as { connection?: { stream?: { remoteAddress?: string } } }
+    ).connection?.stream;
+    return stream?.remoteAddress ?? null;
+  }
+
+  conninfo(): { keyword: string; compiled: string | null; val: string | null }[] {
+    return CONNINFO_KEYWORDS.map((keyword) => ({
+      keyword,
+      compiled: COMPILED_DEFAULTS[keyword] ?? null,
+      val: this.connParams[keyword] == null ? null : String(this.connParams[keyword]),
+    }));
+  }
+
+  conninfoHash(): Record<string, string | null> {
+    const hash: Record<string, string | null> = {};
+    for (const info of this.conninfo()) hash[info.keyword] = info.val;
+    return hash;
+  }
+
+  /** @internal */
+  set flushData(enabled: boolean) {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
+    this._flushData = enabled !== false && enabled != null;
+  }
+
+  setDefaultEncoding(): null {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
+        receiver: this,
+      });
+    }
+    return null;
+  }
+
   connect(): Promise<unknown> {
     return this.client.connect().catch((error: unknown) => {
       throw engine!.pgError(this, error, ConnectionBad);
@@ -406,6 +694,10 @@ export class Connection {
       : PG.CONNECTION_OK;
   }
 
+  /**
+   * @missingRailsCall parse_connect_args — CONVERGEABLE pg-connection-connect-and-reset-private-helpers
+   * @missingRailsCall reset_start2 — CONVERGEABLE pg-connection-connect-and-reset-private-helpers
+   */
   async reset(): Promise<this> {
     const client = this.client;
     const iopts = engine!._clientConfig(this.connParams);
@@ -683,17 +975,31 @@ export class Connection {
     return engine!.execute(this, sql, params);
   }
 
-  socketIo(): { reopen(path: string): void } | null {
+  socketIo(): {
+    reopen(path: string): void;
+    wait(events: number, timeout?: number | null): Promise<unknown>;
+  } | null {
     const stream = (
       this.client as unknown as {
         connection?: { stream?: { removeAllListeners?(): unknown; unref?(): unknown } };
       }
     ).connection?.stream;
     if (!stream) return null;
+    const connecting = this._connecting;
     return {
       reopen(_path: string): void {
         stream.removeAllListeners?.();
         stream.unref?.();
+      },
+      async wait(_events: number, timeout: number | null = null): Promise<unknown> {
+        if (connecting == null) return this;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const expired = new Promise<null>((resolve) => {
+          if (timeout != null) timer = setTimeout(() => resolve(null), timeout * 1000);
+        });
+        const ret = await Promise.race([connecting.then(() => this), expired]);
+        clearTimeout(timer);
+        return ret;
       },
     };
   }
@@ -883,9 +1189,38 @@ const CONNINFO_KEYWORDS = [
   "loadBalanceHosts",
 ];
 
-/** @internal */
-function conndefaults(): { keyword: string; val: string | null }[] {
-  return CONNINFO_KEYWORDS.map((keyword) => ({ keyword, val: null }));
+const CONNECT_ARGUMENT_ORDER = ["host", "port", "options", "tty", "dbname", "user", "password"];
+
+const PROGRAM_NAME = rbProgname();
+
+const COMPILED_DEFAULTS: Record<string, string> = {
+  channelBinding: "prefer",
+  port: "5432",
+  sslmode: "prefer",
+  sslnegotiation: "postgres",
+  sslcompression: "0",
+  sslcertmode: "allow",
+  sslsni: "1",
+  gssencmode: "disable",
+  krbsrvname: "postgres",
+  gssdelegation: "0",
+  targetSessionAttrs: "any",
+  loadBalanceHosts: "disable",
+};
+
+function conndefaults(): { keyword: string; compiled: string | null; val: string | null }[] {
+  return CONNINFO_KEYWORDS.map((keyword) => ({
+    keyword,
+    compiled: COMPILED_DEFAULTS[keyword] ?? null,
+    val: COMPILED_DEFAULTS[keyword] ?? null,
+  }));
+}
+
+/** @noRailsEquivalent PERMANENT */
+function _conninfoHashOf(conninfo: string): Record<string, unknown> {
+  const hash: Record<string, unknown> = {};
+  for (const h of Connection.conninfoParse(conninfo)) if (h.val != null) hash[h.keyword] = h.val;
+  return hash;
 }
 
 export function conndefaultsHash(): Record<string, string | null> {
