@@ -844,7 +844,6 @@ ${requireStatements.join("\n")}`;
     return !(this.options.skipInstall || this.options.pretend);
   }
 
-  /** @internal */
   /**
    * @missingRailsArgs join — PERMANENT
    * @missingRailsArgs remove_file — PERMANENT

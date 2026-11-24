@@ -37,6 +37,7 @@ import {
 } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Root } from "./paths.js";
+import type {} from "./trailties/i18n.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
 import { generateRailtieName, Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
@@ -512,9 +513,7 @@ Engine.initializer("add_routing_paths", async function (this: Engine, ...args: u
 });
 
 Engine.initializer("add_locales", function (this: Engine) {
-  (this.config as unknown as { i18n: { railtiesLoadPath: unknown[] } }).i18n.railtiesLoadPath.push(
-    this.paths().get("config/locales"),
-  );
+  this.config.i18n.railtiesLoadPath.push(this.paths().get("config/locales"));
 });
 
 Engine.initializer("add_view_paths", async function (this: Engine) {
