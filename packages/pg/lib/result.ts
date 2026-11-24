@@ -96,13 +96,9 @@ export class Result {
   }
 
   static resStatus(status: unknown): string {
-    return (
-      Object.keys(PGConstants).find(
-        (c) =>
-          c.startsWith("PGRES_") &&
-          PGConstants[c as keyof typeof PGConstants] === rbNum2Int(status),
-      ) ?? "invalid ExecStatusType code"
-    );
+    const index = rbNum2Int(status);
+    if (index < 0 || index >= PGRES_STATUS.length) return "invalid ExecStatusType code";
+    return PGRES_STATUS[index];
   }
 
   resStatus(...args: unknown[]): string {
@@ -276,3 +272,19 @@ export class Result {
 include(Result, Enumerable);
 
 PG.Result = Result;
+
+const PGRES_STATUS = [
+  "PGRES_EMPTY_QUERY",
+  "PGRES_COMMAND_OK",
+  "PGRES_TUPLES_OK",
+  "PGRES_COPY_OUT",
+  "PGRES_COPY_IN",
+  "PGRES_BAD_RESPONSE",
+  "PGRES_NONFATAL_ERROR",
+  "PGRES_FATAL_ERROR",
+  "PGRES_COPY_BOTH",
+  "PGRES_SINGLE_TUPLE",
+  "PGRES_PIPELINE_SYNC",
+  "PGRES_PIPELINE_ABORTED",
+  "PGRES_TUPLES_CHUNK",
+];
