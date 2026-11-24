@@ -19,6 +19,12 @@ export function aggregateOptions(aggregator: Aggregator) {
 }
 
 /** @internal */
+export function libversionNumber(version: string): number {
+  const [major = 0, minor = 0, release = 0] = version.split(".").map(Number);
+  return major * 1000000 + minor * 1000 + release;
+}
+
+/** @internal */
 export function databaseListFilename(
   rows: readonly { name: string; file: string }[],
   dbName: string,

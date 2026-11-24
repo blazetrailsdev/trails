@@ -55,6 +55,7 @@ export interface EngineDatabase extends EngineErrors {
   loadExtensionInternal(file: string): void;
   enableLoadExtension(onoff: boolean): void;
   dbFilename(dbName: string): string | null | Promise<string | null>;
+  libversion(): number | Promise<number>;
   setAuthorizer?(callback: ((action: number, ...args: (string | null)[]) => number) | null): void;
   defineFunctionWithFlags?(
     name: string,
@@ -470,8 +471,11 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     const proxy = class {
       static template = aggregator;
 
+      /** @inventedArm if — PERMANENT */
       static get arity(): number {
-        return proxy.template.step.length;
+        const arity = proxy.template.step.length;
+        if (arity === 0) return -1;
+        return arity;
       }
 
       #klass: typeof aggregator;

@@ -15,7 +15,7 @@ import { closedStatement, statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
-import { aggregateOptions, databaseListFilename } from "./aggregator.js";
+import { aggregateOptions, databaseListFilename, libversionNumber } from "./aggregator.js";
 
 /** @internal */
 type NodeSqliteModule = typeof import("node:sqlite");
@@ -232,6 +232,10 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
     },
     loadExtensionInternal: (file) => raw.loadExtension(file),
     enableLoadExtension: (onoff) => raw.enableLoadExtension(onoff),
+    libversion: () =>
+      libversionNumber(
+        (raw.prepare("select sqlite_version() v").get() as unknown as { v: string }).v,
+      ),
     dbFilename: (dbName) =>
       databaseListFilename(
         raw.prepare("PRAGMA database_list").all() as unknown as { name: string; file: string }[],

@@ -1,4 +1,11 @@
-import { Process, prepend, rbCallSuper, rbSingletonClass, warn } from "@blazetrails/ruby-compat";
+import {
+  Process,
+  Thread,
+  prepend,
+  rbCallSuper,
+  rbSingletonClass,
+  warn,
+} from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
 import type { Database } from "./database.js";
 
@@ -7,8 +14,7 @@ export const CoreExt = {
   _fork(this: object): unknown {
     const pid = rbCallSuper(this, CoreExt._fork);
     if (pid === 0) {
-      const r = ForkSafety.discard();
-      if (r instanceof Promise) return r.then(() => pid);
+      ForkSafety.discard();
     }
     return pid;
   },
@@ -31,9 +37,8 @@ export const ForkSafety = {
   },
 
   /** @internal */
-  discard(): void | Promise<void> {
+  discard(): void {
     let warned = ForkSafety._suppress;
-    const closing: Promise<unknown>[] = [];
     for (const ref of ForkSafety._databases) {
       const db = ref.deref();
       if (db === undefined) continue;
@@ -49,11 +54,10 @@ export const ForkSafety = {
           warned = true;
         }
         const r = db.close();
-        if (r instanceof Promise) closing.push(r);
+        if (r instanceof Promise) new Thread(() => r);
       }
     }
     ForkSafety._databases.length = 0;
-    if (closing.length !== 0) return Promise.all(closing).then(() => {});
   },
 
   suppressWarningsBang(): void {

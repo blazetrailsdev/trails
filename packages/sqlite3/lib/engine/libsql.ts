@@ -9,7 +9,7 @@ import { closedStatement, statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
-import { databaseListFilename } from "./aggregator.js";
+import { databaseListFilename, libversionNumber } from "./aggregator.js";
 
 const CONNECTION_FAILED = /^ConnectionFailed\(".*: (\d+)"\)$/;
 
@@ -189,6 +189,8 @@ function openEngine(
       disableQuirkMode: () => {},
       loadExtensionInternal: (file) => void raw.loadExtension(file),
       enableLoadExtension: () => {},
+      libversion: () =>
+        libversionNumber((raw.prepare("select sqlite_version() v").get() as { v: string }).v),
       dbFilename: (dbName) =>
         databaseListFilename(
           raw.prepare("PRAGMA database_list").all() as { name: string; file: string }[],

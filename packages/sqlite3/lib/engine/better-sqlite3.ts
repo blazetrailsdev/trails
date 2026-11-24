@@ -14,7 +14,7 @@ import { closedStatement, statementTail } from "./statement-tail.js";
 import { withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
-import { aggregateOptions, databaseListFilename } from "./aggregator.js";
+import { aggregateOptions, databaseListFilename, libversionNumber } from "./aggregator.js";
 
 const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
 
@@ -197,6 +197,8 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
     disableQuirkMode: () => {},
     loadExtensionInternal: (file) => void raw.loadExtension(file),
     enableLoadExtension: () => {},
+    libversion: () =>
+      libversionNumber((raw.prepare("select sqlite_version() v").get() as { v: string }).v),
     dbFilename: (dbName) =>
       databaseListFilename(
         raw.prepare("PRAGMA database_list").all() as { name: string; file: string }[],

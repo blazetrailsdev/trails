@@ -593,15 +593,17 @@ export function setWritableSchema(this: PragmasHost, mode: unknown): unknown {
 }
 
 export async function tableInfo(
-  this: PragmasHost & { prepare(sql: string): Statement | Promise<Statement> },
+  this: PragmasHost & {
+    prepare(sql: string): Statement | Promise<Statement>;
+    _engine: { libversion(): number | Promise<number> };
+  },
   table: string,
   block?: (row: Record<string, unknown>) => unknown,
 ): Promise<Record<string, unknown>[] | undefined> {
   const stmt = await this.prepare(`PRAGMA table_info(${table})`);
   const columns = await stmt.columns();
 
-  const needsTweakDefault =
-    versionCompare(String(await this.getFirstValue("select sqlite_version()")), "3.3.7") > 0;
+  const needsTweakDefault = versionCompare(String(await this._engine.libversion()), "3.3.7") > 0;
 
   const result: Record<string, unknown>[] | undefined = block ? undefined : [];
   await stmt.each((row) => {
@@ -779,11 +781,11 @@ function tweakDefault(hash: Record<string, unknown>): void {
   const dflt = hash["dflt_value"];
   if (typeof dflt !== "string") return;
   let m: RegExpExecArray | null;
-  if (/^null$/i.test(dflt)) {
+  if (/^null$/im.test(dflt)) {
     hash["dflt_value"] = null;
-  } else if ((m = /^'(.*)'$/s.exec(dflt))) {
+  } else if ((m = /^'(.*)'$/ms.exec(dflt))) {
     hash["dflt_value"] = m[1].replaceAll("''", "'");
-  } else if ((m = /^"(.*)"$/s.exec(dflt))) {
+  } else if ((m = /^"(.*)"$/ms.exec(dflt))) {
     hash["dflt_value"] = m[1].replaceAll('""', '"');
   }
 }
