@@ -209,8 +209,7 @@ export default await Trails.initialize();
     );
   });
 
-  // BLOCKED: trailties-reload-routes-in-rake-task-draws-app-routes
-  it.skip("reload routes", async () => {
+  it("reload routes", async () => {
     await rakeTasks(`DSL.task({ do_something: "environment" }, block(async () => { await Trails.application!.reloadRoutesBang();
   console.log([...Trails.application!.routes().namedRoutes.routes.keys()].join(" "));
 }));`);
@@ -261,8 +260,7 @@ Trails.application.routes().draw(function () {
     expect(output).not.toMatch(/Errors running/);
   });
 
-  // BLOCKED: trailties-api-scaffold-generates-rails-test-count
-  it.skip("api scaffold tests pass by default", async () => {
+  it("api scaffold tests pass by default", async () => {
     await t.addToConfig("this.config.apiOnly = true;");
 
     await t.appFile(

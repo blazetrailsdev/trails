@@ -66,6 +66,7 @@ export default class VitestReporter implements Reporter {
   }
 
   onTestCaseResult(testCase: TestCase): void {
+    if (testCase.options.mode === "todo") return;
     if (
       env.TRAILS_TEST_FILTERED != null &&
       testCase.result().state === "skipped" &&

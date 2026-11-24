@@ -25,7 +25,10 @@
       "types": "./dist/server/index.d.ts",
       "default": "./dist/server/index.js"
     },
-    "./all": "./dist/all.js",
+    "./all": {
+      "types": "./types/all.d.ts",
+      "default": "./dist/all.js"
+    },
     "./trails": {
       "types": "./dist/trails.d.ts",
       "default": "./dist/trails.js"
@@ -127,6 +130,7 @@
   "files": [
     "dist",
     "bin",
+    "types",
     "!dist/**/*.d.ts.map"
   ],
   "dependencies": {
