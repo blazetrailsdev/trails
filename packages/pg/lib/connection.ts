@@ -178,6 +178,9 @@ export class Connection {
         if (eq < 0) {
           throw new PgError(`missing key/value separator "=" in URI query parameter: "${pair}"\n`);
         }
+        if (pair.indexOf("=", eq + 1) >= 0) {
+          throw new PgError(`extra key/value separator "=" in URI query parameter: "${pair}"\n`);
+        }
         set(dec(pair.slice(0, eq)), dec(pair.slice(eq + 1)));
       }
     } else {
