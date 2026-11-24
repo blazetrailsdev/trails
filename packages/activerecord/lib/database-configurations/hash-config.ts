@@ -1,4 +1,4 @@
-import { fetch, File, rtest } from "@blazetrails/ruby-compat";
+import { fetch, File, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 import { schemaFormat } from "../active-record.js";
@@ -113,7 +113,7 @@ export class HashConfig extends DatabaseConfig {
     );
   }
 
-  schemaDump(format: SchemaFormat = schemaFormat()): string | null {
+  schemaDump(format: SchemaFormat = this.schemaFormat()): string | null {
     if ("schemaDump" in this.configurationHash) {
       const config = this.configurationHash.schemaDump;
       if (rtest(config)) {
@@ -125,6 +125,13 @@ export class HashConfig extends DatabaseConfig {
     } else {
       return `${this.name}_${this.schemaFileType(format)}`;
     }
+  }
+
+  schemaFormat(): SchemaFormat {
+    const format = ((this.configurationHash as Record<string, unknown>).schemaFormat ??
+      schemaFormat()) as SchemaFormat;
+    if (!["ts", "js", "sql"].includes(format)) throw new RuntimeError("Invalid schema format");
+    return format;
   }
 
   databaseTasks(): boolean {

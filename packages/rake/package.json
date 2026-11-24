@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/rake",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "Port of the rake gem: a make-like build utility",
   "license": "MIT",
   "repository": {

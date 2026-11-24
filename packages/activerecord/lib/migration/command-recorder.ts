@@ -122,12 +122,12 @@ export class CommandRecorder {
       this._commands.push([
         "changeTable",
         [tableName],
-        () =>
+        (t: Table) =>
           (
             this as unknown as {
               bulkChangeTable(tableName: string, operations: MigrationCommand[]): Promise<void>;
             }
-          ).bulkChangeTable(tableName, commands),
+          ).bulkChangeTable(t.name, [...commands].reverse()),
       ]);
     } else {
       await block!(delegate.updateTableDefinition(tableName, this));

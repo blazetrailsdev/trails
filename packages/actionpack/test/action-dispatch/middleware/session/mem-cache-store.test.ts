@@ -24,7 +24,10 @@ describe("ActionDispatch::Session::MemCacheStore", () => {
   it("inherits CacheStore session behavior", async () => {
     const cache = new MemoryStore();
     const store = new MemCacheStore(undefined, { cache });
-    const [sid, session] = await store.findSession({}, null);
+    const [sid, session] = await store.findSession(
+      { getHeader: () => null, setHeader: () => null },
+      null,
+    );
     expect(sid).toBeInstanceOf(SessionId);
     expect(session).toEqual({});
   });

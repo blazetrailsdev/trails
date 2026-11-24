@@ -142,9 +142,11 @@ export class Inflections {
   }
 
   private defineAcronymRegexPatterns(): void {
-    this.acronymRegex = isEmpty(this.acronyms)
-      ? /(?=a)b/
-      : new RegExp([...this.acronyms.values()].join("|"));
+    const sortedAcronyms = isEmpty(this.acronyms)
+      ? []
+      : [...this.acronyms.values()].sort((a, b) => b.length - a.length);
+    this.acronymRegex =
+      sortedAcronyms.length === 0 ? /(?=a)b/ : new RegExp(sortedAcronyms.join("|"));
     this.acronymsCamelizeRegex = new RegExp(
       `^(?:(?:${this.acronymRegex.source})(?=\\b|[A-Z_])|\\w)`,
     );

@@ -1,3 +1,4 @@
+import "../constants.mysql-database-tasks.generated.js";
 import { rbEqq, rbFSystem, RuntimeError } from "@blazetrails/ruby-compat";
 import { kernelArray } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";

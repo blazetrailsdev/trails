@@ -142,6 +142,26 @@ describe("pinPairs", () => {
     expect(next.find((p) => p.rubyName === "find")!.digest).toBe("old2");
   });
 
+  it("--pin-all --source pins only that source's packages, leaving other pins byte-identical", () => {
+    const records = [
+      record({ rubyName: "save", digest: "new1" }),
+      record({ package: "rack", rubyFile: "request.rb", rubyName: "get?", digest: "new2" }),
+      record({ package: "rack", rubyFile: "response.rb", rubyName: "body", digest: "new3" }),
+    ];
+    const kept = pin({ rubyName: "save", digest: "old1", ref: "v8.0.2", reason: "floor" });
+    const existing = [
+      kept,
+      pin({ package: "rack", rubyFile: "request.rb", rubyName: "get?", digest: "old2" }),
+    ];
+    const rack = SOURCES.find((s) => s.name === "rack")!;
+    const next = pinPairs(records, existing, {
+      all: true,
+      packages: new Set(rack.packages.map((p) => p.name)),
+    });
+    expect(next.find((p) => p.package === "activerecord")).toBe(kept);
+    expect(next.filter((p) => p.package === "rack").map((p) => p.digest)).toEqual(["new2", "new3"]);
+  });
+
   it("emits the same manifest order for any input order (no reseed churn)", () => {
     // The manifest is regenerated from whatever order the artifact lists
     // records in; a permuted artifact must not reorder committed pins.

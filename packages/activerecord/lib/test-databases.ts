@@ -3,7 +3,6 @@ import { getEnv } from "@blazetrails/activesupport";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
-import { schemaFormat } from "./active-record.js";
 
 export class TestDatabases {
   static async createAndLoadSchema(i: number, { envName }: { envName: string }): Promise<void> {
@@ -14,7 +13,7 @@ export class TestDatabases {
       for (const dbConfig of Base.configurations().configsFor({ envName })) {
         dbConfig._database = `${dbConfig.database}-${i}`;
 
-        await DatabaseTasks.reconstructFromSchema(dbConfig, schemaFormat(), undefined);
+        await DatabaseTasks.reconstructFromSchema(dbConfig, undefined);
       }
     } finally {
       await Base.establishConnection();

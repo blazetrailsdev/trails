@@ -7,8 +7,11 @@ import { TextField } from "./text-field.js";
 export class FileField extends TextField {
   override render(): unknown {
     const includeHidden = hashDelete(this._options, "includeHidden");
+    if (Array.isArray(this._options["accept"])) {
+      this._options["accept"] = this._options["accept"].join(",");
+    }
     const options = stringifyKeys(this._options);
-    this.addDefaultNameAndId(options);
+    this.addDefaultNameAndField(options);
 
     if (
       options["multiple"] != null &&

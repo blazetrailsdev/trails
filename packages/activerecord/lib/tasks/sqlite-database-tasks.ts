@@ -1,3 +1,4 @@
+import "../constants.sqlite-database-tasks.generated.js";
 import {
   Errno,
   RuntimeError,

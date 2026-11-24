@@ -8,6 +8,7 @@ import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { RuntimeError } from "./runtime-error.js";
 import { isSymbol, symbolToS } from "./symbol.js";
+import { TypeError } from "./type-error.js";
 
 const BLOCK = Symbol.for("@blazetrails/ruby-compat:block");
 const UNDEF = Symbol("Qundef");
@@ -312,7 +313,7 @@ export function rbToHashType<T>(
   hash: Record<string, T> | Map<string, T> | ToHash,
 ): Record<string, T> | Map<string, T> {
   if (hash instanceof Map || isPlainHash(hash)) return hash as Record<string, T> | Map<string, T>;
-  const own = ownMethod(hash, "toHash");
+  const own = hash == null ? undefined : ownMethod(hash, "toHash");
   if (!own) throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(hash)} into Hash`);
   return own.call(hash) as Record<string, T> | Map<string, T>;
 }

@@ -204,6 +204,7 @@ describe("CacheStoreTest", () => {
       await t.get("/setSessionValue");
 
       t.assertResponse(":success");
+      assertNotNil(t.cookies.get("_session_id"));
       assertNotEqual(sid.publicId, t.cookies.get("_session_id"));
       assertNil(await t._cache.read(`_session_id:${sid.privateId}`));
       assertEqual(

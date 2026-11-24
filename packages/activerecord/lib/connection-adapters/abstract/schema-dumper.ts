@@ -25,13 +25,13 @@ export class SchemaDumper extends BaseSchemaDumper {
     column: Column | undefined,
   ): Promise<Record<string, unknown>> {
     const spec: Record<string, unknown> = {};
-    if (!this.isDefaultPrimaryKey(column!)) {
+    if (!(await this.isDefaultPrimaryKey(column!))) {
       spec["id"] = JSON.stringify(this.schemaType(column!).replace(/^:/, ""));
     }
     const colOpts = await this.prepareColumnOptions(column!);
     delete colOpts["null"];
     Object.assign(spec, colOpts);
-    if (this.isExplicitPrimaryKeyDefault(column!)) {
+    if (await this.isExplicitPrimaryKeyDefault(column!)) {
       spec["default"] ??= "null";
     }
     return spec;
@@ -51,12 +51,12 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected isDefaultPrimaryKey(column: Column): boolean {
+  protected isDefaultPrimaryKey(column: Column): boolean | Promise<boolean> {
     return this.schemaType(column) === ":bigint";
   }
 
   /** @internal */
-  protected isExplicitPrimaryKeyDefault(_column: Column): boolean {
+  protected isExplicitPrimaryKeyDefault(_column: Column): boolean | Promise<boolean> {
     return false;
   }
 

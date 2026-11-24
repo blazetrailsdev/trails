@@ -38,6 +38,10 @@ describe("normalizeArg", () => {
     expect(normalizeArg("id:@ast")).toBe(normalizeArg("id:ast"));
   });
 
+  it("reads a JS #-private field as the Ruby ivar", () => {
+    expect(normalizeArg("id:#autoloads")).toBe(normalizeArg("id:@autoloads"));
+  });
+
   it("keeps a name that merely starts with is", () => {
     expect(normalizeArg("id:is_valid")).toBe("ref:isValid");
     expect(normalizeArg("id:isolation_level")).toBe("ref:isolationLevel");

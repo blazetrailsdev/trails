@@ -1319,7 +1319,7 @@ export function extractTableRefFromInsertSql(
   this: DatabaseStatementsHost,
   sql: string,
 ): string | null {
-  const match = sql.match(/into\s("[ A-Za-z0-9_."[\]]+"|[A-Za-z0-9_.[\]"]+)\s*/im);
+  const match = sql.match(/into\s("[-A-Za-z0-9_."[\]\s]+"|[A-Za-z0-9_.[\]"]+)\s*/im);
   if (!match) return null;
   return match[1].replace(/"/g, "").trim();
 }

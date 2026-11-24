@@ -15,6 +15,14 @@ function makeStore(opts: { expireAfter?: number } = {}): {
   return { store, cache };
 }
 
+function req() {
+  const headers = new Map<string, unknown>();
+  return {
+    getHeader: (k: string) => headers.get(k),
+    setHeader: (k: string, v: unknown) => headers.set(k, v),
+  };
+}
+
 describe("ActionDispatch::Session::CacheStore", () => {
   it("requires a cache option", async () => {
     expect(() => new CacheStore(undefined, {})).toThrow(/cache/);
@@ -23,7 +31,7 @@ describe("ActionDispatch::Session::CacheStore", () => {
   describe("findSession", () => {
     it("returns a new sid and empty hash when sid is null", async () => {
       const { store } = makeStore();
-      const [sid, session] = await store.findSession({}, null);
+      const [sid, session] = await store.findSession(req(), null);
       expect(sid).toBeInstanceOf(SessionId);
       expect(sid.publicId).toMatch(/^[0-9a-f]{32}$/);
       expect(sid.privateId).toMatch(/^2::[0-9a-f]{64}$/);
@@ -34,7 +42,7 @@ describe("ActionDispatch::Session::CacheStore", () => {
       const { store, cache } = makeStore();
       const sid = new SessionId("a".repeat(32));
       await cache.write(`_session_id:${sid.privateId}`, { user: 1 });
-      const [returned, session] = await store.findSession({}, sid);
+      const [returned, session] = await store.findSession(req(), sid);
       expect(returned).toBe(sid);
       expect(session).toEqual({ user: 1 });
     });
@@ -43,14 +51,14 @@ describe("ActionDispatch::Session::CacheStore", () => {
       const { store, cache } = makeStore();
       const sid = new SessionId("b".repeat(32));
       await cache.write(`_session_id:${sid.publicId}`, { user: 2 });
-      const [, session] = await store.findSession({}, sid);
+      const [, session] = await store.findSession(req(), sid);
       expect(session).toEqual({ user: 2 });
     });
 
     it("returns new sid when stored session is missing", async () => {
       const { store } = makeStore();
       const sid = new SessionId("c".repeat(32));
-      const [returned, session] = await store.findSession({}, sid);
+      const [returned, session] = await store.findSession(req(), sid);
       expect(returned).not.toBe(sid);
       expect(session).toEqual({});
     });
@@ -60,7 +68,7 @@ describe("ActionDispatch::Session::CacheStore", () => {
     it("writes session under the privateId key", async () => {
       const { store, cache } = makeStore();
       const sid = new SessionId("d".repeat(32));
-      await store.writeSession({}, sid, { user: 3 }, opts({ expireAfter: 60 }));
+      await store.writeSession(req(), sid, { user: 3 }, opts({ expireAfter: 60 }));
       expect(await cache.read(`_session_id:${sid.privateId}`)).toEqual({ user: 3 });
     });
 
@@ -68,7 +76,7 @@ describe("ActionDispatch::Session::CacheStore", () => {
       const { store, cache } = makeStore();
       const sid = new SessionId("e".repeat(32));
       await cache.write(`_session_id:${sid.privateId}`, { user: 4 });
-      await store.writeSession({}, sid, null, opts());
+      await store.writeSession(req(), sid, null, opts());
       expect(await cache.read(`_session_id:${sid.privateId}`)).toBeNull();
     });
   });

@@ -1314,7 +1314,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
-      if (!(await databaseTasks.schemaUpToDate(dbConfig, _schemaFormat()))) return true;
+      if (!(await databaseTasks.schemaUpToDate(dbConfig))) return true;
     }
     return false;
   }
@@ -1848,8 +1848,9 @@ export class Migrator {
       if (this.isDown() && !applied.has(migration.version)) return undefined;
       if (this.isUp() && applied.has(migration.version)) return undefined;
 
+      const message = this.isUp() ? "Migrating to" : "Reverting";
       if (ActiveRecord.Base.logger)
-        ActiveRecord.Base.logger.info(`Migrating to ${migration.name} (${migration.version})`);
+        ActiveRecord.Base.logger.info(`${message} ${migration.name} (${migration.version})`);
 
       return await this.ddlTransaction(migration, async () => {
         await migration.migrate(this._direction);

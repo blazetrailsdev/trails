@@ -1,6 +1,10 @@
+publicHoistPattern:
+  - "@blazetrails/*"
+<% if (this.options.dev) { -%>
 overrides:
 <% for (const [name, path] of Object.entries(this.trailsDevPackages())) { -%>
   <%= JSON.stringify(name) %>: <%= JSON.stringify(`link:${path}`) %>
+<% } -%>
 <% } -%>
 allowBuilds:
   better-sqlite3: true

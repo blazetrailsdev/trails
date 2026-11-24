@@ -170,9 +170,13 @@ export const IsolatedExecutionState = {
       block,
     );
   },
-  shareWith(other: Thread | Fiber): void {
-    const otherState = other.activeSupportExecutionState();
-    IsolatedExecutionState.context().setActiveSupportExecutionState(rbObjDup(otherState));
+  shareWith(
+    other: Thread | Fiber,
+    { except = [] }: { except?: IsolatedKey | IsolatedKey[] } = {},
+  ): void {
+    const state = rbObjDup(other.activeSupportExecutionState());
+    (Array.isArray(except) ? except : [except]).forEach((key) => state?.delete(key));
+    IsolatedExecutionState.context().setActiveSupportExecutionState(state);
   },
 };
 

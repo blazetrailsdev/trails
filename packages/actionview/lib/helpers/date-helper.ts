@@ -20,7 +20,6 @@ import {
   rbInspect,
   rbCNumeric,
   rbObjRespondTo,
-  Range,
   rbBlockGivenP,
   rbModDefineMethod,
   rtest,
@@ -93,10 +92,18 @@ export function distanceOfTimeInWords(
     if (fromTime.month >= 3) fromYear += 1;
     let toYear = toTime.year;
     if (toTime.month < 3) toYear -= 1;
-    const leapYears =
-      fromYear > toYear
-        ? 0
-        : new Range(fromYear, toYear).toA().filter((x) => RubyDate.isLeap(x)).length;
+
+    let leapYears: number;
+    if (fromYear > toYear) {
+      leapYears = 0;
+    } else {
+      const fyear = fromYear - 1;
+      leapYears =
+        Math.floor(toYear / 4) -
+        Math.floor(toYear / 100) +
+        Math.floor(toYear / 400) -
+        (Math.floor(fyear / 4) - Math.floor(fyear / 100) + Math.floor(fyear / 400));
+    }
     const minuteOffsetForLeapYear = leapYears * 1440;
     const minutesWithOffset = distanceInMinutes - minuteOffsetForLeapYear;
     const remainder = ((minutesWithOffset % MINUTES_IN_YEAR) + MINUTES_IN_YEAR) % MINUTES_IN_YEAR;

@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/activerecord",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "ORM layer mirroring Ruby's ActiveRecord, built on @blazetrails/arel and @blazetrails/activemodel",
   "license": "MIT",
   "repository": {

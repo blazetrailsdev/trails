@@ -312,7 +312,7 @@ describe("AppGeneratorTest", () => {
     }
     await t.assertFile(
       "package.json",
-      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#2-1-stable&path:\/packages\/trailties"/,
+      /"@blazetrails\/trails": "github:blazetrailsdev\/trails#2-1-stable&path:\/packages\/trails"/,
     );
   });
 
@@ -325,7 +325,7 @@ describe("AppGeneratorTest", () => {
     }
     await t.assertFile(
       "package.json",
-      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main&path:\/packages\/trailties"/,
+      /"@blazetrails\/trails": "github:blazetrailsdev\/trails#main&path:\/packages\/trails"/,
     );
   });
 
@@ -333,7 +333,7 @@ describe("AppGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--main"]);
     await t.assertFile(
       "package.json",
-      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main&path:\/packages\/trailties"/,
+      /"@blazetrails\/trails": "github:blazetrailsdev\/trails#main&path:\/packages\/trails"/,
     );
   });
 
@@ -341,7 +341,7 @@ describe("AppGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--master"]);
     await t.assertFile(
       "package.json",
-      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main&path:\/packages\/trailties"/,
+      /"@blazetrails\/trails": "github:blazetrailsdev\/trails#main&path:\/packages\/trails"/,
     );
   });
 
@@ -1397,9 +1397,7 @@ describe("AppGenerator", () => {
       const pkg = json(content);
       expect(pkg.name).toBe("my-app");
       expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
-      expect(pkg.dependencies["@blazetrails/activerecord"]).toBeDefined();
-      expect(pkg.dependencies["@blazetrails/activemodel"]).toBeDefined();
-      expect(pkg.dependencies["@blazetrails/activejob"]).toBeDefined();
+      expect(pkg.dependencies["@blazetrails/trails"]).toBeDefined();
       expect(pkg.scripts["db:migrate"]).toBeDefined();
       expect(pkg.scripts["db:seed"]).toBeDefined();
       expect(pkg.scripts["db:setup"]).toBeDefined();
@@ -1445,7 +1443,7 @@ describe("AppGenerator", () => {
       expect(pkg.scripts.prepare).toBe("trails-tsc-views build --views app/views");
       expect(pkg.scripts.postinstall).toBeUndefined();
       expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toBeDefined();
-      expect(pkg.dependencies["@blazetrails/date"]).toBeDefined();
+      expect(pkg.dependencies["@blazetrails/trails"]).toBeDefined();
       expect(pkg.devDependencies["@types/node"]).toBeDefined();
     });
     await t.assertFile(".gitignore", /\/\.trails\//);

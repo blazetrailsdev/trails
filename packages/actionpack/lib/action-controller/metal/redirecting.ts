@@ -1,6 +1,7 @@
 import { ActionController } from "../../namespaces.js";
+import { Response } from "../../action-dispatch/http/response.js";
 import { hashDelete } from "@blazetrails/ruby-compat";
-import { statusCode, type StatusSymbol } from "@blazetrails/rack";
+import { type StatusSymbol } from "@blazetrails/rack";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import type { UrlForHashOptions } from "../../action-dispatch/routing/url-for.js";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
@@ -175,10 +176,10 @@ export function _extractRedirectToStatus(
     !Array.isArray(options) &&
     Object.hasOwn(options, "status")
   ) {
-    return statusCode(hashDelete(options, "status") as number | string);
+    return Response.rackStatusCode(hashDelete(options, "status") as number | string);
   }
   if (Object.hasOwn(responseOptions, "status")) {
-    return statusCode(responseOptions.status as number | string);
+    return Response.rackStatusCode(responseOptions.status as number | string);
   }
   return 302;
 }

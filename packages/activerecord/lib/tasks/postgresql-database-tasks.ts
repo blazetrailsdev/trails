@@ -1,3 +1,4 @@
+import "../constants.postgresql-database-tasks.generated.js";
 import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
 import { File, FileUtils, rtest, rbEqq, rbFSystem, RuntimeError } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -102,17 +103,9 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async structureLoad(filename: string, extraFlags: string | string[] | null): Promise<void> {
-    const args = [
-      "--set",
-      ON_ERROR_STOP_1,
-      "--quiet",
-      "--no-psqlrc",
-      "--output",
-      File.NULL,
-      "--file",
-      filename,
-    ];
+    const args = ["--set", ON_ERROR_STOP_1, "--quiet", "--no-psqlrc", "--output", File.NULL];
     if (extraFlags != null) args.push(...kernelArray(extraFlags));
+    args.push(...["--file", filename]);
     args.push(this.dbConfig.database as string);
     await this.runCmd("psql", args, "loading");
   }
@@ -163,6 +156,13 @@ export class PostgreSQLDatabaseTasks {
     const tempfile = Tempfile.open("uncommented_structure.sql");
     try {
       File.foreach(filename, (line) => {
+        if (line.startsWith("\\restrict ")) return;
+
+        if (line.startsWith("\\unrestrict ")) {
+          removingComments = true;
+          return;
+        }
+
         if (!(removingComments && (line.startsWith(SQL_COMMENT_BEGIN) || isBlank(line)))) {
           tempfile.write(line);
           removingComments = false;

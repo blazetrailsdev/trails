@@ -348,7 +348,8 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
         this as never,
         ...this.attributeNames(),
       );
-      if (this._hasAttribute("id")) this.aliasAttribute("id_value", "id");
+      if (this._hasAttribute("id") && !this._hasAttribute("id_value"))
+        this.aliasAttribute("id_value", "id");
     }
 
     generateAliasAttributes.call(this);

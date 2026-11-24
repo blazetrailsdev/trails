@@ -1,7 +1,6 @@
 export {
   CookieStore,
   SessionId as CookieStoreSessionId,
-  DEFAULT_SAME_SITE,
   type CookieStoreSessionOptions,
   type CookieStoreRequest,
   type CookieJarLike,

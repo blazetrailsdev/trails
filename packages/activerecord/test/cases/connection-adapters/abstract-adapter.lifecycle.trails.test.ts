@@ -148,7 +148,7 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
       }
       events.push("exit");
     };
-    (a as any).attemptConfigureConnection = async () => {};
+    (a as any).configureConnection = async () => {};
     (a as any).active = async () => true;
 
     const p1 = new Thread(() => pool.withConnection((conn) => conn.reconnectBang())).value();
@@ -166,7 +166,7 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
     const events: string[] = [];
     (a as any).active = async () => false;
     (a as any)._unconfiguredConnection = { handle: 1 };
-    (a as any).attemptConfigureConnection = async () => {
+    (a as any).configureConnection = async () => {
       events.push("configure:enter");
       await Promise.resolve();
       events.push("configure:exit");

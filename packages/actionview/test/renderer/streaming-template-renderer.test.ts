@@ -10,11 +10,11 @@ import { TSE } from "../../lib/template/handlers/tse.js";
 import { FixtureResolver } from "../../lib/testing/resolvers.js";
 import type { RenderableTemplate, ViewContext } from "../../lib/renderer/abstract-renderer.js";
 
-function makeFakeTemplate(body: string, format = ":html"): RenderableTemplate {
+function makeFakeTemplate(body: string, format = ":html", streaming = true): RenderableTemplate {
   return {
     identifier: "fake",
     format,
-    supportsStreaming: () => true,
+    supportsStreaming: () => streaming,
     render: vi.fn().mockReturnValue(body),
   };
 }
@@ -69,7 +69,7 @@ describe("StreamingTemplateRenderer", () => {
 
   describe("render_template (streaming)", () => {
     it("renders without layout — yields a single chunk", async () => {
-      const fake = makeFakeTemplate("Hello streaming");
+      const fake = makeFakeTemplate("Hello streaming", ":html", false);
       vi.spyOn(lc, "findTemplate").mockReturnValue(fake);
       const renderer = new StreamingTemplateRenderer(lc);
       const chunks = await collectChunks(renderer.render(ctx, { template: "posts/show" }));
@@ -363,7 +363,7 @@ describe("StreamingTemplateRenderer", () => {
   describe("Renderer#renderBody", () => {
     it("routes to streaming renderer and returns chunks array", async () => {
       const lc2 = makeLookupContext();
-      const fake = makeFakeTemplate("streamed body");
+      const fake = makeFakeTemplate("streamed body", ":html", false);
       vi.spyOn(lc2, "findTemplate").mockReturnValue(fake);
       const renderer = new Renderer(lc2);
       const chunks = await renderer.renderBody(ctx, { template: "posts/show" });

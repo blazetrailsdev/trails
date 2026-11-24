@@ -11,8 +11,16 @@ class StubController extends ActionController.Base {
   }
 }
 
-function assertOperator(o1: object, operator: "respond_to?", o2: string): void {
-  expect(rbObjRespondTo(o1, o2), `Expected ${String(o1)} to be ${operator} ${o2}`).toBe(true);
+function assertOperator(o1: object, operator: "respond_to?", o2: string): void;
+function assertOperator(o1: string, operator: "in", o2: object): void;
+function assertOperator(
+  o1: object | string,
+  operator: "respond_to?" | "in",
+  o2: string | object,
+): void {
+  const result =
+    operator === "in" ? (o1 as string) in (o2 as object) : rbObjRespondTo(o1, o2 as string);
+  expect(result, `Expected ${String(o1)} to be ${operator} ${String(o2)}`).toBe(true);
 }
 
 function assertNotOperator(o1: string, operator: "in", o2: object): void {
@@ -98,7 +106,8 @@ describe("LazyRouteSet", () => {
       if (loaded) return null;
       loaded = true;
       routes.draw(function () {
-        this.root({ to: "posts#index" });
+        this.root({ to: () => [200, {}, []] });
+        this.resources("products");
       });
       return true;
     });
@@ -118,6 +127,28 @@ describe("LazyRouteSet", () => {
 
     assertNotOperator("rootPath", "in", appUrlHelpers);
     assertOperator(appUrlHelpers, "respond_to?", "rootPath");
+  });
+
+  it("app lazily loads routes when making a request", async () => {
+    loadRoutesLazily();
+    const appUrlHelpers = routes.urlHelpers();
+
+    assertNotOperator("rootPath", "in", appUrlHelpers);
+    const response = await routes.call(MockRequest.envFor("/"));
+    expect(response[0]).toBe(200);
+  });
+
+  it("app lazily loads routes when url_for is used", () => {
+    loadRoutesLazily();
+    const appUrlHelpers = routes.urlHelpers() as unknown as {
+      urlFor(o: Record<string, unknown>): string;
+    };
+
+    assertNotOperator("productsPath", "in", appUrlHelpers);
+    expect(appUrlHelpers.urlFor({ controller: "products", action: "index", onlyPath: true })).toBe(
+      "/products",
+    );
+    assertOperator("productsPath", "in", appUrlHelpers);
   });
 
   it("new_with_config builds an instance of the receiving subclass", () => {

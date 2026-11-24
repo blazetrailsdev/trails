@@ -26,8 +26,7 @@ describe("PG::Result", () => {
     await conn.finish();
   });
 
-  // BLOCKED: pg-result-type-map-defaults-to-strings-for-oids-with-no-coder
-  it.skip("yields a row as an Enumerator of hashes", async () => {
+  it("yields a row as an Enumerator of hashes", async () => {
     const res = await conn.exec("SELECT 1 AS a, 2 AS b");
     const e = res.each();
     expect(e).toBeInstanceOf(Enumerator);
@@ -100,5 +99,12 @@ describe("PG::Result", () => {
       if (oldError1 !== undefined) PG.ERROR_CLASSES["42P01"] = oldError1;
       if (oldError2 !== undefined) PG.ERROR_CLASSES["42"] = oldError2;
     }
+  });
+
+  it("can be inspected before and after clear", async () => {
+    const r = await conn.exec("select 1");
+    expect(r.inspect()).toMatch(/status=PGRES_TUPLES_OK/);
+    r.clear();
+    expect(r.inspect()).toMatch(/cleared/);
   });
 });

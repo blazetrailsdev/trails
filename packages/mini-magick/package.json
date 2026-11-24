@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/mini-magick",
-  "version": "0.1.0-alpha0",
+  "version": "0.1.0-alpha0.1",
   "description": "ImageMagick command lines for Trails, mirroring the mini_magick gem",
   "license": "MIT",
   "repository": {

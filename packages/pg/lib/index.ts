@@ -6,6 +6,7 @@ export * from "./exceptions.js";
 import "./constants.generated.js";
 export { Coder, CompositeCoder } from "./coder.js";
 export { Result } from "./result.js";
+export { SimpleCoder } from "./simple-coder.js";
 export { SimpleDecoder } from "./simple-decoder.js";
 export { SimpleEncoder } from "./simple-encoder.js";
 export { TypeMap } from "./type-map.js";

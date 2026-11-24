@@ -640,7 +640,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
     expect(system).toHaveBeenCalledWith(
       "psql",
       expect.anything(),
-      [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
+      [...expectedArgs, "--noop", "--file", filename, "my-app-db"],
       {},
     );
   });
@@ -670,7 +670,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
     expect(system).toHaveBeenCalledWith(
       "psql",
       expect.objectContaining(expectedEnv),
-      [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
+      [...expectedArgs, "--noop", "--file", filename, "my-app-db"],
       {},
     );
   });
@@ -700,7 +700,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
     expect(system).toHaveBeenCalledWith(
       "psql",
       expect.objectContaining(expectedEnv),
-      [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
+      [...expectedArgs, "--noop", "--file", filename, "my-app-db"],
       {},
     );
   });
@@ -728,7 +728,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
     expect(system).toHaveBeenCalledWith(
       "psql",
       expect.anything(),
-      [...expectedArgs, "--file", filename, "--noop", "my-app-db"],
+      [...expectedArgs, "--noop", "--file", filename, "my-app-db"],
       {},
     );
   });

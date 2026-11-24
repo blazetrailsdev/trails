@@ -6,6 +6,7 @@ import {
   rbBlockGivenP,
   rbInspect,
   rbObjClass,
+  rbObjDup,
   slice,
   RuntimeError,
   StandardError,
@@ -129,9 +130,10 @@ export class Exceptions {
   declare afterDiscardProcs: AfterDiscardProc[];
 
   async retryJob(this: ExceptionsJob, options: Record<string, unknown> = {}): Promise<unknown> {
-    return await this.instrument("enqueue_retry", slice(options, "error", "wait"), () =>
-      this.enqueue(options),
-    );
+    return await this.instrument("enqueue_retry", slice(options, "error", "wait"), async () => {
+      const job = rbObjDup(this);
+      return await job.enqueue(options);
+    });
   }
 
   /** @internal */

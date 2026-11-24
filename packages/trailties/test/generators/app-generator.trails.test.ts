@@ -126,7 +126,7 @@ describe("AppGenerator (trails-only)", () => {
     expect(cable).toContain('channelPrefix: "my_app_production"');
     expect(fs.existsSync(path.join(tmpDir, "my-app/app/channels"))).toBe(false);
     const pkg = JSON.parse(fs.readFileSync(path.join(tmpDir, "my-app/package.json"), "utf-8"));
-    expect(pkg.dependencies["@blazetrails/actioncable"]).toBeDefined();
+    expect(pkg.dependencies["@blazetrails/trails"]).toBeDefined();
     expect(pkg.dependencies["@blazetrails/solid-queue"]).toBeDefined();
   });
 
@@ -183,7 +183,13 @@ describe("AppGenerator (trails-only)", () => {
       const app = path.join(root, "my-app");
       fs.mkdirSync(path.join(app, "node_modules/@blazetrails"), { recursive: true });
       const { dependencies } = JSON.parse(fs.readFileSync(path.join(app, "package.json"), "utf8"));
-      for (const name of Object.keys(dependencies)) {
+      const meta = JSON.parse(
+        fs.readFileSync(path.resolve(packageDir, "../trails/package.json"), "utf8"),
+      );
+      for (const name of new Set([
+        ...Object.keys(dependencies),
+        ...Object.keys(meta.dependencies),
+      ])) {
         if (!name.startsWith("@blazetrails/")) continue;
         fs.symlinkSync(
           path.resolve(packageDir, "..", name.slice("@blazetrails/".length)),
@@ -252,7 +258,7 @@ describe("AppGenerator (trails-only)", () => {
       { destinationRoot: tmpDir },
     );
     expect(String(generator.trailsPackageEntry()[0])).toBe(
-      '"@blazetrails/activerecord": "github:blazetrailsdev/trails#main"',
+      '"@blazetrails/trails": "github:blazetrailsdev/trails#main"',
     );
   });
 
@@ -264,11 +270,13 @@ describe("AppGenerator (trails-only)", () => {
     ).invokeAll();
 
     const trailties = File.join(Generators.TRAILS_DEV_PATH, "packages", "trailties");
+    const trails = File.join(Generators.TRAILS_DEV_PATH, "packages", "trails");
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.dependencies["@blazetrails/trailties"]).toBe(`file:${trailties}`);
+    expect(pkg.dependencies["@blazetrails/trails"]).toBe(`file:${trails}`);
     expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toMatch(/^file:.*trails-tsc$/);
     const workspace = File.read(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"));
     expect(workspace).toContain(`  "@blazetrails/trailties": "link:${trailties}"`);
+    expect(workspace).toContain(`  "@blazetrails/trails": "link:${trails}"`);
     expect(workspace).toContain(`  "@blazetrails/arel": "link:`);
     expect(workspace).toContain("allowBuilds:\n  better-sqlite3: true\n  esbuild: true\n");
   });
@@ -276,14 +284,28 @@ describe("AppGenerator (trails-only)", () => {
   it("without --dev keeps the version entries and writes no pnpm-workspace.yaml", async () => {
     await new AppGenerator(
       ["my-app"],
-      { skipInstall: true, database: "sqlite" },
+      { skipInstall: true, database: "sqlite", packageManager: "npm" },
       { destinationRoot: tmpDir },
     ).invokeAll();
 
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.dependencies["@blazetrails/trailties"]).toBe("~0.1.0-alpha0");
-    expect(pkg.dependencies["@blazetrails/rackup"]).toBe("~0.1.0-alpha0");
+    expect(pkg.dependencies["@blazetrails/trails"]).toBe("~0.1.0-alpha0.1");
+    expect(pkg.dependencies["@blazetrails/trailties"]).toBeUndefined();
+    expect(pkg.dependencies["@blazetrails/activerecord"]).toBeUndefined();
+    expect(pkg.dependencies["@blazetrails/rackup"]).toBe("~0.1.0-alpha0.1");
     expect(File.isExist(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"))).toBe(false);
+  });
+
+  it("hoists every @blazetrails package the templates import under pnpm", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true, database: "sqlite" },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+
+    const workspace = File.read(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"));
+    expect(workspace).toContain('publicHoistPattern:\n  - "@blazetrails/*"\n');
+    expect(workspace).not.toContain("overrides:");
   });
 
   it("guards each namespaced environment setting the way the Rails templates do", async () => {

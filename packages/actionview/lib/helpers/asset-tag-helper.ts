@@ -89,9 +89,7 @@ export function javascriptIncludeTag(this: AssetTagHelperHost, ...sources: unkno
       ? preloadLinksHeader
       : (deleteKey(options, "preloadLinksHeader") as boolean);
   const nopush =
-    options["nopush"] === null || options["nopush"] === undefined
-      ? true
-      : deleteKey(options, "nopush");
+    options["nopush"] === null || options["nopush"] === undefined || deleteKey(options, "nopush");
   let crossorigin = deleteKey(options, "crossorigin");
   if (crossorigin === true) crossorigin = "anonymous";
   const integrity = options["integrity"];
@@ -153,9 +151,7 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
   let crossorigin = deleteKey(options, "crossorigin");
   if (crossorigin === true) crossorigin = "anonymous";
   const nopush =
-    options["nopush"] === null || options["nopush"] === undefined
-      ? true
-      : deleteKey(options, "nopush");
+    options["nopush"] === null || options["nopush"] === undefined || deleteKey(options, "nopush");
   const integrity = options["integrity"];
 
   const sourcesTags = htmlSafe(

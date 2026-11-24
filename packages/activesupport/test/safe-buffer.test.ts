@@ -173,8 +173,22 @@ describe("SafeBufferTest", () => {
     const multipliedSafeBuffer = htmlSafe("<br />").repeat(2);
     assertPredicate(multipliedSafeBuffer, isHtmlSafe);
 
-    const multipliedUnsafeBuffer = new SafeBuffer("<>", false).repeat(2);
+    buffer = new SafeBuffer("<>", false);
+    assertNotPredicate(buffer, isHtmlSafe);
+    const multipliedUnsafeBuffer = buffer.repeat(2);
     assertNotPredicate(multipliedUnsafeBuffer, isHtmlSafe);
+  });
+
+  it("Should preserve html_safe? status on format", () => {
+    let safeBuffer = htmlSafe("<br />%{name}");
+    assertPredicate(safeBuffer, isHtmlSafe);
+    safeBuffer = safeBuffer.format({ name: "George" });
+    assertPredicate(safeBuffer, isHtmlSafe);
+
+    let unsafeBuffer = new SafeBuffer("<%{name}>", false);
+    assertNotPredicate(unsafeBuffer, isHtmlSafe);
+    unsafeBuffer = unsafeBuffer.format({ name: "George" });
+    assertNotPredicate(unsafeBuffer, isHtmlSafe);
   });
 
   it("Should concat as a normal string when safe", () => {
