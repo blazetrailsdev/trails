@@ -545,3 +545,170 @@ describe("PG::Connection", () => {
     });
   });
 });
+
+describe("PG::Connection#conninfo_parse", () => {
+  const described_class = PG.Connection;
+  const toHash = (ar: { keyword: string; val: string | null }[]): Record<string, string> =>
+    Object.fromEntries(ar.filter((h) => h.val != null).map((h) => [h.keyword, h.val!]));
+
+  it("encode and decode Hash to connection string to Hash", () => {
+    const hash = {
+      host: "pgsql.example.com",
+      dbname: "db01",
+      sslmode: "require",
+      service: "",
+      password: "\\ \t\n\"'",
+    };
+    const optstring = described_class.connectHashToString(hash);
+    const res = toHash(described_class.conninfoParse(optstring));
+
+    expect(res).toEqual(hash);
+  });
+
+  it("decode option string to Hash", () => {
+    const optstring = "host=overwritten host=c:\\\\pipe password = \\\\\\'\"  ";
+    const res = toHash(described_class.conninfoParse(optstring));
+
+    expect(res).toEqual({ host: "c:\\pipe", password: "\\'\"" });
+  });
+
+  it("can parse connection info strings kind of key=value", () => {
+    const ar = PG.Connection.conninfoParse("user=auser  host=somehost  port=3334 dbname=db");
+    expect(ar).toBeInstanceOf(Array);
+    expect(typeof ar[0]).toBe("object");
+    expect(ar.map((a) => a.keyword)).toEqual(
+      expect.arrayContaining(["dbname", "user", "password", "port"]),
+    );
+    expect(ar.map((a) => a.val)).toEqual(
+      expect.arrayContaining(["auser", "somehost", "3334", "db"]),
+    );
+  });
+
+  it("can parse connection info strings kind of URI", () => {
+    const ar = PG.Connection.conninfoParse("postgresql://auser@somehost:3334/db");
+    expect(ar).toBeInstanceOf(Array);
+    expect(typeof ar[0]).toBe("object");
+    expect(ar.map((a) => a.keyword)).toEqual(
+      expect.arrayContaining(["dbname", "user", "password", "port"]),
+    );
+    expect(ar.map((a) => a.val)).toEqual(
+      expect.arrayContaining(["auser", "somehost", "3334", "db"]),
+    );
+  });
+
+  it("can parse connection info strings with error", () => {
+    expect(() => PG.Connection.conninfoParse("host='abc")).toThrow(/unterminated quoted string/);
+    expect(() => PG.Connection.conninfoParse("host='abc")).toThrow(PG.Error);
+    expect(() => PG.Connection.conninfoParse("host")).toThrow(/missing "=" after/);
+  });
+});
+
+describe("PG::Connection#parse_connect_args", () => {
+  const described_class = PG.Connection;
+
+  it("shouldn't resolve absolute path in connection option string", () => {
+    const optstring = described_class.parseConnectArgs({ host: "/var/socket" });
+    expect(optstring).toMatch(/(^|\s)host='\/var\/socket'/);
+    expect(optstring).not.toMatch(/hostaddr/);
+  });
+
+  it("can create a connection option string from a Hash parameter", () => {
+    const optstring = described_class.parseConnectArgs({
+      host: "pgsql.example.com",
+      dbname: "db01",
+      sslmode: "require",
+      hostaddr: "1.2.3.4",
+    });
+
+    expect(typeof optstring).toBe("string");
+    expect(optstring).toMatch(/(^|\s)host='pgsql.example.com'/);
+    expect(optstring).toMatch(/(^|\s)dbname='db01'/);
+    expect(optstring).toMatch(/(^|\s)sslmode='require'/);
+    expect(optstring).toMatch(/(^|\s)hostaddr='1.2.3.4'/);
+  });
+
+  it("can create a connection option string from positional parameters", () => {
+    const optstring = described_class.parseConnectArgs(
+      "localhost",
+      null,
+      "-c geqo=off",
+      null,
+      "sales",
+    );
+
+    expect(typeof optstring).toBe("string");
+    expect(optstring).toMatch(/(^|\s)host='localhost'/);
+    expect(optstring).toMatch(/(^|\s)dbname='sales'/);
+    expect(optstring).toMatch(/(^|\s)options='-c geqo=off'/);
+
+    expect(optstring).not.toMatch(/port=/);
+    expect(optstring).not.toMatch(/tty=/);
+  });
+
+  it("can create a connection option string from a mix of positional and hash parameters", () => {
+    const optstring = described_class.parseConnectArgs("pgsql.example.com", {
+      dbname: "licensing",
+      user: "jrandom",
+      hostaddr: "1.2.3.4",
+    });
+
+    expect(typeof optstring).toBe("string");
+    expect(optstring).toMatch(/(^|\s)host='pgsql.example.com'/);
+    expect(optstring).toMatch(/(^|\s)dbname='licensing'/);
+    expect(optstring).toMatch(/(^|\s)user='jrandom'/);
+    expect(optstring).toMatch(/(^|\s)hostaddr='1.2.3.4'/);
+  });
+
+  it("can create a connection option string from an option string and a hash", () => {
+    const optstring = described_class.parseConnectArgs("dbname=original", {
+      user: "jrandom",
+      host: "www.ruby-lang.org,nonexisting-domaiiin.xyz,localhost",
+    });
+
+    expect(typeof optstring).toBe("string");
+    expect(optstring).toMatch(/(^|\s)dbname='original'/);
+    expect(optstring).toMatch(/(^|\s)user='jrandom'/);
+  });
+
+  it("escapes single quotes and backslashes in connection parameters", () => {
+    expect(described_class.parseConnectArgs({ password: "DB 'browser' \\" })).toMatch(
+      /password='DB \\'browser\\' \\\\'/,
+    );
+  });
+
+  const uri = "postgresql://user:pass@pgsql.example.com:222/db01?sslmode=require&hostaddr=4.3.2.1";
+
+  it("accepts an URI string", () => {
+    const string = described_class.parseConnectArgs(uri);
+
+    expect(typeof string).toBe("string");
+    expect(string).toMatch(
+      /^user='user' password='pass' dbname='db01' host='pgsql.example.com' hostaddr='4.3.2.1' port='222' sslmode='require' fallback_application_name/,
+    );
+  });
+
+  it("accepts an URI and adds parameters from hash", () => {
+    const string = described_class.parseConnectArgs(uri + "&fallback_application_name=testapp", {
+      connectTimeout: 2,
+    });
+
+    expect(typeof string).toBe("string");
+    expect(string).toMatch(
+      /^user='user' password='pass' dbname='db01' host='pgsql.example.com' hostaddr='4.3.2.1' port='222' fallback_application_name='testapp' sslmode='require' connect_timeout='2'/,
+    );
+  });
+
+  it("accepts an URI with a non-standard domain socket directory", () => {
+    let string = described_class.parseConnectArgs("postgresql://%2Fvar%2Flib%2Fpostgresql/dbname");
+
+    expect(typeof string).toBe("string");
+    expect(string).toMatch(/^dbname='dbname' host='\/var\/lib\/postgresql'/);
+
+    string = described_class.parseConnectArgs("postgresql:///dbname", {
+      host: "/var/lib/postgresql",
+    });
+
+    expect(typeof string).toBe("string");
+    expect(string).toMatch(/^dbname='dbname' host='\/var\/lib\/postgresql'/);
+  });
+});

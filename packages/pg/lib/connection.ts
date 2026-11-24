@@ -169,16 +169,48 @@ export class Connection {
         set(decodeURIComponent(k), decodeURIComponent(v));
       }
     } else {
-      const re = /\s*([^\s=]+)\s*=\s*(?:'((?:[^'\\]|\\.)*)'|((?:[^\s\\]|\\.)*))/gy;
-      let m: RegExpExecArray | null;
-      let pos = 0;
-      while ((m = re.exec(conninfo)) !== null) {
-        set(m[1], (m[2] ?? m[3]).replace(/\\(.)/g, "$1"));
-        pos = re.lastIndex;
-      }
-      const rest = conninfo.slice(pos).trim();
-      if (rest !== "") {
-        throw new PgError(`missing "=" after "${rest.split(/\s/)[0]}" in connection info string\n`);
+      let cp = 0;
+      const isspace = (c: string | undefined): boolean => c != null && /\s/.test(c);
+      while (cp < conninfo.length) {
+        if (isspace(conninfo[cp])) {
+          cp++;
+          continue;
+        }
+        let pname = "";
+        while (cp < conninfo.length && conninfo[cp] !== "=" && !isspace(conninfo[cp])) {
+          pname += conninfo[cp++];
+        }
+        while (isspace(conninfo[cp])) cp++;
+        if (conninfo[cp] !== "=") {
+          throw new PgError(`missing "=" after "${pname}" in connection info string\n`);
+        }
+        cp++;
+        while (isspace(conninfo[cp])) cp++;
+        let pval = "";
+        if (conninfo[cp] !== "'") {
+          while (cp < conninfo.length && !isspace(conninfo[cp])) {
+            if (conninfo[cp] === "\\" && cp + 1 < conninfo.length) cp++;
+            pval += conninfo[cp++];
+          }
+        } else {
+          cp++;
+          for (;;) {
+            if (cp >= conninfo.length) {
+              throw new PgError("unterminated quoted string in connection info string\n");
+            }
+            if (conninfo[cp] === "\\" && cp + 1 < conninfo.length) {
+              cp++;
+              pval += conninfo[cp++];
+              continue;
+            }
+            if (conninfo[cp] === "'") {
+              cp++;
+              break;
+            }
+            pval += conninfo[cp++];
+          }
+        }
+        set(pname, pval);
       }
     }
     return CONNINFO_KEYWORDS.map((keyword) => ({ keyword, val: vals[keyword] ?? null }));
