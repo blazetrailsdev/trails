@@ -1,0 +1,12 @@
+<% await picture.image.load(); if (picture.image.isAttached()) await (await picture.image.attachment).blob; %>
+<%= leafableEditForm(picture, { id: "leafable-editor" }, (form) => { %>
+  <label class="input input--file input--picture unpad" data-controller="upload-preview">
+    <%= imageTag(picture.image.isAttached() ? picture.largeImage() : "default-picture.webp", { alt: "Picture", data: { uploadPreviewTarget: "image" } }) %>
+    <%= form.fileField("image", { class: "input", accept: "image/png, image/jpeg, image/jpg, image/webp", autofocus: true, data: { uploadPreviewTarget: "input", action: "upload-preview#previewImage" } }) %>
+  </label>
+  <div class="flex align-center gap margin-block">
+    <%= translationButton("pictureCaption") %>
+    <%= form.textField("caption", { class: "input", placeholder: "Picture caption" }) %>
+  </div>
+  <%= form.submit("Save", { hidden: true, data: { uploadPreviewTarget: "button" } }) %>
+<% }) %>

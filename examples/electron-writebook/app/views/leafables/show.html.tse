@@ -1,0 +1,43 @@
+<% contentFor("title", pageTitle(leaf, book)); %>
+<% const header = await render("leaves/header", { book, leaf }); %>
+<% const sidebar = await render("leaves/sidebar", { book }); %>
+<% const navigation = await render("leaves/navigation", { leaf }); %>
+<% const leafable = await leaf.leafable; %>
+<% if (leaf.isPicture()) { await leafable.image.load(); if (leafable.image.isAttached()) await (await leafable.image.attachment).blob; } %>
+<% let content = ""; %>
+<% if (leaf.isSection()) content = await highlightSearchedContent(leaf, simpleFormat(leafable.body), params.get("search")); %>
+<% if (leaf.isPage()) content = await highlightSearchedContent(leaf, sanitizeContent((await leafable.body()).toHtml()), params.get("search")); %>
+
+<%= header %>
+
+<% contentFor("sidebar", () => { %>
+  <%= sidebar %>
+<% }) %>
+
+<% if (leaf.isSection()) { %>
+  <div class="page--section <%= leafable.theme === "dark" ? "theme--dark" : "" %>">
+    <h1><%= content %></h1>
+  </div>
+<% } else if (leaf.isPage()) { %>
+  <div class="page--page" data-controller="scroll-to-highlight">
+    <%= content %>
+  </div>
+<% } else if (leaf.isPicture()) { %>
+  <figure class="page--picture flex flex-column align-center gap margin-none">
+    <% if (leafable.image.isAttached()) { %>
+      <%= linkTo(trailsBlobPath(leafable.image), { data: { action: "lightbox#open:prevent", lightboxTarget: "image", lightboxUrlValue: trailsBlobPath(leafable.image, { disposition: "attachment", onlyPath: true }) } }, null, () => { %>
+        <%= imageTag(leafable.largeImage(), { loading: "lazy" }) %>
+      <% }) %>
+    <% } else { %>
+      <%= imageTag("default-picture.webp", { alt: "No image uploaded", loading: "lazy" }) %>
+    <% } %>
+
+    <figcaption>
+      <%= simpleFormat(leafable.caption) %>
+    </figcaption>
+  </figure>
+<% } %>
+
+<% contentFor("footer", () => { %>
+  <%= navigation %>
+<% }) %>

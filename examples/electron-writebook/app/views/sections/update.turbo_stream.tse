@@ -1,0 +1,1 @@
+<%= await turboStream.replace(domId(leaf), null, { partial: "leaves/leaf", locals: { leaf } }) %>

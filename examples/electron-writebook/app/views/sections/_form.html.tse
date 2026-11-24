@@ -1,0 +1,4 @@
+<%= leafableEditForm(section, { id: "leafable-editor" }, (form) => { %>
+  <h1><%= form.textArea("body", { class: "input input--textara full-width txt-align-center", required: true, autocomplete: "off", autofocus: true }) %></h1>
+  <%= form.submit("Save", { hidden: true }) %>
+<% }) %>

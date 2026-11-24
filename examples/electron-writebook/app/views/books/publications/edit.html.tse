@@ -1,0 +1,31 @@
+<%= turboFrameTag(book, "publication", block(() => { %>
+  <div class="flex flex-column gap margin-block-start pad fill-shade border-radius <%= book.errors.get("slug").length > 0 ? "shake" : "" %>">
+    <div class="flex flex-column align-center gap txt-medium">
+      <%= await formWith({ model: book, url: bookPublicationPath(book), class: "max-width", data: { turboFrame: "_top" } }, (form) => { %>
+        <%= form.hiddenField("publication", { value: true }) %>
+
+        <label class="flex flex-column gap full-width txt-align-center">
+          <div id="public_link_label" class="flex align-center gap justify-center">
+            <strong>Edit publication link</strong>
+          </div>
+          <span class="input input--actor flex align-center fill-white">
+            <%= `${request.host}/${book.id}/` %>
+            <%= form.textField("slug", { autofocus: true, class: classNames("input"), required: true, pattern: "^[\\-A-Za-z0-9]+$", title: "Enter letters, numbers, or hyphens only" }) %>
+          </span>
+        </label>
+
+        <div class="flex align-center gap margin-inline margin-block-start">
+          <button type="submit" class="btn btn--positive flex-item-justify-end">
+            <%= imageTag("check.svg", { aria: { hidden: true }, size: 24 }) %>
+            <span class="for-screen-reader">Save</span>
+          </button>
+
+          <%= linkTo(bookSlugPath(book), { class: "btn flex-item-justify-start" }, null, () => { %>
+            <%= imageTag("remove.svg", { aria: { hidden: true }, size: 24 }) %>
+            <span class="for-screen-reader">Cancel</span>
+          <% }) %>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+<% }) %>

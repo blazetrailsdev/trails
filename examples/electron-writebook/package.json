@@ -1,0 +1,57 @@
+{
+  "name": "@blazetrails/example-electron-writebook",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A trails port of 37signals' Writebook, a book-authoring app, served inside Electron",
+  "main": "electron/main.ts",
+  "exports": {
+    "./*.tse": {
+      "types": "./.trails/views/*.tse.d.ts",
+      "default": "./.trails/views/*.tse.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm build:views && pnpm build:assets",
+    "build:views": "trails-tsc-views build --views app/views",
+    "build:assets": "rm -rf public/assets && mkdir -p public/assets && cp -r app/assets/images/. app/assets/stylesheets/. public/assets/ && vite build",
+    "trails": "trails",
+    "db:prepare": "trails db:prepare",
+    "start": "electron .",
+    "test": "vitest run",
+    "typecheck": "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@blazetrails/actioncable": "workspace:*",
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actiontext": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activestorage": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/arel": "workspace:*",
+    "@blazetrails/bcrypt": "workspace:*",
+    "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/html-sanitizer": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rack-test": "workspace:*",
+    "@blazetrails/rackup": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/sqlite3": "workspace:*",
+    "@blazetrails/stimulus": "workspace:*",
+    "@blazetrails/trailties": "workspace:*",
+    "@blazetrails/turbo": "workspace:*",
+    "@hotwired/stimulus": "^3.2.2",
+    "@hotwired/turbo-rails": "^8.0.12",
+    "marked": "^15.0.12"
+  },
+  "devDependencies": {
+    "@blazetrails/activerecord-cli": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@types/node": "^25.3.5",
+    "electron": "^45.4.1",
+    "vite": "^7.0.0",
+    "vitest": "^3.0.0"
+  }
+}

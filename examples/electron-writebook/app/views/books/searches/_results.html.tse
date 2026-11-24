@@ -1,0 +1,14 @@
+<% const searchForm = await render("books/searches/form", { book }); %>
+<% const results = []; %>
+<% for (const leaf of leaves) results.push(await render("books/searches/result", { leaf })); %>
+<%= turboFrameTag("search", block(() => { %>
+  <%= searchForm %>
+
+  <div class="search__results flex flex-column margin-block-start">
+    <% if (leaves.length > 0) { %>
+      <% for (const result of results) { %><%= result %><% } %>
+    <% } else { %>
+      <p class="search__no_matches txt-align-center">No matches.</p>
+    <% } %>
+  </div>
+<% }) %>

@@ -212,6 +212,10 @@
       "ref": "vite_ruby@3.11.1",
       "sha": "77de9ea2b94044d72622f72d44d392953843a1d7"
     },
+    "writebook": {
+      "ref": "v1.2.9",
+      "sha": "194d9cd5dd76607887b049cd474f9b2de690f695"
+    },
     "zeitwerk": {
       "ref": "v2.7.3",
       "sha": "77c971c0f602bd0e5961d22dc7541d863737dbcb"

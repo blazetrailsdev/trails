@@ -1,0 +1,29 @@
+<% const url = sessionTransferUrl(user.transferId()); %>
+<div class="flex flex-column align-center gap txt-medium--responsive">
+  <label class="flex flex-column gap full-width">
+    <div class="flex align-center gap">
+      <% if (Current.user.id !== user.id) { %>
+        <%= translationButton("transferSession") %>
+        <strong id="session_transfer_label" class="txt-align-start">Share to get them back into their account</strong>
+      <% } else { %>
+        <%= translationButton("transferSessionSelf") %>
+        <strong id="session_transfer_label" class="txt-align-start">Link to automatically log in on another device</strong>
+      <% } %>
+    </div>
+    <span class="flex align-center gap margin-inline">
+      <input type="text" class="input fill-white" id="session_transfer_url" value="<%= url %>" aria-labelledby="session_transfer_label" readonly>
+    </span>
+  </label>
+
+  <div class="flex align-center gap">
+    <%= buttonToCopyToClipboard(url, () => { %>
+      <%= imageTag("copy-paste.svg", { aria: { hidden: "true" }, size: 24, class: "colorize--black" }) %>
+      <span class="for-screen-reader">Copy auto-login link</span>
+    <% }) %>
+
+    <%= webShareButton(url, "Your sign-in link", "This is your own private sign-in URL, DO NOT SHARE IT. Use it to sign-in on another device or if you get locked out.", () => { %>
+      <%= imageTag("share.svg", { aria: { hidden: "true" }, size: 24, class: "colorize--black" }) %>
+      <span class="for-screen-reader">Share auto-login link</span>
+    <% }) %>
+  </div>
+</div>

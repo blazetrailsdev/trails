@@ -1,0 +1,28 @@
+<% const leaves = await book.leaves.active().withLeafables().positioned().toArray(); %>
+<% const editable = await book.isEditable(); %>
+<menu class="sidebar__content toc flex flex-column">
+  <header>
+    <h1 class="txt-large--responsive margin-none">
+      <%= book.title %>
+    </h1>
+  </header>
+
+  <% for (const leaf of leaves) { %>
+    <% leaf.association("book").target = book; %>
+    <li class="flex min-width <%= leaf.isSection() ? "leaf--section" : "" -%>">
+      <% if (editable) { %>
+        <%= linkTo(editLeafablePath(leaf), { class: "toc__title hide_from_reading_mode min-width", data: { turboFrame: "_top" } }, null, () => { %>
+          <span class="overflow-ellipsis"><%= leaf.title %></span>
+        <% }) %>
+
+        <%= linkTo(leafableSlugPath(leaf), { class: "toc__title hide_from_edit_mode min-width", data: { turboFrame: "_top" } }, null, () => { %>
+          <span class="overflow-ellipsis"><%= leaf.title %></span>
+        <% }) %>
+      <% } else { %>
+        <%= linkTo(leafableSlugPath(leaf), { class: "toc__title min-width", data: { turboFrame: "_top" } }, null, () => { %>
+          <span class="overflow-ellipsis"><%= leaf.title %></span>
+        <% }) %>
+      <% } %>
+    </li>
+  <% } %>
+</menu>

@@ -1,0 +1,7 @@
+<%= await turboStream.append(domId(leaf, "being_edited"), null, {}, () => { %>
+  <%= tag().div({ id: domId(user, "being_edited_by"), class: "flex-inline align-center justify-center margin-block-end-double txt-medium gap being-edited-by", data: { controller: "autoremove", action: "animationend->autoremove#remove", hideFromUserId: user.id } }, () => { %>
+    <strong class="margin-inline-end-half"><%= user.name %></strong>
+    <span class="spinner txt-small flex-inline"></span>
+    <%= imageTag("write.svg", { aria: { hidden: true }, size: 18, class: "colorize--white margin-inline-start" }) %>
+  <% }) %>
+<% }) %>

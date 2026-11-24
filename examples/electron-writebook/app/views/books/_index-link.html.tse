@@ -1,0 +1,4 @@
+<%= linkTo(rootPath(), { class: "btn borderless txt-small flex-item-no-shrink" }, null, () => { %>
+  <%= imageTag("books.svg", { aria: { label: "Books" }, size: 19, class: "colorize--black", alt: "Books" }) %>
+  <span class="for-screen-reader">All books</span>
+<% }) %>

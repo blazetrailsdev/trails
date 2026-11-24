@@ -1,0 +1,22 @@
+<% await book.cover.load(); if (book.cover.isAttached()) await (await book.cover.attachment).blob; %>
+<%= await cache(book, {}, () => { %>
+<figure class="library__book <%= book.cover.isAttached() ? "" : `theme--${book?.theme}` %>">
+  <div class="flex flex-column gap-half">
+    <div class="flex-inline position-relative center">
+      <% if (book.cover.isAttached()) { %>
+        <%= imageTag(book.cover, { alt: "Book cover", class: "book__cover" }) %>
+      <% } else { %>
+        <span class="book__cover-wrapper">
+          <%= imageTag("empty-cover.png", { alt: "Book cover", class: "book__cover margin-block-none center" }) %>
+          <span class="book__title overflow-line-clamp pad txt-align-start txt-tight-lines" style="--lines: 6" aria-hidden="true"><%= book.title %></span>
+        </span>
+      <% } %>
+      <%= turboFrameTag(domId(book, "bookmark"), { src: bookBookmarkPath(book), target: "_top" }) %>
+    </div>
+    <h2 class="margin-none flex flex-column txt-normal txt-tight-lines txt-medium--responsive">
+      <strong><%= book.title %></strong>
+      <span class="overflow-line-clamp"><%= book.author %></span>
+    </h2>
+  </div>
+</figure>
+<% }) %>

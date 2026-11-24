@@ -1,0 +1,4 @@
+<% const publication = await render("books/publications/publication", { book }); %>
+<%= turboFrameTag(book, "publication", block(() => { %>
+  <%= publication %>
+<% }) %>

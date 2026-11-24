@@ -1,0 +1,25 @@
+<% contentFor("title", `Edit ${book.title}`); %>
+<% const deleteButton = await buttonTo(bookPath(book), { method: "delete", class: "btn btn--negative", data: { turboConfirm: "Are you sure you want to delete this book? It cannot be undone." } }, null, () => { %>
+  <%= imageTag("trash.svg", { aria: { hidden: true }, size: 24 }) %>
+  <span class="for-screen-reader">Delete <%= book.title %></span>
+<% }); %>
+
+<% contentFor("header", () => { %>
+  <nav>
+    <%= linkTo(bookSlugPath(book), { class: "btn flex-item-justify-start" }, null, () => { %>
+      <%= imageTag("arrow-left.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Cancel and go back</span>
+    <% }) %>
+  </nav>
+<% }) %>
+
+<%= await render("books/form", { book, users, creatingUser: null }) %>
+
+<% contentFor("footer", () => { %>
+  <nav class="flex align-end justify-center pad">
+    <%= deleteButton %>
+    <button type="submit" form="book-editor", class="new-book-btn btn btn--reversed center txt-medium--responsive" aria-label="Save changes" title="Save changes">
+      <%= imageTag("check.svg", { aria: { hidden: true }, size: 24 }) %>
+    </button>
+  </nav>
+<% }) %>

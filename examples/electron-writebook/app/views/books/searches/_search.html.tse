@@ -1,0 +1,34 @@
+<% const searchForm = await render("books/searches/form", { book }); %>
+<div data-controller="dialog" data-action="keydown.ctrl+space@document->dialog#open keydown.esc->dialog#close">
+  <button data-action="click->dialog#open" class="btn" title="Search (control + space)">
+    <%= imageTag("search.svg", { aria: { hidden: true }, size: 24 }) %>
+    <span class="for-screen-reader">Search</span>
+  </button>
+
+  <dialog data-dialog-target="dialog" class="search__modal dialog panel shadow">
+    <form method="dialog">
+      <button class="btn panel__close" title="Close (esc)">
+        <%= imageTag("remove.svg", { aria: { hidden: true }, size: 24 }) %>
+        <span class="for-screen-reader">Close</span>
+      </button>
+    </form>
+
+    <div class="flex align-center gap">
+      <label class="flex align-center gap full-width">
+        <div class="flex align-center gap input input--actor">
+          <%= imageTag("search.svg", { aria: { hidden: "true" }, size: 24, class: "colorize--black" }) %>
+          <%= searchFieldTag("search", null, { form: "search_form", class: "search__input input full-width txt-large", autocomplete: "off", autofocus: true, placeholder: "Find in this book…" }) %>
+        </div>
+
+        <button class="btn btn--reversed txt-medium" title="Submit search (enter)" form="search_form" type="submit" tabindex="-1">
+          <%= imageTag("arrow-right.svg", { aria: { hidden: true }, size: 24 }) %>
+          <span class="for-screen-reader">Submit search</span>
+        </button>
+      </label>
+    </div>
+
+    <%= turboFrameTag("search", block(() => { %>
+      <%= searchForm %>
+    <% }) %>
+  </dialog>
+</div>

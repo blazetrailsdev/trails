@@ -1,0 +1,6 @@
+<% if (await leaf.edits.isAny()) { %>
+  <%= linkTo(pageEditPath(leaf, "latest"), { class: "btn flex-item-no-shrink txt-small" }, null, () => { %>
+    <%= imageTag("history.svg", { aria: { hidden: "true" }, size: "24" }) %>
+    <span class="for-screen-reader">Editing history</span>
+  <% }) %>
+<% } %>

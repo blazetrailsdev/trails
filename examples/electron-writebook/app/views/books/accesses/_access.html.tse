@@ -1,0 +1,26 @@
+<% const isEditor = (await book.isEditable({ user })) || (creatingUser != null && user.id === creatingUser.id) || user.isCanAdminister(); %>
+<% const isReader = (await book.isAccessable({ user })) || (creatingUser != null && user.id === creatingUser.id) || user.isCanAdminister(); %>
+<div class="flex align-center gap txt-medium--responsive" data-controller="dependent-checkbox">
+  <span class="flex align-center gap-half">
+    <% if (user.isCanAdminister()) { %>
+      <%= imageTag("crown.svg", { size: 18, aria: { hidden: "true" }, class: "colorize--black" }) %>
+    <% } %>
+    <span class="overflow-ellipsis txt-medium--responsive"><%= user.name %></span>
+  </span>
+  <hr class="flex-item-grow margin-none" aria-hidden="true" style="--border-style: dashed">
+
+  <fieldset class="flex align-center gap borderless unpad margin-none">
+    <legend class="for-screen-reader"><%= user.name %></legend>
+    <label class="btn btn--small flex-item-no-shrink">
+      <%= checkBoxTag("editor_ids[]", user.id, isEditor, { id: null, disabled: user.isCurrent() || user.isCanAdminister(), data: { action: "dependent-checkbox#input", dependentCheckboxTarget: "dependant" }, aria: { label: "Role: Writer" } }) %>
+      <%= imageTag("write.svg", { size: 24, aria: { hidden: "true" } }) %>
+      <span class="for-screen-reader"></span>
+    </label>
+
+    <label class="btn btn--small flex-item-no-shrink book-access__reader">
+      <%= checkBoxTag("reader_ids[]", user.id, isReader, { id: null, disabled: user.isCurrent() || user.isCanAdminister(), data: { action: "dependent-checkbox#input", dependentCheckboxTarget: "dependee" }, aria: { label: "Role: Reader" } }) %>
+      <%= imageTag("eye.svg", { size: 24, aria: { hidden: "true" } }) %>
+      <span class="for-screen-reader"></span>
+    </label>
+  </fieldset>
+</div>
