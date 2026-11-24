@@ -159,6 +159,65 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    it("reconnect after bad connection on check version with native exception", async () => {
+      const connection = new PostgreSQLAdapter({ ...PG_TEST_CONFIG, connectionRetries: 0 });
+      try {
+        await connection.connectBang();
+
+        (connection.pool as unknown as { _serverVersion: unknown })._serverVersion = null;
+        const versionSpy = vi
+          .spyOn(connection._rawConnection as PGConnection, "serverVersion")
+          .mockImplementation(() => {
+            throw new ConnectionBad("PQserverVersion() can't get server version");
+          });
+        const error = await assertRaises([ConnectionNotEstablished], {}, () =>
+          connection.reconnectBang(),
+        );
+        expect(error.message).toBe("PQserverVersion() can't get server version");
+        versionSpy.mockRestore();
+
+        await assertNothingRaised(() => connection.reconnectBang());
+      } finally {
+        await connection.disconnectBang();
+      }
+    });
+
+    it("schema search path is reapplied after reconnect", async () => {
+      const connection = new PostgreSQLAdapter({
+        ...PG_TEST_CONFIG,
+        schemaSearchPath: "public,foo",
+      });
+      try {
+        await connection.connectBang();
+
+        expect(await connection.selectValue("SHOW search_path")).toBe("public, foo");
+
+        await connection.reconnectBang();
+
+        expect(await connection.selectValue("SHOW search_path")).toBe("public, foo");
+      } finally {
+        await connection.disconnectBang();
+      }
+    });
+
+    it("schema search path is reapplied after reset", async () => {
+      const connection = new PostgreSQLAdapter({
+        ...PG_TEST_CONFIG,
+        schemaSearchPath: "public,foo",
+      });
+      try {
+        await connection.connectBang();
+
+        expect(await connection.selectValue("SHOW search_path")).toBe("public, foo");
+
+        await connection.resetBang();
+
+        expect(await connection.selectValue("SHOW search_path")).toBe("public, foo");
+      } finally {
+        await connection.disconnectBang();
+      }
+    });
+
     it("database exists returns false when the database does not exist", async () => {
       const url = new URL(PG_TEST_URL);
       url.pathname = "/non_extant_database";
