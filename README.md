@@ -88,6 +88,13 @@ overrides, then install:
   echo "  vitest: \"$(node -p "require('$TRAILS/node_modules/vitest/package.json').version")\""
   printf 'allowBuilds:\n  better-sqlite3: true\n  esbuild: true\n'
 } > pnpm-workspace.yaml
+node -e '
+const fs = require("fs"), app = JSON.parse(fs.readFileSync("package.json"));
+const meta = require(process.env.TRAILS + "/packages/trails/package.json");
+for (const name of [...Object.keys(meta.dependencies), "@blazetrails/ruby-compat"])
+  app.dependencies[name] = `link:${process.env.TRAILS}/packages/${name.slice(13)}`;
+fs.writeFileSync("package.json", JSON.stringify(app, null, 2) + "\n");
+'
 pnpm install
 ```
 
