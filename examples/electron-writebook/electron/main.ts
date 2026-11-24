@@ -51,7 +51,6 @@ async function boot(): Promise<void> {
       height: 860,
       minWidth: 480,
       title: "Bookshelf",
-      titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
       webPreferences: { contextIsolation: true, sandbox: true },
     });
     win.webContents.setWindowOpenHandler(({ url }) => {
