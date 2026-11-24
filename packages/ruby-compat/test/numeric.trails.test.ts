@@ -5,6 +5,7 @@ import { NoMethodError } from "../lib/no-method-error.js";
 import { NameError } from "../lib/name-error.js";
 import { TypeError } from "../lib/type-error.js";
 import { ArgumentError } from "../lib/argument-error.js";
+import { MathDomainError } from "../lib/math-domain-error.js";
 import {
   intDigits,
   intXor,
@@ -389,10 +390,10 @@ describe("Integer#digits", () => {
   });
 
   it("digits for negative numbers", () => {
-    expect(() => intDigits(-1)).toThrow(ArgumentError);
-    expect(() => intDigits(-1234567890)).toThrow(ArgumentError);
-    expect(() => intDigits(-1234567890, 100)).toThrow(ArgumentError);
-    expect(() => intDigits(-1234567890, 13)).toThrow(ArgumentError);
+    expect(() => intDigits(-1)).toThrow(MathDomainError);
+    expect(() => intDigits(-1234567890)).toThrow(MathDomainError);
+    expect(() => intDigits(-1234567890, 100)).toThrow(MathDomainError);
+    expect(() => intDigits(-1234567890, 13)).toThrow(MathDomainError);
   });
 
   it("digits for invalid base numbers", () => {

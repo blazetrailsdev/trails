@@ -1,6 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
+import { MathDomainError } from "./math-domain-error.js";
 import { NameError } from "./name-error.js";
 import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -773,7 +774,7 @@ export function rubyNumIntervalStepSize(
  * @noRailsEquivalent PERMANENT
  */
 export function intDigits(num: number, base: number = 10): number[] {
-  if (num < 0) throw new ArgumentError("out of domain");
+  if (num < 0) throw new MathDomainError("out of domain");
   if (base < 0) throw new ArgumentError("negative radix");
   else if (base < 2) throw new ArgumentError(`invalid radix ${base}`);
 

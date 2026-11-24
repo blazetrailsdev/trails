@@ -80,11 +80,11 @@ export const SecureRandom = {
     { chars = ALPHANUMERIC }: { chars?: readonly string[] } = {},
   ): string {
     if (n == null) n = 16;
-    return SecureRandom.choose(chars, n);
+    return SecureRandom._choose(chars, n);
   },
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:314 */
-  choose(source: readonly string[], n: number): string {
+  /** @internal */
+  _choose(source: readonly string[], n: number): string {
     const size = source.length;
     let m = 1;
     let limit = size;
