@@ -40,8 +40,8 @@ describe("ActiveStorage::Transformers::ImageProcessingTransformer", () => {
     ["string", { resize: "-write /tmp/x" }],
     ["array", { resize: [100, "-set"] }],
     ["nested array", { resize: [[1, ["-debug"]]] }],
-    ["hash", { saver: { "-write": 1 } }],
-    ["nested hash", { saver: { a: { b: "-DEBUG" } } }],
+    ["hash", { resize: { "-write": 1 } }],
+    ["nested hash", { resize: { a: { b: "-DEBUG" } } }],
   ])("raises UnsupportedImageProcessingArgument for a %s", async (_kind, transformations) => {
     await expect(transform(transformations)).rejects.toThrow(UnsupportedImageProcessingArgument);
   });

@@ -15,6 +15,8 @@ export class FileNotFoundError extends Error {}
 
 export class PreviewError extends Error {}
 
+export class InvalidKeyError extends Error {}
+
 ActiveStorage.Error = Error;
 ActiveStorage.InvariableError = InvariableError;
 ActiveStorage.UnpreviewableError = UnpreviewableError;
@@ -22,3 +24,4 @@ ActiveStorage.UnrepresentableError = UnrepresentableError;
 ActiveStorage.IntegrityError = IntegrityError;
 ActiveStorage.FileNotFoundError = FileNotFoundError;
 ActiveStorage.PreviewError = PreviewError;
+ActiveStorage.InvalidKeyError = InvalidKeyError;

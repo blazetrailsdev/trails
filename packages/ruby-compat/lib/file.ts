@@ -24,10 +24,17 @@ export type PathLike = { toPath(): string };
  * @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/file.c:246`
  */
 export function rbGetPath(obj: unknown): string {
-  if (typeof obj === "string") return obj;
-  const toPath = (obj as { toPath?: unknown } | null)?.toPath;
-  const tmp = typeof toPath === "function" ? toPath.call(obj) : obj;
-  return stringValue(tmp);
+  let path: string;
+  if (typeof obj === "string") {
+    path = obj;
+  } else {
+    const toPath = (obj as { toPath?: unknown } | null)?.toPath;
+    const tmp = typeof toPath === "function" ? toPath.call(obj) : obj;
+    path = stringValue(tmp);
+  }
+  // vendor/ruby/v3.3.11/file.c:232-234
+  if (path.includes("\0")) throw new ArgumentError("path name contains null byte");
+  return path;
 }
 
 /**

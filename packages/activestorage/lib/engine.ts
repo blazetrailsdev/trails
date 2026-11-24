@@ -1,3 +1,4 @@
+import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import {
   OrderedOptions,
   InheritableOptions,
@@ -61,6 +62,8 @@ export interface ActiveStorageConfig extends OrderedOptions {
   binaryContentType?: string;
   videoPreviewArguments?: string;
   trackVariants?: boolean;
+  ffmpegAllowedFormats?: string[] | null;
+  streamingChunkMaxSize?: number;
   queues?: InheritableOptions;
   precompileAssets?: boolean;
   serviceConfigurations?: Record<string, Record<string, unknown>>;
@@ -109,6 +112,7 @@ export class Engine extends TrailsEngine {
     this.config.activeStorage.paths = new OrderedOptions();
     this.config.activeStorage.queues = new InheritableOptions();
     this.config.activeStorage.precompileAssets = true;
+    this.config.activeStorage.ffmpegAllowedFormats = ActiveStorage.ffmpegAllowedFormats;
 
     this.config.activeStorage.variableContentTypes = [
       "image/png",
@@ -158,6 +162,11 @@ export class Engine extends TrailsEngine {
     });
 
     this.initializer("active_storage.configs", () => {
+      this.config.beforeInitialize((app) => {
+        ActiveStorage.touchAttachmentRecords =
+          app.config.activeStorage.touchAttachmentRecords !== false;
+      });
+
       this.config.afterInitialize((app) => {
         const activeStorage = app.config.activeStorage;
         ActiveStorage.logger = activeStorage.logger || TopLevel.Trails!.logger!;
@@ -192,7 +201,6 @@ export class Engine extends TrailsEngine {
         ActiveStorage.variableContentTypes = activeStorage.variableContentTypes || [];
         ActiveStorage.webImageContentTypes = activeStorage.webImageContentTypes || [];
         ActiveStorage.contentTypesToServeAsBinary = activeStorage.contentTypesToServeAsBinary || [];
-        ActiveStorage.touchAttachmentRecords = activeStorage.touchAttachmentRecords !== false;
         ActiveStorage.serviceUrlsExpireIn = activeStorage.serviceUrlsExpireIn || minutes(5);
         ActiveStorage.urlsExpireIn = activeStorage.urlsExpireIn ?? null;
         ActiveStorage.contentTypesAllowedInline = activeStorage.contentTypesAllowedInline || [];
@@ -200,7 +208,10 @@ export class Engine extends TrailsEngine {
           activeStorage.binaryContentType || "application/octet-stream";
         ActiveStorage.videoPreviewArguments =
           activeStorage.videoPreviewArguments || "-y -vframes 1 -f image2";
+        ActiveStorage.ffmpegAllowedFormats = activeStorage.ffmpegAllowedFormats ?? null;
         ActiveStorage.trackVariants = activeStorage.trackVariants || false;
+        ActiveStorage.streamingChunkMaxSize =
+          activeStorage.streamingChunkMaxSize || Numeric.megabytes(100);
       });
     });
 

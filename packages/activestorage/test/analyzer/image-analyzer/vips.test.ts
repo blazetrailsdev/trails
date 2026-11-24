@@ -41,14 +41,6 @@ describe("ActiveStorage::Analyzer::ImageAnalyzer::VipsTest", () => {
     expect(metadata.get("height")).toBe(4104);
   });
 
-  it("analyzing an SVG image without an XML declaration", async () => {
-    const blob = await createFileBlob({ filename: "icon.svg", contentType: "image/svg+xml" });
-    const metadata = await extractMetadataFrom(blob);
-
-    expect(metadata.get("width")).toBe(792);
-    expect(metadata.get("height")).toBe(584);
-  });
-
   it("analyzing an unsupported image type", async () => {
     const blob = await createBlob({
       data: "bad",

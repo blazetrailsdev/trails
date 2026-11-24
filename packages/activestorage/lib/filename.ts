@@ -20,11 +20,11 @@ export class Filename implements Comparable {
   }
 
   base(): string {
-    return File.basename(this.filename, this.extensionWithDelimiter());
+    return File.basename(this.sanitized(), this.extensionWithDelimiter());
   }
 
   extensionWithDelimiter(): string {
-    return File.extname(this.filename);
+    return File.extname(this.sanitized());
   }
 
   extensionWithoutDelimiter(): string {

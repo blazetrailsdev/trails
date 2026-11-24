@@ -6,7 +6,7 @@ type Metadata = { [k: string]: unknown };
 type ReadImage = { width: number; height: number; get(value: unknown): unknown };
 
 export class ImageMagick extends ImageAnalyzer<ReadImage> {
-  static override isAccept(blob: Blob): boolean {
+  static override isAccept(blob: Blob): boolean | undefined {
     return super.isAccept(blob) && ActiveStorage.variantProcessor === "mini_magick";
   }
 

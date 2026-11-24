@@ -16,7 +16,7 @@ import { PreviewError } from "./errors.js";
 export class Previewer {
   readonly blob: Blob;
 
-  static isAccept(_blob: Blob): boolean {
+  static isAccept(_blob: Blob): boolean | undefined {
     return false;
   }
 

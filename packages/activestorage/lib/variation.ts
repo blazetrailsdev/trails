@@ -57,7 +57,7 @@ export class Variation {
   }
 
   get contentType(): string | null {
-    return Marcel.MimeType.for(null, { extension: this.format });
+    return Marcel.MimeType.for({ extension: this.format });
   }
 
   get key(): string {

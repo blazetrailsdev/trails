@@ -1,7 +1,8 @@
+import { Constants } from "@blazetrails/actionpack";
 import { Errno, include, rbEqual, type Included } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import { BaseController } from "./base-controller.js";
-import { IntegrityError } from "./errors.js";
+import { IntegrityError, InvalidKeyError } from "./errors.js";
 import { FileServer } from "./file-server.js";
 import type { DiskService } from "./service/disk-service.js";
 
@@ -42,8 +43,13 @@ export class DiskController extends BaseController {
         await this.head(":not_found");
       }
     } catch (error) {
-      if (!(error instanceof Errno.ENOENT)) throw error;
-      await this.head(":not_found");
+      if (error instanceof Errno.ENOENT) {
+        await this.head(":not_found");
+      } else if (error instanceof InvalidKeyError) {
+        await this.head(":not_found");
+      } else {
+        throw error;
+      }
     }
   }
 
@@ -57,14 +63,19 @@ export class DiskController extends BaseController {
           });
           await this.head(":no_content");
         } else {
-          await this.head(":unprocessable_entity");
+          await this.head(Constants.UNPROCESSABLE_CONTENT);
         }
       } else {
         await this.head(":not_found");
       }
     } catch (error) {
-      if (!(error instanceof IntegrityError)) throw error;
-      await this.head(":unprocessable_entity");
+      if (error instanceof IntegrityError) {
+        await this.head(Constants.UNPROCESSABLE_CONTENT);
+      } else if (error instanceof InvalidKeyError) {
+        await this.head(Constants.UNPROCESSABLE_CONTENT);
+      } else {
+        throw error;
+      }
     }
   }
 

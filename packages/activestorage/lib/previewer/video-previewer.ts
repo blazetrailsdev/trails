@@ -11,7 +11,7 @@ import { Previewer } from "../previewer.js";
 export class VideoPreviewer extends Previewer {
   private static _ffmpegExists?: boolean | null;
 
-  static override isAccept(blob: Blob): boolean {
+  static override isAccept(blob: Blob): boolean | undefined {
     return blob.isVideo() && (this.isFfmpegExists() ?? false);
   }
 
@@ -51,6 +51,7 @@ export class VideoPreviewer extends Previewer {
   private drawRelevantFrameFrom(file: Tempfile, block: (output: Tempfile) => unknown) {
     return this.draw(
       (this.constructor as typeof VideoPreviewer).ffmpegPath(),
+      ...(ActiveStorage.ffmpegFormatWhitelistArguments() ?? []),
       "-i",
       file.path()!,
       ...Shellwords.shellwords(ActiveStorage.videoPreviewArguments),
