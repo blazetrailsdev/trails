@@ -1844,6 +1844,19 @@ dependencies, not ports.
 
 Ruled by the operator on 2026-11-13.
 
+## racc's grammar compiler is not ported (`Racc::GrammarFileParser`, `racc`)
+
+racc is a parser generator: `racc/parser.rb` is the runtime every generated
+parser runs on, and the rest of `lib/racc/` (`grammarfileparser.rb`,
+`grammar.rb`, `state.rb`, `parserfilegenerator.rb`, `bin/racc`) compiles a
+`.y` grammar into a parser. trails ports the runtime only
+(`packages/ruby-compat/lib/racc/parser.ts`). On each racc version bump, every
+grammar a ported gem ships is regenerated with Ruby's `racc` and the generated
+parser is ported. The compiler's test files (`test_racc_command.rb`,
+`test_grammar.rb`, `test_grammar_file_parser.rb`, `test_chk_y.rb`,
+`test_scan_y.rb`, `test_parser_text.rb`) are permanently unported. Ruled by
+the operator on 2026-11-23.
+
 ## Rails API-doc tooling is not ported (`Rails::API::Task`, `RDoc::Generator::API`)
 
 `railties/lib/rails/api/task.rb` and `api/generator.rb` build the Rails

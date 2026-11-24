@@ -5,13 +5,17 @@
 
 import type { UnportedFile } from "./types.js";
 
-const NOT_YET_PORTED = "No TS test file, under any name, ports a test of this Ruby file yet.";
+const COMPILER =
+  "Tests racc's grammar compiler (GrammarFileParser, States, ParserFileGenerator, the racc " +
+  "command). trails regenerates each grammar with Ruby's racc on a version bump and ports " +
+  "the generated parser; the compiler is not ported. PERMANENT: CLAUDE.md § \"racc's grammar " +
+  'compiler is not ported".';
 
 export const RACC_UNPORTED_FILES: UnportedFile[] = [
-  { testFile: "/test_chk_y.rb", package: "racc", reason: NOT_YET_PORTED },
-  { testFile: "/test_grammar.rb", package: "racc", reason: NOT_YET_PORTED },
-  { testFile: "/test_grammar_file_parser.rb", package: "racc", reason: NOT_YET_PORTED },
-  { testFile: "/test_parser_text.rb", package: "racc", reason: NOT_YET_PORTED },
-  { testFile: "/test_racc_command.rb", package: "racc", reason: NOT_YET_PORTED },
-  { testFile: "/test_scan_y.rb", package: "racc", reason: NOT_YET_PORTED },
+  { testFile: "/test_chk_y.rb", package: "racc", reason: COMPILER },
+  { testFile: "/test_grammar.rb", package: "racc", reason: COMPILER },
+  { testFile: "/test_grammar_file_parser.rb", package: "racc", reason: COMPILER },
+  { testFile: "/test_parser_text.rb", package: "racc", reason: COMPILER },
+  { testFile: "/test_racc_command.rb", package: "racc", reason: COMPILER },
+  { testFile: "/test_scan_y.rb", package: "racc", reason: COMPILER },
 ];
