@@ -39,7 +39,8 @@
     "!dist/**/*.d.ts.map"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && pnpm build:templates",
+    "build:templates": "cp -R lib/image-magick dist/"
   },
   "dependencies": {
     "@blazetrails/rake": "workspace:*",

@@ -165,37 +165,44 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
   });
 
   it("multiple Byte Ranges", async () => {
-    const boundary = SecureRandom.hex();
-    await stub(SecureRandom, "hex", boundary, [], async () => {
-      await t.get(
-        t.integrationSession.trailsStorageProxyUrl(
-          await createFileBlob({ filename: "racecar.jpg" }),
-        ),
-        { headers: { Range: "bytes=5-9,13-17" } },
-      );
-      t.assertResponse(":partial_content");
-      expect(t.response.headers.get("Content-Length")).toBe("252");
-      expect(t.response.headers.get("Content-Type")).toBe(
-        `multipart/byteranges; boundary=${boundary}`,
-      );
-      expect(t.response.body).toBe(
-        [
-          "",
-          `--${boundary}`,
-          "Content-Type: image/jpeg",
-          "Content-Range: bytes 5-9/1124062",
-          "",
-          " Exif",
-          `--${boundary}`,
-          "Content-Type: image/jpeg",
-          "Content-Range: bytes 13-17/1124062",
-          "",
-          "I*\u0000\b\u0000",
-          `--${boundary}--`,
-          "",
-        ].join("\r\n"),
-      );
-    });
+    const previousStreamingMaxRanges = ActiveStorage.streamingMaxRanges;
+    ActiveStorage.streamingMaxRanges = 2;
+
+    try {
+      const boundary = SecureRandom.hex();
+      await stub(SecureRandom, "hex", boundary, [], async () => {
+        await t.get(
+          t.integrationSession.trailsStorageProxyUrl(
+            await createFileBlob({ filename: "racecar.jpg" }),
+          ),
+          { headers: { Range: "bytes=5-9,13-17" } },
+        );
+        t.assertResponse(":partial_content");
+        expect(t.response.headers.get("Content-Length")).toBe("252");
+        expect(t.response.headers.get("Content-Type")).toBe(
+          `multipart/byteranges; boundary=${boundary}`,
+        );
+        expect(t.response.body).toBe(
+          [
+            "",
+            `--${boundary}`,
+            "Content-Type: image/jpeg",
+            "Content-Range: bytes 5-9/1124062",
+            "",
+            " Exif",
+            `--${boundary}`,
+            "Content-Type: image/jpeg",
+            "Content-Range: bytes 13-17/1124062",
+            "",
+            "I*\u0000\b\u0000",
+            `--${boundary}--`,
+            "",
+          ].join("\r\n"),
+        );
+      });
+    } finally {
+      ActiveStorage.streamingMaxRanges = previousStreamingMaxRanges;
+    }
   });
 
   it("uses a Live::Response", async () => {

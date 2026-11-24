@@ -12,7 +12,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { Current } from "../current.js";
-import { FileNotFoundError, IntegrityError } from "../errors.js";
+import { FileNotFoundError, IntegrityError, InvalidKeyError } from "../errors.js";
 import type { Filename } from "../filename.js";
 import { Service } from "../service.js";
 
@@ -92,7 +92,12 @@ export class DiskService extends Service {
 
   override async deletePrefixed(prefix: string): Promise<void> {
     await this.instrument("delete_prefixed", { prefix: prefix }, async () => {
-      for (const path of await Dir.globAsync(this.pathFor(`${prefix}*`))) {
+      let prefixPath = this.pathFor(prefix);
+
+      if (prefix.endsWith("/")) prefixPath += "/";
+
+      const escaped = this.escapeGlobMetacharacters(prefixPath);
+      for (const path of await Dir.globAsync(`${escaped}*`)) {
         await FileUtils.rmRfAsync(path);
       }
     });
@@ -151,7 +156,27 @@ export class DiskService extends Service {
 
   /** @internal */
   pathFor(key: string): string {
-    return File.join(this.root, this.folderFor(key), key);
+    if (isBlank(key)) {
+      throw new InvalidKeyError("key is blank");
+    }
+
+    if (key.split("/").some((segment) => segment === "." || segment === "..")) {
+      throw new InvalidKeyError("key has path traversal segments");
+    }
+
+    let path: string;
+    try {
+      path = File.expandPath(File.join(this.root, this.folderFor(key), key));
+    } catch (error) {
+      if (!(error instanceof ArgumentError)) throw error;
+      throw new InvalidKeyError("key is an invalid string");
+    }
+
+    if (!path.startsWith(File.expandPath(this.root) + "/")) {
+      throw new InvalidKeyError("key is outside of disk service root");
+    }
+
+    return path;
   }
 
   override async compose(
@@ -273,6 +298,11 @@ export class DiskService extends Service {
   /** @internal */
   private folderFor(key: string): string {
     return [key.slice(0, 2), key.slice(2, 4)].join("/");
+  }
+
+  /** @internal */
+  private escapeGlobMetacharacters(path: string): string {
+    return path.replace(/[[\]*?{}\\]/g, (c) => `\\${c}`);
   }
 
   /** @internal */

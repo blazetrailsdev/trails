@@ -6,13 +6,14 @@ type Metadata = { [k: string]: unknown };
 type ReadImage = { width: number; height: number; get(value: unknown): unknown };
 
 export class ImageMagick extends ImageAnalyzer<ReadImage> {
-  static override isAccept(blob: Blob): boolean {
+  static override isAccept(blob: Blob): boolean | undefined {
     return super.isAccept(blob) && ActiveStorage.variantProcessor === "mini_magick";
   }
 
   /**
    * @internal
    * @inventedArm get — PERMANENT
+   * @inventedArm loadPath — PERMANENT
    */
   protected override async readImage(
     block: (image: ReadImage) => Promise<Metadata>,
@@ -28,6 +29,9 @@ export class ImageMagick extends ImageAnalyzer<ReadImage> {
       this.logger.info("Skipping image analysis because the mini_magick gem isn't installed");
       return {};
     }
+
+    await ActiveStorage.loadPath["active_storage/image_magick"]();
+    ActiveStorage.requireSecurableMiniMagick();
 
     return await this.downloadBlobToTempfile(async (file) => {
       try {

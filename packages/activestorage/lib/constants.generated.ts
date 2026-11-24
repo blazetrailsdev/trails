@@ -104,6 +104,7 @@ defineConstants([
   [m33, "FileNotFoundError", "ActiveStorage::FileNotFoundError"],
   [m34, "FileServer", "ActiveStorage::FileServer"],
   [m33, "IntegrityError", "ActiveStorage::IntegrityError"],
+  [m33, "InvalidKeyError", "ActiveStorage::InvalidKeyError"],
   [m33, "InvariableError", "ActiveStorage::InvariableError"],
   [m37, "LogSubscriber", "ActiveStorage::LogSubscriber"],
   [m38, "MirrorJob", "ActiveStorage::MirrorJob"],

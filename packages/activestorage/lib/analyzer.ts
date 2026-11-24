@@ -6,7 +6,7 @@ import type { Blob } from "./blob.js";
 export class Analyzer {
   readonly blob: Blob;
 
-  static isAccept(_blob: Blob): boolean {
+  static isAccept(_blob: Blob): boolean | undefined {
     return false;
   }
 

@@ -5,7 +5,7 @@ type Dimensions = { width: number; height: number };
 type Metadata = { [k: string]: unknown };
 
 export abstract class ImageAnalyzer<I extends Dimensions = Dimensions> extends Analyzer {
-  static override isAccept(blob: Blob): boolean {
+  static override isAccept(blob: Blob): boolean | undefined {
     return blob.isImage();
   }
 

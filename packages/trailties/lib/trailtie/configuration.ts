@@ -81,7 +81,7 @@ export class Configuration {
     onLoad("before_eager_load", { yield: true }, block);
   }
 
-  beforeInitialize(block: ConfigurationBlock): void {
+  beforeInitialize(block: (this: unknown, app: Application) => unknown): void {
     onLoad("before_initialize", { yield: true }, block);
   }
 

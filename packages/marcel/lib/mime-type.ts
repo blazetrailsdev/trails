@@ -25,12 +25,17 @@ export class MimeType {
 
   static for(
     pathnameOrIo: unknown = null,
-    {
-      name = null,
-      extension = null,
-      declaredType = null,
-    }: { name?: string | null; extension?: string | null; declaredType?: string | null } = {},
+    options: { name?: string | null; extension?: string | null; declaredType?: string | null } = {},
   ) {
+    if (
+      pathnameOrIo != null &&
+      typeof pathnameOrIo === "object" &&
+      Object.getPrototypeOf(pathnameOrIo) === Object.prototype
+    ) {
+      options = pathnameOrIo;
+      pathnameOrIo = null;
+    }
+    const { name = null, extension = null, declaredType = null } = options;
     const filenameType = this.forName(name) ?? this.forExtension(extension);
     return this.mostSpecificType(
       this.forData(pathnameOrIo),

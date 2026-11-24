@@ -368,3 +368,35 @@ export function subscribeEventsFrom(name: string): unknown[] {
   Notifications.subscribe(name, (event: unknown) => events.push(event));
   return events;
 }
+
+export const VIPS_MAGICK_LOADERS = Object.freeze([
+  "VipsForeignLoadMagick",
+  "VipsForeignLoadMagick7",
+]);
+export const VIPS_SVG_LOADERS = Object.freeze(["VipsForeignLoadSvg"]);
+
+const { vips: Vips } = await import("@blazetrails/image-processing/vips");
+
+export const VIPS_LOADERS_DISABLED_AT_BOOT = (() => {
+  try {
+    Vips.Image.newFromFile(File.expandPath("../fixtures/files/colors.bmp", import.meta.dirname));
+    return false;
+  } catch {
+    return true;
+  }
+})();
+
+export async function withVipsLoadersEnabled<T>(
+  classNames: readonly string[],
+  block: () => T | Promise<T>,
+): Promise<T> {
+  for (const className of classNames) Vips.operationBlock(className, false);
+
+  try {
+    return await block();
+  } finally {
+    for (const className of classNames) {
+      Vips.operationBlock(className, VIPS_LOADERS_DISABLED_AT_BOOT);
+    }
+  }
+}

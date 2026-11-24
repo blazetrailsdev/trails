@@ -677,7 +677,7 @@
     }
   },
   "activestorage": {
-    "rows": 90,
+    "rows": 91,
     "excluded": [],
     "unwalked": [
       "attached/changes.ts::Changes",

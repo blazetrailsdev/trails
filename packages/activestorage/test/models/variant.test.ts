@@ -15,8 +15,16 @@ import {
   UnsupportedImageProcessingArgument,
   UnsupportedImageProcessingMethod,
 } from "../../lib/transformers/image-processing-transformer.js";
-import { createFileBlob, fileFixture, readImage } from "../support/test-helper.js";
+import {
+  createFileBlob,
+  fileFixture,
+  readImage,
+  VIPS_MAGICK_LOADERS,
+  withVipsLoadersEnabled,
+} from "../support/test-helper.js";
 import type { Variant } from "../../lib/variant.js";
+
+const VipsError = WebAssembly.Exception as unknown as typeof Error;
 
 describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
   let wasTracking: boolean;
@@ -116,32 +124,68 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     expect(await image.height()).toBe(100);
   });
 
-  it("resized variation of PSD blob", async () => {
+  it("resized variation of PSD blob raises because the ImageMagick loader is disabled by default", async (ctx) => {
     const blob = await createFileBlob({
       filename: "icon.psd",
       contentType: "image/vnd.adobe.photoshop",
     });
-    const variant = await variantOf(blob, { resizeToLimit: [20, 20] }).processed();
-    expect(await variant.url()).toMatch(/icon\.png/);
 
-    const image = await readImage(variant);
-    expect(await image.type()).toBe("PNG");
-    expect(await image.width()).toBe(20);
-    expect(await image.height()).toBe(20);
+    await processVariantsWith(ctx, "vips", async () => {
+      await expect(variantOf(blob, { resizeToLimit: [20, 20] }).processed()).rejects.toThrow(
+        VipsError,
+      );
+    });
   });
 
-  it("resized variation of ICO blob", async () => {
+  it("resized variation of PSD blob when the ImageMagick loader is enabled", async (ctx) => {
+    const blob = await createFileBlob({
+      filename: "icon.psd",
+      contentType: "image/vnd.adobe.photoshop",
+    });
+
+    await processVariantsWith(ctx, "vips", async () => {
+      await withVipsLoadersEnabled(VIPS_MAGICK_LOADERS, async () => {
+        const variant = await variantOf(blob, { resizeToLimit: [20, 20] }).processed();
+        expect(await variant.url()).toMatch(/icon\.png/);
+
+        const image = await readImage(variant);
+        expect(await image.type()).toBe("PNG");
+        expect(await image.width()).toBe(20);
+        expect(await image.height()).toBe(20);
+      });
+    });
+  });
+
+  it("resized variation of ICO blob raises because the ImageMagick loader is disabled by default", async (ctx) => {
     const blob = await createFileBlob({
       filename: "favicon.ico",
       contentType: "image/vnd.microsoft.icon",
     });
-    const variant = await variantOf(blob, { resizeToLimit: [20, 20] }).processed();
-    expect(await variant.url()).toMatch(/icon\.png/);
 
-    const image = await readImage(variant);
-    expect(await image.type()).toBe("PNG");
-    expect(await image.width()).toBe(20);
-    expect(await image.height()).toBe(20);
+    await processVariantsWith(ctx, "vips", async () => {
+      await expect(variantOf(blob, { resizeToLimit: [20, 20] }).processed()).rejects.toThrow(
+        VipsError,
+      );
+    });
+  });
+
+  it("resized variation of ICO blob when the ImageMagick loader is enabled", async (ctx) => {
+    const blob = await createFileBlob({
+      filename: "favicon.ico",
+      contentType: "image/vnd.microsoft.icon",
+    });
+
+    await processVariantsWith(ctx, "vips", async () => {
+      await withVipsLoadersEnabled(VIPS_MAGICK_LOADERS, async () => {
+        const variant = await variantOf(blob, { resizeToLimit: [20, 20] }).processed();
+        expect(await variant.url()).toMatch(/icon\.png/);
+
+        const image = await readImage(variant);
+        expect(await image.type()).toBe("PNG");
+        expect(await image.width()).toBe(20);
+        expect(await image.height()).toBe(20);
+      });
+    });
   });
 
   it("resized variation of TIFF blob", async () => {
@@ -155,15 +199,30 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     expect(await image.height()).toBe(33);
   });
 
-  it("resized variation of BMP blob", async () => {
+  it("resized variation of BMP blob raises because the ImageMagick loader is disabled by default", async (ctx) => {
     const blob = await createFileBlob({ filename: "colors.bmp", contentType: "image/bmp" });
-    const variant = await variantOf(blob, { resizeToLimit: [15, 15] }).processed();
-    expect(await variant.url()).toMatch(/colors\.png/);
 
-    const image = await readImage(variant);
-    expect(await image.type()).toBe("PNG");
-    expect(await image.width()).toBe(15);
-    expect(await image.height()).toBe(8);
+    await processVariantsWith(ctx, "vips", async () => {
+      await expect(variantOf(blob, { resizeToLimit: [15, 15] }).processed()).rejects.toThrow(
+        VipsError,
+      );
+    });
+  });
+
+  it("resized variation of BMP blob when the ImageMagick loader is enabled", async (ctx) => {
+    const blob = await createFileBlob({ filename: "colors.bmp", contentType: "image/bmp" });
+
+    await processVariantsWith(ctx, "vips", async () => {
+      await withVipsLoadersEnabled(VIPS_MAGICK_LOADERS, async () => {
+        const variant = await variantOf(blob, { resizeToLimit: [15, 15] }).processed();
+        expect(await variant.url()).toMatch(/colors\.png/);
+
+        const image = await readImage(variant);
+        expect(await image.type()).toBe("PNG");
+        expect(await image.width()).toBe(15);
+        expect(await image.height()).toBe(8);
+      });
+    });
   });
 
   it("resized variation of WEBP blob", async () => {
@@ -324,7 +383,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     await processVariantsWith(ctx, "mini_magick", async () => {
       const blob = await createFileBlob({ filename: "racecar.jpg" });
       await expect(
-        variantOf(blob, { saver: { "-write": "/tmp/file.erb" } }).processed(),
+        variantOf(blob, { resize: { "-write": "/tmp/file.erb" } }).processed(),
       ).rejects.toThrow(UnsupportedImageProcessingArgument);
     });
   });
@@ -333,11 +392,11 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     await processVariantsWith(ctx, "mini_magick", async () => {
       const blob = await createFileBlob({ filename: "racecar.jpg" });
       await expect(
-        variantOf(blob, { saver: { something: { "-write": "/tmp/file.erb" } } }).processed(),
+        variantOf(blob, { resize: { something: { "-write": "/tmp/file.erb" } } }).processed(),
       ).rejects.toThrow(UnsupportedImageProcessingArgument);
 
       await expect(
-        variantOf(blob, { saver: { something: ["-write", "/tmp/file.erb"] } }).processed(),
+        variantOf(blob, { resize: { something: ["-write", "/tmp/file.erb"] } }).processed(),
       ).rejects.toThrow(UnsupportedImageProcessingArgument);
     });
   });
