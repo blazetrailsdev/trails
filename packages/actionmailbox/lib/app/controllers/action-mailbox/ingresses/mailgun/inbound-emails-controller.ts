@@ -6,7 +6,7 @@ import {
   Encoding,
   OpenSSL,
   env,
-  greaterThanOrEqual,
+  isBetween,
   kernelInteger,
   rbStrPlus,
   type Comparable,
@@ -107,9 +107,10 @@ export class InboundEmailsController extends BaseController {
 
     /** @internal */
     isRecent(): boolean {
-      return greaterThanOrEqual.call(
+      return isBetween.call(
         Time.at(this.timestamp) as unknown as Comparable,
         minutes(2).ago(),
+        minutes(2).fromNow(),
       );
     }
 

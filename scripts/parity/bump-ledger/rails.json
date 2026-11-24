@@ -1,45 +1,5 @@
 [
   {
-    "package": "actionmailbox",
-    "rubyFile": "ingresses/mailgun/inbound_emails_controller.rb",
-    "rubyName": "recent?",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "actionmailbox",
-    "rubyFile": "ingresses/mandrill/inbound_emails_controller.rb",
-    "rubyName": "create",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "actionmailbox",
-    "rubyFile": "ingresses/postmark/inbound_emails_controller.rb",
-    "rubyName": "create",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "actionmailbox",
-    "rubyFile": "ingresses/relay/inbound_emails_controller.rb",
-    "rubyName": "create",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "actionmailbox",
-    "rubyFile": "ingresses/sendgrid/inbound_emails_controller.rb",
-    "rubyName": "create",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
     "package": "actiontext",
     "rubyFile": "tag_helper.rb",
     "rubyName": "render",
