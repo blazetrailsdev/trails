@@ -5,7 +5,7 @@ import { env, setEnv } from "@blazetrails/ruby-compat";
 import { pluginTrailsInit } from "../../lib/minitest/trails-plugin.js";
 
 function backtraceGemLine(gemName: string): string {
-  return `node_modules/${gemName}/lib/${gemName}.js:1:1`;
+  return "node_modules/vitest/dist/vitest.js:1:1".replaceAll("vitest", gemName);
 }
 
 function withPlugin(
@@ -40,6 +40,14 @@ describe("Minitest::TrailsPluginTest", () => {
 
     withPlugin({}, new BacktraceFilter(), () => {
       expect(Minitest.backtraceFilter.filter(backtrace)).toEqual(backtrace);
+    });
+  });
+
+  it("replacement backtrace filter silences Minitest lines when all lines are gem lines", () => {
+    const backtrace = [backtraceGemLine("trails"), backtraceGemLine("vitest")];
+
+    withPlugin({}, new BacktraceFilter(), () => {
+      expect(Minitest.backtraceFilter.filter(backtrace)).toEqual(backtrace.slice(0, 1));
     });
   });
 
