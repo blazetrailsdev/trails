@@ -68,6 +68,7 @@ import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import { File, LOAD_PATH, OpenSSL, StandardError } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
+import { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
 import { Digest } from "@blazetrails/activesupport/digest";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
@@ -252,6 +253,7 @@ describe("ConfigurationTest", () => {
     [ActiveSupport, "testParallelizationThreshold"],
     [ActiveJob.Base, "enqueueAfterTransactionCommit"],
     [SQLite3Adapter, "strictStringsByDefault"],
+    [PostgreSQLAdapter, "decodeDates"],
   ].map(([owner, key]) => [owner, key, (owner as Record<string, unknown>)[key as string]]) as [
     Record<string, unknown>,
     string,
@@ -1746,6 +1748,46 @@ Trails.application!.configure(function () {
     await application.initializeBang();
 
     expect(ActiveRecord.queues()).toEqual({});
+  });
+
+  it("PostgresqlAdapter.decode_dates is true by default for new apps", async () => {
+    await mkdir(join(appPath, "config", "initializers"));
+    await writeFile(
+      join(appPath, "config", "initializers", "active_record.ts"),
+      `import { Base } from "@blazetrails/activerecord";\nawait Base.establishConnection({ adapter: "postgresql" });\n`,
+    );
+
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initializeBang();
+
+    expect(PostgreSQLAdapter.decodeDates).toBe(true);
+  });
+
+  it("PostgresqlAdapter.decode_dates is false by default for upgraded apps", async () => {
+    await mkdir(join(appPath, "config", "initializers"));
+    await writeFile(
+      join(appPath, "config", "initializers", "active_record.ts"),
+      `import { Base } from "@blazetrails/activerecord";\nawait Base.establishConnection({ adapter: "postgresql" });\n`,
+    );
+
+    await (await app("development")).initializeBang();
+
+    expect(PostgreSQLAdapter.decodeDates).toBe(false);
+  });
+
+  it("PostgresqlAdapter.decode_dates can be configured via config.active_record.postgresql_adapter_decode_dates", async () => {
+    await mkdir(join(appPath, "config", "initializers"));
+    await writeFile(
+      join(appPath, "config", "initializers", "active_record.ts"),
+      `import { Base } from "@blazetrails/activerecord";\nawait Base.establishConnection({ adapter: "postgresql" });\n`,
+    );
+
+    const application = await app("development");
+    application.config.activeRecord.postgresqlAdapterDecodeDates = true;
+    await application.initializeBang();
+
+    expect(PostgreSQLAdapter.decodeDates).toBe(true);
   });
 
   it("SQLite3Adapter.strict_strings_by_default is true by default for new apps", async () => {
