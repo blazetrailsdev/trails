@@ -1103,6 +1103,10 @@ export class Connection {
     return engine!.execute(this, this.prepared.get(stmtName), params, stmtName);
   }
 
+  /**
+   * @missingRailsCall get_copy_data — CONVERGEABLE pg-copy-out-get-copy-data-and-discard-arm
+   * @missingRailsCall close_socket_io — PERMANENT
+   */
   discardResults(): Promise<boolean> | null {
     switch (this.transactionStatus()) {
       case PG.PQTRANS_IDLE:
