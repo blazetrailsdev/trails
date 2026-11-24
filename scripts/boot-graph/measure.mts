@@ -20,6 +20,7 @@ interface Measurement {
   total: number;
   medianMs: number;
   packages: Record<string, { loaded: number; shipped: number | null }>;
+  files: string[];
 }
 
 async function walkJs(dir: string, out: string[] = []): Promise<string[]> {
@@ -82,6 +83,7 @@ async function measure(entry: string, runs: number, cwd = ROOT): Promise<Measure
     total: new Set(files).size,
     medianMs: Math.round(times[Math.floor(times.length / 2)]),
     packages,
+    files: [...new Set(files)],
   };
 }
 
@@ -97,12 +99,16 @@ function table(m: Measurement): string {
   return lines.join("\n");
 }
 
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
 const VALUE_EDGE = /(?:^|\n)\s*(?:import|export)\s*(?:[^'"`;]*?\sfrom\s*)?["'](\.[^"']+)["']/g;
 
 async function rcGraph(): Promise<Map<string, string[]>> {
   const graph = new Map<string, string[]>();
   for (const file of await walkJs(RC_DIST)) {
-    const src = await readFile(file, "utf8");
+    const src = stripComments(await readFile(file, "utf8"));
     const deps = [...src.matchAll(VALUE_EDGE)].map((m) =>
       relative(RC_DIST, resolve(dirname(file), m[1])),
     );
@@ -150,7 +156,14 @@ async function sccMap() {
   const groups = sccs(graph);
   const sccOf = new Map<string, number>();
   groups.forEach((g, i) => g.forEach((m) => sccOf.set(m, i)));
-  const barrel = await readFile(join(RC_DIST, "index.js"), "utf8");
+  const barrel = stripComments(await readFile(join(RC_DIST, "index.js"), "utf8"));
+  const unclassified = barrel
+    .split(/;\s*\n?/)
+    .map((st) => st.trim())
+    .filter((st) => st.startsWith("export") && !/^export\s*\{[^}]*\}\s*from\s*["']\./.test(st));
+  if (unclassified.length) {
+    throw new Error(`ruby-compat barrel export scc-map cannot classify: ${unclassified[0]}`);
+  }
   const bindings: Record<string, { module: string; scc: number | null }> = {};
   for (const m of barrel.matchAll(/export\s*\{([^}]*)\}\s*from\s*["'](\.[^"']+)["']/g)) {
     const module = relative(RC_DIST, resolve(RC_DIST, m[2]));
@@ -170,14 +183,22 @@ async function sccMap() {
 
 async function unionTarget(app: Measurement, map: Awaited<ReturnType<typeof sccMap>>) {
   const modules = new Set<string>();
-  const consumers = Object.keys(app.packages).filter((p) => p !== "ruby-compat");
-  for (const pkg of consumers) {
-    for (const file of await walkJs(join(ROOT, "packages", pkg, "dist"))) {
-      const src = await readFile(file, "utf8");
-      for (const m of src.matchAll(
-        /import\s*\{([^}]*)\}\s*from\s*["']@blazetrails\/ruby-compat["']/g,
-      )) {
-        for (const spec of m[1].split(",")) {
+  const exportsMap = JSON.parse(await readFile(join(RC_DIST, "../package.json"), "utf8")).exports;
+  for (const file of app.files) {
+    if (owner(file) === "ruby-compat" || !file.endsWith(".js")) continue;
+    const src = stripComments(await readFile(file, "utf8"));
+    for (const m of src.matchAll(
+      /(?:import|export)\s*(\*\s*as\s+\w+|\{[^}]*\})\s*from\s*["']@blazetrails\/ruby-compat(\/[^"']+)?["']/g,
+    )) {
+      if (m[2]) {
+        const target =
+          exportsMap[`.${m[2]}`]?.default ?? exportsMap["./*"].default.replace("*", m[2].slice(1));
+        modules.add(relative(RC_DIST, resolve(RC_DIST, "..", target)));
+      } else if (m[1].startsWith("*")) {
+        modules.add("index.js");
+        console.log(`whole ruby-compat barrel via namespace import: ${relative(ROOT, file)}`);
+      } else {
+        for (const spec of m[1].slice(1, -1).split(",")) {
           const name = spec.trim().split(/\s+as\s+/)[0];
           const owning = map.bindings[name]?.module;
           if (owning) modules.add(owning);
@@ -266,7 +287,8 @@ async function main(): Promise<void> {
   );
   const committedMap = await readFile(SCC_MAP, "utf8");
   if (JSON.stringify(JSON.parse(committedMap)) !== JSON.stringify(map)) {
-    console.log("scc-map.json is stale: rerun with --write.");
+    console.error("scc-map.json is stale: rerun with --write.");
+    process.exitCode = 1;
   }
   const allowed = committed.packages["ruby-compat"] ?? 0;
   if (rcLoaded > allowed) {

@@ -41,6 +41,6 @@
     "ua-parser-js": 4,
     "mini-mime": 3
   },
-  "rubyCompatTarget": 152,
-  "appTarget": 1837
+  "rubyCompatTarget": 205,
+  "appTarget": 1890
 }
