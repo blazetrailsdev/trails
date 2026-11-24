@@ -119,7 +119,9 @@ export class Bookmark extends ApplicationRecord {
         continue;
       }
       const bookmark = new Bookmark({
-        title: row.title?.trim() || (URL.canParse(url) ? new URL(url).host : ""),
+        title:
+          (typeof row.title === "string" ? row.title.trim() : "") ||
+          (URL.canParse(url) ? new URL(url).host : ""),
         url: row.url,
         notes: row.notes ?? null,
         read_at: row.read_at ? new Date(row.read_at) : null,
