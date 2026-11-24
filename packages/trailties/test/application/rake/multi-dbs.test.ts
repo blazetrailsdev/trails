@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
@@ -24,17 +24,20 @@ registerSpecType(/^RakeMultiDbsTest$/, RakeMultiDbsTest);
 
 type Host = Generation & { reload(): Promise<void> };
 
-describe("RakeMultiDbsTest", { timeout: 600_000 }, () => {
+describe("RakeMultiDbsTest", { concurrent: true, timeout: 600_000 }, () => {
   let t: Host;
 
-  beforeEach(async () => {
-    t = new RakeMultiDbsTest("test") as unknown as Host;
-    await t.buildApp({ multiDb: true });
-    await FileUtils.rmRfAsync(`${await t.appPath()}/config/environments`);
-    await t.addToConfig("this.config.activeRecord.timestampedMigrations = false;");
+  Object.assign(RakeMultiDbsTest.prototype, {
+    async setup(): Promise<void> {
+      t = new RakeMultiDbsTest("test") as unknown as Host;
+      await t.buildApp({ multiDb: true });
+      await FileUtils.rmRfAsync(`${await t.appPath()}/config/environments`);
+      await t.addToConfig("this.config.activeRecord.timestampedMigrations = false;");
+    },
+    async teardown(): Promise<void> {
+      await t.teardownApp();
+    },
   });
-
-  afterEach(() => t.teardownApp());
 
   const exists = async (path: string) => File.isExistAsync(`${await t.appPath()}/${path}`);
   const read = async (path: string) => File.readAsync(`${await t.appPath()}/${path}`);
