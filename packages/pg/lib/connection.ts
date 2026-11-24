@@ -776,8 +776,6 @@ export class Connection {
   connectPoll(): number {
     if (this._pollStatus === PG.PGRES_POLLING_FAILED) {
       this.bad = true;
-      if (this._connectError != null)
-        throw engine!.pgError(this, this._connectError, ConnectionBad);
     }
     if (this._pollStatus === PG.PGRES_POLLING_WRITING) return PG.PGRES_POLLING_READING;
     return this._pollStatus;
@@ -881,6 +879,7 @@ export class Connection {
   /**
    * @internal
    * @missingRailsArgs join — PERMANENT
+   * @inventedArm if — PERMANENT
    */
   private async pollingLoop(pollMeth: "connectPoll" | "resetPoll"): Promise<void> {
     const connectTimeout = this.conninfoHash().connectTimeout;
@@ -933,6 +932,8 @@ export class Connection {
     if (this.status() != PG.CONNECTION_OK) {
       const msg = this.errorMessage() ?? "";
       await this.finish();
+      if (this._connectError != null)
+        throw engine!.pgError(this, this._connectError, ConnectionBad);
       throw new ConnectionBad(connectionErrors.map((e) => e + "\n").join("") + msg, {
         connection: this,
       });
