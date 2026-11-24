@@ -53,7 +53,10 @@ afterEach(() => {
 async function runGeneratorInstance(): Promise<string> {
   bundleCommands = [];
   const generator = t.generator();
-  generator.installCommand = async (command, ...args) => {
+  (generator as InstanceType<typeof AuthenticationGenerator>).installCommand = async (
+    command,
+    ...args
+  ) => {
     bundleCommands.push([command, ...args]);
   };
   trailsCommands = [];
