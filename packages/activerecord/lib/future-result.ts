@@ -188,6 +188,7 @@ export class FutureResult {
 
       await this.pool.withConnection(async (connection) => {
         if (!this.#mutex.tryLock()) return;
+        const previousInstrumenter = IsolatedExecutionState.get(ACTIVE_RECORD_INSTRUMENTER);
         try {
           if (this.pending()) {
             this.#eventBuffer = new EventBuffer(this, this.instrumenter);
@@ -196,6 +197,7 @@ export class FutureResult {
             await this.executeQuery(connection, { async: true });
           }
         } finally {
+          IsolatedExecutionState.set(ACTIVE_RECORD_INSTRUMENTER, previousInstrumenter);
           this.#mutex.unlock();
         }
       });

@@ -166,7 +166,11 @@ function registerDefaults(): void {
         )
       : slash(tag),
   );
-  Annotation.registerExtensions("css", "scss", "sass", "less", slash);
+  Annotation.registerExtensions("scss", "sass", "less", slash);
+  Annotation.registerExtensions(
+    "css",
+    (tag) => new RegExp(`/\\*\\s*(${tag}):?\\s*(.*?)(?:\\*/)?$`, "m"),
+  );
   Annotation.registerExtensions(
     "yml",
     "yaml",
@@ -238,7 +242,7 @@ export class SourceAnnotationExtractor {
     for (const file of [...results.keys()].sort()) {
       STDOUT.puts(`${file}:`);
       for (const note of results.get(file)!) {
-        STDOUT.puts(`  * ${note.toString(options)}`);
+        STDOUT.puts(`  * ${note.toString(options).trim()}`);
       }
       STDOUT.puts();
     }

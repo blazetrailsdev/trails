@@ -1,13 +1,56 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, test } from "vitest";
 import { TestParser } from "../../lib/test-unit/test-parser.js";
 
-const FILE = new URL("../fixtures/test-unit/test-parser-fixture.ts", import.meta.url).pathname;
+describe("TestParserTestFixture", () => {
+  it("method", () => {
+    expect(true).toBeTruthy();
+
+    expect(true).toBeTruthy();
+  });
+
+  // prettier-ignore
+  it("oneline", () => { expect(true).toBeTruthy(); });
+
+  test("declarative", () => {
+    expect(true).toBeTruthy();
+
+    expect(true).toBeTruthy();
+  });
+
+  test("declarative w/parens", () => {
+    expect(true).toBeTruthy();
+  });
+
+  test("declarative explicit receiver", () => {
+    expect(true).toBeTruthy();
+
+    expect(true).toBeTruthy();
+  });
+
+  test("declarative oneline", () => expect(true).toBeTruthy());
+
+  // prettier-ignore
+  test("declarative oneline do", function () { expect(true).toBeTruthy(); });
+
+  test("declarative multiline w/ braces", () => {
+    expect(true).toBeTruthy();
+    expect(false).toBeFalsy();
+  });
+
+  function myTestingAlias(testName: string, block: () => void): void {
+    it(testName, block);
+  }
+
+  myTestingAlias("method_alias", () => expect(true).toBeTruthy());
+});
+
+const FILE = new URL(import.meta.url).pathname;
 
 describe("TestParserTest", () => {
   beforeAll(() => TestParser.requireParser());
 
   it("parser", () => {
-    const actual = [8, 15, 18, 24, 28, 34, 37, 39, 44].map((startLine) => {
+    const actual = [5, 12, 14, 20, 24, 30, 33, 35, 44].map((startLine) => {
       const [path, range] = TestParser.definitionFor({
         sourceLocation: () => [FILE, startLine],
       })!;
@@ -15,14 +58,14 @@ describe("TestParserTest", () => {
     });
 
     expect(actual).toEqual([
-      [FILE, 8, 12],
-      [FILE, 15, 15],
-      [FILE, 18, 22],
-      [FILE, 24, 26],
-      [FILE, 28, 32],
-      [FILE, 34, 34],
-      [FILE, 37, 37],
-      [FILE, 39, 42],
+      [FILE, 5, 9],
+      [FILE, 12, 12],
+      [FILE, 14, 18],
+      [FILE, 20, 22],
+      [FILE, 24, 28],
+      [FILE, 30, 30],
+      [FILE, 33, 33],
+      [FILE, 35, 38],
       [FILE, 44, 44],
     ]);
   });

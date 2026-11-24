@@ -147,6 +147,8 @@ export class WhereClause {
 
   /** @internal */
   private exceptPredicates(columns: unknown[]): (Nodes.Node | Nodes.SqlLiteral | string)[] {
+    if (columns.length === 0) return this.predicates;
+
     const attrs = extractBang(columns, (node) => node instanceof Arel.Attribute);
     const nonAttrs = extractBang(
       columns,
@@ -310,15 +312,16 @@ function wrapSqlLiteral(node: Nodes.SqlLiteral | string): Nodes.Node {
 /** @internal */
 function extractAttribute(node: Nodes.Node | Nodes.SqlLiteral | string): Arel.Attribute | null {
   let attrNode: Arel.Attribute | null = null;
-  fetchAttribute(node, (attr: Arel.Attribute): boolean => {
-    if (!(attr instanceof Arel.Attribute)) return true;
-    if (attrNode !== null && !rbEqual(attrNode, attr)) {
-      attrNode = null;
-      return false;
+
+  const validAttrs = fetchAttribute(node, (attr: Arel.Attribute): boolean => {
+    try {
+      return !attrNode || rbEqual(attrNode, attr);
+    } finally {
+      attrNode = attr;
     }
-    attrNode = attr;
-    return true;
   });
+  if (!validAttrs) return null;
+
   return attrNode;
 }
 

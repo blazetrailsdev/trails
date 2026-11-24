@@ -74,10 +74,9 @@ describe("AuthenticationGenerator in a generated app", () => {
         );
       }
       const generator = new AuthenticationGenerator([], {}, { destinationRoot: app });
-      const executeCommand = generator.executeCommand.bind(generator);
-      generator.executeCommand = async (executor, command, ...rest) => {
-        if (command !== "add @blazetrails/bcrypt")
-          return executeCommand(executor, command, ...rest);
+      const installCommand = generator.installCommand.bind(generator);
+      generator.installCommand = async (command, ...rest) => {
+        if (command !== "add @blazetrails/bcrypt") return installCommand(command, ...rest);
         const manifest = JSON.parse(fs.readFileSync(path.join(app, "package.json"), "utf8"));
         manifest.dependencies["@blazetrails/bcrypt"] = "*";
         fs.writeFileSync(path.join(app, "package.json"), JSON.stringify(manifest, null, 2));

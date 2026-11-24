@@ -46,10 +46,7 @@ export class ArrayHandler {
       return valuesPredicate as Nodes.Node;
     } else {
       const arrayPredicates = ranges.map((range) => this.predicateBuilder.build(attribute, range));
-      return arrayPredicates.reduce(
-        (memo, predicate) => memo.or(predicate),
-        valuesPredicate,
-      ) as Nodes.Node;
+      return valuesPredicate.or(new Nodes.Grouping(new Nodes.Or(arrayPredicates)));
     }
   }
 }

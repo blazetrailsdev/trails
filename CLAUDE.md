@@ -1844,18 +1844,23 @@ dependencies, not ports.
 
 Ruled by the operator on 2026-11-13.
 
-## racc's grammar compiler is not ported (`Racc::GrammarFileParser`, `racc`)
+## racc's grammar compiler is not ported (`bin/racc`, `Racc::Grammar`)
 
-racc is a parser generator: `racc/parser.rb` is the runtime every generated
-parser runs on, and the rest of `lib/racc/` (`grammarfileparser.rb`,
-`grammar.rb`, `state.rb`, `parserfilegenerator.rb`, `bin/racc`) compiles a
-`.y` grammar into a parser. trails ports the runtime only
-(`packages/ruby-compat/lib/racc/parser.ts`). On each racc version bump, every
-grammar a ported gem ships is regenerated with Ruby's `racc` and the generated
-parser is ported. The compiler's test files (`test_racc_command.rb`,
-`test_grammar.rb`, `test_grammar_file_parser.rb`, `test_chk_y.rb`,
-`test_scan_y.rb`, `test_parser_text.rb`) are permanently unported. Ruled by
-the operator on 2026-11-23.
+trails ports racc's runtime, `racc/parser.rb`
+(`packages/ruby-compat/lib/racc/parser.ts`), and ships the parsers racc
+generated. On each racc version bump, every grammar a ported gem
+ships is regenerated with Ruby's `racc` and the generated parser is ported;
+trails itself never runs `racc`. The grammar compiler (`grammarfileparser.rb`,
+`grammar.rb`, `state.rb`, `iset.rb`, `statetransitiontable.rb`,
+`parserfilegenerator.rb`, `logfilegenerator.rb`, `sourcetext.rb`,
+`debugflags.rb`, `info.rb`, `static.rb` under
+`vendor/racc/v1.8.1/lib/racc/`, and `bin/racc`) is out of scope. Its
+unported-files rows are permanent, as Trilogy's are, and so are the rows for
+the test files that drive it: `test_racc_command.rb` (every test goes through
+`assert_compile` / `assert_debugfile` / `assert_output_unchanged`,
+`test/helper.rb`), `test_grammar.rb`, `test_grammar_file_parser.rb`,
+`test_chk_y.rb`, `test_scan_y.rb` and `test_parser_text.rb`. Ruled by the
+operator on 2026-11-23.
 
 ## Rails API-doc tooling is not ported (`Rails::API::Task`, `RDoc::Generator::API`)
 

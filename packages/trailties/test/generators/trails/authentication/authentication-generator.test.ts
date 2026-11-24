@@ -9,6 +9,7 @@ import { Application } from "../../../../lib/application.js";
 import "../../../../lib/generators.js";
 import { Trails } from "../../../../lib/trails.js";
 import "../../../../lib/trailties/active-record.js";
+import "../../../../lib/trailties/action-mailer.js";
 import "../../../../lib/test-unit/trailtie.js";
 
 class AuthenticationGeneratorApp extends Application {}
@@ -45,9 +46,15 @@ const listFiles = (root: string): string[] =>
   (fs.readdirSync(root, { recursive: true }) as string[])
     .filter((f) => fs.statSync(path.join(root, f)).isFile())
     .sort();
+let bundleCommands: unknown[][];
 const makeGen = (options: { api?: boolean; skip?: boolean } = {}) => ({
   run: async () => {
-    await new AuthenticationGenerator([], options, { destinationRoot: tmpDir }).invokeAll();
+    const generator = new AuthenticationGenerator([], options, { destinationRoot: tmpDir });
+    bundleCommands = [];
+    generator.installCommand = async (...args) => {
+      bundleCommands.push(args);
+    };
+    await generator.invokeAll();
     return listFiles(tmpDir);
   },
 });
@@ -238,14 +245,12 @@ describe("AuthenticationGenerator", () => {
   it("adds bcryptjs to the application's dependencies and installs it", async () => {
     write("package.json", '{ "dependencies": { "@blazetrails/bcrypt": "*" } }');
     await makeGen().run();
-    const commands = spawned.map((command) => command.join(" "));
-    expect(commands.some((c) => c.endsWith("bin/pnpm install --silent"))).toBe(true);
+    expect(bundleCommands).toContainEqual(["install --silent"]);
   });
 
   it("authentication_generator_without_bcrypt_in_gemfile", async () => {
     await makeGen().run();
-    const commands = spawned.map((command) => command.join(" "));
-    expect(commands.some((c) => c.endsWith("bin/pnpm add @blazetrails/bcrypt"))).toBe(true);
+    expect(bundleCommands).toContainEqual(["add @blazetrails/bcrypt", {}, { quiet: true }]);
   });
 
   it("does not silently overwrite an existing file", async () => {
