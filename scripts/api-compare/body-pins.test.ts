@@ -8,6 +8,7 @@ import {
   findDuplicateKeys,
   keyOf,
   missingScope,
+  packagesOfRubyFile,
   pinPairs,
   prunePins,
   sourceRefOf,
@@ -176,6 +177,32 @@ describe("pinPairs", () => {
   });
 });
 
+describe("packagesOfRubyFile", () => {
+  it("lists every package an ambiguous base.rb belongs to, so --pin can refuse it", () => {
+    const records = [
+      record({ rubyFile: "base.rb", rubyName: "save" }),
+      record({ package: "actioncontroller", rubyFile: "base.rb", rubyName: "_set_vary_header" }),
+      record({ package: "actioncontroller", rubyFile: "base.rb", rubyName: "_normalize_options" }),
+      record({ package: "actionmailer", rubyFile: "mail_helper.rb", rubyName: "mailer" }),
+    ];
+    expect(packagesOfRubyFile(records, "base.rb")).toEqual(["actioncontroller", "activerecord"]);
+    expect(packagesOfRubyFile(records, "mail_helper.rb")).toEqual(["actionmailer"]);
+  });
+
+  it("--pin base.rb --package re-pins only that package's base.rb", () => {
+    const records = [
+      record({ rubyFile: "base.rb", rubyName: "save", digest: "new1" }),
+      record({ package: "actioncontroller", rubyFile: "base.rb", rubyName: "x", digest: "new2" }),
+    ];
+    const existing = [
+      pin({ rubyFile: "base.rb", rubyName: "save", digest: "old1" }),
+      pin({ package: "actioncontroller", rubyFile: "base.rb", rubyName: "x", digest: "old2" }),
+    ];
+    const next = pinPairs(records, existing, { rubyFile: "base.rb", package: "activerecord" });
+    expect(next.map((p) => p.digest)).toEqual(["old2", "new1"]);
+  });
+});
+
 describe("findDuplicateKeys", () => {
   it("flags two entries sharing one identity", () => {
     expect(findDuplicateKeys([pin(), pin({ digest: "other" })])).toEqual([
@@ -203,6 +230,11 @@ describe("missingScope", () => {
 });
 
 describe("prunePins", () => {
+  it("with a package drops only that package's stale pins", () => {
+    const pins = [pin({ rubyName: "gone" }), pin({ package: "actionview", rubyName: "gone" })];
+    expect(prunePins([], pins, "activerecord").map(keyOf)).toEqual([keyOf(pins[1])]);
+  });
+
   it("drops pins whose pair no longer resolves and keeps the rest sorted", () => {
     const records = [record(), record({ rubyFile: "core.rb", rubyName: "init" })];
     const pins = [pin({ rubyFile: "core.rb", rubyName: "init" }), pin({ rubyName: "gone" }), pin()];
