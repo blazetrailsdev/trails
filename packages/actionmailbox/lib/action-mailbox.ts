@@ -9,6 +9,7 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 import { File, LOAD_PATH, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { Trails } from "@blazetrails/trailties";
 import type { Base } from "./base.js";
 import type { BaseController } from "./app/controllers/action-mailbox/base-controller.js";
 import type { Callbacks } from "./callbacks.js";
@@ -52,6 +53,14 @@ export const ActionMailbox = { name: "ActionMailbox", loadPath } as AutoloadModu
 };
 extend(ActionMailbox, Autoload);
 constSet(TopLevel, "ActionMailbox", ActionMailbox);
+
+const Ingresses = constSet(ActionMailbox, "Ingresses", {});
+for (const ingress of ["Mailgun", "Mandrill", "Postmark", "Relay", "Sendgrid"]) {
+  constSet(Ingresses, ingress, {});
+}
+
+const Conductor = constSet(Trails, "Conductor", {});
+constSet(constSet(Conductor, "ActionMailbox", {}), "InboundEmails", {});
 
 ActionMailbox.autoload("Base");
 ActionMailbox.autoload("Router");

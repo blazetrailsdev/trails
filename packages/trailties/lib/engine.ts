@@ -50,6 +50,7 @@ import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 const generators = "./generators.js";
 
 type IsolatedNamespace = {
+  name?: string;
   railtieNamespace?: () => typeof Engine;
   tableNamePrefix?: string;
   isUseRelativeModelNaming?: () => boolean;

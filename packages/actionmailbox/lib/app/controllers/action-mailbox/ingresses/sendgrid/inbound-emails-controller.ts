@@ -1,3 +1,4 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import type { Logger } from "@blazetrails/activesupport";
 import { Encoding, JSON, rbStrPlus } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../../../../action-mailbox.js";
@@ -37,3 +38,9 @@ export class InboundEmailsController extends BaseController {
     return JSON.parse(this.params.require("envelope") as string) as Record<string, unknown>;
   }
 }
+
+constSet(
+  (ActionMailbox as unknown as Record<string, Record<string, object>>).Ingresses.Sendgrid,
+  "InboundEmailsController",
+  InboundEmailsController,
+);

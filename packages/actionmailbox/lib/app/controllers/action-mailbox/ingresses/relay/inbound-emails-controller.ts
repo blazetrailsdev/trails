@@ -1,3 +1,4 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../../../../action-mailbox.js";
 import { BaseController } from "../../base-controller.js";
 
@@ -23,3 +24,9 @@ export class InboundEmailsController extends BaseController {
     }
   }
 }
+
+constSet(
+  (ActionMailbox as unknown as Record<string, Record<string, object>>).Ingresses.Relay,
+  "InboundEmailsController",
+  InboundEmailsController,
+);

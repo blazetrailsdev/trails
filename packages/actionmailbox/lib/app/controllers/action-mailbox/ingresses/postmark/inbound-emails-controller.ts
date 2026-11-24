@@ -1,3 +1,4 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import { ActionController } from "@blazetrails/actionpack";
 import type { Logger } from "@blazetrails/activesupport";
 import { Encoding, rbStrPlus } from "@blazetrails/ruby-compat";
@@ -37,3 +38,9 @@ labeled "Include raw email content in JSON payload".
     return rawEmail;
   }
 }
+
+constSet(
+  (ActionMailbox as unknown as Record<string, Record<string, object>>).Ingresses.Postmark,
+  "InboundEmailsController",
+  InboundEmailsController,
+);

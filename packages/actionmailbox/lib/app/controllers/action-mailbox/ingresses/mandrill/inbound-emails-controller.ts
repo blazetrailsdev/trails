@@ -1,3 +1,4 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import type { Request } from "@blazetrails/actionpack";
 import {
   SecurityUtils,
@@ -109,3 +110,9 @@ export class InboundEmailsController extends BaseController {
     }
   };
 }
+
+constSet(
+  (ActionMailbox as unknown as Record<string, Record<string, object>>).Ingresses.Mandrill,
+  "InboundEmailsController",
+  InboundEmailsController,
+);

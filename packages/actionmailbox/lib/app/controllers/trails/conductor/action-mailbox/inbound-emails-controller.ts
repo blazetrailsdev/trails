@@ -1,11 +1,13 @@
+import { Trails } from "@blazetrails/trailties";
+import { constGet, constSet } from "@blazetrails/ruby-compat";
 import { isPresent } from "@blazetrails/activesupport";
 import type { Parameters, UploadedFile } from "@blazetrails/actionpack";
 import { Mail, type Message } from "@blazetrails/mail";
 import { ActionMailbox } from "../../../../../action-mailbox.js";
 import type { InboundEmail } from "../../../../../inbound-email.js";
-import { BaseController } from "../base-controller.js";
+import "../../../action-mailbox/base-controller.js";
 
-export class InboundEmailsController extends BaseController {
+export class InboundEmailsController extends Trails.Conductor.BaseController {
   declare inboundEmails: InboundEmail[];
   declare inboundEmail: InboundEmail;
 
@@ -58,3 +60,9 @@ export class InboundEmailsController extends BaseController {
     return ActionMailbox.InboundEmail.createAndExtractMessageIdBang(mail.toString());
   }
 }
+
+constSet(
+  constGet(Trails, "Conductor::ActionMailbox") as object,
+  "InboundEmailsController",
+  InboundEmailsController,
+);

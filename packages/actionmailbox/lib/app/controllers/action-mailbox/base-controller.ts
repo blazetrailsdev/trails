@@ -1,7 +1,29 @@
 import { ActionController } from "@blazetrails/actionpack";
 import { TopLevel, isPresent, remove, underscore } from "@blazetrails/activesupport";
-import { ArgumentError, env, rbModName } from "@blazetrails/ruby-compat";
+import { ArgumentError, constSet, env, rbModName } from "@blazetrails/ruby-compat";
+import { Trails } from "@blazetrails/trailties";
 import { ActionMailbox } from "../../../action-mailbox.js";
+import type { InboundEmailsController } from "../trails/conductor/action-mailbox/inbound-emails-controller.js";
+import type { SourcesController } from "../trails/conductor/action-mailbox/inbound-emails/sources-controller.js";
+import type { IncineratesController } from "../trails/conductor/action-mailbox/incinerates-controller.js";
+import type { ReroutesController } from "../trails/conductor/action-mailbox/reroutes-controller.js";
+
+declare module "@blazetrails/trailties/trails" {
+  namespace Trails {
+    let Conductor: {
+      BaseController: Omit<typeof ActionController.Base, "prototype"> &
+        (abstract new (...args: never[]) => ActionController.Base & {
+          readonly mainApp: Record<string, (...args: unknown[]) => string>;
+        });
+      ActionMailbox: {
+        InboundEmailsController?: typeof InboundEmailsController;
+        IncineratesController?: typeof IncineratesController;
+        ReroutesController?: typeof ReroutesController;
+        InboundEmails: { SourcesController?: typeof SourcesController };
+      };
+    };
+  }
+}
 
 export class BaseController extends ActionController.Base {
   static {
@@ -54,4 +76,22 @@ export class BaseController extends ActionController.Base {
   }
 }
 
-ActionMailbox.BaseController = BaseController;
+constSet(ActionMailbox, "BaseController", BaseController);
+
+constSet(
+  Trails.Conductor,
+  "BaseController",
+  class BaseController extends ActionController.Base {
+    declare readonly mainApp: Record<string, (...args: unknown[]) => string>;
+
+    static {
+      this.layout("trails/conductor");
+      this.beforeAction(":ensureDevelopmentEnv");
+    }
+
+    /** @internal */
+    private async ensureDevelopmentEnv(): Promise<void> {
+      if (!Trails.env.isDevelopment()) await this.head(":forbidden");
+    }
+  },
+);

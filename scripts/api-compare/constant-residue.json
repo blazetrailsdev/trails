@@ -38,26 +38,15 @@
   },
   "actionmailbox": {
     "rows": 31,
-    "excluded": [],
+    "excluded": ["app/controllers/action-mailbox/base-controller.ts::BaseController"],
     "unwalked": [
+      "app/controllers/action-mailbox/ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
+      "app/controllers/action-mailbox/ingresses/mandrill/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
       "gem-version.ts::VERSION",
       "relayer.ts::Relayer.Result",
       "router.ts::Router.RoutingError"
     ],
     "residue": {
-      "app/controllers/action-mailbox/base-controller.ts::BaseController": "ActionMailbox::BaseController",
-      "app/controllers/action-mailbox/ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController": "ActionMailbox::Ingresses::Mailgun::InboundEmailsController",
-      "app/controllers/action-mailbox/ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController.Authenticator": "ActionMailbox::Ingresses::Mailgun::InboundEmailsController::Authenticator",
-      "app/controllers/action-mailbox/ingresses/mandrill/inbound-emails-controller.ts::InboundEmailsController": "ActionMailbox::Ingresses::Mandrill::InboundEmailsController",
-      "app/controllers/action-mailbox/ingresses/mandrill/inbound-emails-controller.ts::InboundEmailsController.Authenticator": "ActionMailbox::Ingresses::Mandrill::InboundEmailsController::Authenticator",
-      "app/controllers/action-mailbox/ingresses/postmark/inbound-emails-controller.ts::InboundEmailsController": "ActionMailbox::Ingresses::Postmark::InboundEmailsController",
-      "app/controllers/action-mailbox/ingresses/relay/inbound-emails-controller.ts::InboundEmailsController": "ActionMailbox::Ingresses::Relay::InboundEmailsController",
-      "app/controllers/action-mailbox/ingresses/sendgrid/inbound-emails-controller.ts::InboundEmailsController": "ActionMailbox::Ingresses::Sendgrid::InboundEmailsController",
-      "app/controllers/trails/conductor/action-mailbox/inbound-emails-controller.ts::InboundEmailsController": "Trails::Conductor::ActionMailbox::InboundEmailsController",
-      "app/controllers/trails/conductor/action-mailbox/inbound-emails/sources-controller.ts::SourcesController": "Trails::Conductor::ActionMailbox::InboundEmails::SourcesController",
-      "app/controllers/trails/conductor/action-mailbox/incinerates-controller.ts::IncineratesController": "Trails::Conductor::ActionMailbox::IncineratesController",
-      "app/controllers/trails/conductor/action-mailbox/reroutes-controller.ts::ReroutesController": "Trails::Conductor::ActionMailbox::ReroutesController",
-      "app/controllers/trails/conductor/base-controller.ts::BaseController": "Trails::Conductor::BaseController",
       "callbacks.ts::ClassMethods": "ActionMailbox::Callbacks::ClassMethods",
       "inbound-email/message-id.ts::ClassMethods": "ActionMailbox::InboundEmail::MessageId::ClassMethods",
       "routing.ts::ClassMethods": "ActionMailbox::Routing::ClassMethods"
@@ -241,9 +230,7 @@
     "excluded": [],
     "unwalked": [],
     "residue": {
-      "app/helpers/action-text/content-helper.ts::ContentHelper": "ActionText::ContentHelper",
       "app/helpers/action-text/tag-helper.ts::ActionText": "ActionView::Helpers::Tags::ActionText",
-      "app/helpers/action-text/tag-helper.ts::TagHelper": "ActionText::TagHelper",
       "attachable.ts::Attachable": "ActionText::Attachable",
       "attachable.ts::Attachable.ClassMethods": "ActionText::Attachable::ClassMethods",
       "attachables/content-attachment.ts::ContentAttachment": "ActionText::Attachables::ContentAttachment",
@@ -857,19 +844,12 @@
       "error.ts::InvalidSecret": "BCrypt::Errors::InvalidSecret"
     }
   },
-  "builder": {
-    "rows": 5,
-    "excluded": [],
-    "unwalked": ["xchar.ts::XChar"],
-    "residue": {}
-  },
+  "builder": { "rows": 5, "excluded": [], "unwalked": ["xchar.ts::XChar"], "residue": {} },
   "chronic": {
     "rows": 61,
     "excluded": [],
     "unwalked": [],
-    "residue": {
-      "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick"
-    }
+    "residue": { "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick" }
   },
   "date": {
     "rows": 1,
@@ -882,32 +862,21 @@
       "time.ts::Timezone"
     ],
     "unwalked": [],
-    "residue": {
-      "date.ts::DateInfinity": "Date::Infinity"
-    }
+    "residue": { "date.ts::DateInfinity": "Date::Infinity" }
   },
   "did-you-mean": {
     "rows": 7,
     "excluded": [],
     "unwalked": [],
-    "residue": {
-      "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker"
-    }
+    "residue": { "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker" }
   },
   "et-orbi": {
     "rows": 1,
     "excluded": [],
     "unwalked": [],
-    "residue": {
-      "time.ts::EoTime": "EtOrbi::EoTime"
-    }
+    "residue": { "time.ts::EoTime": "EtOrbi::EoTime" }
   },
-  "fugit": {
-    "rows": 13,
-    "excluded": [],
-    "unwalked": [],
-    "residue": {}
-  },
+  "fugit": { "rows": 13, "excluded": [], "unwalked": [], "residue": {} },
   "globalid": {
     "rows": 12,
     "excluded": ["global-id.ts::GlobalID", "signed-global-id.ts::SignedGlobalID"],
@@ -989,9 +958,7 @@
     "rows": 1,
     "excluded": [],
     "unwalked": [],
-    "residue": {
-      "listener.ts::Listener": "Listen::Listener"
-    }
+    "residue": { "listener.ts::Listener": "Listen::Listener" }
   },
   "mail": {
     "rows": 132,
@@ -1042,18 +1009,8 @@
       "yaml.ts::YAML": "Mail::YAML"
     }
   },
-  "marcel": {
-    "rows": 2,
-    "excluded": [],
-    "unwalked": [],
-    "residue": {}
-  },
-  "mini-magick": {
-    "rows": 10,
-    "excluded": [],
-    "unwalked": [],
-    "residue": {}
-  },
+  "marcel": { "rows": 2, "excluded": [], "unwalked": [], "residue": {} },
+  "mini-magick": { "rows": 10, "excluded": [], "unwalked": [], "residue": {} },
   "mini-mime": {
     "rows": 5,
     "excluded": [],
@@ -1177,12 +1134,7 @@
       "type-map.ts::TypeMap": "PG::TypeMap"
     }
   },
-  "raabro": {
-    "rows": 3,
-    "excluded": [],
-    "unwalked": [],
-    "residue": {}
-  },
+  "raabro": { "rows": 3, "excluded": [], "unwalked": [], "residue": {} },
   "rack": {
     "rows": 62,
     "excluded": [],
@@ -1270,9 +1222,7 @@
     "rows": 8,
     "excluded": [],
     "unwalked": ["methods.ts::Methods", "utils.ts::Utils"],
-    "residue": {
-      "test.ts::Test": "Rack::Test"
-    }
+    "residue": { "test.ts::Test": "Rack::Test" }
   },
   "rackup": {
     "rows": 6,
@@ -1373,9 +1323,7 @@
     "rows": 1,
     "excluded": [],
     "unwalked": [],
-    "residue": {
-      "engine.ts::Engine": "Stimulus::Engine"
-    }
+    "residue": { "engine.ts::Engine": "Stimulus::Engine" }
   },
   "thor": {
     "rows": 42,
@@ -1395,7 +1343,7 @@
     }
   },
   "trailties": {
-    "rows": 169,
+    "rows": 170,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "commands/build.ts::BuildCommand",
@@ -1555,6 +1503,7 @@
       "health-controller.ts::HealthController": "Trails::HealthController",
       "info-controller.ts::InfoController": "Trails::InfoController",
       "info.ts::Info": "Trails::Info",
+      "initializable.ts::ClassMethods": "Trails::Initializable::ClassMethods",
       "initializable.ts::Collection": "Trails::Initializable::Collection",
       "initializable.ts::Initializable": "Trails::Initializable",
       "initializable.ts::Initializer": "Trails::Initializable::Initializer",
@@ -1577,17 +1526,7 @@
       "zeitwerk-checker.ts::ZeitwerkChecker": "Trails::ZeitwerkChecker"
     }
   },
-  "turbo": {
-    "rows": 4,
-    "excluded": [],
-    "unwalked": [],
-    "residue": {
-      "app/channels/turbo/streams-channel.ts::StreamsChannel": "Turbo::StreamsChannel",
-      "app/jobs/turbo/streams/action-broadcast-job.ts::ActionBroadcastJob": "Turbo::Streams::ActionBroadcastJob",
-      "app/jobs/turbo/streams/broadcast-job.ts::BroadcastJob": "Turbo::Streams::BroadcastJob",
-      "app/jobs/turbo/streams/broadcast-stream-job.ts::BroadcastStreamJob": "Turbo::Streams::BroadcastStreamJob"
-    }
-  },
+  "turbo": { "rows": 4, "excluded": [], "unwalked": [], "residue": {} },
   "tzinfo": {
     "rows": 50,
     "excluded": [],
@@ -1674,10 +1613,5 @@
       "tag-helpers.ts::TagHelpers": "ViteTrails::TagHelpers"
     }
   },
-  "zeitwerk": {
-    "rows": 20,
-    "excluded": [],
-    "unwalked": [],
-    "residue": {}
-  }
+  "zeitwerk": { "rows": 20, "excluded": [], "unwalked": [], "residue": {} }
 }

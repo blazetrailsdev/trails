@@ -1,3 +1,4 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import { SecurityUtils, TopLevel, isPresent, minutes, squish } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import {
@@ -122,3 +123,9 @@ export class InboundEmailsController extends BaseController {
     }
   };
 }
+
+constSet(
+  (ActionMailbox as unknown as Record<string, Record<string, object>>).Ingresses.Mailgun,
+  "InboundEmailsController",
+  InboundEmailsController,
+);
