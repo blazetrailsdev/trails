@@ -1287,6 +1287,7 @@ export default defineConfig(
           // back to an inferred default project so the rule can type-check them.
           allowDefaultProject: [
             "packages/actionview/types/tse-modules.d.ts",
+            "packages/trailties/types/all.d.ts",
             "packages/activerecord/scripts/materialize-model-declares.ts",
             "packages/activerecord/scripts/materialize-model-declares.test.ts",
             "packages/website/docs/.vitepress/config.ts",
