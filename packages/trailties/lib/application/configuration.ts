@@ -72,6 +72,11 @@ type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 export const LOAD_DEFAULTS_VERSION = "8.0";
 
 export class Configuration extends EngineConfiguration {
+  constructor(root: string | null = null) {
+    super(root);
+    this.encoding = Encoding.UTF_8;
+  }
+
   allowConcurrency: boolean | "unsafe" | null = null;
   assetHost: string | null = null;
   considerAllRequestsLocal = false;
@@ -564,11 +569,6 @@ export class Configuration extends EngineConfiguration {
   }
   set sessionOptions(value: Record<string, unknown>) {
     this._sessionOptions = value;
-  }
-
-  constructor(root: string | null = null) {
-    super(root);
-    this.encoding = Encoding.UTF_8;
   }
 
   get encoding(): Encoding | string {
