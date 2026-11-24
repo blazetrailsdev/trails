@@ -4,16 +4,19 @@ import type { REPLServer } from "node:repl";
 import { RouteSet } from "@blazetrails/actionpack";
 import {
   STDIN,
+  STDOUT,
   TopLevel,
   constSet,
   setEnv,
   getProcessAdapter,
   rbModRemoveConst,
+  File,
   registerReplAdapter,
   replAdapterConfig,
 } from "@blazetrails/ruby-compat";
 import { Console, ConsoleCommand } from "../../lib/commands/console.js";
 import { Trails } from "../../lib/trails.js";
+import { Reloader } from "@blazetrails/activesupport";
 
 interface Primary {
   output: string;
@@ -62,8 +65,11 @@ async function spawnConsole(
     env = {},
   }: { waitForPrompt?: boolean; env?: Record<string, string> } = {},
 ): Promise<void> {
+  env = { TERM: "dumb", ...env };
   for (const [key, value] of Object.entries(env)) setEnv(key, value);
   spawnedEnv.push(...Object.keys(env));
+  const { environment } = new ConsoleCommand([], options.split(" ")).options;
+  if (environment != null) Trails.env = environment;
   started = Console.start(
     Trails.application as never,
     new ConsoleCommand([], options.split(" ")).options,
@@ -87,10 +93,15 @@ async function writePrompt(
 
 describe("FullStackConsoleTest", () => {
   let previousAdapter: string | undefined;
+  let previousEnv: string;
 
   beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(STDIN, "isTty").mockReturnValue(true);
+    vi.spyOn(STDOUT, "puts").mockImplementation((...args) => {
+      primary.output += `${args.join("\n")}\n`;
+      return null;
+    });
     vi.spyOn(getProcessAdapter(), "exit").mockImplementation((() => undefined) as never);
     class ApplicationController {
       static helpers() {
@@ -102,10 +113,12 @@ describe("FullStackConsoleTest", () => {
     routes.draw(function () {
       this.get("foo", { to: "foo#index" });
     });
+    previousEnv = String(Trails.env);
     Trails.application = {
       sandbox: null,
       config: {},
-      name: () => "app",
+      reloader: Reloader,
+      name: () => "app-template",
       loadConsole: async () => {},
       reloadRoutesUnlessLoaded: async () => true,
       routes: () => routes,
@@ -120,9 +133,95 @@ describe("FullStackConsoleTest", () => {
     await started;
     replAdapterConfig.adapter = previousAdapter!;
     Trails.application = null;
+    Trails.env = previousEnv;
     for (const key of spawnedEnv.splice(0)) setEnv(key, undefined);
     rbModRemoveConst(TopLevel, "ApplicationController");
     vi.restoreAllMocks();
+  });
+
+  function addToConfig(config: Record<string, unknown>): void {
+    Object.assign((Trails.application as unknown as { config: object }).config, config);
+  }
+
+  it("sandbox when sandbox is disabled", async () => {
+    addToConfig({ disableSandbox: true });
+    const puts = vi.mocked(STDOUT.puts);
+
+    await Console.new(Trails.application as never, new ConsoleCommand([], ["--sandbox"]).options);
+
+    expect(puts.mock.calls.flat().join("\n")).toContain("sandbox mode is disabled");
+    expect(vi.mocked(getProcessAdapter().exit).mock.calls[0][0]).toBe(1);
+  });
+
+  it("sandbox by default", async () => {
+    addToConfig({ sandboxByDefault: true });
+
+    const options = "-e production -- --verbose";
+    await spawnConsole(options);
+
+    await writePrompt("Trails.application.sandbox", "true");
+  });
+
+  it("sandbox by default with no sandbox", async () => {
+    addToConfig({ sandboxByDefault: true });
+
+    const options = "-e production --no-sandbox -- --verbose";
+    await spawnConsole(options);
+
+    await writePrompt("Trails.application.sandbox", "false");
+  });
+
+  it("sandbox by default with development environment", async () => {
+    addToConfig({ sandboxByDefault: true });
+
+    const options = "-- --verbose";
+    await spawnConsole(options);
+
+    await writePrompt("Trails.application.sandbox", "false");
+  });
+
+  it("prompt is properly set", async () => {
+    const options = "-e test -- --verbose";
+    await spawnConsole(options);
+
+    await writePrompt("a = 1", "1", { prompt: "app-template(test)>" });
+  });
+
+  it("prompt allows changing irb name", async () => {
+    const options = "-e test -- --verbose";
+    await spawnConsole(options);
+
+    await writePrompt("TSREPL.conf.MAIN_CONTEXT.irbName = 'foo'");
+    await writePrompt("a = 1", "1", { prompt: "foo(test)>" });
+  });
+
+  it("environment option and irb option", async () => {
+    const options = "-e test -- --verbose";
+    await spawnConsole(options);
+
+    await writePrompt("a = 1", "1");
+    await writePrompt("String(Trails.env)", "'test'");
+  });
+
+  it("production console prompt", async () => {
+    const options = "-e production";
+    await spawnConsole(options);
+
+    await writePrompt("123", null, { prompt: "app-template(prod)>" });
+  });
+
+  it("development console prompt", async () => {
+    const options = "-e development";
+    await spawnConsole(options);
+
+    await writePrompt("123", null, { prompt: "app-template(dev)> " });
+  });
+
+  it("test console prompt", async () => {
+    const options = "-e test";
+    await spawnConsole(options);
+
+    await writePrompt("123", null, { prompt: "app-template(test)> " });
   });
 
   it("helper helper method", async () => {
@@ -150,6 +249,61 @@ describe("FullStackConsoleTest", () => {
     await spawnConsole("-e development");
 
     await writePrompt("(await app()).fooPath()", "/foo");
+  });
+
+  it("app routes are loaded", async () => {
+    await spawnConsole("-e development");
+
+    await writePrompt("'fooPath' in (await app())", "true");
+  });
+
+  it("reload command fires preparation and cleanup callbacks", async () => {
+    const options = "-e development";
+    await spawnConsole(options);
+
+    await writePrompt("a = b = c = null");
+    await writePrompt("ActiveSupport.Reloader.toComplete(() => { a = b = c = 1 })");
+    await writePrompt("ActiveSupport.Reloader.toComplete(() => { b = c = 2 })");
+    await writePrompt("ActiveSupport.Reloader.toPrepare(() => { c = 3 })");
+    await writePrompt("await reloadBang()", "Reloading...\n");
+    await writePrompt("a", "1");
+    await writePrompt("b", "2");
+    await writePrompt("c", "3");
+    for (const name of ["a", "b", "c"]) delete (globalThis as Record<string, unknown>)[name];
+  });
+
+  it("console respects user defined irb name", async () => {
+    const irbrc = `${import.meta.dirname}/irbrc-${Date.now()}.mjs`;
+    try {
+      await File.writeAsync(
+        irbrc,
+        `import { TSREPL } from "@blazetrails/ruby-compat";\nTSREPL.conf.TSREPL_NAME = "jarretts-irb";\n`,
+      );
+
+      const options = "-e test";
+      await spawnConsole(options, { env: { TSREPLRC: irbrc } });
+
+      await writePrompt("123", null, { prompt: "jarretts-irb(test)" });
+    } finally {
+      await File.deleteAsync(irbrc);
+    }
+  });
+
+  it("console respects user defined prompt mode", async () => {
+    const irbrc = `${import.meta.dirname}/irbrc-${Date.now()}.mjs`;
+    try {
+      await File.writeAsync(
+        irbrc,
+        `import { TSREPL } from "@blazetrails/ruby-compat";\nTSREPL.conf.PROMPT_MODE = "SIMPLE";\n`,
+      );
+
+      const options = "-e test";
+      await spawnConsole(options, { env: { TSREPLRC: irbrc } });
+
+      await writePrompt("123", null, { prompt: ">> " });
+    } finally {
+      await File.deleteAsync(irbrc);
+    }
   });
 
   it("console disables IRB auto completion in non local", async () => {

@@ -73,6 +73,7 @@ export const ActiveSupport = {
   LazyLoadHooks: typeof import("./lazy-load-hooks.js");
   BroadcastLogger: typeof BroadcastLogger;
   Digest?: typeof import("./digest.js").Digest;
+  Reloader?: typeof import("./reloader.js").Reloader;
   Logger: typeof Logger;
   Duration: typeof Duration;
   TimeWithZone?: typeof import("./time-with-zone.js").TimeWithZone;

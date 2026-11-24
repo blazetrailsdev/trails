@@ -28,6 +28,7 @@ function fakeRepl(inputs: Input[] = []) {
           onExit = listener;
         },
         close: () => onExit(),
+        setPrompt() {},
         evaluated: [] as string[],
         eval(cmd: string, _ctx: object, _file: string, cb: (e: Error | null, r?: unknown) => void) {
           server.evaluated.push(cmd);
@@ -60,8 +61,8 @@ describe("TSREPL", () => {
     exit.mockRestore();
   });
 
-  it("setup seeds the default prompts and TSREPL_NAME, which format_prompt expands", () => {
-    TSREPL.setup(null);
+  it("setup seeds the default prompts and TSREPL_NAME, which format_prompt expands", async () => {
+    await TSREPL.setup(null);
     expect(TSREPL.conf.TSREPL_NAME).toBe("tsrepl");
     expect(Object.keys(TSREPL.conf.PROMPT as object)).toContain("DEFAULT");
     expect(["DEFAULT", "NULL"]).toContain(TSREPL.conf.PROMPT_MODE);
@@ -70,14 +71,14 @@ describe("TSREPL", () => {
     expect(new TSREPL.Tsrepl().formatPrompt("%N(%m):%03n%l ", '"', 0, 7)).toBe('app(main):007" ');
   });
 
-  it("setup raises UndefinedPromptMode for an unknown prompt mode", () => {
+  it("setup raises UndefinedPromptMode for an unknown prompt mode", async () => {
     const initConfig = TSREPL.initConfig;
     TSREPL.initConfig = (apPath) => {
       initConfig(apPath);
       TSREPL.conf.PROMPT_MODE = "NOPE";
     };
     try {
-      expect(() => TSREPL.setup(null)).toThrow("Undefined prompt mode(NOPE).");
+      await expect(TSREPL.setup(null)).rejects.toThrow("Undefined prompt mode(NOPE).");
     } finally {
       TSREPL.initConfig = initConfig;
     }
@@ -91,7 +92,7 @@ describe("TSREPL", () => {
       }
     }
     TSREPL.HelperMethod.register("greet", Greet);
-    TSREPL.setup(null);
+    await TSREPL.setup(null);
     TSREPL.conf.PROMPT_MODE = "DEFAULT";
     const order: string[] = [];
     (TSREPL.conf.AT_EXIT as Array<() => void>).push(() => order.push("at_exit"));
@@ -125,7 +126,7 @@ describe("TSREPL", () => {
       ["IrbLazy + 1", (_e, r) => (result = r)],
       ["x.IrbOther", () => {}],
     ]);
-    TSREPL.setup(null);
+    await TSREPL.setup(null);
     const required: string[] = [];
     const prevRequire = Kernel.require;
     Kernel.require = async (feature) => {
@@ -153,7 +154,7 @@ describe("TSREPL", () => {
   it("run returns on EOF without exiting", async () => {
     const results: unknown[] = [];
     fakeRepl([["1", (_e, r) => results.push(r)]]);
-    TSREPL.setup(null);
+    await TSREPL.setup(null);
     const order: string[] = [];
     (TSREPL.conf.AT_EXIT as Array<() => void>).push(() => order.push("at_exit"));
 
@@ -169,7 +170,7 @@ describe("TSREPL", () => {
       ["exit!", () => {}],
       ["1", () => {}],
     ]);
-    TSREPL.setup(null);
+    await TSREPL.setup(null);
 
     await new TSREPL.Tsrepl().run(TSREPL.conf);
 
@@ -177,8 +178,8 @@ describe("TSREPL", () => {
     expect(exit).toHaveBeenCalledTimes(1);
   });
 
-  it("init_config seats VERSION, AP_NAME and the measure, history and completor keys", () => {
-    TSREPL.setup(null);
+  it("init_config seats VERSION, AP_NAME and the measure, history and completor keys", async () => {
+    await TSREPL.setup(null);
     expect(TSREPL.conf.VERSION).toBe("tsrepl 1.13.1 (2024-05-05)");
     expect(TSREPL.conf.AP_NAME).toBe("tsrepl");
     expect(TSREPL.conf.USE_SINGLELINE).toBe(false);

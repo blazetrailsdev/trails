@@ -7,12 +7,15 @@ import { StandardError } from "./standard-error.js";
 import { LoadError } from "./load-error.js";
 import { kernelCatch, throwDataP } from "./kernel-catch.js";
 import { File } from "./file.js";
-import { STDIN, STDOUT } from "./io.js";
+import { STDIN, STDOUT, STDERR } from "./io.js";
+import { rbFLoad } from "./load.js";
+import { Dir } from "./dir.js";
 
 export interface ReplServerLike {
   context: Record<string, unknown>;
   on(event: "exit", listener: () => void): unknown;
   close(): void;
+  setPrompt(prompt: string): void;
   eval: (
     cmd: string,
     context: object,
@@ -173,12 +176,8 @@ export class Tsrepl {
    * @noRailsEquivalent PERMANENT
    */
   async evalInput(): Promise<void> {
-    const pconf = (TSREPL.conf.PROMPT as Record<string, PromptConf>)[
-      TSREPL.conf.PROMPT_MODE as string
-    ];
-    const prompt = this.formatPrompt((pconf.PROMPT_I as string | null) ?? "", null, 0, this.lineNo);
     const repl = await getReplAsync();
-    const server = repl.start({ prompt, useGlobal: true });
+    const server = repl.start({ prompt: this.prompt(), useGlobal: true });
     this.loadHelperMethodsToMain(server);
     const evalDefault = server.eval;
     this.binding = (statements, file) =>
@@ -215,9 +214,11 @@ export class Tsrepl {
           server.close();
           throw error;
         }
+        server.setPrompt(this.prompt());
         callback(error as Error);
         continue;
       }
+      server.setPrompt(this.prompt());
       callback(null, result);
     }
   }
@@ -270,6 +271,21 @@ export class Tsrepl {
   }
 
   /**
+   * `IRB::Irb#prompt`'s `PROMPT_I` arm, read from `IRB.conf` on every
+   * statement as `each_top_level_statement` does
+   * (`vendor/ruby/v3.3.11/lib/irb.rb:1072-1079`), so a live
+   * `irb_name` change reaches the next prompt.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  prompt(): string {
+    const pconf = (TSREPL.conf.PROMPT as Record<string, PromptConf>)[
+      TSREPL.conf.PROMPT_MODE as string
+    ];
+    return this.formatPrompt((pconf.PROMPT_I as string | null) ?? "", null, 0, this.lineNo);
+  }
+
+  /**
    * `IRB::Irb#format_prompt` (`vendor/ruby/v3.3.11/lib/irb.rb:1481-1518`).
    *
    * @noRailsEquivalent PERMANENT
@@ -299,6 +315,43 @@ export class Tsrepl {
 }
 
 /**
+ * `IRB::Color.colorable?` and `.colorize`
+ * (`vendor/ruby/v3.3.11/lib/irb/color.rb:81-91`, `:119-123`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const Color: {
+  BLUE: number;
+  RED: number;
+  CLEAR: number;
+  isColorable(): boolean;
+  colorize(text: string, seq: Array<"BLUE" | "RED">, opts?: { colorable?: boolean }): string;
+} = {
+  BLUE: 34,
+  RED: 31,
+  CLEAR: 0,
+
+  /** @noRailsEquivalent PERMANENT */
+  isColorable(): boolean {
+    const supported = STDOUT.isTty() && Object.hasOwn(env, "TERM") && env.TERM !== "dumb";
+    return (
+      supported && !!(Object.hasOwn(TSREPL.conf, "USE_COLORIZE") ? TSREPL.conf.USE_COLORIZE : true)
+    );
+  },
+
+  /** @noRailsEquivalent PERMANENT */
+  colorize(
+    text: string,
+    seq: Array<"BLUE" | "RED">,
+    { colorable = Color.isColorable() }: { colorable?: boolean } = {},
+  ): string {
+    if (!colorable) return text;
+    const prefix = seq.map((s) => `\u001b[${Color[s]}m`).join("");
+    return `${prefix}${text}\u001b[${Color.CLEAR}m`;
+  },
+};
+
+/**
  * `IRB` (`vendor/ruby/v3.3.11/lib/irb/init.rb:7-17`).
  *
  * @noRailsEquivalent PERMANENT
@@ -311,13 +364,15 @@ export const TSREPL = {
 
   /**
    * `IRB.setup` (`vendor/ruby/v3.3.11/lib/irb/init.rb:50-61`).
-   * `init_error`, `parse_opts`, `run_config` and `load_modules` are not
-   * ported: the REPL adapter reads no `.irbrc`, argv or locale.
+   * `init_error`, `parse_opts` and `load_modules` are not ported: the
+   * REPL adapter reads no argv or locale. `run_config`'s `load` is
+   * awaited.
    *
    * @noRailsEquivalent PERMANENT
    */
-  setup(apPath: string | null): void {
+  async setup(apPath: string | null): Promise<void> {
     TSREPL.initConfig(apPath);
+    await TSREPL.runConfig();
 
     const conf = TSREPL.conf as { PROMPT: Record<string, unknown>; PROMPT_MODE: string };
     if (conf.PROMPT[conf.PROMPT_MODE] == null) {
@@ -325,6 +380,88 @@ export const TSREPL = {
     }
     TSREPL.INITIALIZED = true;
   },
+
+  /**
+   * `IRB.run_config` (`vendor/ruby/v3.3.11/lib/irb/init.rb:396-404`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async runConfig(): Promise<void> {
+    if (TSREPL.conf.RC) {
+      for (const rc of await TSREPL.irbrcFiles()) {
+        try {
+          await rbFLoad(rc);
+        } catch (e) {
+          if (!(e instanceof Error)) throw e;
+          STDERR.puts(`Error loading RC file '${rc}':\n${e.stack ?? e.message}`);
+        }
+      }
+    }
+  },
+
+  /** @noRailsEquivalent PERMANENT */
+  IRBRC_EXT: "rc",
+
+  /**
+   * `IRB.irbrc_files` and `prepare_irbrc_name_generators`
+   * (`vendor/ruby/v3.3.11/lib/irb/init.rb:425-460`). `File.exist?` is
+   * awaited, so the list is computed on each call rather than memoized.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async irbrcFiles(): Promise<string[]> {
+    const irbrcFiles: string[] = [];
+    for (const rcgen of TSREPL.rcFileGenerators()) {
+      const irbrc = rcgen(TSREPL.IRBRC_EXT);
+      if (await File.isExistAsync(irbrc)) irbrcFiles.push(irbrc);
+    }
+    for (const irbrc of TSREPL.generateCurrentDirIrbrcFiles()) {
+      if (await File.isExistAsync(irbrc)) irbrcFiles.push(irbrc);
+    }
+    return [...new Set(irbrcFiles)];
+  },
+
+  /**
+   * `IRB.rc_file_generators` (`vendor/ruby/v3.3.11/lib/irb/init.rb:463-479`).
+   * irb's file names are `tsrepl` names here, as its env vars are.
+   * `File.directory?` on the XDG home is not awaited, so that arm yields
+   * whenever `XDG_CONFIG_HOME` is set and the file check above decides.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  *rcFileGenerators(): Generator<(rc: string) => string> {
+    const irbrc = env.TSREPLRC;
+    if (irbrc != null) {
+      yield (rc) => (rc === "rc" ? irbrc : irbrc + rc);
+    }
+    const xdgConfigHome = env.XDG_CONFIG_HOME;
+    if (xdgConfigHome != null) {
+      const irbHome = File.join(xdgConfigHome, "tsrepl");
+      yield (rc) => irbHome + `/tsrepl${rc}`;
+    }
+    const home = env.HOME;
+    if (home != null) {
+      yield (rc) => home + `/.tsrepl${rc}`;
+      if (xdgConfigHome == null || xdgConfigHome === "") {
+        yield (rc) => home + `/.config/tsrepl/tsrepl${rc}`;
+      }
+    }
+  },
+
+  /**
+   * `IRB.generate_current_dir_irbrc_files`
+   * (`vendor/ruby/v3.3.11/lib/irb/init.rb:482-485`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  generateCurrentDirIrbrcFiles(): string[] {
+    const currentDir = Dir.pwd();
+    return [".tsreplrc", "tsreplrc", "_tsreplrc", "$tsreplrc"].map(
+      (file) => `${currentDir}/${file}`,
+    );
+  },
+
+  Color,
 
   /**
    * `IRB::VERSION`, `@RELEASE_VERSION` and `@LAST_UPDATE_DATE`
