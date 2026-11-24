@@ -1,3 +1,4 @@
+import "../../constants.sqlite3-schema-statements.generated.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any, isPresent, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
 import {

@@ -1021,6 +1021,7 @@ const TRAILS_PACKAGES: TrailsPackage[] = [
   ["@blazetrails/solid-queue", (g) => g.options.skipSolid],
   ["@blazetrails/solid-cable", (g) => g.options.skipSolid || g.options.skipActionCable],
   ["@blazetrails/activerecord-cli"],
+  ["@blazetrails/sqlite3", (g) => g.options.skipActiveRecord || g.database.name !== "sqlite3"],
   ["@blazetrails/trails-tsc"],
 ];
 

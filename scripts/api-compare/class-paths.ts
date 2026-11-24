@@ -386,7 +386,7 @@ export async function walkedClassPaths(
     const source = await place.read(file);
     const namespace =
       !tsName.includes(".") && !isExported(source, tsName) && isSelfNamespace(source, file, tsName);
-    entries.push(namespace ? { file, tsName, fqn, namespace } : { file, tsName, fqn, ...placed });
+    entries.push({ file, tsName, fqn, ...(namespace ? { namespace } : {}), ...placed });
   }
   return entries;
 }
@@ -543,7 +543,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       if (reached !== null) {
         entries.push({ ...entry, tsName: reached, ...placed });
       } else if (modules.has(key) && isSelfNamespace(source, entry.file, entry.tsName)) {
-        entries.push({ ...entry, namespace: true });
+        entries.push({ ...entry, namespace: true, ...placed });
       } else if (fallbackModules.has(key)) continue;
       else if (modules.has(key)) {
         unexportedModules.push(`${dir}/lib/${entry.file}: ${entry.tsName} (${entry.fqn})`);
