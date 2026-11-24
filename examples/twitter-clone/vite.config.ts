@@ -9,8 +9,6 @@ export default defineConfig({
     exclude: ["test/{system,dummy,fixtures}/**/*.test.ts"],
     globalSetup: ["test/global-setup.ts"],
     fileParallelism: false,
-    // Bundler.require imports the framework natively; load it the same way here so
-    // the app and the tests share one copy of each package.
     server: { deps: { external: [/\/packages\//] } },
   },
 });

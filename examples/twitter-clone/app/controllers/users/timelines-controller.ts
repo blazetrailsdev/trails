@@ -3,7 +3,6 @@ import { Tweet } from "../../models/tweet.ts";
 import { User } from "../../models/user.ts";
 
 export class TimelinesController extends ApplicationController {
-  /** The home timeline: tweets from everyone this user follows, newest first. */
   async show(): Promise<void> {
     const user = await User.findByBang({ handle: this.params.get("user_handle") });
     const followeeIds = (await user.following).map((u) => u.id);

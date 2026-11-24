@@ -5,8 +5,6 @@ export class ApplicationController extends ActionController.API {
   static {
     this.rescueFrom(RecordNotFound, { with: "notFound" });
     this.rescueFrom(RecordInvalid, { with: "unprocessableEntity" });
-    // A concurrent insert can lose the unique-index race after the
-    // uniqueness validation passed: a duplicate, not a server error.
     this.rescueFrom(RecordNotUnique, { with: "conflict" });
     this.rescueFrom(ParseError, { with: "badRequest" });
   }

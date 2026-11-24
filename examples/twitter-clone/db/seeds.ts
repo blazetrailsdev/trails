@@ -1,4 +1,3 @@
-// Idempotent seed data, loaded by `bin/trails db:seed` (and by `db:setup` / `db:prepare`).
 import { Follow } from "../app/models/follow.ts";
 import { User } from "../app/models/user.ts";
 
@@ -10,7 +9,6 @@ const handles = [
 
 const users: User[] = [];
 for (const attrs of handles) {
-  // findOrCreateByBang keeps the seed idempotent across repeated runs.
   users.push(
     (await User.findOrCreateByBang({ handle: attrs.handle }, (user) =>
       user.assignAttributes(attrs),
