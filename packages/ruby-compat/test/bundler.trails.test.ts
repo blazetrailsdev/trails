@@ -30,4 +30,17 @@ describe("Bundler.require", () => {
     await Dir.chdir(root, () => Bundler.require("test"));
     expect(seen.bundled).toEqual([]);
   });
+
+  it("skips a dependency with no entry file of its own", async () => {
+    const root = await app({
+      dependencies: { "@blazetrails/meta": "*", "@blazetrails/dep": "*" },
+    });
+    const dir = File.join(root, "node_modules", "@blazetrails", "meta");
+    await FileUtils.mkdirPAsync(dir);
+    await File.writeAsync(File.join(dir, "package.json"), JSON.stringify({ name: "meta" }));
+    const seen = globalThis as { bundled?: string[] };
+    seen.bundled = [];
+    await Dir.chdir(root, () => Bundler.require("default"));
+    expect(seen.bundled).toEqual(["dep"]);
+  });
 });
