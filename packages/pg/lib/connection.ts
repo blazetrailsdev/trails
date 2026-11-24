@@ -1116,7 +1116,8 @@ export class Connection {
       for (;;) {
         try {
           await this.block();
-        } catch {
+        } catch (error) {
+          if (!(error instanceof ConnectionBad)) throw error;
           this.bad = true;
           return false;
         }
@@ -1125,7 +1126,9 @@ export class Connection {
 
         const status = cur.resultStatus();
         if (status == PG.PGRES_COPY_IN) {
-          this.syncPutCopyEnd("COPY terminated by new query or discard_results");
+          while (!this.syncPutCopyEnd("COPY terminated by new query or discard_results")) {
+            this.flush();
+          }
         }
       }
       return true;
@@ -1240,6 +1243,9 @@ export class Connection {
   }
 
   syncGetResult(): Result | null {
+    if (this._results.length === 0 && this._copyIn) {
+      return engine!.emptyResult(null, PG.PGRES_COPY_IN);
+    }
     const result = this._results.shift() ?? null;
     if (result?.resultStatus() === PG.PGRES_PIPELINE_SYNC) {
       this._pipelineStatus = PG.PQ_PIPELINE_ON;
@@ -1308,7 +1314,10 @@ export class Connection {
 
   async block(timeout: number | null = null): Promise<boolean> {
     const ready = (): boolean =>
-      this._results.length > 0 || this._cmdQueue.length === 0 || this._sendError != null;
+      this._results.length > 0 ||
+      this._cmdQueue.length === 0 ||
+      this._sendError != null ||
+      this._copyIn;
     if (!ready()) {
       const ret = await new Promise<boolean>((resolve) => {
         const waiter = (): void => {
@@ -1457,50 +1466,6 @@ type ConninfoOption = {
   dispsize: number;
 };
 
-const CONNINFO_KEYWORDS = [
-  "service",
-  "user",
-  "password",
-  "passfile",
-  "channelBinding",
-  "connectTimeout",
-  "dbname",
-  "host",
-  "hostaddr",
-  "port",
-  "clientEncoding",
-  "options",
-  "applicationName",
-  "fallbackApplicationName",
-  "keepalives",
-  "keepalivesIdle",
-  "keepalivesInterval",
-  "keepalivesCount",
-  "tcpUserTimeout",
-  "sslmode",
-  "sslnegotiation",
-  "sslcompression",
-  "sslcert",
-  "sslkey",
-  "sslcertmode",
-  "sslpassword",
-  "sslrootcert",
-  "sslcrl",
-  "sslcrldir",
-  "sslsni",
-  "requirepeer",
-  "requireAuth",
-  "sslMinProtocolVersion",
-  "sslMaxProtocolVersion",
-  "gssencmode",
-  "krbsrvname",
-  "gsslib",
-  "gssdelegation",
-  "replication",
-  "targetSessionAttrs",
-  "loadBalanceHosts",
-];
-
 const CONNINFO_OPTIONS: Record<
   string,
   { envvar: string | null; label: string; dispchar: string; dispsize: number }
@@ -1622,6 +1587,8 @@ const CONNINFO_OPTIONS: Record<
     dispsize: 8,
   },
 };
+
+const CONNINFO_KEYWORDS = Object.keys(CONNINFO_OPTIONS);
 
 const CONNECT_ARGUMENT_ORDER = ["host", "port", "options", "tty", "dbname", "user", "password"];
 
