@@ -1,13 +1,5 @@
 [
   {
-    "package": "actiontext",
-    "rubyFile": "tag_helper.rb",
-    "rubyName": "render",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
     "package": "actionview",
     "rubyFile": "helpers/sanitize_helper.rb",
     "rubyName": "strip_tags",

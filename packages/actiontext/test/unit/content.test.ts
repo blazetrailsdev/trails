@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { assertDomEqual } from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Marshal, Thread, regexpEscape } from "@blazetrails/ruby-compat";
 import { createFileBlob, fixturesAll } from "../test-helper.js";
@@ -206,7 +207,7 @@ describe("ActionText::ContentTest", () => {
       '<action-text-attachment content="<img src=\\&quot;.\\&quot; onerror=alert>"></action-text-attachment>';
     const trixHtml =
       '<figure data-trix-attachment="{&quot;content&quot;:&quot;<img src=\\&quot;\\\\%22.\\\\%22\\&quot;>&quot;}"></figure>';
-    expect((await (await contentFromHtml(html)).toTrixHtml()).trim()).toBe(trixHtml);
+    assertDomEqual(trixHtml, (await (await contentFromHtml(html)).toTrixHtml()).trim());
   });
 
   it("removes content attribute if it's value is empty", async () => {
