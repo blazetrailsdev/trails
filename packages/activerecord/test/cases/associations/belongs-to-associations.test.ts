@@ -1,4 +1,4 @@
-import { DescendantsTracker, rbEqual } from "@blazetrails/activesupport";
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Admin } from "../../models/admin.js";
 import {
   kernelThrow,
@@ -693,14 +693,14 @@ describe("BelongsToAssociationsTest", () => {
     const book = await CpkBook.createBang({ id: [1, 2], title: "The Well-Grounded Rubyist" });
     const chapter = await CpkOptionalChapter.createBang({ id: [1, 2], book });
 
-    expect(rbEqual(book, await chapter.book)).toBe(true);
+    expect(await chapter.book).toEqualRuby(book);
     expect(chapter.id).toEqual([1, 2]);
 
     await chapter.updateBang({ book: null });
 
     expect(chapter.id).toEqual([1, 2]);
     expect((chapter as any).book_id).toBeNull();
-    expect((chapter as any).author_id).toBe(book.author_id);
+    expect(book.author_id).toBe((chapter as any).author_id);
   });
 
   it("should reload association on model with query constraints when foreign key changes", async () => {
@@ -711,7 +711,7 @@ describe("BelongsToAssociationsTest", () => {
     await comment.blogPost;
     comment.blog_post_id = blogPost.id;
 
-    expect(rbEqual(blogPost, await comment.blogPost)).toBe(true);
+    expect(await comment.blogPost).toEqualRuby(blogPost);
   });
 
   it("building the belonging object with implicit sti base class", async () => {
