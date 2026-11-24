@@ -64,7 +64,7 @@ export class Base {
 
   static get schema(): ModelSchema.ModelSchema {
     if (Object.hasOwn(this, "_schema")) return this._schema;
-    const schema = ModelSchema.loadSchema(this);
+    const schema = ModelSchema.reflectSchema(this);
     this._schema = schema;
     this.prototype._schema = schema;
     ModelSchema.registerModel(this);

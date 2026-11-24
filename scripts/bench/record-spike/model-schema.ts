@@ -51,7 +51,7 @@ interface TableInfoRow {
   pk: number;
 }
 
-export function loadSchema(klass: typeof Base): ModelSchema {
+export function reflectSchema(klass: typeof Base): ModelSchema {
   const tableName = klass.tableName;
   if (tableName == null) {
     throw new ActiveRecordError(`${klass.name} sets no tableName, and the spike infers none`);
