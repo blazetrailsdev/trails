@@ -69,6 +69,7 @@ export function registerLocaleModule(filename: string, translations: unknown): v
 export async function preloadTranslationFiles(...filenames: (string | string[])[]): Promise<void> {
   const paths = filenames.length === 0 ? config().loadPath : filenames;
   for (const filename of paths.flat()) {
+    if (localeModules.has(filename)) continue;
     fileContents.set(filename, await readTranslationFile(filename));
     fileMtimes.set(
       filename,

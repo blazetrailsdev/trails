@@ -22,6 +22,20 @@
     "NOTICE",
     "!dist/**/*.d.ts.map"
   ],
+  "sideEffects": [
+    "./dist/backend/base.js",
+    "./dist/backend/chain.js",
+    "./dist/backend/key-value.js",
+    "./dist/backend/pluralization.js",
+    "./dist/backend/simple.js",
+    "./dist/backend/transliterator.js",
+    "./dist/constants.generated.js",
+    "./dist/exceptions.js",
+    "./dist/gettext/helpers.js",
+    "./dist/i18n.js",
+    "./dist/index.js",
+    "./dist/locale/fallbacks.js"
+  ],
   "scripts": {
     "build": "tsc"
   },

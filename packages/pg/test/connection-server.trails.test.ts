@@ -33,6 +33,35 @@ describe("PG::Connection against a server", () => {
     expect((await conn.exec("SELECT 1")).getvalue(0, 0)).toBe(1);
   });
 
+  it("chunked rows mode delivers a short last chunk before the empty TUPLES_OK", async () => {
+    conn.sendQuery("SELECT generate_series(1,13)");
+    conn.setChunkedRowsMode(5);
+    const statuses: [number, number][] = [];
+    for (;;) {
+      const res = await conn.getResult();
+      if (res == null) break;
+      statuses.push([res.resultStatus(), res.ntuples()]);
+    }
+    expect(statuses).toEqual([
+      [PG.PGRES_TUPLES_CHUNK, 5],
+      [PG.PGRES_TUPLES_CHUNK, 5],
+      [PG.PGRES_TUPLES_CHUNK, 3],
+      [PG.PGRES_TUPLES_OK, 0],
+    ]);
+  });
+
+  it("send_flush_request on an idle connection leaves the client free for the next query", async () => {
+    conn.sendFlushRequest();
+    expect((await conn.exec("SELECT 1")).values()).toEqual([["1"]]);
+  });
+
+  it("concurrent get_result waiters all settle", async () => {
+    conn.sendQuery("SELECT 1");
+    const [a, b] = await Promise.all([conn.block(), conn.block()]);
+    expect([a, b]).toEqual([true, true]);
+    await conn.getLastResult();
+  });
+
   it("server_version is libpq's PQserverVersion of the startup server_version", async () => {
     const num = (await conn.exec("SHOW server_version_num")).getvalue(0, 0);
     expect(conn.serverVersion()).toBe(Number(num));

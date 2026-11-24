@@ -1,18 +1,24 @@
 import "../../../constants.trails-authentication-authentication-generator.generated.js";
 import { TopLevel } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
-import { getPackageManager } from "../../../package-manager.js";
+import { File, include, type Included } from "@blazetrails/ruby-compat";
 import { Base, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
+import { BundleHelper } from "../../bundle-helper.js";
 
 export interface AuthenticationGeneratorOptions extends GeneratorOptions {
   api?: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
+export interface AuthenticationGenerator extends Included<typeof BundleHelper> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuthenticationGenerator extends Base {
   declare options: AuthenticationGeneratorOptions;
 
   static {
+    include(this, BundleHelper);
+
     this.classOption("api", {
       type: "boolean",
       desc: "Generate API-only controllers and models, with no view templates",
@@ -59,8 +65,6 @@ export class AuthenticationGenerator extends Base {
 
     await this.template("app/views/passwords-mailer/reset.html.tse");
     await this.template("app/views/passwords-mailer/reset.text.tse");
-
-    await this.template("test/mailers/previews/passwords-mailer-preview.ts");
   }
 
   configureApplicationController(): void {
@@ -87,14 +91,13 @@ export class AuthenticationGenerator extends Base {
     await this.route(`this.resource("session");`);
   }
 
-  /** @missingRailsArgs execute_command — PERMANENT */
+  /** @missingRailsArgs bundle_command — PERMANENT */
   async enableBcrypt(): Promise<void> {
     const json = JSON.parse(await File.readAsync(File.join(this.destinationRoot, "package.json")));
-    const executor = getPackageManager(this.destinationRoot).name;
     if (json.dependencies?.["@blazetrails/bcrypt"] != null) {
-      await this.executeCommand(executor, "install --silent");
+      await this.installCommand("install --silent");
     } else {
-      await this.executeCommand(executor, "add @blazetrails/bcrypt", { capture: true });
+      await this.installCommand("add @blazetrails/bcrypt", {}, { quiet: true });
     }
   }
 

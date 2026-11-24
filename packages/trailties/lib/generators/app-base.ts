@@ -13,7 +13,6 @@ import {
   type Included,
   rbFBackquote,
   rbFSend,
-  rbFSystem,
   rbObjRespondTo,
   regexpEscape,
 } from "@blazetrails/ruby-compat";
@@ -25,6 +24,7 @@ import { Base, type GeneratorOptions, type GeneratorConfig } from "./base.js";
 import { DATABASES, Database, type DatabaseName } from "./database.js";
 import { Error } from "./base.js";
 import { AppName } from "./app-name.js";
+import { BundleHelper } from "./bundle-helper.js";
 import { getPackageManager } from "../package-manager.js";
 
 export type AppBaseOptions = GeneratorOptions & {
@@ -49,7 +49,7 @@ export const BUN_VERSION = "1.0.1";
 export const JAVASCRIPT_OPTIONS = ["vite", "bun", "webpack", "esbuild", "rollup"];
 export const CSS_OPTIONS = ["tailwind", "bootstrap", "bulma", "postcss", "sass"];
 
-export interface AppBase extends Included<typeof AppName> {
+export interface AppBase extends Included<typeof AppName>, Included<typeof BundleHelper> {
   shebang(): string;
 }
 
@@ -75,6 +75,7 @@ export abstract class AppBase extends Base {
 
   static {
     include(this, AppName);
+    include(this, BundleHelper);
     this.addShebangOptionBang();
     this.argument("appPath", { type: "string" });
     this.noCommands(() => this.methodAdded("requiredRailties"));
@@ -795,29 +796,6 @@ ${requireStatements.join("\n")}`;
       this.trailsTemplate = File.expandPath(interpolated);
     } else {
       this.trailsTemplate = this.options.template;
-    }
-  }
-
-  /** @internal */
-  protected async installCommand(command: string, env: Record<string, string> = {}): Promise<void> {
-    const pm = getPackageManager(this.destinationRoot, {
-      fallback: this.packageManager,
-    });
-    this.sayStatus("run", `${pm.name} ${command}`);
-    await this.execInstallCommand(pm.name, command, env);
-  }
-
-  /** @internal */
-  protected async execInstallCommand(
-    installCommand: string,
-    command: string,
-    env: Record<string, string>,
-  ): Promise<void> {
-    const fullCommand = `"${installCommand}" ${command}`;
-    if (this.options.quiet) {
-      await rbFSystem(env, fullCommand, { out: File.NULL });
-    } else {
-      await rbFSystem(env, fullCommand);
     }
   }
 

@@ -764,6 +764,7 @@ export default defineConfig({
             "scripts/rails-find/*.test.ts",
             "scripts/sync-stats/*.test.ts",
             "scripts/layout/*.test.ts",
+            "scripts/package-size/*.test.ts",
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],

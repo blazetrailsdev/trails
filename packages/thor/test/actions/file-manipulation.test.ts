@@ -1,8 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Dir, File, FileUtils, isEmpty, NameError, rbFBinding } from "@blazetrails/ruby-compat";
-import { capture, isWindows, sourceRoot } from "../support/helper.js";
+import {
+  Dir,
+  Encoding,
+  File,
+  FileUtils,
+  isEmpty,
+  NameError,
+  rbFBinding,
+  rbFSystem,
+} from "@blazetrails/ruby-compat";
+import { capture, isWindows, silenceWarnings, sourceRoot } from "../support/helper.js";
 import { MyCounter } from "../fixtures/group.js";
 import { Error as ThorError } from "../../lib/error.js";
+
+const { readline } = vi.hoisted(() => ({ readline: vi.fn() }));
+
+vi.mock("../../lib/line-editor.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  readline,
+}));
+vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  rbFSystem: vi.fn(),
+}));
 
 type Runner = Record<string, any>;
 
@@ -42,6 +62,8 @@ describe("Thor::Actions", () => {
   beforeEach(() => {
     destinationRoot_ = Dir.mktmpdir("thor-sandbox-");
     runner_ = null;
+    readline.mockReset();
+    vi.mocked(rbFSystem).mockReset();
   });
 
   afterEach(() => {
@@ -107,6 +129,32 @@ describe("Thor::Actions", () => {
       const copy = File.join(destinationRoot(), "preserve/app.sh");
       expect(File.stat(original).mode).toEqual(File.stat(copy).mode);
       expect(filename).toHaveBeenCalled();
+    });
+
+    it("shows the diff when there is a collision and source has utf-8 characters", async () => {
+      const previousInternal = Encoding.defaultInternal;
+
+      silenceWarnings(() => {
+        Encoding.defaultInternal = Encoding.UTF_8;
+      });
+
+      try {
+        const destination = File.join(destinationRoot(), "encoding_with_utf8.thor");
+        FileUtils.mkdirP(destinationRoot());
+
+        File.write(destination, "blabla");
+
+        readline.mockResolvedValueOnce("d").mockResolvedValueOnce("y");
+        await action("copyFile", "encoding_with_utf8.thor");
+        expect(readline).toHaveBeenCalledTimes(2);
+        expect(rbFSystem).toHaveBeenCalledWith(expect.stringMatching(/diff -u/));
+
+        isExistsAndIdentical("encoding_with_utf8.thor", "encoding_with_utf8.thor");
+      } finally {
+        silenceWarnings(() => {
+          Encoding.defaultInternal = previousInternal;
+        });
+      }
     });
 
     it("logs status", async () => {

@@ -174,7 +174,7 @@ export class InsertAll {
     }
     if (Array.isArray(this.returning) && this.returning.length === 0) this.returning = false;
 
-    this.uniqueBy = this.findUniqueIndexFor(this.uniqueBy);
+    if (this.onDuplicate !== ":raise") this.uniqueBy = this.findUniqueIndexFor(this.uniqueBy);
 
     this.configureOnDuplicateUpdateLogic();
     this.ensureValidOptionsForConnectionBang();
