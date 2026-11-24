@@ -70,7 +70,7 @@ describe("PG::Connection#send_query and #get_last_result", () => {
       submitted.push(s);
       return new Promise(() => {});
     });
-    const client = fakePgConnection({ query });
+    const client = fakePgConnection({ query }, { replaySubmittables: false });
     expect(client.sendQuery("SELECT 1")).toBeUndefined();
     expect(query).toHaveBeenCalledOnce();
     expect(() => client.sendQuery("SELECT 2")).toThrow("another command is already in progress");
@@ -207,12 +207,15 @@ describe("PG::Error#result on every carrier path", () => {
   });
 
   it("rewraps the error prepare is handed", async () => {
-    const client = fakePgConnection({
-      _queryable: false,
-      query: (submittable: { handleError(error: unknown): void }) => {
-        submittable.handleError(terminated());
+    const client = fakePgConnection(
+      {
+        _queryable: false,
+        query: (submittable: { handleError(error: unknown): void }) => {
+          submittable.handleError(terminated());
+        },
       },
-    });
+      { replaySubmittables: false },
+    );
     const error = await client.prepare("a1", "SELECT 1").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PG.ConnectionBad);
   });
