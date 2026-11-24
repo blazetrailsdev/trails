@@ -1,4 +1,4 @@
-import { Base } from "@blazetrails/activerecord";
+import { ApplicationRecord } from "./application-record.ts";
 
 /**
  * A user who can tweet, follow others, and like tweets.
@@ -7,11 +7,11 @@ import { Base } from "@blazetrails/activerecord";
  * calls, no `import type { Tweet }`. Attribute types come from
  * `db/schema.ts` (regenerate with `pnpm db:schema:dump`), which
  * `trails-tsc` reads to inject the `declare` members; at runtime the
- * columns are reflected from the live DB (see db.ts). Associations and
+ * columns are reflected from the live DB (Rails-style schema reflection). Associations and
  * scopes still come from the runtime macros below. This mirrors a Rails
  * `class User < ApplicationRecord` exactly.
  */
-export class User extends Base {
+export class User extends ApplicationRecord {
   static {
     this.hasMany("tweets", { dependent: "destroy" });
 

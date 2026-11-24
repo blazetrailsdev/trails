@@ -1,7 +1,7 @@
-import { Base } from "@blazetrails/activerecord";
+import { ApplicationRecord } from "./application-record.ts";
 
 /** Join record: `follower_id` follows `followee_id`. */
-export class Follow extends Base {
+export class Follow extends ApplicationRecord {
   static {
     this.belongsTo("follower", { className: "User" });
     this.belongsTo("followee", { className: "User" });

@@ -1,6 +1,6 @@
-import { Base } from "@blazetrails/activerecord";
+import { ApplicationRecord } from "./application-record.ts";
 
-export class Like extends Base {
+export class Like extends ApplicationRecord {
   static {
     this.belongsTo("user");
     this.belongsTo("tweet");
