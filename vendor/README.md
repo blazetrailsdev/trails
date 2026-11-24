@@ -267,13 +267,10 @@ bump inside a line moves only `TINY` / `PRE`.
 3. **Entry.** For Rails, RFC 0191 § 4's criteria: the dry run reports no red
    outside the ledger, every gate is green on `main`, zero unpinned matched
    bodies. **Retake the pin floor on the old ref**, as late as possible:
-   For Rails, `pnpm parity:api:pins:all`. For a gem, `body-pins.ts` has no
-   per-source filter, so copy `body-pins.json` aside, run
-   `pnpm parity:api:pins:all`, then rebuild the file as the copy plus the
-   new run's rows whose `package` is the gem's (a short `node -e` filter,
-   sorted by `package rubyFile rubyName` in code-point order), and
-   `git checkout` every other file the run rewrote, such as
-   `bump-ledger/rails.json`. `git diff --stat` should show only
+   For Rails, `pnpm parity:api:pins:all`. For a gem,
+   `pnpm tsx scripts/api-compare/body-pins.ts --pin-all --source <name>`,
+   which pins only that source's packages and touches no other source's
+   pins or bump ledger. `git diff --stat` should show only
    `body-pins.json`, with additions only. **If the bump will need a
    ledger, the floor merges in its own PR before the flip**:
    `parity:api:pins:ledger` recomputes the seed from the base branch's pins,
