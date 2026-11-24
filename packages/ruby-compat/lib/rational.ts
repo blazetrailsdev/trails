@@ -416,5 +416,4 @@ export function rational(
   return new Rational(numv, denv);
 }
 
-// `rb_cRational` (`vendor/ruby/v3.3.11/rational.c:2759`).
 classpaths.set(Rational, { path: "Rational", permanent: true });

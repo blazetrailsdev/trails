@@ -1478,7 +1478,6 @@ export class Enumerable<T = unknown, E = unknown> {
   }
 }
 
-// `rb_mEnumerable` (`vendor/ruby/v3.3.11/enum.c:5061`).
 classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
 
 /** `select` is `enum_find_all` under a second name (`vendor/ruby/v3.3.11/enum.c:5076`). */
