@@ -514,6 +514,154 @@ describe("ActionsTest", () => {
     await assertFile("package.json", /"frozen_gem": "1\.0\.0"/);
   });
 
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("add source with block adds source to gemfile with gem", async () => {
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.addSource("http://gems.github.com", {}, () => gen.gem("rspec-rails"));
+    });
+    await assertFile(
+      "Gemfile",
+      /\n\nsource "http:\/\/gems\.github\.com" do\n {2}gem "rspec-rails"\nend\n$/,
+    );
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("add source with block adds source to gemfile after gem", async () => {
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.gem("will-paginate");
+      await gen.addSource("http://gems.github.com", {}, () => gen.gem("rspec-rails"));
+    });
+    await assertFile(
+      "Gemfile",
+      /\ngem "will-paginate"\n\nsource "http:\/\/gems\.github\.com" do\n {2}gem "rspec-rails"\nend\n$/,
+    );
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("add source should create newline between blocks", async () => {
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.addSource("http://gems.github.com", {}, () => gen.gem("rspec-rails"));
+      await gen.addSource("http://gems2.github.com", {}, () => gen.gem("fakeweb"));
+    });
+    await assertFile(
+      "Gemfile",
+      /\n\nsource "http:\/\/gems\.github\.com" do\n {2}gem "rspec-rails"\nend\n\nsource "http:\/\/gems2\.github\.com" do\n {2}gem "fakeweb"\nend\n$/,
+    );
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("gem should insert on separate lines", async () => {
+    File.write(
+      File.join(root, "Gemfile"),
+      `${File.read(File.join(root, "Gemfile"))}# Some content...`,
+    );
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.gem("rspec");
+      await gen.gem("rspec-rails");
+    });
+    await assertFile("Gemfile", /^gem "rspec"$/m);
+    await assertFile("Gemfile", /^gem "rspec-rails"$/m);
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("gem should put the comment before gem declaration", async () => {
+    await capture("stdout", () => makeGen().gem("rspec", { comment: "Use RSpec" }));
+    await assertFile("Gemfile", /# Use RSpec\ngem "rspec"/);
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("gem should support multiline comments", async () => {
+    await capture("stdout", () =>
+      makeGen().gem("rspec", { comment: "Use RSpec\nReplaces minitest" }),
+    );
+    await assertFile("Gemfile", /# Use RSpec\n# Replaces minitest\ngem "rspec"/);
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("gem group should indent comments", async () => {
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.gemGroup("test", () => gen.gem("fakeweb", { comment: "Fake requests" }));
+    });
+    await assertFile(
+      "Gemfile",
+      /\n\ngroup :test do\n {2}# Fake requests\n {2}gem "fakeweb"\nend\n$/,
+    );
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("gem group should indent multiline comments", async () => {
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.gemGroup("test", () =>
+        gen.gem("fakeweb", { comment: "Fake requests\nNeeded in tests" }),
+      );
+    });
+    await assertFile(
+      "Gemfile",
+      /\n\ngroup :test do\n {2}# Fake requests\n {2}# Needed in tests\n {2}gem "fakeweb"\nend\n$/,
+    );
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("gem with gemfile without newline at the end", async () => {
+    File.write(
+      File.join(root, "Gemfile"),
+      `${File.read(File.join(root, "Gemfile"))}gem "rspec-rails"`,
+    );
+    await capture("stdout", () => makeGen().gem("will-paginate"));
+    await assertFile("Gemfile", /gem "rspec-rails"\ngem "will-paginate"\n$/);
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("gem group with gemfile without newline at the end", async () => {
+    File.write(
+      File.join(root, "Gemfile"),
+      `${File.read(File.join(root, "Gemfile"))}gem "rspec-rails"`,
+    );
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.gemGroup("test", () => gen.gem("fakeweb"));
+    });
+    await assertFile("Gemfile", /gem "rspec-rails"\n\ngroup :test do\n {2}gem "fakeweb"\nend\n$/);
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("add source with gemfile without newline at the end", async () => {
+    File.write(
+      File.join(root, "Gemfile"),
+      `${File.read(File.join(root, "Gemfile"))}gem "rspec-rails"`,
+    );
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.addSource("http://gems.github.com", {}, () => gen.gem("fakeweb"));
+    });
+    await assertFile(
+      "Gemfile",
+      /gem "rspec-rails"\n\nsource "http:\/\/gems\.github\.com" do\n {2}gem "fakeweb"\nend\n$/,
+    );
+  });
+
+  // PERMANENT-SKIP: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)"
+  it.skip("github with gemfile without newline at the end", async () => {
+    File.write(
+      File.join(root, "Gemfile"),
+      `${File.read(File.join(root, "Gemfile"))}gem "rspec-rails"`,
+    );
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.github("user/repo", {}, () => gen.gem("fakeweb"));
+    });
+    await assertFile(
+      "Gemfile",
+      /gem "rspec-rails"\n\ngithub "user\/repo" do\n {2}gem "fakeweb"\nend\n$/,
+    );
+  });
+
   it("github should create an indented block", async () => {
     File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
     await capture("stdout", async () => {

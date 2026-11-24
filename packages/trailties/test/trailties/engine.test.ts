@@ -29,7 +29,7 @@ import { I18n } from "@blazetrails/activesupport";
 import { Engine } from "../../lib/engine.js";
 import { Configuration } from "../../lib/trailtie/configuration.js";
 import { Trails } from "../../lib/trails.js";
-import { env, rbFSend, setEnv } from "@blazetrails/ruby-compat";
+import { env, rbFSend, rbModName, setEnv } from "@blazetrails/ruby-compat";
 import { MockRequest } from "@blazetrails/rack";
 import { MiddlewareStackProxy } from "../../lib/configuration.js";
 import { loaded } from "../fixtures/loaded.js";
@@ -419,7 +419,11 @@ export class BukkitsEngine extends Engine {
 
   it("setting priority for engines with config.railties_order", { timeout: 240_000 }, async () => {
     const blog = await t.engine("blog", async (plugin) => {
-      await plugin.write("lib/blog.ts", engineSource("blog", "Blog"));
+      await plugin.write(
+        "lib/blog.ts",
+        engineSource("blog", "Blog") +
+          `import { constSet, TopLevel } from "@blazetrails/ruby-compat";\nexport const Blog = { name: "Blog" };\nconstSet(TopLevel, "Blog", Blog);\nconstSet(Blog, "Engine", BlogEngine);\n`,
+      );
     });
 
     await plugin.write(
@@ -435,6 +439,7 @@ export class BukkitsEngine extends Engine {
     this.isolateNamespace(Bukkits);
   }
 }
+constSet(Bukkits, "Engine", BukkitsEngine);
 `,
     );
 
@@ -486,18 +491,30 @@ Trails.application!.routes().draw(function () {
     await t.get("/bar");
     expect(t.lastResponse().body.trim()).toBe("App's bar partial");
 
-    const { BukkitsEngine } = (await import(`${plugin.path}/lib/bukkits.ts`)) as {
-      BukkitsEngine: typeof Engine;
-    };
-    const { BlogEngine } = (await import(`${blog.path}/lib/blog.ts`)) as {
-      BlogEngine: typeof Engine;
-    };
     expect(
       Trails.application!.orderedRailties()
         .flat(Infinity)
-        .map((r) => (r as object).constructor)
-        .slice(-3),
-    ).toEqual([BukkitsEngine, Trails.application!.constructor, BlogEngine]);
+        .map((r) => rbModName((r as object).constructor)),
+    ).toEqual([
+      "I18n::Railtie",
+      "ActiveSupport::Railtie",
+      "ActionDispatch::Railtie",
+      "ActiveModel::Railtie",
+      "ActionController::Railtie",
+      "ActiveRecord::Railtie",
+      "GlobalID::Railtie",
+      "ActiveJob::Railtie",
+      "ActionMailer::Railtie",
+      "Trails::TestUnitRailtie",
+      "ActionView::Railtie",
+      "ActiveStorage::Engine",
+      "ActionCable::Engine",
+      "ActionMailbox::Engine",
+      "ActionText::Engine",
+      "Bukkits::Engine",
+      "AppTemplate::Application",
+      "Blog::Engine",
+    ]);
   });
 
   it(

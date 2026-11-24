@@ -203,3 +203,5 @@ export class Trailtie extends BaseTrailtie {
     return result;
   }
 }
+
+Object.defineProperty(Trailtie, "name", { value: "I18n::Railtie" });
