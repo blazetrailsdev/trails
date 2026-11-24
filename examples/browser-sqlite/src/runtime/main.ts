@@ -87,6 +87,15 @@ const { PACKAGES, packageShim, transpile } = await import("./modules.ts");
 await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
 const { installTemplateCompiler } = await import("./template-compiler.ts");
 installTemplateCompiler();
+const { DebugView } = await import("@blazetrails/actionpack");
+const rescues = import.meta.glob(
+  "../../../../packages/actionpack/lib/action-dispatch/middleware/templates/**/*.tse",
+  { query: "?raw", import: "default", eager: true },
+);
+for (const [p, source] of Object.entries(rescues)) {
+  const relative = p.slice(p.indexOf("/templates/") + "/templates/".length);
+  vfs.write(`${DebugView.RESCUES_TEMPLATE_PATHS[0]}/${relative}`, source as string, false);
+}
 const { rackEnv, rackResult } = await import("./rack-bridge.ts");
 
 const { CookieJar } = await import("./cookie-jar.ts");
