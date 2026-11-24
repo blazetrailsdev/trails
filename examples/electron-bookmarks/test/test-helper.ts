@@ -5,8 +5,6 @@ await import("../config/environment.ts");
 await import("@blazetrails/trailties/test-help");
 
 const { Base } = await import("@blazetrails/activerecord");
-// Boot warms the schema cache in every env but test (active_record.initialize_database),
-// so the tests warm it here before any model is built with `new`.
 const pool = Base.connectionPool();
 await pool.schemaReflection.loadAllBang(pool);
 

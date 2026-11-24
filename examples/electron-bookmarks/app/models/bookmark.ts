@@ -49,7 +49,6 @@ export class Bookmark extends ApplicationRecord {
   }
 
   async tagNames(): Promise<string[]> {
-    // Sorted here rather than in SQL, so a preloaded `tags` (`includes("tags")`) needs no query.
     const tags = (await this.tags.toArray()) as Tag[];
     return tags.map((tag) => tag.name).sort();
   }

@@ -1,3 +1,3 @@
-<% const f = await flash; %>
-<% if (f.get("notice") != null) { %><div class="flash notice"><%= f.get("notice") %></div><% } %>
-<% if (f.get("alert") != null) { %><div class="flash alert"><%= f.get("alert") %></div><% } %>
+<% const n = await notice; const a = await alert; %>
+<% if (n != null) { %><div class="flash notice"><%= n %></div><% } %>
+<% if (a != null) { %><div class="flash alert"><%= a %></div><% } %>

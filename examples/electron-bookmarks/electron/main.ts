@@ -1,6 +1,3 @@
-// The Electron main process. It boots the trails app in this process, serves
-// it on a random loopback port, and opens a window on it. Controllers reach
-// native dialogs through `Desktop.shell`, which this file installs.
 import { app, BrowserWindow, dialog, Menu, nativeImage, Notification, shell, Tray } from "electron";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -14,15 +11,12 @@ if (process.env.TRAILS_ENV === "production") {
   const userData = app.getPath("userData");
   mkdirSync(userData, { recursive: true });
   process.env.BOOKMARKS_DATABASE ??= join(userData, "bookmarks.sqlite3");
-  // There is no deploy step to hand a desktop install its secret, so each
-  // install generates one on first launch and keeps it beside its database.
   const secretPath = join(userData, "secret_key_base");
   if (!existsSync(secretPath))
     writeFileSync(secretPath, randomBytes(64).toString("hex"), { mode: 0o600 });
   process.env.SECRET_KEY_BASE ??= readFileSync(secretPath, "utf8").trim();
 }
 
-// One window per app: a second launch focuses the first.
 if (!app.requestSingleInstanceLock()) app.exit(0);
 
 await app.whenReady();
@@ -62,7 +56,6 @@ function openWindow(path = "/"): BrowserWindow {
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     webPreferences: { contextIsolation: true, sandbox: true },
   });
-  // Bookmarked links open in the user's browser, not inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     report(shell.openExternal(url));
     return { action: "deny" };
@@ -215,14 +208,12 @@ async function tick(): Promise<void> {
 
 await tick();
 setInterval(() => report(tick()), 30_000);
-// Pages that change read state also change the unread count.
 app.on("browser-window-focus", () => report(tick()));
 
 openWindow();
 
 app.on("second-instance", () => openWindow());
 app.on("activate", () => openWindow());
-// The tray keeps the app (and its reminders) running with no window open.
 app.on("window-all-closed", () => {});
 app.on("before-quit", () => {
   server.close();
