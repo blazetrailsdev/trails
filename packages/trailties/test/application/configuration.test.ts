@@ -9,7 +9,7 @@ import {
   onTestFinished,
   vi,
 } from "vitest";
-import { constSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constSet, isModuleIncluded, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { ActionDispatch, Response, Session } from "@blazetrails/actionpack";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -3464,6 +3464,58 @@ ${POSTS_ROUTES}
     expect(CacheStore.raiseOnInvalidCacheExpirationTime).toBe(true);
   });
 
+  it("adds a time zone aware type if using PostgreSQL", async () => {
+    const originalConfigurations = ActiveRecord.Base.configurations();
+    ActiveRecord.Base.configurations({ production: { db1: { adapter: "postgresql" } } });
+    onTestFinished(() => {
+      ActiveRecord.Base.configurations(originalConfigurations);
+    });
+    await t.appFile(
+      "config/initializers/active-record.ts",
+      `import { ActiveRecord } from "@blazetrails/activerecord";\nawait ActiveRecord.Base.establishConnection({ adapter: "postgresql" });\n`,
+    );
+
+    await app("production");
+
+    expect(ActiveRecord.Base.timeZoneAwareTypes).toEqual(["datetime", "time", "timestamptz"]);
+  });
+
+  it("doesn't add a time zone aware type if using MySQL", async () => {
+    const originalConfigurations = ActiveRecord.Base.configurations();
+    ActiveRecord.Base.configurations({ production: { db1: { adapter: "mysql2" } } });
+    onTestFinished(() => {
+      ActiveRecord.Base.configurations(originalConfigurations);
+    });
+    await t.appFile(
+      "config/initializers/active-record.ts",
+      `import { ActiveRecord } from "@blazetrails/activerecord";\nawait ActiveRecord.Base.establishConnection({ adapter: "mysql2" });\n`,
+    );
+
+    await app("production");
+
+    expect(ActiveRecord.Base.timeZoneAwareTypes).toEqual(["datetime", "time"]);
+  });
+
+  it("can opt out of extra time zone aware types if using PostgreSQL", async () => {
+    const originalConfigurations = ActiveRecord.Base.configurations();
+    ActiveRecord.Base.configurations({ production: { db1: { adapter: "postgresql" } } });
+    onTestFinished(() => {
+      ActiveRecord.Base.configurations(originalConfigurations);
+    });
+    await t.appFile(
+      "config/initializers/active-record.ts",
+      `import { ActiveRecord } from "@blazetrails/activerecord";\nawait ActiveRecord.Base.establishConnection({ adapter: "postgresql" });\n`,
+    );
+    await t.appFile(
+      "config/initializers/tz-aware-types.ts",
+      `import { ActiveRecord } from "@blazetrails/activerecord";\nActiveRecord.Base.timeZoneAwareTypes = ActiveRecord.Base.timeZoneAwareTypes.filter((type) => type !== "timestamptz");\n`,
+    );
+
+    await app("production");
+
+    expect(ActiveRecord.Base.timeZoneAwareTypes).toEqual(["datetime", "time"]);
+  });
+
   it("run_after_transaction_callbacks_in_order_defined is true in new apps", async () => {
     await app("development");
 
@@ -3562,6 +3614,33 @@ ${POSTS_ROUTES}
     await assertRaises([I18n.InvalidLocale], {}, () =>
       I18n.t("en.errors.messages.required", { locale: "dsafdsafdsa" }),
     );
+  });
+
+  it("i18n custom exception handler in initializer and pluralization backend", async () => {
+    await t.appFile(
+      "config/initializers/i18n.ts",
+      `${I18N_HANDLER}import { include } from "@blazetrails/ruby-compat";
+import { Trails } from "@blazetrails/trailties";
+
+Trails.application!.config.afterInitialize(() => {
+  include(I18n.backend().constructor, I18n.Pluralization);
+  (I18n.backend() as unknown as { initTranslations(): void }).initTranslations();
+  I18n.backend().storeTranslations("en", {
+    i18n: { plural: { rule: (n: unknown) => ([0, 1].includes(n as number) ? ":one" : ":other") } },
+  });
+  I18n.backend().storeTranslations("en", { apples: { one: "one or none", other: "more than one" } });
+  I18n.backend().storeTranslations("en", { pears: { pear: "pear", pears: "pears" } });
+});
+`,
+    );
+
+    await app("development");
+
+    expect(isModuleIncluded(I18n.backend().constructor, I18n.Pluralization)).toBeTruthy();
+    expect(I18n.t(":apples", { count: 0 })).toBe("one or none");
+    await assertRaises([I18n.InvalidPluralizationData], {}, () => {
+      expect(I18n.t(":pears", { count: 0 })).toBe("pears");
+    });
   });
 
   it("raises if configuration tries to assign to an actual method", async () => {
