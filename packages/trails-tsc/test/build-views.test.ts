@@ -548,6 +548,36 @@ describe("buildViews", { timeout: 30_000 }, () => {
     ]);
   });
 
+  it("types a mailer view's helpers from its mailer", async () => {
+    const cwd = mkScratch();
+    for (const [pkg, dts] of [
+      [
+        "ruby-compat",
+        "export declare function hashAref(hash: object, key: unknown): unknown;\nexport declare function keys(hash: object): string[];",
+      ],
+      [
+        "actionview",
+        "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare const TopLevel: {};\nexport declare class Base {}",
+      ],
+      ["actionmailer", "export declare class Base {}"],
+    ]) {
+      write(
+        cwd,
+        `node_modules/@blazetrails/${pkg}/package.json`,
+        `{ "name": "@blazetrails/${pkg}", "types": "index.d.ts" }`,
+      );
+      write(cwd, `node_modules/@blazetrails/${pkg}/index.d.ts`, dts);
+    }
+    write(
+      cwd,
+      "app/mailers/post-mailer.ts",
+      'import { Base } from "@blazetrails/actionmailer";\nexport class PostMailer extends Base { declare static _helpers: { unsubscribeLink(): string }; }',
+    );
+    write(cwd, "app/views/post-mailer/published.html.tse", "<%= unsubscribeLink().length %>");
+    await buildViews({ cwd });
+    expect(viewDiagnostics(cwd)).toEqual([]);
+  });
+
   it("keeps the any fallback for a partial some unresolved render site may reach", async () => {
     const cwd = mkScratch();
     write(cwd, "app/models/post.ts", "export class Post {}");

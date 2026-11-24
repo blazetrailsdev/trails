@@ -132,6 +132,7 @@ Object.setPrototypeOf(
       if (attachment == null) {
         let answered: PropertyDescriptor | undefined;
         for (const klass of [ActiveStorage.Attachment!, ActiveStorage.Blob!]) {
+          klass.defineAttributeMethods();
           for (
             let p: object | null = klass.prototype;
             p && !answered;
