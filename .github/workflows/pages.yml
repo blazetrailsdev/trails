@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "packages/website/**"
+      - "examples/browser-sqlite/**"
       - "packages/*/lib/**"
       - "packages/*/package.json"
       - "README.md"
@@ -53,6 +54,8 @@ jobs:
           done
           true
       - run: pnpm --filter @blazetrails/website exec svelte-kit sync
+      - name: Build playground (examples/browser-sqlite)
+        run: pnpm --filter @blazetrails/website run playground:build
       - name: Build SvelteKit
         run: pnpm --filter @blazetrails/website exec vite build
       - name: Build docs (typedoc + VitePress)

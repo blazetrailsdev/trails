@@ -5,8 +5,9 @@ if (!("Temporal" in globalThis)) Object.assign(globalThis, { Temporal });
 if (!("Buffer" in globalThis)) Object.assign(globalThis, { Buffer });
 
 const session = new URLSearchParams(location.search).get("session") ?? "0";
-const moduleBase = `/rt/${session}/vfs/`;
-const pkgBase = `/rt/${session}/pkg/`;
+const previewPath = `${import.meta.env.BASE_URL}preview`;
+const moduleBase = `${import.meta.env.BASE_URL}rt/${session}/vfs/`;
+const pkgBase = `${import.meta.env.BASE_URL}rt/${session}/pkg/`;
 
 type HostMessage = {
   type: "host:files";
@@ -156,7 +157,7 @@ async function handle(request: SwRequest, port: MessagePort): Promise<void> {
   await serially(async () => {
     const started = performance.now();
     try {
-      const env = rackEnv(request.method, request.url, request.headers, request.body, "/preview");
+      const env = rackEnv(request.method, request.url, request.headers, request.body, previewPath);
       const cookie = cookies.header();
       if (cookie) env.HTTP_COOKIE = cookie;
       const response = await rackResult((await app!.call(env)) as RackResponse);
@@ -168,7 +169,7 @@ async function handle(request: SwRequest, port: MessagePort): Promise<void> {
       respond(port, response.status, response.headers, response.body);
       post({
         type: "request",
-        text: `${request.method} ${url.pathname.replace(/^\/preview/, "") || "/"}${url.search} → ${response.status} (${Math.round(performance.now() - started)}ms)`,
+        text: `${request.method} ${(url.pathname.startsWith(previewPath) ? url.pathname.slice(previewPath.length) : url.pathname) || "/"}${url.search} → ${response.status} (${Math.round(performance.now() - started)}ms)`,
       });
     } catch (e) {
       console.error(e);
