@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Pathname, Tempfile, TypeError } from "@blazetrails/ruby-compat";
 import type {} from "@blazetrails/vitest-matchers";
@@ -153,6 +154,36 @@ describe("TestDatabase", () => {
       `;
 
     expect(await db.executeBatch(batch)).toEqual([0]);
+  });
+
+  it("filename", async () => {
+    let tf: ReturnType<typeof Tempfile.new> | null = null;
+    try {
+      expect(await db.filename()).toBe("");
+      tf = Tempfile.new("thing");
+      await db.close();
+      db = new SQLite3.Database(tf.path()!, { engine });
+      expect(realpathSync(String(await db.filename()))).toBe(realpathSync(tf.path()!));
+    } finally {
+      tf?.unlink();
+    }
+  });
+
+  it("filename with attachment", async () => {
+    let tf: ReturnType<typeof Tempfile.new> | null = null;
+    try {
+      expect(await db.filename()).toBe("");
+      tf = Tempfile.new("thing");
+      await db.execute(`ATTACH DATABASE '${tf.path()}' AS 'testing'`);
+
+      expect(realpathSync(String(await db.filename("testing")))).toBe(realpathSync(tf.path()!));
+    } finally {
+      tf?.unlink();
+    }
+  });
+
+  it("get first row", async () => {
+    expect(await db.getFirstRow("SELECT 1")).toEqual([1]);
   });
 
   it("encoding", async () => {

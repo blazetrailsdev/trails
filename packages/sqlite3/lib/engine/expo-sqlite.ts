@@ -7,6 +7,7 @@ import type { SqliteBindValue } from "../driver.js";
 import { closedStatement, statementTail } from "./statement-tail.js";
 import { bindParameterNames } from "./bind-parameter-index.js";
 import { columnText } from "./column-text.js";
+import { databaseListFilename } from "./aggregator.js";
 
 /** @internal */
 interface ExpoResult extends AsyncIterable<unknown[]> {
@@ -212,6 +213,19 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       throw new RuntimeError("load_extension is not supported by the expo-sqlite driver");
     },
     enableLoadExtension: () => {},
+    async dbFilename(dbName) {
+      const st = await (await opening()).prepareAsync("PRAGMA database_list");
+      const rows: { name: string; file: string }[] = [];
+      try {
+        for await (const [, name, file] of await st.executeForRawResultAsync([])) {
+          rows.push({ name: name as string, file: file as string });
+        }
+      } finally {
+        await st.finalizeAsync();
+      }
+      return databaseListFilename(rows, dbName);
+    },
+
     busyHandler: (block) => {
       handler = block;
     },

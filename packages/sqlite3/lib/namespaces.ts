@@ -7,6 +7,7 @@ import type { Blob, Statement } from "./statement.js";
 import type { HashResultSet, ResultSet } from "./resultset.js";
 import type { Constants } from "./constants.js";
 import type { ForkSafety } from "./fork-safety.js";
+import type { Value } from "./value.js";
 
 export type SQLite3Namespace = {
   readonly name: string;
@@ -19,6 +20,7 @@ export type SQLite3Namespace = {
   HashResultSet: typeof HashResultSet;
   Constants: typeof Constants;
   ForkSafety: typeof ForkSafety;
+  Value: typeof Value;
 } & {
   -readonly [K in
     | "AbortException"

@@ -51,6 +51,10 @@ export class ResultSet {
     return this.#stmt.isClosed();
   }
 
+  types(): (string | null)[] | Promise<(string | null)[]> {
+    return this.#stmt.types();
+  }
+
   columns(): (string | null)[] | Promise<(string | null)[]> {
     return this.#stmt.columns();
   }

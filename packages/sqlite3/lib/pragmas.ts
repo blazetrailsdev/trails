@@ -3,6 +3,7 @@ import { block, fetch, isSymbol, rbInspect, rbObjAsString, toI } from "@blazetra
 
 import type { SqliteBinds } from "./driver.js";
 import { Exception } from "./errors.js";
+import type { Statement } from "./statement.js";
 
 export const SYNCHRONOUS_MODES: Readonly<Record<string, number>> = Object.freeze({
   full: 2,
@@ -591,6 +592,40 @@ export function setWritableSchema(this: PragmasHost, mode: unknown): unknown {
   return setBooleanPragma.call(this, "writable_schema", mode);
 }
 
+export async function tableInfo(
+  this: PragmasHost & { prepare(sql: string): Statement | Promise<Statement> },
+  table: string,
+  block?: (row: Record<string, unknown>) => unknown,
+): Promise<Record<string, unknown>[] | undefined> {
+  const stmt = await this.prepare(`PRAGMA table_info(${table})`);
+  const columns = await stmt.columns();
+
+  const needsTweakDefault =
+    versionCompare(String(await this.getFirstValue("select sqlite_version()")), "3.3.7") > 0;
+
+  const result: Record<string, unknown>[] | undefined = block ? undefined : [];
+  await stmt.each((row) => {
+    const newRow: Record<string, unknown> = Object.fromEntries(
+      columns.map((column, i) => [column, row[i] ?? null]),
+    );
+
+    if (needsTweakDefault) tweakDefault(newRow);
+
+    if (newRow["type"] != null && newRow["type"] !== false) {
+      newRow["type"] = String(newRow["type"]).toLowerCase();
+    }
+
+    if (block) {
+      block(newRow);
+    } else {
+      result!.push(newRow);
+    }
+  });
+  await stmt.close();
+
+  return result;
+}
+
 /** @internal */
 function setStringPragma(
   this: PragmasHost,
@@ -722,6 +757,35 @@ export const Pragmas = {
   walCheckpoint,
   setWalCheckpoint,
   setWritableSchema,
+  tableInfo,
 };
+
+/** @internal */
+function versionCompare(v1: string, v2: string): number {
+  const a1: (number | bigint)[] = v1.split(".").map((i) => toI(i));
+  const a2: (number | bigint)[] = v2.split(".").map((i) => toI(i));
+  const parts = Math.max(a1.length, a2.length);
+  while (a1.length < parts) a1.push(0);
+  while (a2.length < parts) a2.push(0);
+  for (const [a, b] of a1.map((a, i) => [a, a2[i]] as const)) {
+    if (a < b) return -1;
+    if (a > b) return 1;
+  }
+  return 0;
+}
+
+/** @internal */
+function tweakDefault(hash: Record<string, unknown>): void {
+  const dflt = hash["dflt_value"];
+  if (typeof dflt !== "string") return;
+  let m: RegExpExecArray | null;
+  if (/^null$/i.test(dflt)) {
+    hash["dflt_value"] = null;
+  } else if ((m = /^'(.*)'$/s.exec(dflt))) {
+    hash["dflt_value"] = m[1].replaceAll("''", "'");
+  } else if ((m = /^"(.*)"$/s.exec(dflt))) {
+    hash["dflt_value"] = m[1].replaceAll('""', '"');
+  }
+}
 
 SQLite3.Pragmas = Pragmas;
