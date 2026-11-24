@@ -444,6 +444,9 @@ jobs:
       # and the minified-bundle runtime smoke for the sideEffects arrays.
       - run: pnpm tsx scripts/package-size/measure.ts
       - run: pnpm tsx scripts/package-size/bundle-smoke.ts
+      # RFC 0192: boot-graph per-package loaded/shipped table on the
+      # serverless-lambda example; fails on a ruby-compat rise or a stale scc-map.
+      - run: pnpm tsx scripts/boot-graph/measure.mts
   lint:
     name: Lint (${{ matrix.shard }})
     needs: changes
