@@ -82,7 +82,8 @@ export class TestParser {
 
   /** @internal */
   static ranges(filepath: string): Record<number, number> {
-    api ??= new (rbRequireLoaded("typescript/unstable/sync") as unknown as typeof Sync).API();
+    const { API } = rbRequireLoaded("typescript/unstable/sync") as unknown as typeof Sync;
+    api ??= new API();
     const sourceFile = api.createSourceFile(filepath, getFs().readFileSync(filepath, "utf8"));
     const line = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
     const queue: Ast.Node[] = [sourceFile];
@@ -112,7 +113,8 @@ export class TestParser {
    * @noRailsEquivalent PERMANENT
    */
   static calls(filepath: string): [number, number, string][] {
-    api ??= new (rbRequireLoaded("typescript/unstable/sync") as unknown as typeof Sync).API();
+    const { API } = rbRequireLoaded("typescript/unstable/sync") as unknown as typeof Sync;
+    api ??= new API();
     const sourceFile = api.createSourceFile(filepath, getFs().readFileSync(filepath, "utf8"));
     const line = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
     const calls: [number, number, string][] = [];

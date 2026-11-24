@@ -95,12 +95,16 @@ export class Runner {
     const lineFiltered = this.filters.some(([, lines]) => lines.length > 0);
     const verbose = argv.includes("-v") || argv.includes("--verbose");
     const success = await rbFSystem(
-      verbose ? { TRAILS_TEST_VERBOSE: "1" } : {},
+      {
+        ...(verbose ? { TRAILS_TEST_VERBOSE: "1" } : {}),
+        ...(lineFiltered || name != null ? { TRAILS_TEST_FILTERED: "1" } : {}),
+      },
       "vitest",
       "run",
       ...(locations.length > 0 ? locations : ["--passWithNoTests", "../../.none"]),
       ...(name != null && !lineFiltered ? ["-t", name.source] : []),
       ...(argv.includes("-f") || argv.includes("--fail-fast") ? ["--bail", "1"] : []),
+      ...(argv.includes("--seed") ? ["--sequence.seed", argv[argv.indexOf("--seed") + 1]] : []),
       "--reporter",
       decodeURIComponent(
         new URL(`./vitest-reporter${/\.[jt]s$/.exec(import.meta.url)![0]}`, import.meta.url)
@@ -250,11 +254,11 @@ export class Runner {
   /** @internal */
   private static rejectUnknownOptions(argv: string[]): void {
     argv.forEach((arg, index) => {
-      const value = argv[index - 1] === "-n" || argv[index - 1] === "--name";
+      const value = ["-n", "--name", "--seed"].includes(argv[index - 1]);
       if (
         arg.startsWith("-") &&
         !value &&
-        !/^(-n|--name\b|-f$|--fail-fast$|-v$|--verbose$)/.test(arg)
+        !/^(-n|--name\b|--seed\b|-f$|--fail-fast$|-v$|--verbose$)/.test(arg)
       ) {
         STDOUT.puts();
         STDOUT.puts(`invalid option: ${arg}`);

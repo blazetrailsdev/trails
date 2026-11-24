@@ -32,16 +32,14 @@ class TestRunnerTest extends TestCase {
   ): Promise<string> {
     return this.appFile(
       `test/${path}/${name.replaceAll("_", "-")}.test.ts`,
-      `
-        import "${"../".repeat(path.split("/").length)}test-helper.ts";
-        import { describe, it, expect } from "vitest";
+      `import "${"../".repeat(path.split("/").length)}test-helper.ts"; import { describe, it, expect } from "vitest";
 
-        describe("${camelize(name)}Test", () => {
-          it("truth", () => {
-            ${print ? `console.log("${camelize(name)}Test");` : ""}
-            expect(${pass}, "wups!").toBe(true);
-          });
-        });
+describe("${camelize(name)}Test", () => {
+  it("truth", () => {
+    ${print ? `console.log("${camelize(name)}Test");` : ""}
+    expect(${pass}, "wups!").toBe(true);
+  });
+});
 `,
     );
   }
@@ -49,6 +47,156 @@ class TestRunnerTest extends TestCase {
 include(TestRunnerTest, Isolation);
 include(TestRunnerTest, EnvHelpers);
 registerSpecType(/^TestRunnerTest$/, TestRunnerTest);
+
+const lineFilterFiles = {
+  mix: `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("PostTest", () => {
+  it("test_post", () => {
+    console.log("PostTest");
+    expect(true).toBe(true);
+  });
+
+  it("test_line_filter_does_not_run_this", () => {
+    expect(true).toBe(true);
+  });
+});
+`,
+  macro: `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("PostTest", () => {
+  it("first filter", () => {
+    console.log("PostTest:FirstFilter");
+    expect(true).toBe(true);
+  });
+
+  it("line filter does not run this", () => {
+    expect(true).toBe(true);
+  });
+
+  it("second filter", () => {
+    console.log("PostTest:SecondFilter");
+    expect(true).toBe(true);
+  });
+});
+`,
+  range: `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("PostTest", () => {
+  it("first", () => {
+    console.log("PostTest:FirstFilter");
+    expect(true).toBe(true);
+  });
+
+  it("second", () => {
+    console.log("PostTest:Second");
+    expect(true).toBe(true);
+  });
+
+  it("third", () => {
+    console.log("PostTest:Third");
+    expect(true).toBe(true);
+  });
+
+  it("fourth", () => {
+    console.log("PostTest:Fourth");
+    expect(true).toBe(true);
+  });
+});
+`,
+  method: `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("PostTest", () => {
+  it("test_first_filter", () => {
+    console.log("PostTest:FirstFilter");
+    expect(true).toBe(true);
+  });
+
+  it("test_second_filter", () => {
+    console.log("PostTest:SecondFilter");
+    expect(true).toBe(true);
+  });
+
+  it("test_line_filter_does_not_run_this", () => {
+    expect(true).toBe(true);
+  });
+});
+`,
+  account: `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("AccountTest", () => {
+  it("first filter", () => {
+    console.log("AccountTest:FirstFilter");
+    expect(true).toBe(true);
+  });
+
+  it("second filter", () => {
+    console.log("AccountTest:SecondFilter");
+    expect(true).toBe(true);
+  });
+
+  it("line filter does not run this", () => {
+    expect(true).toBe(true);
+  });
+});
+`,
+  post: `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("PostTest", () => {
+  it("first filter", () => {
+    console.log("PostTest:FirstFilter");
+    expect(true).toBe(true);
+  });
+
+  it("second filter", () => {
+    console.log("PostTest:SecondFilter");
+    expect(true).toBe(true);
+  });
+
+  it("line filter does not run this", () => {
+    expect(true).toBe(true);
+  });
+});
+`,
+  minitest: `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("PostTest", () => {
+  it("test_by_line", () => {
+    console.log("by line");
+    expect(true).toBe(true);
+  });
+
+  it("test_by_name", () => {
+    console.log("by name");
+    expect(true).toBe(true);
+  });
+});
+`,
+  same: `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("AccountTest", () => {
+  it("first", () => { console.log("first"); }); it("test_second", () => { console.log("second"); });
+  it("third", () => {
+    console.log("third");
+    expect(false).toBe(true);
+  });
+});
+`,
+  runnable: `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("PostTest", () => {
+  it("truth", () => {
+    expect(true).toBe(true);
+  });
+});
+
+describe("SecondPostTest", () => {
+  it("truth", () => {
+    expect(false, "ran second runnable").toBe(true);
+  });
+});
+`,
+};
 
 const chu2Koi = `import "../test-helper.ts";
 import { describe, it } from "vitest";
@@ -356,6 +504,129 @@ describe.concurrent("TestRunnerTest", { timeout: 600_000 }, () => {
     const output = await t.runTestCommand("test\\\\models");
     expect(output).toMatch("AccountTest");
     expect(output).toMatch("1 runs, 0 failures, 0 errors, 0 skips");
+  });
+
+  it("mix files and line filters", async (t) => {
+    await t.createTestFile("models", "account");
+    await t.appFile("test/models/post.test.ts", lineFilterFiles.mix);
+
+    const output = await t.runTestCommand("test/models/account.test.ts test/models/post.test.ts:4");
+    expect(output).toMatch("AccountTest");
+    expect(output).toMatch("PostTest");
+    expect(output).toMatch("2 runs");
+  });
+
+  it("more than one line filter macro syntax", async (t) => {
+    await t.appFile("test/models/post.test.ts", lineFilterFiles.macro);
+
+    const posCases = {
+      "first line of each test": "test/models/post.test.ts:4:13",
+      "interior of tests": "test/models/post.test.ts:5:14",
+      "last line of each test": "test/models/post.test.ts:7:16",
+    };
+
+    for (const [name, cmd] of Object.entries(posCases)) {
+      const output = await t.runTestCommand(cmd);
+      expect(output, `for ${cmd} (${name})`).toMatch("PostTest:FirstFilter");
+      expect(output, `for ${cmd} (${name})`).toMatch("PostTest:SecondFilter");
+      expect(output, `for ${cmd} (${name})`).toMatch("2 runs");
+    }
+
+    expect(await t.runTestCommand("test/models/post.test.ts:8:17")).toMatch("0 runs");
+  });
+
+  it("line range filter syntax", async (t) => {
+    await t.appFile("test/models/post.test.ts", lineFilterFiles.range);
+
+    let output = await t.runTestCommand("test/models/post.test.ts:4-14");
+    expect(output).toMatch("PostTest:First");
+    expect(output).toMatch("PostTest:Second");
+    expect(output).toMatch("PostTest:Third");
+    expect(output).toMatch("3 runs");
+
+    output = await t.runTestCommand("test/models/post.test.ts:4-9:19");
+    expect(output).toMatch("PostTest:First");
+    expect(output).toMatch("PostTest:Second");
+    expect(output).toMatch("PostTest:Fourth");
+    expect(output).toMatch("3 runs");
+
+    output = await t.runTestCommand("test/models/post.test.ts:4-9:14-19");
+    expect(output).toMatch("PostTest:First");
+    expect(output).toMatch("PostTest:Second");
+    expect(output).toMatch("PostTest:Third");
+    expect(output).toMatch("PostTest:Fourth");
+    expect(output).toMatch("4 runs");
+  });
+
+  it("more than one line filter test method syntax", async (t) => {
+    await t.appFile("test/models/post.test.ts", lineFilterFiles.method);
+
+    const posCases = {
+      "first line of each test": "test/models/post.test.ts:4:9",
+      "interior of tests": "test/models/post.test.ts:5:10",
+      "last line of each test": "test/models/post.test.ts:7:12",
+    };
+
+    for (const [name, cmd] of Object.entries(posCases)) {
+      const output = await t.runTestCommand(cmd);
+      expect(output, `for ${cmd} (${name})`).toMatch("PostTest:FirstFilter");
+      expect(output, `for ${cmd} (${name})`).toMatch("PostTest:SecondFilter");
+      expect(output, `for ${cmd} (${name})`).toMatch("2 runs");
+    }
+
+    expect(await t.runTestCommand("test/models/post.test.ts:8:13")).toMatch("0 runs");
+  });
+
+  it("multiple tests on same line", async (t) => {
+    await t.appFile("test/models/account.test.ts", lineFilterFiles.same);
+
+    const output = await t.runTestCommand("test/models/account.test.ts:4");
+    expect(output).toMatch("first");
+    expect(output).toMatch("second");
+    expect(output).not.toMatch("third");
+    expect(output).toMatch("2 runs, 0 failures");
+  });
+
+  it("more than one line filter with multiple files", async (t) => {
+    await t.appFile("test/models/account.test.ts", lineFilterFiles.account);
+    await t.appFile("test/models/post.test.ts", lineFilterFiles.post);
+
+    const output = await t.runTestCommand(
+      "test/models/account.test.ts:4:9 test/models/post.test.ts:4:9",
+    );
+    expect(output).toMatch("AccountTest:FirstFilter");
+    expect(output).toMatch("AccountTest:SecondFilter");
+    expect(output).toMatch("PostTest:FirstFilter");
+    expect(output).toMatch("PostTest:SecondFilter");
+    expect(output).toMatch("4 runs");
+  });
+
+  it("multiple line filters", async (t) => {
+    await t.createTestFile("models", "account");
+    await t.createTestFile("models", "post");
+
+    const output = await t.runTestCommand(
+      "test/models/account.test.ts:4 test/models/post.test.ts:4",
+    );
+    expect(output).toMatch("AccountTest");
+    expect(output).toMatch("PostTest");
+  });
+
+  it("line filters trigger only one runnable", async (t) => {
+    await t.appFile("test/models/post.test.ts", lineFilterFiles.runnable);
+
+    const output = await t.runTestCommand("test/models/post.test.ts:4 --seed 30410");
+    expect(output).not.toMatch("ran second runnable");
+    expect(output).toMatch("1 runs");
+  });
+
+  it("line filter with minitest string filter", async (t) => {
+    await t.appFile("test/models/post.test.ts", lineFilterFiles.minitest);
+
+    const output = await t.runTestCommand("test/models/post.test.ts:4 -n test_by_name");
+    expect(output).toMatch("by line");
+    expect(output).toMatch("by name");
+    expect(output).toMatch("2 runs");
   });
 
   it("raise error when specified file does not exist", async (t) => {
