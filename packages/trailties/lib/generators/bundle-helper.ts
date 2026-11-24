@@ -16,7 +16,6 @@ interface BundleHelperHost {
 }
 
 export const BundleHelper = {
-  /** @internal */
   async installCommand(
     this: BundleHelperHost,
     command: string,
