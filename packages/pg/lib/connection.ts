@@ -139,34 +139,46 @@ export class Connection {
 
   static connect = Connection.new;
 
-  static conninfoParse(conninfo: string): { keyword: string; val: string | null }[] {
+  static conninfoParse(
+    conninfo: string,
+  ): { keyword: string; compiled: string | null; val: string | null }[] {
     const vals: Record<string, string> = {};
     const uri = /^postgres(?:ql)?:\/\//.test(conninfo);
     const set = (key: string, val: string): void => {
       const keyword = key.replace(/_([a-z])/g, (_m: string, c: string) => c.toUpperCase());
-      if (!CONNINFO_KEYWORDS.includes(keyword)) {
+      if (/[A-Z]/.test(key) || !CONNINFO_KEYWORDS.includes(keyword)) {
         throw new PgError(
           uri ? `invalid URI query parameter: "${key}"\n` : `invalid connection option "${key}"\n`,
         );
       }
       vals[keyword] = val;
     };
+    const dec = (token: string): string => {
+      try {
+        return decodeURIComponent(token);
+      } catch {
+        throw new PgError(`invalid percent-encoded token: "${token}"\n`);
+      }
+    };
     if (uri) {
       const m = /^[^:]*:\/\/(?:([^:@/]*)(?::([^@/]*))?@)?([^/?]*)(?:\/([^?]*))?(?:\?(.*))?$/.exec(
         conninfo,
       )!;
       const [, userinfo, password, hostPart, path, query] = m;
-      if (userinfo) set("user", decodeURIComponent(userinfo));
-      if (password) set("password", decodeURIComponent(password));
+      if (userinfo) set("user", dec(userinfo));
+      if (password) set("password", dec(password));
       const hosts = hostPart.split(",").map((h) => /^(\[[^\]]*\]|[^:]*)(?::(.*))?$/.exec(h)!);
       if (hosts.some((h) => h[1])) {
-        set("host", hosts.map((h) => decodeURIComponent(h[1].replace(/^\[|\]$/g, ""))).join(","));
+        set("host", hosts.map((h) => dec(h[1].replace(/^\[|\]$/g, ""))).join(","));
       }
       if (hosts.some((h) => h[2])) set("port", hosts.map((h) => h[2] ?? "").join(","));
-      if (path) set("dbname", decodeURIComponent(path));
+      if (path) set("dbname", dec(path));
       for (const pair of query ? query.split("&") : []) {
-        const [k, v = ""] = pair.split("=");
-        set(decodeURIComponent(k), decodeURIComponent(v));
+        const eq = pair.indexOf("=");
+        if (eq < 0) {
+          throw new PgError(`missing key/value separator "=" in URI query parameter: "${pair}"\n`);
+        }
+        set(dec(pair.slice(0, eq)), dec(pair.slice(eq + 1)));
       }
     } else {
       let cp = 0;
@@ -213,7 +225,11 @@ export class Connection {
         set(pname, pval);
       }
     }
-    return CONNINFO_KEYWORDS.map((keyword) => ({ keyword, val: vals[keyword] ?? null }));
+    return CONNINFO_KEYWORDS.map((keyword) => ({
+      keyword,
+      compiled: COMPILED_DEFAULTS[keyword] ?? null,
+      val: vals[keyword] ?? null,
+    }));
   }
 
   static quoteConnstr(value: unknown): string {
@@ -232,7 +248,7 @@ export class Connection {
   static parseConnectArgs(...args: unknown[]): string {
     const last = args.at(-1);
     const hashArg =
-      typeof last === "object" && last !== null && !Array.isArray(last)
+      typeof last === "object" && last !== null && Object.getPrototypeOf(last) === Object.prototype
         ? (args.pop() as Record<string, unknown>)
         : {};
     let iopts: Record<string, unknown> = {};
@@ -586,6 +602,8 @@ export class Connection {
   /** @internal */
   async resetStart2(conninfo: string): Promise<null> {
     const client = this.client;
+    await client.end().catch(() => null);
+
     const conn = engine!.newClient(_conninfoHashOf(conninfo));
     for (const event of client.eventNames()) {
       for (const listener of client.rawListeners(event)) {
@@ -593,7 +611,6 @@ export class Connection {
       }
     }
     engine!.listen(this, conn);
-    await client.end().catch(() => null);
     this.connParams = _conninfoHashOf(conninfo);
     this.client = conn;
     this.prepared.clear();
@@ -625,12 +642,13 @@ export class Connection {
     const stream = (
       this.client as unknown as { connection?: { stream?: { remoteAddress?: string } } }
     ).connection?.stream;
-    return stream?.remoteAddress ?? "";
+    return stream?.remoteAddress ?? null;
   }
 
-  conninfo(): { keyword: string; val: string | null }[] {
+  conninfo(): { keyword: string; compiled: string | null; val: string | null }[] {
     return CONNINFO_KEYWORDS.map((keyword) => ({
       keyword,
+      compiled: COMPILED_DEFAULTS[keyword] ?? null,
       val: this.connParams[keyword] == null ? null : String(this.connParams[keyword]),
     }));
   }
@@ -1187,8 +1205,12 @@ const COMPILED_DEFAULTS: Record<string, string> = {
   loadBalanceHosts: "disable",
 };
 
-function conndefaults(): { keyword: string; val: string | null }[] {
-  return CONNINFO_KEYWORDS.map((keyword) => ({ keyword, val: COMPILED_DEFAULTS[keyword] ?? null }));
+function conndefaults(): { keyword: string; compiled: string | null; val: string | null }[] {
+  return CONNINFO_KEYWORDS.map((keyword) => ({
+    keyword,
+    compiled: COMPILED_DEFAULTS[keyword] ?? null,
+    val: COMPILED_DEFAULTS[keyword] ?? null,
+  }));
 }
 
 /** @noRailsEquivalent PERMANENT */
