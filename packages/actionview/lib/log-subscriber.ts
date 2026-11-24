@@ -5,7 +5,7 @@ import {
   trailsRoot as appTrailsRoot,
 } from "@blazetrails/activesupport";
 import type { Logger } from "@blazetrails/activesupport";
-import { round } from "@blazetrails/ruby-compat";
+import { round } from "@blazetrails/ruby-compat/numeric";
 
 import { Base } from "./base.js";
 

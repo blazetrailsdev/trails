@@ -1,18 +1,18 @@
 import { ActionView } from "../namespaces.js";
 import { isPresent, SyntaxErrorProxy, symbolizeKeys } from "@blazetrails/activesupport";
 import { Correctable, Jaro } from "@blazetrails/did-you-mean";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import type { Encoding } from "@blazetrails/ruby-compat/encoding";
 import {
-  ArgumentError,
-  type Encoding,
   excBacktrace,
   excBacktraceLocations,
-  File,
-  include,
   type Location,
-  rbInspect,
-  regexpEscape,
-  StandardError,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/backtrace-location";
+import { File } from "@blazetrails/ruby-compat/file";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import type { TemplatePath } from "../template-path.js";
 import type { Template } from "../template.js";
 

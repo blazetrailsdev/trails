@@ -3,7 +3,7 @@ import type { TemplatePath } from "./template-path.js";
 import type { Template } from "./template.js";
 import { MissingTemplate } from "./template/error.js";
 import { FileSystemResolver } from "./template/resolver.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 export type LookupDetails =
   | TemplateDetails

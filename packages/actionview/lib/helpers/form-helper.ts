@@ -20,21 +20,15 @@ import {
   Concern,
   extend,
 } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { block as rbBlock, Hash, fetch, hashDelete, slice } from "@blazetrails/ruby-compat/hash";
+import { rbFSend, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import {
-  ArgumentError,
-  block as rbBlock,
-  Hash,
-  fetch,
-  hashDelete,
-  rbFSend,
-  rbInspect,
-  rbObjRespondTo,
-  slice,
   classModule,
   included,
   include,
   rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/include";
 
 import { ModelNaming, convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
 export { convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";

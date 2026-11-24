@@ -1,4 +1,4 @@
-import { ObjectSpace } from "@blazetrails/ruby-compat";
+import { ObjectSpace } from "@blazetrails/ruby-compat/object-space";
 import type { CompiledMethodContainer } from "../base.js";
 import { Template } from "../template.js";
 

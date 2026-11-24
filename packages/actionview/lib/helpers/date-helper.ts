@@ -9,26 +9,25 @@ import {
   type TimeWithZone,
 } from "@blazetrails/activesupport";
 import { Date as RubyDate, Time } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { format, sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { hashDelete, rbBlockGivenP, type Block } from "@blazetrails/ruby-compat/hash";
 import {
-  ArgumentError,
-  StandardError,
-  format,
-  hashDelete,
   include,
   type Included,
+  defineModule,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat/include";
+import {
   rbFSend,
   rbInspect,
   rbCNumeric,
   rbObjRespondTo,
-  rbBlockGivenP,
   rbModDefineMethod,
   rtest,
-  type Block,
-  numStep,
-  sprintf,
-  defineModule,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { numStep } from "@blazetrails/ruby-compat/numeric";
 
 import "../action-view.js";
 import { Tags } from "../namespaces.js";

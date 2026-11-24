@@ -1,4 +1,4 @@
-import { defineModule } from "@blazetrails/ruby-compat";
+import { defineModule } from "@blazetrails/ruby-compat/include";
 import { tag, type TagHelperHost, type TagBuilder } from "./tag-helper.js";
 import type { SafeBuffer } from "@blazetrails/activesupport";
 

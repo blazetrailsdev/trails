@@ -6,19 +6,15 @@ import {
 } from "@blazetrails/activesupport";
 import {
   classModule,
-  hasKey,
   include,
   included,
   rbModAppendFeatures,
-  rbSeatSuper,
-  hashAref,
-  hashAset,
-  isSymbol,
   rbCallSuper,
-  rtest,
-  symbolToS,
   rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/include";
+import { hasKey, hashAref, hashAset } from "@blazetrails/ruby-compat/hash";
+import { rbSeatSuper, rtest } from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 
 import type { UrlHelperHost } from "./helpers/url-helper.js";
 

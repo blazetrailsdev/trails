@@ -1,4 +1,5 @@
-import { rbInspect, rbRegInitStr, rbRegToS } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { rbRegInitStr, rbRegToS } from "@blazetrails/ruby-compat/regexp";
 import type { Html5Node, NodeSet } from "@blazetrails/nokogiri";
 
 export class SubstitutionContext {

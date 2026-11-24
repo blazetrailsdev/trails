@@ -1,6 +1,6 @@
 import { Tags } from "../../namespaces.js";
 import { stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
-import { hashDelete } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
 
 import { TextField } from "./text-field.js";
 

@@ -18,6 +18,8 @@ import {
   rbObjMethod,
 } from "@blazetrails/ruby-compat";
 import { htmlSafe, SafeBuffer, withOptions } from "@blazetrails/activesupport";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { HTML5 } from "@blazetrails/nokogiri";
 import { assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { FixtureResolver } from "../../lib/testing/resolvers.js";
 import { raw } from "../../lib/helpers/output-safety-helper.js";
@@ -144,6 +146,80 @@ describe("TagHelperTest", () => {
   it("tag builder options accepts false option", () => {
     const t = tag() as any;
     expect(t.p({ value: false }).toString()).toBe('<p value="false"></p>');
+  });
+
+  class NameThatChangesWhenConverted {
+    private conversions = 0;
+
+    toString(): string {
+      this.conversions += 1;
+      return this.conversions === 1 ? "first" : " ";
+    }
+  }
+
+  const h = (...pairs: [unknown, unknown][]): Hash<unknown, unknown> => {
+    const hash = new Hash<unknown, unknown>();
+    for (const [k, v] of pairs) hash.store(k, v);
+    return hash;
+  };
+  const s = (v: unknown): string => (v as SafeBuffer).toString();
+  const attrNames = (html: unknown): string[] =>
+    HTML5.DocumentFragment.parse(String(html))
+      .atCss("img")!
+      .attributeNodes.map((a: { name: string }) => a.name);
+
+  it("tag options rejects blank key", () => {
+    expect(s(tag("p", h(["", "value"])))).toBe("<p />");
+    expect(s(tag("p", h([null, "value"])))).toBe("<p />");
+    expect(s(tag("p", h(["", "value"], ["class", "a"])))).toBe('<p class="a" />');
+    expect(s(tag("p", h([null, "value"], ["class", "a"])))).toBe('<p class="a" />');
+  });
+
+  it("tag options rejects blank data key", () => {
+    expect(s(tag("p", { data: h(["", "value"]) }))).toBe("<p />");
+    expect(s(tag("p", { data: h([null, "value"]) }))).toBe("<p />");
+    expect(s(tag("p", { data: h(["", "value"], ["x", "y"]) }))).toBe('<p data-x="y" />');
+    expect(s(tag("p", { data: h([null, "value"], ["x", "y"]) }))).toBe('<p data-x="y" />');
+  });
+
+  it("tag options rejects blank aria key", () => {
+    expect(s(tag("p", { aria: h(["", "value"]) }))).toBe("<p />");
+    expect(s(tag("p", { aria: h([null, "value"]) }))).toBe("<p />");
+    expect(s(tag("p", { aria: h(["", "value"], ["x", "y"]) }))).toBe('<p aria-x="y" />');
+    expect(s(tag("p", { aria: h([null, "value"], ["x", "y"]) }))).toBe('<p aria-x="y" />');
+  });
+
+  it("tag with blank attribute name generates valid markup", () => {
+    const html = tag("img", { src: "/nonexistent.png", "": "/onerror=alert(1)" });
+    expect(attrNames(html)).toEqual(["src"]);
+  });
+
+  it("tag with whitespace symbol attribute name generates valid markup", () => {
+    const html = tag("img", { src: "/nonexistent.png", " ": "/onerror=alert(1)//" });
+    expect(attrNames(html)).toEqual(["src"]);
+  });
+
+  it("tag with whitespace symbol data attribute name is skipped", () => {
+    expect(s(tag("img", { data: { " ": "/onerror=alert(1)//" } }))).toBe("<img />");
+  });
+
+  it("tag with whitespace symbol aria attribute name is skipped", () => {
+    expect(s(tag("img", { aria: { " ": "/onerror=alert(1)//" } }))).toBe("<img />");
+  });
+
+  it("tag with attribute name that is blank before conversion is skipped", () => {
+    expect(s(tag("img", h([false, "/onerror=alert(1)//"])))).toBe("<img />");
+    expect(s(tag("img", h([[], "/onerror=alert(1)//"])))).toBe("<img />");
+    expect(s(tag("img", { data: h([false, "x"]) }))).toBe("<img />");
+    expect(s(tag("img", { aria: h([false, "x"]) }))).toBe("<img />");
+  });
+
+  it("tag with attribute name that changes when converted generates valid markup", () => {
+    const html = tag(
+      "img",
+      h(["src", "/nonexistent.png"], [new NameThatChangesWhenConverted(), "/onerror=alert(1)//"]),
+    );
+    expect(attrNames(html)).toEqual(["src", "first"]);
   });
 
   it("tag options accepts blank option", () => {

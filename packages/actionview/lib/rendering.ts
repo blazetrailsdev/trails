@@ -9,7 +9,8 @@ import {
   dasherize,
   underscore,
 } from "@blazetrails/activesupport";
-import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { include, Module, rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { Base, type ViewContextClass } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";

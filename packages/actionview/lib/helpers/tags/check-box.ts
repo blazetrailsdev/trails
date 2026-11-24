@@ -1,14 +1,9 @@
 import { Tags } from "../../namespaces.js";
 import { htmlSafe, stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
-import {
-  hashDelete,
-  include,
-  rbFSend,
-  rbObjRespondTo,
-  rtest,
-  slice,
-  toI,
-} from "@blazetrails/ruby-compat";
+import { hashDelete, slice } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
+import { toI } from "@blazetrails/ruby-compat/numeric";
 
 import { Base } from "./base.js";
 import { Checkable } from "./checkable.js";

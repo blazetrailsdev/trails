@@ -1,4 +1,4 @@
-import { hashDelete } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
 
 interface CheckableHost {
   value(): unknown;

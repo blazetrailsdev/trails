@@ -8,17 +8,12 @@ import {
   presenceIn,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  File,
-  NoMethodError,
-  rbObjRespondTo,
-  rtest,
-  stringToSym,
-  symbolToS,
-  include,
-  defineModule,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
+import { stringToSym, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { include, defineModule } from "@blazetrails/ruby-compat/include";
 import { Template } from "../template.js";
 import {
   pathToAsset,

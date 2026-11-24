@@ -12,19 +12,13 @@ import {
   toParam,
   urlEncode,
 } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  InvalidURIError,
-  include,
-  RFC2396_PARSER,
-  RuntimeError,
-  URI,
-  hashDelete,
-  isSymbol,
-  rbObjAsString,
-  rbObjRespondTo,
-  rtest,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { InvalidURIError, RFC2396_PARSER, URI } from "@blazetrails/ruby-compat/uri";
+import { include } from "@blazetrails/ruby-compat/include";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
+import { rbObjAsString, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
 
 import { RoutingUrlFor } from "../routing-url-for.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";

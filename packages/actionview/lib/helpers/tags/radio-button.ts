@@ -1,6 +1,6 @@
 import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 
 import { Base } from "./base.js";
 import { Checkable } from "./checkable.js";

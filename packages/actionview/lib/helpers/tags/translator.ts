@@ -1,6 +1,6 @@
 import { Tags } from "../../namespaces.js";
 import { I18n, presence } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 interface TranslatorModel {
   modelName: { i18nKey: string };

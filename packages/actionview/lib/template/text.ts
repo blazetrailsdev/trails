@@ -1,4 +1,4 @@
-import { toS } from "@blazetrails/ruby-compat";
+import { toS } from "@blazetrails/ruby-compat/object";
 
 export class Text {
   type: unknown;

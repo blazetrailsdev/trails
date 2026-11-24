@@ -1,4 +1,4 @@
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import * as DomAssertions from "./assertions/dom-assertions.js";
 import * as SelectorAssertions from "./assertions/selector-assertions.js";
 

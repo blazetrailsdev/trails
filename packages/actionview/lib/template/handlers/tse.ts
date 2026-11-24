@@ -1,15 +1,15 @@
 import { chomp, classAttribute, tokenize } from "@blazetrails/activesupport";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { encode } from "@blazetrails/ruby-compat/string/encode";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
 import {
-  b,
-  encode,
-  Encoding,
   forceEncoding,
   isValidEncoding,
-  NotImplementedError,
-  rbEqual,
   rbObjEncoding,
-  rbStrEnumerateLines,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/string/force-encoding";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbStrEnumerateLines } from "@blazetrails/ruby-compat/string/each";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { ENCODING_FLAG } from "../../action-view.js";
 import { ActionView } from "../../namespaces.js";

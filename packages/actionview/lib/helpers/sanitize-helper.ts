@@ -1,4 +1,11 @@
-import { Concern, SafeBuffer, extend, htmlSafe, mattrAccessor } from "@blazetrails/activesupport";
+import {
+  Concern,
+  SafeBuffer,
+  extend,
+  htmlEscapeOnce,
+  htmlSafe,
+  mattrAccessor,
+} from "@blazetrails/activesupport";
 import {
   ActionView as RailsHtmlSanitizer,
   HTML4,
@@ -54,8 +61,8 @@ export function stripTags(
   this: SanitizeHelperHost,
   html: string | null | undefined,
 ): SafeBuffer | null {
-  const result = (this.constructor as SanitizeHelperClass).fullSanitizer.sanitize(html);
-  return result == null ? null : htmlSafe(result);
+  const stripped = (this.constructor as SanitizeHelperClass).fullSanitizer.sanitize(html);
+  return stripped != null ? htmlEscapeOnce(stripped) : null;
 }
 
 export function stripLinks(

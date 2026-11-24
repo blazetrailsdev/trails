@@ -12,16 +12,11 @@ import {
   isPresent,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  include,
-  BigDecimal,
-  eachPair,
-  Hash,
-  hashAref,
-  isNil,
-  rbInspect,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { include } from "@blazetrails/ruby-compat/include";
+import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
+import { eachPair, Hash, hashAref } from "@blazetrails/ruby-compat/hash";
+import { isNil, rbInspect } from "@blazetrails/ruby-compat/object";
 import { CaptureHelper, capture, type CaptureHelperHost } from "./capture-helper.js";
 import { OutputSafetyHelper, safeJoin } from "./output-safety-helper.js";
 
@@ -130,21 +125,21 @@ export function tag(this: TagHelperHost): ElementTagBuilder;
 export function tag(
   this: TagHelperHost,
   name: string,
-  options?: Record<string, unknown> | null,
+  options?: Record<string, unknown> | Hash<unknown, unknown> | null,
   open?: boolean,
   escape?: boolean,
 ): SafeBuffer;
 export function tag(
   this: TagHelperHost,
   name?: string,
-  options?: Record<string, unknown> | null,
+  options?: Record<string, unknown> | Hash<unknown, unknown> | null,
   open?: boolean,
   escape?: boolean,
 ): SafeBuffer | TagBuilder;
 export function tag(
   this: TagHelperHost,
   name?: string,
-  options?: Record<string, unknown> | null,
+  options?: Record<string, unknown> | Hash<unknown, unknown> | null,
   open?: boolean,
   escape?: boolean,
 ): SafeBuffer | TagBuilder {
@@ -644,7 +639,7 @@ export class TagBuilder {
   contentTagString(
     name: string,
     content: unknown,
-    options: Record<string, unknown> | Hash<string, unknown> | null | undefined,
+    options: Record<string, unknown> | Hash<unknown, unknown> | null | undefined,
     escape: boolean = true,
   ): SafeBuffer {
     let tagOptions: string | null | undefined;
@@ -659,58 +654,61 @@ export class TagBuilder {
   }
 
   tagOptions(
-    options: Record<string, unknown> | Hash<string, unknown> | null | undefined,
+    options: Record<string, unknown> | Hash<unknown, unknown> | null | undefined,
     escape: boolean = true,
   ): string | null {
     if (isBlank(options)) return null;
     let output = "";
     const sep = " ";
-    eachPair(options!, (key: string, value: unknown) => {
-      if (isBlank(key)) return;
+    eachPair(
+      options as Hash<string, unknown> | Record<string, unknown>,
+      (key: string, value: unknown) => {
+        if (isBlank(key)) return;
 
-      const name = String(key);
-      if (isBlank(name)) return;
+        const name = String(key);
+        if (isBlank(name)) return;
 
-      const type = hashAref(TAG_TYPES, key);
-      if (type === "data" && (isPlainObject(value) || value instanceof Hash)) {
-        eachPair(value, (k: string, v: unknown) => {
-          if (isBlank(k) || isNil(v)) return;
+        const type = hashAref(TAG_TYPES, key);
+        if (type === "data" && (isPlainObject(value) || value instanceof Hash)) {
+          eachPair(value, (k: string, v: unknown) => {
+            if (isBlank(k) || isNil(v)) return;
 
-          const nestedName = String(k);
-          if (isBlank(nestedName)) return;
+            const nestedName = String(k);
+            if (isBlank(nestedName)) return;
 
-          output += sep;
-          output += this.prefixTagOption(name, nestedName, v, escape);
-        });
-      } else if (type === "aria" && (isPlainObject(value) || value instanceof Hash)) {
-        eachPair(value, (k: string, v: unknown) => {
-          if (isBlank(k) || isNil(v)) return;
+            output += sep;
+            output += this.prefixTagOption(name, nestedName, v, escape);
+          });
+        } else if (type === "aria" && (isPlainObject(value) || value instanceof Hash)) {
+          eachPair(value, (k: string, v: unknown) => {
+            if (isBlank(k) || isNil(v)) return;
 
-          const nestedName = String(k);
-          if (isBlank(nestedName)) return;
+            const nestedName = String(k);
+            if (isBlank(nestedName)) return;
 
-          if (Array.isArray(v) || isPlainObject(v) || v instanceof Hash) {
-            const tokens = buildTagValues(v);
-            if (tokens.length === 0) return;
+            if (Array.isArray(v) || isPlainObject(v) || v instanceof Hash) {
+              const tokens = buildTagValues(v);
+              if (tokens.length === 0) return;
 
-            v = safeJoin(tokens, " ");
-          } else {
-            v = String(v);
+              v = safeJoin(tokens, " ");
+            } else {
+              v = String(v);
+            }
+
+            output += sep;
+            output += this.prefixTagOption(name, nestedName, v, escape);
+          });
+        } else if (type === "boolean") {
+          if (value != null && value !== false) {
+            output += sep;
+            output += this.booleanTagOption(name);
           }
-
+        } else if (!isNil(value)) {
           output += sep;
-          output += this.prefixTagOption(name, nestedName, v, escape);
-        });
-      } else if (type === "boolean") {
-        if (value != null && value !== false) {
-          output += sep;
-          output += this.booleanTagOption(name);
+          output += this.tagOption(name, value, escape);
         }
-      } else if (!isNil(value)) {
-        output += sep;
-        output += this.tagOption(name, value, escape);
-      }
-    });
+      },
+    );
     return output === "" ? null : output;
   }
 

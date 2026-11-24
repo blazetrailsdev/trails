@@ -1,11 +1,7 @@
-import {
-  ArgumentError,
-  File,
-  isSymbol,
-  rbInspect,
-  rbObjRespondTo,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { htmlSafe, kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";

@@ -1,5 +1,5 @@
 import { SafeBuffer, htmlEscape, htmlSafe, isHtmlSafe } from "@blazetrails/activesupport";
-import { rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
 
 export class OutputBuffer {
   private _raw: string;

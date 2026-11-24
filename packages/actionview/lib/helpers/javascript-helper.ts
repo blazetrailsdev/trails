@@ -1,4 +1,5 @@
-import { defineModule, toS } from "@blazetrails/ruby-compat";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import { toS } from "@blazetrails/ruby-compat/object";
 import { SafeBuffer, htmlSafe, isHtmlSafe, isPlainObject } from "@blazetrails/activesupport";
 
 import { capture } from "./capture-helper.js";

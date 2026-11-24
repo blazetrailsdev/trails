@@ -1,7 +1,8 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { assert, assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { type Html5DocumentFragment, type Html5Node } from "@blazetrails/nokogiri";
-import { rbEqual, stringSplit } from "@blazetrails/ruby-compat";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 import { Testing } from "../testing.js";
 
 type Fragment = Html5DocumentFragment | Html5Node;

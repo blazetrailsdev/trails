@@ -1,6 +1,7 @@
 import { MemoryStore, SafeBuffer, indexWith, isPlainObject } from "@blazetrails/activesupport";
 import type { CacheStore } from "@blazetrails/activesupport";
-import { Hash, hasKey, hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash, hasKey, hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 import { OutputBuffer } from "../../buffers.js";
 import type { SameCollectionIterator } from "../collection-renderer.js";

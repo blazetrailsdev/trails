@@ -1,5 +1,5 @@
 import { attrInternal, delegate } from "@blazetrails/activesupport";
-import { basicObjRespondTo, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 export interface ControllerHelperHost {
   _controller: ControllerLike | null;

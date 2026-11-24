@@ -5,7 +5,7 @@ import {
   extend,
   type Extended,
 } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { Tags } from "./namespaces.js";
 import { ActiveModelHelper } from "./helpers/active-model-helper.js";
 import { AtomFeedHelper } from "./helpers/atom-feed-helper.js";

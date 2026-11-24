@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 
 import { Template } from "../template.js";
 

@@ -1,19 +1,16 @@
 import { Tags } from "../../namespaces.js";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { block, fetch, hashDelete } from "@blazetrails/ruby-compat/hash";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
 import {
-  ArgumentError,
-  block,
-  NotImplementedError,
-  fetch,
-  hashDelete,
-  include,
-  type Included,
   rbFSend,
-  NameError,
   rbInspect,
   rbObjIvarDefined,
   rbObjIvarGet,
   rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
 
 import { isBlank, isPresent, toParam } from "@blazetrails/activesupport";
 

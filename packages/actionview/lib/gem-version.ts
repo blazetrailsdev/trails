@@ -1,4 +1,4 @@
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
 
 export const VERSION = {
   MAJOR: 8,

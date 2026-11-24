@@ -1,15 +1,9 @@
 import { I18n, camelize, isPresent, kernelArray, presence } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  Module,
-  include,
-  isSymbol,
-  rbEqual,
-  rbInspect,
-  rbObjRespondTo,
-  stringToSym,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Module, include } from "@blazetrails/ruby-compat/include";
+import { isSymbol, stringToSym, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import type { NestedDependencies } from "./digestor.js";
 import type { I18nProxy } from "./rendering.js";
 import { Base, type ViewContextClass } from "./base.js";
@@ -28,9 +22,9 @@ const REGISTERED_DETAILS: string[] = [];
 
 type DetailWriter = DetailValue | string | symbol | null | undefined;
 
-export const Accessors = Object.assign(new Module(), {
-  DEFAULT_PROCS: {} as Record<string, DefaultProc>,
-});
+const DEFAULT_PROCS: Record<string, DefaultProc> = {};
+
+export const Accessors = Object.assign(new Module(), { DEFAULT_PROCS });
 
 interface Accessors {
   defaultLocale(): DetailValue;
@@ -64,7 +58,7 @@ export class DetailsKey {
     if (formats && !Template.Types.isValidSymbols(formats)) {
       formats = formats.filter(
         (f) => typeof f === "string" && Template.Types.symbols().includes(f),
-      ) as DetailValue;
+      );
     }
     const normalized: DetailsHash = { ...details, formats: formats ?? [] };
     const key = DetailsKey._stableKey(normalized);

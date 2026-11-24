@@ -1,6 +1,9 @@
 import { Tags } from "../../namespaces.js";
 import { isBlank, stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
-import { ArgumentError, block, fetch, hashDelete, rtest, toI } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { block, fetch, hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rtest } from "@blazetrails/ruby-compat/object";
+import { toI } from "@blazetrails/ruby-compat/numeric";
 
 import type { TagBuilder } from "../tag-helper.js";
 

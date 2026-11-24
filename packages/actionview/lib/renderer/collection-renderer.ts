@@ -1,5 +1,6 @@
 import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
-import { NotImplementedError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 import {
   EmptyCollection,
