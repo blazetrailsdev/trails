@@ -2,8 +2,8 @@
   <% if (bookmark.errors.isAny()) { %>
     <div class="flash alert"><%= bookmark.errors.fullMessages.join(", ") %></div>
   <% } %>
-  <label>Title <%= form.textField("title", { required: true, autofocus: true }) %></label>
-  <label>URL <%= form.urlField("url", { required: true, placeholder: "https://" }) %></label>
+  <label>URL <%= form.urlField("url", { required: true, autofocus: true, placeholder: "https://" }) %></label>
+  <label>Title <%= form.textField("title", { placeholder: "Leave blank to use the page's title" }) %></label>
   <label>Tags <input type="text" name="tag_list" value="<%= tagList %>" placeholder="comma, separated"></label>
   <label>Notes <%= form.textArea("notes", { rows: 4 }) %></label>
   <label>Remind me <%= form.datetimeLocalField("remind_at") %></label>

@@ -27,6 +27,10 @@ export class Bookmark extends ApplicationRecord {
     this.hasMany("attachments", { dependent: "destroy" });
 
     this.normalizes("url", { with: (url: string) => url.trim() });
+    this.beforeValidation(async function (this: Bookmark) {
+      if (this.title?.trim() || !/^https?:\/\/\S+$/.test(this.url ?? "")) return;
+      this.title = (await fetchTitle(this.url)) ?? new URL(this.url).host;
+    });
     this.validates("title", { presence: true, length: { maximum: 200 } });
     this.validates("url", {
       presence: true,
@@ -144,6 +148,49 @@ export class Bookmark extends ApplicationRecord {
     if (!Array.isArray(data)) throw new SyntaxError("expected a JSON array of bookmarks");
     return data as BookmarkRow[];
   }
+}
+
+const MAX_TITLE_BYTES = 256 * 1024;
+
+/** Answers the page's `<title>`, or null when it can't be fetched or has none. */
+async function fetchTitle(url: string): Promise<string | null> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(5000),
+      headers: { accept: "text/html" },
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok || !(response.headers.get("content-type") ?? "").includes("html")) {
+    await response.body?.cancel();
+    return null;
+  }
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let html = "";
+  let match: RegExpMatchArray | null = null;
+  while (html.length < MAX_TITLE_BYTES && !(match = html.match(/<title[^>]*>([^<]*)<\/title>/i))) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    html += decoder.decode(value, { stream: true });
+  }
+  await reader.cancel();
+  const title = decodeEntities(match?.[1] ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return title === "" ? null : title.slice(0, 200);
+}
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&amp;/g, "&");
 }
 
 function csvCell(value: string): string {

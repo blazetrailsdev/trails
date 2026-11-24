@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetDatabase } from "../test-helper.ts";
 import { Bookmark } from "../../app/models/bookmark.ts";
 import { Tag } from "../../app/models/tag.ts";
 
 describe("BookmarkTest", () => {
   beforeEach(resetDatabase);
+  afterEach(() => vi.unstubAllGlobals());
 
   it("requires an http(s) URL and a title", async () => {
     const bookmark = new Bookmark({ title: "", url: "ftp://example.com" });
@@ -125,5 +126,35 @@ describe("BookmarkImportTest", () => {
     await resetDatabase();
     await Bookmark.importRows(Bookmark.parseExport(csv, "b.csv"));
     expect(((await Bookmark.first()) as Bookmark).title).toBe("=HYPERLINK(1)");
+  });
+
+  it("fills a blank title from the page's <title>", async () => {
+    const fetch = vi.fn(
+      async () =>
+        new Response("<html><head><title>\n  Ruby &amp; Rails  </title></head></html>", {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const bookmark = await Bookmark.createBang({ url: "https://rails.example/guide" });
+    expect(bookmark.title).toBe("Ruby & Rails");
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it("falls back to the host when the page can't be fetched", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new TypeError("offline"))),
+    );
+    const bookmark = await Bookmark.createBang({ url: "https://offline.example/a" });
+    expect(bookmark.title).toBe("offline.example");
+  });
+
+  it("keeps a title that was entered without fetching", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const bookmark = await Bookmark.createBang({ title: "Mine", url: "https://x.example" });
+    expect(bookmark.title).toBe("Mine");
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
