@@ -97,7 +97,7 @@ function defaultVariantFormat(this: Blob): string {
 function format(this: Blob): string | null {
   if (
     isPresent(this.filename.extension()) &&
-    Marcel.MimeType.for(null, { extension: this.filename.extension() }) === this.content_type
+    Marcel.MimeType.for(undefined, { extension: this.filename.extension() }) === this.content_type
   ) {
     return this.filename.extension();
   } else {

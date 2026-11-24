@@ -598,7 +598,10 @@ ${requireStatements.join("\n")}`;
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs floats — PERMANENT
+   */
   protected javascriptPackageEntry(): PackageEntry | undefined {
     if (this.options.skipJavascript) return;
 
@@ -610,7 +613,10 @@ ${requireStatements.join("\n")}`;
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs floats — PERMANENT
+   */
   protected hotwirePackageEntry(): PackageEntry[] | undefined {
     if (this.options.skipHotwire) return;
 
@@ -861,6 +867,11 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
+  /**
+   * @missingRailsArgs join — PERMANENT
+   * @missingRailsArgs remove_file — PERMANENT
+   * @internal
+   */
   async targetTrailsPrerelease(selfCommand = "new"): Promise<void> {
     if (!(this.trailsPrerelease() && this.isInstall())) return;
 

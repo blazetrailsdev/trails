@@ -454,7 +454,10 @@ export class PluginGenerator extends AppBase {
     return (this._namespacedName ??= this.name().replaceAll("-", "/"));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs simplify_gemfile_entries — PERMANENT
+   */
   override packageEntries(): PackageEntry[] {
     return [this.trailsPackageEntry(), this.simplifyPackageEntries(this.databasePackageEntry())]
       .flat()
