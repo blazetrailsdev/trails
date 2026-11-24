@@ -46,7 +46,7 @@ import { ApplicationController } from "./application-controller.ts";
 import { Pet } from "../models/pet.ts";
 export class UsersController extends ApplicationController {
   async index() {
-    await this.render({ inline: QueryLogs.call("", await Pet.leaseConnection()) });
+    await this.render({ inline: QueryLogs.call("", await Pet.connection) });
   }
 
   dynamicContent() {
