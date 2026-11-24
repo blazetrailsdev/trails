@@ -411,7 +411,7 @@ export const TSREPL = {
    */
   async irbrcFiles(): Promise<string[]> {
     const irbrcFiles: string[] = [];
-    for (const rcgen of TSREPL.rcFileGenerators()) {
+    for await (const rcgen of TSREPL.rcFileGenerators()) {
       const irbrc = rcgen(TSREPL.IRBRC_EXT);
       if (await File.isExistAsync(irbrc)) irbrcFiles.push(irbrc);
     }
@@ -424,12 +424,11 @@ export const TSREPL = {
   /**
    * `IRB.rc_file_generators` (`vendor/ruby/v3.3.11/lib/irb/init.rb:463-479`).
    * irb's file names are `tsrepl` names here, as its env vars are.
-   * `File.directory?` on the XDG home is not awaited, so that arm yields
-   * whenever `XDG_CONFIG_HOME` is set and the file check above decides.
+   * `File.directory?` is awaited, so the generator is async.
    *
    * @noRailsEquivalent PERMANENT
    */
-  *rcFileGenerators(): Generator<(rc: string) => string> {
+  async *rcFileGenerators(): AsyncGenerator<(rc: string) => string> {
     const irbrc = env.TSREPLRC;
     if (irbrc != null) {
       yield (rc) => (rc === "rc" ? irbrc : irbrc + rc);
@@ -437,7 +436,9 @@ export const TSREPL = {
     const xdgConfigHome = env.XDG_CONFIG_HOME;
     if (xdgConfigHome != null) {
       const irbHome = File.join(xdgConfigHome, "tsrepl");
-      yield (rc) => irbHome + `/tsrepl${rc}`;
+      if (await File.isDirectoryAsync(irbHome)) {
+        yield (rc) => irbHome + `/tsrepl${rc}`;
+      }
     }
     const home = env.HOME;
     if (home != null) {
