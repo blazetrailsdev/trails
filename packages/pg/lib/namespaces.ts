@@ -47,6 +47,7 @@ export interface PGNamespace {
     ): Promise<R>;
   };
   Constants: typeof Constants;
+  BUNDLED_LIBPQ_WITH_UNIXSOCKET: boolean;
   ERROR_CLASSES: Record<string, typeof Error>;
   Error: typeof Error;
   ServerError: typeof ServerError;

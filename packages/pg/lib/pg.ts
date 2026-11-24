@@ -5,6 +5,12 @@ import { PG } from "./namespaces.js";
 export const Constants = {
   CONNECTION_OK: 0,
   CONNECTION_BAD: 1,
+  CONNECTION_STARTED: 2,
+  CONNECTION_MADE: 3,
+  PGRES_POLLING_FAILED: 0,
+  PGRES_POLLING_READING: 1,
+  PGRES_POLLING_WRITING: 2,
+  PGRES_POLLING_OK: 3,
   PQTRANS_IDLE: 0,
   PQTRANS_ACTIVE: 1,
   PQTRANS_INTRANS: 2,
@@ -47,6 +53,8 @@ export const Constants = {
 };
 
 PG.Constants = Constants;
+
+PG.BUNDLED_LIBPQ_WITH_UNIXSOCKET = false;
 Object.assign(PG, Constants);
 
 export function connect(connParams?: Record<string, unknown>): Promise<Connection>;
