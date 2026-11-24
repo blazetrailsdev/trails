@@ -1308,7 +1308,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
     const rowidColumn = new SQLite3Column("id", null, typeMetadata, true, null, { rowid: true });
     const regularColumn = new SQLite3Column("id", null, typeMetadata, true, null, { rowid: false });
 
-    expect(rowidColumn.equals(regularColumn)).toBe(false);
+    expect(rowidColumn).not.toEqualRuby(regularColumn);
   });
 
   it("generated type changes column equality", () => {
@@ -1321,7 +1321,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
       generatedType: "virtual",
     });
 
-    expect(storedColumn.equals(virtualColumn)).toBe(false);
+    expect(storedColumn).not.toEqualRuby(virtualColumn);
   });
 
   it("alter table with fk preserves rows when referenced table altered", async () => {

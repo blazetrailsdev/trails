@@ -19,7 +19,6 @@ import {
   assertRaise,
   assertRaises,
   assertRespondTo,
-  assertSame,
 } from "@blazetrails/activesupport/testing/assertions";
 import {
   ConnectionNotEstablished,
@@ -1030,13 +1029,13 @@ it("checkout callback error does not affect permanent lease and active connectio
   };
   AbstractAdapter.setCallback("checkout", "after", procToRaise);
   try {
-    expect(pool.isPermanentLease()).toBe(true);
+    expect(pool.isPermanentLease()).toBeTruthy();
     expect(pool.isActiveConnection()).toBeFalsy();
 
     const error = await assertRaises([StandardError], {}, () => pool.leaseConnection());
-    assertSame(checkoutError, error);
+    expect(error).toBe(checkoutError);
 
-    expect(pool.isPermanentLease()).toBe(true);
+    expect(pool.isPermanentLease()).toBeTruthy();
     expect(pool.isActiveConnection()).toBeFalsy();
   } finally {
     (

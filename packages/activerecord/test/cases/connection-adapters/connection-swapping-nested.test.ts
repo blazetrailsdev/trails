@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../../../lib/base.js";
 import { DatabaseConfigurations } from "../../../lib/database-configurations.js";
 import { currentRole, currentPreventingWrites } from "../../../lib/core.js";
@@ -271,17 +272,27 @@ describe("ConnectionSwappingNestedTest", () => {
         expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
 
         PrimaryBase.prohibitShardSwapping(() => {
-          expect(() => PrimaryBase.connectedTo({ shard: "shard_two" }, () => {})).toThrow(
-            /cannot swap/,
-          );
+          let e: unknown;
+          try {
+            PrimaryBase.connectedTo({ shard: "shard_two" }, () => {});
+          } catch (error) {
+            e = error;
+          }
+          expect(e).toBeInstanceOf(ArgumentError);
+          expect((e as Error).message).toMatch(/cannot swap/);
         });
 
         expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
 
         PrimaryBase.prohibitShardSwapping(() => {
-          expect(() =>
-            Base.connectedToMany([PrimaryBase], { shard: "shard_two", role: "writing" }, () => {}),
-          ).toThrow(/cannot swap/);
+          let e: unknown;
+          try {
+            Base.connectedToMany([PrimaryBase], { shard: "shard_two", role: "writing" }, () => {});
+          } catch (error) {
+            e = error;
+          }
+          expect(e).toBeInstanceOf(ArgumentError);
+          expect((e as Error).message).toMatch(/cannot swap/);
         });
 
         expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");

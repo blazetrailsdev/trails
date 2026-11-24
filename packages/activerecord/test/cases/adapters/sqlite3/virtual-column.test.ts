@@ -179,9 +179,9 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3VirtualColumnTest", () 
         const regularCol = RegularModel.columnsHash()["name"] as unknown as Column;
         const virtualCol = VirtualColumn.columnsHash()["upper_name"] as unknown as Column;
 
-        expect(virtualCol.isVirtual()).toBe(true);
-        expect(regularCol.isVirtual()).toBe(false);
-        expect(regularCol.equals(virtualCol)).toBe(false);
+        expect(virtualCol.isVirtual()).toBeTruthy();
+        expect(regularCol.isVirtual()).toBeFalsy();
+        expect(regularCol).not.toEqualRuby(virtualCol);
 
         FixtureFile.registerModule(
           `${TS_FIXTURES_ROOT}/virtual_columns.ts`,

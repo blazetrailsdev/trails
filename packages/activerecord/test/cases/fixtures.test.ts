@@ -1,4 +1,3 @@
-import { rbEqual } from "@blazetrails/activesupport";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFile } from "fs/promises";
 import {
@@ -1719,19 +1718,11 @@ describe("MultipleFixtureConnectionsTest", () => {
       ]);
 
     it("supports inline habtm", async () => {
-      expect(
-        await cpkPosts("welcome").tags.isInclude(cpkTags("cpk_tag_ruby_on_rails")),
-      ).toBeTruthy();
-      expect(
-        await cpkPosts("welcome").tags.isInclude(cpkTags("cpk_tag_digital_product")),
-      ).toBeTruthy();
-      expect(
-        await cpkPosts("welcome").tags.isInclude(cpkTags("cpk_tag_loyal_customer")),
-      ).toBeFalsy();
+      expect(await cpkPosts("welcome").tags).toInclude(cpkTags("cpk_tag_ruby_on_rails"));
+      expect(await cpkPosts("welcome").tags).toInclude(cpkTags("cpk_tag_digital_product"));
+      expect(await cpkPosts("welcome").tags).not.toInclude(cpkTags("cpk_tag_loyal_customer"));
 
-      expect(rbEqual([cpkTags("cpk_tag_digital_product")], await cpkPosts("thinking").tags)).toBe(
-        true,
-      );
+      expect(await cpkPosts("thinking").tags).toEqualRuby([cpkTags("cpk_tag_digital_product")]);
     });
 
     it("generates composite primary key for partially filled fixtures", () => {
