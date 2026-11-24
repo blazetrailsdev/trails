@@ -13,7 +13,7 @@ import {
 import { OutputBuffer } from "../buffers.js";
 import { chomp } from "@blazetrails/ruby-compat/string/chomp";
 import { fetch } from "@blazetrails/ruby-compat/hash";
-import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { regexpEscape, rbRegToS } from "@blazetrails/ruby-compat/regexp";
 import { include, defineModule } from "@blazetrails/ruby-compat/include";
 import { TagHelper, contentTag, type TagHelperHost } from "./tag-helper.js";
 import { SanitizeHelper, sanitize } from "./sanitize-helper.js";
@@ -96,11 +96,15 @@ export function highlight(
     return htmlSafe(text == null ? "" : String(text));
   }
   const patterns = (Array.isArray(phrases) ? phrases : [phrases!]).map((phrase) =>
-    phrase instanceof RegExp ? phrase.source : regexpEscape(String(phrase)),
+    phrase instanceof RegExp ? rbRegToS(phrase) : regexpEscape(String(phrase)),
   );
   const pattern = `(${patterns.join("|")})`;
   const patternAfterTag = `(?!^)${pattern}`;
-  const highlighter = block ? undefined : String(options.highlighter ?? "<mark>\\1</mark>");
+  const highlighter = block
+    ? undefined
+    : Object.hasOwn(options, "highlighter")
+      ? options.highlighter
+      : "<mark>\\1</mark>";
 
   return htmlSafe(
     (String(text).match(/<[^>]*|[^<]+/g) ?? [])
@@ -113,9 +117,11 @@ export function highlight(
           } else {
             segment = segment.replace(segmentPattern, (...args: unknown[]) => {
               const match = args.slice(0, args.length - (typeof args.at(-1) === "object" ? 3 : 2));
-              return highlighter!.replace(/\\(\d)/g, (_m, n: string) =>
-                htmlEscapeOnce(match[Number(n)] ?? null).toString(),
-              );
+              return highlighter!
+                .toString()
+                .replace(/\\(\d)/g, (_m, n: string) =>
+                  htmlEscapeOnce(match[Number(n)] ?? null).toString(),
+                );
             });
           }
         }
