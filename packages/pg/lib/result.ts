@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import type pg from "pg";
 import { Constants as PGConstants } from "./pg.js";
-import { Error as PgError } from "./exceptions.js";
+import { Error as PgError, lookupErrorClass } from "./exceptions.js";
 import { PG } from "./namespaces.js";
 import type { TypeMapByOid } from "./type-map-by-oid.js";
 
@@ -52,11 +52,20 @@ export class Result {
   readonly #error: DatabaseErrorFields | null;
   /** @internal */
   private _cleared = false;
+  /** @internal */
+  _connection: object | null = null;
+  /** @internal */
+  private readonly _status: number | null;
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(native: pg.QueryResult, error: DatabaseErrorFields | null = null) {
+  constructor(
+    native: pg.QueryResult,
+    error: DatabaseErrorFields | null = null,
+    status: number | null = null,
+  ) {
     this.#native = native;
     this.#error = error;
+    this._status = status;
   }
 
   /** @internal */
@@ -81,6 +90,7 @@ export class Result {
 
   resultStatus(): number {
     this._pgresultGet();
+    if (this._status != null) return this._status;
     if (this.#error != null) return PGConstants.PGRES_FATAL_ERROR;
     return this.nfields() > 0 ? PGConstants.PGRES_TUPLES_OK : PGConstants.PGRES_COMMAND_OK;
   }
@@ -114,6 +124,19 @@ export class Result {
     return `${str.slice(0, -1)}${stats}${str.slice(-1)}`;
   }
 
+  errorMessage(): string {
+    this._pgresultGet();
+    if (this.#error?.message == null) return "";
+    let msg = `${this.#error.severity ?? "ERROR"}:  ${this.#error.message}\n`;
+    if (this.#error.detail != null) msg += `DETAIL:  ${this.#error.detail}\n`;
+    if (this.#error.hint != null) msg += `HINT:  ${this.#error.hint}\n`;
+    return msg;
+  }
+
+  resultErrorMessage(): string {
+    return this.errorMessage();
+  }
+
   errorField(fieldcode: number): string | null {
     this._pgresultGet();
     const name = _ERROR_FIELDS[fieldcode];
@@ -123,6 +146,39 @@ export class Result {
 
   resultErrorField(fieldcode: number): string | null {
     return this.errorField(fieldcode);
+  }
+
+  check(): this {
+    let error: string;
+    switch (this.resultStatus()) {
+      case PGConstants.PGRES_TUPLES_OK:
+      case PGConstants.PGRES_COPY_OUT:
+      case PGConstants.PGRES_COPY_IN:
+      case PGConstants.PGRES_COPY_BOTH:
+      case PGConstants.PGRES_SINGLE_TUPLE:
+      case PGConstants.PGRES_EMPTY_QUERY:
+      case PGConstants.PGRES_COMMAND_OK:
+      case PGConstants.PGRES_PIPELINE_SYNC:
+      case PGConstants.PGRES_TUPLES_CHUNK:
+        return this;
+      case PGConstants.PGRES_BAD_RESPONSE:
+      case PGConstants.PGRES_FATAL_ERROR:
+      case PGConstants.PGRES_NONFATAL_ERROR:
+      case PGConstants.PGRES_PIPELINE_ABORTED:
+        error = this.errorMessage();
+        break;
+      default:
+        error = "internal error : unknown result status.";
+    }
+    const sqlstate = this.errorField(PGConstants.PG_DIAG_SQLSTATE);
+    const klass = lookupErrorClass(sqlstate);
+    throw new klass(error, { connection: this._connection, result: this });
+  }
+
+  fieldValues(field: string): unknown[] {
+    const fnum = this.fields().indexOf(field);
+    if (fnum < 0) throw new IndexError(`no such field '${field}' in result`);
+    return this.values().map((row) => row[fnum]);
   }
 
   ntuples(): number {

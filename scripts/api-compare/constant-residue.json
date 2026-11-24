@@ -1101,7 +1101,7 @@
     }
   },
   "pg": {
-    "rows": 33,
+    "rows": 35,
     "excluded": ["pg.ts::Constants"],
     "unwalked": [],
     "residue": {
@@ -1114,6 +1114,8 @@
       "exceptions.ts::Error": "PG::Error",
       "exceptions.ts::FeatureNotSupported": "PG::FeatureNotSupported",
       "exceptions.ts::ServerError": "PG::ServerError",
+      "exceptions.ts::SyntaxError": "PG::SyntaxError",
+      "exceptions.ts::SyntaxErrorOrAccessRuleViolation": "PG::SyntaxErrorOrAccessRuleViolation",
       "exceptions.ts::UnableToSend": "PG::UnableToSend",
       "result.ts::Result": "PG::Result",
       "simple-coder.ts::SimpleCoder": "PG::SimpleCoder",
