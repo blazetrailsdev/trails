@@ -262,7 +262,9 @@ export class JoinDependency {
     strictLoadingValue?: boolean | null,
     block?: (record: any) => void,
   ): any[] {
-    const primaryKey = this.aliases().columnAlias(this.joinRoot, this.joinRoot.primaryKey);
+    const primaryKey = kernelArray(this.joinRoot.primaryKey).map((column) =>
+      this.aliases().columnAlias(this.joinRoot, column),
+    );
 
     const seen: Seen = new Hash<any, Hash<JoinPart, Hash<unknown, any>>>((i, parent) => {
       const j = new Hash<JoinPart, Hash<unknown, any>>((j, childClass) => {
@@ -314,7 +316,8 @@ export class JoinDependency {
 
     Notifications.instrument("instantiation.active_record", payload, () => {
       for (const rowHash of rows) {
-        const parentKey = primaryKey != null ? rowHash[primaryKey] : rowHash;
+        const parentKey =
+          primaryKey.length === 0 ? rowHash : primaryKey.map((k) => rowHash[k as string]);
         const parent =
           parents.get(parentKey) ||
           parents

@@ -166,7 +166,7 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
       const a = new AbstractAdapter({});
       let called = 0;
       a.configureConnection = async () => void called++;
-      await a.attemptConfigureConnection();
+      await a.attemptConfigureConnection(() => a.configureConnection() as Promise<void>);
       expect(called).toBe(1);
     });
 
@@ -176,7 +176,9 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
         throw new Error("connect failed");
       };
       const spy = vi.spyOn(a, "disconnectBang");
-      await expect(a.attemptConfigureConnection()).rejects.toThrow("connect failed");
+      await expect(
+        a.attemptConfigureConnection(() => a.configureConnection() as Promise<void>),
+      ).rejects.toThrow("connect failed");
       expect(spy).toHaveBeenCalledOnce();
     });
   });

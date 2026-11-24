@@ -578,6 +578,13 @@ export class PostgreSQLAdapter
     });
   }
 
+  override async clearCacheBang({
+    newConnection = false,
+  }: { newConnection?: boolean } = {}): Promise<void> {
+    await super.clearCacheBang({ newConnection });
+    if (newConnection) this._schemaSearchPathMemo = null;
+  }
+
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
@@ -1252,6 +1259,8 @@ export class PostgreSQLAdapter
 
     this.addPgEncoders();
     await this.addPgDecoders();
+
+    await this.schemaSearchPath();
 
     await this.reloadTypeMap();
   }

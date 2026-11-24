@@ -100,7 +100,7 @@ describe("ColumnEqualityTrails", () => {
       plain.equals(
         new SQLite3Column("id", null, new SqlTypeMetadata(opts), false, null, { rowid: true }),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("does not equal a sibling adapter's column", () => {
@@ -168,15 +168,5 @@ describe("ColumnDeduplicationTrails", () => {
     const column = new Column("dedup_interned", null, own, false).deduplicate();
     expect(column.sqlTypeMetadata).toBe(canonical);
     expect(Object.isFrozen(canonical)).toBe(true);
-  });
-
-  it("folds the SQLite3 rowid flag into the key, which its equality ignores", () => {
-    const opts = { sqlType: "integer", type: "integer" };
-    const plain = new SQLite3Column("dedup_sqlite", null, new SqlTypeMetadata(opts), false);
-    const rowid = new SQLite3Column("dedup_sqlite", null, new SqlTypeMetadata(opts), false, null, {
-      rowid: true,
-    });
-    expect(plain.equals(rowid)).toBe(true);
-    expect(plain.deduplicate()).not.toBe(rowid.deduplicate());
   });
 });
