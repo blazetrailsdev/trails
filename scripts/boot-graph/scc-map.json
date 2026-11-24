@@ -1,0 +1,2435 @@
+{
+  "sccs": [
+    {
+      "size": 32,
+      "modules": [
+        "array.js",
+        "base64.js",
+        "comparable.js",
+        "complex.js",
+        "enumerable.js",
+        "enumerator.js",
+        "fiber.js",
+        "hash.js",
+        "kernel-float.js",
+        "kernel-format.js",
+        "kernel-integer.js",
+        "match-data.js",
+        "numeric.js",
+        "object.js",
+        "process-adapter.js",
+        "process.js",
+        "range.js",
+        "rational.js",
+        "rb-equal.js",
+        "rb-hash.js",
+        "regexp.js",
+        "string/byte-methods.js",
+        "string/case-mapping.js",
+        "string/convert.js",
+        "string/each.js",
+        "string/method-table.js",
+        "string/slice.js",
+        "string/split.js",
+        "string/sub.js",
+        "string/support.js",
+        "string/tr.js",
+        "thread.js"
+      ]
+    },
+    {
+      "size": 3,
+      "modules": ["psych.js", "psych/visitors/to-ruby.js", "psych/visitors/yaml-tree.js"]
+    },
+    {
+      "size": 2,
+      "modules": ["include.js", "variable.js"]
+    },
+    {
+      "size": 2,
+      "modules": ["io.js", "string-io.js"]
+    },
+    {
+      "size": 2,
+      "modules": ["dir.js", "file-utils.js"]
+    },
+    {
+      "size": 2,
+      "modules": ["zlib-adapter.js", "zlib.js"]
+    },
+    {
+      "size": 2,
+      "modules": ["uri/common.js", "uri/generic.js"]
+    }
+  ],
+  "bindings": {
+    "__INTERNAL_resetProcessAdapter_TEST_ONLY": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "abort": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "Addrinfo": {
+      "module": "socket.js",
+      "scc": null
+    },
+    "anybits": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "ArgumentError": {
+      "module": "argument-error.js",
+      "scc": null
+    },
+    "argv": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "ARGV": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "ARRAY_METHOD_TABLE": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "aryCount": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "aryDelete": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "aryDeleteIf": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "aryIncludes": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "aryJoin": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "aryReject": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "arySlice": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "asyncContextAdapterConfig": {
+      "module": "async-context-adapter.js",
+      "scc": null
+    },
+    "AsyncEnumerable": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "atExit": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "AtomicFixnum": {
+      "module": "concurrent/atomic-fixnum.js",
+      "scc": null
+    },
+    "autoloadDelete": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "b": {
+      "module": "string/b.js",
+      "scc": null
+    },
+    "BadURIError": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "Base64": {
+      "module": "base64.js",
+      "scc": 0
+    },
+    "basicObjRespondTo": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "BasicSocket": {
+      "module": "socket.js",
+      "scc": null
+    },
+    "Benchmark": {
+      "module": "benchmark.js",
+      "scc": null
+    },
+    "BigDecimal": {
+      "module": "big-decimal.js",
+      "scc": null
+    },
+    "BINARY_METHOD_TABLE": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "binaryBytes": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "binaryString": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "Binding": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "block": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "Bundler": {
+      "module": "bundler.js",
+      "scc": null
+    },
+    "bytes": {
+      "module": "string/bytes.js",
+      "scc": null
+    },
+    "byteslice": {
+      "module": "string/byte-methods.js",
+      "scc": 0
+    },
+    "CachedThreadPool": {
+      "module": "thread-pool-executor.js",
+      "scc": null
+    },
+    "camelized": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "CancelledOperationError": {
+      "module": "scheduled-task.js",
+      "scc": null
+    },
+    "capitalize": {
+      "module": "string/case-mapping.js",
+      "scc": 0
+    },
+    "casecmp": {
+      "module": "string/case-mapping.js",
+      "scc": 0
+    },
+    "CGI": {
+      "module": "cgi.js",
+      "scc": null
+    },
+    "Chain": {
+      "module": "enumerator.js",
+      "scc": 0
+    },
+    "childProcessAdapterConfig": {
+      "module": "child-process-adapter.js",
+      "scc": null
+    },
+    "chomp": {
+      "module": "string/chomp.js",
+      "scc": null
+    },
+    "Cipher": {
+      "module": "openssl.js",
+      "scc": null
+    },
+    "CLASS_METHOD_TABLE": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "classModule": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "classPathMismatches": {
+      "module": "classpath.js",
+      "scc": null
+    },
+    "classpaths": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "ClosedQueueError": {
+      "module": "closed-queue-error.js",
+      "scc": null
+    },
+    "cmp": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "compact": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "compactBang": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "compiledFilesIn": {
+      "module": "load.js",
+      "scc": null
+    },
+    "complex": {
+      "module": "complex.js",
+      "scc": 0
+    },
+    "Complex": {
+      "module": "complex.js",
+      "scc": 0
+    },
+    "Concurrent": {
+      "module": "concurrent/map.js",
+      "scc": null
+    },
+    "constDefined": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "constGet": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "constSet": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "ConverterNotFoundError": {
+      "module": "converter-not-found-error.js",
+      "scc": null
+    },
+    "coreHashMergeKwd": {
+      "module": "keyword-splat.js",
+      "scc": null
+    },
+    "count": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "createTmpname": {
+      "module": "dir.js",
+      "scc": 4
+    },
+    "cryptoAdapterConfig": {
+      "module": "crypto-adapter.js",
+      "scc": null
+    },
+    "DEFAULT_PARSER": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "defineAccessorHalf": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "defineConstants": {
+      "module": "classpath.js",
+      "scc": null
+    },
+    "defineModule": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "DelegateClass": {
+      "module": "delegate.js",
+      "scc": null
+    },
+    "Delegator": {
+      "module": "delegate.js",
+      "scc": null
+    },
+    "deleteAt": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "deleteIf": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "Digest": {
+      "module": "digest.js",
+      "scc": null
+    },
+    "DigestClass": {
+      "module": "digest.js",
+      "scc": null
+    },
+    "DigestInstance": {
+      "module": "digest.js",
+      "scc": null
+    },
+    "Dir": {
+      "module": "dir.js",
+      "scc": 4
+    },
+    "displacedIncludedMembers": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "dup": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "each": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "eachCons": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "eachKey": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "eachPair": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "eachSlice": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "eachValue": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "eachWithIndex": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "eachWithObject": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "encode": {
+      "module": "string/encode.js",
+      "scc": null
+    },
+    "Encoding": {
+      "module": "encoding.js",
+      "scc": null
+    },
+    "EncodingError": {
+      "module": "encoding-error.js",
+      "scc": null
+    },
+    "enumChain": {
+      "module": "enumerator.js",
+      "scc": 0
+    },
+    "Enumerable": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "ENUMERABLE_METHOD_TABLE": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "enumerableLazy": {
+      "module": "enumerator.js",
+      "scc": 0
+    },
+    "Enumerator": {
+      "module": "enumerator.js",
+      "scc": 0
+    },
+    "env": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "EOFError": {
+      "module": "eof-error.js",
+      "scc": null
+    },
+    "equals": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "Errno": {
+      "module": "errno.js",
+      "scc": null
+    },
+    "Error": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "excBacktrace": {
+      "module": "backtrace-location.js",
+      "scc": null
+    },
+    "excBacktraceLocations": {
+      "module": "backtrace-location.js",
+      "scc": null
+    },
+    "except": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "Exception": {
+      "module": "exception.js",
+      "scc": null
+    },
+    "excSetBacktrace": {
+      "module": "backtrace-location.js",
+      "scc": null
+    },
+    "excSetupMessage": {
+      "module": "exception.js",
+      "scc": null
+    },
+    "excToS": {
+      "module": "exc-to-s.js",
+      "scc": null
+    },
+    "exec": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "exit": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "exitBang": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "extend": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "extended": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "fetch": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "Fiber": {
+      "module": "fiber.js",
+      "scc": 0
+    },
+    "FiberError": {
+      "module": "fiber-error.js",
+      "scc": null
+    },
+    "File": {
+      "module": "file.js",
+      "scc": null
+    },
+    "FileUtils": {
+      "module": "file-utils.js",
+      "scc": 4
+    },
+    "filterMap": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "findAll": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "first": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "fixDiv": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "FixedThreadPool": {
+      "module": "thread-pool-executor.js",
+      "scc": null
+    },
+    "fixMod": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "flatten": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "FLOAT_DIG": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "FloatDomainError": {
+      "module": "float-domain-error.js",
+      "scc": null
+    },
+    "forceEncoding": {
+      "module": "string/force-encoding.js",
+      "scc": null
+    },
+    "format": {
+      "module": "kernel-format.js",
+      "scc": 0
+    },
+    "FrozenError": {
+      "module": "frozen-error.js",
+      "scc": null
+    },
+    "fsAdapterConfig": {
+      "module": "fs-adapter.js",
+      "scc": null
+    },
+    "Gem": {
+      "module": "gem.js",
+      "scc": null
+    },
+    "Generic": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "getAsyncContext": {
+      "module": "async-context-adapter.js",
+      "scc": null
+    },
+    "getChildProcess": {
+      "module": "child-process-adapter.js",
+      "scc": null
+    },
+    "getChildProcessAsync": {
+      "module": "child-process-adapter.js",
+      "scc": null
+    },
+    "getCrypto": {
+      "module": "crypto-adapter.js",
+      "scc": null
+    },
+    "getCryptoAsync": {
+      "module": "crypto-adapter.js",
+      "scc": null
+    },
+    "getFs": {
+      "module": "fs-adapter.js",
+      "scc": null
+    },
+    "getHttpAsync": {
+      "module": "http-adapter.js",
+      "scc": null
+    },
+    "getOs": {
+      "module": "os-adapter.js",
+      "scc": null
+    },
+    "getOsAsync": {
+      "module": "os-adapter.js",
+      "scc": null
+    },
+    "getPath": {
+      "module": "fs-adapter.js",
+      "scc": null
+    },
+    "getProcessAdapter": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "getReplAsync": {
+      "module": "repl-adapter.js",
+      "scc": null
+    },
+    "getZlib": {
+      "module": "zlib-adapter.js",
+      "scc": 5
+    },
+    "getZlibAsync": {
+      "module": "zlib-adapter.js",
+      "scc": 5
+    },
+    "globalIoExecutor": {
+      "module": "thread-pool-executor.js",
+      "scc": null
+    },
+    "greaterThan": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "greaterThanOrEqual": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "groupBy": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "GzipWriter": {
+      "module": "zlib-adapter.js",
+      "scc": 5
+    },
+    "Hash": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "hashAref": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "hashAset": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "hashClear": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "hashDelete": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "hashReplace": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "hasKey": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "HMAC": {
+      "module": "openssl.js",
+      "scc": null
+    },
+    "HTTP": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "httpAdapterConfig": {
+      "module": "http-adapter.js",
+      "scc": null
+    },
+    "HTTPS": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "ImmediateExecutor": {
+      "module": "immediate-executor.js",
+      "scc": null
+    },
+    "include": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "included": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "includedModules": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "IndexError": {
+      "module": "index-error.js",
+      "scc": null
+    },
+    "inherited": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "Interrupt": {
+      "module": "signal-exception.js",
+      "scc": null
+    },
+    "InvalidByteSequenceError": {
+      "module": "invalid-byte-sequence-error.js",
+      "scc": null
+    },
+    "InvalidComponentError": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "InvalidURIError": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "IO": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "IOError": {
+      "module": "io-error.js",
+      "scc": null
+    },
+    "IPAddr": {
+      "module": "ipaddr.js",
+      "scc": null
+    },
+    "IPSocket": {
+      "module": "socket.js",
+      "scc": null
+    },
+    "isAbsentHalf": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "isAll": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "isAny": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "isAsciiOnly": {
+      "module": "string/force-encoding.js",
+      "scc": null
+    },
+    "isBetween": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "isCasecmp": {
+      "module": "string/case-mapping.js",
+      "scc": 0
+    },
+    "isClassPathPending": {
+      "module": "classpath.js",
+      "scc": null
+    },
+    "isCompiledFile": {
+      "module": "load.js",
+      "scc": null
+    },
+    "isEmpty": {
+      "module": "ruby-empty.js",
+      "scc": null
+    },
+    "iseqLocationSetup": {
+      "module": "method.js",
+      "scc": null
+    },
+    "isFinite": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "isInclude": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "isIntersect": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "isMatch": {
+      "module": "string/sub.js",
+      "scc": 0
+    },
+    "isModuleIncluded": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "isModuleObject": {
+      "module": "classpath.js",
+      "scc": null
+    },
+    "isMonOwned": {
+      "module": "monitor.js",
+      "scc": null
+    },
+    "isNan": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "isNil": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "isNone": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "isOne": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "isPlainHash": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "isRubyTzUptodate": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "isStruct": {
+      "module": "struct.js",
+      "scc": null
+    },
+    "isSymbol": {
+      "module": "symbol.js",
+      "scc": null
+    },
+    "isValidEncoding": {
+      "module": "string/force-encoding.js",
+      "scc": null
+    },
+    "JSON": {
+      "module": "json.js",
+      "scc": null
+    },
+    "kebabCase": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "keepIf": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "Kernel": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "KERNEL_METHODS": {
+      "module": "method-missing-proxy.js",
+      "scc": null
+    },
+    "kernelCatch": {
+      "module": "kernel-catch.js",
+      "scc": null
+    },
+    "kernelCatchSync": {
+      "module": "kernel-catch.js",
+      "scc": null
+    },
+    "kernelFloat": {
+      "module": "kernel-float.js",
+      "scc": 0
+    },
+    "kernelHash": {
+      "module": "kernel-hash.js",
+      "scc": null
+    },
+    "kernelInteger": {
+      "module": "kernel-integer.js",
+      "scc": 0
+    },
+    "kernelRand": {
+      "module": "kernel-rand.js",
+      "scc": null
+    },
+    "kernelSrand": {
+      "module": "kernel-rand.js",
+      "scc": null
+    },
+    "kernelThrow": {
+      "module": "kernel-catch.js",
+      "scc": null
+    },
+    "kernelURI": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "KeyError": {
+      "module": "key-error.js",
+      "scc": null
+    },
+    "keys": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "keywordSplat": {
+      "module": "keyword-splat.js",
+      "scc": null
+    },
+    "last": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "lastMatchGetter": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "Lazy": {
+      "module": "enumerator.js",
+      "scc": 0
+    },
+    "lessThan": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "lessThanOrEqual": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "LOAD_PATH": {
+      "module": "load.js",
+      "scc": null
+    },
+    "LOADED_FEATURES": {
+      "module": "load.js",
+      "scc": null
+    },
+    "loadedFileExports": {
+      "module": "load.js",
+      "scc": null
+    },
+    "LoadError": {
+      "module": "load-error.js",
+      "scc": null
+    },
+    "loadingTable": {
+      "module": "load.js",
+      "scc": null
+    },
+    "loadIseqEval": {
+      "module": "load.js",
+      "scc": null
+    },
+    "LocalJumpError": {
+      "module": "local-jump-error.js",
+      "scc": null
+    },
+    "Location": {
+      "module": "backtrace-location.js",
+      "scc": null
+    },
+    "Logger": {
+      "module": "logger.js",
+      "scc": null
+    },
+    "map": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "Marshal": {
+      "module": "marshal.js",
+      "scc": null
+    },
+    "MatchData": {
+      "module": "match-data.js",
+      "scc": 0
+    },
+    "matchOperator": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "max": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "maxBy": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "merge": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "mergeBang": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "Method": {
+      "module": "method.js",
+      "scc": null
+    },
+    "methodCacheSerial": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "methodMissingPrototype": {
+      "module": "method-missing-proxy.js",
+      "scc": null
+    },
+    "min": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "minBy": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "Module": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "moduleVisibility": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "Monitor": {
+      "module": "monitor.js",
+      "scc": null
+    },
+    "MonitorConditionVariable": {
+      "module": "monitor.js",
+      "scc": null
+    },
+    "monSynchronize": {
+      "module": "monitor.js",
+      "scc": null
+    },
+    "Mutex": {
+      "module": "mutex.js",
+      "scc": null
+    },
+    "nameErrMesgReceiver": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "NameError": {
+      "module": "name-error.js",
+      "scc": null
+    },
+    "Net": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "newCond": {
+      "module": "monitor.js",
+      "scc": null
+    },
+    "NilClass": {
+      "module": "nil-class.js",
+      "scc": null
+    },
+    "NoMethodError": {
+      "module": "no-method-error.js",
+      "scc": null
+    },
+    "NotImplementedError": {
+      "module": "not-implemented-error.js",
+      "scc": null
+    },
+    "numericAbs": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "numericDiv": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "numericMinus": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "numericModulo": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "numericMul": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "numericPlus": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "numericPow": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "numericUminus": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "numStep": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "OBJECT_METHOD_TABLE": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "ObjectSpace": {
+      "module": "object-space.js",
+      "scc": null
+    },
+    "objRespondToMissing": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "onSignal": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "Open3": {
+      "module": "open3.js",
+      "scc": null
+    },
+    "OpenSSL": {
+      "module": "openssl.js",
+      "scc": null
+    },
+    "OpenTimeout": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "OpenURI": {
+      "module": "open-uri.js",
+      "scc": null
+    },
+    "OptionParser": {
+      "module": "optparse.js",
+      "scc": null
+    },
+    "osAdapterConfig": {
+      "module": "os-adapter.js",
+      "scc": null
+    },
+    "pack": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "partition": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "Pathname": {
+      "module": "pathname.js",
+      "scc": null
+    },
+    "PipeIO": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "PP": {
+      "module": "pp.js",
+      "scc": null
+    },
+    "prepend": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "prepended": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "PrettyPrint": {
+      "module": "pretty-print.js",
+      "scc": null
+    },
+    "print": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "printf": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "Process": {
+      "module": "process.js",
+      "scc": 0
+    },
+    "processAdapterConfig": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "product": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "ProtoAuthError": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "Protocol": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "PROTOCOL_PROBES": {
+      "module": "method-missing-proxy.js",
+      "scc": null
+    },
+    "ProtocolError": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "ProtoFatalError": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "ProtoServerError": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "ProtoSyntaxError": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "ProtoUnknownError": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "publicInstanceMethods": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "puts": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "Queue": {
+      "module": "queue.js",
+      "scc": null
+    },
+    "Range": {
+      "module": "range.js",
+      "scc": 0
+    },
+    "RangeError": {
+      "module": "range-error.js",
+      "scc": null
+    },
+    "rational": {
+      "module": "rational.js",
+      "scc": 0
+    },
+    "Rational": {
+      "module": "rational.js",
+      "scc": 0
+    },
+    "rbAnyToS": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbArgv": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "rbAryBsearch": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "rbAryBsearchIndex": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "rbAryFetch": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "rbAryFirst": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "rbAryReplace": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "rbAutoloadLoad": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbAutoloadP": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbAutoloadStr": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbBigNorm": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "rbBlockGivenP": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "rbBuiltinClassName": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCallSuper": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbCArray": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCBasicObject": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCClass": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCDate": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCDateTime": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCFalseClass": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCFloat": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCheckArity": {
+      "module": "method.js",
+      "scc": null
+    },
+    "rbCheckArrayType": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "rbCheckFuncall": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCheckStringType": {
+      "module": "string/support.js",
+      "scc": 0
+    },
+    "rbCheckToInt": {
+      "module": "kernel-integer.js",
+      "scc": 0
+    },
+    "rbCInteger": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbClassAttachedObject": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbClassInheritedP": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbClassNewInstance": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbClassOf": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbClassPath": {
+      "module": "classpath.js",
+      "scc": null
+    },
+    "rbClassSuperclass": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbClearMethodCache": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbCModule": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbCmpint": {
+      "module": "comparable.js",
+      "scc": 0
+    },
+    "rbCNilClass": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCNumeric": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "RbConfig": {
+      "module": "rb-config.js",
+      "scc": null
+    },
+    "rbConstGet": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbConstMissing": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbConstTableGet": {
+      "module": "classpath.js",
+      "scc": null
+    },
+    "rbConstWarnIfDeprecated": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbCProc": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCString": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCSymbol": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCTime": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbCTrueClass": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbDbl2num": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "rbDeclareIvar": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbDefineAllocFunc": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbDefineInspectCustom": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbDefineMethod": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "rbEnsure": {
+      "module": "ensure.js",
+      "scc": null
+    },
+    "rbEql": {
+      "module": "rb-equal.js",
+      "scc": 0
+    },
+    "rbEqq": {
+      "module": "rb-equal.js",
+      "scc": 0
+    },
+    "rbEqual": {
+      "module": "rb-equal.js",
+      "scc": 0
+    },
+    "rbFArray": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "rbFBackquote": {
+      "module": "kernel-system.js",
+      "scc": null
+    },
+    "rbFBinding": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbFCaller": {
+      "module": "backtrace-location.js",
+      "scc": null
+    },
+    "rbFFork": {
+      "module": "kernel-fork.js",
+      "scc": null
+    },
+    "rbFLoad": {
+      "module": "load.js",
+      "scc": null
+    },
+    "rbFloatTypeP": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "rbForkedPipe": {
+      "module": "kernel-fork.js",
+      "scc": null
+    },
+    "rbForkPayload": {
+      "module": "kernel-fork.js",
+      "scc": null
+    },
+    "rbFRequire": {
+      "module": "load.js",
+      "scc": null
+    },
+    "rbFRequireFile": {
+      "module": "load.js",
+      "scc": null
+    },
+    "rbFSend": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbFSleep": {
+      "module": "thread.js",
+      "scc": 0
+    },
+    "rbFSystem": {
+      "module": "kernel-system.js",
+      "scc": null
+    },
+    "rbGetKwargs": {
+      "module": "keyword-splat.js",
+      "scc": null
+    },
+    "rbGvGet": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbGvSet": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbHash": {
+      "module": "rb-hash.js",
+      "scc": 0
+    },
+    "rbHashSRuby2KeywordsHash": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "rbHashSRuby2KeywordsHashP": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "rbInspect": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbIntegerTypeP": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "rbIseqParameters": {
+      "module": "method.js",
+      "scc": null
+    },
+    "rbIterBreakValue": {
+      "module": "thread.js",
+      "scc": 0
+    },
+    "rbMethodName": {
+      "module": "symbol.js",
+      "scc": null
+    },
+    "rbModAncestors": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbModAppendFeatures": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbModAttrReader": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbModAttrWriter": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbModConstants": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbModConstMissing": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbModDefineMethod": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbModDeprecateConstant": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbModGt": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbModInstanceMethod": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbModMethodDefined": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbModName": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbModRemoveConst": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "rbModSingletonP": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbModToS": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbModUndefMethod": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbNum2Int": {
+      "module": "kernel-integer.js",
+      "scc": 0
+    },
+    "rbObjAsString": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjClass": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjClassname": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjClone": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbObjDup": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbObjEncoding": {
+      "module": "string/force-encoding.js",
+      "scc": null
+    },
+    "rbObjHash": {
+      "module": "rb-hash.js",
+      "scc": 0
+    },
+    "rbObjId": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjInspect": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjInstanceVariables": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjIsKindOf": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "rbObjIsProc": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjIvarDefined": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjIvarGet": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjIvarSet": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjMethod": {
+      "module": "method.js",
+      "scc": null
+    },
+    "rbObjMethods": {
+      "module": "method.js",
+      "scc": null
+    },
+    "rbObjNotMatch": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "rbObjRemoveInstanceVariable": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjRespondTo": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbObjSingletonClass": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbOutputRs": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "rbPlus": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "rbProcCall": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbProgname": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "rbRegInitStr": {
+      "module": "regexp.js",
+      "scc": 0
+    },
+    "rbRegMatchM": {
+      "module": "string/sub.js",
+      "scc": 0
+    },
+    "rbRegMatchP": {
+      "module": "regexp.js",
+      "scc": 0
+    },
+    "rbRegSUnion": {
+      "module": "regexp.js",
+      "scc": 0
+    },
+    "rbRegToS": {
+      "module": "regexp.js",
+      "scc": 0
+    },
+    "rbRequireLoaded": {
+      "module": "load.js",
+      "scc": null
+    },
+    "rbScanArgs": {
+      "module": "keyword-splat.js",
+      "scc": null
+    },
+    "rbSeatSuper": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbSetClassPathString": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbSingletonClass": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "rbStrByteslice": {
+      "module": "string/byte-methods.js",
+      "scc": 0
+    },
+    "rbStrDump": {
+      "module": "string/convert.js",
+      "scc": 0
+    },
+    "rbStrEachCharBytes": {
+      "module": "string/force-encoding.js",
+      "scc": null
+    },
+    "rbStrEnumerateLines": {
+      "module": "string/each.js",
+      "scc": 0
+    },
+    "rbStrGetbyte": {
+      "module": "string/byte-methods.js",
+      "scc": 0
+    },
+    "rbStrHex": {
+      "module": "string/convert.js",
+      "scc": 0
+    },
+    "rbStrInclude": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "rbStrMatch": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "rbStrMatchM": {
+      "module": "string/sub.js",
+      "scc": 0
+    },
+    "rbStrPlus": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "rbStrRespondTo": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "rbStrRpartition": {
+      "module": "string/sub.js",
+      "scc": 0
+    },
+    "rbStrScanSubexpCall": {
+      "module": "string/sub.js",
+      "scc": 0
+    },
+    "rbStrSend": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "rbStrStartWith": {
+      "module": "string/sub.js",
+      "scc": 0
+    },
+    "rbStrSub": {
+      "module": "string/sub.js",
+      "scc": 0
+    },
+    "rbStrSubBang": {
+      "module": "string/sub.js",
+      "scc": 0
+    },
+    "rbStrToF": {
+      "module": "string/convert.js",
+      "scc": 0
+    },
+    "rbStrToI": {
+      "module": "string/convert.js",
+      "scc": 0
+    },
+    "rbToHashType": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "rbWarningSAref": {
+      "module": "kernel-warn.js",
+      "scc": null
+    },
+    "rbWarningSAset": {
+      "module": "kernel-warn.js",
+      "scc": null
+    },
+    "ReadTimeout": {
+      "module": "net/protocol.js",
+      "scc": null
+    },
+    "reduce": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "regexpEscape": {
+      "module": "regexp.js",
+      "scc": 0
+    },
+    "registerAsyncContextAdapter": {
+      "module": "async-context-adapter.js",
+      "scc": null
+    },
+    "registerChildProcessAdapter": {
+      "module": "child-process-adapter.js",
+      "scc": null
+    },
+    "registerCompiledFiles": {
+      "module": "load.js",
+      "scc": null
+    },
+    "registerCryptoAdapter": {
+      "module": "crypto-adapter.js",
+      "scc": null
+    },
+    "registerFsAdapter": {
+      "module": "fs-adapter.js",
+      "scc": null
+    },
+    "registerHttpAdapter": {
+      "module": "http-adapter.js",
+      "scc": null
+    },
+    "registerOsAdapter": {
+      "module": "os-adapter.js",
+      "scc": null
+    },
+    "registerProcessAdapter": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "registerReplAdapter": {
+      "module": "repl-adapter.js",
+      "scc": null
+    },
+    "registerZlibAdapter": {
+      "module": "zlib-adapter.js",
+      "scc": 5
+    },
+    "reject": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "RejectedExecutionError": {
+      "module": "thread-pool-executor.js",
+      "scc": null
+    },
+    "replAdapterConfig": {
+      "module": "repl-adapter.js",
+      "scc": null
+    },
+    "resetConstants": {
+      "module": "variable.js",
+      "scc": 2
+    },
+    "Resolv": {
+      "module": "resolv.js",
+      "scc": null
+    },
+    "RFC2396_PARSER": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "RFC2396Parser": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "RFC3986_PARSER": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "round": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "rstrip": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "rtest": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "RUBY_ENGINE": {
+      "module": "ruby-platform.js",
+      "scc": null
+    },
+    "RUBY_PLATFORM": {
+      "module": "ruby-platform.js",
+      "scc": null
+    },
+    "RUBY_VERSION": {
+      "module": "ruby-platform.js",
+      "scc": null
+    },
+    "RuntimeError": {
+      "module": "runtime-error.js",
+      "scc": null
+    },
+    "ScheduledTask": {
+      "module": "scheduled-task.js",
+      "scc": null
+    },
+    "scrub": {
+      "module": "string/scrub.js",
+      "scc": null
+    },
+    "SecureRandom": {
+      "module": "secure-random.js",
+      "scc": null
+    },
+    "Semaphore": {
+      "module": "concurrent/semaphore.js",
+      "scc": null
+    },
+    "Set": {
+      "module": "set.js",
+      "scc": null
+    },
+    "setArg0": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "setClassDefinedHook": {
+      "module": "load.js",
+      "scc": null
+    },
+    "setEnv": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "setExitCode": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "setLoadImporter": {
+      "module": "load.js",
+      "scc": null
+    },
+    "setRubyTzUptodate": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "setSourceMapsSupport": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "setVerbose": {
+      "module": "verbose.js",
+      "scc": null
+    },
+    "shadowsIncluded": {
+      "module": "include.js",
+      "scc": 2
+    },
+    "Shellwords": {
+      "module": "shellwords.js",
+      "scc": null
+    },
+    "SignalException": {
+      "module": "signal-exception.js",
+      "scc": null
+    },
+    "signo2signm": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "SimpleDelegator": {
+      "module": "delegate.js",
+      "scc": null
+    },
+    "size": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "SizedQueue": {
+      "module": "queue.js",
+      "scc": null
+    },
+    "slice": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "sliceBang": {
+      "module": "string/slice.js",
+      "scc": 0
+    },
+    "Socket": {
+      "module": "socket.js",
+      "scc": null
+    },
+    "SocketError": {
+      "module": "socket.js",
+      "scc": null
+    },
+    "sort": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "sortBy": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "sortByBang": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "sprintf": {
+      "module": "kernel-format.js",
+      "scc": 0
+    },
+    "StandardError": {
+      "module": "standard-error.js",
+      "scc": null
+    },
+    "stderr": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "STDERR": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "stdin": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "STDIN": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "stdout": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "STDOUT": {
+      "module": "io.js",
+      "scc": 3
+    },
+    "StopIteration": {
+      "module": "stop-iteration.js",
+      "scc": null
+    },
+    "strCount": {
+      "module": "string/tr.js",
+      "scc": 0
+    },
+    "strGsub": {
+      "module": "string/sub.js",
+      "scc": 0
+    },
+    "STRING_METHOD_TABLE": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "stringDelete": {
+      "module": "string/delete.js",
+      "scc": null
+    },
+    "stringInspect": {
+      "module": "string/inspect.js",
+      "scc": null
+    },
+    "StringIO": {
+      "module": "string-io.js",
+      "scc": 3
+    },
+    "StringScanner": {
+      "module": "string-scanner.js",
+      "scc": null
+    },
+    "stringSplit": {
+      "module": "string/split.js",
+      "scc": 0
+    },
+    "stringSuperclass": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "stringToSym": {
+      "module": "symbol.js",
+      "scc": null
+    },
+    "stringValue": {
+      "module": "string/support.js",
+      "scc": 0
+    },
+    "strip": {
+      "module": "string/method-table.js",
+      "scc": 0
+    },
+    "strlen": {
+      "module": "string/support.js",
+      "scc": 0
+    },
+    "strNew": {
+      "module": "string/bytes.js",
+      "scc": null
+    },
+    "strSlice": {
+      "module": "string/slice.js",
+      "scc": 0
+    },
+    "strSqueeze": {
+      "module": "string/tr.js",
+      "scc": 0
+    },
+    "Struct": {
+      "module": "struct.js",
+      "scc": null
+    },
+    "symbolToS": {
+      "module": "symbol.js",
+      "scc": null
+    },
+    "synchronize": {
+      "module": "monitor.js",
+      "scc": null
+    },
+    "SystemCallError": {
+      "module": "errno.js",
+      "scc": null
+    },
+    "SystemExit": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "take": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "tally": {
+      "module": "enumerable.js",
+      "scc": 0
+    },
+    "TCPSocket": {
+      "module": "socket.js",
+      "scc": null
+    },
+    "Tempfile": {
+      "module": "tempfile.js",
+      "scc": null
+    },
+    "TEMPORAL_METHOD_TABLE": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "Thread": {
+      "module": "thread.js",
+      "scc": 0
+    },
+    "ThreadError": {
+      "module": "thread-error.js",
+      "scc": null
+    },
+    "ThreadPoolExecutor": {
+      "module": "thread-pool-executor.js",
+      "scc": null
+    },
+    "throwDataP": {
+      "module": "kernel-catch.js",
+      "scc": null
+    },
+    "Timeout": {
+      "module": "timeout.js",
+      "scc": null
+    },
+    "TimerTask": {
+      "module": "concurrent/timer-task.js",
+      "scc": null
+    },
+    "toA": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "toD": {
+      "module": "big-decimal.js",
+      "scc": null
+    },
+    "toEnum": {
+      "module": "enumerator.js",
+      "scc": 0
+    },
+    "toF": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "toH": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "toI": {
+      "module": "numeric.js",
+      "scc": 0
+    },
+    "TopLevel": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "toS": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "toSym": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "transformValues": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "transformValuesBang": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "trap": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
+    "trTrans": {
+      "module": "string/tr.js",
+      "scc": 0
+    },
+    "TSE": {
+      "module": "tse.js",
+      "scc": null
+    },
+    "TSREPL": {
+      "module": "repl-adapter.js",
+      "scc": null
+    },
+    "TypeError": {
+      "module": "type-error.js",
+      "scc": null
+    },
+    "UncaughtThrowError": {
+      "module": "kernel-catch.js",
+      "scc": null
+    },
+    "UndefinedConversionError": {
+      "module": "undefined-conversion-error.js",
+      "scc": null
+    },
+    "union": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "uniq": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "uniqBang": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "unpack": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "unpack1": {
+      "module": "array.js",
+      "scc": 0
+    },
+    "upcase": {
+      "module": "string/case-mapping.js",
+      "scc": 0
+    },
+    "update": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "URI": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "Util": {
+      "module": "uri.js",
+      "scc": null
+    },
+    "valuesAt": {
+      "module": "hash.js",
+      "scc": 0
+    },
+    "verbose": {
+      "module": "verbose.js",
+      "scc": null
+    },
+    "warn": {
+      "module": "kernel-warn.js",
+      "scc": null
+    },
+    "writerSpelling": {
+      "module": "object.js",
+      "scc": 0
+    },
+    "ZeroDivisionError": {
+      "module": "rational.js",
+      "scc": 0
+    },
+    "Zlib": {
+      "module": "zlib.js",
+      "scc": 5
+    },
+    "zlibAdapterConfig": {
+      "module": "zlib-adapter.js",
+      "scc": 5
+    }
+  }
+}
