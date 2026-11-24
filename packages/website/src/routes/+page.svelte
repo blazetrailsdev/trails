@@ -125,7 +125,7 @@
   <section class="band">
     <div class="card">
       <h2>Built for Rails developers, new and seasoned.</h2>
-      <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/{data.buildRef}/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/{data.buildRef}/examples/react-native-notes">React Native app</a>. Run <a href="{base}/playground/">the full stack in a browser tab</a>, on SQLite (<a href="{repo}/tree/{data.buildRef}/examples/browser-sqlite">source</a>).</p>
+      <p class="small"><strong>Bring the Rails you know, or learn it as you go, and let agents write the types.</strong> Use the Rails vocabulary to write apps at the speed of agents. Deploy serverless to <a href="{repo}/tree/{data.buildRef}/examples/serverless-lambda">Lambda</a> or <a href="{repo}/tree/{data.buildRef}/examples/cloudflare-worker">Cloudflare</a>. Use Active Record in a <a href="{repo}/tree/{data.buildRef}/examples/react-native-notes">React Native app</a>. Ship <a href="{repo}/tree/{data.buildRef}/examples/electron-bookmarks">a desktop app in Electron</a>. Run <a href="{base}/playground/">the full stack in a browser tab</a>, on SQLite (<a href="{repo}/tree/{data.buildRef}/examples/browser-sqlite">source</a>).</p>
     </div>
   </section>
 
