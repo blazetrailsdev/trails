@@ -1049,10 +1049,8 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - name: Install ImageMagick
-        run: |
-          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq -o Acquire::Retries=5 && sudo apt-get install -y -qq -o Acquire::Retries=5 imagemagick; }
-          { magick -version 2>/dev/null || convert -version; } | head -1
+      # Cached .debs: a cold apt install of imagemagick with Recommends took ~400s.
+      - uses: ./.github/actions/activestorage-media-binaries
       - run: pnpm build
       - if: needs.changes.outputs.unit_packages == '' || contains(needs.changes.outputs.unit_packages, 'packages/mini-mime')
         run: pnpm vendor:fetch --source mime-types-data
@@ -1230,23 +1228,22 @@ jobs:
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 30
     env:
-      TRAILTIES_SHARD_TOTAL: 4
+      TRAILTIES_SHARD_TOTAL: 7
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, mailer-previews, configuration]
+        shard: [1, 2, 3, 4, 5, 6, 7, configuration]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
       - run: pnpm build
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard != 'mailer-previews' && matrix.shard != 'configuration'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard != 'configuration'
         env:
-          TRAILTIES_EXCLUDE: packages/trailties/test/application/mailer-previews.test.ts,packages/trailties/test/application/configuration.test.ts
+          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts
+          VITEST_SHARD_DURATIONS: trailties
         run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ env.TRAILTIES_SHARD_TOTAL }}
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 'mailer-previews'
-        run: pnpm vitest run packages/trailties/test/application/mailer-previews.test.ts
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 'configuration'
         run: pnpm vitest run packages/trailties/test/application/configuration.test.ts
       - if: needs.changes.outputs.actioncable_only == 'true' && matrix.shard == 1
@@ -1323,10 +1320,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Install ImageMagick
-        run: |
-          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq -o Acquire::Retries=5 && sudo apt-get install -y -qq -o Acquire::Retries=5 imagemagick; }
-          { magick -version 2>/dev/null || convert -version; } | head -1
+      # Cached .debs: a cold apt install of imagemagick with Recommends took ~400s.
+      - uses: ./.github/actions/activestorage-media-binaries
       - name: Run vitest with coverage (non-AR packages)
         run: >
           pnpm vitest run

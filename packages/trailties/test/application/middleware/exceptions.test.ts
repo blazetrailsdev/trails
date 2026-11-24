@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
@@ -41,18 +41,19 @@ const fooController = (body: string): string => `
   }
 `;
 
-describe("MiddlewareExceptionsTest", { timeout: 120_000 }, () => {
+describe("MiddlewareExceptionsTest", { concurrent: true, timeout: 120_000 }, () => {
   let t: Host;
 
-  beforeEach(async () => {
-    t = new MiddlewareExceptionsTest("test") as unknown as Host;
-    await t.buildApp();
-  });
-
-  afterEach(async () => {
-    await t.teardownApp();
-    Trails.application = null;
-    Application.appClass = null;
+  Object.assign(MiddlewareExceptionsTest.prototype, {
+    async setup(): Promise<void> {
+      t = new MiddlewareExceptionsTest("test") as unknown as Host;
+      await t.buildApp();
+    },
+    async teardown(): Promise<void> {
+      await t.teardownApp();
+      Trails.application = null;
+      Application.appClass = null;
+    },
   });
 
   it("show exceptions middleware filter backtrace before logging", async () => {
