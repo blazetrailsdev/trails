@@ -1,9 +1,9 @@
 <% const modelClassName = this.className().split("::").pop(); -%>
-<% const singular = this.singularTableName(); -%>
-<% const plural = this.pluralTableName(); -%>
+<% const singular = ActiveSupport.Inflector.camelize(this.singularTableName(), false); -%>
+<% const plural = ActiveSupport.Inflector.camelize(this.pluralTableName(), false); -%>
 <% const params = `this._${ActiveSupport.Inflector.camelize(singular, false)}Params()`; -%>
 <% const ts = this.isTypeScript(); -%>
-import { <%= modelClassName %> } from "<%= "../".repeat(this.controllerClassPath().length + 1) %>models/<%= this.filePath() %><%= this.ext() %>";
+import { <%= modelClassName %> } from "<%= "../".repeat(this.controllerClassPath().length + 1) %>models/<%= [...this.classPath(), ActiveSupport.Inflector.dasherize(this.fileName)].join("/") %><%= this.ext() %>";
 import { ApplicationController } from "<%= "../".repeat(this.controllerClassPath().length) || "./" %>application-controller<%= this.ext() %>";
 
 export class <%= this.controllerClassName().split("::").pop() %>Controller extends ApplicationController {
@@ -38,7 +38,7 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
   async create()<%= sig %> {
     this.<%= singular %> = <%= this.ormClass().build(modelClassName, params) %>;
 
-    if (await this.<%= this.ormInstance().save() %>) {
+    if (await this.<%= this.ormInstance(singular).save() %>) {
       await this.redirectTo(<%= this.redirectResourceName() %>, { notice: "<%= this.humanName() %> was successfully created." });
     } else {
       await this.render("new", { status: ":unprocessable_entity" });
@@ -47,7 +47,7 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
 
   // PATCH/PUT <%= this.routeUrl() %>/1
   async update()<%= sig %> {
-    if (await this.<%= this.ormInstance().update(params) %>) {
+    if (await this.<%= this.ormInstance(singular).update(params) %>) {
       await this.redirectTo(<%= this.redirectResourceName() %>, { notice: "<%= this.humanName() %> was successfully updated.", status: ":see_other" });
     } else {
       await this.render("edit", { status: ":unprocessable_entity" });
@@ -56,7 +56,7 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
 
   // DELETE <%= this.routeUrl() %>/1
   async destroy()<%= sig %> {
-    await this.<%= this.ormInstance().destroy() %>;
+    await this.<%= this.ormInstance(singular).destroy() %>;
     await this.redirectTo(this.<%= this.indexHelper() %>Path(), { notice: "<%= this.humanName() %> was successfully destroyed.", status: ":see_other" });
   }
 
@@ -68,11 +68,11 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
   // Only allow a list of trusted parameters through.
 <% if (this.attributesNames().length === 0) { -%>
   <%= ts ? "private " : "" %>_<%= ActiveSupport.Inflector.camelize(singular, false) %>Params() {
-    return this.params.fetch("<%= singular %>", {});
+    return this.params.fetch("<%= this.singularTableName() %>", {});
   }
 <% } else { -%>
   <%= ts ? "private " : "" %>_<%= ActiveSupport.Inflector.camelize(singular, false) %>Params() {
-    return this.params.expect({ <%= singular %>: [<%= this.permittedParams() %>] });
+    return this.params.expect({ <%= this.singularTableName() %>: [<%= this.permittedParams() %>] });
   }
 <% } -%>
 }

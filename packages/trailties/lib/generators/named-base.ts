@@ -106,7 +106,7 @@ export class NamedBase extends GeneratorBase {
 
   showHelper(
     this: NamedBase & { controllerClassPath(): string[] },
-    arg: string = `this.${this.singularTableName()}`,
+    arg: string = `this.${camelize(this.singularTableName(), "lower")}`,
     { type = "url" }: { type?: string } = {},
   ): string {
     return `${camelize(`${this.singularRouteName()}_${type}`, "lower")}(${arg})`;
@@ -182,7 +182,7 @@ export class NamedBase extends GeneratorBase {
 
   /** @missingRailsArgs model_resource_name — PERMANENT */
   redirectResourceName(this: NamedBase & { controllerClassPath(): string[] }): string {
-    return this.modelResourceName(undefined, { prefix: "this." });
+    return this.modelResourceName(camelize(this.singularTableName(), "lower"), { prefix: "this." });
   }
 
   modelResourceName(
