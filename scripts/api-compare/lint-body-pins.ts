@@ -121,7 +121,7 @@ async function main(scope: string | null): Promise<number> {
   }
 
   let red = stale;
-  if (scope !== null && !process.env.CI && stale.length > 0) {
+  if (scope !== null && stale.length > 0) {
     const tags = await inlinedFromOutside(scope);
     const outside = stale.filter((s) =>
       tags.some((t) => t.method === s.rubyName && t.file.endsWith(`/${s.rubyFile}`)),
