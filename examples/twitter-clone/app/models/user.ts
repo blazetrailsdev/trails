@@ -1,21 +1,8 @@
 import { ApplicationRecord } from "./application-record.ts";
 
-/**
- * A user who can tweet, follow others, and like tweets.
- *
- * Zero-declare AND zero-attribute: no `declare` fields, no `this.attribute`
- * calls, no `import type { Tweet }`. Attribute types come from
- * `db/schema.ts` (regenerate with `pnpm db:schema:dump`), which
- * `trails-tsc` reads to inject the `declare` members; at runtime the
- * columns are reflected from the live DB (Rails-style schema reflection). Associations and
- * scopes still come from the runtime macros below. This mirrors a Rails
- * `class User < ApplicationRecord` exactly.
- */
 export class User extends ApplicationRecord {
   static {
     this.hasMany("tweets", { dependent: "destroy" });
-
-    // follows where this user is the follower → the people they follow.
     this.hasMany("activeFollows", {
       className: "Follow",
       foreignKey: "follower_id",
@@ -26,8 +13,6 @@ export class User extends ApplicationRecord {
       source: "followee",
       className: "User",
     });
-
-    // follows where this user is the followee → their followers.
     this.hasMany("passiveFollows", {
       className: "Follow",
       foreignKey: "followee_id",
@@ -41,7 +26,6 @@ export class User extends ApplicationRecord {
 
     this.validates("handle", { presence: true });
     this.validates("display_name", { presence: true });
-    // Uniqueness is DB-aware, so it has its own (AR-only) macro.
     this.validatesUniquenessOf("handle");
   }
 }
