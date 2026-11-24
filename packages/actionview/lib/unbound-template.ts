@@ -1,7 +1,7 @@
 import type { DetailKey, TemplateDetails } from "./template-details.js";
 import { Template } from "./template.js";
 import type { File as SourcesFile } from "./template/sources/file.js";
-import { symbolToS } from "@blazetrails/ruby-compat";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 
 export class UnboundTemplate {
   readonly virtualPath: string;

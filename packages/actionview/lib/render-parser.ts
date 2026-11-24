@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { dasherize } from "@blazetrails/activesupport";
 
 export const ALL_KNOWN_KEYS = [

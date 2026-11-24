@@ -4,14 +4,9 @@ import {
   stringifyKeys,
   type SafeBuffer,
 } from "@blazetrails/activesupport";
-import {
-  defineModule,
-  fetch,
-  rbObjAsString,
-  rbObjRespondTo,
-  rtest,
-  slice,
-} from "@blazetrails/ruby-compat";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import { fetch, slice } from "@blazetrails/ruby-compat/hash";
+import { rbObjAsString, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
 
 export interface CollectionTemplateObject {
   label(

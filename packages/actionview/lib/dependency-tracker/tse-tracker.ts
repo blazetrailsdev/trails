@@ -1,5 +1,5 @@
 import { pluralize, singularize } from "@blazetrails/activesupport";
-import { StringScanner } from "@blazetrails/ruby-compat";
+import { StringScanner } from "@blazetrails/ruby-compat/string-scanner";
 
 import type { PathSet } from "../path-set.js";
 import type { Base } from "../render-parser.js";

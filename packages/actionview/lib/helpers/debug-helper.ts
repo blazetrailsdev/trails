@@ -1,5 +1,8 @@
 import { SafeBuffer, htmlEscape } from "@blazetrails/activesupport";
-import { Exception, Marshal, StandardError, include, defineModule } from "@blazetrails/ruby-compat";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { include, defineModule } from "@blazetrails/ruby-compat/include";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { contentTag, type TagHelperHost, TagHelper } from "./tag-helper.js";
 

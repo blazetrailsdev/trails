@@ -1,14 +1,9 @@
 import { Tags } from "../../namespaces.js";
 import { isBlank, isPlainObject } from "@blazetrails/activesupport";
-import {
-  block as rbBlock,
-  fetch,
-  include,
-  Range,
-  rbFSend,
-  rbObjRespondTo,
-  rtest,
-} from "@blazetrails/ruby-compat";
+import { block as rbBlock, fetch } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { rbFSend, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
 
 import { FormOptionsHelper } from "../form-options-helper.js";
 import { Base } from "./base.js";

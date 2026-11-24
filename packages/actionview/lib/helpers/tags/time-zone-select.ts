@@ -1,6 +1,7 @@
 import { Tags } from "../../namespaces.js";
 import { TimeZone, type SafeBuffer } from "@blazetrails/activesupport";
-import { include, rtest } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rtest } from "@blazetrails/ruby-compat/object";
 
 import { FormOptionsHelper } from "../form-options-helper.js";
 import { Base } from "./base.js";

@@ -1,5 +1,5 @@
 import { Concern, dasherize, extend } from "@blazetrails/activesupport";
-import { rbClassSuperclass } from "@blazetrails/ruby-compat";
+import { rbClassSuperclass } from "@blazetrails/ruby-compat/object";
 import { LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";

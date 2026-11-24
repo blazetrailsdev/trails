@@ -1,6 +1,7 @@
 import { Tags } from "../../namespaces.js";
 import { humanize, stringifyKeys } from "@blazetrails/activesupport";
-import { block, fetch, include } from "@blazetrails/ruby-compat";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
 
 import { Base } from "./base.js";
 import { Placeholderable } from "./placeholderable.js";

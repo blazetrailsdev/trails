@@ -1,4 +1,5 @@
-import { File as RubyFile, loadedFileExports } from "@blazetrails/ruby-compat";
+import { File as RubyFile } from "@blazetrails/ruby-compat/file";
+import { loadedFileExports } from "@blazetrails/ruby-compat/load";
 
 export class File {
   private readonly _filename: string;

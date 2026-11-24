@@ -1,5 +1,5 @@
 import { Tags } from "../../namespaces.js";
-import { hashDelete } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
 
 import { DatetimeField, strftime } from "./datetime-field.js";
 

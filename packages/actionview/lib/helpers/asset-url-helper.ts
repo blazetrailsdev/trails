@@ -1,5 +1,7 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { ArgumentError, Zlib, defineModule } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Zlib } from "@blazetrails/ruby-compat/zlib";
+import { defineModule } from "@blazetrails/ruby-compat/include";
 
 export const URI_REGEXP = /^[-a-z]+:\/\/|^(?:cid|data):|^\/\//i;
 

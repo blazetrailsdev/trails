@@ -18,6 +18,7 @@ import {
 } from "../../lib/helpers/text-helper.js";
 import { include } from "@blazetrails/ruby-compat";
 import { raw } from "../../lib/helpers/output-safety-helper.js";
+import { contentTag } from "../../lib/helpers/tag-helper.js";
 import { Base } from "../../lib/base.js";
 import { I18n, inflections } from "@blazetrails/activesupport";
 import { assertNil } from "@blazetrails/activesupport/testing/assertions";
@@ -477,6 +478,89 @@ describe("TextHelperTest", () => {
         (word) => `<b>${word}</b>`,
       ).toString(),
     ).toBe("<b>one</b> <b>two</b> <b>three</b>");
+  });
+
+  it("highlight escapes quotes in the highlighted phrase", () => {
+    expect(
+      String(
+        highlight('rails" onclick="alert(1)', 'rails" onclick="alert(1)', {
+          highlighter: '<a href="search?q=\\1">\\1</a>',
+        }),
+      ),
+    ).toBe(
+      '<a href="search?q=rails&quot; onclick=&quot;alert(1)">rails&quot; onclick=&quot;alert(1)</a>',
+    );
+    expect(
+      String(
+        highlight("rails' onclick='alert(1)", /rails.*/, { highlighter: "<a title='\\1'>\\1</a>" }),
+      ),
+    ).toBe("<a title='rails&#39; onclick=&#39;alert(1)'>rails&#39; onclick=&#39;alert(1)</a>");
+    expect(
+      String(
+        highlight('rails" onclick="alert(1)', /rails.*/, {
+          highlighter: '<a title="\\0">\\0</a>',
+          sanitize: false,
+        }),
+      ),
+    ).toBe('<a title="rails&quot; onclick=&quot;alert(1)">rails&quot; onclick=&quot;alert(1)</a>');
+  });
+
+  it("highlight does not escape the highlighted phrase twice", () => {
+    expect(
+      String(
+        highlight("ruby & rails", /ruby.*rails/, { highlighter: '<mark title="\\1">\\1</mark>' }),
+      ),
+    ).toBe('<mark title="ruby &amp; rails">ruby &amp; rails</mark>');
+  });
+
+  it("highlight with regexp groups in highlighter", () => {
+    expect(
+      String(
+        highlight('ruby on "rails"', /(on) (\S+)/, {
+          highlighter: '<b>\\2</b> <i title="\\3">\\3</i>\\4',
+        }),
+      ),
+    ).toBe('ruby <b>on</b> <i title="&quot;rails&quot;">&quot;rails&quot;</i>');
+  });
+
+  it("highlight with html safe highlighter", () => {
+    expect(
+      String(
+        highlight('"rails"', '"rails"', {
+          highlighter: contentTag.call(view, "mark", "\\1", { title: "\\1" }),
+        }),
+      ),
+    ).toBe('<mark title="&quot;rails&quot;">&quot;rails&quot;</mark>');
+  });
+
+  it("highlight does not replace the end of a tag", () => {
+    const text = '<img src="x"> onerror=alert(1) a=" <b>end</b>';
+    expect(String(highlight(text, ">", { highlighter: "\\1" }))).toBe(text);
+    expect(String(highlight(text, ">", {}, () => ""))).toBe(text);
+    expect(String(highlight(text, /.*end/, { highlighter: "\\1" }))).toBe(text);
+    expect(String(highlight(text, />.*/, { highlighter: "\\1" }))).toBe(text);
+    expect(String(highlight(text, ">", { highlighter: "\\1", sanitize: false }))).toBe(text);
+    expect(String(highlight(text, />.*/, { highlighter: "\\1", sanitize: false }))).toBe(text);
+
+    expect(String(highlight("<p>rails</p>", ">"))).toBe("<p>rails</p>");
+    expect(String(highlight("<p>rails</p>", />rails/))).toBe("<p>rails</p>");
+    expect(String(highlight("<p>rails</p>", /.*rails.*/))).toBe("<p><mark>rails</mark></p>");
+    expect(
+      String(highlight("<p>rails</p>", /.*rails.*/, {}, (match) => `<mark>${match}</mark>`)),
+    ).toBe("<p><mark>rails</mark></p>");
+
+    expect(String(highlight("> 1 > 2", "&gt;"))).toBe("<mark>&gt;</mark> 1 <mark>&gt;</mark> 2");
+    expect(String(highlight("> 1 > 2", ">", { sanitize: false }))).toBe(
+      "<mark>&gt;</mark> 1 <mark>&gt;</mark> 2",
+    );
+    expect(String(highlight("<p>1 > 2</p>", ">", { sanitize: false }))).toBe(
+      "<p>1 <mark>&gt;</mark> 2</p>",
+    );
+  });
+
+  it("highlight preserves regexp boundaries after a tag", () => {
+    expect(String(highlight("<p>rails</p>", /^rails/))).toBe("<p>rails</p>");
+    expect(String(highlight("<p>rails</p>", /(?<=>)rails/))).toBe("<p><mark>rails</mark></p>");
   });
 
   it("excerpt", () => {

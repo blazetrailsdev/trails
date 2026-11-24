@@ -1,16 +1,11 @@
 import { assert, assertEqual, assertOperator } from "@blazetrails/activesupport/testing/assertions";
-import {
-  ArgumentError,
-  aryJoin,
-  block as rbBlock,
-  type Block,
-  type Range,
-  LocalJumpError,
-  NotImplementedError,
-  rbBlockGivenP,
-  rbInspect,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { aryJoin } from "@blazetrails/ruby-compat/array";
+import { block as rbBlock, type Block, rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import type { Range } from "@blazetrails/ruby-compat/range";
+import { LocalJumpError } from "@blazetrails/ruby-compat/local-jump-error";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbInspect, TopLevel } from "@blazetrails/ruby-compat/object";
 import {
   HTML5,
   XML,

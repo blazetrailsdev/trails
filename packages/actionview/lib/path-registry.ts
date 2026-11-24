@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { PathSet } from "./path-set.js";
 import { FileSystemResolver } from "./template/resolver.js";
 import type { PathSetResolver } from "./path-set.js";

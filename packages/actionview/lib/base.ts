@@ -28,16 +28,11 @@ import type { Template } from "./template.js";
 import { StrictLocalsError } from "./template/error.js";
 import type { RenderOptions } from "./renderer/abstract-renderer.js";
 import { Renderer } from "./renderer/renderer.js";
-import {
-  ArgumentError,
-  excBacktraceLocations,
-  include,
-  isModuleIncluded,
-  NotImplementedError,
-  rbDeclareIvar,
-  rbObjIvarSet,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { excBacktraceLocations } from "@blazetrails/ruby-compat/backtrace-location";
+import { include, isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbDeclareIvar, rbObjIvarSet, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Resolver } from "./template/resolver.js";
 
 export type CompiledMethod = ((

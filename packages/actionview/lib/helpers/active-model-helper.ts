@@ -1,5 +1,6 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { rbCallSuper, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 import { ActionView } from "../namespaces.js";
 

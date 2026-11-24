@@ -1,4 +1,6 @@
-import { ArgumentError, extend, rbInspect, include } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { extend, include } from "@blazetrails/ruby-compat/include";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 import { ModelNaming, convertToModel, modelNameFromRecordOrClass } from "./model-naming.js";
 

@@ -1,6 +1,7 @@
 import { Tags } from "../../namespaces.js";
 import { stringifyKeys } from "@blazetrails/activesupport";
-import { hashDelete, type Range } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import type { Range } from "@blazetrails/ruby-compat/range";
 
 import { TextField } from "./text-field.js";
 

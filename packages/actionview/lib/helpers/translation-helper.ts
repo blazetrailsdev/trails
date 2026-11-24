@@ -9,15 +9,11 @@ import {
   mattrAccessor,
   titleize,
 } from "@blazetrails/activesupport";
-import {
-  RuntimeError,
-  hashDelete,
-  isSymbol,
-  rbInspect,
-  symbolToS,
-  include,
-  defineModule,
-} from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { include, defineModule } from "@blazetrails/ruby-compat/include";
 import { ActionView } from "../namespaces.js";
 import { contentTag, TagHelper, type TagHelperHost } from "./tag-helper.js";
 

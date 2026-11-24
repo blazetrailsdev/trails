@@ -1,6 +1,6 @@
 import { Tags } from "../../namespaces.js";
 import { type SafeBuffer } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 
 import { FormOptionsHelper } from "../form-options-helper.js";
 import { Base } from "./base.js";

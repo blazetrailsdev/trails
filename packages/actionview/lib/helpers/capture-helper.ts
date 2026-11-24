@@ -1,4 +1,4 @@
-import { defineModule } from "@blazetrails/ruby-compat";
+import { defineModule } from "@blazetrails/ruby-compat/include";
 import { SafeBuffer, htmlEscape, isPresent, presence } from "@blazetrails/activesupport";
 
 import { OutputBuffer } from "../buffers.js";

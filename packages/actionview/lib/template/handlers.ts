@@ -1,10 +1,6 @@
-import {
-  ArgumentError,
-  classModule,
-  extended,
-  stringToSym,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { classModule, extended } from "@blazetrails/ruby-compat/include";
+import { stringToSym, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { Builder } from "./handlers/builder.js";
 import { Html } from "./handlers/html.js";
 import { Raw } from "./handlers/raw.js";

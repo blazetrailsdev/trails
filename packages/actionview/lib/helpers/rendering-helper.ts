@@ -1,5 +1,6 @@
 import type { SafeBuffer } from "@blazetrails/activesupport";
-import { isSymbol, defineModule } from "@blazetrails/ruby-compat";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
+import { defineModule } from "@blazetrails/ruby-compat/include";
 import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 
 import { capture, type CaptureHelperHost } from "./capture-helper.js";

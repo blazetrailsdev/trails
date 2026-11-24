@@ -1,5 +1,6 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { isSymbol, NoMethodError, symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 
 const SYMBOLS: readonly string[] = [":html", ":text", ":js", ":css", ":xml", ":json"];
 

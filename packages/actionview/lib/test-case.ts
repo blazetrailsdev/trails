@@ -16,29 +16,29 @@ import { AbstractController, ActionController, ActionDispatch } from "@blazetrai
 import { ControllerTestRequest } from "@blazetrails/actionpack/testing";
 import {
   include,
-  isPlainHash,
   Module,
-  NoMethodError,
+  rbClassNewInstance,
+  rbObjIsKindOf,
+} from "@blazetrails/ruby-compat/include";
+import {
+  isPlainHash,
   rbClassSuperclass,
   rbDeclareIvar,
-  rbEqual,
   rbFSend,
   rbModDefineMethod,
   rbModMethodDefined,
   rbObjClassname,
   rbObjInstanceVariables,
-  rbClassNewInstance,
-  rbObjIsKindOf,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
   rbObjSingletonClass,
-  rbStrSend,
-  StandardError,
-  isSymbol,
-  stringSuperclass,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbStrSend, stringSuperclass } from "@blazetrails/ruby-compat/string/method-table";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import type { Base } from "./base.js";
 import { OutputBuffer } from "./buffers.js";
 import { Context } from "./context.js";

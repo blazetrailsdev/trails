@@ -8,7 +8,9 @@ import {
   isPlainObject,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
-import { Hash, isSymbol, symbolToS, defineModule } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { defineModule } from "@blazetrails/ruby-compat/include";
 import { OutputBuffer } from "../buffers.js";
 
 export function raw(stringish: unknown): SafeBuffer {

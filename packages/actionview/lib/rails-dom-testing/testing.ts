@@ -1,5 +1,7 @@
 import { mattrAccessor } from "@blazetrails/activesupport";
-import { ArgumentError, NotImplementedError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { HTML5 } from "@blazetrails/nokogiri";
 import * as Nokogiri from "@blazetrails/nokogiri";
 

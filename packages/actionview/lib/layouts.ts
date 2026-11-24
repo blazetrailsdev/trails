@@ -1,4 +1,6 @@
-import { ArgumentError, NameError, rbFSend, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { rbFSend, rbInspect } from "@blazetrails/ruby-compat/object";
 import { Concern, classAttribute, dasherize, extend, underscore } from "@blazetrails/activesupport";
 import { include, Module } from "@blazetrails/ruby-compat/include";
 import type { LookupContext } from "./lookup-context.js";

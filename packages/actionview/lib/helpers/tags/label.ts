@@ -6,7 +6,7 @@ import {
   isPresent,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import { hashDelete } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
 
 import { Base } from "./base.js";
 import { Translator } from "./translator.js";

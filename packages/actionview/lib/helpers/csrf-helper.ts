@@ -1,5 +1,6 @@
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
-import { rbObjRespondTo, defineModule } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { defineModule } from "@blazetrails/ruby-compat/include";
 import { tag, type TagHelperHost } from "./tag-helper.js";
 
 interface CsrfHelperHost extends TagHelperHost {

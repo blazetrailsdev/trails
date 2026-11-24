@@ -1,7 +1,9 @@
 import { Tags } from "../../namespaces.js";
 import { htmlSafe } from "@blazetrails/activesupport";
 import { Date as RubyDate, Time } from "@blazetrails/date";
-import { block, fetch, include, rbFSend, rtest } from "@blazetrails/ruby-compat";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rtest } from "@blazetrails/ruby-compat/object";
 
 import { DateTimeSelector } from "../date-helper.js";
 import { Base } from "./base.js";

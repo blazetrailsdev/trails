@@ -1,4 +1,4 @@
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { DetailsKey } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { ActionView } from "./namespaces.js";

@@ -42,6 +42,7 @@ import {
   type AssetUrlHelperHost,
 } from "../../lib/helpers/asset-url-helper.js";
 import { Mime } from "@blazetrails/actionpack";
+import { HTML5 } from "@blazetrails/nokogiri";
 import { Template } from "../../lib/template.js";
 import {
   applyStylesheetMediaDefault,
@@ -1101,6 +1102,13 @@ describe("AssetTagHelperTest", () => {
     const options = { size: "16x10" };
     imageTag.call(host, "icon", options);
     expect(options).toEqual({ size: "16x10" });
+  });
+
+  it("image tag with whitespace attribute name generates valid markup", () => {
+    const html = imageTag.call(host, "/nonexistent.png", { " ": "/onerror=alert(1)//" });
+    const fragment = HTML5.DocumentFragment.parse(String(html));
+    const attrs = fragment.atCss("img")!.attributeNodes.map((a: { name: string }) => a.name);
+    expect(attrs).toEqual(["src"]);
   });
 
   it("image tag raises an error for competing size arguments", async () => {

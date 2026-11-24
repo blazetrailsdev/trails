@@ -1,4 +1,4 @@
-import { defineModule } from "@blazetrails/ruby-compat";
+import { defineModule } from "@blazetrails/ruby-compat/include";
 import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
 
 export let prependContentExfiltrationPrevention: boolean = false;

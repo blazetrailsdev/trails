@@ -2,6 +2,7 @@ import {
   I18n,
   SafeBuffer,
   htmlEscape,
+  htmlEscapeOnce,
   htmlSafe,
   isBlank,
   pluralize as inflectorPluralize,
@@ -10,7 +11,10 @@ import {
   extend,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
-import { chomp, fetch, regexpEscape, include, defineModule } from "@blazetrails/ruby-compat";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { include, defineModule } from "@blazetrails/ruby-compat/include";
 import { TagHelper, contentTag, type TagHelperHost } from "./tag-helper.js";
 import { SanitizeHelper, sanitize } from "./sanitize-helper.js";
 import { OutputSafetyHelper, raw } from "./output-safety-helper.js";
@@ -75,7 +79,7 @@ export function pluralize(
 }
 
 export interface HighlightOptions {
-  highlighter?: string;
+  highlighter?: string | SafeBuffer;
   sanitize?: boolean;
 }
 
@@ -86,44 +90,39 @@ export function highlight(
   options: HighlightOptions = {},
   block?: (match: string) => string,
 ): SafeBuffer {
-  const doSanitize = options.sanitize !== false;
-  let working: string;
-  if (text == null) {
-    working = "";
-  } else {
-    working = doSanitize ? sanitize.call(this, String(text))!.toString() : String(text);
+  if (options.sanitize !== false) text = sanitize.call(this, text == null ? text : String(text));
+
+  if (isBlank(text) || isBlank(phrases)) {
+    return htmlSafe(text == null ? "" : String(text));
   }
+  const patterns = (Array.isArray(phrases) ? phrases : [phrases!]).map((phrase) =>
+    phrase instanceof RegExp ? phrase.source : regexpEscape(String(phrase)),
+  );
+  const pattern = `(${patterns.join("|")})`;
+  const patternAfterTag = `(?!^)${pattern}`;
+  const highlighter = block ? undefined : String(options.highlighter ?? "<mark>\\1</mark>");
 
-  const phrasesBlank =
-    phrases == null ||
-    (typeof phrases === "string" && phrases.length === 0) ||
-    (Array.isArray(phrases) && phrases.length === 0);
-  const phraseList: Array<string | RegExp> = Array.isArray(phrases)
-    ? phrases
-    : phrases == null
-      ? []
-      : [phrases];
+  return htmlSafe(
+    (String(text).match(/<[^>]*|[^<]+/g) ?? [])
+      .map((segment, index) => {
+        if (!segment.startsWith("<")) {
+          const segmentPattern = new RegExp(index > 0 ? patternAfterTag : pattern, "gi");
 
-  if (isBlank(working) || phrasesBlank) {
-    return htmlSafe(working);
-  }
-
-  const sources = phraseList.map((p) => (p instanceof RegExp ? p.source : regexpEscape(String(p))));
-  const pattern = new RegExp(`(${sources.join("|")})`, "gi");
-  const highlighter = options.highlighter ?? "<mark>\\1</mark>";
-
-  const segments = working.match(/<[^>]*|[^<]+/g) ?? [];
-  const replaced = segments
-    .map((segment) => {
-      if (segment.startsWith("<")) return segment;
-      if (block) {
-        return segment.replace(pattern, (match) => block(match));
-      }
-      return segment.replace(pattern, (_match, p1: string) => highlighter.replace(/\\1/g, p1));
-    })
-    .join("");
-
-  return htmlSafe(replaced);
+          if (block) {
+            segment = segment.replace(segmentPattern, (match) => block(match));
+          } else {
+            segment = segment.replace(segmentPattern, (...args: unknown[]) => {
+              const match = args.slice(0, args.length - (typeof args.at(-1) === "object" ? 3 : 2));
+              return highlighter!.replace(/\\(\d)/g, (_m, n: string) =>
+                htmlEscapeOnce(match[Number(n)] ?? null).toString(),
+              );
+            });
+          }
+        }
+        return segment;
+      })
+      .join(""),
+  );
 }
 
 export interface ExcerptOptions {

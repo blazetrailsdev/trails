@@ -1,6 +1,9 @@
 import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
 
-import { ArgumentError, File, hasKey, hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { hasKey, hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 import type { LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../template/error.js";

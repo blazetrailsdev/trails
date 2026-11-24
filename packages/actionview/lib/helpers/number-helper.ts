@@ -1,5 +1,5 @@
-import { defineModule } from "@blazetrails/ruby-compat";
-import type { Rational } from "@blazetrails/ruby-compat";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import type { Rational } from "@blazetrails/ruby-compat/rational";
 import {
   NumberHelper as ActiveSupportNumberHelper,
   SafeBuffer,

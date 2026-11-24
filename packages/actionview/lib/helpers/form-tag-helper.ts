@@ -13,17 +13,11 @@ import {
   Concern,
   extend,
 } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  Hash,
-  type Range,
-  fetch,
-  hashDelete,
-  rbObjRespondTo,
-  update,
-  include,
-  defineModule,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Hash, fetch, hashDelete, update } from "@blazetrails/ruby-compat/hash";
+import type { Range } from "@blazetrails/ruby-compat/range";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { include, defineModule } from "@blazetrails/ruby-compat/include";
 
 import { ActionView } from "../namespaces.js";
 import type { capture } from "./capture-helper.js";

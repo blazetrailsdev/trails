@@ -1,12 +1,10 @@
 import { ActionView } from "../namespaces.js";
 import { I18n, cattrAccessor } from "@blazetrails/activesupport";
-import {
-  compiledFilesIn,
-  Dir,
-  File,
-  NotImplementedError,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { compiledFilesIn } from "@blazetrails/ruby-compat/load";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
 import { UnboundTemplate } from "../unbound-template.js";

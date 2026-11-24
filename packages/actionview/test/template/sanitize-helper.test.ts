@@ -319,6 +319,40 @@ function sanitizeHelperVendorTests(vendor: SanitizerVendor): void {
     expect(String(result)).toBe("Example of a fragment");
   });
 
+  it("strip tags returns nil for nil", () => {
+    expect(subject.stripTags(null)).toBeNull();
+  });
+
+  it("strip tags encodes ampersand", () => {
+    expect(String(subject.stripTags("this & that"))).toBe("this &amp; that");
+    expect(String(subject.stripTags("this &amp; that"))).toBe("this &amp; that");
+    expect(String(subject.stripTags("this &#38; that"))).toBe("this &amp; that");
+  });
+
+  it("strip tags encodes less than", () => {
+    expect(String(subject.stripTags("this < that"))).toBe("this &lt; that");
+    expect(String(subject.stripTags("this &lt; that"))).toBe("this &lt; that");
+    expect(String(subject.stripTags("this &#60; that"))).toBe("this &lt; that");
+  });
+
+  it("strip tags encodes greater than", () => {
+    expect(String(subject.stripTags("this > that"))).toBe("this &gt; that");
+    expect(String(subject.stripTags("this &gt; that"))).toBe("this &gt; that");
+    expect(String(subject.stripTags("this &#62; that"))).toBe("this &gt; that");
+  });
+
+  it("strip tags encodes double quote", () => {
+    expect(String(subject.stripTags('this " that'))).toBe("this &quot; that");
+    expect(String(subject.stripTags("this &quot; that"))).toBe("this &quot; that");
+    expect(String(subject.stripTags("this &#34; that"))).toBe("this &quot; that");
+  });
+
+  it("strip tags encodes single quote", () => {
+    expect(String(subject.stripTags("this ' that"))).toBe("this &#39; that");
+    expect(String(subject.stripTags("this &apos; that"))).toBe("this &#39; that");
+    expect(String(subject.stripTags("this &#39; that"))).toBe("this &#39; that");
+  });
+
   it("strip links", () => {
     const input = `<div><a href="http://www.example.com/">Example</a> of a fragment</div>`;
     const result = subject.stripLinks(input);

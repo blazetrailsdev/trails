@@ -1,5 +1,7 @@
 import { I18n, Notifications, type SafeBuffer } from "@blazetrails/activesupport";
-import { Fiber, excBacktrace, rbObjClassname, rbObjRespondTo, toS } from "@blazetrails/ruby-compat";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { excBacktrace } from "@blazetrails/ruby-compat/backtrace-location";
+import { rbObjClassname, rbObjRespondTo, toS } from "@blazetrails/ruby-compat/object";
 import { StreamingBuffer } from "../buffers.js";
 import { StreamingFlow } from "../flows.js";
 import { Base } from "../base.js";

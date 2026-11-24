@@ -9,20 +9,18 @@ import {
   wrap,
   SafeBuffer,
 } from "@blazetrails/activesupport";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { first, last } from "@blazetrails/ruby-compat/array";
 import {
-  fetch,
-  first,
-  last,
   rbModDefineMethod,
   rbFSend,
-  rbEql,
   rbObjAsString,
   rbObjRespondTo,
   rtest,
-  include,
-  filterMap,
-  defineModule,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbEql } from "@blazetrails/ruby-compat/rb-equal";
+import { include, defineModule } from "@blazetrails/ruby-compat/include";
+import { filterMap } from "@blazetrails/ruby-compat/enumerable";
 
 import { contentTag, tagBuilder, type TagHelperHost } from "./tag-helper.js";
 import { TextHelper } from "./text-helper.js";

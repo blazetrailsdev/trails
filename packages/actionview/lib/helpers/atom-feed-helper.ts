@@ -1,12 +1,8 @@
 import { Time } from "@blazetrails/date";
-import {
-  NameError,
-  PROTOCOL_PROBES,
-  defineModule,
-  isPlainHash,
-  rbModName,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import { isPlainHash, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import type { XmlBase } from "@blazetrails/builder";
 
 type Block<T> = (builder: T) => unknown;

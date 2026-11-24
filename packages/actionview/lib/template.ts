@@ -5,23 +5,17 @@ import {
   toSentence,
   TopLevel,
 } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  Encoding,
-  forceEncoding,
-  isCompiledFile,
-  isValidEncoding,
-  Exception,
-  extend,
-  LoadError,
-  loadedFileExports,
-  NotImplementedError,
-  rbInspect,
-  rbModName,
-  rbObjRespondTo,
-  rbStrEnumerateLines,
-  StandardError,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { forceEncoding, isValidEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
+import { isCompiledFile, loadedFileExports } from "@blazetrails/ruby-compat/load";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { extend } from "@blazetrails/ruby-compat/include";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbInspect, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbStrEnumerateLines } from "@blazetrails/ruby-compat/string/each";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer, StreamingBuffer } from "./buffers.js";

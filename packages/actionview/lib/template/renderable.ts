@@ -1,5 +1,6 @@
 import { tryCall, type SafeBuffer } from "@blazetrails/activesupport";
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 export class Renderable {
   private readonly renderable: unknown;
