@@ -53,9 +53,8 @@ afterEach(() => {
 async function runGeneratorInstance(): Promise<string> {
   bundleCommands = [];
   const generator = t.generator();
-  generator.executeCommand = async (_executor, ...args) => {
-    bundleCommands.push(args);
-    return true;
+  generator.installCommand = async (command, ...args) => {
+    bundleCommands.push([command, ...args]);
   };
   trailsCommands = [];
   generator.trailsCommand = async (command) => {
@@ -118,7 +117,7 @@ describe("AuthenticationGeneratorTest", { timeout: 120_000 }, () => {
 
     await runGeneratorInstance();
 
-    expect(bundleCommands).toContainEqual(["add @blazetrails/bcrypt", { capture: true }]);
+    expect(bundleCommands).toContainEqual(["add @blazetrails/bcrypt", {}, { quiet: true }]);
   });
 
   it("authentication generator with api flag", async () => {

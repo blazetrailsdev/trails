@@ -64,12 +64,17 @@ describe("LazyRouteSet url helper modules", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it("reloads routes before polymorphic_mappings answers", () => {
+    const routes = new LazyRouteSet();
+
+    expect(routes.polymorphicMappings.size).toBe(0);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ["urlFor", [{ host: "example.com" }]],
     ["fullUrlFor", [{ host: "example.com" }]],
     ["optimizeRoutesGeneration", []],
-    ["polymorphicUrl", [[]]],
-    ["polymorphicPath", [[]]],
   ] as const)("reloads routes before %s delegates", (name, args) => {
     const mod = new LazyRouteSet().generateUrlHelpers(true) as unknown as Record<
       string,
