@@ -16,6 +16,7 @@ export interface ReplServerLike {
   on(event: "exit", listener: () => void): unknown;
   close(): void;
   setPrompt(prompt: string): void;
+  _handleError?(error: unknown): void;
   eval: (
     cmd: string,
     context: object,
@@ -123,6 +124,12 @@ export const HelpersContainer = Object.defineProperty({}, "installHelperMethods"
   },
 }) as Record<string, unknown> & { installHelperMethods(): void };
 
+/** @noRailsEquivalent PERMANENT */
+class ReportedError {
+  /** @noRailsEquivalent PERMANENT */
+  constructor(readonly error: unknown) {}
+}
+
 /**
  * `IRB::Irb` (`vendor/ruby/v3.3.11/lib/irb.rb:920`), over the REPL adapter.
  * Its workspace is a REPL context whose missed reads resolve through
@@ -180,12 +187,21 @@ export class Tsrepl {
     const server = repl.start({ prompt: this.prompt(), useGlobal: true });
     this.loadHelperMethodsToMain(server);
     const evalDefault = server.eval;
+    let reported: ((error: unknown) => void) | null = null;
+    const handleError = server._handleError;
+    if (handleError != null) {
+      server._handleError = (error) => {
+        reported?.(error);
+        handleError.call(server, error);
+      };
+    }
     this.binding = (statements, file) =>
-      new Promise((resolve, reject) =>
+      new Promise((resolve, reject) => {
+        reported = (error) => reject(new ReportedError(error));
         evalDefault.call(server, statements, server.context, file, (err, result) =>
           err ? reject(err) : resolve(result),
-        ),
-      );
+        );
+      }).finally(() => (reported = null));
     const statements: Array<[string, string, (err: Error | null, result?: unknown) => void]> = [];
     let closed = false;
     let wake: (() => void) | null = null;
@@ -213,6 +229,10 @@ export class Tsrepl {
         if (throwDataP(error)) {
           server.close();
           throw error;
+        }
+        if (error instanceof ReportedError) {
+          server.setPrompt(this.prompt());
+          continue;
         }
         server.setPrompt(this.prompt());
         callback(error as Error);

@@ -7,6 +7,8 @@ import {
   STDOUT,
   TopLevel,
   constSet,
+  constGet,
+  include,
   setEnv,
   getProcessAdapter,
   rbModRemoveConst,
@@ -17,6 +19,13 @@ import {
 import { Console, ConsoleCommand } from "../../lib/commands/console.js";
 import { Trails } from "../../lib/trails.js";
 import { Reloader } from "@blazetrails/activesupport";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { ActiveRecord, AbstractAdapter } from "@blazetrails/activerecord";
+import { Application } from "../../lib/application.js";
+import type { Generation } from "../support/isolation/abstract-unit.js";
+import "../support/isolation/abstract-unit.js";
 
 interface Primary {
   output: string;
@@ -56,6 +65,8 @@ async function assertOutput(expected: string, io: Primary, timeout = 10): Promis
 }
 
 let started: Promise<void> | null = null;
+let previousAdapter: string | undefined;
+let previousEnv: string;
 const spawnedEnv: string[] = [];
 
 async function spawnConsole(
@@ -92,9 +103,6 @@ async function writePrompt(
 }
 
 describe("FullStackConsoleTest", () => {
-  let previousAdapter: string | undefined;
-  let previousEnv: string;
-
   beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(STDIN, "isTty").mockReturnValue(true);
@@ -325,5 +333,116 @@ describe("FullStackConsoleTest", () => {
     await spawnConsole(options);
 
     await writePrompt("TSREPL.conf.USE_AUTOCOMPLETE", "true");
+  });
+});
+
+class FullStackConsoleTest extends TestCase {}
+include(FullStackConsoleTest, Isolation);
+registerSpecType(/^FullStackConsoleTest$/, FullStackConsoleTest);
+
+describe("FullStackConsoleTest", { timeout: 300_000 }, () => {
+  let t: Generation;
+  let callbacks: unknown;
+
+  beforeEach(async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(STDIN, "isTty").mockReturnValue(true);
+    vi.spyOn(STDOUT, "puts").mockImplementation((...args) => {
+      primary.output += `${args.join("\n")}\n`;
+      return null;
+    });
+    callbacks = (AbstractAdapter as unknown as { __callbacks: unknown }).__callbacks;
+    previousEnv = String(Trails.env);
+    previousAdapter = replAdapterConfig.adapter;
+    replAdapterConfig.adapter = "full-stack-console";
+    Object.assign(primary, { output: "", read: 0, server: null, input: null });
+
+    t = new FullStackConsoleTest("test") as unknown as Generation;
+    await t.buildApp();
+    await t.appFile(
+      "app/models/post.ts",
+      `
+import { Base } from "@blazetrails/activerecord";
+export class Post extends Base {}
+`,
+    );
+  });
+
+  afterEach(async () => {
+    primary.server?.close();
+    await started;
+    await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang();
+    (AbstractAdapter as unknown as { __callbacks: unknown }).__callbacks = callbacks;
+    replAdapterConfig.adapter = previousAdapter!;
+    for (const key of spawnedEnv.splice(0)) setEnv(key, undefined);
+    await t.teardownApp();
+    Trails.application = null;
+    Application.appClass = null;
+    Trails.env = previousEnv;
+    vi.restoreAllMocks();
+  });
+
+  async function bootApp(): Promise<void> {
+    await t.bootTrails();
+    const Post = constGet(TopLevel, "Post") as typeof ActiveRecord.Base;
+    await (await Post.leaseConnection()).createTable("posts");
+    ActiveRecord.Base.connectionHandler.clearActiveConnectionsBang();
+  }
+
+  async function quit(): Promise<void> {
+    primary.server!.close();
+    await started;
+    await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang();
+    Object.assign(primary, { output: "", read: 0, server: null, input: null });
+  }
+
+  it("sandbox", async () => {
+    await bootApp();
+    const options = "--sandbox";
+    await spawnConsole(options);
+
+    await writePrompt("await Post.count()", "0");
+    await writePrompt("await Post.create()");
+    await writePrompt("await Post.count()", "1");
+    await quit();
+
+    await spawnConsole(options);
+
+    await writePrompt("await Post.count()", "0");
+    await writePrompt(
+      "await Post.transaction(async () => { await Post.create(); throw new Error(); })",
+    );
+    await writePrompt("await Post.count()", "0");
+    await quit();
+  });
+
+  it("reload command reload constants", async () => {
+    await t.appFile(
+      "app/models/user.ts",
+      `
+export class User {
+  name: unknown = null;
+}
+`,
+    );
+    await bootApp();
+
+    const options = "-e development";
+    await spawnConsole(options);
+
+    await writePrompt("'age' in new User()", "false");
+
+    await t.appFile(
+      "app/models/user.ts",
+      `
+export class User {
+  name: unknown = null;
+  age: unknown = null;
+}
+`,
+    );
+
+    await writePrompt("await reloadBang()", "Reloading...\n");
+    await writePrompt("'age' in new User()", "true");
   });
 });
