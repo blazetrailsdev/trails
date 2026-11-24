@@ -23,7 +23,7 @@ import {
   stderr,
   rbInspect,
 } from "@blazetrails/ruby-compat";
-import { HTML5, XML } from "@blazetrails/nokogiri";
+import { HTML5, XML, type Html5Document } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import {
@@ -1444,7 +1444,8 @@ describe("IntegrationRequestEncodersTest", () => {
       expect(t.request.accepts[0].toString()).toBe("text/html");
       expect(t.request.format().ref()).toBe(":html");
       expect(t.request.requestParameters).toEqual({ foo: "fighters" });
-      expect(t.response.parsedBody.at("code").text).toBe(rbInspect({ foo: "fighters" }));
+      const parsedBody: unknown = t.response.parsedBody;
+      expect((parsedBody as Html5Document).at("code")!.text).toBe(rbInspect({ foo: "fighters" }));
     });
   });
 
