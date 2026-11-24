@@ -15,6 +15,14 @@ describe("rbModName over the generated class-path table", () => {
     expect(rbPathToClass("Outer::Inner::Generated")).toBe(Generated);
   });
 
+  it("reads a thunked namespace at lookup, not at registration", () => {
+    class Lazy {}
+    defineConstants([[() => namespace, "Lazy", "ThunkedRow::Lazy"]]);
+    const namespace = { Lazy };
+    expect(rbModName(Lazy)).toBe("ThunkedRow::Lazy");
+    expect(rbPathToClass("ThunkedRow::Lazy")).toBe(Lazy);
+  });
+
   it("answers a generated namespace-member row, and the namespace itself", () => {
     class Member {}
     const namespace = { Member };
