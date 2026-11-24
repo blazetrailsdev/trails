@@ -44,7 +44,7 @@ function it(name: string, block: (t: Host) => Promise<void>): void {
   });
 }
 
-describe.concurrent("TestTest", { timeout: 600_000 }, () => {
+describe("TestTest", { timeout: 600_000 }, () => {
   it("simple successful test", async (t) => {
     await t.appFile(
       "test/unit/foo.test.ts",

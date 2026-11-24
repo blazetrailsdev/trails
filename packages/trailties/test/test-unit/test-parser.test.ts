@@ -36,6 +36,12 @@ describe("TestParserTestFixture", () => {
     expect(true).toBeTruthy();
     expect(false).toBeFalsy();
   });
+
+  function myTestingAlias(testName: string, block: () => void): void {
+    it(testName, block);
+  }
+
+  myTestingAlias("method_alias", () => expect(true).toBeTruthy());
 });
 
 const FILE = new URL(import.meta.url).pathname;
@@ -44,7 +50,7 @@ describe("TestParserTest", () => {
   beforeAll(() => TestParser.requireParser());
 
   it("parser", () => {
-    const actual = [5, 12, 14, 20, 24, 30, 33, 35].map((startLine) => {
+    const actual = [5, 12, 14, 20, 24, 30, 33, 35, 44].map((startLine) => {
       const [path, range] = TestParser.definitionFor({
         sourceLocation: () => [FILE, startLine],
       })!;
@@ -60,6 +66,7 @@ describe("TestParserTest", () => {
       [FILE, 30, 30],
       [FILE, 33, 33],
       [FILE, 35, 38],
+      [FILE, 44, 44],
     ]);
   });
 });
