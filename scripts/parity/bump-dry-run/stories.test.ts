@@ -85,7 +85,7 @@ describe("burn-down stories", () => {
       "git diff --no-index vendor/gem/v1/core/lib/a/x.rb vendor/gem/v2/core/lib/a/x.rb",
     );
     expect(md).toContain("TS: `a/x.ts`");
-    expect(md).toContain("body-pins.ts --pin b/y.rb");
+    expect(md).toContain("body-pins.ts --pin b/y.rb --package core");
     expect(md).toContain("- `XTest > new`");
     expect(md).toMatch(/^deps:\n {2}- gem-2-web$/m);
     expect(md).toContain('packages: ["gem-core"]');

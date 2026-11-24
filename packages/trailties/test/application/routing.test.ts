@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
@@ -54,18 +54,19 @@ const userModel = `
   }
 `;
 
-describe("RoutingTest", { timeout: 120_000 }, () => {
+describe("RoutingTest", { concurrent: true, timeout: 120_000 }, () => {
   let t: Host;
 
-  beforeEach(async () => {
-    t = new RoutingTest("test") as unknown as Host;
-    await t.buildApp();
-  });
-
-  afterEach(async () => {
-    await t.teardownApp();
-    Trails.application = null;
-    Application.appClass = null;
+  Object.assign(RoutingTest.prototype, {
+    async setup(): Promise<void> {
+      t = new RoutingTest("test") as unknown as Host;
+      await t.buildApp();
+    },
+    async teardown(): Promise<void> {
+      await t.teardownApp();
+      Trails.application = null;
+      Application.appClass = null;
+    },
   });
 
   it("trails/welcome in development", async () => {

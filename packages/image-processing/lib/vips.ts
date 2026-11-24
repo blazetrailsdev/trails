@@ -19,6 +19,34 @@ type Image = InstanceType<Awaited<ReturnType<typeof WasmVips>>["Image"]>;
 /** @noRailsEquivalent PERMANENT */
 export const vips = await WasmVips({ dynamicLibraries: ["vips-resvg.wasm"] });
 
+const MAGICKLOAD_CLASS_HIERARCHY = new Set([
+  "VipsOperation",
+  "VipsForeign",
+  "VipsForeignLoad",
+  "VipsForeignLoadMagick",
+  "VipsForeignLoadMagick7",
+]);
+let magickloadBlocked = false;
+
+const blockUntrusted = vips.blockUntrusted.bind(vips);
+const operationBlock = vips.operationBlock.bind(vips);
+/**
+ * @noRailsEquivalent PERMANENT
+ * @inventedArm magickloadBlocked — PERMANENT
+ */
+vips.blockUntrusted = (state: boolean) => {
+  blockUntrusted(state);
+  magickloadBlocked = state;
+};
+/**
+ * @noRailsEquivalent PERMANENT
+ * @inventedArm magickloadBlocked — PERMANENT
+ */
+vips.operationBlock = (name: string, state: boolean) => {
+  operationBlock(name, state);
+  if (MAGICKLOAD_CLASS_HIERARCHY.has(name)) magickloadBlocked = state;
+};
+
 /** @noRailsEquivalent PERMANENT */
 function atLeastLibvips(x: number, y: number): boolean {
   const major = Number(vips.version(0));
@@ -117,6 +145,7 @@ function vipsForeignLoadMagick(
   { page = 0, n = 1, density = null }: Options = {},
   error: unknown,
 ): Image {
+  if (magickloadBlocked) throw error;
   const tempfile = Tempfile.new(["magickload", ".png"]);
   try {
     const args = density != null ? ["-density", String(density)] : [];
@@ -355,7 +384,8 @@ export class Processor extends BaseProcessor {
     { mode = "over", gravity = "north-west", offset = null, ...options }: Options = {},
   ): Image {
     if (_mode != null && typeof _mode === "object" && !Array.isArray(_mode)) {
-      ({ mode = "over", gravity = "north-west", offset = null, ...options } = _mode as Options);
+      const modeOptions: Options = _mode as Options;
+      ({ mode = "over", gravity = "north-west", offset = null, ...options } = modeOptions);
       _mode = null;
     }
     const image = this.image as Image;

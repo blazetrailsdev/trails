@@ -12,18 +12,16 @@ import { Trails } from "../trails.js";
 
 export type Tagger = string | ((request: Request) => string);
 
-export class Logger extends LogSubscriber {
+export class Logger {
   private app: RackApp | { call: RackApp };
   private taggers: Tagger[];
 
   constructor(app: RackApp | { call: RackApp }, taggers: Tagger[] | null = null) {
-    super();
     this.app = app;
     this.taggers = taggers ?? [];
   }
 
-  // @ts-expect-error TS2416: CLAUDE.md, "Override arity (Ruby does not check it; TypeScript does)".
-  override async call(env: RackEnv): Promise<RackResponse> {
+  async call(env: RackEnv): Promise<RackResponse> {
     const request = new Request(env);
 
     const logger = this.logger;
@@ -76,7 +74,7 @@ export class Logger extends LogSubscriber {
   }
 
   /** @internal */
-  override get logger(): ActiveSupportLogger | null {
+  get logger(): ActiveSupportLogger | null {
     return Trails.logger;
   }
 

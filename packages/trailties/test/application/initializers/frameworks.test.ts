@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ActionController, Response, URL } from "@blazetrails/actionpack";
 import { Base, ConnectionNotEstablished, ScopeRegistry } from "@blazetrails/activerecord";
 import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
@@ -32,16 +32,19 @@ include(FrameworksTest, Isolation);
 registerSpecType(/^FrameworksTest$/, FrameworksTest);
 include(FrameworksTest, EnvHelpers);
 
-describe("FrameworksTest", { timeout: 120_000 }, () => {
+describe("FrameworksTest", { concurrent: true, timeout: 120_000 }, () => {
   let t: FrameworksTest;
 
-  beforeEach(async () => {
-    t = new FrameworksTest("test");
-    await t.buildApp();
-    await FileUtils.rmRfAsync(`${await t.appPath()}/config/environments`);
+  Object.assign(FrameworksTest.prototype, {
+    async setup(): Promise<void> {
+      t = new FrameworksTest("test");
+      await t.buildApp();
+      await FileUtils.rmRfAsync(`${await t.appPath()}/config/environments`);
+    },
+    async teardown(): Promise<void> {
+      await t.teardownApp();
+    },
   });
-
-  afterEach(() => t.teardownApp());
 
   it("set load paths set only if action controller or action mailer are in use", async () => {
     await expect(

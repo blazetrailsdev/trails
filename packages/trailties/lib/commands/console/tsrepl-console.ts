@@ -60,10 +60,6 @@ TSREPL.HelperMethod.register("newSession", NewSession);
 TSREPL.HelperMethod.register("app", AppInstance);
 TSREPL.HelperMethod.register("reloadBang", ReloadHelper);
 
-const BLUE = "\u001b[34m";
-const RED = "\u001b[31m";
-const CLEAR = "\u001b[0m";
-
 export class TSREPLConsole {
   /** @internal */
   private app: { name(): string };
@@ -77,7 +73,7 @@ export class TSREPLConsole {
   }
 
   async start(): Promise<void> {
-    TSREPL.setup(null);
+    await TSREPL.setup(null);
 
     if (!Trails.env.isLocal() && !Object.hasOwn(ENV, "TSREPL_USE_AUTOCOMPLETE")) {
       TSREPL.conf.USE_AUTOCOMPLETE = false;
@@ -115,11 +111,11 @@ export class TSREPLConsole {
   colorizedEnv(): string {
     switch (String(Trails.env)) {
       case "development":
-        return `${BLUE}dev${CLEAR}`;
+        return TSREPL.Color.colorize("dev", ["BLUE"]);
       case "test":
-        return `${BLUE}test${CLEAR}`;
+        return TSREPL.Color.colorize("test", ["BLUE"]);
       case "production":
-        return `${RED}prod${CLEAR}`;
+        return TSREPL.Color.colorize("prod", ["RED"]);
       default:
         return String(Trails.env);
     }

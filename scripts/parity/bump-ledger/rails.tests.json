@@ -16,14 +16,6 @@
     "to": "v8.0.5.2"
   },
   {
-    "package": "activestorage",
-    "rubyFile": "analyzer/audio_analyzer_test.rb",
-    "path": "ActiveStorage::Analyzer::AudioAnalyzerTest > analyzing an audio",
-    "kind": "changed",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
     "package": "actiontext",
     "rubyFile": "unit/attachment_test.rb",
     "path": "ActionText::AttachmentTest > to_trix_html sanitizes action-text HTML content attachment",

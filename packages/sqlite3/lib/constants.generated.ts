@@ -7,6 +7,7 @@ import * as m4 from "./fork-safety.js";
 import * as m5 from "./pragmas.js";
 import * as m6 from "./resultset.js";
 import * as m7 from "./statement.js";
+import * as m8 from "./value.js";
 
 defineConstants([
   [m3, "AbortException", "SQLite3::AbortException"],
@@ -19,9 +20,11 @@ defineConstants([
   [m3, "ConstraintException", "SQLite3::ConstraintException"],
   [m3, "CorruptException", "SQLite3::CorruptException"],
   [m2, "Database", "SQLite3::Database"],
+  [m2, "FunctionProxy", "SQLite3::Database::FunctionProxy"],
   [m3, "EmptyException", "SQLite3::EmptyException"],
   [m3, "Exception", "SQLite3::Exception"],
   [m4, "ForkSafety", "SQLite3::ForkSafety"],
+  [m4, "CoreExt", "SQLite3::ForkSafety::CoreExt"],
   [m3, "FormatException", "SQLite3::FormatException"],
   [m3, "FullException", "SQLite3::FullException"],
   [m6, "HashResultSet", "SQLite3::HashResultSet"],
@@ -45,4 +48,5 @@ defineConstants([
   [m7, "Statement", "SQLite3::Statement"],
   [m3, "TooBigException", "SQLite3::TooBigException"],
   [m3, "UnsupportedException", "SQLite3::UnsupportedException"],
+  [m8, "Value", "SQLite3::Value"],
 ]);

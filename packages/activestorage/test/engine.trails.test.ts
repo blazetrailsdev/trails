@@ -85,6 +85,13 @@ describe("ActiveStorage::Engine", () => {
     expect(VariantRecord.reflectOnAssociation("imageAttachment")).not.toBeNull();
   });
 
+  it("an app that never sets ffmpeg_allowed_formats keeps the default whitelist after boot", () => {
+    expect(ActiveStorage.ffmpegFormatWhitelistArguments()).toEqual([
+      "-format_whitelist",
+      "mov,matroska,avi,mpeg,mpegts,flv,asf,ogg,mp3,wav,flac,aac,aiff,caf",
+    ]);
+  });
+
   it("raises when Blob loads with no storage configuration", async () => {
     const trails = TopLevel.Trails!;
     const activeStorage = (

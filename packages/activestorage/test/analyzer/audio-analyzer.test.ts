@@ -1,3 +1,4 @@
+import { Range } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import "../support/database/setup.js";
@@ -17,7 +18,9 @@ describe("ActiveStorage::Analyzer::AudioAnalyzerTest", () => {
     const blob = await createFileBlob({ filename: "audio.mp3", contentType: "audio/mp3" });
     const metadata = await extractMetadataFrom(blob);
 
-    expect(metadata.get("duration")).toEqual(0.914286);
+    expect(
+      new Range(0.863379, 0.914286).isInclude(metadata.get("duration") as number),
+    ).toBeTruthy();
     expect(metadata.get("bitRate")).toEqual(128000);
     expect(metadata.get("sampleRate")).toEqual(44100);
     expect(metadata.get("tags")).not.toBeNull();

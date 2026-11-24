@@ -6,6 +6,7 @@ import {
   Hash,
   IO,
   JSON,
+  Process,
   kernelFloat,
   kernelInteger,
   stringSplit,
@@ -28,7 +29,7 @@ export class VideoAnalyzer extends Analyzer {
   private _audioStream?: Stream;
   private _probe?: Promise<Probe>;
 
-  static override isAccept(blob: Blob): boolean {
+  static override isAccept(blob: Blob): boolean | undefined {
     return blob.isVideo();
   }
 
@@ -206,10 +207,17 @@ export class VideoAnalyzer extends Analyzer {
             "-show_format",
             "-v",
             "error",
+            ...(ActiveStorage.ffmpegFormatWhitelistArguments() ?? []),
             file.path(),
           ],
           (output) => JSON.parse(new TextDecoder().decode(output.read())) as Probe,
-        ),
+        ).then((result) => {
+          if (!Process.lastStatus!.isSuccess())
+            this.logger.warn(
+              `Video analysis failed because ffprobe exited with status ${Process.lastStatus!.exitstatus()}. The file may be corrupt, or in a format outside config.active_storage.ffmpeg_allowed_formats.`,
+            );
+          return result;
+        }),
       );
     } catch (error) {
       if (!(error instanceof Errno.ENOENT)) throw error;

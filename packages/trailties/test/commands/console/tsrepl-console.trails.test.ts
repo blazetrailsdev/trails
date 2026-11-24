@@ -24,8 +24,8 @@ describe("TSREPLConsole#start", () => {
 
   function setupWith(extra: (conf: Record<string, unknown>) => void): void {
     const setup = TSREPL.setup;
-    vi.spyOn(TSREPL, "setup").mockImplementation((apPath) => {
-      setup(apPath);
+    vi.spyOn(TSREPL, "setup").mockImplementation(async (apPath) => {
+      await setup(apPath);
       extra(TSREPL.conf);
     });
   }

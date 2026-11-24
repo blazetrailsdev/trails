@@ -10,14 +10,18 @@ const ROTATIONS = /Right-top|Left-bottom|Top-right|Bottom-left|^[2468] \(/;
 export class Vips extends ImageAnalyzer<ReadImage> {
   static readonly ROTATIONS = ROTATIONS;
 
-  static override isAccept(blob: Blob): boolean {
+  static override isAccept(blob: Blob): boolean | undefined {
     return super.isAccept(blob) && ActiveStorage.variantProcessor === "vips";
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm loadPath — PERMANENT
+   */
   protected override async readImage(
     block: (image: ReadImage) => Promise<Metadata>,
   ): Promise<Metadata> {
+    await ActiveStorage.loadPath["active_storage/vips"]();
     let vips;
     try {
       vips = (await import("@blazetrails/image-processing/vips")).vips;

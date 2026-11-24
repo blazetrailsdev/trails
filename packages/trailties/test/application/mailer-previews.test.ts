@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
@@ -107,15 +107,18 @@ const sleep = (seconds: number): Promise<void> =>
 const FROM = 'static { this.default({ from: "from@example.com" }); }';
 const FOO = 'foo() { return this.mail({ to: "to@example.org" }); }';
 
-describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
+describe("MailerPreviewsTest", { concurrent: true, timeout: 120_000 }, () => {
   let t: MailerPreviewsTest;
 
-  beforeEach(async () => {
-    t = new MailerPreviewsTest("test");
-    await t.buildApp();
+  Object.assign(MailerPreviewsTest.prototype, {
+    async setup(): Promise<void> {
+      t = new MailerPreviewsTest("test");
+      await t.buildApp();
+    },
+    async teardown(): Promise<void> {
+      await t.teardownApp();
+    },
   });
-
-  afterEach(() => t.teardownApp());
 
   it("/trails/mailers is accessible in development", async () => {
     await t.app("development");

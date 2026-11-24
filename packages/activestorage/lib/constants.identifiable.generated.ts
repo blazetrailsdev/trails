@@ -1,4 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
 import * as m0 from "./app/models/active-storage/blob/identifiable.js";
 
-defineConstants([[m0, "Identifiable", "ActiveStorage::Blob::Identifiable"]]);
+defineConstants([[() => m0, "Identifiable", "ActiveStorage::Blob::Identifiable"]]);

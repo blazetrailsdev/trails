@@ -50,6 +50,8 @@ function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
     busyHandler: () => undefined,
     loadExtensionInternal: () => undefined,
     enableLoadExtension: () => undefined,
+    dbFilename: () => null,
+    libversion: () => 3045001,
   };
   const db = new SQLite3.Database(":memory:", { engine: () => engineDb });
   return { db, binds, engineDb };

@@ -4,8 +4,9 @@
 //
 //   node scripts/ci/ar-shard-durations.mjs <run-id>
 //
-// <run-id> is a green `CI` run on main. Every leg of the SQLite, PostgreSQL
-// and MariaDB lanes is read, so each adapter's table covers every file once.
+// <run-id> is a green `CI` run on main. Every leg of the SQLite, PostgreSQL,
+// MariaDB and numbered Trailties lanes is read, so each table covers every
+// file once.
 // A file vitest reports with no time (a skipped file) is recorded as 0; the
 // sequencer adds its per-file overhead to every file either way.
 import { execFile } from "node:child_process";
@@ -18,6 +19,7 @@ const LANES = {
   sqlite3: /^Active Record SQLite Tests \(\d+\)$/,
   postgresql: /^Active Record PostgreSQL Tests \(\d+\)$/,
   mysql2: /^Active Record MariaDB Tests \(\d+\)$/,
+  trailties: /^Trailties Tests \(\d+\)$/,
 };
 // ` ✓  activerecord  packages/activerecord/test/cases/finder.test.ts (261 tests | 1 skipped) 9387ms`
 const FILE_LINE =

@@ -1,3 +1,4 @@
+import { ActiveSupport } from "./namespaces.js";
 import { classAttribute } from "./class-attribute.js";
 import type { FilterListEntry } from "./callbacks.js";
 import { ExecutionWrapper } from "./execution-wrapper.js";
@@ -159,3 +160,5 @@ export class Reloader extends ExecutionWrapper {
 
 classAttribute.call(Reloader, "executor", { default: Executor });
 classAttribute.call(Reloader, "check", { default: () => false });
+
+ActiveSupport.Reloader = Reloader;

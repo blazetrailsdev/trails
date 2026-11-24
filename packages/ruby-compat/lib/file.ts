@@ -19,15 +19,22 @@ export type PathLike = { toPath(): string };
  * `rb_get_path` (`vendor/ruby/v3.3.11/file.c:246`), the `FilePathValue` conversion:
  * a String is the path, anything else is asked for `to_path`, and the answer (the
  * object itself where it has no `to_path`) goes through `StringValue`
- * (`rb_get_path_check_to_string`, `file.c:212-224`).
+ * (`rb_get_path_check_to_string`, `file.c:212-224`). A path holding a NUL raises
+ * `ArgumentError` (`rb_get_path_check_convert`, `vendor/ruby/v3.3.11/file.c:232-234`).
  *
  * @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/file.c:246`
  */
 export function rbGetPath(obj: unknown): string {
-  if (typeof obj === "string") return obj;
-  const toPath = (obj as { toPath?: unknown } | null)?.toPath;
-  const tmp = typeof toPath === "function" ? toPath.call(obj) : obj;
-  return stringValue(tmp);
+  let path: string;
+  if (typeof obj === "string") {
+    path = obj;
+  } else {
+    const toPath = (obj as { toPath?: unknown } | null)?.toPath;
+    const tmp = typeof toPath === "function" ? toPath.call(obj) : obj;
+    path = stringValue(tmp);
+  }
+  if (path.includes("\0")) throw new ArgumentError("path name contains null byte");
+  return path;
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   type Extended,
   type Logger,
 } from "@blazetrails/activesupport";
+import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Deprecation } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -28,6 +29,8 @@ export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
   "active_storage/fixture_set": () => import("@blazetrails/activestorage/testing/fixture-set"),
+  "active_storage/image_magick": () => import("./image-magick.js"),
+  "active_storage/vips": () => import("./vips.js"),
 };
 
 export const ActiveStorage = {
@@ -62,6 +65,7 @@ export const ActiveStorage = {
   IntegrityError: typeof Errors.IntegrityError;
   FileNotFoundError: typeof Errors.FileNotFoundError;
   PreviewError: typeof Errors.PreviewError;
+  InvalidKeyError: typeof Errors.InvalidKeyError;
   LogSubscriber: typeof LogSubscriber;
   deprecator(): Deprecation;
   logger: Logger | null;
@@ -86,6 +90,15 @@ export const ActiveStorage = {
   resolveModelToRoute: string;
   trackVariants: boolean;
   videoPreviewArguments: string;
+  streamingChunkMaxSize: number;
+  streamingMaxRanges: number;
+  ffmpegAllowedFormats: string[] | null;
+  ffmpegFormatWhitelistArguments(): string[] | null;
+  ImageMagick?: typeof import("./image-magick.js").ImageMagick;
+  MINIMAGICK_AVAILABLE?: boolean;
+  MINIMAGICK_UNSECURABLE?: boolean;
+  requireSecurableMiniMagick(): void;
+  VIPS_AVAILABLE?: boolean;
 };
 extend(ActiveStorage, Autoload);
 constSet(ActiveStorage, "Blobs", {});
@@ -126,7 +139,6 @@ mattrAccessor.call(ActiveStorage, "supportedImageProcessingMethods", {
     "annotate",
     "antialias",
     "append",
-    "apply",
     "attenuate",
     "authenticate",
     "autoGamma",
@@ -267,7 +279,6 @@ mattrAccessor.call(ActiveStorage, "supportedImageProcessingMethods", {
     "linewidth",
     "liquidRescale",
     "list",
-    "loader",
     "log",
     "loop",
     "lowlightColor",
@@ -330,7 +341,6 @@ mattrAccessor.call(ActiveStorage, "supportedImageProcessingMethods", {
     "rotate",
     "sample",
     "samplingFactor",
-    "saver",
     "scale",
     "scene",
     "screen",
@@ -408,6 +418,7 @@ mattrAccessor.call(ActiveStorage, "supportedImageProcessingMethods", {
 });
 mattrAccessor.call(ActiveStorage, "unsupportedImageProcessingArguments");
 
+mattrAccessor.call(ActiveStorage, "streamingChunkMaxSize", { default: Numeric.megabytes(100) });
 mattrAccessor.call(ActiveStorage, "serviceUrlsExpireIn", { default: minutes(5) });
 mattrAccessor.call(ActiveStorage, "touchAttachmentRecords", { default: true });
 mattrAccessor.call(ActiveStorage, "urlsExpireIn");
@@ -418,7 +429,34 @@ mattrAccessor.call(ActiveStorage, "resolveModelToRoute", { default: "trails_stor
 
 mattrAccessor.call(ActiveStorage, "trackVariants", { default: false });
 
+ActiveStorage.streamingMaxRanges = 1;
+
 mattrAccessor.call(ActiveStorage, "videoPreviewArguments", { default: "-y -vframes 1 -f image2" });
+
+mattrAccessor.call(ActiveStorage, "ffmpegAllowedFormats", {
+  default: Object.freeze([
+    "mov",
+    "matroska",
+    "avi",
+    "mpeg",
+    "mpegts",
+    "flv",
+    "asf",
+    "ogg",
+    "mp3",
+    "wav",
+    "flac",
+    "aac",
+    "aiff",
+    "caf",
+  ]),
+});
+
+ActiveStorage.ffmpegFormatWhitelistArguments = function ffmpegFormatWhitelistArguments() {
+  return this.ffmpegAllowedFormats != null
+    ? ["-format_whitelist", Array.from(this.ffmpegAllowedFormats).join(",")]
+    : null;
+};
 
 export const Transformers = {
   name: "ActiveStorage::Transformers",

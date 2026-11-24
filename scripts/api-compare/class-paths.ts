@@ -32,6 +32,7 @@ import {
   rubyFileToTs,
 } from "../parity/conventions.js";
 import { isSourceUnported } from "@blazetrails/parity/unported-files";
+import { resolveRevisions } from "./bump-ledger.js";
 import { resolveTsClassForRuby } from "./compare.js";
 import { BRAND_RENAMES, derivedConstantPath, walkConstants } from "./constant-table.js";
 import { PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
@@ -555,7 +556,11 @@ const ENTRY_FIRST = new Set(["i18n", "solid-queue"]);
  * `entry` is the package entry an `ENTRY_FIRST` table imports first: entered at
  * the table, the entry's own order still runs, so no `extends` meets a class in TDZ.
  */
-export function renderClassPaths(entries: readonly ClassPathEntry[], entry?: string): string {
+export function renderClassPaths(
+  entries: readonly ClassPathEntry[],
+  entry?: string,
+  lazy = false,
+): string {
   const sorted = [...entries].sort((a, b) => a.fqn.localeCompare(b.fqn));
   const files = [...new Set(sorted.map((e) => e.file))].sort();
   const alias = new Map<string, string>();
@@ -572,7 +577,7 @@ export function renderClassPaths(entries: readonly ClassPathEntry[], entry?: str
     "defineConstants([",
     ...sorted.map(
       (e) =>
-        `  [${alias.get(e.file)}, ${e.namespace ? "null" : JSON.stringify(e.tsName)}, ${JSON.stringify(e.fqn)}],`,
+        `  [${lazy ? `() => ${alias.get(e.file)}` : alias.get(e.file)}, ${e.namespace ? "null" : JSON.stringify(e.tsName)}, ${JSON.stringify(e.fqn)}],`,
     ),
     "]);",
     "",
@@ -872,16 +877,25 @@ async function readRecord(): Promise<Record<string, ConstantResidue>> {
   >;
 }
 
-/** The record at the merge-base with `origin/main`, against which `excluded` only shrinks. */
+async function git(args: string[]): Promise<string | null> {
+  return run("git", args, { cwd: ROOT_DIR }).then(
+    ({ stdout }) => stdout,
+    () => null,
+  );
+}
+
+/**
+ * The record at the fork point `resolveRevisions` names (the merge base with
+ * `origin/main`, or `HEAD^1`/`HEAD^2`'s on a GitHub merge checkout, which
+ * carries no `origin/main` ref), against which `excluded` only shrinks.
+ */
 async function baseRecord(): Promise<Record<string, ConstantResidue>> {
-  const { stdout: sha } = await run("git", ["merge-base", "HEAD", "origin/main"], {
+  const revs = await resolveRevisions(git, "origin/main");
+  if ("error" in revs) throw new Error(revs.error);
+  const { stdout } = await run("git", ["show", `${revs.fork}:${path.relative(ROOT_DIR, RECORD)}`], {
     cwd: ROOT_DIR,
-  });
-  const { stdout } = await run(
-    "git",
-    ["show", `${sha.trim()}:${path.relative(ROOT_DIR, RECORD)}`],
-    { cwd: ROOT_DIR, maxBuffer: 1 << 26 },
-  ).catch(() => ({ stdout: "{}" }));
+    maxBuffer: 1 << 26,
+  }).catch(() => ({ stdout: "{}" }));
   return JSON.parse(stdout) as Record<string, ConstantResidue>;
 }
 
@@ -1160,7 +1174,7 @@ async function main(): Promise<void> {
       table === GENERATED && ENTRY_FIRST.has(dir)
         ? (await entryFile(path.join(ROOT_DIR, "packages", dir))).replace(/^\.\/dist\//, "")
         : undefined;
-    const next = await prettier.format(renderClassPaths(entries, entry), {
+    const next = await prettier.format(renderClassPaths(entries, entry, table !== GENERATED), {
       ...(await prettier.resolveConfig(target)),
       filepath: target,
     });

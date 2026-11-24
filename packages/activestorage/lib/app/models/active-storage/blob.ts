@@ -2,6 +2,7 @@ import "../../../constants.blob.generated.js";
 import {
   base36,
   classAttribute,
+  isBlank,
   runLoadHooks,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
@@ -57,6 +58,8 @@ type UnfurlOptions = {
 };
 
 const MINIMUM_TOKEN_LENGTH = 28;
+
+const PROTECTED_METADATA = ["analyzed", "identified", "composed"];
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Blob
@@ -236,6 +239,7 @@ export class Blob extends Record {
     serviceName?: string | null;
     record?: unknown;
   }): Promise<Blob> {
+    metadata = this.filterMetadata(metadata);
     return await this.createBang({
       key: key,
       filename: filename,
@@ -357,20 +361,20 @@ export class Blob extends Record {
     );
   }
 
-  isImage(): boolean {
-    return this.content_type!.startsWith("image");
+  isImage(): boolean | undefined {
+    return this.content_type?.startsWith("image");
   }
 
-  isAudio(): boolean {
-    return this.content_type!.startsWith("audio");
+  isAudio(): boolean | undefined {
+    return this.content_type?.startsWith("audio");
   }
 
-  isVideo(): boolean {
-    return this.content_type!.startsWith("video");
+  isVideo(): boolean | undefined {
+    return this.content_type?.startsWith("video");
   }
 
-  isText(): boolean {
-    return this.content_type!.startsWith("text");
+  isText(): boolean | undefined {
+    return this.content_type?.startsWith("text");
   }
 
   async url({
@@ -461,7 +465,7 @@ export class Blob extends Record {
       {
         checksum: this.checksum,
         verify: !this.composed,
-        name: [`ActiveStorage-${this.id}-`, this.filename.extensionWithDelimiter()],
+        name: [`ActiveStorage-${this.id}-`, this.tempfileExtension()],
         tmpdir: tmpdir,
       },
       block,
@@ -503,6 +507,36 @@ export class Blob extends Record {
 
   get service(): Service {
     return this.services.fetch(this.service_name!);
+  }
+
+  /** @internal */
+  private static filterMetadata(
+    metadata: { [k: string]: unknown } | null,
+  ): { [k: string]: unknown } | null {
+    if (metadata != null && typeof metadata === "object" && !Array.isArray(metadata)) {
+      return Object.fromEntries(
+        Object.entries(metadata).filter(([k]) => !PROTECTED_METADATA.includes(k)),
+      );
+    } else {
+      return metadata;
+    }
+  }
+
+  /** @internal */
+  private tempfileExtension(): string {
+    const extension = this.filename.extensionWithDelimiter();
+    if (isBlank(extension)) return "";
+
+    const typeForExtension = Marcel.MimeType.for({ name: this.filename.toString() });
+    if (typeForExtension === Marcel.MimeType.BINARY || typeForExtension !== this.mediaType())
+      return "";
+
+    return extension;
+  }
+
+  /** @internal */
+  private mediaType(): string {
+    return (String(this.content_type ?? "").split(";")[0] ?? "").trim().toLowerCase();
   }
 
   /** @internal */

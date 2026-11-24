@@ -1,10 +1,11 @@
 import { ActionController } from "@blazetrails/actionpack";
 import { Concern, extend, isBlank } from "@blazetrails/activesupport";
 import { Utils } from "@blazetrails/rack";
-import { include, rbStrPlus, SecureRandom } from "@blazetrails/ruby-compat";
+import { include, rbStrPlus, SecureRandom, type Range } from "@blazetrails/ruby-compat";
 import type { Blob } from "../../../models/active-storage/blob.js";
 import type { Filename } from "../../../models/active-storage/filename.js";
 import { FileNotFoundError } from "../../../../errors.js";
+import { ActiveStorage } from "../../../../active-storage.js";
 
 export const DEFAULT_BLOB_STREAMING_DISPOSITION = "inline";
 
@@ -21,7 +22,8 @@ async function sendBlobByteRangeData(
 ): Promise<unknown> {
   const ranges = Utils.getByteRanges(rangeHeader, blob.byte_size!);
 
-  if (isBlank(ranges) || ranges!.every((range) => isBlank(range))) {
+  if (!rangesValid.call(this, ranges)) return this.head(":range_not_satisfiable");
+  if (ranges!.length > ActiveStorage.streamingMaxRanges) {
     return this.head(":range_not_satisfiable");
   }
 
@@ -74,6 +76,16 @@ async function sendBlobByteRangeData(
 }
 
 /** @internal */
+function rangesValid(this: StreamingHost, ranges: Range<number>[] | null): boolean {
+  if (isBlank(ranges) || ranges!.every((range) => isBlank(range))) return false;
+
+  return (
+    ranges!.reduce((sum, range) => sum + (range.end! - range.begin!), 0) <
+    ActiveStorage.streamingChunkMaxSize
+  );
+}
+
+/** @internal */
 async function sendBlobStream(
   this: StreamingHost,
   blob: {
@@ -100,11 +112,16 @@ async function sendBlobStream(
         });
       } catch (error) {
         if (error instanceof FileNotFoundError) {
+          if (this.response.committed) throw error;
+
           this.expiresNow();
           await this.head(":not_found");
         } else {
-          this.expiresNow();
-          await this.head(":internal_server_error");
+          if (!this.response.committed) {
+            this.expiresNow();
+            await this.head(":internal_server_error");
+          }
+
           throw error;
         }
       }
@@ -115,6 +132,7 @@ async function sendBlobStream(
 export const Streaming = {
   DEFAULT_BLOB_STREAMING_DISPOSITION,
   sendBlobByteRangeData,
+  rangesValid,
   sendBlobStream,
 };
 extend(Streaming, Concern);

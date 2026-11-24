@@ -4,6 +4,7 @@ import {
   Hash,
   include,
   rbBlockGivenP,
+  NotImplementedError,
   rbClassNewInstance,
 } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
@@ -25,6 +26,12 @@ export interface EngineStatement {
   bindParameterCount(): number;
   /** @noRailsEquivalent PERMANENT */
   setReadBigInts(toggle: boolean): void;
+  statFor?(key: string): number;
+  statsAsHash?(): Record<string, number>;
+}
+
+export function toBlob(string: string): Blob {
+  return new SQLite3.Blob(string);
 }
 
 export class Statement {
@@ -267,10 +274,35 @@ export class Statement {
     return this.#st.bindParameterCount();
   }
 
+  stat(key: string | null = null): number | Record<string, number> {
+    if (key != null) {
+      return this.statFor(key);
+    } else {
+      return this.statsAsHash();
+    }
+  }
+
   /** @noRailsEquivalent PERMANENT */
   setReadBigInts(toggle: boolean): void {
     this.mustBeOpenBang();
     this.#st.setReadBigInts(toggle);
+  }
+
+  /** @internal */
+  private statFor(key: string): number {
+    this.mustBeOpenBang();
+    if (!this.#st.statFor)
+      throw new NotImplementedError("stat_for() function is unimplemented on this machine");
+    return this.#st.statFor(key);
+  }
+
+  /** @internal */
+  private statsAsHash(): Record<string, number> {
+    this.mustBeOpenBang();
+    if (!this.#st.statsAsHash) {
+      throw new NotImplementedError("stats_as_hash() function is unimplemented on this machine");
+    }
+    return this.#st.statsAsHash();
   }
 
   /** @internal */

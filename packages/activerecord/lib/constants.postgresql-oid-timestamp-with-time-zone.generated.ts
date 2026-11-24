@@ -3,7 +3,7 @@ import * as m0 from "./connection-adapters/postgresql/oid/timestamp-with-time-zo
 
 defineConstants([
   [
-    m0,
+    () => m0,
     "TimestampWithTimeZone",
     "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::TimestampWithTimeZone",
   ],

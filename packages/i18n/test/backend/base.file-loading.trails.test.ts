@@ -182,6 +182,13 @@ describe("I18n::Backend::Base file loading", () => {
       expect(backend.translate("en", "bundled.greeting")).toBe("hi");
     });
 
+    it("preloads around a registered module rather than reading it from disk", async () => {
+      registerLocaleModule("bundled/not-on-disk.js", { en: { bundled: { greeting: "hi" } } });
+      await expect(preloadTranslationFiles("bundled/not-on-disk.js")).resolves.toBeUndefined();
+      config().loadPath.push("bundled/not-on-disk.js");
+      expect(backend.translate("en", "bundled.greeting")).toBe("hi");
+    });
+
     it("refuses a module the load path names but nothing registered", () => {
       config().loadPath.push("bundled/unregistered.js");
       expect(() => backend.translate("en", "bundled.greeting")).toThrow(
