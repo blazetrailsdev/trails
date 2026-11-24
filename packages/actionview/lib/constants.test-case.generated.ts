@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat/classpath";
+import { defineConstants } from "@blazetrails/ruby-compat";
 import * as m0 from "./test-case.js";
 
 defineConstants([
