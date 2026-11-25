@@ -61,7 +61,7 @@ export class Book extends ApplicationRecord {
 
   async markable(): Promise<string> {
     const leaves = await this.leaves.active().positioned().toArray();
-    const parts: string[] = [];
+    const parts: (string | null)[] = [];
     for (const it of leaves) parts.push(await (await it.leafable).markable());
     return parts.join("\n\n");
   }

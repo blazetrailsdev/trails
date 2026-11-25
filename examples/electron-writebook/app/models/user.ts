@@ -23,6 +23,7 @@ export class User extends ApplicationRecord {
   declare role: "member" | "administrator";
   declare active: boolean;
   declare isAdministrator: () => boolean;
+  declare isMember: () => boolean;
   declare sessions: CollectionProxy<Session>;
   declare accesses: CollectionProxy<Access>;
   declare books: CollectionProxy<Book>;
