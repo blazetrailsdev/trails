@@ -368,7 +368,9 @@ async function writeBoot(
       if (key === "app/views") {
         for (const dir of node.existent()) {
           if (!(await File.isDirectoryAsync(dir))) continue;
-          if (views) await buildViews({ viewsDir: dir, inPlace: true });
+          if (views && engine === application && `${dir}/`.includes("/app/views/")) {
+            await buildViews({ cwd: root, viewsDir: dir, inPlace: true });
+          }
           await viewEntries(trailsDir, root, dir, viewImports);
         }
         continue;
