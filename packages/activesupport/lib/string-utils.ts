@@ -111,7 +111,8 @@ export function stripHeredoc(str: string): string {
 }
 
 export function at(str: string, position: number | Range<number | null> | RegExp): string | null {
-  return strSlice(str, position);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TS 6 lint resolves strSlice overloads differently from tsc 7
+  return strSlice(str, position as number);
 }
 
 export function exclude(str: string, search: string): boolean {
