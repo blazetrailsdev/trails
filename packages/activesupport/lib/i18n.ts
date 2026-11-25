@@ -1,5 +1,5 @@
 import * as I18nModule from "@blazetrails/i18n";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { en } from "./locale/en.js";
 import { TopLevel } from "./namespaces.js";
 

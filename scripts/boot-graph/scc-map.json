@@ -1,7 +1,7 @@
 {
   "sccs": [
     {
-      "size": 32,
+      "size": 33,
       "modules": [
         "array.js",
         "base64.js",
@@ -14,6 +14,7 @@
         "kernel-float.js",
         "kernel-format.js",
         "kernel-integer.js",
+        "kernel-warn.js",
         "match-data.js",
         "numeric.js",
         "object.js",
@@ -1913,11 +1914,11 @@
     },
     "rbWarningSAref": {
       "module": "kernel-warn.js",
-      "scc": null
+      "scc": 0
     },
     "rbWarningSAset": {
       "module": "kernel-warn.js",
-      "scc": null
+      "scc": 0
     },
     "ReadTimeout": {
       "module": "net/protocol.js",
@@ -2425,7 +2426,7 @@
     },
     "warn": {
       "module": "kernel-warn.js",
-      "scc": null
+      "scc": 0
     },
     "writerSpelling": {
       "module": "object.js",

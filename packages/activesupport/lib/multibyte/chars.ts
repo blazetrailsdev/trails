@@ -1,19 +1,16 @@
+import { pack, toA } from "@blazetrails/ruby-compat/array";
+import { cmp, equals as cmpEquals } from "@blazetrails/ruby-compat/comparable";
+import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { OBJECT_METHOD_TABLE } from "@blazetrails/ruby-compat/object";
 import {
-  cmp,
-  equals as cmpEquals,
-  KERNEL_METHODS,
-  NoMethodError,
-  OBJECT_METHOD_TABLE,
-  pack,
-  PROTOCOL_PROBES,
   rbStrMatch,
   rbStrRespondTo,
   rbStrSend,
-  sliceBang,
   STRING_METHOD_TABLE,
-  stringSplit,
-  toA,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/string/method-table";
+import { sliceBang } from "@blazetrails/ruby-compat/string/slice";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 import { String as JsonString } from "../core-ext/object/json.js";
 import type { EncodeOptions } from "../json/encoding.js";
 import { truncateBytes } from "../string-utils.js";

@@ -1,4 +1,4 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { ActiveSupport } from "../../namespaces.js";
 
 export function actsLike(this: unknown, duck: string): boolean {

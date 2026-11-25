@@ -1,4 +1,4 @@
-import { rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat/object";
 
 export class Object {
   static instanceValues(self: object): Record<string, unknown> {

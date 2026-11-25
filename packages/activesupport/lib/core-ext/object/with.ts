@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 
 function with_<T extends object, R>(
   obj: T,

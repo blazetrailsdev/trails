@@ -47,8 +47,8 @@
       "router.ts::Router.RoutingError"
     ],
     "residue": {
+      "app/models/action-mailbox/inbound-email/message-id.ts::ClassMethods": "ActionMailbox::InboundEmail::MessageId::ClassMethods",
       "callbacks.ts::ClassMethods": "ActionMailbox::Callbacks::ClassMethods",
-      "inbound-email/message-id.ts::ClassMethods": "ActionMailbox::InboundEmail::MessageId::ClassMethods",
       "routing.ts::ClassMethods": "ActionMailbox::Routing::ClassMethods"
     }
   },

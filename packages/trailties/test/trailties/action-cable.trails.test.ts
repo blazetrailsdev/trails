@@ -4,7 +4,7 @@ import { Engine } from "@blazetrails/actioncable/engine";
 
 describe("ActionCable::Engine", () => {
   it("is rooted at the actioncable package, as Rails roots it at the actioncable gem", () => {
-    expect(Engine.instance().root()).toBe(
+    expect(Engine.instance().root()?.toString()).toBe(
       getPath().resolve(import.meta.dirname, "../../../actioncable"),
     );
   });

@@ -1,4 +1,4 @@
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 export function tryCall<T extends object>(
   obj: T | null | undefined,

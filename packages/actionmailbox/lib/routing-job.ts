@@ -1,6 +1,6 @@
 import { Base } from "@blazetrails/activejob";
 import { ActionMailbox } from "./action-mailbox.js";
-import type { InboundEmail } from "./inbound-email.js";
+import type { InboundEmail } from "./app/models/action-mailbox/inbound-email.js";
 
 export class RoutingJob extends Base {
   static {

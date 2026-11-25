@@ -278,7 +278,7 @@ export class ServerCommand extends Base {
 
     const server = await Server.new(this.serverOptions());
     await requireApplicationBang();
-    Dir.chdir(Trails.application!.root()!);
+    Dir.chdir(Trails.application!.root()!.toString());
 
     if (await server.isServeable()) {
       this.printBootInformation((await server.server()).name, await server.servedUrl());

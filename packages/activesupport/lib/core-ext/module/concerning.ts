@@ -1,4 +1,5 @@
-import { constSet, extend, include, type TopLevelConstants } from "@blazetrails/ruby-compat";
+import { constSet, extend, include } from "@blazetrails/ruby-compat/include";
+import type { TopLevelConstants } from "@blazetrails/ruby-compat/object";
 import { prepend as prependModule } from "@blazetrails/ruby-compat/include";
 import { Concern } from "../../concern.js";
 

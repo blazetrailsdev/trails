@@ -1,4 +1,4 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { slice } from "../../hash-utils.js";
 
 type AnyObject = Record<string, unknown>;

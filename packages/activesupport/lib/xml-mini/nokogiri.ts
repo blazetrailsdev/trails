@@ -1,4 +1,5 @@
-import { StringIO, warn } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { isBlank } from "../core-ext/object/blank.js";
 
 const CONTENT_ROOT = "__content__";
@@ -31,8 +32,8 @@ interface XmlNode {
 }
 
 export const Document = {
-  toHash(this: { root: XmlNode }): XmlHash {
-    return Node.toHash.call(this.root);
+  toHash(this: { root: XmlNode | null }): XmlHash {
+    return Node.toHash.call(this.root!);
   },
 };
 

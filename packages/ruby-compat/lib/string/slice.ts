@@ -23,6 +23,7 @@ export function sliceBang(
     | [Range<number | null>]
     | [RegExp, (number | string)?]
     | [string]
+    | [number | Range<number | null> | RegExp | string]
 ): [string | null, string];
 /** @noRailsEquivalent PERMANENT — Ruby core `String#slice!` (`vendor/ruby/v3.3.11/string.c:5588`). */
 export function sliceBang(
@@ -33,6 +34,7 @@ export function sliceBang(
     | [Range<number | null>]
     | [RegExp, (number | string)?]
     | [string]
+    | [number | Range<number | null> | RegExp | string]
 ): [string | Uint8Array | null, string | Uint8Array] {
   const [arg, arg2] = args;
   if (typeof arg === "string" && typeof string === "string") {
@@ -99,6 +101,7 @@ export function strSlice(
     | [Range<number | null>]
     | [RegExp, (number | string)?]
     | [string]
+    | [number | Range<number | null> | RegExp | string]
 ): string | null {
   if (typeof str !== "string") return str.slice(...args) as string | null;
   return sliceBang(str, ...args)[0];

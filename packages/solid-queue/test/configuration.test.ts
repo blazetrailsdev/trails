@@ -64,7 +64,7 @@ describe("ConfigurationTest", () => {
   });
 
   beforeEach(() => {
-    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
+    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(new Pathname(dummyRoot));
   });
 
   afterEach(() => {

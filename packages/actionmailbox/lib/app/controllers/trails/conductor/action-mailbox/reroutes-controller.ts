@@ -1,7 +1,7 @@
 import { Trails } from "@blazetrails/trailties";
 import { constGet, constSet } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../../../../action-mailbox.js";
-import type { InboundEmail } from "../../../../../inbound-email.js";
+import type { InboundEmail } from "../../../../models/action-mailbox/inbound-email.js";
 import "../../../action-mailbox/base-controller.js";
 
 export class ReroutesController extends Trails.Conductor.BaseController {

@@ -27,6 +27,7 @@ export interface XmlNode {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class XmlNode {
+  static readonly DOCUMENT_NODE = 9;
   static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly SaveOptions = SaveOptions;
 
@@ -51,6 +52,14 @@ export class XmlNode {
       hash[key] = href;
     }
     return hash;
+  }
+
+  get type(): number {
+    return Nokogiri.LibXml2!.XmlTreeCommonStruct.type(this.pointerId);
+  }
+
+  isXml(): boolean {
+    return this.type === XmlNode.DOCUMENT_NODE;
   }
 
   get name(): string {
@@ -145,6 +154,10 @@ export class XmlNode {
     return new XML.DocumentFragment(this.document as XmlDocument, tags, this);
   }
 
+  toString(): string {
+    return (this.document as XmlNode).isXml() ? this.toXml() : this.toHtml();
+  }
+
   /** @missingRailsArgs join — PERMANENT */
   innerHtml(...args: unknown[]): string {
     return this.children.map((x) => x.toHtml(...(args as [{ saveWith?: number }?]))).join("");
@@ -172,9 +185,13 @@ export class XmlNode {
     return this.toFormat(SaveOptions.DEFAULT_HTML, options);
   }
 
-  toXml(options: { saveWith?: number; encoding?: string | null } = {}): string {
+  toXml(options: { saveWith?: number; encoding?: string | null; indent?: number } = {}): string {
     options.saveWith ||= SaveOptions.DEFAULT_XML;
     return this.serialize(options);
+  }
+
+  toXhtml(options: { saveWith?: number } = {}): string {
+    return this.toFormat(SaveOptions.DEFAULT_XHTML, options);
   }
 
   writeTo(io: StringIO, ...options: unknown[]): void {
@@ -207,19 +224,17 @@ export class XmlNode {
   /** @internal */
   protected nativeWriteTo(
     io: StringIO,
-    _encoding: string | null,
+    encoding: string | null,
     indentString: string,
     options: number,
   ): StringIO {
-    io.write(
-      this._node instanceof Nokogiri.LibXml2!.XmlElement
-        ? this._node.toString({
-            format: (options & SaveOptions.FORMAT) !== 0,
-            noEmptyTags: (options & SaveOptions.NO_EMPTY_TAGS) !== 0,
-            indentString,
-          })
-        : (this._node as XmlTreeNode).toString(),
-    );
+    const libxml = Nokogiri.LibXml2!;
+    const handler = new libxml.XmlStringOutputBufferHandler();
+    const savectx = libxml.xmlSaveToIO(handler, encoding, options);
+    libxml.xmlSaveSetIndentString(savectx, indentString);
+    libxml.xmlSaveTree(savectx, this.pointerId);
+    libxml.xmlSaveClose(savectx);
+    io.write(handler.result);
     return io;
   }
 

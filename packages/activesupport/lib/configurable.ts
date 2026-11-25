@@ -1,5 +1,6 @@
 import { extend, included, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
-import { type Block, rbBlockGivenP, rbModMethodDefined } from "@blazetrails/ruby-compat";
+import { type Block, rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbModMethodDefined } from "@blazetrails/ruby-compat/object";
 import { NameError } from "./core-ext/name-error.js";
 import { InheritableOptions } from "./ordered-options.js";
 

@@ -1,17 +1,12 @@
-import {
-  b,
-  byteslice,
-  fetch,
-  Hash,
-  LoadError,
-  Marshal,
-  ArgumentError,
-  rbInspect,
-  rbModToS,
-  rbObjClass,
-  rbStrPlus,
-  rbStrStartWith,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { fetch, Hash } from "@blazetrails/ruby-compat/hash";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbInspect, rbModToS, rbObjClass } from "@blazetrails/ruby-compat/object";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { byteslice } from "@blazetrails/ruby-compat/string/byte-methods";
+import { rbStrPlus } from "@blazetrails/ruby-compat/string/method-table";
+import { rbStrStartWith } from "@blazetrails/ruby-compat/string/sub";
 
 import { extend, include } from "@blazetrails/ruby-compat/include";
 import { Entry } from "./entry.js";

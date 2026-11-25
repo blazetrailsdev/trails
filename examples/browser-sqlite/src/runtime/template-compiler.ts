@@ -30,21 +30,32 @@ let compiled = 0;
  */
 export function installTemplateCompiler(): void {
   setTemplateCompiler(async (template: Template, _methodName, source) => {
-    const { ts } =
-      template.handler instanceof TSE
-        ? virtualizeTseWithDeltas(template.handler.stripTrailingNewlines ? chomp(source) : source, {
-            view: "any",
-            localsSignature: template.strictLocalsBang(),
-            ...tseHandlerScope(template),
-          })
-        : virtualizeHandler(template.handler.call(template, source), source);
-    const { outputText } = transpileTse(ts);
-    const exports: { default?: never } = {};
-    new Function(
-      "exports",
-      "require",
-      `${outputText.replace(/^\/\/# sourceMappingURL=.*$/mu, "")}\n//# sourceURL=${template.identifier}?${++compiled}`,
-    )(exports, (id: string) => MODULES[id]);
-    return { default: exports.default! };
+    try {
+      return compile(template, source);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      const error = new Error(`${template.identifier} does not compile: ${reason}`);
+      console.error(`${error.message}\nCheck the code inside its <% %> tags.`);
+      throw error;
+    }
   });
+}
+
+function compile(template: Template, source: string): { default: never } {
+  const { ts } =
+    template.handler instanceof TSE
+      ? virtualizeTseWithDeltas(template.handler.stripTrailingNewlines ? chomp(source) : source, {
+          view: "any",
+          localsSignature: template.strictLocalsBang(),
+          ...tseHandlerScope(template),
+        })
+      : virtualizeHandler(template.handler.call(template, source), source);
+  const { outputText } = transpileTse(ts);
+  const exports: { default?: never } = {};
+  new Function(
+    "exports",
+    "require",
+    `${outputText.replace(/^\/\/# sourceMappingURL=.*$/mu, "")}\n//# sourceURL=${template.identifier}?${++compiled}`,
+  )(exports, (id: string) => MODULES[id]);
+  return { default: exports.default! };
 }

@@ -19,7 +19,7 @@ import {
   freezeTime,
   unfreezeTime,
 } from "../lib/testing/time-helpers.js";
-import { currentTimeInstant, setFrozenInstant, setTimeOffsetNs } from "../lib/time-travel.js";
+import { currentTimeInstant } from "../lib/time-travel.js";
 import { withEnvTz } from "../lib/time-zone-test-helpers.js";
 import { utcOffset as dateTimeUtcOffset } from "../lib/core-ext/date-time/calculations.js";
 import { TimeHelpers } from "../lib/testing/time-helpers.js";
@@ -605,26 +605,13 @@ describe("TimeTravelTest", () => {
   it("currentTimeInstant respects frozen instant at nanosecond precision", () => {
     const baseMs = Date.UTC(2030, 0, 1, 0, 0, 0);
     const baseNs = BigInt(baseMs) * 1_000_000n + 123_456n;
-    const frozen = Temporal.Instant.fromEpochNanoseconds(baseNs);
-    setFrozenInstant(frozen);
+    const spy = vi
+      .spyOn(Time, "now")
+      .mockReturnValue(Time.at(new Rational(baseNs, 1_000_000_000n)));
     try {
       expect(currentTimeInstant().epochNanoseconds).toBe(baseNs);
     } finally {
-      setFrozenInstant(null);
-    }
-  });
-
-  it("currentTimeInstant respects nanosecond time offset", () => {
-    const offsetNs = 365n * 24n * 3600n * 1_000_000_000n + 42n;
-    const before = Temporal.Now.instant().epochNanoseconds;
-    setTimeOffsetNs(offsetNs);
-    try {
-      const traveled = currentTimeInstant().epochNanoseconds;
-      const drift = traveled - before - offsetNs;
-      expect(drift).toBeGreaterThanOrEqual(-1_000_000_000n);
-      expect(drift).toBeLessThanOrEqual(1_000_000_000n);
-    } finally {
-      setTimeOffsetNs(0n);
+      spy.mockRestore();
     }
   });
 });

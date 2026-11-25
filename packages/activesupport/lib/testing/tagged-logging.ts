@@ -1,4 +1,4 @@
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { TopLevel } from "../namespaces.js";
 
 type TaggedLogger = {

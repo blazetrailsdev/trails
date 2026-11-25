@@ -1,8 +1,8 @@
-import "../constants.routable.generated.js";
+import "../../../../constants.routable.generated.js";
 import { Concern, extend } from "@blazetrails/activesupport";
 import { TopLevel } from "@blazetrails/ruby-compat";
 import type { InboundEmail } from "../inbound-email.js";
-import { RoutingJob } from "../routing-job.js";
+import { RoutingJob } from "../../../../routing-job.js";
 
 declare module "@blazetrails/ruby-compat" {
   interface TopLevelConstants {

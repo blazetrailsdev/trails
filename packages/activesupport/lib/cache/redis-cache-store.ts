@@ -1,19 +1,15 @@
 import { createPool, type Pool } from "generic-pool";
 import { Redis, ReplyError, type ChainableCommander, type RedisOptions } from "ioredis";
 import { MaxRetriesPerRequestError } from "ioredis/built/errors/index.js";
-import {
-  ArgumentError,
-  rbCmpint,
-  b,
-  byteslice,
-  Gem,
-  Hash,
-  NotImplementedError,
-  prepend,
-  rbInspect,
-  rbModName,
-  type Included,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbCmpint } from "@blazetrails/ruby-compat/comparable";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { prepend, type Included } from "@blazetrails/ruby-compat/include";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbInspect, rbModName } from "@blazetrails/ruby-compat/object";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { byteslice } from "@blazetrails/ruby-compat/string/byte-methods";
 import { ActiveSupport } from "../namespaces.js";
 import { wrap } from "../core-ext/array/wrap.js";
 import { pluck } from "../core-ext/enumerable.js";

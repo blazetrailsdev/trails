@@ -1,16 +1,20 @@
 import { Date, DateTime, Time } from "@blazetrails/date";
-import { Rational, rational, rbCallSuper, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { Rational, rational } from "@blazetrails/ruby-compat/rational";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import type { TestCase } from "../test-case.js";
 
 import { Duration } from "../duration.js";
 import { TimeWithZone } from "../time-with-zone.js";
-import { clock, currentTimeInstant } from "../time-travel.js";
+import { currentTimeInstant } from "../time-travel.js";
 import { zone as timeZone } from "../time-zone-config.js";
 import { midnight } from "../core-ext/date/calculations.js";
 import { change } from "../time-ext.js";
 import { plusWithDuration } from "../core-ext/time/calculations.js";
 import { toTime } from "../core-ext/date-time/compatibility.js";
-import { isEmpty, Struct } from "@blazetrails/ruby-compat";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { Struct } from "@blazetrails/ruby-compat/struct";
 
 const Stub = Struct.new("object", "methodName", "originalMethod");
 type Stub = InstanceType<typeof Stub>;
@@ -181,8 +185,6 @@ export function travelTo(
     );
   });
 
-  stubs.stubObject(clock, "now", () => now.toZonedDateTime().toInstant());
-
   if (block) {
     return rbEnsure(
       () => {
@@ -247,7 +249,7 @@ function _runningTestCase(): TestCase {
 }
 
 function currentTime(): globalThis.Date {
-  return new globalThis.Date(clock.now().epochMilliseconds);
+  return new globalThis.Date(currentTimeInstant().epochMilliseconds);
 }
 
 export const TimeHelpers = {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import "../../test-helper.js";
-import "../../../lib/inbound-email.js";
+import "../../../lib/app/models/action-mailbox/inbound-email.js";
 import { Base } from "../../../lib/base.js";
 import { TestCase } from "../../../lib/test-case.js";
 

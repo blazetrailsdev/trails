@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { include, type Included } from "@blazetrails/ruby-compat";
 import { Autoloaders } from "../../lib/autoloaders.js";
 import {
@@ -25,7 +26,7 @@ const baseConfig = (): BootstrapConfig => ({
   logFormatter: null,
   defaultLogFile: async () => ({ write() {} }),
   paths: () => ({ get: () => ({ first: () => "log/test.log" }) }),
-  middleware: new Configuration("/app").middleware,
+  middleware: new Configuration(new Pathname("/app")).middleware,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type

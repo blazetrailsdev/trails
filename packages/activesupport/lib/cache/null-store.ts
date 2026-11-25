@@ -1,4 +1,5 @@
-import { prepend, rbModName, type Included } from "@blazetrails/ruby-compat";
+import { prepend, type Included } from "@blazetrails/ruby-compat/include";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import { ActiveSupport } from "../namespaces.js";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";

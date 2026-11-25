@@ -1,4 +1,4 @@
-import { classModule } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
 import type { ThreadLocalVar } from "../thread-local-var.js";
 import type { AllowMatcher, Disallowed } from "./disallowed.js";
 import type { Behavior } from "./behaviors.js";

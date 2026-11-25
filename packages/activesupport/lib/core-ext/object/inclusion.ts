@@ -1,4 +1,4 @@
-import { OBJECT_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { OBJECT_METHOD_TABLE } from "@blazetrails/ruby-compat/object";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { ArgumentError, isPlainObject } from "../../hash-utils.js";
 

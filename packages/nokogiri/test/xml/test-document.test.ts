@@ -14,7 +14,7 @@ describe("Nokogiri::XML::Document", () => {
   it("parse returns document with root", () => {
     doc = XmlDocument.parse("<root><child/></root>");
     expect(doc.errors).toHaveLength(0);
-    expect(doc.root.name).toBe("root");
+    expect(doc.root!.name).toBe("root");
   });
 
   it("parse collects errors on malformed input", () => {
@@ -26,7 +26,7 @@ describe("Nokogiri::XML::Document", () => {
 
   it("root node has children", () => {
     const doc = XmlDocument.parse("<root><a/><b/></root>");
-    const children = doc.root.children.toA();
+    const children = doc.root!.children.toA();
     expect(children).toHaveLength(2);
     expect(children[0].name).toBe("a");
     expect(children[1].name).toBe("b");
@@ -34,7 +34,7 @@ describe("Nokogiri::XML::Document", () => {
 
   it("attributeNodes returns attribute name and value", () => {
     doc = XmlDocument.parse('<root lang="en" version="1"/>');
-    const attrs = doc.root.attributeNodes;
+    const attrs = doc.root!.attributeNodes;
     expect(attrs).toHaveLength(2);
     const lang = attrs.find((a) => a.nodeName === "lang");
     expect(lang?.value).toBe("en");
@@ -44,7 +44,7 @@ describe("Nokogiri::XML::Document", () => {
 
   it("text node reports isText and content", () => {
     doc = XmlDocument.parse("<root>hello</root>");
-    const text = doc.root.children.toA()[0];
+    const text = doc.root!.children.toA()[0];
     expect(text.isText()).toBe(true);
     expect(text.isElement()).toBe(false);
     expect(text.content).toBe("hello");
@@ -53,7 +53,7 @@ describe("Nokogiri::XML::Document", () => {
 
   it("cdata node reports isCdata and content", () => {
     doc = XmlDocument.parse("<root><![CDATA[raw data]]></root>");
-    const cdata = doc.root.children.toA()[0];
+    const cdata = doc.root!.children.toA()[0];
     expect(cdata.isCdata()).toBe(true);
     expect(cdata.content).toBe("raw data");
     expect(cdata.name).toBe("#cdata-section");
@@ -71,8 +71,8 @@ describe("Nokogiri::XML::Searchable", () => {
   it("css on document searches from the root and on a node searches descendants", () => {
     const doc = XmlDocument.parse(xml);
     expect(doc.css("root").size).toBe(1);
-    expect(doc.root.css("root").size).toBe(0);
-    expect(doc.root.css("e").size).toBe(1);
+    expect(doc.root!.css("root").size).toBe(0);
+    expect(doc.root!.css("e").size).toBe(1);
     expect(doc.atCss("c")?.content).toBe("3");
   });
 
@@ -108,7 +108,7 @@ describe("Nokogiri::XML::Searchable", () => {
 
   it("blank? answers true only for whitespace text", () => {
     const doc = XmlDocument.parse("<root> <a/>x</root>");
-    const [space, a, text] = doc.root.children;
+    const [space, a, text] = doc.root!.children;
     expect(space.isBlank()).toBe(true);
     expect(a.isBlank()).toBe(false);
     expect(text.isBlank()).toBe(false);
@@ -122,10 +122,10 @@ describe("Nokogiri::XML::Searchable", () => {
 
   it("css defaults its namespaces to the root's", () => {
     const doc = XmlDocument.parse('<root xmlns="urn:x" xmlns:y="urn:y"><a/><y:b/></root>');
-    expect(doc.root.namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
+    expect(doc.root!.namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
     expect(doc.css("a").length).toBe(1);
     expect(doc.css("y|b").length).toBe(1);
-    expect(doc.root.children.toA()[0].namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
+    expect(doc.root!.children.toA()[0].namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
   });
 });
 
@@ -145,7 +145,7 @@ describe("Nokogiri::XML::Document.parse (trails)", () => {
 
   it("parse reads an IO", () => {
     const doc = XmlDocument.parse({ read: () => "<root/>" });
-    expect(doc.root.name).toBe("root");
+    expect(doc.root!.name).toBe("root");
     doc.dispose();
   });
 
@@ -165,7 +165,7 @@ describe("Nokogiri::XML::Document.parse (trails)", () => {
   it("parse treats an IO at eof as an empty document", () => {
     const doc = XmlDocument.parse({ read: () => "<root/>", isEof: () => true }, null, "UTF-8");
     expect(doc.encoding).toBe("UTF-8");
-    expect(() => doc.root).toThrow();
+    expect(doc.root).toBeNull();
   });
 });
 

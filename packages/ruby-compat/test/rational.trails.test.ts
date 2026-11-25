@@ -60,3 +60,30 @@ describe("Kernel#Rational()", () => {
     expect(new Rational(7, 2).mod(2)).toEqual(new Rational(3, 2));
   });
 });
+
+describe("Kernel#Rational String arm", () => {
+  it("parses a String as string_to_r_strict does", () => {
+    expect(rational("0.")).toEqual(new Rational(0, 1));
+    expect(rational("0.10")).toEqual(new Rational(1, 10));
+    expect(rational(" 1_0.5e1 ")).toEqual(new Rational(105, 1));
+    expect(rational("1.5/3")).toEqual(new Rational(1, 2));
+    expect(rational("-3/4")).toEqual(new Rational(-3, 4));
+    expect(rational(1, "2")).toEqual(new Rational(1, 2));
+    expect(rational("2/4")).toEqual(new Rational(1, 2));
+    expect(rational("1e-99999999999")).toEqual(new Rational(0, 1));
+  });
+
+  it("raises FloatDomainError where f_expt10 overflows to a Float", () => {
+    expect(() => rational("1e99999999999")).toThrow("Infinity");
+  });
+
+  it("raises ZeroDivisionError for a zero String denominator", () => {
+    expect(() => rational(1, "0")).toThrow(ZeroDivisionError);
+  });
+
+  it("raises ArgumentError for a String parse_rat rejects", () => {
+    for (const s of ["", "1/", "1e", "0x1", "1 /3"]) {
+      expect(() => rational(s)).toThrow(`invalid value for convert(): "${s}"`);
+    }
+  });
+});

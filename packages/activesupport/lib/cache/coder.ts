@@ -1,17 +1,13 @@
-import {
-  Encoding,
-  Marshal,
-  Range,
-  b,
-  forceEncoding,
-  pack,
-  rbObjEncoding,
-  byteslice,
-  rbStrPlus,
-  rbStrStartWith,
-  transformValues,
-  unpack1,
-} from "@blazetrails/ruby-compat";
+import { pack, unpack1 } from "@blazetrails/ruby-compat/array";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { transformValues } from "@blazetrails/ruby-compat/hash";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { byteslice } from "@blazetrails/ruby-compat/string/byte-methods";
+import { forceEncoding, rbObjEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
+import { rbStrPlus } from "@blazetrails/ruby-compat/string/method-table";
+import { rbStrStartWith } from "@blazetrails/ruby-compat/string/sub";
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
 

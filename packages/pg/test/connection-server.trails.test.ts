@@ -23,6 +23,38 @@ describe("PG::Connection against a server", () => {
     if (!conn.isFinished()) await conn.finish();
   });
 
+  it("exec after an unread COPY TO STDOUT discards it and runs the next query", async () => {
+    const res = await conn.exec("COPY (SELECT generate_series(1, 100)) TO STDOUT");
+    expect(res.resultStatus()).toBe(PG.PGRES_COPY_OUT);
+    expect((await conn.exec("SELECT 1")).getvalue(0, 0)).toBe("1");
+  });
+
+  it("get_copy_data answers nil once a COPY TO STDOUT fails partway, and get_result raises", async () => {
+    const res = await conn.exec("COPY (SELECT 1 / (3 - x) FROM generate_series(1, 5) x) TO STDOUT");
+    expect(res.resultStatus()).toBe(PG.PGRES_COPY_OUT);
+    let data: unknown;
+    do data = await conn.getCopyData();
+    while (data != null);
+    await expect(conn.getLastResult()).rejects.toThrow(PG.Error);
+    expect((await conn.exec("SELECT 1")).getvalue(0, 0)).toBe("1");
+  });
+
+  it("connect walks the host list until one entry accepts", async () => {
+    const c = await PG.connect({ ...connParams, host: `/nonexistent,${connParams.host}` });
+    try {
+      expect(c.host()).toBe(connParams.host);
+      expect((await c.exec("SELECT 1")).getvalue(0, 0)).toBe("1");
+    } finally {
+      await c.finish();
+    }
+  });
+
+  it("connect fails only after the last host in the list", async () => {
+    await expect(
+      PG.connect({ ...connParams, host: "/nonexistent1,/nonexistent2" }),
+    ).rejects.toThrow(PG.ConnectionBad);
+  });
+
   it("exec after an unfinished COPY FROM STDIN discards it and runs the next query", async () => {
     await conn.exec("CREATE TEMP TABLE copytable3 (col1 TEXT)");
     expect((await conn.exec("COPY copytable3 FROM STDIN")).resultStatus()).toBe(PG.PGRES_COPY_IN);

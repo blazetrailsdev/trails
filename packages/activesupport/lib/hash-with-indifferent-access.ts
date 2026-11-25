@@ -2,25 +2,22 @@ import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang, toQuery } from
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import { DeepMergeable } from "./deep-mergeable.js";
 import { ActiveSupport } from "./namespaces.js";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat/enumerator";
 import {
-  ArgumentError,
   type Block,
   block as rbBlock,
   type DefaultProc,
   fetch,
   slice,
   Hash,
-  TypeError,
   eachPair,
-  include,
-  isSymbol,
-  rbObjClassname,
-  rbObjRespondTo,
-  symbolToS,
-  toEnum,
   transformValuesBang,
-  type Enumerator,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 
 type AnyObject = Record<string, unknown>;
 

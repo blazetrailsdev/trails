@@ -1,10 +1,7 @@
 import { Date as RubyDate, DateTime as RubyDateTime, Time } from "@blazetrails/date";
-import {
-  Rational,
-  rational,
-  TEMPORAL_METHOD_TABLE,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat/object";
+import { Rational, rational } from "@blazetrails/ruby-compat/rational";
 import { ArgumentError } from "../../hash-utils.js";
 import { instantFrom } from "../../temporal.js";
 import { currentTime } from "../../time-travel.js";

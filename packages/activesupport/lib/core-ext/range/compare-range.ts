@@ -1,4 +1,4 @@
-import { prepend, rbCallSuper } from "@blazetrails/ruby-compat";
+import { prepend, rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { Range } from "@blazetrails/ruby-compat/range";
 
 /**

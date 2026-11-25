@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import type { RackResponse } from "@blazetrails/rack";
 import { Encoding, publicInstanceMethods, rbFSend, StringIO } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
@@ -48,8 +49,8 @@ import { HelloWorldApp, buildRoutes } from "./fixtures/hello-world/app.js";
 
 const posixPath: PathAdapter = {
   join: (...p) => p.join("/").replace(/\/+/g, "/"),
-  dirname: (p) => p.replace(/\/[^/]*$/, "") || "/",
-  basename: (p) => p.split("/").pop() ?? "",
+  dirname: (p) => p.replace(/\/+$/, "").replace(/\/[^/]*$/, "") || (p.startsWith("/") ? "/" : "."),
+  basename: (p) => (/^\/+$/.test(p) ? "/" : (p.replace(/\/+$/, "").split("/").pop() ?? "")),
   resolve: (...p) =>
     p
       .reduce((o, x) => (!x ? o : x.startsWith("/") ? x : o ? `${o}/${x}` : x), "")
@@ -174,14 +175,14 @@ describe("Application", () => {
       installFs(new Set(["/", "/app", "/app/src", "/app/src/inner"]), new Set(["/app/config.ts"]));
       class RootApp extends Application {}
       Application.register(RootApp);
-      expect(RootApp.findRoot("/app/src/inner")).toBe("/app");
+      expect(RootApp.findRoot("/app/src/inner")?.toString()).toBe("/app");
     });
 
     it("falls back to fs.cwd() when no flag is found", () => {
       installFs(new Set(["/", "/cwd", "/elsewhere"]), new Set(["/cwd/config.ts"]), "/cwd");
       class CwdApp extends Application {}
       Application.register(CwdApp);
-      expect(CwdApp.findRoot("/elsewhere")).toBe("/cwd");
+      expect(CwdApp.findRoot("/elsewhere")?.toString()).toBe("/cwd");
     });
   });
 
@@ -587,7 +588,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
 describe("Application::Configuration", () => {
   it("config.session_store writes the store and reads it back resolved", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     expect(c.isSessionStore()).toBeNull();
     expect(c.sessionStore()).toBeNull();
 
@@ -598,28 +599,28 @@ describe("Application::Configuration", () => {
   });
 
   it("config.session_store :disabled reads back as nil", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     c.sessionStore(":disabled");
     expect(c.isSessionStore()).toBe(":disabled");
     expect(c.sessionStore()).toBeNull();
   });
 
   it("config.debug_exception_response_format is :api by default if only_api is enabled", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     expect(c.debugExceptionResponseFormat).toBe("default");
     c.apiOnly = true;
     expect(c.debugExceptionResponseFormat).toBe("api");
   });
 
   it("config.debug_exception_response_format can be overridden", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     c.apiOnly = true;
     c.debugExceptionResponseFormat = "default";
     expect(c.debugExceptionResponseFormat).toBe("default");
   });
 
   it("defaults match Trails::Application::Configuration#initialize", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     expect(c.considerAllRequestsLocal).toBe(false);
     expect(c.apiOnly).toBe(false);
     expect(c.timeZone).toBe("UTC");
@@ -645,7 +646,7 @@ describe("Application::Configuration", () => {
   });
 
   it("config.load_defaults 5.0 assigns the 5.0 framework defaults", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     c.set("activeRecord", {});
     c.set("actionController", {});
     c.set("activeSupport", {});
@@ -663,7 +664,7 @@ describe("Application::Configuration", () => {
   });
 
   it("config.load_defaults includes defaults for versions prior to the target version", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     c.set("activeRecord", { encryption: {} });
 
     c.loadDefaults("7.2");
@@ -680,13 +681,13 @@ describe("Application::Configuration", () => {
   });
 
   it("config.load_defaults skips a framework that has not registered its config", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     expect(() => c.loadDefaults("8.0")).not.toThrow();
     expect(c.isRespondTo("assets")).toBe(false);
   });
 
   it("config.load_defaults raises on an unknown version", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     expect(() => c.loadDefaults("4.2")).toThrow('Unknown version "4.2"');
   });
 
@@ -697,7 +698,7 @@ describe("Application::Configuration", () => {
     onTestFinished(() => {
       Trails.application = null;
     });
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     c.setRoot("/app");
     c.autoloadLibOnce({ ignore: "tasks" });
 
@@ -716,19 +717,19 @@ describe("Application::Configuration", () => {
   });
 
   it("paths() appends the application-only 'public' entry on top of EngineConfiguration", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     expect(c.paths().get("public")).toBeDefined();
   });
 });
 
 describe("Application::DefaultMiddlewareStack", () => {
   const paths = (() => {
-    const root = new Root("/app");
+    const root = new Root(new Pathname("/app"));
     root.add("public");
     return root;
   })();
   const buildApp = () => ({
-    config: new Configuration("/app"),
+    config: new Configuration(new Pathname("/app")),
     executor: class extends Executor {},
     reloader: class extends Reloader {},
   });
@@ -848,9 +849,9 @@ describe("Application key/message/credentials wiring", () => {
   };
 
   it("routes_reloader memoized, key_generator/message_verifier work, config_for rejects non-database, Configuration defaults null", async () => {
-    expect(new Configuration("/app").credentials.toH()).toEqual({
-      contentPath: "/app/config/credentials.yml.enc",
-      keyPath: "/app/config/master.key",
+    expect(new Configuration(new Pathname("/app")).credentials.toH()).toEqual({
+      contentPath: new Pathname("/app/config/credentials.yml.enc"),
+      keyPath: new Pathname("/app/config/master.key"),
     });
     class A extends Application {}
     Application.register(A);

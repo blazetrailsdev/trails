@@ -1,4 +1,6 @@
-import { ArgumentError, Logger, rbEnsure } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { Logger } from "@blazetrails/ruby-compat/logger";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { NameError } from "./core-ext/name-error.js";
 import type { LogLevel } from "./logger.js";

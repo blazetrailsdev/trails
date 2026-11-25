@@ -1,8 +1,11 @@
-import { ArgumentError, isSymbol, keys, sortBy, symbolToS } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { sortBy } from "@blazetrails/ruby-compat/enumerable";
+import { keys } from "@blazetrails/ruby-compat/hash";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
-import { kernelFloat } from "@blazetrails/ruby-compat";
+import { kernelFloat } from "@blazetrails/ruby-compat/kernel-float";
 import { I18n } from "../i18n.js";
 import type { NumberToHumanOptions } from "../number-helper.js";
 

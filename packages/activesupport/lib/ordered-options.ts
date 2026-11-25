@@ -1,6 +1,9 @@
-import type { PP } from "@blazetrails/ruby-compat";
+import type { PP } from "@blazetrails/ruby-compat/pp";
 import { presence } from "./core-ext/object/blank.js";
-import { fetch, KeyError, rbEqual, rbObjClassname } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 
 export class OrderedOptions {
   static name = "ActiveSupport::OrderedOptions";

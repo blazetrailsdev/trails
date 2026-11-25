@@ -1,7 +1,10 @@
 import { ArgumentError } from "./hash-utils.js";
 import { Unicode } from "./multibyte/unicode.js";
 import { I18n } from "./i18n.js";
-import { Encoding, rbObjClassname, rbObjEncoding, regexpEscape } from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { rbObjEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 
 export const ALLOWED_ENCODINGS_FOR_TRANSLITERATE: readonly Encoding[] = Object.freeze([
   Encoding.UTF_8,

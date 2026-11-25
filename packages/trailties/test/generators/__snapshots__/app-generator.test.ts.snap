@@ -180,10 +180,10 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config/storage.ts
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > environments/development.ts 1`] = `
 "import { days } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 
-const cachingDev = await getFs().exists(getPath().join(Trails.root()!, "tmp/caching-dev.txt"));
+const cachingDev = await getFs().exists(Trails.root()!.join("tmp/caching-dev.txt").toString());
 
 Trails.application.configure(function () {
   // Settings specified here will take precedence over those in config/application.ts.

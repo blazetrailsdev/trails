@@ -1,11 +1,9 @@
-import {
-  SecureRandom,
-  FileUtils,
-  IO,
-  File,
-  env as processEnv,
-  chomp,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { IO } from "@blazetrails/ruby-compat/io";
+import { env as processEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
 import { MessageEncryptor } from "./message-encryptor.js";
 import { Tempfile } from "./tempfile.js";
 

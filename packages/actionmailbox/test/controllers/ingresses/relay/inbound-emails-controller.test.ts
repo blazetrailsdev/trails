@@ -9,7 +9,7 @@ import {
 import { ArgumentError, File } from "@blazetrails/ruby-compat";
 import { credentials, switchPasswordTo } from "../../../test-helper.js";
 import { ActionMailbox } from "../../../../lib/action-mailbox.js";
-import { InboundEmail } from "../../../../lib/inbound-email.js";
+import { InboundEmail } from "../../../../lib/app/models/action-mailbox/inbound-email.js";
 import "../../../../lib/app/controllers/action-mailbox/ingresses/relay/inbound-emails-controller.js";
 
 const routes = TopLevel.Trails!.application!.routes() as unknown as RouteSet;

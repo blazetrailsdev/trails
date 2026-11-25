@@ -1,5 +1,8 @@
 import { expect } from "vitest";
-import { NameError, TopLevel, constGet, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 
 class AceBaseCase {}
 class AceBaseCaseDice {}

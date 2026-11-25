@@ -32,6 +32,7 @@
   const navLeft = [
     { label: "Source", href: repo },
     { label: "API", href: `${base}/docs/api/README` },
+    { label: "Playground", href: `${base}/playground/` },
   ];
   const navRight = [
     { label: "Docs", href: `${base}/docs/` },

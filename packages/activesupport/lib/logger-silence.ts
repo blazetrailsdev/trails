@@ -1,4 +1,4 @@
-import { Logger as RubyLogger } from "@blazetrails/ruby-compat";
+import { Logger as RubyLogger } from "@blazetrails/ruby-compat/logger";
 import { include, included } from "@blazetrails/ruby-compat/include";
 import { cattrAccessor } from "./module-ext.js";
 import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";

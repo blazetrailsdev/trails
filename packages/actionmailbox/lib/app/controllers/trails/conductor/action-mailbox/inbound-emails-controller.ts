@@ -4,7 +4,7 @@ import { isPresent } from "@blazetrails/activesupport";
 import type { Parameters, UploadedFile } from "@blazetrails/actionpack";
 import { Mail, type Message } from "@blazetrails/mail";
 import { ActionMailbox } from "../../../../../action-mailbox.js";
-import type { InboundEmail } from "../../../../../inbound-email.js";
+import type { InboundEmail } from "../../../../models/action-mailbox/inbound-email.js";
 import "../../../action-mailbox/base-controller.js";
 
 export class InboundEmailsController extends Trails.Conductor.BaseController {

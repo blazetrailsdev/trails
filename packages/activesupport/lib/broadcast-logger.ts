@@ -1,4 +1,6 @@
-import { NoMethodError, rbObjDup, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { include } from "@blazetrails/ruby-compat/include";
 import { Logger, type LogLevel } from "./logger.js";
 import { LoggerSilence } from "./logger-silence.js";

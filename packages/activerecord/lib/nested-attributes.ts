@@ -332,7 +332,7 @@ export function assignNestedAttributesForOneToOneAssociation(
 
 /**
  * @internal
- * @inventedArm if — CONVERGEABLE reopen-rfc-0087-constructor-arm-for-association-io-at-assignment
+ * @inventedArm if — CONVERGEABLE nested-attributes-maybe-promise-assignment-arms
  */
 export function assignNestedAttributesForCollectionAssociation(
   this: Base,

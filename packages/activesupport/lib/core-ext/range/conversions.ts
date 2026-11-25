@@ -1,5 +1,6 @@
 import { Range } from "@blazetrails/ruby-compat/range";
-import { rbFSend, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import "../time/conversions.js";
 import "../date/conversions.js";
 

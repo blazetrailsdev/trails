@@ -1,5 +1,8 @@
-import { ArgumentError, NoMethodError, Rational, fetch } from "@blazetrails/ruby-compat";
-import { BigDecimal } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
 import { BIGDECIMAL_STRING } from "./number-converter.js";
 
 function bigDecimal(value: string): BigDecimal {

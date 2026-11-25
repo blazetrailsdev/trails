@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import "./test-helper.js";
@@ -21,7 +22,9 @@ describe("Configuration", () => {
       return fromConfiguration(key, options);
     });
 
-    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(`${import.meta.dirname}/support/dummy`);
+    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(
+      new Pathname(`${import.meta.dirname}/support/dummy`),
+    );
     const configuration = new Configuration({ dispatchers: [] });
     const processes = await configuration.configuredProcesses();
 

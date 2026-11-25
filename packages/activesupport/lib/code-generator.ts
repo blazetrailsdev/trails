@@ -1,5 +1,5 @@
 import { NameError } from "./core-ext/name-error.js";
-import { block as rbBlock, eachValue, fetch } from "@blazetrails/ruby-compat";
+import { block as rbBlock, eachValue, fetch } from "@blazetrails/ruby-compat/hash";
 import { Module, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
 
 export type MethodSource = (mod: Record<string, unknown>) => void;

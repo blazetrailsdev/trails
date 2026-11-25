@@ -1,5 +1,5 @@
 import type { Time } from "@blazetrails/date";
-import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat/string/method-table";
 import { findZoneBang, zone as timeZone } from "../../time-zone-config.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";

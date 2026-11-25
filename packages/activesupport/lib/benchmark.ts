@@ -1,4 +1,4 @@
-import { Process } from "@blazetrails/ruby-compat";
+import { Process } from "@blazetrails/ruby-compat/process";
 
 export class Benchmark {
   static realtime<T>(unit: string, block: () => Promise<T>): Promise<number>;

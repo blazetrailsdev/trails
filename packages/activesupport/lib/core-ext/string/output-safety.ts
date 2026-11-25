@@ -1,19 +1,15 @@
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { IndexError } from "@blazetrails/ruby-compat/index-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { camelized, rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
 import {
-  camelized,
-  IndexError,
-  NoMethodError,
-  Range,
-  rbBlockGivenP,
-  toEnum,
-  type Enumerator,
-  rbObjClassname,
   rbStrRespondTo,
   rbStrSend,
-  rbStrSub,
-  rbStrSubBang,
-  strGsub,
   stringSuperclass,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/string/method-table";
+import { rbStrSub, rbStrSubBang, strGsub } from "@blazetrails/ruby-compat/string/sub";
 
 class Object {
   static isHtmlSafe(_self: unknown): false {

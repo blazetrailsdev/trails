@@ -9,7 +9,7 @@ import {
 import { ArgumentError, env, setEnv } from "@blazetrails/ruby-compat";
 import "../../../test-helper.js";
 import { ActionMailbox } from "../../../../lib/action-mailbox.js";
-import { InboundEmail } from "../../../../lib/inbound-email.js";
+import { InboundEmail } from "../../../../lib/app/models/action-mailbox/inbound-email.js";
 import "../../../../lib/app/controllers/action-mailbox/ingresses/mandrill/inbound-emails-controller.js";
 
 setEnv("MANDRILL_INGRESS_API_KEY", "1l9Qf7lutEf7h73VXfBwhw");

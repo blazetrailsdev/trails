@@ -1,6 +1,6 @@
 import { Mail, type BccField, type Message } from "@blazetrails/mail";
 import type { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import type { InboundEmail } from "./inbound-email.js";
+import type { InboundEmail } from "./app/models/action-mailbox/inbound-email.js";
 import { ActionMailbox } from "./action-mailbox.js";
 
 type MailBlock = (this: Message, mail: Message) => unknown;

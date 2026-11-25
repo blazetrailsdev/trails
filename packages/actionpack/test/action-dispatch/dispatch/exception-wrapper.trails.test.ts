@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { Pathname } from "@blazetrails/ruby-compat";
 import { BacktraceCleaner, TopLevel } from "@blazetrails/activesupport";
 import {
   Base,
@@ -180,7 +181,7 @@ describe("ExceptionWrapper#clean_backtrace", () => {
 describe("ExceptionWrapper#sourceFragment", () => {
   it("reads an absolute backtrace path as is, ignoring Trails.root", () => {
     const trails = TopLevel.Trails;
-    TopLevel.Trails = { root: () => "/nonexistent-root" } as unknown as typeof trails;
+    TopLevel.Trails = { root: () => new Pathname("/nonexistent-root") } as unknown as typeof trails;
     try {
       const wrapper = new ExceptionWrapper(null, new Error("boom"));
       const fragment = wrapper.sourceFragment(new URL(import.meta.url).pathname, 1);

@@ -1,4 +1,4 @@
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 import { DateTime as RubyDateTime } from "@blazetrails/date";
 
 declare module "@blazetrails/date" {

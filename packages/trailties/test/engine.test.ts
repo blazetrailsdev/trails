@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import {
@@ -104,16 +105,18 @@ describe("Engine", () => {
     );
 
     it("walks parents until the flag is found", () => {
-      expect(Engine.findRootWithFlag("lib", "/app/sub/deep")).toBe("/app");
+      expect(Engine.findRootWithFlag("lib", "/app/sub/deep")?.toString()).toBe("/app");
     });
     it("returns the fallback when nothing matches", () => {
-      expect(Engine.findRootWithFlag("missing", "/app/sub", "/fallback")).toBe("/fallback");
+      expect(Engine.findRootWithFlag("missing", "/app/sub", "/fallback")?.toString()).toBe(
+        "/fallback",
+      );
     });
     it("throws when no flag and no fallback", () => {
       expect(() => Engine.findRootWithFlag("missing", "/app/sub")).toThrow(/Could not find root/);
     });
     it("find_root uses 'lib' as the flag", () => {
-      expect(Engine.findRoot("/app")).toBe("/app");
+      expect(Engine.findRoot("/app")?.toString()).toBe("/app");
     });
   });
 
@@ -138,7 +141,7 @@ describe("Engine", () => {
     );
     class FoundEngine extends Engine {}
     Engine.register(FoundEngine, "/found/sub");
-    expect(FoundEngine.instance().root()).toBe("/found");
+    expect(FoundEngine.instance().root()?.toString()).toBe("/found");
     expect(await Engine.find("/found")).toBe(FoundEngine.instance());
     expect(await Engine.find("/elsewhere")).toBeUndefined();
   });
@@ -169,13 +172,13 @@ describe("Engine", () => {
       const paths = cfg.paths();
       expect(paths.path).toBeNull();
       cfg.setRoot("/blog");
-      expect(cfg.root).toBe("/blog");
-      expect(paths.path).toBe("/blog");
+      expect(cfg.root?.toString()).toBe("/blog");
+      expect(paths.path?.toString()).toBe("/blog");
       expect(cfg.paths()).toBe(paths);
     });
 
     it("paths declares the Rails default layout", () => {
-      const paths = new EngineConfiguration("/blog").paths();
+      const paths = new EngineConfiguration(new Pathname("/blog")).paths();
       for (const k of ["app", "app/models", "lib", "config/routes.ts", "db/migrate", "vendor"]) {
         expect(paths.get(k), k).toBeDefined();
       }
@@ -190,14 +193,14 @@ describe("Engine", () => {
 
     it("all_autoload_paths unions the paths registry contribution", async () => {
       installFs(new Set(["/blog", "/blog/test/mailers/previews"]), new Set());
-      const cfg = new EngineConfiguration("/blog");
+      const cfg = new EngineConfiguration(new Pathname("/blog"));
       cfg.autoloadPaths.push("/x/auto");
       expect(await cfg.allAutoloadPaths()).toEqual(["/x/auto", "/blog/test/mailers/previews"]);
       expect(await cfg.allAutoloadOncePaths()).toEqual([]);
     });
 
     it("autoload_paths, autoload_once_paths, eager_load_paths are independently writable", async () => {
-      const cfg = new EngineConfiguration("/nonexistent-engine-root");
+      const cfg = new EngineConfiguration(new Pathname("/nonexistent-engine-root"));
       cfg.autoloadPaths.push("/x/auto");
       cfg.autoloadOncePaths.push("/x/once");
       cfg.eagerLoadPaths.push("/x/eager");

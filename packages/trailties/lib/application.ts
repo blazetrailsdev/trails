@@ -17,7 +17,6 @@ import {
   block,
   rbFLoad,
   getFs,
-  getPath,
   loadIseqEval,
   rbFRequireFile,
   LOAD_PATH,
@@ -144,7 +143,7 @@ export class Application extends Engine {
     return this.instance().config;
   }
 
-  static override findRoot(from: string | undefined): string {
+  static override findRoot(from: string | undefined): Pathname {
     const fs = getFs();
     return this.findRootWithFlag("config.ts", from, fs.cwd());
   }
@@ -306,7 +305,7 @@ export class Application extends Engine {
     (this.constructor as typeof Application).isolateNamespace(mod);
   }
 
-  static addLibToLoadPathBang(root: string): void {
+  static addLibToLoadPathBang(root: Pathname): void {
     const path = File.join(root, "lib");
     if (File.isExist(path) && !LOAD_PATH.includes(path)) {
       LOAD_PATH.unshift(path);
@@ -316,7 +315,7 @@ export class Application extends Engine {
   async initializeBang(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
     setSourceMapsSupport(true);
-    setTrailsRoot(() => this.config.root);
+    setTrailsRoot(() => this.config.root?.toString() ?? null);
     this._resetAutoloadState();
     await this.runInitializers(group, this);
     this._initialized = true;
@@ -502,14 +501,14 @@ export class Application extends Engine {
   }
 
   async encrypted(
-    path: string,
-    opts: { keyPath?: string; envKey?: string } = {},
+    path: string | Pathname,
+    opts: { keyPath?: string | Pathname; envKey?: string } = {},
   ): Promise<EncryptedConfiguration> {
-    const p = getPath();
-    const root = this.root()!;
     return new EncryptedConfiguration({
-      configPath: p.resolve(root, path),
-      keyPath: p.resolve(root, opts.keyPath ?? "config/master.key"),
+      configPath: Trails.root()!.join(path).toString(),
+      keyPath: Trails.root()!
+        .join(opts.keyPath ?? "config/master.key")
+        .toString(),
       envKey: opts.envKey ?? "TRAILS_MASTER_KEY",
       raiseIfMissingKey: this.config.requireMasterKey,
     });

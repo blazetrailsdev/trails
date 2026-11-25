@@ -1,13 +1,11 @@
 import { wrap } from "../core-ext/array/wrap.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import { Notifications } from "../notifications.js";
-import {
-  ArgumentError,
-  StandardError,
-  classModule,
-  rbObjRespondTo,
-  stderr,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { ActiveSupport, TopLevel } from "../namespaces.js";
 import type { Reporting } from "./reporting.js";
 

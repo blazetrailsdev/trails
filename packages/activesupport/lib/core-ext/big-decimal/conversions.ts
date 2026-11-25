@@ -1,4 +1,5 @@
-import { BigDecimal, prepend, rbCallSuper } from "@blazetrails/ruby-compat";
+import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
+import { prepend, rbCallSuper } from "@blazetrails/ruby-compat/include";
 
 /** @internal */
 export const BigDecimalWithDefaultFormat = {
@@ -9,4 +10,4 @@ export const BigDecimalWithDefaultFormat = {
 
 prepend(BigDecimal, BigDecimalWithDefaultFormat);
 
-export { BigDecimal, toD } from "@blazetrails/ruby-compat";
+export { BigDecimal, toD } from "@blazetrails/ruby-compat/big-decimal";

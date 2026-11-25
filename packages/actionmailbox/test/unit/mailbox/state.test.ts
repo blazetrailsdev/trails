@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { RuntimeError, block } from "@blazetrails/ruby-compat";
 import "../../test-helper.js";
-import "../../../lib/inbound-email.js";
-import type { InboundEmail } from "../../../lib/inbound-email.js";
+import "../../../lib/app/models/action-mailbox/inbound-email.js";
+import type { InboundEmail } from "../../../lib/app/models/action-mailbox/inbound-email.js";
 import { Base } from "../../../lib/base.js";
 import { TestCase } from "../../../lib/test-case.js";
 

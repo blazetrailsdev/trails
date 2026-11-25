@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { OrderedOptions } from "@blazetrails/activesupport";
 import {
@@ -10,7 +11,7 @@ import { Configuration } from "../../../lib/application/configuration.js";
 
 describe("CustomTest", () => {
   it("access custom configuration point", async () => {
-    const config = new Configuration("/app");
+    const config = new Configuration(new Pathname("/app"));
     config.x.paymentProcessing.schedule = ":daily";
     config.x.paymentProcessing.retries = 3;
     config.x.superDebugger = true;

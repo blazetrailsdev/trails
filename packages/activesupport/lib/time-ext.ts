@@ -10,7 +10,7 @@
  */
 
 import { Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import "./core-ext/time/calculations.js";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";

@@ -1,4 +1,5 @@
-import { ArgumentError, STRING_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat/string/method-table";
 
 import {
   camelize as inflectorCamelize,

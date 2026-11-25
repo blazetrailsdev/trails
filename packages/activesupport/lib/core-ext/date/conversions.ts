@@ -1,4 +1,4 @@
-import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat/object";
 import { Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
 import { ordinalize } from "../../inflector.js";
 import { ArgumentError } from "../../time-zone-config.js";

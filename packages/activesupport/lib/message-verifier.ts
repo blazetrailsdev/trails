@@ -1,12 +1,9 @@
-import {
-  DigestInstance,
-  OpenSSL,
-  prepend,
-  type Bytes,
-  rbModName,
-  sprintf,
-  rbObjId,
-} from "@blazetrails/ruby-compat";
+import { DigestInstance } from "@blazetrails/ruby-compat/digest";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { prepend } from "@blazetrails/ruby-compat/include";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { rbModName, rbObjId } from "@blazetrails/ruby-compat/object";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 import { isPresent } from "./core-ext/object/blank.js";
 import { SecurityUtils } from "./security-utils.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";

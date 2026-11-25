@@ -1,4 +1,8 @@
-import { RuntimeError, env as ENV, fetch, rbStrGetbyte, toI } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { rbStrGetbyte } from "@blazetrails/ruby-compat/string/byte-methods";
 import { Factory, type Pool } from "@blazetrails/msgpack";
 import { delegate } from "../module-ext.js";
 import { Extensions } from "./extensions.js";

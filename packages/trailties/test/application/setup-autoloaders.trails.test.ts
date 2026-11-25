@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Dependencies } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
@@ -22,7 +23,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
     const host = {
       autoloaders,
       config: { root, isReloadingEnabled: () => false },
-      paths: () => new Root(root),
+      paths: () => new Root(new Pathname(root)),
       credentials: async () => null,
     };
     const initializer = klass.initializers.find((i) => i.name === name)!;
@@ -49,7 +50,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
     dir("app/models");
     dir("app/views/concerns");
 
-    const config = new EngineConfiguration(root);
+    const config = new EngineConfiguration(new Pathname(root));
     const eagerLoad = config.paths().eagerLoad();
 
     expect(eagerLoad).toContain(File.join(root, "app/models"));

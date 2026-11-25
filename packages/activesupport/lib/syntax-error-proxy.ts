@@ -1,10 +1,10 @@
 import {
-  DelegateClass,
   Location,
   excBacktrace,
   excBacktraceLocations,
-  rbFSend,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/backtrace-location";
+import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 
 export class SyntaxErrorProxy extends DelegateClass(SyntaxError) {
   backtrace(): string[] {

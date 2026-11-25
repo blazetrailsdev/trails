@@ -4,5 +4,5 @@
  * `@blazetrails/activesupport`'s public surface unchanged until
  * `delete-ruby-compat-reexport-shims` removes it.
  */
-export { Tempfile } from "@blazetrails/ruby-compat";
-export type { TempfileBasename } from "@blazetrails/ruby-compat";
+export { Tempfile } from "@blazetrails/ruby-compat/tempfile";
+export type { TempfileBasename } from "@blazetrails/ruby-compat/tempfile";

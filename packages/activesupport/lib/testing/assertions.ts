@@ -1,38 +1,34 @@
 import { indexWith } from "../core-ext/enumerable.js";
 
+import { rbFArray } from "@blazetrails/ruby-compat/array";
+import { getChildProcess } from "@blazetrails/ruby-compat/child-process-adapter";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { hashAref, keys } from "@blazetrails/ruby-compat/hash";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
 import {
-  Dir,
-  Exception,
-  RbConfig,
-  StandardError,
   basicObjRespondTo,
   rbDeclareIvar,
-  Tempfile,
-  env,
-  isEmpty,
-  getChildProcess,
-  hashAref,
-  include,
-  type Included,
-  keys,
   isAbsentHalf,
   rbAnyToS,
-  rbEqual,
   rbModName,
   rbModToS,
-  rbFArray,
   rbObjClass,
   rbFSend,
   rbObjClassname,
   rbObjRespondTo,
   rbProcCall,
-  rbStrRespondTo,
-  regexpEscape,
-  SignalException,
-  stderr,
-  SystemExit,
-  verbose,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { env, stderr, SystemExit } from "@blazetrails/ruby-compat/process-adapter";
+import { RbConfig } from "@blazetrails/ruby-compat/rb-config";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { SignalException } from "@blazetrails/ruby-compat/signal-exception";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { rbStrRespondTo } from "@blazetrails/ruby-compat/string/method-table";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
+import { verbose } from "@blazetrails/ruby-compat/verbose";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 import * as MinitestAssertions from "./assertions.js";
 

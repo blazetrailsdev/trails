@@ -1,11 +1,7 @@
-import {
-  type Block,
-  defineAccessorHalf,
-  Module,
-  NameError,
-  rbBlockGivenP,
-  rbModName,
-} from "@blazetrails/ruby-compat";
+import { type Block, rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { Module } from "@blazetrails/ruby-compat/include";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { defineAccessorHalf, rbModName } from "@blazetrails/ruby-compat/object";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";

@@ -4,10 +4,29 @@ import { Buffer } from "buffer";
 if (!("Temporal" in globalThis)) Object.assign(globalThis, { Temporal });
 if (!("Buffer" in globalThis)) Object.assign(globalThis, { Buffer });
 
-const session = new URLSearchParams(location.search).get("session") ?? "0";
-const previewPath = `${import.meta.env.BASE_URL}preview`;
-const moduleBase = `${import.meta.env.BASE_URL}rt/${session}/vfs/`;
-const pkgBase = `${import.meta.env.BASE_URL}rt/${session}/pkg/`;
+const query = new URLSearchParams(location.search);
+const session = query.get("session") ?? "0";
+const tab = query.get("tab") ?? "0";
+const previewPath = `${import.meta.env.BASE_URL}preview/${tab}`;
+const moduleBase = `${import.meta.env.BASE_URL}rt/${tab}/${session}/vfs/`;
+const pkgBase = `${import.meta.env.BASE_URL}rt/${tab}/${session}/pkg/`;
+
+type SwRequest = {
+  type: "sw:request";
+  method: string;
+  url: string;
+  headers: [string, string][];
+  body: ArrayBuffer | null;
+};
+
+const waiting: [SwRequest, MessagePort][] = [];
+let answer: ((request: SwRequest, port: MessagePort) => void) | null = null;
+navigator.serviceWorker.addEventListener("message", (event) => {
+  if (event.data?.type !== "sw:request") return;
+  if (answer) answer(event.data as SwRequest, event.ports[0]);
+  else waiting.push([event.data as SwRequest, event.ports[0]]);
+});
+navigator.serviceWorker.startMessages();
 
 type HostMessage = {
   type: "host:files";
@@ -20,11 +39,17 @@ function post(message: Record<string, unknown>, transfer: Transferable[] = []): 
   parent.postMessage(message, location.origin, transfer);
 }
 
+function describe(e: Error): string {
+  const head = `${e.name}: ${e.message}`;
+  if (!e.stack) return head;
+  return e.stack.includes(e.message) ? e.stack : `${head}\n${e.stack}`;
+}
+
 function format(args: unknown[]): string {
   return args
     .map((a) => {
       if (typeof a === "string") return a;
-      if (a instanceof Error) return a.stack ?? `${a.name}: ${a.message}`;
+      if (a instanceof Error) return describe(a);
       try {
         return JSON.stringify(a);
       } catch {
@@ -78,12 +103,22 @@ vfs.onWrite = (path) => {
   const added = text.slice(from).replace(/\n$/, "");
   if (added) post({ type: "console", level: "log", text: added });
 };
+const { FRAMEWORK_ROOT, SEAT_FRAMEWORK_DIR } = await import("./package-names.ts");
+Object.assign(globalThis, {
+  [SEAT_FRAMEWORK_DIR]: (dirname: string) => {
+    const pkg = dirname.slice(FRAMEWORK_ROOT.length + 1).split("/")[0];
+    vfs.write(`${FRAMEWORK_ROOT}/${pkg}/package.json`, "{}", false);
+    vfs.mkdirp(dirname);
+    return dirname;
+  },
+});
 const { installHost } = await import("./host.ts");
 installHost(vfs, moduleBase, (level, text) => post({ type: "console", level, text }));
 (await import("./crypto.ts")).installCrypto();
 
 status("Loading trails…");
-const { PACKAGES, packageShim, transpile } = await import("./modules.ts");
+const { PACKAGES, consoleLine, packageShim, syntaxErrors, transpile } =
+  await import("./modules.ts");
 await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
 const { installTemplateCompiler } = await import("./template-compiler.ts");
 installTemplateCompiler();
@@ -96,6 +131,15 @@ for (const [p, source] of Object.entries(rescues)) {
   const relative = p.slice(p.indexOf("/templates/") + "/templates/".length);
   vfs.write(`${DebugView.RESCUES_TEMPLATE_PATHS[0]}/${relative}`, source as string, false);
 }
+const info = import.meta.glob("../../../../packages/trailties/lib/templates/**/*.tse", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+for (const [p, source] of Object.entries(info)) {
+  const relative = p.slice(p.indexOf("/templates/"));
+  vfs.write(`${FRAMEWORK_ROOT}/trailties/dist${relative}`, source as string, false);
+}
 const { rackEnv, rackResult } = await import("./rack-bridge.ts");
 
 const { CookieJar } = await import("./cookie-jar.ts");
@@ -107,14 +151,6 @@ function serially<T>(fn: () => Promise<T>): Promise<T> {
   serialize = run;
   return run;
 }
-
-type SwRequest = {
-  type: "sw:request";
-  method: string;
-  url: string;
-  headers: [string, string][];
-  body: ArrayBuffer | null;
-};
 
 const NULL_BODY = new Set([101, 204, 205, 304]);
 
@@ -201,24 +237,96 @@ function escapeHtml(s: string): string {
   );
 }
 
-navigator.serviceWorker.addEventListener("message", (event) => {
-  if (event.data?.type === "sw:request")
-    handle(event.data as SwRequest, event.ports[0]).catch((e) => console.error(e));
-});
-await new Promise<void>((resolve) => {
-  const channel = new MessageChannel();
-  channel.port1.onmessage = () => resolve();
-  navigator.serviceWorker.controller!.postMessage({ type: "runtime:hello" }, [channel.port2]);
+answer = (request, port) => {
+  handle(request, port).catch((e) => console.error(e));
+};
+for (const [request, port] of waiting.splice(0)) answer(request, port);
+
+type HostRequest =
+  | { type: "host:eval"; id: number; code: string }
+  | { type: "host:tables"; id: number }
+  | { type: "host:rows"; id: number; table: string };
+
+addEventListener("message", (event: MessageEvent) => {
+  if (event.origin !== location.origin || event.source !== parent) return;
+  const request = event.data as HostRequest;
+  const reply = (body: Record<string, unknown>) => post({ type: "reply", id: request.id, ...body });
+  if (request.type === "host:eval") {
+    serially(() => evaluate(request.code)).then(
+      (value) => {
+        reply({ text: inspect(value) });
+        const bytes = sqlite.exportDatabase("browser.db");
+        if (bytes) post({ type: "db", bytes }, [bytes.buffer]);
+      },
+      (e: unknown) => reply({ error: e instanceof Error ? `${e.name}: ${e.message}` : String(e) }),
+    );
+  } else if (request.type === "host:tables") {
+    reply({ tables: sqlite.tables("browser.db") });
+  } else if (request.type === "host:rows") {
+    reply({ rows: sqlite.rows("browser.db", request.table, 100) });
+  }
 });
 
+function inspect(value: unknown): string {
+  if (value === undefined) return "undefined";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "function") return `[Function ${value.name || "anonymous"}]`;
+  if (value instanceof Error) return describe(value);
+  if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
+  if (typeof value === "object" && value !== null && "attributes" in value) {
+    const attributes: unknown = value.attributes;
+    if (typeof attributes === "object" && attributes !== null) {
+      const pairs = Object.entries(attributes).map(([k, v]) => `${k}: ${inspect(v)}`);
+      return `#<${value.constructor.name} ${pairs.join(", ")}>`;
+    }
+  }
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Runs a console line in the booted app, as `trails console` would: every
+ * class under `app/models` is in scope, with `Trails` and `Base`. The line is
+ * an expression when it parses as one, and a function body otherwise.
+ */
+async function evaluate(code: string): Promise<unknown> {
+  if (!app) throw new Error("the application is not running");
+  const scope: Record<string, unknown> = { Trails, Base };
+  for (const path of Object.keys(vfs.files()).filter((p) => /^\/app\/models\/.*\.ts$/.test(p))) {
+    Object.assign(scope, await import(/* @vite-ignore */ `${moduleBase}${path.slice(1)}`));
+  }
+  const names = Object.keys(scope).filter((n) => /^[A-Za-z_$][\w$]*$/.test(n));
+  const run = new Function(...names, `return ${consoleLine(code)}`) as (
+    ...values: unknown[]
+  ) => Promise<unknown>;
+  return run(...names.map((n) => scope[n]));
+}
+
+let Trails: unknown = null;
+let Base: unknown = null;
+
 try {
+  const problems = Object.entries(vfs.files()).flatMap(([path, source]) =>
+    path.endsWith(".ts") && typeof source === "string" ? syntaxErrors(source, path) : [],
+  );
+  post({ type: "problems", problems });
+  if (problems.length) {
+    const lines = problems.map((p) => `${p.path}:${p.line}:${p.column} ${p.message}`);
+    throw new SyntaxError(`the app has syntax errors\n  ${lines.join("\n  ")}`);
+  }
   status("Booting the application…");
-  const { Trails } =
+  const trailties =
     (await import("@blazetrails/trailties")) as typeof import("@blazetrails/trailties");
+  Trails = trailties.Trails;
   await import(/* @vite-ignore */ `${moduleBase}config/environment.ts`);
   status("Running migrations…");
-  const { Base, DatabaseTasks } = await import("@blazetrails/activerecord");
-  const pool = Base.connectionPool();
+  const activerecord = await import("@blazetrails/activerecord");
+  const { DatabaseTasks } = activerecord;
+  Base = activerecord.Base;
+  const pool = activerecord.Base.connectionPool();
   await pool.migrationContext.migrate();
   pool.schemaReflection.clearBang();
   await pool.schemaReflection.loadAllBang(pool);
@@ -228,12 +336,12 @@ try {
     const bytes = sqlite.exportDatabase("browser.db");
     if (bytes) post({ type: "db", bytes }, [bytes.buffer]);
   }
-  app = Trails.application;
+  app = trailties.Trails.application;
   status("Running");
   post({ type: "booted" });
 } catch (e) {
   bootError = e;
   console.error("Boot failed:", e);
   status("Boot failed");
-  post({ type: "boot-failed" });
+  post({ type: "boot-failed", text: e instanceof Error ? `${e.name}: ${e.message}` : String(e) });
 }

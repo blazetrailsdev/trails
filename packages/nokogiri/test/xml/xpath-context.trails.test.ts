@@ -106,7 +106,7 @@ describe("XPathContext", () => {
   });
   it("answers the namespace axis as XML::Namespace over the libxml2 tree", () => {
     const doc = XmlDocument.parse('<root xmlns="urn:d" xmlns:a="urn:a"><a:c b="1"/></root>');
-    const c = doc.root.children.toA()[0];
+    const c = doc.root!.children.toA()[0];
     const context = new XPathContext(c);
     const set = context.evaluate("namespace::*") as NodeSet;
     const pairs = set.map((n) => {
@@ -137,7 +137,7 @@ describe("XPathContext", () => {
 
   it("unions namespace nodes by owning element and prefix", () => {
     const doc = XmlDocument.parse('<root xmlns:a="urn:a"><b/><c/></root>');
-    const [b, c] = doc.root.children;
+    const [b, c] = doc.root!.children;
     const fromB = new XPathContext(b).evaluate("namespace::*") as NodeSet;
     const fromC = new XPathContext(c).evaluate("namespace::*") as NodeSet;
     const again = new XPathContext(b).evaluate("namespace::*") as NodeSet;

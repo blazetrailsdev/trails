@@ -1,4 +1,7 @@
-import { ArgumentError, File, Pathname, format } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { format } from "@blazetrails/ruby-compat/kernel-format";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "../class-attribute.js";
 

@@ -1219,6 +1219,11 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright-core install chromium
       - run: pnpm vitest run --project system
+      - name: Boot the browser playground (examples/browser-sqlite)
+        run: |
+          pnpm exec tsc --build tsconfig.json
+          pnpm --filter @blazetrails/example-browser-sqlite exec playwright install chromium
+          pnpm --filter @blazetrails/example-browser-sqlite smoke
 
   trailties-tests:
     name: Trailties Tests

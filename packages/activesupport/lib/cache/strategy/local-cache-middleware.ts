@@ -1,4 +1,6 @@
-import { constGet, rbFRequire, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbFRequire } from "@blazetrails/ruby-compat/load";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { ActiveSupport } from "../../namespaces.js";
 import type { RackApp, RackBody, RackEnv, RackMiddleware, RackResponse } from "@blazetrails/rack";
 import { LocalCacheRegistry, LocalStore } from "./local-cache.js";

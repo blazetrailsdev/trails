@@ -203,7 +203,7 @@ describe("ScreenshotHelperTest", () => {
 
   it("image path returns the absolute path from root", () => {
     const parent = new Pathname(Dir.pwd()).join("..");
-    TopLevel.Trails = { root: () => parent } as unknown as typeof TopLevel.Trails;
+    TopLevel.Trails = { root: () => new Pathname(parent) } as unknown as typeof TopLevel.Trails;
     assertEqual(parent.join("tmp/screenshots/0_x.png").toString(), imagePath.call(host));
   });
 

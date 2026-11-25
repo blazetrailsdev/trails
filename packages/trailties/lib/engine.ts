@@ -1,4 +1,4 @@
-import type { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat";
 import "./constants.engine.generated.js";
 import {
   Callbacks as ASCallbacks,
@@ -161,7 +161,7 @@ export class Engine extends Trailtie {
     for (const klass of Engine.subclasses()) {
       const engine = klass.instance() as Engine;
       const root = engine.root();
-      if ((await realpathOr(fs, p.resolve(root!))) === expanded) return engine;
+      if ((await realpathOr(fs, p.resolve(root!.toString()))) === expanded) return engine;
     }
     return undefined;
   }
@@ -174,7 +174,7 @@ export class Engine extends Trailtie {
     flag: string,
     rootPath: string | undefined,
     defaultValue?: string,
-  ): string {
+  ): Pathname {
     while (
       rootPath &&
       File.isDirectory(rootPath) &&
@@ -186,14 +186,14 @@ export class Engine extends Trailtie {
     const root =
       rootPath && File.isExist(resolveTsThenJs(`${rootPath}/${flag}`)) ? rootPath : defaultValue;
     if (!root) throw new Error(`Could not find root path for ${this.name}`);
-    return File.realpath(root);
+    return new Pathname(File.realpath(root));
   }
 
   /**
    * @inventedArm loop — PERMANENT
    * @inventedArm if — PERMANENT
    */
-  static findRoot(from: string | undefined): string {
+  static findRoot(from: string | undefined): Pathname {
     let packageRoot = from;
     while (
       packageRoot &&
@@ -209,7 +209,7 @@ export class Engine extends Trailtie {
       !File.isExist(`${packageRoot}/lib`) &&
       File.isExist(`${packageRoot}/package.json`)
     ) {
-      return File.realpath(packageRoot);
+      return new Pathname(File.realpath(packageRoot));
     }
     return this.findRootWithFlag("lib", from);
   }
@@ -225,7 +225,7 @@ export class Engine extends Trailtie {
     return this.config.middleware;
   }
 
-  root(): string | null {
+  root(): Pathname | null {
     return this.config.root;
   }
 
@@ -430,17 +430,13 @@ export class Engine extends Trailtie {
     return this._allLoadPathsCache;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs join — CONVERGEABLE trails-root-is-a-pathname
-   */
-  async fixturesInRootAndNotInVendorOrDotDir(fixtures: string): Promise<boolean> {
-    const root = TopLevel.Trails!.root()!;
+  /** @internal */
+  async fixturesInRootAndNotInVendorOrDotDir(fixtures: Pathname): Promise<boolean> {
     return (
-      (await getFs().exists(fixtures)) &&
-      fixtures.startsWith(root) &&
-      !fixtures.startsWith(getPath().join(root, "vendor")) &&
-      !fixtures.startsWith(`${root}/.`)
+      (await getFs().exists(fixtures.toString())) &&
+      fixtures.toString().startsWith(TopLevel.Trails!.root()!.toString()) &&
+      !fixtures.toString().startsWith(TopLevel.Trails!.root()!.join("vendor").toString()) &&
+      !fixtures.toString().startsWith(`${TopLevel.Trails!.root()}/.`.toString())
     );
   }
 }
@@ -548,7 +544,7 @@ Engine.initializer("add_mailer_preview_paths", function (this: Engine) {
 Engine.initializer("add_fixture_paths", async function (this: Engine) {
   if (this instanceof TopLevel.Trails!.Application) return;
 
-  const fixtures = getPath().join(this.config.root as string, "test", "fixtures");
+  const fixtures = this.config.root!.join("test", "fixtures");
   if (await this.fixturesInRootAndNotInVendorOrDotDir(fixtures)) {
     onLoad("active_record_fixtures", (base: ActiveRecordFixturesLike) => {
       base.fixturePaths = [...new Set([...base.fixturePaths, `${fixtures}/`])];

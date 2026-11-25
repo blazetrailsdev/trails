@@ -5,7 +5,6 @@ import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
 import { toEnum, type Enumerator } from "@blazetrails/ruby-compat/enumerator";
 import { File } from "@blazetrails/ruby-compat/file";
 import { rbInspect, rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
-import { Pathname } from "@blazetrails/ruby-compat/pathname";
 
 import {
   ActionableError,
@@ -407,7 +406,7 @@ export class ExceptionWrapper {
     line: number,
   ): Record<number, string | [string, string, string]> | null {
     if (!(rbObjRespondTo(TopLevel.Trails, "root") && TopLevel.Trails!.root() != null)) return null;
-    const fullPath = new Pathname(TopLevel.Trails!.root()!).join(path).toString();
+    const fullPath = TopLevel.Trails!.root()!.join(path).toString();
     if (File.isExist(fullPath)) {
       return File.open(fullPath, "r", (file) =>
         this.extractSourceFragmentLines(file.eachLine() as Generator<string>, line),

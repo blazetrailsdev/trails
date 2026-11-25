@@ -21,16 +21,14 @@ export {
 export { Tempfile } from "./tempfile.js";
 export type { TempfileBasename } from "./tempfile.js";
 
-import {
-  asyncContextAdapterConfig,
-  childProcessAdapterConfig,
-  cryptoAdapterConfig,
-  fsAdapterConfig,
-  httpAdapterConfig,
-  osAdapterConfig,
-  processAdapterConfig,
-  zlibAdapterConfig,
-} from "@blazetrails/ruby-compat";
+import { asyncContextAdapterConfig } from "@blazetrails/ruby-compat/async-context-adapter";
+import { childProcessAdapterConfig } from "@blazetrails/ruby-compat/child-process-adapter";
+import { cryptoAdapterConfig } from "@blazetrails/ruby-compat/crypto-adapter";
+import { fsAdapterConfig } from "@blazetrails/ruby-compat/fs-adapter";
+import { httpAdapterConfig } from "@blazetrails/ruby-compat/http-adapter";
+import { osAdapterConfig } from "@blazetrails/ruby-compat/os-adapter";
+import { processAdapterConfig } from "@blazetrails/ruby-compat/process-adapter";
+import { zlibAdapterConfig } from "@blazetrails/ruby-compat/zlib-adapter";
 import { ActiveSupport } from "./active-support.js";
 
 Object.defineProperties(
@@ -146,7 +144,7 @@ export {
   to,
   indent,
 } from "./string-utils.js";
-export { chomp } from "@blazetrails/ruby-compat";
+export { chomp } from "@blazetrails/ruby-compat/string/chomp";
 
 export {
   deepMerge,
@@ -442,7 +440,7 @@ export type { TaggedLogger, TaggedFormatter } from "./tagged-logging.js";
 export { DeepMergeable } from "./deep-mergeable.js";
 export { DelegationError, Delegation } from "./delegation.js";
 export { ActiveSupportJSON, parseJsonTimes, setParseJsonTimes } from "./json.js";
-export { JSON } from "@blazetrails/ruby-compat";
+export { JSON } from "@blazetrails/ruby-compat/json";
 export {
   presence,
   NilClass,
@@ -467,7 +465,7 @@ export { SecurityUtils } from "./security-utils.js";
 export { StringInquirer } from "./string-inquirer.js";
 export { inquiry } from "./core-ext/string/inquiry.js";
 export { stripThenable } from "./strip-thenable.js";
-export { StringIO } from "@blazetrails/ruby-compat";
+export { StringIO } from "@blazetrails/ruby-compat/string-io";
 export { EnvironmentInquirer } from "./environment-inquirer.js";
 export { Reloader } from "./reloader.js";
 export { getEnv } from "./environment.js";
@@ -538,14 +536,14 @@ export {
 export type { Included, Extended, ModuleVisibility } from "@blazetrails/ruby-compat/include";
 export { CodeGenerator, MethodSet } from "./code-generator.js";
 export type { MethodSource } from "./code-generator.js";
-export { prepend } from "@blazetrails/ruby-compat";
+export { prepend } from "@blazetrails/ruby-compat/include";
 export { ClassAttribute } from "./class-attribute.js";
 
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 
-export { rbEqual } from "@blazetrails/ruby-compat";
-export { rbHash } from "@blazetrails/ruby-compat";
+export { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+export { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 export { caseEquals, isInclude } from "./core-ext/range/compare-range.js";
 export { overlap, overlaps } from "./core-ext/range/overlap.js";
 

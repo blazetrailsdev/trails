@@ -5,7 +5,9 @@ import { Encoding } from "../json/encoding.js";
 import { onLoad } from "../lazy-load-hooks.js";
 import { ActiveSupport } from "../namespaces.js";
 import { Time } from "@blazetrails/date";
-import { Rational, fetch, hasKey, hashAref, rbStrStartWith } from "@blazetrails/ruby-compat";
+import { fetch, hasKey, hashAref } from "@blazetrails/ruby-compat/hash";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { rbStrStartWith } from "@blazetrails/ruby-compat/string/sub";
 import type { MessageSerializer } from "./codec.js";
 import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
 

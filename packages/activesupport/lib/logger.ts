@@ -1,20 +1,18 @@
 import {
-  rbObjId,
   Logger as RubyLogger,
-  rbInspect,
-  rbObjRespondTo,
-  stdout,
   type Logdev,
   type LoggerKwargs,
-} from "@blazetrails/ruby-compat";
-import { File } from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/logger";
+import { rbObjId, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
+import { File } from "@blazetrails/ruby-compat/file";
 import { ActiveSupport } from "./namespaces.js";
 import { include } from "@blazetrails/ruby-compat/include";
 import { LoggerSilence } from "./logger-silence.js";
 
 import type { BroadcastLogger } from "./broadcast-logger.js";
 
-export type { LoggerFormatter } from "@blazetrails/ruby-compat";
+export type { LoggerFormatter } from "@blazetrails/ruby-compat/logger";
 
 export type LogLevel = ":debug" | ":info" | ":warn" | ":error" | ":fatal" | ":unknown";
 

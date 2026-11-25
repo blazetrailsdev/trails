@@ -1,4 +1,5 @@
-import { b, type Bytes } from "@blazetrails/ruby-compat";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import { Metadata } from "./metadata.js";
 import { classAttribute } from "../class-attribute.js";
 import {

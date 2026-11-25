@@ -1,6 +1,6 @@
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
-import { BigDecimal } from "@blazetrails/ruby-compat";
+import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
 import type { NumberToCurrencyOptions } from "../number-helper.js";
 
 const HALF = new BigDecimal("0.5");

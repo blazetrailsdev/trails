@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import type { RackResponse } from "@blazetrails/rack";
 import { LoadError, rbFSend } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
@@ -36,9 +37,9 @@ import { Trails } from "../../lib/trails.js";
 import { Logger as ActiveSupportLogger } from "@blazetrails/activesupport";
 
 function defaultStack(mutate: (c: Configuration) => void = () => {}) {
-  const paths = new Root("/app");
+  const paths = new Root(new Pathname("/app"));
   paths.add("public");
-  const config = new Configuration("/app");
+  const config = new Configuration(new Pathname("/app"));
   config.publicFileServer.enabled = false;
   config.enableReloading = false;
   config.considerAllRequestsLocal = false;

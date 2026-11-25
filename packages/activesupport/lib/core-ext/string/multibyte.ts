@@ -1,4 +1,4 @@
-import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat/string/method-table";
 import { Multibyte } from "../../multibyte.js";
 import type { Chars } from "../../multibyte/chars.js";
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { TopLevel, constSet, include } from "@blazetrails/ruby-compat";
 import "../../test-helper.js";
-import "../../../lib/inbound-email.js";
+import "../../../lib/app/models/action-mailbox/inbound-email.js";
 import { Base } from "../../../lib/base.js";
 import { RoutingJob } from "../../../lib/routing-job.js";
 import { TestCase } from "../../../lib/test-case.js";

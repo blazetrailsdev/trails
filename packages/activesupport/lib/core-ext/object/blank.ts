@@ -1,11 +1,10 @@
+import { OBJECT_METHOD_TABLE, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { Pathname as RubyPathname } from "@blazetrails/ruby-compat/pathname";
 import {
   BINARY_METHOD_TABLE,
-  OBJECT_METHOD_TABLE,
   STRING_METHOD_TABLE,
   rbDefineMethod,
-  rbObjRespondTo,
-  Pathname as RubyPathname,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/string/method-table";
 import * as pathnameBlank from "../pathname/blank.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { stripThenable } from "../../strip-thenable.js";

@@ -1,4 +1,4 @@
-import { classModule } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
 import { extractOptionsBang } from "../core-ext/array/extract-options.js";
 import type { Deprecation } from "../deprecation.js";
 

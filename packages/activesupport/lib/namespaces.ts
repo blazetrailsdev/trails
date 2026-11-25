@@ -1,4 +1,8 @@
-import { LoadError, warn, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
@@ -111,7 +115,7 @@ interface ParametersInstance {
   set(key: string, value: unknown): void;
 }
 
-export { TopLevel } from "@blazetrails/ruby-compat";
+export { TopLevel } from "@blazetrails/ruby-compat/object";
 
 declare module "@blazetrails/ruby-compat" {
   interface TrailsConfiguration {
@@ -133,7 +137,7 @@ declare module "@blazetrails/ruby-compat" {
       application: {
         config: {
           considerAllRequestsLocal: boolean;
-          root?: string | null;
+          root?: Pathname | null;
           loadDatabaseYaml(): Promise<Record<string, unknown>>;
           paths(): {
             get(
@@ -159,7 +163,7 @@ declare module "@blazetrails/ruby-compat" {
         loadSeed(): Promise<void>;
         migrationRailties(): Array<{
           railtieName: string;
-          root(): string | null;
+          root(): Pathname | null;
           paths?(): { get(path: string): { first(): string | undefined } | undefined };
         }>;
         call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
@@ -168,7 +172,7 @@ declare module "@blazetrails/ruby-compat" {
       Generators?: { configureBang(config: unknown): void };
       Engine: abstract new (...args: never[]) => unknown;
       Trailtie: abstract new (...args: never[]) => unknown;
-      root(): string | null | undefined;
+      root(): Pathname | null | undefined;
       configuration?: TrailsConfiguration | null;
     };
     ActionDispatch?: {

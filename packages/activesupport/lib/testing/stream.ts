@@ -1,5 +1,5 @@
-import { stderr as STDERR, stdout as STDOUT } from "@blazetrails/ruby-compat";
-import type { WriteStream } from "@blazetrails/ruby-compat";
+import { stderr as STDERR, stdout as STDOUT } from "@blazetrails/ruby-compat/process-adapter";
+import type { WriteStream } from "@blazetrails/ruby-compat/process-adapter";
 
 const CONSOLE_METHODS = new Map<
   WriteStream,
