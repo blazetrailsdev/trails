@@ -8,7 +8,7 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
-import { Digest, OpenSSL, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { Digest, OpenSSL, StandardError, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Deprecation } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import type { Analyzer } from "./analyzer.js";
@@ -456,7 +456,8 @@ ActiveStorage.setChecksumImplementation = setChecksumImplementation;
 _checksumImplementation = OpenSSL.Digest.MD5;
 try {
   (_checksumImplementation as typeof OpenSSL.Digest.MD5).hexdigest("test");
-} catch {
+} catch (e) {
+  if (!(e instanceof StandardError)) throw e;
   _checksumImplementation = Digest.MD5;
 }
 
