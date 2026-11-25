@@ -19,7 +19,8 @@
     "db:prepare": "trails db:prepare",
     "start": "electron .",
     "test": "vitest run",
-    "typecheck": "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json"
+    "typecheck": "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json",
+    "test:system": "pnpm build:assets && TRAILS_SYSTEM_TESTS=1 vitest run"
   },
   "dependencies": {
     "@blazetrails/actioncable": "workspace:*",
@@ -51,6 +52,7 @@
     "@blazetrails/trails-tsc": "workspace:*",
     "@types/node": "^25.3.5",
     "electron": "^45.4.1",
+    "playwright": "^1.60.0",
     "vite": "^7.0.0",
     "vitest": "^3.0.0"
   }

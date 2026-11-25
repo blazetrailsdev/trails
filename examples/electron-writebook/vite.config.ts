@@ -7,9 +7,13 @@ const path = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 export default defineConfig({
   test: {
     root: path("."),
-    include: ["test/**/*.test.ts"],
+    include: process.env.TRAILS_SYSTEM_TESTS
+      ? ["test/system/**/*.system.test.ts"]
+      : ["test/**/*.test.ts"],
+    exclude: process.env.TRAILS_SYSTEM_TESTS ? [] : ["test/system/**"],
     globalSetup: ["test/global-setup.ts"],
     fileParallelism: false,
+    hookTimeout: process.env.TRAILS_SYSTEM_TESTS ? 60_000 : undefined,
     server: { deps: { external: [/\/packages\//] } },
   },
   publicDir: false,
