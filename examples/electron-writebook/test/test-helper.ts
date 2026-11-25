@@ -41,6 +41,7 @@ export async function resetDatabase(): Promise<void> {
 }
 
 const { FixtureSet } = await import("@blazetrails/activerecord/fixtures.js");
+const { Trails: TrailsApp } = await import("@blazetrails/trailties");
 const { File: FixtureFile } = await import("@blazetrails/activerecord/fixture-set/file.js");
 const { FixtureSet: ActiveStorageFixtureSet } =
   await import("@blazetrails/activestorage/testing/fixture-set");
@@ -94,6 +95,14 @@ export function leafablePath(leaf: {
   leafable_type: string;
 }): string {
   return `/books/${leaf.book_id}/${leaf.leafable_type.toLowerCase()}s/${leaf.id}`;
+}
+
+/** The application's route helpers, as `Rails.application.routes.url_helpers` (`trailsBlobPath` &c.). */
+export function urlHelpers(): Record<string, (...args: unknown[]) => string> {
+  return TrailsApp.application.routes().urlHelpers() as unknown as Record<
+    string,
+    (...args: unknown[]) => string
+  >;
 }
 
 /** Writebook's `fixture_file_upload(name, type)`. */
